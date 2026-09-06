@@ -33,8 +33,6 @@ jobs:
           grep -q 'policy_is_not_belief_workspace_action_or_promotion_authority' "$production"
           grep -q 'pub struct RegisteredShadowDispositionPolicyV1' "$production"
 
-          # This tranche registers policy only. It must not acquire the inputs or
-          # output surface of a disposition engine.
           if grep -Eq 'pub enum ShadowDisposition|pub struct ShadowDisposition|pub fn (evaluate|decide|dispose|compute_disposition|issue_disposition)' "$production"; then
             echo 'Disposition engine API appeared in the policy-only tranche.' >&2
             exit 1
@@ -67,15 +65,11 @@ jobs:
           grep -q 'PairwiseIndependentSet' "$production"
           grep -q 'min_pairwise_independent_evidence_roots' "$production"
           grep -q 'min_pairwise_independent_interpretation_roots' "$production"
-
-          # Resource feasibility must witness the entire pairwise-independent set,
-          # not merely N root ids or N pair edges.
           grep -q 'pair_count_for_roots' "$production"
           grep -q 'root_count.saturating_sub(1)' "$production"
           grep -q 'InterpretationPairCeilingBelowRootRequirement' "$production"
           grep -q 'CaseCeilingBelowEvidenceRootRequirement' "$production"
 
-          # No count-voting or arithmetic relation-strength policy may appear.
           grep -q 'strength_treatment=diagnostic_only_v1_no_arithmetic' "$production"
           grep -q 'RelationStrengthTreatmentV1::DiagnosticOnly' "$production"
           if grep -Eqi 'majority.?vote|sum.*strength|mean.*strength|average.*strength|bayes|posterior|normalize.*strength|multiply.*strength' "$production"; then
@@ -98,8 +92,6 @@ jobs:
           grep -q 'evaluation_details_are_transitively_bound_by_registered_experiment_contract_not_duplicated' "$production"
           grep -q 'ExperimentContractSchemaMismatch' "$production"
 
-          # Do not recreate a second preregistration record that can disagree with
-          # RegisteredExperimentContractV1.
           if grep -Eq 'pub (evaluation_corpus_digest|seed_plan_digest|metric_contract_digest|evaluator_id|evaluator_version)[[:space:]]*:' "$production"; then
             echo 'Disposition policy duplicated registered experiment-contract fields.' >&2
             exit 1
@@ -176,7 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           tree="$(cargo tree -p symthaea-rca-shadow-disposition-policy -e normal)"
-          if printf '%s\n' "$tree" | grep -Eq '(^| )symthaea v|symthaea-core|symthaea-rca-observer|symthaea-rca-shadow-disposition'; then
+          if printf '%s\n' "$tree" | grep -Eq '(^| )symthaea v|symthaea-core|symthaea-rca-observer|symthaea-rca-shadow-disposition-engine'; then
             echo 'Policy crate acquired live cognition or disposition-engine dependency.' >&2
             exit 1
           fi
