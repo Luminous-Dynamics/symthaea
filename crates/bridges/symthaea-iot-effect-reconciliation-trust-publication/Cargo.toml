@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-iot-effect-reconciliation-trust-publication"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Crash-durable atomic publication of current physical-effect reconciliation trust roots"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "safety", "reconciliation", "trust"]
+categories = ["embedded"]
+
+[dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+libc = { workspace = true }
+serde = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-effect-outcome-verifier = { path = "../symthaea-iot-actuation-effect-outcome-verifier" }
+thiserror = { workspace = true }
