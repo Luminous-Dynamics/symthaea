@@ -1,0 +1,154 @@
+name: RCA Bound Shadow Case
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-bound-shadow-case/**'
+      - 'crates/bridges/symthaea-rca-shadow-case/**'
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - '.github/workflows/rca-bound-shadow-case.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze provenance-bound case boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=crates/bridges/symthaea-rca-bound-shadow-case/Cargo.toml
+          src=crates/bridges/symthaea-rca-bound-shadow-case/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'symthaea-rca-shadow-case' "$manifest"
+          grep -q 'symthaea-epistemic-governance' "$manifest"
+          grep -q 'BOUND_SHADOW_EVIDENCE_CASE_CONTRACT_V1' "$production"
+          grep -q 'one_bound_declaration_per_exact_candidate' "$production"
+          grep -q 'relation_declaration_id_is_identity_bearing' "$production"
+          grep -q 'structural_case_is_recomputed_internally' "$production"
+          grep -q 'case_id=blake3_explicit_complete_case_content_v1' "$production"
+          grep -q 'raw_structural_case_is_not_eligible_for_future_disposition_without_binding' "$production"
+          grep -q 'bound_case_is_not_truth_belief_or_authority' "$production"
+
+          # The only issuance path must take raw ingredients + bound relation
+          # declarations and rebuild the structural case internally.
+          grep -q 'pub fn bind_shadow_evidence_case_v1' "$production"
+          grep -q 'declarations: &\[BoundEvidenceRelationDeclarationV1\]' "$production"
+          grep -q 'assemble_shadow_evidence_case_v1' "$production"
+          grep -q 'let structural_case = assemble_shadow_evidence_case_v1' "$production"
+
+          # The issued bound case must not become a persisted capability.
+          grep -q 'pub struct BoundShadowEvidenceCaseV1' "$production"
+          if grep -Eq '#\[derive\([^]]*Deserialize|impl[^\n]*Deserialize[^\n]*BoundShadowEvidenceCaseV1' "$production"; then
+            echo 'Bound shadow case became deserializable.' >&2
+            exit 1
+          fi
+
+          # No truth/disposition or downstream authority API belongs here.
+          if grep -Eqi 'pub fn (is_supported|is_true|posterior|confidence|admit|authorize|promote)|CanonicalBelief|AdmittedCognitiveEvidence|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$production"; then
+            echo 'Bound shadow case crossed truth/admission/action authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Freeze complete case identity surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-bound-shadow-case/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          for field in \
+            binding_profile_digest \
+            binding_schema_version \
+            structural_profile \
+            structural_profile_digest \
+            proposition_id \
+            relevance_context_commitment \
+            case_scope_digest \
+            lineage_graph_id \
+            item_candidate_id \
+            item_observation_root_id \
+            item_claim_digest \
+            item_field \
+            producer_relation_id \
+            relation_declaration_id \
+            relation_declaration_profile_digest \
+            declarer_id \
+            declarer_version \
+            declaration_method \
+            declaration_provenance_digest \
+            declared_relation \
+            declared_relation_strength_ppm \
+            current_runtime_relevant \
+            relevance_defect_count \
+            independence_pair_count \
+            independence_assessment \
+            declared_relation_topology \
+            has_declared_current_runtime_defeater
+          do
+            grep -q "$field" "$production"
+          done
+
+          # Explicit tags must cover every current semantic variant.
+          for tag in \
+            cycle_time_us prediction_error_ppm peak_attention_bits learning_occurred \
+            detected_primitive_count output_digest thought_digest metadata_digest language_output \
+            supports contradicts weakens defeats supersedes corroborates irrelevant \
+            human_annotation deterministic_rule model_inference formal_procedure imported_assertion \
+            same_evidence derived same_root partially_shared independent \
+            no_current_runtime_relevant_items only_neutral_relations support_side_only opposition_side_only mixed_support_and_opposition \
+            source_generation_mismatch execution_lineage_mismatch adapter_profile_mismatch adapter_contract_mismatch future_observation stale_by_cycle_lag
+          do
+            grep -q "\"$tag\"" "$production"
+          done
+
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Bound case identity acquired incidental serializer/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+
+      - name: Freeze identity and join tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-bound-shadow-case/src/lib.rs
+          grep -q 'exact_inputs_produce_deterministic_content_addressed_case' "$src"
+          grep -q 'same_structural_case_different_declarer_provenance_changes_bound_case_id' "$src"
+          grep -q 'caller_declaration_order_does_not_change_case_identity' "$src"
+          grep -q 'changed_relation_body_changes_bound_case_identity' "$src"
+          grep -q 'every_candidate_requires_exactly_one_bound_declaration' "$src"
+          grep -q 'declaration_for_candidate_outside_case_fails_closed' "$src"
+          grep -q 'relevance_context_is_case_identity_bearing' "$src"
+          grep -q 'issued_bound_case_serializes_for_audit' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-rca-bound-shadow-case -e normal)"
+          printf '%s\n' "$tree" | grep -q 'symthaea-rca-shadow-case'
+          printf '%s\n' "$tree" | grep -q 'symthaea-epistemic-governance'
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-observer-bridge|symthaea v[0-9]'; then
+            echo 'Bound shadow case acquired a live/root cognitive dependency.' >&2
+            exit 1
+          fi
+
+      - name: Format bound shadow case
+        run: cargo fmt -p symthaea-rca-bound-shadow-case -- --check
+
+      - name: Test bound shadow case
+        run: cargo test -p symthaea-rca-bound-shadow-case
+
+      - name: Clippy bound shadow case
+        run: cargo clippy -p symthaea-rca-bound-shadow-case --all-targets -- -D warnings
