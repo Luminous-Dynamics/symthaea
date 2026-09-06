@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-xenia-guarded-witness-frontier"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Guarded composition of verified Xenia witness currentness with SQLite witness-frontier recovery"
+publish = false
+
+[dependencies]
+symthaea-qualification-witness-frontier = { path = "../symthaea-qualification-witness-frontier" }
+symthaea-qualification-witness-frontier-sqlite = { path = "../symthaea-qualification-witness-frontier-sqlite" }
+symthaea-xenia-witness-frontier-adapter = { path = "../symthaea-xenia-witness-frontier-adapter" }
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-authority-time = { path = "../symthaea-authority-time" }
+symthaea-qualification-witness-sequence = { path = "../symthaea-qualification-witness-sequence" }
+symthaea-xenia-authority = { path = "../symthaea-xenia-authority" }
