@@ -6,13 +6,14 @@
 //!
 //! This crate intentionally contains **no disposition engine**. It freezes the
 //! complete policy surface that a later pure engine may consume so thresholds,
-//! profile bindings, abstention behavior, defeater treatment, evaluation identity,
+//! profile bindings, abstention behavior, defeater treatment, preregistration,
 //! and resource ceilings cannot be introduced as hidden implementation constants.
 
 #![deny(unsafe_code)]
 
 use serde::{Deserialize, Deserializer, Serialize};
 use symthaea_epistemic_governance::{
+    experiment_contract::EXPERIMENT_CONTRACT_SCHEMA_VERSION,
     interpretation_lineage::interpretation_lineage_profile_digest_v1,
     relation_qualification::relation_declaration_eligibility_profile_digest_v1,
 };
@@ -33,7 +34,8 @@ pub const SHADOW_DISPOSITION_POLICY_CONTRACT_V1: &str = concat!(
     "defeater_mode=qualified_current_blocker_only_v1\n",
     "unknown_interpretation_independence=force_underdetermined_v1\n",
     "contestation=qualified_support_and_opposition_must_survive\n",
-    "evaluation_binding=preregistration+corpus+seed+metric+evaluator_identity\n",
+    "evaluation_binding=exact_registered_rca_experiment_contract_schema+digest\n",
+    "evaluation_details_are_transitively_bound_by_registered_experiment_contract_not_duplicated\n",
     "resource_ceilings=explicit_case_items+interpretation_pairs_and_must_make_thresholds_feasible\n",
     "policy_id=blake3_explicit_complete_normalized_policy_v1\n",
     "post_result_policy_change_requires_new_policy_identity\n",
@@ -57,9 +59,6 @@ pub enum RootSetSemanticsV1 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RelationStrengthTreatmentV1 {
-    /// Relation strength is retained as diagnostic metadata only. V1 exposes no
-    /// arithmetic semantics for summing, averaging, multiplying, normalizing,
-    /// voting, or Bayesian updating declared relation strengths.
     DiagnosticOnly,
 }
 
@@ -76,9 +75,7 @@ pub enum UnknownInterpretationIndependenceModeV1 {
 }
 
 /// Root-set requirements for one future shadow-disposition outcome condition.
-///
-/// These numbers refer to the cardinality of selected pairwise-independent root
-/// sets, never candidate/module counts or numbers of independent pair edges.
+/// These are set-cardinality requirements, not module/candidate/pair-edge counts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OutcomeRootRequirementsV1 {
@@ -86,15 +83,17 @@ pub struct OutcomeRootRequirementsV1 {
     pub min_pairwise_independent_interpretation_roots: u16,
 }
 
+/// Exact preregistration lineage under which this policy was frozen.
+///
+/// `RegisteredExperimentContractV1::contract_digest()` already commits the
+/// held-out corpus, seed plan, evaluator, metrics, thresholds, falsification
+/// criteria, allowed outcomes, and experiment resource ceilings. The policy
+/// references that one canonical artifact instead of duplicating those fields.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DispositionPolicyEvaluationBindingV1 {
-    pub preregistration_contract_digest: String,
-    pub evaluation_corpus_digest: String,
-    pub seed_plan_digest: String,
-    pub metric_contract_digest: String,
-    pub evaluator_id: String,
-    pub evaluator_version: Option<String>,
+    pub experiment_contract_schema_version: u16,
+    pub registered_experiment_contract_digest: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -109,7 +108,6 @@ pub struct DispositionPolicyResourceCeilingsV1 {
 pub struct ShadowDispositionPolicyV1 {
     pub schema_version: u16,
     pub proposition_id: String,
-
     pub bound_case_profile_digest: String,
     pub relation_eligibility_profile_digest: String,
     pub interpretation_lineage_profile_digest: String,
@@ -292,7 +290,6 @@ fn validate_policy_v1(value: &ShadowDispositionPolicyV1) -> Result<(), ShadowDis
     for (name, requirements) in all_requirements(value) {
         validate_root_requirements(name, requirements)?;
     }
-
     if !requirements_at_least(
         value.support_requirements,
         value.tentative_support_requirements,
@@ -353,21 +350,12 @@ fn requirements_at_least(
 fn validate_evaluation_binding(
     value: &DispositionPolicyEvaluationBindingV1,
 ) -> Result<(), ShadowDispositionPolicyError> {
-    validate_digest(&value.preregistration_contract_digest)?;
-    validate_digest(&value.evaluation_corpus_digest)?;
-    validate_digest(&value.seed_plan_digest)?;
-    validate_digest(&value.metric_contract_digest)?;
-    if value.evaluator_id.trim().is_empty() {
-        return Err(ShadowDispositionPolicyError::MissingEvaluatorId);
+    if value.experiment_contract_schema_version != EXPERIMENT_CONTRACT_SCHEMA_VERSION {
+        return Err(ShadowDispositionPolicyError::ExperimentContractSchemaMismatch {
+            found: value.experiment_contract_schema_version,
+        });
     }
-    if value
-        .evaluator_version
-        .as_deref()
-        .is_some_and(|version| version.trim().is_empty())
-    {
-        return Err(ShadowDispositionPolicyError::EmptyEvaluatorVersion);
-    }
-    Ok(())
+    validate_digest(&value.registered_experiment_contract_digest)
 }
 
 fn validate_resource_feasibility(
@@ -471,37 +459,16 @@ fn shadow_disposition_policy_id_v1(
         value.contested_requires_qualified_support_and_opposition,
     );
 
-    hash_text(
+    hash_bytes(
         &mut hasher,
-        b"preregistration_contract_digest",
-        &value.evaluation.preregistration_contract_digest,
+        b"experiment_contract_schema_version",
+        &value.evaluation.experiment_contract_schema_version.to_le_bytes(),
     );
     hash_text(
         &mut hasher,
-        b"evaluation_corpus_digest",
-        &value.evaluation.evaluation_corpus_digest,
+        b"registered_experiment_contract_digest",
+        &value.evaluation.registered_experiment_contract_digest,
     );
-    hash_text(
-        &mut hasher,
-        b"seed_plan_digest",
-        &value.evaluation.seed_plan_digest,
-    );
-    hash_text(
-        &mut hasher,
-        b"metric_contract_digest",
-        &value.evaluation.metric_contract_digest,
-    );
-    hash_text(
-        &mut hasher,
-        b"evaluator_id",
-        &value.evaluation.evaluator_id,
-    );
-    hash_option_text(
-        &mut hasher,
-        b"evaluator_version",
-        value.evaluation.evaluator_version.as_deref(),
-    );
-
     hash_bytes(
         &mut hasher,
         b"max_case_items",
@@ -579,21 +546,6 @@ fn hash_text(hasher: &mut blake3::Hasher, label: &[u8], value: &str) {
     hash_bytes(hasher, label, value.as_bytes());
 }
 
-fn hash_option_text(hasher: &mut blake3::Hasher, label: &[u8], value: Option<&str>) {
-    hasher.update(&(label.len() as u64).to_le_bytes());
-    hasher.update(label);
-    match value {
-        None => {
-            hasher.update(&[0]);
-        }
-        Some(text) => {
-            hasher.update(&[1]);
-            hasher.update(&(text.len() as u64).to_le_bytes());
-            hasher.update(text.as_bytes());
-        }
-    }
-}
-
 fn hash_bytes(hasher: &mut blake3::Hasher, label: &[u8], value: &[u8]) {
     hasher.update(&(label.len() as u64).to_le_bytes());
     hasher.update(label);
@@ -623,8 +575,7 @@ pub enum ShadowDispositionPolicyError {
     SupportWeakerThanTentativeSupport,
     OppositionWeakerThanTentativeOpposition,
     ContestedMustPreserveBothSides,
-    MissingEvaluatorId,
-    EmptyEvaluatorVersion,
+    ExperimentContractSchemaMismatch { found: u16 },
     ZeroMaxCaseItems,
     CaseCeilingBelowEvidenceRootRequirement,
     InterpretationPairCountOverflow,
@@ -674,12 +625,10 @@ impl std::fmt::Display for ShadowDispositionPolicyError {
             Self::ContestedMustPreserveBothSides => {
                 f.write_str("v1 Contested must require qualified support and opposition")
             }
-            Self::MissingEvaluatorId => {
-                f.write_str("policy evaluation binding requires evaluator id")
-            }
-            Self::EmptyEvaluatorVersion => {
-                f.write_str("policy evaluator version cannot be empty when present")
-            }
+            Self::ExperimentContractSchemaMismatch { found } => write!(
+                f,
+                "policy expects RCA experiment-contract schema {EXPERIMENT_CONTRACT_SCHEMA_VERSION}, found {found}"
+            ),
             Self::ZeroMaxCaseItems => f.write_str("policy max_case_items must be non-zero"),
             Self::CaseCeilingBelowEvidenceRootRequirement => f.write_str(
                 "policy max_case_items cannot be below its largest pairwise-independent evidence-root requirement",
@@ -706,14 +655,10 @@ mod tests {
 
     const PROPOSITION: &str =
         "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const PRE_REG: &str =
+    const EXPERIMENT: &str =
         "blake3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    const CORPUS: &str =
+    const EXPERIMENT_2: &str =
         "blake3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-    const SEEDS: &str =
-        "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
-    const METRIC: &str =
-        "blake3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
     fn requirements(evidence: u16, interpretations: u16) -> OutcomeRootRequirementsV1 {
         OutcomeRootRequirementsV1 {
@@ -742,12 +687,8 @@ mod tests {
                 UnknownInterpretationIndependenceModeV1::ForceUnderdetermined,
             contested_requires_qualified_support_and_opposition: true,
             evaluation: DispositionPolicyEvaluationBindingV1 {
-                preregistration_contract_digest: PRE_REG.into(),
-                evaluation_corpus_digest: CORPUS.into(),
-                seed_plan_digest: SEEDS.into(),
-                metric_contract_digest: METRIC.into(),
-                evaluator_id: "shadow-disposition-policy-evaluator".into(),
-                evaluator_version: Some("v1".into()),
+                experiment_contract_schema_version: EXPERIMENT_CONTRACT_SCHEMA_VERSION,
+                registered_experiment_contract_digest: EXPERIMENT.into(),
             },
             resources: DispositionPolicyResourceCeilingsV1 {
                 max_case_items: 32,
@@ -783,6 +724,30 @@ mod tests {
         );
         assert!(SHADOW_DISPOSITION_POLICY_CONTRACT_V1.contains(
             "candidate_count_and_pair_edge_count_do_not_satisfy_root_thresholds"
+        ));
+    }
+
+    #[test]
+    fn evaluation_binding_uses_exact_registered_experiment_contract_identity() {
+        let registered = policy().register().unwrap();
+        assert_eq!(
+            registered.policy().evaluation.experiment_contract_schema_version,
+            EXPERIMENT_CONTRACT_SCHEMA_VERSION
+        );
+        assert_eq!(
+            registered.policy().evaluation.registered_experiment_contract_digest,
+            EXPERIMENT
+        );
+    }
+
+    #[test]
+    fn wrong_experiment_contract_schema_fails_closed() {
+        let mut raw = policy();
+        raw.evaluation.experiment_contract_schema_version =
+            EXPERIMENT_CONTRACT_SCHEMA_VERSION.saturating_add(1);
+        assert!(matches!(
+            raw.register(),
+            Err(ShadowDispositionPolicyError::ExperimentContractSchemaMismatch { .. })
         ));
     }
 
@@ -831,7 +796,7 @@ mod tests {
     #[test]
     fn lower_layer_profile_drift_requires_new_policy() {
         let mut raw = policy();
-        raw.interpretation_lineage_profile_digest = PRE_REG.into();
+        raw.interpretation_lineage_profile_digest = EXPERIMENT.into();
         assert_eq!(
             raw.register(),
             Err(ShadowDispositionPolicyError::InterpretationLineageProfileMismatch)
@@ -849,10 +814,10 @@ mod tests {
     }
 
     #[test]
-    fn evaluation_and_resource_identity_are_policy_bearing() {
+    fn experiment_and_resource_identity_are_policy_bearing() {
         let a = policy().register().unwrap();
         let mut changed = policy();
-        changed.evaluation.metric_contract_digest = PRE_REG.into();
+        changed.evaluation.registered_experiment_contract_digest = EXPERIMENT_2.into();
         let b = changed.register().unwrap();
         assert_ne!(a.policy_id(), b.policy_id());
 
