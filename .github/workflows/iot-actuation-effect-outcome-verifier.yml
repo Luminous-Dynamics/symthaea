@@ -1,0 +1,208 @@
+name: IoT Actuation Effect Outcome Verifier
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/**'
+      - 'crates/bridges/symthaea-iot-actuation-effect-reconciliation-challenge/**'
+      - '.github/workflows/iot-actuation-effect-outcome-verifier.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-effect-outcome-verifier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Freeze outcome-verifier TCB contract
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          root = Path('crates/bridges/symthaea-iot-actuation-effect-outcome-verifier')
+          sources = {
+              p.name: p.read_text()
+              for p in (root / 'src').glob('*.rs')
+          }
+          code = '\n'.join(sources.values())
+          stripped = '\n'.join(
+              line for line in code.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+          compact = ''.join(stripped.split())
+
+          required = [
+              'pubconstEFFECT_OUTCOME_ED25519_ALGORITHM:&str="ed25519-rfc8032";',
+              'pubenumEffectOutcomeClaimKindV1{ExecutionAndPostcondition,NonExecution,}',
+              'ExecutionAndPostcondition{execution_record_digest:Digest32,effect_recorded_at_unix_ms:u64,postcondition_evidence_digest:Digest32,postcondition_observed_at_unix_ms:u64,}',
+              'NonExecution{non_execution_proof_digest:Digest32,execution_log_head_digest:Digest32,coverage_from_unix_ms:u64,coverage_through_unix_ms:u64,}',
+              'pubstructGuardPhysicalEffectOutcomeState',
+              'pubfnverify_evidence(&self,evidence:PhysicalEffectOutcomeEvidenceV1,challenge:&EffectReconciliationChallengeV1)',
+              'self.verify_evidence_at(evidence,challenge,system_unix_ms()?)',
+              'pub(crate)fnverify_evidence_at(',
+              'ifbody.challenge_digest!=challenge_digest',
+              'ifbody.command_digest!=challenge.command_digest()',
+              'ifbody.outcome_profile_digest!=self.policy.exact_outcome_profile_digest',
+              'validate_claim_causality(body.claim,body.evidence_issued_at_unix_ms,challenge)?;',
+              'letcurrent_key=self.trust_registry.exact_active_key(body,now_unix_ms)?;',
+              '.verify_strict(&message,&signature)',
+              'ifbody.evidence_issued_at_unix_ms<self.trust_registry.snapshot().issued_at_unix_ms',
+              'effect_recorded_at_unix_ms<challenge.attempt_common_fenced_at_unix_ms()',
+              'effect_recorded_at_unix_ms>=challenge.attempt_wall_valid_until_unix_ms()',
+              'postcondition_observed_at_unix_ms<challenge.issued_at_unix_ms()',
+              'coverage_from_unix_ms>challenge.attempt_common_fenced_at_unix_ms()',
+              'coverage_through_unix_ms<challenge.attempt_wall_valid_until_unix_ms()',
+              'coverage_through_unix_ms>evidence_issued_at_unix_ms',
+              'pubstructCurrentPhysicalEffectOutcomeGuard',
+              'self.fence_current_at(proof,system_unix_ms()?)',
+              'pub(crate)fnfence_current_at',
+              'body.challenge_digest!=proof.challenge_digest()',
+              'current_key.digest()?!=proof.key_digest()',
+              '.min(verifier_key_not_after_unix_ms).min(trust_snapshot_expires_at_unix_ms).min(proof.challenge_expires_at_unix_ms())',
+              'pubstructCurrentPhysicalEffectOutcomeFence',
+              'pub(crate)fnexact_active_key(',
+              '!key.active_at(body.evidence_issued_at_unix_ms)||!key.active_at(now_unix_ms)',
+          ]
+          missing = [needle for needle in required if needle not in compact]
+          if missing:
+              raise SystemExit(f'missing outcome-verifier invariant: {missing}')
+
+          forbidden = [
+              'Deserialize', 'Serialize', 'serde', 'bincode',
+              'VerificationProvider', 'SignatureVerifier', 'VerifierProvider',
+              'Box<dyn', 'Arc<dyn',
+              'PrivilegedPhysicalEffectPort', 'dispatch_current_attempt',
+              'FinalActuatorPermit', 'TrustBoundFinalActuatorPermit',
+              'JustInTimeHalLease', 'CompleteJitHalLease',
+              'persist_prepared_anchored(', 'persist_adapter_acknowledged_anchored(',
+              'persist_adapter_indeterminate_anchored(', 'persist_abandoned_before_port_anchored(',
+              'ReconciledRealized', 'ReconciledNotRealized',
+              'TcpListener', 'TcpStream', 'UdpSocket', 'tokio::spawn',
+              'std::process::Command', 'Command::new', 'unsafe{',
+              'HashMap<String', 'BTreeMap<String',
+          ]
+          found = [needle for needle in forbidden if needle in compact]
+          if found:
+              raise SystemExit(f'outcome verifier crossed reviewed TCB boundary: {found}')
+
+          if 'pubfnverify_evidence_at' in compact or 'pubfnfence_current_at' in compact:
+              raise SystemExit('deterministic time injection escaped crate-private qualification scope')
+          if compact.count('.verify_strict(&message,&signature)') != 2:
+              raise SystemExit('fixed Ed25519 must execute once at historical verification and once at current fencing')
+          if compact.count('system_unix_ms()?') != 2:
+              raise SystemExit('public verifier/current fence must each use exactly one guard-local wall-clock read')
+
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          expected = {
+              'blake3', 'ed25519-dalek', 'symthaea-authority',
+              'symthaea-iot-actuation-effect-reconciliation-challenge', 'thiserror',
+          }
+          actual = set(manifest.get('dependencies', {}))
+          if actual != expected:
+              raise SystemExit(f'outcome-verifier production dependency drift: {sorted(actual)}')
+
+          expected_dev = {
+              'symthaea-iot-actuation-effect-attempt-journal',
+              'symthaea-iot-actuation-effect-dispatch',
+          }
+          dev = manifest.get('dev-dependencies', {})
+          if set(dev) != expected_dev:
+              raise SystemExit(f'outcome-verifier dev dependency drift: {sorted(dev)}')
+          if dev['symthaea-iot-actuation-effect-dispatch'].get('features') != [
+              'qualification-legacy-unjournaled'
+          ]:
+              raise SystemExit('qualification correlation constructor escaped reviewed feature')
+
+      - name: Install Rust 1.96 formatter
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt outcome verifier
+        run: >-
+          cargo +1.96.0 fmt --check
+          -p symthaea-iot-actuation-effect-outcome-verifier
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Check outcome-verifier package
+        run: >-
+          cargo +1.94.0 check
+          -p symthaea-iot-actuation-effect-outcome-verifier
+          --all-targets --no-default-features
+
+      - name: Reject unreviewed external dependency drift
+        shell: python
+        run: |
+          import tomllib
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source')): p
+                  for p in doc.get('package', []) if p.get('source') is not None
+              }
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          b = set(before); a = set(after)
+          added = a - b; removed = b - a
+          changed = sorted(k for k in a & b if after[k] != before[k])
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          if not added.issubset(allowed) or removed or changed:
+              raise SystemExit(
+                  f'external dependency drift: added={sorted(added)}, '
+                  f'removed={sorted(removed)}, changed={changed}'
+              )
+
+      - name: Run causal/current outcome regressions first
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-actuation-effect-outcome-verifier
+          --lib --no-default-features
+
+      - name: Outcome-verifier package tests
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-actuation-effect-outcome-verifier
+          --all-targets --no-default-features
+
+      - name: Strict package-local Clippy
+        run: >-
+          cargo +1.94.0 clippy
+          -p symthaea-iot-actuation-effect-outcome-verifier
+          --all-targets --no-default-features --no-deps -- -D warnings
+
+      - name: Show local-only Cargo.lock bookkeeping
+        if: always()
+        run: git diff -- Cargo.lock || true
