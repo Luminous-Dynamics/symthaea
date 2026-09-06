@@ -81,6 +81,26 @@ class CompilerContracts(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first["content_digest"], second["content_digest"])
 
+    def test_write_artifact_is_byte_deterministic(self) -> None:
+        artifact = compiler.compile_artifact(self.lh, self.rh, AREA_ORDER)
+        first = self.root / "first.json"
+        second = self.root / "second.json"
+        compiler.write_artifact(first, artifact)
+        compiler.write_artifact(second, artifact)
+        self.assertEqual(first.read_bytes(), second.read_bytes())
+
+    def test_malformed_source_input_is_rejected_cleanly(self) -> None:
+        artifact = compiler.compile_artifact(self.lh, self.rh, AREA_ORDER)
+        artifact["source_inputs"][0] = "not-an-object"
+        with self.assertRaisesRegex(compiler.QualificationError, "source_input must be an object"):
+            compiler.validate_artifact(artifact, AREA_ORDER)
+
+    def test_missing_qualification_field_is_rejected_cleanly(self) -> None:
+        artifact = compiler.compile_artifact(self.lh, self.rh, AREA_ORDER)
+        del artifact["qualification"]["unknown_labels"]
+        with self.assertRaisesRegex(compiler.QualificationError, "missing fields: unknown_labels"):
+            compiler.validate_artifact(artifact, AREA_ORDER)
+
     def test_wrong_vertex_count_fails_closed(self) -> None:
         doc = surface_doc("left", self.areas)
         doc["labels"].pop()
