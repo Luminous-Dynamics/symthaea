@@ -3,12 +3,12 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Physical-agency composition primitives for Symthaea.
 //!
-//! PA-12 remains deliberately pre-execution. This crate can negotiate declared
+//! PA-13 remains deliberately pre-execution. This crate can negotiate declared
 //! simulator capabilities, preserve multi-objective candidate frontiers, bind
 //! deliberation to immutable world snapshots, validate strict typed-context
-//! simulation lineage, and derive strict requests from selection receipts, but
-//! it cannot construct actuator commands, depend on HAL, or mint physical
-//! execution authority.
+//! simulation lineage, derive strict requests from selection receipts, and
+//! preregister/evaluate typed simulation outcome claims. It cannot construct
+//! actuator commands, depend on HAL, or mint physical execution authority.
 //!
 //! Capability manifests are declarations used to choose a suitable modelling
 //! path. They are **not** safety evidence and cannot discharge execution gates.
@@ -21,13 +21,14 @@
 #![deny(unsafe_code)]
 
 pub mod deliberation;
+pub mod outcome_claim;
 pub mod portfolio;
 pub mod strict_context;
 pub mod strict_selection;
 mod qualification;
 mod qualification_lineage;
 
-pub use deliberation::WorldSnapshotRef;
+pub use deliberation::{SnapshotDigestAlgorithm, WorldSnapshotRef};
 pub use qualification::{
     SimulationQualificationError,
     VerifiedSimulationEvidence as RegistryValidatedSimulationEvidence,
