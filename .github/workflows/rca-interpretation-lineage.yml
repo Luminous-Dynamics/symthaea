@@ -32,13 +32,17 @@ jobs:
           grep -q 'pub mod interpretation_lineage;' "$lib"
           grep -q 'INTERPRETATION_LINEAGE_CONTRACT_V1' "$production"
           grep -q 'INTERPRETATION_INDEPENDENCE_QUALIFICATION_CONTRACT_V1' "$production"
+          grep -q 'graph_is_normalized_to_unique_interpretation_roots' "$production"
+          grep -q 'same_root_declarations_do_not_create_pair_edges' "$production"
+          grep -q 'each_distinct_unordered_root_pair_is_assessed_exactly_once' "$production"
           grep -q 'distinct_interpretation_roots_do_not_imply_independence' "$production"
           grep -q 'distinct_roots_without_exact_current_qualification=independence_unknown' "$production"
           grep -q 'independence_qualified_only_by_exact_root_pair+proposition+use+time_join' "$production"
-          grep -q 'pair_topology_is_exposed_but_qualified_pair_count_is_not_an_api' "$production"
+          grep -q 'root_pair_topology_is_exposed_but_qualified_pair_count_is_not_an_api' "$production"
           grep -q 'interpretation_independence_is_not_truth_or_evidence_independence' "$production"
           grep -q 'independent observations' "$doc"
           grep -q 'independent interpretations' "$doc"
+          grep -q 'Root-normalized graph' "$doc"
           grep -q 'No count voting' "$doc"
 
           # Root identity is deliberately derived only from declarer identity,
@@ -53,14 +57,17 @@ jobs:
           # actually found. Name inequality must never map directly to qualified.
           grep -q 'DistinctRootsIndependenceUnknown' "$production"
           grep -q 'IndependenceQualified' "$production"
-          grep -q 'qualifications_by_pair.get' "$production"
+          grep -q 'qualifications_by_pair' "$production"
 
-          # Edge count is not an independent-root-set witness. Keep the exact pair
-          # topology available, but do not expose a convenience count that invites
-          # downstream count-voting semantics.
-          grep -q 'pub fn pair_assessments' "$production"
+          # Expose the normalized root topology, not a convenience edge count.
+          grep -q 'pub fn roots' "$production"
+          grep -q 'pub fn root_pair_assessments' "$production"
           if grep -q 'qualified_independent_pair_count' "$production"; then
             echo 'Interpretation lineage exposed qualified edge count as an API.' >&2
+            exit 1
+          fi
+          if grep -q 'pub fn pair_assessments' "$production"; then
+            echo 'Interpretation lineage regressed to declaration-pair topology.' >&2
             exit 1
           fi
 
@@ -106,7 +113,7 @@ jobs:
             exit 1
           fi
 
-      - name: Freeze exact shared context and canonical identity
+      - name: Freeze normalized graph and canonical identity
         shell: bash
         run: |
           set -euo pipefail
@@ -117,11 +124,17 @@ jobs:
           grep -q 'eligible.context_commitment() != context_commitment' "$production"
           grep -q 'EligiblePropositionMismatch' "$production"
           grep -q 'entries.sort_by' "$production"
-          grep -q 'canonical_pair' "$production"
+          grep -q 'roots.sort_by' "$production"
+          grep -q 'Vec::with_capacity(pair_count(roots.len()))' "$production"
+          grep -q 'for left_index in 0..roots.len()' "$production"
+          grep -q 'for right_index in (left_index + 1)..roots.len()' "$production"
           grep -q 'LINEAGE_ID_DOMAIN' "$production"
           grep -q 'b"eligibility_context_commitment"' "$production"
           grep -q 'b"declaration_id"' "$production"
           grep -q 'b"eligibility_id"' "$production"
+          grep -q 'b"entry_interpretation_root_id"' "$production"
+          grep -q 'b"root_count"' "$production"
+          grep -q 'b"root_pair_count"' "$production"
           grep -q 'b"interpretation_root_id"' "$production"
           grep -q 'b"independence_status"' "$production"
           grep -q 'b"independence_qualification_id"' "$production"
@@ -144,6 +157,7 @@ jobs:
           grep -q 'same_declarer_version_method_is_one_interpretation_root' "$src"
           grep -q 'distinct_roots_default_to_independence_unknown' "$src"
           grep -q 'exact_current_pair_qualification_establishes_independence' "$src"
+          grep -q 'multiple_declarations_do_not_duplicate_root_pair_edges' "$src"
           grep -q 'pair_order_does_not_change_independence_qualification_identity' "$src"
           grep -q 'same_root_cannot_be_registered_as_independent' "$src"
           grep -q 'root_owner_cannot_directly_qualify_pair_independence' "$src"
