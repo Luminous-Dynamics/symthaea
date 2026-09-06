@@ -47,17 +47,7 @@ declarer_id
 + interpretation-lineage profile identity
 ```
 
-This is deliberately conservative.
-
-The following declarations share one interpretation root:
-
-```text
-same declarer id
-same declarer version
-same method
-```
-
-even when they interpret different independent evidence events.
+This is deliberately conservative. Declarations with the same declarer id, version, and method share one interpretation root even when they interpret different independent evidence events.
 
 If a declarer omits a version, internal changes do **not** automatically create a new root. That prevents unversioned producer drift from manufacturing apparent interpretive independence.
 
@@ -68,6 +58,41 @@ distinct root identity
         !=
 independent interpretation
 ```
+
+## Root-normalized graph
+
+The lineage graph is normalized around unique interpretation roots rather than declaration pairs.
+
+Conceptually:
+
+```text
+declaration A1 ─┐
+declaration A2 ─┼── interpretation root A
+                │
+declaration A3 ─┘
+
+
+declaration B1 ─┐
+declaration B2 ─┼── interpretation root B
+                └── ...
+
+root A ───────── root B
+       one pair assessment
+```
+
+If root A owns three declarations and root B owns four, the graph contains:
+
+```text
+7 declaration -> root mappings
+2 unique interpretation roots
+1 A <-> B root-pair assessment
+```
+
+not twelve repeated declaration-pair edges.
+
+Same-root declarations are represented by the shared root identity. They do not create a synthetic `SameInterpretationRoot` pair edge.
+
+Every distinct unordered interpretation-root pair appears exactly once. This is the topology later pairwise-independent-set reasoning is allowed to consume.
 
 ## Fail-closed independence
 
@@ -127,28 +152,26 @@ A future or expired qualification fails the exact join. Omitting a qualification
 
 - exact proposition id;
 - exact eligibility-context commitment;
-- every declaration id;
-- every current eligibility id;
-- every derived interpretation-root id;
-- declarer id/version/method;
-- every pair status;
+- every declaration id and current eligibility id;
+- every declaration -> root mapping;
+- the canonical unique root table;
+- declarer id/version/method for each root;
+- every distinct root-pair status exactly once;
 - exact independence-qualification id where one was accepted.
 
 The complete report receives a domain-separated BLAKE3 `lineage_id`.
 
-Caller input order does not define identity; entries are ordered by declaration id and root-pair qualifications are canonicalized.
+Caller input order does not define identity: declaration mappings are ordered by declaration id, roots are ordered by root id, and pair qualifications are canonicalized as unordered root pairs.
 
 `InterpretationLineageV1` is Serialize-only with private fields. Archived bytes are audit material and cannot be deserialized into a trusted current lineage report.
 
 ## What the statuses do not mean
 
-`SameInterpretationRoot` does not mean the relation declaration is false.
-
 `DistinctRootsIndependenceUnknown` does not mean the roots are dependent; it means independence has not been qualified.
 
 `IndependenceQualified` does not mean either interpretation is correct.
 
-None of these statuses is:
+Neither status is:
 
 - evidence-root independence;
 - proposition truth;
@@ -162,15 +185,26 @@ None of these statuses is:
 
 ## No count voting
 
-The number of declarations, roots, or qualified pairs has **no disposition meaning by itself**.
+The number of declarations, roots, or qualified pair edges has **no disposition meaning by itself**.
 
-A later preregistered disposition policy may require particular root structures, but it may not silently convert module/candidate/pair counts into truth or confidence.
+The public lineage API intentionally exposes:
+
+```text
+roots()
+root_pair_assessments()
+```
+
+but no `qualified_independent_pair_count()` helper.
+
+A qualified edge count is not an independent-root-set witness. A later preregistered policy may require a set of roots where every distinct pair satisfies the required independence relation, but it may not silently convert candidate/module/root/edge counts into truth or confidence.
 
 ## Required adversarial cases
 
 Qualification must prove at least:
 
 - two declarations from the same declarer/version/method share one root;
+- same-root declarations create no synthetic pair edge;
+- multiple declarations on two roots create one unique root-pair assessment, not a Cartesian product of declaration pairs;
 - different declarer names default to `IndependenceUnknown`;
 - exact current pair qualification is required for `IndependenceQualified`;
 - root-pair order does not change qualification identity;
@@ -181,4 +215,5 @@ Qualification must prove at least:
 - persisted registered qualifications revalidate;
 - issued lineage cannot deserialize;
 - lineage identity is input-order independent and changes with accepted qualification state;
+- no pair-count convenience API is exposed;
 - no path enters belief, workspace, action, or promotion authority.
