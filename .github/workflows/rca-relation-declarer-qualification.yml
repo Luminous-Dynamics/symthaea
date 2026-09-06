@@ -30,13 +30,22 @@ jobs:
 
           grep -q 'pub mod relation_qualification;' "$lib"
           grep -q 'RELATION_DECLARER_QUALIFICATION_CONTRACT_V1' "$production"
+          grep -q 'RELATION_DECLARATION_ELIGIBILITY_CONTRACT_V1' "$production"
           grep -q 'qualification_is_use_specific_not_global_trust' "$production"
           grep -q 'scope=exact_proposition_id_v1' "$production"
           grep -q 'qualifier_must_not_equal_subject_declarer' "$production"
-          grep -q 'registered_qualification_is_not_relation_eligibility' "$production"
-          grep -q 'eligibility_requires_exact_declaration_subject_method_proposition_kind_use_time_join' "$production"
+          grep -q 'registered_qualification_is_not_current_use_eligibility' "$production"
+          grep -q 'input=bound_relation_declaration+registered_qualification+validated_use_context' "$production"
+          grep -q 'eligibility_requires_exact_declaration_subject_version_method_join' "$production"
           grep -q 'eligible_result=is_issued_private_non_deserializable_capability' "$production"
-          grep -q 'qualification_and_eligibility_are_not_truth_belief_action_or_promotion_authority' "$production"
+          grep -q 'persistence_does_not_recreate_current_eligibility' "$production"
+
+          # Qualification and eligibility are distinct semantic profiles, not the
+          # same contract hashed under two labels.
+          grep -q 'relation_declarer_qualification_profile_digest_v1' "$production"
+          grep -q 'RELATION_DECLARER_QUALIFICATION_CONTRACT_V1.as_bytes()' "$production"
+          grep -q 'relation_declaration_eligibility_profile_digest_v1' "$production"
+          grep -q 'RELATION_DECLARATION_ELIGIBILITY_CONTRACT_V1.as_bytes()' "$production"
 
           # V1 qualification must bind the complete use-specific field surface.
           for field in \
@@ -60,18 +69,18 @@ jobs:
 
           grep -q 'ShadowRuntimeDisposition' "$production"
           grep -q 'SupersedesNotDispositionRelation' "$production"
-          grep -q 'value.allowed_relation_kinds.sort_by_key' "$production"
+          grep -q 'sort_by_key' "$production"
 
-          # Direct self-signing is structurally rejected. This check intentionally
-          # does not claim organizational or causal independence.
+          # Direct self-signing is structurally rejected. This intentionally does
+          # not claim organizational or causal independence.
           grep -q 'value.qualifier_id == value.subject_declarer_id' "$production"
           grep -q 'SelfQualification' "$production"
 
           # Registered qualification is persistable/revalidated, but current
           # eligibility is an issued capability and must not be deserializable.
           grep -q 'pub struct RegisteredRelationDeclarerQualificationV1' "$production"
-          grep -q 'impl.*Deserialize' "$src"
           grep -q 'pub struct DispositionEligibleRelationDeclarationV1' "$production"
+          grep -q 'pub fn profile_contract_digest(&self)' "$production"
           if grep -Eq 'impl[^\n]*Deserialize[^\n]*DispositionEligibleRelationDeclarationV1|derive\([^)]*Deserialize[^)]*\)[[:space:]]*pub struct DispositionEligibleRelationDeclarationV1' "$production"; then
             echo 'Disposition eligibility became deserializable.' >&2
             exit 1
@@ -102,8 +111,6 @@ jobs:
           grep -q 'context_raw.now_unix_ms < record.qualified_at_unix_ms' "$production"
           grep -q 'context_raw.now_unix_ms > record.valid_until_unix_ms' "$production"
 
-          # Eligibility identity binds exact declaration, qualification, and use
-          # context rather than merely subject identity.
           grep -q 'declaration_id' "$production"
           grep -q 'qualification_id' "$production"
           grep -q 'context_commitment' "$production"
@@ -123,6 +130,7 @@ jobs:
           grep -q 'registered_qualification_revalidates_after_persistence' "$src"
           grep -q 'qualification_tampering_fails_closed' "$src"
           grep -q 'exact_join_issues_non_persisted_eligibility' "$src"
+          grep -q 'eligibility_has_distinct_semantic_contract_identity' "$src"
           grep -q 'wrong_subject_fails_exact_join' "$src"
           grep -q 'wrong_proposition_fails_exact_join' "$src"
           grep -q 'unqualified_relation_kind_cannot_become_eligible' "$src"
