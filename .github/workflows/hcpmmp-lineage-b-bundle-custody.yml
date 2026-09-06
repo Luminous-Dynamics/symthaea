@@ -1,0 +1,75 @@
+name: HCPMMP Lineage B Bundle Custody
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/test_hcpmmp_neuromaps_bundle_custody.py'
+      - 'scripts/test_derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/test_hcpmmp_neuromaps_generator_provenance.py'
+      - 'docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_BUNDLE_CUSTODY_V1.md'
+      - '.github/workflows/hcpmmp-lineage-b-bundle-custody.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify Lineage-B evidence bundle custody
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax contract
+        run: |
+          python -m py_compile \
+            scripts/derive_hcpmmp1_neuromaps_lineage_b.py \
+            scripts/test_hcpmmp_neuromaps_bundle_custody.py
+
+      - name: Bundle custody contracts
+        run: PYTHONPATH=scripts python -m unittest scripts/test_hcpmmp_neuromaps_bundle_custody.py
+
+      - name: Preserve Lineage-B scientific contracts
+        run: |
+          PYTHONPATH=scripts python -m unittest scripts/test_derive_hcpmmp1_neuromaps_lineage_b.py
+          PYTHONPATH=scripts python -m unittest scripts/test_hcpmmp_neuromaps_generator_provenance.py
+
+      - name: Custody ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=scripts/derive_hcpmmp1_neuromaps_lineage_b.py
+          DOC=docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_BUNDLE_CUSTODY_V1.md
+          grep -Fq 'publish-lock' "$SRC"
+          grep -Fq 'os.O_EXCL' "$SRC"
+          grep -Fq '0o600' "$SRC"
+          grep -Fq '0o700' "$SRC"
+          grep -Fq 'os.rename' "$SRC"
+          grep -Fq 'BUNDLE_RECEIPT_PROFILE' "$SRC"
+          grep -Fq 'never deliberately truncates or replaces' "$DOC"
+          grep -Fq 'does not establish' "$DOC"
+
+      - name: No full-evidence CLI receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=scripts/derive_hcpmmp1_neuromaps_lineage_b.py
+          if grep -Fq 'print(json.dumps(evidence' "$SRC"; then
+            echo 'CLI must not print the full evidence record' >&2
+            exit 1
+          fi
+
+      - name: CLI contract
+        run: |
+          PYTHONPATH=scripts python scripts/derive_hcpmmp1_neuromaps_lineage_b.py --help
+          PYTHONPATH=scripts python scripts/derive_hcpmmp1_neuromaps_lineage_b.py derive --help
+          PYTHONPATH=scripts python scripts/derive_hcpmmp1_neuromaps_lineage_b.py verify-evidence --help
