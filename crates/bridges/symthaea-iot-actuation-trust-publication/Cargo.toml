@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-iot-actuation-trust-publication"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Crash-durable atomic publication root for current IoT actuation trust and policy anchors"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "security", "trust", "durability"]
+categories = ["embedded", "filesystem"]
+
+[dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+libc = { workspace = true }
+serde = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-guard-device-reality = { path = "../symthaea-iot-actuation-guard-device-reality" }
+symthaea-iot-interlock-trust = { path = "../symthaea-iot-interlock-trust" }
+symthaea-iot-transport-receipt = { path = "../symthaea-iot-transport-receipt" }
+thiserror = { workspace = true }
