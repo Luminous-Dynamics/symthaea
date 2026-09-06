@@ -12,4 +12,5 @@
 #![deny(unsafe_code)]
 
 pub mod currentness;
+pub mod experiment_contract;
 pub mod lineage;
