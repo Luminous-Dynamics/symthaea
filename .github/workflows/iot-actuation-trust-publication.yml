@@ -1,0 +1,163 @@
+name: IoT Actuation Trust Publication
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-trust-publication/**'
+      - '.github/workflows/iot-actuation-trust-publication.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-trust-publication-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Atomic publication source contract
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          root = Path('crates/bridges/symthaea-iot-actuation-trust-publication')
+          src = (root / 'src/lib.rs').read_text()
+          code = '\n'.join(
+              line for line in src.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+          compact = ''.join(code.split())
+          required = [
+              'pubstructActuationTrustRootsV1',
+              'transport_trust_head:TransportTrustHead',
+              'device_reality_trust_head:DeviceRealityTrustHead',
+              'device_reality_policy:ActuationPolicyAnchorV1',
+              'interlock_trust_head:InterlockTrustHead',
+              'interlock_policy:ActuationPolicyAnchorV1',
+              'pubstructActuationTrustPublicationHead',
+              'previous_publication_digest:Option<Digest32>',
+              'fnsuccessor(',
+              'validate_root_successor(&self.roots,&roots)?',
+              'pubfnpublish_successor(',
+              'letkernel=self.open_lock_file()?',
+              'kernel.lock().map_err(ActuationTrustPublicationError::Io)?',
+              'self.write_state_locked(&successor)?',
+              'persisted!=successor||persisted.head()?!=expected_head',
+              'pubfnfence_current(',
+              "pubstructCurrentActuationTrustFence<'a>",
+              "_local:MutexGuard<'a,()>",
+              '_kernel:File',
+              'publication:ActuationTrustPublicationV1',
+          ]
+          missing = [needle for needle in required if needle not in compact]
+          if missing:
+              raise SystemExit(f'missing actuation-trust publication invariant: {missing}')
+
+          forbidden = [
+              'HybridReceiptSignatureVerifier', 'verify_xenia_physical_effect_receipt(',
+              'verify_interlock_key_binding(', 'VerifyingKey', 'verify_strict(',
+              'CurrentXeniaTransportFence', 'CurrentAdmissionDeviceRealityFence',
+              'CurrentPostSemanticInterlockFence', 'FinalActuatorPermit',
+              'TrustBoundFinalActuatorPermit', 'CompleteJitHalLease', 'JustInTimeHalLease',
+              'TcpListener', 'TcpStream', 'tokio::spawn', 'std::process::Command',
+              'Command::new', 'unsafe {',
+          ]
+          found = [needle for needle in forbidden if needle in code]
+          if found:
+              raise SystemExit(f'publication acquired crypto/authority/I-O surface: {found}')
+
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          expected = {
+              'bincode', 'blake3', 'libc', 'serde', 'symthaea-authority',
+              'symthaea-iot-actuation-guard-device-reality',
+              'symthaea-iot-interlock-trust', 'symthaea-iot-transport-receipt',
+              'thiserror',
+          }
+          actual = set(manifest.get('dependencies', {}))
+          if actual != expected:
+              raise SystemExit(f'production dependency drift: {sorted(actual)}')
+
+      - name: Install Rust 1.96 formatter
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt
+        run: cargo +1.96.0 fmt --check -p symthaea-iot-actuation-trust-publication
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Resolve candidate and check package
+        run: cargo +1.94.0 check -p symthaea-iot-actuation-trust-publication --all-targets
+
+      - name: Reject unreviewed external dependency drift
+        shell: python
+        run: |
+          import tomllib
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source')): p
+                  for p in doc.get('package', [])
+                  if p.get('source') is not None
+              }
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          b = set(before)
+          a = set(after)
+          added = a - b
+          removed = b - a
+          changed = sorted(k for k in a & b if after[k] != before[k])
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          if not added.issubset(allowed) or removed or changed:
+              raise SystemExit(
+                  f'external dependency drift: added={sorted(added)}, '
+                  f'removed={sorted(removed)}, changed={changed}'
+              )
+
+      - name: Held publication fence blocks successor first
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-actuation-trust-publication
+          tests::current_fence_blocks_authoritative_successor_publication -- --exact
+
+      - name: Anti-rollback/substitution package tests
+        run: cargo +1.94.0 test -p symthaea-iot-actuation-trust-publication
+
+      - name: Strict package-local Clippy
+        run: >-
+          cargo +1.94.0 clippy -p symthaea-iot-actuation-trust-publication
+          --all-targets --no-deps -- -D warnings
+
+      - name: Show local-only Cargo.lock bookkeeping
+        if: always()
+        run: git diff -- Cargo.lock || true
