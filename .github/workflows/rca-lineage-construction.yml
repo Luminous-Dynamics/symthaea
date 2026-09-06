@@ -1,0 +1,87 @@
+name: RCA Lineage Construction
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-observer-bridge/**'
+      - '.github/workflows/rca-lineage-construction.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze strict construction boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-observer-bridge/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub struct RcaObservableCognitiveLoopV1' "$src"
+          grep -q 'pub struct RcaCompletedCycleV1' "$src"
+          grep -q 'IssuedCognitiveExecutionLineageV1' "$src"
+          grep -q 'new_shadow_observable' "$src"
+          grep -q 'canonical_config_projection_v1' "$src"
+          grep -q 'RCA_CONFIG_PROFILE_CONTRACT_V1' "$src"
+          grep -q 'keys.sort_unstable_by' "$src"
+          grep -q 'checked_add(1)' "$src"
+
+          # This lane may delegate cycles, but must not expose the underlying
+          # service or live-issued capability for callers to escape the binding.
+          if grep -Eq 'pub fn (service|service_mut|into_inner|into_parts|issued_lineage)[[:space:]]*\(' "$production"; then
+            echo 'RCA wrapper exposes a forbidden service/issuance escape hatch.' >&2
+            exit 1
+          fi
+          if grep -Eq 'impl([^\n]|\n)*(Deref|DerefMut)[[:space:]]+for[[:space:]]+RcaObservableCognitiveLoopV1' "$production"; then
+            echo 'RCA wrapper must not Deref/DerefMut to the cognitive service.' >&2
+            exit 1
+          fi
+
+          # Raw JSON text serialization is not the canonical config identity.
+          if grep -Eq 'serde_json::to_(vec|string)\(&?config\)' "$production"; then
+            echo 'Raw serde_json text must not define RCA config identity.' >&2
+            exit 1
+          fi
+
+          # RCA-002.0b must still have no shadow feedback or epistemic/action path.
+          manifest=crates/bridges/symthaea-rca-observer-bridge/Cargo.toml
+          if grep -Eq 'symthaea-(rca-shadow|epistemic-governance|runtime|memory)' "$manifest"; then
+            echo 'RCA construction lane acquired a shadow/control dependency too early.' >&2
+            exit 1
+          fi
+          if grep -Eq 'ActionAuthority|SelfImprovementPromotion|CanonicalBeliefAdmission|CanonicalEpistemic' "$production"; then
+            echo 'RCA construction lane acquired epistemic/action promotion semantics.' >&2
+            exit 1
+          fi
+
+      - name: Verify intended dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree=$(cargo tree -p symthaea-rca-observer-bridge)
+          printf '%s\n' "$tree" | grep -q 'symthaea-execution-lineage'
+          printf '%s\n' "$tree" | grep -q 'symthaea v'
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-(rca-shadow|epistemic-governance)'; then
+            printf '%s\n' "$tree" >&2
+            echo 'Construction bridge must precede shadow/epistemic evaluation.' >&2
+            exit 1
+          fi
+
+      - name: Format
+        run: cargo fmt -p symthaea-rca-observer-bridge -- --check
+
+      - name: Test strict construction lane
+        run: cargo test -p symthaea-rca-observer-bridge
+
+      - name: Clippy strict construction lane
+        run: cargo clippy -p symthaea-rca-observer-bridge --all-targets -- -D warnings
