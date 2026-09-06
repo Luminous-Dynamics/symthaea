@@ -951,12 +951,14 @@ mod tests {
             framework.get("silicon").unwrap().evidence_level,
             EvidenceLevel::Theoretical
         );
-        assert!(framework
-            .get("silicon")
-            .unwrap()
-            .predictions
-            .iter()
-            .all(|p| p.tested && p.result == Some(true)));
+        assert!(
+            framework
+                .get("silicon")
+                .unwrap()
+                .predictions
+                .iter()
+                .all(|p| p.tested && p.result == Some(true))
+        );
     }
 
     #[test]
@@ -968,12 +970,14 @@ mod tests {
             framework.get("silicon").unwrap().evidence_level,
             EvidenceLevel::Theoretical
         );
-        assert!(framework
-            .get("silicon")
-            .unwrap()
-            .predictions
-            .iter()
-            .all(|p| !p.tested));
+        assert!(
+            framework
+                .get("silicon")
+                .unwrap()
+                .predictions
+                .iter()
+                .all(|p| !p.tested)
+        );
     }
 
     #[test]
