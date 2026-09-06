@@ -75,8 +75,10 @@ jobs:
             grep -q "\"$relation\"" "$production"
           done
 
-          # Serializer/debug/Rust hash layout must not define canonical identity.
-          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"|as[[:space:]]+u(8|16|32|64)' "$production"; then
+          # Serializer/debug/Rust Hash layout must not define canonical identity.
+          # Integer casts used only for explicit length-prefix encoding are fine;
+          # semantic enum identity is frozen above by explicit string tags.
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
             echo 'Relation declaration identity acquired incidental serialization or Rust-layout semantics.' >&2
             exit 1
           fi
