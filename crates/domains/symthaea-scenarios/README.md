@@ -21,11 +21,22 @@ Transitively pure `std` (all deps are pure-std domain crates), no
   proportional adjustment. Both preserve the exact `symthaea-economics`
   double-entry ledger and recover the same predicted employment direction, but
   they do not produce identical magnitudes.
+- `economic_identification` — **ESE-A5 blind synthetic identification**: all
+  candidate predictions are frozen from a generator-free input table before the
+  hidden generator table is consulted. Identification compares separate demand
+  and employment errors by Pareto dominance rather than a scalar welfare/error
+  weight.
 
-ESE-A4 is a **synthetic qualification fixture only**. Its outputs are not
+ESE-A4/A5 are **synthetic qualification fixtures only**. Their outputs are not
 observations, empirical economic evidence, policy recommendations, or governance
-authority. It exists to prove that the model-neutral scientific contracts can
-compare genuinely different implementations before real data are admitted.
+authority. A5 distinguishes three different no-winner states: `Indistinguishable`
+when candidate observables are identical, `EqualFit` when different predictions
+have the same error vector, and `Incomparable` when each candidate is better on a
+different observable. None may be silently converted into a forced ranking.
+
+The A5 in-memory freeze is not durable preregistration. Probabilistic forecasting,
+proper scoring, calibration, and durable evidence records belong to the existing
+Symthaea Futures Laboratory in a later tranche rather than being duplicated here.
 
 ## Property tests (`tests/invariants.rs`)
 

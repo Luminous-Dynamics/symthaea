@@ -1,0 +1,139 @@
+name: Economic Science A5 Blind Identification
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-scenarios/src/economic_identification.rs"
+      - "crates/domains/symthaea-scenarios/src/economic_science.rs"
+      - "crates/domains/symthaea-scenarios/src/lib.rs"
+      - "crates/domains/symthaea-scenarios/README.md"
+      - "crates/domains/symthaea-economics/**"
+      - ".github/workflows/economic-science-a5.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-scenarios/src/economic_identification.rs"
+      - "crates/domains/symthaea-scenarios/src/economic_science.rs"
+      - "crates/domains/symthaea-scenarios/src/lib.rs"
+      - "crates/domains/symthaea-scenarios/README.md"
+      - "crates/domains/symthaea-economics/**"
+      - ".github/workflows/economic-science-a5.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: economic-science-a5-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze A5 blind-identification boundary
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("crates/domains/symthaea-scenarios/src/economic_identification.rs").read_text()
+
+          required = [
+              "struct BlindCaseInput",
+              "const BLIND_INPUTS",
+              "const HIDDEN_GENERATORS",
+              "struct FrozenCandidatePredictions",
+              "fn freeze_candidate_predictions(shock_bps: u16)",
+              "fn freeze_blind_suite()",
+              "fn reveal_world(",
+              "IdentificationVerdict::Indistinguishable",
+              "IdentificationVerdict::EqualFit",
+              "IdentificationVerdict::Incomparable",
+              "fn pareto_dominates",
+              "summary.correct_identifications, 6",
+              "summary.incorrect_identifications, 0",
+              "summary.indistinguishable_cases, 2",
+              "summary.equal_fit_cases, 0",
+              "pareto_rule_refuses_cross_metric_tradeoffs",
+              "equal_error_does_not_imply_observational_equivalence",
+          ]
+          missing = [item for item in required if item not in source]
+          if missing:
+              raise SystemExit(f"A5 blind-identification contract drift: {missing}")
+
+          # Candidate prediction construction must not receive hidden-world identity.
+          freeze_decl = source.split("fn freeze_candidate_predictions", 1)[1].split("{", 1)[0]
+          if "generator" in freeze_decl or "world" in freeze_decl or "case_id" in freeze_decl:
+              raise SystemExit("A5 candidate freeze surface gained hidden-world information")
+
+          # Freeze the whole suite before the experiment runner performs any reveal.
+          runner = source.split("pub fn run_a5_blind_identification_suite", 1)[1].split(
+              "pub fn summarize_a5", 1
+          )[0]
+          freeze_at = runner.find("let frozen_cases = freeze_blind_suite")
+          reveal_at = runner.find("reveal_world(frozen_case.input)")
+          if freeze_at < 0 or reveal_at < 0 or freeze_at >= reveal_at:
+              raise SystemExit("A5 must freeze the complete candidate suite before reveal")
+
+          # Generator-free inputs and hidden generators must remain separate tables.
+          inputs = source.split("const BLIND_INPUTS", 1)[1].split("const HIDDEN_GENERATORS", 1)[0]
+          if "SyntheticGeneratorKind" in inputs or "generator:" in inputs:
+              raise SystemExit("A5 blind input table leaks hidden generator identity")
+          hidden = source.split("const HIDDEN_GENERATORS", 1)[1].split("struct FrozenBlindCase", 1)[0]
+          if "shock_bps" in hidden:
+              raise SystemExit("A5 hidden generator table must not duplicate candidate shocks")
+
+          # Keep errors dimension-preserving: no scalar numerical aggregation layer here.
+          forbidden_scalar = [
+              "f64",
+              "weighted_error",
+              "combined_error",
+              "total_error",
+              "error_weight",
+              "welfare_weight",
+          ]
+          present_scalar = [item for item in forbidden_scalar if item in source]
+          if present_scalar:
+              raise SystemExit(f"A5 gained scalarized comparison surface: {present_scalar}")
+
+          forbidden_surface = [
+              "rand::",
+              "thread_rng",
+              "SystemTime",
+              "Instant::now",
+              "std::fs",
+              "std::net",
+              "EvidenceChannel",
+              "EvidenceMaturity",
+              "symthaea_futures",
+          ]
+          present_surface = [item for item in forbidden_surface if item in source]
+          if present_surface:
+              raise SystemExit(f"A5 gained forbidden nondeterministic/evidence surface: {present_surface}")
+
+          if source.count("shock_bps: 1_000") != 2:
+              raise SystemExit("A5 must retain both null-identifiability controls")
+          if "produced exactly the same observable prediction" not in source:
+              raise SystemExit("A5 must distinguish observational equivalence from equal fit")
+          if "synthetic model behavior only" not in source:
+              raise SystemExit("A5 must retain explicit synthetic-only non-claim")
+          PY
+
+      - name: Verify locked workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-scenarios
+
+      - name: Focused A5 tests
+        run: cargo test --locked -p symthaea-scenarios --lib economic_identification
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-scenarios --lib --no-deps -- -D warnings
