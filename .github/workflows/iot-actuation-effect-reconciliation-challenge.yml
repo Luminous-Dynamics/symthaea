@@ -1,0 +1,219 @@
+name: IoT Actuation Effect Reconciliation Challenge
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-effect-reconciliation-challenge/**'
+      - 'crates/bridges/symthaea-iot-actuation-effect-attempt-journal/**'
+      - 'crates/bridges/symthaea-iot-actuation-effect-dispatch/**'
+      - '.github/workflows/iot-actuation-effect-reconciliation-challenge.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-actuation-effect-reconciliation-challenge-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Freeze non-authorizing reconciliation challenge contract
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          root = Path('crates/bridges/symthaea-iot-actuation-effect-reconciliation-challenge')
+          src = (root / 'src/lib.rs').read_text()
+          code = '\n'.join(
+              line for line in src.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+          compact = ''.join(code.split())
+
+          required = [
+              'pubconstEFFECT_RECONCILIATION_CHALLENGE_SCHEMA_VERSION:u16=1;',
+              'pubconstMAX_EFFECT_RECONCILIATION_CHALLENGE_LIFETIME_MS:u64=5_000;',
+              'pubenumReconciliationSourceStateV1',
+              'Prepared,',
+              'AdapterAcknowledged{adapter_evidence_digest:Digest32,}',
+              'AdapterIndeterminate,',
+              'pubstructEffectReconciliationChallengeV1',
+              'journal_generation:u64',
+              'journal_digest:Digest32',
+              'correlation_digest:Digest32',
+              'command_digest:Digest32',
+              'envelope_digest:Digest32',
+              'composition_digest:Digest32',
+              'source_state:ReconciliationSourceStateV1',
+              'attempt_common_fenced_at_unix_ms:u64',
+              'attempt_wall_valid_until_unix_ms:u64',
+              'issued_at_unix_ms:u64',
+              'expires_at_unix_ms:u64',
+              'pubfnissue_effect_reconciliation_challenge<A>(journal:&mutRollbackProtectedEffectAttemptJournal<A>)',
+              'A:IndependentEffectAttemptHeadAnchor',
+              '.current_checkpoint()',
+              'ifcheckpoint_head!=journal.anchored_head()',
+              'if!latest.requires_reconciliation()',
+              'DurableEffectAttemptStateV1::AbandonedBeforePort{..}',
+              'getrandom::getrandom(&mutnonce)',
+              'letissued_at_unix_ms=system_unix_ms()',
+              '.checked_add(MAX_EFFECT_RECONCILIATION_CHALLENGE_LIFETIME_MS)',
+              'ifself.issued_at_unix_ms<self.attempt_common_fenced_at_unix_ms',
+              'now_unix_ms>=self.issued_at_unix_ms&&now_unix_ms<self.expires_at_unix_ms',
+          ]
+          missing = [needle for needle in required if needle not in compact]
+          if missing:
+              raise SystemExit(f'missing reconciliation-challenge invariant: {missing}')
+
+          ordered = [
+              compact.find('.current_checkpoint()'),
+              compact.find('letcheckpoint_head=checkpoint.head()'),
+              compact.find('letlatest=checkpoint.latest()'),
+              compact.find('letcorrelation=latest.correlation();'),
+              compact.find('getrandom::getrandom(&mutnonce)'),
+              compact.find('letissued_at_unix_ms=system_unix_ms()'),
+              compact.find('letchallenge=EffectReconciliationChallengeV1{'),
+          ]
+          if any(pos < 0 for pos in ordered) or ordered != sorted(ordered):
+              raise SystemExit(f'protected-state/entropy/time/challenge order changed: {ordered}')
+
+          forbidden = [
+              'Deserialize',
+              'PrivilegedPhysicalEffectPort',
+              'dispatch_current_attempt',
+              'FinalActuatorPermit',
+              'TrustBoundFinalActuatorPermit',
+              'JustInTimeHalLease',
+              'CompleteJitHalLease',
+              'TransportTrustRegistry',
+              'DeviceRealityTrustRegistry',
+              'InterlockTrustRegistry',
+              'verify_xenia_',
+              'verify_strict(',
+              'persist_prepared_anchored(',
+              'persist_abandoned_before_port_anchored(',
+              'persist_adapter_acknowledged_anchored(',
+              'persist_adapter_indeterminate_anchored(',
+              'TcpListener', 'TcpStream', 'UdpSocket', 'tokio::spawn',
+              'std::process::Command', 'Command::new', 'unsafe{',
+              'ReconciledRealized', 'ReconciledNotRealized',
+              'DurableEffectAttemptStateV1::Realized',
+              'DurableEffectAttemptStateV1::NotRealized',
+          ]
+          found = [needle for needle in forbidden if needle in compact]
+          if found:
+              raise SystemExit(f'challenge crossed non-authorizing boundary: {found}')
+
+          if compact.count('getrandom::getrandom(&mutnonce)') != 1:
+              raise SystemExit('challenge nonce must come from exactly one OS-entropy call')
+          if compact.count('system_unix_ms()') < 2:
+              raise SystemExit('guard-local wall clock helper/issuance path changed unexpectedly')
+
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          expected = {
+              'bincode', 'blake3', 'getrandom', 'serde', 'symthaea-authority',
+              'symthaea-iot-actuation-effect-attempt-journal', 'thiserror',
+          }
+          actual = set(manifest.get('dependencies', {}))
+          if actual != expected:
+              raise SystemExit(f'challenge production dependency drift: {sorted(actual)}')
+
+          dev = manifest.get('dev-dependencies', {})
+          if set(dev) != {'symthaea-iot-actuation-effect-dispatch'}:
+              raise SystemExit(f'challenge dev dependency drift: {sorted(dev)}')
+          if dev['symthaea-iot-actuation-effect-dispatch'].get('features') != [
+              'qualification-legacy-unjournaled'
+          ]:
+              raise SystemExit('qualification correlation fixture escaped its reviewed feature')
+
+      - name: Install Rust 1.96 formatter
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt reconciliation challenge
+        run: >-
+          cargo +1.96.0 fmt --check
+          -p symthaea-iot-actuation-effect-reconciliation-challenge
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Check challenge package
+        run: >-
+          cargo +1.94.0 check
+          -p symthaea-iot-actuation-effect-reconciliation-challenge
+          --all-targets --no-default-features
+
+      - name: Reject unreviewed external dependency drift
+        shell: python
+        run: |
+          import tomllib
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source')): p
+                  for p in doc.get('package', []) if p.get('source') is not None
+              }
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          b = set(before); a = set(after)
+          added = a - b; removed = b - a
+          changed = sorted(k for k in a & b if after[k] != before[k])
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          if not added.issubset(allowed) or removed or changed:
+              raise SystemExit(
+                  f'external dependency drift: added={sorted(added)}, '
+                  f'removed={sorted(removed)}, changed={changed}'
+              )
+
+      - name: Run protected challenge regressions first
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-actuation-effect-reconciliation-challenge
+          --test challenge --no-default-features
+
+      - name: Challenge package tests
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-actuation-effect-reconciliation-challenge
+          --all-targets --no-default-features
+
+      - name: Strict package-local Clippy
+        run: >-
+          cargo +1.94.0 clippy
+          -p symthaea-iot-actuation-effect-reconciliation-challenge
+          --all-targets --no-default-features --no-deps -- -D warnings
+
+      - name: Show local-only Cargo.lock bookkeeping
+        if: always()
+        run: git diff -- Cargo.lock || true
