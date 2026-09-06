@@ -534,14 +534,19 @@ mod tests {
     fn independently_anchored_policy_and_trust_are_required() {
         let signing_key = signing_key(0x61);
         let policy = policy();
-        let registry = registry(
+        let policy_mismatch_registry = registry(
             &signing_key,
             DeviceRealityVerifierKeyStatus::Active,
             20_000,
         );
-        let head = registry.head();
+        let head = policy_mismatch_registry.head();
         assert!(matches!(
-            GuardDeviceRealityState::new(policy.clone(), d(0xFE), registry, head),
+            GuardDeviceRealityState::new(
+                policy.clone(),
+                d(0xFE),
+                policy_mismatch_registry,
+                head,
+            ),
             Err(DeviceRealityError::AnchoredPolicyDigestMismatch)
         ));
 
