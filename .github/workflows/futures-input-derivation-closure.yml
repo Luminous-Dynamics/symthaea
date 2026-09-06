@@ -1,0 +1,125 @@
+name: Futures Input Derivation Closure
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-futures-ledger/tests/input_derivation_closure.rs'
+      - '.github/workflows/futures-input-derivation-closure.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze derivation-closure theorem and qualification-only scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          test = Path('crates/domains/symthaea-futures-ledger/tests/input_derivation_closure.rs').read_text()
+          provenance = Path('crates/domains/symthaea-futures-ledger/src/provenance.rs').read_text()
+
+          required = [
+              'struct DerivationStep',
+              'transform: ContentAddressedRef',
+              'inputs: Vec<ContentAddressedRef>',
+              'parameters: Vec<ContentAddressedRef>',
+              'output: ContentAddressedRef',
+              'struct ClosedInputDerivation',
+              'FinalSnapshotUndeclared',
+              'FinalSnapshotDigestMismatch',
+              'UnknownDependency',
+              'DependencyDigestMismatch',
+              'Cycle(String)',
+              'DecorativeStep(String)',
+              'DecorativeRoot(String)',
+              'current_typed_provenance_is_an_inventory_not_a_derivation_proof',
+              'closed_derivation_accepts_a_complete_two_step_chain_independent_of_step_order',
+              'unrelated_final_snapshot_fails_even_when_all_digests_are_well_formed',
+              'undeclared_dependency_and_digest_substitution_fail_closed',
+              'cycles_fail_even_when_every_artifact_is_declared',
+              'decorative_steps_and_roots_are_rejected_not_silently_credited',
+              'direct_source_snapshot_is_closed_without_inventing_a_transform',
+          ]
+          for needle in required:
+              if needle not in test:
+                  raise SystemExit(f'missing derivation-closure invariant: {needle}')
+
+          # Freeze #548 as an inventory boundary. If product provenance later grows
+          # graph topology, this qualification spike must be re-audited rather than
+          # silently becoming a duplicate authority path.
+          inventory_markers = [
+              'observations: Vec<ContentAddressedRef>',
+              'input_snapshot: ContentAddressedRef',
+              'transformations: Vec<ContentAddressedRef>',
+              'observation_policy: ContentAddressedRef',
+              'models: Vec<ContentAddressedRef>',
+              'generators: Vec<ContentAddressedRef>',
+          ]
+          for needle in inventory_markers:
+              if needle not in provenance:
+                  raise SystemExit(f'#548 provenance boundary changed; re-audit closure theorem: {needle}')
+
+          forbidden = [
+              'sha2::',
+              'blake3::',
+              'SystemTime::now',
+              'chrono::',
+              'reqwest::',
+              'ureq::',
+              'symthaea_economics',
+          ]
+          for needle in forbidden:
+              if needle in test:
+                  raise SystemExit(f'derivation spike acquired unrelated computation/authority: {needle}')
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/futures-input-derivation-closure.yml',
+              'crates/domains/symthaea-futures-ledger/tests/input_derivation_closure.rs',
+          }
+          if changed != allowed:
+              raise SystemExit(f'derivation qualification must remain exactly two files; got {sorted(changed)}')
+
+          forbidden_product = {
+              'crates/domains/symthaea-futures-ledger/src/v2.rs',
+              'crates/domains/symthaea-futures-ledger/src/prospective.rs',
+              'crates/domains/symthaea-futures-ledger/src/provenance.rs',
+              'crates/domains/symthaea-futures-ledger/src/lib.rs',
+              'crates/domains/symthaea-futures-ledger/Cargo.toml',
+              'Cargo.lock',
+          }
+          touched = changed & forbidden_product
+          if touched:
+              raise SystemExit(f'qualification spike modified product/manifest state: {sorted(touched)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-futures-ledger -- --check
+
+      - name: Derivation closure qualification test
+        run: cargo test --locked -p symthaea-futures-ledger --test input_derivation_closure
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-futures-ledger --test input_derivation_closure -- -D warnings
