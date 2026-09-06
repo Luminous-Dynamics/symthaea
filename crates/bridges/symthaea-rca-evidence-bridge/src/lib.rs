@@ -30,6 +30,16 @@ use symthaea_rca_shadow::{
 pub const RUNTIME_EVIDENCE_CANDIDATE_SCHEMA_VERSION: u16 = 1;
 pub const RUNTIME_EVIDENCE_CANDIDATE_PROFILE_V1: &str =
     "rca-instrumented-runtime-evidence-candidate-v1";
+pub const RUNTIME_OBSERVATION_ROOT_PROFILE_V1: &str = "rca-runtime-observation-root-v1";
+
+/// Normative identity for the shared provenance root of one frozen observation.
+pub const RUNTIME_OBSERVATION_ROOT_CONTRACT_V1: &str = concat!(
+    "rca-runtime-observation-root-v1\n",
+    "root=one_exact_validated_frozen_cycle_observation\n",
+    "root_id=blake3(profile_digest|observer_contract_digest|observation_commitment)\n",
+    "all_field_candidates_from_same_observation_share_root\n",
+    "observation_root_is_provenance_only_not_epistemic_admission\n",
+);
 
 /// Normative semantics for candidate evidence extracted from the detached
 /// runtime observation boundary.
@@ -43,14 +53,17 @@ pub const RUNTIME_EVIDENCE_CANDIDATE_CONTRACT_V1: &str = concat!(
     "claim_selection=closed_lossless_field_projection_only\n",
     "fields=cycle_time_us,prediction_error_ppm,peak_attention_bits,learning_occurred,detected_primitive_count,output_digest,thought_digest,metadata_digest,language_output\n",
     "claim_digest=domain_separated_explicit_variant_encoding\n",
-    "candidate_id=blake3(profile_digest|observer_contract_digest|observation_commitment|claim_digest)\n",
+    "candidate_id=blake3(profile_digest|observation_root_id|claim_digest)\n",
+    "candidate_lineage=transformation_child_of_shared_observation_root\n",
+    "same_observation_field_candidates_are_not_independent_roots\n",
     "candidate_is_not_CognitiveEvidenceRefV1\n",
     "candidate_is_not_AdmittedCognitiveEvidenceV1\n",
-    "lineage_root_is_provenance_only_not_epistemic_admission\n",
     "candidate_does_not_self_declare_currentness\n",
     "no_gwt_workspace_action_or_self_improvement_authority\n",
 );
 
+const ROOT_PROFILE_DOMAIN: &[u8] = b"symthaea:rca-runtime-observation-root-contract:v1\0";
+const ROOT_ID_DOMAIN: &[u8] = b"symthaea:rca-runtime-observation-root:v1\0";
 const PROFILE_DOMAIN: &[u8] = b"symthaea:rca-runtime-evidence-candidate-contract:v1\0";
 const CLAIM_DOMAIN: &[u8] = b"symthaea:rca-runtime-observed-claim:v1\0";
 const CANDIDATE_DOMAIN: &[u8] = b"symthaea:rca-runtime-evidence-candidate:v1\0";
@@ -89,12 +102,34 @@ pub enum InstrumentedRuntimeClaimV1 {
     },
 }
 
+/// Recomputed lineage fragment for one runtime field candidate.
+///
+/// The observation event is the root. The selected field candidate is a
+/// deterministic `Transformation` child of that shared root. This prevents two
+/// fields extracted from the same cycle from masquerading as independent
+/// observations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeCandidateLineageV1 {
+    observation_root: ValidatedEvidenceLineageNodeV1,
+    candidate_node: ValidatedEvidenceLineageNodeV1,
+}
+
+impl RuntimeCandidateLineageV1 {
+    pub fn observation_root(&self) -> &ValidatedEvidenceLineageNodeV1 {
+        &self.observation_root
+    }
+
+    pub fn candidate_node(&self) -> &ValidatedEvidenceLineageNodeV1 {
+        &self.candidate_node
+    }
+}
+
 /// Persistable candidate evidence derived mechanically from a detached
 /// observation.
 ///
 /// Deserialization revalidates the nested observation, re-extracts the selected
-/// field, recomputes observer identity, claim identity, and candidate identity,
-/// and rejects any mismatch.
+/// field, recomputes observer identity, shared observation-root identity, claim
+/// identity, and candidate identity, and rejects any mismatch.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct InstrumentedRuntimeEvidenceCandidateV1 {
     schema_version: u16,
@@ -103,6 +138,7 @@ pub struct InstrumentedRuntimeEvidenceCandidateV1 {
     observer_profile: String,
     observer_contract_digest: String,
     observation_commitment: String,
+    observation_root_id: String,
     field: ShadowObservationFieldV1,
     claim: InstrumentedRuntimeClaimV1,
     claim_digest: String,
@@ -117,12 +153,15 @@ impl InstrumentedRuntimeEvidenceCandidateV1 {
     ) -> Self {
         let receipt = observe(&observation);
         let candidate_profile_digest = runtime_evidence_candidate_profile_digest_v1();
+        let observation_root_id = runtime_observation_root_id_v1_from_receipt(
+            &receipt.observer_contract_digest,
+            &receipt.observation_commitment,
+        );
         let claim = extract_claim(&observation, field);
         let claim_digest = runtime_claim_digest_v1(&claim);
         let candidate_id = runtime_evidence_candidate_id_v1(
             &candidate_profile_digest,
-            &receipt.observer_contract_digest,
-            &receipt.observation_commitment,
+            &observation_root_id,
             &claim_digest,
         );
 
@@ -133,6 +172,7 @@ impl InstrumentedRuntimeEvidenceCandidateV1 {
             observer_profile: receipt.observer_profile,
             observer_contract_digest: receipt.observer_contract_digest,
             observation_commitment: receipt.observation_commitment,
+            observation_root_id,
             field,
             claim,
             claim_digest,
@@ -143,6 +183,10 @@ impl InstrumentedRuntimeEvidenceCandidateV1 {
 
     pub fn candidate_id(&self) -> &str {
         &self.candidate_id
+    }
+
+    pub fn observation_root_id(&self) -> &str {
+        &self.observation_root_id
     }
 
     pub fn claim_digest(&self) -> &str {
@@ -165,20 +209,32 @@ impl InstrumentedRuntimeEvidenceCandidateV1 {
         &self.observation
     }
 
-    /// Represent this candidate as a root in the generic evidence-lineage DAG.
+    /// Recompute the generic lineage fragment for this candidate.
     ///
-    /// This records provenance only. A lineage root is not canonical cognitive
-    /// evidence admission and does not grant any downstream use.
-    pub fn lineage_root(
-        &self,
-    ) -> Result<ValidatedEvidenceLineageNodeV1, CognitiveLineageError> {
-        EvidenceLineageNodeV1 {
+    /// The candidate itself is **not** a root observation. It is a deterministic
+    /// transformation of the exact frozen observation event represented by the
+    /// shared `observation_root_id`.
+    pub fn lineage_fragment(&self) -> Result<RuntimeCandidateLineageV1, CognitiveLineageError> {
+        let observation_root = EvidenceLineageNodeV1 {
             schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
-            evidence_id: self.candidate_id.clone(),
+            evidence_id: self.observation_root_id.clone(),
             parent_ids: Vec::new(),
             derivation_kind: CognitiveDerivationKindV1::RootObservation,
         }
-        .validate()
+        .validate()?;
+
+        let candidate_node = EvidenceLineageNodeV1 {
+            schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
+            evidence_id: self.candidate_id.clone(),
+            parent_ids: vec![self.observation_root_id.clone()],
+            derivation_kind: CognitiveDerivationKindV1::Transformation,
+        }
+        .validate()?;
+
+        Ok(RuntimeCandidateLineageV1 {
+            observation_root,
+            candidate_node,
+        })
     }
 }
 
@@ -191,6 +247,7 @@ struct InstrumentedRuntimeEvidenceCandidateWireV1 {
     observer_profile: String,
     observer_contract_digest: String,
     observation_commitment: String,
+    observation_root_id: String,
     field: ShadowObservationFieldV1,
     claim: InstrumentedRuntimeClaimV1,
     claim_digest: String,
@@ -219,6 +276,7 @@ impl<'de> Deserialize<'de> for InstrumentedRuntimeEvidenceCandidateV1 {
         validate_digest(&wire.candidate_profile_digest).map_err(serde::de::Error::custom)?;
         validate_digest(&wire.observer_contract_digest).map_err(serde::de::Error::custom)?;
         validate_digest(&wire.observation_commitment).map_err(serde::de::Error::custom)?;
+        validate_digest(&wire.observation_root_id).map_err(serde::de::Error::custom)?;
         validate_digest(&wire.claim_digest).map_err(serde::de::Error::custom)?;
         validate_digest(&wire.candidate_id).map_err(serde::de::Error::custom)?;
 
@@ -240,6 +298,16 @@ impl<'de> Deserialize<'de> for InstrumentedRuntimeEvidenceCandidateV1 {
             ));
         }
 
+        let expected_observation_root_id = runtime_observation_root_id_v1_from_receipt(
+            &receipt.observer_contract_digest,
+            &receipt.observation_commitment,
+        );
+        if wire.observation_root_id != expected_observation_root_id {
+            return Err(serde::de::Error::custom(
+                RuntimeEvidenceCandidateError::ObservationRootIdentityMismatch,
+            ));
+        }
+
         let expected_claim = extract_claim(&wire.observation, wire.field);
         if wire.claim != expected_claim {
             return Err(serde::de::Error::custom(
@@ -256,8 +324,7 @@ impl<'de> Deserialize<'de> for InstrumentedRuntimeEvidenceCandidateV1 {
 
         let expected_candidate_id = runtime_evidence_candidate_id_v1(
             &expected_profile_digest,
-            &receipt.observer_contract_digest,
-            &receipt.observation_commitment,
+            &expected_observation_root_id,
             &expected_claim_digest,
         );
         if wire.candidate_id != expected_candidate_id {
@@ -273,6 +340,7 @@ impl<'de> Deserialize<'de> for InstrumentedRuntimeEvidenceCandidateV1 {
             observer_profile: wire.observer_profile,
             observer_contract_digest: wire.observer_contract_digest,
             observation_commitment: wire.observation_commitment,
+            observation_root_id: wire.observation_root_id,
             field: wire.field,
             claim: wire.claim,
             claim_digest: wire.claim_digest,
@@ -282,11 +350,42 @@ impl<'de> Deserialize<'de> for InstrumentedRuntimeEvidenceCandidateV1 {
     }
 }
 
+pub fn runtime_observation_root_profile_digest_v1() -> String {
+    domain_hash(
+        ROOT_PROFILE_DOMAIN,
+        RUNTIME_OBSERVATION_ROOT_CONTRACT_V1.as_bytes(),
+    )
+}
+
 pub fn runtime_evidence_candidate_profile_digest_v1() -> String {
     domain_hash(
         PROFILE_DOMAIN,
         RUNTIME_EVIDENCE_CANDIDATE_CONTRACT_V1.as_bytes(),
     )
+}
+
+fn runtime_observation_root_id_v1_from_receipt(
+    observer_contract_digest: &str,
+    observation_commitment: &str,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(ROOT_ID_DOMAIN);
+    hash_field(
+        &mut hasher,
+        b"root_profile_digest",
+        runtime_observation_root_profile_digest_v1().as_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"observer_contract_digest",
+        observer_contract_digest.as_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"observation_commitment",
+        observation_commitment.as_bytes(),
+    );
+    format!("blake3:{}", hasher.finalize().to_hex())
 }
 
 fn extract_claim(
@@ -388,8 +487,7 @@ fn runtime_claim_digest_v1(claim: &InstrumentedRuntimeClaimV1) -> String {
 
 fn runtime_evidence_candidate_id_v1(
     profile_digest: &str,
-    observer_contract_digest: &str,
-    observation_commitment: &str,
+    observation_root_id: &str,
     claim_digest: &str,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
@@ -397,13 +495,8 @@ fn runtime_evidence_candidate_id_v1(
     hash_field(&mut hasher, b"profile_digest", profile_digest.as_bytes());
     hash_field(
         &mut hasher,
-        b"observer_contract_digest",
-        observer_contract_digest.as_bytes(),
-    );
-    hash_field(
-        &mut hasher,
-        b"observation_commitment",
-        observation_commitment.as_bytes(),
+        b"observation_root_id",
+        observation_root_id.as_bytes(),
     );
     hash_field(&mut hasher, b"claim_digest", claim_digest.as_bytes());
     format!("blake3:{}", hasher.finalize().to_hex())
@@ -459,6 +552,7 @@ pub enum RuntimeEvidenceCandidateError {
     MalformedDigest,
     CandidateProfileDigestMismatch,
     ObservationBindingMismatch,
+    ObservationRootIdentityMismatch,
     ClaimProjectionMismatch,
     ClaimDigestMismatch,
     CandidateIdentityMismatch,
@@ -484,6 +578,9 @@ impl std::fmt::Display for RuntimeEvidenceCandidateError {
             Self::ObservationBindingMismatch => {
                 f.write_str("runtime-evidence candidate does not match its validated observation")
             }
+            Self::ObservationRootIdentityMismatch => {
+                f.write_str("runtime-evidence candidate does not match its shared observation-root identity")
+            }
             Self::ClaimProjectionMismatch => {
                 f.write_str("runtime-evidence claim is not the declared lossless observation-field projection")
             }
@@ -491,7 +588,7 @@ impl std::fmt::Display for RuntimeEvidenceCandidateError {
                 f.write_str("runtime-evidence claim digest does not match the extracted claim")
             }
             Self::CandidateIdentityMismatch => {
-                f.write_str("runtime-evidence candidate id does not match observation and claim identity")
+                f.write_str("runtime-evidence candidate id does not match observation-root and claim identity")
             }
         }
     }
@@ -502,6 +599,9 @@ impl std::error::Error for RuntimeEvidenceCandidateError {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_epistemic_governance::lineage::{
+        EvidenceIndependenceV1, EvidenceLineageGraphV1,
+    };
     use symthaea_rca_shadow::{
         FrozenCycleObservationV1, FROZEN_CYCLE_OBSERVATION_SCHEMA_VERSION,
     };
@@ -536,6 +636,12 @@ mod tests {
         .unwrap()
     }
 
+    fn observation_at_cycle(cycle_index: u64) -> ValidatedFrozenCycleObservationV1 {
+        let mut raw = observation().as_raw().clone();
+        raw.cycle_index = cycle_index;
+        raw.validate().unwrap()
+    }
+
     #[test]
     fn candidate_is_deterministic_for_same_observation_and_field() {
         let a = InstrumentedRuntimeEvidenceCandidateV1::new(
@@ -564,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    fn different_fields_are_different_candidate_evidence() {
+    fn different_fields_are_different_candidates_but_share_observation_root() {
         let pe = InstrumentedRuntimeEvidenceCandidateV1::new(
             observation(),
             ShadowObservationFieldV1::PredictionErrorPpm,
@@ -575,36 +681,37 @@ mod tests {
         );
         assert_ne!(pe.claim_digest(), learning.claim_digest());
         assert_ne!(pe.candidate_id(), learning.candidate_id());
+        assert_eq!(pe.observation_root_id(), learning.observation_root_id());
     }
 
     #[test]
-    fn observation_identity_is_candidate_identity_bearing() {
+    fn observation_identity_is_candidate_and_root_identity_bearing() {
         let a = InstrumentedRuntimeEvidenceCandidateV1::new(
             observation(),
             ShadowObservationFieldV1::PredictionErrorPpm,
         );
-        let mut raw = observation().as_raw().clone();
-        raw.cycle_index += 1;
         let b = InstrumentedRuntimeEvidenceCandidateV1::new(
-            raw.validate().unwrap(),
+            observation_at_cycle(10),
             ShadowObservationFieldV1::PredictionErrorPpm,
         );
         assert_ne!(a.observation_commitment(), b.observation_commitment());
+        assert_ne!(a.observation_root_id(), b.observation_root_id());
         assert_ne!(a.candidate_id(), b.candidate_id());
     }
 
     #[test]
-    fn candidate_id_is_not_observation_or_claim_identity() {
+    fn candidate_id_is_not_root_observation_or_claim_identity() {
         let candidate = InstrumentedRuntimeEvidenceCandidateV1::new(
             observation(),
             ShadowObservationFieldV1::PredictionErrorPpm,
         );
+        assert_ne!(candidate.candidate_id(), candidate.observation_root_id());
         assert_ne!(candidate.candidate_id(), candidate.observation_commitment());
         assert_ne!(candidate.candidate_id(), candidate.claim_digest());
     }
 
     #[test]
-    fn persistence_revalidates_complete_projection() {
+    fn persistence_revalidates_complete_projection_and_shared_root() {
         let candidate = InstrumentedRuntimeEvidenceCandidateV1::new(
             observation(),
             ShadowObservationFieldV1::PredictionErrorPpm,
@@ -629,6 +736,19 @@ mod tests {
     }
 
     #[test]
+    fn tampered_observation_root_fails_closed() {
+        let candidate = InstrumentedRuntimeEvidenceCandidateV1::new(
+            observation(),
+            ShadowObservationFieldV1::PredictionErrorPpm,
+        );
+        let mut value = serde_json::to_value(&candidate).unwrap();
+        value["observation_root_id"] = serde_json::Value::String(SHA_A.into());
+        assert!(
+            serde_json::from_value::<InstrumentedRuntimeEvidenceCandidateV1>(value).is_err()
+        );
+    }
+
+    #[test]
     fn tampered_candidate_identity_fails_closed() {
         let candidate = InstrumentedRuntimeEvidenceCandidateV1::new(
             observation(),
@@ -642,15 +762,91 @@ mod tests {
     }
 
     #[test]
-    fn candidate_can_be_a_provenance_root_without_becoming_admitted_evidence() {
+    fn lineage_fragment_makes_candidate_a_transformation_child() {
         let candidate = InstrumentedRuntimeEvidenceCandidateV1::new(
             observation(),
             ShadowObservationFieldV1::LearningOccurred,
         );
-        let root = candidate.lineage_root().unwrap();
-        assert_eq!(root.evidence_id(), candidate.candidate_id());
-        assert_eq!(root.derivation_kind(), CognitiveDerivationKindV1::RootObservation);
-        assert!(root.parent_ids().is_empty());
+        let lineage = candidate.lineage_fragment().unwrap();
+        assert_eq!(lineage.observation_root().evidence_id(), candidate.observation_root_id());
+        assert_eq!(
+            lineage.observation_root().derivation_kind(),
+            CognitiveDerivationKindV1::RootObservation
+        );
+        assert!(lineage.observation_root().parent_ids().is_empty());
+        assert_eq!(lineage.candidate_node().evidence_id(), candidate.candidate_id());
+        assert_eq!(
+            lineage.candidate_node().derivation_kind(),
+            CognitiveDerivationKindV1::Transformation
+        );
+        assert_eq!(
+            lineage.candidate_node().parent_ids(),
+            &[candidate.observation_root_id().to_string()]
+        );
+    }
+
+    #[test]
+    fn same_observation_field_candidates_are_not_independent() {
+        let pe = InstrumentedRuntimeEvidenceCandidateV1::new(
+            observation(),
+            ShadowObservationFieldV1::PredictionErrorPpm,
+        );
+        let learning = InstrumentedRuntimeEvidenceCandidateV1::new(
+            observation(),
+            ShadowObservationFieldV1::LearningOccurred,
+        );
+        let pe_lineage = pe.lineage_fragment().unwrap();
+        let learning_lineage = learning.lineage_fragment().unwrap();
+
+        let graph = EvidenceLineageGraphV1 {
+            schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
+            graph_id: SHA_B.into(),
+            nodes: vec![
+                pe_lineage.observation_root().clone(),
+                pe_lineage.candidate_node().clone(),
+                learning_lineage.candidate_node().clone(),
+            ],
+        }
+        .validate()
+        .unwrap();
+
+        assert_eq!(
+            graph
+                .assess_independence(pe.candidate_id(), learning.candidate_id())
+                .unwrap(),
+            EvidenceIndependenceV1::SameRoot
+        );
+    }
+
+    #[test]
+    fn different_observation_events_can_be_independent() {
+        let a = InstrumentedRuntimeEvidenceCandidateV1::new(
+            observation_at_cycle(9),
+            ShadowObservationFieldV1::PredictionErrorPpm,
+        );
+        let b = InstrumentedRuntimeEvidenceCandidateV1::new(
+            observation_at_cycle(10),
+            ShadowObservationFieldV1::PredictionErrorPpm,
+        );
+        let a_lineage = a.lineage_fragment().unwrap();
+        let b_lineage = b.lineage_fragment().unwrap();
+        let graph = EvidenceLineageGraphV1 {
+            schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
+            graph_id: SHA_A.into(),
+            nodes: vec![
+                a_lineage.observation_root().clone(),
+                a_lineage.candidate_node().clone(),
+                b_lineage.observation_root().clone(),
+                b_lineage.candidate_node().clone(),
+            ],
+        }
+        .validate()
+        .unwrap();
+
+        assert_eq!(
+            graph.assess_independence(a.candidate_id(), b.candidate_id()).unwrap(),
+            EvidenceIndependenceV1::Independent
+        );
     }
 
     #[test]
@@ -669,6 +865,14 @@ mod tests {
                 source: None
             }
         );
+    }
+
+    #[test]
+    fn observation_root_profile_has_strict_identity() {
+        let digest = runtime_observation_root_profile_digest_v1();
+        assert!(digest.starts_with("blake3:"));
+        assert_eq!(digest.len(), "blake3:".len() + 64);
+        assert_eq!(digest, runtime_observation_root_profile_digest_v1());
     }
 
     #[test]
