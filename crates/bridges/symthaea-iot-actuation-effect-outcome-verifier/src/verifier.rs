@@ -58,7 +58,7 @@ impl GuardPhysicalEffectOutcomeState {
         self.verify_evidence_at(evidence, challenge, system_unix_ms()?)
     }
 
-    fn verify_evidence_at(
+    pub(crate) fn verify_evidence_at(
         &self,
         evidence: PhysicalEffectOutcomeEvidenceV1,
         challenge: &EffectReconciliationChallengeV1,
