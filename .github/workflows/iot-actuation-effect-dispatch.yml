@@ -178,6 +178,13 @@ jobs:
           fixture::wrong_privileged_port_binding_never_invokes_effect_method
           -- --exact
 
+      - name: Adapter error is retained as indeterminate correlation
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-actuation-linearization
+          --test full_chain
+          fixture::adapter_error_after_invocation_is_indeterminate_with_exact_correlation
+          -- --exact
+
       - name: Effect-dispatch package tests
         run: cargo +1.94.0 test -p symthaea-iot-actuation-effect-dispatch --all-targets
 
