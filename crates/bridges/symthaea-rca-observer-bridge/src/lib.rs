@@ -23,8 +23,9 @@
 //!
 //! The wrapper keeps both the service and live-issued lineage capability private.
 //! It exposes cognitive cycles only as [`RcaCompletedCycleV1`], which binds each
-//! result to the immutable execution-lineage digest and a wrapper-owned monotonic
-//! cycle index. No shadow observer is invoked in RCA-002.0b.
+//! result to both source-generation and execution-lineage identity plus a
+//! wrapper-owned monotonic cycle index. No shadow observer is invoked in
+//! RCA-002.0b.
 
 #![deny(unsafe_code)]
 
@@ -72,16 +73,22 @@ const PROFILE_DIGEST_DOMAIN: &[u8] = b"symthaea:rca-config-profile-contract:v1\0
 
 /// One completed cycle emitted by the strict RCA-observable construction lane.
 ///
-/// Fields are private so callers cannot manufacture a lineage/cycle pairing with
-/// a struct literal. This type is deliberately non-serializable in RCA-002.0b;
-/// archival projection belongs to the later shadow-observation boundary.
+/// Fields are private so callers cannot manufacture a provenance/cycle pairing
+/// with a struct literal. This type is deliberately non-serializable in
+/// RCA-002.0b; archival projection belongs to the later shadow-observation
+/// boundary.
 pub struct RcaCompletedCycleV1 {
+    source_generation_digest: String,
     execution_lineage_digest: String,
     cycle_index: u64,
     result: CycleResult,
 }
 
 impl RcaCompletedCycleV1 {
+    pub fn source_generation_digest(&self) -> &str {
+        &self.source_generation_digest
+    }
+
     pub fn execution_lineage_digest(&self) -> &str {
         &self.execution_lineage_digest
     }
@@ -150,6 +157,11 @@ impl RcaObservableCognitiveLoopV1 {
             .expect("RCA execution cycle index exhausted u64");
 
         RcaCompletedCycleV1 {
+            source_generation_digest: self
+                .issued_lineage
+                .lineage()
+                .source_generation_digest()
+                .to_string(),
             execution_lineage_digest: self.issued_lineage.lineage_digest().to_string(),
             cycle_index: self.completed_cycles,
             result,
@@ -161,6 +173,10 @@ impl RcaObservableCognitiveLoopV1 {
     /// This does not expose or clone the live issuance capability itself.
     pub fn archival_lineage(&self) -> &CognitiveExecutionLineageV1 {
         self.issued_lineage.lineage()
+    }
+
+    pub fn source_generation_digest(&self) -> &str {
+        self.issued_lineage.lineage().source_generation_digest()
     }
 
     pub fn execution_lineage_digest(&self) -> &str {
@@ -321,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn completed_cycles_are_lineage_bound_and_monotonic() {
+    fn completed_cycles_are_provenance_bound_and_monotonic() {
         let mut observable = RcaObservableCognitiveLoopV1::new_shadow_observable(
             CognitiveLoopConfig::default(),
             SOURCE,
@@ -330,10 +346,12 @@ mod tests {
         let lineage = observable.execution_lineage_digest().to_string();
 
         let first = observable.cycle("first observation-bound cycle");
+        assert_eq!(first.source_generation_digest(), SOURCE);
         assert_eq!(first.execution_lineage_digest(), lineage);
         assert_eq!(first.cycle_index(), 1);
 
         let second = observable.cycle("second observation-bound cycle");
+        assert_eq!(second.source_generation_digest(), SOURCE);
         assert_eq!(second.execution_lineage_digest(), lineage);
         assert_eq!(second.cycle_index(), 2);
         assert_eq!(observable.completed_cycles(), 2);
