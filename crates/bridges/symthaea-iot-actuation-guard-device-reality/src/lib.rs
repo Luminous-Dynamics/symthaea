@@ -18,19 +18,26 @@
 //! current privileged path is [`GuardAdmissionDeviceRealityState`], which consumes the
 //! reservation-bound evidence introduced after durable admission reservation.
 //!
-//! Successful verification is still **not actuator authority**. Durable semantic
-//! acceptance, controller interlock verification, final-gate composition, JIT fencing
-//! and HAL/device I/O remain separate later stages.
+//! A later physical attempt must not assume that historical verification remains current.
+//! [`CurrentAdmissionDeviceRealityGuard`] re-fences the exact proof under independently anchored
+//! current policy/trust, the exact verifier key, fixed Ed25519, and natural expiry while borrowing
+//! the checked current state for the attempt.
+//!
+//! Successful verification and current fencing are still **not actuator authority**. Durable
+//! semantic state, controller interlock, multi-root linearization and HAL/device I/O remain
+//! separate later stages.
 
 #![deny(unsafe_code)]
 
 mod admission;
+mod current;
 mod error;
 mod policy;
 mod trust;
 mod verifier;
 
 pub use admission::{GuardAdmissionDeviceRealityState, VerifiedAdmissionDeviceReality};
+pub use current::{CurrentAdmissionDeviceRealityFence, CurrentAdmissionDeviceRealityGuard};
 pub use error::DeviceRealityError;
 pub use policy::{
     DEVICE_REALITY_POLICY_SCHEMA_VERSION, DeviceRealityPolicyV1,

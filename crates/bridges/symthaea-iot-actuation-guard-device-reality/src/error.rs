@@ -116,6 +116,20 @@ pub enum DeviceRealityError {
     InvalidAttestationSignature,
     #[error("device attestation result commitment could not be constructed")]
     AttestationObjectCommitmentFailed,
+
+    #[error("current device-reality proof was verified under another guard policy")]
+    CurrentDeviceRealityProofPolicyMismatch,
+    #[error("current device-reality proof was verified under another trust generation")]
+    CurrentDeviceRealityProofTrustHeadMismatch,
+    #[error("current device-reality proof's result commitment no longer matches its retained result")]
+    CurrentDeviceRealityProofCommitmentMismatch,
+    #[error("current device-reality verifier/key identity or exact key record differs from the proof")]
+    CurrentDeviceRealityVerifierKeyMismatch,
+    #[error("system wall clock regressed behind the prior device-reality verification")]
+    CurrentDeviceRealityClockRegressed,
+    #[error("current device-reality attestation/key/trust validity window has elapsed")]
+    CurrentDeviceRealityWindowElapsed,
+
     #[error("system wall clock is before Unix epoch")]
     SystemClockBeforeUnixEpoch,
     #[error("system wall-clock milliseconds do not fit the protocol time domain")]
