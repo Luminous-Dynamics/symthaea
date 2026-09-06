@@ -1,9 +1,16 @@
 mod fixture {
     include!("../../symthaea-iot-actuation-guard-interlock/tests/post_semantic.rs");
 
+    use std::error::Error as StdError;
+    use std::fmt;
+
     use fips204::{
         ml_dsa_65,
         traits::{KeyGen, SerDes, Signer as MlDsaSigner},
+    };
+    use symthaea_iot_actuation_effect_dispatch::{
+        AdapterAttemptAcknowledgement, AuthorizedPhysicalEffectRequest,
+        PhysicalEffectDispatchError, PrivilegedPhysicalEffectPort, dispatch_current_attempt,
     };
     use symthaea_iot_actuation_guard_device_reality::CurrentAdmissionDeviceRealityGuard;
     use symthaea_iot_actuation_guard_interlock::{
@@ -299,6 +306,103 @@ mod fixture {
         )
     }
 
+    fn published_roots(
+        composed: &ComposedActuationEvidence,
+        transport_guard: &CurrentXeniaTransportFenceGuard,
+        device_reality_guard: &CurrentAdmissionDeviceRealityGuard,
+        interlock_guard: &CurrentPostSemanticInterlockGuard,
+    ) -> ActuationTrustRootsV1 {
+        ActuationTrustRootsV1 {
+            device: composed
+                .semantic_acceptance()
+                .admission_reservation()
+                .envelope()
+                .command
+                .device
+                .clone(),
+            transport_trust_head: transport_guard.anchored_current_head(),
+            device_reality_trust_head: device_reality_guard.anchored_trust_head(),
+            device_reality_policy: ActuationPolicyAnchorV1 {
+                generation: 1,
+                digest: device_reality_guard.anchored_policy_digest(),
+            },
+            interlock_trust_head: interlock_guard.anchored_trust_head(),
+            interlock_policy: ActuationPolicyAnchorV1 {
+                generation: 1,
+                digest: interlock_guard.anchored_policy_digest(),
+            },
+        }
+    }
+
+    #[derive(Debug)]
+    struct RecordingPortError;
+
+    impl fmt::Display for RecordingPortError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("recording port failure")
+        }
+    }
+
+    impl StdError for RecordingPortError {}
+
+    struct RecordingPort {
+        adapter_id: String,
+        device: ResourceRef,
+        operation: Operation,
+        executor: PrincipalId,
+        calls: usize,
+        seen_command_digest: Option<Digest32>,
+        seen_envelope_digest: Option<Digest32>,
+        seen_composition_digest: Option<Digest32>,
+    }
+
+    impl RecordingPort {
+        fn from_command(command: &DeviceCommand) -> Self {
+            Self {
+                adapter_id: "mock-hal:valve-72".into(),
+                device: command.device.clone(),
+                operation: command.operation.clone(),
+                executor: command.executor.clone(),
+                calls: 0,
+                seen_command_digest: None,
+                seen_envelope_digest: None,
+                seen_composition_digest: None,
+            }
+        }
+    }
+
+    impl PrivilegedPhysicalEffectPort for RecordingPort {
+        type Error = RecordingPortError;
+
+        fn adapter_id(&self) -> &str {
+            &self.adapter_id
+        }
+
+        fn device(&self) -> &ResourceRef {
+            &self.device
+        }
+
+        fn operation(&self) -> &Operation {
+            &self.operation
+        }
+
+        fn executor(&self) -> &PrincipalId {
+            &self.executor
+        }
+
+        fn attempt_effect(
+            &mut self,
+            request: AuthorizedPhysicalEffectRequest<'_>,
+        ) -> Result<AdapterAttemptAcknowledgement, Self::Error> {
+            self.calls += 1;
+            self.seen_command_digest = Some(request.command_digest());
+            self.seen_envelope_digest = Some(request.envelope_digest());
+            self.seen_composition_digest = Some(request.composition_digest());
+            assert_eq!(request.command().digest(), request.command_digest());
+            AdapterAttemptAcknowledgement::new(d(0xE7)).map_err(|_| RecordingPortError)
+        }
+    }
+
     #[test]
     fn real_two_branch_chain_linearizes_under_all_held_roots_without_hal_io() {
         let admission_root = temp_root("linearize-admission");
@@ -317,20 +421,12 @@ mod fixture {
             .clone();
         let semantic_head = composed.semantic_acceptance().device_head();
 
-        let roots = ActuationTrustRootsV1 {
-            device: expected_device.clone(),
-            transport_trust_head: transport_guard.anchored_current_head(),
-            device_reality_trust_head: device_reality_guard.anchored_trust_head(),
-            device_reality_policy: ActuationPolicyAnchorV1 {
-                generation: 1,
-                digest: device_reality_guard.anchored_policy_digest(),
-            },
-            interlock_trust_head: interlock_guard.anchored_trust_head(),
-            interlock_policy: ActuationPolicyAnchorV1 {
-                generation: 1,
-                digest: interlock_guard.anchored_policy_digest(),
-            },
-        };
+        let roots = published_roots(
+            &composed,
+            &transport_guard,
+            &device_reality_guard,
+            &interlock_guard,
+        );
         let publication =
             DurableActuationTrustPublicationStore::initialize(&trust_root, roots).unwrap();
 
@@ -364,6 +460,141 @@ mod fixture {
         };
 
         assert_eq!(observed_digest, expected_digest);
+        std::fs::remove_dir_all(admission_root).unwrap();
+        std::fs::remove_dir_all(semantic_root).unwrap();
+        std::fs::remove_dir_all(trust_root).unwrap();
+    }
+
+    #[test]
+    fn real_two_branch_chain_reaches_matching_privileged_port_exactly_once() {
+        let admission_root = temp_root("dispatch-admission");
+        let semantic_root = temp_root("dispatch-semantic");
+        let trust_root = temp_root("dispatch-trust");
+        let (composed, transport_guard, device_reality_guard, interlock_guard) =
+            complete_composed_fixture(&admission_root, &semantic_root);
+
+        let expected_command = composed
+            .semantic_acceptance()
+            .admission_reservation()
+            .envelope()
+            .command
+            .clone();
+        let expected_command_digest = expected_command.digest();
+        let expected_envelope_digest = composed.transport().envelope_digest();
+        let expected_composition_digest = composed.composition_digest();
+        let semantic_head = composed.semantic_acceptance().device_head();
+        let roots = published_roots(
+            &composed,
+            &transport_guard,
+            &device_reality_guard,
+            &interlock_guard,
+        );
+        let publication =
+            DurableActuationTrustPublicationStore::initialize(&trust_root, roots).unwrap();
+        let mut port = RecordingPort::from_command(&expected_command);
+
+        let record = {
+            let trust_store =
+                DurableActuationTrustPublicationStore::open(&trust_root, publication.head())
+                    .unwrap();
+            let admission_store =
+                DurableAdmissionReservationStore::open(&admission_root, config()).unwrap();
+            let semantic_store =
+                DurableSemanticAcceptanceStore::open(&semantic_root, config(), semantic_head)
+                    .unwrap();
+            let linearizer = ActuationLinearizer::new(
+                &trust_store,
+                &admission_store,
+                &semantic_store,
+                &transport_guard,
+                &device_reality_guard,
+                &interlock_guard,
+            );
+
+            linearizer
+                .with_current_attempt(composed, |attempt| {
+                    dispatch_current_attempt(attempt, &mut port)
+                })
+                .unwrap()
+                .unwrap()
+        };
+
+        assert_eq!(port.calls, 1);
+        assert_eq!(port.seen_command_digest, Some(expected_command_digest));
+        assert_eq!(port.seen_envelope_digest, Some(expected_envelope_digest));
+        assert_eq!(port.seen_composition_digest, Some(expected_composition_digest));
+        assert_eq!(record.correlation().command_digest(), expected_command_digest);
+        assert_eq!(record.correlation().envelope_digest(), expected_envelope_digest);
+        assert_eq!(
+            record.correlation().composition_digest(),
+            expected_composition_digest
+        );
+        assert_eq!(record.correlation().sequence(), expected_command.sequence);
+        assert_eq!(record.correlation().adapter_id(), "mock-hal:valve-72");
+        assert_eq!(record.adapter_evidence_digest(), d(0xE7));
+
+        std::fs::remove_dir_all(admission_root).unwrap();
+        std::fs::remove_dir_all(semantic_root).unwrap();
+        std::fs::remove_dir_all(trust_root).unwrap();
+    }
+
+    #[test]
+    fn wrong_privileged_port_binding_never_invokes_effect_method() {
+        let admission_root = temp_root("dispatch-wrong-port-admission");
+        let semantic_root = temp_root("dispatch-wrong-port-semantic");
+        let trust_root = temp_root("dispatch-wrong-port-trust");
+        let (composed, transport_guard, device_reality_guard, interlock_guard) =
+            complete_composed_fixture(&admission_root, &semantic_root);
+
+        let expected_command = composed
+            .semantic_acceptance()
+            .admission_reservation()
+            .envelope()
+            .command
+            .clone();
+        let semantic_head = composed.semantic_acceptance().device_head();
+        let roots = published_roots(
+            &composed,
+            &transport_guard,
+            &device_reality_guard,
+            &interlock_guard,
+        );
+        let publication =
+            DurableActuationTrustPublicationStore::initialize(&trust_root, roots).unwrap();
+        let mut port = RecordingPort::from_command(&expected_command);
+        port.device = ResourceRef("iot:valve:attacker".into());
+
+        let result = {
+            let trust_store =
+                DurableActuationTrustPublicationStore::open(&trust_root, publication.head())
+                    .unwrap();
+            let admission_store =
+                DurableAdmissionReservationStore::open(&admission_root, config()).unwrap();
+            let semantic_store =
+                DurableSemanticAcceptanceStore::open(&semantic_root, config(), semantic_head)
+                    .unwrap();
+            let linearizer = ActuationLinearizer::new(
+                &trust_store,
+                &admission_store,
+                &semantic_store,
+                &transport_guard,
+                &device_reality_guard,
+                &interlock_guard,
+            );
+
+            linearizer
+                .with_current_attempt(composed, |attempt| {
+                    dispatch_current_attempt(attempt, &mut port)
+                })
+                .unwrap()
+        };
+
+        assert!(matches!(
+            result,
+            Err(PhysicalEffectDispatchError::PortDeviceMismatch)
+        ));
+        assert_eq!(port.calls, 0);
+
         std::fs::remove_dir_all(admission_root).unwrap();
         std::fs::remove_dir_all(semantic_root).unwrap();
         std::fs::remove_dir_all(trust_root).unwrap();
