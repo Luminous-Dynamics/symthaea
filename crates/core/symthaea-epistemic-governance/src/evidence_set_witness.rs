@@ -10,11 +10,16 @@
 //! a selected set of evidence **items** whose complete ancestry-root sets are
 //! pairwise disjoint and whose items are pairwise `EvidenceIndependenceV1::Independent`.
 //!
-//! The issued witness is shadow epistemic structure only. It grants no relation,
-//! disposition, belief, workspace, action, or self-improvement authority.
+//! Every witness is also bound to the canonical content identity of the complete
+//! validated lineage graph from which it was issued. A selected subset therefore
+//! cannot be replayed under another lineage generation merely because its local
+//! roots happen to look identical.
 
-use crate::lineage::{
-    CognitiveLineageError, EvidenceIndependenceV1, ValidatedEvidenceLineageGraphV1,
+use crate::{
+    lineage::{CognitiveLineageError, EvidenceIndependenceV1, ValidatedEvidenceLineageGraphV1},
+    lineage_identity::{
+        canonical_evidence_lineage_graph_id_v1, CanonicalLineageIdentityError,
+    },
 };
 use serde::Serialize;
 use std::collections::HashSet;
@@ -26,6 +31,8 @@ pub const INDEPENDENT_EVIDENCE_SET_WITNESS_PROFILE_V1: &str =
 pub const INDEPENDENT_EVIDENCE_SET_WITNESS_CONTRACT_V1: &str = concat!(
     "rca-independent-evidence-set-witness-v1\n",
     "input=validated_evidence_lineage_graph+selected_evidence_item_ids\n",
+    "lineage_generation=canonical_validated_graph_content_identity_v1\n",
+    "legacy_producer_graph_id_is_not_witness_authority\n",
     "selected_item_identity_is_not_ancestry_root_identity\n",
     "one_multiroot_derived_item_is_one_evidence_item_not_many_confirmations\n",
     "every_selected_item_root_set_is_recomputed_from_closed_lineage\n",
@@ -33,7 +40,8 @@ pub const INDEPENDENT_EVIDENCE_SET_WITNESS_CONTRACT_V1: &str = concat!(
     "pairwise_independent_items_require_disjoint_complete_ancestry_root_sets\n",
     "ancestor_derived_same_root_and_partial_overlap_pairs_fail_closed\n",
     "selected_item_input_order_does_not_change_witness_identity\n",
-    "witness_identity=blake3_explicit_items+root_sets+pair_topology\n",
+    "unrelated_lineage_change_changes_witness_identity_even_if_selected_subset_is_same\n",
+    "witness_identity=blake3_lineage_generation+items+root_sets+pair_topology\n",
     "issued_witness=is_private_non_deserializable_shadow_artifact\n",
     "distinct_root_count_is_not_independent_evidence_item_count\n",
     "witness_is_not_relation_disposition_belief_workspace_action_or_promotion_authority\n",
@@ -77,8 +85,10 @@ impl IndependentEvidenceItemPairV1 {
 }
 
 /// Issued witness for one exact selected set of pairwise-independent evidence
-/// items. Private fields and absence of `Deserialize` are deliberate: archived
-/// bytes are audit material; current trust requires recomputation from a currently
+/// items under one exact canonical lineage generation.
+///
+/// Private fields and absence of `Deserialize` are deliberate: archived bytes
+/// are audit material; current trust requires recomputation from a currently
 /// validated closed lineage graph.
 #[must_use = "independent evidence set witnesses are shadow epistemic artifacts and should be inspected"]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -87,6 +97,7 @@ pub struct IndependentEvidenceSetWitnessV1 {
     profile: String,
     profile_contract_digest: String,
     witness_id: String,
+    lineage_graph_id: String,
     items: Vec<IndependentEvidenceItemV1>,
     pairs: Vec<IndependentEvidenceItemPairV1>,
     distinct_root_ids: Vec<String>,
@@ -109,6 +120,12 @@ impl IndependentEvidenceSetWitnessV1 {
         &self.witness_id
     }
 
+    /// Canonical complete validated-lineage content identity. This is not the
+    /// legacy producer-supplied `EvidenceLineageGraphV1::graph_id` label.
+    pub fn lineage_graph_id(&self) -> &str {
+        &self.lineage_graph_id
+    }
+
     /// Selected evidence items. Cardinality here is item cardinality, not root
     /// cardinality and not pair-edge cardinality.
     pub fn items(&self) -> &[IndependentEvidenceItemV1] {
@@ -122,7 +139,7 @@ impl IndependentEvidenceSetWitnessV1 {
     }
 
     /// Union of all ancestry roots, retained for provenance/audit. Its length is
-    /// deliberately not exposed as an "independence count" API.
+    /// deliberately not exposed as an independence-count API.
     pub fn distinct_root_ids(&self) -> &[String] {
         &self.distinct_root_ids
     }
@@ -137,9 +154,9 @@ pub fn independent_evidence_set_witness_profile_digest_v1() -> String {
 
 /// Issue an exact pairwise-independent evidence-item-set witness.
 ///
-/// The function recomputes complete root sets and pair independence from the
-/// validated lineage graph. Callers cannot supply root sets, pair statuses, or an
-/// independence count.
+/// The function recomputes the complete canonical lineage generation, complete
+/// root sets, and pair independence from the validated graph. Callers cannot
+/// supply graph identity, root sets, pair statuses, or an independence count.
 pub fn issue_independent_evidence_set_witness_v1(
     graph: &ValidatedEvidenceLineageGraphV1,
     selected_evidence_ids: &[String],
@@ -147,6 +164,9 @@ pub fn issue_independent_evidence_set_witness_v1(
     if selected_evidence_ids.is_empty() {
         return Err(EvidenceSetWitnessError::EmptySelection);
     }
+
+    let lineage_graph_id = canonical_evidence_lineage_graph_id_v1(graph)
+        .map_err(EvidenceSetWitnessError::LineageIdentity)?;
 
     let mut selected = selected_evidence_ids.to_vec();
     selected.sort();
@@ -214,6 +234,7 @@ pub fn issue_independent_evidence_set_witness_v1(
     let profile_contract_digest = independent_evidence_set_witness_profile_digest_v1();
     let witness_id = independent_evidence_set_witness_id_v1(
         &profile_contract_digest,
+        &lineage_graph_id,
         &items,
         &pairs,
         &distinct_root_ids,
@@ -224,6 +245,7 @@ pub fn issue_independent_evidence_set_witness_v1(
         profile: INDEPENDENT_EVIDENCE_SET_WITNESS_PROFILE_V1.to_string(),
         profile_contract_digest,
         witness_id,
+        lineage_graph_id,
         items,
         pairs,
         distinct_root_ids,
@@ -232,6 +254,7 @@ pub fn issue_independent_evidence_set_witness_v1(
 
 fn independent_evidence_set_witness_id_v1(
     profile_contract_digest: &str,
+    lineage_graph_id: &str,
     items: &[IndependentEvidenceItemV1],
     pairs: &[IndependentEvidenceItemPairV1],
     distinct_root_ids: &[String],
@@ -248,6 +271,7 @@ fn independent_evidence_set_witness_id_v1(
         b"schema_version",
         &INDEPENDENT_EVIDENCE_SET_WITNESS_SCHEMA_VERSION.to_le_bytes(),
     );
+    hash_text(&mut hasher, b"lineage_graph_id", lineage_graph_id);
     hash_count(&mut hasher, b"item_count", items.len());
     for item in items {
         hash_text(&mut hasher, b"evidence_id", &item.evidence_id);
@@ -319,20 +343,18 @@ pub enum EvidenceSetWitnessError {
         right_evidence_id: String,
     },
     Lineage(CognitiveLineageError),
+    LineageIdentity(CanonicalLineageIdentityError),
 }
 
 impl std::fmt::Display for EvidenceSetWitnessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::EmptySelection => {
-                f.write_str("independent evidence set witness requires at least one evidence item")
+            Self::EmptySelection => f.write_str("independent evidence-set witness requires at least one selected item"),
+            Self::DuplicateEvidenceId { evidence_id } => {
+                write!(f, "duplicate selected evidence id {evidence_id}")
             }
-            Self::DuplicateEvidenceId { evidence_id } => write!(
-                f,
-                "independent evidence set selection contains duplicate evidence item {evidence_id}"
-            ),
             Self::EmptyRootSet { evidence_id } => {
-                write!(f, "evidence item {evidence_id} resolved to an empty ancestry-root set")
+                write!(f, "selected evidence {evidence_id} resolved to an empty root set")
             }
             Self::NonIndependentPair {
                 left_evidence_id,
@@ -340,16 +362,17 @@ impl std::fmt::Display for EvidenceSetWitnessError {
                 status,
             } => write!(
                 f,
-                "evidence items {left_evidence_id} and {right_evidence_id} are not independent: {status:?}"
+                "selected evidence pair {left_evidence_id} / {right_evidence_id} is not independent: {status:?}"
             ),
             Self::IndependentStatusRootOverlap {
                 left_evidence_id,
                 right_evidence_id,
             } => write!(
                 f,
-                "evidence items {left_evidence_id} and {right_evidence_id} reported independent but their complete root sets overlap"
+                "selected evidence pair {left_evidence_id} / {right_evidence_id} reported independent despite ancestry-root overlap"
             ),
-            Self::Lineage(error) => write!(f, "evidence lineage rejected witness input: {error}"),
+            Self::Lineage(error) => write!(f, "lineage validation failed: {error}"),
+            Self::LineageIdentity(error) => write!(f, "lineage identity derivation failed: {error}"),
         }
     }
 }
@@ -361,7 +384,7 @@ mod tests {
     use super::*;
     use crate::lineage::{
         CognitiveDerivationKindV1, EvidenceLineageGraphV1, EvidenceLineageNodeV1,
-        COGNITIVE_LINEAGE_SCHEMA_VERSION,
+        ValidatedEvidenceLineageNodeV1, COGNITIVE_LINEAGE_SCHEMA_VERSION,
     };
 
     const A: &str = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -369,113 +392,94 @@ mod tests {
     const C: &str = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const D: &str = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
     const E: &str = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-    const GRAPH: &str = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    const F: &str = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
-    fn node(id: &str, parents: &[&str], kind: CognitiveDerivationKindV1) -> crate::lineage::ValidatedEvidenceLineageNodeV1 {
+    fn root(id: &str) -> ValidatedEvidenceLineageNodeV1 {
+        EvidenceLineageNodeV1 {
+            schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
+            evidence_id: id.into(),
+            parent_ids: vec![],
+            derivation_kind: CognitiveDerivationKindV1::RootObservation,
+        }
+        .validate()
+        .unwrap()
+    }
+
+    fn derived(id: &str, parents: &[&str]) -> ValidatedEvidenceLineageNodeV1 {
         EvidenceLineageNodeV1 {
             schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
             evidence_id: id.into(),
             parent_ids: parents.iter().map(|value| (*value).to_string()).collect(),
-            derivation_kind: kind,
+            derivation_kind: CognitiveDerivationKindV1::Inference,
         }
         .validate()
         .unwrap()
     }
 
-    fn graph() -> ValidatedEvidenceLineageGraphV1 {
+    fn graph(nodes: Vec<ValidatedEvidenceLineageNodeV1>) -> ValidatedEvidenceLineageGraphV1 {
         EvidenceLineageGraphV1 {
             schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
-            graph_id: GRAPH.into(),
-            nodes: vec![
-                node(A, &[], CognitiveDerivationKindV1::RootObservation),
-                node(B, &[], CognitiveDerivationKindV1::RootObservation),
-                node(C, &[A, B], CognitiveDerivationKindV1::Inference),
-                node(D, &[], CognitiveDerivationKindV1::RootObservation),
-                node(E, &[A], CognitiveDerivationKindV1::Transformation),
-            ],
+            graph_id: F.into(),
+            nodes,
         }
         .validate()
         .unwrap()
+    }
+
+    fn ids(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_string()).collect()
     }
 
     #[test]
     fn multiroot_derived_item_is_one_independent_item_not_multiple_confirmations() {
-        let witness = issue_independent_evidence_set_witness_v1(
-            &graph(),
-            &[C.to_string(), D.to_string()],
-        )
-        .unwrap();
+        let g = graph(vec![root(A), root(B), root(D), derived(C, &[A, B])]);
+        let witness = issue_independent_evidence_set_witness_v1(&g, &ids(&[C, D])).unwrap();
         assert_eq!(witness.items().len(), 2);
         assert_eq!(witness.items()[0].root_ids().len(), 2);
-        assert_eq!(witness.items()[1].root_ids().len(), 1);
         assert_eq!(witness.distinct_root_ids().len(), 3);
         assert_eq!(witness.pairs().len(), 1);
     }
 
     #[test]
     fn shared_root_siblings_cannot_form_independent_set_witness() {
-        let error = issue_independent_evidence_set_witness_v1(
-            &graph(),
-            &[E.to_string(), C.to_string()],
-        )
-        .unwrap_err();
+        let g = graph(vec![root(A), derived(B, &[A]), derived(C, &[A])]);
         assert!(matches!(
-            error,
-            EvidenceSetWitnessError::NonIndependentPair {
-                status: EvidenceIndependenceV1::PartiallyShared,
-                ..
-            }
+            issue_independent_evidence_set_witness_v1(&g, &ids(&[B, C])),
+            Err(EvidenceSetWitnessError::NonIndependentPair { .. })
         ));
     }
 
     #[test]
     fn ancestor_and_descendant_cannot_form_independent_set_witness() {
-        let error = issue_independent_evidence_set_witness_v1(
-            &graph(),
-            &[A.to_string(), E.to_string()],
-        )
-        .unwrap_err();
+        let g = graph(vec![root(A), derived(B, &[A])]);
         assert!(matches!(
-            error,
-            EvidenceSetWitnessError::NonIndependentPair {
-                status: EvidenceIndependenceV1::Derived,
-                ..
-            }
+            issue_independent_evidence_set_witness_v1(&g, &ids(&[A, B])),
+            Err(EvidenceSetWitnessError::NonIndependentPair { .. })
         ));
     }
 
     #[test]
     fn selection_order_does_not_change_witness_identity() {
-        let cd = issue_independent_evidence_set_witness_v1(
-            &graph(),
-            &[C.to_string(), D.to_string()],
-        )
-        .unwrap();
-        let dc = issue_independent_evidence_set_witness_v1(
-            &graph(),
-            &[D.to_string(), C.to_string()],
-        )
-        .unwrap();
-        assert_eq!(cd, dc);
-        assert_eq!(cd.witness_id(), dc.witness_id());
+        let g = graph(vec![root(A), root(B)]);
+        let first = issue_independent_evidence_set_witness_v1(&g, &ids(&[A, B])).unwrap();
+        let second = issue_independent_evidence_set_witness_v1(&g, &ids(&[B, A])).unwrap();
+        assert_eq!(first.witness_id(), second.witness_id());
     }
 
     #[test]
     fn duplicate_selected_item_fails_closed() {
+        let g = graph(vec![root(A)]);
         assert!(matches!(
-            issue_independent_evidence_set_witness_v1(
-                &graph(),
-                &[D.to_string(), D.to_string()],
-            ),
+            issue_independent_evidence_set_witness_v1(&g, &ids(&[A, A])),
             Err(EvidenceSetWitnessError::DuplicateEvidenceId { .. })
         ));
     }
 
     #[test]
     fn unknown_item_fails_through_lineage_validation() {
-        let unknown = "sha256:9999999999999999999999999999999999999999999999999999999999999999";
+        let g = graph(vec![root(A)]);
         assert!(matches!(
-            issue_independent_evidence_set_witness_v1(&graph(), &[unknown.to_string()]),
+            issue_independent_evidence_set_witness_v1(&g, &ids(&[B])),
             Err(EvidenceSetWitnessError::Lineage(
                 CognitiveLineageError::UnknownEvidenceId { .. }
             ))
@@ -484,20 +488,57 @@ mod tests {
 
     #[test]
     fn selected_item_change_changes_witness_identity() {
-        let a = issue_independent_evidence_set_witness_v1(&graph(), &[D.to_string()]).unwrap();
-        let b = issue_independent_evidence_set_witness_v1(&graph(), &[C.to_string()]).unwrap();
-        assert_ne!(a.witness_id(), b.witness_id());
+        let g = graph(vec![root(A), root(B), root(C)]);
+        let first = issue_independent_evidence_set_witness_v1(&g, &ids(&[A, B])).unwrap();
+        let second = issue_independent_evidence_set_witness_v1(&g, &ids(&[A, C])).unwrap();
+        assert_ne!(first.witness_id(), second.witness_id());
+    }
+
+    #[test]
+    fn unrelated_lineage_change_changes_witness_identity() {
+        let first_graph = graph(vec![root(A), root(B)]);
+        let second_graph = graph(vec![root(A), root(B), root(C)]);
+        let first =
+            issue_independent_evidence_set_witness_v1(&first_graph, &ids(&[A, B])).unwrap();
+        let second =
+            issue_independent_evidence_set_witness_v1(&second_graph, &ids(&[A, B])).unwrap();
+        assert_ne!(first.lineage_graph_id(), second.lineage_graph_id());
+        assert_ne!(first.witness_id(), second.witness_id());
+        assert_eq!(first.items(), second.items());
+        assert_eq!(first.distinct_root_ids(), second.distinct_root_ids());
+    }
+
+    #[test]
+    fn legacy_graph_label_does_not_change_witness_identity() {
+        let nodes = vec![root(A), root(B)];
+        let first_graph = EvidenceLineageGraphV1 {
+            schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
+            graph_id: E.into(),
+            nodes: nodes.clone(),
+        }
+        .validate()
+        .unwrap();
+        let second_graph = EvidenceLineageGraphV1 {
+            schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
+            graph_id: F.into(),
+            nodes,
+        }
+        .validate()
+        .unwrap();
+        let first =
+            issue_independent_evidence_set_witness_v1(&first_graph, &ids(&[A, B])).unwrap();
+        let second =
+            issue_independent_evidence_set_witness_v1(&second_graph, &ids(&[A, B])).unwrap();
+        assert_eq!(first.lineage_graph_id(), second.lineage_graph_id());
+        assert_eq!(first.witness_id(), second.witness_id());
     }
 
     #[test]
     fn issued_witness_serializes_for_audit_only() {
-        let witness = issue_independent_evidence_set_witness_v1(
-            &graph(),
-            &[C.to_string(), D.to_string()],
-        )
-        .unwrap();
-        let encoded = serde_json::to_string(&witness).unwrap();
-        assert!(encoded.contains(witness.witness_id()));
-        assert!(encoded.contains(witness.profile_contract_digest()));
+        let g = graph(vec![root(A), root(B)]);
+        let witness = issue_independent_evidence_set_witness_v1(&g, &ids(&[A, B])).unwrap();
+        let json = serde_json::to_string(&witness).unwrap();
+        assert!(json.contains("witness_id"));
+        assert!(json.contains("lineage_graph_id"));
     }
 }
