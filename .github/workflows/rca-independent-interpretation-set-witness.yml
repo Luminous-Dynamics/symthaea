@@ -52,7 +52,7 @@ jobs:
 
           grep -q 'pub fn root_ids' "$production"
           grep -q 'pub fn pairs' "$production"
-          if grep -Eqi 'qualified_.*count|independent_.*count|pair_.*count.*pub fn|root_.*count.*pub fn' "$production"; then
+          if grep -Eqi 'pub fn [A-Za-z0-9_]*(qualified|independent|pair|root)[A-Za-z0-9_]*count' "$production"; then
             echo 'Interpretation witness exposed a count shortcut as public authority surface.' >&2
             exit 1
           fi
