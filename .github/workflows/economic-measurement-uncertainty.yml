@@ -1,0 +1,123 @@
+name: Economic Measurement Uncertainty Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-economics/tests/measurement_uncertainty_qualification.rs'
+      - '.github/workflows/economic-measurement-uncertainty.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze uncertainty theorem and qualification-only scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          test_path = Path('crates/domains/symthaea-economics/tests/measurement_uncertainty_qualification.rs')
+          text = test_path.read_text()
+
+          required = [
+              'enum MeasurementUncertainty',
+              'ExactByConstruction',
+              'StandardError',
+              'Interval',
+              'enum UncertaintySource',
+              'Sampling',
+              'MeasurementProcess',
+              'ModelBased',
+              'RevisionRange',
+              'enum QualifiedMeasuredValue',
+              'ExactObservation',
+              'EstimatedObservation',
+              'zero_standard_error_cannot_disguise_an_estimate_as_exact',
+              'tiny_nonzero_uncertainty_does_not_upgrade_a_point_estimate_to_exact',
+              'model_based_interval_retains_method_source_and_coverage',
+              'revision_range_without_probability_coverage_remains_estimated',
+              'interval_must_have_positive_width_and_contain_the_point_estimate',
+              'exact_observation_requires_an_explicit_exactness_basis',
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f'missing uncertainty qualification invariant: {needle}')
+
+          forbidden_shortcuts = [
+              'standard_error_atoms <=',
+              'standard_error_atoms <',
+              'coverage_bps.unwrap_or',
+              'EstimatedObservation => ExactObservation',
+              'as f64',
+          ]
+          for needle in forbidden_shortcuts:
+              if needle in text:
+                  raise SystemExit(f'uncertainty theorem acquired forbidden exactness shortcut: {needle}')
+
+          forbidden_authority = [
+              'reqwest::',
+              'ureq::',
+              'SystemTime::now',
+              'Utc::now',
+              'EvidenceChannel::',
+              'NormativeProposition',
+              'PolicyRecommendation',
+              'ForecastDistribution',
+          ]
+          for needle in forbidden_authority:
+              if needle in text:
+                  raise SystemExit(f'uncertainty theorem acquired unrelated authority: {needle}')
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/economic-measurement-uncertainty.yml',
+              'crates/domains/symthaea-economics/tests/measurement_uncertainty_qualification.rs',
+          }
+          if changed != allowed:
+              raise SystemExit(
+                  f'uncertainty qualification must remain exactly two files; got {sorted(changed)}'
+              )
+
+          forbidden_product = {
+              'crates/domains/symthaea-economics/src/ontology.rs',
+              'crates/domains/symthaea-economics/src/etir.rs',
+              'crates/domains/symthaea-economics/src/theory.rs',
+              'crates/domains/symthaea-economics/src/science.rs',
+              'crates/domains/symthaea-economics/src/lib.rs',
+              'crates/domains/symthaea-economics/Cargo.toml',
+              'Cargo.lock',
+          }
+          touched = changed & forbidden_product
+          if touched:
+              raise SystemExit(f'qualification spike modified product/manifest state: {sorted(touched)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-economics -- --check
+
+      - name: Measurement uncertainty qualification test
+        run: cargo test --locked -p symthaea-economics --test measurement_uncertainty_qualification
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-economics --test measurement_uncertainty_qualification -- -D warnings
