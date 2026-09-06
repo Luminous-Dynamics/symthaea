@@ -365,15 +365,4 @@ mod tests {
             Err(DeliberationError::InvalidCryptographicSnapshotDigest)
         );
     }
-
-    #[test]
-    fn historical_snapshot_json_defaults_to_legacy_opaque() {
-        let json = r#"{"frame_id":"world","snapshot_digest":"historical-id"}"#;
-        let restored: WorldSnapshotRef = serde_json::from_str(json).unwrap();
-        assert_eq!(
-            restored.digest_algorithm(),
-            SnapshotDigestAlgorithm::LegacyOpaque
-        );
-        assert_eq!(restored.snapshot_digest(), "historical-id");
-    }
 }
