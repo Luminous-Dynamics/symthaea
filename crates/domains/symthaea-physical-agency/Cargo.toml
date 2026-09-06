@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-physical-agency"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Evidence-aware physical-agency planning primitives for Symthaea"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["physics", "robotics", "causality", "safety", "embodied-ai"]
+categories = ["science", "robotics"]
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-physical-effects = { path = "../symthaea-physical-effects" }
+symthaea-sim-bridge = { path = "../../bridges/symthaea-sim-bridge" }
