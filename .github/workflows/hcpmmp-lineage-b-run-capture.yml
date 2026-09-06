@@ -1,0 +1,73 @@
+name: HCPMMP Lineage B Run Capture
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/capture_hcpmmp1_neuromaps_lineage_b_run.py'
+      - 'scripts/test_capture_hcpmmp1_neuromaps_lineage_b_run.py'
+      - 'scripts/hcpmmp_neuromaps_common.py'
+      - 'data/neuroscience/hcpmmp1_neuromaps_transform_method_v1.json'
+      - 'docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_RUN_CAPTURE_V1.md'
+      - '.github/workflows/hcpmmp-lineage-b-run-capture.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify Lineage B run capture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax
+        run: |
+          python -m py_compile \
+            scripts/capture_hcpmmp1_neuromaps_lineage_b_run.py \
+            scripts/test_capture_hcpmmp1_neuromaps_lineage_b_run.py
+
+      - name: Capture contracts
+        run: PYTHONPATH=scripts python -m unittest scripts/test_capture_hcpmmp1_neuromaps_lineage_b_run.py
+
+      - name: No network or transform execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/capture_hcpmmp1_neuromaps_lineage_b_run.py
+          if grep -Eq '(urllib|requests|http://|https://|curl|wget)' "$f"; then
+            echo 'run capture must remain network-free' >&2
+            exit 1
+          fi
+          if grep -Eq '(-cifti-separate|-label-resample|-metric-resample)' "$f"; then
+            echo 'run capture must not execute scientific transforms' >&2
+            exit 1
+          fi
+          grep -Fq '"-version"' "$f"
+          grep -Fq 'bytes changed during -version probe' "$f"
+          grep -Fq 'bytes changed during capture' "$f"
+
+      - name: Custody and authority ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/capture_hcpmmp1_neuromaps_lineage_b_run.py
+          grep -Fq 'load_run(candidate,method,method_manifest)' "$f"
+          grep -Fq 'os.chmod(tmp,0o600)' "$f"
+          grep -Fq 'run_manifest_file_sha256' "$f"
+          if grep -Fq 'print(json.dumps(doc' "$f"; then
+            echo 'full run manifest must not be echoed to stdout' >&2
+            exit 1
+          fi
+          grep -Fq 'may **not**' docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_RUN_CAPTURE_V1.md
+
+      - name: CLI
+        run: python scripts/capture_hcpmmp1_neuromaps_lineage_b_run.py --help
