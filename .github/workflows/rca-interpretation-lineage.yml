@@ -35,6 +35,7 @@ jobs:
           grep -q 'distinct_interpretation_roots_do_not_imply_independence' "$production"
           grep -q 'distinct_roots_without_exact_current_qualification=independence_unknown' "$production"
           grep -q 'independence_qualified_only_by_exact_root_pair+proposition+use+time_join' "$production"
+          grep -q 'pair_topology_is_exposed_but_qualified_pair_count_is_not_an_api' "$production"
           grep -q 'interpretation_independence_is_not_truth_or_evidence_independence' "$production"
           grep -q 'independent observations' "$doc"
           grep -q 'independent interpretations' "$doc"
@@ -53,6 +54,15 @@ jobs:
           grep -q 'DistinctRootsIndependenceUnknown' "$production"
           grep -q 'IndependenceQualified' "$production"
           grep -q 'qualifications_by_pair.get' "$production"
+
+          # Edge count is not an independent-root-set witness. Keep the exact pair
+          # topology available, but do not expose a convenience count that invites
+          # downstream count-voting semantics.
+          grep -q 'pub fn pair_assessments' "$production"
+          if grep -q 'qualified_independent_pair_count' "$production"; then
+            echo 'Interpretation lineage exposed qualified edge count as an API.' >&2
+            exit 1
+          fi
 
       - name: Freeze interpretation independence qualification
         shell: bash
