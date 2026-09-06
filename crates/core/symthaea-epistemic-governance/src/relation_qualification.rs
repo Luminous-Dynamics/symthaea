@@ -29,7 +29,7 @@ pub const RELATION_DECLARATION_ELIGIBILITY_SCHEMA_VERSION: u16 = 1;
 pub const RELATION_DECLARATION_ELIGIBILITY_PROFILE_V1: &str =
     "rca-relation-declaration-eligibility-v1";
 
-/// Normative qualification semantics.
+/// Normative persistable qualification semantics.
 pub const RELATION_DECLARER_QUALIFICATION_CONTRACT_V1: &str = concat!(
     "rca-relation-declarer-qualification-v1\n",
     "qualification_is_use_specific_not_global_trust\n",
@@ -38,13 +38,29 @@ pub const RELATION_DECLARER_QUALIFICATION_CONTRACT_V1: &str = concat!(
     "qualifier_must_not_equal_subject_declarer\n",
     "qualification=qualifier+evaluator+policy_digest+artifact_digest\n",
     "allowed_relation_kinds=canonical_unique_set_without_supersedes\n",
-    "validity=qualified_at_unix_ms<=now<=valid_until_unix_ms\n",
+    "validity=qualified_at_unix_ms<=valid_until_unix_ms\n",
     "permitted_use=shadow_runtime_disposition_only_v1\n",
     "qualification_id=blake3_explicit_complete_record_v1\n",
-    "registered_qualification_is_not_relation_eligibility\n",
-    "eligibility_requires_exact_declaration_subject_method_proposition_kind_use_time_join\n",
+    "registered_qualification_is_not_current_use_eligibility\n",
+    "qualification_is_not_truth_belief_action_or_promotion_authority\n",
+);
+
+/// Normative live eligibility semantics.
+///
+/// This is intentionally a distinct contract identity from the persistable
+/// qualification contract. A qualification can remain historically valid while
+/// current-use eligibility changes with declaration, proposition, use, or time.
+pub const RELATION_DECLARATION_ELIGIBILITY_CONTRACT_V1: &str = concat!(
+    "rca-relation-declaration-eligibility-v1\n",
+    "input=bound_relation_declaration+registered_qualification+validated_use_context\n",
+    "eligibility_requires_exact_declaration_subject_version_method_join\n",
+    "eligibility_requires_exact_qualification_and_declaration_proposition_join\n",
+    "eligibility_requires_exact_relation_kind_and_permitted_use_join\n",
+    "eligibility_requires_qualified_at_unix_ms<=now<=valid_until_unix_ms\n",
+    "eligibility_id=blake3(profile+declaration+qualification+context)\n",
     "eligible_result=is_issued_private_non_deserializable_capability\n",
-    "qualification_and_eligibility_are_not_truth_belief_action_or_promotion_authority\n",
+    "persistence_does_not_recreate_current_eligibility\n",
+    "eligibility_is_not_truth_belief_action_or_promotion_authority\n",
 );
 
 const QUALIFICATION_PROFILE_DOMAIN: &[u8] =
@@ -64,8 +80,6 @@ pub enum RelationDeclarationUseV1 {
     ShadowRuntimeDisposition,
 }
 
-/// Persistable raw qualification record. Validation canonicalizes the allowed
-/// relation-kind set and derives a stable qualification identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RelationDeclarerQualificationV1 {
@@ -73,15 +87,12 @@ pub struct RelationDeclarerQualificationV1 {
     pub subject_declarer_id: String,
     pub subject_declarer_version: Option<String>,
     pub subject_method: RelationDeclarationMethodV1,
-    /// Authority responsible for approving this qualification. V1 structurally
-    /// requires this identity to differ from the subject declarer identity. That
-    /// inequality is not, by itself, proof of organizational independence.
+    /// Structural anti-self-signing boundary only. Distinct ids do not prove
+    /// organizational, model, or causal independence.
     pub qualifier_id: String,
     pub qualifier_version: Option<String>,
-    /// Evaluator/harness that produced the qualification evidence.
     pub evaluator_id: String,
     pub evaluator_version: Option<String>,
-    /// V1 intentionally scopes qualification to one exact proposition identity.
     pub proposition_id: String,
     pub allowed_relation_kinds: Vec<EvidenceRelationKindV1>,
     pub permitted_use: RelationDeclarationUseV1,
@@ -99,7 +110,6 @@ impl RelationDeclarerQualificationV1 {
     }
 }
 
-/// Persistable, revalidated qualification record with a derived governance id.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegisteredRelationDeclarerQualificationV1 {
@@ -111,6 +121,10 @@ pub struct RegisteredRelationDeclarerQualificationV1 {
 }
 
 impl RegisteredRelationDeclarerQualificationV1 {
+    pub const fn schema_version(&self) -> u16 {
+        self.schema_version
+    }
+
     pub fn qualification_id(&self) -> &str {
         &self.qualification_id
     }
@@ -134,10 +148,8 @@ impl TryFrom<RelationDeclarerQualificationV1> for RegisteredRelationDeclarerQual
     fn try_from(mut value: RelationDeclarerQualificationV1) -> Result<Self, Self::Error> {
         validate_and_canonicalize_qualification(&mut value)?;
         let profile_contract_digest = relation_declarer_qualification_profile_digest_v1();
-        let qualification_id = relation_declarer_qualification_id_v1(
-            &profile_contract_digest,
-            &value,
-        );
+        let qualification_id =
+            relation_declarer_qualification_id_v1(&profile_contract_digest, &value);
         Ok(Self {
             schema_version: RELATION_DECLARER_QUALIFICATION_SCHEMA_VERSION,
             profile: RELATION_DECLARER_QUALIFICATION_PROFILE_V1.to_string(),
@@ -196,8 +208,6 @@ impl<'de> Deserialize<'de> for RegisteredRelationDeclarerQualificationV1 {
     }
 }
 
-/// Explicit context for deciding whether one exact bound relation declaration is
-/// eligible for one use now.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RelationDeclarationEligibilityContextV1 {
@@ -248,8 +258,6 @@ impl<'de> Deserialize<'de> for ValidatedRelationDeclarationEligibilityContextV1 
     }
 }
 
-/// Issued use-eligibility capability. Private fields and no `Deserialize` are
-/// deliberate: archived JSON cannot recreate current eligibility.
 #[must_use = "eligible relation declarations are scoped shadow capabilities and should be inspected"]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct DispositionEligibleRelationDeclarationV1 {
@@ -263,6 +271,18 @@ pub struct DispositionEligibleRelationDeclarationV1 {
 }
 
 impl DispositionEligibleRelationDeclarationV1 {
+    pub const fn schema_version(&self) -> u16 {
+        self.schema_version
+    }
+
+    pub fn profile(&self) -> &str {
+        &self.profile
+    }
+
+    pub fn profile_contract_digest(&self) -> &str {
+        &self.profile_contract_digest
+    }
+
     pub fn eligibility_id(&self) -> &str {
         &self.eligibility_id
     }
@@ -284,8 +304,6 @@ impl DispositionEligibleRelationDeclarationV1 {
     }
 }
 
-/// Issue exact-use eligibility after joining one declaration, one registered
-/// qualification, and one explicit current use context.
 pub fn admit_relation_declaration_for_use_v1(
     declaration: &BoundEvidenceRelationDeclarationV1,
     qualification: &RegisteredRelationDeclarerQualificationV1,
@@ -368,7 +386,7 @@ pub fn relation_declarer_qualification_profile_digest_v1() -> String {
 pub fn relation_declaration_eligibility_profile_digest_v1() -> String {
     domain_hash(
         ELIGIBILITY_PROFILE_DOMAIN,
-        RELATION_DECLARER_QUALIFICATION_CONTRACT_V1.as_bytes(),
+        RELATION_DECLARATION_ELIGIBILITY_CONTRACT_V1.as_bytes(),
     )
 }
 
@@ -380,17 +398,26 @@ fn validate_and_canonicalize_qualification(
             found: value.schema_version,
         });
     }
-    validate_nonempty(&value.subject_declarer_id, RelationQualificationError::MissingSubjectDeclarerId)?;
+    validate_nonempty(
+        &value.subject_declarer_id,
+        RelationQualificationError::MissingSubjectDeclarerId,
+    )?;
     validate_optional_nonempty(
         value.subject_declarer_version.as_deref(),
         RelationQualificationError::EmptySubjectDeclarerVersion,
     )?;
-    validate_nonempty(&value.qualifier_id, RelationQualificationError::MissingQualifierId)?;
+    validate_nonempty(
+        &value.qualifier_id,
+        RelationQualificationError::MissingQualifierId,
+    )?;
     validate_optional_nonempty(
         value.qualifier_version.as_deref(),
         RelationQualificationError::EmptyQualifierVersion,
     )?;
-    validate_nonempty(&value.evaluator_id, RelationQualificationError::MissingEvaluatorId)?;
+    validate_nonempty(
+        &value.evaluator_id,
+        RelationQualificationError::MissingEvaluatorId,
+    )?;
     validate_optional_nonempty(
         value.evaluator_version.as_deref(),
         RelationQualificationError::EmptyEvaluatorVersion,
@@ -422,7 +449,9 @@ fn validate_and_canonicalize_qualification(
             });
         }
     }
-    value.allowed_relation_kinds.sort_by_key(|kind| relation_kind_rank(*kind));
+    value
+        .allowed_relation_kinds
+        .sort_by_key(|kind| relation_kind_rank(*kind));
     Ok(())
 }
 
@@ -432,13 +461,21 @@ fn relation_declarer_qualification_id_v1(
 ) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(QUALIFICATION_ID_DOMAIN);
-    hash_text(&mut hasher, b"profile_contract_digest", profile_contract_digest);
+    hash_text(
+        &mut hasher,
+        b"profile_contract_digest",
+        profile_contract_digest,
+    );
     hash_bytes(
         &mut hasher,
         b"schema_version",
         &value.schema_version.to_le_bytes(),
     );
-    hash_text(&mut hasher, b"subject_declarer_id", &value.subject_declarer_id);
+    hash_text(
+        &mut hasher,
+        b"subject_declarer_id",
+        &value.subject_declarer_id,
+    );
     hash_option_text(
         &mut hasher,
         b"subject_declarer_version",
@@ -539,7 +576,11 @@ fn relation_declaration_eligibility_id_v1(
 ) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(ELIGIBILITY_ID_DOMAIN);
-    hash_text(&mut hasher, b"profile_contract_digest", profile_contract_digest);
+    hash_text(
+        &mut hasher,
+        b"profile_contract_digest",
+        profile_contract_digest,
+    );
     hash_text(&mut hasher, b"declaration_id", declaration_id);
     hash_text(&mut hasher, b"qualification_id", qualification_id);
     hash_text(&mut hasher, b"context_commitment", context_commitment);
@@ -713,14 +754,26 @@ impl std::fmt::Display for RelationQualificationError {
             Self::QualificationIdentityMismatch => {
                 f.write_str("registered qualification does not match its complete normalized record")
             }
-            Self::MissingSubjectDeclarerId => f.write_str("qualification requires subject declarer id"),
-            Self::EmptySubjectDeclarerVersion => f.write_str("subject declarer version cannot be empty when present"),
+            Self::MissingSubjectDeclarerId => {
+                f.write_str("qualification requires subject declarer id")
+            }
+            Self::EmptySubjectDeclarerVersion => {
+                f.write_str("subject declarer version cannot be empty when present")
+            }
             Self::MissingQualifierId => f.write_str("qualification requires qualifier id"),
-            Self::EmptyQualifierVersion => f.write_str("qualifier version cannot be empty when present"),
+            Self::EmptyQualifierVersion => {
+                f.write_str("qualifier version cannot be empty when present")
+            }
             Self::MissingEvaluatorId => f.write_str("qualification requires evaluator id"),
-            Self::EmptyEvaluatorVersion => f.write_str("evaluator version cannot be empty when present"),
-            Self::SelfQualification => f.write_str("declarer cannot be its own sole qualification authority"),
-            Self::MalformedDigest => f.write_str("digest must be sha256:<64 hex> or blake3:<64 hex>"),
+            Self::EmptyEvaluatorVersion => {
+                f.write_str("evaluator version cannot be empty when present")
+            }
+            Self::SelfQualification => {
+                f.write_str("declarer cannot be its own sole qualification authority")
+            }
+            Self::MalformedDigest => {
+                f.write_str("digest must be sha256:<64 hex> or blake3:<64 hex>")
+            }
             Self::ValidityEndsBeforeQualification {
                 qualified_at_unix_ms,
                 valid_until_unix_ms,
@@ -728,23 +781,47 @@ impl std::fmt::Display for RelationQualificationError {
                 f,
                 "qualification validity {valid_until_unix_ms} precedes qualification time {qualified_at_unix_ms}"
             ),
-            Self::EmptyAllowedRelationKinds => f.write_str("qualification requires at least one allowed relation kind"),
-            Self::DuplicateAllowedRelationKind { relation } => write!(f, "duplicate allowed relation kind {relation:?}"),
-            Self::SupersedesNotDispositionRelation => f.write_str("Supersedes targets evidence and is not a v1 shadow-disposition proposition relation"),
-            Self::DeclarationSubjectMismatch => f.write_str("declaration provenance does not match qualified subject declarer/method"),
-            Self::QualificationPropositionMismatch => f.write_str("qualification does not cover the requested proposition"),
-            Self::DeclarationPropositionMismatch => f.write_str("declaration does not target the requested proposition"),
-            Self::DispositionRequiresPropositionRelation => f.write_str("shadow runtime disposition requires a proposition-targeting relation"),
-            Self::UseNotPermitted => f.write_str("qualification does not permit the requested use"),
-            Self::RelationKindNotQualified { relation } => write!(f, "relation kind {relation:?} is not qualified for this declarer/use"),
+            Self::EmptyAllowedRelationKinds => {
+                f.write_str("qualification requires at least one allowed relation kind")
+            }
+            Self::DuplicateAllowedRelationKind { relation } => {
+                write!(f, "duplicate allowed relation kind {relation:?}")
+            }
+            Self::SupersedesNotDispositionRelation => f.write_str(
+                "Supersedes targets evidence and is not a v1 shadow-disposition proposition relation",
+            ),
+            Self::DeclarationSubjectMismatch => f.write_str(
+                "declaration provenance does not match qualified subject declarer/method",
+            ),
+            Self::QualificationPropositionMismatch => {
+                f.write_str("qualification does not cover the requested proposition")
+            }
+            Self::DeclarationPropositionMismatch => {
+                f.write_str("declaration does not target the requested proposition")
+            }
+            Self::DispositionRequiresPropositionRelation => {
+                f.write_str("shadow runtime disposition requires a proposition-targeting relation")
+            }
+            Self::UseNotPermitted => {
+                f.write_str("qualification does not permit the requested use")
+            }
+            Self::RelationKindNotQualified { relation } => {
+                write!(f, "relation kind {relation:?} is not qualified for this declarer/use")
+            }
             Self::QualificationNotYetValid {
                 qualified_at_unix_ms,
                 now_unix_ms,
-            } => write!(f, "qualification begins at {qualified_at_unix_ms}, requested at {now_unix_ms}"),
+            } => write!(
+                f,
+                "qualification begins at {qualified_at_unix_ms}, requested at {now_unix_ms}"
+            ),
             Self::QualificationExpired {
                 valid_until_unix_ms,
                 now_unix_ms,
-            } => write!(f, "qualification expired at {valid_until_unix_ms}, requested at {now_unix_ms}"),
+            } => write!(
+                f,
+                "qualification expired at {valid_until_unix_ms}, requested at {now_unix_ms}"
+            ),
         }
     }
 }
@@ -755,9 +832,7 @@ impl std::error::Error for RelationQualificationError {}
 mod tests {
     use super::*;
     use crate::{
-        currentness::{
-            EvidenceRelationV1, COGNITIVE_CURRENTNESS_SCHEMA_VERSION,
-        },
+        currentness::{EvidenceRelationV1, COGNITIVE_CURRENTNESS_SCHEMA_VERSION},
         relation_provenance::{
             EvidenceRelationDeclarationProvenanceV1,
             RELATION_DECLARATION_PROVENANCE_SCHEMA_VERSION,
@@ -878,7 +953,10 @@ mod tests {
             qualified_at_unix_ms: 100,
             valid_until_unix_ms: 200,
         };
-        assert_eq!(raw.register(), Err(RelationQualificationError::SelfQualification));
+        assert_eq!(
+            raw.register(),
+            Err(RelationQualificationError::SelfQualification)
+        );
     }
 
     #[test]
@@ -895,7 +973,9 @@ mod tests {
         let registered = qualification(vec![EvidenceRelationKindV1::Supports]);
         let mut value = serde_json::to_value(&registered).unwrap();
         value["record"]["evaluator_id"] = serde_json::Value::String("forged".into());
-        assert!(serde_json::from_value::<RegisteredRelationDeclarerQualificationV1>(value).is_err());
+        assert!(
+            serde_json::from_value::<RegisteredRelationDeclarerQualificationV1>(value).is_err()
+        );
     }
 
     #[test]
@@ -908,12 +988,36 @@ mod tests {
             &context(PROPOSITION, 150),
         )
         .unwrap();
-        assert_eq!(eligible.declaration().declaration_id(), declaration.declaration_id());
-        assert_eq!(eligible.qualification().qualification_id(), qualification.qualification_id());
+        assert_eq!(
+            eligible.declaration().declaration_id(),
+            declaration.declaration_id()
+        );
+        assert_eq!(
+            eligible.qualification().qualification_id(),
+            qualification.qualification_id()
+        );
         assert_eq!(eligible.proposition_id(), PROPOSITION);
+        assert_eq!(eligible.schema_version(), RELATION_DECLARATION_ELIGIBILITY_SCHEMA_VERSION);
+        assert_eq!(eligible.profile(), RELATION_DECLARATION_ELIGIBILITY_PROFILE_V1);
+        assert_eq!(
+            eligible.profile_contract_digest(),
+            relation_declaration_eligibility_profile_digest_v1()
+        );
         assert!(eligible.eligibility_id().starts_with("blake3:"));
         let encoded = serde_json::to_string(&eligible).unwrap();
         assert!(encoded.contains(eligible.eligibility_id()));
+    }
+
+    #[test]
+    fn eligibility_has_distinct_semantic_contract_identity() {
+        assert_ne!(
+            RELATION_DECLARER_QUALIFICATION_CONTRACT_V1,
+            RELATION_DECLARATION_ELIGIBILITY_CONTRACT_V1
+        );
+        assert_ne!(
+            relation_declarer_qualification_profile_digest_v1(),
+            relation_declaration_eligibility_profile_digest_v1()
+        );
     }
 
     #[test]
@@ -925,7 +1029,10 @@ mod tests {
             &context(PROPOSITION, 150),
         )
         .unwrap_err();
-        assert_eq!(error, RelationQualificationError::DeclarationSubjectMismatch);
+        assert_eq!(
+            error,
+            RelationQualificationError::DeclarationSubjectMismatch
+        );
     }
 
     #[test]
@@ -937,7 +1044,10 @@ mod tests {
             &context(OTHER_PROPOSITION, 150),
         )
         .unwrap_err();
-        assert_eq!(error, RelationQualificationError::QualificationPropositionMismatch);
+        assert_eq!(
+            error,
+            RelationQualificationError::QualificationPropositionMismatch
+        );
     }
 
     #[test]
