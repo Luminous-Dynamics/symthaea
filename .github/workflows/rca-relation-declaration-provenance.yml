@@ -1,0 +1,122 @@
+name: RCA Relation Declaration Provenance
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - '.github/workflows/rca-relation-declaration-provenance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze relation declaration identity boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/relation_provenance.rs
+          lib=crates/core/symthaea-epistemic-governance/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub mod relation_provenance;' "$lib"
+          grep -q 'RELATION_DECLARATION_IDENTITY_CONTRACT_V1' "$production"
+          grep -q 'producer_relation_id=is_reference_not_canonical_declaration_identity' "$production"
+          grep -q 'declaration_identity=blake3_explicit_complete_relation_body_plus_provenance' "$production"
+          grep -q 'declaration_provenance_is_not_truth_or_epistemic_authority' "$production"
+
+          # Identity must bind the complete validated relation body and explicit
+          # declarer provenance under stable semantic tags.
+          for field in \
+            provenance_schema_version \
+            declarer_id \
+            declarer_version \
+            declaration_method \
+            provenance_digest \
+            relation_schema_version \
+            producer_relation_id \
+            evidence_id \
+            relation_kind \
+            target_kind \
+            target_id \
+            strength_ppm
+          do
+            grep -q "$field" "$production"
+          done
+
+          for method in \
+            human_annotation \
+            deterministic_rule \
+            model_inference \
+            formal_procedure \
+            imported_assertion
+          do
+            grep -q "$method" "$production"
+          done
+
+          for relation in \
+            supports \
+            contradicts \
+            weakens \
+            defeats \
+            supersedes \
+            corroborates \
+            irrelevant
+          do
+            grep -q "\"$relation\"" "$production"
+          done
+
+          # Serializer/debug/Rust hash layout must not define canonical identity.
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"|as[[:space:]]+u(8|16|32|64)' "$production"; then
+            echo 'Relation declaration identity acquired incidental serialization or Rust-layout semantics.' >&2
+            exit 1
+          fi
+
+          # Provenance bookkeeping must not grant a downstream authority token.
+          if grep -Eqi 'AdmittedCognitiveEvidence|CanonicalBelief|QualifiedEpistemicState|global.?workspace|action_author|external_effect|self.?improvement.*promotion|\.authorize[[:space:]]*\(' "$production"; then
+            echo 'Relation declaration provenance crossed an epistemic/action authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Freeze persistence and negative identity tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/relation_provenance.rs
+          grep -q 'producer_reference_is_not_canonical_declaration_identity' "$src"
+          grep -q 'declarer_and_provenance_are_identity_bearing' "$src"
+          grep -q 'same_producer_reference_changed_relation_body_changes_declaration_id' "$src"
+          grep -q 'persistence_revalidates_complete_relation_and_provenance' "$src"
+          grep -q 'tampering_fails_closed' "$src"
+          grep -q 'malformed_provenance_fails_before_binding' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-epistemic-governance -e normal)"
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-(shadow|observer|evidence|shadow-case)'; then
+            echo 'Generic epistemic governance acquired an RCA runtime/bridge dependency.' >&2
+            exit 1
+          fi
+
+      - name: Format epistemic governance
+        run: cargo fmt -p symthaea-epistemic-governance -- --check
+
+      - name: Test relation declaration provenance
+        run: cargo test -p symthaea-epistemic-governance --lib relation_provenance
+
+      - name: Test epistemic governance
+        run: cargo test -p symthaea-epistemic-governance
+
+      - name: Clippy epistemic governance
+        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
