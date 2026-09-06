@@ -1,0 +1,84 @@
+name: Neural Benchmark Quarantine
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/neural_validation/mod.rs'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/neural_validation/cortical_similarity.rs'
+      - 'docs/neuroscience/NEURAL_BENCHMARK_QUALIFICATION_V1.md'
+      - 'docs/neuroscience/FSAVERAGE5_GLASSER_TRANSFORM_QUALIFICATION_V1.md'
+      - '.github/workflows/neural-benchmark-quarantine.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Enforce neural benchmark qualification boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Static quarantine contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          MOD=crates/domains/symthaea-psych-bench/src/benchmarks/neural_validation/mod.rs
+          DOC=docs/neuroscience/NEURAL_BENCHMARK_QUALIFICATION_V1.md
+          MAP=docs/neuroscience/FSAVERAGE5_GLASSER_TRANSFORM_QUALIFICATION_V1.md
+
+          grep -Fq 'pub(crate) mod cortical_similarity;' "$MOD"
+          if grep -Eq '^pub use cortical_similarity::' "$MOD"; then
+            echo 'legacy neural benchmarks must not be publicly re-exported' >&2
+            exit 1
+          fi
+          grep -Fq 'pub const QUALIFIED_EXTERNAL_BENCHMARKS: &[&str] = &[];' "$MOD"
+          grep -Fq 'NeuralValidationQualification::Quarantined' "$MOD"
+
+          for benchmark in \
+            CorticalSimilarity \
+            TemporalDynamics \
+            BidirectionalValidation \
+            SubstrateComparison \
+            ParcellationRobustness \
+            EvidenceUpgrade \
+            EegValidation \
+            HybridSubstrate
+          do
+            grep -Fq "\"$benchmark\"" "$MOD"
+            grep -Fq "\`$benchmark\`" "$DOC"
+          done
+
+          grep -Fq 'NBQ-002 — No implicit fallback' "$DOC"
+          grep -Fq 'NBQ-004 — Transform lineage complete' "$DOC"
+          grep -Fq 'NBQ-007 — Evidence-use admission' "$DOC"
+          grep -Fq 'NBQ-009 — Claim bounded by evidence' "$DOC"
+
+          # De-quarantining the cortical-surrogate path requires a reviewed
+          # surface-parcellation contract, not merely a new implementation.
+          grep -Fq 'total vertices: `20_484`' "$MAP"
+          grep -Fq 'indices `0..10_242`: left hemisphere' "$MAP"
+          grep -Fq 'indices `10_242..20_484`: right hemisphere' "$MAP"
+          grep -Fq 'FMQ-003 — Semantic label resolution' "$MAP"
+          grep -Fq 'FMQ-006 — Complete parcel coverage' "$MAP"
+          grep -Fq 'FMQ-010 — Independent derivation check' "$MAP"
+          grep -Fq 'FMQ-012 — Lossiness explicit' "$MAP"
+          grep -Fq 'FMQ-014 — No authority upgrade' "$MAP"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format contract
+        run: cargo fmt --check -p symthaea-psych-bench
+
+      - name: Feature-enabled regression tests
+        run: cargo test -p symthaea-psych-bench --lib --features neural_validation
+
+      - name: Lint contract
+        run: cargo clippy -p symthaea-psych-bench --lib --features neural_validation -- -D warnings
