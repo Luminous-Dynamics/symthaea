@@ -31,7 +31,7 @@ pub const RCA_CYCLE_ADAPTER_CONTRACT_V1: &str = concat!(
     "cycle_index=wrapper_owned_monotonic_cycle_index\n",
     "cycle_time_us=CycleResult.cycle_time_us\n",
     "prediction_error_ppm=reject_nonfinite_or_outside_[0,1];round(f64(value)*1000000)\n",
-    "peak_attention_ppm=reject_nonfinite_or_outside_[0,1];round(f64(value)*1000000)\n",
+    "peak_attention_bits=exact_f32_to_bits;shadow_validation_rejects_nonfinite_or_negative;no_clamp_or_normalization\n",
     "learning_occurred=CycleResult.learning_occurred\n",
     "detected_primitive_count=checked_u32_len_only;primitive_identities_excluded_v1\n",
     "output_digest=blake3_domain|u64le_len|ordered_f32_to_bits_le\n",
@@ -64,8 +64,8 @@ pub fn adapt_completed_cycle_v1(
 ) -> Result<ValidatedFrozenCycleObservationV1, RcaShadowAdapterError> {
     let result = completed.result();
 
-    let prediction_error_ppm = unit_interval_to_ppm("prediction_error", result.prediction_error)?;
-    let peak_attention_ppm = unit_interval_to_ppm("peak_attention", result.peak_attention)?;
+    let prediction_error_ppm = prediction_error_to_ppm(result.prediction_error)?;
+    let peak_attention_bits = result.peak_attention.to_bits();
     let detected_primitive_count = u32::try_from(result.detected_primitives.len()).map_err(|_| {
         RcaShadowAdapterError::PrimitiveCountOverflow {
             found: result.detected_primitives.len(),
@@ -94,7 +94,7 @@ pub fn adapt_completed_cycle_v1(
         cycle_index: completed.cycle_index(),
         cycle_time_us: result.cycle_time_us,
         prediction_error_ppm,
-        peak_attention_ppm,
+        peak_attention_bits,
         learning_occurred: result.learning_occurred,
         detected_primitive_count,
         output_digest,
@@ -109,11 +109,8 @@ pub fn adapt_completed_cycle_v1(
 
 #[derive(Debug, Error)]
 pub enum RcaShadowAdapterError {
-    #[error("{field} must be finite and in [0,1]; found f32 bits 0x{value_bits:08x}")]
-    MetricOutsideUnitInterval {
-        field: &'static str,
-        value_bits: u32,
-    },
+    #[error("prediction_error must be finite and in [0,1]; found f32 bits 0x{value_bits:08x}")]
+    PredictionErrorOutsideUnitInterval { value_bits: u32 },
     #[error("detected primitive count {found} does not fit in shadow schema u32")]
     PrimitiveCountOverflow { found: usize },
     #[error("cannot serialize CycleMetadata for the declared v1 projection: {0}")]
@@ -122,13 +119,9 @@ pub enum RcaShadowAdapterError {
     ShadowValidation(ShadowObservationError),
 }
 
-fn unit_interval_to_ppm(
-    field: &'static str,
-    value: f32,
-) -> Result<u32, RcaShadowAdapterError> {
+fn prediction_error_to_ppm(value: f32) -> Result<u32, RcaShadowAdapterError> {
     if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-        return Err(RcaShadowAdapterError::MetricOutsideUnitInterval {
-            field,
+        return Err(RcaShadowAdapterError::PredictionErrorOutsideUnitInterval {
             value_bits: value.to_bits(),
         });
     }
@@ -202,6 +195,12 @@ mod tests {
     #[test]
     fn output_and_thought_commitments_are_bit_sensitive() {
         let mut completed = completed_cycle();
+        if completed.result.output.is_empty() {
+            completed.result.output.push(0.0);
+        }
+        if completed.result.thought_vector.is_empty() {
+            completed.result.thought_vector.push(0.0);
+        }
         let original = adapt_completed_cycle_v1(&completed).unwrap();
 
         completed.result.output[0] = f32::from_bits(completed.result.output[0].to_bits() ^ 1);
@@ -233,6 +232,34 @@ mod tests {
     }
 
     #[test]
+    fn peak_attention_above_one_is_preserved_bit_exact() {
+        let mut completed = completed_cycle();
+        completed.result.peak_attention = 2.75;
+        let observation = adapt_completed_cycle_v1(&completed).unwrap();
+        assert_eq!(observation.as_raw().peak_attention_bits, 2.75_f32.to_bits());
+    }
+
+    #[test]
+    fn invalid_peak_attention_fails_without_clamping() {
+        let mut completed = completed_cycle();
+        completed.result.peak_attention = f32::NAN;
+        assert!(matches!(
+            adapt_completed_cycle_v1(&completed),
+            Err(RcaShadowAdapterError::ShadowValidation(
+                ShadowObservationError::InvalidPeakAttention { .. }
+            ))
+        ));
+
+        completed.result.peak_attention = -0.25;
+        assert!(matches!(
+            adapt_completed_cycle_v1(&completed),
+            Err(RcaShadowAdapterError::ShadowValidation(
+                ShadowObservationError::InvalidPeakAttention { .. }
+            ))
+        ));
+    }
+
+    #[test]
     fn excluded_training_loss_does_not_silently_widen_v1_projection() {
         let mut completed = completed_cycle();
         let original = adapt_completed_cycle_v1(&completed).unwrap();
@@ -242,24 +269,29 @@ mod tests {
     }
 
     #[test]
-    fn out_of_range_metrics_fail_instead_of_clamping() {
+    fn primitive_identity_is_excluded_while_count_is_admitted() {
+        let mut completed = completed_cycle();
+        completed.result.detected_primitives = vec!["ALPHA".into(), "BETA".into()];
+        let original = adapt_completed_cycle_v1(&completed).unwrap();
+        completed.result.detected_primitives = vec!["GAMMA".into(), "DELTA".into()];
+        let changed = adapt_completed_cycle_v1(&completed).unwrap();
+        assert_eq!(original, changed);
+        assert_eq!(changed.as_raw().detected_primitive_count, 2);
+    }
+
+    #[test]
+    fn out_of_range_prediction_error_fails_instead_of_clamping() {
         let mut completed = completed_cycle();
         completed.result.prediction_error = 1.01;
         assert!(matches!(
             adapt_completed_cycle_v1(&completed),
-            Err(RcaShadowAdapterError::MetricOutsideUnitInterval {
-                field: "prediction_error",
-                ..
-            })
+            Err(RcaShadowAdapterError::PredictionErrorOutsideUnitInterval { .. })
         ));
 
         completed.result.prediction_error = f32::NAN;
         assert!(matches!(
             adapt_completed_cycle_v1(&completed),
-            Err(RcaShadowAdapterError::MetricOutsideUnitInterval {
-                field: "prediction_error",
-                ..
-            })
+            Err(RcaShadowAdapterError::PredictionErrorOutsideUnitInterval { .. })
         ));
     }
 
@@ -274,6 +306,20 @@ mod tests {
                 ShadowObservationError::MissingLanguageSource
             ))
         ));
+    }
+
+    #[test]
+    fn exact_language_bytes_change_commitment() {
+        let mut completed = completed_cycle();
+        completed.result.language_source = Some("qualified-test-language-source".into());
+        completed.result.language_output = Some("alpha".into());
+        let alpha = adapt_completed_cycle_v1(&completed).unwrap();
+        completed.result.language_output = Some("Alpha".into());
+        let capitalized = adapt_completed_cycle_v1(&completed).unwrap();
+        assert_ne!(
+            alpha.as_raw().language_output_digest,
+            capitalized.as_raw().language_output_digest
+        );
     }
 
     #[test]
