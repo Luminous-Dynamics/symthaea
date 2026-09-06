@@ -239,13 +239,14 @@ impl MotorOutputBridge {
             let program = ctx
                 .args
                 .first()
+                .filter(|program| !program.trim().is_empty())
                 .cloned()
-                .unwrap_or_else(|| "echo".to_string());
-            let args = if ctx.args.len() > 1 {
-                ctx.args[1..].to_vec()
-            } else {
-                vec![]
-            };
+                .ok_or_else(|| {
+                    crate::action::ActionError::ValidationFailed(
+                        "RUN_COMMAND requires an explicit non-empty program".into(),
+                    )
+                })?;
+            let args = ctx.args[1..].to_vec();
             Ok(ActionIR::RunCommand {
                 program,
                 args,
@@ -771,6 +772,24 @@ mod tests {
         let skipped = MotorOutputResult::skipped("test skip");
         assert!(!skipped.success);
         assert_eq!(skipped.prediction_error, 0.5);
+    }
+
+    #[test]
+    fn test_run_command_registry_requires_explicit_program() {
+        let registry = MotorOutputBridge::coding_registry();
+
+        for args in [vec![], vec!["   ".into()]] {
+            let ctx = ActionContext {
+                target_path: None,
+                content: None,
+                args,
+                env: Default::default(),
+            };
+            let err = registry
+                .resolve("RUN_COMMAND", &ctx)
+                .expect_err("RUN_COMMAND must fail closed without a program");
+            assert!(format!("{err}").contains("explicit non-empty program"));
+        }
     }
 
     #[test]
