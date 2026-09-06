@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-rca-shadow-case"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Causally inert RCA shadow evidence-case assembly and independence topology"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-epistemic-governance = { path = "../../core/symthaea-epistemic-governance" }
+symthaea-rca-evidence-bridge = { path = "../symthaea-rca-evidence-bridge" }
+symthaea-rca-shadow-epistemics = { path = "../symthaea-rca-shadow-epistemics" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+symthaea-rca-shadow = { path = "../../core/symthaea-rca-shadow" }
