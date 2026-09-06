@@ -1,0 +1,298 @@
+name: IoT Live Current Fences Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-actuation-guard-device-reality/**'
+      - 'crates/bridges/symthaea-iot-actuation-guard-interlock/**'
+      - 'crates/bridges/symthaea-iot-transport-current-fence/**'
+      - '.github/workflows/iot-live-current-fences-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-live-current-fences-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Aggregate live-fence source contract
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          def production(path):
+              src = Path(path).read_text()
+              return '\n'.join(
+                  line for line in src.splitlines()
+                  if not line.lstrip().startswith('//')
+              )
+
+          def compact(code):
+              return ''.join(code.split())
+
+          device = production(
+              'crates/bridges/symthaea-iot-actuation-guard-device-reality/src/current.rs'
+          )
+          interlock = production(
+              'crates/bridges/symthaea-iot-actuation-guard-interlock/src/current_post_semantic.rs'
+          )
+          transport = production(
+              'crates/bridges/symthaea-iot-transport-current-fence/src/lib.rs'
+          )
+
+          requirements = {
+              'device': (
+                  compact(device),
+                  [
+                      'pubstructCurrentAdmissionDeviceRealityGuard',
+                      'pubfnfence_current',
+                      'proof.policy_digest()',
+                      'proof.trust_head()',
+                      'self.trust_registry.exact_active_key(',
+                      'current_key.digest()?!=proof.key_digest()',
+                      'verify_strict(&message,&signature)',
+                      '.min(verifier_key_not_after_unix_ms)',
+                      '.min(trust_snapshot_expires_at_unix_ms)',
+                      "_guard:&'aCurrentAdmissionDeviceRealityGuard",
+                      "proof:&'aVerifiedAdmissionDeviceReality",
+                  ],
+              ),
+              'interlock': (
+                  compact(interlock),
+                  [
+                      'pubstructCurrentPostSemanticInterlockGuard',
+                      'pubfnfence_current',
+                      'challenge.device_attestation_object_digest()',
+                      'challenge.semantic_head()',
+                      'challenge.transport_trust_head()',
+                      'verify_interlock_key_binding(',
+                      '&Ed25519Rfc8032InterlockVerifier',
+                      'binding.key_digest()!=proof.controller_key_digest()',
+                      'current_key.digest()?!=binding.key_digest()',
+                      '.min(controller_key_not_after_unix_ms)',
+                      '.min(trust_snapshot_expires_at_unix_ms)',
+                      "_guard:&'aCurrentPostSemanticInterlockGuard",
+                      "proof:&'aVerifiedPostSemanticPhysicalInterlock",
+                  ],
+              ),
+              'transport': (
+                  compact(transport),
+                  [
+                      'pubstructCurrentXeniaTransportFenceGuard',
+                      'pubfnfence_current',
+                      'proof.transport_trust_head()',
+                      'proof.revalidated_at_unix_ms()',
+                      'key.attestor_id==proof.attestor_id()',
+                      'key.key_id==proof.key_id()',
+                      'current_key.digest()?!=proof.transport_key_digest()',
+                      'current_key.not_after_unix_ms!=proof.transport_key_not_after_unix_ms()',
+                      'snapshot.expires_at_unix_ms!=proof.trust_snapshot_expires_at_unix_ms()',
+                      '.receipt_expires_at_unix_ms()',
+                      'expected_valid_until!=proof.valid_until_unix_ms()',
+                      "_guard:&'aCurrentXeniaTransportFenceGuard",
+                      "proof:&'aRevalidatedXeniaTransport",
+                  ],
+              ),
+          }
+          for name, (code, needles) in requirements.items():
+              missing = [needle for needle in needles if needle not in code]
+              if missing:
+                  raise SystemExit(f'missing {name} live-fence invariant: {missing}')
+
+          # Public fencing APIs must not accept relying-party time, cryptographic providers,
+          # registries, policies or trust heads from the caller.
+          public_specs = [
+              (device, 'device', [
+                  'now_unix_ms', 'verifier:', 'public_key', 'DeviceRealityTrustRegistry',
+                  'DeviceRealityPolicyV1', 'DeviceRealityTrustHead',
+              ]),
+              (interlock, 'interlock', [
+                  'now_unix_ms', 'verifier:', 'public_key', 'InterlockTrustRegistry',
+                  'PhysicalInterlockPolicyV1', 'InterlockTrustHead',
+              ]),
+              (transport, 'transport', [
+                  'now_unix_ms', 'TransportTrustRegistry', 'TransportTrustHead',
+              ]),
+          ]
+          for code, name, forbidden in public_specs:
+              surface = code.split('pub fn fence_current', 1)[1].split('fn fence_current_at', 1)[0]
+              found = [needle for needle in forbidden if needle in surface]
+              if found:
+                  raise SystemExit(f'caller-controlled {name} live-fence input: {found}')
+
+          shared_forbidden = [
+              'FinalActuatorPermit', 'TrustBoundFinalActuatorPermit',
+              'CompleteJitHalLease', 'JustInTimeHalLease', 'TcpListener', 'TcpStream',
+              'tokio::spawn', 'std::process::Command', 'Command::new', 'unsafe {',
+          ]
+          for name, code in [('device', device), ('interlock', interlock), ('transport', transport)]:
+              found = [needle for needle in shared_forbidden if needle in code]
+              if found:
+                  raise SystemExit(f'forbidden authority/I/O surface in {name} live fence: {found}')
+
+          # Transport intentionally relies on same-head commitment + the deadline proven by
+          # fixed #476 cryptography. Do not grow a second key lifecycle or receipt verifier here.
+          transport_forbidden = [
+              'TransportAttestorStatus', '.active_at(', '.trusted_key(', 'not_before_unix_ms',
+              'HybridReceiptSignatureVerifier', 'verify_xenia_transport_receipt(',
+              'verify_xenia_physical_effect_receipt(', 'ed25519_dalek', 'fips204',
+          ]
+          found = [needle for needle in transport_forbidden if needle in transport]
+          if found:
+              raise SystemExit(f'duplicated transport lifecycle/crypto surface: {found}')
+
+          manifests = {
+              'device': (
+                  'crates/bridges/symthaea-iot-actuation-guard-device-reality/Cargo.toml',
+                  {
+                      'blake3', 'ed25519-dalek', 'serde', 'symthaea-authority',
+                      'symthaea-iot-actuation-guard-admission-challenge',
+                      'symthaea-iot-actuation-guard-admission-reservation',
+                      'symthaea-iot-actuation-guard-two-phase-protocol',
+                      'symthaea-iot-authority', 'symthaea-iot-posture',
+                      'symthaea-iot-transport-receipt', 'thiserror',
+                  },
+              ),
+              'interlock': (
+                  'crates/bridges/symthaea-iot-actuation-guard-interlock/Cargo.toml',
+                  {
+                      'symthaea-authority', 'symthaea-iot-actuation-guard',
+                      'symthaea-iot-actuation-guard-post-semantic-controller',
+                      'symthaea-iot-actuation-guard-protocol', 'symthaea-iot-final-gate',
+                      'symthaea-iot-interlock-ed25519', 'symthaea-iot-interlock-trust',
+                      'symthaea-iot-transport-receipt', 'thiserror',
+                  },
+              ),
+              'transport': (
+                  'crates/bridges/symthaea-iot-transport-current-fence/Cargo.toml',
+                  {
+                      'symthaea-iot-transport-current-revalidation',
+                      'symthaea-iot-transport-receipt', 'thiserror',
+                  },
+              ),
+          }
+          for name, (path, expected) in manifests.items():
+              actual = set(tomllib.loads(Path(path).read_text()).get('dependencies', {}))
+              if actual != expected:
+                  raise SystemExit(f'{name} production dependency drift: {sorted(actual)}')
+
+      - name: Install Rust 1.96 formatter
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Format only live-fence owned source files
+        run: |
+          rustfmt +1.96.0 --edition 2024 --check \
+            crates/bridges/symthaea-iot-actuation-guard-device-reality/src/current.rs \
+            crates/bridges/symthaea-iot-actuation-guard-interlock/src/current_post_semantic.rs \
+            crates/bridges/symthaea-iot-transport-current-fence/src/lib.rs
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Resolve candidate and check live-fence packages
+        run: |
+          cargo +1.94.0 check \
+            -p symthaea-iot-actuation-guard-device-reality \
+            -p symthaea-iot-actuation-guard-interlock \
+            -p symthaea-iot-transport-current-fence
+
+      - name: Reject unreviewed external dependency drift
+        shell: python
+        run: |
+          import tomllib
+
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source')): p
+                  for p in doc.get('package', [])
+                  if p.get('source') is not None
+              }
+
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          b = set(before)
+          a = set(after)
+          added = a - b
+          removed = b - a
+          changed = sorted(k for k in a & b if after[k] != before[k])
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          if not added.issubset(allowed) or removed or changed:
+              raise SystemExit(
+                  f'external dependency drift: added={sorted(added)}, '
+                  f'removed={sorted(removed)}, changed={changed}'
+              )
+          if added:
+              package = after[next(iter(added))]
+              if package.get('checksum') != 'c9fb5a367b9846933e271a3c2a992930743f82ae5e8cb7faa780715a80fa0b15':
+                  raise SystemExit(f'unexpected fips204 checksum: {package}')
+              families = {dep.split(' ', 1)[0] for dep in package.get('dependencies', [])}
+              if families != {'rand_core', 'sha2', 'sha3', 'zeroize'}:
+                  raise SystemExit(f'unexpected fips204 dependency family: {families}')
+
+      - name: Device-reality live-current regression
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-actuation-guard-device-reality
+          --test current current_device_reality_fence_reverifies_fixed_ed25519_and_caps_natural_expiry -- --exact
+
+      - name: Post-semantic interlock live-current regression
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-actuation-guard-interlock
+          --test current_post_semantic current_post_semantic_interlock_reverifies_fixed_key_and_rejects_generation_advance -- --exact
+
+      - name: Xenia transport live-current regression
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-transport-current-fence
+          --test current fixed_current_transport_can_be_borrowed_fenced_and_generation_advance_kills_it -- --exact
+
+      - name: Device-reality package tests
+        run: cargo +1.94.0 test -p symthaea-iot-actuation-guard-device-reality
+
+      - name: Interlock package tests
+        run: cargo +1.94.0 test -p symthaea-iot-actuation-guard-interlock
+
+      - name: Transport-fence package tests
+        run: cargo +1.94.0 test -p symthaea-iot-transport-current-fence
+
+      - name: Strict Clippy on live-fence packages only
+        run: |
+          cargo +1.94.0 clippy -p symthaea-iot-actuation-guard-device-reality --all-targets --no-deps -- -D warnings
+          cargo +1.94.0 clippy -p symthaea-iot-actuation-guard-interlock --all-targets --no-deps -- -D warnings
+          cargo +1.94.0 clippy -p symthaea-iot-transport-current-fence --all-targets --no-deps -- -D warnings
+
+      - name: Show local-only Cargo.lock bookkeeping
+        if: always()
+        run: git diff -- Cargo.lock || true
