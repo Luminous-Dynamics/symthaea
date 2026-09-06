@@ -19,6 +19,12 @@
 //! material, and mints a fresh execution-instance nonce from operating-system
 //! entropy. Entropy failure is fatal: there is no deterministic, timestamp,
 //! PID, package-version, or genesis-derived fallback for execution identity.
+//!
+//! Persisted [`CognitiveExecutionLineageV1`] is archival identity only. Live
+//! issuance returns [`IssuedCognitiveExecutionLineageV1`], which deliberately
+//! implements neither `Serialize` nor `Deserialize`. A future live cognitive
+//! constructor can therefore require proof that lineage issuance happened in
+//! the current process instead of accepting a replayed/fabricated JSON record.
 
 #![deny(unsafe_code)]
 
@@ -54,10 +60,12 @@ struct ExecutionLineageBodyV1 {
     execution_nonce_commitment: String,
 }
 
-/// Immutable, persistence-safe identity for one concrete cognitive execution.
+/// Immutable archival identity for one concrete cognitive execution.
 ///
 /// The raw execution nonce is intentionally not retained. Persisted records
 /// revalidate all commitment shapes and recompute `lineage_digest` on load.
+/// This type is *not* proof that live OS-entropy issuance occurred in the
+/// current process; use [`IssuedCognitiveExecutionLineageV1`] for that boundary.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CognitiveExecutionLineageV1 {
@@ -65,8 +73,33 @@ pub struct CognitiveExecutionLineageV1 {
     lineage_digest: String,
 }
 
+/// Affine-style capability proving that a lineage was issued by the live
+/// OS-entropy path in this process.
+///
+/// Deliberately non-serializable and non-deserializable. Persistence strips
+/// issuance authority down to the archival [`CognitiveExecutionLineageV1`]
+/// record, which must never be treated as a live-constructor permit by itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssuedCognitiveExecutionLineageV1 {
+    lineage: CognitiveExecutionLineageV1,
+}
+
+impl IssuedCognitiveExecutionLineageV1 {
+    pub fn lineage(&self) -> &CognitiveExecutionLineageV1 {
+        &self.lineage
+    }
+
+    pub fn lineage_digest(&self) -> &str {
+        self.lineage.lineage_digest()
+    }
+
+    pub fn into_archival_record(self) -> CognitiveExecutionLineageV1 {
+        self.lineage
+    }
+}
+
 impl CognitiveExecutionLineageV1 {
-    /// Issue a fresh execution lineage.
+    /// Issue a fresh live execution-lineage capability.
     ///
     /// `source_generation_digest` must come from the outer build/evidence
     /// boundary. It is never synthesized from package version, wall time, or
@@ -77,7 +110,7 @@ impl CognitiveExecutionLineageV1 {
         config_profile_digest: &str,
         config_bytes: &[u8],
         genesis_material: Option<&[u8]>,
-    ) -> Result<Self, ExecutionLineageError> {
+    ) -> Result<IssuedCognitiveExecutionLineageV1, ExecutionLineageError> {
         if config_bytes.is_empty() {
             return Err(ExecutionLineageError::MissingConfigBytes);
         }
@@ -86,17 +119,18 @@ impl CognitiveExecutionLineageV1 {
         getrandom::getrandom(&mut nonce)
             .map_err(|error| ExecutionLineageError::EntropyUnavailable(error.to_string()))?;
 
-        Self::issue_with_nonce(
+        let lineage = Self::issue_record_with_nonce(
             source_generation_digest,
             config_profile,
             config_profile_digest,
             config_bytes,
             genesis_material,
             nonce,
-        )
+        )?;
+        Ok(IssuedCognitiveExecutionLineageV1 { lineage })
     }
 
-    fn issue_with_nonce(
+    fn issue_record_with_nonce(
         source_generation_digest: &str,
         config_profile: &str,
         config_profile_digest: &str,
@@ -369,14 +403,14 @@ mod tests {
     const PROFILE_B: &str =
         "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
-    fn deterministic(
+    fn deterministic_record(
         source: &str,
         profile_digest: &str,
         config: &[u8],
         genesis: Option<&[u8]>,
         nonce: [u8; 32],
     ) -> CognitiveExecutionLineageV1 {
-        CognitiveExecutionLineageV1::issue_with_nonce(
+        CognitiveExecutionLineageV1::issue_record_with_nonce(
             source,
             "cognitive-loop-config-serde-json-v1",
             profile_digest,
@@ -388,47 +422,73 @@ mod tests {
     }
 
     #[test]
+    fn live_issue_returns_non_archival_capability_surface() {
+        let issued = CognitiveExecutionLineageV1::issue(
+            SOURCE_A,
+            "cognitive-loop-config-serde-json-v1",
+            PROFILE_A,
+            b"config",
+            Some(b"genesis"),
+        )
+        .unwrap();
+        assert_eq!(issued.lineage().source_generation_digest(), SOURCE_A);
+        assert!(issued.lineage_digest().starts_with("blake3:"));
+    }
+
+    #[test]
     fn identical_committed_inputs_and_nonce_are_stable() {
-        let a = deterministic(SOURCE_A, PROFILE_A, b"{\"a\":1}", Some(b"genesis"), [7; 32]);
-        let b = deterministic(SOURCE_A, PROFILE_A, b"{\"a\":1}", Some(b"genesis"), [7; 32]);
+        let a = deterministic_record(
+            SOURCE_A,
+            PROFILE_A,
+            b"{\"a\":1}",
+            Some(b"genesis"),
+            [7; 32],
+        );
+        let b = deterministic_record(
+            SOURCE_A,
+            PROFILE_A,
+            b"{\"a\":1}",
+            Some(b"genesis"),
+            [7; 32],
+        );
         assert_eq!(a, b);
     }
 
     #[test]
     fn fresh_execution_nonce_separates_otherwise_identical_runs() {
-        let a = deterministic(SOURCE_A, PROFILE_A, b"same-config", Some(b"same"), [1; 32]);
-        let b = deterministic(SOURCE_A, PROFILE_A, b"same-config", Some(b"same"), [2; 32]);
+        let a = deterministic_record(SOURCE_A, PROFILE_A, b"same-config", Some(b"same"), [1; 32]);
+        let b = deterministic_record(SOURCE_A, PROFILE_A, b"same-config", Some(b"same"), [2; 32]);
         assert_ne!(a.execution_nonce_commitment(), b.execution_nonce_commitment());
         assert_ne!(a.lineage_digest(), b.lineage_digest());
     }
 
     #[test]
     fn source_generation_is_part_of_execution_identity() {
-        let a = deterministic(SOURCE_A, PROFILE_A, b"same", None, [9; 32]);
-        let b = deterministic(SOURCE_B, PROFILE_A, b"same", None, [9; 32]);
+        let a = deterministic_record(SOURCE_A, PROFILE_A, b"same", None, [9; 32]);
+        let b = deterministic_record(SOURCE_B, PROFILE_A, b"same", None, [9; 32]);
         assert_ne!(a.lineage_digest(), b.lineage_digest());
     }
 
     #[test]
     fn config_bytes_are_committed_exactly() {
-        let a = deterministic(SOURCE_A, PROFILE_A, b"{\"a\":1}", None, [9; 32]);
-        let b = deterministic(SOURCE_A, PROFILE_A, b"{\"a\":2}", None, [9; 32]);
+        let a = deterministic_record(SOURCE_A, PROFILE_A, b"{\"a\":1}", None, [9; 32]);
+        let b = deterministic_record(SOURCE_A, PROFILE_A, b"{\"a\":2}", None, [9; 32]);
         assert_ne!(a.config_digest(), b.config_digest());
         assert_ne!(a.lineage_digest(), b.lineage_digest());
     }
 
     #[test]
     fn config_projection_semantics_are_bound_separately_from_config_bytes() {
-        let a = deterministic(SOURCE_A, PROFILE_A, b"same", None, [9; 32]);
-        let b = deterministic(SOURCE_A, PROFILE_B, b"same", None, [9; 32]);
+        let a = deterministic_record(SOURCE_A, PROFILE_A, b"same", None, [9; 32]);
+        let b = deterministic_record(SOURCE_A, PROFILE_B, b"same", None, [9; 32]);
         assert_ne!(a.config_profile_digest(), b.config_profile_digest());
         assert_ne!(a.lineage_digest(), b.lineage_digest());
     }
 
     #[test]
     fn absent_and_explicitly_empty_genesis_are_distinct() {
-        let absent = deterministic(SOURCE_A, PROFILE_A, b"same", None, [9; 32]);
-        let empty = deterministic(SOURCE_A, PROFILE_A, b"same", Some(b""), [9; 32]);
+        let absent = deterministic_record(SOURCE_A, PROFILE_A, b"same", None, [9; 32]);
+        let empty = deterministic_record(SOURCE_A, PROFILE_A, b"same", Some(b""), [9; 32]);
         assert_ne!(absent.genesis_commitment(), empty.genesis_commitment());
         assert_ne!(absent.lineage_digest(), empty.lineage_digest());
     }
@@ -436,7 +496,7 @@ mod tests {
     #[test]
     fn malformed_source_and_profile_commitments_fail_closed() {
         assert_eq!(
-            CognitiveExecutionLineageV1::issue_with_nonce(
+            CognitiveExecutionLineageV1::issue_record_with_nonce(
                 "git:abc123",
                 "profile",
                 PROFILE_A,
@@ -449,7 +509,7 @@ mod tests {
             })
         );
         assert_eq!(
-            CognitiveExecutionLineageV1::issue_with_nonce(
+            CognitiveExecutionLineageV1::issue_record_with_nonce(
                 SOURCE_A,
                 "profile",
                 "decorative",
@@ -466,7 +526,7 @@ mod tests {
     #[test]
     fn empty_config_profile_fails_closed() {
         assert_eq!(
-            CognitiveExecutionLineageV1::issue_with_nonce(
+            CognitiveExecutionLineageV1::issue_record_with_nonce(
                 SOURCE_A,
                 "   ",
                 PROFILE_A,
@@ -481,7 +541,7 @@ mod tests {
     #[test]
     fn empty_config_projection_fails_closed() {
         assert_eq!(
-            CognitiveExecutionLineageV1::issue_with_nonce(
+            CognitiveExecutionLineageV1::issue_record_with_nonce(
                 SOURCE_A,
                 "profile",
                 PROFILE_A,
@@ -494,8 +554,8 @@ mod tests {
     }
 
     #[test]
-    fn persistence_revalidates_lineage_commitment() {
-        let valid = deterministic(SOURCE_A, PROFILE_A, b"config", None, [4; 32]);
+    fn persistence_revalidates_archival_lineage_commitment() {
+        let valid = deterministic_record(SOURCE_A, PROFILE_A, b"config", None, [4; 32]);
         let encoded = serde_json::to_string(&valid).unwrap();
         let decoded: CognitiveExecutionLineageV1 = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded, valid);
@@ -507,7 +567,7 @@ mod tests {
 
     #[test]
     fn persistence_rejects_lineage_digest_tampering() {
-        let valid = deterministic(SOURCE_A, PROFILE_A, b"config", None, [4; 32]);
+        let valid = deterministic_record(SOURCE_A, PROFILE_A, b"config", None, [4; 32]);
         let mut value = serde_json::to_value(&valid).unwrap();
         value["lineage_digest"] = serde_json::json!(SOURCE_B);
         assert!(serde_json::from_value::<CognitiveExecutionLineageV1>(value).is_err());
