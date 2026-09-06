@@ -29,7 +29,7 @@ jobs:
             test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           fi
 
-      - name: One-shot effect-dispatch source contract
+      - name: Rollback-protected effect-dispatch source contract
         shell: python
         run: |
           from pathlib import Path
@@ -44,42 +44,61 @@ jobs:
           compact = ''.join(code.split())
 
           required = [
+              'pubtraitDurablePreparedPhysicalEffectAttempt',
+              'pubtraitDurablePhysicalEffectAttemptJournal',
+              'pubtraitRollbackProtectedPhysicalEffectAttemptJournal',
+              'fnpersist_prepared_anchored(',
+              'fnpersist_abandoned_before_port_anchored(',
+              'fnpersist_adapter_acknowledged_anchored(',
+              'fnpersist_adapter_indeterminate_anchored(',
               'pubstructAuthorizedPhysicalEffectRequest',
-              'command:&',
-              'command_digest:Digest32',
-              'envelope_digest:Digest32',
-              'composition_digest:Digest32',
               'pubtraitPrivilegedPhysicalEffectPort',
-              'fnadapter_id(&self)->&str',
-              'fndevice(&self)->&ResourceRef',
-              'fnoperation(&self)->&Operation',
-              'fnexecutor(&self)->&PrincipalId',
-              'pubfndispatch_current_attempt',
+              'pubfndispatch_current_attempt_durable',
               "attempt:CurrentActuationAttempt<'_>",
+              'J:RollbackProtectedPhysicalEffectAttemptJournal',
               'letcommand=attempt.command();',
               'ifport.device()!=&command.device',
               'ifport.operation()!=&command.operation',
               'ifport.executor()!=&command.executor',
-              'AdapterAttemptIndeterminate',
-              'correlation:PhysicalEffectAttemptCorrelation',
+              '.persist_prepared_anchored(&correlation)',
+              'attempt.validate_dispatch_window_now()',
+              'port.attempt_effect(request)',
+              'ProtectedPreparation',
+              'AdapterAcknowledgedButProtectionIndeterminate',
+              'AdapterAndProtectionIndeterminate',
+              'LinearizationAfterProtectedPreparation',
+              'PrePortProtectionIndeterminate',
           ]
           missing = [needle for needle in required if needle not in compact]
           if missing:
-              raise SystemExit(f'missing effect-dispatch invariant: {missing}')
+              raise SystemExit(f'missing rollback-protected effect-dispatch invariant: {missing}')
 
-          adjacent = (
-              'attempt.validate_dispatch_window_now()'
-              '.map_err(PhysicalEffectDispatchError::Linearization)?;'
-              'letacknowledgement=matchport.attempt_effect(request){'
-          )
-          if adjacent not in compact:
-              raise SystemExit('final dispatch-window check is not immediately adjacent to privileged port call')
+          ordered = [
+              'letcommand=attempt.command();',
+              '.persist_prepared_anchored(&correlation)',
+              'attempt.validate_dispatch_window_now()',
+              'port.attempt_effect(request)',
+          ]
+          positions = []
+          for needle in ordered:
+              pos = compact.find(needle)
+              if pos < 0:
+                  raise SystemExit(f'missing dispatch-order step: {needle}')
+              positions.append(pos)
+          if positions != sorted(positions) or len(set(positions)) != len(positions):
+              raise SystemExit(f'rollback-protected dispatch order changed: {positions}')
           if compact.count('port.attempt_effect(request)') != 1:
               raise SystemExit('privileged port must be invoked exactly once in production dispatch path')
+          signature = compact[compact.find('pubfndispatch_current_attempt_durable'):]
+          signature = signature[:signature.find('{')]
+          if 'DurablePhysicalEffectAttemptJournal' in signature.replace(
+              'RollbackProtectedPhysicalEffectAttemptJournal', ''
+          ):
+              raise SystemExit('production dispatch accepted local-only journal authority')
 
           forbidden = [
               '#[derive(Clone', 'implCloneforAuthorizedPhysicalEffectRequest',
-              'implCloneforPhysicalEffectAttemptRecord', 'Serialize', 'Deserialize', 'bincode',
+              'Serialize', 'Deserialize', 'bincode',
               'FinalActuatorPermit', 'TrustBoundFinalActuatorPermit', 'JustInTimeHalLease',
               'CompleteJitHalLease', 'GuardOwnedCurrentState', 'TransportTrustRegistry',
               'InterlockTrustRegistry', 'DeviceRealityTrustRegistry', 'raw_transport_receipt',
@@ -104,6 +123,25 @@ jobs:
               raise SystemExit(f'production dependency drift: {sorted(actual)}')
           if manifest.get('dev-dependencies'):
               raise SystemExit('effect dispatch unexpectedly acquired dev dependencies')
+          features = manifest.get('features', {})
+          if features.get('default') != []:
+              raise SystemExit('default dispatch features must remain empty')
+          if set(features) != {'default', 'qualification-legacy-unjournaled'}:
+              raise SystemExit(f'unreviewed dispatch feature surface: {sorted(features)}')
+
+          linearization = tomllib.loads(
+              Path('crates/bridges/symthaea-iot-actuation-linearization/Cargo.toml').read_text()
+          )
+          legacy = linearization['dev-dependencies']['symthaea-iot-actuation-effect-dispatch']
+          if legacy.get('features') != ['qualification-legacy-unjournaled']:
+              raise SystemExit('legacy unjournaled surface must remain qualification-only')
+
+          journal = tomllib.loads(
+              Path('crates/bridges/symthaea-iot-actuation-effect-attempt-journal/Cargo.toml').read_text()
+          )
+          fixture = journal['dev-dependencies']['symthaea-iot-actuation-effect-dispatch']
+          if fixture.get('features') != ['qualification-legacy-unjournaled']:
+              raise SystemExit('journal correlation fixture must remain qualification-only')
 
       - name: Install Rust 1.96 formatter
         uses: dtolnay/rust-toolchain@master
@@ -116,6 +154,7 @@ jobs:
           cargo +1.96.0 fmt --check
           -p symthaea-iot-actuation-linearization
           -p symthaea-iot-actuation-effect-dispatch
+          -p symthaea-iot-actuation-effect-attempt-journal
 
       - name: Install Rust 1.94 qualification toolchain
         uses: dtolnay/rust-toolchain@master
@@ -131,12 +170,23 @@ jobs:
       - name: Preserve checked-in lock
         run: cp Cargo.lock /tmp/Cargo.lock.before
 
-      - name: Check effect dispatch and exact-command parent
+      - name: Check default protected dispatch without qualification feature
+        run: >-
+          cargo +1.94.0 check
+          -p symthaea-iot-actuation-effect-dispatch
+          --lib --no-default-features
+
+      - name: Check inherited exact-command qualification surface
         run: >-
           cargo +1.94.0 check
           -p symthaea-iot-actuation-linearization
-          -p symthaea-iot-actuation-effect-dispatch
           --all-targets
+
+      - name: Check rollback-protected journal package
+        run: >-
+          cargo +1.94.0 check
+          -p symthaea-iot-actuation-effect-attempt-journal
+          --all-targets --no-default-features
 
       - name: Reject unreviewed external dependency drift
         shell: python
@@ -164,35 +214,44 @@ jobs:
                   f'removed={sorted(removed)}, changed={changed}'
               )
 
-      - name: Real chain reaches matching privileged port exactly once
+      - name: Re-run inherited matching-port theorem
         run: >-
           cargo +1.94.0 test -p symthaea-iot-actuation-linearization
           --test full_chain
           fixture::real_two_branch_chain_reaches_matching_privileged_port_exactly_once
           -- --exact
 
-      - name: Wrong privileged port is never invoked
+      - name: Re-run inherited wrong-port zero-call theorem
         run: >-
           cargo +1.94.0 test -p symthaea-iot-actuation-linearization
           --test full_chain
           fixture::wrong_privileged_port_binding_never_invokes_effect_method
           -- --exact
 
-      - name: Adapter error is retained as indeterminate correlation
+      - name: Re-run inherited post-call indeterminate theorem
         run: >-
           cargo +1.94.0 test -p symthaea-iot-actuation-linearization
           --test full_chain
           fixture::adapter_error_after_invocation_is_indeterminate_with_exact_correlation
           -- --exact
 
-      - name: Effect-dispatch package tests
-        run: cargo +1.94.0 test -p symthaea-iot-actuation-effect-dispatch --all-targets
+      - name: Rollback-protected journal regressions
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-actuation-effect-attempt-journal
+          --test protected_store --no-default-features
 
-      - name: Strict package-local Clippy
+      - name: Default effect-dispatch package tests
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-actuation-effect-dispatch
+          --all-targets --no-default-features
+
+      - name: Strict default package-local Clippy
         run: >-
           cargo +1.94.0 clippy
           -p symthaea-iot-actuation-effect-dispatch
-          --all-targets --no-deps -- -D warnings
+          -p symthaea-iot-actuation-effect-attempt-journal
+          --all-targets --no-default-features --no-deps -- -D warnings
 
       - name: Show local-only Cargo.lock bookkeeping
         if: always()

@@ -1,0 +1,27 @@
+[package]
+name = "symthaea-iot-actuation-effect-attempt-journal"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Crash-durable authority-free journal for physical-effect attempt ambiguity"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["iot", "safety", "durability", "actuation"]
+categories = ["embedded", "filesystem"]
+
+[lib]
+path = "src/root.rs"
+
+[dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+libc = { workspace = true }
+serde = { workspace = true }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-iot-actuation-effect-dispatch = { path = "../symthaea-iot-actuation-effect-dispatch" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-iot-actuation-effect-dispatch = { path = "../symthaea-iot-actuation-effect-dispatch", features = ["qualification-legacy-unjournaled"] }
