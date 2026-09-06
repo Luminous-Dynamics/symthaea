@@ -1,0 +1,161 @@
+{
+  "$schema": "./spore-product-source-lineage-v1.schema.json",
+  "schema": "spore-product-source-lineage-v1",
+  "destination_repository": "Luminous-Dynamics/spore",
+  "destination_repository_status": "not-created",
+  "qualification_transfer_policy": "never-inherit",
+  "host_pin": {
+    "repository": "Tristan-Stoltz-ERC/nixos-config",
+    "branch": "spore/runtime-expendability-v1.3.2-proof",
+    "commit": "5d80360768ee329c50756e71fbce4692ac3a8e45",
+    "tree": "51c04910b3a97586ecf88a46699b7de22e3e1b0b",
+    "flake_lock_path": "flake.lock",
+    "flake_lock_blob_sha1": "2ff122e7f9cc7fde5ad6cb8fcc18453513915b67",
+    "input_name": "symthaea",
+    "input_flake": false,
+    "input_repository": "Luminous-Dynamics/luminous-dynamics",
+    "input_revision": "4fe8b1e2ca5fb60463de16c0b9ec649e1fc059a2",
+    "input_nar_hash": "sha256-G/SffFTFiEyLmQ4Y9O6vEhrEM0kLLi/7lwQ6b22/1JA="
+  },
+  "recovery_source": {
+    "repository": "Luminous-Dynamics/luminous-dynamics",
+    "branch": "spore/recovery-v0.3.4f-qualified",
+    "commit": "4fe8b1e2ca5fb60463de16c0b9ec649e1fc059a2",
+    "tree": "d53df873dd204738fe669066ca9aa22db88b22c1",
+    "historical_qualification": "source-lineage-only",
+    "destination_qualification": "NOT_ESTABLISHED"
+  },
+  "artifacts": [
+    {
+      "id": "spore-boot-tools-package",
+      "path": "nix/packages/spore-boot-tools.nix",
+      "blob_sha1": "ab753efcfb377ee49d652ef9ec419a99389760e5",
+      "role": "mixed-recovery-presentation-package",
+      "target_owner": "split-required",
+      "migration_kind": "split",
+      "destination_path": null
+    },
+    {
+      "id": "boot-state-cargo",
+      "path": "crates/core/symthaea-boot-state/Cargo.toml",
+      "blob_sha1": "b8c07286e8ca6618e4b71e15578270cdf9a58832",
+      "role": "recovery-package-metadata",
+      "target_owner": "spore",
+      "migration_kind": "transform",
+      "destination_path": null
+    },
+    {
+      "id": "boot-state-lib",
+      "path": "crates/core/symthaea-boot-state/src/lib.rs",
+      "blob_sha1": "a4d8f43b00c506dc723aaf146fe6295b3bcaef2a",
+      "role": "recovery-state-with-presentation-coupling",
+      "target_owner": "spore",
+      "migration_kind": "transform",
+      "destination_path": null
+    },
+    {
+      "id": "linux-recovery",
+      "path": "crates/core/symthaea-boot-state/src/linux_recovery.rs",
+      "blob_sha1": "693c5c0bb704119bdcd134600be83bda5ed20ffa",
+      "role": "linux-recovery-adapter",
+      "target_owner": "spore",
+      "migration_kind": "move-or-transform",
+      "destination_path": null
+    },
+    {
+      "id": "recovery-planner",
+      "path": "crates/core/symthaea-boot-state/src/recovery.rs",
+      "blob_sha1": "62f9540f9ade5a42442f795bf20df868b17e9a73",
+      "role": "pure-recovery-planner",
+      "target_owner": "spore",
+      "migration_kind": "move-or-transform",
+      "destination_path": null
+    },
+    {
+      "id": "recovery-executor",
+      "path": "crates/core/symthaea-boot-state/src/recovery_executor.rs",
+      "blob_sha1": "b465ea10c2066097e433302191366b8835a41663",
+      "role": "fault-injectable-recovery-executor",
+      "target_owner": "spore",
+      "migration_kind": "move-or-transform",
+      "destination_path": null
+    },
+    {
+      "id": "recovery-cli",
+      "path": "crates/core/symthaea-boot-state/src/bin/spore_recovery_linux.rs",
+      "blob_sha1": "36ad29330608ddf691b6cc45f2b1ea76ffaf411e",
+      "role": "linux-recovery-cli",
+      "target_owner": "spore",
+      "migration_kind": "transform",
+      "destination_path": null
+    },
+    {
+      "id": "boot-ecology-cargo",
+      "path": "crates/core/symthaea-boot-ecology/Cargo.toml",
+      "blob_sha1": "39328407fcfb8e0a10862fa3c816e156815cbe38",
+      "role": "mixed-protocol-presentation-metadata",
+      "target_owner": "split-required",
+      "migration_kind": "split",
+      "destination_path": null
+    },
+    {
+      "id": "boot-ecology-lib",
+      "path": "crates/core/symthaea-boot-ecology/src/lib.rs",
+      "blob_sha1": "88b8c8ea9715d13e39fb02d23356fe94e4ebb3ff",
+      "role": "mixed-factual-protocol-and-visual-composer",
+      "target_owner": "split-required",
+      "migration_kind": "split",
+      "destination_path": null
+    }
+  ],
+  "findings": [
+    {
+      "id": "SRC-001",
+      "severity": "architectural",
+      "status": "OPEN",
+      "statement": "The host package currently bundles recovery binaries with the quicken-fb presentation binary; extraction must split packaging ownership."
+    },
+    {
+      "id": "SRC-002",
+      "severity": "architectural",
+      "status": "OPEN",
+      "statement": "symthaea-boot-state depends on symthaea-boot-ecology, which combines factual receipt types with morphology/composer presentation semantics."
+    },
+    {
+      "id": "SRC-003",
+      "severity": "authority",
+      "status": "OPEN",
+      "tracking_issue": "Luminous-Dynamics/luminous-dynamics#51",
+      "statement": "BootStateStore::prepare declares host semantic LKG authority but currently derives receipt rollback/health classification from MorphologyLineage.last_known_good_generation."
+    },
+    {
+      "id": "SRC-004",
+      "severity": "authority",
+      "status": "OPEN",
+      "tracking_issue": "Luminous-Dynamics/luminous-dynamics#56",
+      "statement": "Presentation state is currently on recovery preparation and LKG-promotion authority paths: BootStateStore::prepare requires morphology/visual state, plan_qualification requires lineage parseability, BootStateStore::bless can veto CommitLastKnownGood through lineage and BootEcologyComposer state, and AlreadyKnownGood preserves the semantic root without re-blessing the exact current boot so last_boot_blessed can remain false after a healthy boot."
+    }
+  ],
+  "required_pre_extraction_repairs": [
+    {
+      "id": "REPAIR-001",
+      "status": "REQUIRED",
+      "statement": "Bind factual rollback/known-good receipt semantics to the semantic recovery LKG input; morphology lineage remains non-authoritative."
+    },
+    {
+      "id": "REPAIR-002",
+      "status": "REQUIRED",
+      "statement": "Remove morphology/presentation state from factual recovery preparation, qualification and LKG-commit authority, introduce a recovery-native prepared-boot qualification/bless identity independent of BootEcologyComposer, genome seeds, and morphology history, and exact-subject bless every healthy prepared boot including AlreadyKnownGood so per-boot qualification truth remains correct."
+    },
+    {
+      "id": "REPAIR-003",
+      "status": "REQUIRED",
+      "statement": "Split recovery protocol facts from visual composition types so the recovery core has no Symthaea presentation dependency."
+    },
+    {
+      "id": "REPAIR-004",
+      "status": "REQUIRED",
+      "statement": "Split the Nix package so recovery tools can build and qualify without quicken-fb or presentation dependencies."
+    }
+  ]
+}
