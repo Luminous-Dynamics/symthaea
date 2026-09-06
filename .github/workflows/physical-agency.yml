@@ -58,7 +58,7 @@ jobs:
             ${{ runner.os }}-physical-agency-
 
       - name: Format physical-agency sources
-        run: cargo fmt --check -- crates/domains/symthaea-physical-effects crates/domains/symthaea-physical-agency
+        run: cargo fmt --check -p symthaea-physical-effects -p symthaea-physical-agency
 
       - name: Check physical-agency crates
         run: cargo check -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
