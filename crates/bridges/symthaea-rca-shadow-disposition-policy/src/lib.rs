@@ -26,13 +26,15 @@ pub const SHADOW_DISPOSITION_POLICY_CONTRACT_V1: &str = concat!(
     "policy_is_registered_before_result_bearing_case_evaluation\n",
     "scope=one_exact_proposition_id_v1\n",
     "profiles=exact_bound_case+relation_eligibility+interpretation_lineage\n",
-    "thresholds=explicit_per_outcome_evidence_root+interpretation_root_requirements\n",
+    "root_set_semantics=pairwise_independent_set_v1\n",
+    "thresholds=cardinality_of_pairwise_independent_evidence_and_interpretation_root_sets\n",
+    "candidate_count_and_pair_edge_count_do_not_satisfy_root_thresholds\n",
     "strength_treatment=diagnostic_only_v1_no_arithmetic\n",
     "defeater_mode=qualified_current_blocker_only_v1\n",
     "unknown_interpretation_independence=force_underdetermined_v1\n",
     "contestation=qualified_support_and_opposition_must_survive\n",
     "evaluation_binding=preregistration+corpus+seed+metric+evaluator_identity\n",
-    "resource_ceilings=explicit_case_items+interpretation_pairs\n",
+    "resource_ceilings=explicit_case_items+interpretation_pairs_and_must_make_thresholds_feasible\n",
     "policy_id=blake3_explicit_complete_normalized_policy_v1\n",
     "post_result_policy_change_requires_new_policy_identity\n",
     "policy_registration_is_not_case_evaluation_or_disposition\n",
@@ -41,6 +43,16 @@ pub const SHADOW_DISPOSITION_POLICY_CONTRACT_V1: &str = concat!(
 
 const PROFILE_DOMAIN: &[u8] = b"symthaea:rca-shadow-disposition-policy-contract:v1\0";
 const POLICY_ID_DOMAIN: &[u8] = b"symthaea:rca-shadow-disposition-policy:v1\0";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RootSetSemanticsV1 {
+    /// A threshold N means there must exist a set of at least N distinct roots
+    /// for which every distinct pair is established independent by the relevant
+    /// lower-layer lineage contract. Pair-edge count, candidate count, and merely
+    /// distinct ids are not substitutes for this set property.
+    PairwiseIndependentSet,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -54,33 +66,26 @@ pub enum RelationStrengthTreatmentV1 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DefeaterModeV1 {
-    /// A later engine may block positive support only when the defeater relation
-    /// is current, case-joined, declarer-eligible, and satisfies the exact root
-    /// requirements registered in this policy.
     QualifiedCurrentBlocker,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UnknownInterpretationIndependenceModeV1 {
-    /// Missing interpretation independence never becomes an independent vote.
-    /// The later engine must preserve underdetermination where the registered
-    /// root requirements cannot be established.
     ForceUnderdetermined,
 }
 
-/// Root requirements for one future shadow-disposition outcome condition.
+/// Root-set requirements for one future shadow-disposition outcome condition.
 ///
-/// These are topology requirements, not candidate/module vote counts and not
-/// calibrated probabilities.
+/// These numbers refer to the cardinality of selected pairwise-independent root
+/// sets, never candidate/module counts or numbers of independent pair edges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OutcomeRootRequirementsV1 {
-    pub min_independent_evidence_roots: u16,
-    pub min_qualified_interpretation_roots: u16,
+    pub min_pairwise_independent_evidence_roots: u16,
+    pub min_pairwise_independent_interpretation_roots: u16,
 }
 
-/// Exact evaluation/preregistration lineage under which this policy was frozen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DispositionPolicyEvaluationBindingV1 {
@@ -92,7 +97,6 @@ pub struct DispositionPolicyEvaluationBindingV1 {
     pub evaluator_version: Option<String>,
 }
 
-/// Resource ceilings are part of policy identity even before an engine exists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DispositionPolicyResourceCeilingsV1 {
@@ -100,27 +104,22 @@ pub struct DispositionPolicyResourceCeilingsV1 {
     pub max_interpretation_pairs: u32,
 }
 
-/// Raw preregistered policy before normalization/registration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ShadowDispositionPolicyV1 {
     pub schema_version: u16,
     pub proposition_id: String,
 
-    /// Exact lower-layer semantic profiles this policy is allowed to interpret.
     pub bound_case_profile_digest: String,
     pub relation_eligibility_profile_digest: String,
     pub interpretation_lineage_profile_digest: String,
 
+    pub root_set_semantics: RootSetSemanticsV1,
     pub tentative_support_requirements: OutcomeRootRequirementsV1,
     pub support_requirements: OutcomeRootRequirementsV1,
     pub tentative_opposition_requirements: OutcomeRootRequirementsV1,
     pub opposition_requirements: OutcomeRootRequirementsV1,
-    /// Requirements that a qualified current `Defeats` relation must satisfy
-    /// before a later engine may block positive support.
     pub defeater_requirements: OutcomeRootRequirementsV1,
-    /// Requirements on each surviving side before a later engine may emit
-    /// `Contested` rather than collapsing disagreement.
     pub contested_side_requirements: OutcomeRootRequirementsV1,
 
     pub strength_treatment: RelationStrengthTreatmentV1,
@@ -133,15 +132,14 @@ pub struct ShadowDispositionPolicyV1 {
 }
 
 impl ShadowDispositionPolicyV1 {
-    pub fn register(self) -> Result<RegisteredShadowDispositionPolicyV1, ShadowDispositionPolicyError> {
+    pub fn register(
+        self,
+    ) -> Result<RegisteredShadowDispositionPolicyV1, ShadowDispositionPolicyError> {
         RegisteredShadowDispositionPolicyV1::try_from(self)
     }
 }
 
-/// Persistable/revalidated preregistered policy.
-///
-/// This is policy data only. There is deliberately no method that accepts a case
-/// or emits `Supported`, `Contested`, `Defeated`, or any other disposition.
+/// Persistable/revalidated preregistered policy. No case-evaluation API exists.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegisteredShadowDispositionPolicyV1 {
@@ -204,7 +202,6 @@ impl<'de> Deserialize<'de> for RegisteredShadowDispositionPolicyV1 {
         }
         validate_digest(&wire.profile_contract_digest).map_err(serde::de::Error::custom)?;
         validate_digest(&wire.policy_id).map_err(serde::de::Error::custom)?;
-
         let expected = wire
             .policy
             .clone()
@@ -266,28 +263,35 @@ fn validate_policy_v1(value: &ShadowDispositionPolicyV1) -> Result<(), ShadowDis
     }
     validate_digest(&value.proposition_id)?;
 
-    let expected_case = current_bound_case_profile_digest_v1();
-    if value.bound_case_profile_digest != expected_case {
+    if value.bound_case_profile_digest != current_bound_case_profile_digest_v1() {
         return Err(ShadowDispositionPolicyError::BoundCaseProfileMismatch);
     }
-    let expected_eligibility = current_relation_eligibility_profile_digest_v1();
-    if value.relation_eligibility_profile_digest != expected_eligibility {
+    if value.relation_eligibility_profile_digest != current_relation_eligibility_profile_digest_v1()
+    {
         return Err(ShadowDispositionPolicyError::RelationEligibilityProfileMismatch);
     }
-    let expected_interpretation = current_interpretation_lineage_profile_digest_v1();
-    if value.interpretation_lineage_profile_digest != expected_interpretation {
+    if value.interpretation_lineage_profile_digest
+        != current_interpretation_lineage_profile_digest_v1()
+    {
         return Err(ShadowDispositionPolicyError::InterpretationLineageProfileMismatch);
     }
 
-    validate_root_requirements("tentative_support", value.tentative_support_requirements)?;
-    validate_root_requirements("support", value.support_requirements)?;
-    validate_root_requirements(
-        "tentative_opposition",
-        value.tentative_opposition_requirements,
-    )?;
-    validate_root_requirements("opposition", value.opposition_requirements)?;
-    validate_root_requirements("defeater", value.defeater_requirements)?;
-    validate_root_requirements("contested_side", value.contested_side_requirements)?;
+    match value.root_set_semantics {
+        RootSetSemanticsV1::PairwiseIndependentSet => {}
+    }
+    match value.strength_treatment {
+        RelationStrengthTreatmentV1::DiagnosticOnly => {}
+    }
+    match value.defeater_mode {
+        DefeaterModeV1::QualifiedCurrentBlocker => {}
+    }
+    match value.unknown_interpretation_independence_mode {
+        UnknownInterpretationIndependenceModeV1::ForceUnderdetermined => {}
+    }
+
+    for (name, requirements) in all_requirements(value) {
+        validate_root_requirements(name, requirements)?;
+    }
 
     if !requirements_at_least(
         value.support_requirements,
@@ -305,53 +309,32 @@ fn validate_policy_v1(value: &ShadowDispositionPolicyV1) -> Result<(), ShadowDis
         return Err(ShadowDispositionPolicyError::ContestedMustPreserveBothSides);
     }
 
-    // V1 intentionally has only these fail-closed variants. Keeping the matches
-    // explicit prevents later enum growth from silently acquiring semantics.
-    match value.strength_treatment {
-        RelationStrengthTreatmentV1::DiagnosticOnly => {}
-    }
-    match value.defeater_mode {
-        DefeaterModeV1::QualifiedCurrentBlocker => {}
-    }
-    match value.unknown_interpretation_independence_mode {
-        UnknownInterpretationIndependenceModeV1::ForceUnderdetermined => {}
-    }
-
     validate_evaluation_binding(&value.evaluation)?;
-    if value.resources.max_case_items == 0 {
-        return Err(ShadowDispositionPolicyError::ZeroMaxCaseItems);
-    }
-    if value.resources.max_interpretation_pairs == 0 {
-        return Err(ShadowDispositionPolicyError::ZeroMaxInterpretationPairs);
-    }
-
-    let max_required_evidence_roots = [
-        value.tentative_support_requirements,
-        value.support_requirements,
-        value.tentative_opposition_requirements,
-        value.opposition_requirements,
-        value.defeater_requirements,
-        value.contested_side_requirements,
-    ]
-    .into_iter()
-    .map(|requirement| requirement.min_independent_evidence_roots as u32)
-    .max()
-    .unwrap_or(0);
-    if value.resources.max_case_items < max_required_evidence_roots {
-        return Err(ShadowDispositionPolicyError::CaseCeilingBelowEvidenceRootRequirement);
-    }
-
+    validate_resource_feasibility(value)?;
     Ok(())
+}
+
+fn all_requirements(
+    value: &ShadowDispositionPolicyV1,
+) -> [(&'static str, OutcomeRootRequirementsV1); 6] {
+    [
+        ("tentative_support", value.tentative_support_requirements),
+        ("support", value.support_requirements),
+        ("tentative_opposition", value.tentative_opposition_requirements),
+        ("opposition", value.opposition_requirements),
+        ("defeater", value.defeater_requirements),
+        ("contested_side", value.contested_side_requirements),
+    ]
 }
 
 fn validate_root_requirements(
     outcome: &'static str,
     value: OutcomeRootRequirementsV1,
 ) -> Result<(), ShadowDispositionPolicyError> {
-    if value.min_independent_evidence_roots == 0 {
+    if value.min_pairwise_independent_evidence_roots == 0 {
         return Err(ShadowDispositionPolicyError::ZeroEvidenceRootRequirement { outcome });
     }
-    if value.min_qualified_interpretation_roots == 0 {
+    if value.min_pairwise_independent_interpretation_roots == 0 {
         return Err(ShadowDispositionPolicyError::ZeroInterpretationRootRequirement { outcome });
     }
     Ok(())
@@ -361,8 +344,10 @@ fn requirements_at_least(
     stronger: OutcomeRootRequirementsV1,
     weaker: OutcomeRootRequirementsV1,
 ) -> bool {
-    stronger.min_independent_evidence_roots >= weaker.min_independent_evidence_roots
-        && stronger.min_qualified_interpretation_roots >= weaker.min_qualified_interpretation_roots
+    stronger.min_pairwise_independent_evidence_roots
+        >= weaker.min_pairwise_independent_evidence_roots
+        && stronger.min_pairwise_independent_interpretation_roots
+            >= weaker.min_pairwise_independent_interpretation_roots
 }
 
 fn validate_evaluation_binding(
@@ -383,6 +368,44 @@ fn validate_evaluation_binding(
         return Err(ShadowDispositionPolicyError::EmptyEvaluatorVersion);
     }
     Ok(())
+}
+
+fn validate_resource_feasibility(
+    value: &ShadowDispositionPolicyV1,
+) -> Result<(), ShadowDispositionPolicyError> {
+    if value.resources.max_case_items == 0 {
+        return Err(ShadowDispositionPolicyError::ZeroMaxCaseItems);
+    }
+
+    let max_evidence_roots = all_requirements(value)
+        .into_iter()
+        .map(|(_, requirement)| requirement.min_pairwise_independent_evidence_roots as u32)
+        .max()
+        .unwrap_or(0);
+    if value.resources.max_case_items < max_evidence_roots {
+        return Err(ShadowDispositionPolicyError::CaseCeilingBelowEvidenceRootRequirement);
+    }
+
+    let max_interpretation_roots = all_requirements(value)
+        .into_iter()
+        .map(|(_, requirement)| requirement.min_pairwise_independent_interpretation_roots as u32)
+        .max()
+        .unwrap_or(0);
+    let required_pairs = pair_count_for_roots(max_interpretation_roots)?;
+    if value.resources.max_interpretation_pairs < required_pairs {
+        return Err(ShadowDispositionPolicyError::InterpretationPairCeilingBelowRootRequirement {
+            required_pairs,
+            configured_pairs: value.resources.max_interpretation_pairs,
+        });
+    }
+    Ok(())
+}
+
+fn pair_count_for_roots(root_count: u32) -> Result<u32, ShadowDispositionPolicyError> {
+    let product = root_count
+        .checked_mul(root_count.saturating_sub(1))
+        .ok_or(ShadowDispositionPolicyError::InterpretationPairCountOverflow)?;
+    Ok(product / 2)
 }
 
 fn shadow_disposition_policy_id_v1(
@@ -417,25 +440,15 @@ fn shadow_disposition_policy_id_v1(
         b"interpretation_lineage_profile_digest",
         &value.interpretation_lineage_profile_digest,
     );
+    hash_text(
+        &mut hasher,
+        b"root_set_semantics",
+        root_set_semantics_tag(value.root_set_semantics),
+    );
 
-    hash_requirements(
-        &mut hasher,
-        b"tentative_support",
-        value.tentative_support_requirements,
-    );
-    hash_requirements(&mut hasher, b"support", value.support_requirements);
-    hash_requirements(
-        &mut hasher,
-        b"tentative_opposition",
-        value.tentative_opposition_requirements,
-    );
-    hash_requirements(&mut hasher, b"opposition", value.opposition_requirements);
-    hash_requirements(&mut hasher, b"defeater", value.defeater_requirements);
-    hash_requirements(
-        &mut hasher,
-        b"contested_side",
-        value.contested_side_requirements,
-    );
+    for (name, requirements) in all_requirements(value) {
+        hash_requirements(&mut hasher, name.as_bytes(), requirements);
+    }
 
     hash_text(
         &mut hasher,
@@ -505,21 +518,26 @@ fn shadow_disposition_policy_id_v1(
 
 fn hash_requirements(
     hasher: &mut blake3::Hasher,
-    label: &[u8],
+    outcome: &[u8],
     value: OutcomeRootRequirementsV1,
 ) {
-    let evidence_label = [label, b"_min_independent_evidence_roots"].concat();
-    let interpretation_label = [label, b"_min_qualified_interpretation_roots"].concat();
+    hash_bytes(hasher, b"outcome", outcome);
     hash_bytes(
         hasher,
-        &evidence_label,
-        &value.min_independent_evidence_roots.to_le_bytes(),
+        b"min_pairwise_independent_evidence_roots",
+        &value.min_pairwise_independent_evidence_roots.to_le_bytes(),
     );
     hash_bytes(
         hasher,
-        &interpretation_label,
-        &value.min_qualified_interpretation_roots.to_le_bytes(),
+        b"min_pairwise_independent_interpretation_roots",
+        &value.min_pairwise_independent_interpretation_roots.to_le_bytes(),
     );
+}
+
+fn root_set_semantics_tag(value: RootSetSemanticsV1) -> &'static str {
+    match value {
+        RootSetSemanticsV1::PairwiseIndependentSet => "pairwise_independent_set",
+    }
 }
 
 fn strength_treatment_tag(value: RelationStrengthTreatmentV1) -> &'static str {
@@ -608,8 +626,12 @@ pub enum ShadowDispositionPolicyError {
     MissingEvaluatorId,
     EmptyEvaluatorVersion,
     ZeroMaxCaseItems,
-    ZeroMaxInterpretationPairs,
     CaseCeilingBelowEvidenceRootRequirement,
+    InterpretationPairCountOverflow,
+    InterpretationPairCeilingBelowRootRequirement {
+        required_pairs: u32,
+        configured_pairs: u32,
+    },
 }
 
 impl std::fmt::Display for ShadowDispositionPolicyError {
@@ -626,34 +648,51 @@ impl std::fmt::Display for ShadowDispositionPolicyError {
             Self::MalformedDigest => {
                 f.write_str("digest must be sha256:<64 hex> or blake3:<64 hex>")
             }
-            Self::BoundCaseProfileMismatch => f.write_str("policy does not bind the current bound-case profile"),
-            Self::RelationEligibilityProfileMismatch => f.write_str("policy does not bind the current relation-eligibility profile"),
-            Self::InterpretationLineageProfileMismatch => f.write_str("policy does not bind the current interpretation-lineage profile"),
-            Self::ZeroEvidenceRootRequirement { outcome } => {
-                write!(f, "{outcome} requires at least one independent evidence root")
+            Self::BoundCaseProfileMismatch => {
+                f.write_str("policy does not bind the current bound-case profile")
             }
-            Self::ZeroInterpretationRootRequirement { outcome } => {
-                write!(f, "{outcome} requires at least one qualified interpretation root")
+            Self::RelationEligibilityProfileMismatch => {
+                f.write_str("policy does not bind the current relation-eligibility profile")
             }
-            Self::SupportWeakerThanTentativeSupport => {
-                f.write_str("Supported requirements cannot be weaker than TentativelySupported requirements")
+            Self::InterpretationLineageProfileMismatch => {
+                f.write_str("policy does not bind the current interpretation-lineage profile")
             }
-            Self::OppositionWeakerThanTentativeOpposition => {
-                f.write_str("Opposed requirements cannot be weaker than TentativelyOpposed requirements")
-            }
+            Self::ZeroEvidenceRootRequirement { outcome } => write!(
+                f,
+                "{outcome} requires at least one pairwise-independent evidence root"
+            ),
+            Self::ZeroInterpretationRootRequirement { outcome } => write!(
+                f,
+                "{outcome} requires at least one pairwise-independent interpretation root"
+            ),
+            Self::SupportWeakerThanTentativeSupport => f.write_str(
+                "Supported root-set requirements cannot be weaker than TentativelySupported requirements",
+            ),
+            Self::OppositionWeakerThanTentativeOpposition => f.write_str(
+                "Opposed root-set requirements cannot be weaker than TentativelyOpposed requirements",
+            ),
             Self::ContestedMustPreserveBothSides => {
                 f.write_str("v1 Contested must require qualified support and opposition")
             }
-            Self::MissingEvaluatorId => f.write_str("policy evaluation binding requires evaluator id"),
+            Self::MissingEvaluatorId => {
+                f.write_str("policy evaluation binding requires evaluator id")
+            }
             Self::EmptyEvaluatorVersion => {
                 f.write_str("policy evaluator version cannot be empty when present")
             }
             Self::ZeroMaxCaseItems => f.write_str("policy max_case_items must be non-zero"),
-            Self::ZeroMaxInterpretationPairs => {
-                f.write_str("policy max_interpretation_pairs must be non-zero")
-            }
             Self::CaseCeilingBelowEvidenceRootRequirement => f.write_str(
-                "policy max_case_items cannot be below its largest evidence-root requirement",
+                "policy max_case_items cannot be below its largest pairwise-independent evidence-root requirement",
+            ),
+            Self::InterpretationPairCountOverflow => {
+                f.write_str("interpretation-root pair requirement overflowed u32")
+            }
+            Self::InterpretationPairCeilingBelowRootRequirement {
+                required_pairs,
+                configured_pairs,
+            } => write!(
+                f,
+                "policy requires at least {required_pairs} interpretation-pair assessments but ceiling is {configured_pairs}"
             ),
         }
     }
@@ -678,8 +717,8 @@ mod tests {
 
     fn requirements(evidence: u16, interpretations: u16) -> OutcomeRootRequirementsV1 {
         OutcomeRootRequirementsV1 {
-            min_independent_evidence_roots: evidence,
-            min_qualified_interpretation_roots: interpretations,
+            min_pairwise_independent_evidence_roots: evidence,
+            min_pairwise_independent_interpretation_roots: interpretations,
         }
     }
 
@@ -690,6 +729,7 @@ mod tests {
             bound_case_profile_digest: current_bound_case_profile_digest_v1(),
             relation_eligibility_profile_digest: current_relation_eligibility_profile_digest_v1(),
             interpretation_lineage_profile_digest: current_interpretation_lineage_profile_digest_v1(),
+            root_set_semantics: RootSetSemanticsV1::PairwiseIndependentSet,
             tentative_support_requirements: requirements(1, 1),
             support_requirements: requirements(2, 2),
             tentative_opposition_requirements: requirements(1, 1),
@@ -735,14 +775,23 @@ mod tests {
     }
 
     #[test]
+    fn root_thresholds_mean_pairwise_independent_sets_not_counts_or_edges() {
+        let registered = policy().register().unwrap();
+        assert_eq!(
+            registered.policy().root_set_semantics,
+            RootSetSemanticsV1::PairwiseIndependentSet
+        );
+        assert!(SHADOW_DISPOSITION_POLICY_CONTRACT_V1.contains(
+            "candidate_count_and_pair_edge_count_do_not_satisfy_root_thresholds"
+        ));
+    }
+
+    #[test]
     fn strength_semantics_are_diagnostic_only_v1() {
         assert_eq!(
             policy().strength_treatment,
             RelationStrengthTreatmentV1::DiagnosticOnly
         );
-        assert!(SHADOW_DISPOSITION_POLICY_CONTRACT_V1.contains(
-            "strength_treatment=diagnostic_only_v1_no_arithmetic"
-        ));
     }
 
     #[test]
@@ -835,18 +884,34 @@ mod tests {
     fn policy_tampering_fails_closed() {
         let registered = policy().register().unwrap();
         let mut value = serde_json::to_value(&registered).unwrap();
-        value["policy"]["support_requirements"]["min_independent_evidence_roots"] =
-            serde_json::Value::from(7_u64);
+        value["policy"]["support_requirements"]
+            ["min_pairwise_independent_evidence_roots"] = serde_json::Value::from(7_u64);
         assert!(serde_json::from_value::<RegisteredShadowDispositionPolicyV1>(value).is_err());
     }
 
     #[test]
-    fn resource_ceiling_cannot_be_below_required_evidence_roots() {
+    fn evidence_resource_ceiling_must_make_threshold_feasible() {
         let mut raw = policy();
         raw.support_requirements = requirements(33, 2);
         assert_eq!(
             raw.register(),
             Err(ShadowDispositionPolicyError::CaseCeilingBelowEvidenceRootRequirement)
+        );
+    }
+
+    #[test]
+    fn interpretation_pair_ceiling_must_make_root_set_feasible() {
+        let mut raw = policy();
+        raw.support_requirements = requirements(2, 4);
+        raw.resources.max_interpretation_pairs = 5;
+        assert_eq!(
+            raw.register(),
+            Err(
+                ShadowDispositionPolicyError::InterpretationPairCeilingBelowRootRequirement {
+                    required_pairs: 6,
+                    configured_pairs: 5,
+                }
+            )
         );
     }
 
