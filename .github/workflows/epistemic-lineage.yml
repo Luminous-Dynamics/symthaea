@@ -1,0 +1,38 @@
+name: Epistemic Lineage
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - '.github/workflows/epistemic-lineage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+      - name: Freeze anti-self-certification contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/lineage.rs
+          grep -q 'pub fn assess_independence' "$src"
+          grep -q 'UnknownParent' "$src"
+          grep -q 'CycleDetected' "$src"
+          if grep -Eq 'independent[[:space:]]*:[[:space:]]*bool' "$src"; then
+            echo 'Evidence producers must not self-declare independence.' >&2
+            exit 1
+          fi
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Test epistemic governance
+        run: cargo test -p symthaea-epistemic-governance
+      - name: Clippy epistemic governance
+        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
