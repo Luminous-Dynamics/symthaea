@@ -144,14 +144,18 @@ impl EffectReconciliationChallengeV1 {
         h.update(&self.sequence.to_be_bytes());
         update_string(&mut h, &self.adapter_id);
         match self.source_state {
-            ReconciliationSourceStateV1::Prepared => h.update(&[0]),
+            ReconciliationSourceStateV1::Prepared => {
+                h.update(&[0]);
+            }
             ReconciliationSourceStateV1::AdapterAcknowledged {
                 adapter_evidence_digest,
             } => {
                 h.update(&[1]);
                 update_digest(&mut h, adapter_evidence_digest);
             }
-            ReconciliationSourceStateV1::AdapterIndeterminate => h.update(&[2]),
+            ReconciliationSourceStateV1::AdapterIndeterminate => {
+                h.update(&[2]);
+            }
         }
         h.update(&self.attempt_common_fenced_at_unix_ms.to_be_bytes());
         h.update(&self.attempt_wall_valid_until_unix_ms.to_be_bytes());
