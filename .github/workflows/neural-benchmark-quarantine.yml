@@ -6,6 +6,7 @@ on:
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/neural_validation/mod.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/neural_validation/cortical_similarity.rs'
       - 'docs/neuroscience/NEURAL_BENCHMARK_QUALIFICATION_V1.md'
+      - 'docs/neuroscience/FSAVERAGE5_GLASSER_TRANSFORM_QUALIFICATION_V1.md'
       - '.github/workflows/neural-benchmark-quarantine.yml'
   workflow_dispatch:
 
@@ -28,6 +29,7 @@ jobs:
           set -euo pipefail
           MOD=crates/domains/symthaea-psych-bench/src/benchmarks/neural_validation/mod.rs
           DOC=docs/neuroscience/NEURAL_BENCHMARK_QUALIFICATION_V1.md
+          MAP=docs/neuroscience/FSAVERAGE5_GLASSER_TRANSFORM_QUALIFICATION_V1.md
 
           grep -Fq 'pub(crate) mod cortical_similarity;' "$MOD"
           if grep -Eq '^pub use cortical_similarity::' "$MOD"; then
@@ -55,6 +57,17 @@ jobs:
           grep -Fq 'NBQ-004 — Transform lineage complete' "$DOC"
           grep -Fq 'NBQ-007 — Evidence-use admission' "$DOC"
           grep -Fq 'NBQ-009 — Claim bounded by evidence' "$DOC"
+
+          # De-quarantining the cortical-surrogate path requires a reviewed
+          # surface-parcellation contract, not merely a new implementation.
+          grep -Fq 'total vertices: `20_484`' "$MAP"
+          grep -Fq 'indices `0..10_242`: left hemisphere' "$MAP"
+          grep -Fq 'indices `10_242..20_484`: right hemisphere' "$MAP"
+          grep -Fq 'FMQ-003 — Semantic label resolution' "$MAP"
+          grep -Fq 'FMQ-006 — Complete parcel coverage' "$MAP"
+          grep -Fq 'FMQ-010 — Independent derivation check' "$MAP"
+          grep -Fq 'FMQ-012 — Lossiness explicit' "$MAP"
+          grep -Fq 'FMQ-014 — No authority upgrade' "$MAP"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
