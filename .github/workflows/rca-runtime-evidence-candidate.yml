@@ -1,0 +1,129 @@
+name: RCA Runtime Evidence Candidate
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-evidence-bridge/**'
+      - 'crates/core/symthaea-rca-shadow/**'
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - '.github/workflows/rca-runtime-evidence-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze candidate-only runtime observation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=crates/bridges/symthaea-rca-evidence-bridge/Cargo.toml
+          src=crates/bridges/symthaea-rca-evidence-bridge/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'symthaea-rca-shadow' "$manifest"
+          grep -q 'symthaea-epistemic-governance' "$manifest"
+          if grep -Eq '^symthaea[[:space:]]*=|symthaea-rca-observer-bridge|symthaea-types' "$manifest"; then
+            echo 'Runtime evidence candidate bridge acquired a forbidden live/canonical dependency.' >&2
+            exit 1
+          fi
+
+          grep -q 'RUNTIME_EVIDENCE_CANDIDATE_CONTRACT_V1' "$production"
+          grep -q 'InstrumentedRuntimeEvidenceCandidateV1' "$production"
+          grep -q 'ShadowObservationFieldV1' "$production"
+          grep -q 'InstrumentedRuntimeClaimV1' "$production"
+          grep -q 'ValidatedFrozenCycleObservationV1' "$production"
+          grep -q 'claim_selection=closed_lossless_field_projection_only' "$production"
+          grep -q 'candidate_does_not_self_declare_currentness' "$production"
+          grep -q 'lineage_root_is_provenance_only_not_epistemic_admission' "$production"
+
+          # This layer is intentionally weaker than canonical cognitive evidence.
+          # It must not mislabel internal runtime observation as inference or
+          # external empirical evidence, and must not create admitted authority.
+          if grep -Eq 'CognitiveEvidenceRefV1|ValidatedCognitiveEvidenceRefV1|AdmittedCognitiveEvidenceV1|CognitiveEvidenceUseV1|\.authorize[[:space:]]*\(' "$production"; then
+            echo 'Runtime observation candidate crossed canonical evidence admission boundary.' >&2
+            exit 1
+          fi
+
+          # Currentness is a downstream proposition/use-context judgment. The
+          # candidate producer may not mint or assess currentness itself.
+          if grep -Eq 'EvidenceCurrentnessV1|ValidatedEvidenceCurrentnessV1|CurrentnessContextV1|CurrentnessAssessmentV1|\.assess[[:space:]]*\(' "$production"; then
+            echo 'Runtime evidence candidate attempted to self-declare currentness.' >&2
+            exit 1
+          fi
+
+          # No live cognition or feedback capability may enter this bridge.
+          if grep -Eqi 'CognitiveLoopService|RcaCompletedCycleV1|RcaObservableCognitiveLoopV1|global.?workspace|MetaRouter|gwt_manager|motor|action_author|external_effect|recursive_improvement|self.?improvement|memory_mut|service_mut|into_inner|into_parts' "$production"; then
+            echo 'Runtime evidence candidate acquired a live cognition/control path.' >&2
+            exit 1
+          fi
+
+          # Candidate creation accepts only validated detached observation + a
+          # closed field selector. No caller-supplied claim value or digest.
+          grep -q 'observation: ValidatedFrozenCycleObservationV1' "$production"
+          grep -q 'field: ShadowObservationFieldV1' "$production"
+          grep -q 'let claim = extract_claim(&observation, field)' "$production"
+          grep -q 'let claim_digest = runtime_claim_digest_v1(&claim)' "$production"
+
+          # No serializer, ambient state, or side effect participates in claim or
+          # candidate identity.
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|std::(fs|net|process)::|tokio::|Mutex|RwLock|mpsc|channel\(|SystemTime|Instant::now|thread::' "$production"; then
+            echo 'Runtime evidence candidate acquired incidental identity or side effects.' >&2
+            exit 1
+          fi
+
+      - name: Freeze closed lossless claim set
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-evidence-bridge/src/lib.rs
+          for field in \
+            CycleTimeUs \
+            PredictionErrorPpm \
+            PeakAttentionBits \
+            LearningOccurred \
+            DetectedPrimitiveCount \
+            OutputDigest \
+            ThoughtDigest \
+            MetadataDigest \
+            LanguageOutput
+          do
+            grep -q "$field" "$src"
+          done
+
+          grep -q 'selected_claim_is_lossless_observation_field' "$src"
+          grep -q 'different_fields_are_different_candidate_evidence' "$src"
+          grep -q 'observation_identity_is_candidate_identity_bearing' "$src"
+          grep -q 'tampered_claim_fails_closed' "$src"
+          grep -q 'candidate_can_be_a_provenance_root_without_becoming_admitted_evidence' "$src"
+          grep -q 'language_absence_is_an_exact_observed_claim' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-rca-evidence-bridge -e normal)"
+          printf '%s\n' "$tree" | grep -q 'symthaea-rca-shadow'
+          printf '%s\n' "$tree" | grep -q 'symthaea-epistemic-governance'
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-observer-bridge'; then
+            echo 'Candidate evidence must consume detached observations, not the live observer wrapper.' >&2
+            exit 1
+          fi
+
+      - name: Format runtime evidence candidate bridge
+        run: cargo fmt -p symthaea-rca-evidence-bridge -- --check
+
+      - name: Test runtime evidence candidate bridge
+        run: cargo test -p symthaea-rca-evidence-bridge
+
+      - name: Clippy runtime evidence candidate bridge
+        run: cargo clippy -p symthaea-rca-evidence-bridge --all-targets -- -D warnings
