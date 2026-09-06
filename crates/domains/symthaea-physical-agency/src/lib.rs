@@ -3,20 +3,21 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Physical-agency composition primitives for Symthaea.
 //!
-//! PA-13 remains deliberately pre-execution. This crate can negotiate declared
+//! PA-14 remains deliberately pre-execution. This crate can negotiate declared
 //! simulator capabilities, preserve multi-objective candidate frontiers, bind
 //! deliberation to immutable world snapshots, validate strict typed-context
-//! simulation lineage, derive strict requests from selection receipts, and
-//! preregister/evaluate typed simulation outcome claims. It cannot construct
-//! actuator commands, depend on HAL, or mint physical execution authority.
+//! simulation lineage, derive strict requests from selection receipts,
+//! preregister/evaluate typed outcome claims, and structurally qualify exact
+//! confirmatory simulation + safety-case evidence. It cannot construct actuator
+//! commands, depend on HAL, or mint physical execution authority.
 //!
 //! Capability manifests are declarations used to choose a suitable modelling
 //! path. They are **not** safety evidence and cannot discharge execution gates.
 //!
-//! The loose PA-04 qualifier and its narrower evidence binding are crate-private.
-//! Public qualification must consume a non-serializable selection receipt
-//! produced from an evaluated Pareto frontier plus a binding to the exact world
-//! snapshot used for deliberation.
+//! The legacy PA-04/PA-08 simulation qualifier remains available for the older
+//! research path. The PA-11+ strict path is intentionally separate and requires
+//! typed contexts, selection-derived world lineage, preregistered outcome claims,
+//! and exact-run safety evidence.
 
 #![deny(unsafe_code)]
 
@@ -24,6 +25,7 @@ pub mod deliberation;
 pub mod outcome_claim;
 pub mod portfolio;
 pub mod strict_context;
+pub mod strict_qualification;
 pub mod strict_selection;
 mod qualification;
 mod qualification_lineage;
