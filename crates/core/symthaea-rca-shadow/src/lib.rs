@@ -23,6 +23,28 @@ pub const SHADOW_OBSERVATION_RECEIPT_SCHEMA_VERSION: u16 = 1;
 pub const SHADOW_OBSERVER_PROFILE_V1: &str = "rca-shadow-observer-v1";
 pub const COGNITIVE_PROBABILITY_SCALE: u32 = 1_000_000;
 
+/// Normative commitment semantics for the causally inert v1 observer.
+///
+/// The observer never delegates commitment identity to a general-purpose
+/// serializer. Every field is committed in a fixed order with explicit labels,
+/// lengths, and little-endian primitive encodings. Optional strings carry an
+/// explicit presence byte. Any semantic change requires a new observer profile
+/// or contract rather than silently changing the meaning of the same profile.
+pub const SHADOW_OBSERVER_CONTRACT_V1: &str = concat!(
+    "rca-shadow-observer-v1\n",
+    "commitment=blake3_domain_separated_labelled_fields_v1\n",
+    "field=label_len_u64le|label_utf8|value_len_u64le|value_bytes\n",
+    "option_string=label_len_u64le|label_utf8|presence_u8|[value_len_u64le|value_utf8]\n",
+    "numeric=u16/u32/u64_little_endian\n",
+    "bool=single_u8_0_or_1\n",
+    "field_order=schema_version,source_generation_digest,execution_lineage_digest,adapter_profile,adapter_contract_digest,cycle_index,cycle_time_us,prediction_error_ppm,peak_attention_bits,learning_occurred,detected_primitive_count,output_digest,thought_digest,metadata_digest,language_output_digest,language_source\n",
+    "no_clock_rng_filesystem_network_callbacks_or_runtime_handles\n",
+    "receipt_is_observational_only_not_epistemic_or_action_authority\n",
+);
+
+const OBSERVER_CONTRACT_DOMAIN: &[u8] = b"symthaea:rca-shadow-observer-contract:v1\0";
+const OBSERVATION_COMMITMENT_DOMAIN: &[u8] = b"symthaea:rca-shadow-observation:v1\0";
+
 /// Owned, detached projection of one already-completed cognitive cycle.
 ///
 /// This is intentionally a small observation surface rather than a clone of
@@ -164,7 +186,8 @@ impl<'de> Deserialize<'de> for ValidatedFrozenCycleObservationV1 {
 pub struct ShadowObservationReceiptV1 {
     pub schema_version: u16,
     pub observer_profile: String,
-    /// BLAKE3 commitment over the exact validated observation serialization.
+    pub observer_contract_digest: String,
+    /// Canonical BLAKE3 commitment over the exact validated observation fields.
     pub observation_commitment: String,
     pub source_generation_digest: String,
     pub execution_lineage_digest: String,
@@ -179,21 +202,23 @@ pub struct ShadowObservationReceiptV1 {
     pub has_language_output: bool,
 }
 
+pub fn observer_contract_digest_v1() -> String {
+    domain_hash(OBSERVER_CONTRACT_DOMAIN, SHADOW_OBSERVER_CONTRACT_V1.as_bytes())
+}
+
 /// Pure one-way RCA-002 observation function.
 ///
 /// There is no clock, RNG, filesystem, network, mutable singleton, runtime
-/// handle, or callback here. Equal validated observations produce equal receipts.
-pub fn observe(
-    observation: &ValidatedFrozenCycleObservationV1,
-) -> Result<ShadowObservationReceiptV1, ShadowObservationError> {
+/// handle, callback, serializer, or fallible external dependency here. Equal
+/// validated observations always produce equal receipts.
+pub fn observe(observation: &ValidatedFrozenCycleObservationV1) -> ShadowObservationReceiptV1 {
     let raw = observation.as_raw();
-    let bytes = serde_json::to_vec(raw).map_err(ShadowObservationError::Serialization)?;
-    let commitment = format!("blake3:{}", blake3::hash(&bytes).to_hex());
 
-    Ok(ShadowObservationReceiptV1 {
+    ShadowObservationReceiptV1 {
         schema_version: SHADOW_OBSERVATION_RECEIPT_SCHEMA_VERSION,
         observer_profile: SHADOW_OBSERVER_PROFILE_V1.to_string(),
-        observation_commitment: commitment,
+        observer_contract_digest: observer_contract_digest_v1(),
+        observation_commitment: observation_commitment_v1(raw),
         source_generation_digest: raw.source_generation_digest.clone(),
         execution_lineage_digest: raw.execution_lineage_digest.clone(),
         adapter_profile: raw.adapter_profile.clone(),
@@ -205,10 +230,110 @@ pub fn observe(
         learning_occurred: raw.learning_occurred,
         detected_primitive_count: raw.detected_primitive_count,
         has_language_output: raw.language_output_digest.is_some(),
-    })
+    }
 }
 
-#[derive(Debug)]
+fn observation_commitment_v1(raw: &FrozenCycleObservationV1) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(OBSERVATION_COMMITMENT_DOMAIN);
+
+    hash_field(&mut hasher, b"schema_version", &raw.schema_version.to_le_bytes());
+    hash_field(
+        &mut hasher,
+        b"source_generation_digest",
+        raw.source_generation_digest.as_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"execution_lineage_digest",
+        raw.execution_lineage_digest.as_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"adapter_profile",
+        raw.adapter_profile.as_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"adapter_contract_digest",
+        raw.adapter_contract_digest.as_bytes(),
+    );
+    hash_field(&mut hasher, b"cycle_index", &raw.cycle_index.to_le_bytes());
+    hash_field(
+        &mut hasher,
+        b"cycle_time_us",
+        &raw.cycle_time_us.to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"prediction_error_ppm",
+        &raw.prediction_error_ppm.to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"peak_attention_bits",
+        &raw.peak_attention_bits.to_le_bytes(),
+    );
+    hash_field(
+        &mut hasher,
+        b"learning_occurred",
+        &[u8::from(raw.learning_occurred)],
+    );
+    hash_field(
+        &mut hasher,
+        b"detected_primitive_count",
+        &raw.detected_primitive_count.to_le_bytes(),
+    );
+    hash_field(&mut hasher, b"output_digest", raw.output_digest.as_bytes());
+    hash_field(&mut hasher, b"thought_digest", raw.thought_digest.as_bytes());
+    hash_field(
+        &mut hasher,
+        b"metadata_digest",
+        raw.metadata_digest.as_bytes(),
+    );
+    hash_option_text(
+        &mut hasher,
+        b"language_output_digest",
+        raw.language_output_digest.as_deref(),
+    );
+    hash_option_text(
+        &mut hasher,
+        b"language_source",
+        raw.language_source.as_deref(),
+    );
+
+    format!("blake3:{}", hasher.finalize().to_hex())
+}
+
+fn hash_field(hasher: &mut blake3::Hasher, label: &[u8], value: &[u8]) {
+    hasher.update(&(label.len() as u64).to_le_bytes());
+    hasher.update(label);
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value);
+}
+
+fn hash_option_text(hasher: &mut blake3::Hasher, label: &[u8], value: Option<&str>) {
+    hasher.update(&(label.len() as u64).to_le_bytes());
+    hasher.update(label);
+    match value {
+        None => hasher.update(&[0]),
+        Some(text) => {
+            hasher.update(&[1]);
+            hasher.update(&(text.len() as u64).to_le_bytes());
+            hasher.update(text.as_bytes());
+        }
+    }
+}
+
+fn domain_hash(domain: &[u8], bytes: &[u8]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain);
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);
+    format!("blake3:{}", hasher.finalize().to_hex())
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum ShadowObservationError {
     UnsupportedObservationSchema { found: u16 },
     MalformedDigest,
@@ -217,34 +342,7 @@ pub enum ShadowObservationError {
     InvalidPeakAttention { value_bits: u32 },
     MissingLanguageSource,
     DanglingLanguageSource,
-    Serialization(serde_json::Error),
 }
-
-impl PartialEq for ShadowObservationError {
-    fn eq(&self, other: &Self) -> bool {
-        use ShadowObservationError::*;
-        match (self, other) {
-            (
-                UnsupportedObservationSchema { found: a },
-                UnsupportedObservationSchema { found: b },
-            ) => a == b,
-            (MalformedDigest, MalformedDigest) => true,
-            (MissingAdapterProfile, MissingAdapterProfile) => true,
-            (PredictionErrorOutOfRange { found: a }, PredictionErrorOutOfRange { found: b }) => {
-                a == b
-            }
-            (InvalidPeakAttention { value_bits: a }, InvalidPeakAttention { value_bits: b }) => {
-                a == b
-            }
-            (MissingLanguageSource, MissingLanguageSource) => true,
-            (DanglingLanguageSource, DanglingLanguageSource) => true,
-            (Serialization(a), Serialization(b)) => a.to_string() == b.to_string(),
-            _ => false,
-        }
-    }
-}
-
-impl Eq for ShadowObservationError {}
 
 impl std::fmt::Display for ShadowObservationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -273,7 +371,6 @@ impl std::fmt::Display for ShadowObservationError {
             Self::DanglingLanguageSource => {
                 f.write_str("language source cannot be present without language output commitment")
             }
-            Self::Serialization(error) => write!(f, "cannot serialize shadow observation: {error}"),
         }
     }
 }
@@ -328,9 +425,10 @@ mod tests {
     #[test]
     fn valid_observation_produces_receipt() {
         let validated = raw().validate().unwrap();
-        let receipt = observe(&validated).unwrap();
+        let receipt = observe(&validated);
         assert_eq!(receipt.cycle_index, 42);
         assert_eq!(receipt.observer_profile, SHADOW_OBSERVER_PROFILE_V1);
+        assert_eq!(receipt.observer_contract_digest, observer_contract_digest_v1());
         assert_eq!(receipt.execution_lineage_digest, BLAKE_C);
         assert_eq!(receipt.adapter_profile, "cycle-result-shadow-adapter-v1");
         assert_eq!(receipt.peak_attention_bits, 2.75_f32.to_bits());
@@ -341,7 +439,15 @@ mod tests {
     #[test]
     fn observer_is_deterministic() {
         let validated = raw().validate().unwrap();
-        assert_eq!(observe(&validated).unwrap(), observe(&validated).unwrap());
+        assert_eq!(observe(&validated), observe(&validated));
+    }
+
+    #[test]
+    fn observer_contract_has_strict_identity() {
+        let digest = observer_contract_digest_v1();
+        assert!(digest.starts_with("blake3:"));
+        assert_eq!(digest.len(), "blake3:".len() + 64);
+        assert_eq!(digest, observer_contract_digest_v1());
     }
 
     #[test]
@@ -351,8 +457,8 @@ mod tests {
         b_raw.cycle_index += 1;
         let b = b_raw.validate().unwrap();
         assert_ne!(
-            observe(&a).unwrap().observation_commitment,
-            observe(&b).unwrap().observation_commitment
+            observe(&a).observation_commitment,
+            observe(&b).observation_commitment
         );
     }
 
@@ -363,8 +469,8 @@ mod tests {
         b_raw.execution_lineage_digest = SHA_B.into();
         let b = b_raw.validate().unwrap();
         assert_ne!(
-            observe(&a).unwrap().observation_commitment,
-            observe(&b).unwrap().observation_commitment
+            observe(&a).observation_commitment,
+            observe(&b).observation_commitment
         );
     }
 
@@ -375,8 +481,8 @@ mod tests {
         b_raw.adapter_contract_digest = BLAKE_C.into();
         let b = b_raw.validate().unwrap();
         assert_ne!(
-            observe(&a).unwrap().observation_commitment,
-            observe(&b).unwrap().observation_commitment
+            observe(&a).observation_commitment,
+            observe(&b).observation_commitment
         );
     }
 
@@ -466,7 +572,7 @@ mod tests {
 
     #[test]
     fn receipt_contains_no_raw_language_payload() {
-        let receipt = observe(&raw().validate().unwrap()).unwrap();
+        let receipt = observe(&raw().validate().unwrap());
         let encoded = serde_json::to_string(&receipt).unwrap();
         assert!(!encoded.contains("broca-lite"));
         assert!(!encoded.contains("language_output_digest"));
