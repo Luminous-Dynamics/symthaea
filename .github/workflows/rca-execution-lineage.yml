@@ -1,0 +1,76 @@
+name: RCA Execution Lineage
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-execution-lineage/**'
+      - '.github/workflows/rca-execution-lineage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze execution-lineage authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-execution-lineage/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub struct CognitiveExecutionLineageV1' "$src"
+          grep -q 'source_generation_digest' "$src"
+          grep -q 'config_profile_digest' "$src"
+          grep -q 'execution_nonce_commitment' "$src"
+          grep -q 'getrandom::getrandom' "$production"
+          grep -q 'EntropyUnavailable' "$production"
+          grep -q 'IntegrityMismatch' "$production"
+
+          # Exact source identity must be supplied from outside this crate.
+          # Never synthesize it from weak local stand-ins.
+          if grep -Eq 'CARGO_PKG_VERSION|CARGO_PKG_NAME|rev-parse|SystemTime|UNIX_EPOCH|process::id' "$production"; then
+            echo 'Execution lineage must not synthesize source/run identity from package version, git shelling, time, or PID.' >&2
+            exit 1
+          fi
+
+          # OS-entropy failure must not fall back to deterministic identity.
+          if grep -Eq 'EntropyUnavailable.*unwrap_or|EntropyUnavailable.*unwrap_or_else' "$production"; then
+            echo 'Execution nonce entropy failure must remain fatal.' >&2
+            exit 1
+          fi
+
+          # Keep this identity contract independent of cognition/control planes.
+          manifest=crates/core/symthaea-execution-lineage/Cargo.toml
+          if grep -Eq 'symthaea-(core|rca-shadow|epistemic-governance|evidence-plane|runtime|memory)' "$manifest"; then
+            echo 'Execution-lineage contract acquired an RCA/cognitive control dependency.' >&2
+            exit 1
+          fi
+
+      - name: Verify resolved dependency isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree=$(cargo tree -p symthaea-execution-lineage)
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-(core|rca-shadow|epistemic-governance|evidence-plane|runtime|memory)'; then
+            printf '%s\n' "$tree" >&2
+            echo 'Resolved execution-lineage dependency graph reaches a forbidden Symthaea control/evidence crate.' >&2
+            exit 1
+          fi
+
+      - name: Format
+        run: cargo fmt -p symthaea-execution-lineage -- --check
+
+      - name: Test execution lineage
+        run: cargo test -p symthaea-execution-lineage
+
+      - name: Clippy execution lineage
+        run: cargo clippy -p symthaea-execution-lineage --all-targets -- -D warnings
