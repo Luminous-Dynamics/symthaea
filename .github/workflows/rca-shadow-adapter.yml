@@ -1,0 +1,126 @@
+name: RCA Shadow Adapter
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-observer-bridge/**'
+      - 'crates/core/symthaea-rca-shadow/**'
+      - '.github/workflows/rca-shadow-adapter.yml'
+      - '.github/workflows/rca-shadow-observer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze immutable one-way adapter boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-observer-bridge/src/shadow_adapter.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub fn adapt_completed_cycle_v1' "$production"
+          grep -q 'completed: &RcaCompletedCycleV1' "$production"
+          grep -q 'RCA_CYCLE_ADAPTER_CONTRACT_V1' "$production"
+          grep -q 'metadata_fields=' "$production"
+          grep -q 'excluded_v1=' "$production"
+          grep -q 'peak_attention_bits' "$production"
+          grep -q 'prediction_error_ppm' "$production"
+
+          # The adapter may mutate local hashing buffers, but may read only an
+          # already-completed cycle. It must never accept mutable cognition or
+          # invoke/unwrap the live wrapper.
+          if grep -Eq 'completed:[[:space:]]*&mut|&mut[[:space:]]+RcaCompletedCycleV1|RcaObservableCognitiveLoopV1|\.cycle\(|service_mut|into_inner|into_parts|issued_lineage|DerefMut' "$production"; then
+            echo 'RCA shadow adapter acquired a live/mutable cognition path.' >&2
+            exit 1
+          fi
+
+          # Shadow receipts and observer results remain downstream data. The
+          # adapter returns only a validated detached observation.
+          if grep -Eq 'ShadowObservationReceiptV1|observe[[:space:]]*\(' "$production"; then
+            echo 'RCA adapter must not invoke or consume shadow observer receipts.' >&2
+            exit 1
+          fi
+
+          # No cognition/control subsystem may enter the adapter implementation.
+          if grep -Eqi 'global.?workspace|MetaRouter|gwt_manager|motor|action_author|external_effect|recursive_improvement|self.?improvement|memory_mut|workspace_admission' "$production"; then
+            echo 'RCA adapter acquired a cognition/control-plane dependency.' >&2
+            exit 1
+          fi
+
+          # Evidence semantics must stay explicit. Never serialize all of
+          # CycleMetadata or clamp attention into probability-shaped data.
+          if grep -Eq 'to_value[[:space:]]*\([^)]*metadata|to_vec[[:space:]]*\([^)]*metadata|peak_attention_ppm|peak_attention.*clamp|\.clamp\(' "$production"; then
+            echo 'RCA adapter widened/rewrote declared observation semantics.' >&2
+            exit 1
+          fi
+
+          # Reject obvious side-effect primitives from this pure projection.
+          if grep -Eq 'std::(fs|net|process)::|tokio::|Mutex|RwLock|mpsc|channel\(|SystemTime|Instant::now|thread::' "$production"; then
+            echo 'RCA adapter acquired a side-effect or ambient-state primitive.' >&2
+            exit 1
+          fi
+
+      - name: Freeze explicit metadata projection
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-observer-bridge/src/shadow_adapter.rs
+          for field in \
+            surprise_triggered \
+            prefrontal_veto \
+            reasoning_confidence_bits \
+            reasoning_gate_evaluated \
+            reasoning_gate_blocked \
+            predictive_self_safety_bits \
+            predictive_behavioral_error_bits \
+            narrative_gwt_veto \
+            urgency_code \
+            epistemic_quality_bits \
+            epistemic_conflict_count_u64 \
+            epistemic_gate_confidence_bits \
+            epistemic_gate_approved \
+            metacognitive_anomaly \
+            safety_blocked \
+            feedback_conflict_ratio_bits \
+            cross_module_agreement_bits \
+            prediction_coherence_bits \
+            startup_suppressed \
+            self_model_accuracy_bits \
+            predictive_budget_gated
+          do
+            grep -q "$field" "$src"
+          done
+
+          # Pin negative tests proving that unlisted fields and identities do
+          # not silently widen v1 evidence semantics.
+          grep -q 'unlisted_metadata_field_does_not_silently_widen_v1_projection' "$src"
+          grep -q 'excluded_training_loss_does_not_silently_widen_v1_projection' "$src"
+          grep -q 'primitive_identity_is_excluded_while_count_is_admitted' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-rca-observer-bridge -e normal)"
+          printf '%s\n' "$tree" | grep -q 'symthaea-rca-shadow'
+          printf '%s\n' "$tree" | grep -q 'symthaea-execution-lineage'
+
+      - name: Format RCA observer bridge
+        run: cargo fmt -p symthaea-rca-observer-bridge -- --check
+
+      - name: Test RCA observer bridge
+        run: cargo test -p symthaea-rca-observer-bridge
+
+      - name: Clippy RCA observer bridge
+        run: cargo clippy -p symthaea-rca-observer-bridge --all-targets -- -D warnings

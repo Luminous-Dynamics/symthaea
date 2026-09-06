@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
-description = "Strict lineage-bound construction lane for RCA shadow observation"
+description = "Strict lineage-bound construction and one-way RCA shadow observation adapter"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 
@@ -13,4 +13,5 @@ blake3 = { workspace = true }
 serde_json = { workspace = true }
 symthaea = { path = "../../.." }
 symthaea-execution-lineage = { path = "../../core/symthaea-execution-lineage" }
+symthaea-rca-shadow = { path = "../../core/symthaea-rca-shadow" }
 thiserror = { workspace = true }

@@ -24,10 +24,13 @@
 //! The wrapper keeps both the service and live-issued lineage capability private.
 //! It exposes cognitive cycles only as [`RcaCompletedCycleV1`], which binds each
 //! result to both source-generation and execution-lineage identity plus a
-//! wrapper-owned monotonic cycle index. No shadow observer is invoked in
-//! RCA-002.0b.
+//! wrapper-owned monotonic cycle index. RCA-002.1 adds only a pure one-way
+//! projection of those completed cycles into the isolated shadow-observation
+//! contract.
 
 #![deny(unsafe_code)]
+
+pub mod shadow_adapter;
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleResult};
 use symthaea_execution_lineage::{
@@ -75,7 +78,7 @@ const PROFILE_DIGEST_DOMAIN: &[u8] = b"symthaea:rca-config-profile-contract:v1\0
 ///
 /// Fields are private so callers cannot manufacture a provenance/cycle pairing
 /// with a struct literal. This type is deliberately non-serializable in
-/// RCA-002.0b; archival projection belongs to the later shadow-observation
+/// RCA-002.0b/002.1; archival projection belongs to the shadow-observation
 /// boundary.
 pub struct RcaCompletedCycleV1 {
     source_generation_digest: String,
@@ -106,7 +109,7 @@ impl RcaCompletedCycleV1 {
 ///
 /// There is intentionally no `Deref`, `DerefMut`, `service_mut`, `into_inner`, or
 /// live-issued-lineage accessor. The ordinary cognitive service cannot escape this
-/// wrapper through the RCA-002.0b API and continue producing unbound cycles.
+/// wrapper through the RCA API and continue producing unbound cycles.
 pub struct RcaObservableCognitiveLoopV1 {
     service: CognitiveLoopService,
     issued_lineage: IssuedCognitiveExecutionLineageV1,
