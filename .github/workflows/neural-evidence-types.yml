@@ -1,0 +1,37 @@
+name: Neural Evidence Types
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-types/src/lib.rs'
+      - 'crates/core/symthaea-types/src/neural_evidence.rs'
+      - 'crates/core/symthaea-types/Cargo.toml'
+      - '.github/workflows/neural-evidence-types.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Qualify canonical neural evidence types
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format contract
+        run: cargo fmt --check -p symthaea-types
+
+      - name: Unit contracts
+        run: cargo test -p symthaea-types --lib
+
+      - name: Lint contract
+        run: cargo clippy -p symthaea-types --lib -- -D warnings

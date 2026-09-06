@@ -16,6 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod neural_evidence;
 pub mod threshold_overrides;
 
 pub use threshold_overrides::{THRESHOLD_OVERRIDES_PATH_ENV, ThresholdOverrideValues};
