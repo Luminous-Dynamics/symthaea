@@ -1,0 +1,115 @@
+name: Futures Prospective Attempt Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-futures-ledger/src/prospective.rs"
+      - "crates/domains/symthaea-futures-ledger/src/lib.rs"
+      - "crates/domains/symthaea-futures-ledger/src/v2.rs"
+      - "crates/domains/symthaea-futures-core/src/payload.rs"
+      - ".github/workflows/futures-prospective-attempt.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-futures-ledger/src/prospective.rs"
+      - "crates/domains/symthaea-futures-ledger/src/lib.rs"
+      - "crates/domains/symthaea-futures-ledger/src/v2.rs"
+      - "crates/domains/symthaea-futures-core/src/payload.rs"
+      - ".github/workflows/futures-prospective-attempt.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: futures-prospective-attempt-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze prospective-attempt boundary
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("crates/domains/symthaea-futures-ledger/src/prospective.rs").read_text()
+          ledger_root = Path("crates/domains/symthaea-futures-ledger/src/lib.rs").read_text()
+
+          required = [
+              "pub struct EvaluationProtocol",
+              "pub enum ForecastAttemptDecision",
+              "Forecast(ForecastPayload)",
+              "Abstain(AbstentionReason)",
+              "pub struct ProspectiveAttemptCommitment {",
+              "pub enum ProspectiveAttemptResolution",
+              "AbstentionObserved",
+              "pub fn resolve_forecast(",
+              "pub fn resolve_abstention(",
+              "pub fn validate_against(",
+              "EvaluationProtocolMismatch",
+              "AttemptIdMismatch",
+              "ForecastTargetMismatch",
+              "OutcomeSpaceMismatch",
+              "AbstentionReasonMismatch",
+          ]
+          missing = [item for item in required if item not in source]
+          if missing:
+              raise SystemExit(f"prospective attempt contract drift: {missing}")
+
+          commitment = source.split("pub struct ProspectiveAttemptCommitment {", 1)[1].split(
+              "impl ProspectiveAttemptCommitment", 1
+          )[0]
+          for forbidden in ["actual_continuation", "score:", "calibration_bucket"]:
+              if forbidden in commitment:
+                  raise SystemExit(f"pre-outcome attempt gained post-outcome field: {forbidden}")
+          for required_field in ["evaluation_protocol", "decision"]:
+              if required_field not in commitment:
+                  raise SystemExit(f"pre-outcome attempt lost required field: {required_field}")
+
+          resolve_forecast_decl = source.split("pub fn resolve_forecast(", 1)[1].split(") ->", 1)[0]
+          for forbidden in ["scoring_rule", "evaluation_protocol"]:
+              if forbidden in resolve_forecast_decl:
+                  raise SystemExit(
+                      f"post-outcome forecast resolution gained evaluation-choice input: {forbidden}"
+                  )
+          if "score: f64" not in resolve_forecast_decl:
+              raise SystemExit("forecast resolution must receive the realized numeric score")
+
+          resolve_abstain_decl = source.split("pub fn resolve_abstention(", 1)[1].split(") ->", 1)[0]
+          if "score" in resolve_abstain_decl:
+              raise SystemExit("abstention resolution must not fabricate a forecast score")
+
+          if "pub mod prospective;" not in ledger_root:
+              raise SystemExit("prospective protocol is not exported by futures-ledger")
+
+          for regression in [
+              "scoring_rule_is_fixed_before_resolution",
+              "abstention_is_committed_and_resolved_without_fake_score",
+              "cross_record_validation_detects_different_attempt",
+              "cross_record_validation_detects_protocol_drift",
+              "outcome_before_target_fails_closed_for_both_decisions",
+          ]:
+              if regression not in source:
+                  raise SystemExit(f"prospective regression missing: {regression}")
+          PY
+
+      - name: Verify locked workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-futures-ledger
+
+      - name: Focused prospective tests
+        run: cargo test --locked -p symthaea-futures-ledger prospective
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-futures-ledger --all-targets --no-deps -- -D warnings

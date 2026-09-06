@@ -8,25 +8,27 @@
 //! [`EvidenceRecord`] is the original v1 schema used by existing seeded
 //! simulation backtests. It remains wire/API compatible.
 //!
-//! [`v2`] adds a time/provenance-neutral two-phase lifecycle:
-//! [`v2::ForecastCommitment`] contains only information available before an
-//! outcome, while [`v2::ForecastResolution`] records the later realization and
-//! score. v2 supports both seeded simulations and hashed external observation
-//! snapshots without sentinel seeds or fake tick semantics.
+//! [`v2`] adds time/provenance-neutral commitment and resolution primitives.
+//! [`prospective`] builds the stricter prospective-evaluation protocol above
+//! those primitives: evaluation policy is committed before outcome reveal, a
+//! forecast attempt can explicitly abstain, and later resolutions can be
+//! cross-validated against the exact attempt they claim to resolve.
 //!
-//! The v2 *schema* does not by itself prove wall-clock precedence. A durable
-//! prospective registry must additionally enforce unique immutable commitment IDs
-//! (and, in a later hardening, content-addressed/append-only commitment evidence).
-//! Never treat possession of a `ForecastCommitmentId` alone as cryptographic proof
-//! that a forecast existed before its outcome.
+//! Neither schema by itself proves wall-clock precedence. A durable prospective
+//! registry must additionally enforce unique immutable attempt IDs and, in a
+//! later hardening, content-addressed/append-only commitment evidence. Never
+//! treat possession of an ID alone as cryptographic proof that a forecast existed
+//! before its outcome.
 
 use serde::{Deserialize, Serialize};
 use symthaea_futures_core::{ForecastDistribution, OutcomeRegion};
 
+pub mod prospective;
 pub mod v2;
 
 /// Original seeded-simulation evidence schema. Retained unchanged for existing
-/// artifacts and backtests; new prospective/external integrations should use v2.
+/// artifacts and backtests; new prospective/external integrations should use the
+/// `prospective` protocol above v2 rather than this post-hoc record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvidenceRecord {
     pub scenario_family: String,
