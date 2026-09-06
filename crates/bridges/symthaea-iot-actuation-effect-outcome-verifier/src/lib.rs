@@ -26,6 +26,9 @@ mod policy;
 mod trust;
 mod verifier;
 
+#[cfg(test)]
+mod tests;
+
 pub use current::{CurrentPhysicalEffectOutcomeFence, CurrentPhysicalEffectOutcomeGuard};
 pub use error::EffectOutcomeError;
 pub use evidence::{
