@@ -5,7 +5,6 @@ mod fixture {
         ml_dsa_65,
         traits::{KeyGen, SerDes, Signer as MlDsaSigner},
     };
-    use symthaea_iot_actuation_guard_semantic_persistence::PersistedSemanticAcceptance;
     use symthaea_iot_composed_actuation_evidence::{
         ComposedActuationEvidenceError, compose_actuation_evidence,
     };
@@ -111,7 +110,8 @@ mod fixture {
         semantic_root: &PathBuf,
         transport: VerifiedTransportEnvelope,
     ) -> PersistedSemanticAcceptance {
-        let admission_store = DurableAdmissionReservationStore::open(admission_root, config()).unwrap();
+        let admission_store =
+            DurableAdmissionReservationStore::open(admission_root, config()).unwrap();
         let reservation = admission_store.reserve_verified_transport(transport).unwrap();
         let challenge =
             AdmissionRealityChallengeV1::issue_from_persisted_reservation(&reservation).unwrap();
@@ -141,10 +141,9 @@ mod fixture {
     fn post_semantic_interlock(
         semantic: &PersistedSemanticAcceptance,
     ) -> symthaea_iot_actuation_guard_interlock::VerifiedPostSemanticPhysicalInterlock {
-        let challenge = PostSemanticControllerChallengeV1::issue_from_persisted_semantic_acceptance(
-            semantic,
-        )
-        .unwrap();
+        let challenge =
+            PostSemanticControllerChallengeV1::issue_from_persisted_semantic_acceptance(semantic)
+                .unwrap();
         let controller_key = SigningKey::from_bytes(&[0x71; 32]);
         let state = interlock_state(
             &controller_key,
@@ -165,11 +164,8 @@ mod fixture {
         let semantic_root = temp_root("compose-semantic");
         let now = wall_ms();
         let (semantic_transport, current_transport) = real_transport_pair(now, envelope(now));
-        let semantic = semantic_acceptance_from_transport(
-            &admission_root,
-            &semantic_root,
-            semantic_transport,
-        );
+        let semantic =
+            semantic_acceptance_from_transport(&admission_root, &semantic_root, semantic_transport);
         let interlock = post_semantic_interlock(&semantic);
 
         let expected_envelope = current_transport.envelope_digest();
@@ -183,11 +179,20 @@ mod fixture {
         assert_eq!(composed.transport().envelope_digest(), expected_envelope);
         assert_eq!(composed.transport().receipt_digest(), expected_receipt);
         assert_eq!(
-            composed.semantic_acceptance().admission_reservation().head(),
+            composed
+                .semantic_acceptance()
+                .admission_reservation()
+                .head(),
             expected_admission_head
         );
-        assert_eq!(composed.semantic_acceptance().device_head(), expected_semantic_head);
-        assert_eq!(composed.post_semantic_interlock().statement_digest(), expected_statement);
+        assert_eq!(
+            composed.semantic_acceptance().device_head(),
+            expected_semantic_head
+        );
+        assert_eq!(
+            composed.post_semantic_interlock().statement_digest(),
+            expected_statement
+        );
         assert_ne!(composed.composition_digest(), Digest32([0; 32]));
 
         std::fs::remove_dir_all(admission_root).unwrap();
@@ -200,11 +205,8 @@ mod fixture {
         let semantic_root = temp_root("compose-mismatch-semantic");
         let now = wall_ms();
         let (semantic_transport, _matching_current) = real_transport_pair(now, envelope(now));
-        let semantic = semantic_acceptance_from_transport(
-            &admission_root,
-            &semantic_root,
-            semantic_transport,
-        );
+        let semantic =
+            semantic_acceptance_from_transport(&admission_root, &semantic_root, semantic_transport);
         let interlock = post_semantic_interlock(&semantic);
 
         let mut different_envelope = envelope(now);
