@@ -1,0 +1,136 @@
+name: Futures Outcome Observation Policy
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-futures-ledger/tests/outcome_observation_policy.rs'
+      - '.github/workflows/futures-outcome-observation-policy.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze outcome-policy theorem and qualification-only scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          test = Path('crates/domains/symthaea-futures-ledger/tests/outcome_observation_policy.rs').read_text()
+          prospective = Path('crates/domains/symthaea-futures-ledger/src/prospective.rs').read_text()
+
+          required = [
+              'enum ReleaseSelector',
+              'FirstPublished',
+              'Ordinal(u16)',
+              'FixedVintage(String)',
+              'enum MissingOutcomeDisposition',
+              'RemainUnresolved',
+              'ResolveMissingWithoutScore',
+              'struct OutcomeObservationPolicy',
+              'source_id: String',
+              'measure_id: String',
+              'release_selector: ReleaseSelector',
+              'transform: Option<ContentAddressedRef>',
+              'missing_disposition: MissingOutcomeDisposition',
+              'struct PrecommittedEvaluationContract',
+              'attempt_id: ForecastCommitmentId',
+              'evaluation_protocol: EvaluationProtocol',
+              'outcome_policy: OutcomeObservationPolicy',
+              'current_resolution_api_accepts_multiple_posthoc_outcome_vintages',
+              'first_published_policy_rejects_later_revision_after_reveal',
+              'exact_release_ordinal_and_fixed_vintage_selectors_are_distinct',
+              'source_measure_and_transform_substitution_fail_closed',
+              'precommitted_contract_is_bound_to_one_attempt_and_evaluation_protocol',
+              'invalid_policy_or_observation_identities_fail_before_selection',
+          ]
+          for needle in required:
+              if needle not in test:
+                  raise SystemExit(f'missing outcome-policy invariant: {needle}')
+
+          # Current protocol commits scoring/abstention semantics but intentionally
+          # has no explicit outcome-observation selector. If that changes, this
+          # spike must be re-audited instead of becoming duplicate authority.
+          current_markers = [
+              'pub struct EvaluationProtocol',
+              'protocol_version: LedgerLabel',
+              'scoring_rule: LedgerLabel',
+              'abstention_policy_version: LedgerLabel',
+              'outcome_lineage: ObservationLineage',
+          ]
+          for needle in current_markers:
+              if needle not in prospective:
+                  raise SystemExit(f'prospective evaluation boundary changed; re-audit outcome policy: {needle}')
+
+          forbidden_current = [
+              'outcome_policy_version:',
+              'release_selector:',
+              'outcome_source_id:',
+          ]
+          for needle in forbidden_current:
+              if needle in prospective:
+                  raise SystemExit(f'product already gained explicit outcome policy; retire/rework spike: {needle}')
+
+          forbidden_test = [
+              'SystemTime::now',
+              'chrono::',
+              'sha2::',
+              'blake3::',
+              'reqwest::',
+              'ureq::',
+              'symthaea_economics',
+          ]
+          for needle in forbidden_test:
+              if needle in test:
+                  raise SystemExit(f'outcome-policy spike acquired unrelated authority/dependency: {needle}')
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/futures-outcome-observation-policy.yml',
+              'crates/domains/symthaea-futures-ledger/tests/outcome_observation_policy.rs',
+          }
+          if changed != allowed:
+              raise SystemExit(f'outcome-policy qualification must remain exactly two files; got {sorted(changed)}')
+
+          forbidden_product = {
+              'crates/domains/symthaea-futures-ledger/src/v2.rs',
+              'crates/domains/symthaea-futures-ledger/src/prospective.rs',
+              'crates/domains/symthaea-futures-ledger/src/provenance.rs',
+              'crates/domains/symthaea-futures-ledger/src/lib.rs',
+              'crates/domains/symthaea-futures-ledger/Cargo.toml',
+              'Cargo.lock',
+          }
+          touched = changed & forbidden_product
+          if touched:
+              raise SystemExit(f'qualification spike modified product/manifest state: {sorted(touched)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-futures-ledger -- --check
+
+      - name: Outcome observation policy qualification test
+        run: cargo test --locked -p symthaea-futures-ledger --test outcome_observation_policy
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-futures-ledger --test outcome_observation_policy -- -D warnings
