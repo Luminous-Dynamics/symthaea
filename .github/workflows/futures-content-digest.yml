@@ -1,0 +1,113 @@
+name: Futures Typed Content Provenance
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-futures-ledger/src/provenance.rs'
+      - 'crates/domains/symthaea-futures-ledger/src/lib.rs'
+      - '.github/workflows/futures-content-digest.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze typed-provenance theorem and tranche scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          path = Path('crates/domains/symthaea-futures-ledger/src/provenance.rs')
+          text = path.read_text()
+          lib = Path('crates/domains/symthaea-futures-ledger/src/lib.rs').read_text()
+
+          required = [
+              'pub struct ContentDigest',
+              'pub enum DigestAlgorithm',
+              'Self::Sha256 => "sha256"',
+              'hex.len() != 64',
+              'byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()',
+              'algorithm.trim().eq_ignore_ascii_case("sha256")',
+              'UnsupportedDigestAlgorithm',
+              'NonCanonicalDigest',
+              'pub struct ContentAddressedRef',
+              'struct TypedForecastProvenanceRepr',
+              'pub struct TypedForecastProvenance',
+              "impl<'de> Deserialize<'de> for TypedForecastProvenance",
+              'Self::try_from(repr).map_err(serde::de::Error::custom)',
+              'field: "model references"',
+              'field: "generator references"',
+              'DuplicateReference',
+              'malformed_or_noncanonical_digests_fail_closed',
+              'unknown_algorithm_is_not_reinterpreted_as_sha256',
+              'duplicate_content_identity_is_rejected_within_each_role',
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f'missing typed-provenance invariant: {needle}')
+
+          forbidden = [
+              'to_ascii_lowercase',
+              '.trim().to_',
+              'sha2::',
+              'ring::',
+              'blake3::',
+              'derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]\npub struct TypedForecastProvenance',
+          ]
+          for needle in forbidden:
+              if needle in text:
+                  raise SystemExit(f'typed provenance became permissive or bypassable: {needle}')
+
+          if 'pub mod provenance;' not in lib:
+              raise SystemExit('typed provenance module is not exported')
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/futures-content-digest.yml',
+              'crates/domains/symthaea-futures-ledger/src/lib.rs',
+              'crates/domains/symthaea-futures-ledger/src/provenance.rs',
+          }
+          extra = changed - allowed
+          if extra:
+              raise SystemExit(f'unexpected files in typed-provenance tranche: {sorted(extra)}')
+
+          forbidden_existing = {
+              'crates/domains/symthaea-futures-ledger/src/v2.rs',
+              'crates/domains/symthaea-futures-ledger/src/prospective.rs',
+              'crates/domains/symthaea-futures-ledger/Cargo.toml',
+              'Cargo.lock',
+          }
+          touched = changed & forbidden_existing
+          if touched:
+              raise SystemExit(f'compatibility surface changed in typed-provenance tranche: {sorted(touched)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-futures-ledger -- --check
+
+      - name: Focused ledger tests
+        run: cargo test --locked -p symthaea-futures-ledger provenance
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-futures-ledger --all-targets -- -D warnings
