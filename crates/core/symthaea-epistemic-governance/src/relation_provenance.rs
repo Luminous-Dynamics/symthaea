@@ -4,15 +4,15 @@
 
 //! Provenance and derived identity for declared epistemic relations.
 //!
-//! `EvidenceRelationV1::relation_id` is a producer-supplied reference. Structural
-//! validation proves its shape, not that the id is a canonical commitment to the
-//! complete relation declaration. RCA must therefore not use that field alone as
-//! the identity of a declaration that may later influence epistemic policy.
+//! `EvidenceRelationV1::relation_id` is a producer-supplied reference. RCA must
+//! not treat that reference as the canonical identity of a declaration that may
+//! later participate in epistemic policy. This module instead binds the complete
+//! validated relation body to explicit declarer provenance and derives a stable,
+//! serializer-independent governance identity.
 //!
-//! This module binds a validated relation to explicit declarer provenance and
-//! derives a governance identity from the complete relation body plus provenance.
-//! The result is provenance bookkeeping only; it does not certify that the
-//! declared relation is true, independent, current, or admitted for belief/action.
+//! The binding is provenance bookkeeping only. It does not certify truth,
+//! independence, currentness, canonical evidence admission, belief, action, or
+//! recursive-improvement authority.
 
 use crate::currentness::{
     EvidenceRelationKindV1, EvidenceRelationTargetV1, ValidatedEvidenceRelationV1,
@@ -23,7 +23,6 @@ pub const RELATION_DECLARATION_PROVENANCE_SCHEMA_VERSION: u16 = 1;
 pub const RELATION_DECLARATION_IDENTITY_PROFILE_V1: &str =
     "rca-evidence-relation-declaration-v1";
 
-/// Normative identity semantics for one declared relation + provenance binding.
 pub const RELATION_DECLARATION_IDENTITY_CONTRACT_V1: &str = concat!(
     "rca-evidence-relation-declaration-v1\n",
     "producer_relation_id=is_reference_not_canonical_declaration_identity\n",
@@ -32,6 +31,7 @@ pub const RELATION_DECLARATION_IDENTITY_CONTRACT_V1: &str = concat!(
     "relation=relation_schema+producer_relation_id+evidence_id+relation_kind+target_kind+target_id+strength_ppm\n",
     "stable_method_and_relation_tags_not_rust_discriminants\n",
     "serializer_debug_and_default_hash_do_not_define_identity\n",
+    "persistence_revalidates_profile_and_complete_declaration_identity\n",
     "declaration_provenance_is_not_truth_or_epistemic_authority\n",
 );
 
@@ -49,20 +49,17 @@ pub enum RelationDeclarationMethodV1 {
     ImportedAssertion,
 }
 
-/// Raw provenance supplied for one relation declaration before validation.
+/// Raw declarer provenance before validation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvidenceRelationDeclarationProvenanceV1 {
     pub schema_version: u16,
-    /// Stable, explicit identity of the human, subsystem, rule service, or
-    /// external declaration boundary that produced the relation declaration.
     pub declarer_id: String,
-    /// Optional immutable/reviewable version of that declarer.
     pub declarer_version: Option<String>,
     pub method: RelationDeclarationMethodV1,
-    /// Immutable artifact committing the actual declaration procedure/source:
-    /// annotation record, rule/config, model result, proof artifact, imported
-    /// assertion record, etc. This is provenance, not a truth certificate.
+    /// Immutable artifact for the declaration procedure/source: annotation
+    /// record, rule/config, model result, proof artifact, imported assertion,
+    /// etc. This is a provenance commitment, not a truth certificate.
     pub provenance_digest: String,
 }
 
@@ -123,8 +120,8 @@ impl<'de> Deserialize<'de> for ValidatedEvidenceRelationDeclarationProvenanceV1 
     }
 }
 
-/// Persistable binding between one structurally validated relation declaration,
-/// its declarer provenance, and a derived canonical governance identity.
+/// Persistable binding between a validated relation, declarer provenance, and a
+/// derived canonical declaration identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BoundEvidenceRelationDeclarationV1 {
@@ -173,8 +170,7 @@ impl BoundEvidenceRelationDeclarationV1 {
         &self.relation
     }
 
-    /// Producer-supplied relation reference retained for audit/discussion. This
-    /// value is deliberately distinct from [`Self::declaration_id`].
+    /// Producer-supplied reference retained for audit/discussion only.
     pub fn producer_relation_id(&self) -> &str {
         &self.relation.as_raw().relation_id
     }
@@ -212,15 +208,13 @@ impl<'de> Deserialize<'de> for BoundEvidenceRelationDeclarationV1 {
         validate_digest(&wire.identity_profile_digest).map_err(serde::de::Error::custom)?;
         validate_digest(&wire.declaration_id).map_err(serde::de::Error::custom)?;
 
-        let expected_profile_digest = relation_declaration_profile_digest_v1();
-        if wire.identity_profile_digest != expected_profile_digest {
+        let expected_profile = relation_declaration_profile_digest_v1();
+        if wire.identity_profile_digest != expected_profile {
             return Err(serde::de::Error::custom(
                 RelationDeclarationError::ProfileDigestMismatch,
             ));
         }
-
-        let expected_declaration_id = relation_declaration_id_v1(&wire.provenance, &wire.relation);
-        if wire.declaration_id != expected_declaration_id {
+        if wire.declaration_id != relation_declaration_id_v1(&wire.provenance, &wire.relation) {
             return Err(serde::de::Error::custom(
                 RelationDeclarationError::DeclarationIdentityMismatch,
             ));
@@ -244,9 +238,9 @@ pub fn relation_declaration_profile_digest_v1() -> String {
     )
 }
 
-/// Derive a canonical governance identity from the complete relation declaration
-/// and provenance. The producer relation id participates as one declared field,
-/// but does not define identity by itself.
+/// Derive canonical governance identity from complete validated relation body +
+/// declarer provenance. The producer relation id participates as one field but
+/// never defines the declaration identity by itself.
 pub fn relation_declaration_id_v1(
     provenance: &ValidatedEvidenceRelationDeclarationProvenanceV1,
     relation: &ValidatedEvidenceRelationV1,
@@ -256,60 +250,60 @@ pub fn relation_declaration_id_v1(
     let mut hasher = blake3::Hasher::new();
     hasher.update(DECLARATION_DOMAIN);
 
-    hash_text_field(
+    hash_text(
         &mut hasher,
         b"identity_profile_digest",
         &relation_declaration_profile_digest_v1(),
     );
-    hash_field(
+    hash_bytes(
         &mut hasher,
         b"provenance_schema_version",
         &provenance.schema_version.to_le_bytes(),
     );
-    hash_text_field(&mut hasher, b"declarer_id", &provenance.declarer_id);
+    hash_text(&mut hasher, b"declarer_id", &provenance.declarer_id);
     hash_option_text(
         &mut hasher,
         b"declarer_version",
         provenance.declarer_version.as_deref(),
     );
-    hash_text_field(
+    hash_text(
         &mut hasher,
         b"declaration_method",
         declaration_method_tag(provenance.method),
     );
-    hash_text_field(
+    hash_text(
         &mut hasher,
         b"provenance_digest",
         &provenance.provenance_digest,
     );
 
-    hash_field(
+    hash_bytes(
         &mut hasher,
         b"relation_schema_version",
         &relation.schema_version.to_le_bytes(),
     );
-    hash_text_field(
+    hash_text(
         &mut hasher,
         b"producer_relation_id",
         &relation.relation_id,
     );
-    hash_text_field(&mut hasher, b"evidence_id", &relation.evidence_id);
-    hash_text_field(
+    hash_text(&mut hasher, b"evidence_id", &relation.evidence_id);
+    hash_text(
         &mut hasher,
         b"relation_kind",
         relation_kind_tag(relation.relation),
     );
     match &relation.target {
         EvidenceRelationTargetV1::Proposition { proposition_id } => {
-            hash_text_field(&mut hasher, b"target_kind", "proposition");
-            hash_text_field(&mut hasher, b"target_id", proposition_id);
+            hash_text(&mut hasher, b"target_kind", "proposition");
+            hash_text(&mut hasher, b"target_id", proposition_id);
         }
         EvidenceRelationTargetV1::Evidence { evidence_id } => {
-            hash_text_field(&mut hasher, b"target_kind", "evidence");
-            hash_text_field(&mut hasher, b"target_id", evidence_id);
+            hash_text(&mut hasher, b"target_kind", "evidence");
+            hash_text(&mut hasher, b"target_id", evidence_id);
         }
     }
-    hash_field(
+    hash_bytes(
         &mut hasher,
         b"strength_ppm",
         &relation.strength_ppm.to_le_bytes(),
@@ -340,15 +334,15 @@ fn relation_kind_tag(kind: EvidenceRelationKindV1) -> &'static str {
     }
 }
 
-fn hash_field(hasher: &mut blake3::Hasher, label: &[u8], value: &[u8]) {
+fn hash_bytes(hasher: &mut blake3::Hasher, label: &[u8], value: &[u8]) {
     hasher.update(&(label.len() as u64).to_le_bytes());
     hasher.update(label);
     hasher.update(&(value.len() as u64).to_le_bytes());
     hasher.update(value);
 }
 
-fn hash_text_field(hasher: &mut blake3::Hasher, label: &[u8], value: &str) {
-    hash_field(hasher, label, value.as_bytes());
+fn hash_text(hasher: &mut blake3::Hasher, label: &[u8], value: &str) {
+    hash_bytes(hasher, label, value.as_bytes());
 }
 
 fn hash_option_text(hasher: &mut blake3::Hasher, label: &[u8], value: Option<&str>) {
@@ -422,7 +416,7 @@ impl std::fmt::Display for RelationDeclarationError {
                 f.write_str("relation-declaration identity profile digest mismatch")
             }
             Self::DeclarationIdentityMismatch => {
-                f.write_str("relation-declaration id does not match complete relation and provenance")
+                f.write_str("relation-declaration id does not match relation and provenance")
             }
         }
     }
@@ -433,9 +427,7 @@ impl std::error::Error for RelationDeclarationError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::currentness::{
-        EvidenceRelationV1, COGNITIVE_CURRENTNESS_SCHEMA_VERSION,
-    };
+    use crate::currentness::{EvidenceRelationV1, COGNITIVE_CURRENTNESS_SCHEMA_VERSION};
 
     const A: &str = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const B: &str = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -470,7 +462,7 @@ mod tests {
     }
 
     #[test]
-    fn producer_relation_reference_is_not_derived_declaration_identity() {
+    fn producer_reference_is_not_canonical_declaration_identity() {
         let bound = BoundEvidenceRelationDeclarationV1::new(provenance(), relation());
         assert_eq!(bound.producer_relation_id(), A);
         assert_ne!(bound.declaration_id(), bound.producer_relation_id());
@@ -478,37 +470,24 @@ mod tests {
     }
 
     #[test]
-    fn same_relation_different_declarer_is_different_declaration() {
+    fn declarer_and_provenance_are_identity_bearing() {
         let a = BoundEvidenceRelationDeclarationV1::new(provenance(), relation());
-        let mut raw = provenance().as_raw().clone();
-        raw.declarer_id = "another-declarer".into();
-        let b = BoundEvidenceRelationDeclarationV1::new(raw.validate().unwrap(), relation());
+
+        let mut changed_declarer = provenance().as_raw().clone();
+        changed_declarer.declarer_id = "another-declarer".into();
+        let b = BoundEvidenceRelationDeclarationV1::new(
+            changed_declarer.validate().unwrap(),
+            relation(),
+        );
         assert_ne!(a.declaration_id(), b.declaration_id());
-    }
 
-    #[test]
-    fn same_relation_different_provenance_artifact_is_different_declaration() {
-        let a = BoundEvidenceRelationDeclarationV1::new(provenance(), relation());
-        let mut raw = provenance().as_raw().clone();
-        raw.provenance_digest = A.into();
-        let b = BoundEvidenceRelationDeclarationV1::new(raw.validate().unwrap(), relation());
-        assert_ne!(a.declaration_id(), b.declaration_id());
-    }
-
-    #[test]
-    fn producer_can_reuse_relation_reference_but_body_change_changes_derived_identity() {
-        let a = BoundEvidenceRelationDeclarationV1::new(provenance(), relation());
-        let mut raw = relation().as_raw().clone();
-        raw.strength_ppm = 800_000;
-        let b = BoundEvidenceRelationDeclarationV1::new(raw.validate().unwrap(), provenance_relation_swap());
-        // This helper test is replaced below; retained assertion would be invalid.
-        drop((a, b));
-    }
-
-    fn provenance_relation_swap() -> ValidatedEvidenceRelationV1 {
-        let mut raw = relation().as_raw().clone();
-        raw.strength_ppm = 800_000;
-        raw.validate().unwrap()
+        let mut changed_artifact = provenance().as_raw().clone();
+        changed_artifact.provenance_digest = A.into();
+        let c = BoundEvidenceRelationDeclarationV1::new(
+            changed_artifact.validate().unwrap(),
+            relation(),
+        );
+        assert_ne!(a.declaration_id(), c.declaration_id());
     }
 
     #[test]
@@ -534,19 +513,21 @@ mod tests {
     }
 
     #[test]
-    fn tampered_relation_body_fails_closed_even_when_producer_id_is_unchanged() {
+    fn tampering_fails_closed() {
         let bound = BoundEvidenceRelationDeclarationV1::new(provenance(), relation());
-        let mut value = serde_json::to_value(&bound).unwrap();
-        value["relation"]["strength_ppm"] = serde_json::Value::from(900_000_u64);
-        assert!(serde_json::from_value::<BoundEvidenceRelationDeclarationV1>(value).is_err());
-    }
 
-    #[test]
-    fn tampered_declarer_fails_closed() {
-        let bound = BoundEvidenceRelationDeclarationV1::new(provenance(), relation());
-        let mut value = serde_json::to_value(&bound).unwrap();
-        value["provenance"]["declarer_id"] = serde_json::Value::String("forged".into());
-        assert!(serde_json::from_value::<BoundEvidenceRelationDeclarationV1>(value).is_err());
+        let mut relation_tamper = serde_json::to_value(&bound).unwrap();
+        relation_tamper["relation"]["strength_ppm"] = serde_json::Value::from(900_000_u64);
+        assert!(
+            serde_json::from_value::<BoundEvidenceRelationDeclarationV1>(relation_tamper).is_err()
+        );
+
+        let mut provenance_tamper = serde_json::to_value(&bound).unwrap();
+        provenance_tamper["provenance"]["declarer_id"] =
+            serde_json::Value::String("forged".into());
+        assert!(
+            serde_json::from_value::<BoundEvidenceRelationDeclarationV1>(provenance_tamper).is_err()
+        );
     }
 
     #[test]
