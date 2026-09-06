@@ -6,6 +6,8 @@ This ledger records exact source identities that are candidates for migration in
 
 A ledger entry is provenance only. It is not destination qualification.
 
+The human-readable ledger is mirrored by the machine-checkable `spore-migration-manifest-v1.json`; disagreement between them is a migration defect, not a reason to choose whichever representation permits advancement.
+
 ## Rules
 
 For each migrated artifact, preserve:
@@ -65,6 +67,8 @@ This is recorded as a provenance fact only. A signed Git commit alone is not int
 | `.github/workflows/spore-runtime-v132-proof.yml` | `4b4f9f1d9db9a67bf3cc7d4e9d36694726eb93be` | v1.3.2 qualification experiment | Historical evidence only; destination workflow must be rebuilt around exact committed bytes | NOT MIGRATED |
 | `.github/workflows/spore-runtime-v13-autopatch.yml` | `43d902c0fb0a763fad14d37d0727ebd76f8eac30` | guarded runtime hardening/autopatch workflow | Historical evidence/migration context only | NOT MIGRATED |
 
+The machine-readable manifest binds these same paths to the same source tree and blob identities and marks every destination artifact `destination_qualification = required`.
+
 ## Critical evidence boundary for lineage A
 
 The `v1.3.2` source tree above is **not equivalent to the source bytes actually exercised after workspace transformation** by the qualification workflow.
@@ -104,6 +108,16 @@ destination exact-source qualification = NOT YET ESTABLISHED
 
 The destination repository should eliminate this ambiguity by committing the stabilized implementation and qualifying it without product-source mutation after checkout.
 
+The manifest encodes this as:
+
+```text
+qualification_boundary = transformed-candidate
+source_mutation_in_qualification = true
+qualification_transfer_policy = never-inherit
+```
+
+The validator rejects attempts to classify a source-mutating qualification lineage as `exact-committed-source`.
+
 ## Source lineage B — Symthaea presentation/recovery-adjacent work
 
 Repository:
@@ -126,18 +140,32 @@ Commit message:
 
 `ci(spore): qualify exact repaired source head`
 
-This entry intentionally does **not** yet enumerate destination migration blobs.
+The known `.github/workflows/spore-rehydration.yml` source blob is recorded in the manifest as provenance with destination ownership deliberately `undecided`; the commit message is not being promoted into a destination qualification claim.
 
 Reason: the extraction boundary distinguishes two classes that must not be conflated:
 
 1. generic recovery/qualification implementation that belongs in independent Spore, and
 2. Boot Ecology/presentation implementation that remains in Symthaea.
 
-Before moving any Symthaea file, the migration PR must identify its exact role and exact blob and prove that it belongs on the recovery side rather than the presentation side.
+Before moving any Symthaea product file, the migration PR must identify its exact role and exact blob and prove that it belongs on the recovery side rather than the presentation side.
 
 ### Explicit non-migration
 
 `crates/domains/symthaea-spore` is not implicitly part of this recovery extraction. It is an existing Symthaea domain/consciousness component and remains under Symthaea ownership unless a later, separately reviewed design explicitly changes that meaning.
+
+## Machine-checkable state
+
+The current pre-extraction state is encoded as:
+
+```text
+destination_repository = Luminous-Dynamics/spore
+destination_repository_status = not-created
+qualification_transfer_policy = never-inherit
+```
+
+While the destination repository status is `not-created`, the validator rejects any artifact with a non-null destination path. This prevents documentation from making a migration look more complete than the repository state actually is.
+
+The universal PR gate validates the exact checked-out head, parses the schema/manifest, runs the cross-record checker and negative regression suite, and finally proves those checks left the working tree unchanged.
 
 ## Destination fields
 
@@ -175,4 +203,6 @@ rather than claiming parity.
 
 ## Next ledger action
 
-After the independent repository is created, the first destination PR should import this ledger and add only repository scaffolding plus a machine-checkable manifest/schema for these provenance records. Product implementation should move in later PRs after the golden parity corpus is established.
+After the independent repository is created, the first destination PR should import this boundary, ledger, schema, manifest, checker, and regression corpus as a single provenance root. It should then change `destination_repository_status` to `created` and populate destination paths only for artifacts actually introduced by that PR.
+
+Product implementation should move only after the golden parity corpus exists, and every migrated artifact must remain `destination_qualification = required` until fresh destination evidence establishes a stronger state.
