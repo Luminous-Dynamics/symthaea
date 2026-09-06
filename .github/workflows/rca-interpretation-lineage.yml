@@ -1,0 +1,166 @@
+name: RCA Interpretation Lineage
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - '.github/workflows/rca-interpretation-lineage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze evidence versus interpretation independence
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/interpretation_lineage.rs
+          doc=crates/core/symthaea-epistemic-governance/INTERPRETATION_LINEAGE.md
+          lib=crates/core/symthaea-epistemic-governance/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub mod interpretation_lineage;' "$lib"
+          grep -q 'INTERPRETATION_LINEAGE_CONTRACT_V1' "$production"
+          grep -q 'INTERPRETATION_INDEPENDENCE_QUALIFICATION_CONTRACT_V1' "$production"
+          grep -q 'distinct_interpretation_roots_do_not_imply_independence' "$production"
+          grep -q 'distinct_roots_without_exact_current_qualification=independence_unknown' "$production"
+          grep -q 'independence_qualified_only_by_exact_root_pair+proposition+use+time_join' "$production"
+          grep -q 'interpretation_independence_is_not_truth_or_evidence_independence' "$production"
+          grep -q 'independent observations' "$doc"
+          grep -q 'independent interpretations' "$doc"
+          grep -q 'No count voting' "$doc"
+
+          # Root identity is deliberately derived only from declarer identity,
+          # optional version, method, and profile semantics. Evidence ids or
+          # relation ids must not manufacture new interpreter roots.
+          grep -q 'b"declarer_id"' "$production"
+          grep -q 'b"declarer_version"' "$production"
+          grep -q 'b"declaration_method"' "$production"
+          grep -q 'ROOT_ID_DOMAIN' "$production"
+
+          # Distinct roots remain unknown unless the exact pair qualification is
+          # actually found. Name inequality must never map directly to qualified.
+          grep -q 'DistinctRootsIndependenceUnknown' "$production"
+          grep -q 'IndependenceQualified' "$production"
+          grep -q 'qualifications_by_pair.get' "$production"
+
+      - name: Freeze interpretation independence qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/interpretation_lineage.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          for field in \
+            left_interpretation_root_id \
+            right_interpretation_root_id \
+            proposition_id \
+            permitted_use \
+            qualifier_id \
+            qualifier_version \
+            evaluator_id \
+            evaluator_version \
+            qualification_policy_digest \
+            qualification_artifact_digest \
+            qualified_at_unix_ms \
+            valid_until_unix_ms
+          do
+            grep -q "$field" "$production"
+          done
+
+          grep -q 'std::mem::swap' "$production"
+          grep -q 'SameRootCannotBeQualifiedIndependent' "$production"
+          grep -q 'DirectInterpretationSelfQualification' "$production"
+          grep -q 'context_raw.now_unix_ms < record.qualified_at_unix_ms' "$production"
+          grep -q 'context_raw.now_unix_ms > record.valid_until_unix_ms' "$production"
+          grep -q 'UnexpectedIndependenceQualificationPair' "$production"
+          grep -q 'DuplicateIndependenceQualificationPair' "$production"
+
+          # Qualification persistence revalidates. Issued current lineage does not
+          # deserialize back into trusted state.
+          grep -q 'impl.*Deserialize' "$src"
+          grep -q 'pub struct InterpretationLineageV1' "$production"
+          if grep -Eq 'impl[^\n]*Deserialize[^\n]*InterpretationLineageV1|derive\([^)]*Deserialize[^)]*\)[[:space:]]*pub struct InterpretationLineageV1' "$production"; then
+            echo 'Issued interpretation lineage became deserializable.' >&2
+            exit 1
+          fi
+
+      - name: Freeze exact shared context and canonical identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/interpretation_lineage.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'eligible.context_commitment() != context_commitment' "$production"
+          grep -q 'EligiblePropositionMismatch' "$production"
+          grep -q 'entries.sort_by' "$production"
+          grep -q 'canonical_pair' "$production"
+          grep -q 'LINEAGE_ID_DOMAIN' "$production"
+          grep -q 'b"eligibility_context_commitment"' "$production"
+          grep -q 'b"declaration_id"' "$production"
+          grep -q 'b"eligibility_id"' "$production"
+          grep -q 'b"interpretation_root_id"' "$production"
+          grep -q 'b"independence_status"' "$production"
+          grep -q 'b"independence_qualification_id"' "$production"
+
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Interpretation lineage identity acquired incidental serializer/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|AdmittedCognitiveEvidence|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$production"; then
+            echo 'Interpretation lineage crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Freeze adversarial lineage tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/interpretation_lineage.rs
+          grep -q 'same_declarer_version_method_is_one_interpretation_root' "$src"
+          grep -q 'distinct_roots_default_to_independence_unknown' "$src"
+          grep -q 'exact_current_pair_qualification_establishes_independence' "$src"
+          grep -q 'pair_order_does_not_change_independence_qualification_identity' "$src"
+          grep -q 'same_root_cannot_be_registered_as_independent' "$src"
+          grep -q 'root_owner_cannot_directly_qualify_pair_independence' "$src"
+          grep -q 'mixed_eligibility_contexts_fail_closed' "$src"
+          grep -q 'expired_independence_qualification_cannot_establish_independence' "$src"
+          grep -q 'registered_independence_qualification_revalidates_after_persistence' "$src"
+          grep -q 'lineage_is_order_independent_and_content_addressed' "$src"
+          grep -q 'issued_lineage_serializes_for_audit_only' "$src"
+
+      - name: Verify governance dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-epistemic-governance -e normal)"
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-(shadow|observer|evidence|shadow-case|bound-shadow-case|disposition)'; then
+            echo 'Generic epistemic governance acquired an RCA runtime/bridge dependency.' >&2
+            exit 1
+          fi
+
+      - name: Format epistemic governance
+        run: cargo fmt -p symthaea-epistemic-governance -- --check
+
+      - name: Test interpretation lineage
+        run: cargo test -p symthaea-epistemic-governance --lib interpretation_lineage
+
+      - name: Test epistemic governance
+        run: cargo test -p symthaea-epistemic-governance
+
+      - name: Clippy epistemic governance
+        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
