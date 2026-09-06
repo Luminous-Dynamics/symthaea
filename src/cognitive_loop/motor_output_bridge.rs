@@ -345,7 +345,19 @@ impl MotorOutputBridge {
             }
         };
 
-        // 6. Check destructiveness vs Phi tier
+        // 6. Wisdom may propose a different action, but caller-specific motor
+        // admission has not yet been recomputed for that new identity. Until
+        // resolution is a first-class pre-admission phase, fail closed rather
+        // than allow SimpleExecutor to substitute a hidden post-admission action.
+        if self.executor.consult_wisdom(&action_ir).is_some() {
+            return MotorOutputResult::failure(
+                Some(action_type),
+                "Wisdom proposed an action substitution; fresh admission is required before execution"
+                    .into(),
+            );
+        }
+
+        // 7. Check destructiveness vs Phi tier
         //    ReadOnly: min_phi (default 0.3)
         //    Reversible: min_phi + 0.1
         //    NeedsConfirmation: min_phi + 0.2
@@ -373,7 +385,7 @@ impl MotorOutputBridge {
             );
         }
 
-        // 7. Execute through persistent SimpleExecutor (policy + sandbox + dream engine)
+        // 8. Execute through persistent SimpleExecutor (policy + sandbox + dream engine)
         match self
             .executor
             .execute(&action_ir, &self.policy, &self.sandbox, current_phi)
@@ -725,6 +737,46 @@ mod tests {
         let result = bridge.execute(&[], 0.8, 0.9, &request);
         assert!(!result.success);
         assert!(result.error.unwrap().contains("No valid action type"));
+    }
+
+    #[test]
+    fn test_wisdom_substitution_requires_fresh_admission() {
+        let mut bridge = MotorOutputBridge::with_defaults().unwrap();
+        let context = vec![0.0f32; 64];
+        let actual_outcome = vec![0.0f32; 64];
+
+        // Seed a deterministic high-confidence wisdom entry. DeleteFile perturbs
+        // to a read-only `ls` command whose predicted outcome beats this zero
+        // actual outcome, producing wisdom under the legacy zero context.
+        bridge.executor.dream_engine.record(
+            &context,
+            ActionIR::DeleteFile {
+                path: PathBuf::from("/tmp/symthaea/motor_bridge/stale.txt"),
+            },
+            &actual_outcome,
+            0.9,
+        );
+        let dream = bridge.executor.dream_engine.dream().unwrap();
+        assert!(dream.insights > 0);
+        assert!(!bridge.executor.dream_engine.wisdom().is_empty());
+
+        // The requested action itself is an ordinary read with sufficient Phi.
+        // A hidden wisdom substitution must invalidate that admission instead of
+        // being executed under the read action's prior authority decision.
+        let request = MotorActionRequest {
+            target_path: Some(PathBuf::from("/tmp/symthaea/motor_bridge/test.txt")),
+            ..Default::default()
+        };
+        let result = bridge.execute(&[0.0], 0.8, 0.9, &request);
+        assert!(!result.success);
+        assert!(
+            result
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("fresh admission")
+        );
+        assert!(bridge.telemetry().is_empty());
     }
 
     #[test]
