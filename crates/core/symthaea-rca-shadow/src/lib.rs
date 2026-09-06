@@ -316,7 +316,9 @@ fn hash_option_text(hasher: &mut blake3::Hasher, label: &[u8], value: Option<&st
     hasher.update(&(label.len() as u64).to_le_bytes());
     hasher.update(label);
     match value {
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        }
         Some(text) => {
             hasher.update(&[1]);
             hasher.update(&(text.len() as u64).to_le_bytes());
