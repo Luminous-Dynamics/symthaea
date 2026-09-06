@@ -154,13 +154,16 @@ impl CurrentPostSemanticInterlockGuard {
         if statement.expires_at_unix_ms > challenge.expires_at_unix_ms() {
             return Err(CurrentPostSemanticInterlockError::ReportOutlivesChallenge);
         }
-        if now_unix_ms < statement.checked_at_unix_ms
-            || now_unix_ms >= statement.expires_at_unix_ms
+        if now_unix_ms < statement.checked_at_unix_ms || now_unix_ms >= statement.expires_at_unix_ms
         {
             return Err(CurrentPostSemanticInterlockError::ReportNotFresh);
         }
 
-        if !self.policy.allowed_controllers.contains(&statement.controller_id) {
+        if !self
+            .policy
+            .allowed_controllers
+            .contains(&statement.controller_id)
+        {
             return Err(CurrentPostSemanticInterlockError::ControllerDenied);
         }
         if statement.asserted_interlocks != self.policy.required_interlocks {
