@@ -1,0 +1,95 @@
+name: RCA Evidence Identity
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - 'crates/core/symthaea-types/src/cognitive_evidence.rs'
+      - '.github/workflows/rca-evidence-identity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze derived evidence-object identity boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/identity.rs
+          manifest=crates/core/symthaea-epistemic-governance/Cargo.toml
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'symthaea-types' "$manifest"
+          grep -q 'COGNITIVE_EVIDENCE_IDENTITY_CONTRACT_V1' "$production"
+          grep -q 'cognitive_evidence_id_v1' "$production"
+          grep -q 'BoundCognitiveEvidenceV1' "$production"
+          grep -q 'EvidenceIdentityMismatch' "$production"
+          grep -q 'GovernanceIdentityMismatch' "$production"
+          grep -q 'claim_digest_is_payload_identity_not_evidence_object_identity' "$production"
+          grep -q 'evidence_id_is_derived_never_producer_asserted' "$production"
+
+          # Identity must be an explicit canonical contract, not incidental Rust
+          # hashing/formatting or a general-purpose serializer.
+          if grep -Eq 'DefaultHasher|std::hash|serde_json::|format!\([^\n]*\{:\?\}|authority[[:space:]]+as[[:space:]]+(u8|u16|u32|usize)' "$production"; then
+            echo 'RCA evidence identity depends on unstable/incidental serialization or discriminants.' >&2
+            exit 1
+          fi
+
+          # Every provenance-bearing field in CognitiveEvidenceRefV1 is part of
+          # the v1 identity contract. Claim identity alone must never be the join key.
+          for field in \
+            evidence_schema_version \
+            authority \
+            source \
+            source_version \
+            claim_digest \
+            source_digest \
+            model_id \
+            model_version \
+            observation_id \
+            formal_verifier \
+            freshness_epoch
+          do
+            grep -q "$field" "$production"
+          done
+
+          # Pin the negative tests that prevent claim/provenance collapse.
+          grep -q 'claim_digest_is_not_evidence_object_identity' "$src"
+          grep -q 'same_claim_from_different_provenance_stays_distinct' "$src"
+          grep -q 'source_version_is_identity_bearing' "$src"
+          grep -q 'model_revision_changes_internal_simulation_identity' "$src"
+          grep -q 'tampered_persisted_identity_fails_closed' "$src"
+          grep -q 'governance_join_requires_exact_evidence_object_id' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-epistemic-governance -e normal)"
+          printf '%s\n' "$tree" | grep -q 'symthaea-types'
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-shadow|symthaea-rca-observer-bridge'; then
+            echo 'Generic epistemic governance must not depend on RCA runtime/shadow adapters.' >&2
+            exit 1
+          fi
+
+      - name: Format epistemic governance
+        run: cargo fmt -p symthaea-epistemic-governance -- --check
+
+      - name: Test evidence identity
+        run: cargo test -p symthaea-epistemic-governance identity
+
+      - name: Test epistemic governance
+        run: cargo test -p symthaea-epistemic-governance
+
+      - name: Clippy epistemic governance
+        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
