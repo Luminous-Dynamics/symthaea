@@ -12,8 +12,8 @@ use symthaea_physical_agency::portfolio::{
 };
 use symthaea_physical_agency::{
     BackendCapabilities, BackendCapability, BackendCapabilityManifest, CapabilityCatalog,
-    CapabilityRequirement, SimulationEvidenceBinding, execute_registry_validated_simulation,
-    qualify_selected_simulation_candidate,
+    CapabilityRequirement, DeliberationQualificationError, SimulationEvidenceBinding,
+    execute_registry_validated_simulation, qualify_selected_simulation_candidate,
 };
 use symthaea_physical_effects::{
     AbstentionReason, AuthorityClass, DesiredTransition, EffectKind, MechanismRef,
@@ -308,4 +308,77 @@ fn physis_v0_transition_contract_rejects_out_of_envelope_candidate() {
         candidates: vec![over_budget],
     };
     assert!(deliberate(&portfolio, PortfolioPolicy::default()).is_err());
+}
+
+#[test]
+fn physis_v0_transition_uncertainty_gate_overrides_permissive_selection_policy() {
+    let mut strict_transition = transition();
+    strict_transition.uncertainty.min_confidence = 0.7;
+    strict_transition.uncertainty.max_epistemic = 0.2;
+
+    let disputed = assessment(
+        proposal("policy-permitted-dispute", PhysicalModality::Acoustic, 0.85, 0.1),
+        vec![
+            ModelPrediction {
+                model_id: "policy-model-a".into(),
+                success_probability: 0.95,
+            },
+            ModelPrediction {
+                model_id: "policy-model-b".into(),
+                success_probability: 0.70,
+            },
+        ],
+        2.0,
+        0.7,
+        0.9,
+    );
+    let portfolio = CandidatePortfolio {
+        transition: strict_transition,
+        candidates: vec![disputed],
+    };
+
+    // Deliberately permissive policy: selection is allowed to proceed so the
+    // transition-level gate itself is exercised at qualification.
+    let frontier = match deliberate(
+        &portfolio,
+        PortfolioPolicy {
+            min_success_probability: 0.0,
+            max_epistemic_uncertainty: 1.0,
+            max_aleatoric_uncertainty: 1.0,
+            max_model_disagreement: 1.0,
+            min_safety_margin: 0.0,
+        },
+    )
+    .unwrap()
+    {
+        DeliberationOutcome::ParetoFrontier(frontier) => frontier,
+        other => panic!("expected deliberately permissive frontier, got {other:?}"),
+    };
+    let selected = frontier.select("policy-permitted-dispute").unwrap();
+    assert!(selected.assessment().model_disagreement().unwrap() > 0.2);
+
+    let request = SimulationRequest::new(
+        "physis-sim-policy-gate",
+        EngineeringDomain::Systems,
+        SolverKind::Custom,
+        "exercise transition uncertainty gate",
+    );
+    let mut registry = SimulationRegistry::new();
+    registry.register(PhysisExternalBackend);
+    let validated = execute_registry_validated_simulation(&registry, &request).unwrap();
+    let binding = SimulationEvidenceBinding {
+        proposal_id: selected.assessment().proposal.id.clone(),
+        simulation_request_id: request.id.clone(),
+        expected_backend: "physis-solver".into(),
+    };
+    let mut safety_case = SafetyCase::new(&selected.assessment().proposal.id);
+    safety_case.add_obligation(
+        ProofObligation::new("exact evidence", EvidenceKind::Simulation)
+            .discharge(validated.safety_evidence_ref()),
+    );
+
+    assert!(matches!(
+        qualify_selected_simulation_candidate(&selected, &binding, &validated, &safety_case),
+        Err(DeliberationQualificationError::EnsembleUncertaintyOutsideTransitionBudget { .. })
+    ));
 }
