@@ -13,16 +13,12 @@
 //! Instead, the bridge extracts only lossless field claims from an already
 //! validated [`ValidatedFrozenCycleObservationV1`] and produces
 //! [`InstrumentedRuntimeEvidenceCandidateV1`]. Candidate evidence can receive
-//! provenance/currentness bookkeeping, but it cannot be converted here into
-//! canonical cognitive evidence or admitted evidence-use authority.
+//! provenance bookkeeping, but currentness, canonical cognitive evidence, and
+//! admitted evidence-use authority remain later policy boundaries.
 
 #![deny(unsafe_code)]
 
 use serde::{Deserialize, Deserializer, Serialize};
-use symthaea_epistemic_governance::currentness::{
-    CurrentnessError, EvidenceCurrentnessModeV1, EvidenceCurrentnessV1,
-    ValidatedEvidenceCurrentnessV1, COGNITIVE_CURRENTNESS_SCHEMA_VERSION,
-};
 use symthaea_epistemic_governance::lineage::{
     CognitiveDerivationKindV1, CognitiveLineageError, EvidenceLineageNodeV1,
     ValidatedEvidenceLineageNodeV1, COGNITIVE_LINEAGE_SCHEMA_VERSION,
@@ -51,7 +47,7 @@ pub const RUNTIME_EVIDENCE_CANDIDATE_CONTRACT_V1: &str = concat!(
     "candidate_is_not_CognitiveEvidenceRefV1\n",
     "candidate_is_not_AdmittedCognitiveEvidenceV1\n",
     "lineage_root_is_provenance_only_not_epistemic_admission\n",
-    "immutable_historical_currentness_does_not_mean_current_system_relevance\n",
+    "candidate_does_not_self_declare_currentness\n",
     "no_gwt_workspace_action_or_self_improvement_authority\n",
 );
 
@@ -181,29 +177,6 @@ impl InstrumentedRuntimeEvidenceCandidateV1 {
             evidence_id: self.candidate_id.clone(),
             parent_ids: Vec::new(),
             derivation_kind: CognitiveDerivationKindV1::RootObservation,
-        }
-        .validate()
-    }
-
-    /// Currentness of the exact historical observation claim itself.
-    ///
-    /// A statement such as "cycle N had prediction error X" does not become
-    /// false because time advances. This must not be interpreted as evidence
-    /// that the same state holds *now*; proposition relevance remains a later
-    /// admission/relation decision.
-    pub fn immutable_historical_currentness(
-        &self,
-    ) -> Result<ValidatedEvidenceCurrentnessV1, CurrentnessError> {
-        EvidenceCurrentnessV1 {
-            schema_version: COGNITIVE_CURRENTNESS_SCHEMA_VERSION,
-            evidence_id: self.candidate_id.clone(),
-            mode: EvidenceCurrentnessModeV1::Immutable,
-            observed_at_unix_ms: None,
-            valid_until_unix_ms: None,
-            source_generation: None,
-            model_generation: None,
-            environment_generation: None,
-            superseded_by: None,
         }
         .validate()
     }
@@ -529,9 +502,6 @@ impl std::error::Error for RuntimeEvidenceCandidateError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_epistemic_governance::currentness::{
-        CurrentnessAssessmentV1, CurrentnessContextV1,
-    };
     use symthaea_rca_shadow::{
         FrozenCycleObservationV1, FROZEN_CYCLE_OBSERVATION_SCHEMA_VERSION,
     };
@@ -681,28 +651,6 @@ mod tests {
         assert_eq!(root.evidence_id(), candidate.candidate_id());
         assert_eq!(root.derivation_kind(), CognitiveDerivationKindV1::RootObservation);
         assert!(root.parent_ids().is_empty());
-    }
-
-    #[test]
-    fn exact_historical_claim_is_immutable_not_a_current_state_assertion() {
-        let candidate = InstrumentedRuntimeEvidenceCandidateV1::new(
-            observation(),
-            ShadowObservationFieldV1::PredictionErrorPpm,
-        );
-        let currentness = candidate.immutable_historical_currentness().unwrap();
-        assert_eq!(
-            currentness.as_raw().mode,
-            EvidenceCurrentnessModeV1::Immutable
-        );
-        assert_eq!(
-            currentness.assess(&CurrentnessContextV1 {
-                now_unix_ms: u64::MAX,
-                source_generation: Some(999),
-                model_generation: Some(999),
-                environment_generation: Some(999),
-            }),
-            CurrentnessAssessmentV1::Current
-        );
     }
 
     #[test]
