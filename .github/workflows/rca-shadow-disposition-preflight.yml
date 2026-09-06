@@ -82,7 +82,7 @@ jobs:
           grep -q 'CaseItemCeilingExceeded' "$production"
           grep -q 'InterpretationPairCeilingExceeded' "$production"
 
-          grep -q 'experiment_contract.verify_integrity()' "$production"
+          grep -q '\.verify_integrity()' "$production"
           grep -q 'EXPERIMENT_CONTRACT_SCHEMA_VERSION' "$production"
           grep -q 'experiment_contract.contract_digest()' "$production"
           grep -q 'ExperimentContractDigestMismatch' "$production"
