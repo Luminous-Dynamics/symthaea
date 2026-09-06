@@ -74,6 +74,7 @@ jobs:
               '.checked_add(MAX_EFFECT_RECONCILIATION_CHALLENGE_LIFETIME_MS)',
               'ifself.issued_at_unix_ms<self.attempt_common_fenced_at_unix_ms',
               'now_unix_ms>=self.issued_at_unix_ms&&now_unix_ms<self.expires_at_unix_ms',
+              'fnsystem_unix_ms()->Result<u64,EffectReconciliationClockError>',
           ]
           missing = [needle for needle in required if needle not in compact]
           if missing:
@@ -120,8 +121,8 @@ jobs:
 
           if compact.count('getrandom::getrandom(&mutnonce)') != 1:
               raise SystemExit('challenge nonce must come from exactly one OS-entropy call')
-          if compact.count('system_unix_ms()') < 2:
-              raise SystemExit('guard-local wall clock helper/issuance path changed unexpectedly')
+          if compact.count('letissued_at_unix_ms=system_unix_ms()') != 1:
+              raise SystemExit('challenge issue path must read guard-local wall time exactly once')
 
           manifest = tomllib.loads((root / 'Cargo.toml').read_text())
           expected = {
