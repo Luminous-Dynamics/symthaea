@@ -1,0 +1,109 @@
+name: RCA Effective Shadow Disposition Policy
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-effective-disposition-policy/**'
+      - '.github/workflows/rca-effective-disposition-policy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze effective policy binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-effective-disposition-policy/src/lib.rs
+          production=$(mktemp)
+          code=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+          grep -vE '^[[:space:]]*//|^[[:space:]]*/\*|^[[:space:]]*\*' "$production" > "$code"
+
+          grep -q 'EFFECTIVE_SHADOW_DISPOSITION_POLICY_CONTRACT_V1' "$production"
+          grep -q 'interpretation_set_witness_profile_is_preregistration_bearing' "$production"
+          grep -q 'profile_change_requires_new_effective_policy_identity' "$production"
+          grep -q 'effective_policy_registration_precedes_result_bearing_evaluation' "$production"
+          grep -q 'pub struct RegisteredEffectiveShadowDispositionPolicyV1' "$production"
+          grep -q 'register_effective_shadow_disposition_policy_v1' "$production"
+          grep -q 'independent_interpretation_root_set_witness_profile_digest_v1' "$production"
+
+          grep -q 'b"base_policy_id"' "$production"
+          grep -q 'b"base_policy_profile_contract_digest"' "$production"
+          grep -q 'b"interpretation_set_witness_profile_digest"' "$production"
+          grep -q 'EFFECTIVE_POLICY_ID_DOMAIN' "$production"
+
+      - name: Freeze policy-only authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-effective-disposition-policy/src/lib.rs
+          production=$(mktemp)
+          code=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+          grep -vE '^[[:space:]]*//|^[[:space:]]*/\*|^[[:space:]]*\*' "$production" > "$code"
+
+          if grep -Eq 'BoundShadowEvidenceCaseV1|IndependentEvidenceSetWitnessV1|InterpretationLineageV1|IndependentInterpretationRootSetWitnessV1' "$code"; then
+            echo 'Effective policy binding acquired a result-bearing artifact instance input.' >&2
+            exit 1
+          fi
+          if grep -Eq 'pub enum ShadowDisposition|pub struct ShadowDisposition|pub fn (evaluate|decide|dispose|compute_disposition|issue_disposition)' "$code"; then
+            echo 'Disposition engine API appeared in effective-policy tranche.' >&2
+            exit 1
+          fi
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$code"; then
+            echo 'Effective policy crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Freeze persistence revalidation
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-effective-disposition-policy/src/lib.rs
+          grep -q 'impl.*Deserialize' "$src"
+          grep -q 'register_effective_shadow_disposition_policy_v1(wire.base_policy.clone())' "$src"
+          grep -q 'EffectivePolicyIdentityMismatch' "$src"
+          grep -q 'effective_policy_revalidates_after_persistence' "$src"
+          grep -q 'tampered_interpretation_witness_profile_fails_closed' "$src"
+          grep -q 'base_policy_identity_is_effective_policy_bearing' "$src"
+
+      - name: Freeze serializer-independent identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-effective-disposition-policy/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Effective policy identity acquired incidental serializer/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-rca-effective-disposition-policy -e normal)"
+          if printf '%s\n' "$tree" | grep -Eq '(^| )symthaea v|symthaea-core|symthaea-rca-observer|symthaea-rca-shadow-disposition-engine'; then
+            echo 'Effective policy acquired live cognition or disposition-engine dependency.' >&2
+            exit 1
+          fi
+
+      - name: Format effective policy crate
+        run: cargo fmt -p symthaea-rca-effective-disposition-policy -- --check
+
+      - name: Test effective policy crate
+        run: cargo test -p symthaea-rca-effective-disposition-policy
+
+      - name: Clippy effective policy crate
+        run: cargo clippy -p symthaea-rca-effective-disposition-policy --all-targets -- -D warnings
