@@ -1,0 +1,129 @@
+name: RCA Shadow Disposition Evaluation Policy
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-shadow-disposition-evaluation-policy/**'
+      - '.github/workflows/rca-shadow-disposition-evaluation-policy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze exact evaluation-surface profile binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-evaluation-policy/src/lib.rs
+          production=$(mktemp)
+          code=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+          grep -vE '^[[:space:]]*//|^[[:space:]]*/\*|^[[:space:]]*\*' "$production" > "$code"
+
+          grep -q 'SHADOW_DISPOSITION_EVALUATION_POLICY_CONTRACT_V1' "$production"
+          grep -q 'raw_preflight_profile_is_preregistration_bearing' "$production"
+          grep -q 'lineage_bound_preflight_profile_is_preregistration_bearing' "$production"
+          grep -q 'profile_drift_requires_new_evaluation_policy_identity' "$production"
+          grep -q 'register_shadow_disposition_evaluation_policy_v1' "$production"
+          grep -q 'shadow_disposition_preflight_profile_digest_v1' "$production"
+          grep -q 'lineage_bound_preflight_profile_digest_v1' "$production"
+
+          grep -q 'b"effective_policy_id"' "$production"
+          grep -q 'b"effective_policy_profile_contract_digest"' "$production"
+          grep -q 'b"raw_preflight_profile_digest"' "$production"
+          grep -q 'b"lineage_bound_preflight_profile_digest"' "$production"
+          grep -q 'POLICY_ID_DOMAIN' "$production"
+
+      - name: Freeze pre-result registration boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-evaluation-policy/src/lib.rs
+          production=$(mktemp)
+          code=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+          grep -vE '^[[:space:]]*//|^[[:space:]]*/\*|^[[:space:]]*\*' "$production" > "$code"
+
+          grep -q 'input=registered_effective_shadow_disposition_policy_v1_only' "$production"
+          grep -q 'evaluation_policy_accepts_no_case_preflight_witness_or_lineage_instance' "$production"
+
+          if grep -Eq 'BoundShadowEvidenceCaseV1|IndependentEvidenceSetWitnessV1|InterpretationLineageV1|IndependentInterpretationRootSetWitnessV1' "$code"; then
+            echo 'Evaluation policy acquired a result-bearing case/witness/lineage instance input.' >&2
+            exit 1
+          fi
+          if grep -Eq 'use .*ShadowDispositionPreflightV1|use .*LineageBoundShadowDispositionPreflightV1|:[[:space:]]*&?ShadowDispositionPreflightV1|:[[:space:]]*&?LineageBoundShadowDispositionPreflightV1' "$code"; then
+            echo 'Evaluation policy acquired a concrete preflight instance input.' >&2
+            exit 1
+          fi
+          if grep -Eq 'pub enum ShadowDisposition|pub struct ShadowDisposition|pub fn (evaluate|decide|dispose|compute_disposition|issue_disposition)' "$code"; then
+            echo 'Disposition engine API appeared in evaluation-policy tranche.' >&2
+            exit 1
+          fi
+          if grep -Eq 'min_pairwise_independent_(evidence_items|interpretation_roots)' "$code"; then
+            echo 'Evaluation policy started comparing disposition thresholds.' >&2
+            exit 1
+          fi
+          if grep -Eqi 'majority.?vote|sum.*strength|mean.*strength|average.*strength|bayes|posterior|normalize.*strength|multiply.*strength' "$code"; then
+            echo 'Evaluation policy acquired interpretation arithmetic.' >&2
+            exit 1
+          fi
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$code"; then
+            echo 'Evaluation policy crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Freeze persistence revalidation and canonical identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-evaluation-policy/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'impl.*Deserialize' "$src"
+          grep -q 'register_shadow_disposition_evaluation_policy_v1(wire.effective_policy.clone())' "$src"
+          grep -q 'EvaluationPolicyIdentityMismatch' "$src"
+
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Evaluation-policy identity acquired incidental serializer/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+
+      - name: Freeze adversarial policy tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-evaluation-policy/src/lib.rs
+          grep -q 'evaluation_policy_binds_both_preflight_profiles' "$src"
+          grep -q 'effective_policy_identity_is_evaluation_policy_bearing' "$src"
+          grep -q 'evaluation_policy_revalidates_after_persistence' "$src"
+          grep -q 'tampered_raw_preflight_profile_fails_closed' "$src"
+          grep -q 'tampered_lineage_bound_preflight_profile_fails_closed' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-rca-shadow-disposition-evaluation-policy -e normal)"
+          if printf '%s\n' "$tree" | grep -Eq '(^| )symthaea v|symthaea-core'; then
+            echo 'Evaluation policy acquired live root cognition dependency.' >&2
+            exit 1
+          fi
+
+      - name: Format evaluation policy crate
+        run: cargo fmt -p symthaea-rca-shadow-disposition-evaluation-policy -- --check
+
+      - name: Test evaluation policy crate
+        run: cargo test -p symthaea-rca-shadow-disposition-evaluation-policy
+
+      - name: Clippy evaluation policy crate
+        run: cargo clippy -p symthaea-rca-shadow-disposition-evaluation-policy --all-targets -- -D warnings
