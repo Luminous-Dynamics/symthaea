@@ -1,0 +1,73 @@
+name: Cognitive Evidence Types
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-types/src/cognitive_evidence.rs"
+      - "crates/core/symthaea-types/src/lib.rs"
+      - ".github/workflows/cognitive-evidence-types.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/core/symthaea-types/src/cognitive_evidence.rs"
+      - "crates/core/symthaea-types/src/lib.rs"
+      - ".github/workflows/cognitive-evidence-types.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.94.0"
+          components: rustfmt, clippy
+
+      - name: Freeze authority boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=crates/core/symthaea-types/src/cognitive_evidence.rs
+          LIB=crates/core/symthaea-types/src/lib.rs
+
+          grep -Fq 'pub mod cognitive_evidence;' "$LIB"
+          grep -Fq 'pub enum CognitiveEvidenceAuthorityV1' "$SRC"
+          grep -Fq 'pub enum CognitiveEvidenceUseV1' "$SRC"
+          grep -Fq 'CanonicalBeliefAdmission' "$SRC"
+          grep -Fq 'ActionAuthority' "$SRC"
+          grep -Fq 'SelfImprovementPromotion' "$SRC"
+          grep -Fq 'CognitiveEvidenceUseV1::CanonicalBeliefAdmission' "$SRC"
+          grep -Fq 'CognitiveEvidenceUseV1::ActionAuthority' "$SRC"
+          grep -Fq 'CognitiveEvidenceUseV1::SelfImprovementPromotion => false' "$SRC"
+          grep -Fq 'pub struct AdmittedCognitiveEvidenceV1' "$SRC"
+
+          # Admitted evidence must remain a runtime capability rather than a
+          # persisted self-authorizing token.
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('crates/core/symthaea-types/src/cognitive_evidence.rs').read_text()
+          marker = 'pub struct AdmittedCognitiveEvidenceV1'
+          before = src[:src.index(marker)]
+          derive = before.rsplit('#[derive(', 1)[-1].split(')]', 1)[0]
+          forbidden = {'Serialize', 'Deserialize'}
+          found = forbidden.intersection(part.strip() for part in derive.split(','))
+          if found:
+              raise SystemExit(f'AdmittedCognitiveEvidenceV1 must not derive {sorted(found)}')
+          PY
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-types
+
+      - name: Tests
+        run: cargo test -p symthaea-types --lib cognitive_evidence
+
+      - name: Full shared-types tests
+        run: cargo test -p symthaea-types --lib
+
+      - name: Strict clippy
+        run: cargo clippy -p symthaea-types --lib -- -D warnings
