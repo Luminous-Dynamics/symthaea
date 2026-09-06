@@ -11,6 +11,11 @@
 //! reference. The target frame in the desired transition must match the frame
 //! identified by that snapshot before a frontier receipt can be minted.
 //!
+//! PA-12 makes the snapshot digest scheme part of that immutable lineage. The
+//! legacy two-argument constructor remains available for historical opaque
+//! identifiers, but strict solver evidence can only consume snapshots explicitly
+//! created with a supported cryptographic digest scheme.
+//!
 //! The receipt grants no execution authority. It exists solely to keep
 //! deliberation lineage from being replaced by caller-assembled proposal or
 //! world-state data at the later simulation-qualification boundary.
@@ -22,27 +27,65 @@ use serde::{Deserialize, Serialize};
 use symthaea_physical_effects::{AbstentionReason, DesiredTransition};
 use thiserror::Error;
 
-/// Immutable reference to the world/digital-twin state used for deliberation.
+/// Digest semantics attached to an immutable world snapshot.
 ///
-/// The digest algorithm is intentionally not prescribed here. The producing
-/// world-model layer owns that contract; Physical Agency only requires a
-/// non-empty stable digest and exact frame identity.
+/// `LegacyOpaque` preserves the PA-08 compatibility surface for historical
+/// identifiers that were stable names rather than cryptographic content
+/// digests. It is deliberately ineligible for PA-12 strict solver evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SnapshotDigestAlgorithm {
+    #[default]
+    LegacyOpaque,
+    Blake3,
+    Sha256,
+}
+
+/// Immutable reference to the world/digital-twin state used for deliberation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct WorldSnapshotRef {
     frame_id: String,
+    /// Missing algorithm metadata in historical PA-08 records is conservatively
+    /// interpreted as `LegacyOpaque`, never as a cryptographic assertion.
+    #[serde(default)]
+    digest_algorithm: SnapshotDigestAlgorithm,
     snapshot_digest: String,
 }
 
 impl WorldSnapshotRef {
+    /// Backward-compatible constructor for pre-PA-12 stable snapshot identities.
+    ///
+    /// These values remain valid deliberation lineage but are not eligible for
+    /// the strict solver-evidence path because no cryptographic digest scheme is
+    /// asserted.
     pub fn new(frame_id: impl Into<String>, snapshot_digest: impl Into<String>) -> Self {
         Self {
             frame_id: frame_id.into(),
+            digest_algorithm: SnapshotDigestAlgorithm::LegacyOpaque,
+            snapshot_digest: snapshot_digest.into(),
+        }
+    }
+
+    /// Construct a snapshot with an explicit cryptographic content-digest
+    /// scheme. Validation requires a 32-byte hexadecimal digest.
+    pub fn cryptographic(
+        frame_id: impl Into<String>,
+        digest_algorithm: SnapshotDigestAlgorithm,
+        snapshot_digest: impl Into<String>,
+    ) -> Self {
+        Self {
+            frame_id: frame_id.into(),
+            digest_algorithm,
             snapshot_digest: snapshot_digest.into(),
         }
     }
 
     pub fn frame_id(&self) -> &str {
         &self.frame_id
+    }
+
+    pub fn digest_algorithm(&self) -> SnapshotDigestAlgorithm {
+        self.digest_algorithm
     }
 
     pub fn snapshot_digest(&self) -> &str {
@@ -59,6 +102,15 @@ impl WorldSnapshotRef {
             return Err(DeliberationError::EmptySnapshotField(
                 "world_snapshot.snapshot_digest",
             ));
+        }
+        if self.digest_algorithm != SnapshotDigestAlgorithm::LegacyOpaque
+            && (self.snapshot_digest.len() != 64
+                || !self
+                    .snapshot_digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit()))
+        {
+            return Err(DeliberationError::InvalidCryptographicSnapshotDigest);
         }
         Ok(())
     }
@@ -182,6 +234,8 @@ pub enum DeliberationError {
     Portfolio(PortfolioError),
     #[error("required world-snapshot field is empty: {0}")]
     EmptySnapshotField(&'static str),
+    #[error("cryptographic world-snapshot digest must be exactly 32 hexadecimal bytes")]
+    InvalidCryptographicSnapshotDigest,
     #[error(
         "target frame {target_frame:?} does not match world snapshot frame {snapshot_frame:?}"
     )]
@@ -280,5 +334,35 @@ mod tests {
             deliberate(&portfolio(), &empty, PortfolioPolicy::default()),
             Err(DeliberationError::EmptySnapshotField(_))
         ));
+    }
+
+    #[test]
+    fn cryptographic_snapshot_scheme_is_part_of_lineage() {
+        let blake = WorldSnapshotRef::cryptographic(
+            "world",
+            SnapshotDigestAlgorithm::Blake3,
+            "a".repeat(64),
+        );
+        let sha = WorldSnapshotRef::cryptographic(
+            "world",
+            SnapshotDigestAlgorithm::Sha256,
+            "a".repeat(64),
+        );
+        assert_ne!(blake, sha);
+        assert!(blake.validate().is_ok());
+        assert!(sha.validate().is_ok());
+    }
+
+    #[test]
+    fn malformed_declared_cryptographic_digest_fails_closed() {
+        let malformed = WorldSnapshotRef::cryptographic(
+            "world",
+            SnapshotDigestAlgorithm::Blake3,
+            "not-a-content-digest",
+        );
+        assert_eq!(
+            malformed.validate(),
+            Err(DeliberationError::InvalidCryptographicSnapshotDigest)
+        );
     }
 }
