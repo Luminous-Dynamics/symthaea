@@ -127,12 +127,22 @@ They:
 9. acquire the #456 SQLite writer barrier;
 10. classify while the barrier is live.
 
-Two cases are frozen:
+Five closed-world cases are frozen through that public signed-Xenia path:
 
 - exact current Xenia/local equality yields only a provenance-retaining publication permit;
-- Xenia sequence 1 as a proven prefix of local sequence 2 yields only a provenance-retaining re-anchor permit.
+- Xenia sequence 1 as a proven prefix of local sequence 2 yields only a provenance-retaining re-anchor permit;
+- a valid signed Xenia frontier at the same height but with a different reservation head yields `DivergentAtSameHeight`, `Contained`, and no permit;
+- a valid signed Xenia frontier ahead of the audited local state yields `RollbackOrMissingLocal`, `Contained`, and no permit;
+- a valid signed older Xenia frontier whose reservation head is not the exact local historical prefix yields `DivergentTrustedPrefix`, `Contained`, and no permit.
 
-The second case additionally verifies that the re-anchor permit carries the newer local frontier while retaining the older exact Xenia evidence that established why re-anchoring is required.
+The re-anchor case additionally verifies that the permit carries the newer local frontier while retaining the older exact Xenia evidence that established why re-anchoring is required.
+
+The three hostile cases are deliberately built as internally valid, Ed25519-signed, challenge-current Xenia evidence. Containment is therefore caused by the local/external chronology relationship, not by a malformed signature, stale observation, fake verifier object, or test-only bypass.
+
+The qualification evidence artifact hashes both integration fixtures separately:
+
+- `guarded_composition.rs` for permit-producing states;
+- `guarded_containment.rs` for fork/rollback/wrong-prefix denial states.
 
 ## Cargo.lock diagnostic model
 
