@@ -1,0 +1,106 @@
+name: HCPMMP Lineage B Scientific Input Snapshot
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/hcpmmp_neuromaps_execution_snapshot.py'
+      - 'scripts/test_hcpmmp_neuromaps_execution_snapshot.py'
+      - 'scripts/hcpmmp_neuromaps_common.py'
+      - 'docs/neuroscience/HCPMMP1_LINEAGE_B_SCIENTIFIC_INPUT_SNAPSHOT_V1.md'
+      - '.github/workflows/hcpmmp-lineage-b-input-snapshot.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify Lineage-B scientific input snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax contract
+        run: |
+          python -m py_compile \
+            scripts/hcpmmp_neuromaps_execution_snapshot.py \
+            scripts/test_hcpmmp_neuromaps_execution_snapshot.py
+
+      - name: Snapshot qualification contracts
+        run: PYTHONPATH=scripts python -m unittest scripts/test_hcpmmp_neuromaps_execution_snapshot.py
+
+      - name: Closed-world and custody ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=scripts/hcpmmp_neuromaps_execution_snapshot.py
+          DOC=docs/neuroscience/HCPMMP1_LINEAGE_B_SCIENTIFIC_INPUT_SNAPSHOT_V1.md
+          grep -Fq 'REQUIRED_INPUT_ROLES' "$SRC"
+          grep -Fq 'os.O_EXCL' "$SRC"
+          grep -Fq '0o600' "$SRC"
+          grep -Fq '0o400' "$SRC"
+          grep -Fq 'os.fsync' "$SRC"
+          grep -Fq 'digest_file(destination)' "$SRC"
+          grep -Fq 'not yet wired into `derive()`' "$DOC"
+
+      - name: Opened-descriptor ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=scripts/hcpmmp_neuromaps_execution_snapshot.py
+          grep -Fq 'O_NOFOLLOW' "$SRC"
+          grep -Fq 'O_NONBLOCK' "$SRC"
+          grep -Fq 'os.fstat' "$SRC"
+          grep -Fq 'stat.S_ISREG' "$SRC"
+          grep -Fq 'opened source is not a regular file' "$SRC"
+
+      - name: Descriptor lifetime ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=scripts/hcpmmp_neuromaps_execution_snapshot.py
+          TEST=scripts/test_hcpmmp_neuromaps_execution_snapshot.py
+          grep -Fq 'destination_fd: int | None = None' "$SRC"
+          grep -Fq 'if destination_fd is not None:' "$SRC"
+          grep -Fq 'test_destination_open_failure_closes_source_descriptor' "$TEST"
+          grep -Fq 'errno.EBADF' "$TEST"
+
+      - name: Confirmed-cleanup ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=scripts/hcpmmp_neuromaps_execution_snapshot.py
+          DOC=docs/neuroscience/HCPMMP1_LINEAGE_B_SCIENTIFIC_INPUT_SNAPSHOT_V1.md
+          grep -Fq '_cleanup_failed_snapshot' "$SRC"
+          grep -Fq 'failed snapshot cleanup not confirmed' "$SRC"
+          grep -Fq 'unconfirmed cleanup can never be represented as a successful' "$DOC"
+          grep -Fq 'returns no snapshot receipt' "$DOC"
+
+      - name: No execution or network surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=scripts/hcpmmp_neuromaps_execution_snapshot.py
+          for forbidden in subprocess requests urllib socket http.client aiohttp; do
+            if grep -Eq "(^|[^[:alnum:]_])${forbidden}([^[:alnum:]_]|$)" "$SRC"; then
+              echo "forbidden execution/network surface in snapshot primitive: $forbidden" >&2
+              exit 1
+            fi
+          done
+
+      - name: Profile and role cardinality
+        run: |
+          PYTHONPATH=scripts python - <<'PY'
+          import hcpmmp_neuromaps_execution_snapshot as snapshot
+          from hcpmmp_neuromaps_common import REQUIRED_INPUT_ROLES
+          assert snapshot.SNAPSHOT_PROFILE == 'symthaea-hcpmmp-scientific-input-snapshot-v1'
+          assert len(REQUIRED_INPUT_ROLES) == 14
+          PY
