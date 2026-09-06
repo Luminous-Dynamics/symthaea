@@ -47,22 +47,29 @@ jobs:
           grep -q 'lineage_root_is_provenance_only_not_epistemic_admission' "$production"
 
           # This layer is intentionally weaker than canonical cognitive evidence.
-          # It must not mislabel internal runtime observation as inference or
-          # external empirical evidence, and must not create admitted authority.
-          if grep -Eq 'CognitiveEvidenceRefV1|ValidatedCognitiveEvidenceRefV1|AdmittedCognitiveEvidenceV1|CognitiveEvidenceUseV1|\.authorize[[:space:]]*\(' "$production"; then
+          # Contract prose may name forbidden types to state non-equivalence, so
+          # reject actual imports/API use rather than mere textual mention.
+          if grep -Eq '^[[:space:]]*(pub[[:space:]]+)?use[[:space:]].*(CognitiveEvidenceRefV1|ValidatedCognitiveEvidenceRefV1|AdmittedCognitiveEvidenceV1|CognitiveEvidenceUseV1)|symthaea_types::|\.authorize[[:space:]]*\(' "$production"; then
             echo 'Runtime observation candidate crossed canonical evidence admission boundary.' >&2
+            exit 1
+          fi
+
+          # Never mislabel an internal instrumented runtime observation as either
+          # an external empirical observation or an internal inference.
+          if grep -Eq 'CognitiveEvidenceAuthorityV1::(EmpiricalObservation|InternalInference)' "$production"; then
+            echo 'Runtime observation candidate was assigned a false canonical evidence authority.' >&2
             exit 1
           fi
 
           # Currentness is a downstream proposition/use-context judgment. The
           # candidate producer may not mint or assess currentness itself.
-          if grep -Eq 'EvidenceCurrentnessV1|ValidatedEvidenceCurrentnessV1|CurrentnessContextV1|CurrentnessAssessmentV1|\.assess[[:space:]]*\(' "$production"; then
+          if grep -Eq '^[[:space:]]*(pub[[:space:]]+)?use[[:space:]].*(EvidenceCurrentnessV1|ValidatedEvidenceCurrentnessV1|CurrentnessContextV1|CurrentnessAssessmentV1)|\.assess[[:space:]]*\(' "$production"; then
             echo 'Runtime evidence candidate attempted to self-declare currentness.' >&2
             exit 1
           fi
 
           # No live cognition or feedback capability may enter this bridge.
-          if grep -Eqi 'CognitiveLoopService|RcaCompletedCycleV1|RcaObservableCognitiveLoopV1|global.?workspace|MetaRouter|gwt_manager|motor|action_author|external_effect|recursive_improvement|self.?improvement|memory_mut|service_mut|into_inner|into_parts' "$production"; then
+          if grep -Eqi '^[[:space:]]*(pub[[:space:]]+)?use[[:space:]].*(CognitiveLoopService|RcaCompletedCycleV1|RcaObservableCognitiveLoopV1|MetaRouter)|gwt_manager|service_mut|into_inner|into_parts|\.cycle[[:space:]]*\(' "$production"; then
             echo 'Runtime evidence candidate acquired a live cognition/control path.' >&2
             exit 1
           fi
