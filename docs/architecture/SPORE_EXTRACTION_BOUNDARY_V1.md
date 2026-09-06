@@ -142,6 +142,38 @@ fresh exact-source qualification
 
 Historical qualification MAY be cited as provenance evidence, but MUST NOT be relabeled as destination-repository product qualification.
 
+### Machine-checkable contract
+
+The human-readable boundary is backed by:
+
+- `docs/architecture/spore-migration-manifest-v1.schema.json` — strict structural schema;
+- `docs/architecture/spore-migration-manifest-v1.json` — exact source lineage/artifact manifest;
+- `scripts/check_spore_migration_manifest.py` — cross-record authority and provenance invariant checker;
+- `tests/test_spore_migration_manifest.py` — negative regressions for the critical migration boundaries;
+- `.github/workflows/spore-migration-contract.yml` — exact-head, clean-tree CI gate.
+
+The CI gate runs for every pull request rather than using native path filters. This contract is intentionally cheap enough to be universal, which avoids making migration authority depend on GitHub's changed-file path-filter view.
+
+The checker currently enforces, among other rules:
+
+```text
+qualification_transfer_policy = never-inherit
+
+source mutation during qualification
+    -> qualification_boundary = transformed-candidate
+
+recovery/qualification authority
+    -> target_owner = spore
+
+destination repository not created
+    -> destination_path = null
+
+all destination artifacts
+    -> destination_qualification = required
+```
+
+A prose review cannot override these constraints merely by describing a stronger evidence tier.
+
 ## 5. Exact-source qualification rule
 
 The canonical independent Spore repository MUST converge on:
@@ -260,5 +292,7 @@ Every extraction PR should answer four questions explicitly:
 2. **What authority did not move?**
 3. **What exact source lineage was migrated?**
 4. **What evidence proves destination behavior rather than assuming source qualification transferred?**
+
+The machine-readable manifest and validator are part of that review contract. If prose and machine-readable provenance disagree, the migration MUST NOT advance until they are reconciled.
 
 If a PR cannot answer those questions precisely, it is not ready to advance the migration boundary.
