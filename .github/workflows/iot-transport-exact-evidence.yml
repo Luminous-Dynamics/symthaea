@@ -10,11 +10,23 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: iot-transport-exact-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   qualify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
 
       - name: Source contract
         shell: python
@@ -42,6 +54,11 @@ jobs:
           missing = [item for item in required if item not in prod]
           if missing:
               raise SystemExit(f'missing required exact-evidence contract: {missing}')
+
+          code = '\n'.join(
+              line for line in prod.splitlines()
+              if not line.lstrip().startswith('//')
+          )
           forbidden = [
               'transport: &VerifiedTransportEnvelope',
               'HybridReceiptSignatureVerifier',
@@ -58,11 +75,13 @@ jobs:
               'Command::new',
               'unsafe {',
           ]
-          found = [item for item in forbidden if item in prod]
+          found = [item for item in forbidden if item in code]
           if found:
               raise SystemExit(f'forbidden authority/crypto/borrowed-proof surface in provenance capsule: {found}')
-          header = prod.split('pub struct ExactXeniaTransportEvidence', 1)[0].rsplit('#[derive(', 1)[-1]
-          if 'Clone' in header or 'Serialize' in header or 'Deserialize' in header:
+
+          struct_prefix = code.split('pub struct ExactXeniaTransportEvidence', 1)[0]
+          derive = struct_prefix.rsplit('#[derive(', 1)[-1] if '#[derive(' in struct_prefix else ''
+          if any(item in derive for item in ['Clone', 'Serialize', 'Deserialize']):
               raise SystemExit('exact-evidence capsule must remain non-clone/non-serializable')
 
       - name: Install Rust 1.96 for formatting
@@ -79,6 +98,11 @@ jobs:
         with:
           toolchain: 1.94.0
           components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
 
       - name: Preserve checked-in lock
         run: cp Cargo.lock /tmp/Cargo.lock.before
@@ -101,12 +125,15 @@ jobs:
           before = sourced('/tmp/Cargo.lock.before')
           after = sourced('Cargo.lock')
           extra = after - before
+          removed = before - after
           extra = {
               item for item in extra
               if not (item[0] == 'fips204' and item[1] == '0.4.6')
           }
-          if extra:
-              raise SystemExit(f'unreviewed sourced package drift: {sorted(extra)}')
+          if extra or removed:
+              raise SystemExit(
+                  f'unreviewed sourced dependency drift: added={sorted(extra)}, removed={sorted(removed)}'
+              )
 
       - name: Exact-byte ownership regression first
         run: cargo +1.94.0 test --locked -p symthaea-iot-transport-exact-evidence tests::exact_evidence_token_owns_original_canonical_bytes -- --exact
@@ -116,6 +143,10 @@ jobs:
 
       - name: Strict Clippy
         run: cargo +1.94.0 clippy --locked -p symthaea-iot-transport-exact-evidence --all-targets -- -D warnings
+
+      - name: Show candidate lock delta
+        if: always()
+        run: git diff -- Cargo.lock || true
 
       - name: Checked-in lock must already be fresh
         run: git diff --exit-code -- Cargo.lock
