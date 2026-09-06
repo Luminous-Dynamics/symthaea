@@ -56,13 +56,17 @@ impl TestAnchor {
     fn set_head(&self, head: DurableEffectAttemptJournalHeadV1) {
         *self.head.lock().unwrap() = head;
     }
+
+    fn observed_head(&self) -> DurableEffectAttemptJournalHeadV1 {
+        *self.head.lock().unwrap()
+    }
 }
 
 impl IndependentEffectAttemptHeadAnchor for TestAnchor {
     type Error = TestAnchorError;
 
     fn current_head(&mut self) -> Result<DurableEffectAttemptJournalHeadV1, Self::Error> {
-        Ok(*self.head.lock().unwrap())
+        Ok(self.observed_head())
     }
 
     fn compare_and_swap(
@@ -99,17 +103,25 @@ fn prepared_attempt_issues_fresh_nonce_bound_challenges_for_exact_protected_head
     let first = issue_effect_reconciliation_challenge(&mut journal).unwrap();
     let second = issue_effect_reconciliation_challenge(&mut journal).unwrap();
     assert_eq!(first.journal_generation(), 1);
-    assert_eq!(first.journal_digest(), observer.current_head().unwrap().digest());
+    assert_eq!(first.journal_digest(), observer.observed_head().digest());
+    assert_ne!(first.correlation_digest(), Digest32([0; 32]));
     assert_eq!(first.command_digest(), Digest32([0x11; 32]));
     assert_eq!(first.envelope_digest(), Digest32([0x22; 32]));
     assert_eq!(first.composition_digest(), Digest32([0x33; 32]));
     assert_eq!(first.device(), &device);
+    assert_eq!(first.operation().0, "qualification.effect");
+    assert_eq!(first.executor().0, "qualification:executor");
+    assert_eq!(first.adapter_id(), "qualification:adapter");
     assert_eq!(first.sequence(), 1);
     assert_eq!(first.source_state(), ReconciliationSourceStateV1::Prepared);
+    assert_eq!(first.attempt_common_fenced_at_unix_ms(), 1_000);
+    assert_eq!(first.attempt_wall_valid_until_unix_ms(), 2_000);
     assert_ne!(first.nonce(), [0; 32]);
     assert_ne!(first.nonce(), second.nonce());
     assert_ne!(first.digest().unwrap(), second.digest().unwrap());
     assert!(first.is_fresh_at(first.issued_at_unix_ms()));
+    assert!(first.is_fresh_at(first.expires_at_unix_ms() - 1));
+    assert!(!first.is_fresh_at(first.expires_at_unix_ms()));
     assert!(!first.canonical_bytes().unwrap().is_empty());
 
     fs::remove_dir_all(root).unwrap();
@@ -135,6 +147,29 @@ fn acknowledged_attempt_challenge_retains_exact_adapter_evidence_without_claimin
         } if adapter_evidence_digest == Digest32([0xE7; 32])
     ));
     assert_eq!(challenge.journal_generation(), 2);
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn indeterminate_attempt_issues_challenge_without_inventing_adapter_evidence() {
+    let root = temp_root("indeterminate");
+    let device = ResourceRef("iot:valve:72".into());
+    let anchor = TestAnchor::new(genesis(&device));
+    let mut journal = RollbackProtectedEffectAttemptJournal::open(&root, &device, anchor).unwrap();
+    let correlation = PhysicalEffectAttemptCorrelation::qualification_fixture(device.clone(), 1);
+    let prepared = journal.persist_prepared_anchored(&correlation).unwrap();
+    journal
+        .persist_adapter_indeterminate_anchored(&prepared)
+        .unwrap();
+
+    let challenge = issue_effect_reconciliation_challenge(&mut journal).unwrap();
+    assert_eq!(
+        challenge.source_state(),
+        ReconciliationSourceStateV1::AdapterIndeterminate
+    );
+    assert_eq!(challenge.journal_generation(), 2);
+    assert_ne!(challenge.digest().unwrap(), Digest32([0; 32]));
 
     fs::remove_dir_all(root).unwrap();
 }
