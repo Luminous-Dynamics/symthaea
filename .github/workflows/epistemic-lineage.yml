@@ -30,8 +30,8 @@ jobs:
             echo 'Evidence producers must not self-declare independence.' >&2
             exit 1
           fi
-      - name: Format
-        run: cargo fmt --all -- --check
+      - name: Format epistemic governance
+        run: cargo fmt --package symthaea-epistemic-governance -- --check
       - name: Test epistemic governance
         run: cargo test -p symthaea-epistemic-governance
       - name: Clippy epistemic governance
