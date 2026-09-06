@@ -1,0 +1,70 @@
+# Physical Agency qualification
+#
+# Keeps the new domain crates from silently escaping default-member CI coverage.
+# This workflow is intentionally simulation-only: it runs Rust checks/tests and
+# never accesses hardware or external actuator interfaces.
+
+name: Physical Agency Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-physical-effects/**'
+      - 'crates/domains/symthaea-physical-agency/**'
+      - 'crates/bridges/symthaea-sim-bridge/**'
+      - 'crates/domains/symthaea-formal-safety/**'
+      - '.github/workflows/physical-agency.yml'
+      - 'docs/architecture/PHYSICAL_AGENCY_RFC.md'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/domains/symthaea-physical-effects/**'
+      - 'crates/domains/symthaea-physical-agency/**'
+      - 'crates/bridges/symthaea-sim-bridge/**'
+      - 'crates/domains/symthaea-formal-safety/**'
+      - '.github/workflows/physical-agency.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: physical-agency-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    name: Physical Agency (fmt, check, tests, clippy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-physical-agency-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-physical-agency-
+
+      - name: Format physical-agency sources
+        run: cargo fmt --check -p symthaea-physical-effects -p symthaea-physical-agency
+
+      - name: Check physical-agency crates
+        run: cargo check -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
+
+      - name: Test physical-effect contract and PHYSIS
+        run: cargo test -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
+
+      - name: Clippy physical-agency crates
+        run: cargo clippy -p symthaea-physical-effects -p symthaea-physical-agency --all-targets -- -D warnings
