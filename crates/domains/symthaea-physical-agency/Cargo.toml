@@ -16,3 +16,4 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 symthaea-physical-effects = { path = "../symthaea-physical-effects" }
 symthaea-sim-bridge = { path = "../../bridges/symthaea-sim-bridge" }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
