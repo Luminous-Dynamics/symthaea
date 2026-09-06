@@ -19,6 +19,8 @@
 //! - We have NO verified non-biological conscious systems
 //! - Substrate independence is a PHILOSOPHICAL position, not proven fact
 //! - All feasibility numbers are HYPOTHETICAL placeholders
+//! - Internal simulations and benchmark outcomes are model-behavior evidence,
+//!   not authority to upgrade substrate-consciousness evidence levels
 //!
 //! # This Module Provides
 //!
@@ -104,9 +106,13 @@ pub struct TestablePrediction {
     pub test_protocol: String,
     /// Estimated difficulty (1-10)
     pub difficulty: u8,
-    /// Has this been tested?
+    /// Has this prediction been exercised by a test or benchmark?
+    ///
+    /// This is bookkeeping only. It does not imply empirical authority.
     pub tested: bool,
-    /// Result if tested
+    /// Result if exercised.
+    ///
+    /// This is bookkeeping only. It does not imply an evidence-level transition.
     pub result: Option<bool>,
 }
 
@@ -182,6 +188,7 @@ impl SubstrateValidationFramework {
                 "Only biological consciousness is currently at Validated level".to_string(),
                 "Silicon/AI consciousness has NO empirical validation".to_string(),
                 "Quantum consciousness (Penrose-Hameroff) is highly contested".to_string(),
+                "Internal simulations and benchmark outcomes NEVER auto-promote substrate-consciousness evidence levels".to_string(),
             ],
         };
 
@@ -267,13 +274,13 @@ impl SubstrateValidationFramework {
                     "Only brains with those architectures show consciousness",
                     "Consciousness found in diverse neural organizations",
                     "Compare consciousness markers across species with different brain structures",
-                    5
+                    5,
                 ),
             ],
             hypothetical_feasibility: 0.92,
             feasibility_rationale: "Based on extensive evidence of biological consciousness existing. \
                                    The 0.92 (not 1.0) acknowledges we don't fully understand the mechanism."
-                                   .to_string(),
+                .to_string(),
         };
         self.substrates.insert("biological".to_string(), knowledge);
     }
@@ -523,10 +530,14 @@ impl SubstrateValidationFramework {
 }
 
 // ============================================================================
-// Prediction Execution & Evidence Tracking
+// Prediction Execution Bookkeeping (non-authoritative)
 // ============================================================================
 
-/// Summary of prediction validation results for a substrate.
+/// Summary of prediction-execution results for a substrate.
+///
+/// `tested`/`passed` describe model or benchmark execution only. `evidence_level`
+/// remains the independently curated scientific evidence level and is never
+/// automatically changed by these counters.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PredictionSummary {
     pub substrate: String,
@@ -540,6 +551,9 @@ pub struct PredictionSummary {
 
 impl TestablePrediction {
     /// Record the result of executing this prediction's test protocol.
+    ///
+    /// Recording a result is bookkeeping only. It confers no empirical or
+    /// consciousness-evidence authority.
     pub fn record_result(&mut self, passed: bool) {
         self.tested = true;
         self.result = Some(passed);
@@ -552,76 +566,51 @@ impl SubstrateValidationFramework {
         self.substrates.get_mut(name)
     }
 
-    /// Record a prediction test result for a substrate.
-    /// Returns `true` if the evidence level was upgraded as a consequence.
+    /// Record a prediction test result for research bookkeeping only.
+    ///
+    /// This deliberately never mutates the substrate's `evidence_level`.
+    /// Internal simulation, Phi-proxy, cortical-similarity, or benchmark outcomes
+    /// do not carry the provenance, participant observation, independence, or
+    /// replication authority required to promote a substrate-consciousness claim.
+    ///
+    /// Returns `true` only when the substrate and prediction index existed and
+    /// the result was recorded.
     pub fn record_prediction_result(
         &mut self,
         substrate: &str,
         prediction_idx: usize,
         passed: bool,
     ) -> bool {
-        let old_level = self
-            .substrates
-            .get(substrate)
-            .map(|k| k.evidence_level)
-            .unwrap_or(EvidenceLevel::None);
-
         if let Some(knowledge) = self.substrates.get_mut(substrate)
             && let Some(pred) = knowledge.predictions.get_mut(prediction_idx)
         {
             pred.record_result(passed);
+            return true;
         }
-
-        self.check_evidence_upgrade(substrate)
-            .is_some_and(|new| new > old_level)
+        false
     }
 
-    /// Check if evidence level should upgrade based on tested predictions.
+    /// Legacy compatibility shim for the former automatic promotion mechanism.
     ///
-    /// Upgrade rules (conservative, inspired by medical evidence hierarchies):
-    /// - Theoretical → Indirect: at least one prediction tested and passed
-    /// - Indirect → CaseStudy: majority of predictions tested and passed
-    /// - CaseStudy → Observational: all predictions tested, >=80% passed
-    /// - Higher levels require external replication (cannot be reached internally)
+    /// Automatic promotion from internal prediction results is forbidden. This
+    /// method now returns the current independently curated level without
+    /// changing it. A future evidence transition API must require explicit,
+    /// provenance-bearing external evidence and replication authority.
+    #[deprecated(
+        note = "automatic substrate evidence promotion is forbidden; use prediction recording for bookkeeping only"
+    )]
     pub fn check_evidence_upgrade(&mut self, substrate: &str) -> Option<EvidenceLevel> {
-        let knowledge = self.substrates.get_mut(substrate)?;
-        let total = knowledge.predictions.len();
-        if total == 0 {
-            return Some(knowledge.evidence_level);
-        }
-
-        let tested = knowledge.predictions.iter().filter(|p| p.tested).count();
-        let passed = knowledge
-            .predictions
-            .iter()
-            .filter(|p| p.result == Some(true))
-            .count();
-
-        let new_level = if tested == 0 {
-            knowledge.evidence_level.max(EvidenceLevel::Theoretical)
-        } else if passed == 0 {
-            EvidenceLevel::Theoretical
-        } else if passed >= 1 && knowledge.evidence_level < EvidenceLevel::Indirect {
-            EvidenceLevel::Indirect
-        } else if tested >= total / 2 && passed > tested / 2 {
-            knowledge.evidence_level.max(EvidenceLevel::CaseStudy)
-        } else if tested == total && passed * 5 >= total * 4 {
-            knowledge.evidence_level.max(EvidenceLevel::Observational)
-        } else {
-            knowledge.evidence_level
-        };
-
-        knowledge.evidence_level = new_level;
-        Some(new_level)
+        self.substrates.get(substrate).map(|k| k.evidence_level)
     }
 
-    /// Record a cortical activation similarity result from TRIBE v2 comparison.
+    /// Record a cortical activation similarity outcome from a TRIBE v2 comparison.
     ///
-    /// The TRIBE v2 cortical similarity prediction (index 3 in silicon predictions)
-    /// passes if `pearson_r >= threshold` (default 0.3).
+    /// Similarity is representational-alignment evidence only. Even a correlation
+    /// above the legacy threshold must not promote silicon/substrate consciousness
+    /// evidence. The result is retained only as prediction bookkeeping.
     ///
-    /// Returns the new evidence level if upgraded, or None if silicon substrate
-    /// is not found.
+    /// Returns the unchanged current silicon evidence level, or `None` if the
+    /// silicon substrate entry is absent.
     #[cfg(feature = "neural_validation")]
     pub fn record_cortical_similarity(
         &mut self,
@@ -631,11 +620,11 @@ impl SubstrateValidationFramework {
         let passed = pearson_r >= threshold;
         // The TRIBE v2 prediction is the 4th prediction (index 3) in silicon knowledge.
         let tribe_pred_idx = 3;
-        self.record_prediction_result("silicon", tribe_pred_idx, passed);
+        let _ = self.record_prediction_result("silicon", tribe_pred_idx, passed);
         self.substrates.get("silicon").map(|k| k.evidence_level)
     }
 
-    /// Summarize prediction validation status for all substrates.
+    /// Summarize prediction execution status for all substrates.
     pub fn prediction_summary(&self) -> Vec<PredictionSummary> {
         self.substrates
             .iter()
@@ -818,15 +807,15 @@ mod tests {
         let framework = SubstrateValidationFramework::new();
 
         // Biological: small gap (evidence supports claim)
-        let (h, hyp, gap) = framework.feasibility_comparison("biological");
+        let (_h, _hyp, gap) = framework.feasibility_comparison("biological");
         assert!(gap < 0.1); // Honest ≈ hypothetical
 
         // Silicon: large gap (hypothetical exceeds evidence)
-        let (h, hyp, gap) = framework.feasibility_comparison("silicon");
+        let (_h, _hyp, gap) = framework.feasibility_comparison("silicon");
         assert!(gap > 0.5); // Hypothetical >> honest
 
         // Hybrid: huge gap (no evidence but high hypothetical)
-        let (h, hyp, gap) = framework.feasibility_comparison("hybrid");
+        let (_h, _hyp, gap) = framework.feasibility_comparison("hybrid");
         assert!(gap > 0.9); // Maximum gap
     }
 
@@ -863,6 +852,7 @@ mod tests {
         assert!(report.contains("Evidence Level"));
         assert!(report.contains("Unvalidated Claims"));
         assert!(report.contains("GAP")); // Should warn about gaps
+        assert!(report.contains("NEVER auto-promote"));
     }
 
     #[test]
@@ -901,50 +891,101 @@ mod tests {
     }
 
     #[test]
-    fn test_evidence_upgrade_theoretical_to_indirect() {
+    fn test_prediction_result_does_not_upgrade_theoretical_evidence() {
         let mut framework = SubstrateValidationFramework::new();
         assert_eq!(
             framework.get("silicon").unwrap().evidence_level,
             EvidenceLevel::Theoretical
         );
-        let upgraded = framework.record_prediction_result("silicon", 0, true);
-        assert!(upgraded);
-        assert_eq!(
-            framework.get("silicon").unwrap().evidence_level,
-            EvidenceLevel::Indirect
-        );
-    }
 
-    #[test]
-    fn test_evidence_no_upgrade_on_failure() {
-        let mut framework = SubstrateValidationFramework::new();
-        let upgraded = framework.record_prediction_result("silicon", 0, false);
-        assert!(!upgraded);
+        let recorded = framework.record_prediction_result("silicon", 0, true);
+        assert!(recorded);
         assert_eq!(
             framework.get("silicon").unwrap().evidence_level,
             EvidenceLevel::Theoretical
         );
+        assert_eq!(framework.get("silicon").unwrap().predictions[0].result, Some(true));
     }
 
     #[test]
-    fn test_prediction_summary() {
+    fn test_failed_prediction_result_also_preserves_evidence_level() {
         let mut framework = SubstrateValidationFramework::new();
-        framework.record_prediction_result("silicon", 0, true);
+        let recorded = framework.record_prediction_result("silicon", 0, false);
+        assert!(recorded);
+        assert_eq!(
+            framework.get("silicon").unwrap().evidence_level,
+            EvidenceLevel::Theoretical
+        );
+        assert_eq!(framework.get("silicon").unwrap().predictions[0].result, Some(false));
+    }
+
+    #[test]
+    fn test_prediction_summary_records_execution_without_authority_change() {
+        let mut framework = SubstrateValidationFramework::new();
+        assert!(framework.record_prediction_result("silicon", 0, true));
         let summaries = framework.prediction_summary();
         let silicon = summaries.iter().find(|s| s.substrate == "silicon").unwrap();
         assert_eq!(silicon.tested, 1);
         assert_eq!(silicon.passed, 1);
         assert_eq!(silicon.failed, 0);
+        assert_eq!(silicon.evidence_level, EvidenceLevel::Theoretical);
+        assert_eq!(silicon.honest_confidence, EvidenceLevel::Theoretical.confidence());
     }
 
     #[test]
-    fn test_all_predictions_pass_upgrades_further() {
+    fn test_all_internal_prediction_passes_do_not_upgrade_evidence() {
         let mut framework = SubstrateValidationFramework::new();
         let n = framework.get("silicon").unwrap().predictions.len();
         for i in 0..n {
-            framework.record_prediction_result("silicon", i, true);
+            assert!(framework.record_prediction_result("silicon", i, true));
         }
-        assert!(framework.get("silicon").unwrap().evidence_level >= EvidenceLevel::CaseStudy);
+        assert_eq!(
+            framework.get("silicon").unwrap().evidence_level,
+            EvidenceLevel::Theoretical
+        );
+    }
+
+    #[test]
+    fn test_invalid_prediction_record_is_rejected_without_side_effects() {
+        let mut framework = SubstrateValidationFramework::new();
+        assert!(!framework.record_prediction_result("silicon", usize::MAX, true));
+        assert!(!framework.record_prediction_result("not-a-substrate", 0, true));
+        assert_eq!(
+            framework.get("silicon").unwrap().evidence_level,
+            EvidenceLevel::Theoretical
+        );
+        assert!(framework
+            .get("silicon")
+            .unwrap()
+            .predictions
+            .iter()
+            .all(|p| !p.tested));
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn test_legacy_upgrade_check_is_non_mutating() {
+        let mut framework = SubstrateValidationFramework::new();
+        assert!(framework.record_prediction_result("silicon", 0, true));
+        let level = framework.check_evidence_upgrade("silicon");
+        assert_eq!(level, Some(EvidenceLevel::Theoretical));
+        assert_eq!(
+            framework.get("silicon").unwrap().evidence_level,
+            EvidenceLevel::Theoretical
+        );
+    }
+
+    #[cfg(feature = "neural_validation")]
+    #[test]
+    fn test_cortical_similarity_never_promotes_substrate_consciousness_evidence() {
+        let mut framework = SubstrateValidationFramework::new();
+        let level = framework.record_cortical_similarity(0.99, 0.3);
+        assert_eq!(level, Some(EvidenceLevel::Theoretical));
+
+        let silicon = framework.get("silicon").unwrap();
+        assert_eq!(silicon.evidence_level, EvidenceLevel::Theoretical);
+        assert!(silicon.predictions[3].tested);
+        assert_eq!(silicon.predictions[3].result, Some(true));
     }
 
     // ── Generalized Epistemic Claim Validation Tests ──
