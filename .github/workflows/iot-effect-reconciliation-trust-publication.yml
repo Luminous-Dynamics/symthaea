@@ -1,0 +1,176 @@
+name: IoT Effect Reconciliation Trust Publication
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-effect-reconciliation-trust-publication/**'
+      - 'crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/**'
+      - '.github/workflows/iot-effect-reconciliation-trust-publication.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-effect-reconciliation-trust-publication-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Freeze reconciliation trust publication contract
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          root = Path('crates/bridges/symthaea-iot-effect-reconciliation-trust-publication')
+          src = (root / 'src/lib.rs').read_text()
+          code = '\n'.join(
+              line for line in src.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+          compact = ''.join(code.split())
+
+          required = [
+              'compile_error!("theprivilegedeffect-reconciliationtrustpublicationstoreisLinux-only")',
+              'pubstructEffectReconciliationTrustRootsV1{pubdevice:ResourceRef,puboutcome_policy:EffectReconciliationPolicyAnchorV1,puboutcome_trust_head:PublishedEffectOutcomeTrustHeadV1,}',
+              'pubconstfnfrom_outcome_trust_head(head:EffectOutcomeTrustHead)->Self',
+              'pubconstfnmatches_outcome_trust_head(self,head:EffectOutcomeTrustHead)->bool',
+              'pubstructDurableEffectReconciliationTrustPublicationStore',
+              'pubfnpublish_successor(',
+              'pubfnfence_current(',
+              'letkernel=self.open_lock_file()?;',
+              'kernel.lock()',
+              'file.sync_all()?;',
+              'fs::rename(&temp,&target)?;',
+              'root.sync_all()?;',
+              'libc::O_DIRECTORY|libc::O_CLOEXEC|libc::O_NOFOLLOW',
+              'libc::O_CLOEXEC|libc::O_NOFOLLOW',
+              'pubstructCurrentEffectReconciliationTrustFence',
+              'validate_policy_transition(previous.outcome_policy,next.outcome_policy)?;',
+              'validate_outcome_trust_transition(previous.outcome_trust_head,next.outcome_trust_head)?;',
+              'ifnext.generation<previous.generation',
+              'ifnext.generation==previous.generation&&next.digest!=previous.digest',
+              'ifnext.sequence<previous.sequence',
+              'ifnext.sequence==previous.sequence&&next.digest!=previous.digest',
+              'ifroots==self.roots{returnErr(EffectReconciliationTrustPublicationError::NoOpSuccessor);}',
+              'ifpublication.head()?!=self.trusted_current_head',
+          ]
+          missing = [needle for needle in required if needle not in compact]
+          if missing:
+              raise SystemExit(f'missing reconciliation-publication invariant: {missing}')
+
+          if compact.count('letkernel=self.open_lock_file()?;') < 4:
+              raise SystemExit('initialize/open/publish/fence must all use the same kernel lock file')
+          if compact.count('kernel.lock()') < 4:
+              raise SystemExit('initialize/open/publish/fence must all take the kernel lock')
+
+          forbidden = [
+              'ed25519_dalek', 'verify_strict(', 'SigningKey', 'VerifyingKey',
+              'PhysicalEffectOutcomeEvidenceV1', 'VerifiedPhysicalEffectOutcomeEvidence',
+              'CurrentPhysicalEffectOutcomeGuard', 'CurrentPhysicalEffectOutcomeFence',
+              'persist_prepared_anchored(', 'persist_adapter_acknowledged_anchored(',
+              'persist_adapter_indeterminate_anchored(', 'persist_abandoned_before_port_anchored(',
+              'PrivilegedPhysicalEffectPort', 'dispatch_current_attempt',
+              'FinalActuatorPermit', 'JustInTimeHalLease', 'CompleteJitHalLease',
+              'TcpListener', 'TcpStream', 'UdpSocket', 'tokio::spawn',
+              'std::process::Command', 'Command::new', 'unsafe{',
+          ]
+          found = [needle for needle in forbidden if needle in compact]
+          if found:
+              raise SystemExit(f'reconciliation publication crossed atomicity-only boundary: {found}')
+
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          expected = {
+              'bincode', 'blake3', 'libc', 'serde', 'symthaea-authority',
+              'symthaea-iot-actuation-effect-outcome-verifier', 'thiserror',
+          }
+          actual = set(manifest.get('dependencies', {}))
+          if actual != expected:
+              raise SystemExit(f'reconciliation-publication dependency drift: {sorted(actual)}')
+          if manifest.get('dev-dependencies'):
+              raise SystemExit('reconciliation-publication should not require external dev dependencies')
+
+      - name: Install Rust 1.96 formatter
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt reconciliation trust publication
+        run: >-
+          cargo +1.96.0 fmt --check
+          -p symthaea-iot-effect-reconciliation-trust-publication
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Check reconciliation trust publication
+        run: >-
+          cargo +1.94.0 check
+          -p symthaea-iot-effect-reconciliation-trust-publication
+          --all-targets --no-default-features
+
+      - name: Reject unreviewed external dependency drift
+        shell: python
+        run: |
+          import tomllib
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source')): p
+                  for p in doc.get('package', []) if p.get('source') is not None
+              }
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          b = set(before); a = set(after)
+          added = a - b; removed = b - a
+          changed = sorted(k for k in a & b if after[k] != before[k])
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          if not added.issubset(allowed) or removed or changed:
+              raise SystemExit(
+                  f'external dependency drift: added={sorted(added)}, '
+                  f'removed={sorted(removed)}, changed={changed}'
+              )
+
+      - name: Run publication/fence regressions first
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-effect-reconciliation-trust-publication
+          --lib --no-default-features
+
+      - name: Strict package-local Clippy
+        run: >-
+          cargo +1.94.0 clippy
+          -p symthaea-iot-effect-reconciliation-trust-publication
+          --all-targets --no-default-features --no-deps -- -D warnings
+
+      - name: Show local-only Cargo.lock bookkeeping
+        if: always()
+        run: git diff -- Cargo.lock || true
