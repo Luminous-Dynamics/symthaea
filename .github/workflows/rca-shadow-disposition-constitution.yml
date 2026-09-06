@@ -25,10 +25,28 @@ jobs:
 
           test -f "$doc"
 
-          # Required input/authority separation.
-          grep -q 'BoundShadowEvidenceCaseV1' "$doc"
-          grep -q 'BoundShadowEvidenceCaseV1' "$doc"
-          grep -q '!=.*ShadowDispositionV1' "$doc" || grep -q 'ShadowDispositionV1' "$doc"
+          # Freeze the actual ordered non-equivalence theorem rather than merely
+          # checking that each symbol appears somewhere in the document.
+          python3 - "$doc" <<'PY'
+          from pathlib import Path
+          import sys
+
+          text = Path(sys.argv[1]).read_text()
+          theorem = """BoundShadowEvidenceCaseV1
+                  !=
+          ShadowDispositionV1
+                  !=
+          canonical epistemic state
+                  !=
+          workspace/GWT authority
+                  !=
+          action authority
+                  !=
+          self-improvement promotion"""
+          if theorem not in text:
+              raise SystemExit("RCA shadow-disposition non-equivalence theorem drifted")
+          PY
+
           grep -q 'No canonical belief admission' "$doc"
           grep -q 'No action authority' "$doc"
           grep -q 'No recursive-improvement promotion authority' "$doc"
