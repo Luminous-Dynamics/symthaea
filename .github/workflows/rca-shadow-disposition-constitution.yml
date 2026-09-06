@@ -29,21 +29,19 @@ jobs:
           # checking that each symbol appears somewhere in the document.
           python3 - "$doc" <<'PY'
           from pathlib import Path
+          import re
           import sys
 
           text = Path(sys.argv[1]).read_text()
-          theorem = """BoundShadowEvidenceCaseV1
-                  !=
-          ShadowDispositionV1
-                  !=
-          canonical epistemic state
-                  !=
-          workspace/GWT authority
-                  !=
-          action authority
-                  !=
-          self-improvement promotion"""
-          if theorem not in text:
+          theorem = re.compile(
+              r"BoundShadowEvidenceCaseV1\s*\n\s*!=\s*\n"
+              r"\s*ShadowDispositionV1\s*\n\s*!=\s*\n"
+              r"\s*canonical epistemic state\s*\n\s*!=\s*\n"
+              r"\s*workspace/GWT authority\s*\n\s*!=\s*\n"
+              r"\s*action authority\s*\n\s*!=\s*\n"
+              r"\s*self-improvement promotion"
+          )
+          if not theorem.search(text):
               raise SystemExit("RCA shadow-disposition non-equivalence theorem drifted")
           PY
 
