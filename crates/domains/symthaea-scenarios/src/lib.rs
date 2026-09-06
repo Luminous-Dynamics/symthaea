@@ -11,8 +11,12 @@
 //!   lost output) + **geodesy** (inter-city distance).
 //! - [`controlled_epidemic`] composes **control theory** (a PID intervention)
 //!   + **epidemiology** — and demonstrates the controller flattens the curve.
+//! - [`economic_science`] hosts the ESE-A4 deterministic synthetic
+//!   mechanism-recovery fixture above the theory-neutral economics kernel.
 //!
 //! Pure `std` transitively (all deps are pure-std domain crates).
+
+pub mod economic_science;
 
 use symthaea_control_theory::Pid;
 use symthaea_economics::finance::npv;

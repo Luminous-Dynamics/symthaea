@@ -1,0 +1,98 @@
+name: Economic Science A4 Synthetic Recovery
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-scenarios/src/economic_science.rs"
+      - "crates/domains/symthaea-scenarios/src/lib.rs"
+      - "crates/domains/symthaea-scenarios/README.md"
+      - "crates/domains/symthaea-economics/**"
+      - ".github/workflows/economic-science-a4.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-scenarios/src/economic_science.rs"
+      - "crates/domains/symthaea-scenarios/src/lib.rs"
+      - "crates/domains/symthaea-scenarios/README.md"
+      - "crates/domains/symthaea-economics/**"
+      - ".github/workflows/economic-science-a4.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: economic-science-a4-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze A4 synthetic-recovery boundary
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("crates/domains/symthaea-scenarios/src/economic_science.rs").read_text()
+
+          required = [
+              "A4_DEMAND_SHOCK_BPS",
+              "ModelParadigm::AgentBased",
+              "ModelParadigm::SystemDynamics",
+              "DEMAND_EMPLOYMENT_CLAIM",
+              "theory.validate_adapter(&adapter)",
+              "DoubleEntryLedger",
+              "JournalEntry",
+              "ledger.is_balanced()",
+              "pub(crate) fn heterogeneous_agent_prediction",
+              "pub(crate) fn aggregate_system_dynamics_prediction",
+              "comparison.agent_based.outcome.shocked_employment, 6",
+              "comparison.system_dynamics.outcome.shocked_employment, 8",
+          ]
+          missing = [item for item in required if item not in source]
+          if missing:
+              raise SystemExit(f"A4 synthetic contract drift: {missing}")
+
+          forbidden = [
+              "rand::",
+              "thread_rng",
+              "SystemTime",
+              "Instant::now",
+              "std::fs",
+              "std::net",
+              "EvidenceChannel",
+              "EvidenceMaturity",
+              "pub fn heterogeneous_agent_prediction",
+              "pub fn aggregate_system_dynamics_prediction",
+          ]
+          present = [item for item in forbidden if item in source]
+          if present:
+              raise SystemExit(f"A4 gained forbidden nondeterministic/evidence/public surface: {present}")
+
+          if source.count("DEMAND_EMPLOYMENT_CLAIM") < 2:
+              raise SystemExit("A4 models must bind one shared ETIR claim identity")
+          if "heterogeneous_agent_response_is_not_aggregate_rescaling" not in source:
+              raise SystemExit("A4 must prove the two paradigms are behaviorally distinct")
+          if "synthetic model behavior only" not in source:
+              raise SystemExit("A4 must retain explicit synthetic-only authority language")
+          PY
+
+      - name: Verify locked workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-scenarios
+
+      - name: Focused A4 tests
+        run: cargo test --locked -p symthaea-scenarios --lib economic_science
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-scenarios --lib --no-deps -- -D warnings
