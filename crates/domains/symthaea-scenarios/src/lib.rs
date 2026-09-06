@@ -13,9 +13,13 @@
 //!   + **epidemiology** — and demonstrates the controller flattens the curve.
 //! - [`economic_science`] hosts the ESE-A4 deterministic synthetic
 //!   mechanism-recovery fixture above the theory-neutral economics kernel.
+//! - [`economic_identification`] hosts ESE-A5 blind synthetic mechanism
+//!   identification with Pareto error comparison and explicit abstention when
+//!   competing mechanisms are observationally indistinguishable.
 //!
 //! Pure `std` transitively (all deps are pure-std domain crates).
 
+pub mod economic_identification;
 pub mod economic_science;
 
 use symthaea_control_theory::Pid;
