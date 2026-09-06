@@ -24,7 +24,10 @@
 
 // Kept crate-private so the code can continue to compile, be tested, and be
 // repaired without presenting the historical experiments as a public scientific
-// validation API.
+// validation API. Some formerly public experiment structs are intentionally
+// unreachable outside this crate during quarantine, so dead-code allowance is
+// scoped to this legacy module rather than weakening linting globally.
+#[allow(dead_code)]
 pub(crate) mod cortical_similarity;
 
 /// Qualification state of the public external-neural benchmark surface.
