@@ -14,16 +14,21 @@
 //! forecast attempt can explicitly abstain, and later resolutions can be
 //! cross-validated against the exact attempt they claim to resolve.
 //!
+//! [`provenance`] adds canonical content-digest and content-addressed provenance
+//! types for newer evidence boundaries. These types validate digest identity
+//! syntax but deliberately do not claim that external bytes have already been
+//! rehashed; byte verification remains an ingestion/qualification responsibility.
+//!
 //! Neither schema by itself proves wall-clock precedence. A durable prospective
-//! registry must additionally enforce unique immutable attempt IDs and, in a
-//! later hardening, content-addressed/append-only commitment evidence. Never
-//! treat possession of an ID alone as cryptographic proof that a forecast existed
-//! before its outcome.
+//! registry must additionally enforce unique immutable attempt IDs and
+//! content-addressed/append-only commitment evidence. Never treat possession of
+//! an ID alone as cryptographic proof that a forecast existed before its outcome.
 
 use serde::{Deserialize, Serialize};
 use symthaea_futures_core::{ForecastDistribution, OutcomeRegion};
 
 pub mod prospective;
+pub mod provenance;
 pub mod v2;
 
 /// Original seeded-simulation evidence schema. Retained unchanged for existing
