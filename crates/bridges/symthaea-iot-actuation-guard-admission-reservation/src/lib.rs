@@ -16,6 +16,9 @@
 #[cfg(not(target_os = "linux"))]
 compile_error!("the privileged IoT admission reservation store is Linux-only");
 
+mod current;
+pub use current::{CurrentAdmissionReservationFence, CurrentAdmissionReservationFenceError};
+
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::os::fd::AsRawFd;

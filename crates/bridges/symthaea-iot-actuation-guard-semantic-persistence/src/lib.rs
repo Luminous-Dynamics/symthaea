@@ -17,6 +17,9 @@ compile_error!(
     "symthaea-iot-actuation-guard-semantic-persistence is Linux-only and relies on a pinned directory capability"
 );
 
+mod current;
+pub use current::{CurrentSemanticHeadFence, CurrentSemanticHeadFenceError};
+
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::os::fd::AsRawFd;
