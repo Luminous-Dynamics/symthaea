@@ -48,6 +48,8 @@ pub const RUNTIME_RELEVANCE_CONTRACT_V1: &str = concat!(
     "lag_rule=current_cycle-observed_cycle<=explicit_max_cycle_lag\n",
     "all_semantically_valid_detected_defects_are_preserved\n",
     "historical_truth_is_not_current_runtime_relevance\n",
+    "assessment_is_issued_non_deserializable_shadow_result\n",
+    "persistence_does_not_recreate_relevance_assessment_authority\n",
     "relevance_is_not_evidence_admission_or_proposition_support\n",
     "relevance_is_not_workspace_action_or_self_improvement_authority\n",
 );
@@ -157,21 +159,59 @@ pub enum RuntimeRelevanceDefectV1 {
     },
 }
 
-/// Replayable result of one pure shadow relevance assessment.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+/// Issued result of one pure shadow relevance assessment.
+///
+/// The fields are private and this type deliberately does not implement
+/// `Deserialize`. An archived JSON representation is audit data only; loading
+/// bytes must not recreate a trusted "relevant" result. Downstream code that
+/// needs a current relevance decision must retain/reload the candidate and
+/// validated context and call [`assess_current_runtime_relevance`] again.
+#[must_use = "runtime relevance assessments are shadow evidence and should be inspected"]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeRelevanceAssessmentV1 {
-    pub schema_version: u16,
-    pub profile: String,
-    pub profile_contract_digest: String,
-    pub candidate_id: String,
-    pub context_commitment: String,
-    pub observed_cycle_index: u64,
-    pub current_cycle_index: u64,
-    pub defects: Vec<RuntimeRelevanceDefectV1>,
+    schema_version: u16,
+    profile: String,
+    profile_contract_digest: String,
+    candidate_id: String,
+    context_commitment: String,
+    observed_cycle_index: u64,
+    current_cycle_index: u64,
+    defects: Vec<RuntimeRelevanceDefectV1>,
 }
 
 impl RuntimeRelevanceAssessmentV1 {
+    pub const fn schema_version(&self) -> u16 {
+        self.schema_version
+    }
+
+    pub fn profile(&self) -> &str {
+        &self.profile
+    }
+
+    pub fn profile_contract_digest(&self) -> &str {
+        &self.profile_contract_digest
+    }
+
+    pub fn candidate_id(&self) -> &str {
+        &self.candidate_id
+    }
+
+    pub fn context_commitment(&self) -> &str {
+        &self.context_commitment
+    }
+
+    pub const fn observed_cycle_index(&self) -> u64 {
+        self.observed_cycle_index
+    }
+
+    pub const fn current_cycle_index(&self) -> u64 {
+        self.current_cycle_index
+    }
+
+    pub fn defects(&self) -> &[RuntimeRelevanceDefectV1] {
+        &self.defects
+    }
+
     pub fn is_relevant(&self) -> bool {
         self.defects.is_empty()
     }
@@ -200,8 +240,10 @@ pub fn runtime_relevance_profile_digest_v1() -> String {
 /// Pure shadow-only assessment of whether a candidate can describe the current
 /// RCA execution under one explicit cycle-lag policy.
 ///
-/// This function does not convert the candidate to canonical evidence, attach a
-/// proposition relation, or return any authority-bearing capability.
+/// This function is the only public issuance path for
+/// [`RuntimeRelevanceAssessmentV1`]. It does not convert the candidate to
+/// canonical evidence, attach a proposition relation, or return any
+/// authority-bearing capability.
 pub fn assess_current_runtime_relevance(
     candidate: &InstrumentedRuntimeEvidenceCandidateV1,
     context: &ValidatedCurrentRuntimeRelevanceContextV1,
@@ -439,7 +481,7 @@ mod tests {
         assert!(assessment.is_relevant());
         assert_eq!(assessment.cycle_lag(), Some(2));
         assert_eq!(
-            assessment.profile_contract_digest,
+            assessment.profile_contract_digest(),
             runtime_relevance_profile_digest_v1()
         );
     }
@@ -449,8 +491,8 @@ mod tests {
         assert!(assess_current_runtime_relevance(&candidate(42), &context(42, 0)).is_relevant());
         let stale = assess_current_runtime_relevance(&candidate(41), &context(42, 0));
         assert_eq!(
-            stale.defects,
-            vec![RuntimeRelevanceDefectV1::StaleByCycleLag {
+            stale.defects(),
+            &[RuntimeRelevanceDefectV1::StaleByCycleLag {
                 lag: 1,
                 max_cycle_lag: 0
             }]
@@ -463,7 +505,7 @@ mod tests {
         raw.source_generation_digest = SOURCE_B.into();
         let assessment =
             assess_current_runtime_relevance(&candidate(42), &raw.validate().unwrap());
-        assert!(assessment.defects.iter().any(|defect| matches!(
+        assert!(assessment.defects().iter().any(|defect| matches!(
             defect,
             RuntimeRelevanceDefectV1::SourceGenerationMismatch { .. }
         )));
@@ -475,7 +517,7 @@ mod tests {
         raw.execution_lineage_digest = LINEAGE_B.into();
         let assessment =
             assess_current_runtime_relevance(&candidate(42), &raw.validate().unwrap());
-        assert!(assessment.defects.iter().any(|defect| matches!(
+        assert!(assessment.defects().iter().any(|defect| matches!(
             defect,
             RuntimeRelevanceDefectV1::ExecutionLineageMismatch { .. }
         )));
@@ -489,8 +531,8 @@ mod tests {
         let assessment =
             assess_current_runtime_relevance(&candidate(1), &raw.validate().unwrap());
         assert_eq!(
-            assessment.defects,
-            vec![RuntimeRelevanceDefectV1::ExecutionLineageMismatch {
+            assessment.defects(),
+            &[RuntimeRelevanceDefectV1::ExecutionLineageMismatch {
                 observed: LINEAGE_A.into(),
                 current: LINEAGE_B.into(),
             }]
@@ -505,11 +547,11 @@ mod tests {
         raw.adapter_contract_digest = ADAPTER_B.into();
         let assessment =
             assess_current_runtime_relevance(&candidate(42), &raw.validate().unwrap());
-        assert!(assessment.defects.iter().any(|defect| matches!(
+        assert!(assessment.defects().iter().any(|defect| matches!(
             defect,
             RuntimeRelevanceDefectV1::AdapterProfileMismatch { .. }
         )));
-        assert!(assessment.defects.iter().any(|defect| matches!(
+        assert!(assessment.defects().iter().any(|defect| matches!(
             defect,
             RuntimeRelevanceDefectV1::AdapterContractMismatch { .. }
         )));
@@ -519,8 +561,8 @@ mod tests {
     fn stale_observation_fails_explicit_lag_policy() {
         let assessment = assess_current_runtime_relevance(&candidate(30), &context(42, 5));
         assert_eq!(
-            assessment.defects,
-            vec![RuntimeRelevanceDefectV1::StaleByCycleLag {
+            assessment.defects(),
+            &[RuntimeRelevanceDefectV1::StaleByCycleLag {
                 lag: 12,
                 max_cycle_lag: 5
             }]
@@ -531,8 +573,8 @@ mod tests {
     fn future_observation_fails_closed() {
         let assessment = assess_current_runtime_relevance(&candidate(43), &context(42, 5));
         assert_eq!(
-            assessment.defects,
-            vec![RuntimeRelevanceDefectV1::FutureObservation {
+            assessment.defects(),
+            &[RuntimeRelevanceDefectV1::FutureObservation {
                 observed_cycle: 43,
                 current_cycle: 42
             }]
@@ -549,8 +591,8 @@ mod tests {
         raw.adapter_contract_digest = ADAPTER_B.into();
         let assessment =
             assess_current_runtime_relevance(&candidate(30), &raw.validate().unwrap());
-        assert_eq!(assessment.defects.len(), 4);
-        assert!(assessment.defects.iter().all(|defect| !matches!(
+        assert_eq!(assessment.defects().len(), 4);
+        assert!(assessment.defects().iter().all(|defect| !matches!(
             defect,
             RuntimeRelevanceDefectV1::StaleByCycleLag { .. }
                 | RuntimeRelevanceDefectV1::FutureObservation { .. }
@@ -569,6 +611,14 @@ mod tests {
         assert!(digest.starts_with("blake3:"));
         assert_eq!(digest.len(), "blake3:".len() + 64);
         assert_eq!(digest, runtime_relevance_profile_digest_v1());
+    }
+
+    #[test]
+    fn issued_assessment_serializes_for_audit_but_is_not_a_persisted_capability() {
+        let assessment = assess_current_runtime_relevance(&candidate(40), &context(42, 2));
+        let encoded = serde_json::to_string(&assessment).unwrap();
+        assert!(encoded.contains(assessment.candidate_id()));
+        assert!(encoded.contains(assessment.profile_contract_digest()));
     }
 
     #[test]
