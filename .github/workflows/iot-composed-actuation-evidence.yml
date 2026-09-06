@@ -1,0 +1,175 @@
+name: IoT Composed Actuation Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-composed-actuation-evidence/**'
+      - '.github/workflows/iot-composed-actuation-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-composed-actuation-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Non-authorizing composition source contract
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          root = Path('crates/bridges/symthaea-iot-composed-actuation-evidence')
+          src = (root / 'src/lib.rs').read_text()
+          code = '\n'.join(
+              line for line in src.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+          compact = ''.join(code.split())
+          required = [
+              'pubfncompose_actuation_evidence(',
+              'transport:RevalidatedXeniaTransport',
+              'semantic:PersistedSemanticAcceptance',
+              'interlock:VerifiedPostSemanticPhysicalInterlock',
+              'admission.checkpoint().head()',
+              'semantic.checkpoint().head()',
+              'transport.envelope()!=admission.envelope()',
+              'transport.receipt_digest()!=admission.transport_receipt_digest()',
+              'transport.transport_trust_head()!=admission.transport_trust_head()',
+              'reality.reservation_head()!=admission.head()',
+              'reality.attestation_object_digest()!=semantic.device_attestation_object_digest()',
+              'challenge.admission_reservation_head()!=admission.head()',
+              'challenge.semantic_head()!=semantic.device_head()',
+              'challenge.device_attestation_object_digest()!=reality.attestation_object_digest()',
+              'statement.challenge_digest!=challenge_digest',
+              'statement.device_attestation_result_digest!=reality.attestation_object_digest()',
+              'statement.semantic_head!=semantic.device_head()',
+              'statement.transport_trust_head!=transport.transport_trust_head()',
+              'reconstructed_statement_digest!=interlock.statement_digest()',
+              'pubstructComposedActuationEvidence',
+              'composition_digest:Digest32',
+          ]
+          missing = [needle for needle in required if needle not in compact]
+          if missing:
+              raise SystemExit(f'missing composed-evidence invariant: {missing}')
+
+          forbidden = [
+              'SystemTime', 'Instant', 'CurrentXeniaTransportFence',
+              'CurrentAdmissionDeviceRealityFence', 'CurrentPostSemanticInterlockFence',
+              'TransportTrustRegistry', 'DeviceRealityTrustRegistry', 'InterlockTrustRegistry',
+              'FinalActuatorPermit', 'TrustBoundFinalActuatorPermit', 'CompleteJitHalLease',
+              'JustInTimeHalLease', 'TcpListener', 'TcpStream', 'tokio::spawn',
+              'std::process::Command', 'Command::new', 'unsafe {',
+          ]
+          found = [needle for needle in forbidden if needle in code]
+          if found:
+              raise SystemExit(f'composition acquired current/authority/I-O surface: {found}')
+
+          output = code.split('pub struct ComposedActuationEvidence', 1)[1]
+          header = output.split('impl ComposedActuationEvidence', 1)[0]
+          if 'Serialize' in header or 'Deserialize' in header or 'Clone' in header:
+              raise SystemExit('composed evidence must remain affine and non-portable')
+
+          manifest = tomllib.loads((root / 'Cargo.toml').read_text())
+          expected = {
+              'blake3', 'symthaea-authority',
+              'symthaea-iot-actuation-guard-interlock',
+              'symthaea-iot-actuation-guard-semantic-persistence',
+              'symthaea-iot-transport-current-revalidation', 'thiserror',
+          }
+          actual = set(manifest.get('dependencies', {}))
+          if actual != expected:
+              raise SystemExit(f'production dependency drift: {sorted(actual)}')
+
+      - name: Install Rust 1.96 formatter
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt composition crate
+        run: cargo +1.96.0 fmt --check -p symthaea-iot-composed-actuation-evidence
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Resolve candidate and check package
+        run: cargo +1.94.0 check -p symthaea-iot-composed-actuation-evidence --all-targets
+
+      - name: Reject unreviewed external dependency drift
+        shell: python
+        run: |
+          import tomllib
+
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source')): p
+                  for p in doc.get('package', [])
+                  if p.get('source') is not None
+              }
+
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          b = set(before)
+          a = set(after)
+          added = a - b
+          removed = b - a
+          changed = sorted(k for k in a & b if after[k] != before[k])
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          if not added.issubset(allowed) or removed or changed:
+              raise SystemExit(
+                  f'external dependency drift: added={sorted(added)}, '
+                  f'removed={sorted(removed)}, changed={changed}'
+              )
+
+      - name: Real independent-branch composition regression first
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-composed-actuation-evidence
+          --test full_chain fixture::independently_verified_transport_and_durable_chain_compose_without_authority -- --exact
+
+      - name: Different valid transport lineage must not compose
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-composed-actuation-evidence
+          --test full_chain fixture::independently_valid_but_different_transport_lineage_cannot_compose -- --exact
+
+      - name: Package tests
+        run: cargo +1.94.0 test -p symthaea-iot-composed-actuation-evidence --all-targets
+
+      - name: Strict package-local Clippy
+        run: >-
+          cargo +1.94.0 clippy -p symthaea-iot-composed-actuation-evidence
+          --all-targets --no-deps -- -D warnings
+
+      - name: Show local-only Cargo.lock bookkeeping
+        if: always()
+        run: git diff -- Cargo.lock || true
