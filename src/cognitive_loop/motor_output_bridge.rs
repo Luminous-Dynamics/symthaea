@@ -44,8 +44,17 @@ pub enum ActionType {
 }
 
 impl ActionType {
-    /// Decode from a floating-point parameter index.
+    /// Decode from an exact floating-point integer action ID.
+    ///
+    /// Motor parameters are untrusted numeric input at an effect boundary. Reject
+    /// non-finite, fractional, negative, and out-of-range values before the `u8`
+    /// conversion so Rust's float-cast truncation/saturation semantics cannot turn
+    /// malformed state into a valid action identity.
     pub fn from_param(val: f64) -> Option<Self> {
+        if !val.is_finite() || val.fract() != 0.0 || !(0.0..=7.0).contains(&val) {
+            return None;
+        }
+
         match val as u8 {
             0 => Some(Self::Read),
             1 => Some(Self::Write),
@@ -570,6 +579,26 @@ mod tests {
             assert_eq!(at as u8, i);
         }
         assert!(ActionType::from_param(99.0).is_none());
+    }
+
+    #[test]
+    fn test_action_type_rejects_ambiguous_numeric_selectors() {
+        for value in [
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            -1.0,
+            -0.1,
+            0.5,
+            1.9,
+            7.1,
+            8.0,
+        ] {
+            assert!(
+                ActionType::from_param(value).is_none(),
+                "selector {value:?} must not coerce into an action"
+            );
+        }
     }
 
     #[test]
