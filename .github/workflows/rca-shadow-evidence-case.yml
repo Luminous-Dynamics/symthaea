@@ -1,0 +1,183 @@
+name: RCA Shadow Evidence Case
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-shadow-case/**'
+      - 'crates/bridges/symthaea-rca-evidence-bridge/**'
+      - 'crates/bridges/symthaea-rca-shadow-epistemics/**'
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - '.github/workflows/rca-shadow-evidence-case.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze case-assembly authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=crates/bridges/symthaea-rca-shadow-case/Cargo.toml
+          src=crates/bridges/symthaea-rca-shadow-case/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'symthaea-epistemic-governance' "$manifest"
+          grep -q 'symthaea-rca-evidence-bridge' "$manifest"
+          grep -q 'symthaea-rca-shadow-epistemics' "$manifest"
+          if grep -Eq '^symthaea[[:space:]]*=|symthaea-rca-observer-bridge|symthaea-types' "$manifest"; then
+            echo 'Shadow evidence case acquired a forbidden live/canonical dependency.' >&2
+            exit 1
+          fi
+
+          grep -q 'SHADOW_EVIDENCE_CASE_CONTRACT_V1' "$production"
+          grep -q 'one_case_one_relevance_context_commitment' "$production"
+          grep -q 'case_scope=exact_proposition_digest+exact_relevance_context_commitment' "$production"
+          grep -q 'relation_semantics=caller_declared_not_truth_verified' "$production"
+          grep -q 'declared_relation_topology_is_diagnostic_not_truth_disposition' "$production"
+
+          # RCA-003a receives one validated context and recomputes relevance.
+          grep -q 'relevance_context: &ValidatedCurrentRuntimeRelevanceContextV1' "$production"
+          grep -q 'assess_current_runtime_relevance(candidate, relevance_context)' "$production"
+          if grep -Eq 'relevances:[[:space:]]*&\[RuntimeRelevanceAssessmentV1\]|RuntimeRelevanceAssessmentV1' "$production"; then
+            echo 'Shadow case must not accept spliceable precomputed relevance reports.' >&2
+            exit 1
+          fi
+
+          # No live cognition, canonical evidence admission, workspace/action, or
+          # recursive-improvement authority may enter case assembly.
+          if grep -Eq '^[[:space:]]*(pub[[:space:]]+)?use[[:space:]].*(CognitiveLoopService|RcaObservableCognitiveLoopV1|CognitiveEvidenceRefV1|AdmittedCognitiveEvidenceV1|CognitiveEvidenceUseV1|GlobalWorkspace|MetaRouter)|\.authorize[[:space:]]*\(|service_mut|into_inner|into_parts|action_author|external_effect|recursive_improvement' "$production"; then
+            echo 'Shadow evidence case crossed a cognition/authority boundary.' >&2
+            exit 1
+          fi
+
+          # No ambient state or side effects participate in the case theorem.
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|std::(fs|net|process)::|tokio::|Mutex|RwLock|mpsc|channel\(|SystemTime|Instant::now|thread::' "$production"; then
+            echo 'Shadow evidence case acquired incidental identity or side effects.' >&2
+            exit 1
+          fi
+
+      - name: Freeze reconstructed lineage and independence
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-case/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'reconstruct_candidate_lineage(candidates)' "$production"
+          grep -q 'candidate.lineage_fragment()' "$production"
+          grep -q 'EvidenceLineageGraphV1' "$production"
+          grep -q 'assess_independence(left.candidate_id(), right.candidate_id())' "$production"
+          grep -q 'roots.len() != 1' "$production"
+          grep -q 'candidate.observation_root_id()' "$production"
+
+          # Caller-supplied lineage graphs would defeat the theorem.
+          if grep -Eq 'lineage(_graph)?:[[:space:]]*&|lineage(_graph)?:[[:space:]]*ValidatedEvidenceLineageGraphV1' "$production"; then
+            echo 'Shadow evidence case accepts caller-supplied lineage.' >&2
+            exit 1
+          fi
+
+          grep -q 'same_observation_candidates_preserve_same_root_not_independence' "$src"
+          grep -q 'distinct_observation_events_can_be_independent' "$src"
+
+      - name: Freeze declared-relation semantics without aggregation
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-case/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'declared_relation' "$production"
+          grep -q 'declared_relation_strength_ppm' "$production"
+          grep -q 'ShadowDeclaredRelationTopologyV1' "$production"
+          grep -q 'relation_strength_is_preserved_not_summed_or_converted_to_probability' "$production"
+          grep -q 'EvidenceRelationTargetV1::Proposition' "$production"
+          grep -q 'RelationTargetMismatch' "$production"
+
+          # RCA-003a must not turn declared relation strength into a score.
+          if grep -Eq '\.sum[[:space:]]*\(|\.fold[[:space:]]*\(|relation_strength_ppm[[:space:]]*[+*/-]|declared_relation_strength_ppm[[:space:]]*[+*/-]' "$production"; then
+            echo 'Shadow evidence case started aggregating declared relation strength.' >&2
+            exit 1
+          fi
+
+          # Do not expose a truth/belief disposition API from this tranche.
+          if grep -Eqi 'pub[[:space:]]+(const[[:space:]]+)?fn[[:space:]]+(is_supported|is_true|is_false|confidence|posterior|probability|belief|admit|admission)' "$production"; then
+            echo 'RCA-003a acquired a truth/belief disposition API.' >&2
+            exit 1
+          fi
+
+          grep -q 'support_and_contradiction_remain_declared_mixed_topology_not_truth_result' "$src"
+          grep -q 'declared_defeater_is_preserved_without_becoming_belief_or_admission' "$src"
+          grep -q 'declared_relation_strength_is_preserved_without_aggregation' "$src"
+
+      - name: Freeze issued non-rehydratable case report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          src = Path('crates/bridges/symthaea-rca-shadow-case/src/lib.rs').read_text()
+          tests = src.find('#[cfg(test)]')
+          prod = src if tests < 0 else src[:tests]
+
+          marker = 'pub struct ShadowEvidenceCaseV1 {'
+          start = prod.index(marker)
+          derive_start = prod.rfind('#[derive(', 0, start)
+          impl_start = prod.index('impl ShadowEvidenceCaseV1', start)
+          block = prod[derive_start:impl_start]
+          if 'Deserialize' in block:
+              raise SystemExit('Shadow evidence case became deserializable.')
+
+          struct_body = prod[start + len(marker):prod.index('\n}', start)]
+          public_fields = [line for line in struct_body.splitlines() if line.strip().startswith('pub ')]
+          if public_fields:
+              raise SystemExit(f'Shadow evidence case exposed forgeable public fields: {public_fields}')
+
+          if 'case_result=is_issued_private_non_deserializable_shadow_report' not in prod:
+              raise SystemExit('Issued-case contract is not frozen.')
+          if 'assemble_shadow_evidence_case_v1' not in prod:
+              raise SystemExit('Missing shadow case issuance function.')
+          PY
+
+      - name: Freeze one-context proposition scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-case/src/lib.rs
+          grep -q 'relevance_is_recomputed_from_one_context_for_all_candidates' "$src"
+          grep -q 'case_scope_binds_proposition_and_relevance_context' "$src"
+          grep -q 'relation_target_must_match_exact_case_proposition' "$src"
+          grep -q 'relation_must_join_exact_candidate_once' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-rca-shadow-case -e normal)"
+          printf '%s\n' "$tree" | grep -q 'symthaea-rca-evidence-bridge'
+          printf '%s\n' "$tree" | grep -q 'symthaea-rca-shadow-epistemics'
+          printf '%s\n' "$tree" | grep -q 'symthaea-epistemic-governance'
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-observer-bridge'; then
+            echo 'Shadow case must consume detached epistemic artifacts, not live cognition.' >&2
+            exit 1
+          fi
+
+      - name: Format RCA shadow case
+        run: cargo fmt -p symthaea-rca-shadow-case -- --check
+
+      - name: Test RCA shadow case
+        run: cargo test -p symthaea-rca-shadow-case
+
+      - name: Clippy RCA shadow case
+        run: cargo clippy -p symthaea-rca-shadow-case --all-targets -- -D warnings
