@@ -1,0 +1,72 @@
+{
+  "atlas": "HCP-MMP1.0/Glasser360",
+  "independence_contract": {
+    "execution_independence_requires_external_proof": true,
+    "external_provenance_review_required": true,
+    "independence_established_by_this_manifest": false,
+    "same_atlas_root_required": true,
+    "semantic_normalizer_independent": false,
+    "transform_implementation_family_independent": false,
+    "transform_method_distinct_from_mills": true
+  },
+  "lineage_id": "hcpmmp1-neuromaps-adap-bary-area-fslr32k-to-fsaverage10k-v1",
+  "method_provenance": {
+    "area_correction": "average_vertex_area_metrics",
+    "atlas_fetcher_blob_sha": "82259057dbeb847795b2b461699300e0c51f3b55",
+    "citation_doi": "10.1038/s41592-022-01625-w",
+    "commit": "ffcc2e0f657943ce00a1b6a968396f32250e495c",
+    "implementation_family": "Connectome Workbench",
+    "label_resample_method": "ADAP_BARY_AREA",
+    "license": "CC-BY-NC-SA-4.0",
+    "registry_blob_sha": "f56eebc42375c11b18d4a2fca6c9ea151e1b50af",
+    "repository": "netneurolab/neuromaps",
+    "source_roi_required": true,
+    "target_mask_profile": "symthaea-positive-label-mask-v1",
+    "transforms_blob_sha": "cddd03f2f2f6da94119732d57b4e4d0f1f1563bd"
+  },
+  "required_inputs": {
+    "fsaverage10k_left_medialwall_roi": "tpl-fsaverage_den-10k_hemi-L_desc-nomedialwall_dparc.label.gii",
+    "fsaverage10k_left_sphere": "tpl-fsaverage_den-10k_hemi-L_sphere.surf.gii",
+    "fsaverage10k_left_vaavg": "tpl-fsaverage_den-10k_hemi-L_desc-vaavg_midthickness.shape.gii",
+    "fsaverage10k_right_medialwall_roi": "tpl-fsaverage_den-10k_hemi-R_desc-nomedialwall_dparc.label.gii",
+    "fsaverage10k_right_sphere": "tpl-fsaverage_den-10k_hemi-R_sphere.surf.gii",
+    "fsaverage10k_right_vaavg": "tpl-fsaverage_den-10k_hemi-R_desc-vaavg_midthickness.shape.gii",
+    "fslr32k_left_medialwall_roi": "tpl-fsLR_den-32k_hemi-L_desc-nomedialwall_dparc.label.gii",
+    "fslr32k_left_sphere_to_fsaverage": "tpl-fsLR_space-fsaverage_den-32k_hemi-L_sphere.surf.gii",
+    "fslr32k_left_vaavg": "tpl-fsLR_den-32k_hemi-L_desc-vaavg_midthickness.shape.gii",
+    "fslr32k_right_medialwall_roi": "tpl-fsLR_den-32k_hemi-R_desc-nomedialwall_dparc.label.gii",
+    "fslr32k_right_sphere_to_fsaverage": "tpl-fsLR_space-fsaverage_den-32k_hemi-R_sphere.surf.gii",
+    "fslr32k_right_vaavg": "tpl-fsLR_den-32k_hemi-R_desc-vaavg_midthickness.shape.gii",
+    "hcp_left_dlabel": "authorized BALSA file npz0: Q1-Q6_RelatedParcellation210.L.CorticalAreas_dil_Colors.32k_fs_LR.dlabel.nii",
+    "hcp_right_dlabel": "authorized BALSA file pkN9: Q1-Q6_RelatedParcellation210.R.CorticalAreas_dil_Colors.32k_fs_LR.dlabel.nii"
+  },
+  "schema": "symthaea-hcpmmp1-neuromaps-method-v1",
+  "source_atlas": {
+    "automatic_acquisition_permitted": false,
+    "hemisphere_pair_required": true,
+    "left_file_id": "npz0",
+    "left_filename": "Q1-Q6_RelatedParcellation210.L.CorticalAreas_dil_Colors.32k_fs_LR.dlabel.nii",
+    "provider": "BALSA/Human Connectome Project",
+    "right_file_id": "pkN9",
+    "right_filename": "Q1-Q6_RelatedParcellation210.R.CorticalAreas_dil_Colors.32k_fs_LR.dlabel.nii",
+    "scene_id": "WN56",
+    "source_bytes_status": "operator_pinned_required",
+    "study_id": "RVVG"
+  },
+  "source_space": "fsLR32k",
+  "target_space": "fsaverage5",
+  "target_vertices_per_hemisphere": 10242,
+  "template_bundles": {
+    "fsLR32k": {
+      "md5": "7932b4418f63d28935b5adf67150b16f",
+      "osf_file_id": "60b684b53a6df1021bd4df2d",
+      "osf_project_id": "4mw3a"
+    },
+    "fsaverage10k": {
+      "md5": "c61384c271ee2e6b5449222281137414",
+      "osf_file_id": "60b684ab9096b7021b63cf6b",
+      "osf_project_id": "4mw3a"
+    }
+  },
+  "terms_reference": "https://balsa.wustl.edu/WN56"
+}
