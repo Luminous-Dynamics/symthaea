@@ -13,3 +13,9 @@ The crate must not grant `ActionAuthority` or `SelfImprovementPromotion`.
 ## RCA-001.1 invariant
 
 Multiple evidence objects do not imply multiple independent observations. Independence is computed only from a closed, acyclic ancestry graph. Missing ancestry fails closed instead of being interpreted as independent corroboration.
+
+## RCA-001.2 invariant
+
+Historically valid evidence is not automatically current evidence. Producers never declare a `current` boolean; currentness is assessed at the point of use against explicit time and source/model/environment generations. Dynamic evidence with no expiry or generation boundary is invalid.
+
+Typed evidence relations preserve support, contradiction, weakening, defeaters, supersession, corroboration, and irrelevance without collapsing them into a single support score. A `Corroborates` relation does not establish independence; lineage remains authoritative for that question.
