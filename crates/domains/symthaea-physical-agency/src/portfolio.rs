@@ -4,14 +4,25 @@
 //!
 //! This module ranks *unqualified* proposals for further reasoning. It never
 //! executes a simulator, selects an actuator command, or grants authority.
+//!
+//! PA-06 hardening keeps the evidence used by deliberation structurally bound
+//! to each candidate: model disagreement is derived from the supplied model
+//! predictions rather than accepted as a caller-supplied scalar, and every
+//! portfolio carries the full [`DesiredTransition`] contract rather than only
+//! its string id.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use symthaea_physical_effects::{
-    AbstentionReason, EffectValidationError, ProposedIntervention,
+    AbstentionReason, DesiredTransition, EffectValidationError, ProposedIntervention,
 };
 use thiserror::Error;
 
-/// One independent model's prediction for the same candidate intervention.
+/// One model's prediction for the same candidate intervention.
+///
+/// Distinct `model_id` values are required within an ensemble. That proves
+/// identity separation only; it does not by itself prove statistical or
+/// implementation independence between models.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelPrediction {
     pub model_id: String,
@@ -30,13 +41,15 @@ impl ModelPrediction {
     }
 }
 
-/// Preserves model disagreement instead of averaging it away.
+/// Derived ensemble statistics. Callers cannot provide a separate disagreement
+/// scalar to a candidate; the planner recomputes this summary from predictions.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ModelEnsembleSummary {
+    pub model_count: usize,
     pub min_success_probability: f64,
     pub max_success_probability: f64,
     pub mean_success_probability: f64,
-    /// Range of the independent success predictions, in [0, 1].
+    /// Range of the distinct model success predictions, in [0, 1].
     pub disagreement: f64,
 }
 
@@ -45,8 +58,15 @@ impl ModelEnsembleSummary {
         if predictions.is_empty() {
             return Err(PortfolioError::EmptyModelEnsemble);
         }
+
+        let mut ids = BTreeSet::new();
         for prediction in predictions {
             prediction.validate()?;
+            if !ids.insert(prediction.model_id.as_str()) {
+                return Err(PortfolioError::DuplicateModelId(
+                    prediction.model_id.clone(),
+                ));
+            }
         }
 
         let mut min = 1.0_f64;
@@ -59,6 +79,7 @@ impl ModelEnsembleSummary {
         }
 
         Ok(Self {
+            model_count: predictions.len(),
             min_success_probability: min,
             max_success_probability: max,
             mean_success_probability: sum / predictions.len() as f64,
@@ -69,29 +90,70 @@ impl ModelEnsembleSummary {
 
 /// Multi-objective assessment of an unqualified proposal.
 ///
-/// Benefits are success probability, information gain, reversibility, and
-/// safety margin. Costs are uncertainty, energy, duration, and model
-/// disagreement. All fields are explicit so Pareto filtering does not hide a
-/// weighting scheme inside one scalar reward.
+/// Benefits are conservative ensemble success, information gain,
+/// reversibility, and safety margin. Costs are effective epistemic uncertainty,
+/// aleatoric uncertainty, energy, power, duration, and model disagreement.
+/// All fields remain explicit so Pareto filtering does not hide a weighting
+/// scheme inside one scalar reward.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CandidateAssessment {
     pub proposal: ProposedIntervention,
+    /// Predictions used to derive disagreement and conservative success.
+    pub model_predictions: Vec<ModelPrediction>,
     pub expected_energy_j: f64,
+    /// Predicted power when available. If the transition specifies a power
+    /// budget this field becomes mandatory and fails closed when absent.
+    pub expected_power_w: Option<f64>,
     pub expected_duration_ms: u64,
     pub information_gain: f64,
     pub reversibility_score: f64,
+    /// Planning estimate only; never formal safety evidence.
     pub safety_margin: f64,
-    pub model_disagreement: f64,
 }
 
 impl CandidateAssessment {
+    pub fn model_summary(&self) -> Result<ModelEnsembleSummary, PortfolioError> {
+        ModelEnsembleSummary::from_predictions(&self.model_predictions)
+    }
+
+    /// Conservative success used for admission/dominance: the least optimistic
+    /// prediction in the declared model ensemble.
+    pub fn conservative_success_probability(&self) -> Result<f64, PortfolioError> {
+        Ok(self.model_summary()?.min_success_probability)
+    }
+
+    pub fn model_disagreement(&self) -> Result<f64, PortfolioError> {
+        Ok(self.model_summary()?.disagreement)
+    }
+
+    /// Model disagreement is treated as a lower bound on epistemic uncertainty
+    /// instead of allowing a proposal-local uncertainty estimate to hide a
+    /// conflict between models.
+    pub fn effective_epistemic_uncertainty(&self) -> Result<f64, PortfolioError> {
+        Ok(self
+            .proposal
+            .predicted_outcome
+            .epistemic_uncertainty
+            .max(self.model_summary()?.disagreement))
+    }
+
     pub fn validate(&self) -> Result<(), PortfolioError> {
         self.proposal.validate().map_err(PortfolioError::Effect)?;
+        self.model_summary()?;
+
         if !self.expected_energy_j.is_finite() || self.expected_energy_j < 0.0 {
             return Err(PortfolioError::InvalidMetric {
                 field: "candidate.expected_energy_j",
                 value: self.expected_energy_j,
             });
+        }
+        if let Some(power) = self.expected_power_w {
+            if !power.is_finite() || power < 0.0 {
+                return Err(PortfolioError::InvalidMetric {
+                    field: "candidate.expected_power_w",
+                    value: power,
+                });
+            }
         }
         if self.expected_duration_ms == 0 {
             return Err(PortfolioError::ZeroDuration);
@@ -99,7 +161,6 @@ impl CandidateAssessment {
         validate_unit_interval("candidate.information_gain", self.information_gain)?;
         validate_unit_interval("candidate.reversibility_score", self.reversibility_score)?;
         validate_unit_interval("candidate.safety_margin", self.safety_margin)?;
-        validate_unit_interval("candidate.model_disagreement", self.model_disagreement)?;
         Ok(())
     }
 
@@ -107,31 +168,56 @@ impl CandidateAssessment {
     ///
     /// No hidden weights are used. `self` dominates `other` only when it is no
     /// worse on every objective and strictly better on at least one.
-    pub fn dominates(&self, other: &Self) -> bool {
+    pub fn dominates(&self, other: &Self) -> Result<bool, PortfolioError> {
+        self.validate()?;
+        other.validate()?;
+
         let a = &self.proposal.predicted_outcome;
         let b = &other.proposal.predicted_outcome;
+        let a_success = self.conservative_success_probability()?;
+        let b_success = other.conservative_success_probability()?;
+        let a_epistemic = self.effective_epistemic_uncertainty()?;
+        let b_epistemic = other.effective_epistemic_uncertainty()?;
+        let a_disagreement = self.model_disagreement()?;
+        let b_disagreement = other.model_disagreement()?;
 
-        let no_worse = a.success_probability >= b.success_probability
-            && a.epistemic_uncertainty <= b.epistemic_uncertainty
+        // Missing power cannot dominate a known power value. When both are
+        // absent the objective is equal/unknown and contributes no advantage.
+        let power_no_worse = match (self.expected_power_w, other.expected_power_w) {
+            (Some(a), Some(b)) => a <= b,
+            (Some(_), None) => true,
+            (None, Some(_)) => false,
+            (None, None) => true,
+        };
+        let power_strictly_better = match (self.expected_power_w, other.expected_power_w) {
+            (Some(a), Some(b)) => a < b,
+            (Some(_), None) => false,
+            (None, Some(_)) | (None, None) => false,
+        };
+
+        let no_worse = a_success >= b_success
+            && a_epistemic <= b_epistemic
             && a.aleatoric_uncertainty <= b.aleatoric_uncertainty
             && self.expected_energy_j <= other.expected_energy_j
+            && power_no_worse
             && self.expected_duration_ms <= other.expected_duration_ms
             && self.information_gain >= other.information_gain
             && self.reversibility_score >= other.reversibility_score
             && self.safety_margin >= other.safety_margin
-            && self.model_disagreement <= other.model_disagreement;
+            && a_disagreement <= b_disagreement;
 
-        let strictly_better = a.success_probability > b.success_probability
-            || a.epistemic_uncertainty < b.epistemic_uncertainty
+        let strictly_better = a_success > b_success
+            || a_epistemic < b_epistemic
             || a.aleatoric_uncertainty < b.aleatoric_uncertainty
             || self.expected_energy_j < other.expected_energy_j
+            || power_strictly_better
             || self.expected_duration_ms < other.expected_duration_ms
             || self.information_gain > other.information_gain
             || self.reversibility_score > other.reversibility_score
             || self.safety_margin > other.safety_margin
-            || self.model_disagreement < other.model_disagreement;
+            || a_disagreement < b_disagreement;
 
-        no_worse && strictly_better
+        Ok(no_worse && strictly_better)
     }
 }
 
@@ -179,35 +265,93 @@ impl PortfolioPolicy {
         Ok(())
     }
 
-    fn admits(&self, candidate: &CandidateAssessment) -> bool {
+    fn admits(&self, candidate: &CandidateAssessment) -> Result<bool, PortfolioError> {
         let outcome = &candidate.proposal.predicted_outcome;
-        outcome.success_probability >= self.min_success_probability
-            && outcome.epistemic_uncertainty <= self.max_epistemic_uncertainty
+        Ok(candidate.conservative_success_probability()? >= self.min_success_probability
+            && candidate.effective_epistemic_uncertainty()? <= self.max_epistemic_uncertainty
             && outcome.aleatoric_uncertainty <= self.max_aleatoric_uncertainty
-            && candidate.model_disagreement <= self.max_model_disagreement
-            && candidate.safety_margin >= self.min_safety_margin
+            && candidate.model_disagreement()? <= self.max_model_disagreement
+            && candidate.safety_margin >= self.min_safety_margin)
     }
 }
 
-/// A collection of mechanism candidates for one desired transition.
+/// A collection of mechanism candidates for one complete desired transition.
+///
+/// Carrying the full transition prevents a candidate from entering deliberation
+/// merely because it copied the right transition id while violating modality,
+/// authority, or resource constraints.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CandidatePortfolio {
-    pub transition_id: String,
+    pub transition: DesiredTransition,
     pub candidates: Vec<CandidateAssessment>,
 }
 
 impl CandidatePortfolio {
     pub fn validate(&self) -> Result<(), PortfolioError> {
-        if self.transition_id.trim().is_empty() {
-            return Err(PortfolioError::EmptyField("portfolio.transition_id"));
-        }
+        self.transition
+            .validate()
+            .map_err(PortfolioError::Effect)?;
+
         for candidate in &self.candidates {
             candidate.validate()?;
-            if candidate.proposal.transition_id != self.transition_id {
+            if candidate.proposal.transition_id != self.transition.id {
                 return Err(PortfolioError::TransitionMismatch {
-                    portfolio: self.transition_id.clone(),
+                    portfolio: self.transition.id.clone(),
                     proposal: candidate.proposal.transition_id.clone(),
                 });
+            }
+            if !self
+                .transition
+                .allowed_modalities
+                .contains(&candidate.proposal.mechanism.modality)
+            {
+                return Err(PortfolioError::ModalityNotAllowed {
+                    proposal: candidate.proposal.id.clone(),
+                });
+            }
+            if !self
+                .transition
+                .required_authority
+                .allows(candidate.proposal.required_authority)
+            {
+                return Err(PortfolioError::AuthorityExceedsTransition {
+                    proposal: candidate.proposal.id.clone(),
+                });
+            }
+
+            if let Some(max_energy) = self.transition.resources.max_energy_j {
+                if candidate.expected_energy_j > max_energy {
+                    return Err(PortfolioError::EnergyBudgetExceeded {
+                        proposal: candidate.proposal.id.clone(),
+                        expected: candidate.expected_energy_j,
+                        maximum: max_energy,
+                    });
+                }
+            }
+
+            if let Some(max_power) = self.transition.resources.max_power_w {
+                let expected = candidate.expected_power_w.ok_or_else(|| {
+                    PortfolioError::MissingPowerEstimate {
+                        proposal: candidate.proposal.id.clone(),
+                    }
+                })?;
+                if expected > max_power {
+                    return Err(PortfolioError::PowerBudgetExceeded {
+                        proposal: candidate.proposal.id.clone(),
+                        expected,
+                        maximum: max_power,
+                    });
+                }
+            }
+
+            if let Some(max_duration) = self.transition.resources.max_duration_ms {
+                if candidate.expected_duration_ms > max_duration {
+                    return Err(PortfolioError::DurationBudgetExceeded {
+                        proposal: candidate.proposal.id.clone(),
+                        expected: candidate.expected_duration_ms,
+                        maximum: max_duration,
+                    });
+                }
             }
         }
         Ok(())
@@ -220,12 +364,12 @@ impl CandidatePortfolio {
         self.validate()?;
         policy.validate()?;
 
-        let eligible = self
-            .candidates
-            .iter()
-            .filter(|candidate| policy.admits(candidate))
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut eligible = Vec::new();
+        for candidate in &self.candidates {
+            if policy.admits(candidate)? {
+                eligible.push(candidate.clone());
+            }
+        }
 
         if eligible.is_empty() {
             return Ok(PortfolioOutcome::Abstain(
@@ -233,17 +377,19 @@ impl CandidatePortfolio {
             ));
         }
 
-        let frontier = eligible
-            .iter()
-            .enumerate()
-            .filter(|(index, candidate)| {
-                !eligible
-                    .iter()
-                    .enumerate()
-                    .any(|(other_index, other)| other_index != *index && other.dominates(candidate))
-            })
-            .map(|(_, candidate)| candidate.clone())
-            .collect::<Vec<_>>();
+        let mut frontier = Vec::new();
+        for (index, candidate) in eligible.iter().enumerate() {
+            let mut dominated = false;
+            for (other_index, other) in eligible.iter().enumerate() {
+                if other_index != index && other.dominates(candidate)? {
+                    dominated = true;
+                    break;
+                }
+            }
+            if !dominated {
+                frontier.push(candidate.clone());
+            }
+        }
 
         if frontier.is_empty() {
             // This should be unreachable for a finite non-empty set under
@@ -270,13 +416,39 @@ pub enum PortfolioError {
     EmptyField(&'static str),
     #[error("model ensemble cannot be empty")]
     EmptyModelEnsemble,
+    #[error("duplicate model id in ensemble: {0:?}")]
+    DuplicateModelId(String),
     #[error("invalid metric for {field}: {value}")]
     InvalidMetric { field: &'static str, value: f64 },
     #[error("candidate expected duration must be greater than zero")]
     ZeroDuration,
     #[error("proposal transition {proposal:?} does not match portfolio {portfolio:?}")]
     TransitionMismatch { portfolio: String, proposal: String },
-    #[error("invalid physical-effect proposal: {0}")]
+    #[error("proposal {proposal:?} uses a modality not allowed by the transition")]
+    ModalityNotAllowed { proposal: String },
+    #[error("proposal {proposal:?} requires authority above the transition envelope")]
+    AuthorityExceedsTransition { proposal: String },
+    #[error("proposal {proposal:?} energy estimate {expected} J exceeds budget {maximum} J")]
+    EnergyBudgetExceeded {
+        proposal: String,
+        expected: f64,
+        maximum: f64,
+    },
+    #[error("proposal {proposal:?} lacks a power estimate required by the transition budget")]
+    MissingPowerEstimate { proposal: String },
+    #[error("proposal {proposal:?} power estimate {expected} W exceeds budget {maximum} W")]
+    PowerBudgetExceeded {
+        proposal: String,
+        expected: f64,
+        maximum: f64,
+    },
+    #[error("proposal {proposal:?} duration {expected} ms exceeds budget {maximum} ms")]
+    DurationBudgetExceeded {
+        proposal: String,
+        expected: u64,
+        maximum: u64,
+    },
+    #[error("invalid physical-effect value: {0}")]
     Effect(EffectValidationError),
 }
 
@@ -291,8 +463,37 @@ fn validate_unit_interval(field: &'static str, value: f64) -> Result<(), Portfol
 mod tests {
     use super::*;
     use symthaea_physical_effects::{
-        AuthorityClass, MechanismRef, PhysicalModality, PredictedOutcome,
+        AuthorityClass, EffectKind, MechanismRef, PhysicalModality, PredictedOutcome, TargetRegion,
     };
+
+    fn transition() -> DesiredTransition {
+        DesiredTransition::simulation_only(
+            "t-1",
+            "compare diagnostic mechanisms",
+            TargetRegion::new("world", "fixture"),
+            EffectKind::Characterize,
+            vec![
+                PhysicalModality::Acoustic,
+                PhysicalModality::Photonic,
+                PhysicalModality::Coupled,
+                PhysicalModality::Thermal,
+                PhysicalModality::Mechanical,
+            ],
+        )
+    }
+
+    fn predictions(id: &str, success: f64, disagreement: f64) -> Vec<ModelPrediction> {
+        vec![
+            ModelPrediction {
+                model_id: format!("{id}-model-a"),
+                success_probability: success,
+            },
+            ModelPrediction {
+                model_id: format!("{id}-model-b"),
+                success_probability: (success - disagreement).max(0.0),
+            },
+        ]
+    }
 
     fn candidate(
         id: &str,
@@ -319,17 +520,18 @@ mod tests {
                     aleatoric_uncertainty: 0.05,
                 },
             },
+            model_predictions: predictions(id, success, disagreement),
             expected_energy_j: energy,
+            expected_power_w: None,
             expected_duration_ms: 100,
             information_gain: info,
             reversibility_score: 1.0,
             safety_margin: safety,
-            model_disagreement: disagreement,
         }
     }
 
     #[test]
-    fn model_disagreement_is_preserved_as_range() {
+    fn model_disagreement_is_derived_as_range() {
         let summary = ModelEnsembleSummary::from_predictions(&[
             ModelPrediction {
                 model_id: "analytical".into(),
@@ -346,9 +548,41 @@ mod tests {
         ])
         .unwrap();
 
+        assert_eq!(summary.model_count, 3);
         assert!((summary.disagreement - 0.3).abs() < 1e-12);
         assert!((summary.min_success_probability - 0.6).abs() < 1e-12);
         assert!((summary.max_success_probability - 0.9).abs() < 1e-12);
+    }
+
+    #[test]
+    fn duplicate_model_identity_is_rejected() {
+        assert!(matches!(
+            ModelEnsembleSummary::from_predictions(&[
+                ModelPrediction {
+                    model_id: "same".into(),
+                    success_probability: 0.9,
+                },
+                ModelPrediction {
+                    model_id: "same".into(),
+                    success_probability: 0.8,
+                },
+            ]),
+            Err(PortfolioError::DuplicateModelId(_))
+        ));
+    }
+
+    #[test]
+    fn model_disagreement_sets_epistemic_floor() {
+        let candidate = candidate(
+            "disputed",
+            PhysicalModality::Acoustic,
+            0.9,
+            1.0,
+            0.5,
+            0.9,
+            0.4,
+        );
+        assert!((candidate.effective_epistemic_uncertainty().unwrap() - 0.4).abs() < 1e-12);
     }
 
     #[test]
@@ -371,10 +605,10 @@ mod tests {
             0.8,
             0.1,
         );
-        assert!(strong.dominates(&weak));
+        assert!(strong.dominates(&weak).unwrap());
 
         let portfolio = CandidatePortfolio {
-            transition_id: "t-1".into(),
+            transition: transition(),
             candidates: vec![strong.clone(), weak],
         };
         let outcome = portfolio.evaluate(PortfolioPolicy::default()).unwrap();
@@ -402,11 +636,11 @@ mod tests {
             0.05,
         );
 
-        assert!(!efficient.dominates(&informative));
-        assert!(!informative.dominates(&efficient));
+        assert!(!efficient.dominates(&informative).unwrap());
+        assert!(!informative.dominates(&efficient).unwrap());
 
         let portfolio = CandidatePortfolio {
-            transition_id: "t-1".into(),
+            transition: transition(),
             candidates: vec![efficient, informative],
         };
         match portfolio.evaluate(PortfolioPolicy::default()).unwrap() {
@@ -427,7 +661,7 @@ mod tests {
             0.7,
         );
         let portfolio = CandidatePortfolio {
-            transition_id: "t-1".into(),
+            transition: transition(),
             candidates: vec![uncertain],
         };
         let policy = PortfolioPolicy {
@@ -444,7 +678,7 @@ mod tests {
     #[test]
     fn empty_portfolio_abstains_instead_of_inventing_action() {
         let portfolio = CandidatePortfolio {
-            transition_id: "t-1".into(),
+            transition: transition(),
             candidates: vec![],
         };
         assert_eq!(
@@ -466,7 +700,7 @@ mod tests {
         );
         wrong.proposal.transition_id = "another-transition".into();
         let portfolio = CandidatePortfolio {
-            transition_id: "t-1".into(),
+            transition: transition(),
             candidates: vec![wrong],
         };
         assert!(matches!(
@@ -476,7 +710,85 @@ mod tests {
     }
 
     #[test]
-    fn non_finite_metrics_fail_closed() {
+    fn disallowed_modality_is_rejected_before_pareto() {
+        let only_acoustic = DesiredTransition::simulation_only(
+            "t-1",
+            "acoustic-only diagnostic",
+            TargetRegion::new("world", "fixture"),
+            EffectKind::Characterize,
+            vec![PhysicalModality::Acoustic],
+        );
+        let portfolio = CandidatePortfolio {
+            transition: only_acoustic,
+            candidates: vec![candidate(
+                "photonic",
+                PhysicalModality::Photonic,
+                0.9,
+                1.0,
+                0.5,
+                0.9,
+                0.05,
+            )],
+        };
+        assert!(matches!(
+            portfolio.evaluate(PortfolioPolicy::default()),
+            Err(PortfolioError::ModalityNotAllowed { .. })
+        ));
+    }
+
+    #[test]
+    fn transition_resource_envelope_is_enforced() {
+        let mut limited = transition();
+        limited.resources.max_energy_j = Some(5.0);
+        limited.resources.max_power_w = Some(10.0);
+        limited.resources.max_duration_ms = Some(50);
+
+        let mut over = candidate(
+            "over-budget",
+            PhysicalModality::Acoustic,
+            0.9,
+            6.0,
+            0.5,
+            0.9,
+            0.05,
+        );
+        over.expected_power_w = Some(8.0);
+        over.expected_duration_ms = 40;
+
+        let portfolio = CandidatePortfolio {
+            transition: limited,
+            candidates: vec![over],
+        };
+        assert!(matches!(
+            portfolio.evaluate(PortfolioPolicy::default()),
+            Err(PortfolioError::EnergyBudgetExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn power_budget_requires_power_estimate() {
+        let mut limited = transition();
+        limited.resources.max_power_w = Some(10.0);
+        let portfolio = CandidatePortfolio {
+            transition: limited,
+            candidates: vec![candidate(
+                "unknown-power",
+                PhysicalModality::Acoustic,
+                0.9,
+                1.0,
+                0.5,
+                0.9,
+                0.05,
+            )],
+        };
+        assert!(matches!(
+            portfolio.evaluate(PortfolioPolicy::default()),
+            Err(PortfolioError::MissingPowerEstimate { .. })
+        ));
+    }
+
+    #[test]
+    fn non_finite_model_prediction_fails_closed() {
         let mut bad = candidate(
             "bad",
             PhysicalModality::Mechanical,
@@ -486,7 +798,7 @@ mod tests {
             0.9,
             0.1,
         );
-        bad.model_disagreement = f64::NAN;
+        bad.model_predictions[0].success_probability = f64::NAN;
         assert!(bad.validate().is_err());
     }
 }
