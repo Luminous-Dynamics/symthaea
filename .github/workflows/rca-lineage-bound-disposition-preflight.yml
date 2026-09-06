@@ -1,0 +1,162 @@
+name: RCA Canonical-Lineage-Bound Disposition Preflight
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-lineage-bound-disposition-preflight/**'
+      - '.github/workflows/rca-lineage-bound-disposition-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze raw-preflight and exact-witness re-binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-lineage-bound-disposition-preflight/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'LINEAGE_BOUND_PREFLIGHT_CONTRACT_V1' "$production"
+          grep -q 'raw_preflight_case_scope_must_equal_exact_bound_case' "$production"
+          grep -q 'raw_preflight_witness_slot_ids_must_equal_supplied_witness_slot_ids' "$production"
+          grep -q 'validate_preflight_case_binding' "$production"
+          grep -q 'preflight.case_id() != bound_case.case_id()' "$production"
+          grep -q 'preflight.proposition_id() != structural.proposition_id()' "$production"
+          grep -q 'preflight.case_scope_digest() != structural.case_scope_digest()' "$production"
+          grep -q 'preflight.evidence_lineage_graph_id() != structural.lineage_graph_id()' "$production"
+          grep -q 'validate_exact_witness_slot' "$production"
+          grep -q 'preflight.support_evidence_witness_id()' "$production"
+          grep -q 'preflight.opposition_evidence_witness_id()' "$production"
+          grep -q 'preflight.defeater_evidence_witness_id()' "$production"
+
+      - name: Freeze canonical runtime lineage reconstruction
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-lineage-bound-disposition-preflight/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'canonical_case_lineage=v1_observation_roots+transformation_candidate_children' "$production"
+          grep -q 'CognitiveDerivationKindV1::RootObservation' "$production"
+          grep -q 'CognitiveDerivationKindV1::Transformation' "$production"
+          grep -q 'parent_ids: vec!\[fact.observation_root_id.clone()\]' "$production"
+          grep -q 'seen_roots.insert' "$production"
+          grep -q 'COGNITIVE_LINEAGE_SCHEMA_VERSION' "$production"
+          grep -q 'canonical_evidence_lineage_graph_id_v1(&graph)' "$production"
+          grep -q 'case_local_lineage_reference_is_not_canonical_generation_authority' "$production"
+
+      - name: Freeze evidence-witness generation equality
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-lineage-bound-disposition-preflight/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'every_supplied_evidence_witness_lineage_graph_id_must_equal_canonical_case_generation' "$production"
+          grep -q 'subset_superset_or_alternate_lineage_generation_fails_closed' "$production"
+          grep -q 'witness.lineage_graph_id() != canonical_case_generation' "$production"
+          grep -q 'EvidenceWitnessLineageGenerationMismatch' "$production"
+
+          # The historical/local case lineage reference may be used for exact
+          # raw-preflight binding and as the legacy wire label during reconstruction,
+          # but it must never be the right-hand authority in witness comparison.
+          if grep -Eq 'witness\.lineage_graph_id\(\)[[:space:]]*!=[[:space:]]*(structural\.)?lineage_graph_id' "$production"; then
+            echo 'Witness lineage was compared to a case-local reference instead of canonical generation.' >&2
+            exit 1
+          fi
+
+      - name: Freeze binding identity and persistence boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-lineage-bound-disposition-preflight/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub struct LineageBoundShadowDispositionPreflightV1' "$production"
+          grep -q 'BINDING_ID_DOMAIN' "$production"
+          grep -q 'b"profile_contract_digest"' "$production"
+          grep -q 'b"schema_version"' "$production"
+          grep -q 'b"preflight_id"' "$production"
+          grep -q 'b"canonical_evidence_lineage_graph_id"' "$production"
+
+          if grep -Eq 'impl[^\n]*Deserialize[^\n]*LineageBoundShadowDispositionPreflightV1|derive\([^)]*Deserialize[^)]*\)[[:space:]]*pub struct LineageBoundShadowDispositionPreflightV1' "$production"; then
+            echo 'Issued lineage-bound preflight became deserializable.' >&2
+            exit 1
+          fi
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Lineage-bound preflight identity acquired incidental serializer/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+
+      - name: Freeze no-disposition authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-lineage-bound-disposition-preflight/src/lib.rs
+          production=$(mktemp)
+          code=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+          grep -vE '^[[:space:]]*//|^[[:space:]]*/\*|^[[:space:]]*\*' "$production" > "$code"
+
+          grep -q 'binding_performs_no_threshold_comparison_or_disposition' "$production"
+          if grep -Eq 'min_pairwise_independent_(evidence_items|interpretation_roots)' "$code"; then
+            echo 'Lineage binding started comparing disposition thresholds.' >&2
+            exit 1
+          fi
+          if grep -Eq 'pub enum ShadowDisposition|pub struct ShadowDisposition|pub fn (evaluate|decide|dispose|compute_disposition|issue_disposition)' "$code"; then
+            echo 'Disposition engine API appeared in lineage-binding tranche.' >&2
+            exit 1
+          fi
+          if grep -Eqi 'majority.?vote|sum.*strength|mean.*strength|average.*strength|bayes|posterior|normalize.*strength|multiply.*strength' "$code"; then
+            echo 'Lineage binding acquired prohibited interpretation arithmetic.' >&2
+            exit 1
+          fi
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$code"; then
+            echo 'Lineage binding crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Freeze focused adversarial tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-lineage-bound-disposition-preflight/src/lib.rs
+          grep -q 'runtime_lineage_reconstruction_is_order_independent' "$src"
+          grep -q 'same_observation_root_is_deduplicated' "$src"
+          grep -q 'unrelated_candidate_changes_complete_generation' "$src"
+          grep -q 'local_legacy_graph_reference_does_not_define_generation' "$src"
+          grep -q 'witness_slot_binding_is_exact' "$src"
+          grep -q 'binding_profile_identity_is_stable' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-rca-lineage-bound-disposition-preflight -e normal)"
+          if printf '%s\n' "$tree" | grep -Eq '(^| )symthaea v|symthaea-core'; then
+            echo 'Lineage-bound preflight acquired live root cognition dependency.' >&2
+            exit 1
+          fi
+
+      - name: Format lineage-bound preflight crate
+        run: cargo fmt -p symthaea-rca-lineage-bound-disposition-preflight -- --check
+
+      - name: Test lineage-bound preflight crate
+        run: cargo test -p symthaea-rca-lineage-bound-disposition-preflight
+
+      - name: Clippy lineage-bound preflight crate
+        run: cargo clippy -p symthaea-rca-lineage-bound-disposition-preflight --all-targets -- -D warnings
