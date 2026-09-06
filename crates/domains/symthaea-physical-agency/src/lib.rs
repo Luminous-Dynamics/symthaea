@@ -3,18 +3,19 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Physical-agency composition primitives for Symthaea.
 //!
-//! PA-07 remains deliberately pre-execution. This crate can negotiate declared
-//! simulator capabilities, preserve multi-objective candidate frontiers, and
-//! qualify simulation-only evidence, but it cannot construct actuator commands,
-//! depend on HAL, or mint physical execution authority.
+//! PA-08 remains deliberately pre-execution. This crate can negotiate declared
+//! simulator capabilities, preserve multi-objective candidate frontiers, bind
+//! deliberation to immutable world snapshots, and qualify simulation-only
+//! evidence, but it cannot construct actuator commands, depend on HAL, or mint
+//! physical execution authority.
 //!
 //! Capability manifests are declarations used to choose a suitable modelling
 //! path. They are **not** safety evidence and cannot discharge execution gates.
 //!
-//! The loose PA-04 qualifier is now crate-private. Public qualification must
-//! consume a non-serializable selection receipt produced from an evaluated
-//! Pareto frontier, so model/transition lineage cannot be replaced by an
-//! arbitrary caller-supplied proposal between deliberation and qualification.
+//! The loose PA-04 qualifier and its narrower evidence binding are crate-private.
+//! Public qualification must consume a non-serializable selection receipt
+//! produced from an evaluated Pareto frontier plus a binding to the exact world
+//! snapshot used for deliberation.
 
 #![deny(unsafe_code)]
 
@@ -23,14 +24,15 @@ pub mod portfolio;
 mod qualification;
 mod qualification_lineage;
 
+pub use deliberation::WorldSnapshotRef;
 pub use qualification::{
-    SimulationEvidenceBinding, SimulationQualificationError,
+    SimulationQualificationError,
     VerifiedSimulationEvidence as RegistryValidatedSimulationEvidence,
     execute_verified_simulation as execute_registry_validated_simulation,
 };
 pub use qualification_lineage::{
     DeliberationBoundSimulationCandidate, DeliberationQualificationError,
-    qualify_selected_simulation_candidate,
+    DeliberationSimulationBinding, qualify_selected_simulation_candidate,
 };
 
 use serde::{Deserialize, Serialize};
