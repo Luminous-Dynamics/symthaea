@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-rca-shadow-epistemics"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Shadow-only epistemic relevance policy for Symthaea RCA runtime evidence candidates"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-rca-evidence-bridge = { path = "../symthaea-rca-evidence-bridge" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+symthaea-rca-shadow = { path = "../../core/symthaea-rca-shadow" }
