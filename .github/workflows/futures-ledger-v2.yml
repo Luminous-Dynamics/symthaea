@@ -1,0 +1,125 @@
+name: Futures Ledger V2 Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-futures-core/src/payload.rs"
+      - "crates/domains/symthaea-futures-core/src/lib.rs"
+      - "crates/domains/symthaea-futures-ledger/**"
+      - ".github/workflows/futures-ledger-v2.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/domains/symthaea-futures-core/src/payload.rs"
+      - "crates/domains/symthaea-futures-core/src/lib.rs"
+      - "crates/domains/symthaea-futures-ledger/**"
+      - ".github/workflows/futures-ledger-v2.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: futures-ledger-v2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze v2 evidence boundary
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          payload = Path("crates/domains/symthaea-futures-core/src/payload.rs").read_text()
+          ledger = Path("crates/domains/symthaea-futures-ledger/src/v2.rs").read_text()
+          legacy = Path("crates/domains/symthaea-futures-ledger/src/lib.rs").read_text()
+          manifest = Path("crates/domains/symthaea-futures-ledger/Cargo.toml").read_text()
+
+          for forbidden in ["issued_at_tick", "Horizon", "world_seed"]:
+              if forbidden in payload:
+                  raise SystemExit(f"time-neutral ForecastPayload gained legacy time/source field: {forbidden}")
+
+          required = [
+              "pub struct ForecastCommitment {",
+              "pub struct ForecastResolution {",
+              "ObservedSnapshots",
+              "SeededSimulation",
+              "ForecastCoordinate",
+              "ForecastWindow",
+              "OutcomeBeforeForecastTarget",
+              "ExternalReference",
+              "ForecastPayload",
+          ]
+          missing = [item for item in required if item not in ledger]
+          if missing:
+              raise SystemExit(f"v2 ledger contract drift: {missing}")
+
+          commitment = ledger.split("pub struct ForecastCommitment {", 1)[1].split("impl ForecastCommitment", 1)[0]
+          for forbidden in ["actual_continuation", "scoring_rule", "score:", "calibration_bucket"]:
+              if forbidden in commitment:
+                  raise SystemExit(f"pre-outcome commitment gained post-outcome field: {forbidden}")
+
+          resolution = ledger.split("pub struct ForecastResolution {", 1)[1].split("impl ForecastResolution", 1)[0]
+          for required_field in ["commitment_id", "forecast_target", "outcome_cutoff", "actual_continuation", "score"]:
+              if required_field not in resolution:
+                  raise SystemExit(f"resolution lost required linkage field: {required_field}")
+
+          # v1 remains present and unchanged in role for existing seeded backtests.
+          for legacy_field in [
+              "pub struct EvidenceRecord",
+              "pub world_seed: u64",
+              "pub observation_cutoff_tick: u64",
+              "pub predicted_distribution: ForecastDistribution",
+              "pub actual_continuation: OutcomeRegion",
+          ]:
+              if legacy_field not in legacy:
+                  raise SystemExit(f"legacy v1 evidence surface drifted: {legacy_field}")
+
+          if "symthaea-economics" in manifest or "symthaea_economics" in ledger:
+              raise SystemExit("Futures ledger v2 must remain domain-neutral")
+
+          sentinel_patterns = [
+              "real world => world_seed",
+              "real_world_seed",
+              "external_seed",
+          ]
+          present = [item for item in sentinel_patterns if item in ledger.lower()]
+          if present:
+              raise SystemExit(f"v2 gained sentinel external-reality convention: {present}")
+
+          # Replay validation must remain constructor-backed rather than derive-only.
+          for replay_guard in [
+              "impl<'de> Deserialize<'de> for ForecastWindow",
+              "impl<'de> Deserialize<'de> for ForecastCommitment",
+              "impl<'de> Deserialize<'de> for ForecastResolution",
+              "OutcomeBeforeForecastTarget",
+          ]:
+              if replay_guard not in ledger:
+                  raise SystemExit(f"v2 replay-validation guard drifted: {replay_guard}")
+          PY
+
+      - name: Verify locked workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-futures-core -p symthaea-futures-ledger
+
+      - name: Core payload tests
+        run: cargo test --locked -p symthaea-futures-core payload
+
+      - name: Ledger v2 tests
+        run: cargo test --locked -p symthaea-futures-ledger
+
+      - name: Strict focused Clippy
+        run: |
+          cargo clippy --locked -p symthaea-futures-core --lib --no-deps -- -D warnings
+          cargo clippy --locked -p symthaea-futures-ledger --all-targets --no-deps -- -D warnings
