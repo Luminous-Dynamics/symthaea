@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-execution-lineage"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Authoritative execution-lineage identity contract for Symthaea cognitive runs"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+getrandom = { workspace = true, features = ["js"] }
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
