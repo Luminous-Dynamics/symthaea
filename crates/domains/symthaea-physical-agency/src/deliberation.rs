@@ -32,9 +32,10 @@ use thiserror::Error;
 /// `LegacyOpaque` preserves the PA-08 compatibility surface for historical
 /// identifiers that were stable names rather than cryptographic content
 /// digests. It is deliberately ineligible for PA-12 strict solver evidence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SnapshotDigestAlgorithm {
+    #[default]
     LegacyOpaque,
     Blake3,
     Sha256,
@@ -44,6 +45,9 @@ pub enum SnapshotDigestAlgorithm {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct WorldSnapshotRef {
     frame_id: String,
+    /// Missing algorithm metadata in historical PA-08 records is conservatively
+    /// interpreted as `LegacyOpaque`, never as a cryptographic assertion.
+    #[serde(default)]
     digest_algorithm: SnapshotDigestAlgorithm,
     snapshot_digest: String,
 }
@@ -360,5 +364,16 @@ mod tests {
             malformed.validate(),
             Err(DeliberationError::InvalidCryptographicSnapshotDigest)
         );
+    }
+
+    #[test]
+    fn historical_snapshot_json_defaults_to_legacy_opaque() {
+        let json = r#"{"frame_id":"world","snapshot_digest":"historical-id"}"#;
+        let restored: WorldSnapshotRef = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            restored.digest_algorithm(),
+            SnapshotDigestAlgorithm::LegacyOpaque
+        );
+        assert_eq!(restored.snapshot_digest(), "historical-id");
     }
 }
