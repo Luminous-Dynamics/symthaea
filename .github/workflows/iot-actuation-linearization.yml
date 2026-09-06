@@ -164,7 +164,14 @@ jobs:
                   f'removed={sorted(removed)}, changed={changed}'
               )
 
-      - name: Linearization unit tests
+      - name: Run real two-branch linearization regression first
+        run: >-
+          cargo +1.94.0 test -p symthaea-iot-actuation-linearization
+          --test full_chain
+          fixture::real_two_branch_chain_linearizes_under_all_held_roots_without_hal_io
+          -- --exact
+
+      - name: Linearization package tests
         run: cargo +1.94.0 test -p symthaea-iot-actuation-linearization --all-targets
 
       - name: Strict package-local Clippy
