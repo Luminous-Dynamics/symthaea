@@ -17,6 +17,7 @@ class MergeAdmissionTests(unittest.TestCase):
             "schema": "symthaea.merge-admission-policy.v1",
             "repository": "Luminous-Dynamics/symthaea",
             "target_branch": "main",
+            "enforcement_ready": False,
             "decision_default": "incomplete",
             "head_change_invalidates": True,
             "base_change_invalidates": True,
@@ -90,6 +91,7 @@ class MergeAdmissionTests(unittest.TestCase):
     def decision(self, observation=None):
         result = evaluate(self.policy, observation or self.observation)
         self.assertEqual(result.receipt["decision"], result.decision.value)
+        self.assertFalse(result.receipt["enforcement_ready"])
         self.assertEqual(len(result.receipt["receipt_sha256"]), 64)
         self.assertEqual(len(result.receipt["evidence_binding_sha256"]), 64)
         self.assertIn("unsigned policy-core disposition", result.receipt["caveat"])
@@ -103,11 +105,11 @@ class MergeAdmissionTests(unittest.TestCase):
         obs["full_integration"] = None
         self.assertIs(self.decision(obs), Decision.INCOMPLETE)
 
-    def test_tier1_or_focused_cannot_substitute_for_full(self) -> None:
+    def test_full_integration_cannot_be_omitted_even_if_policy_mentions_lower_tiers(self) -> None:
         obs = copy.deepcopy(self.observation)
         obs["full_integration"] = None
-        obs["tier1_green"] = True
-        obs["focused_evidence_green"] = True
+        self.assertFalse(self.policy["tier1_can_substitute_for_full_integration"])
+        self.assertFalse(self.policy["focused_evidence_can_substitute_for_full_integration"])
         self.assertIs(self.decision(obs), Decision.INCOMPLETE)
 
     def test_prior_head_success_is_stale(self) -> None:
@@ -189,6 +191,18 @@ class MergeAdmissionTests(unittest.TestCase):
         obs = copy.deepcopy(self.observation)
         obs["repository"] = "attacker/fork"
         self.assertIs(self.decision(obs), Decision.REJECTED)
+
+    def test_unknown_observation_field_is_refused(self) -> None:
+        obs = copy.deepcopy(self.observation)
+        obs["mystery_authority"] = True
+        with self.assertRaisesRegex(ValueError, "unknown fields"):
+            evaluate(self.policy, obs)
+
+    def test_v1_cannot_claim_enforcement_ready(self) -> None:
+        policy = copy.deepcopy(self.policy)
+        policy["enforcement_ready"] = True
+        with self.assertRaisesRegex(ValueError, "enforcement_ready=false"):
+            evaluate(policy, self.observation)
 
     def test_policy_digest_changes_when_policy_changes(self) -> None:
         first = evaluate(self.policy, self.observation)
