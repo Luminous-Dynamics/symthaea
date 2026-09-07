@@ -5,6 +5,7 @@
 
 pub mod forge;
 pub mod forge_commitment;
+pub mod forge_profile;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
