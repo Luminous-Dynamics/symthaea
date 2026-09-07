@@ -15,7 +15,7 @@ use crate::confirmatory_contract as v3;
 use crate::deliberation::SelectedCandidate;
 use crate::outcome_claim::{
     ClaimAggregation, ConfirmatoryClaimOutcome, ConfirmatorySimulationEvidence, MetricCriterion,
-    MetricPredicate, PreparedConfirmatorySimulation, SatisfiedSimulationClaim,
+    MetricPredicate, OutcomeClaimError, PreparedConfirmatorySimulation, SatisfiedSimulationClaim,
     SimulationOutcomeClaim,
 };
 use crate::safety_preregistration::{
@@ -293,14 +293,48 @@ fn bytes_to_hex(bytes: &[u8]) -> String {
 
 #[derive(Debug, Error)]
 pub enum ConfirmatoryContractError {
-    #[error("lower confirmatory contract failed: {0}")]
-    Lower(#[from] v3::ConfirmatoryContractError),
+    #[error("outcome-claim contract failed: {0}")]
+    Outcome(OutcomeClaimError),
     #[error("safety preregistration/qualification failed: {0}")]
-    Safety(#[from] SafetyPreregistrationError),
+    Safety(SafetyPreregistrationError),
+    #[error("claim metric {0:?} was not explicitly requested by the simulation request")]
+    ClaimMetricNotRequested(String),
+    #[error("claim metric {0:?} appears more than once in simulation requested_metrics")]
+    ClaimMetricRequestedMultipleTimes(String),
     #[error("claim contains an exact duplicate criterion")]
     DuplicateClaimCriterion,
     #[error("completed safety case does not cite semantic-canonical v4 simulation lineage")]
     MissingSemanticClaimBoundSafetyEvidence,
+    #[error("private v3 confirmatory contract failed: {0}")]
+    Lower(v3::ConfirmatoryContractError),
+}
+
+impl From<v3::ConfirmatoryContractError> for ConfirmatoryContractError {
+    fn from(error: v3::ConfirmatoryContractError) -> Self {
+        match error {
+            v3::ConfirmatoryContractError::Outcome(error) => Self::Outcome(error),
+            v3::ConfirmatoryContractError::Safety(error) => Self::Safety(error),
+            v3::ConfirmatoryContractError::ClaimMetricNotRequested(metric) => {
+                Self::ClaimMetricNotRequested(metric)
+            }
+            v3::ConfirmatoryContractError::ClaimMetricRequestedMultipleTimes(metric) => {
+                Self::ClaimMetricRequestedMultipleTimes(metric)
+            }
+            other => Self::Lower(other),
+        }
+    }
+}
+
+impl From<SafetyPreregistrationError> for ConfirmatoryContractError {
+    fn from(error: SafetyPreregistrationError) -> Self {
+        Self::Safety(error)
+    }
+}
+
+impl From<OutcomeClaimError> for ConfirmatoryContractError {
+    fn from(error: OutcomeClaimError) -> Self {
+        Self::Outcome(error)
+    }
 }
 
 #[cfg(test)]
@@ -364,5 +398,18 @@ mod tests {
             canonical_claim_transcript(&a).unwrap(),
             canonical_claim_transcript(&b).unwrap()
         );
+    }
+
+    #[test]
+    fn safety_errors_are_not_hidden_behind_private_v3_surface() {
+        let public = ConfirmatoryContractError::from(v3::ConfirmatoryContractError::Safety(
+            SafetyPreregistrationError::MissingIndependentObligation,
+        ));
+        assert!(matches!(
+            public,
+            ConfirmatoryContractError::Safety(
+                SafetyPreregistrationError::MissingIndependentObligation
+            )
+        ));
     }
 }
