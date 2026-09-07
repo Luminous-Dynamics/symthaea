@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use thiserror::Error;
 
+const PORT_EPSILON: f64 = 1e-9;
+
 /// A conserved or capacity-bearing resource exchanged between system boundaries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ResourceKind {
@@ -122,13 +124,13 @@ impl ResourcePort {
     pub fn accepts(&self, amount: ResourceAmount) -> bool {
         matches!(self.direction, PortDirection::Input | PortDirection::Bidirectional)
             && self.capacity.key == amount.key
-            && amount.value <= self.capacity.value
+            && amount.value <= self.capacity.value + PORT_EPSILON
     }
 
     pub fn provides(&self, amount: ResourceAmount) -> bool {
         matches!(self.direction, PortDirection::Output | PortDirection::Bidirectional)
             && self.capacity.key == amount.key
-            && amount.value <= self.capacity.value
+            && amount.value <= self.capacity.value + PORT_EPSILON
     }
 }
 
@@ -237,6 +239,10 @@ impl ResourceEdge {
 }
 
 /// Minimal topology container that validates transfers against port contracts.
+///
+/// Port capacity is shared across every edge attached to that port. For a
+/// bidirectional port, simultaneous inbound and outbound utilization consume the
+/// same physical capacity budget.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ResourceGraph {
     nodes: BTreeMap<String, BTreeMap<String, ResourcePort>>,
@@ -264,6 +270,16 @@ impl ResourceGraph {
     }
 
     pub fn connect(&mut self, edge: ResourceEdge) -> Result<(), ResourceError> {
+        if self.edges.iter().any(|existing| existing.id == edge.id) {
+            return Err(ResourceError::DuplicateEdge(edge.id));
+        }
+        if edge.from_node == edge.to_node && edge.from_port == edge.to_port {
+            return Err(ResourceError::SelfLoopPort {
+                node: edge.from_node,
+                port: edge.from_port,
+            });
+        }
+
         let source = self
             .nodes
             .get(&edge.from_node)
@@ -283,15 +299,65 @@ impl ResourceGraph {
                 port: edge.to_port.clone(),
             })?;
 
+        let delivered = edge.delivered()?;
         if !source.provides(edge.amount) {
             return Err(ResourceError::SourceContractViolation(edge.id));
         }
-        if !destination.accepts(edge.amount) {
+        if !destination.accepts(delivered) {
             return Err(ResourceError::DestinationContractViolation(edge.id));
         }
-        edge.delivered()?;
+
+        let source_capacity = source.capacity.value;
+        let destination_capacity = destination.capacity.value;
+        let source_used = self.port_utilization(&edge.from_node, &edge.from_port)?;
+        let destination_used = self.port_utilization(&edge.to_node, &edge.to_port)?;
+        let attempted_source = source_used + edge.amount.value;
+        if attempted_source > source_capacity + PORT_EPSILON {
+            return Err(ResourceError::AggregatePortCapacityExceeded {
+                node: edge.from_node.clone(),
+                port: edge.from_port.clone(),
+                capacity: source_capacity,
+                attempted: attempted_source,
+            });
+        }
+        let attempted_destination = destination_used + delivered.value;
+        if attempted_destination > destination_capacity + PORT_EPSILON {
+            return Err(ResourceError::AggregatePortCapacityExceeded {
+                node: edge.to_node.clone(),
+                port: edge.to_port.clone(),
+                capacity: destination_capacity,
+                attempted: attempted_destination,
+            });
+        }
+
         self.edges.push(edge);
         Ok(())
+    }
+
+    /// Sum physical utilization already committed to a port.
+    ///
+    /// Outbound edges consume sent quantity; inbound edges consume delivered
+    /// quantity after explicit transfer loss.
+    pub fn port_utilization(&self, node: &str, port: &str) -> Result<f64, ResourceError> {
+        self.nodes
+            .get(node)
+            .ok_or_else(|| ResourceError::UnknownNode(node.to_owned()))?
+            .get(port)
+            .ok_or_else(|| ResourceError::UnknownPort {
+                node: node.to_owned(),
+                port: port.to_owned(),
+            })?;
+
+        let mut used = 0.0;
+        for edge in &self.edges {
+            if edge.from_node == node && edge.from_port == port {
+                used += edge.amount.value;
+            }
+            if edge.to_node == node && edge.to_port == port {
+                used += edge.delivered()?.value;
+            }
+        }
+        Ok(used)
     }
 
     pub fn edges(&self) -> &[ResourceEdge] {
@@ -316,14 +382,27 @@ pub enum ResourceError {
     DuplicateNode(String),
     #[error("duplicate port on node {0}")]
     DuplicatePort(String),
+    #[error("duplicate resource edge {0}")]
+    DuplicateEdge(String),
     #[error("unknown node {0}")]
     UnknownNode(String),
     #[error("unknown port {node}/{port}")]
     UnknownPort { node: String, port: String },
+    #[error("resource edge cannot loop from a port back to itself: {node}/{port}")]
+    SelfLoopPort { node: String, port: String },
     #[error("source port contract rejected edge {0}")]
     SourceContractViolation(String),
     #[error("destination port contract rejected edge {0}")]
     DestinationContractViolation(String),
+    #[error(
+        "aggregate utilization {attempted} exceeds capacity {capacity} on port {node}/{port}"
+    )]
+    AggregatePortCapacityExceeded {
+        node: String,
+        port: String,
+        capacity: f64,
+        attempted: f64,
+    },
 }
 
 #[cfg(test)]
@@ -339,6 +418,18 @@ mod tests {
             id: id.into(),
             direction,
             capacity: electricity(capacity_w),
+        }
+    }
+
+    fn edge(id: &str, from: (&str, &str), to: (&str, &str), watts: f64) -> ResourceEdge {
+        ResourceEdge {
+            id: id.into(),
+            from_node: from.0.into(),
+            from_port: from.1.into(),
+            to_node: to.0.into(),
+            to_port: to.1.into(),
+            amount: electricity(watts),
+            loss_fraction: 0.0,
         }
     }
 
@@ -366,7 +457,6 @@ mod tests {
         envelope.insert(electricity(20.0));
         let gpu = ResourceAmount::new(ResourceKind::Compute, ResourceUnit::GpuSecond, 4.0).unwrap();
         envelope.insert(gpu);
-
         assert_eq!(envelope.capacity(electricity(0.0).key), 100.0);
         assert_eq!(envelope.capacity(gpu.key), 4.0);
     }
@@ -436,10 +526,12 @@ mod tests {
             })
             .unwrap();
         assert_eq!(graph.edges().len(), 1);
+        assert_eq!(graph.port_utilization("generation", "out").unwrap(), 80.0);
+        assert_eq!(graph.port_utilization("load", "in").unwrap(), 78.4);
     }
 
     #[test]
-    fn graph_rejects_over_capacity_transfer() {
+    fn graph_rejects_single_over_capacity_transfer() {
         let mut graph = ResourceGraph::default();
         graph
             .add_node("generation", [port("out", PortDirection::Output, 50.0)])
@@ -447,15 +539,102 @@ mod tests {
         graph
             .add_node("load", [port("in", PortDirection::Input, 100.0)])
             .unwrap();
-        let result = graph.connect(ResourceEdge {
-            id: "overload".into(),
-            from_node: "generation".into(),
-            from_port: "out".into(),
-            to_node: "load".into(),
-            to_port: "in".into(),
-            amount: electricity(75.0),
-            loss_fraction: 0.0,
-        });
+        let result = graph.connect(edge(
+            "overload",
+            ("generation", "out"),
+            ("load", "in"),
+            75.0,
+        ));
         assert!(matches!(result, Err(ResourceError::SourceContractViolation(_))));
+    }
+
+    #[test]
+    fn multiple_edges_share_source_port_capacity() {
+        let mut graph = ResourceGraph::default();
+        graph
+            .add_node("source", [port("out", PortDirection::Output, 100.0)])
+            .unwrap();
+        graph
+            .add_node("a", [port("in", PortDirection::Input, 100.0)])
+            .unwrap();
+        graph
+            .add_node("b", [port("in", PortDirection::Input, 100.0)])
+            .unwrap();
+        graph
+            .connect(edge("a", ("source", "out"), ("a", "in"), 60.0))
+            .unwrap();
+        let result = graph.connect(edge("b", ("source", "out"), ("b", "in"), 50.0));
+        assert!(matches!(
+            result,
+            Err(ResourceError::AggregatePortCapacityExceeded {
+                node,
+                attempted,
+                ..
+            }) if node == "source" && (attempted - 110.0).abs() < 1e-9
+        ));
+    }
+
+    #[test]
+    fn multiple_edges_share_destination_port_capacity_after_losses() {
+        let mut graph = ResourceGraph::default();
+        graph
+            .add_node("a", [port("out", PortDirection::Output, 100.0)])
+            .unwrap();
+        graph
+            .add_node("b", [port("out", PortDirection::Output, 100.0)])
+            .unwrap();
+        graph
+            .add_node("sink", [port("in", PortDirection::Input, 100.0)])
+            .unwrap();
+        let mut first = edge("a", ("a", "out"), ("sink", "in"), 60.0);
+        first.loss_fraction = 0.1; // 54 W delivered
+        graph.connect(first).unwrap();
+        let result = graph.connect(edge("b", ("b", "out"), ("sink", "in"), 50.0));
+        assert!(matches!(
+            result,
+            Err(ResourceError::AggregatePortCapacityExceeded { node, port, .. })
+                if node == "sink" && port == "in"
+        ));
+    }
+
+    #[test]
+    fn bidirectional_port_shares_one_capacity_budget() {
+        let mut graph = ResourceGraph::default();
+        graph
+            .add_node("bus", [port("ac", PortDirection::Bidirectional, 100.0)])
+            .unwrap();
+        graph
+            .add_node("load", [port("in", PortDirection::Input, 100.0)])
+            .unwrap();
+        graph
+            .add_node("source", [port("out", PortDirection::Output, 100.0)])
+            .unwrap();
+        graph
+            .connect(edge("out", ("bus", "ac"), ("load", "in"), 70.0))
+            .unwrap();
+        let result = graph.connect(edge("in", ("source", "out"), ("bus", "ac"), 40.0));
+        assert!(matches!(
+            result,
+            Err(ResourceError::AggregatePortCapacityExceeded { node, port, .. })
+                if node == "bus" && port == "ac"
+        ));
+    }
+
+    #[test]
+    fn duplicate_edge_id_is_rejected() {
+        let mut graph = ResourceGraph::default();
+        graph
+            .add_node("source", [port("out", PortDirection::Output, 100.0)])
+            .unwrap();
+        graph
+            .add_node("sink", [port("in", PortDirection::Input, 100.0)])
+            .unwrap();
+        graph
+            .connect(edge("same", ("source", "out"), ("sink", "in"), 20.0))
+            .unwrap();
+        assert!(matches!(
+            graph.connect(edge("same", ("source", "out"), ("sink", "in"), 20.0)),
+            Err(ResourceError::DuplicateEdge(id)) if id == "same"
+        ));
     }
 }
