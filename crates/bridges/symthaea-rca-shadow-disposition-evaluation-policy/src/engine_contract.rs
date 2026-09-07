@@ -29,6 +29,8 @@ pub const SHADOW_DISPOSITION_ENGINE_CONTRACT_V1: &str = concat!(
     "threshold_predicates=D,CS,CO,S,TS,O,TO\n",
     "registered_invariants=S_implies_TS+O_implies_TO\n",
     "precedence=qualified_defeater>qualified_contestation>bilateral_qualifying_disagreement>unilateral_full>unilateral_tentative>underdetermined\n",
+    "rule_to_primary_class_mapping_is_exact_and_profile_bearing\n",
+    "decision_lattice_total_over_all_72_admissible_predicate_states_v1\n",
     "qualified_defeater_primary=blocked_by_qualified_defeater_not_false_or_refuted\n",
     "bilateral_tentative_or_stronger_disagreement_below_contestation=underdetermined\n",
     "count_margin_vote_strength_posterior_and_winner_take_all_tiebreakers_forbidden\n",
@@ -65,6 +67,26 @@ pub const SHADOW_DISPOSITION_RULE_PRECEDENCE_V1: &[&str] = &[
     "insufficient_topology",
 ];
 
+/// Exact V1 mapping from every decision-rule identifier to its primary class.
+/// The mapping is profile-bearing so a future implementation cannot keep the
+/// same precedence table while silently changing what a selected rule means.
+pub const SHADOW_DISPOSITION_RULE_TO_CLASS_V1: &[(&str, &str)] = &[
+    (
+        "qualified_defeater_blocker",
+        "blocked_by_qualified_defeater",
+    ),
+    ("qualified_contestation", "contested"),
+    (
+        "bilateral_qualified_disagreement_below_contestation",
+        "underdetermined",
+    ),
+    ("full_support", "supported"),
+    ("full_opposition", "opposed"),
+    ("tentative_support", "tentatively_supported"),
+    ("tentative_opposition", "tentatively_opposed"),
+    ("insufficient_topology", "underdetermined"),
+];
+
 /// Stable boolean predicate identifiers retained in the future reason trace.
 pub const SHADOW_DISPOSITION_PREDICATE_TAGS_V1: &[&str] = &[
     "defeater_qualified",
@@ -81,9 +103,9 @@ const PROFILE_DOMAIN: &[u8] = b"symthaea:rca-pure-shadow-disposition-engine-cont
 /// Content identity for the exact non-result-bearing engine semantics.
 ///
 /// The digest binds the normative contract and every stable machine-readable tag
-/// table. Changing taxonomy, predicates, rule IDs, or precedence therefore
-/// requires a new evaluation-policy identity before any result-bearing engine may
-/// run.
+/// table. Changing taxonomy, predicates, rule IDs, precedence, or rule meaning
+/// therefore requires a new evaluation-policy identity before any result-bearing
+/// engine may run.
 pub fn shadow_disposition_engine_contract_profile_digest_v1() -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(PROFILE_DOMAIN);
@@ -112,6 +134,11 @@ pub fn shadow_disposition_engine_contract_profile_digest_v1() -> String {
         b"rule_precedence",
         SHADOW_DISPOSITION_RULE_PRECEDENCE_V1,
     );
+    hash_rule_mapping(
+        &mut hasher,
+        b"rule_to_class",
+        SHADOW_DISPOSITION_RULE_TO_CLASS_V1,
+    );
     hash_tags(
         &mut hasher,
         b"predicate_tags",
@@ -124,6 +151,14 @@ fn hash_tags(hasher: &mut blake3::Hasher, label: &[u8], tags: &[&str]) {
     hash_bytes(hasher, label, &(tags.len() as u64).to_le_bytes());
     for tag in tags {
         hash_text(hasher, b"tag", tag);
+    }
+}
+
+fn hash_rule_mapping(hasher: &mut blake3::Hasher, label: &[u8], mappings: &[(&str, &str)]) {
+    hash_bytes(hasher, label, &(mappings.len() as u64).to_le_bytes());
+    for (rule, class) in mappings {
+        hash_text(hasher, b"rule", rule);
+        hash_text(hasher, b"class", class);
     }
 }
 
@@ -142,6 +177,44 @@ fn hash_bytes(hasher: &mut blake3::Hasher, label: &[u8], value: &[u8]) {
 mod tests {
     use super::*;
 
+    #[derive(Clone, Copy)]
+    struct PredicateState {
+        defeater: bool,
+        support_contested: bool,
+        opposition_contested: bool,
+        support_full: bool,
+        support_tentative: bool,
+        opposition_full: bool,
+        opposition_tentative: bool,
+    }
+
+    fn frozen_rule_for(state: PredicateState) -> &'static str {
+        if state.defeater {
+            "qualified_defeater_blocker"
+        } else if state.support_contested && state.opposition_contested {
+            "qualified_contestation"
+        } else if state.support_tentative && state.opposition_tentative {
+            "bilateral_qualified_disagreement_below_contestation"
+        } else if state.support_full {
+            "full_support"
+        } else if state.opposition_full {
+            "full_opposition"
+        } else if state.support_tentative {
+            "tentative_support"
+        } else if state.opposition_tentative {
+            "tentative_opposition"
+        } else {
+            "insufficient_topology"
+        }
+    }
+
+    fn class_for_rule(rule: &str) -> &'static str {
+        SHADOW_DISPOSITION_RULE_TO_CLASS_V1
+            .iter()
+            .find_map(|(candidate, class)| (*candidate == rule).then_some(*class))
+            .expect("every frozen rule must map to one primary class")
+    }
+
     #[test]
     fn engine_contract_has_expected_primary_taxonomy() {
         assert_eq!(SHADOW_DISPOSITION_CLASS_TAGS_V1.len(), 7);
@@ -153,6 +226,25 @@ mod tests {
             SHADOW_DISPOSITION_CLASS_TAGS_V1.last().copied(),
             Some("underdetermined")
         );
+    }
+
+    #[test]
+    fn rule_to_class_mapping_covers_every_rule_exactly_once() {
+        assert_eq!(
+            SHADOW_DISPOSITION_RULE_TO_CLASS_V1.len(),
+            SHADOW_DISPOSITION_RULE_PRECEDENCE_V1.len()
+        );
+        for rule in SHADOW_DISPOSITION_RULE_PRECEDENCE_V1 {
+            assert_eq!(
+                SHADOW_DISPOSITION_RULE_TO_CLASS_V1
+                    .iter()
+                    .filter(|(candidate, _)| candidate == rule)
+                    .count(),
+                1,
+                "rule {rule} must have exactly one primary class"
+            );
+            assert!(SHADOW_DISPOSITION_CLASS_TAGS_V1.contains(&class_for_rule(rule)));
+        }
     }
 
     #[test]
@@ -182,6 +274,34 @@ mod tests {
     }
 
     #[test]
+    fn decision_lattice_is_total_over_all_72_admissible_states() {
+        let mut admissible = 0_u16;
+        for bits in 0_u16..128 {
+            let state = PredicateState {
+                defeater: bits & 1 != 0,
+                support_contested: bits & 2 != 0,
+                opposition_contested: bits & 4 != 0,
+                support_full: bits & 8 != 0,
+                support_tentative: bits & 16 != 0,
+                opposition_full: bits & 32 != 0,
+                opposition_tentative: bits & 64 != 0,
+            };
+            if state.support_full && !state.support_tentative {
+                continue;
+            }
+            if state.opposition_full && !state.opposition_tentative {
+                continue;
+            }
+            admissible += 1;
+            let rule = frozen_rule_for(state);
+            assert!(SHADOW_DISPOSITION_RULE_PRECEDENCE_V1.contains(&rule));
+            let class = class_for_rule(rule);
+            assert!(SHADOW_DISPOSITION_CLASS_TAGS_V1.contains(&class));
+        }
+        assert_eq!(admissible, 72);
+    }
+
+    #[test]
     fn contract_profile_is_content_addressed() {
         let digest = shadow_disposition_engine_contract_profile_digest_v1();
         assert!(digest.starts_with("blake3:"));
@@ -190,9 +310,9 @@ mod tests {
 
     #[test]
     fn contract_exposes_no_evaluator() {
-        // Compile-time shape test: this module intentionally exposes only static
-        // contract data and its profile digest. Result-bearing behavior belongs in
-        // a later crate after qualification.
+        // The classifier above exists only in #[cfg(test)] to prove the frozen
+        // contract is total. Production exposes static contract data and its
+        // profile digest only; result-bearing behavior belongs in a later crate.
         assert!(!SHADOW_DISPOSITION_ENGINE_CONTRACT_V1.contains("engine_implements_evaluate"));
     }
 }
