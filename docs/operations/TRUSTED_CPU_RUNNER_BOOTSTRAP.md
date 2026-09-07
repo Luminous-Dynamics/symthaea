@@ -73,7 +73,7 @@ The validator fails closed unless all of the following hold in one validation in
 - the checked-out commit exactly equals the operator-authorized recovery head;
 - the checked-out commit exactly equals the current published `ci/nixos-ephemeral-runner-v1` head;
 - current public `main` is an ancestor of that recovery head;
-- the complete `main...recovery` diff is exactly the reviewed trusted-runner/recovery infrastructure allowlist;
+- the complete `main...recovery` diff is exactly the reviewed trusted-runner/recovery infrastructure allowlist, including the host-lifecycle contract;
 - the runner-policy Nix evaluation succeeds;
 - the trusted-routing Nix evaluation succeeds and the trusted CPU capability consumer set is unchanged;
 - the minimal pinned Rust shell resolves and accepts locked metadata plus `symthaea-psych-bench` library compilation;
@@ -91,7 +91,7 @@ The manifest binds, among other provenance:
 - exact recovery commit and source tree actually validated;
 - exact `main` commit observed for the complete validation interval;
 - SHA-256 of the exact reviewed diff-path set;
-- Git blob identities for the runner module, routing policy, main-only smoke workflow, and bootstrap validator;
+- Git blob identities for the runner module, routing policy, main-only smoke workflow, bootstrap validator, and persistent-host lifecycle contract;
 - pinned nixpkgs revision and repository Rust channel;
 - `flake.lock` and `rust-toolchain.toml` SHA-256 values;
 - PASS state for explicit operator-authorization verification, runner policy, routing policy, locked Rust validation, and ref-stability checks.
@@ -104,15 +104,17 @@ Stage A is bootstrap evidence for the runner infrastructure only. It is **not** 
 
 Only after Stage A succeeds:
 
-1. Materialize the repository-scoped access token outside the Nix store in a root-owned runtime file.
-2. Verify the token file is `0400` or `0600`, contains exactly the token with no trailing newline, and is not readable by group/other users.
-3. Import `nix/modules/github-actions-runner.nix` or the aggregate Symthaea NixOS module set from the exact Stage-A-qualified recovery generation.
-4. Enable only `services.symthaea-ci-runner`.
-5. Rebuild the isolated host.
-6. Verify the runner service is healthy.
-7. Verify GitHub shows exactly the custom capability `symthaea-trusted-cpu-v1`; default labels must remain absent.
+1. Read `docs/operations/TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md` and record that v1 is a **persistent hardened host with an ephemeral runner registration/process**, not a fresh machine per job.
+2. Materialize the repository-scoped access token outside the Nix store in a root-owned runtime file.
+3. Verify the token file is `0400` or `0600`, contains exactly the token with no trailing newline, and is not readable by group/other users.
+4. Import `nix/modules/github-actions-runner.nix` or the aggregate Symthaea NixOS module set from the exact Stage-A-qualified recovery generation.
+5. Enable only `services.symthaea-ci-runner`.
+6. Rebuild the isolated host.
+7. Configure and test external retention for the runner/system logs required by the host-lifecycle contract before Stage D/E recovery use.
+8. Verify the runner service is healthy.
+9. Verify GitHub shows exactly the custom capability `symthaea-trusted-cpu-v1`; default labels must remain absent.
 
-Do not route any correctness job to the host yet. An online runner is not a qualified runner.
+Do not route any correctness job to the host yet. An online runner is not a qualified runner, and an ephemeral runner registration is not an ephemeral host.
 
 If the recovery branch changes after Stage A, rerun Stage A against the newly reviewed and explicitly operator-authorized head before using the changed module or workflow content.
 
@@ -123,10 +125,10 @@ The GitHub smoke becomes dispatchable only after its workflow exists on `main`.
 The bootstrap merge/review surface must remain restricted to trusted-runner infrastructure:
 
 - the NixOS runner module and aggregate import;
-- eval-only runner/routing tests;
+- eval-only runner/routing and lifecycle tests;
 - the minimal pinned CPU Rust shell;
 - the host-side bootstrap validator;
-- operator documentation;
+- the persistent-host lifecycle contract and other operator documentation;
 - reviewed `workflow_dispatch`-only trusted recovery workflows.
 
 Do not bundle application, scientific-result, RCA policy, root Cargo/toolchain, build-script, or performance changes into this bootstrap transition.
@@ -155,6 +157,8 @@ The smoke must establish all of the following in one GitHub-issued run:
 - pinned Nix/Rust provenance;
 - locked Rust compilation through the minimal Nix shell;
 - clean source tree after execution.
+
+The operator must also retain the external runner/system lifecycle evidence required by `TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md`; GitHub job success alone does not establish clean host state for a subsequent job.
 
 If the smoke fails, do not route recovery workloads. Disable or leave idle the runner, repair only the observed defect, and repeat Stage A if the trusted infrastructure generation changes, then repeat the smoke.
 
@@ -189,6 +193,7 @@ bootstrap policy PASS != scientific gate PASS
 trusted CPU correctness PASS != performance equivalence
 stale bootstrap manifest != current infrastructure authority
 current branch head != operator authorization
+runner process ephemeral != host ephemeral
 ```
 
 The fallback exists to restore executable evidence, not to weaken what counts as evidence.
