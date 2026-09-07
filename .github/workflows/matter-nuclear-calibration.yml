@@ -1,0 +1,109 @@
+name: Matter Nuclear Calibration
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-nuclear/src/conformal.rs'
+      - 'crates/domains/symthaea-nuclear/src/blind_criteria.rs'
+      - 'crates/domains/symthaea-nuclear/src/blind_learned.rs'
+      - 'crates/domains/symthaea-nuclear/src/blind_models.rs'
+      - 'crates/domains/symthaea-nuclear/src/blind_validation.rs'
+      - 'crates/domains/symthaea-nuclear/src/ml_mass.rs'
+      - 'crates/domains/symthaea-nuclear/src/lib.rs'
+      - '.github/workflows/matter-nuclear-calibration.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  calibration-boundary:
+    name: Leakage-free calibration and declared bounds
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Lockfile must remain unchanged from PR base
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          test -z "$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- Cargo.lock)"
+
+      - name: Focused formatting
+        run: cargo fmt --check -p symthaea-nuclear
+
+      - name: Focused nuclear package check
+        run: cargo check --locked -p symthaea-nuclear
+
+      - name: Conformal boundary regressions
+        run: cargo test --locked -p symthaea-nuclear conformal::tests -- --nocapture --test-threads=1
+
+      - name: Declared-bounds regressions
+        run: cargo test --locked -p symthaea-nuclear blind_criteria::tests -- --nocapture
+
+      - name: Calibration leakage and authority ratchets
+        shell: python
+        run: |
+          from pathlib import Path
+
+          conformal = Path('crates/domains/symthaea-nuclear/src/conformal.rs').read_text()
+          criteria = Path('crates/domains/symthaea-nuclear/src/blind_criteria.rs').read_text()
+
+          if 'MlMassPredictor::new()' in conformal:
+              raise SystemExit('full-corpus RF constructor must not enter conformal calibration')
+
+          required_conformal = (
+              'MlMassPredictor::fit_measured_with_config(&fit, rf_config)',
+              'for nucleus in &split.training',
+              'blind_holdout: exact_data(&split.holdout)',
+              'NoExchangeabilityGuarantee',
+              'SplitDoesNotMatchCalibrationReceipt',
+              'rank - 1',
+          )
+          for token in required_conformal:
+              if token not in conformal:
+                  raise SystemExit(f'missing conformal boundary token: {token}')
+
+          # Prevent the old leakage pattern from returning: calibration may not
+          # be drawn from a predictor already trained by the full-corpus constructor.
+          forbidden_conformal_claims = (
+              '95% prediction interval =',
+              'should be ~95% if calibrated',
+              'Coverage Verification (full dataset)',
+          )
+          for token in forbidden_conformal_claims:
+              if token in conformal:
+                  raise SystemExit(f'legacy overclaim/leakage language returned: {token}')
+
+          required_criteria = (
+              'registration_evidence_id',
+              'MeetsAllDeclaredBounds',
+              'ViolatesAtLeastOneDeclaredBound',
+              'does not prove chronology',
+              'CandidateProtocolMismatch',
+              'BaselineHoldoutCountMismatch',
+          )
+          for token in required_criteria:
+              if token not in criteria:
+                  raise SystemExit(f'missing declared-bounds contract token: {token}')
+
+          # No embedded default scientific thresholds: callers must construct
+          # criteria and bind them to an external registration identity.
+          forbidden_authority = (
+              'impl Default for PreregisteredBlindCriteria',
+              'pub qualified:',
+              'pub scientifically_valid:',
+              'pub discovered:',
+          )
+          for token in forbidden_authority:
+              if token in criteria:
+                  raise SystemExit(f'forbidden calibration authority shortcut: {token}')
+
+          print('calibration leakage/authority ratchets passed')
