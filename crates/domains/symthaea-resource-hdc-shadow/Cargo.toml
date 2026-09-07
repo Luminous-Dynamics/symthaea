@@ -1,0 +1,36 @@
+[package]
+name = "symthaea-resource-hdc-shadow"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Deterministic HDC shadow selector for evidence-qualified resource planning"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "hdc", "planning", "shadow"]
+categories = ["science", "simulation"]
+
+[dependencies]
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-core = { path = "../../core/symthaea-core", default-features = false }
+symthaea-resource-objective-metric = { path = "../symthaea-resource-objective-metric" }
+symthaea-resource-objective-normalization = { path = "../symthaea-resource-objective-normalization" }
+symthaea-resource-pareto = { path = "../symthaea-resource-pareto" }
+symthaea-resource-recommendation = { path = "../symthaea-resource-recommendation" }
+symthaea-resource-selectors = { path = "../symthaea-resource-selectors" }
+
+[dev-dependencies]
+chrono = { workspace = true }
+symthaea-operations-research = { path = "../symthaea-operations-research" }
+symthaea-resource-allocation = { path = "../symthaea-resource-allocation" }
+symthaea-resource-capacity = { path = "../symthaea-resource-capacity" }
+symthaea-resource-feasible-set = { path = "../symthaea-resource-feasible-set" }
+symthaea-resource-model = { path = "../symthaea-resource-model" }
+symthaea-resource-objective-evidence = { path = "../symthaea-resource-objective-evidence" }
+symthaea-resource-objective-qualification = { path = "../symthaea-resource-objective-qualification" }
+symthaea-resource-quality = { path = "../symthaea-resource-quality" }
+symthaea-resource-quality-evidence = { path = "../symthaea-resource-quality-evidence" }
+symthaea-resource-quality-qualification = { path = "../symthaea-resource-quality-qualification" }
+symthaea-resource-topology = { path = "../symthaea-resource-topology" }
