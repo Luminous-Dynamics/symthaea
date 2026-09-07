@@ -29,8 +29,8 @@
 //! belong to the same population-local epoch rather than borrowing the outer simulator's clock.
 
 use crate::{
-    Genome, GenomeEvidenceV1, LifecycleDeathCauseV1, LifecycleEventV1, LifecycleTransitionV1,
-    Organism,
+    EvolutionBirthPlanV1, Genome, GenomeEvidenceV1, LifecycleDeathCauseV1, LifecycleEventV1,
+    LifecycleTransitionV1, Organism,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +39,7 @@ pub enum LifecycleRecorderErrorV1 {
     EpochOverflow,
     InvalidFounderIdentity,
     InvalidNumericEvidence,
+    BirthPlanOffspringGenomeMismatch,
 }
 
 /// Append-only lifecycle evidence recorder.
@@ -101,6 +102,43 @@ impl LifecycleRecorderV1 {
             reproductive_parent_genome: genome_evidence(reproductive_parent),
             genome_source_genome: genome_evidence(genome_source),
             offspring_genome: genome_evidence(offspring),
+            initial_energy_bits: offspring.energy.to_bits(),
+        })
+    }
+
+    /// Record a birth from the exact [`EvolutionBirthPlanV1`] that produced the offspring genome.
+    ///
+    /// This is the preferred production bridge once `Population` uses the deterministic birth-plan
+    /// contract. It does not re-index the population or re-run RandomPeer source selection: the
+    /// reproductive parent, genetic source, and all three genome snapshots come directly from the
+    /// already-authoritative plan. The constructed offspring is still checked against the plan
+    /// before any lifecycle sequence is consumed.
+    pub fn record_birth_from_plan(
+        &mut self,
+        plan: &EvolutionBirthPlanV1,
+        offspring: &Organism,
+    ) -> Result<(), LifecycleRecorderErrorV1> {
+        validate_genome(plan.reproductive_parent_genome)?;
+        validate_genome(plan.genome_source_genome)?;
+        validate_genome(plan.offspring_genome)?;
+        validate_organism_snapshot(offspring)?;
+
+        let observed_offspring_genome = Genome::from_config(&offspring.cfg);
+        if observed_offspring_genome != plan.offspring_genome {
+            return Err(LifecycleRecorderErrorV1::BirthPlanOffspringGenomeMismatch);
+        }
+
+        self.push_transition(LifecycleTransitionV1::Birth {
+            reproductive_parent_id: plan.reproductive_parent_id,
+            genome_source_id: plan.genome_source_id,
+            offspring_id: offspring.id,
+            lineage_id: offspring.lineage_id,
+            generation: offspring.generation,
+            reproductive_parent_genome: GenomeEvidenceV1::from_genome(
+                plan.reproductive_parent_genome,
+            ),
+            genome_source_genome: GenomeEvidenceV1::from_genome(plan.genome_source_genome),
+            offspring_genome: GenomeEvidenceV1::from_genome(plan.offspring_genome),
             initial_energy_bits: offspring.energy.to_bits(),
         })
     }
@@ -179,13 +217,21 @@ fn genome_evidence(organism: &Organism) -> GenomeEvidenceV1 {
     GenomeEvidenceV1::from_genome(Genome::from_config(&organism.cfg))
 }
 
-fn validate_organism_snapshot(organism: &Organism) -> Result<(), LifecycleRecorderErrorV1> {
-    let genome = Genome::from_config(&organism.cfg);
+fn validate_genome(genome: Genome) -> Result<(), LifecycleRecorderErrorV1> {
     let finite_genome = genome.set_point.is_finite()
         && genome.forage_efficiency.is_finite()
         && genome.action_temperature.is_finite()
         && genome.perceptual_grain.is_none_or(f64::is_finite);
-    if !finite_genome || !organism.energy.is_finite() {
+    if !finite_genome {
+        return Err(LifecycleRecorderErrorV1::InvalidNumericEvidence);
+    }
+    Ok(())
+}
+
+fn validate_organism_snapshot(organism: &Organism) -> Result<(), LifecycleRecorderErrorV1> {
+    let genome = Genome::from_config(&organism.cfg);
+    validate_genome(genome)?;
+    if !organism.energy.is_finite() {
         return Err(LifecycleRecorderErrorV1::InvalidNumericEvidence);
     }
     Ok(())
@@ -237,6 +283,76 @@ mod tests {
         let ledger = analyze_lifecycle_events(recorder.events()).expect("valid lifecycle");
         assert!(ledger.reproductive_edges().contains(&(parent.id, child.id)));
         assert!(ledger.genetic_edges().contains(&(donor.id, child.id)));
+    }
+
+    #[test]
+    fn birth_plan_bridge_preserves_exact_plan_ancestry() {
+        let mut ids = AgentIdAllocator::new();
+        let parent = founder(&mut ids, 11);
+        let mut donor = founder(&mut ids, 12);
+        donor.cfg.forage_efficiency = 0.31;
+        let mut child_cfg = donor.cfg;
+        child_cfg.set_point = 0.73;
+        let mut child = Organism::new(child_cfg, 13)
+            .with_id(ids.allocate())
+            .with_lineage(parent.lineage_id, parent.generation + 1);
+        child.energy = 0.4;
+
+        let plan = EvolutionBirthPlanV1 {
+            reproductive_parent_index: 0,
+            reproductive_parent_id: parent.id,
+            reproductive_parent_genome: Genome::from_config(&parent.cfg),
+            genome_source_index: 1,
+            genome_source_id: donor.id,
+            genome_source_genome: Genome::from_config(&donor.cfg),
+            offspring_genome: Genome::from_config(&child.cfg),
+        };
+        let founders = [parent, donor];
+        let mut recorder = LifecycleRecorderV1::from_founders(&founders).expect("founders");
+        recorder
+            .record_birth_from_plan(&plan, &child)
+            .expect("birth plan evidence");
+
+        let ledger = analyze_lifecycle_events(recorder.events()).expect("valid lifecycle");
+        assert!(ledger.reproductive_edges().contains(&(plan.reproductive_parent_id, child.id)));
+        assert!(ledger.genetic_edges().contains(&(plan.genome_source_id, child.id)));
+        assert_eq!(
+            ledger.records().get(&child.id).expect("child").genome,
+            GenomeEvidenceV1::from_genome(plan.offspring_genome)
+        );
+    }
+
+    #[test]
+    fn mismatched_birth_plan_fails_before_consuming_sequence() {
+        let mut ids = AgentIdAllocator::new();
+        let parent = founder(&mut ids, 21);
+        let donor = founder(&mut ids, 22);
+        let mut child = Organism::new(donor.cfg, 23)
+            .with_id(ids.allocate())
+            .with_lineage(parent.lineage_id, parent.generation + 1);
+        child.energy = 0.4;
+
+        let mut planned_offspring = Genome::from_config(&child.cfg);
+        planned_offspring.forage_efficiency += 0.01;
+        let plan = EvolutionBirthPlanV1 {
+            reproductive_parent_index: 0,
+            reproductive_parent_id: parent.id,
+            reproductive_parent_genome: Genome::from_config(&parent.cfg),
+            genome_source_index: 1,
+            genome_source_id: donor.id,
+            genome_source_genome: Genome::from_config(&donor.cfg),
+            offspring_genome: planned_offspring,
+        };
+        let founders = [parent, donor];
+        let mut recorder = LifecycleRecorderV1::from_founders(&founders).expect("founders");
+        let before_sequence = recorder.next_sequence();
+        let before_events = recorder.events().len();
+        assert_eq!(
+            recorder.record_birth_from_plan(&plan, &child),
+            Err(LifecycleRecorderErrorV1::BirthPlanOffspringGenomeMismatch)
+        );
+        assert_eq!(recorder.next_sequence(), before_sequence);
+        assert_eq!(recorder.events().len(), before_events);
     }
 
     #[test]
