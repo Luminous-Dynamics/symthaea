@@ -1,0 +1,78 @@
+name: Matter Crystal Execution Wire
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_crystal_execution_wire.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-crystal-execution-wire.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crystal-execution-wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify child scope and frozen parent
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='75fd963ab7d6a6d208bbcd2f1cb5a76bece4d44f'
+          test -z "$(git diff --name-only "$BASE"...HEAD -- Cargo.lock Cargo.toml)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- src/knowledge/matter_crystal_execution.rs)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- crates/core/symthaea-evidence-plane crates/domains/symthaea-epistemic-types)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- src/knowledge/matter_crystal_phase.rs src/knowledge/matter_crystal_evidence_binding.rs)"
+
+      - name: Ratchet versioned fail-closed wire schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_crystal_execution_wire.rs
+          grep -q 'symthaea.matter.crystal-solver-execution/v1' "$FILE"
+          grep -q '#\[serde(deny_unknown_fields)\]' "$FILE"
+          grep -q "impl<'de> Deserialize<'de> for CrystalSolverExecutionWireV1" "$FILE"
+          grep -q 'validate_wire_shape' "$FILE"
+          grep -q '\.validate()' "$FILE"
+          grep -q 'UnsupportedSchema' "$FILE"
+          grep -q 'ControlCharacter' "$FILE"
+          grep -q 'TooManyItems' "$FILE"
+          if grep -Eq '#\[derive\([^]]*Deserialize[^]]*\)\][[:space:]]*pub struct CrystalSolverExecutionWireV1' "$FILE"; then
+            echo 'main wire type must not derive unchecked Deserialize' >&2
+            exit 1
+          fi
+          if grep -Eq 'unwrap_or_default|unwrap_or\(|default\(\).*schema|unknown.*ignore' "$FILE"; then
+            echo 'wire schema must not silently fall back on malformed/unknown input' >&2
+            exit 1
+          fi
+
+      - name: Ratchet bounded adapter input
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_crystal_execution_wire.rs
+          grep -q 'MAX_ID_LEN' "$FILE"
+          grep -q 'MAX_TEXT_LEN' "$FILE"
+          grep -q 'MAX_OUTPUT_ARTIFACTS' "$FILE"
+          grep -q 'MAX_DEPENDENCY_SNAPSHOTS' "$FILE"
+          grep -q 'value.chars().any(char::is_control)' "$FILE"
+          grep -q 'unknown_field_fails_during_deserialization' "$FILE"
+          grep -q 'invalid_domain_receipt_fails_during_deserialization' "$FILE"
+          grep -q 'oversized_artifact_lists_fail_closed' "$FILE"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Wire regression tests
+        run: cargo test --locked --lib knowledge::matter_crystal_execution_wire::tests
