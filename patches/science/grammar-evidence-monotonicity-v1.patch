@@ -2,6 +2,25 @@ diff --git a/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.
 index 80149c3..0000000 100644
 --- a/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
 +++ b/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
+@@ -245,7 +245,7 @@ impl DynamicGrammar {
+                         existing
+                             .parent_formulas
+                             .insert(conjecture_parent_formula_identity(conj));
+                         if conj.macro_promotion_tier.allows_recurrent_promotion()
+-                            && is_verified(&conj.status)
++                            && is_recurrently_verified(&conj.status)
+                         {
+                             existing.verified_count += 1;
+                             existing.promotion_tier = existing
+@@ -281,7 +281,7 @@ impl DynamicGrammar {
+                 sources.insert(conj.source.clone());
+                 parent_formulas.insert(conjecture_parent_formula_identity(conj));
+                 if conj.macro_promotion_tier.allows_recurrent_promotion()
+-                    && is_verified(&conj.status)
++                    && is_recurrently_verified(&conj.status)
+                 {
+                     verified_count += 1;
+                     promotion_tier = promotion_tier.max(MacroPromotionTier::RecurrentNumerical);
 @@ -609,15 +609,22 @@ impl Default for DynamicGrammar {
  // HELPERS
  // ═══════════════════════════════════════════════════════════════════════════
@@ -33,25 +52,6 @@ index 80149c3..0000000 100644
          _ => false,
      }
  }
-@@ -245,7 +252,7 @@ impl DynamicGrammar {
-                         existing
-                             .parent_formulas
-                             .insert(conjecture_parent_formula_identity(conj));
-                         if conj.macro_promotion_tier.allows_recurrent_promotion()
--                            && is_verified(&conj.status)
-+                            && is_recurrently_verified(&conj.status)
-                         {
-                             existing.verified_count += 1;
-                             existing.promotion_tier = existing
-@@ -281,7 +288,7 @@ impl DynamicGrammar {
-                 sources.insert(conj.source.clone());
-                 parent_formulas.insert(conjecture_parent_formula_identity(conj));
-                 if conj.macro_promotion_tier.allows_recurrent_promotion()
--                    && is_verified(&conj.status)
-+                    && is_recurrently_verified(&conj.status)
-                 {
-                     verified_count += 1;
-                     promotion_tier = promotion_tier.max(MacroPromotionTier::RecurrentNumerical);
 @@ -1714,5 +1721,76 @@ mod tests {
          assert_eq!(metrics.signature_stats[0].signature, "n");
          assert_eq!(metrics.signature_stats[0].used_operator_count, 1);
