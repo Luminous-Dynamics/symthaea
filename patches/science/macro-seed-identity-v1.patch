@@ -1,0 +1,209 @@
+diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine/regressor.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine/regressor.rs
+index b19c688..0000000 100644
+--- a/crates/core/symthaea-core/src/hdc/conjecture_engine/regressor.rs
++++ b/crates/core/symthaea-core/src/hdc/conjecture_engine/regressor.rs
+@@ -175,6 +175,30 @@ pub struct SeedSpecializationStats {
+     pub exact_fit_found: bool,
+ }
+ 
++/// Identity-bearing learned macro seed.
++///
++/// `identity` is the exact promoted-operator identity supplied by the grammar.
++/// It must not be reconstructed from `template`: the grammar may use a richer
++/// canonicalization (for example an EML-qualified identity) than the
++/// regressor's structural expression key.
++#[derive(Debug, Clone)]
++pub struct MacroSeed {
++    pub identity: String,
++    pub template: Expr,
++}
++
++impl MacroSeed {
++    pub fn new(identity: impl Into<String>, template: Expr) -> Self {
++        Self {
++            identity: identity.into(),
++            template,
++        }
++    }
++
++    fn inferred(template: Expr) -> Self {
++        let identity = macro_usage_key(&template);
++        Self { identity, template }
++    }
++}
++
+ /// Grammar-guided symbolic regression via genetic programming.
+ pub struct SymbolicRegressor {
+     config: RegressorConfig,
+@@ -182,7 +206,7 @@ pub struct SymbolicRegressor {
+     rng: u64,
+     /// Optional seed expressions from learned macro-operators (abstract thought).
+     /// Injected into the initial population alongside growth-class templates.
+-    seed_macros: Vec<Expr>,
++    seed_macros: Vec<MacroSeed>,
+     /// Per-generation best fitness (lower = better). Collected during `fit()`.
+     /// Enables cold-vs-primed convergence comparison and "generations-to-ε" analysis.
+     fitness_history: Vec<f64>,
+@@ -242,9 +266,19 @@ impl SymbolicRegressor {
+     /// Called by `ConjectureEngine::generate_conjectures` when abstract thought
+     /// is enabled and grammar has promoted macros. Each macro is instantiated
+     /// with random constants to explore parameter variations.
++    ///
++    /// Compatibility path: because raw expressions carry no external grammar
++    /// identity, their usage identity is inferred from the expression itself.
+     pub fn set_seed_macros(&mut self, macros: Vec<Expr>) {
+-        self.seed_macros = macros;
++        self.seed_macros = macros.into_iter().map(MacroSeed::inferred).collect();
++    }
++
++    /// Inject learned macros while preserving the exact identity assigned by
++    /// the dynamic grammar. Scientific ancestry/usage consumers should prefer
++    /// this path over reconstructing an identity from the expression template.
++    pub fn set_seed_macros_with_identity(&mut self, macros: Vec<MacroSeed>) {
++        self.seed_macros = macros;
+     }
+ 
+     /// Run symbolic regression on observed data.
+@@ -256,9 +290,8 @@ impl SymbolicRegressor {
+         self.seed_specialization_stats = SeedSpecializationStats::default();
+         // Pre-seed macro_usage keys so 0 counts are visible (not absent)
+-        for macro_expr in &self.seed_macros {
+-            let canonical = macro_usage_key(macro_expr);
+-            self.macro_usage.entry(canonical).or_insert(0);
++        for macro_seed in &self.seed_macros {
++            self.macro_usage.entry(macro_seed.identity.clone()).or_insert(0);
+         }
+         let (train, _test) = seq.train_test_split();
+@@ -366,8 +399,9 @@ impl SymbolicRegressor {
+             );
+             let mut specialized_variants = Vec::new();
+             let mut exact_fit_found = false;
+-            for template in &self.seed_macros {
+-                for variant in seed_macro_variants(template)
++            for macro_seed in &self.seed_macros {
++                let template = &macro_seed.template;
++                for variant in seed_macro_variants(template)
+                     .into_iter()
+                     .take(budget.max_variants_per_macro)
+                 {
+@@ -412,7 +446,9 @@ impl SymbolicRegressor {
+                 } else {
+                     self.rng = lcg_step(self.rng);
+                     let macro_idx = self.rng as usize % self.seed_macros.len();
+-                    self.seed_macros[macro_idx].mutate(&mut self.rng, 2)
++                    self.seed_macros[macro_idx]
++                        .template
++                        .mutate(&mut self.rng, 2)
+                 };
+                 self.population[slot] = seeded;
+             }
+@@ -607,10 +643,10 @@ impl SymbolicRegressor {
+             for &idx in &top_indices {
+                 let expr = &self.population[idx];
+-                for macro_expr in &self.seed_macros {
+-                    if contains_structural_match(expr, macro_expr) {
+-                        let key = macro_usage_key(macro_expr);
+-                        *self.macro_usage.entry(key).or_insert(0) += 1;
++                for macro_seed in &self.seed_macros {
++                    if contains_structural_match(expr, &macro_seed.template) {
++                        *self.macro_usage.entry(macro_seed.identity.clone()).or_insert(0) += 1;
+                     }
+                 }
+             }
+@@ -749,3 +785,49 @@ impl SymbolicRegressor {
+         best_idx
+     }
+ }
++
++#[cfg(test)]
++mod macro_seed_identity_tests {
++    use super::*;
++
++    #[test]
++    fn explicit_macro_seed_identity_survives_usage_accounting() {
++        let n = Expr::Var("n".into());
++        let template = Expr::BinOp(
++            BinOp::Add,
++            Box::new(Expr::Func(UnaryFn::Sin, Box::new(n.clone()))),
++            Box::new(Expr::BinOp(
++                BinOp::Mul,
++                Box::new(n.clone()),
++                Box::new(n),
++            )),
++        );
++        let identity = "eml:strict:fixture-scientific-macro-id".to_string();
++        let data = (1..=12)
++            .map(|x| {
++                let x = x as f64;
++                (x, x.sin() + x * x)
++            })
++            .collect();
++        let sequence = ObservedSequence::new("macro_identity_fixture", MathDomain::Physics, data);
++        let mut regressor = SymbolicRegressor::new(RegressorConfig {
++            population_size: 30,
++            generations: 0,
++            max_depth: 5,
++            max_complexity: 12,
++            lambda: 0.0,
++            seed: 17,
++            ..RegressorConfig::default()
++        });
++        regressor.set_seed_macros_with_identity(vec![MacroSeed::new(
++            identity.clone(),
++            template.clone(),
++        )]);
++
++        let results = regressor.fit(&sequence, 5);
++        assert!(
++            results
++                .iter()
++                .any(|candidate| contains_structural_match(&candidate.formula, &template)),
++            "identity fixture must retain the seeded macro in at least one returned candidate"
++        );
++        assert!(
++            regressor.macro_usage().get(&identity).copied().unwrap_or(0) > 0,
++            "usage must be attributed to the exact caller-supplied macro identity"
++        );
++    }
++}
+diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+index 7cfb3be..0000000 100644
+--- a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
++++ b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+@@ -381,14 +381,17 @@ impl ConjectureEngine {
+     }
+ 
+     #[cfg(feature = "abstract_thought")]
+-    fn compatible_macro_seeds_for_sequence(&self) -> Vec<Expr> {
++    fn compatible_macro_seeds_for_sequence(&self) -> Vec<MacroSeed> {
+         self.abstract_thought
+             .as_ref()
+             .map(|at| {
+                 at.dynamic_grammar
+                     .operators_compatible_with_vars(&["n"])
+                     .into_iter()
+-                    .map(|op| op.template.clone())
++                    .map(|op| MacroSeed::new(op.canonical.clone(), op.template.clone()))
+                     .collect()
+             })
+             .unwrap_or_default()
+@@ -640,9 +643,9 @@ impl ConjectureEngine {
+             // These are learned sub-expressions that recur across past conjectures,
+             // now injected as GP seeds to accelerate future discovery.
+             #[cfg(feature = "abstract_thought")]
+-            let macro_seeds: Vec<Expr> = self.compatible_macro_seeds_for_sequence();
++            let macro_seeds: Vec<MacroSeed> = self.compatible_macro_seeds_for_sequence();
+             #[cfg(not(feature = "abstract_thought"))]
+-            let macro_seeds: Vec<Expr> = Vec::new();
++            let macro_seeds: Vec<MacroSeed> = Vec::new();
+ 
+             let mut all_conjectures = Vec::new();
+             for &seed in &seeds {
+@@ -669,7 +672,7 @@ impl ConjectureEngine {
+                     use_lie_fitness: self.config.use_lie_fitness,
+                 });
+                 if !macro_seeds.is_empty() {
+-                    regressor.set_seed_macros(macro_seeds.clone());
++                    regressor.set_seed_macros_with_identity(macro_seeds.clone());
+                 }
+                 let results = regressor.fit(seq, top_k_per_sequence);
