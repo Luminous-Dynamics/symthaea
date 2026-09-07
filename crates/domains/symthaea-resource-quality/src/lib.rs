@@ -10,6 +10,9 @@
 
 #![deny(unsafe_code)]
 
+pub mod graph;
+pub use graph::*;
+
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use symthaea_resource_model::ResourceKey;
