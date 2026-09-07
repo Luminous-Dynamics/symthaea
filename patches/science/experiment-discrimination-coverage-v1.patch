@@ -1,0 +1,238 @@
+diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+index 7cfb3be..2222222 100644
+--- a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
++++ b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+@@ -68,7 +68,10 @@ use dynamics::*;
+ /// FEP-flavored active experiment selection. See
+ /// `experiment_selection.rs` module docs.
+-pub use experiment_selection::{epistemic_value, select_most_informative_experiment};
++pub use experiment_selection::{
++    ExperimentDiscrimination, epistemic_value, experiment_discrimination,
++    select_most_informative_experiment, select_most_informative_experiment_with_min_coverage,
++};
+ pub use expressions::*;
+ /// Stage B M2: constrained flux discovery given a known density. See
+ /// `flux_discovery.rs` module docs.
+diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs
+index 06a0339..3333333 100644
+--- a/crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs
++++ b/crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs
+@@ -52,6 +52,46 @@ fn variance(values: &[f64]) -> f64 {
+     values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64
+ }
+ 
++/// Coverage-aware diagnostic for one candidate experiment.
++///
++/// `prediction_variance` remains the original query-by-committee disagreement
++/// score. The additional counts make explicit how much of the live hypothesis
++/// set could actually be evaluated at this experiment. Coverage is not a
++/// posterior probability and does not by itself make an experiment useful.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct ExperimentDiscrimination {
++    pub prediction_variance: f64,
++    pub valid_predictions: usize,
++    pub total_hypotheses: usize,
++}
++
++impl ExperimentDiscrimination {
++    /// Fraction of hypotheses that produced a finite prediction.
++    pub fn prediction_coverage(&self) -> f64 {
++        if self.total_hypotheses == 0 {
++            0.0
++        } else {
++            self.valid_predictions as f64 / self.total_hypotheses as f64
++        }
++    }
++}
++
++/// Measure prediction disagreement and prediction coverage for one experiment.
++///
++/// `None` and non-finite predictions are both treated as unavailable. This
++/// follows the module contract that undefined/non-finite predictions should not
++/// be injected into the disagreement statistic as numerical values.
++pub fn experiment_discrimination<H, E>(
++    experiment: &E,
++    hypotheses: &[H],
++    predict: impl Fn(&H, &E) -> Option<f64>,
++) -> ExperimentDiscrimination {
++    let predictions: Vec<f64> = hypotheses
++        .iter()
++        .filter_map(|h| predict(h, experiment).filter(|value| value.is_finite()))
++        .collect();
++    ExperimentDiscrimination {
++        prediction_variance: variance(&predictions),
++        valid_predictions: predictions.len(),
++        total_hypotheses: hypotheses.len(),
++    }
++}
++
+ /// How informative would running `experiment` be for discriminating among
+ /// `hypotheses`? Scored as the variance of their predictions for that
+ /// experiment -- high variance means the hypotheses disagree a lot, so
+@@ -68,11 +108,7 @@ pub fn epistemic_value<H, E>(
+     hypotheses: &[H],
+     predict: impl Fn(&H, &E) -> Option<f64>,
+ ) -> f64 {
+-    let predictions: Vec<f64> = hypotheses
+-        .iter()
+-        .filter_map(|h| predict(h, experiment))
+-        .collect();
+-    variance(&predictions)
++    experiment_discrimination(experiment, hypotheses, predict).prediction_variance
+ }
+ 
+ /// Select, from a pool of candidate experiments, the one with maximum
+@@ -80,15 +116,60 @@ pub fn epistemic_value<H, E>(
+ /// discriminating experiment to run next. Returns `None` if `candidates` is
+ /// empty. Ties broken by first occurrence (stable, deterministic given a
+ /// fixed candidate ordering).
++///
++/// This compatibility selector is intentionally coverage-unaware. Use
++/// [`select_most_informative_experiment_with_min_coverage`] when sparse model
++/// support should disqualify an otherwise high-variance experiment.
+ pub fn select_most_informative_experiment<'a, H, E>(
+     candidates: &'a [E],
+     hypotheses: &[H],
+     predict: impl Fn(&H, &E) -> Option<f64> + Copy,
+ ) -> Option<(&'a E, f64)> {
+-    candidates
+-        .iter()
+-        .map(|e| (e, epistemic_value(e, hypotheses, predict)))
+-        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
++    let mut best: Option<(&E, f64)> = None;
++    for experiment in candidates {
++        let value = epistemic_value(experiment, hypotheses, predict);
++        match best {
++            None => best = Some((experiment, value)),
++            Some((_, best_value)) if value > best_value => {
++                best = Some((experiment, value));
++            }
++            _ => {}
++        }
++    }
++    best
++}
++
++/// Select the highest-disagreement experiment that is evaluable by at least
++/// `min_prediction_coverage` of the live hypotheses.
++///
++/// Experiments with fewer than two finite predictions are never eligible,
++/// because there is no pairwise disagreement to measure. `None` is returned
++/// for an empty candidate pool, an invalid coverage threshold, or when no
++/// experiment meets the requested coverage.
++///
++/// This is still a query-by-committee heuristic, not expected information gain:
++/// it does not yet model hypothesis posterior weights, measurement noise, cost,
++/// duration, safety risk, or intervention feasibility.
++pub fn select_most_informative_experiment_with_min_coverage<'a, H, E>(
++    candidates: &'a [E],
++    hypotheses: &[H],
++    min_prediction_coverage: f64,
++    predict: impl Fn(&H, &E) -> Option<f64> + Copy,
++) -> Option<(&'a E, ExperimentDiscrimination)> {
++    if !min_prediction_coverage.is_finite() || !(0.0..=1.0).contains(&min_prediction_coverage) {
++        return None;
++    }
++
++    let mut best: Option<(&E, ExperimentDiscrimination)> = None;
++    for experiment in candidates {
++        let score = experiment_discrimination(experiment, hypotheses, predict);
++        if score.valid_predictions < 2 || score.prediction_coverage() < min_prediction_coverage {
++            continue;
++        }
++        match best {
++            None => best = Some((experiment, score)),
++            Some((_, best_score)) if score.prediction_variance > best_score.prediction_variance => {
++                best = Some((experiment, score));
++            }
++            _ => {}
++        }
++    }
++    best
+ }
+ 
+ #[cfg(test)]
+@@ -167,4 +248,70 @@ mod tests {
+             "should prefer the point where x vs x^2 diverge most"
+         );
+     }
++
++    #[test]
++    fn non_finite_predictions_are_unavailable_not_numeric_evidence() {
++        let hypotheses = ["left", "nan", "right"];
++        let predict = |h: &&str, _: &f64| match *h {
++            "left" => Some(1.0),
++            "nan" => Some(f64::NAN),
++            "right" => Some(3.0),
++            _ => None,
++        };
++        let score = experiment_discrimination(&0.0, &hypotheses, predict);
++        assert_eq!(score.valid_predictions, 2);
++        assert_eq!(score.total_hypotheses, 3);
++        assert!((score.prediction_coverage() - 2.0 / 3.0).abs() < 1e-12);
++        assert!((score.prediction_variance - 1.0).abs() < 1e-12);
++        assert!(epistemic_value(&0.0, &hypotheses, predict).is_finite());
++    }
++
++    #[test]
++    fn compatibility_selector_really_breaks_ties_by_first_occurrence() {
++        let hypotheses: Vec<fn(f64) -> f64> = vec![|x| x, |x| -x];
++        let predict = |h: &fn(f64) -> f64, x: &f64| Some(h(*x));
++        let candidates = [-1.0, 1.0];
++        let (chosen, value) = select_most_informative_experiment(&candidates, &hypotheses, predict)
++            .expect("non-empty candidate pool");
++        assert_eq!(*chosen, -1.0);
++        assert!((value - 1.0).abs() < 1e-12);
++    }
++
++    #[test]
++    fn coverage_aware_selector_rejects_sparse_high_variance_experiment() {
++        let hypotheses = ["h1", "h2", "h3", "h4"];
++        let predict = |h: &&str, x: &f64| {
++            if *x == 10.0 {
++                match *h {
++                    "h1" => Some(-100.0),
++                    "h2" => Some(100.0),
++                    _ => None,
++                }
++            } else {
++                match *h {
++                    "h1" => Some(0.0),
++                    "h2" => Some(1.0),
++                    "h3" => Some(2.0),
++                    "h4" => Some(3.0),
++                    _ => None,
++                }
++            }
++        };
++        let candidates = [10.0, 1.0];
++
++        let (baseline, _) =
++            select_most_informative_experiment(&candidates, &hypotheses, predict).unwrap();
++        assert_eq!(*baseline, 10.0, "variance-only baseline should prefer sparse extreme disagreement");
++
++        let (chosen, score) = select_most_informative_experiment_with_min_coverage(
++            &candidates,
++            &hypotheses,
++            0.75,
++            predict,
++        )
++        .expect("full-coverage candidate should remain eligible");
++        assert_eq!(*chosen, 1.0);
++        assert_eq!(score.valid_predictions, 4);
++        assert_eq!(score.prediction_coverage(), 1.0);
++    }
++
++    #[test]
++    fn invalid_prediction_coverage_threshold_fails_closed() {
++        let hypotheses = [1.0, 2.0];
++        let candidates = [0.0];
++        let predict = |h: &f64, _: &f64| Some(*h);
++        assert!(select_most_informative_experiment_with_min_coverage(
++            &candidates, &hypotheses, f64::NAN, predict
++        ).is_none());
++        assert!(select_most_informative_experiment_with_min_coverage(
++            &candidates, &hypotheses, 1.1, predict
++        ).is_none());
++    }
+ }
