@@ -305,8 +305,8 @@ pub enum ConfirmatoryContractError {
     DuplicateClaimCriterion,
     #[error("completed safety case does not cite semantic-canonical v4 simulation lineage")]
     MissingSemanticClaimBoundSafetyEvidence,
-    #[error("private v3 confirmatory contract failed: {0}")]
-    Lower(v3::ConfirmatoryContractError),
+    #[error("private v3 structural qualification unexpectedly lacked its exact simulation lineage")]
+    InternalV3StructuralEvidenceMissing,
 }
 
 impl From<v3::ConfirmatoryContractError> for ConfirmatoryContractError {
@@ -320,7 +320,9 @@ impl From<v3::ConfirmatoryContractError> for ConfirmatoryContractError {
             v3::ConfirmatoryContractError::ClaimMetricRequestedMultipleTimes(metric) => {
                 Self::ClaimMetricRequestedMultipleTimes(metric)
             }
-            other => Self::Lower(other),
+            v3::ConfirmatoryContractError::MissingClaimBoundSafetyEvidence => {
+                Self::InternalV3StructuralEvidenceMissing
+            }
         }
     }
 }
