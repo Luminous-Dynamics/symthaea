@@ -230,11 +230,17 @@ impl PartitionRecoverySupervisor {
         self.reconciliations
     }
 
+    /// Clear only provisional reconciliation progress while preserving the
+    /// current partition/recovery restriction and the evidence that a
+    /// partition occurred.
+    ///
+    /// A reset cannot establish connectivity, motion authority, or
+    /// authoritative team state. If reconciliation was already in progress,
+    /// its positive dwell is conservatively discarded and must be earned again
+    /// from fresh observations.
     pub fn reset_runtime(&mut self) {
-        self.mode = PartitionRecoveryMode::Connected;
-        self.partition_steps = 0;
         self.reconciliation_steps = 0;
-        self.last_assessment = PartitionRecoveryAssessment::connected();
+        self.last_assessment.reconciliation_steps = 0;
     }
 }
 
@@ -306,5 +312,59 @@ mod tests {
         let assessment = supervisor.update(diverged);
         assert_eq!(assessment.reconciliation_steps, 0);
         assert_eq!(assessment.map_revision_gap, 5);
+    }
+
+    #[test]
+    fn runtime_reset_cannot_manufacture_connected_authority() {
+        let mut supervisor = PartitionRecoverySupervisor::new(PartitionRecoveryPolicy {
+            grace_steps: 0,
+            local_autonomy_steps: 0,
+            ..Default::default()
+        });
+        let mut lost = observation(false);
+        lost.return_feasible = false;
+        let before = supervisor.update(lost);
+        assert_eq!(before.mode, PartitionRecoveryMode::HoldAndBeacon);
+        assert!(!before.motion_permitted);
+        assert!(!before.team_state_authoritative);
+
+        supervisor.reset_runtime();
+
+        let after = supervisor.assessment();
+        assert_eq!(after.mode, PartitionRecoveryMode::HoldAndBeacon);
+        assert!(!after.motion_permitted);
+        assert!(!after.team_state_authoritative);
+    }
+
+    #[test]
+    fn runtime_reset_discards_partial_reconciliation_dwell() {
+        let mut supervisor = PartitionRecoverySupervisor::new(PartitionRecoveryPolicy {
+            grace_steps: 0,
+            local_autonomy_steps: 0,
+            reconciliation_dwell_steps: 2,
+            ..Default::default()
+        });
+        supervisor.update(observation(false));
+        let first = supervisor.update(observation(true));
+        assert_eq!(first.mode, PartitionRecoveryMode::Reconciling);
+        assert_eq!(first.reconciliation_steps, 1);
+        assert!(!first.motion_permitted);
+
+        supervisor.reset_runtime();
+
+        let reset = supervisor.assessment();
+        assert_eq!(reset.mode, PartitionRecoveryMode::Reconciling);
+        assert_eq!(reset.reconciliation_steps, 0);
+        assert!(!reset.motion_permitted);
+        assert!(!reset.team_state_authoritative);
+
+        let after_one_fresh = supervisor.update(observation(true));
+        assert_eq!(after_one_fresh.mode, PartitionRecoveryMode::Reconciling);
+        assert_eq!(after_one_fresh.reconciliation_steps, 1);
+        assert!(!after_one_fresh.team_state_authoritative);
+
+        let after_two_fresh = supervisor.update(observation(true));
+        assert_eq!(after_two_fresh.mode, PartitionRecoveryMode::Connected);
+        assert!(after_two_fresh.team_state_authoritative);
     }
 }
