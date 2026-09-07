@@ -1,0 +1,232 @@
+diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs
+index 1bf4b66..0000000 100644
+--- a/crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs
++++ b/crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs
+@@ -1,5 +1,11 @@
+ use super::*;
+ 
++/// Whether this conjecture has a sampled-equivalent EML execution backend.
++///
++/// This is an execution/representation property only. It does not establish
++/// that the conjecture fits observations, is symbolically true, has a formal
++/// proof, or is eligible for scientific grammar promotion. Callers must not
++/// treat backend equivalence as conjecture verification.
+ pub fn conjecture_has_verified_eml_backend(conjecture: &Conjecture) -> bool {
+     conjecture.eml_compiled.is_some()
+         || conjecture.eml_constructive_compiled.is_some()
+diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine/verification.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine/verification.rs
+index e14c65e..0000000 100644
+--- a/crates/core/symthaea-core/src/hdc/conjecture_engine/verification.rs
++++ b/crates/core/symthaea-core/src/hdc/conjecture_engine/verification.rs
+@@ -43,9 +43,10 @@ impl ConjectureEngine {
+                 {
+                     conjecture.status = ConjectureStatus::NumericallyTested { test_mse };
+-                    let macro_safe_numeric_fit = test_mse < 1e-3
+-                        || mean_rel_error < 0.01
+-                        || conjecture_has_verified_eml_backend(conjecture);
++                    // Grammar admissibility is based on predictive fit here.
++                    // EML backend equivalence is deliberately excluded: it
++                    // only checks representation/execution agreement.
++                    let macro_safe_numeric_fit = test_mse < 1e-3 || mean_rel_error < 0.01;
+                     if macro_safe_numeric_fit {
+                         elevate_macro_promotion_tier(
+                             conjecture,
+@@ -177,3 +178,58 @@ impl ConjectureEngine {
+         }
+     }
+ }
++
++#[cfg(test)]
++mod eml_authority_boundary_tests {
++    use super::*;
++
++    #[test]
++    fn eml_equivalence_does_not_make_mediocre_numeric_fit_macro_safe() {
++        let data: Vec<(f64, f64)> = (1..=10)
++            .map(|x| {
++                let x = x as f64;
++                (x, x)
++            })
++            .collect();
++        let sequence = ObservedSequence::new("eml_authority_fixture", MathDomain::Physics, data);
++        let formula = Expr::BinOp(
++            BinOp::Mul,
++            Box::new(Expr::Const(0.95)),
++            Box::new(Expr::Var("n".into())),
++        );
++        let mut conjecture = Conjecture {
++            formula: formula.clone(),
++            formula_str: format!("{formula}"),
++            source: sequence.name.clone(),
++            domain: MathDomain::Physics,
++            training_mse: 0.1,
++            complexity: formula.complexity(),
++            fitness: 0.1,
++            status: ConjectureStatus::Proposed,
++            confidence: 0.5,
++            macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
++            eml_compiled: None,
++            eml_metrics: None,
++            eml_verified_real: None,
++            eml_real_domain: None,
++            eml_verified_complex: None,
++            eml_constructive_compiled: None,
++            eml_constructive_metrics: None,
++            eml_verified_constructive_real: None,
++        };
++        attach_eml_metadata(&mut conjecture);
++        assert!(
++            conjecture_has_verified_eml_backend(&conjecture),
++            "fixture must have verified EML representation equivalence"
++        );
++
++        let mut engine = ConjectureEngine::new();
++        engine.observe(sequence);
++        engine.conjectures.push(conjecture);
++        engine.verify_numerical();
++
++        assert!(matches!(
++            engine.conjectures[0].status,
++            ConjectureStatus::NumericallyTested { .. }
++        ));
++        assert_eq!(
++            engine.conjectures[0].macro_promotion_tier,
++            MacroPromotionTier::Quarantined,
++            "5% held-out relative error must remain macro-quarantined even when EML-equivalent"
++        );
++    }
++}
+diff --git a/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs b/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
+index 80149c3..0000000 100644
+--- a/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
++++ b/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
+@@ -31,10 +31,8 @@ use std::collections::{HashMap, HashSet};
+ 
+ use crate::hdc::binary_hv::BinaryHV;
+ use crate::hdc::conjecture_engine::{
+-    BinOp, Conjecture, ConjectureEngine, ConjectureStatus, Expr, MacroPromotionTier,
+-    PreferredEmlBackend, conjecture_has_verified_eml_backend,
++    BinOp, Conjecture, ConjectureEngine, ConjectureStatus, Expr, MacroPromotionTier,
+ };
+ use crate::hdc::deterministic_seeds::seed_from_name;
+ use crate::hdc::eml;
+@@ -341,9 +339,9 @@ impl DynamicGrammar {
+             let a = &self.candidates[*a_idx];
+             let b = &self.candidates[*b_idx];
+             b_fast
+                 .cmp(a_fast)
+-                .then_with(|| {
+-                    candidate_fast_track_rank(a, engine).cmp(&candidate_fast_track_rank(b, engine))
+-                })
++                // EML rank is only an execution/canonicalization tiebreaker
++                // after scientific promotion eligibility has been established
++                // independently by status/recurrence evidence.
+                 .then_with(|| candidate_eml_rank(a).cmp(&candidate_eml_rank(b)))
+                 .then_with(|| b.strongly_verified_count.cmp(&a.strongly_verified_count))
+                 .then_with(|| b.verified_count.cmp(&a.verified_count))
+@@ -642,7 +640,11 @@ fn is_strongly_verified(status: &ConjectureStatus) -> bool {
+ }
+ 
+ fn conjecture_supports_fast_track(conjecture: &crate::hdc::conjecture_engine::Conjecture) -> bool {
+-    is_strongly_verified(&conjecture.status) || conjecture_has_verified_eml_backend(conjecture)
++    // Fast-track is scientific-evidence authority. EML compilation/round-trip
++    // verification establishes only that another execution representation
++    // agrees with this expression; it says nothing about whether the
++    // conjecture itself is true.
++    is_strongly_verified(&conjecture.status)
+ }
+ 
+ fn conjecture_parent_formula_identity(
+@@ -677,47 +679,6 @@ fn candidate_eml_rank(candidate: &SubtreeCandidate) -> u8 {
+     }
+ }
+ 
+-fn candidate_fast_track_rank(candidate: &SubtreeCandidate, engine: &ConjectureEngine) -> u8 {
+-    candidate
+-        .occurrences
+-        .iter()
+-        .filter_map(|&id| engine.conjectures.get(id))
+-        .filter(|conj| conjecture_supports_fast_track(conj))
+-        .map(conjecture_fast_track_rank)
+-        .min()
+-        .unwrap_or(u8::MAX)
+-}
+-
+-fn conjecture_fast_track_rank(conjecture: &Conjecture) -> u8 {
+-    if is_strongly_verified(&conjecture.status) {
+-        return 0;
+-    }
+-
+-    match conjecture.preferred_eml_backend() {
+-        Some(PreferredEmlBackend::StrictRealAndComplex) => {
+-            if conjecture
+-                .eml_real_domain
+-                .is_some_and(|d| d.is_unconstrained())
+-            {
+-                1
+-            } else {
+-                2
+-            }
+-        }
+-        Some(PreferredEmlBackend::StrictReal) => {
+-            if conjecture
+-                .eml_real_domain
+-                .is_some_and(|d| d.is_unconstrained())
+-            {
+-                3
+-            } else {
+-                4
+-            }
+-        }
+-        Some(PreferredEmlBackend::StrictComplex) => 5,
+-        Some(PreferredEmlBackend::ConstructiveReal) => 6,
+-        Some(PreferredEmlBackend::StrictUnverified) | None => 7,
+-    }
+-}
+-
+ fn subtree_admits_fast_track(expr: &Expr) -> bool {
+     !(contains_unary_fn(expr)
+         && crate::hdc::abstract_thought::expr_variables(expr).len() <= 1
+@@ -1714,5 +1675,44 @@ mod tests {
+         assert_eq!(metrics.signature_stats[0].signature, "n");
+         assert_eq!(metrics.signature_stats[0].used_operator_count, 1);
+     }
++
++    #[test]
++    fn eml_backend_equivalence_does_not_fast_track_proposed_conjecture() {
++        let formula = n_squared_plus_c(1.0);
++        let mut conjecture = make_conjecture(
++            formula.clone(),
++            MathDomain::Physics,
++            "eml_only_proposed",
++            ConjectureStatus::Proposed,
++        );
++        conjecture.macro_promotion_tier = MacroPromotionTier::RecurrentNumerical;
++        attach_eml_metadata(&mut conjecture);
++        assert!(
++            crate::hdc::conjecture_engine::conjecture_has_verified_eml_backend(&conjecture),
++            "fixture must have verified EML representation equivalence"
++        );
++
++        let mut engine = ConjectureEngine::new();
++        engine.conjectures.push(conjecture);
++        let mut grammar = DynamicGrammar::new();
++        grammar.observe_subtree(normalize_expr(&formula), &[0], &engine);
++
++        assert_eq!(grammar.candidates.len(), 1);
++        assert_eq!(
++            grammar.candidates[0].strongly_verified_count, 0,
++            "backend equivalence must not count as strong conjecture verification"
++        );
++        assert_eq!(
++            grammar.candidates[0].promotion_tier,
++            MacroPromotionTier::Quarantined
++        );
++
++        grammar.promote_eligible(&engine);
++        assert!(
++            grammar.operators.is_empty(),
++            "a Proposed conjecture must not singleton-fast-track from EML equivalence"
++        );
++    }
+ }
