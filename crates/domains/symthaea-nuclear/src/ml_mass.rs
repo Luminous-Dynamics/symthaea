@@ -17,12 +17,74 @@
 
 use crate::ame2020::ame2020_reference_nuclei;
 use crate::deformation::frdm_deformation;
+use crate::discovery::MeasuredNucleus;
 use crate::duflo_zuker::dz_binding_energy;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use std::fmt;
 
 /// Magic numbers for shell proximity feature.
 const MAGIC_Z: &[f64] = &[2.0, 8.0, 20.0, 28.0, 50.0, 82.0, 114.0, 126.0];
 const MAGIC_N: &[f64] = &[2.0, 8.0, 20.0, 28.0, 50.0, 82.0, 126.0, 184.0];
+
+/// Frozen Random-Forest hyperparameters used by one fit.
+///
+/// Keeping these explicit is important for blind-validation receipts: the
+/// training corpus alone is not enough to reproduce a learned model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MlMassConfig {
+    pub n_trees: usize,
+    pub max_depth: usize,
+    pub min_samples: usize,
+    pub seed: u64,
+}
+
+impl Default for MlMassConfig {
+    fn default() -> Self {
+        Self {
+            n_trees: 50,
+            max_depth: 8,
+            min_samples: 3,
+            seed: 42,
+        }
+    }
+}
+
+/// Failure to construct a learned nuclear-mass model from an explicit corpus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MlMassFitError {
+    EmptyTrainingSet,
+    EstimatedMassInTraining { z: u16, n: u16 },
+    DuplicateTrainingNucleus { z: u16, n: u16 },
+    NonFiniteTrainingEnergy { z: u16, n: u16 },
+    InvalidTrainingCoordinate { z: u16, n: u16 },
+    InvalidConfig,
+}
+
+impl fmt::Display for MlMassFitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyTrainingSet => write!(f, "ML nuclear-mass training set is empty"),
+            Self::EstimatedMassInTraining { z, n } => write!(
+                f,
+                "estimated/extrapolated nucleus entered measured-only ML training at Z={z}, N={n}"
+            ),
+            Self::DuplicateTrainingNucleus { z, n } => {
+                write!(f, "duplicate ML training nucleus at Z={z}, N={n}")
+            }
+            Self::NonFiniteTrainingEnergy { z, n } => write!(
+                f,
+                "non-finite ML training binding energy at Z={z}, N={n}"
+            ),
+            Self::InvalidTrainingCoordinate { z, n } => {
+                write!(f, "invalid ML training coordinate Z={z}, N={n}")
+            }
+            Self::InvalidConfig => write!(f, "invalid ML nuclear-mass Random-Forest configuration"),
+        }
+    }
+}
+
+impl std::error::Error for MlMassFitError {}
 
 /// ML mass prediction result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,7 +95,10 @@ pub struct MlMassPrediction {
     pub dz_baseline: f64,
     /// ML correction (MeV)
     pub ml_correction: f64,
-    /// Estimated uncertainty (MeV) — std dev of tree predictions
+    /// Tree-prediction standard deviation (MeV).
+    ///
+    /// This is an ensemble-dispersion proxy, not a calibrated predictive
+    /// uncertainty interval.
     pub uncertainty: f64,
     /// Binding energy per nucleon (MeV)
     pub ba: f64,
@@ -107,6 +172,48 @@ fn extract_features(z: u16, n: u16) -> [f64; 12] {
     ]
 }
 
+fn validate_training_corpus(
+    nuclei: &[MeasuredNucleus],
+    config: MlMassConfig,
+) -> Result<(), MlMassFitError> {
+    if nuclei.is_empty() {
+        return Err(MlMassFitError::EmptyTrainingSet);
+    }
+    if config.n_trees == 0 || config.max_depth == 0 || config.min_samples == 0 {
+        return Err(MlMassFitError::InvalidConfig);
+    }
+
+    let mut seen = BTreeSet::new();
+    for nucleus in nuclei {
+        if !nucleus.is_measured {
+            return Err(MlMassFitError::EstimatedMassInTraining {
+                z: nucleus.z,
+                n: nucleus.n,
+            });
+        }
+        if nucleus.z == 0 && nucleus.n == 0 {
+            return Err(MlMassFitError::InvalidTrainingCoordinate {
+                z: nucleus.z,
+                n: nucleus.n,
+            });
+        }
+        if !nucleus.binding_energy_mev.is_finite() {
+            return Err(MlMassFitError::NonFiniteTrainingEnergy {
+                z: nucleus.z,
+                n: nucleus.n,
+            });
+        }
+        if !seen.insert((nucleus.z, nucleus.n)) {
+            return Err(MlMassFitError::DuplicateTrainingNucleus {
+                z: nucleus.z,
+                n: nucleus.n,
+            });
+        }
+    }
+
+    Ok(())
+}
+
 /// A single decision tree node.
 #[derive(Debug, Clone)]
 enum TreeNode {
@@ -152,10 +259,11 @@ impl RandomForest {
         n_trees: usize,
         max_depth: usize,
         min_samples: usize,
+        seed: u64,
     ) -> Self {
         let n = features.len();
         let mut trees = Vec::with_capacity(n_trees);
-        let mut rng_state: u64 = 42;
+        let mut rng_state = seed;
 
         for _ in 0..n_trees {
             // Bootstrap sample
@@ -324,35 +432,62 @@ impl RandomForest {
 /// Architecture: DZ baseline + Random Forest correction on residuals.
 pub struct MlMassPredictor {
     forest: RandomForest,
+    config: MlMassConfig,
 }
 
 impl MlMassPredictor {
-    /// Create and train the predictor on AME2020 data.
+    /// Create and train the exploratory predictor on all measured AME2020 data.
+    ///
+    /// Blind/extrapolation protocols must use `fit_measured` or
+    /// `fit_measured_with_config` with their exact frozen training partition.
     pub fn new() -> Self {
-        let nuclei = ame2020_reference_nuclei();
+        let nuclei: Vec<_> = ame2020_reference_nuclei()
+            .into_iter()
+            .filter(|nucleus| nucleus.is_measured)
+            .collect();
+        Self::fit_measured(&nuclei)
+            .expect("built-in measured AME2020 corpus must satisfy ML training invariants")
+    }
 
-        // Extract features and compute DZ residuals
-        let mut features = Vec::new();
-        let mut residuals = Vec::new();
+    /// Fit from an explicit measured training corpus using the frozen default
+    /// Random-Forest configuration.
+    pub fn fit_measured(nuclei: &[MeasuredNucleus]) -> Result<Self, MlMassFitError> {
+        Self::fit_measured_with_config(nuclei, MlMassConfig::default())
+    }
 
-        for nuc in &nuclei {
-            if !nuc.is_measured {
-                continue;
-            }
-            let dz_be = dz_binding_energy(nuc.z, nuc.n);
-            let residual = nuc.binding_energy_mev - dz_be;
-            features.push(extract_features(nuc.z, nuc.n));
-            residuals.push(residual);
+    /// Fit from an explicit measured training corpus and explicit configuration.
+    ///
+    /// No AME lookup occurs inside this function. This is the constructor that
+    /// blind-validation code should use so the caller can prove the exact fit
+    /// ancestry.
+    pub fn fit_measured_with_config(
+        nuclei: &[MeasuredNucleus],
+        config: MlMassConfig,
+    ) -> Result<Self, MlMassFitError> {
+        validate_training_corpus(nuclei, config)?;
+
+        let mut features = Vec::with_capacity(nuclei.len());
+        let mut residuals = Vec::with_capacity(nuclei.len());
+        for nucleus in nuclei {
+            let dz_be = dz_binding_energy(nucleus.z, nucleus.n);
+            features.push(extract_features(nucleus.z, nucleus.n));
+            residuals.push(nucleus.binding_energy_mev - dz_be);
         }
 
-        // Train Random Forest on residuals
         let forest = RandomForest::train(
-            &features, &residuals, 50, // 50 trees
-            8,  // max depth 8
-            3,  // min 3 samples per leaf
+            &features,
+            &residuals,
+            config.n_trees,
+            config.max_depth,
+            config.min_samples,
+            config.seed,
         );
 
-        Self { forest }
+        Ok(Self { forest, config })
+    }
+
+    pub fn config(&self) -> MlMassConfig {
+        self.config
     }
 
     /// Predict binding energy for (Z, N).
@@ -387,29 +522,19 @@ impl MlMassPredictor {
             let test_start = fold * fold_size;
             let test_end = if fold == 4 { n } else { (fold + 1) * fold_size };
 
-            // Train on everything except fold
-            let mut train_features = Vec::new();
-            let mut train_targets = Vec::new();
-
-            for (i, nuc) in nuclei.iter().enumerate() {
-                if i >= test_start && i < test_end {
-                    continue;
-                }
-                let dz_be = dz_binding_energy(nuc.z, nuc.n);
-                train_features.push(extract_features(nuc.z, nuc.n));
-                train_targets.push(nuc.binding_energy_mev - dz_be);
-            }
-
-            let forest = RandomForest::train(&train_features, &train_targets, 50, 8, 3);
+            let train_nuclei: Vec<_> = nuclei
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index < test_start || *index >= test_end)
+                .map(|(_, nucleus)| nucleus.clone())
+                .collect();
+            let predictor = Self::fit_measured(&train_nuclei)
+                .expect("measured cross-validation fold must satisfy ML training invariants");
 
             // Test on fold
-            for i in test_start..test_end {
-                let nuc = &nuclei[i];
-                let features = extract_features(nuc.z, nuc.n);
-                let dz_be = dz_binding_energy(nuc.z, nuc.n);
-                let (correction, _) = forest.predict(&features);
-                let predicted = dz_be + correction;
-                let error = predicted - nuc.binding_energy_mev;
+            for nucleus in &nuclei[test_start..test_end] {
+                let predicted = predictor.predict(nucleus.z, nucleus.n).binding_energy;
+                let error = predicted - nucleus.binding_energy_mev;
                 total_sq_error += error * error;
                 total_count += 1;
             }
@@ -437,6 +562,67 @@ mod tests {
         assert_eq!(features[2], 56.0); // A
         assert!(features[3].abs() < 0.1); // low isospin for Fe-56
         assert_eq!(features[4], 1.0); // even-even
+    }
+
+    #[test]
+    fn explicit_training_path_matches_legacy_full_corpus_constructor() {
+        let measured: Vec<_> = ame2020_reference_nuclei()
+            .into_iter()
+            .filter(|nucleus| nucleus.is_measured)
+            .collect();
+        let explicit = MlMassPredictor::fit_measured(&measured).unwrap();
+        let legacy = MlMassPredictor::new();
+
+        for (z, n) in [(26, 30), (50, 70), (82, 126), (114, 184)] {
+            let explicit_prediction = explicit.predict(z, n);
+            let legacy_prediction = legacy.predict(z, n);
+            assert_eq!(
+                explicit_prediction.binding_energy.to_bits(),
+                legacy_prediction.binding_energy.to_bits()
+            );
+            assert_eq!(
+                explicit_prediction.uncertainty.to_bits(),
+                legacy_prediction.uncertainty.to_bits()
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_training_path_fails_closed_on_bad_corpus() {
+        let measured = ame2020_reference_nuclei()
+            .into_iter()
+            .find(|nucleus| nucleus.is_measured)
+            .unwrap();
+
+        let mut estimated = measured.clone();
+        estimated.is_measured = false;
+        assert!(matches!(
+            MlMassPredictor::fit_measured(&[estimated]),
+            Err(MlMassFitError::EstimatedMassInTraining { .. })
+        ));
+
+        assert!(matches!(
+            MlMassPredictor::fit_measured(&[measured.clone(), measured.clone()]),
+            Err(MlMassFitError::DuplicateTrainingNucleus { .. })
+        ));
+
+        let mut nonfinite = measured.clone();
+        nonfinite.binding_energy_mev = f64::NAN;
+        assert!(matches!(
+            MlMassPredictor::fit_measured(&[nonfinite]),
+            Err(MlMassFitError::NonFiniteTrainingEnergy { .. })
+        ));
+
+        assert!(matches!(
+            MlMassPredictor::fit_measured_with_config(
+                &[measured],
+                MlMassConfig {
+                    n_trees: 0,
+                    ..MlMassConfig::default()
+                }
+            ),
+            Err(MlMassFitError::InvalidConfig)
+        ));
     }
 
     #[test]
