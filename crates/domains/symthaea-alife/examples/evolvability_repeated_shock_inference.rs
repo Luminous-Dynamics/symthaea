@@ -26,12 +26,16 @@ use symthaea_alife::exact_positive_sign_test;
 const EXPECTED_SEEDS: &[u64] = &[1, 2, 3, 4, 5, 6, 7, 8];
 const PRIMARY_METRIC: &str = "deficit_area_advantage_candidate_minus_reference";
 
-fn digest_json(value: &serde_json::Value) -> (String, String) {
-    let bytes = serde_json::to_vec(value).expect("inference JSON must serialize");
-    let digest = Sha256::digest(&bytes)
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
         .iter()
         .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
+        .collect::<String>()
+}
+
+fn digest_json(value: &serde_json::Value) -> (String, String) {
+    let bytes = serde_json::to_vec(value).expect("inference JSON must serialize");
+    let digest = sha256_hex(&bytes);
     let json = String::from_utf8(bytes).expect("serde_json output is UTF-8");
     (digest, json)
 }
@@ -42,12 +46,18 @@ fn main() {
     let results_sha_path = args.next().expect("usage: inference <results.json> <results.sha256>");
     assert!(args.next().is_none(), "unexpected extra arguments");
 
-    let results_text = fs::read_to_string(&results_path).expect("read results JSON");
-    let results: serde_json::Value = serde_json::from_str(&results_text).expect("parse results JSON");
+    let results_bytes = fs::read(&results_path).expect("read results JSON");
     let results_sha256 = fs::read_to_string(&results_sha_path)
         .expect("read verified result digest")
         .trim()
         .to_owned();
+    let observed_results_sha256 = sha256_hex(&results_bytes);
+    assert_eq!(
+        observed_results_sha256, results_sha256,
+        "inference input bytes must match the supplied verified result digest"
+    );
+    let results: serde_json::Value =
+        serde_json::from_slice(&results_bytes).expect("parse results JSON");
 
     assert_eq!(
         results.get("schema").and_then(serde_json::Value::as_str),
