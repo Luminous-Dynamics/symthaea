@@ -34,6 +34,7 @@ pub mod evolvability_comparison;
 pub mod genome;
 pub mod hierarchy;
 pub mod ledger;
+pub mod lifecycle;
 pub mod ma001;
 pub mod ma001l;
 pub mod ma001r;
@@ -58,6 +59,11 @@ pub use evolvability_comparison::{
 pub use genome::Genome;
 pub use hierarchy::HierarchicalStack;
 pub use ledger::{InteractionRecord, compress_for_observation};
+pub use lifecycle::{
+    AgentLifecycleRecordV1, ExtinctionEvidenceV1, GenomeEvidenceV1, LifecycleDeathCauseV1,
+    LifecycleError, LifecycleEventV1, LifecycleLedgerV1, LifecycleTransitionV1,
+    analyze_lifecycle_events,
+};
 pub use metabolism::{
     K_ALIFE_BOLTZMANN, landauer_minimum, prigogine_dissipation_cost, shannon_entropy_bits,
 };
