@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symthaea.merge-admission-receipt.v2",
+  "title": "Symthaea Merge Admission Receipt v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "policy_sha256",
+    "policy_blob_sha",
+    "enforcement_ready",
+    "repository",
+    "target_branch",
+    "current_base_sha",
+    "candidate_head_sha",
+    "candidate_tree_sha",
+    "evidence_binding_sha256",
+    "evidence_binding",
+    "decision",
+    "reasons",
+    "caveat",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema": {"const": "symthaea.merge-admission-receipt.v2"},
+    "policy_sha256": {"$ref": "#/$defs/sha256"},
+    "policy_blob_sha": {"$ref": "#/$defs/objectId"},
+    "enforcement_ready": {"const": false},
+    "repository": {"type": "string", "minLength": 1},
+    "target_branch": {"type": "string", "minLength": 1},
+    "current_base_sha": {"$ref": "#/$defs/objectId"},
+    "candidate_head_sha": {"$ref": "#/$defs/objectId"},
+    "candidate_tree_sha": {"$ref": "#/$defs/objectId"},
+    "evidence_binding_sha256": {"$ref": "#/$defs/sha256"},
+    "evidence_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["control_plane", "full_integration"],
+      "properties": {
+        "control_plane": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/controlPlaneEntry"}
+        },
+        "full_integration": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/integrationBinding"}
+          ]
+        }
+      }
+    },
+    "decision": {
+      "enum": ["admitted", "incomplete", "stale", "bootstrap_required", "rejected"]
+    },
+    "reasons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "caveat": {"type": "string", "minLength": 1},
+    "receipt_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "objectId": {"type": "string", "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"},
+    "nullableObjectId": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/objectId"}
+      ]
+    },
+    "controlPlaneEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "base_blob_sha", "candidate_blob_sha"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "base_blob_sha": {"$ref": "#/$defs/nullableObjectId"},
+        "candidate_blob_sha": {"$ref": "#/$defs/nullableObjectId"}
+      }
+    },
+    "integrationBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflow_path",
+        "workflow_blob_sha",
+        "run_id",
+        "run_attempt",
+        "event",
+        "status",
+        "conclusion",
+        "head_sha",
+        "base_sha",
+        "job_census_complete",
+        "job_census_count",
+        "job_census_sha256",
+        "required_job_observation_count",
+        "required_jobs_sha256",
+        "required_job_manifest_sha256",
+        "required_job_manifest_blob_sha"
+      ],
+      "properties": {
+        "workflow_path": {"type": ["string", "null"]},
+        "workflow_blob_sha": {"$ref": "#/$defs/nullableObjectId"},
+        "run_id": {"type": ["integer", "null"], "minimum": 1},
+        "run_attempt": {"type": ["integer", "null"], "minimum": 1},
+        "event": {"type": ["string", "null"]},
+        "status": {"type": ["string", "null"]},
+        "conclusion": {"type": ["string", "null"]},
+        "head_sha": {"$ref": "#/$defs/nullableObjectId"},
+        "base_sha": {"$ref": "#/$defs/nullableObjectId"},
+        "job_census_complete": {"type": ["boolean", "null"]},
+        "job_census_count": {"type": "integer", "minimum": 0},
+        "job_census_sha256": {"$ref": "#/$defs/sha256"},
+        "required_job_observation_count": {"type": "integer", "minimum": 0},
+        "required_jobs_sha256": {"$ref": "#/$defs/sha256"},
+        "required_job_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "required_job_manifest_blob_sha": {"$ref": "#/$defs/objectId"}
+      }
+    }
+  }
+}
