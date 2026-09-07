@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-safety-profile"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Canonical applicability profiles for Symthaea safety configuration manifests"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["infrastructure", "safety", "configuration", "profile"]
+categories = ["science", "simulation"]
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-safety-configuration = { path = "../symthaea-safety-configuration" }
