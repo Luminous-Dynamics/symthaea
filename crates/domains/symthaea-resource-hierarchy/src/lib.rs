@@ -6,6 +6,10 @@
 //! Every node exposes the same external resource vocabulary regardless of scale.
 //! The hierarchy preserves child identity and requires explicit aggregation rules;
 //! parents do not implicitly absorb child authority or silently invent capacity.
+//!
+//! Containment scale and semantic role are intentionally orthogonal. A battery,
+//! greenhouse, compute module, or water subsystem can occupy the same structural
+//! depth without pretending to be the same kind of asset.
 
 #![deny(unsafe_code)]
 
@@ -14,7 +18,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use symthaea_resource_model::{ResourceAmount, ResourceEnvelope, ResourceKey};
 use thiserror::Error;
 
-/// Coarse physical/civic scale used to enforce monotone containment.
+/// Coarse containment depth used to enforce monotone hierarchy.
+///
+/// The generic vocabulary (`Component`, `Assembly`, `Zone`, `Facility`) is suitable
+/// for mixed civic infrastructure. The compute-oriented names (`Device`, `Rack`,
+/// `Hall`, `Site`) are retained as same-rank domain vocabulary for existing callers.
+/// Containment must always be checked with [`NodeScale::rank`] / `can_contain`; the
+/// derived enum ordering is not a containment relation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum NodeScale {
     Device,
@@ -24,15 +34,19 @@ pub enum NodeScale {
     Community,
     Region,
     Federation,
+    Component,
+    Assembly,
+    Zone,
+    Facility,
 }
 
 impl NodeScale {
     pub fn rank(self) -> u8 {
         match self {
-            Self::Device => 0,
-            Self::Rack => 1,
-            Self::Hall => 2,
-            Self::Site => 3,
+            Self::Device | Self::Component => 0,
+            Self::Rack | Self::Assembly => 1,
+            Self::Hall | Self::Zone => 2,
+            Self::Site | Self::Facility => 3,
             Self::Community => 4,
             Self::Region => 5,
             Self::Federation => 6,
@@ -42,6 +56,32 @@ impl NodeScale {
     pub fn can_contain(self, child: Self) -> bool {
         self.rank() > child.rank()
     }
+}
+
+/// Semantic function of a node, independent of containment depth.
+///
+/// Roles are descriptive metadata, not authority. They do not affect parent/child
+/// permission, resource conservation, or operating-envelope validity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+pub enum NodeRole {
+    #[default]
+    Generic,
+    Compute,
+    EnergyGeneration,
+    EnergyStorage,
+    ThermalSource,
+    ThermalStorage,
+    ThermalConsumer,
+    Cooling,
+    WaterSystem,
+    Network,
+    Building,
+    Greenhouse,
+    Workshop,
+    Ecological,
+    CommunityService,
+    /// Namespaced/open extension point for domain roles not yet standardized.
+    Custom(String),
 }
 
 /// How a parent may summarize a particular resource dimension across children.
@@ -63,6 +103,8 @@ pub struct ResourceNode {
     pub id: String,
     pub label: String,
     pub scale: NodeScale,
+    #[serde(default)]
+    pub role: NodeRole,
     pub local_envelope: ResourceEnvelope,
 }
 
@@ -77,8 +119,14 @@ impl ResourceNode {
             id: id.into(),
             label: label.into(),
             scale,
+            role: NodeRole::Generic,
             local_envelope,
         }
+    }
+
+    pub fn with_role(mut self, role: NodeRole) -> Self {
+        self.role = role;
+        self
     }
 }
 
@@ -87,6 +135,7 @@ impl ResourceNode {
 pub struct NodeSummary {
     pub node_id: String,
     pub scale: NodeScale,
+    pub role: NodeRole,
     pub direct_children: Vec<String>,
     pub envelope: ResourceEnvelope,
 }
@@ -225,6 +274,7 @@ impl ResourceHierarchy {
         Ok(NodeSummary {
             node_id: node.id.clone(),
             scale: node.scale,
+            role: node.role.clone(),
             direct_children: children.iter().map(|child| child.id.clone()).collect(),
             envelope: result,
         })
@@ -266,6 +316,17 @@ mod tests {
     }
 
     #[test]
+    fn compute_and_generic_scale_names_share_containment_ranks() {
+        assert_eq!(NodeScale::Device.rank(), NodeScale::Component.rank());
+        assert_eq!(NodeScale::Rack.rank(), NodeScale::Assembly.rank());
+        assert_eq!(NodeScale::Hall.rank(), NodeScale::Zone.rank());
+        assert_eq!(NodeScale::Site.rank(), NodeScale::Facility.rank());
+        assert!(NodeScale::Facility.can_contain(NodeScale::Assembly));
+        assert!(NodeScale::Site.can_contain(NodeScale::Component));
+        assert!(!NodeScale::Facility.can_contain(NodeScale::Site));
+    }
+
+    #[test]
     fn scale_containment_is_strictly_monotone() {
         assert!(NodeScale::Site.can_contain(NodeScale::Rack));
         assert!(!NodeScale::Rack.can_contain(NodeScale::Site));
@@ -273,15 +334,40 @@ mod tests {
     }
 
     #[test]
-    fn child_identity_and_parent_boundary_are_preserved() {
+    fn semantic_role_is_independent_of_scale() {
+        let battery = ResourceNode::new(
+            "battery",
+            "Battery",
+            NodeScale::Component,
+            ResourceEnvelope::default(),
+        )
+        .with_role(NodeRole::EnergyStorage);
+        let greenhouse = ResourceNode::new(
+            "greenhouse",
+            "Greenhouse",
+            NodeScale::Facility,
+            ResourceEnvelope::default(),
+        )
+        .with_role(NodeRole::Greenhouse);
+        assert_eq!(battery.scale, NodeScale::Component);
+        assert_eq!(battery.role, NodeRole::EnergyStorage);
+        assert_eq!(greenhouse.scale, NodeScale::Facility);
+        assert_eq!(greenhouse.role, NodeRole::Greenhouse);
+    }
+
+    #[test]
+    fn child_identity_parent_boundary_and_role_are_preserved() {
         let mut hierarchy = ResourceHierarchy::default();
         hierarchy
-            .insert_root(ResourceNode::new(
-                "site-a",
-                "Site A",
-                NodeScale::Site,
-                ResourceEnvelope::default(),
-            ))
+            .insert_root(
+                ResourceNode::new(
+                    "site-a",
+                    "Site A",
+                    NodeScale::Site,
+                    ResourceEnvelope::default(),
+                )
+                .with_role(NodeRole::Compute),
+            )
             .unwrap();
         hierarchy
             .insert_child(
@@ -291,13 +377,16 @@ mod tests {
                     "Rack 1",
                     NodeScale::Rack,
                     envelope([watts(40.0)]),
-                ),
+                )
+                .with_role(NodeRole::Compute),
             )
             .unwrap();
 
         assert_eq!(hierarchy.parent("rack-1"), Some("site-a"));
         assert_eq!(hierarchy.children("site-a").collect::<Vec<_>>(), vec!["rack-1"]);
         assert_eq!(hierarchy.node("rack-1").unwrap().label, "Rack 1");
+        let summary = hierarchy.summarize("site-a").unwrap();
+        assert_eq!(summary.role, NodeRole::Compute);
     }
 
     #[test]
