@@ -20,6 +20,7 @@ use crate::outcome_claim::{
 };
 use crate::safety_preregistration::{
     PreparedSafetyConfirmatorySimulation, SafetyPreregisteredConfirmatoryEvidence,
+    SafetyPreregistrationError,
 };
 use crate::strict_context::StrictSimulationRegistry;
 use symthaea_formal_safety::{EvidenceKind, SafetyCase};
@@ -294,6 +295,8 @@ fn bytes_to_hex(bytes: &[u8]) -> String {
 pub enum ConfirmatoryContractError {
     #[error("lower confirmatory contract failed: {0}")]
     Lower(#[from] v3::ConfirmatoryContractError),
+    #[error("safety preregistration/qualification failed: {0}")]
+    Safety(#[from] SafetyPreregistrationError),
     #[error("claim contains an exact duplicate criterion")]
     DuplicateClaimCriterion,
     #[error("completed safety case does not cite semantic-canonical v4 simulation lineage")]
