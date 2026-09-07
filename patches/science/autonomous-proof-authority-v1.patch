@@ -1,0 +1,98 @@
+diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+index 7cfb3be..0000000 100644
+--- a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
++++ b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+@@ -430,25 +430,49 @@ impl ConjectureEngine {
+-    /// Ingest autonomously-discovered invariants from `discover_invariants_autonomous`
+-    /// into the conjecture pool so downstream reflection (subtree extraction,
+-    /// macro promotion) can act on them.
+-    ///
+-    /// This is the **multivariate bridge**: `discover_invariants_autonomous`
+-    /// handles k-dimensional state spaces (Kepler 4D, Hénon-Heiles 4D, PCR3BP
+-    /// 4D), but its results live in a separate `AutonomousInvariant` type
+-    /// that the abstract_thought extraction pipeline doesn't know about.
+-    /// This method bridges the two worlds so a macro pool that was previously
+-    /// 1D-only (via `ObservedSequence`) can now accumulate multivariate
+-    /// distance kernels, cross-products, and Hamiltonian skeletons extracted
+-    /// from trajectory-based discoveries.
+-    ///
+-    /// For each invariant, status is assigned based on whether it was
+-    /// symbolically proven via the chain-rule path:
+-    /// - `symbolically_proven == true` → `ConjectureStatus::SymbolicallyChecked`
+-    ///   (eligible for fast-track macro promotion)
+-    /// - else → `ConjectureStatus::NumericallyTested` with `test_mse = variance`
+-    ///   and `MacroPromotionTier::Quarantined`, so unproven trajectory fits
+-    ///   cannot enter the permanent macro pool through either fast-track or
+-    ///   recurrent promotion.
+-    ///
+-    /// The `source` field is set to the caller-provided tag so later
+-    /// filtering (e.g. "what macros did the Kepler discovery contribute?")
+-    /// remains possible.
++    /// Ingest caller-supplied autonomous invariants as **untrusted data**.
++    ///
++    /// `AutonomousInvariant` is a public transport/result type whose
++    /// `symbolically_proven` field can be constructed by callers. Therefore
++    /// this public ingestion boundary must not convert that boolean directly
++    /// into `SymbolicallyChecked` or `FastTrackVerified` authority.
++    ///
++    /// Caller-supplied invariants enter as numerical observations and remain
++    /// macro-quarantined. Use `discover_and_ingest_autonomous_invariants()`
++    /// when the engine itself should execute discovery + symbolic checking and
++    /// retain that in-process verification authority.
+     pub fn ingest_autonomous_invariants(
+         &mut self,
+         source_tag: &str,
+         domain: MathDomain,
+         invariants: &[AutonomousInvariant],
+     ) {
++        self.ingest_autonomous_invariants_inner(source_tag, domain, invariants, false);
++    }
++
++    /// Internal ingestion path for results produced immediately by this
++    /// engine's own `discover_invariants_autonomous` transaction.
++    ///
++    /// The boolean authority is accepted only on this private control-flow
++    /// path. It remains evidence relative to the supplied symbolic dynamics;
++    /// it is not experimental validation or external scientific authority.
++    fn ingest_engine_verified_autonomous_invariants(
++        &mut self,
++        source_tag: &str,
++        domain: MathDomain,
++        invariants: &[AutonomousInvariant],
++    ) {
++        self.ingest_autonomous_invariants_inner(source_tag, domain, invariants, true);
++    }
++
++    fn ingest_autonomous_invariants_inner(
++        &mut self,
++        source_tag: &str,
++        domain: MathDomain,
++        invariants: &[AutonomousInvariant],
++        accept_internal_symbolic_proof: bool,
++    ) {
+         for inv in invariants {
+             let fitness = inv.variance + self.config.lambda * inv.complexity as f64;
+-            let status = if inv.symbolically_proven {
++            let symbolic_authority = accept_internal_symbolic_proof && inv.symbolically_proven;
++            let status = if symbolic_authority {
+                 ConjectureStatus::SymbolicallyChecked
+             } else {
+                 ConjectureStatus::NumericallyTested {
+@@ -464,8 +488,8 @@ impl ConjectureEngine {
+                 complexity: inv.complexity,
+                 fitness,
+                 status,
+-                confidence: if inv.symbolically_proven { 0.99 } else { 0.6 },
+-                macro_promotion_tier: if inv.symbolically_proven {
++                confidence: if symbolic_authority { 0.99 } else { 0.6 },
++                macro_promotion_tier: if symbolic_authority {
+                     MacroPromotionTier::FastTrackVerified
+                 } else {
+                     MacroPromotionTier::Quarantined
+@@ -511,7 +535,7 @@ impl ConjectureEngine {
+             &extra_templates,
+         );
+-        self.ingest_autonomous_invariants(source_tag, domain, &invariants);
++        self.ingest_engine_verified_autonomous_invariants(source_tag, domain, &invariants);
+         invariants
+     }
