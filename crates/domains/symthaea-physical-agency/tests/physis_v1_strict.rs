@@ -185,6 +185,10 @@ fn open_safety_case() -> SafetyCase {
         EvidenceKind::Simulation,
     ));
     safety.add_obligation(ProofObligation::new(
+        "secondary simulation invariant is supported by the same exact confirmatory lineage",
+        EvidenceKind::Simulation,
+    ));
+    safety.add_obligation(ProofObligation::new(
         "independent invariant review confirms the benchmark safety assumptions",
         EvidenceKind::FormalProof,
     ));
@@ -237,6 +241,53 @@ fn physis_v1_exercises_the_complete_strict_simulation_chain() {
     assert_eq!(qualified.world_snapshot().snapshot_digest(), "c".repeat(64));
     assert_eq!(qualified.contexts().len(), 1);
     assert!(!qualified.claim_transcript().as_bytes().is_empty());
+}
+
+#[test]
+fn every_simulation_obligation_requires_the_exact_v4_lineage() {
+    let selected = cryptographic_selected();
+    let prepared = prepare_confirmatory_simulation(
+        &selected,
+        request("physis-v1-all-simulation-obligations"),
+        claim(),
+    )
+    .unwrap();
+    let safety = open_safety_case();
+    let mut completed = safety.clone();
+    let prepared = preregister_confirmatory_safety(prepared, &safety).unwrap();
+
+    let mut registry = StrictSimulationRegistry::new();
+    registry.register(PhysisV1Backend {
+        interval: Interval::new(0.86, 0.94),
+    });
+    let evidence = run_preregistered_safety_confirmatory_simulation(&registry, &prepared).unwrap();
+    let satisfied = match evaluate_confirmatory_claim(evidence.confirmatory()).unwrap() {
+        ConfirmatoryClaimOutcome::Satisfied(receipt) => receipt,
+        other => panic!("expected satisfied claim, got {other:?}"),
+    };
+    let exact = required_confirmatory_safety_evidence_ref(&evidence, &satisfied).unwrap();
+
+    let mut simulation_index = 0usize;
+    for obligation in &mut completed.obligations {
+        obligation.status = ObligationStatus::Discharged;
+        if obligation.expected_evidence == EvidenceKind::Simulation {
+            simulation_index += 1;
+            obligation.evidence_refs.push(if simulation_index == 1 {
+                exact.clone()
+            } else {
+                "simulation:neighboring-unbound-run".into()
+            });
+        } else {
+            obligation
+                .evidence_refs
+                .push("formal-proof:physis-v1-independent-invariant-review".into());
+        }
+    }
+
+    assert!(matches!(
+        qualify_confirmatory_simulation(&evidence, &satisfied, &completed),
+        Err(ConfirmatoryContractError::SimulationObligationMissingNormalizedEvidence(_))
+    ));
 }
 
 #[test]
