@@ -32,6 +32,59 @@ OBSERVATION_SCHEMA = "symthaea.merge-admission-observation.v1"
 RECEIPT_SCHEMA = "symthaea.merge-admission-receipt.v1"
 HEX_ID = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
 
+POLICY_KEYS = {
+    "schema",
+    "repository",
+    "target_branch",
+    "enforcement_ready",
+    "decision_default",
+    "head_change_invalidates",
+    "base_change_invalidates",
+    "unknown_evidence_default",
+    "control_plane",
+    "full_integration",
+    "focused_evidence_can_substitute_for_full_integration",
+    "tier1_can_substitute_for_full_integration",
+}
+CONTROL_POLICY_KEYS = {
+    "mode",
+    "paths",
+    "candidate_changes_require_independent_bootstrap",
+}
+INTEGRATION_POLICY_KEYS = {
+    "workflow_path",
+    "accepted_events",
+    "required_status",
+    "required_conclusion",
+    "require_exact_head",
+    "require_exact_base",
+    "require_no_required_job_skips",
+}
+OBSERVATION_KEYS = {
+    "schema",
+    "repository",
+    "target_branch",
+    "current_base_sha",
+    "candidate_head_sha",
+    "candidate_tree_sha",
+    "control_plane",
+    "full_integration",
+}
+CONTROL_OBSERVATION_KEYS = {"path", "base_blob_sha", "candidate_blob_sha"}
+INTEGRATION_OBSERVATION_KEYS = {
+    "workflow_path",
+    "workflow_blob_sha",
+    "run_id",
+    "event",
+    "status",
+    "conclusion",
+    "head_sha",
+    "base_sha",
+    "job_set_complete",
+    "required_jobs",
+}
+JOB_OBSERVATION_KEYS = {"name", "status", "conclusion", "skipped"}
+
 
 class Decision(str, Enum):
     ADMITTED = "admitted"
@@ -77,11 +130,20 @@ def _require_sha(value: Any, name: str) -> str:
     return value
 
 
+def _reject_unknown_keys(value: dict[str, Any], allowed: set[str], name: str) -> None:
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise ValueError(f"{name} contains unknown fields: {', '.join(unknown)}")
+
+
 def validate_policy(policy: dict[str, Any]) -> None:
+    _reject_unknown_keys(policy, POLICY_KEYS, "policy")
     if policy.get("schema") != POLICY_SCHEMA:
         raise ValueError("unexpected merge admission policy schema")
     _require_string(policy.get("repository"), "policy.repository")
     _require_string(policy.get("target_branch"), "policy.target_branch")
+    if policy.get("enforcement_ready") is not False:
+        raise ValueError("v1 is an executable policy core and must remain enforcement_ready=false")
     if policy.get("decision_default") != "incomplete":
         raise ValueError("policy must default to incomplete")
     if policy.get("head_change_invalidates") is not True:
@@ -96,6 +158,7 @@ def validate_policy(policy: dict[str, Any]) -> None:
         raise ValueError("Tier-1 evidence may not substitute for full integration")
 
     control = _require_object(policy.get("control_plane"), "policy.control_plane")
+    _reject_unknown_keys(control, CONTROL_POLICY_KEYS, "policy.control_plane")
     if control.get("mode") != "exact_base_equivalence":
         raise ValueError("v1 requires exact_base_equivalence control-plane mode")
     if control.get("candidate_changes_require_independent_bootstrap") is not True:
@@ -107,14 +170,17 @@ def validate_policy(policy: dict[str, Any]) -> None:
         raise ValueError("control_plane.paths contains duplicates")
 
     integration = _require_object(policy.get("full_integration"), "policy.full_integration")
+    _reject_unknown_keys(integration, INTEGRATION_POLICY_KEYS, "policy.full_integration")
     workflow_path = _require_string(
         integration.get("workflow_path"), "policy.full_integration.workflow_path"
     )
     if workflow_path not in paths:
         raise ValueError("full integration workflow must be part of the control plane")
     events = integration.get("accepted_events")
-    if not isinstance(events, list) or not events or not all(isinstance(v, str) for v in events):
+    if not isinstance(events, list) or not events or not all(isinstance(v, str) and v for v in events):
         raise ValueError("full_integration.accepted_events must be a non-empty string list")
+    if len(events) != len(set(events)):
+        raise ValueError("full_integration.accepted_events contains duplicates")
     if integration.get("required_status") != "completed":
         raise ValueError("full integration must require completed status")
     if integration.get("required_conclusion") != "success":
@@ -125,6 +191,7 @@ def validate_policy(policy: dict[str, Any]) -> None:
 
 
 def validate_observation(observation: dict[str, Any]) -> None:
+    _reject_unknown_keys(observation, OBSERVATION_KEYS, "observation")
     if observation.get("schema") != OBSERVATION_SCHEMA:
         raise ValueError("unexpected merge admission observation schema")
     _require_string(observation.get("repository"), "observation.repository")
@@ -137,14 +204,45 @@ def validate_observation(observation: dict[str, Any]) -> None:
         raise ValueError("observation.control_plane must be a list")
     for index, item in enumerate(control):
         item = _require_object(item, f"observation.control_plane[{index}]")
+        _reject_unknown_keys(
+            item,
+            CONTROL_OBSERVATION_KEYS,
+            f"observation.control_plane[{index}]",
+        )
         _require_string(item.get("path"), f"observation.control_plane[{index}].path")
         for side in ("base_blob_sha", "candidate_blob_sha"):
             value = item.get(side)
             if value is not None:
                 _require_sha(value, f"observation.control_plane[{index}].{side}")
+
     integration = observation.get("full_integration")
-    if integration is not None and not isinstance(integration, dict):
-        raise ValueError("observation.full_integration must be an object or null")
+    if integration is None:
+        return
+    integration = _require_object(integration, "observation.full_integration")
+    _reject_unknown_keys(
+        integration,
+        INTEGRATION_OBSERVATION_KEYS,
+        "observation.full_integration",
+    )
+    _require_string(integration.get("workflow_path"), "observation.full_integration.workflow_path")
+    workflow_blob = integration.get("workflow_blob_sha")
+    if workflow_blob is not None:
+        _require_sha(workflow_blob, "observation.full_integration.workflow_blob_sha")
+    for field in ("head_sha", "base_sha"):
+        value = integration.get(field)
+        if value is not None:
+            _require_sha(value, f"observation.full_integration.{field}")
+    jobs = integration.get("required_jobs")
+    if jobs is not None:
+        if not isinstance(jobs, list):
+            raise ValueError("observation.full_integration.required_jobs must be a list or null")
+        for index, job in enumerate(jobs):
+            job = _require_object(job, f"observation.full_integration.required_jobs[{index}]")
+            _reject_unknown_keys(
+                job,
+                JOB_OBSERVATION_KEYS,
+                f"observation.full_integration.required_jobs[{index}]",
+            )
 
 
 def _control_plane_disposition(
@@ -381,6 +479,7 @@ def _finish(
     body: dict[str, Any] = {
         "schema": RECEIPT_SCHEMA,
         "policy_sha256": policy_digest,
+        "enforcement_ready": False,
         "repository": observation.get("repository"),
         "target_branch": observation.get("target_branch"),
         "current_base_sha": observation.get("current_base_sha"),
