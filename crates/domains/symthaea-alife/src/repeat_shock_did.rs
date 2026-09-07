@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn exact_equality_is_directionally_neutral() {
         let frozen = transfer(0.01, 0.02, 0.03, 0.5);
-        let evolving = frozen;
+        let evolving = frozen.clone();
         let did = compare_repeated_shock_did(&frozen, &evolving).expect("finite DID");
         assert_eq!(
             did.verdict,
