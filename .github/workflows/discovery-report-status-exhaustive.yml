@@ -1,0 +1,103 @@
+name: Discovery Report Status Exhaustiveness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/discovery-report-status-exhaustive.yml'
+      - 'patches/discovery/real-discovery-report-status-exhaustive-v1.patch'
+      - 'crates/core/symthaea-core/examples/real_discovery_report.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  PATCH: patches/discovery/real-discovery-report-status-exhaustive-v1.patch
+  REPORT: crates/core/symthaea-core/examples/real_discovery_report.rs
+
+jobs:
+  qualify:
+    name: Apply candidate and compile exact status surface
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          test -f "$REPORT"
+          git diff --exit-code "${{ github.event.pull_request.base.sha || 'HEAD^' }}" -- Cargo.toml Cargo.lock crates/core/symthaea-core/src || {
+            echo 'SCI discovery-status candidate must not modify product/library source or dependency state'
+            exit 1
+          }
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet current conjecture evidence states
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path('crates/core/symthaea-core/examples/real_discovery_report.rs').read_text()
+          start = text.index('fn count_status(')
+          end = text.index('\nfn is_verified_eml', start)
+          body = text[start:end]
+
+          required = [
+              'ConjectureStatus::Proposed',
+              'ConjectureStatus::NumericallyTested',
+              'ConjectureStatus::BoundedChecked',
+              'ConjectureStatus::SmtSamplesChecked',
+              'ConjectureStatus::SymbolicallyChecked',
+              'ConjectureStatus::FormallyVerified',
+              'ConjectureStatus::Refuted',
+          ]
+          missing = [name for name in required if name not in body]
+          assert not missing, f'missing ConjectureStatus arms: {missing}'
+          assert '_ =>' not in body, 'count_status must remain compiler-exhaustive; wildcard arm forbidden'
+
+          helper_start = text.index('impl StatusCounts')
+          helper_end = text.index('\n#[derive(Debug)]\nstruct SuspiciousFormula', helper_start)
+          helper = text[helper_start:helper_end]
+          for field in ['numeric', 'bounded', 'smt_samples', 'symbolic', 'formal']:
+              assert f'self.{field}' in helper, f'verified() omits {field}'
+          for forbidden in ['self.proposed', 'self.refuted']:
+              assert forbidden not in helper, f'verified() must not count {forbidden}'
+
+          assert text.count('report.status.verified()') == 2, \
+              'summary and health warning paths must share the same verified-status definition'
+          assert 'bounded={}, smt_samples={}' in text, \
+              'detail output must expose bounded and SMT-sample evidence separately'
+          PY
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format candidate
+        run: cargo fmt --check -p symthaea-core
+
+      - name: Compile real discovery report
+        run: cargo check --locked -p symthaea-core --example real_discovery_report --features abstract_thought
+
+      - name: Strict Clippy for real discovery report
+        run: cargo clippy --locked -p symthaea-core --example real_discovery_report --features abstract_thought -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS means only that the exact candidate patch applies and the report compiles/lints against the current typed ConjectureStatus surface.'
+          echo 'It does not qualify any conjecture, discovery result, formal proof, or scientific claim.'
