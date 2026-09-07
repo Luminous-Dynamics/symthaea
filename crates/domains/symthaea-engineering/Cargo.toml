@@ -25,7 +25,6 @@ symthaea-operations-research = { path = "../symthaea-operations-research" }
 uuid = { version = "1.0", features = ["v4"] }
 serde_json = "1.0"
 
-
 uom.workspace = true
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-broca = { path = "../symthaea-broca" }
@@ -44,3 +43,11 @@ symthaea-types = { path = "../../core/symthaea-types" }
 symtropy-robotics-bridge-core = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+chrono = { workspace = true }
+symthaea-resource-model = { path = "../symthaea-resource-model" }
+symthaea-resource-hierarchy = { path = "../symthaea-resource-hierarchy" }
+symthaea-resource-quality = { path = "../symthaea-resource-quality" }
+symthaea-operating-envelope = { path = "../symthaea-operating-envelope" }
+symthaea-operating-authority = { path = "../symthaea-operating-authority" }
