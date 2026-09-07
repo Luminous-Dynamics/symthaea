@@ -33,17 +33,21 @@ Hosted qualification must establish:
 3. exact raw-preflight profile digest is evaluation-policy-bearing;
 4. exact canonical-lineage-bound preflight profile digest is evaluation-policy-bearing;
 5. exact pure-engine decision-contract profile digest is evaluation-policy-bearing;
-6. engine-contract digest binds normative contract, class tags, predicate tags, and ordered rule precedence;
-7. qualified defeater precedes contestation and unilateral outcomes in the frozen rule table;
-8. bilateral qualifying disagreement precedes unilateral support/opposition outcomes;
-9. no vote/count-margin/relation-strength/posterior tie-breaker enters the engine contract;
-10. drift in preflight or engine decision semantics requires a new evaluation-policy identity;
-11. domain-separated serializer-independent BLAKE3 identities;
-12. persistence revalidates nested effective policy and all current profile contracts;
-13. tampered preflight/engine profile or identity state fails closed;
-14. no result-bearing artifact instance input exists;
-15. no classifier/disposition or downstream authority exists;
-16. rustfmt, tests, and strict Clippy pass.
+6. engine-contract digest binds normative contract, class tags, predicate tags, rule precedence, exact rule → class mapping, and exact reason-trace schema;
+7. every frozen rule maps to exactly one frozen primary class;
+8. the frozen decision lattice is total over all 72 predicate states admissible under `S => TS` and `O => TO`;
+9. qualified defeater precedes contestation and unilateral outcomes in the frozen rule table;
+10. bilateral qualifying disagreement precedes unilateral support/opposition outcomes;
+11. no vote/count-margin/relation-strength/posterior tie-breaker enters the engine contract;
+12. exact identity, slot, predicate, rule, and primary-class trace fields are profile-bearing;
+13. drift in preflight, decision semantics, rule meaning, or trace schema requires a new evaluation-policy identity;
+14. domain-separated serializer-independent BLAKE3 identities;
+15. persistence revalidates nested effective policy and all current profile contracts;
+16. tampered preflight/engine profile or identity state fails closed;
+17. no result-bearing artifact instance input exists;
+18. no production classifier/disposition or downstream authority exists;
+19. automatic workflow runs supersede stale copies while manual historical `workflow_dispatch` runs remain independent;
+20. rustfmt, tests, and strict Clippy pass.
 
 ## Required negative checks
 
@@ -54,9 +58,9 @@ Qualification must fail if this crate gains:
 - `LineageBoundShadowDispositionPreflightV1` instance input;
 - evidence/interpretation witness instance input;
 - interpretation-lineage instance input;
-- an evaluate/decide/dispose/issue-disposition API;
+- a production evaluate/decide/dispose/classify/issue-disposition API;
 - a `ShadowDispositionV1` or equivalent result-bearing output;
-- executable threshold comparison/classification logic;
+- executable threshold comparison/classification logic outside `#[cfg(test)]` contract proofs;
 - count-margin, majority-vote, relation-strength, Bayesian/posterior, or winner-take-all arithmetic;
 - canonical belief, workspace/GWT, action, or self-improvement promotion authority;
 - deserialization that skips full re-registration and current engine-contract recomputation.
@@ -67,17 +71,24 @@ Qualification must fail if this crate gains:
 
 It must not accept a policy, preflight, witness, case, current time, RNG, callback, or mutable state. It must not emit a result-bearing disposition.
 
+A `#[cfg(test)]` classifier may exist solely to prove the frozen lattice is exhaustive/total. No equivalent classifier may exist in production code in this tranche.
+
 The contract profile must change if any of the following changes:
 
 - primary outcome taxonomy;
 - predicate taxonomy;
 - decision-rule IDs;
 - decision-rule precedence;
+- decision-rule → primary-class mapping;
 - cardinality semantics;
 - blocker/contestation/underdetermination semantics;
-- reason-trace requirements;
+- identity-trace fields;
+- support/opposition/defeater slot-trace fields;
+- decision-trace fields;
 - purity/authority boundary.
 
 ## Evidence tier
 
-A green focused workflow qualifies the exact preregistered evaluation-surface **and decision-contract identity** at one commit. It does not qualify a disposition engine; no result-bearing disposition engine belongs in this tranche.
+A green focused workflow qualifies the exact preregistered evaluation-surface **and decision/audit-contract identity** at one commit. It does not qualify a disposition engine; no result-bearing disposition engine belongs in this tranche.
+
+A queued, pending, superseded, or cancelled run is infrastructure state only and must never be interpreted as PASS/FAIL evidence.
