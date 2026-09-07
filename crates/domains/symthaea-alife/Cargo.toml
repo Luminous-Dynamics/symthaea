@@ -12,3 +12,4 @@ symthaea-earth-system = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+sha2 = { workspace = true }
