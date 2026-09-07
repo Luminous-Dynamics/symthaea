@@ -4,22 +4,20 @@ Status: architecture candidate / non-normative until independently reviewed and 
 
 Parent: `HUMAN_AGENCY_KERNEL_AUDIT_V1.md` (HAK-001)
 
+Supporting audit: `HUMAN_AGENCY_KERNEL_RESET_CONTINUITY_AUDIT_V1.md`
+
 ## 1. Purpose
 
-HAK-001 separated assistance, scoring, consent, delegation, execution, outcome, and human benefit. This document sharpens one part of that boundary into an auditable contract for future Symthaea/Mycelix work.
+HAK-001 separated assistance, scoring, consent, delegation, execution, outcome, and human benefit. HAK-002 makes one part of that separation more precise: how authority can be represented, translated, delegated, attenuated, revoked, recovered, and composed without silently becoming broader than the authority actually established.
 
-The central problem is not merely whether an actor is authenticated or whether evidence is valid. The problem is whether a chain of representations, translations, fallbacks, resets, caches, and delegations can accidentally produce *more authority* than its source established.
+Two design candidates are introduced:
 
-This document therefore defines two candidate architectural objects:
+- `AuthorityEnvelopeV1`: an explicit description of bounded authority and its lineage.
+- `AugmentationContractV1`: an explicit description of how an AI system helps a human while preserving retained decisions, verification, dissent, interruption, and reliance calibration.
 
-- `AugmentationContractV1`: what a human asks an augmenting system to do, what it must not substitute for the human, and how reliance/contestability are handled.
-- `AuthorityEnvelopeV1`: the exact bounded authority, if any, that may cross from evidence/consent/delegation into an execution boundary.
+These are architecture shapes, not implementation APIs. HAK-002 does **not** create a shared Rust crate and transfers no qualification from existing domain code.
 
-This document does **not** create a shared Rust crate and does **not** transfer qualification from any existing domain implementation.
-
-## 2. Constitutional invariants
-
-### 2.1 Assessment is not authority
+## 2. Constitutional distinctions
 
 ```text
 ModelAssessmentOfPerson != AuthorityOverPerson
@@ -31,9 +29,7 @@ Delegation                != Execution
 Execution                 != HumanBenefit
 ```
 
-A verified fact can be a prerequisite for an authority decision without itself becoming the authority decision.
-
-### 2.2 No action without current explicit authority
+A fact, score, credential, explanation, or model confidence may be relevant to a policy decision. It does not become execution authority merely by being verified.
 
 For consequential execution, permission is established positively:
 
@@ -47,19 +43,28 @@ not negatively:
 ExecutionPermission = !KnownDenial
 ```
 
-`Unknown`, `Unavailable`, `Refused`, `Revoked`, and `Expired` remain distinct states even when all fail closed for a particular action.
+`Unknown`, `Unavailable`, `Refused`, `Revoked`, and `Expired` remain semantically distinct even where all fail closed for a particular action.
 
-### 2.3 Authority monotonicity
+## 3. Authority monotonicity — with a lineage precondition
 
-For any transformation `T` applied to an authority-bearing artifact `A`:
+For a transformation `T` of an authority-bearing artifact `A` **within the same authority lineage**:
 
 ```text
 Authority(T(A)) ⊆ Authority(A)
 ```
 
-A representation change, compatibility fallback, cache reconstruction, restart, migration, summary, or derived credential must not increase the set of actions that the source artifact permits.
+This is the central HAK-002 security theorem.
 
-If exact or conservative translation cannot be demonstrated:
+Examples include:
+
+- new wire representation of the same grant;
+- compatibility fallback for the same policy;
+- child delegation from a parent grant;
+- checkpoint/recovery of the same operational lineage;
+- cache reconstruction of the same authorization;
+- policy compilation of the same human commitment.
+
+If exact preservation or a domain-proven conservative attenuation cannot be established:
 
 ```text
 NotRepresentable -> NoAuthority
@@ -71,75 +76,114 @@ not:
 NotRepresentable -> BestEffortAuthorization
 ```
 
-### 2.4 Restriction removal is an authority transition
+### 3.1 Lineage identity is load-bearing
 
-Removing a hold, stop, maintenance lock, refusal, revocation barrier, degraded mode, or review latch is not ordinary cleanup.
+The monotonicity theorem does **not** apply blindly across unrelated worlds or new scenarios.
+
+A clean deterministic simulation reset may intentionally terminate simulation lineage A and construct simulation lineage B with configured nominal fixtures.
+
+Therefore:
+
+```text
+same-lineage recovery -> monotonicity required
+new simulation lineage -> old/new authority sets need not be comparable
+```
+
+Before applying an authority attenuation proof, HAK review must identify:
+
+```text
+principal
+resource/subject
+context
+lifecycle operation
+authority lineage
+```
+
+This correction emerged from the reset-continuity audit: the first implementation pass treated scenario `reset()` as if it were operational restart. Broader call-site evidence showed that interpretation was not established, and the resulting preservation PRs were closed unmerged.
+
+## 4. Restriction removal is an authority transition — within a continuing lineage
+
+Within the same operational lineage, removing a stop, hold, maintenance lock, refusal, revocation barrier, recovery latch, or review hold widens the action set.
 
 ```text
 RestrictionRemoval == AuthorityWidening
 ```
 
-Therefore it requires the same explicit semantics as any other authority-widening transition.
+That transition therefore needs explicit domain semantics.
 
-In particular:
+For an operational lineage:
 
 ```text
-reset       != ResumeNominal
 restart     != ResumeNominal
 cache miss  != ResumeNominal
 expiry      != RevocationUndo
 migration   != RevocationUndo
 ```
 
-### 2.5 Negative barriers and positive grants are temporally asymmetric
+But a declared new simulation/scenario lineage is different: its configured initial authority is part of the new world, not a recovery claim about the old one.
 
-Positive grants should normally be bounded by time, scope, context, and evidence freshness.
+## 5. Positive grants and negative barriers
 
-Negative barriers such as refusal or revocation must not disappear merely because their record becomes old, is evicted from a cache, or a previous positive grant remains in history.
+Positive grants should normally be bounded by:
 
-Candidate generic model:
+- action scope;
+- resource/subject scope;
+- context;
+- audience/executor;
+- time;
+- evidence freshness;
+- integrity binding.
+
+Negative barriers such as refusal or revocation must not disappear merely because a record expires, is evicted, a cache misses, or an earlier positive grant remains in history when the domain defines the barrier as durable for that lineage.
+
+Candidate generic ordering concept:
 
 ```text
-Grant:
-  generation = g
-  valid_until = t
+Grant {
+    generation = g
+    valid_until = t
+}
 
-Revocation:
-  revocation_generation >= g
-
-A grant is usable only if:
-  current_time < valid_until
-  and grant_generation > applicable_revocation_generation
+Revocation {
+    revocation_generation >= g
+}
 ```
 
-A new explicit grant may supersede a revocation only according to domain-owned rules and an unambiguously newer generation/sequence.
+A new explicit grant may supersede a revocation only according to domain-owned semantics and unambiguous ordering.
 
-## 3. Authority is a partial order, not a scalar
+HAK does not assume every kind of refusal or revocation is permanent. It requires the domain to state how it can be superseded rather than letting storage behavior make that decision implicitly.
 
-HAK must not represent authority as one number such as `trust = 0.82`.
+## 6. Authority is a partial order, not a scalar
 
-Authority is multidimensional and action-relative. A useful conceptual relation is:
+HAK should not represent authority as one generalized score such as:
+
+```text
+trust = 0.82
+```
+
+A useful conceptual relation is:
 
 ```text
 A <= B
 ```
 
-when every action permitted by `A` is also permitted by `B` under the same subjects, resources, contexts, and temporal bounds.
+when every action permitted by `A` is also permitted by `B` under the same principal, resources, context, audience, and lineage.
 
-This relation is only defined when the relevant domain can compare the two grants safely.
+That relation may be undefined for arbitrary cross-domain grants.
 
-If the implementation cannot determine whether one arbitrary authorization is a subset of another, it must report `Incomparable` / `NotRepresentable` rather than guess.
+If the domain cannot prove comparability, it should return a typed `Incomparable` / `NotRepresentable` result rather than fabricate an ordering.
 
-This mirrors an important limitation in fine-grained authorization systems: permission attenuation is meaningful only when the semantics of the authorization details are known to the relevant policy domain.
+This also reinforces HAK-001’s human-standing theorem: expertise, reputation, contribution, confidence, or civic measurements are not one universal currency of authority or human worth.
 
-## 4. AuthorityEnvelopeV1 candidate
+## 7. AuthorityEnvelopeV1 candidate
 
-The following is a design shape, not yet a Rust API:
+Conceptual shape:
 
 ```text
 AuthorityEnvelopeV1 {
     schema_version
     envelope_id
+    lineage_id
 
     principal
     delegate
@@ -171,65 +215,66 @@ AuthorityEnvelopeV1 {
 }
 ```
 
-### 4.1 Required semantics
+### 7.1 Required semantics
+
+`lineage_id`
+: Identifies the continuity domain in which attenuation/revocation claims are meaningful. A new simulation or deliberate factory lineage must not masquerade as continuation of an old operational lineage.
 
 `principal`
-: The actor/entity whose legitimate authority is being exercised or delegated. It is not inferred from model confidence.
+: The actor/entity whose legitimate authority is exercised or delegated. It is not inferred from model confidence.
 
 `delegate`
-: The actor/software receiving bounded authority. A delegate cannot expand the grant by re-expression.
+: The actor/software receiving bounded authority. Re-expression cannot expand the grant.
 
 `resource_subjects`
-: The concrete resources/persons/objects to which the grant applies. Avoid ambient authority.
+: Concrete resources/persons/objects to which the grant applies. Avoid ambient authority.
 
 `purpose`
-: Human-visible intent/scope. If purpose materially constrains the grant, it must be integrity-bound.
+: Human-visible scope. If it constrains authority, it must be integrity-bound.
 
 `permitted_actions`
-: Explicit action vocabulary owned by the domain.
+: Explicit domain-owned action vocabulary.
 
 `explicit_denials`
-: Restrictions that remain visible rather than disappearing into a single permit bit.
+: Restrictions that remain visible rather than disappearing into a permit bit.
 
 `source_authority`
-: The artifact(s) that actually justify the grant, distinct from supporting evidence.
+: The artifact(s) that justify the grant, distinct from supporting evidence.
 
 `evidence_dependencies`
-: Evidence needed to keep the grant current. Evidence expiration may remove authority; evidence alone cannot create it.
+: Evidence needed to keep authority current. Evidence can invalidate authority; evidence alone does not create it.
 
 `valid_from` / `valid_until`
-: Explicit temporal bounds.
+: Temporal bounds.
 
 `grant_generation` / `revocation_generation`
-: Durable ordering semantics for grant/revocation continuity.
+: Ordering semantics for continuity.
 
 `context_binding`
-: Environment/session/mission/case constraints.
+: Session/mission/case/environment constraints.
 
 `resource_binding`
-: Prevents a grant for resource A from being replayed against resource B.
+: Prevents replay against another object.
 
 `audience_binding`
-: Prevents a grant intended for one executor/enforcement point from being reused elsewhere.
+: Prevents a grant intended for one enforcement point from being reused elsewhere.
 
 `translation_lineage`
-: Records each authority-relevant representation transition.
+: Records authority-relevant representation transitions.
 
 `translation_disposition`
-: Must distinguish exact preservation, conservative attenuation, incompatibility, expiry, revocation, stale evidence, and context mismatch.
+: Distinguishes exact preservation, attenuation, incompatibility, expiry, revocation, stale evidence, lineage mismatch, and context mismatch.
 
 `human_review_policy`
-: Specifies where a human decision is required and, equally importantly, where review is advisory rather than authority-creating.
+: Identifies where human review is required and where it is advisory rather than authority-creating.
 
 `contestability_policy`
-: Defines inspect/contest/appeal semantics where the domain requires them.
+: Defines inspect/contest/appeal semantics where relevant.
 
 `integrity_binding`
-: Cryptographically or otherwise strongly binds every authority-relevant field for contexts that cross a trust boundary.
+: Strongly binds every authority-relevant field when the artifact crosses a trust boundary.
 
-## 5. Typed authority transitions
-
-HAK should prefer typed transition outcomes over booleans.
+## 8. Typed authority transitions
 
 Candidate vocabulary:
 
@@ -242,6 +287,7 @@ AuthorityTranslationDisposition {
     Expired,
     Revoked,
     EvidenceStale,
+    LineageMismatch,
     ContextMismatch,
     AudienceMismatch,
     ResourceMismatch,
@@ -250,13 +296,15 @@ AuthorityTranslationDisposition {
 
 Only `Exact` and a domain-proven `Attenuated` result may continue into authorization.
 
-`Incomparable` is not equivalent to denial as a semantic statement, but consequential execution should fail closed because permission has not been established.
+`Incomparable` is not logically identical to denial, but consequential execution fails closed because permission has not been established.
 
-## 6. AugmentationContractV1 candidate
+`LineageMismatch` is important: it prevents a proof about one scenario/session/deployment from being treated as authority continuity in another.
 
-Authority is only one half of HAK. A system can preserve formal permission while still reducing human agency through dependence, anchoring, hidden substitution, or opaque automation.
+## 9. AugmentationContractV1 candidate
 
-Candidate shape:
+Formal authorization can be correct while human agency is still reduced through dependence, anchoring, opaque substitution, or excessive automation.
+
+Conceptual shape:
 
 ```text
 AugmentationContractV1 {
@@ -285,7 +333,7 @@ AugmentationContractV1 {
 }
 ```
 
-### 6.1 Assistance modes
+### 9.1 Assistance modes
 
 At minimum distinguish:
 
@@ -300,43 +348,33 @@ PrepareAction
 ExecuteDelegatedAction
 ```
 
-Moving downward in this list generally increases the amount of authority and responsibility transferred to the system.
+Moving downward generally transfers more authority/responsibility to the system. A request for analysis must not silently become permission to execute.
 
-The transition must be explicit. A request for analysis must not silently become permission to execute.
+### 9.2 Retained decisions
 
-### 6.2 Retained human decisions
+The contract should identify decisions intentionally retained by the human, especially values/ends, irreversible commitments, delegation changes, withdrawal/revocation, publication in the human’s name, and high-impact domain decisions where policy requires human authority.
 
-An augmentation contract should identify decisions intentionally retained by the human, particularly:
+These are domain-dependent boundaries, not one universal paternalistic policy.
 
-- values and ends;
-- acceptance of consequential trade-offs;
-- irreversible commitments;
-- delegation changes;
-- withdrawal/revocation;
-- publication or representation in the human's name;
-- high-impact civic, medical, financial, legal, employment, or physical actions where domain policy requires human authority.
+### 9.3 Explanation as verification interface
 
-This list is domain-dependent; HAK should provide the shape, not one universal paternalistic policy.
+The objective is calibrated reliance, not maximal acceptance.
 
-### 6.3 Verification rather than persuasive explanation
-
-The goal of explanation is not maximal user acceptance. It is calibrated reliance.
-
-Useful interfaces should help the human answer:
+Interfaces should help a human ask:
 
 ```text
-What is being claimed?
+What is claimed?
 What evidence supports it?
-What would falsify it?
+What was inferred rather than observed?
 What is uncertain?
-What did the model infer rather than observe?
-What action, if any, would follow?
+What would falsify the claim?
+What action would follow?
 Who retains authority for that action?
 ```
 
-### 6.4 Independence and dissent
+### 9.4 Independence and dissent
 
-For deliberative or collective-intelligence contexts, HAK should support independent elicitation before common AI synthesis when anchoring would materially reduce epistemic diversity.
+Where common AI synthesis could anchor a deliberative group, HAK should support independent elicitation before synthesis:
 
 ```text
 independent positions
@@ -345,156 +383,91 @@ independent positions
 -> shared synthesis
 ```
 
-not necessarily:
+rather than assuming one shared AI answer is always the best first move.
+
+## 10. Demonstrated repository findings
+
+HAK-002 distinguishes demonstrated implementation findings from architectural hypotheses.
+
+### 10.1 Rescue negative-consent continuity — demonstrated
+
+A newer refusal/withdrawal could expire and allow an older accepted handoff to reappear as consent.
+
+Invariant:
 
 ```text
-one AI synthesis
--> everyone reacts to the same anchor
+storage expiry/eviction must not implicitly undo a domain-durable negative consent barrier
 ```
 
-## 7. Existing implementation findings that motivate this contract
+Tracked in the independent rescue-consent hardening tranche.
 
-This architecture is grounded in concrete repository findings rather than hypothetical concerns.
+### 10.2 Mycelix SubPassport transcript — demonstrated
 
-### 7.1 Rescue consent continuity
+The legacy delegation transcript omitted authority-relevant semantics and concatenated variable-length identity strings without framing. Renewal/revocation semantics also needed tightening.
 
-Existing rescue semantics correctly distinguish explicit case consent from distress/silence, but the ledger previously allowed a later refusal/withdrawal to expire and fall back to an older accepted handoff state.
-
-The HAK invariant is:
+Invariant:
 
 ```text
-negative consent barrier cannot disappear by expiry/cache behavior and resurrect older positive authority
+integrity-bound delegation == exact grant semantics
 ```
 
-Tracked independently in the rescue-consent hardening tranche.
+Tracked independently in MYC-HAK-001.
 
-### 7.2 Mycelix SubPassport transcript
+### 10.3 Sovereign -> legacy governance fallback — demonstrated
 
-The previous delegation transcript did not bind all authority-relevant semantics and concatenated variable-length identity strings without framing.
+A custom 8D `CivicRequirement` can contain dimensions that legacy governance requirements cannot enforce. Silent conversion could discard those constraints.
 
-The HAK invariant is:
-
-```text
-signed delegation == exact integrity-bound grant semantics
-```
-
-A renewal that changes signed temporal bounds must require a new integrity binding; revocation cannot be ordinary renewal state.
-
-### 7.3 Sovereign -> legacy governance fallback
-
-An 8D civic requirement can contain constraints the legacy schema cannot represent.
-
-The HAK invariant is:
+Invariant:
 
 ```text
 compatibility fallback != authority to weaken policy
 ```
 
-Unsupported constraints must produce a typed incompatibility rather than being silently discarded.
+The checked fallback rejects nonrepresentable requirements instead of authorizing a weaker approximation.
 
-### 7.4 Subterranean operator reset
+### 10.4 Embodiment reset/recovery boundary — architectural ambiguity, not demonstrated bypass
 
-The operator authority state machine requires quorum and hazard checks to clear restrictive authority. A generic runtime reset previously cleared the active constraint directly.
+The subterranean reset audit initially treated local reset helpers as operational recovery and opened three preservation patches.
 
-The HAK invariant is:
+A wider audit showed:
 
-```text
-reset/restart != recovery authorization
-```
+- the shared trait documents `reset()` as resetting the body to default state;
+- tests and robotics bridge call sites use it as scenario/full-state reinitialization;
+- subterranean operational checkpointing separately persists operator/degraded/partition/temporal state;
+- checkpoint tests already preserve operator and temporal restrictions.
 
-A reset may discard incomplete authority-accruing state (for example partial resume quorum) but must not itself widen authority.
+Therefore the first three reset-preservation drafts were closed unmerged.
 
-### 7.5 Degraded-operation reset — open audit finding
-
-`DegradedMode::RecoveryRequired` is intentionally latched: normal link restoration is insufficient, and clearing it requires an explicit external authorization plus healthy dwell at a safe/service location.
-
-The current `reset_runtime()` nevertheless sets the mode directly to `Normal`.
-
-This is an unresolved audit finding in this HAK-002 document, not a claim of qualification or a bundled code change.
-
-Candidate repair theorem:
+Correct invariant:
 
 ```text
-runtime reset may clear ephemeral counters
-but must preserve RecoveryRequired until the domain's authorized clear transition succeeds
+scenario reset may start a new clean lineage
+operational recovery must preserve/revalidate same-lineage authority
 ```
 
-### 7.6 Partition-recovery reset — open audit finding
+The remaining work is to make those lifecycle semantics explicit enough that a caller cannot confuse them.
 
-Partition recovery explicitly states that restored connectivity is not restored operational truth and requires a reconciliation dwell before team state becomes authoritative.
+## 11. Reset/lifecycle classes
 
-The current `reset_runtime()` sets mode and cached assessment to `Connected`, with motion permitted and team state authoritative.
-
-This is another unresolved audit finding.
-
-Candidate repair theorem:
+HAK recommends distinguishing conceptually:
 
 ```text
-reset cannot manufacture Connected / authoritative team state
+NewSimulationLineage
+EphemeralRuntimeReset
+OperationalRecovery
+AdministrativeFactoryReset
 ```
 
-A conservative reset may discard partial reconciliation progress, but it must require fresh observations to regain connected authority.
+The detailed evidence and revised sequence live in the reset-continuity supporting audit.
 
-### 7.7 Temporal-assurance reset — open audit finding
-
-Temporal assurance latches `HoldForReview` after broken clock/causal history and requires clean dwell at a safe service location to release the latch.
-
-The embodiment reset currently replaces the temporal supervisor with `Default`, whose initial assessment is nominal.
-
-Candidate theorem:
+The key rule is not “reset must always preserve restrictions.” It is:
 
 ```text
-reset cannot clear a causal/temporal review latch without the same evidence required by the normal recovery transition
+new lineage must be explicit
+same-lineage recovery must not invent authority
 ```
 
-## 8. Reset classes
-
-One source of confusion is using one word, `reset`, for semantically different operations.
-
-HAK recommends distinguishing:
-
-### 8.1 Pure simulation reset
-
-Purpose: deterministic test/scenario initialization.
-
-May intentionally create a clean world *only when the simulated world itself is also reset and there is no claim of continuity with an operational authority lineage*.
-
-It should be clearly named/scoped and must not be reused as a live recovery primitive by accident.
-
-### 8.2 Ephemeral runtime reset
-
-Purpose: discard caches, incomplete computations, partial handshakes, or partial quorum accumulation.
-
-Rule:
-
-```text
-may remove provisional positive state
-must not remove durable negative/restrictive state
-must not manufacture positive evidence
-```
-
-### 8.3 Operational restart/recovery
-
-Purpose: resume a real system after restart, fault, update, or checkpoint restoration.
-
-Requires explicit continuity semantics for:
-
-- active restrictions;
-- revocation generations;
-- replay barriers;
-- evidence freshness;
-- authority epochs;
-- physical state;
-- trust state;
-- pending vs completed authorization transitions.
-
-### 8.4 Administrative factory reset
-
-Purpose: intentionally destroy an authority lineage/configuration.
-
-This is a privileged destructive action, not a safety recovery shortcut. Any future implementation must specify who can authorize it, what physical state is required, and whether subsequent operation begins in an unqualified/hold state.
-
-## 9. Evidence, credentials, policy and enforcement must remain separate
+## 12. Evidence, credentials, policy and enforcement remain separate
 
 Candidate pipeline:
 
@@ -518,18 +491,32 @@ Bounded execution
 Outcome evidence
 ```
 
-No arrow may be collapsed merely because two adjacent components currently live in one process or crate.
+No arrow becomes equivalent to its neighbor merely because two components live in one process.
 
-A credential can answer `what has been established about this subject?` while the authority layer answers `what action is this executor permitted to perform, on what resource, for what purpose, until when?`
+A credential can answer:
 
-## 10. Comparison with relevant external security architecture
+```text
+what has been established about this subject?
+```
 
-HAK is not an OAuth replacement, GNAP profile, VC profile, or Zero Trust product. However, several mature authorization systems reinforce useful boundaries:
+while authority answers:
 
-- OAuth Rich Authorization Requests (RFC 9396) represents fine-grained authorization details and requires unknown or invalid authorization-detail types/fields to fail rather than being interpreted approximately.
-- GNAP (RFC 9635) treats authorization to software as an explicit negotiated grant rather than as a side effect of identity.
-- W3C Verifiable Credentials Data Model 2.0 explicitly notes that verifiable credentials are not, by themselves, a complete authorization framework.
-- NIST Zero Trust separates policy decision/administration/enforcement and emphasizes least privilege, deny-by-default policy, and continuing authorization evaluation.
+```text
+what may this executor do,
+on which resource,
+for what purpose,
+in which lineage/context,
+until when?
+```
+
+## 13. Relevant external authorization architecture
+
+HAK is not an OAuth replacement, GNAP profile, VC profile, or Zero Trust product. Several mature systems nevertheless reinforce useful narrower boundaries:
+
+- OAuth Rich Authorization Requests (RFC 9396) provides fine-grained authorization details and fail-closed handling of unknown/invalid authorization details.
+- GNAP (RFC 9635) treats authority delegated to software as an explicit negotiated grant.
+- W3C Verifiable Credentials Data Model 2.0 notes that credentials are not by themselves a complete authorization framework.
+- NIST SP 800-207 separates policy decision/administration/enforcement and emphasizes least privilege and continuing authorization evaluation.
 
 References:
 
@@ -538,164 +525,152 @@ References:
 - https://www.w3.org/TR/vc-data-model/#authorization
 - https://csrc.nist.gov/publications/detail/sp/800-207/final
 
-The point of these references is not standards compliance. The point is that HAK should avoid reinventing known authorization mistakes while extending the model to human agency, augmentation, contestability, negative consent continuity, and cross-domain authority transformations.
+These are prior art, not claims of HAK compliance or equivalence.
 
-## 11. Candidate review rules
+## 14. Candidate review checklist
 
-Future code reviews involving authority should answer all of the following.
+For an authority-bearing change, reviewers should ask:
 
-1. **Source** — What artifact actually grants authority?
-2. **Subject** — Who/what is the principal and delegate?
-3. **Action** — What exact action vocabulary is permitted?
-4. **Resource** — What exact resources/persons/objects are bound?
-5. **Purpose** — Is material scope integrity-bound?
-6. **Time** — What establishes freshness and expiry?
-7. **Revocation** — Can a negative barrier disappear through TTL, eviction, restart, or migration?
-8. **Translation** — Can any representation change discard restrictions?
-9. **Fallback** — Does incompatibility fail closed?
-10. **Reset** — Can reset/restart widen authority or manufacture nominal state?
-11. **Evidence** — Can stale/missing evidence be confused with positive authorization?
-12. **Human boundary** — Did recommendation/planning silently become execution?
-13. **Contestability** — Can affected humans inspect and contest consequential decisions where required?
-14. **Audit** — Can the authority lineage be reconstructed without trusting mutable explanatory text?
-15. **Attenuation** — If authority is delegated again, can the child grant be proven no broader than the parent?
+1. **Lineage** — Is this the same authority lineage or a declared new one?
+2. **Source** — What artifact actually grants authority?
+3. **Principal/delegate** — Who exercises whose authority?
+4. **Action** — What exact action vocabulary is permitted?
+5. **Resource** — What exact objects/persons/resources are bound?
+6. **Purpose** — Is material scope integrity-bound?
+7. **Time** — What establishes freshness and expiry?
+8. **Revocation** — Can storage behavior, restart, migration, or cache loss undo it?
+9. **Translation** — Can representation changes discard restrictions?
+10. **Fallback** — Does incompatibility fail closed?
+11. **Lifecycle** — Is reset/recovery/new-lineage semantics explicit?
+12. **Evidence** — Can missing/stale evidence be confused with positive authorization?
+13. **Human boundary** — Did recommendation/planning silently become execution?
+14. **Contestability** — Can affected humans inspect/contest consequential decisions where required?
+15. **Attenuation** — If authority is redelegated, is child scope provably no broader than parent scope?
 
-## 12. Candidate property tests
+## 15. Candidate property tests
 
-Any future generic implementation should be tested with properties rather than only examples.
+### 15.1 Translation monotonicity
 
-### 12.1 Translation monotonicity
-
-For every successful translation:
+For every successful same-lineage translation:
 
 ```text
 permitted(translated) ⊆ permitted(source)
 ```
 
-### 12.2 Unknown-field fail closed
+### 15.2 Unknown-field fail closed
 
-Adding an authority-relevant field unknown to an older representation must never leave authorization unchanged unless the field is explicitly declared non-authoritative.
+Adding an authority-relevant field unknown to an older representation must not leave authorization unchanged unless that field is explicitly declared non-authoritative.
 
-### 12.3 Reset monotonicity
+### 15.3 Revocation non-resurrection
 
-For every non-factory operational reset:
+Once a grant generation is revoked, time passage, cache eviction, same-lineage restart, checkpoint restore, compatibility conversion, or missing data cannot make that generation executable again unless domain semantics explicitly establish a newer grant.
 
-```text
-permitted(after_reset) ⊆ permitted(before_reset)
-```
+### 15.4 Delegation attenuation
 
-until fresh evidence/authorization transitions occur.
-
-### 12.4 Revocation non-resurrection
-
-Once a grant generation is revoked, no combination of:
-
-- time passage;
-- cache eviction;
-- restart;
-- checkpoint restore;
-- compatibility conversion;
-- missing data;
-
-may make that generation executable again.
-
-### 12.5 Delegation attenuation
-
-For parent grant `P` and child grant `C`:
+For parent `P` and child `C` in the same delegation lineage:
 
 ```text
 C <= P
 ```
 
-must be mechanically established or child issuance fails.
+must be mechanically established or issuance fails.
 
-### 12.6 Evidence non-authority
+### 15.5 Evidence non-authority
 
-Mutation of a model score or descriptive credential must not directly create executable permission without the relevant policy/grant transition.
+Changing a model score or descriptive credential must not directly create executable permission without the relevant policy/grant transition.
 
-## 13. What should remain domain-owned
+### 15.6 Recovery continuity
 
-HAK should not centralize every authority state machine.
+A future operational recovery path must not gain authority merely from memory reinitialization or positive defaults.
+
+### 15.7 Scenario lineage separation
+
+A clean simulation reset may create configured nominal authority only if it creates/declares a new scenario lineage rather than claiming recovery of the prior one.
+
+## 16. What remains domain-owned
+
+HAK should not centralize every state machine.
 
 Likely domain-owned semantics include:
 
-- emergency medical/rescue exceptions;
+- rescue/emergency exceptions;
 - physical machinery recovery;
 - civic membership and constitutional legitimacy;
 - financial transaction authorization;
-- research consent;
+- medical/research consent;
 - youth/guardian authority;
 - publication/editorial approval;
-- infrastructure operator qualifications.
+- infrastructure operator qualification.
 
-HAK may eventually supply small common types for lineage, translation disposition, generation ordering, and envelope metadata, but only after at least several domains demonstrate genuinely identical semantics.
+Common types should be extracted only after several domains demonstrate genuinely identical semantics.
 
-## 14. Proposed tranche sequence after HAK-002
+## 17. Revised tranche sequence
 
 ```text
 HAK-001  Human Agency Kernel audit
    ↓
-HAK-002  Authority & Augmentation Contract v1   [this document]
+HAK-002  Authority & Augmentation Contract v1   [this tranche]
    ↓
-HAK-003  Authority-bearing type inventory + machine-readable audit manifest
+HAK-003  authority-bearing type + lineage inventory
    ↓
-HAK-004  CapabilityOutcomeVectorV1 / AgencyImpactClaimV1
+HAK-004  CapabilityOutcomeVector / AgencyImpactClaim
    ↓
-HAK-005  reliance + unaided-transfer benchmark harness
+HAK-005  reliance + unaided-transfer benchmarks
    ↓
-HAK-006  DissentEnvelopeV1 / independent elicitation
+HAK-006  DissentEnvelope / independent elicitation
    ↓
 HAK-007  collective-intelligence experiments
    ↓
 HAK-008  advisory institutional linter
 ```
 
-Parallel domain hardening remains independent:
+Parallel implementation work remains independently qualified:
 
 ```text
 rescue negative-consent continuity
 Mycelix SubPassport transcript hardening
 lossless civic compatibility fallback
-operator reset authority monotonicity
-future degraded/partition/temporal reset continuity repairs
+embodiment lifecycle semantic split / operational recovery design
 ```
 
-## 15. Exit criteria for HAK-002
+The earlier operator/degraded/partition reset-preservation drafts are intentionally **not** part of the active implementation stack after the lifecycle correction.
 
-HAK-002 should not be treated as ready merely because this document exists.
+## 18. Exit criteria
 
-Review should establish that:
+HAK-002 should remain draft until review establishes that:
 
-- the authority monotonicity principle is coherent across the audited domains;
-- the contract does not confuse human standing with scoped role authority;
-- the proposed envelope does not make evidence or credentials self-authorizing;
-- negative barriers remain semantically distinct from expiring grants;
-- reset/restart classes are sufficiently separated;
-- translation outcomes are explicit enough to prevent lossy authorization fallbacks;
-- augmentation semantics preserve a clear boundary between assistance and execution;
-- the design remains small enough that domain-specific authority semantics are not prematurely centralized.
+- authority monotonicity is scoped to a defined lineage;
+- new-lineage vs same-lineage lifecycle semantics are explicit;
+- human standing is not collapsed into scoped role authority;
+- evidence and credentials remain non-self-authorizing;
+- negative barriers have explicit supersession semantics;
+- lossy translation fails closed;
+- augmentation preserves a clear assistance/execution boundary;
+- the architecture remains small enough to avoid premature centralization;
+- the reset-audit correction is treated as evidence of successful falsification, not hidden as an inconvenience.
 
-Only after that review should a machine-readable inventory or common implementation type be proposed.
-
-## 16. Non-claims
+## 19. Non-claims
 
 This document does not establish that:
 
-- one authorization model is appropriate for all human institutions;
-- every action requires direct synchronous human approval;
-- all delegation is harmful;
-- all automated execution is illegitimate;
+- one authorization model fits every human institution;
+- every action requires synchronous human approval;
+- all delegation or automation is harmful;
 - OAuth, GNAP, VC, or Zero Trust solve human agency;
 - the sovereign-profile governance model is accepted or rejected;
-- current HAK-related code PRs are qualified;
-- a universal `AuthorityEnvelope` Rust type should already be introduced;
-- Symthaea can measure human flourishing with one scalar;
-- safety restrictions should never be cleared; only that clearing them must be an explicit, authorized transition.
+- current HAK-related implementation PRs are qualified;
+- generic scenario reset is presently an operational security bypass;
+- a universal `AuthorityEnvelope` Rust type should already exist;
+- Symthaea can measure human flourishing with one scalar.
 
-The target is narrower and more testable:
+The target is narrower and testable:
 
 ```text
-A system may become increasingly capable and helpful
-without allowing representation changes, inference, fallback,
-reset, or delegation to silently become additional authority.
+Within a defined authority lineage,
+representation change, inference, fallback, delegation, or recovery
+must not silently become additional authority.
+
+Across a deliberately new lineage,
+the lineage break itself must be explicit enough that nobody mistakes
+reinitialization for recovery evidence.
 ```
