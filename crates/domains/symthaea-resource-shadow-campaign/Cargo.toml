@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-resource-shadow-campaign"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Preregistered multi-scenario campaign protocol for resource shadow benchmarks"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "benchmark", "campaign", "reproducibility"]
+categories = ["science", "simulation"]
+
+[dependencies]
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-operations-research = { path = "../symthaea-operations-research" }
+symthaea-resource-objective-metric = { path = "../symthaea-resource-objective-metric" }
+symthaea-resource-shadow-benchmark = { path = "../symthaea-resource-shadow-benchmark" }
