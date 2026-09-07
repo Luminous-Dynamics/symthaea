@@ -28,6 +28,7 @@ pub const SHADOW_DISPOSITION_ENGINE_CONTRACT_V1: &str = concat!(
     "ancestry_root_pair_edge_candidate_declaration_module_and_strength_counts_are_not_cardinality_substitutes\n",
     "threshold_predicates=D,CS,CO,S,TS,O,TO\n",
     "registered_invariants=S_implies_TS+O_implies_TO\n",
+    "qualified_contestation_requires=CS+CO+TS+TO\n",
     "precedence=qualified_defeater>qualified_contestation>bilateral_qualifying_disagreement>unilateral_full>unilateral_tentative>underdetermined\n",
     "rule_to_primary_class_mapping_is_exact_and_profile_bearing\n",
     "decision_lattice_total_over_all_72_admissible_predicate_states_v1\n",
@@ -243,7 +244,11 @@ mod tests {
     fn frozen_rule_for(state: PredicateState) -> &'static str {
         if state.defeater {
             "qualified_defeater_blocker"
-        } else if state.support_contested && state.opposition_contested {
+        } else if state.support_contested
+            && state.opposition_contested
+            && state.support_tentative
+            && state.opposition_tentative
+        {
             "qualified_contestation"
         } else if state.support_tentative && state.opposition_tentative {
             "bilateral_qualified_disagreement_below_contestation"
@@ -310,6 +315,30 @@ mod tests {
             SHADOW_DISPOSITION_DECISION_TRACE_TAGS_V1,
             &["decision_rule_id", "primary_class"]
         );
+    }
+
+    #[test]
+    fn contested_requires_both_tentative_sides() {
+        let only_contested_topology = PredicateState {
+            defeater: false,
+            support_contested: true,
+            opposition_contested: true,
+            support_full: false,
+            support_tentative: false,
+            opposition_full: false,
+            opposition_tentative: false,
+        };
+        assert_eq!(
+            frozen_rule_for(only_contested_topology),
+            "insufficient_topology"
+        );
+
+        let fully_qualified = PredicateState {
+            support_tentative: true,
+            opposition_tentative: true,
+            ..only_contested_topology
+        };
+        assert_eq!(frozen_rule_for(fully_qualified), "qualified_contestation");
     }
 
     #[test]
