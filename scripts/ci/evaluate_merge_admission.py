@@ -231,6 +231,48 @@ def _job_failure_disposition(jobs: Any) -> tuple[Decision | None, list[str]]:
     return None, []
 
 
+def _evidence_binding(observation: dict[str, Any]) -> dict[str, Any]:
+    control_rows = sorted(
+        (
+            {
+                "path": row.get("path"),
+                "base_blob_sha": row.get("base_blob_sha"),
+                "candidate_blob_sha": row.get("candidate_blob_sha"),
+            }
+            for row in observation.get("control_plane", [])
+            if isinstance(row, dict)
+        ),
+        key=lambda row: str(row.get("path")),
+    )
+    integration = observation.get("full_integration")
+    if not isinstance(integration, dict):
+        integration_binding = None
+    else:
+        jobs = integration.get("required_jobs")
+        jobs_for_digest = jobs if isinstance(jobs, list) else []
+        integration_binding = {
+            "workflow_path": integration.get("workflow_path"),
+            "workflow_blob_sha": integration.get("workflow_blob_sha"),
+            "run_id": integration.get("run_id"),
+            "event": integration.get("event"),
+            "status": integration.get("status"),
+            "conclusion": integration.get("conclusion"),
+            "head_sha": integration.get("head_sha"),
+            "base_sha": integration.get("base_sha"),
+            "job_set_complete": integration.get("job_set_complete"),
+            "required_job_observation_count": len(jobs_for_digest),
+            "required_jobs_sha256": sha256_hex(canonical_json(jobs_for_digest)),
+        }
+    binding = {
+        "control_plane": control_rows,
+        "full_integration": integration_binding,
+    }
+    return {
+        "sha256": sha256_hex(canonical_json(binding)),
+        "value": binding,
+    }
+
+
 def evaluate(
     policy: dict[str, Any], observation: dict[str, Any], *, policy_bytes: bytes | None = None
 ) -> Evaluation:
@@ -245,8 +287,7 @@ def evaluate(
     if observation["target_branch"] != policy["target_branch"]:
         reasons.append("target branch does not match policy")
     if reasons:
-        decision = Decision.REJECTED
-        return _finish(policy_digest, observation, decision, reasons)
+        return _finish(policy_digest, observation, Decision.REJECTED, reasons)
 
     control_decision, control_reasons, base_blobs = _control_plane_disposition(policy, observation)
     if control_decision is not None:
@@ -275,8 +316,7 @@ def evaluate(
     identity_errors: list[str] = []
     if integration.get("workflow_path") != workflow_path:
         identity_errors.append("workflow path is not the trusted full-integration workflow")
-    workflow_blob = integration.get("workflow_blob_sha")
-    if workflow_blob != workflow_base_blob:
+    if integration.get("workflow_blob_sha") != workflow_base_blob:
         identity_errors.append("workflow blob does not equal trusted target-base workflow blob")
     if integration.get("event") not in set(required["accepted_events"]):
         identity_errors.append("workflow event is not admitted by policy")
@@ -304,10 +344,11 @@ def evaluate(
             [f"full integration status is {status!r}, not completed"],
         )
     if conclusion != required["required_conclusion"]:
-        if conclusion in (None, "cancelled", "skipped", "neutral"):
-            decision = Decision.INCOMPLETE
-        else:
-            decision = Decision.REJECTED
+        decision = (
+            Decision.INCOMPLETE
+            if conclusion in (None, "cancelled", "skipped", "neutral")
+            else Decision.REJECTED
+        )
         return _finish(
             policy_digest,
             observation,
@@ -336,6 +377,7 @@ def _finish(
     decision: Decision,
     reasons: list[str],
 ) -> Evaluation:
+    evidence_binding = _evidence_binding(observation)
     body: dict[str, Any] = {
         "schema": RECEIPT_SCHEMA,
         "policy_sha256": policy_digest,
@@ -344,6 +386,8 @@ def _finish(
         "current_base_sha": observation.get("current_base_sha"),
         "candidate_head_sha": observation.get("candidate_head_sha"),
         "candidate_tree_sha": observation.get("candidate_tree_sha"),
+        "evidence_binding_sha256": evidence_binding["sha256"],
+        "evidence_binding": evidence_binding["value"],
         "decision": decision.value,
         "reasons": list(reasons),
         "caveat": "unsigned policy-core disposition; enforceable authority requires a trusted external collector/check and repository merge rule",
