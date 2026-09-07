@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-resource-quality-interval"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Piecewise interval qualification for topology-bound resource quality evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "quality", "time", "feasibility"]
+categories = ["science", "simulation"]
+
+[dependencies]
+chrono = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-quality = { path = "../symthaea-resource-quality" }
+symthaea-resource-quality-evidence = { path = "../symthaea-resource-quality-evidence" }
+symthaea-resource-quality-qualification = { path = "../symthaea-resource-quality-qualification" }
+symthaea-resource-topology = { path = "../symthaea-resource-topology" }
