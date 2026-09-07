@@ -1,0 +1,72 @@
+name: NeuroBridge Local Evidence Verifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/neurobridge/verify_local_qualification_evidence.py'
+      - 'scripts/neurobridge/test_verify_local_qualification_evidence.py'
+      - 'docs/neuroscience/NEUROBRIDGE_LOCAL_EVIDENCE_VERIFIER_V01.md'
+      - '.github/workflows/neurobridge-local-evidence-verifier.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify hostile NeuroBridge local archive verifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax contract
+        run: |
+          python -m py_compile \
+            scripts/neurobridge/verify_local_qualification_evidence.py \
+            scripts/neurobridge/test_verify_local_qualification_evidence.py
+
+      - name: Hostile archive regressions
+        run: PYTHONPATH=scripts/neurobridge python -m unittest scripts/neurobridge/test_verify_local_qualification_evidence.py
+
+      - name: Non-execution and no-extraction ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=scripts/neurobridge/verify_local_qualification_evidence.py
+          if grep -Eq '(subprocess|os\.system|Popen|cargo |nix develop|Workbench|run_wb)' "$FILE"; then
+            echo 'evidence verifier must not execute qualification/runtime tools' >&2
+            exit 1
+          fi
+          if grep -Eq '(extractall|extract\(|unpack_archive|shutil\.unpack)' "$FILE"; then
+            echo 'evidence verifier must never extract hostile archives' >&2
+            exit 1
+          fi
+          grep -Fq 'producer_authenticity_established' "$FILE"
+          grep -Fq 'hosted_ci_agreement_established' "$FILE"
+          grep -Fq 'real_neuroscience_evidence_established' "$FILE"
+
+      - name: Closed-world PASS contract ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=scripts/neurobridge/verify_local_qualification_evidence.py
+          DOC=docs/neuroscience/NEUROBRIDGE_LOCAL_EVIDENCE_VERIFIER_V01.md
+          grep -Fq 'EXPECTED_FILES' "$FILE"
+          grep -Fq 'MANIFEST_FILES' "$FILE"
+          grep -Fq 'EXECUTION_RESULT' "$FILE"
+          grep -Fq 'LAST_PHASE' "$FILE"
+          grep -Fq 'source-clean-after' "$FILE"
+          grep -Fq 'release: expected archive SHA-256 required' "$FILE"
+          grep -Fq 'never calls archive extraction APIs' "$DOC"
+          grep -Fq 'producer_authenticity_established = false' "$DOC"
+
+      - name: CLI contract
+        run: python scripts/neurobridge/verify_local_qualification_evidence.py --help
