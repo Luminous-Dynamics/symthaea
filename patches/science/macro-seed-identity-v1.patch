@@ -44,7 +44,33 @@ index b19c688..0000000 100644
      /// Per-generation best fitness (lower = better). Collected during `fit()`.
      /// Enables cold-vs-primed convergence comparison and "generations-to-ε" analysis.
      fitness_history: Vec<f64>,
-@@ -242,9 +266,19 @@ impl SymbolicRegressor {
+@@ -232,6 +256,20 @@ impl SymbolicRegressor {
+         &self.macro_usage
+     }
+ 
++    /// Exact learned-macro identities structurally present in `expr`.
++    ///
++    /// This reports dependency candidates only: structural presence establishes
++    /// that the returned expression contains a seeded learned primitive, not
++    /// that the primitive was necessary, independently discovered, or
++    /// scientifically evidential. Identities are sorted/deduplicated so the
++    /// result is deterministic and suitable for a later dependency receipt.
++    pub fn macro_dependencies_for_expr(&self, expr: &Expr) -> Vec<String> {
++        let mut identities: Vec<String> = self
++            .seed_macros
++            .iter()
++            .filter(|seed| contains_structural_match(expr, &seed.template))
++            .map(|seed| seed.identity.clone())
++            .collect();
++        identities.sort();
++        identities.dedup();
++        identities
++    }
++
+     pub fn seed_specialization_stats(&self) -> &SeedSpecializationStats {
+         &self.seed_specialization_stats
+     }
+@@ -242,9 +280,19 @@ impl SymbolicRegressor {
      /// Called by `ConjectureEngine::generate_conjectures` when abstract thought
      /// is enabled and grammar has promoted macros. Each macro is instantiated
      /// with random constants to explore parameter variations.
@@ -64,7 +90,7 @@ index b19c688..0000000 100644
      }
  
      /// Run symbolic regression on observed data.
-@@ -256,9 +290,8 @@ impl SymbolicRegressor {
+@@ -256,9 +304,8 @@ impl SymbolicRegressor {
          self.seed_specialization_stats = SeedSpecializationStats::default();
          // Pre-seed macro_usage keys so 0 counts are visible (not absent)
 -        for macro_expr in &self.seed_macros {
@@ -74,7 +100,7 @@ index b19c688..0000000 100644
 +            self.macro_usage.entry(macro_seed.identity.clone()).or_insert(0);
          }
          let (train, _test) = seq.train_test_split();
-@@ -366,8 +399,9 @@ impl SymbolicRegressor {
+@@ -366,8 +413,9 @@ impl SymbolicRegressor {
              );
              let mut specialized_variants = Vec::new();
              let mut exact_fit_found = false;
@@ -86,7 +112,7 @@ index b19c688..0000000 100644
                      .into_iter()
                      .take(budget.max_variants_per_macro)
                  {
-@@ -412,7 +446,9 @@ impl SymbolicRegressor {
+@@ -412,7 +460,9 @@ impl SymbolicRegressor {
                  } else {
                      self.rng = lcg_step(self.rng);
                      let macro_idx = self.rng as usize % self.seed_macros.len();
@@ -97,20 +123,21 @@ index b19c688..0000000 100644
                  };
                  self.population[slot] = seeded;
              }
-@@ -607,10 +643,10 @@ impl SymbolicRegressor {
+@@ -607,10 +657,10 @@ impl SymbolicRegressor {
              for &idx in &top_indices {
                  let expr = &self.population[idx];
 -                for macro_expr in &self.seed_macros {
 -                    if contains_structural_match(expr, macro_expr) {
 -                        let key = macro_usage_key(macro_expr);
 -                        *self.macro_usage.entry(key).or_insert(0) += 1;
-+                for macro_seed in &self.seed_macros {
-+                    if contains_structural_match(expr, &macro_seed.template) {
-+                        *self.macro_usage.entry(macro_seed.identity.clone()).or_insert(0) += 1;
-                     }
+-                    }
++                let dependencies = self.macro_dependencies_for_expr(expr);
++                for identity in dependencies {
++                    *self.macro_usage.entry(identity).or_insert(0) += 1;
                  }
              }
-@@ -749,3 +785,49 @@ impl SymbolicRegressor {
+         }
+@@ -749,3 +799,36 @@ impl SymbolicRegressor {
          best_idx
      }
  }
@@ -120,7 +147,7 @@ index b19c688..0000000 100644
 +    use super::*;
 +
 +    #[test]
-+    fn explicit_macro_seed_identity_survives_usage_accounting() {
++    fn explicit_macro_seed_identity_survives_dependency_resolution() {
 +        let n = Expr::Var("n".into());
 +        let template = Expr::BinOp(
 +            BinOp::Add,
@@ -132,37 +159,17 @@ index b19c688..0000000 100644
 +            )),
 +        );
 +        let identity = "eml:strict:fixture-scientific-macro-id".to_string();
-+        let data = (1..=12)
-+            .map(|x| {
-+                let x = x as f64;
-+                (x, x.sin() + x * x)
-+            })
-+            .collect();
-+        let sequence = ObservedSequence::new("macro_identity_fixture", MathDomain::Physics, data);
-+        let mut regressor = SymbolicRegressor::new(RegressorConfig {
-+            population_size: 30,
-+            generations: 0,
-+            max_depth: 5,
-+            max_complexity: 12,
-+            lambda: 0.0,
-+            seed: 17,
-+            ..RegressorConfig::default()
-+        });
++        let mut regressor = SymbolicRegressor::new(RegressorConfig::default());
 +        regressor.set_seed_macros_with_identity(vec![MacroSeed::new(
 +            identity.clone(),
 +            template.clone(),
 +        )]);
 +
-+        let results = regressor.fit(&sequence, 5);
-+        assert!(
-+            results
-+                .iter()
-+                .any(|candidate| contains_structural_match(&candidate.formula, &template)),
-+            "identity fixture must retain the seeded macro in at least one returned candidate"
-+        );
-+        assert!(
-+            regressor.macro_usage().get(&identity).copied().unwrap_or(0) > 0,
-+            "usage must be attributed to the exact caller-supplied macro identity"
++        assert_ne!(identity, macro_usage_key(&template));
++        assert_eq!(
++            regressor.macro_dependencies_for_expr(&template),
++            vec![identity],
++            "dependency lookup must preserve the exact caller-supplied macro identity"
 +        );
 +    }
 +}
