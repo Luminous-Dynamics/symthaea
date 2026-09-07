@@ -1,0 +1,18 @@
+{
+  "schema": "symthaea.required-ci-job-manifest.v1",
+  "workflow_path": ".github/workflows/ci.yml",
+  "workflow_blob_sha": "a48366076b30eb8e12d22c927a3b8bf333181409",
+  "complete": false,
+  "profiles": {
+    "pull_request": {
+      "event": "pull_request",
+      "top_level_job_ids": [],
+      "families": []
+    },
+    "workflow_dispatch": {
+      "event": "workflow_dispatch",
+      "top_level_job_ids": [],
+      "families": []
+    }
+  }
+}
