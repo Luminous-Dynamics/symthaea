@@ -68,21 +68,21 @@ jobs:
           cargo --version
 
       - name: Test foundation crates
-        run: cargo test $FOUNDATION_PACKAGES --all-targets
+        run: cargo test --locked $FOUNDATION_PACKAGES --all-targets
 
       - name: Clippy foundation crates
-        run: cargo clippy $FOUNDATION_PACKAGES --all-targets -- -D warnings
+        run: cargo clippy --locked $FOUNDATION_PACKAGES --all-targets -- -D warnings
 
       - name: Test Compute Commons reference compositions
         run: >-
-          cargo test -p symthaea-engineering
+          cargo test --locked -p symthaea-engineering
           --example compute_commons_habitat
           --example compute_commons_failure_lab
           --example compute_commons_commissioning_lab
 
       - name: Clippy Compute Commons reference compositions
         run: >-
-          cargo clippy -p symthaea-engineering
+          cargo clippy --locked -p symthaea-engineering
           --example compute_commons_habitat
           --example compute_commons_failure_lab
           --example compute_commons_commissioning_lab
