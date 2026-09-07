@@ -1,0 +1,98 @@
+name: ALife Evolution Controls
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/src/evolution_rng.rs"
+      - "crates/domains/symthaea-alife/src/inheritance_source.rs"
+      - "crates/domains/symthaea-alife/src/evolution_birth.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/tests/phase4_evolution.rs"
+      - ".github/workflows/alife-evolution-controls.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  evolution-control-contracts:
+    name: Evolution control contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-evolution-controls
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test evolution RNG contract
+        run: cargo test --locked -p symthaea-alife evolution_rng::
+
+      - name: Test inheritance-source contract
+        run: cargo test --locked -p symthaea-alife inheritance_source::
+
+      - name: Test evolutionary birth-plan contract
+        run: cargo test --locked -p symthaea-alife evolution_birth::
+
+      - name: Re-run Phase 4 selection ground truth
+        run: cargo test --locked -p symthaea-alife --test phase4_evolution -- --nocapture
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze contract-only production boundary
+        run: |
+          if grep -n -E 'EvolutionRngStreamsV1|prepare_evolution_birth_v1|select_genome_source_v1' \
+            crates/domains/symthaea-alife/src/population.rs; then
+            echo "Evolution-control contract types are unexpectedly wired into Population."
+            echo "Production wiring belongs in the next separately reviewed tranche."
+            exit 1
+          fi
+
+      - name: Record qualification identity
+        run: |
+          {
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "authority=contract_only_not_population_wired"
+          } | tee alife-evolution-controls-metadata.txt
+
+      - name: Upload qualification metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-evolution-controls-${{ github.event.pull_request.head.sha || github.sha }}
+          path: alife-evolution-controls-metadata.txt
+          retention-days: 30
