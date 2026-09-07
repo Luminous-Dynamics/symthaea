@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-operating-autonomy"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Locally-owned survival envelopes composed with expiring parent coordination"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["infrastructure", "autonomy", "safety", "resilience"]
+categories = ["science", "simulation"]
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-operating-envelope = { path = "../symthaea-operating-envelope" }
+symthaea-operating-authority = { path = "../symthaea-operating-authority" }
+symthaea-resource-hierarchy = { path = "../symthaea-resource-hierarchy" }
+
+[dev-dependencies]
+symthaea-resource-model = { path = "../symthaea-resource-model" }
