@@ -67,13 +67,15 @@ jobs:
           p = Path('crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs')
           s = p.read_text()
           needle = '    vec![\n        // ─── Identity & reflexive implications'
-          replacement = '''    vec![
-        Fixture {
-            name: "negative_control_unproved_atom",
-            description: "P (not a closed tautology)",
-            goal: p(),
-        },
-        // ─── Identity & reflexive implications'''
+          replacement = (
+              '    vec![\n'
+              '        Fixture {\n'
+              '            name: "negative_control_unproved_atom",\n'
+              '            description: "P (not a closed tautology)",\n'
+              '            goal: p(),\n'
+              '        },\n'
+              '        // ─── Identity & reflexive implications'
+          )
           assert needle in s
           p.write_text(s.replace(needle, replacement, 1))
           PY
@@ -114,13 +116,15 @@ jobs:
           p = Path('crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs')
           s = p.read_text()
           needle = '    vec![\n        // ─── Identity & reflexive implications'
-          replacement = '''    vec![
-        Fixture {
-            name: "negative_control_unproved_atom",
-            description: "P (not a closed tautology)",
-            goal: p(),
-        },
-        // ─── Identity & reflexive implications'''
+          replacement = (
+              '    vec![\n'
+              '        Fixture {\n'
+              '            name: "negative_control_unproved_atom",\n'
+              '            description: "P (not a closed tautology)",\n'
+              '            goal: p(),\n'
+              '        },\n'
+              '        // ─── Identity & reflexive implications'
+          )
           assert needle in s
           p.write_text(s.replace(needle, replacement, 1))
           PY
