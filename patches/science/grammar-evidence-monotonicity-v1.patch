@@ -1,0 +1,123 @@
+diff --git a/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs b/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
+index 80149c3..0000000 100644
+--- a/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
++++ b/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
+@@ -609,15 +609,22 @@ impl Default for DynamicGrammar {
+ // HELPERS
+ // ═══════════════════════════════════════════════════════════════════════════
+ 
+-/// A conjecture counts as "verified" for grammar promotion if it has been
+-/// tested against data with reasonable confidence. We accept formal proofs,
+-/// symbolic checks, AND numerically-tested conjectures with low test MSE —
+-/// the latter is a pragmatic proxy for real-world discovery where Z3
+-/// verification may be unavailable (e.g., transcendental formulas).
+-fn is_verified(status: &ConjectureStatus) -> bool {
++/// Whether an evidence state may retain the recurrent grammar-admission path.
++///
++/// This is deliberately broader than singleton fast-track verification.
++/// `BoundedChecked` and `SmtSamplesChecked` are refinements reached only after
++/// earlier numerical admission, and the verification pipeline explicitly
++/// retains `MacroPromotionTier::RecurrentNumerical` for them. Moving into one
++/// of those more explicit evidence states must therefore not revoke recurrent
++/// eligibility merely because the enum variant changed.
++///
++/// None of these finite/sample states constitute universal proof or qualify
++/// for singleton fast-track promotion.
++fn is_recurrently_verified(status: &ConjectureStatus) -> bool {
+     match status {
+         ConjectureStatus::FormallyVerified { .. } => true,
+         ConjectureStatus::SymbolicallyChecked => true,
+         ConjectureStatus::NumericallyTested { test_mse } => *test_mse < 1e-3,
++        ConjectureStatus::BoundedChecked { checked_points, .. } => *checked_points > 0,
++        ConjectureStatus::SmtSamplesChecked { checked_points } => *checked_points > 0,
+         _ => false,
+     }
+ }
+@@ -245,7 +252,7 @@ impl DynamicGrammar {
+                         existing
+                             .parent_formulas
+                             .insert(conjecture_parent_formula_identity(conj));
+                         if conj.macro_promotion_tier.allows_recurrent_promotion()
+-                            && is_verified(&conj.status)
++                            && is_recurrently_verified(&conj.status)
+                         {
+                             existing.verified_count += 1;
+                             existing.promotion_tier = existing
+@@ -281,7 +288,7 @@ impl DynamicGrammar {
+                 sources.insert(conj.source.clone());
+                 parent_formulas.insert(conjecture_parent_formula_identity(conj));
+                 if conj.macro_promotion_tier.allows_recurrent_promotion()
+-                    && is_verified(&conj.status)
++                    && is_recurrently_verified(&conj.status)
+                 {
+                     verified_count += 1;
+                     promotion_tier = promotion_tier.max(MacroPromotionTier::RecurrentNumerical);
+@@ -1714,5 +1721,76 @@ mod tests {
+         assert_eq!(metrics.signature_stats[0].signature, "n");
+         assert_eq!(metrics.signature_stats[0].used_operator_count, 1);
+     }
++
++    fn assert_refined_finite_state_retains_recurrent_promotion(
++        status: ConjectureStatus,
++        label: &str,
++    ) {
++        let formula = n_squared_plus_c(1.0);
++        let subtree = normalize_expr(&formula);
++        let mut engine = ConjectureEngine::new();
++
++        for i in 0..3 {
++            let mut conjecture = make_conjecture(
++                formula.clone(),
++                MathDomain::Physics,
++                &format!("{label}-source-{i}"),
++                status.clone(),
++            );
++            conjecture.macro_promotion_tier = MacroPromotionTier::RecurrentNumerical;
++            engine.conjectures.push(conjecture);
++        }
++
++        let mut grammar = DynamicGrammar::new();
++        grammar.observe_subtree(subtree, &[0, 1, 2], &engine);
++
++        assert_eq!(grammar.candidates.len(), 1);
++        assert_eq!(
++            grammar.candidates[0].verified_count, 3,
++            "{label} must retain the recurrent evidence already earned"
++        );
++        assert_eq!(
++            grammar.candidates[0].strongly_verified_count, 0,
++            "{label} must not become singleton fast-track evidence"
++        );
++        assert_eq!(
++            grammar.candidates[0].promotion_tier,
++            MacroPromotionTier::RecurrentNumerical
++        );
++
++        grammar.promote_eligible(&engine);
++        assert_eq!(grammar.operators.len(), 1);
++        assert_eq!(
++            grammar.operators[0].promotion_tier,
++            MacroPromotionTier::RecurrentNumerical,
++            "{label} should promote only through recurrence"
++        );
++    }
++
++    #[test]
++    fn bounded_checked_retains_recurrent_grammar_eligibility() {
++        assert_refined_finite_state_retains_recurrent_promotion(
++            ConjectureStatus::BoundedChecked {
++                checked_points: 12,
++                max_n: 20,
++            },
++            "bounded",
++        );
++    }
++
++    #[test]
++    fn smt_samples_checked_retains_recurrent_grammar_eligibility() {
++        assert_refined_finite_state_retains_recurrent_promotion(
++            ConjectureStatus::SmtSamplesChecked { checked_points: 12 },
++            "smt-samples",
++        );
++    }
+ }
