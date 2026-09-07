@@ -1,0 +1,166 @@
+name: Broca Formal Implementation Authority
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/broca-formal-implementation-authority.yml'
+      - 'patches/science/broca-formal-implementation-authority-v1.patch'
+      - 'crates/domains/symthaea-broca/src/formal_logic_scorer.rs'
+      - 'crates/domains/symthaea-broca/src/epistemic_scorers.rs'
+      - 'crates/domains/symthaea-broca/src/invariant_discovery.rs'
+      - 'crates/domains/symthaea-broca/src/lib.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/broca-formal-implementation-authority-v1.patch
+
+jobs:
+  qualify:
+    name: Prove code-independent formal credit and qualify scope separation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates src || {
+            echo 'qualification branch must not materialize product source'
+            exit 1
+          }
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze current authority shortcuts
+        run: |
+          SCORER=crates/domains/symthaea-broca/src/formal_logic_scorer.rs
+          EPI=crates/domains/symthaea-broca/src/epistemic_scorers.rs
+          INV=crates/domains/symthaea-broca/src/invariant_discovery.rs
+          grep -F '_generated_code: &str, // placeholder for future invariant extraction' "$SCORER"
+          grep -F 'CheckOutcome::Accepted => (1.0, true)' "$SCORER"
+          grep -F '0.5 // Default neutral if no spec provided' "$EPI"
+          grep -F 'FolFormulaExt::from_prop(Proposition::True)' "$INV"
+          grep -F 'Scientific consensus established' "$INV"
+
+      - name: Prove current implementation score is independent of code
+        run: |
+          mkdir -p .qualification crates/domains/symthaea-broca/tests
+          cat > .qualification/fake-lean <<'SH'
+          #!/bin/sh
+          exit 0
+          SH
+          chmod +x .qualification/fake-lean
+          cat > crates/domains/symthaea-broca/tests/formal_implementation_authority_negative_control.rs <<'RS'
+          use symthaea_broca::FormalLogicScorer;
+          use symthaea_core::hdc::fol_formula_ext::FolFormulaExt;
+          use symthaea_core::hdc::logic_engine::Proposition;
+
+          #[test]
+          fn provable_spec_currently_mints_full_credit_for_unrelated_code() {
+              let scorer = FormalLogicScorer::new();
+              let spec = FolFormulaExt::from_prop(Proposition::True);
+              let result = scorer.score_algorithm(
+                  "unrelated_implementation",
+                  &spec,
+                  "compile_error!(\"this code is not linked to the proof\");",
+              );
+              assert_eq!(result.score, 1.0);
+              assert!(result.verified);
+          }
+          RS
+          LEAN_PATH_BIN="$PWD/.qualification/fake-lean" \
+            cargo test --locked -p symthaea-broca \
+            --test formal_implementation_authority_negative_control
+          rm crates/domains/symthaea-broca/tests/formal_implementation_authority_negative_control.rs
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet formal scope and reward boundaries
+        run: |
+          SCORER=crates/domains/symthaea-broca/src/formal_logic_scorer.rs
+          EPI=crates/domains/symthaea-broca/src/epistemic_scorers.rs
+          INV=crates/domains/symthaea-broca/src/invariant_discovery.rs
+          grep -F 'pub enum FormalVerificationScope' "$SCORER"
+          grep -F 'SpecificationOnly' "$SCORER"
+          grep -F 'ImplementationConformance' "$SCORER"
+          grep -F 'supporting_statement_verified' "$SCORER"
+          grep -F 'implementation_binding=absent' "$SCORER"
+          grep -F 'smt_statement_binding=not_checked' "$SCORER"
+          grep -F '0.0 // No specification means no formal-proof evidence.' "$EPI"
+          ! grep -F '0.5 // Default neutral if no spec provided' "$EPI"
+          ! grep -F 'FolFormulaExt::from_prop(Proposition::True)' "$INV"
+          ! grep -F 'Scientific consensus established' "$INV"
+          grep -F 'formal proof NOT ESTABLISHED: theorem translation/binding absent' "$INV"
+
+      - name: Prove specification proof cannot mint implementation conformance
+        run: |
+          cat > crates/domains/symthaea-broca/tests/formal_implementation_authority_repaired.rs <<'RS'
+          use symthaea_broca::{
+              FormalLogicScorer, FormalVerificationScope,
+          };
+          use symthaea_core::hdc::fol_formula_ext::FolFormulaExt;
+          use symthaea_core::hdc::logic_engine::Proposition;
+
+          #[test]
+          fn theorem_success_is_supporting_evidence_not_code_conformance() {
+              let scorer = FormalLogicScorer::new();
+              let spec = FolFormulaExt::from_prop(Proposition::True);
+
+              let implementation = scorer.score_algorithm(
+                  "unrelated_implementation",
+                  &spec,
+                  "compile_error!(\"this code is not linked to the proof\");",
+              );
+              assert_eq!(implementation.score, 0.0);
+              assert!(!implementation.verified);
+              assert_eq!(
+                  implementation.scope,
+                  FormalVerificationScope::ImplementationConformance
+              );
+              assert!(implementation.supporting_statement_verified);
+              assert!(implementation.logic.contains("implementation_binding=absent"));
+
+              let theorem = scorer.verify_formula(&spec);
+              assert_eq!(theorem.score, 1.0);
+              assert!(theorem.verified);
+              assert_eq!(theorem.scope, FormalVerificationScope::SpecificationOnly);
+              assert!(theorem.supporting_statement_verified);
+          }
+          RS
+          LEAN_PATH_BIN="$PWD/.qualification/fake-lean" \
+            cargo test --locked -p symthaea-broca \
+            --test formal_implementation_authority_repaired
+          rm crates/domains/symthaea-broca/tests/formal_implementation_authority_repaired.rs
+
+      - name: Format, check, and lint
+        run: |
+          cargo fmt --check -p symthaea-broca
+          cargo check --locked -p symthaea-broca
+          cargo clippy --locked -p symthaea-broca --lib -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes that proving an explicitly supplied formal statement cannot by itself mint implementation-conformance score/verified status for unrelated generated code; direct specification verification remains separately represented.'
+          echo 'PASS also establishes that absence of a spec earns zero formal-proof evidence and the placeholder Proposition::True invariant path no longer prints proof/scientific-consensus authority.'
+          echo 'It does not establish a code-to-spec semantics extractor, implementation conformance, natural-language-to-formal equivalence, SMT-body-to-Lean-statement identity, scientific consensus, experimental validation, independent replication, or action authority.'
