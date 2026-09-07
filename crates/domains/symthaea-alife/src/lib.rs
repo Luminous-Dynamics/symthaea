@@ -51,7 +51,9 @@ pub use earth_forcing::EarthForcedEnvironment;
 pub use encounter::{EncounterScheduler, PairingMode};
 pub use environment::Environment;
 pub use events::GenesisEvent;
-pub use evolvability::{EvolvabilityError, RecoveryMetrics, analyze_recovery};
+pub use evolvability::{
+    EvolvabilityError, RecoveryMetrics, analyze_recovery, analyze_recovery_through,
+};
 pub use evolvability_comparison::{
     RecoveryComparison, RecoveryComparisonError, RecoveryLatencyComparison, compare_recovery,
 };

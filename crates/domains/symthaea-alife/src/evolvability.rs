@@ -7,10 +7,11 @@
 //! the number of distinct agents observed entering each social tick. They do **not** reinterpret
 //! a missing tick as extinction, do not infer exact birth/death timing, and do not claim a causal
 //! mechanism for recovery.
-//! 
+//!
 //! A recovery analysis requires contiguous observed-tick coverage from the requested baseline
-//! window through the end of the report. This fail-closed rule prevents a truncated event stream
-//! from masquerading as a population crash or recovery.
+//! window through its explicit evaluation horizon. This fail-closed rule prevents a truncated
+//! event stream from masquerading as a population crash or recovery and permits matched shocks to
+//! be compared over equal post-perturbation observation windows.
 
 use crate::{ObservatoryReport, ResourcePerturbation};
 
@@ -28,8 +29,8 @@ pub struct RecoveryMetrics {
     pub minimum_fraction_of_baseline_after_perturbation: f64,
     pub final_fraction_of_baseline: f64,
     /// First post-perturbation tick whose observed population reaches the requested fraction of
-    /// the pre-perturbation baseline. `None` means no recovery was observed before the supplied
-    /// report ended; it is not an extinction claim.
+    /// the pre-perturbation baseline. `None` means no recovery was observed before the selected
+    /// evaluation horizon ended; it is not an extinction claim.
     pub recovery_tick: Option<u64>,
     pub recovery_latency_ticks: Option<u64>,
     /// Sum over every observed tick from perturbation start through evaluation end of
@@ -41,7 +42,9 @@ pub struct RecoveryMetrics {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EvolvabilityError {
     ZeroBaselineLookback,
-    InvalidRecoveryFraction { recovery_fraction: f64 },
+    InvalidRecoveryFraction {
+        recovery_fraction: f64,
+    },
     BaselineWindowUnderflow {
         perturbation_start_tick: u64,
         baseline_lookback_ticks: u64,
@@ -51,19 +54,48 @@ pub enum EvolvabilityError {
         evaluation_end_tick: u64,
         perturbation_end_tick_exclusive: u64,
     },
-    MissingObservedTick { tick: u64 },
+    EvaluationEndsAfterReport {
+        evaluation_end_tick: u64,
+        report_last_tick: u64,
+    },
+    MissingObservedTick {
+        tick: u64,
+    },
     ZeroBaselinePopulation,
 }
 
-/// Measure observed population recovery around one perturbation.
+/// Measure observed population recovery through the report's final observed tick.
 ///
-/// `baseline_lookback_ticks` defines the exact half-open pre-perturbation baseline window
-/// `[start - lookback, start)`. `recovery_fraction` must be in `(0, 1]`.
+/// This convenience wrapper preserves #652's original behavior. For matched repeated-shock
+/// comparisons, prefer [`analyze_recovery_through`] so every shock receives the same explicit
+/// post-shock observation horizon.
 pub fn analyze_recovery(
     report: &ObservatoryReport,
     perturbation: ResourcePerturbation,
     baseline_lookback_ticks: u64,
     recovery_fraction: f64,
+) -> Result<RecoveryMetrics, EvolvabilityError> {
+    let evaluation_end_tick = report.last_tick.ok_or(EvolvabilityError::EmptyReport)?;
+    analyze_recovery_through(
+        report,
+        perturbation,
+        baseline_lookback_ticks,
+        recovery_fraction,
+        evaluation_end_tick,
+    )
+}
+
+/// Measure observed population recovery through one explicit inclusive evaluation end tick.
+///
+/// `baseline_lookback_ticks` defines the exact half-open pre-perturbation baseline window
+/// `[start - lookback, start)`. `recovery_fraction` must be in `(0, 1]`. The requested evaluation
+/// end must exist within the supplied report and reach at least the first post-perturbation tick.
+pub fn analyze_recovery_through(
+    report: &ObservatoryReport,
+    perturbation: ResourcePerturbation,
+    baseline_lookback_ticks: u64,
+    recovery_fraction: f64,
+    evaluation_end_tick: u64,
 ) -> Result<RecoveryMetrics, EvolvabilityError> {
     if baseline_lookback_ticks == 0 {
         return Err(EvolvabilityError::ZeroBaselineLookback);
@@ -79,11 +111,17 @@ pub fn analyze_recovery(
             perturbation_start_tick: perturbation.start_tick(),
             baseline_lookback_ticks,
         })?;
-    let evaluation_end_tick = report.last_tick.ok_or(EvolvabilityError::EmptyReport)?;
+    let report_last_tick = report.last_tick.ok_or(EvolvabilityError::EmptyReport)?;
     if evaluation_end_tick < perturbation.end_tick_exclusive() {
         return Err(EvolvabilityError::EvaluationEndsBeforePerturbation {
             evaluation_end_tick,
             perturbation_end_tick_exclusive: perturbation.end_tick_exclusive(),
+        });
+    }
+    if evaluation_end_tick > report_last_tick {
+        return Err(EvolvabilityError::EvaluationEndsAfterReport {
+            evaluation_end_tick,
+            report_last_tick,
         });
     }
 
@@ -120,14 +158,16 @@ pub fn analyze_recovery(
         .expect("evaluation end was validated to reach post-perturbation interval");
 
     let recovery_target = baseline_mean * recovery_fraction;
-    let recovery_tick = (post_start..=evaluation_end_tick)
-        .find(|&tick| require_population(report, tick).expect("coverage prevalidated") as f64 >= recovery_target);
+    let recovery_tick = (post_start..=evaluation_end_tick).find(|&tick| {
+        require_population(report, tick).expect("coverage prevalidated") as f64 >= recovery_target
+    });
     let recovery_latency_ticks = recovery_tick.map(|tick| tick - post_start);
 
     let mut normalized_population_deficit_area = 0.0;
     for tick in perturbation.start_tick()..=evaluation_end_tick {
         let population = require_population(report, tick)? as f64;
-        normalized_population_deficit_area += ((baseline_mean - population).max(0.0)) / baseline_mean;
+        normalized_population_deficit_area +=
+            ((baseline_mean - population).max(0.0)) / baseline_mean;
     }
 
     let final_population = require_population(report, evaluation_end_tick)? as f64;
@@ -200,6 +240,47 @@ mod tests {
         assert_eq!(metrics.recovery_latency_ticks, Some(1));
         assert_eq!(metrics.final_fraction_of_baseline, 1.0);
         assert!((metrics.normalized_population_deficit_area - 1.4).abs() < 1e-12);
+    }
+
+    #[test]
+    fn explicit_horizon_does_not_leak_later_recovery_into_an_earlier_window() {
+        let report = report(&[
+            (0, 10),
+            (1, 10),
+            (2, 10),
+            (3, 6),
+            (4, 4),
+            (5, 7),
+            (6, 8),
+            (7, 10),
+        ]);
+        let bounded = analyze_recovery_through(
+            &report,
+            shock().expect("shock"),
+            3,
+            0.9,
+            6,
+        )
+        .expect("bounded metrics");
+        assert_eq!(bounded.evaluation_end_tick, 6);
+        assert_eq!(bounded.recovery_tick, None);
+        assert_eq!(bounded.final_fraction_of_baseline, 0.8);
+
+        let full = analyze_recovery(&report, shock().expect("shock"), 3, 0.9).expect("full metrics");
+        assert_eq!(full.recovery_tick, Some(7));
+        assert_eq!(full.final_fraction_of_baseline, 1.0);
+    }
+
+    #[test]
+    fn rejects_explicit_horizon_beyond_available_evidence() {
+        let report = report(&[(0, 10), (1, 10), (2, 10), (3, 6), (4, 4), (5, 8)]);
+        assert_eq!(
+            analyze_recovery_through(&report, shock().expect("shock"), 3, 0.9, 6),
+            Err(EvolvabilityError::EvaluationEndsAfterReport {
+                evaluation_end_tick: 6,
+                report_last_tick: 5,
+            })
+        );
     }
 
     #[test]

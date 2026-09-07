@@ -4,13 +4,15 @@
 //!
 //! This example compares an evolving population (`mutation_rate = 0.1`) with an otherwise
 //! identical frozen control (`mutation_rate = 0.0`) under two identical resource shocks.
+//! Each shock receives the same fixed post-shock evaluation horizon, preventing the earlier shock
+//! from receiving more recovery time merely because it occurred earlier in the run.
 //! It deliberately makes no superiority assertion: the output is evidence for later analysis,
 //! not a preregistered claim that evolution must improve every recovery dimension.
 
 use symthaea_alife::{
     EncounterScheduler, InheritanceMode, OrganismConfig, PairingMode, PerturbationSchedule,
-    Population, PopulationConfig, ResourcePerturbation, analyze_genesis_events, analyze_recovery,
-    compare_recovery,
+    Population, PopulationConfig, ResourcePerturbation, analyze_genesis_events,
+    analyze_recovery_through, compare_recovery,
 };
 
 const TICKS: u64 = 1_400;
@@ -18,6 +20,7 @@ const INITIAL_COUNT: usize = 24;
 const PLANT_RESOURCE_TOTAL: f64 = 12.0;
 const BASELINE_LOOKBACK_TICKS: u64 = 100;
 const RECOVERY_FRACTION: f64 = 0.90;
+const POST_SHOCK_EVALUATION_TICKS: u64 = 300;
 
 const SHOCK_1_START: u64 = 400;
 const SHOCK_2_START: u64 = 900;
@@ -34,6 +37,13 @@ fn population_config(mutation_rate: f64) -> PopulationConfig {
         mutation_std: 0.05,
         inheritance: InheritanceMode::FromParent,
     }
+}
+
+fn evaluation_end_tick(shock: ResourcePerturbation) -> u64 {
+    shock
+        .end_tick_exclusive()
+        .checked_add(POST_SHOCK_EVALUATION_TICKS - 1)
+        .expect("fixed evaluation horizon must fit in u64")
 }
 
 fn main() {
@@ -86,20 +96,23 @@ fn main() {
         analyze_genesis_events(&evolving_events).expect("valid evolving event stream");
 
     for (label, shock) in [("shock-1", shock_1), ("shock-2", shock_2)] {
-        let frozen_recovery = analyze_recovery(
+        let evaluation_end_tick = evaluation_end_tick(shock);
+        let frozen_recovery = analyze_recovery_through(
             &frozen_report,
             shock,
             BASELINE_LOOKBACK_TICKS,
             RECOVERY_FRACTION,
+            evaluation_end_tick,
         );
-        let evolving_recovery = analyze_recovery(
+        let evolving_recovery = analyze_recovery_through(
             &evolving_report,
             shock,
             BASELINE_LOOKBACK_TICKS,
             RECOVERY_FRACTION,
+            evaluation_end_tick,
         );
 
-        println!("{label}");
+        println!("{label} (fixed post-shock horizon: {POST_SHOCK_EVALUATION_TICKS} ticks)");
         match (evolving_recovery, frozen_recovery) {
             (Ok(evolving_recovery), Ok(frozen_recovery)) => {
                 let comparison = compare_recovery(&evolving_recovery, &frozen_recovery)
