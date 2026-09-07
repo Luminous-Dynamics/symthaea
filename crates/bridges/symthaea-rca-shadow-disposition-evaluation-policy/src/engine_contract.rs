@@ -38,7 +38,7 @@ pub const SHADOW_DISPOSITION_ENGINE_CONTRACT_V1: &str = concat!(
     "result_identity=domain_separated_serializer_independent_complete_normalized_result_v1\n",
     "future_issued_result=private_serialize_only_recompute_for_current_result\n",
     "engine=pure_deterministic_stateless_clock_rng_network_filesystem_callback_free\n",
-    "engine_has_no_belief_workspace_gwt_action_or_self_improvement_promotion_authority\n",
+    "engine_has_no_belief_workspace_gwt_action_or_recursive_improvement_promotion_authority\n",
 );
 
 /// Stable primary outcome tags. These are taxonomy only; this module does not
