@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-resource-hierarchy"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Recursive resource-node composition for multiscale infrastructure"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "hierarchy", "infrastructure", "federation"]
+categories = ["science", "simulation"]
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-model = { path = "../symthaea-resource-model" }
