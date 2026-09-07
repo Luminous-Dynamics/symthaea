@@ -30,6 +30,7 @@ pub mod encounter;
 pub mod environment;
 pub mod events;
 pub mod evolvability;
+pub mod evolvability_comparison;
 pub mod genome;
 pub mod hierarchy;
 pub mod ledger;
@@ -51,6 +52,9 @@ pub use encounter::{EncounterScheduler, PairingMode};
 pub use environment::Environment;
 pub use events::GenesisEvent;
 pub use evolvability::{EvolvabilityError, RecoveryMetrics, analyze_recovery};
+pub use evolvability_comparison::{
+    RecoveryComparison, RecoveryComparisonError, RecoveryLatencyComparison, compare_recovery,
+};
 pub use genome::Genome;
 pub use hierarchy::HierarchicalStack;
 pub use ledger::{InteractionRecord, compress_for_observation};
