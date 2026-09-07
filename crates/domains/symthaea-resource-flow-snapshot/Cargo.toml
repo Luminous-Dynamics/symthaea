@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-resource-flow-snapshot"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Materialize admitted temporal allocations into committed resource-flow snapshots"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "flow", "infrastructure", "scheduling"]
+categories = ["science", "simulation"]
+
+[dependencies]
+chrono = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-model = { path = "../symthaea-resource-model" }
+symthaea-resource-topology = { path = "../symthaea-resource-topology" }
+symthaea-resource-allocation = { path = "../symthaea-resource-allocation" }
