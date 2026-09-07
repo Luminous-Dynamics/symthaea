@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-resource-quality-evidence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Subject-, time-, and provenance-bound quality evidence for multiscale resources"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "quality", "evidence", "infrastructure"]
+categories = ["science", "simulation"]
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-model = { path = "../symthaea-resource-model" }
+symthaea-resource-quality = { path = "../symthaea-resource-quality" }
+symthaea-resource-topology = { path = "../symthaea-resource-topology" }
