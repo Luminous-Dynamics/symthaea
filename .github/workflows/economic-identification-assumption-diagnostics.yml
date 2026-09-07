@@ -1,0 +1,127 @@
+name: Economic Identification Assumption Diagnostics
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-economics/tests/identification_assumption_diagnostics.rs'
+      - '.github/workflows/economic-identification-assumption-diagnostics.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze assumption-diagnostic theorem and qualification-only scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          test_path = Path('crates/domains/symthaea-economics/tests/identification_assumption_diagnostics.rs')
+          text = test_path.read_text()
+          causal_parent = Path('crates/domains/symthaea-economics/tests/causal_identification_qualification.rs').read_text()
+
+          required = [
+              'enum AssumptionTestability',
+              'DirectlyAuditable',
+              'FalsifiableDiagnostic',
+              'PartiallyTestable',
+              'NotTestableFromObservedData',
+              'struct IdentificationAssumption',
+              'struct DiagnosticSpecification',
+              'DiagnosticDecisionRule',
+              'struct DiagnosticResult',
+              'enum AssumptionAssessment',
+              'NoDetectedViolation',
+              'DetectedViolation',
+              'Inconclusive',
+              'UntestableAssumptionCannotHaveObservedDiagnostic',
+              'passing_pretrend_diagnostic_means_no_detected_violation_not_assumption_true',
+              'untestable_exclusion_restriction_cannot_be_certified_by_fake_observed_diagnostic',
+              'diagnostic_threshold_is_predeclared_in_specification',
+              'diagnostic_result_retains_exact_implementation_and_observation',
+              'diagnostic_cannot_be_replayed_against_another_assumption',
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f'missing identification-assumption invariant: {needle}')
+
+          forbidden = [
+              'AssumptionTrue',
+              'AssumptionSatisfied',
+              'assumption_true: bool',
+              'identified: bool',
+              'CausalTruth',
+              'truth_score',
+              'assumption_score',
+              'strategy_strength',
+              'PartialOrd, Ord',
+              'EvidenceChannel::',
+              'NormativeProposition',
+              'reqwest::',
+              'ureq::',
+              'SystemTime::now',
+              'Utc::now',
+          ]
+          for needle in forbidden:
+              if needle in text:
+                  raise SystemExit(f'assumption diagnostic acquired forbidden truth shortcut: {needle}')
+
+          # The parent causal theorem must remain strategy/estimand separation;
+          # this child may not rewrite it to self-certify assumptions.
+          for needle in ['AssumptionTrue', 'AssumptionSatisfied', 'identified: bool']:
+              if needle in causal_parent:
+                  raise SystemExit(f'parent causal theorem acquired assumption authority: {needle}')
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/economic-identification-assumption-diagnostics.yml',
+              'crates/domains/symthaea-economics/tests/identification_assumption_diagnostics.rs',
+          }
+          if changed != allowed:
+              raise SystemExit(
+                  f'assumption-diagnostic qualification must remain exactly two files; got {sorted(changed)}'
+              )
+
+          forbidden_product = {
+              'crates/domains/symthaea-economics/src/ontology.rs',
+              'crates/domains/symthaea-economics/src/etir.rs',
+              'crates/domains/symthaea-economics/src/theory.rs',
+              'crates/domains/symthaea-economics/src/science.rs',
+              'crates/domains/symthaea-economics/src/lib.rs',
+              'crates/domains/symthaea-economics/Cargo.toml',
+              'Cargo.lock',
+          }
+          touched = changed & forbidden_product
+          if touched:
+              raise SystemExit(f'qualification spike modified product/manifest state: {sorted(touched)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-economics -- --check
+
+      - name: Assumption diagnostic qualification test
+        run: cargo test --locked -p symthaea-economics --test identification_assumption_diagnostics
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-economics --test identification_assumption_diagnostics -- -D warnings
