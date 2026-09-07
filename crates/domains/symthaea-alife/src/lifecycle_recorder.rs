@@ -271,7 +271,10 @@ mod tests {
             .record_death(&founders[0], LifecycleDeathCauseV1::CullWeakest)
             .expect("first removal");
         recorder
-            .record_death(&founders[1], LifecycleDeathCauseV1::EnergyThreshold)
+            .record_death(
+                &founders[1],
+                LifecycleDeathCauseV1::PopulationEnergyThreshold,
+            )
             .expect("second removal");
 
         let first = &recorder.events()[founder_count];
@@ -298,7 +301,10 @@ mod tests {
         // The next event cannot accidentally be stamped with a stale/external tick because no
         // timestamp enters the record API at all.
         recorder
-            .record_death(founder, LifecycleDeathCauseV1::EnergyThreshold)
+            .record_death(
+                founder,
+                LifecycleDeathCauseV1::PopulationEnergyThreshold,
+            )
             .expect("epoch-one death");
         assert_eq!(recorder.events().last().expect("event").tick, 1);
     }
