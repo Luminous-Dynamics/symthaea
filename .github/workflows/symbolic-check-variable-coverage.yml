@@ -1,0 +1,130 @@
+name: Symbolic Check Variable Coverage
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/symbolic-check-variable-coverage.yml'
+      - 'patches/science/symbolic-check-variable-coverage-v1.patch'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine/symbolic.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/symbolic-check-variable-coverage-v1.patch
+
+jobs:
+  qualify:
+    name: Prove missing-variable false positive and qualify complete probes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates/core src || {
+            echo 'qualification branch must not materialize product source'
+            exit 1
+          }
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Prove current missing-variable false positive
+        run: |
+          mkdir -p crates/core/symthaea-core/tests
+          cat > crates/core/symthaea-core/tests/symbolic_variable_coverage_negative_control.rs <<'RS'
+          use symthaea_core::hdc::conjecture_engine::{
+              SymExpr, verify_conservation_symbolic,
+          };
+
+          #[test]
+          fn current_checker_silently_zero_fills_unbound_y() {
+              let energy = SymExpr::Var("x".into());
+              let dynamics = [
+                  ("x", SymExpr::Var("y".into())),
+                  ("y", SymExpr::Const(1.0)),
+              ];
+
+              let proof = verify_conservation_symbolic(&energy, &dynamics);
+
+              assert_eq!(proof.total_derivative, "y");
+              assert!(
+                  proof.is_conserved,
+                  "negative control requires current main to exhibit the false positive"
+              );
+              assert_eq!(proof.max_numerical_residual, 0.0);
+          }
+          RS
+          cargo test --locked -p symthaea-core --test symbolic_variable_coverage_negative_control
+          rm crates/core/symthaea-core/tests/symbolic_variable_coverage_negative_control.rs
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet complete-variable probe contract
+        run: |
+          FILE=crates/core/symthaea-core/src/hdc/conjecture_engine/symbolic.rs
+          grep -F 'fn collect_conservation_variables' "$FILE"
+          grep -F 'fn conservation_probe_points' "$FILE"
+          grep -F 'legacy missing-variable default (`0.0`)' "$FILE"
+          grep -F 'let test_points = conservation_probe_points(&total_deriv);' "$FILE"
+          grep -F 'f64::INFINITY' "$FILE"
+
+      - name: Prove missing-variable false positive is rejected after repair
+        run: |
+          cat > crates/core/symthaea-core/tests/symbolic_variable_coverage_repaired.rs <<'RS'
+          use symthaea_core::hdc::conjecture_engine::{
+              SymExpr, verify_conservation_symbolic,
+          };
+
+          #[test]
+          fn nonzero_y_residual_is_not_collapsed_to_zero() {
+              let energy = SymExpr::Var("x".into());
+              let dynamics = [
+                  ("x", SymExpr::Var("y".into())),
+                  ("y", SymExpr::Const(1.0)),
+              ];
+
+              let proof = verify_conservation_symbolic(&energy, &dynamics);
+
+              assert_eq!(proof.total_derivative, "y");
+              assert!(!proof.is_conserved);
+              assert!(proof.max_numerical_residual > 1e-10);
+          }
+          RS
+          cargo test --locked -p symthaea-core --test symbolic_variable_coverage_repaired
+          rm crates/core/symthaea-core/tests/symbolic_variable_coverage_repaired.rs
+
+      - name: Run permanent regression and harmonic positive control
+        run: |
+          cargo test --locked -p symthaea-core conservation_verification_tests
+
+      - name: Format, check, and lint
+        run: |
+          cargo fmt --check -p symthaea-core
+          cargo check --locked -p symthaea-core
+          cargo clippy --locked -p symthaea-core --lib -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes that the chain-rule residual probe binds every variable remaining in the simplified residual and fails closed on non-finite evaluations; the demonstrated dx/dt=y false positive is rejected.'
+          echo 'It does not make finite probes a symbolic identity proof, establish universal conservation, prove the supplied dynamics describe nature, establish experimental validity, independent replication, or action authority.'
