@@ -91,6 +91,7 @@ class MergeAdmissionTests(unittest.TestCase):
         result = evaluate(self.policy, observation or self.observation)
         self.assertEqual(result.receipt["decision"], result.decision.value)
         self.assertEqual(len(result.receipt["receipt_sha256"]), 64)
+        self.assertEqual(len(result.receipt["evidence_binding_sha256"]), 64)
         self.assertIn("unsigned policy-core disposition", result.receipt["caveat"])
         return result.decision
 
@@ -195,6 +196,33 @@ class MergeAdmissionTests(unittest.TestCase):
         changed["full_integration"]["accepted_events"] = ["pull_request"]
         second = evaluate(changed, self.observation)
         self.assertNotEqual(first.receipt["policy_sha256"], second.receipt["policy_sha256"])
+        self.assertNotEqual(first.receipt["receipt_sha256"], second.receipt["receipt_sha256"])
+
+    def test_receipt_binds_exact_workflow_run_identity(self) -> None:
+        first = evaluate(self.policy, self.observation)
+        changed = copy.deepcopy(self.observation)
+        changed["full_integration"]["run_id"] = 124
+        second = evaluate(self.policy, changed)
+        self.assertIs(first.decision, Decision.ADMITTED)
+        self.assertIs(second.decision, Decision.ADMITTED)
+        self.assertNotEqual(first.receipt["evidence_binding_sha256"], second.receipt["evidence_binding_sha256"])
+        self.assertNotEqual(first.receipt["receipt_sha256"], second.receipt["receipt_sha256"])
+
+    def test_receipt_binds_required_job_observation_set(self) -> None:
+        first = evaluate(self.policy, self.observation)
+        changed = copy.deepcopy(self.observation)
+        changed["full_integration"]["required_jobs"].append(
+            {
+                "name": "Integration Tests",
+                "status": "completed",
+                "conclusion": "success",
+                "skipped": False,
+            }
+        )
+        second = evaluate(self.policy, changed)
+        self.assertIs(first.decision, Decision.ADMITTED)
+        self.assertIs(second.decision, Decision.ADMITTED)
+        self.assertNotEqual(first.receipt["evidence_binding_sha256"], second.receipt["evidence_binding_sha256"])
         self.assertNotEqual(first.receipt["receipt_sha256"], second.receipt["receipt_sha256"])
 
 
