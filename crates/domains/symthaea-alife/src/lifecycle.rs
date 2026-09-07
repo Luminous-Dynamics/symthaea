@@ -5,11 +5,8 @@
 //! The ordinary [`crate::GenesisEvent`] stream is behavioral evidence: it records what an
 //! organism did on a social tick. It does not, by itself, establish exact founder creation,
 //! immediate parentage, genome-source ancestry, birth/death timing, or extinction. This module
-//! defines those lifecycle facts separately so later simulation wiring can emit them at the
-//! authoritative transition instead of reconstructing them heuristically from missing behavior.
-//!
-//! No simulation path emits these events yet. This tranche freezes the data contract and a
-//! fail-closed validator before hot reproduction/death code is modified.
+//! defines those lifecycle facts separately so authoritative simulation transitions can emit them
+//! directly instead of reconstructing them heuristically from missing behavior.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -199,6 +196,7 @@ impl LifecycleLedgerV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LifecycleError {
     NonContiguousSequence { expected: u64, observed: u64 },
+    SequenceOverflow { sequence: u64 },
     NonMonotonicTick { previous_tick: u64, next_tick: u64 },
     FounderAfterLifecycleStarted { agent_id: AgentId },
     FounderTickNotZero { agent_id: AgentId, tick: u64 },
@@ -248,9 +246,7 @@ pub fn analyze_lifecycle_events(
                 observed: event.sequence,
             });
         }
-        expected_sequence = expected_sequence
-            .checked_add(1)
-            .unwrap_or(u64::MAX);
+        expected_sequence = next_expected_sequence(event.sequence)?;
 
         if let Some(previous_tick) = previous_tick {
             if event.tick < previous_tick {
@@ -441,6 +437,12 @@ pub fn analyze_lifecycle_events(
     Ok(ledger)
 }
 
+fn next_expected_sequence(sequence: u64) -> Result<u64, LifecycleError> {
+    sequence
+        .checked_add(1)
+        .ok_or(LifecycleError::SequenceOverflow { sequence })
+}
+
 fn validate_bits(field: &'static str, bits: u64) -> Result<(), LifecycleError> {
     if f64::from_bits(bits).is_finite() {
         Ok(())
@@ -559,6 +561,16 @@ mod tests {
             Err(LifecycleError::NonContiguousSequence {
                 expected: 0,
                 observed: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn expected_sequence_increment_fails_closed_at_u64_max() {
+        assert_eq!(
+            next_expected_sequence(u64::MAX),
+            Err(LifecycleError::SequenceOverflow {
+                sequence: u64::MAX,
             })
         );
     }
