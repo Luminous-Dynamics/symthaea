@@ -9,9 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::{
-    AgentId, ExtinctionEvidenceV1, GenomeEvidenceV1, LifecycleLedgerV1,
-};
+use crate::{AgentId, ExtinctionEvidenceV1, GenomeEvidenceV1, LifecycleLedgerV1};
 
 /// Exact field-level difference between a genome source and one offspring.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -132,7 +130,9 @@ pub fn analyze_evolutionary_history(
             cross_lineage_genetic_imports: 0,
         });
         lineage.members_total += 1;
-        lineage.living_members += usize::from(record.is_alive());
+        if record.is_alive() {
+            lineage.living_members += 1;
+        }
         lineage.max_generation = lineage.max_generation.max(record.generation);
         lineage.first_birth_tick = lineage.first_birth_tick.min(record.born_tick);
         lineage.last_birth_tick = lineage.last_birth_tick.max(record.born_tick);
@@ -172,7 +172,9 @@ pub fn analyze_evolutionary_history(
         lineage.total_changed_genome_fields += u64::from(delta.changed_fields);
         lineage.max_changed_fields_in_one_birth =
             lineage.max_changed_fields_in_one_birth.max(delta.changed_fields);
-        lineage.cross_lineage_genetic_imports += usize::from(cross_lineage_genetic_import);
+        if cross_lineage_genetic_import {
+            lineage.cross_lineage_genetic_imports += 1;
+        }
 
         mutation_ancestry.insert(
             record.agent_id,
