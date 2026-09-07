@@ -19,6 +19,8 @@ use crate::encounter::EncounterScheduler;
 use crate::events::GenesisEvent;
 use crate::evolution_birth::prepare_evolution_birth_v1;
 use crate::evolution_rng::EvolutionRngStreamsV1;
+use crate::lifecycle::{LifecycleDeathCauseV1, LifecycleEventV1};
+use crate::lifecycle_recorder::LifecycleRecorderV1;
 use crate::organism::{Action, Organism, OrganismConfig};
 
 /// How an offspring's genome is chosen at reproduction, per `ALIFE_PLAN_2026-07-08.md` Phase 4.
@@ -150,6 +152,9 @@ pub struct Population {
     /// construction, offspring at birth in `step`/`step_social`. Never reused, per
     /// `ALIFE_MULTIAGENT_GENESIS_PLAN_2026-07-25.md`'s "Identity" Stage 0 invariant.
     id_allocator: AgentIdAllocator,
+    /// First-class founder/birth/death evidence. The recorder is intentionally private so callers
+    /// can inspect/drain evidence but cannot forge transition timestamps or sequence numbers.
+    lifecycle_recorder: LifecycleRecorderV1,
     /// Genesis v0 event-stream log, appended to by `step_social` only (`step` never touches
     /// this). Grows one [`GenesisEvent`] per organism per tick -- callers running a long session
     /// should periodically [`Self::drain_event_log`] rather than let it grow unbounded (the same
@@ -171,7 +176,9 @@ impl Population {
                 Organism::new(cfg.organism_cfg, seed_base.wrapping_add(i as u64).max(1))
                     .with_id(id_allocator.allocate())
             })
-            .collect();
+            .collect::<Vec<_>>();
+        let lifecycle_recorder = LifecycleRecorderV1::from_founders(&organisms)
+            .expect("fresh Population founders must satisfy lifecycle evidence contract");
         Self {
             organisms,
             cfg,
@@ -180,6 +187,7 @@ impl Population {
             total_births: 0,
             total_deaths: 0,
             id_allocator,
+            lifecycle_recorder,
             event_log: Vec::new(),
             current_tick: 0,
         }
@@ -192,6 +200,21 @@ impl Population {
         std::mem::take(&mut self.event_log)
     }
 
+    /// First-class lifecycle evidence buffered since construction or the last drain.
+    pub fn lifecycle_events(&self) -> &[LifecycleEventV1] {
+        self.lifecycle_recorder.events()
+    }
+
+    /// Population-local lifecycle epoch assigned to the next authoritative transition.
+    pub fn lifecycle_epoch(&self) -> u64 {
+        self.lifecycle_recorder.current_epoch()
+    }
+
+    /// Drain buffered lifecycle evidence without resetting global sequence or lifecycle epoch.
+    pub fn drain_lifecycle_events(&mut self) -> Vec<LifecycleEventV1> {
+        self.lifecycle_recorder.drain()
+    }
+
     /// Remove up to `n` of the lowest-energy organisms (predation picks off the weak first —
     /// a real, if simplified, ecological detail). Returns how many were actually removed,
     /// capped by the current population size.
@@ -202,6 +225,11 @@ impl Population {
         }
         self.organisms
             .sort_by(|a, b| a.energy.partial_cmp(&b.energy).unwrap());
+        for organism in self.organisms.iter().take(n) {
+            self.lifecycle_recorder
+                .record_death(organism, LifecycleDeathCauseV1::CullWeakest)
+                .expect("authoritative cull lifecycle evidence must be recordable");
+        }
         self.organisms.drain(0..n);
         self.total_deaths += n as u64;
         n
@@ -236,6 +264,12 @@ impl Population {
             }
 
             if tick.energy <= self.cfg.death_energy_threshold {
+                self.lifecycle_recorder
+                    .record_death(
+                        &self.organisms[i],
+                        LifecycleDeathCauseV1::PopulationEnergyThreshold,
+                    )
+                    .expect("authoritative threshold-death lifecycle evidence must be recordable");
                 self.organisms.remove(i);
                 self.total_deaths += 1;
                 deaths_this_tick += 1;
@@ -266,6 +300,9 @@ impl Population {
                     .with_lineage(parent_lineage_id, parent_generation + 1);
                 self.next_seed = self.next_seed.wrapping_add(1).max(1);
                 offspring.energy = self.cfg.reproduction_energy_cost;
+                self.lifecycle_recorder
+                    .record_birth_from_plan(&birth_plan, &offspring)
+                    .expect("authoritative birth lifecycle evidence must match evolution birth plan");
                 newborns.push(offspring);
                 self.total_births += 1;
                 births_this_tick += 1;
@@ -275,6 +312,9 @@ impl Population {
         }
 
         self.organisms.extend(newborns);
+        self.lifecycle_recorder
+            .advance_epoch()
+            .expect("population lifecycle epoch overflow");
 
         StepSummary {
             population: self.organisms.len(),
@@ -446,6 +486,12 @@ impl Population {
         while i < self.organisms.len() {
             let energy = self.organisms[i].energy;
             if energy <= self.cfg.death_energy_threshold {
+                self.lifecycle_recorder
+                    .record_death(
+                        &self.organisms[i],
+                        LifecycleDeathCauseV1::PopulationEnergyThreshold,
+                    )
+                    .expect("authoritative threshold-death lifecycle evidence must be recordable");
                 self.organisms.remove(i);
                 self.total_deaths += 1;
                 deaths_this_tick += 1;
@@ -476,6 +522,9 @@ impl Population {
                     .with_lineage(parent_lineage_id, parent_generation + 1);
                 self.next_seed = self.next_seed.wrapping_add(1).max(1);
                 offspring.energy = self.cfg.reproduction_energy_cost;
+                self.lifecycle_recorder
+                    .record_birth_from_plan(&birth_plan, &offspring)
+                    .expect("authoritative birth lifecycle evidence must match evolution birth plan");
                 newborns.push(offspring);
                 self.total_births += 1;
                 births_this_tick += 1;
@@ -485,6 +534,9 @@ impl Population {
         }
 
         self.organisms.extend(newborns);
+        self.lifecycle_recorder
+            .advance_epoch()
+            .expect("population lifecycle epoch overflow");
 
         StepSummary {
             population: self.organisms.len(),
