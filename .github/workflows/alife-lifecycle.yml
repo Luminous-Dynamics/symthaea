@@ -1,0 +1,80 @@
+name: ALife Lifecycle Evidence
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/src/lifecycle.rs"
+      - "crates/domains/symthaea-alife/src/evolutionary_history.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - ".github/workflows/alife-lifecycle.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  lifecycle-contracts:
+    name: Lifecycle evidence contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-lifecycle-contracts
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check -p symthaea-alife --all-targets
+
+      - name: Test lifecycle contract
+        run: cargo test -p symthaea-alife lifecycle::
+
+      - name: Test evolutionary-history contract
+        run: cargo test -p symthaea-alife evolutionary_history::
+
+      - name: Test complete ALife package
+        run: cargo test -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze contract-only authority boundary
+        run: |
+          unexpected="$(grep -R -n -E 'Lifecycle(Event|Transition)V1' \
+            crates/domains/symthaea-alife/src \
+            --include='*.rs' \
+            | grep -v '/lifecycle.rs:' \
+            | grep -v '/lib.rs:' \
+            || true)"
+          if [ -n "$unexpected" ]; then
+            echo "Lifecycle emission/transition types escaped the contract boundary:"
+            echo "$unexpected"
+            exit 1
+          fi
