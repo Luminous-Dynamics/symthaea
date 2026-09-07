@@ -51,3 +51,4 @@ symthaea-resource-hierarchy = { path = "../symthaea-resource-hierarchy" }
 symthaea-resource-quality = { path = "../symthaea-resource-quality" }
 symthaea-operating-envelope = { path = "../symthaea-operating-envelope" }
 symthaea-operating-authority = { path = "../symthaea-operating-authority" }
+symthaea-operating-autonomy = { path = "../symthaea-operating-autonomy" }
