@@ -1,0 +1,97 @@
+name: Self-hosted NixOS Runner Smoke
+
+on:
+  workflow_dispatch:
+
+# This job uses public unauthenticated Git and does not need GITHUB_TOKEN access.
+permissions: {}
+
+env:
+  # Keep flake support local to the trusted job instead of widening host Nix
+  # configuration merely for CI compatibility.
+  NIX_CONFIG: experimental-features = nix-command flakes
+  GIT_TERMINAL_PROMPT: "0"
+
+concurrency:
+  # Manual smoke runs are deliberate and should not cancel one another.
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Validate trusted NixOS CPU runner
+    # workflow_dispatch permits choosing a branch/ref. A self-hosted validation
+    # host must never execute an arbitrary branch merely because it lives in the
+    # canonical repository.
+    if: >-
+      github.repository == 'Luminous-Dynamics/symthaea' &&
+      github.ref == 'refs/heads/main'
+    # noDefaultLabels=true on the runner means this unique capability label is
+    # the only scheduling label. Generic self-hosted/GPU workflows cannot land
+    # on this machine accidentally.
+    runs-on: [symthaea-trusted-cpu-v1]
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact trusted main commit without an Action
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+          git init .
+          git remote add origin https://github.com/Luminous-Dynamics/symthaea.git
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Report runner and source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -a
+          cat /etc/os-release
+          nix --version
+          git --version
+          printf 'source_commit=%s\n' "$(git rev-parse HEAD)"
+          printf 'nixpkgs_rev=%s\n' "$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
+          printf 'rust_channel=%s\n' "$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
+          sha256sum flake.lock rust-toolchain.toml
+
+      - name: Evaluate runner trust and routing policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix build --no-link --no-write-lock-file \
+            --impure \
+            --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-github-actions-runner.nix { inherit pkgs; }'
+          nix build --no-link --no-write-lock-file \
+            --impure \
+            --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-trusted-runner-routing.nix { inherit pkgs; }'
+
+      - name: Verify pinned toolchain and smoke-check psych-bench
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CARGO_HOME="$RUNNER_TEMP/cargo-home"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/cargo-target"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+          nix develop --no-write-lock-file \
+            --impure \
+            --expr 'let f = builtins.getFlake (toString ./.); in import ./nix/ci-rust-shell.nix { nixpkgs = f.inputs.nixpkgs; rust-overlay = f.inputs.rust-overlay; system = builtins.currentSystem; }' \
+            --command bash -c '
+              set -euo pipefail
+              rustc --version
+              cargo --version
+              rustfmt --version
+              cargo clippy --version
+              cargo check --locked -p symthaea-psych-bench --lib
+            '
+
+      - name: Verify source tree stayed immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"

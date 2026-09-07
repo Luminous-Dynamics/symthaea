@@ -1,0 +1,377 @@
+name: Trusted Recovery - RCA Canonical Lineage
+
+on:
+  workflow_dispatch:
+
+# One-purpose recovery harness for exact draft PR #578. It accepts no ref/SHA
+# inputs, grants no GITHUB_TOKEN permissions, and executes only on trusted main.
+permissions: {}
+
+env:
+  NIX_CONFIG: experimental-features = nix-command flakes
+  GIT_TERMINAL_PROMPT: "0"
+  TARGET_COMMIT: d3a47c4e3ff7857772693910a90398dbba7133ec
+  TARGET_TREE: af59a9987073cf5983256a2ab05bc57b063856f6
+  TARGET_BASE: 4c0e29a34ef4a8e33953eb5615ae18121571edd6
+  TARGET_CANONICAL_WORKFLOW_BLOB: 0da83cfddf6f9fa4b3e4a755158d87a6a396a75b
+  TARGET_WITNESS_WORKFLOW_BLOB: c8493aa4486e6dc3069afc82aa25dd4d435f49b4
+  TARGET_RUST_CHANNEL: 1.94.0
+
+concurrency:
+  # Every manual recovery attempt is deliberate evidence and remains independent.
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  exact-tree-canonical-lineage:
+    name: Validate frozen #578 canonical lineage generation
+    if: >-
+      github.repository == 'Luminous-Dynamics/symthaea' &&
+      github.ref == 'refs/heads/main'
+    runs-on: [symthaea-trusted-cpu-v1]
+    timeout-minutes: 30
+
+    steps:
+      - name: Fetch trusted harness and authenticate frozen source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/main'
+
+          HARNESS_DIR="$RUNNER_TEMP/trusted-harness"
+          SOURCE_DIR="$RUNNER_TEMP/frozen-source"
+          rm -rf -- "$HARNESS_DIR" "$SOURCE_DIR"
+          mkdir -p "$HARNESS_DIR" "$SOURCE_DIR"
+
+          # Harness/Nix policy always comes from the trusted main commit that
+          # defined this workflow, never from the unmerged RCA target.
+          git -C "$HARNESS_DIR" init
+          git -C "$HARNESS_DIR" remote add origin https://github.com/Luminous-Dynamics/symthaea.git
+          git -C "$HARNESS_DIR" -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git -C "$HARNESS_DIR" checkout --detach FETCH_HEAD
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
+
+          # Fetch only the known parent generation and exact frozen target.
+          git -C "$SOURCE_DIR" init
+          git -C "$SOURCE_DIR" remote add origin https://github.com/Luminous-Dynamics/symthaea.git
+          git -C "$SOURCE_DIR" -c protocol.version=2 fetch --no-tags origin "$TARGET_BASE" "$TARGET_COMMIT"
+
+          test "$(git -C "$SOURCE_DIR" rev-parse "$TARGET_COMMIT^{commit}")" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse "$TARGET_COMMIT^{tree}")" = "$TARGET_TREE"
+          git -C "$SOURCE_DIR" merge-base --is-ancestor "$TARGET_BASE" "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse "$TARGET_COMMIT:.github/workflows/rca-canonical-evidence-lineage-identity.yml")" = "$TARGET_CANONICAL_WORKFLOW_BLOB"
+          test "$(git -C "$SOURCE_DIR" rev-parse "$TARGET_COMMIT:.github/workflows/rca-independent-evidence-set-witness.yml")" = "$TARGET_WITNESS_WORKFLOW_BLOB"
+
+          # Freeze the complete PR diff. No root Cargo/Nix/toolchain/build script,
+          # runtime cognition, bridge, or unrelated governance file may enter.
+          actual_paths="$(git -C "$SOURCE_DIR" diff --name-only "$TARGET_BASE" "$TARGET_COMMIT" | LC_ALL=C sort)"
+          expected_paths="$(cat <<'EOF'
+          .github/workflows/rca-canonical-evidence-lineage-identity.yml
+          .github/workflows/rca-independent-evidence-set-witness.yml
+          crates/core/symthaea-epistemic-governance/CANONICAL_EVIDENCE_LINEAGE_IDENTITY.md
+          crates/core/symthaea-epistemic-governance/INDEPENDENT_EVIDENCE_SET_WITNESS.md
+          crates/core/symthaea-epistemic-governance/src/evidence_set_witness.rs
+          crates/core/symthaea-epistemic-governance/src/lib.rs
+          crates/core/symthaea-epistemic-governance/src/lineage_identity.rs
+          EOF
+          )"
+          test "$actual_paths" = "$expected_paths"
+
+          git -C "$SOURCE_DIR" checkout --detach "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
+
+          printf 'HARNESS_DIR=%s\nSOURCE_DIR=%s\n' "$HARNESS_DIR" "$SOURCE_DIR" >> "$GITHUB_ENV"
+
+      - name: Report frozen-source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
+
+          uname -a
+          cat /etc/os-release
+          nix --version
+          git --version
+          printf 'recovery_harness=%s\n' "$GITHUB_SHA"
+          printf 'target_commit=%s\n' "$TARGET_COMMIT"
+          printf 'target_tree=%s\n' "$TARGET_TREE"
+          printf 'target_base=%s\n' "$TARGET_BASE"
+          printf 'canonical_workflow_blob=%s\n' "$TARGET_CANONICAL_WORKFLOW_BLOB"
+          printf 'witness_workflow_blob=%s\n' "$TARGET_WITNESS_WORKFLOW_BLOB"
+          printf 'recovery_rust_channel=%s\n' "$TARGET_RUST_CHANNEL"
+
+          cd "$SOURCE_DIR"
+          printf 'target_nixpkgs_rev=%s\n' "$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
+          printf 'target_repository_rust_channel=%s\n' "$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
+          sha256sum flake.lock rust-toolchain.toml Cargo.lock
+
+      - name: Evaluate trusted-runner policy from trusted harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$HARNESS_DIR"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          nix build --no-link --no-write-lock-file \
+            --impure \
+            --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-github-actions-runner.nix { inherit pkgs; }'
+          nix build --no-link --no-write-lock-file \
+            --impure \
+            --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-trusted-runner-routing.nix { inherit pkgs; }'
+
+      - name: Reproduce canonical lineage static contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          src=crates/core/symthaea-epistemic-governance/src/lineage_identity.rs
+          lib=crates/core/symthaea-epistemic-governance/src/lib.rs
+          doc=crates/core/symthaea-epistemic-governance/CANONICAL_EVIDENCE_LINEAGE_IDENTITY.md
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub mod lineage_identity;' "$lib"
+          grep -q 'CANONICAL_EVIDENCE_LINEAGE_IDENTITY_CONTRACT_V1' "$production"
+          grep -q 'legacy_wire_graph_id_is_explicitly_excluded_from_governance_identity' "$production"
+          grep -q 'canonical_evidence_lineage_graph_id_v1' "$production"
+          grep -q 'producer graph label' "$doc"
+          grep -q 'canonical evidence-lineage generation identity' "$doc"
+          if grep -q 'object.get("graph_id")' "$production"; then
+            echo 'Legacy producer graph_id entered canonical identity.' >&2
+            exit 1
+          fi
+
+          grep -q 'GRAPH_ID_DOMAIN' "$production"
+          grep -q 'b"profile_contract_digest"' "$production"
+          grep -q 'b"identity_schema_version"' "$production"
+          grep -q 'b"graph_schema_version"' "$production"
+          grep -q 'b"node_count"' "$production"
+          grep -q 'b"node_schema_version"' "$production"
+          grep -q 'b"evidence_id"' "$production"
+          grep -q 'b"derivation_kind"' "$production"
+          grep -q 'b"parent_count"' "$production"
+          grep -q 'b"parent_id"' "$production"
+          grep -q 'parent_ids.sort()' "$production"
+          grep -q 'nodes.sort_by' "$production"
+          for tag in root_observation retrieval transformation inference simulation summary critique formal_derivation other; do
+            grep -q "\"$tag\"" "$production"
+          done
+          if grep -Eq 'serde_json::to_string|serde_json::to_vec|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Canonical lineage identity acquired incidental byte/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+
+          grep -q 'legacy_graph_label_does_not_define_canonical_identity' "$src"
+          grep -q 'node_and_parent_order_do_not_change_identity' "$src"
+          grep -q 'unrelated_node_addition_changes_identity' "$src"
+          grep -q 'derivation_change_changes_identity' "$src"
+          grep -q 'parent_change_changes_identity' "$src"
+
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion|ShadowDisposition' "$production"; then
+            echo 'Canonical lineage identity crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Reproduce evidence-set witness static contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          src=crates/core/symthaea-epistemic-governance/src/evidence_set_witness.rs
+          doc=crates/core/symthaea-epistemic-governance/INDEPENDENT_EVIDENCE_SET_WITNESS.md
+          lib=crates/core/symthaea-epistemic-governance/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub mod evidence_set_witness;' "$lib"
+          grep -q 'INDEPENDENT_EVIDENCE_SET_WITNESS_CONTRACT_V1' "$production"
+          grep -q 'selected_item_identity_is_not_ancestry_root_identity' "$production"
+          grep -q 'one_multiroot_derived_item_is_one_evidence_item_not_many_confirmations' "$production"
+          grep -q 'distinct_root_count_is_not_independent_evidence_item_count' "$production"
+          grep -q 'distinct evidence-root count' "$doc"
+          grep -q 'independent evidence-item count' "$doc"
+          grep -q 'pub fn issue_independent_evidence_set_witness_v1' "$production"
+          grep -q 'graph: &ValidatedEvidenceLineageGraphV1' "$production"
+          grep -q 'selected_evidence_ids: &\[String\]' "$production"
+          if grep -Eq 'pub fn issue_independent_evidence_set_witness_v1[^\{]*(root_ids|pair_status|independence_count|lineage_graph_id)' "$production"; then
+            echo 'Evidence-set witness issuer acquired caller-authored independence or lineage identity semantics.' >&2
+            exit 1
+          fi
+
+          grep -q 'lineage_generation=canonical_validated_graph_content_identity_v1' "$production"
+          grep -q 'legacy_producer_graph_id_is_not_witness_authority' "$production"
+          grep -q 'canonical_evidence_lineage_graph_id_v1(graph)' "$production"
+          grep -q 'pub fn lineage_graph_id' "$production"
+          grep -q 'b"lineage_graph_id"' "$production"
+          grep -q 'unrelated_lineage_change_changes_witness_identity_even_if_selected_subset_is_same' "$production"
+
+          grep -q 'graph.*root_ids' "$production" || grep -q '.root_ids' "$production"
+          grep -q 'graph.*assess_independence' "$production" || grep -q '.assess_independence' "$production"
+          grep -q 'status != EvidenceIndependenceV1::Independent' "$production"
+          grep -q 'has_root_overlap' "$production"
+          grep -q 'NonIndependentPair' "$production"
+          grep -q 'IndependentStatusRootOverlap' "$production"
+          grep -q 'selected.sort' "$production"
+          grep -q 'pair_count(items.len())' "$production"
+          grep -q 'pub fn items' "$production"
+          grep -q 'pub fn pairs' "$production"
+          grep -q 'pub fn distinct_root_ids' "$production"
+          if grep -Eqi 'independent_(item|root|pair)_count|corroboration_count|vote_count' "$production"; then
+            echo 'Evidence witness exposed a count shortcut as epistemic authority.' >&2
+            exit 1
+          fi
+
+          grep -q 'WITNESS_ID_DOMAIN' "$production"
+          grep -q 'b"profile_contract_digest"' "$production"
+          grep -q 'b"lineage_graph_id"' "$production"
+          grep -q 'b"item_count"' "$production"
+          grep -q 'b"evidence_id"' "$production"
+          grep -q 'b"item_root_count"' "$production"
+          grep -q 'b"item_root_id"' "$production"
+          grep -q 'b"pair_count"' "$production"
+          grep -q 'b"left_evidence_id"' "$production"
+          grep -q 'b"right_evidence_id"' "$production"
+          grep -q 'b"distinct_root_id"' "$production"
+          grep -q 'pub struct IndependentEvidenceSetWitnessV1' "$production"
+          if grep -Eq 'impl[^\n]*Deserialize[^\n]*IndependentEvidenceSetWitnessV1|derive\([^)]*Deserialize[^)]*\)[[:space:]]*pub struct IndependentEvidenceSetWitnessV1' "$production"; then
+            echo 'Issued evidence-set witness became deserializable.' >&2
+            exit 1
+          fi
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Evidence-set witness identity acquired incidental serializer/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion|ShadowDisposition' "$production"; then
+            echo 'Evidence-set witness crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+          grep -q 'multiroot_derived_item_is_one_independent_item_not_multiple_confirmations' "$src"
+          grep -q 'shared_root_siblings_cannot_form_independent_set_witness' "$src"
+          grep -q 'ancestor_and_descendant_cannot_form_independent_set_witness' "$src"
+          grep -q 'selection_order_does_not_change_witness_identity' "$src"
+          grep -q 'duplicate_selected_item_fails_closed' "$src"
+          grep -q 'unknown_item_fails_through_lineage_validation' "$src"
+          grep -q 'selected_item_change_changes_witness_identity' "$src"
+          grep -q 'unrelated_lineage_change_changes_witness_identity' "$src"
+          grep -q 'legacy_graph_label_does_not_change_witness_identity' "$src"
+          grep -q 'issued_witness_serializes_for_audit_only' "$src"
+
+      - name: Reproduce dependency and Rust gates under hosted toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+
+          RECOVERY_TOOLCHAIN_FILE="$RUNNER_TEMP/rust-toolchain-1.94.0.toml"
+          cat > "$RECOVERY_TOOLCHAIN_FILE" <<EOF
+          [toolchain]
+          channel = "$TARGET_RUST_CHANNEL"
+          components = ["rustfmt", "clippy"]
+          EOF
+          export RECOVERY_TOOLCHAIN_FILE
+          export CARGO_HOME="$RUNNER_TEMP/cargo-home"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/cargo-target"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+          nix develop --no-write-lock-file \
+            --impure \
+            --expr 'let
+              f = builtins.getFlake (toString ./.);
+              harness = builtins.getEnv "HARNESS_DIR";
+              toolchain = builtins.getEnv "RECOVERY_TOOLCHAIN_FILE";
+              shellFile = builtins.toPath (harness + "/nix/ci-rust-shell.nix");
+            in import shellFile {
+              nixpkgs = f.inputs.nixpkgs;
+              rust-overlay = f.inputs.rust-overlay;
+              toolchainFile = builtins.toPath toolchain;
+              system = builtins.currentSystem;
+            }' \
+            --command bash -c '
+              set -euo pipefail
+              rustc --version
+              cargo --version
+              rustfmt --version
+              cargo clippy --version
+              test "$(rustc --version | awk '\''{print $2}'\'')" = "1.94.0"
+
+              tree="$(cargo tree --locked -p symthaea-epistemic-governance -e normal)"
+              if printf "%s\n" "$tree" | grep -Eq "symthaea-rca-(shadow|observer|evidence|shadow-case|bound-shadow-case|disposition)"; then
+                echo "Generic epistemic governance acquired an RCA runtime/bridge dependency." >&2
+                exit 1
+              fi
+
+              cargo fmt -p symthaea-epistemic-governance -- --check
+              cargo metadata --locked --format-version 1 > /dev/null
+              cargo test --locked -p symthaea-epistemic-governance --lib lineage_identity
+              cargo test --locked -p symthaea-epistemic-governance --lib evidence_set_witness
+              cargo test --locked -p symthaea-epistemic-governance
+              cargo clippy --locked -p symthaea-epistemic-governance --all-targets -- -D warnings
+            '
+
+      - name: Verify immutability and emit recovery attestation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
+          git -C "$HARNESS_DIR" diff --exit-code
+          git -C "$HARNESS_DIR" diff --cached --exit-code
+          test -z "$(git -C "$HARNESS_DIR" status --porcelain=v1 --untracked-files=all --ignored=matching)"
+
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
+          git -C "$SOURCE_DIR" diff --exit-code
+          git -C "$SOURCE_DIR" diff --cached --exit-code
+          test -z "$(git -C "$SOURCE_DIR" status --porcelain=v1 --untracked-files=all --ignored=matching)"
+
+          cd "$SOURCE_DIR"
+          nixpkgs_rev="$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
+          flake_lock_sha="$(sha256sum flake.lock | awk '{print $1}')"
+          cargo_lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+
+          manifest="$RUNNER_TEMP/rca-canonical-lineage-trusted-recovery-v1.txt"
+          cat > "$manifest" <<EOF
+          schema=symthaea.rca.canonical-lineage.trusted-recovery.v1
+          result=PASS
+          github_run_id=$GITHUB_RUN_ID
+          github_run_attempt=$GITHUB_RUN_ATTEMPT
+          runner_name=${RUNNER_NAME:-unknown}
+          runner_os=${RUNNER_OS:-unknown}
+          runner_arch=${RUNNER_ARCH:-unknown}
+          harness_commit=$GITHUB_SHA
+          target_commit=$TARGET_COMMIT
+          target_tree=$TARGET_TREE
+          target_base=$TARGET_BASE
+          canonical_workflow_blob=$TARGET_CANONICAL_WORKFLOW_BLOB
+          witness_workflow_blob=$TARGET_WITNESS_WORKFLOW_BLOB
+          rust_channel=$TARGET_RUST_CHANNEL
+          nixpkgs_rev=$nixpkgs_rev
+          flake_lock_sha256=$flake_lock_sha
+          cargo_lock_sha256=$cargo_lock_sha
+          gate=exact-diff+canonical-static+witness-static+dependency-direction+fmt+locked-metadata+targeted-tests+package-tests+clippy-deny-warnings
+          cargo_dependency_mode=locked
+          evidence_scope=correctness-and-reproducibility-not-performance
+          EOF
+
+          attestation_sha="$(sha256sum "$manifest" | awk '{print $1}')"
+          cat "$manifest"
+          printf 'attestation_sha256=%s\n' "$attestation_sha"
+
+          {
+            echo '## RCA #578 canonical lineage trusted recovery: PASS'
+            echo
+            echo "- Harness commit: \`$GITHUB_SHA\`"
+            echo "- Frozen target commit: \`$TARGET_COMMIT\`"
+            echo "- Frozen target tree: \`$TARGET_TREE\`"
+            echo "- Exact base: \`$TARGET_BASE\`"
+            echo "- Canonical workflow blob: \`$TARGET_CANONICAL_WORKFLOW_BLOB\`"
+            echo "- Witness workflow blob: \`$TARGET_WITNESS_WORKFLOW_BLOB\`"
+            echo "- Runner: \`${RUNNER_NAME:-unknown}\` / \`${RUNNER_OS:-unknown}\` / \`${RUNNER_ARCH:-unknown}\`"
+            echo "- Rust: \`$TARGET_RUST_CHANNEL\`"
+            echo "- nixpkgs: \`$nixpkgs_rev\`"
+            echo "- Attestation SHA-256: \`$attestation_sha\`"
+            echo
+            echo 'Correctness/reproducibility recovery evidence only; no performance or downstream epistemic authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
