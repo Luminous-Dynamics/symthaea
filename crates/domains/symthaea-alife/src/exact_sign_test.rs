@@ -12,7 +12,9 @@
 
 /// Maximum non-tied panel size supported by the exact integer implementation.
 ///
-/// `2^120` and the `20 * tail_numerator` alpha comparison both fit comfortably in `u128`.
+/// At this cap the largest possible tail numerator/denominator is `2^120`. The exact alpha check
+/// multiplies the tail by 20, so its worst case is `20 * 2^120 < 2^125 < 2^128`. The iterative
+/// binomial-coefficient intermediates also remain inside `u128` for `n <= 120`.
 pub const MAX_EXACT_SIGN_TEST_NON_TIES: usize = 120;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -161,6 +163,45 @@ mod tests {
         assert_eq!(
             exact_positive_sign_test(&[1.0, f64::NAN]),
             Err(ExactSignTestErrorV1::NonFiniteObservation { index: 1 })
+        );
+    }
+
+    #[test]
+    fn maximum_supported_all_negative_panel_keeps_exact_worst_case_tail_in_range() {
+        let observations = [-1.0; MAX_EXACT_SIGN_TEST_NON_TIES];
+        let result = exact_positive_sign_test(&observations).expect("maximum supported panel");
+        let denominator = 1u128 << MAX_EXACT_SIGN_TEST_NON_TIES;
+        assert_eq!(result.positive, 0);
+        assert_eq!(result.negative, MAX_EXACT_SIGN_TEST_NON_TIES);
+        assert_eq!(result.tail_numerator, denominator);
+        assert_eq!(result.denominator, denominator);
+        assert_eq!(result.one_sided_p_value, 1.0);
+        assert!(!result.reject_at_alpha_0_05);
+        assert!(result.tail_numerator.checked_mul(20).is_some());
+    }
+
+    #[test]
+    fn maximum_supported_all_positive_panel_is_exactly_one_over_two_to_120() {
+        let observations = [1.0; MAX_EXACT_SIGN_TEST_NON_TIES];
+        let result = exact_positive_sign_test(&observations).expect("maximum supported panel");
+        assert_eq!(result.positive, MAX_EXACT_SIGN_TEST_NON_TIES);
+        assert_eq!(result.tail_numerator, 1);
+        assert_eq!(
+            result.denominator,
+            1u128 << MAX_EXACT_SIGN_TEST_NON_TIES
+        );
+        assert!(result.reject_at_alpha_0_05);
+    }
+
+    #[test]
+    fn panel_above_exact_integer_cap_fails_before_binomial_arithmetic() {
+        let observations = vec![1.0; MAX_EXACT_SIGN_TEST_NON_TIES + 1];
+        assert_eq!(
+            exact_positive_sign_test(&observations),
+            Err(ExactSignTestErrorV1::TooManyNonTies {
+                observed: MAX_EXACT_SIGN_TEST_NON_TIES + 1,
+                maximum: MAX_EXACT_SIGN_TEST_NON_TIES,
+            })
         );
     }
 }
