@@ -2,19 +2,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Paired multi-seed repeated-shock evolvability sweep.
 //!
-//! This example applies the already-defined repeated-shock transfer criterion unchanged across a
-//! fixed eight-seed panel. Frozen and evolving conditions share the same population and encounter
-//! seeds within each pair. The output is descriptive evidence: verdict counts, paired outcomes,
-//! and a conservative difference-in-differences contrast — not a statistical-significance or
-//! mechanism-causality claim.
+//! Three conditions share the same founder and encounter-scheduler seeds within every seed panel
+//! entry:
+//!
+//! - frozen: no mutation, fitness-linked `FromParent` inheritance;
+//! - selected evolving: mutation enabled, fitness-linked `FromParent` inheritance;
+//! - random-peer evolving: the same mutation rate, but `RandomPeer` deliberately breaks the
+//!   successful-reproducer -> inherited-genome link.
+//!
+//! The RandomPeer arm is a selection-link ablation, not an exact common-random-number replay of
+//! mutation draws: source selection itself consumes the population RNG and therefore changes the
+//! later RNG trajectory. Results remain descriptive evidence rather than a statistical or causal
+//! mechanism claim.
 
 use sha2::{Digest, Sha256};
 use symthaea_alife::{
     EncounterScheduler, EvolvabilityError, GenesisEvent, InheritanceMode, ObservatoryReport,
     OrganismConfig, PairingMode, PerturbationSchedule, Population, PopulationConfig,
     RecoveryMetrics, RepeatShockErrorV1, RepeatShockTransferV1, RepeatShockTransferVerdictV1,
-    RepeatedShockDidVerdictV1, ResourcePerturbation, analyze_genesis_events,
-    analyze_recovery_through, compare_repeated_shock_did, compare_repeated_shocks,
+    RepeatedShockDidVerdictV1, RepeatedShockRelativeVerdictV1, ResourcePerturbation,
+    analyze_genesis_events, analyze_recovery_through, compare_repeated_shock_did,
+    compare_repeated_shock_relative, compare_repeated_shocks,
 };
 
 const SEEDS: &[u64] = &[1, 2, 3, 4, 5, 6, 7, 8];
@@ -79,7 +87,36 @@ impl DidCounts {
     }
 }
 
-fn population_config(mutation_rate: f64) -> PopulationConfig {
+#[derive(Debug, Default)]
+struct RelativeCounts {
+    pareto_candidate: usize,
+    mixed: usize,
+    no_directional_difference: usize,
+    pareto_reference: usize,
+    unavailable: usize,
+}
+
+impl RelativeCounts {
+    fn record(&mut self, verdict: RepeatedShockRelativeVerdictV1) {
+        match verdict {
+            RepeatedShockRelativeVerdictV1::ParetoCandidate => self.pareto_candidate += 1,
+            RepeatedShockRelativeVerdictV1::Mixed => self.mixed += 1,
+            RepeatedShockRelativeVerdictV1::NoDirectionalDifference => {
+                self.no_directional_difference += 1
+            }
+            RepeatedShockRelativeVerdictV1::ParetoReference => self.pareto_reference += 1,
+        }
+    }
+}
+
+fn inheritance_name(inheritance: InheritanceMode) -> &'static str {
+    match inheritance {
+        InheritanceMode::FromParent => "FromParent",
+        InheritanceMode::RandomPeer => "RandomPeer",
+    }
+}
+
+fn population_config(mutation_rate: f64, inheritance: InheritanceMode) -> PopulationConfig {
     PopulationConfig {
         death_energy_threshold: 0.05,
         reproduction_energy_threshold: 0.8,
@@ -87,17 +124,18 @@ fn population_config(mutation_rate: f64) -> PopulationConfig {
         organism_cfg: OrganismConfig::default(),
         mutation_rate,
         mutation_std: MUTATION_STD,
-        inheritance: InheritanceMode::FromParent,
+        inheritance,
     }
 }
 
 fn protocol_evidence_json() -> serde_json::Value {
-    let frozen = population_config(FROZEN_MUTATION_RATE);
-    let evolving = population_config(EVOLVING_MUTATION_RATE);
+    let frozen = population_config(FROZEN_MUTATION_RATE, InheritanceMode::FromParent);
+    let selected = population_config(EVOLVING_MUTATION_RATE, InheritanceMode::FromParent);
+    let random_peer = population_config(EVOLVING_MUTATION_RATE, InheritanceMode::RandomPeer);
     let organism = frozen.organism_cfg;
 
     serde_json::json!({
-        "schema": "symthaea.alife.repeated-shock.protocol.v1",
+        "schema": "symthaea.alife.repeated-shock.protocol.v2",
         "crate_version": env!("CARGO_PKG_VERSION"),
         "seed_panel": SEEDS,
         "simulation": {
@@ -112,15 +150,28 @@ fn protocol_evidence_json() -> serde_json::Value {
             "pairing_mode": "Random",
             "seed_rule": "population_seed.wrapping_add(offset)",
             "seed_offset": SCHEDULER_SEED_OFFSET,
+            "same_initial_seed_across_conditions": true,
+        },
+        "conditions": {
+            "frozen": {
+                "mutation_rate": frozen.mutation_rate,
+                "inheritance_mode": inheritance_name(frozen.inheritance),
+            },
+            "selected_evolving": {
+                "mutation_rate": selected.mutation_rate,
+                "inheritance_mode": inheritance_name(selected.inheritance),
+            },
+            "random_peer_evolving": {
+                "mutation_rate": random_peer.mutation_rate,
+                "inheritance_mode": inheritance_name(random_peer.inheritance),
+                "ablation": "break_fitness_link_to_inherited_genome_source",
+            },
         },
         "population": {
             "death_energy_threshold": frozen.death_energy_threshold,
             "reproduction_energy_threshold": frozen.reproduction_energy_threshold,
             "reproduction_energy_cost": frozen.reproduction_energy_cost,
-            "inheritance_mode": "FromParent",
             "mutation_std": MUTATION_STD,
-            "frozen_mutation_rate": frozen.mutation_rate,
-            "evolving_mutation_rate": evolving.mutation_rate,
         },
         "organism_config": {
             "set_point": organism.set_point,
@@ -158,8 +209,18 @@ fn protocol_evidence_json() -> serde_json::Value {
             "recovery_fraction": RECOVERY_FRACTION,
             "post_shock_evaluation_ticks": POST_SHOCK_EVALUATION_TICKS,
             "repeat_shock_verdict": "pareto_predeclared_dimensions",
-            "difference_in_differences": "evolving_transfer_minus_frozen_transfer",
-            "did_latency_in_pareto_verdict": false,
+            "contrasts": [
+                "selected_evolving_minus_frozen_transfer",
+                "random_peer_evolving_minus_frozen_transfer",
+                "selected_evolving_minus_random_peer_evolving_transfer"
+            ],
+            "selected_vs_frozen_did": "selected_transfer_minus_frozen_transfer",
+            "relative_latency_in_pareto_verdict": false,
+        },
+        "known_control_limitation": {
+            "random_peer_source_selection_consumes_population_rng": true,
+            "exact_common_random_number_mutation_replay": false,
+            "interpretation": "selection_link_ablation_not_exact_mutation_draw_replay",
         }
     })
 }
@@ -186,12 +247,13 @@ fn evaluation_end_tick(shock: ResourcePerturbation) -> u64 {
 
 fn run_condition(
     mutation_rate: f64,
+    inheritance: InheritanceMode,
     population_seed: u64,
     scheduler_seed: u64,
     schedule: &PerturbationSchedule,
 ) -> Vec<GenesisEvent> {
     let mut population = Population::new(
-        population_config(mutation_rate),
+        population_config(mutation_rate, inheritance),
         INITIAL_COUNT,
         population_seed,
     );
@@ -235,6 +297,23 @@ fn transfer(
         .map_err(|error: RepeatShockErrorV1| format!("transfer comparison unavailable: {error:?}"))
 }
 
+fn record_transfer(
+    label: &str,
+    result: &Result<RepeatShockTransferV1, String>,
+    counts: &mut VerdictCounts,
+) {
+    match result {
+        Ok(report) => {
+            counts.record(report.verdict);
+            println!("  {label} transfer: {report:#?}");
+        }
+        Err(error) => {
+            counts.unavailable += 1;
+            println!("  {label} transfer unavailable: {error}");
+        }
+    }
+}
+
 fn main() {
     emit_protocol_evidence();
 
@@ -255,89 +334,131 @@ fn main() {
     let schedule = PerturbationSchedule::new(vec![shock_1, shock_2]);
 
     let mut frozen_counts = VerdictCounts::default();
-    let mut evolving_counts = VerdictCounts::default();
-    let mut did_counts = DidCounts::default();
-    let mut paired_valid = 0usize;
-    let mut evolving_only_pareto_improved = 0usize;
-    let mut frozen_only_pareto_improved = 0usize;
-    let mut both_pareto_improved = 0usize;
-    let mut neither_pareto_improved = 0usize;
+    let mut selected_counts = VerdictCounts::default();
+    let mut random_peer_counts = VerdictCounts::default();
+    let mut selected_vs_frozen_did_counts = DidCounts::default();
+    let mut random_peer_vs_frozen_counts = RelativeCounts::default();
+    let mut selected_vs_random_peer_counts = RelativeCounts::default();
+    let mut all_three_valid = 0usize;
 
     for &seed in SEEDS {
         let scheduler_seed = seed.wrapping_add(SCHEDULER_SEED_OFFSET);
-        let frozen_events = run_condition(FROZEN_MUTATION_RATE, seed, scheduler_seed, &schedule);
-        let evolving_events = run_condition(EVOLVING_MUTATION_RATE, seed, scheduler_seed, &schedule);
+        let frozen_events = run_condition(
+            FROZEN_MUTATION_RATE,
+            InheritanceMode::FromParent,
+            seed,
+            scheduler_seed,
+            &schedule,
+        );
+        let selected_events = run_condition(
+            EVOLVING_MUTATION_RATE,
+            InheritanceMode::FromParent,
+            seed,
+            scheduler_seed,
+            &schedule,
+        );
+        let random_peer_events = run_condition(
+            EVOLVING_MUTATION_RATE,
+            InheritanceMode::RandomPeer,
+            seed,
+            scheduler_seed,
+            &schedule,
+        );
+
         let frozen_report = analyze_genesis_events(&frozen_events)
             .expect("frozen Genesis event stream must satisfy observatory invariants");
-        let evolving_report = analyze_genesis_events(&evolving_events)
-            .expect("evolving Genesis event stream must satisfy observatory invariants");
+        let selected_report = analyze_genesis_events(&selected_events)
+            .expect("selected Genesis event stream must satisfy observatory invariants");
+        let random_peer_report = analyze_genesis_events(&random_peer_events)
+            .expect("RandomPeer Genesis event stream must satisfy observatory invariants");
 
         let frozen_transfer = transfer(&frozen_report, shock_1, shock_2);
-        let evolving_transfer = transfer(&evolving_report, shock_1, shock_2);
+        let selected_transfer = transfer(&selected_report, shock_1, shock_2);
+        let random_peer_transfer = transfer(&random_peer_report, shock_1, shock_2);
 
         println!("seed={seed}");
-        match &frozen_transfer {
-            Ok(report) => {
-                frozen_counts.record(report.verdict);
-                println!("  frozen transfer:   {report:#?}");
-            }
-            Err(error) => {
-                frozen_counts.unavailable += 1;
-                println!("  frozen transfer unavailable: {error}");
-            }
-        }
-        match &evolving_transfer {
-            Ok(report) => {
-                evolving_counts.record(report.verdict);
-                println!("  evolving transfer: {report:#?}");
-            }
-            Err(error) => {
-                evolving_counts.unavailable += 1;
-                println!("  evolving transfer unavailable: {error}");
-            }
-        }
+        record_transfer("frozen", &frozen_transfer, &mut frozen_counts);
+        record_transfer("selected", &selected_transfer, &mut selected_counts);
+        record_transfer(
+            "random-peer",
+            &random_peer_transfer,
+            &mut random_peer_counts,
+        );
 
-        if let (Ok(frozen), Ok(evolving)) = (&frozen_transfer, &evolving_transfer) {
-            paired_valid += 1;
-            let frozen_improved =
-                frozen.verdict == RepeatShockTransferVerdictV1::ParetoImproved;
-            let evolving_improved =
-                evolving.verdict == RepeatShockTransferVerdictV1::ParetoImproved;
-            match (frozen_improved, evolving_improved) {
-                (false, true) => evolving_only_pareto_improved += 1,
-                (true, false) => frozen_only_pareto_improved += 1,
-                (true, true) => both_pareto_improved += 1,
-                (false, false) => neither_pareto_improved += 1,
-            }
-
-            match compare_repeated_shock_did(frozen, evolving) {
+        match (&frozen_transfer, &selected_transfer) {
+            (Ok(frozen), Ok(selected)) => match compare_repeated_shock_did(frozen, selected) {
                 Ok(did) => {
-                    did_counts.record(did.verdict);
-                    println!("  paired difference-in-differences: {did:#?}");
+                    selected_vs_frozen_did_counts.record(did.verdict);
+                    println!("  selected-vs-frozen DID: {did:#?}");
                 }
                 Err(error) => {
-                    did_counts.unavailable += 1;
-                    println!("  paired difference-in-differences unavailable: {error:?}");
+                    selected_vs_frozen_did_counts.unavailable += 1;
+                    println!("  selected-vs-frozen DID unavailable: {error:?}");
+                }
+            },
+            _ => selected_vs_frozen_did_counts.unavailable += 1,
+        }
+
+        match (&frozen_transfer, &random_peer_transfer) {
+            (Ok(frozen), Ok(random_peer)) => {
+                match compare_repeated_shock_relative(frozen, random_peer) {
+                    Ok(relative) => {
+                        random_peer_vs_frozen_counts.record(relative.verdict);
+                        println!("  random-peer-vs-frozen relative transfer: {relative:#?}");
+                    }
+                    Err(error) => {
+                        random_peer_vs_frozen_counts.unavailable += 1;
+                        println!("  random-peer-vs-frozen relative unavailable: {error:?}");
+                    }
                 }
             }
-        } else {
-            did_counts.unavailable += 1;
+            _ => random_peer_vs_frozen_counts.unavailable += 1,
+        }
+
+        match (&random_peer_transfer, &selected_transfer) {
+            (Ok(random_peer), Ok(selected)) => {
+                match compare_repeated_shock_relative(random_peer, selected) {
+                    Ok(relative) => {
+                        selected_vs_random_peer_counts.record(relative.verdict);
+                        println!("  selected-vs-random-peer relative transfer: {relative:#?}");
+                    }
+                    Err(error) => {
+                        selected_vs_random_peer_counts.unavailable += 1;
+                        println!("  selected-vs-random-peer relative unavailable: {error:?}");
+                    }
+                }
+            }
+            _ => selected_vs_random_peer_counts.unavailable += 1,
+        }
+
+        if frozen_transfer.is_ok() && selected_transfer.is_ok() && random_peer_transfer.is_ok() {
+            all_three_valid += 1;
         }
     }
 
     println!("fixed seed panel: {SEEDS:?}");
-    println!("frozen verdict counts:   {frozen_counts:#?}");
-    println!("evolving verdict counts: {evolving_counts:#?}");
-    println!("paired-valid seeds: {paired_valid}/{}", SEEDS.len());
-    println!("paired Pareto-improvement table:");
-    println!("  evolving-only: {evolving_only_pareto_improved}");
-    println!("  frozen-only:   {frozen_only_pareto_improved}");
-    println!("  both:          {both_pareto_improved}");
-    println!("  neither:       {neither_pareto_improved}");
-    println!("paired repeated-shock difference-in-differences counts: {did_counts:#?}");
+    println!("frozen transfer verdict counts:       {frozen_counts:#?}");
+    println!("selected transfer verdict counts:     {selected_counts:#?}");
+    println!("random-peer transfer verdict counts:  {random_peer_counts:#?}");
+    println!("all-three-valid seeds: {all_three_valid}/{}", SEEDS.len());
     println!(
-        "Difference-in-differences is a directional paired contrast over predeclared continuous \
-         recovery dimensions. These counts remain descriptive evidence only; no p-value, causal \
-         mutation mechanism, or population-level generalization is established by this example."
+        "selected-vs-frozen repeated-shock DID counts: \
+         {selected_vs_frozen_did_counts:#?}"
+    );
+    println!(
+        "random-peer-vs-frozen relative-transfer counts: \
+         {random_peer_vs_frozen_counts:#?}"
+    );
+    println!(
+        "selected-vs-random-peer relative-transfer counts: \
+         {selected_vs_random_peer_counts:#?}"
+    );
+    println!(
+        "The selected-vs-random-peer contrast is a selection-link ablation: both mutation-enabled \
+         arms use the same nominal mutation rate, while RandomPeer breaks successful-parent -> \
+         genome-source inheritance. RandomPeer also consumes RNG for source selection, so this is \
+         not an exact common-random-number mutation replay. All counts remain descriptive evidence \
+         only; no p-value, lineage mechanism, or population-level causal generalization is \
+         established by this example."
     );
 }
