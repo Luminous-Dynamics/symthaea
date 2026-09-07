@@ -1,0 +1,136 @@
+name: Economic Causal Identification Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-economics/tests/causal_identification_qualification.rs'
+      - '.github/workflows/economic-causal-identification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze causal identification theorem and qualification-only scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          test_path = Path('crates/domains/symthaea-economics/tests/causal_identification_qualification.rs')
+          text = test_path.read_text()
+          theory = Path('crates/domains/symthaea-economics/src/theory.rs').read_text()
+          ontology = Path('crates/domains/symthaea-economics/src/ontology.rs').read_text()
+
+          required = [
+              'struct CausalEstimand',
+              'enum IdentificationDesign',
+              'RandomizedAssignment',
+              'InstrumentalVariable',
+              'RegressionDiscontinuity',
+              'DifferenceInDifferences',
+              'SyntheticControl',
+              'BackdoorAdjustment',
+              'struct IdentificationStrategy',
+              'assumptions: Vec<String>',
+              'struct EstimatorSpecification',
+              'uncertainty_method_artifact_id',
+              'AssociationalOutputNotCausal',
+              'struct StrategyBoundCausalEstimateCandidate',
+              'plain_association_cannot_upgrade_to_causal_estimate',
+              'identical_effect_values_from_different_strategies_remain_distinct_evidence',
+              'estimator_and_output_cannot_retarget_another_estimand',
+              'treatment_outcome_and_unit_substitution_fail_closed',
+              'qualified_candidate_preserves_strategy_estimator_and_uncertainty_lineage',
+              'identification_families_are_not_encoded_as_a_truth_ranking',
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f'missing causal-identification invariant: {needle}')
+
+          forbidden = [
+              'identified: bool',
+              'causal_truth',
+              'CausalTruth',
+              'strategy_strength',
+              'evidence_strength',
+              'fn rank(',
+              'fn score_strategy(',
+              'PartialOrd, Ord',
+              'EvidenceChannel::',
+              'NormativeProposition',
+              'reqwest::',
+              'ureq::',
+              'SystemTime::now',
+              'Utc::now',
+          ]
+          for needle in forbidden:
+              if needle in text:
+                  raise SystemExit(f'causal qualification acquired forbidden shortcut/authority: {needle}')
+
+          # A0-A3 must remain theory-neutral: identification machinery belongs
+          # above the foundational claim/ontology types rather than being hidden
+          # inside EconomicVariable or EmpiricalClaim.
+          for needle in [
+              'IdentificationStrategy',
+              'EstimatorSpecification',
+              'CausalEstimand',
+              'causal_graph_artifact_id',
+          ]:
+              if needle in ontology or needle in theory:
+                  raise SystemExit(
+                      f'foundation acquired causal-identification authority; re-audit layering: {needle}'
+                  )
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/economic-causal-identification.yml',
+              'crates/domains/symthaea-economics/tests/causal_identification_qualification.rs',
+          }
+          if changed != allowed:
+              raise SystemExit(
+                  f'causal identification qualification must remain exactly two files; got {sorted(changed)}'
+              )
+
+          forbidden_product = {
+              'crates/domains/symthaea-economics/src/ontology.rs',
+              'crates/domains/symthaea-economics/src/etir.rs',
+              'crates/domains/symthaea-economics/src/theory.rs',
+              'crates/domains/symthaea-economics/src/science.rs',
+              'crates/domains/symthaea-economics/src/lib.rs',
+              'crates/domains/symthaea-economics/Cargo.toml',
+              'Cargo.lock',
+          }
+          touched = changed & forbidden_product
+          if touched:
+              raise SystemExit(f'qualification spike modified product/manifest state: {sorted(touched)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-economics -- --check
+
+      - name: Causal identification qualification test
+        run: cargo test --locked -p symthaea-economics --test causal_identification_qualification
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-economics --test causal_identification_qualification -- -D warnings
