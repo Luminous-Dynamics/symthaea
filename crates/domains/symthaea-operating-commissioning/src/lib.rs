@@ -20,15 +20,8 @@ use symthaea_operating_autonomy::{
 };
 use symthaea_operating_envelope::OperatingPoint;
 use symthaea_resource_hierarchy::ResourceHierarchy;
+pub use symthaea_safety_configuration::ConfigurationDigest;
 use thiserror::Error;
-
-/// Exact digest algorithm and bytes used to identify one safety-relevant
-/// configuration image. This crate records/compares digests; digest computation
-/// belongs to the provisioning/evidence layer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ConfigurationDigest {
-    Blake3_256([u8; 32]),
-}
 
 /// Provenance tying a local safety envelope to commissioning evidence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
