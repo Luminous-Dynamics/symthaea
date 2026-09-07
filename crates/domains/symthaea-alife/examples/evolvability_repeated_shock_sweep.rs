@@ -19,8 +19,9 @@ use sha2::{Digest, Sha256};
 use symthaea_alife::{
     EncounterScheduler, EvolvabilityError, GenesisEvent, InheritanceMode, ObservatoryReport,
     OrganismConfig, PairingMode, PerturbationSchedule, Population, PopulationConfig,
-    RecoveryMetrics, RepeatShockErrorV1, RepeatShockTransferV1, RepeatShockTransferVerdictV1,
-    RepeatedShockDidVerdictV1, RepeatedShockRelativeVerdictV1, ResourcePerturbation,
+    RecoveryMetrics, RepeatShockErrorV1, RepeatShockLatencyV1, RepeatShockTransferV1,
+    RepeatShockTransferVerdictV1, RepeatedShockDidV1, RepeatedShockDidVerdictV1,
+    RepeatedShockRelativeV1, RepeatedShockRelativeVerdictV1, ResourcePerturbation,
     analyze_genesis_events, analyze_recovery_through, compare_repeated_shock_did,
     compare_repeated_shock_relative, compare_repeated_shocks,
 };
@@ -63,6 +64,16 @@ impl VerdictCounts {
             RepeatShockTransferVerdictV1::ParetoWorse => self.pareto_worse += 1,
         }
     }
+
+    fn as_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "pareto_improved": self.pareto_improved,
+            "mixed": self.mixed,
+            "no_directional_change": self.no_directional_change,
+            "pareto_worse": self.pareto_worse,
+            "unavailable": self.unavailable,
+        })
+    }
 }
 
 #[derive(Debug, Default)]
@@ -85,6 +96,16 @@ impl DidCounts {
             RepeatedShockDidVerdictV1::ParetoFrozen => self.pareto_frozen += 1,
         }
     }
+
+    fn as_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "pareto_evolving": self.pareto_evolving,
+            "mixed": self.mixed,
+            "no_directional_difference": self.no_directional_difference,
+            "pareto_frozen": self.pareto_frozen,
+            "unavailable": self.unavailable,
+        })
+    }
 }
 
 #[derive(Debug, Default)]
@@ -106,6 +127,16 @@ impl RelativeCounts {
             }
             RepeatedShockRelativeVerdictV1::ParetoReference => self.pareto_reference += 1,
         }
+    }
+
+    fn as_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "pareto_candidate": self.pareto_candidate,
+            "mixed": self.mixed,
+            "no_directional_difference": self.no_directional_difference,
+            "pareto_reference": self.pareto_reference,
+            "unavailable": self.unavailable,
+        })
     }
 }
 
@@ -225,17 +256,130 @@ fn protocol_evidence_json() -> serde_json::Value {
     })
 }
 
-fn emit_protocol_evidence() {
-    let protocol = protocol_evidence_json();
-    let canonical = serde_json::to_vec(&protocol).expect("protocol evidence must serialize");
-    let digest = Sha256::digest(&canonical);
-    let digest_hex = digest
+fn digest_json(value: &serde_json::Value) -> (String, String) {
+    let bytes = serde_json::to_vec(value).expect("evidence JSON must serialize");
+    let digest = Sha256::digest(&bytes)
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
-    let canonical = String::from_utf8(canonical).expect("serde_json output is UTF-8");
-    println!("protocol_sha256={digest_hex}");
-    println!("protocol_json={canonical}");
+    let json = String::from_utf8(bytes).expect("serde_json output is UTF-8");
+    (digest, json)
+}
+
+fn emit_protocol_evidence() -> String {
+    let (digest, json) = digest_json(&protocol_evidence_json());
+    println!("protocol_sha256={digest}");
+    println!("protocol_json={json}");
+    digest
+}
+
+fn repeat_shock_verdict_name(verdict: RepeatShockTransferVerdictV1) -> &'static str {
+    match verdict {
+        RepeatShockTransferVerdictV1::ParetoImproved => "ParetoImproved",
+        RepeatShockTransferVerdictV1::Mixed => "Mixed",
+        RepeatShockTransferVerdictV1::NoDirectionalChange => "NoDirectionalChange",
+        RepeatShockTransferVerdictV1::ParetoWorse => "ParetoWorse",
+    }
+}
+
+fn did_verdict_name(verdict: RepeatedShockDidVerdictV1) -> &'static str {
+    match verdict {
+        RepeatedShockDidVerdictV1::ParetoEvolving => "ParetoEvolving",
+        RepeatedShockDidVerdictV1::Mixed => "Mixed",
+        RepeatedShockDidVerdictV1::NoDirectionalDifference => "NoDirectionalDifference",
+        RepeatedShockDidVerdictV1::ParetoFrozen => "ParetoFrozen",
+    }
+}
+
+fn relative_verdict_name(verdict: RepeatedShockRelativeVerdictV1) -> &'static str {
+    match verdict {
+        RepeatedShockRelativeVerdictV1::ParetoCandidate => "ParetoCandidate",
+        RepeatedShockRelativeVerdictV1::Mixed => "Mixed",
+        RepeatedShockRelativeVerdictV1::NoDirectionalDifference => "NoDirectionalDifference",
+        RepeatedShockRelativeVerdictV1::ParetoReference => "ParetoReference",
+    }
+}
+
+fn latency_json(latency: RepeatShockLatencyV1) -> serde_json::Value {
+    match latency {
+        RepeatShockLatencyV1::BothRecovered {
+            first_latency_ticks,
+            second_latency_ticks,
+            latency_advantage_ticks,
+        } => serde_json::json!({
+            "status": "BothRecovered",
+            "first_latency_ticks": first_latency_ticks,
+            "second_latency_ticks": second_latency_ticks,
+            "latency_advantage_ticks": latency_advantage_ticks.to_string(),
+        }),
+        RepeatShockLatencyV1::SecondOnlyRecovered => {
+            serde_json::json!({"status": "SecondOnlyRecovered"})
+        }
+        RepeatShockLatencyV1::FirstOnlyRecovered => {
+            serde_json::json!({"status": "FirstOnlyRecovered"})
+        }
+        RepeatShockLatencyV1::NeitherRecovered => {
+            serde_json::json!({"status": "NeitherRecovered"})
+        }
+    }
+}
+
+fn transfer_json(result: &Result<RepeatShockTransferV1, String>) -> serde_json::Value {
+    match result {
+        Ok(report) => serde_json::json!({
+            "status": "ok",
+            "verdict": repeat_shock_verdict_name(report.verdict),
+            "first_baseline_mean_observed_population": report.first_baseline_mean_observed_population,
+            "second_baseline_mean_observed_population": report.second_baseline_mean_observed_population,
+            "minimum_during_fraction_delta": report.minimum_during_fraction_delta,
+            "minimum_after_fraction_delta": report.minimum_after_fraction_delta,
+            "final_fraction_delta": report.final_fraction_delta,
+            "deficit_area_advantage": report.deficit_area_advantage,
+            "latency": latency_json(report.latency),
+        }),
+        Err(error) => serde_json::json!({
+            "status": "unavailable",
+            "error": error,
+        }),
+    }
+}
+
+fn did_json(result: &Result<RepeatedShockDidV1, String>) -> serde_json::Value {
+    match result {
+        Ok(report) => serde_json::json!({
+            "status": "ok",
+            "verdict": did_verdict_name(report.verdict),
+            "minimum_during_fraction_did": report.minimum_during_fraction_did,
+            "minimum_after_fraction_did": report.minimum_after_fraction_did,
+            "final_fraction_did": report.final_fraction_did,
+            "deficit_area_advantage_did": report.deficit_area_advantage_did,
+            "frozen_latency_transfer": latency_json(report.frozen_latency_transfer),
+            "evolving_latency_transfer": latency_json(report.evolving_latency_transfer),
+        }),
+        Err(error) => serde_json::json!({
+            "status": "unavailable",
+            "error": error,
+        }),
+    }
+}
+
+fn relative_json(result: &Result<RepeatedShockRelativeV1, String>) -> serde_json::Value {
+    match result {
+        Ok(report) => serde_json::json!({
+            "status": "ok",
+            "verdict": relative_verdict_name(report.verdict),
+            "minimum_during_candidate_minus_reference": report.minimum_during_candidate_minus_reference,
+            "minimum_after_candidate_minus_reference": report.minimum_after_candidate_minus_reference,
+            "final_fraction_candidate_minus_reference": report.final_fraction_candidate_minus_reference,
+            "deficit_area_advantage_candidate_minus_reference": report.deficit_area_advantage_candidate_minus_reference,
+            "reference_latency_transfer": latency_json(report.reference_latency_transfer),
+            "candidate_latency_transfer": latency_json(report.candidate_latency_transfer),
+        }),
+        Err(error) => serde_json::json!({
+            "status": "unavailable",
+            "error": error,
+        }),
+    }
 }
 
 fn evaluation_end_tick(shock: ResourcePerturbation) -> u64 {
@@ -297,6 +441,36 @@ fn transfer(
         .map_err(|error: RepeatShockErrorV1| format!("transfer comparison unavailable: {error:?}"))
 }
 
+fn did(
+    frozen: &Result<RepeatShockTransferV1, String>,
+    selected: &Result<RepeatShockTransferV1, String>,
+) -> Result<RepeatedShockDidV1, String> {
+    let frozen = frozen
+        .as_ref()
+        .map_err(|error| format!("frozen transfer unavailable: {error}"))?;
+    let selected = selected
+        .as_ref()
+        .map_err(|error| format!("selected transfer unavailable: {error}"))?;
+    compare_repeated_shock_did(frozen, selected)
+        .map_err(|error| format!("DID unavailable: {error:?}"))
+}
+
+fn relative(
+    reference_name: &str,
+    reference: &Result<RepeatShockTransferV1, String>,
+    candidate_name: &str,
+    candidate: &Result<RepeatShockTransferV1, String>,
+) -> Result<RepeatedShockRelativeV1, String> {
+    let reference = reference
+        .as_ref()
+        .map_err(|error| format!("{reference_name} transfer unavailable: {error}"))?;
+    let candidate = candidate
+        .as_ref()
+        .map_err(|error| format!("{candidate_name} transfer unavailable: {error}"))?;
+    compare_repeated_shock_relative(reference, candidate)
+        .map_err(|error| format!("relative transfer unavailable: {error:?}"))
+}
+
 fn record_transfer(
     label: &str,
     result: &Result<RepeatShockTransferV1, String>,
@@ -314,8 +488,38 @@ fn record_transfer(
     }
 }
 
+fn record_did(label: &str, result: &Result<RepeatedShockDidV1, String>, counts: &mut DidCounts) {
+    match result {
+        Ok(report) => {
+            counts.record(report.verdict);
+            println!("  {label}: {report:#?}");
+        }
+        Err(error) => {
+            counts.unavailable += 1;
+            println!("  {label} unavailable: {error}");
+        }
+    }
+}
+
+fn record_relative(
+    label: &str,
+    result: &Result<RepeatedShockRelativeV1, String>,
+    counts: &mut RelativeCounts,
+) {
+    match result {
+        Ok(report) => {
+            counts.record(report.verdict);
+            println!("  {label}: {report:#?}");
+        }
+        Err(error) => {
+            counts.unavailable += 1;
+            println!("  {label} unavailable: {error}");
+        }
+    }
+}
+
 fn main() {
-    emit_protocol_evidence();
+    let protocol_sha256 = emit_protocol_evidence();
 
     let shock_1 = ResourcePerturbation::new(
         SHOCK_1_START,
@@ -340,6 +544,7 @@ fn main() {
     let mut random_peer_vs_frozen_counts = RelativeCounts::default();
     let mut selected_vs_random_peer_counts = RelativeCounts::default();
     let mut all_three_valid = 0usize;
+    let mut seed_results = Vec::with_capacity(SEEDS.len());
 
     for &seed in SEEDS {
         let scheduler_seed = seed.wrapping_add(SCHEDULER_SEED_OFFSET);
@@ -375,6 +580,19 @@ fn main() {
         let frozen_transfer = transfer(&frozen_report, shock_1, shock_2);
         let selected_transfer = transfer(&selected_report, shock_1, shock_2);
         let random_peer_transfer = transfer(&random_peer_report, shock_1, shock_2);
+        let selected_vs_frozen_did = did(&frozen_transfer, &selected_transfer);
+        let random_peer_vs_frozen = relative(
+            "frozen",
+            &frozen_transfer,
+            "random-peer",
+            &random_peer_transfer,
+        );
+        let selected_vs_random_peer = relative(
+            "random-peer",
+            &random_peer_transfer,
+            "selected",
+            &selected_transfer,
+        );
 
         println!("seed={seed}");
         record_transfer("frozen", &frozen_transfer, &mut frozen_counts);
@@ -384,56 +602,36 @@ fn main() {
             &random_peer_transfer,
             &mut random_peer_counts,
         );
-
-        match (&frozen_transfer, &selected_transfer) {
-            (Ok(frozen), Ok(selected)) => match compare_repeated_shock_did(frozen, selected) {
-                Ok(did) => {
-                    selected_vs_frozen_did_counts.record(did.verdict);
-                    println!("  selected-vs-frozen DID: {did:#?}");
-                }
-                Err(error) => {
-                    selected_vs_frozen_did_counts.unavailable += 1;
-                    println!("  selected-vs-frozen DID unavailable: {error:?}");
-                }
-            },
-            _ => selected_vs_frozen_did_counts.unavailable += 1,
-        }
-
-        match (&frozen_transfer, &random_peer_transfer) {
-            (Ok(frozen), Ok(random_peer)) => {
-                match compare_repeated_shock_relative(frozen, random_peer) {
-                    Ok(relative) => {
-                        random_peer_vs_frozen_counts.record(relative.verdict);
-                        println!("  random-peer-vs-frozen relative transfer: {relative:#?}");
-                    }
-                    Err(error) => {
-                        random_peer_vs_frozen_counts.unavailable += 1;
-                        println!("  random-peer-vs-frozen relative unavailable: {error:?}");
-                    }
-                }
-            }
-            _ => random_peer_vs_frozen_counts.unavailable += 1,
-        }
-
-        match (&random_peer_transfer, &selected_transfer) {
-            (Ok(random_peer), Ok(selected)) => {
-                match compare_repeated_shock_relative(random_peer, selected) {
-                    Ok(relative) => {
-                        selected_vs_random_peer_counts.record(relative.verdict);
-                        println!("  selected-vs-random-peer relative transfer: {relative:#?}");
-                    }
-                    Err(error) => {
-                        selected_vs_random_peer_counts.unavailable += 1;
-                        println!("  selected-vs-random-peer relative unavailable: {error:?}");
-                    }
-                }
-            }
-            _ => selected_vs_random_peer_counts.unavailable += 1,
-        }
+        record_did(
+            "selected-vs-frozen DID",
+            &selected_vs_frozen_did,
+            &mut selected_vs_frozen_did_counts,
+        );
+        record_relative(
+            "random-peer-vs-frozen relative transfer",
+            &random_peer_vs_frozen,
+            &mut random_peer_vs_frozen_counts,
+        );
+        record_relative(
+            "selected-vs-random-peer relative transfer",
+            &selected_vs_random_peer,
+            &mut selected_vs_random_peer_counts,
+        );
 
         if frozen_transfer.is_ok() && selected_transfer.is_ok() && random_peer_transfer.is_ok() {
             all_three_valid += 1;
         }
+
+        seed_results.push(serde_json::json!({
+            "seed": seed,
+            "scheduler_seed": scheduler_seed,
+            "frozen_transfer": transfer_json(&frozen_transfer),
+            "selected_transfer": transfer_json(&selected_transfer),
+            "random_peer_transfer": transfer_json(&random_peer_transfer),
+            "selected_vs_frozen_did": did_json(&selected_vs_frozen_did),
+            "random_peer_vs_frozen_relative": relative_json(&random_peer_vs_frozen),
+            "selected_vs_random_peer_relative": relative_json(&selected_vs_random_peer),
+        }));
     }
 
     println!("fixed seed panel: {SEEDS:?}");
@@ -453,6 +651,31 @@ fn main() {
         "selected-vs-random-peer relative-transfer counts: \
          {selected_vs_random_peer_counts:#?}"
     );
+
+    let results = serde_json::json!({
+        "schema": "symthaea.alife.repeated-shock.results.v1",
+        "protocol_sha256": protocol_sha256,
+        "seed_results": seed_results,
+        "aggregate": {
+            "seed_count": SEEDS.len(),
+            "all_three_valid": all_three_valid,
+            "frozen_transfer": frozen_counts.as_json(),
+            "selected_transfer": selected_counts.as_json(),
+            "random_peer_transfer": random_peer_counts.as_json(),
+            "selected_vs_frozen_did": selected_vs_frozen_did_counts.as_json(),
+            "random_peer_vs_frozen_relative": random_peer_vs_frozen_counts.as_json(),
+            "selected_vs_random_peer_relative": selected_vs_random_peer_counts.as_json(),
+        },
+        "evidence_boundary": {
+            "descriptive_only": true,
+            "statistical_population_generalization": false,
+            "lineage_mechanism_established": false,
+            "exact_common_random_number_mutation_replay": false,
+        }
+    });
+    let (results_sha256, results_json) = digest_json(&results);
+    println!("results_sha256={results_sha256}");
+    println!("results_json={results_json}");
     println!(
         "The selected-vs-random-peer contrast is a selection-link ablation: both mutation-enabled \
          arms use the same nominal mutation rate, while RandomPeer breaks successful-parent -> \
