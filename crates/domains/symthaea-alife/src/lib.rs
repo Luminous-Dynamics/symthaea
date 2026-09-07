@@ -31,6 +31,7 @@ pub mod environment;
 pub mod events;
 pub mod evolvability;
 pub mod evolvability_comparison;
+pub mod evolution_rng;
 pub mod exact_sign_test;
 pub mod genome;
 pub mod hierarchy;
@@ -60,6 +61,10 @@ pub use evolvability::{
 };
 pub use evolvability_comparison::{
     RecoveryComparison, RecoveryComparisonError, RecoveryLatencyComparison, compare_recovery,
+};
+pub use evolution_rng::{
+    EvolutionRngSnapshotV1, EvolutionRngStreamsV1, INHERITANCE_SOURCE_SEED_OFFSET_V1,
+    LEGACY_MUTATION_SEED_OFFSET_V1,
 };
 pub use exact_sign_test::{
     ExactPositiveSignTestV1, ExactSignTestErrorV1, MAX_EXACT_SIGN_TEST_NON_TIES,
