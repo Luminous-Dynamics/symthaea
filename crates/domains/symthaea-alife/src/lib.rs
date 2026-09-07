@@ -33,11 +33,14 @@ pub mod evolvability;
 pub mod evolvability_comparison;
 pub mod evolution_birth;
 pub mod evolution_rng;
+pub mod evolutionary_history;
 pub mod exact_sign_test;
 pub mod genome;
 pub mod hierarchy;
 pub mod inheritance_source;
 pub mod ledger;
+pub mod lifecycle;
+pub mod lifecycle_recorder;
 pub mod ma001;
 pub mod ma001l;
 pub mod ma001r;
@@ -71,6 +74,10 @@ pub use evolution_rng::{
     EvolutionRngSnapshotV1, EvolutionRngStreamsV1, INHERITANCE_SOURCE_SEED_OFFSET_V1,
     LEGACY_MUTATION_SEED_OFFSET_V1,
 };
+pub use evolutionary_history::{
+    EvolutionaryHistoryError, EvolutionaryHistoryReportV1, GenomeDeltaV1, LineageHistoryV1,
+    MutationAncestryV1, analyze_evolutionary_history,
+};
 pub use exact_sign_test::{
     ExactPositiveSignTestV1, ExactSignTestErrorV1, MAX_EXACT_SIGN_TEST_NON_TIES,
     exact_positive_sign_test,
@@ -81,6 +88,12 @@ pub use inheritance_source::{
     GenomeSourceSelectionErrorV1, GenomeSourceSelectionV1, select_genome_source_v1,
 };
 pub use ledger::{InteractionRecord, compress_for_observation};
+pub use lifecycle::{
+    AgentLifecycleRecordV1, ExtinctionEvidenceV1, GenomeEvidenceV1, LifecycleDeathCauseV1,
+    LifecycleError, LifecycleEventV1, LifecycleLedgerV1, LifecycleTransitionV1,
+    analyze_lifecycle_events,
+};
+pub use lifecycle_recorder::{LifecycleRecorderErrorV1, LifecycleRecorderV1};
 pub use metabolism::{
     K_ALIFE_BOLTZMANN, landauer_minimum, prigogine_dissipation_cost, shannon_entropy_bits,
 };
