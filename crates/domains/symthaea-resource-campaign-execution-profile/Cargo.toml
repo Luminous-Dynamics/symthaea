@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-resource-campaign-execution-profile"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Selection-root execution profile for reproducible resource shadow campaigns"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "reproducibility", "execution", "campaign"]
+categories = ["science", "simulation"]
+
+[dependencies]
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-shadow-campaign = { path = "../symthaea-resource-shadow-campaign" }
+
+[dev-dependencies]
+symthaea-operations-research = { path = "../symthaea-operations-research" }
+symthaea-resource-objective-metric = { path = "../symthaea-resource-objective-metric" }
+symthaea-resource-shadow-benchmark = { path = "../symthaea-resource-shadow-benchmark" }
