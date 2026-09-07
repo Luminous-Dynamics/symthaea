@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-multiscale-coordination"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bounded Pareto coordination across direct-child infrastructure nodes"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["coordination", "infrastructure", "pareto", "hierarchy"]
+categories = ["science", "simulation"]
+
+[dependencies]
+thiserror = { workspace = true }
+symthaea-operations-research = { path = "../symthaea-operations-research" }
+symthaea-operating-envelope = { path = "../symthaea-operating-envelope" }
+symthaea-resource-hierarchy = { path = "../symthaea-resource-hierarchy" }
+
+[dev-dependencies]
+chrono = { workspace = true }
