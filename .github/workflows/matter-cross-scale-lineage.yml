@@ -1,0 +1,93 @@
+name: Matter Cross-Scale Lineage
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_cross_scale_lineage.rs'
+      - 'src/knowledge/matter_cross_scale.rs'
+      - 'src/knowledge/mod.rs'
+      - 'crates/domains/symthaea-epistemic-types/src/matter.rs'
+      - '.github/workflows/matter-cross-scale-lineage.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  cross-scale-lineage:
+    name: Structured Matter lineage preservation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Parent calculus, canonical types, and lockfile must remain unchanged
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          test -z "$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- Cargo.lock src/knowledge/matter_cross_scale.rs crates/domains/symthaea-epistemic-types/src/matter.rs)"
+
+      - name: Focused formatting
+        run: cargo fmt --check -p symthaea
+
+      - name: Cross-scale lineage regressions
+        run: cargo test --locked -p symthaea --lib knowledge::matter_cross_scale_lineage::tests -- --nocapture --test-threads=1
+
+      - name: Lineage preservation semantic ratchet
+        shell: python
+        run: |
+          from pathlib import Path
+
+          src = Path('src/knowledge/matter_cross_scale_lineage.rs').read_text()
+          mod = Path('src/knowledge/mod.rs').read_text()
+
+          required = (
+              'pub mod matter_cross_scale_lineage;',
+              'CrossScaleLineageEnvelope',
+              'CrossScaleDependencySnapshot',
+              'claim: MatterClaim',
+              'assess_cross_scale_evidence',
+              'validate_dependency_set',
+              'CrossScaleInheritedConstraint',
+              'CrossScaleInheritedFalsifier',
+              'CrossScaleInheritedEvidence',
+              'CrossScaleConstraintKind::ClaimLimitation',
+              'CrossScaleConstraintKind::SolverLimitation',
+              'admit_derived_computational_claim',
+              'DerivedClaimReusesDependencyId',
+              'enforce_derived_computational_claim',
+              'dependency.claim.limitations',
+              'dependency.claim.falsifiers',
+              'dependency.claim.evidence',
+              'dependency.claim.solver',
+          )
+          combined = mod + '\n' + src
+          for token in required:
+              if token not in combined:
+                  raise SystemExit(f'missing cross-scale lineage invariant: {token}')
+
+          forbidden = (
+              'upgrade_authority',
+              'promote_authority',
+              'verified: bool',
+              'is_verified',
+              'clear_limitations',
+              'clear_falsifiers',
+              'clear_evidence',
+              'confidence_threshold',
+          )
+          lowered = src.lower()
+          for token in forbidden:
+              if token.lower() in lowered:
+                  raise SystemExit(f'forbidden lineage authority/loss shortcut: {token}')
+
+          if 'lineage object, not a stronger epistemic credential' not in src:
+              raise SystemExit('lineage non-authority boundary must remain explicit')
+
+          print('cross-scale lineage preservation ratchet passed')
