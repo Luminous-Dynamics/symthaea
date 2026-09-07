@@ -1,0 +1,220 @@
+use serde::{de, Deserialize, Deserializer, Serialize};
+
+use crate::{
+    assess_homeostasis, InteroceptiveDrive, NativeInteroceptiveModel, NativeInteroceptiveState,
+    ViabilityChannel, CHANNEL_COUNT,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct AllostaticConfig {
+    pub horizon_steps: u16,
+    pub dt: f32,
+    pub discount: f32,
+}
+
+#[derive(Deserialize)]
+struct AllostaticConfigWire {
+    horizon_steps: u16,
+    dt: f32,
+    discount: f32,
+}
+
+impl<'de> Deserialize<'de> for AllostaticConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = AllostaticConfigWire::deserialize(deserializer)?;
+        let config = Self {
+            horizon_steps: wire.horizon_steps,
+            dt: wire.dt,
+            discount: wire.discount,
+        };
+        config.try_validate().map_err(de::Error::custom)?;
+        Ok(config)
+    }
+}
+
+impl Default for AllostaticConfig {
+    fn default() -> Self {
+        Self {
+            horizon_steps: 16,
+            dt: 1.0,
+            discount: 0.95,
+        }
+    }
+}
+
+impl AllostaticConfig {
+    pub fn try_validate(&self) -> Result<(), String> {
+        if self.horizon_steps == 0 {
+            return Err("horizon_steps must be greater than zero".into());
+        }
+        if !self.dt.is_finite() || self.dt <= 0.0 {
+            return Err("allostatic dt must be finite and positive".into());
+        }
+        if !self.discount.is_finite() || !(0.0..=1.0).contains(&self.discount) {
+            return Err("discount must be finite and in [0, 1]".into());
+        }
+        Ok(())
+    }
+
+    pub fn validate(&self) {
+        self.try_validate()
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AllostaticReport {
+    pub discounted_debt: f32,
+    pub peak_projected_deviation: f32,
+    pub terminal_deviation: f32,
+    /// Number of channel-step exposures outside viability across the forecast.
+    pub breach_exposures: u32,
+    /// Number of distinct channels that breach viability at least once.
+    pub unique_breached_channels: u8,
+    /// Earliest forecast step containing any viability breach.
+    pub first_breach_step: Option<u16>,
+    pub channel_debt: [f32; CHANNEL_COUNT],
+}
+
+#[derive(Debug)]
+struct AllostaticAccumulator {
+    discounted_debt: f32,
+    peak_projected_deviation: f32,
+    terminal_deviation: f32,
+    breach_exposures: u32,
+    breached_channels: [bool; CHANNEL_COUNT],
+    first_breach_step: Option<u16>,
+    channel_debt: [f32; CHANNEL_COUNT],
+    discount_weight: f32,
+    total_discount_weight: f32,
+}
+
+impl AllostaticAccumulator {
+    fn new() -> Self {
+        Self {
+            discounted_debt: 0.0,
+            peak_projected_deviation: 0.0,
+            terminal_deviation: 0.0,
+            breach_exposures: 0,
+            breached_channels: [false; CHANNEL_COUNT],
+            first_breach_step: None,
+            channel_debt: [0.0; CHANNEL_COUNT],
+            discount_weight: 1.0,
+            total_discount_weight: 0.0,
+        }
+    }
+
+    fn observe(
+        &mut self,
+        projected: &NativeInteroceptiveState,
+        step: u16,
+        terminal_step: u16,
+        discount: f32,
+    ) {
+        let report = assess_homeostasis(projected);
+
+        self.discounted_debt += report.weighted_deviation * self.discount_weight;
+        self.total_discount_weight += self.discount_weight;
+        self.peak_projected_deviation = self
+            .peak_projected_deviation
+            .max(report.peak_deviation);
+
+        for channel in ViabilityChannel::ALL {
+            self.channel_debt[channel.index()] +=
+                report.channel_deviations[channel.index()] * self.discount_weight;
+
+            if !projected.get(channel).is_viable() {
+                self.breach_exposures = self.breach_exposures.saturating_add(1);
+                self.breached_channels[channel.index()] = true;
+                self.first_breach_step.get_or_insert(step);
+            }
+        }
+
+        if step == terminal_step {
+            self.terminal_deviation = report.weighted_deviation;
+        }
+
+        self.discount_weight *= discount;
+    }
+
+    fn finish(mut self) -> AllostaticReport {
+        if self.total_discount_weight > f32::EPSILON {
+            self.discounted_debt /= self.total_discount_weight;
+            for debt in &mut self.channel_debt {
+                *debt /= self.total_discount_weight;
+            }
+        }
+
+        let unique_breached_channels = self
+            .breached_channels
+            .iter()
+            .filter(|breached| **breached)
+            .count() as u8;
+
+        AllostaticReport {
+            discounted_debt: self.discounted_debt,
+            peak_projected_deviation: self.peak_projected_deviation,
+            terminal_deviation: self.terminal_deviation,
+            breach_exposures: self.breach_exposures,
+            unique_breached_channels,
+            first_breach_step: self.first_breach_step,
+            channel_debt: self.channel_debt,
+        }
+    }
+}
+
+/// Kinematic allostatic baseline using the state's measured velocity.
+///
+/// This deliberately does not assume that the velocity will continue to be
+/// generated by the native regulatory dynamics. Use [`assess_allostasis_with_drive`]
+/// when the future drive is part of the declared experimental condition.
+pub fn assess_allostasis(
+    state: &NativeInteroceptiveState,
+    config: AllostaticConfig,
+) -> AllostaticReport {
+    config.validate();
+    let mut accumulator = AllostaticAccumulator::new();
+
+    for step in 1..=config.horizon_steps {
+        let projected = state.predicted(config.dt * step as f32);
+        accumulator.observe(&projected, step, config.horizon_steps, config.discount);
+    }
+
+    accumulator.finish()
+}
+
+/// Dynamics-aware allostatic rollout under an explicitly declared constant drive.
+///
+/// The rollout clones the model and executes its actual deterministic transition
+/// law. The forecast timestep must match the model timestep so the report cannot
+/// silently mix incompatible temporal semantics.
+pub fn assess_allostasis_with_drive(
+    model: &NativeInteroceptiveModel,
+    drive: InteroceptiveDrive,
+    config: AllostaticConfig,
+) -> AllostaticReport {
+    config.validate();
+    let model_dt = model.config().step_dt;
+    assert!(
+        (config.dt - model_dt).abs() <= f32::EPSILON,
+        "allostatic rollout dt must equal the model step_dt"
+    );
+
+    let mut projected = model.clone();
+    let mut accumulator = AllostaticAccumulator::new();
+
+    for step in 1..=config.horizon_steps {
+        projected.step(drive);
+        accumulator.observe(
+            projected.state(),
+            step,
+            config.horizon_steps,
+            config.discount,
+        );
+    }
+
+    accumulator.finish()
+}
