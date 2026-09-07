@@ -48,14 +48,14 @@ jobs:
       - name: Check ALife formatting
         run: cargo fmt -p symthaea-alife -- --check
 
-      - name: Check ALife targets
-        run: cargo check -p symthaea-alife --all-targets
+      - name: Check ALife targets from frozen lock
+        run: cargo check --locked -p symthaea-alife --all-targets
 
-      - name: Test ALife contracts
-        run: cargo test -p symthaea-alife
+      - name: Test ALife contracts from frozen lock
+        run: cargo test --locked -p symthaea-alife
 
-      - name: Strict package-local Clippy
-        run: cargo clippy -p symthaea-alife --all-targets --no-deps -- -D warnings
+      - name: Strict package-local Clippy from frozen lock
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
 
   repeated-shock-sweep:
     name: Repeated-shock evidence sweep
@@ -81,16 +81,17 @@ jobs:
         with:
           key: alife-evolvability-sweep
 
-      - name: Run fixed paired eight-seed sweep
+      - name: Run fixed paired eight-seed sweep from frozen lock
         run: |
           mkdir -p target/alife-evolvability
-          cargo run --release -p symthaea-alife --example evolvability_repeated_shock_sweep \
+          cargo run --locked --release -p symthaea-alife --example evolvability_repeated_shock_sweep \
             | tee target/alife-evolvability/repeated-shock-sweep.txt
 
       - name: Record exact evidence metadata
         run: |
           {
             echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
             echo "rustc=$(rustc --version)"
             echo "cargo=$(cargo --version)"
             echo "example=evolvability_repeated_shock_sweep"
