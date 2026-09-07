@@ -1,0 +1,150 @@
+diff --git a/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs b/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
+index 80149c3..1111111 100644
+--- a/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
++++ b/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
+@@ -3,14 +3,16 @@
+ //! # Dynamic Grammar Generation — Macro-Operators for GP
+ //!
+ //! When the ConjectureEngine consistently discovers the same sub-expression
+-//! across multiple independently verified conjectures, this module packages
++//! across multiple verified conjectures, this module packages
+ //! that sub-expression as a reusable macro-operator and injects it into
+ //! the GP grammar pool.
+ //!
+ //! ## Promotion Criteria (Strict)
+ //!
+ //! A subtree is promoted to macro-operator only when:
+ //! 1. It appears in >= 3 conjectures (`min_occurrences`)
+-//! 2. From >= 2 different source sequences (independence)
++//! 2. From >= 2 distinct source-sequence tags (recurrence breadth only;
++//!    distinct tags do not establish independent evidence lineages)
+ //! 3. At least 1 occurrence is verified strongly enough for the selected path
+ //! 4. Current operator count < `max_operators` (20)
+ //!
+@@ -71,6 +73,18 @@ pub struct SubtreeCandidate {
+     pub signature: String,
+ }
+ 
++/// Immutable promotion-time identity snapshot for one conjecture that
++/// contributed to a learned macro.
++///
++/// This is intentionally a source tag + parent-formula pair rather than an
++/// index into `ConjectureEngine::conjectures`: that vector is re-sorted by
++/// later discovery runs, so positional indices are not stable lineage IDs.
++/// A source tag is still only a local label; it does not prove dataset or
++/// evidence independence.
++#[derive(Debug, Clone, PartialEq, Eq, Hash)]
++pub struct MacroSourceSnapshot {
++    pub source_tag: String,
++    pub parent_formula: String,
++}
++
+ /// A promoted macro-operator added to the GP grammar.
+ #[derive(Debug, Clone)]
+ pub struct MacroOperator {
+@@ -84,7 +98,9 @@ pub struct MacroOperator {
+     pub arity: usize,
+     /// How this macro entered the pool.
+     pub promotion_tier: MacroPromotionTier,
+-    /// Source conjecture indices that justified promotion
++    /// Promotion-time conjecture indices retained for backwards-compatible
++    /// diagnostics only. These are not stable lineage identities because the
++    /// engine re-sorts its conjecture vector after later discovery runs.
+     pub source_conjectures: Vec<usize>,
+     /// Human-readable parents that justified promotion.
+     pub parent_formulas: Vec<String>,
+@@ -99,7 +115,8 @@ pub struct MacroOperator {
+     pub var_count: usize,
+     /// Canonical signature key for the macro's variable set.
+     pub signature: String,
+-    /// Number of independent sources that contributed this macro.
++    /// Number of distinct source-sequence tags that contributed this macro.
++    /// This is recurrence breadth, not an independent-replication count.
+     pub source_count: usize,
+     /// How many times this operator appeared in top conjectures during GP runs
+     pub usage_count: u64,
+@@ -137,6 +154,10 @@ pub struct DynamicGrammar {
+     pub cycle: u64,
+     /// Signature-partitioned operator index for variable-aware retrieval.
+     operators_by_signature: HashMap<String, Vec<usize>>,
++    /// Stable promotion-time source/formula snapshots keyed by macro canonical
++    /// identity. This sidecar avoids making mutable conjecture-vector indices
++    /// carry scientific lineage authority.
++    source_snapshots_by_operator: HashMap<String, Vec<MacroSourceSnapshot>>,
+     /// Lifetime count of promoted operators.
+     total_promoted: u64,
+@@ -158,6 +179,7 @@ impl DynamicGrammar {
+             min_sources: 2,
+             cycle: 0,
+             operators_by_signature: HashMap::new(),
++            source_snapshots_by_operator: HashMap::new(),
+             total_promoted: 0,
+             total_pruned: 0,
+@@ -306,13 +328,14 @@ impl DynamicGrammar {
+     /// Promote eligible candidates to macro-operators.
+     ///
+     /// Two parallel paths:
+-    /// 1. **Standard path**: needs N+ occurrences from K+ independent sources
++    /// 1. **Standard path**: needs N+ occurrences from K+ distinct source tags
+     ///    and at least one numerically-verified hit. Catches polynomial idioms
+     ///    that recur across many discoveries.
+     /// 2. **Fast track**: a single FormallyVerified or SymbolicallyChecked
+     ///    occurrence is sufficient, regardless of source/occurrence counts.
+-    ///    The proof IS the redundancy. This is what lets unique novel shapes
++    ///    This is a grammar-admission rule, not an independent-replication
++    ///    claim. It lets unique strongly checked shapes
+     ///    like Hardy-Ramanujan's `exp(c*sqrt(n))` enter the pool from a
+     ///    single discovery.
+@@ -361,6 +384,23 @@ impl DynamicGrammar {
+             let mut parent_formulas: Vec<String> =
+                 candidate.parent_formulas.iter().cloned().collect();
+             parent_formulas.sort();
++            let mut source_snapshots: Vec<MacroSourceSnapshot> = candidate
++                .occurrences
++                .iter()
++                .filter_map(|&idx| {
++                    engine.conjectures.get(idx).map(|conjecture| MacroSourceSnapshot {
++                        source_tag: conjecture.source.clone(),
++                        parent_formula: conjecture_parent_formula_identity(conjecture),
++                    })
++                })
++                .collect();
++            source_snapshots.sort_by(|a, b| {
++                a.source_tag
++                    .cmp(&b.source_tag)
++                    .then_with(|| a.parent_formula.cmp(&b.parent_formula))
++            });
++            source_snapshots.dedup();
++            self.source_snapshots_by_operator
++                .insert(candidate.canonical.clone(), source_snapshots);
+ 
+             self.operators.push(MacroOperator {
+@@ -394,6 +434,9 @@ impl DynamicGrammar {
+         self.total_pruned += (before - self.operators.len()) as u64;
+         if self.operators.len() != before {
+             self.rebuild_operator_index();
++            self.source_snapshots_by_operator.retain(|canonical, _| {
++                self.operators.iter().any(|op| op.canonical == *canonical)
++            });
+         }
+     }
+ 
+@@ -409,6 +452,18 @@ impl DynamicGrammar {
+         }
+     }
+ 
++    /// Stable promotion-time source/formula snapshots for one macro.
++    ///
++    /// These snapshots remain valid if `ConjectureEngine::conjectures` is
++    /// later re-sorted. They are local provenance labels, not proof that the
++    /// underlying datasets or evidence lineages are independent.
++    pub fn source_snapshots(&self, canonical: &str) -> &[MacroSourceSnapshot] {
++        self.source_snapshots_by_operator
++            .get(canonical)
++            .map(Vec::as_slice)
++            .unwrap_or(&[])
++    }
++
+     /// Instantiate a macro-operator template with random constants.
+     ///
+     /// Replaces `Const(1.0)` placeholders with random values from a seed.
