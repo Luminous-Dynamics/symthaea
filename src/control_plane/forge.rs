@@ -166,6 +166,83 @@ impl ForgeVerificationRequestV1 {
     }
 }
 
+/// Exact resource/profile scope that a separate Forge authority may carry.
+///
+/// This type is deliberately **not** an authority token. It has no issuer,
+/// signature, generation, expiry, or revocation semantics. A current authenticated
+/// policy/grant must carry this scope before it can authorize an effect.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ForgeCapabilityScopeV1 {
+    /// Schema version. Must equal [`FORGE_PROTOCOL_VERSION`].
+    pub protocol_version: u16,
+    /// Exact artifact identity permitted by the scope.
+    pub artifact: ForgeArtifactIdentityV1,
+    /// Exact entry point permitted by the scope.
+    pub entry_point: String,
+    /// Exact execution-profile identity permitted by the scope.
+    pub execution_profile: ForgeExecutionProfileIdentityV1,
+    /// Exact claim scope permitted by the scope.
+    pub claim_scope: ForgeClaimScopeV1,
+    /// Whether a real execution may be requested. Simulation remains non-effectful.
+    pub allow_real_execution: bool,
+}
+
+impl ForgeCapabilityScopeV1 {
+    /// Build the least-privilege scope for one exact request.
+    pub fn exact_for_request(
+        request: &ForgeVerificationRequestV1,
+        allow_real_execution: bool,
+    ) -> Result<Self, ForgeProtocolError> {
+        request.validate()?;
+        Ok(Self {
+            protocol_version: FORGE_PROTOCOL_VERSION,
+            artifact: request.artifact.clone(),
+            entry_point: request.entry_point.clone(),
+            execution_profile: request.execution_profile.clone(),
+            claim_scope: request.claim_scope,
+            allow_real_execution,
+        })
+    }
+
+    /// Validate structural scope invariants.
+    pub fn validate(&self) -> Result<(), ForgeProtocolError> {
+        if self.protocol_version != FORGE_PROTOCOL_VERSION {
+            return Err(ForgeProtocolError::UnsupportedProtocolVersion(
+                self.protocol_version,
+            ));
+        }
+        self.artifact.validate()?;
+        if self.entry_point.trim().is_empty() {
+            return Err(ForgeProtocolError::EmptyEntryPoint);
+        }
+        self.execution_profile.validate()?;
+        Ok(())
+    }
+
+    /// Whether this resource scope exactly matches a request and execution mode.
+    ///
+    /// `true` means only that the scope matches. It does not prove that a current
+    /// authenticated authority actually granted or still authorizes this scope.
+    pub fn matches_request(
+        &self,
+        request: &ForgeVerificationRequestV1,
+        mode: ForgeExecutionModeV1,
+    ) -> Result<bool, ForgeProtocolError> {
+        self.validate()?;
+        request.validate()?;
+
+        if mode == ForgeExecutionModeV1::Real && !self.allow_real_execution {
+            return Ok(false);
+        }
+
+        Ok(self.artifact == request.artifact
+            && self.entry_point == request.entry_point
+            && self.execution_profile == request.execution_profile
+            && self.claim_scope == request.claim_scope)
+    }
+}
+
 /// Whether the recorded operation was simulated or actually executed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ForgeExecutionModeV1 {
@@ -356,6 +433,72 @@ mod tests {
             req.validate(),
             Err(ForgeProtocolError::UnsupportedProtocolVersion(_))
         ));
+    }
+
+    #[test]
+    fn exact_capability_scope_matches_only_the_bound_request() {
+        let req = request();
+        let scope = ForgeCapabilityScopeV1::exact_for_request(&req, true).unwrap();
+
+        assert!(
+            scope
+                .matches_request(&req, ForgeExecutionModeV1::Simulated)
+                .unwrap()
+        );
+        assert!(
+            scope
+                .matches_request(&req, ForgeExecutionModeV1::Real)
+                .unwrap()
+        );
+
+        let mut different_artifact = req.clone();
+        different_artifact.artifact.digest[0] ^= 0xFF;
+        assert!(
+            !scope
+                .matches_request(&different_artifact, ForgeExecutionModeV1::Real)
+                .unwrap()
+        );
+
+        let mut different_entry = req.clone();
+        different_entry.entry_point = "verify_other".into();
+        assert!(
+            !scope
+                .matches_request(&different_entry, ForgeExecutionModeV1::Real)
+                .unwrap()
+        );
+
+        let mut different_profile_id = req.clone();
+        different_profile_id.execution_profile.profile_id = "different-profile".into();
+        assert!(
+            !scope
+                .matches_request(&different_profile_id, ForgeExecutionModeV1::Real)
+                .unwrap()
+        );
+
+        let mut different_profile_commitment = req.clone();
+        different_profile_commitment.execution_profile.profile_commitment[0] ^= 0xFF;
+        assert!(
+            !scope
+                .matches_request(&different_profile_commitment, ForgeExecutionModeV1::Real)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn simulation_only_scope_never_matches_real_execution() {
+        let req = request();
+        let scope = ForgeCapabilityScopeV1::exact_for_request(&req, false).unwrap();
+
+        assert!(
+            scope
+                .matches_request(&req, ForgeExecutionModeV1::Simulated)
+                .unwrap()
+        );
+        assert!(
+            !scope
+                .matches_request(&req, ForgeExecutionModeV1::Real)
+                .unwrap()
+        );
     }
 
     #[test]
