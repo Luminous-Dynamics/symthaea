@@ -1,0 +1,89 @@
+name: Matter Relativistic Evidence Bindings
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_relativistic.rs'
+      - 'src/knowledge/matter_relativistic_evidence.rs'
+      - 'src/knowledge/mod.rs'
+      - 'crates/core/symthaea-evidence-plane/src/external_receipt.rs'
+      - '.github/workflows/matter-relativistic-evidence.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  relativistic-evidence-bindings:
+    name: Reference-only relativistic execution evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Shared evidence contract and lockfile must remain unchanged from PR base
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          test -z "$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- Cargo.lock crates/core/symthaea-evidence-plane/src/external_receipt.rs)"
+
+      - name: Focused formatting
+        run: cargo fmt --check -p symthaea
+
+      - name: Relativistic evidence-binding regressions
+        run: cargo test --locked -p symthaea --lib knowledge::matter_relativistic_evidence::tests -- --nocapture --test-threads=1
+
+      - name: Relativistic evidence authority ratchet
+        shell: python
+        run: |
+          from pathlib import Path
+
+          src = Path('src/knowledge/matter_relativistic_evidence.rs').read_text()
+          mod = Path('src/knowledge/mod.rs').read_text()
+
+          required = (
+              'pub mod matter_relativistic_evidence;',
+              'RelativisticExecutionReferenceBinding',
+              'RelativisticReferenceDatasetBinding',
+              'EvidenceRole::SolverExecution',
+              'EvidenceRole::ArtifactContent',
+              'ensure_core_identity_distinctness',
+              'ensure_core_content_distinctness',
+              'SemanticSlotIdentityAlias',
+              'SemanticSlotContentAlias',
+              'DuplicateReferenceDatasetContent',
+              'ReferenceDatasetAliasesCoreContent',
+              'DependencyPostdatesExecution',
+              'OutputPredatesExecution',
+              'EvidenceReferenceInterpretation::ReferenceOnly',
+              'DeclaredChronologyInterpretation::DeclaredChronologyOnly',
+          )
+          combined = mod + '\n' + src
+          for token in required:
+              if token not in combined:
+                  raise SystemExit(f'missing relativistic evidence invariant: {token}')
+
+          forbidden = (
+              'VerifiedChronology',
+              'VerifiedExecution',
+              'verified: bool',
+              'is_verified',
+              'ExperimentalAuthority',
+              'promoted_to_experimental',
+              'replication_verified',
+              'confidence:',
+          )
+          for token in forbidden:
+              if token in src:
+                  raise SystemExit(f'forbidden relativistic evidence authority shortcut: {token}')
+
+          if 'does not fetch or re-hash' not in src:
+              raise SystemExit('reference-only non-claim must remain explicit')
+
+          print('relativistic evidence binding authority ratchet passed')

@@ -46,6 +46,7 @@ pub mod manager;
 pub mod matter_evidence_bindings;
 pub mod matter_observatory;
 pub mod matter_relativistic;
+pub mod matter_relativistic_evidence;
 pub mod persistence;
 pub mod reasoning_context;
 #[cfg(feature = "self_schema")]
