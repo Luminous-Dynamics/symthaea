@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symthaea.merge-admission-observation.v2",
+  "title": "Symthaea Merge Admission Observation v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "repository",
+    "target_branch",
+    "current_base_sha",
+    "candidate_head_sha",
+    "candidate_tree_sha",
+    "control_plane",
+    "full_integration"
+  ],
+  "properties": {
+    "schema": {"const": "symthaea.merge-admission-observation.v2"},
+    "repository": {"type": "string", "minLength": 1},
+    "target_branch": {"type": "string", "minLength": 1},
+    "current_base_sha": {"$ref": "#/$defs/objectId"},
+    "candidate_head_sha": {"$ref": "#/$defs/objectId"},
+    "candidate_tree_sha": {"$ref": "#/$defs/objectId"},
+    "control_plane": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/controlPlaneEntry"}
+    },
+    "full_integration": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/fullIntegration"}
+      ]
+    }
+  },
+  "$defs": {
+    "objectId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"
+    },
+    "nullableObjectId": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/objectId"}
+      ]
+    },
+    "controlPlaneEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "base_blob_sha", "candidate_blob_sha"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "base_blob_sha": {"$ref": "#/$defs/nullableObjectId"},
+        "candidate_blob_sha": {"$ref": "#/$defs/nullableObjectId"}
+      }
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["job_id", "name", "status", "conclusion", "skipped"],
+      "properties": {
+        "job_id": {"type": "integer", "minimum": 1},
+        "name": {"type": "string", "minLength": 1},
+        "status": {"type": ["string", "null"]},
+        "conclusion": {"type": ["string", "null"]},
+        "skipped": {"type": "boolean"}
+      }
+    },
+    "fullIntegration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflow_path",
+        "workflow_blob_sha",
+        "run_id",
+        "run_attempt",
+        "event",
+        "status",
+        "conclusion",
+        "head_sha",
+        "base_sha",
+        "job_census_complete",
+        "job_census"
+      ],
+      "properties": {
+        "workflow_path": {"type": "string", "minLength": 1},
+        "workflow_blob_sha": {"$ref": "#/$defs/objectId"},
+        "run_id": {"type": "integer", "minimum": 1},
+        "run_attempt": {"type": "integer", "minimum": 1},
+        "event": {"type": "string", "minLength": 1},
+        "status": {"type": ["string", "null"]},
+        "conclusion": {"type": ["string", "null"]},
+        "head_sha": {"$ref": "#/$defs/objectId"},
+        "base_sha": {"$ref": "#/$defs/objectId"},
+        "job_census_complete": {"type": "boolean"},
+        "job_census": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/job"}
+        }
+      }
+    }
+  }
+}
