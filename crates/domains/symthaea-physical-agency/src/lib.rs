@@ -12,11 +12,12 @@
 //! evidence. It cannot construct actuator commands, depend on HAL, or mint
 //! physical execution authority.
 //!
-//! The public strict-confirmatory facade additionally requires every judged
-//! metric to be part of the exact solver request and binds the complete canonical
-//! claim definition into safety-evidence identity. Lower PA-13/14/15 minting
-//! primitives remain crate-private so callers cannot bypass the stronger v3
-//! contract.
+//! The public strict-confirmatory facade requires every judged metric to be part
+//! of the exact solver request and binds a semantic-canonical complete claim
+//! definition into safety-evidence identity. `AllCriteria` ordering is normalized,
+//! exact duplicate criteria are rejected, and signed zero has one identity.
+//! Lower PA-13/14/15/v3 minting primitives remain crate-private so callers cannot
+//! bypass the stronger v4 contract.
 //!
 //! Capability manifests are declarations used to choose a suitable modelling
 //! path. They are **not** safety evidence and cannot discharge execution gates.
@@ -25,11 +26,12 @@
 //! research path. The PA-11+ strict path is intentionally separate and requires
 //! typed contexts, selection-derived world lineage, preregistered outcome claims,
 //! preregistered safety obligations, independent non-simulation safety evidence,
-//! exact-run simulation evidence, and full claim/request lineage binding.
+//! exact-run simulation evidence, and semantic-canonical claim/request lineage.
 
 #![deny(unsafe_code)]
 
-pub mod confirmatory_contract;
+pub mod confirmatory;
+mod confirmatory_contract;
 pub mod deliberation;
 mod outcome_claim;
 pub mod portfolio;
@@ -40,7 +42,7 @@ mod qualification;
 mod qualification_lineage;
 mod strict_qualification;
 
-pub use confirmatory_contract::{
+pub use confirmatory::{
     CanonicalClaimTranscript, ClaimBoundConfirmatorySimulationQualification,
     ConfirmatoryContractError, canonical_claim_transcript, evaluate_confirmatory_claim,
     prepare_confirmatory_simulation, preregister_confirmatory_safety,
