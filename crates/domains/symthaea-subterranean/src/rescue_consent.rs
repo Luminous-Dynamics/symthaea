@@ -351,7 +351,7 @@ mod tests {
         for i in 0..MAX_RESCUE_CONSENT_RECORDS {
             let statement = RescueConsentStatement {
                 schema_version: RESCUE_CONSENT_SCHEMA_VERSION,
-                subject: AgentId::new((i + 2) as u32),
+                subject: AgentId::new((i + 2) as u64),
                 case_id: RescueCaseId((i + 1) as u64),
                 epoch: 1,
                 sequence: 1,
