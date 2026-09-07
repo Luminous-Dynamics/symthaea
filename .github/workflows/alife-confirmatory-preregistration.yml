@@ -36,6 +36,7 @@ jobs:
           import json
           import math
           import pathlib
+          import subprocess
 
           path = pathlib.Path("crates/domains/symthaea-alife/experiments/repeated_shock_confirmatory_v1.json")
           raw = path.read_bytes()
@@ -46,18 +47,18 @@ jobs:
 
           seed_panel = manifest["seed_panel"]
           assert seed_panel["role"] == "confirmatory_holdout"
-          assert seed_panel["count"] == 16
+          assert seed_panel["count"] == 40
           assert seed_panel["derivation"]["domain"] == "symthaea-alife-repeated-shock-confirmatory-v1"
           assert seed_panel["derivation"]["hand_selected"] is False
 
           domain = seed_panel["derivation"]["domain"]
           regenerated = []
-          for counter in range(16):
+          for counter in range(40):
               digest = hashlib.sha256(f"{domain}:{counter}".encode("utf-8")).digest()
               seed = int.from_bytes(digest[:8], "little")
               regenerated.append(seed if seed != 0 else 1)
           assert seed_panel["seeds"] == regenerated
-          assert len(set(regenerated)) == 16
+          assert len(set(regenerated)) == 40
           assert set(regenerated).isdisjoint({1, 2, 3, 4, 5, 6, 7, 8})
 
           pre = manifest["execution_preconditions"]
@@ -117,35 +118,57 @@ jobs:
           assert primary["alternative"] == "positive_directional_tendency"
           assert primary["alpha_numerator"] == 1
           assert primary["alpha_denominator"] == 20
-          assert primary["missingness_policy"] == "require_all_16_primary_outcomes"
+          assert primary["missingness_policy"] == "require_all_40_primary_outcomes"
           assert primary["tie_policy"] == "exact_zero_excluded_from_binomial_denominator"
           assert primary["secondary_metric_p_values"] is False
 
           freeze = manifest["analysis_freeze"]
           assert all(freeze.values())
 
-          # Descriptive design fact: with all 16 outcomes non-tied, 12 positive is the first
-          # count whose exact one-sided Binomial(16, 0.5) tail is <= 0.05.
+          n = 40
+          denominator = 2**n
           threshold = None
           threshold_num = None
-          denominator = 2**16
-          for positive in range(17):
-              numerator = sum(math.comb(16, k) for k in range(positive, 17))
+          for positive in range(n + 1):
+              numerator = sum(math.comb(n, k) for k in range(positive, n + 1))
               if 20 * numerator <= denominator:
                   threshold = positive
                   threshold_num = numerator
                   break
-          assert threshold == 12
+          assert threshold == 26
+          assert threshold_num == 44_360_053_772
+          assert denominator == 1_099_511_627_776
+
+          power = manifest["power_design"]
+          assert power["computed_before_discovery_outcome_observation"] is True
+          assert power["assumes_all_40_outcomes_non_tied"] is True
+          assert power["minimum_positive_for_alpha_0_05"] == threshold
+          assert power["exact_null_tail_at_threshold"] == {
+              "numerator": threshold_num,
+              "denominator": denominator,
+          }
+
+          expected_power = {}
+          for p in (0.60, 0.65, 0.70, 0.75, 0.80):
+              value = sum(
+                  math.comb(n, k) * (p**k) * ((1.0 - p)**(n - k))
+                  for k in range(threshold, n + 1)
+              )
+              expected_power[f"{p:.2f}"] = value
+          for key, expected in expected_power.items():
+              observed = power["prospective_power_by_true_positive_probability"][key]
+              assert abs(observed - expected) < 1e-15
 
           evidence = {
-              "git_sha": __import__("subprocess").check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
               "manifest_sha256": hashlib.sha256(raw).hexdigest(),
               "seed_panel_sha256": hashlib.sha256(json.dumps(regenerated, separators=(",", ":")).encode()).hexdigest(),
-              "holdout_seed_count": 16,
+              "holdout_seed_count": 40,
               "discovery_seed_overlap": 0,
               "all_non_tied_minimum_positive_for_alpha_0_05": threshold,
               "all_non_tied_tail_numerator_at_threshold": threshold_num,
               "all_non_tied_denominator": denominator,
+              "prospective_power": expected_power,
               "executed": False,
           }
           pathlib.Path("target/alife-confirmatory-preregistration/verification.json").write_text(
