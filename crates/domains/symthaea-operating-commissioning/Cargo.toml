@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-operating-commissioning"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Commissioning/configuration binding for locally autonomous operating safety"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["infrastructure", "safety", "commissioning", "autonomy"]
+categories = ["science", "simulation"]
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-operating-autonomy = { path = "../symthaea-operating-autonomy" }
+symthaea-operating-authority = { path = "../symthaea-operating-authority" }
+symthaea-operating-envelope = { path = "../symthaea-operating-envelope" }
+symthaea-resource-hierarchy = { path = "../symthaea-resource-hierarchy" }
+
+[dev-dependencies]
+symthaea-resource-model = { path = "../symthaea-resource-model" }
