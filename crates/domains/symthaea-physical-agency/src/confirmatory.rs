@@ -12,6 +12,10 @@
 //! normal form: metric units remain typed only as strings and logically
 //! redundant-but-distinct criteria are still represented explicitly.
 //!
+//! The strict v4 profile also requires every preregistered Simulation safety
+//! obligation to cite the exact v4 confirmatory lineage. Additional simulation
+//! runs need a future typed multi-run evidence contract rather than opaque refs.
+//!
 //! The earlier v3 facade remains crate-private for regression coverage. External
 //! callers therefore cannot mint qualification from its order-sensitive claim
 //! transcript.
@@ -163,27 +167,58 @@ pub fn required_confirmatory_safety_evidence_ref(
     Ok(reference)
 }
 
-/// Qualify only when the completed preregistered SafetyCase cites v4.
+/// Qualify only when every preregistered Simulation obligation cites v4.
 ///
 /// The crate-private v3 facade is satisfied only on an ephemeral clone so the
-/// weaker v3 label never becomes externally sufficient evidence.
+/// weaker v3 label never becomes externally sufficient evidence. The current
+/// strict profile does not accept opaque neighboring simulation receipts for
+/// additional Simulation obligations; those require a future typed multi-run
+/// evidence contract.
 pub fn qualify_confirmatory_simulation(
     evidence: &SafetyPreregisteredConfirmatoryEvidence,
     satisfied: &SatisfiedSimulationClaim,
     completed_safety_case: &SafetyCase,
 ) -> Result<ClaimBoundConfirmatorySimulationQualification, ConfirmatoryContractError> {
     let required_v4 = required_confirmatory_safety_evidence_ref(evidence, satisfied)?;
-    let Some(index) = completed_safety_case
-        .obligations
+    let mut first_simulation_index = None;
+
+    for frozen in evidence
+        .safety_plan()
+        .obligations()
         .iter()
-        .position(|obligation| {
-            obligation.expected_evidence == EvidenceKind::Simulation
-                && obligation
-                    .evidence_refs
-                    .iter()
-                    .any(|reference| reference == &required_v4)
-        })
-    else {
+        .filter(|obligation| obligation.expected_evidence() == EvidenceKind::Simulation)
+    {
+        let Some((index, actual)) = completed_safety_case
+            .obligations
+            .iter()
+            .enumerate()
+            .find(|(_, obligation)| obligation.id.to_string() == frozen.id())
+        else {
+            return Err(
+                ConfirmatoryContractError::SimulationObligationMissingNormalizedEvidence(
+                    frozen.id().to_string(),
+                ),
+            );
+        };
+
+        if !actual
+            .evidence_refs
+            .iter()
+            .any(|reference| reference == &required_v4)
+        {
+            return Err(
+                ConfirmatoryContractError::SimulationObligationMissingNormalizedEvidence(
+                    frozen.id().to_string(),
+                ),
+            );
+        }
+
+        if first_simulation_index.is_none() {
+            first_simulation_index = Some(index);
+        }
+    }
+
+    let Some(index) = first_simulation_index else {
         return Err(ConfirmatoryContractError::MissingNormalizedClaimBoundSafetyEvidence);
     };
 
@@ -456,6 +491,8 @@ pub enum ConfirmatoryContractError {
     DuplicateClaimCriterion,
     #[error("all_criteria claim is unsatisfiable for metric {metric_name:?} unit {unit:?}")]
     UnsatisfiableClaim { metric_name: String, unit: String },
+    #[error("preregistered Simulation obligation {0:?} does not cite normalized-canonical v4 lineage")]
+    SimulationObligationMissingNormalizedEvidence(String),
     #[error("completed safety case does not cite normalized-canonical v4 simulation lineage")]
     MissingNormalizedClaimBoundSafetyEvidence,
     #[error("private v3 structural qualification unexpectedly lacked its exact simulation lineage")]
