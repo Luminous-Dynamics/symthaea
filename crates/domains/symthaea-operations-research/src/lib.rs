@@ -3,17 +3,20 @@
 
 //! # symthaea-operations-research
 //!
-//! Operations research for Symthaea: inventory optimization, queueing, and
-//! shortest paths. A practical decision-science layer the workspace lacked.
+//! Operations research for Symthaea: inventory optimization, queueing, shortest
+//! paths, and deterministic multi-objective Pareto ranking. A practical
+//! decision-science layer the workspace lacked.
 //!
-//! Pure `std`, zero dependencies, no `symthaea-core` link. Closed-form results
-//! and an exact Dijkstra, checked against known values.
+//! Pure `std`, zero dependencies, no `symthaea-core` link. Closed-form results,
+//! an exact Dijkstra, and deterministic non-dominated sorting checked against
+//! known values.
 //!
 //! ## Scope
 //!
 //! - [`inventory`]: economic order quantity (EOQ) + total cost.
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
+//! - [`pareto`]: deterministic non-dominated sorting without weighted-score collapse.
 //!
 //! ## Example
 //!
@@ -25,8 +28,13 @@
 
 pub mod graph;
 pub mod inventory;
+pub mod pareto;
 pub mod queue;
 
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
+pub use pareto::{
+    Candidate as ParetoCandidate, Objective as ParetoObjective, ObjectiveDirection, ParetoError,
+    ParetoRanking, dominates, rank_pareto,
+};
 pub use queue::MM1;
