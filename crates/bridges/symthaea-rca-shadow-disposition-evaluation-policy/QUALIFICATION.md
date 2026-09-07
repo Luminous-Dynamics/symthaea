@@ -37,17 +37,18 @@ Hosted qualification must establish:
 7. every frozen rule maps to exactly one frozen primary class;
 8. the frozen decision lattice is total over all 72 predicate states admissible under `S => TS` and `O => TO`;
 9. qualified defeater precedes contestation and unilateral outcomes in the frozen rule table;
-10. bilateral qualifying disagreement precedes unilateral support/opposition outcomes;
-11. no vote/count-margin/relation-strength/posterior tie-breaker enters the engine contract;
-12. exact identity, slot, predicate, rule, and primary-class trace fields are profile-bearing;
-13. drift in preflight, decision semantics, rule meaning, or trace schema requires a new evaluation-policy identity;
-14. domain-separated serializer-independent BLAKE3 identities;
-15. persistence revalidates nested effective policy and all current profile contracts;
-16. tampered preflight/engine profile or identity state fails closed;
-17. no result-bearing artifact instance input exists;
-18. no production classifier/disposition or downstream authority exists;
-19. automatic workflow runs supersede stale copies while manual historical `workflow_dispatch` runs remain independent;
-20. rustfmt, tests, and strict Clippy pass.
+10. `QualifiedContestation` requires `CS && CO && TS && TO`, so contested-side topology cannot bypass tentative qualification on either side;
+11. bilateral qualifying disagreement precedes unilateral support/opposition outcomes;
+12. no vote/count-margin/relation-strength/posterior tie-breaker enters the engine contract;
+13. exact identity, slot, predicate, rule, and primary-class trace fields are profile-bearing;
+14. drift in preflight, decision semantics, rule meaning, or trace schema requires a new evaluation-policy identity;
+15. domain-separated serializer-independent BLAKE3 identities;
+16. persistence revalidates nested effective policy and all current profile contracts;
+17. tampered preflight/engine profile or identity state fails closed;
+18. no result-bearing artifact instance input exists;
+19. no production classifier/disposition or downstream authority exists;
+20. automatic workflow runs supersede stale copies while manual historical `workflow_dispatch` runs remain independent;
+21. rustfmt, tests, and strict Clippy pass.
 
 ## Required negative checks
 
@@ -61,6 +62,7 @@ Qualification must fail if this crate gains:
 - a production evaluate/decide/dispose/classify/issue-disposition API;
 - a `ShadowDispositionV1` or equivalent result-bearing output;
 - executable threshold comparison/classification logic outside `#[cfg(test)]` contract proofs;
+- a `Contested` rule that can succeed without both tentative-side predicates;
 - count-margin, majority-vote, relation-strength, Bayesian/posterior, or winner-take-all arithmetic;
 - canonical belief, workspace/GWT, action, or self-improvement promotion authority;
 - deserialization that skips full re-registration and current engine-contract recomputation.
