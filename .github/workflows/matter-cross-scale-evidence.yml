@@ -1,0 +1,91 @@
+name: Matter Cross-Scale Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_cross_scale.rs'
+      - 'src/knowledge/mod.rs'
+      - 'crates/domains/symthaea-epistemic-types/src/matter.rs'
+      - 'crates/domains/symthaea-epistemic-types/src/global_ledger.rs'
+      - '.github/workflows/matter-cross-scale-evidence.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  cross-scale-evidence:
+    name: Monotone Matter evidence propagation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Canonical epistemic types and lockfile must remain unchanged from PR base
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          test -z "$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- Cargo.lock crates/domains/symthaea-epistemic-types/src/matter.rs crates/domains/symthaea-epistemic-types/src/global_ledger.rs)"
+
+      - name: Focused formatting
+        run: cargo fmt --check -p symthaea
+
+      - name: Cross-scale evidence regressions
+        run: cargo test --locked -p symthaea --lib knowledge::matter_cross_scale::tests -- --nocapture --test-threads=1
+
+      - name: Cross-scale authority semantic ratchet
+        shell: python
+        run: |
+          from pathlib import Path
+
+          src = Path('src/knowledge/matter_cross_scale.rs').read_text()
+          mod = Path('src/knowledge/mod.rs').read_text()
+
+          required = (
+              'pub mod matter_cross_scale;',
+              'MatterAuthorityCeiling',
+              'MatterTransitionSupport',
+              'SupportedInDomain',
+              'SupportedOutOfDomain',
+              'Unsupported',
+              'MissingEvidence',
+              'CrossScaleDecision::Refused',
+              'min(self.coordinate.empirical, claim.epistemic.empirical)',
+              'min(self.coordinate.normative, claim.epistemic.normative)',
+              'min(self.coordinate.materiality, claim.epistemic.materiality)',
+              'AuthorityEscalation',
+              'OutOfDomainTransitionMissingMarker',
+              'OutOfDomainStatusNotPropagated',
+              'DerivedClaimCannotMintObservation',
+              'validation_stage.is_local_computational()',
+          )
+          combined = mod + '\n' + src
+          for token in required:
+              if token not in combined:
+                  raise SystemExit(f'missing cross-scale evidence invariant: {token}')
+
+          forbidden = (
+              'authority_score',
+              'average_authority',
+              'mean_authority',
+              'weighted_authority',
+              'upgrade_authority',
+              'promote_authority',
+              'confidence_threshold',
+              'MatterValidationStage as u8',
+          )
+          lowered = src.lower()
+          for token in forbidden:
+              if token.lower() in lowered:
+                  raise SystemExit(f'forbidden cross-scale authority shortcut: {token}')
+
+          if 'Validation stages are deliberately not ranked or averaged' not in src:
+              raise SystemExit('non-ranked validation-stage boundary must remain explicit')
+
+          print('cross-scale evidence monotonicity ratchet passed')

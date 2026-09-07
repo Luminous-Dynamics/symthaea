@@ -42,6 +42,7 @@ pub mod graph;
 pub mod hdc_retrieval;
 pub mod llm_extraction;
 pub mod manager;
+pub mod matter_cross_scale;
 #[cfg(feature = "nuclear")]
 pub mod matter_evidence_bindings;
 pub mod matter_observatory;
