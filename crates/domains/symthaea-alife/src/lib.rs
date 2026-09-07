@@ -36,6 +36,7 @@ pub mod genome;
 pub mod hierarchy;
 pub mod ledger;
 pub mod lifecycle;
+pub mod lifecycle_recorder;
 pub mod ma001;
 pub mod ma001l;
 pub mod ma001r;
@@ -69,6 +70,7 @@ pub use lifecycle::{
     LifecycleError, LifecycleEventV1, LifecycleLedgerV1, LifecycleTransitionV1,
     analyze_lifecycle_events,
 };
+pub use lifecycle_recorder::{LifecycleRecorderErrorV1, LifecycleRecorderV1};
 pub use metabolism::{
     K_ALIFE_BOLTZMANN, landauer_minimum, prigogine_dissipation_cost, shannon_entropy_bits,
 };
