@@ -14,7 +14,10 @@
       "scripts/ci/ci_lifecycle_jobs_v1.json",
       "scripts/ci/validate_ci_lifecycle_registry.py",
       "scripts/ci/apply_ci_lifecycle_tiering.py",
-      "docs/operations/CI_LIFECYCLE_TIERING_V1.md"
+      "docs/operations/CI_LIFECYCLE_TIERING_V1.md",
+      "scripts/ci/merge_admission_policy_v1.json",
+      "scripts/ci/evaluate_merge_admission.py",
+      "docs/operations/MERGE_ADMISSION_RECEIPT_V1.md"
     ],
     "candidate_changes_require_independent_bootstrap": true
   },
