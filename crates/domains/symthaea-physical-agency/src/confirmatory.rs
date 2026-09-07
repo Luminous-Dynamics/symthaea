@@ -36,7 +36,7 @@ use crate::safety_preregistration::{
 use crate::strict_context::StrictSimulationRegistry;
 use std::collections::BTreeMap;
 use symthaea_formal_safety::{EvidenceKind, SafetyCase};
-use symthaea_sim_bridge::SimulationRequest;
+use symthaea_sim_bridge::{SimulationMetric, SimulationRequest};
 use thiserror::Error;
 
 const NORMALIZED_CLAIM_TRANSCRIPT_DOMAIN: &[u8] =
@@ -168,7 +168,49 @@ pub fn run_preregistered_safety_confirmatory_simulation(
 pub fn evaluate_confirmatory_claim(
     evidence: &ConfirmatorySimulationEvidence,
 ) -> Result<ConfirmatoryClaimOutcome, ConfirmatoryContractError> {
+    validate_claimed_metric_interval_consistency(evidence)?;
     Ok(v3::evaluate_confirmatory_claim(evidence)?)
+}
+
+fn validate_claimed_metric_interval_consistency(
+    evidence: &ConfirmatorySimulationEvidence,
+) -> Result<(), ConfirmatoryContractError> {
+    let result = evidence.selection_evidence().validated().result();
+
+    for criterion in &evidence.claim().criteria {
+        let mut matching = result.metrics.iter().filter(|metric| {
+            metric.name == criterion.metric_name && metric.unit == criterion.unit
+        });
+        let Some(metric) = matching.next() else {
+            continue;
+        };
+        if matching.next().is_some() {
+            continue;
+        }
+        validate_metric_interval_consistency(metric)?;
+    }
+
+    Ok(())
+}
+
+fn validate_metric_interval_consistency(
+    metric: &SimulationMetric,
+) -> Result<(), ConfirmatoryContractError> {
+    let Some(interval) = metric.uncertainty.and_then(|uncertainty| uncertainty.interval) else {
+        return Ok(());
+    };
+
+    if !interval.contains(metric.value) {
+        return Err(ConfirmatoryContractError::MetricEstimateOutsideInterval {
+            metric_name: metric.name.clone(),
+            unit: metric.unit.clone(),
+            value: metric.value,
+            lower: interval.lower,
+            upper: interval.upper,
+        });
+    }
+
+    Ok(())
 }
 
 /// Normalized-canonical v4 evidence reference.
@@ -515,6 +557,14 @@ pub enum ConfirmatoryContractError {
     UnsatisfiableClaim { metric_name: String, unit: String },
     #[error("strict v4 preregistration permits exactly one Simulation obligation; found {0}")]
     MultipleSimulationObligationsRequireTypedBindings(usize),
+    #[error("claimed metric {metric_name:?} unit {unit:?} reports estimate {value} outside uncertainty interval [{lower}, {upper}]")]
+    MetricEstimateOutsideInterval {
+        metric_name: String,
+        unit: String,
+        value: f64,
+        lower: f64,
+        upper: f64,
+    },
     #[error("preregistered Simulation obligation {0:?} does not cite normalized-canonical v4 lineage")]
     SimulationObligationMissingNormalizedEvidence(String),
     #[error("completed safety case does not cite normalized-canonical v4 simulation lineage")]
@@ -557,6 +607,7 @@ impl From<OutcomeClaimError> for ConfirmatoryContractError {
 mod tests {
     use super::*;
     use crate::{MetricUncertaintyPolicy, SimulationOutcomeClaim};
+    use symthaea_sim_bridge::{Interval, UncertaintyEstimate};
 
     fn criterion(metric: &str, predicate: MetricPredicate) -> MetricCriterion {
         MetricCriterion {
@@ -662,6 +713,37 @@ mod tests {
             ),
         ]);
         assert!(canonical_claim_transcript(&feasible).is_ok());
+    }
+
+    #[test]
+    fn claimed_metric_estimate_must_lie_inside_its_interval() {
+        let metric = SimulationMetric {
+            name: "quality".into(),
+            value: 0.1,
+            unit: "1".into(),
+            uncertainty: Some(
+                UncertaintyEstimate::new(0.1, 0.1).with_interval(Interval::new(0.9, 1.0)),
+            ),
+        };
+
+        assert!(matches!(
+            validate_metric_interval_consistency(&metric),
+            Err(ConfirmatoryContractError::MetricEstimateOutsideInterval { .. })
+        ));
+    }
+
+    #[test]
+    fn claimed_metric_estimate_inside_interval_is_consistent() {
+        let metric = SimulationMetric {
+            name: "quality".into(),
+            value: 0.95,
+            unit: "1".into(),
+            uncertainty: Some(
+                UncertaintyEstimate::new(0.1, 0.1).with_interval(Interval::new(0.9, 1.0)),
+            ),
+        };
+
+        assert!(validate_metric_interval_consistency(&metric).is_ok());
     }
 
     #[test]
