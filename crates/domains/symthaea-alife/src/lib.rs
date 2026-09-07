@@ -44,6 +44,7 @@ pub mod perturbation;
 pub mod population;
 pub mod predator_prey;
 pub mod repeat_shock;
+pub mod repeat_shock_did;
 pub mod types;
 
 pub use agent_id::{AgentId, AgentIdAllocator};
@@ -77,5 +78,9 @@ pub use predator_prey::{PredatorPreyConfig, PredatorPreySim, PredatorPreyStep};
 pub use repeat_shock::{
     RepeatShockErrorV1, RepeatShockLatencyV1, RepeatShockTransferV1,
     RepeatShockTransferVerdictV1, compare_repeated_shocks,
+};
+pub use repeat_shock_did::{
+    RepeatedShockDidErrorV1, RepeatedShockDidV1, RepeatedShockDidVerdictV1,
+    compare_repeated_shock_did,
 };
 pub use types::BoundaryModulators;
