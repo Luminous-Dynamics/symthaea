@@ -21,7 +21,7 @@ pub const SHADOW_DISPOSITION_ENGINE_CONTRACT_V1: &str = concat!(
     "contract_precedes_result_bearing_engine_implementation\n",
     "future_input=registered_evaluation_policy+lineage_bound_preflight+exact_evidence_witness_slots+exact_interpretation_witness_slots\n",
     "future_engine_must_not_accept_raw_case_raw_preflight_eligibility_lineage_or_experiment_as_separate_inputs\n",
-    "identity_join=effective_policy_id+raw_preflight_profile+lineage_bound_preflight_profile+exact_embedded_witness_ids\n",
+    "identity_join=evaluation_policy_engine_contract+effective_policy+preflight_profiles+exact_embedded_witness_ids\n",
     "invalid_identity_profile_or_witness_join_is_engine_error_not_epistemic_outcome\n",
     "evidence_cardinality=one_exact_issued_evidence_witness_item_count_per_slot\n",
     "interpretation_cardinality=one_exact_issued_interpretation_witness_root_count_per_slot\n",
@@ -35,7 +35,8 @@ pub const SHADOW_DISPOSITION_ENGINE_CONTRACT_V1: &str = concat!(
     "bilateral_tentative_or_stronger_disagreement_below_contestation=underdetermined\n",
     "count_margin_vote_strength_posterior_and_winner_take_all_tiebreakers_forbidden\n",
     "unknown_interpretation_independence_is_scoped_to_witness_that_requires_it_not_global_case_poison\n",
-    "reason_trace=typed_predicates+typed_rule_id+primary_class+identity_lineage+slot_cardinalities\n",
+    "reason_trace_fields_are_exact_and_profile_bearing\n",
+    "reason_trace=identity_lineage+slot_facts+typed_predicates+typed_rule_id+primary_class\n",
     "reason_trace_preserves_all_simultaneously_true_predicates_under_higher_precedence_rule\n",
     "result_identity=domain_separated_serializer_independent_complete_normalized_result_v1\n",
     "future_issued_result=private_serialize_only_recompute_for_current_result\n",
@@ -98,14 +99,50 @@ pub const SHADOW_DISPOSITION_PREDICATE_TAGS_V1: &[&str] = &[
     "opposition_tentative_qualified",
 ];
 
+/// Exact identity/provenance fields retained in every future result reason trace.
+pub const SHADOW_DISPOSITION_IDENTITY_TRACE_TAGS_V1: &[&str] = &[
+    "engine_implementation_profile_digest",
+    "engine_contract_profile_digest",
+    "evaluation_policy_id",
+    "effective_policy_id",
+    "base_policy_id",
+    "lineage_bound_preflight_binding_id",
+    "raw_preflight_id",
+    "proposition_id",
+    "case_id",
+    "canonical_evidence_lineage_graph_id",
+    "registered_experiment_contract_digest",
+];
+
+/// Exact per-slot evidence/interpretation cardinality facts retained in every
+/// future result reason trace.
+pub const SHADOW_DISPOSITION_SLOT_TRACE_TAGS_V1: &[&str] = &[
+    "support_evidence_witness_id",
+    "support_evidence_item_count",
+    "support_interpretation_witness_id",
+    "support_interpretation_root_count",
+    "opposition_evidence_witness_id",
+    "opposition_evidence_item_count",
+    "opposition_interpretation_witness_id",
+    "opposition_interpretation_root_count",
+    "defeater_evidence_witness_id",
+    "defeater_evidence_item_count",
+    "defeater_interpretation_witness_id",
+    "defeater_interpretation_root_count",
+];
+
+/// Exact final decision fields retained in every future result reason trace.
+pub const SHADOW_DISPOSITION_DECISION_TRACE_TAGS_V1: &[&str] =
+    &["decision_rule_id", "primary_class"];
+
 const PROFILE_DOMAIN: &[u8] = b"symthaea:rca-pure-shadow-disposition-engine-contract:v1\0";
 
 /// Content identity for the exact non-result-bearing engine semantics.
 ///
 /// The digest binds the normative contract and every stable machine-readable tag
-/// table. Changing taxonomy, predicates, rule IDs, precedence, or rule meaning
-/// therefore requires a new evaluation-policy identity before any result-bearing
-/// engine may run.
+/// table. Changing taxonomy, predicates, rule IDs, precedence, rule meaning, or
+/// reason-trace schema therefore requires a new evaluation-policy identity before
+/// any result-bearing engine may run.
 pub fn shadow_disposition_engine_contract_profile_digest_v1() -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(PROFILE_DOMAIN);
@@ -143,6 +180,21 @@ pub fn shadow_disposition_engine_contract_profile_digest_v1() -> String {
         &mut hasher,
         b"predicate_tags",
         SHADOW_DISPOSITION_PREDICATE_TAGS_V1,
+    );
+    hash_tags(
+        &mut hasher,
+        b"identity_trace_tags",
+        SHADOW_DISPOSITION_IDENTITY_TRACE_TAGS_V1,
+    );
+    hash_tags(
+        &mut hasher,
+        b"slot_trace_tags",
+        SHADOW_DISPOSITION_SLOT_TRACE_TAGS_V1,
+    );
+    hash_tags(
+        &mut hasher,
+        b"decision_trace_tags",
+        SHADOW_DISPOSITION_DECISION_TRACE_TAGS_V1,
     );
     format!("blake3:{}", hasher.finalize().to_hex())
 }
@@ -245,6 +297,19 @@ mod tests {
             );
             assert!(SHADOW_DISPOSITION_CLASS_TAGS_V1.contains(&class_for_rule(rule)));
         }
+    }
+
+    #[test]
+    fn reason_trace_schema_is_exact_and_identity_bearing() {
+        assert!(SHADOW_DISPOSITION_IDENTITY_TRACE_TAGS_V1.contains(&"evaluation_policy_id"));
+        assert!(SHADOW_DISPOSITION_IDENTITY_TRACE_TAGS_V1.contains(&"case_id"));
+        assert!(SHADOW_DISPOSITION_IDENTITY_TRACE_TAGS_V1
+            .contains(&"canonical_evidence_lineage_graph_id"));
+        assert_eq!(SHADOW_DISPOSITION_SLOT_TRACE_TAGS_V1.len(), 12);
+        assert_eq!(
+            SHADOW_DISPOSITION_DECISION_TRACE_TAGS_V1,
+            &["decision_rule_id", "primary_class"]
+        );
     }
 
     #[test]
