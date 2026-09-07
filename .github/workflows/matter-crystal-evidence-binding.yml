@@ -1,0 +1,78 @@
+name: Matter Crystal Evidence Binding
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_crystal_evidence_binding.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-crystal-evidence-binding.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crystal-evidence-binding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify child scope and no parent drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='ce9dae73b66a105dc43c948da318333443a91a95'
+          test -z "$(git diff --name-only "$BASE"...HEAD -- Cargo.lock Cargo.toml)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- crates/core/symthaea-evidence-plane/src/external_receipt.rs)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- src/knowledge/matter_crystal_phase.rs crates/domains/symthaea-materials/src/compound_stability.rs)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- src/knowledge/matter_cross_scale.rs src/knowledge/matter_cross_scale_lineage.rs src/knowledge/matter_relativistic.rs src/knowledge/matter_relativistic_evidence.rs)"
+
+      - name: Ratchet canonical preregistration binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_crystal_evidence_binding.rs
+          grep -q 'EvidenceRole::Preregistration' "$FILE"
+          grep -q 'EvidenceReferenceInterpretation::ReferenceOnly' "$FILE"
+          grep -q 'content_sha256' "$FILE"
+          grep -q 'criterion_bindings.len() != 3' "$FILE"
+          grep -q 'MissingSolverProfile' "$FILE"
+          grep -q 'EmptySolverField' "$FILE"
+          grep -q 'StoredCriterionNotMet' "$FILE"
+          grep -q 'enforce_derived_computational_claim' "$FILE"
+          grep -q 'UpstreamAuthorityCeilingMismatch' "$FILE"
+          grep -q 'UpstreamLineageMismatch' "$FILE"
+          grep -q 'bind_relativistic_execution_references' "$FILE"
+          grep -q 'RelativisticBindingMismatch' "$FILE"
+          if grep -q 'require_preregistration_before' "$FILE"; then
+            echo 'crystal evidence lacks universal solver execution chronology; do not fabricate preregistration-before-execution proof' >&2
+            exit 1
+          fi
+          if grep -Eq 'VerifiedChronology|VerifiedPreregistration|ExperimentallyObserved|IndependentlyReplicated' "$FILE"; then
+            echo 'reference binding must not mint stronger chronology/experimental authority' >&2
+            exit 1
+          fi
+
+      - name: Ratchet one public binding surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '^pub mod matter_crystal_evidence_binding;' src/knowledge/mod.rs
+          if grep -q '^pub mod matter_crystal_evidence;' src/knowledge/mod.rs; then
+            echo 'alternate public crystal evidence binder detected' >&2
+            exit 1
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Crystal evidence binding regression tests
+        run: cargo test --locked --lib knowledge::matter_crystal_evidence_binding::tests
