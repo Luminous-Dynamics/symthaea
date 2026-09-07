@@ -1,0 +1,84 @@
+diff --git a/crates/domains/symthaea-broca/src/formal_logic_scorer.rs b/crates/domains/symthaea-broca/src/formal_logic_scorer.rs
+--- a/crates/domains/symthaea-broca/src/formal_logic_scorer.rs
++++ b/crates/domains/symthaea-broca/src/formal_logic_scorer.rs
+@@ -8,8 +8,9 @@
+ //! Returns a formal_correctness score (0.0–1.0) that is injected into
+ //! ThoughtChannels and used by CodeGate + reward shaping.
+ //!
+-//! This completes "Absolute Correctness": the system doesn't just
+-//! "look correct" — it can *prove* it.
++//! Lean process success is necessary but not sufficient for verification:
++//! generated scripts containing an admission (`sorry`) are explicitly
++//! non-proofs and must never receive formal-verification credit.
+ 
+ use std::path::PathBuf;
+ use symthaea_core::hdc::fol_formula_ext::FolFormulaExt;
+@@ -27,6 +28,10 @@
+     pub proof_script: String, // emitted Lean source
+     pub verified: bool,
+     pub logic: String, // detected SMT fragment or "propositional"
++}
++
++fn lean_source_contains_admission(source: &str) -> bool {
++    source.lines().any(|line| line.trim() == "sorry")
+ }
+ 
+ /// FormalLogicScorer — the E-axis component.
+@@ -56,6 +61,7 @@
+         let lean_source = render_fol_ext_file(theorem_name, spec);
+ 
+         // 2. Write to temp file and run lean check
++        let contains_admission = lean_source_contains_admission(&lean_source);
+         let tmp = NamedTempFile::new_in(&self.temp_dir).unwrap();
+         std::fs::write(tmp.path(), &lean_source).unwrap();
+ 
+@@ -72,10 +78,11 @@
+         // (0.6 * the 25% weight) into every training reward regardless of
+         // whether the generated code is actually correct.
+         let (score, verified) = match outcome {
+-            CheckOutcome::Accepted => (1.0, true),
+-            CheckOutcome::Rejected(_) => (0.0, false),
+-            CheckOutcome::LeanNotInstalled => (0.0, false),
+-            CheckOutcome::ProcessError(_) => (0.0, false),
++            CheckOutcome::Accepted if !contains_admission => (1.0, true),
++            CheckOutcome::Accepted
++            | CheckOutcome::Rejected(_)
++            | CheckOutcome::LeanNotInstalled
++            | CheckOutcome::ProcessError(_) => (0.0, false),
+         };
+ 
+         FormalVerificationResult {
+@@ -94,6 +101,7 @@
+         smtlib: &str,
+     ) -> FormalVerificationResult {
+         let script = lean_from_z3(theorem_name, lean_statement, smtlib);
++        let contains_admission = script.contains_sorry();
+         let lean_source = script.to_lean();
+ 
+         let tmp = NamedTempFile::new_in(&self.temp_dir).unwrap();
+@@ -101,7 +109,7 @@
+ 
+         let outcome = check_with_lean4(tmp.path());
+         let (score, verified) = match outcome {
+-            CheckOutcome::Accepted => (1.0, true),
++            CheckOutcome::Accepted if !contains_admission => (1.0, true),
+             _ => (0.0, false),
+         };
+ 
+@@ -137,6 +145,16 @@
+         assert_eq!(result.score, 0.0);
+         assert!(!result.verified);
+     }
++
++    #[test]
++    fn admission_detection_ignores_comments_but_rejects_tactic_line() {
++        assert!(lean_source_contains_admission(
++            "theorem t : P := by\n  sorry\n"
++        ));
++        assert!(!lean_source_contains_admission(
++            "-- sorry is discussed here\ntheorem t : True := by\n  trivial\n"
++        ));
++    }
+ }
+ 
+ impl Default for FormalLogicScorer {
