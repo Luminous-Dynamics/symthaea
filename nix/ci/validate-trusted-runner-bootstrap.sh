@@ -64,6 +64,7 @@ refresh_public_refs() {
 
 refresh_public_refs
 main_head_start="$(git rev-parse refs/remotes/origin/main)"
+main_tree_start="$(git rev-parse refs/remotes/origin/main^{tree})"
 recovery_head_start="$(git rev-parse "refs/remotes/origin/${RECOVERY_BRANCH}")"
 
 if [[ "$recovery_head_start" != "$EXPECTED_HEAD" ]]; then
@@ -127,14 +128,21 @@ flake_lock_sha256="$(sha256sum flake.lock | awk '{print $1}')"
 rust_toolchain_sha256="$(sha256sum rust-toolchain.toml | awk '{print $1}')"
 nixpkgs_rev="$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
 rust_channel="$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
+host_nix_system="$(nix eval --raw --impure --expr builtins.currentSystem)"
+host_nix_version="$(nix --version | awk '{print $3}')"
 
 printf 'bootstrap_authorized_head=%s\n' "$EXPECTED_HEAD"
 printf 'bootstrap_recovery_head=%s\n' "$recovery_head_start"
 printf 'bootstrap_main_head=%s\n' "$main_head_start"
+printf 'bootstrap_main_tree=%s\n' "$main_tree_start"
 printf 'bootstrap_source_tree=%s\n' "$initial_tree"
+printf 'bootstrap_promotion_required_ancestor=%s\n' "$EXPECTED_HEAD"
+printf 'bootstrap_promotion_expected_main_tree=%s\n' "$initial_tree"
 printf 'bootstrap_diff_paths_sha256=%s\n' "$diff_paths_sha256"
 printf 'bootstrap_nixpkgs_rev=%s\n' "$nixpkgs_rev"
 printf 'bootstrap_rust_channel=%s\n' "$rust_channel"
+printf 'bootstrap_host_nix_system=%s\n' "$host_nix_system"
+printf 'bootstrap_host_nix_version=%s\n' "$host_nix_version"
 printf 'bootstrap_host_lifecycle_contract_blob=%s\n' "$host_lifecycle_contract_blob"
 
 # These evaluations contact no GitHub API and consume no runner credential.
@@ -207,9 +215,9 @@ git merge-base --is-ancestor "$main_head_end" "$recovery_head_end" || {
   exit 1
 }
 
-manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v1.XXXXXX)"
+manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v4.XXXXXX)"
 cat > "$manifest" <<EOF
-schema=symthaea.trusted-runner.bootstrap.v3
+schema=symthaea.trusted-runner.bootstrap.v4
 result=PASS
 repository=$REPOSITORY_URL
 recovery_branch=$RECOVERY_BRANCH
@@ -217,6 +225,9 @@ operator_authorized_head=$EXPECTED_HEAD
 recovery_head=$recovery_head_end
 source_tree=$initial_tree
 main_head=$main_head_end
+main_tree=$main_tree_start
+promotion_required_ancestor=$EXPECTED_HEAD
+promotion_expected_main_tree=$initial_tree
 recovery_diff_paths_sha256=$diff_paths_sha256
 runner_module_blob=$runner_module_blob
 routing_policy_blob=$routing_policy_blob
@@ -225,6 +236,8 @@ bootstrap_validator_blob=$bootstrap_validator_blob
 host_lifecycle_contract_blob=$host_lifecycle_contract_blob
 nixpkgs_rev=$nixpkgs_rev
 rust_channel=$rust_channel
+host_nix_system=$host_nix_system
+host_nix_version=$host_nix_version
 flake_lock_sha256=$flake_lock_sha256
 rust_toolchain_sha256=$rust_toolchain_sha256
 operator_authorization_checked=PASS
