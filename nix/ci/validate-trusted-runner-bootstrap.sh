@@ -97,6 +97,7 @@ docs/operations/GITHUB_ACTIONS_NIXOS_RUNNER.md
 docs/operations/RCA_CANONICAL_LINEAGE_TRUSTED_RECOVERY.md
 docs/operations/SYM_ARCH_002A_TRUSTED_RECOVERY.md
 docs/operations/TRUSTED_CPU_RUNNER_BOOTSTRAP.md
+docs/operations/TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md
 nix/ci-rust-shell.nix
 nix/ci/validate-trusted-runner-bootstrap.sh
 nix/modules/default.nix
@@ -120,6 +121,7 @@ runner_module_blob="$(git rev-parse "$recovery_head_start:nix/modules/github-act
 routing_policy_blob="$(git rev-parse "$recovery_head_start:nix/tests/eval-trusted-runner-routing.nix")"
 smoke_workflow_blob="$(git rev-parse "$recovery_head_start:.github/workflows/self-hosted-runner-smoke.yml")"
 bootstrap_validator_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-bootstrap.sh")"
+host_lifecycle_contract_blob="$(git rev-parse "$recovery_head_start:docs/operations/TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md")"
 
 flake_lock_sha256="$(sha256sum flake.lock | awk '{print $1}')"
 rust_toolchain_sha256="$(sha256sum rust-toolchain.toml | awk '{print $1}')"
@@ -133,6 +135,7 @@ printf 'bootstrap_source_tree=%s\n' "$initial_tree"
 printf 'bootstrap_diff_paths_sha256=%s\n' "$diff_paths_sha256"
 printf 'bootstrap_nixpkgs_rev=%s\n' "$nixpkgs_rev"
 printf 'bootstrap_rust_channel=%s\n' "$rust_channel"
+printf 'bootstrap_host_lifecycle_contract_blob=%s\n' "$host_lifecycle_contract_blob"
 
 # These evaluations contact no GitHub API and consume no runner credential.
 nix build --no-link --no-write-lock-file \
@@ -219,6 +222,7 @@ runner_module_blob=$runner_module_blob
 routing_policy_blob=$routing_policy_blob
 smoke_workflow_blob=$smoke_workflow_blob
 bootstrap_validator_blob=$bootstrap_validator_blob
+host_lifecycle_contract_blob=$host_lifecycle_contract_blob
 nixpkgs_rev=$nixpkgs_rev
 rust_channel=$rust_channel
 flake_lock_sha256=$flake_lock_sha256
