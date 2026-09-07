@@ -95,6 +95,30 @@ mod tests {
     }
 
     #[test]
+    fn from_parent_mutation_sequence_matches_the_historical_raw_state() {
+        let seed = 0x5eed_u64;
+        let genome = Genome::from_config(&OrganismConfig::default());
+        let mut legacy_state = seed
+            .wrapping_add(LEGACY_MUTATION_SEED_OFFSET_V1)
+            .max(1);
+        let mut streams = EvolutionRngStreamsV1::new(seed);
+
+        for birth in 0..64 {
+            let legacy = genome.mutate(&mut legacy_state, 0.37, 0.05);
+            let split = genome.mutate(streams.mutation_state_mut(), 0.37, 0.05);
+            assert_eq!(
+                legacy, split,
+                "split mutation stream drifted from historical FromParent sequence at birth {birth}"
+            );
+            assert_eq!(
+                legacy_state,
+                streams.snapshot().mutation_state,
+                "mutation RNG state drifted at birth {birth}"
+            );
+        }
+    }
+
+    #[test]
     fn inheritance_source_draws_do_not_change_mutation_state() {
         let mut streams = EvolutionRngStreamsV1::new(7);
         let before = streams.snapshot().mutation_state;
