@@ -4,6 +4,7 @@
 //! Shared control-plane policy and audit helpers.
 
 pub mod forge;
+pub mod forge_commitment;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
