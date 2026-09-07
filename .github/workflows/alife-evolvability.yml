@@ -1,0 +1,107 @@
+name: ALife Evolvability
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/**"
+      - ".github/workflows/alife-evolvability.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  contracts:
+    name: ALife contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-evolvability-contracts
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets from frozen lock
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test ALife contracts from frozen lock
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy from frozen lock
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+  repeated-shock-sweep:
+    name: Repeated-shock evidence sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: contracts
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-evolvability-sweep
+
+      - name: Run fixed paired eight-seed sweep from frozen lock
+        run: |
+          mkdir -p target/alife-evolvability
+          cargo run --locked --release -p symthaea-alife --example evolvability_repeated_shock_sweep \
+            | tee target/alife-evolvability/repeated-shock-sweep.txt
+
+      - name: Record exact evidence metadata
+        run: |
+          {
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "example=evolvability_repeated_shock_sweep"
+            echo "seed_panel=1,2,3,4,5,6,7,8"
+            echo "post_shock_evaluation_ticks=300"
+          } > target/alife-evolvability/metadata.txt
+
+      - name: Upload ALife evolvability evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-evolvability-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/alife-evolvability/
+          retention-days: 30
