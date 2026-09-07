@@ -19,6 +19,7 @@ symthaea-operating-autonomy = { path = "../symthaea-operating-autonomy" }
 symthaea-operating-authority = { path = "../symthaea-operating-authority" }
 symthaea-operating-envelope = { path = "../symthaea-operating-envelope" }
 symthaea-resource-hierarchy = { path = "../symthaea-resource-hierarchy" }
+symthaea-safety-configuration = { path = "../symthaea-safety-configuration" }
 
 [dev-dependencies]
 symthaea-resource-model = { path = "../symthaea-resource-model" }
