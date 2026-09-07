@@ -1,0 +1,59 @@
+diff --git a/crates/bridges/symthaea-lean-bridge/examples/prove_minif2f.rs b/crates/bridges/symthaea-lean-bridge/examples/prove_minif2f.rs
+--- a/crates/bridges/symthaea-lean-bridge/examples/prove_minif2f.rs
++++ b/crates/bridges/symthaea-lean-bridge/examples/prove_minif2f.rs
+@@ -141,7 +141,11 @@ fn main() -> ExitCode {
+ 
+         let check_label = if do_check {
+             match check_with_lean4(&file_path) {
+-                CheckOutcome::Accepted => "accepted".to_string(),
++                CheckOutcome::Accepted if contains_sorry => {
++                    any_failure = true;
++                    "accepted_with_admission".to_string()
++                }
++                CheckOutcome::Accepted => "accepted".to_string(),
+                 CheckOutcome::Rejected(_) => {
+                     any_failure = true;
+                     "rejected".to_string()
+diff --git a/crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs b/crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs
+--- a/crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs
++++ b/crates/bridges/symthaea-lean-bridge/examples/prove_proptauts.rs
+@@ -167,6 +167,7 @@ fn main() -> ExitCode {
+     let mut accepted = 0usize;
+     let mut rejected = 0usize;
+     let mut skipped = 0usize;
++    let mut admitted = 0usize;
+     let mut sorry_count = 0usize;
+ 
+     for fx in fixtures() {
+@@ -190,6 +191,10 @@ fn main() -> ExitCode {
+ 
+         let check_label = if do_check {
+             match check_with_lean4(&file_path) {
++                CheckOutcome::Accepted if contains_sorry => {
++                    admitted += 1;
++                    "accepted_with_admission".to_string()
++                }
+                 CheckOutcome::Accepted => {
+                     accepted += 1;
+                     "accepted".to_string()
+@@ -222,16 +227,17 @@ fn main() -> ExitCode {
+     }
+ 
+     eprintln!(
+-        "# summary: {} fixtures total | {} sorry | accepted={} rejected={} skipped={}",
++        "# summary: {} fixtures total | {} sorry | accepted={} admitted={} rejected={} skipped={}",
+         fixtures().len(),
+         sorry_count,
+         accepted,
++        admitted,
+         rejected,
+         skipped
+     );
+ 
+-    // Exit code signals overall success when Lean was asked to verify.
+-    if do_check && rejected > 0 {
++    // An admitted theorem is not a proved theorem even when Lean accepts it.
++    if do_check && (rejected > 0 || admitted > 0) {
+         ExitCode::from(1)
+     } else {
+         ExitCode::SUCCESS
