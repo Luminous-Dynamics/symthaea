@@ -47,6 +47,7 @@ pub mod predator_prey;
 pub mod repeat_shock;
 pub mod repeat_shock_did;
 pub mod repeat_shock_relative;
+pub mod repeated_shock_baseline;
 pub mod types;
 
 pub use agent_id::{AgentId, AgentIdAllocator};
@@ -92,5 +93,9 @@ pub use repeat_shock_did::{
 pub use repeat_shock_relative::{
     RepeatedShockRelativeErrorV1, RepeatedShockRelativeV1, RepeatedShockRelativeVerdictV1,
     compare_repeated_shock_relative,
+};
+pub use repeated_shock_baseline::{
+    RelativeBaselineShiftV1, RepeatedShockBaselineErrorV1, RepeatedShockBaselineShiftV1,
+    compare_relative_baseline_shift, repeated_shock_baseline_shift,
 };
 pub use types::BoundaryModulators;
