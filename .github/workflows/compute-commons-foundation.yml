@@ -1,0 +1,89 @@
+name: Compute Commons Foundation CI
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-resource-model/**'
+      - 'crates/domains/symthaea-resource-hierarchy/**'
+      - 'crates/domains/symthaea-resource-accounting/**'
+      - 'crates/domains/symthaea-resource-quality/**'
+      - 'crates/domains/symthaea-multiscale-twin/**'
+      - 'crates/domains/symthaea-multiscale-coordination/**'
+      - 'crates/domains/symthaea-operating-envelope/**'
+      - 'crates/domains/symthaea-operating-authority/**'
+      - 'crates/domains/symthaea-operating-autonomy/**'
+      - 'crates/domains/symthaea-operating-commissioning/**'
+      - 'crates/domains/symthaea-safety-configuration/**'
+      - 'crates/domains/symthaea-safety-profile/**'
+      - 'crates/domains/symthaea-safety-qualification/**'
+      - 'crates/domains/symthaea-operations-research/**'
+      - 'crates/domains/symthaea-thermofluids/**'
+      - 'crates/domains/symthaea-engineering/Cargo.toml'
+      - 'crates/domains/symthaea-engineering/examples/compute_commons_*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/compute-commons-foundation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compute-commons-foundation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FOUNDATION_PACKAGES: >-
+    -p symthaea-resource-model
+    -p symthaea-resource-hierarchy
+    -p symthaea-resource-accounting
+    -p symthaea-resource-quality
+    -p symthaea-multiscale-twin
+    -p symthaea-multiscale-coordination
+    -p symthaea-operating-envelope
+    -p symthaea-operating-authority
+    -p symthaea-operating-autonomy
+    -p symthaea-operating-commissioning
+    -p symthaea-safety-configuration
+    -p symthaea-safety-profile
+    -p symthaea-safety-qualification
+    -p symthaea-operations-research
+    -p symthaea-thermofluids
+
+jobs:
+  qualify-foundation:
+    name: Qualify resource, authority, and safety foundations
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.96.0 --component clippy
+          rustup default 1.96.0
+          rustc --version
+          cargo --version
+
+      - name: Test foundation crates
+        run: cargo test --locked $FOUNDATION_PACKAGES --all-targets
+
+      - name: Clippy foundation crates
+        run: cargo clippy --locked $FOUNDATION_PACKAGES --all-targets -- -D warnings
+
+      - name: Test Compute Commons reference compositions
+        run: >-
+          cargo test --locked -p symthaea-engineering
+          --example compute_commons_habitat
+          --example compute_commons_failure_lab
+          --example compute_commons_commissioning_lab
+
+      - name: Clippy Compute Commons reference compositions
+        run: >-
+          cargo clippy --locked -p symthaea-engineering
+          --example compute_commons_habitat
+          --example compute_commons_failure_lab
+          --example compute_commons_commissioning_lab
+          -- -D warnings
