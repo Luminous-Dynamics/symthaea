@@ -1,0 +1,90 @@
+name: Spore Product Source Lineage
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  FROZEN_PARENT: a25738c119beb15cca96563ec7a36cd03ab376e2
+
+concurrency:
+  group: spore-product-source-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Exact host-consumed source ownership
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Assert exact one-commit source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          test "$(git rev-parse HEAD^)" = "$FROZEN_PARENT"
+          test "$(git rev-list --count "$FROZEN_PARENT..HEAD")" -eq 1
+          echo "source_head=$(git rev-parse HEAD)"
+          echo "source_tree=$(git rev-parse 'HEAD^{tree}')"
+          echo "source_parent=$(git rev-parse HEAD^)"
+          echo "runner_image=${ImageOS:-unknown}/${ImageVersion:-unknown}"
+          python3 --version
+
+      - name: Enforce exact six-file audit scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git diff --name-only "$FROZEN_PARENT" HEAD | sort)
+          expected=(
+            ".github/workflows/spore-product-source-lineage.yml"
+            "docs/architecture/SPORE_PRODUCT_SOURCE_LINEAGE_V1.md"
+            "docs/architecture/spore-product-source-lineage-v1.json"
+            "docs/architecture/spore-product-source-lineage-v1.schema.json"
+            "scripts/check_spore_product_source_lineage.py"
+            "tests/test_spore_product_source_lineage.py"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "$(printf '%s\n' "${changed[@]}")" = "$(printf '%s\n' "${expected_sorted[@]}")"
+          printf 'changed=%s\n' "${changed[*]}"
+
+      - name: Parse source, migration, and parity contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m json.tool docs/architecture/spore-product-source-lineage-v1.json >/dev/null
+          python3 -m json.tool docs/architecture/spore-product-source-lineage-v1.schema.json >/dev/null
+          python3 -m json.tool docs/architecture/spore-migration-manifest-v1.json >/dev/null
+          python3 -m json.tool docs/architecture/spore-golden-parity-v1.json >/dev/null
+
+      - name: Re-validate migration boundary
+        run: python3 scripts/check_spore_migration_manifest.py
+
+      - name: Re-validate golden parity boundary
+        run: python3 scripts/check_spore_golden_parity.py
+
+      - name: Enforce exact product source ownership
+        run: python3 scripts/check_spore_product_source_lineage.py
+
+      - name: Adversarial source ownership regressions
+        run: >-
+          python3 -m unittest
+          tests/test_spore_migration_manifest.py
+          tests/test_spore_golden_parity.py
+          tests/test_spore_product_source_lineage.py
+
+      - name: Verify checks left source unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=all)"
