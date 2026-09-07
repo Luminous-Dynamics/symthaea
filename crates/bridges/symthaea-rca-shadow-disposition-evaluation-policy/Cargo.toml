@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-rca-shadow-disposition-evaluation-policy"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Preregistered evaluation-surface binding for RCA shadow disposition"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-rca-effective-disposition-policy = { path = "../symthaea-rca-effective-disposition-policy" }
+symthaea-rca-lineage-bound-disposition-preflight = { path = "../symthaea-rca-lineage-bound-disposition-preflight" }
+symthaea-rca-shadow-disposition-preflight = { path = "../symthaea-rca-shadow-disposition-preflight" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+symthaea-epistemic-governance = { path = "../../core/symthaea-epistemic-governance" }
+symthaea-rca-shadow-disposition-policy = { path = "../symthaea-rca-shadow-disposition-policy" }
