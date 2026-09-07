@@ -8,6 +8,7 @@
 //! and a conservative difference-in-differences contrast — not a statistical-significance or
 //! mechanism-causality claim.
 
+use sha2::{Digest, Sha256};
 use symthaea_alife::{
     EncounterScheduler, EvolvabilityError, GenesisEvent, InheritanceMode, ObservatoryReport,
     OrganismConfig, PairingMode, PerturbationSchedule, Population, PopulationConfig,
@@ -28,6 +29,11 @@ const SHOCK_1_START: u64 = 400;
 const SHOCK_2_START: u64 = 900;
 const SHOCK_DURATION: u64 = 60;
 const SHOCK_MULTIPLIER: f64 = 0.65;
+const SHOCK_DELTA: f64 = 0.0;
+const SCHEDULER_SEED_OFFSET: u64 = 100_003;
+const FROZEN_MUTATION_RATE: f64 = 0.0;
+const EVOLVING_MUTATION_RATE: f64 = 0.1;
+const MUTATION_STD: f64 = 0.05;
 
 #[derive(Debug, Default)]
 struct VerdictCounts {
@@ -80,9 +86,95 @@ fn population_config(mutation_rate: f64) -> PopulationConfig {
         reproduction_energy_cost: 0.4,
         organism_cfg: OrganismConfig::default(),
         mutation_rate,
-        mutation_std: 0.05,
+        mutation_std: MUTATION_STD,
         inheritance: InheritanceMode::FromParent,
     }
+}
+
+fn protocol_evidence_json() -> serde_json::Value {
+    let frozen = population_config(FROZEN_MUTATION_RATE);
+    let evolving = population_config(EVOLVING_MUTATION_RATE);
+    let organism = frozen.organism_cfg;
+
+    serde_json::json!({
+        "schema": "symthaea.alife.repeated-shock.protocol.v1",
+        "crate_version": env!("CARGO_PKG_VERSION"),
+        "seed_panel": SEEDS,
+        "simulation": {
+            "ticks": TICKS,
+            "initial_count": INITIAL_COUNT,
+        },
+        "resource": {
+            "rule": "shared_pool_total_div_population_max_1",
+            "plant_resource_total": PLANT_RESOURCE_TOTAL,
+        },
+        "scheduler": {
+            "pairing_mode": "Random",
+            "seed_rule": "population_seed.wrapping_add(offset)",
+            "seed_offset": SCHEDULER_SEED_OFFSET,
+        },
+        "population": {
+            "death_energy_threshold": frozen.death_energy_threshold,
+            "reproduction_energy_threshold": frozen.reproduction_energy_threshold,
+            "reproduction_energy_cost": frozen.reproduction_energy_cost,
+            "inheritance_mode": "FromParent",
+            "mutation_std": MUTATION_STD,
+            "frozen_mutation_rate": frozen.mutation_rate,
+            "evolving_mutation_rate": evolving.mutation_rate,
+        },
+        "organism_config": {
+            "set_point": organism.set_point,
+            "metabolic_cost": organism.metabolic_cost,
+            "forage_activity_cost": organism.forage_activity_cost,
+            "forage_efficiency": organism.forage_efficiency,
+            "goal_precision": organism.goal_precision,
+            "effective_temperature": organism.effective_temperature,
+            "dissipation_rate": organism.dissipation_rate,
+            "death_energy_threshold": organism.death_energy_threshold,
+            "action_temperature": organism.action_temperature,
+            "perceptual_grain": organism.perceptual_grain,
+            "spoilage_sigma": organism.spoilage_sigma,
+            "resource_preference": organism.resource_preference,
+            "resource_prior": organism.resource_prior,
+            "social_enabled": organism.social_enabled,
+            "transfer_quantum": organism.transfer_quantum,
+        },
+        "shocks": [
+            {
+                "start_tick": SHOCK_1_START,
+                "duration_ticks": SHOCK_DURATION,
+                "multiplier": SHOCK_MULTIPLIER,
+                "delta": SHOCK_DELTA,
+            },
+            {
+                "start_tick": SHOCK_2_START,
+                "duration_ticks": SHOCK_DURATION,
+                "multiplier": SHOCK_MULTIPLIER,
+                "delta": SHOCK_DELTA,
+            }
+        ],
+        "analysis": {
+            "baseline_lookback_ticks": BASELINE_LOOKBACK_TICKS,
+            "recovery_fraction": RECOVERY_FRACTION,
+            "post_shock_evaluation_ticks": POST_SHOCK_EVALUATION_TICKS,
+            "repeat_shock_verdict": "pareto_predeclared_dimensions",
+            "difference_in_differences": "evolving_transfer_minus_frozen_transfer",
+            "did_latency_in_pareto_verdict": false,
+        }
+    })
+}
+
+fn emit_protocol_evidence() {
+    let protocol = protocol_evidence_json();
+    let canonical = serde_json::to_vec(&protocol).expect("protocol evidence must serialize");
+    let digest = Sha256::digest(&canonical);
+    let digest_hex = digest
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let canonical = String::from_utf8(canonical).expect("serde_json output is UTF-8");
+    println!("protocol_sha256={digest_hex}");
+    println!("protocol_json={canonical}");
 }
 
 fn evaluation_end_tick(shock: ResourcePerturbation) -> u64 {
@@ -144,18 +236,20 @@ fn transfer(
 }
 
 fn main() {
+    emit_protocol_evidence();
+
     let shock_1 = ResourcePerturbation::new(
         SHOCK_1_START,
         SHOCK_DURATION,
         SHOCK_MULTIPLIER,
-        0.0,
+        SHOCK_DELTA,
     )
     .expect("valid first shock");
     let shock_2 = ResourcePerturbation::new(
         SHOCK_2_START,
         SHOCK_DURATION,
         SHOCK_MULTIPLIER,
-        0.0,
+        SHOCK_DELTA,
     )
     .expect("valid second shock");
     let schedule = PerturbationSchedule::new(vec![shock_1, shock_2]);
@@ -170,9 +264,9 @@ fn main() {
     let mut neither_pareto_improved = 0usize;
 
     for &seed in SEEDS {
-        let scheduler_seed = seed.wrapping_add(100_003);
-        let frozen_events = run_condition(0.0, seed, scheduler_seed, &schedule);
-        let evolving_events = run_condition(0.1, seed, scheduler_seed, &schedule);
+        let scheduler_seed = seed.wrapping_add(SCHEDULER_SEED_OFFSET);
+        let frozen_events = run_condition(FROZEN_MUTATION_RATE, seed, scheduler_seed, &schedule);
+        let evolving_events = run_condition(EVOLVING_MUTATION_RATE, seed, scheduler_seed, &schedule);
         let frozen_report = analyze_genesis_events(&frozen_events)
             .expect("frozen Genesis event stream must satisfy observatory invariants");
         let evolving_report = analyze_genesis_events(&evolving_events)
