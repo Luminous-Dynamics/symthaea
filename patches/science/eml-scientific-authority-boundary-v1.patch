@@ -31,8 +31,9 @@ index e14c65e..0000000 100644
                      if macro_safe_numeric_fit {
                          elevate_macro_promotion_tier(
                              conjecture,
-@@ -177,3 +178,58 @@ impl ConjectureEngine {
-         }
+@@ -274,6 +275,61 @@ impl ConjectureEngine {
+     pub fn auto_prove_via_z3(&mut self) {
+         self.check_samples_via_z3();
      }
  }
 +
