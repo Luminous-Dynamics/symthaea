@@ -1,0 +1,184 @@
+name: ALife Confirmatory Preregistration
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-alife/experiments/repeated_shock_confirmatory_v1.json"
+      - ".github/workflows/alife-confirmatory-preregistration.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-preregistration:
+    name: Verify frozen confirmatory protocol
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Regenerate and verify preregistered holdout
+        run: |
+          mkdir -p target/alife-confirmatory-preregistration
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import math
+          import pathlib
+          import subprocess
+
+          path = pathlib.Path("crates/domains/symthaea-alife/experiments/repeated_shock_confirmatory_v1.json")
+          raw = path.read_bytes()
+          manifest = json.loads(raw)
+
+          assert manifest["schema"] == "symthaea.alife.repeated-shock.confirmatory-preregistration.v1"
+          assert manifest["status"] == "preregistered_not_executed"
+
+          seed_panel = manifest["seed_panel"]
+          assert seed_panel["role"] == "confirmatory_holdout"
+          assert seed_panel["count"] == 40
+          assert seed_panel["derivation"]["domain"] == "symthaea-alife-repeated-shock-confirmatory-v1"
+          assert seed_panel["derivation"]["hand_selected"] is False
+
+          domain = seed_panel["derivation"]["domain"]
+          regenerated = []
+          for counter in range(40):
+              digest = hashlib.sha256(f"{domain}:{counter}".encode("utf-8")).digest()
+              seed = int.from_bytes(digest[:8], "little")
+              regenerated.append(seed if seed != 0 else 1)
+          assert seed_panel["seeds"] == regenerated
+          assert len(set(regenerated)) == 40
+          assert set(regenerated).isdisjoint({1, 2, 3, 4, 5, 6, 7, 8})
+
+          pre = manifest["execution_preconditions"]
+          assert pre["population_uses_evolution_rng_streams_v1"] is True
+          assert pre["from_parent_legacy_mutation_sequence_preserved"] is True
+          assert pre["random_peer_source_selection_does_not_advance_mutation_rng"] is True
+          assert pre["exact_head_alife_package_qualification_required"] is True
+          assert pre["protocol_result_and_inference_digests_required"] is True
+
+          rng = manifest["rng_contract"]
+          assert rng["mutation_seed_offset"] == 1_000_011
+          assert rng["inheritance_source_seed_offset"] == 2_000_033
+          assert rng["mutation_and_inheritance_source_streams_independent"] is True
+
+          sim = manifest["simulation"]
+          assert sim == {
+              "ticks": 1400,
+              "initial_count": 24,
+              "plant_resource_total": 12.0,
+              "resource_rule": "shared_pool_total_div_population_max_1",
+              "scheduler_pairing_mode": "Random",
+              "scheduler_seed_rule": "population_seed.wrapping_add(100003)",
+              "scheduler_seed_offset": 100003,
+          }
+
+          assert manifest["population"] == {
+              "death_energy_threshold": 0.05,
+              "reproduction_energy_threshold": 0.8,
+              "reproduction_energy_cost": 0.4,
+              "mutation_std": 0.05,
+          }
+
+          conditions = manifest["conditions"]
+          assert conditions["frozen"] == {"mutation_rate": 0.0, "inheritance_mode": "FromParent"}
+          assert conditions["selected_evolving"] == {"mutation_rate": 0.1, "inheritance_mode": "FromParent"}
+          assert conditions["random_peer_evolving"]["mutation_rate"] == 0.1
+          assert conditions["random_peer_evolving"]["inheritance_mode"] == "RandomPeer"
+          assert conditions["random_peer_evolving"]["requires_independent_inheritance_source_rng"] is True
+
+          assert manifest["shocks"] == [
+              {"start_tick": 400, "duration_ticks": 60, "multiplier": 0.65, "delta": 0.0},
+              {"start_tick": 900, "duration_ticks": 60, "multiplier": 0.65, "delta": 0.0},
+          ]
+
+          recovery = manifest["recovery_analysis"]
+          assert recovery["baseline_lookback_ticks"] == 100
+          assert recovery["recovery_fraction"] == 0.9
+          assert recovery["post_shock_evaluation_ticks"] == 300
+          assert recovery["secondary_pareto_dimensions_descriptive_only"] is True
+          assert recovery["categorical_latency_excluded_from_primary_test"] is True
+
+          primary = manifest["primary_inference"]
+          assert primary["comparison"] == "selected_from_parent_vs_mutation_enabled_random_peer"
+          assert primary["metric"] == "deficit_area_advantage_candidate_minus_reference"
+          assert primary["orientation"] == "positive_favors_selected_from_parent"
+          assert primary["test"] == "exact_one_sided_paired_sign_test"
+          assert primary["alternative"] == "positive_directional_tendency"
+          assert primary["alpha_numerator"] == 1
+          assert primary["alpha_denominator"] == 20
+          assert primary["missingness_policy"] == "require_all_40_primary_outcomes"
+          assert primary["tie_policy"] == "exact_zero_excluded_from_binomial_denominator"
+          assert primary["secondary_metric_p_values"] is False
+
+          freeze = manifest["analysis_freeze"]
+          assert all(freeze.values())
+
+          n = 40
+          denominator = 2**n
+          threshold = None
+          threshold_num = None
+          for positive in range(n + 1):
+              numerator = sum(math.comb(n, k) for k in range(positive, n + 1))
+              if 20 * numerator <= denominator:
+                  threshold = positive
+                  threshold_num = numerator
+                  break
+          assert threshold == 26
+          assert threshold_num == 44_360_053_772
+          assert denominator == 1_099_511_627_776
+
+          power = manifest["power_design"]
+          assert power["computed_before_discovery_outcome_observation"] is True
+          assert power["assumes_all_40_outcomes_non_tied"] is True
+          assert power["minimum_positive_for_alpha_0_05"] == threshold
+          assert power["exact_null_tail_at_threshold"] == {
+              "numerator": threshold_num,
+              "denominator": denominator,
+          }
+
+          expected_power = {}
+          for p in (0.60, 0.65, 0.70, 0.75, 0.80):
+              value = sum(
+                  math.comb(n, k) * (p**k) * ((1.0 - p)**(n - k))
+                  for k in range(threshold, n + 1)
+              )
+              expected_power[f"{p:.2f}"] = value
+          for key, expected in expected_power.items():
+              observed = power["prospective_power_by_true_positive_probability"][key]
+              assert abs(observed - expected) < 1e-15
+
+          evidence = {
+              "git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+              "seed_panel_sha256": hashlib.sha256(json.dumps(regenerated, separators=(",", ":")).encode()).hexdigest(),
+              "holdout_seed_count": 40,
+              "discovery_seed_overlap": 0,
+              "all_non_tied_minimum_positive_for_alpha_0_05": threshold,
+              "all_non_tied_tail_numerator_at_threshold": threshold_num,
+              "all_non_tied_denominator": denominator,
+              "prospective_power": expected_power,
+              "executed": False,
+          }
+          pathlib.Path("target/alife-confirmatory-preregistration/verification.json").write_text(
+              json.dumps(evidence, sort_keys=True, indent=2) + "\n"
+          )
+          PY
+
+      - name: Upload preregistration verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-confirmatory-preregistration-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/alife-confirmatory-preregistration/
+          retention-days: 90
