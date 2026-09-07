@@ -1,0 +1,27 @@
+[package]
+name = "symthaea-resource-recommendation"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Closed-set recommendation contract for deterministic resource planning"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "planning", "recommendation", "infrastructure"]
+categories = ["science", "simulation"]
+
+[dependencies]
+thiserror = { workspace = true }
+symthaea-resource-feasible-set = { path = "../symthaea-resource-feasible-set" }
+symthaea-resource-feasibility = { path = "../symthaea-resource-feasibility" }
+
+[dev-dependencies]
+chrono = { workspace = true }
+symthaea-resource-allocation = { path = "../symthaea-resource-allocation" }
+symthaea-resource-capacity = { path = "../symthaea-resource-capacity" }
+symthaea-resource-model = { path = "../symthaea-resource-model" }
+symthaea-resource-quality = { path = "../symthaea-resource-quality" }
+symthaea-resource-quality-evidence = { path = "../symthaea-resource-quality-evidence" }
+symthaea-resource-quality-qualification = { path = "../symthaea-resource-quality-qualification" }
+symthaea-resource-topology = { path = "../symthaea-resource-topology" }
