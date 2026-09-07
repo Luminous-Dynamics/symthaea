@@ -56,10 +56,12 @@ jobs:
           grep -q 'SHADOW_DISPOSITION_ENGINE_CONTRACT_V1' "$engine"
           grep -q 'SHADOW_DISPOSITION_CLASS_TAGS_V1' "$engine"
           grep -q 'SHADOW_DISPOSITION_RULE_PRECEDENCE_V1' "$engine"
+          grep -q 'SHADOW_DISPOSITION_RULE_TO_CLASS_V1' "$engine"
           grep -q 'SHADOW_DISPOSITION_PREDICATE_TAGS_V1' "$engine"
           grep -q 'shadow_disposition_engine_contract_profile_digest_v1' "$engine"
+          grep -q 'b"rule_to_class"' "$engine"
 
-      - name: Freeze exact decision taxonomy and precedence
+      - name: Freeze exact decision taxonomy, mapping, and precedence
         shell: bash
         run: |
           set -euo pipefail
@@ -75,6 +77,12 @@ jobs:
               if not m:
                   raise SystemExit(f'missing tag table {name}')
               return re.findall(r'"([^"]+)"', m.group(1))
+
+          def mapping(name):
+              m = re.search(rf'pub const {name}: &\[\(&str, &str\)\] = &\[(.*?)\];', src, re.S)
+              if not m:
+                  raise SystemExit(f'missing mapping table {name}')
+              return re.findall(r'\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)', m.group(1), re.S)
 
           expected_classes = [
               'blocked_by_qualified_defeater',
@@ -95,6 +103,16 @@ jobs:
               'tentative_opposition',
               'insufficient_topology',
           ]
+          expected_mapping = [
+              ('qualified_defeater_blocker', 'blocked_by_qualified_defeater'),
+              ('qualified_contestation', 'contested'),
+              ('bilateral_qualified_disagreement_below_contestation', 'underdetermined'),
+              ('full_support', 'supported'),
+              ('full_opposition', 'opposed'),
+              ('tentative_support', 'tentatively_supported'),
+              ('tentative_opposition', 'tentatively_opposed'),
+              ('insufficient_topology', 'underdetermined'),
+          ]
           expected_predicates = [
               'defeater_qualified',
               'support_contested_side_qualified',
@@ -108,10 +126,14 @@ jobs:
               raise SystemExit('primary disposition taxonomy drifted')
           if tags('SHADOW_DISPOSITION_RULE_PRECEDENCE_V1') != expected_rules:
               raise SystemExit('decision-rule precedence drifted')
+          if mapping('SHADOW_DISPOSITION_RULE_TO_CLASS_V1') != expected_mapping:
+              raise SystemExit('decision rule-to-class mapping drifted')
           if tags('SHADOW_DISPOSITION_PREDICATE_TAGS_V1') != expected_predicates:
               raise SystemExit('predicate taxonomy drifted')
           PY
 
+          grep -q 'rule_to_primary_class_mapping_is_exact_and_profile_bearing' "$engine"
+          grep -q 'decision_lattice_total_over_all_72_admissible_predicate_states_v1' "$engine"
           grep -q 'qualified_defeater_primary=blocked_by_qualified_defeater_not_false_or_refuted' "$engine"
           grep -q 'bilateral_tentative_or_stronger_disagreement_below_contestation=underdetermined' "$engine"
           grep -q 'count_margin_vote_strength_posterior_and_winner_take_all_tiebreakers_forbidden' "$engine"
@@ -218,8 +240,10 @@ jobs:
           grep -q 'tampered_raw_preflight_profile_fails_closed' "$src"
           grep -q 'tampered_lineage_bound_preflight_profile_fails_closed' "$src"
           grep -q 'tampered_engine_contract_profile_fails_closed' "$src"
+          grep -q 'rule_to_class_mapping_covers_every_rule_exactly_once' "$engine"
           grep -q 'rule_precedence_preserves_bilateral_disagreement_before_unilateral_outcomes' "$engine"
           grep -q 'defeater_is_primary_rule' "$engine"
+          grep -q 'decision_lattice_is_total_over_all_72_admissible_states' "$engine"
           grep -q 'contract_profile_is_content_addressed' "$engine"
 
       - name: Verify dependency direction
