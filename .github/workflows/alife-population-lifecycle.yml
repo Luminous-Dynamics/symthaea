@@ -1,0 +1,108 @@
+name: ALife Population Lifecycle
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle_recorder.rs"
+      - "crates/domains/symthaea-alife/src/evolutionary_history.rs"
+      - "crates/domains/symthaea-alife/src/evolution_birth.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - "crates/domains/symthaea-alife/tests/population_lifecycle_emission.rs"
+      - ".github/workflows/alife-population-lifecycle.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  production-lifecycle:
+    name: Production lifecycle evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-population-lifecycle
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check all ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test authoritative Population lifecycle emission
+        run: cargo test --locked -p symthaea-alife --test population_lifecycle_emission -- --nocapture
+
+      - name: Test lifecycle recorder contract
+        run: cargo test --locked -p symthaea-alife lifecycle_recorder:: -- --nocapture
+
+      - name: Test lifecycle validator contract
+        run: cargo test --locked -p symthaea-alife lifecycle:: -- --nocapture
+
+      - name: Test evolutionary history contract
+        run: cargo test --locked -p symthaea-alife evolutionary_history:: -- --nocapture
+
+      - name: Preserve Phase 4 evolutionary control behavior
+        run: cargo test --locked -p symthaea-alife --test phase4_evolution -- --nocapture
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Verify production authority wiring
+        run: |
+          population=crates/domains/symthaea-alife/src/population.rs
+          test "$(grep -c 'lifecycle_recorder: LifecycleRecorderV1' "$population")" -eq 1
+          test "$(grep -c 'LifecycleRecorderV1::from_founders' "$population")" -eq 1
+          test "$(grep -c 'record_birth_from_plan' "$population")" -eq 2
+          test "$(grep -c 'LifecycleDeathCauseV1::PopulationEnergyThreshold' "$population")" -eq 2
+          test "$(grep -c 'LifecycleDeathCauseV1::CullWeakest' "$population")" -eq 1
+          test "$(grep -c '\.advance_epoch()' "$population")" -eq 2
+
+      - name: Record qualification identity
+        run: |
+          {
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "authority=production_population_lifecycle_emission"
+            echo "founders_emitted=true"
+            echo "threshold_deaths_emitted=true"
+            echo "culls_emitted=true"
+            echo "births_bound_to_evolution_plan=true"
+            echo "recorder_owned_epoch=true"
+          } | tee alife-population-lifecycle-metadata.txt
+
+      - name: Upload qualification metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-population-lifecycle-${{ github.event.pull_request.head.sha || github.sha }}
+          path: alife-population-lifecycle-metadata.txt
+          retention-days: 30
