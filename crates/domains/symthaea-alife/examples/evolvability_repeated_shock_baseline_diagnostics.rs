@@ -6,6 +6,11 @@
 //! p-values. It exposes whether each condition entered shock 2 from a substantially different
 //! observed population baseline than shock 1, which is context needed when interpreting metrics
 //! normalized to each shock's own baseline.
+//!
+//! The canonical sweep uses `shared_pool_total / current_population` as its unperturbed resource
+//! scale. The emitted inverse-density fields therefore also expose the direction of the per-capita
+//! resource-scale change implied by baseline population drift. They do not establish that density
+//! caused any recovery difference.
 
 use sha2::{Digest, Sha256};
 use std::{env, fs};
@@ -38,6 +43,8 @@ fn shift_json(shift: RepeatedShockBaselineShiftV1) -> serde_json::Value {
         "second_to_first_ratio": shift.second_to_first_ratio,
         "fractional_change": shift.fractional_change,
         "log_ratio": shift.log_ratio,
+        "inverse_density_ratio": shift.inverse_density_ratio,
+        "inverse_density_log_shift": shift.inverse_density_log_shift,
     })
 }
 
@@ -80,6 +87,8 @@ fn relative_result_json(
                 "status": "ok",
                 "candidate_to_reference_ratio_of_ratios": relative.candidate_to_reference_ratio_of_ratios,
                 "log_ratio_advantage": relative.log_ratio_advantage,
+                "candidate_to_reference_inverse_density_ratio": relative.candidate_to_reference_inverse_density_ratio,
+                "inverse_density_log_advantage": relative.inverse_density_log_advantage,
             }),
             Err(error) => serde_json::json!({
                 "status": "unavailable",
@@ -170,6 +179,8 @@ fn main() {
             "seed_exclusion_rule": false,
             "p_values": false,
             "absolute_population_generalization": false,
+            "shared_pool_inverse_density_context": true,
+            "density_mediation_causally_established": false,
             "interpretation": "context_for_metrics_normalized_to_each_shocks_own_pre_shock_baseline",
         },
         "seed_diagnostics": diagnostics,
