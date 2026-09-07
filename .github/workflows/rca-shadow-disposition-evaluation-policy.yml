@@ -177,6 +177,7 @@ jobs:
 
           grep -q 'rule_to_primary_class_mapping_is_exact_and_profile_bearing' "$engine"
           grep -q 'decision_lattice_total_over_all_72_admissible_predicate_states_v1' "$engine"
+          grep -q 'qualified_contestation_requires=CS+CO+TS+TO' "$engine"
           grep -q 'reason_trace_fields_are_exact_and_profile_bearing' "$engine"
           grep -q 'qualified_defeater_primary=blocked_by_qualified_defeater_not_false_or_refuted' "$engine"
           grep -q 'bilateral_tentative_or_stronger_disagreement_below_contestation=underdetermined' "$engine"
@@ -286,6 +287,7 @@ jobs:
           grep -q 'tampered_engine_contract_profile_fails_closed' "$src"
           grep -q 'rule_to_class_mapping_covers_every_rule_exactly_once' "$engine"
           grep -q 'reason_trace_schema_is_exact_and_identity_bearing' "$engine"
+          grep -q 'contested_requires_both_tentative_sides' "$engine"
           grep -q 'rule_precedence_preserves_bilateral_disagreement_before_unilateral_outcomes' "$engine"
           grep -q 'defeater_is_primary_rule' "$engine"
           grep -q 'decision_lattice_is_total_over_all_72_admissible_states' "$engine"
