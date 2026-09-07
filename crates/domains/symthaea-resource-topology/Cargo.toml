@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-resource-topology"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Potential resource-connectivity topology separate from committed multiscale flow"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "topology", "infrastructure", "scheduling"]
+categories = ["science", "simulation"]
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-model = { path = "../symthaea-resource-model" }
