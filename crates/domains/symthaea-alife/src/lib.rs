@@ -36,6 +36,7 @@ pub mod ma001;
 pub mod ma001l;
 pub mod ma001r;
 pub mod metabolism;
+pub mod observatory;
 pub mod organism;
 pub mod population;
 pub mod predator_prey;
@@ -52,6 +53,10 @@ pub use hierarchy::HierarchicalStack;
 pub use ledger::{InteractionRecord, compress_for_observation};
 pub use metabolism::{
     K_ALIFE_BOLTZMANN, landauer_minimum, prigogine_dissipation_cost, shannon_entropy_bits,
+};
+pub use observatory::{
+    AgentTrajectorySummary, LineageSummary, ObservatoryError, ObservatoryReport,
+    TransferEdgeSummary, analyze_genesis_events,
 };
 pub use organism::{Action, Organism, OrganismConfig, OrganismTick, PendingSocialLearning};
 pub use population::{
