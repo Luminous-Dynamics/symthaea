@@ -12,9 +12,9 @@ RCA-003b.3c LineageBoundShadowDispositionPreflightV1
 RCA-003b.4 future pure disposition engine
 ```
 
-If only the input profiles were policy-bearing, two different engines could interpret the same qualified artifacts using different precedence or outcome semantics.
+If only the input profiles were policy-bearing, two different engines could interpret the same qualified artifacts using different precedence, rule meanings, outcome classes, or audit traces.
 
-This layer closes both gaps before result-bearing code exists:
+This layer closes those gaps before result-bearing code exists:
 
 ```text
 RegisteredEffectiveShadowDispositionPolicyV1
@@ -30,7 +30,7 @@ RegisteredShadowDispositionEvaluationPolicyV1
 
 ## Non-result-bearing engine contract
 
-`src/engine_contract.rs` contains **no classifier** and accepts no evaluation artifacts. It freezes only the semantic contract a future engine must implement:
+`src/engine_contract.rs` contains **no production classifier** and accepts no evaluation artifacts. It freezes only the semantic contract a future engine must implement:
 
 - future input classes;
 - exact identity-join requirements;
@@ -38,10 +38,11 @@ RegisteredShadowDispositionEvaluationPolicyV1
 - primary outcome taxonomy;
 - predicate taxonomy;
 - exact decision-rule precedence;
+- exact decision-rule → primary-class mapping;
 - qualified-defeater blocker semantics;
 - conservative bilateral-disagreement behavior;
 - scoped unknown-independence semantics;
-- typed reason-trace requirements;
+- exact reason-trace field schema;
 - serializer-independent result identity requirement;
 - Serialize-only current-result boundary;
 - purity and downstream-authority exclusions.
@@ -61,32 +62,115 @@ Underdetermined
 The stable V1 rule precedence is:
 
 ```text
-qualified defeater blocker
-    >
-qualified contestation
-    >
-bilateral qualified disagreement below contestation
-    >
-full support / full opposition
-    >
-tentative support / tentative opposition
-    >
-insufficient topology / underdetermined
+QualifiedDefeaterBlocker
+QualifiedContestation
+BilateralQualifiedDisagreementBelowContestation
+FullSupport
+FullOpposition
+TentativeSupport
+TentativeOpposition
+InsufficientTopology
+```
+
+The exact rule → class mapping is:
+
+```text
+QualifiedDefeaterBlocker                    -> BlockedByQualifiedDefeater
+QualifiedContestation                       -> Contested
+BilateralQualifiedDisagreementBelowContestation -> Underdetermined
+FullSupport                                 -> Supported
+FullOpposition                              -> Opposed
+TentativeSupport                            -> TentativelySupported
+TentativeOpposition                         -> TentativelyOpposed
+InsufficientTopology                        -> Underdetermined
 ```
 
 There is no count-margin, vote, relation-strength, posterior, or winner-take-all tie-breaker.
+
+## Exhaustive decision-lattice theorem
+
+The frozen predicates are:
+
+```text
+D   defeater qualified
+CS  support meets contested-side topology
+CO  opposition meets contested-side topology
+S   full support qualified
+TS  tentative support qualified
+O   full opposition qualified
+TO  tentative opposition qualified
+```
+
+Policy registration already guarantees:
+
+```text
+S  => TS
+O  => TO
+```
+
+Under only those two invariants there are exactly **72 admissible boolean states**. A test-only classifier in `engine_contract.rs` enumerates all 72 and proves every state selects exactly one frozen rule whose primary class exists in the frozen taxonomy.
+
+This proof is test-only. Production code in this tranche still exposes no classifier.
+
+## Exact reason-trace schema
+
+The future result must retain exact machine-readable audit fields. These tag tables are part of the engine-contract digest.
+
+### Identity lineage
+
+```text
+engine_implementation_profile_digest
+engine_contract_profile_digest
+evaluation_policy_id
+effective_policy_id
+base_policy_id
+lineage_bound_preflight_binding_id
+raw_preflight_id
+proposition_id
+case_id
+canonical_evidence_lineage_graph_id
+registered_experiment_contract_digest
+```
+
+### Support/opposition/defeater slot facts
+
+For each of the three slots:
+
+```text
+evidence_witness_id
+evidence_item_count
+interpretation_witness_id
+interpretation_root_count
+```
+
+That produces 12 exact slot-fact fields.
+
+### Predicate and decision facts
+
+The seven frozen predicates are retained independently of the selected primary outcome. Final decision fields are exactly:
+
+```text
+decision_rule_id
+primary_class
+```
+
+A higher-precedence result therefore cannot erase simultaneously true lower-level evidence facts. For example, `BlockedByQualifiedDefeater` must still preserve support/opposition/contestation predicates that were also satisfied.
 
 ## Engine-contract identity
 
 `shadow_disposition_engine_contract_profile_digest_v1()` is a domain-separated BLAKE3 identity over:
 
-- the normative contract text;
+- normative contract text;
 - engine-contract schema/profile;
 - all primary class tags;
 - all predicate tags;
-- the exact ordered decision-rule precedence table.
+- exact ordered decision-rule precedence;
+- exact rule → primary-class mapping;
+- exact identity-trace field tags;
+- exact slot-trace field tags;
+- exact decision-trace field tags.
 
-Changing the taxonomy, predicate surface, or precedence therefore changes the engine-contract profile.
+Changing any of those requires a new evaluation-policy identity before result-bearing evaluation.
 
 ## Evaluation-policy identity
 
@@ -104,12 +188,12 @@ Therefore:
 ```text
 preflight contract drift
 or
-decision-semantic drift
+decision-semantic/audit-schema drift
         ↓
 new evaluation-policy identity required
 ```
 
-The engine cannot decide what its decision rules mean after observing the case.
+The engine cannot decide what “winning,” “blocked,” or “auditable” means after observing the case.
 
 ## Registration timing
 
@@ -119,7 +203,7 @@ This crate accepts only:
 RegisteredEffectiveShadowDispositionPolicyV1
 ```
 
-It obtains the current preflight and engine-contract profile digests from their contract modules.
+It obtains current preflight and engine-contract profile digests from their contract modules.
 
 It accepts **no** case, raw preflight, lineage-bound preflight, witness, interpretation-lineage, or result instance. Registration can therefore occur before result-bearing evaluation.
 
@@ -155,7 +239,18 @@ action authority
 self-improvement promotion
 ```
 
-This layer freezes **which evaluation contracts and decision semantics are permitted**. It does not evaluate an instance under them.
+This layer freezes **which evaluation contracts, decision semantics, and audit schema are permitted**. It does not evaluate an instance under them.
+
+## Queue governance
+
+The focused workflow uses the repository's mature evidence-run pattern:
+
+```text
+automatic PR/ref run -> stale automatic copy superseded
+manual workflow_dispatch -> unique run_id, preserved independently
+```
+
+The focused job also has a 20-minute timeout. Superseded/cancelled runs remain infrastructure state, never PASS/FAIL epistemic evidence.
 
 ## Future engine rule
 
@@ -171,4 +266,4 @@ exact witnessed artifacts needed for the typed reason trace
 
 and verify that the lineage-bound preflight's embedded raw preflight carries the same effective-policy ID contained by the registered evaluation policy.
 
-The engine should not accept raw preflight directly, should not rediscover independence/currentness/provenance, and should not invent precedence or policy/profile bindings itself.
+The engine should not accept raw preflight directly, should not rediscover independence/currentness/provenance, and should not invent precedence, rule mappings, trace fields, or policy/profile bindings itself.
