@@ -1,0 +1,203 @@
+name: IoT Effect Outcome Policy-Bound V2
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-iot-effect-outcome-policy-bound-protocol/**'
+      - 'crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/**'
+      - '.github/workflows/iot-effect-outcome-policy-bound-v2.yml'
+      - '.github/workflows/iot-actuation-effect-outcome-verifier.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iot-effect-outcome-policy-bound-v2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Prove V1 wire and verifier sources were not rewritten
+        if: github.event_name == 'pull_request'
+        run: |
+          base='${{ github.event.pull_request.base.sha }}'
+          forbidden='crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/evidence.rs|crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/policy.rs|crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/verifier.rs|crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/current.rs|crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/trust.rs|crates/bridges/symthaea-iot-actuation-effect-reconciliation-challenge/'
+          if git diff --name-only "$base"...HEAD | grep -E "$forbidden"; then
+            echo 'V2 tranche must not rewrite V1 wire/current/trust semantics' >&2
+            exit 1
+          fi
+
+      - name: Freeze policy-bound V2 source contract
+        shell: python
+        run: |
+          from pathlib import Path
+          import tomllib
+
+          protocol = Path('crates/bridges/symthaea-iot-effect-outcome-policy-bound-protocol/src/lib.rs').read_text()
+          v2 = Path('crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/provenance_v2.rs').read_text()
+          code = protocol + '\n' + v2
+          stripped = '\n'.join(
+              line for line in code.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+          compact = ''.join(stripped.split())
+
+          required = [
+              'pubconstPOLICY_BOUND_RECONCILIATION_CHALLENGE_SCHEMA_VERSION:u16=2;',
+              'SYMTHAEA-IOT-RECON-CHALLENGE-V2-POLICY-BOUND',
+              'symthaea-iot-effect-reconciliation-challenge-policy-bound-v2',
+              'pubstructExpectedOutcomePolicyIdentityV2{generation:u64,digest:Digest32,}',
+              'letbase=self.base.canonical_bytes()?;',
+              'pubenumEffectOutcomeEvidenceProvenanceModeV2{FreshGuardReauthorizationAllowed,SignedPolicyIdentityRequired,}',
+              'Self::SignedPolicyIdentityRequired=>1',
+              'pubstructEffectOutcomePolicyV2{pubschema_version:u16,pubbase:EffectOutcomePolicyV1,pubprovenance_mode:EffectOutcomeEvidenceProvenanceModeV2,}',
+              'h.update(&self.base.generation.to_be_bytes());h.update(&base_digest.0);h.update(&[self.provenance_mode.tag()]);',
+              'pubstructPhysicalEffectOutcomeEvidenceBodyV2{pubschema_version:u16,pubsemantic:PhysicalEffectOutcomeEvidenceBodyV1,puboutcome_policy_generation:u64,puboutcome_policy_digest:Digest32,}',
+              'symthaea-iot-effect-outcome-evidence-signature-v2-policy-bound',
+              'pubstructGuardPhysicalEffectOutcomeStateV2',
+              'ifexpected.generation()!=self.policy.generation()||expected.digest()!=self.anchored_policy_digest',
+              'body.outcome_policy_generation!=self.policy.generation()',
+              'body.outcome_policy_digest!=self.anchored_policy_digest',
+              'letcurrent_key=self.trust_registry.exact_active_key(semantic,now_unix_ms)?;',
+              '.verify_strict(&message,&signature)',
+              'policy_generation:self.policy.generation()',
+              'provenance_mode:self.policy.provenance_mode',
+              'pubstructCurrentPhysicalEffectOutcomeGuardV2',
+              'pubstructCurrentPhysicalEffectOutcomeFenceV2',
+              '.min(verifier_key_not_after_unix_ms).min(trust_snapshot_expires_at_unix_ms).min(proof.challenge_expires_at_unix_ms())',
+          ]
+          missing = [needle for needle in required if needle not in compact]
+          if missing:
+              raise SystemExit(f'missing policy-bound V2 invariant: {missing}')
+
+          forbidden = [
+              'Deserialize', 'Serialize', 'serde', 'bincode',
+              'VerificationProvider', 'SignatureVerifier', 'VerifierProvider',
+              'Box<dyn', 'Arc<dyn',
+              'PrivilegedPhysicalEffectPort', 'dispatch_current_attempt',
+              'FinalActuatorPermit', 'TrustBoundFinalActuatorPermit',
+              'JustInTimeHalLease', 'CompleteJitHalLease',
+              'persist_prepared_anchored(', 'persist_adapter_acknowledged_anchored(',
+              'persist_adapter_indeterminate_anchored(', 'persist_abandoned_before_port_anchored(',
+              'persist_terminal_reconciliation',
+              'ReconciledExecutionAndPostcondition', 'ReconciledNonExecution',
+              'TcpListener', 'TcpStream', 'UdpSocket', 'tokio::spawn',
+              'std::process::Command', 'Command::new', 'unsafe{',
+          ]
+          found = [needle for needle in forbidden if needle in compact]
+          if found:
+              raise SystemExit(f'V2 protocol/verifier crossed reviewed boundary: {found}')
+
+          if 'pubfnverify_policy_bound_evidence_at' in compact or 'pubfnfence_current_at' in compact:
+              raise SystemExit('caller-selectable V2 verification time escaped crate-private scope')
+          if compact.count('.verify_strict(&message,&signature)') != 2:
+              raise SystemExit('V2 fixed Ed25519 must execute once historically and once at current fencing')
+          if compact.count('exact_active_key(semantic,now_unix_ms)') != 2:
+              raise SystemExit('V2 must reuse the owner-local exact key lifecycle selector at both boundaries')
+
+          protocol_manifest = tomllib.loads(Path(
+              'crates/bridges/symthaea-iot-effect-outcome-policy-bound-protocol/Cargo.toml'
+          ).read_text())
+          expected_protocol = {
+              'blake3', 'symthaea-authority',
+              'symthaea-iot-actuation-effect-reconciliation-challenge', 'thiserror',
+          }
+          if set(protocol_manifest.get('dependencies', {})) != expected_protocol:
+              raise SystemExit('policy-bound protocol dependency drift')
+
+          verifier_manifest = tomllib.loads(Path(
+              'crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/Cargo.toml'
+          ).read_text())
+          if 'symthaea-iot-effect-outcome-policy-bound-protocol' not in verifier_manifest.get('dependencies', {}):
+              raise SystemExit('V2 verifier does not depend on canonical policy-bound protocol')
+
+      - name: Install Rust 1.96 formatter
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Rustfmt V2 protocol and verifier
+        run: >-
+          cargo +1.96.0 fmt --check
+          -p symthaea-iot-effect-outcome-policy-bound-protocol
+          -p symthaea-iot-actuation-effect-outcome-verifier
+
+      - name: Install Rust 1.94 qualification toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: clippy
+
+      - name: Verify exact qualification toolchain
+        run: |
+          rustc +1.94.0 --version | grep -F 'rustc 1.94.0'
+          cargo +1.94.0 --version | grep -F 'cargo 1.94.0'
+
+      - name: Preserve checked-in lock
+        run: cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Check V2 protocol/verifier packages
+        run: >-
+          cargo +1.94.0 check
+          -p symthaea-iot-effect-outcome-policy-bound-protocol
+          -p symthaea-iot-actuation-effect-outcome-verifier
+          --all-targets --no-default-features
+
+      - name: Reject unreviewed external dependency drift
+        shell: python
+        run: |
+          import tomllib
+          def sourced(path):
+              with open(path, 'rb') as f:
+                  doc = tomllib.load(f)
+              return {
+                  (p['name'], p['version'], p.get('source')): p
+                  for p in doc.get('package', []) if p.get('source') is not None
+              }
+          before = sourced('/tmp/Cargo.lock.before')
+          after = sourced('Cargo.lock')
+          b = set(before); a = set(after)
+          added = a - b; removed = b - a
+          changed = sorted(k for k in a & b if after[k] != before[k])
+          allowed = {
+              ('fips204', '0.4.6', 'registry+https://github.com/rust-lang/crates.io-index')
+          }
+          if not added.issubset(allowed) or removed or changed:
+              raise SystemExit(
+                  f'external dependency drift: added={sorted(added)}, '
+                  f'removed={sorted(removed)}, changed={changed}'
+              )
+
+      - name: Run V2 policy/protocol regressions first
+        run: |
+          cargo +1.94.0 test -p symthaea-iot-effect-outcome-policy-bound-protocol --no-default-features
+          cargo +1.94.0 test -p symthaea-iot-actuation-effect-outcome-verifier --test policy_bound_v2 --no-default-features
+
+      - name: Preserve full outcome-verifier regression suite
+        run: >-
+          cargo +1.94.0 test
+          -p symthaea-iot-actuation-effect-outcome-verifier
+          --all-targets --no-default-features
+
+      - name: Strict package-local Clippy
+        run: |
+          cargo +1.94.0 clippy -p symthaea-iot-effect-outcome-policy-bound-protocol --all-targets --no-default-features --no-deps -- -D warnings
+          cargo +1.94.0 clippy -p symthaea-iot-actuation-effect-outcome-verifier --all-targets --no-default-features --no-deps -- -D warnings
+
+      - name: Show local-only Cargo.lock bookkeeping
+        if: always()
+        run: git diff -- Cargo.lock || true
