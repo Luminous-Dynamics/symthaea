@@ -1,0 +1,90 @@
+name: ALife Evolvability
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/**"
+      - ".github/workflows/alife-evolvability.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  contracts:
+    name: ALife contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-evolvability-contracts
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check -p symthaea-alife --all-targets
+
+      - name: Test ALife contracts
+        run: cargo test -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+  repeated-shock-sweep:
+    name: Repeated-shock evidence sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: contracts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-evolvability-sweep
+
+      - name: Run fixed paired eight-seed sweep
+        run: |
+          mkdir -p target/alife-evolvability
+          cargo run --release -p symthaea-alife --example evolvability_repeated_shock_sweep \
+            | tee target/alife-evolvability/repeated-shock-sweep.txt
+
+      - name: Record exact evidence metadata
+        run: |
+          {
+            echo "git_sha=${GITHUB_SHA}"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "example=evolvability_repeated_shock_sweep"
+            echo "seed_panel=1,2,3,4,5,6,7,8"
+            echo "post_shock_evaluation_ticks=300"
+          } > target/alife-evolvability/metadata.txt
+
+      - name: Upload ALife evolvability evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-evolvability-${{ github.sha }}
+          path: target/alife-evolvability/
+          retention-days: 30
