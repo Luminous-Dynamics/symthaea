@@ -50,20 +50,20 @@ jobs:
       - name: Check ALife formatting
         run: cargo fmt -p symthaea-alife -- --check
 
-      - name: Check ALife targets
-        run: cargo check -p symthaea-alife --all-targets
+      - name: Check ALife targets from frozen lock
+        run: cargo check --locked -p symthaea-alife --all-targets
 
-      - name: Test lifecycle contract
-        run: cargo test -p symthaea-alife lifecycle::
+      - name: Test lifecycle contract from frozen lock
+        run: cargo test --locked -p symthaea-alife lifecycle::
 
-      - name: Test evolutionary-history contract
-        run: cargo test -p symthaea-alife evolutionary_history::
+      - name: Test evolutionary-history contract from frozen lock
+        run: cargo test --locked -p symthaea-alife evolutionary_history::
 
-      - name: Test complete ALife package
-        run: cargo test -p symthaea-alife
+      - name: Test complete ALife package from frozen lock
+        run: cargo test --locked -p symthaea-alife
 
-      - name: Strict package-local Clippy
-        run: cargo clippy -p symthaea-alife --all-targets --no-deps -- -D warnings
+      - name: Strict package-local Clippy from frozen lock
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
 
       - name: Freeze contract-only authority boundary
         run: |
@@ -74,3 +74,10 @@ jobs:
             echo "That belongs in the later production-emission tranche, not this contract-only head."
             exit 1
           fi
+
+      - name: Record qualification identity
+        run: |
+          echo "candidate_sha=$(git rev-parse HEAD)"
+          echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          rustc --version
+          cargo --version
