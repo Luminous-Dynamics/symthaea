@@ -6,7 +6,7 @@
 //! The goal is not high-fidelity plant simulation. It is to prove that the
 //! multiscale contracts fail in the right direction when common infrastructure
 //! assumptions disappear: parent coordination can vanish, the grid can disappear,
-//! a heat sink can be lost, and an invalid thermal reroute can be attempted.
+//! a heat sink can be lost, and thermal grade cannot be upgraded for free.
 
 use chrono::{Duration, TimeZone, Utc};
 use std::collections::BTreeSet;
@@ -23,20 +23,24 @@ use symthaea_operating_envelope::{
 use symthaea_resource_hierarchy::{NodeRole, NodeScale, ResourceHierarchy, ResourceNode};
 use symthaea_resource_model::{
     PortDirection, ResourceAmount, ResourceBalance, ResourceEdge, ResourceEnvelope,
-    ResourceError, ResourceGraph, ResourceKind, ResourcePort, ResourceUnit,
+    ResourceError, ResourceKind, ResourcePort, ResourceUnit,
 };
 use symthaea_resource_quality::{
-    NumericQualityConstraint, QualityMetric, ResourceQualityProfile,
-    ResourceQualityRequirement,
+    NumericQualityConstraint, PortQualityContract, QualifiedGraphError, QualifiedPort,
+    QualifiedResourceGraph, QualityMetric, ResourceQualityProfile, ResourceQualityRequirement,
 };
+use symthaea_thermofluids::heat_pump::HeatPump;
 
 #[derive(Debug)]
 struct FailureLabReport {
     grid_loss_shed_fraction: f64,
     battery_reserve_after_kwh: f64,
-    thermal_reduction_kw: f64,
+    thermal_reduction_without_recovery_kw: f64,
+    thermal_reduction_with_heat_pump_kw: f64,
+    heat_pump_delivered_kw: f64,
+    heat_pump_electrical_kw: f64,
     parent_expiry_local_only: bool,
-    high_temperature_route_blocked: bool,
+    high_temperature_direct_route_blocked: bool,
 }
 
 fn watts(kind: ResourceKind, value: f64) -> ResourceAmount {
@@ -49,6 +53,37 @@ fn port(id: &str, direction: PortDirection, capacity: ResourceAmount) -> Resourc
         direction,
         capacity,
     }
+}
+
+fn qualified_port(
+    id: &str,
+    direction: PortDirection,
+    capacity: ResourceAmount,
+    quality: PortQualityContract,
+) -> QualifiedPort {
+    QualifiedPort::new(port(id, direction, capacity), quality)
+}
+
+fn heat_profile(temp_c: f64) -> ResourceQualityProfile {
+    let key = watts(ResourceKind::ThermalEnergy, 0.0).key;
+    let mut profile = ResourceQualityProfile::new(key);
+    profile
+        .set_numeric(QualityMetric::TemperatureCelsius, temp_c)
+        .unwrap();
+    profile
+}
+
+fn heat_requirement(minimum_c: f64, maximum_c: Option<f64>) -> ResourceQualityRequirement {
+    let key = watts(ResourceKind::ThermalEnergy, 0.0).key;
+    let mut requirement = ResourceQualityRequirement::new(key);
+    requirement
+        .require_numeric(NumericQualityConstraint {
+            metric: QualityMetric::TemperatureCelsius,
+            minimum: Some(minimum_c),
+            maximum: maximum_c,
+        })
+        .unwrap();
+    requirement
 }
 
 fn hierarchy() -> ResourceHierarchy {
@@ -169,8 +204,6 @@ fn run_failure_lab() -> Result<FailureLabReport, Box<dyn Error>> {
         CoordinationMode::ParentCoordinated { .. }
     ));
 
-    // Parent is stricter: a point still inside the local 250 kW ceiling but above
-    // the parent's 180 kW ceiling must be rejected while that lease is active.
     let parent_blocked = evaluate_effective_operation(
         &local,
         &hierarchy,
@@ -183,7 +216,6 @@ fn run_failure_lab() -> Result<FailureLabReport, Box<dyn Error>> {
     assert!(!parent_blocked.parent_violations.is_empty());
 
     // --- Grid loss after parent connectivity/lease expiry. -----------------------
-    // One-hour average: 120 kW solar + 50 kW battery against a 200 kW demand.
     let mut battery = Battery::new(500.0, 150.0, 0.90).with_soc(0.75);
     let delivered_battery_kwh = battery
         .discharge(50.0, 1.0)
@@ -209,8 +241,6 @@ fn run_failure_lab() -> Result<FailureLabReport, Box<dyn Error>> {
     assert!(islanded.compliant);
     assert_eq!(islanded.mode, CoordinationMode::LocalOnly);
 
-    // Local autonomy is bounded rather than permissive: excessive shedding remains
-    // illegal even though no parent lease is active.
     let unsafe_islanding = evaluate_effective_operation(
         &local,
         &hierarchy,
@@ -223,8 +253,6 @@ fn run_failure_lab() -> Result<FailureLabReport, Box<dyn Error>> {
     assert!(unsafe_islanding.parent_violations.is_empty());
 
     // --- Loss of the greenhouse heat sink. ---------------------------------------
-    // In the normal habitat, compute exports 180 kW of heat. If only the 70 kW
-    // building branch remains, the unconsumed thermal residual must stay visible.
     let building_sent_w = 70_000.0;
     let building_loss_fraction = 0.05;
     let building_delivered_w = building_sent_w * (1.0 - building_loss_fraction);
@@ -242,36 +270,25 @@ fn run_failure_lab() -> Result<FailureLabReport, Box<dyn Error>> {
     assert!(!failed_thermal_balance.conserved_within(1e-9)?);
     assert!((failed_thermal_balance.residual()? - 110_000.0).abs() < 1e-9);
 
-    // A degraded workload that emits only what the surviving branch can accept is
-    // physically account-balanced again.
-    let degraded_thermal_balance = ResourceBalance {
-        key: watts(ResourceKind::ThermalEnergy, 0.0).key,
-        produced: building_sent_w,
-        consumed: building_delivered_w,
-        imported: 0.0,
-        exported: 0.0,
-        storage_delta: 0.0,
-        modeled_losses: building_loss_w,
-    };
-    assert!(degraded_thermal_balance.conserved_within(1e-9)?);
-
-    // The topology layer independently refuses the tempting but impossible response
-    // of dumping all 180 kW into an 80 kW building heat interface.
-    let mut failed_route_graph = ResourceGraph::default();
+    // Capacity remains an independent failure boundary even when thermal grade is
+    // otherwise acceptable.
+    let mut failed_route_graph = QualifiedResourceGraph::default();
     failed_route_graph.add_node(
         "compute",
-        [port(
+        [qualified_port(
             "heat-out",
             PortDirection::Output,
             watts(ResourceKind::ThermalEnergy, 190_000.0),
+            PortQualityContract::Provide(heat_profile(42.0)),
         )],
     )?;
     failed_route_graph.add_node(
         "building",
-        [port(
+        [qualified_port(
             "heat-in",
             PortDirection::Input,
             watts(ResourceKind::ThermalEnergy, 80_000.0),
+            PortQualityContract::Require(heat_requirement(35.0, None)),
         )],
     )?;
     let impossible_reroute = failed_route_graph.connect(ResourceEdge {
@@ -285,29 +302,171 @@ fn run_failure_lab() -> Result<FailureLabReport, Box<dyn Error>> {
     });
     assert!(matches!(
         impossible_reroute,
-        Err(ResourceError::DestinationContractViolation(_))
+        Err(QualifiedGraphError::Resource(
+            ResourceError::DestinationContractViolation(_)
+        ))
     ));
 
-    // Grade is another independent failure boundary: enough thermal power is still
-    // not a valid route when the remaining consumer needs higher-temperature heat.
-    let thermal_key = watts(ResourceKind::ThermalEnergy, 0.0).key;
-    let mut low_grade_heat = ResourceQualityProfile::new(thermal_key);
-    low_grade_heat.set_numeric(QualityMetric::TemperatureCelsius, 42.0)?;
-    let mut high_temperature_requirement = ResourceQualityRequirement::new(thermal_key);
-    high_temperature_requirement.require_numeric(NumericQualityConstraint {
-        metric: QualityMetric::TemperatureCelsius,
-        minimum: Some(60.0),
-        maximum: None,
+    // Grade is enforced by routing itself. Sufficient thermal power at 42 C cannot
+    // directly satisfy a 60 C minimum consumer.
+    let mut grade_graph = QualifiedResourceGraph::default();
+    grade_graph.add_node(
+        "compute",
+        [qualified_port(
+            "heat-out",
+            PortDirection::Output,
+            watts(ResourceKind::ThermalEnergy, 100_000.0),
+            PortQualityContract::Provide(heat_profile(42.0)),
+        )],
+    )?;
+    grade_graph.add_node(
+        "high-temp-service",
+        [qualified_port(
+            "heat-in",
+            PortDirection::Input,
+            watts(ResourceKind::ThermalEnergy, 100_000.0),
+            PortQualityContract::Require(heat_requirement(60.0, None)),
+        )],
+    )?;
+    let direct_high_temp_route = grade_graph.connect(ResourceEdge {
+        id: "direct-low-grade-route".into(),
+        from_node: "compute".into(),
+        from_port: "heat-out".into(),
+        to_node: "high-temp-service".into(),
+        to_port: "heat-in".into(),
+        amount: watts(ResourceKind::ThermalEnergy, 60_000.0),
+        loss_fraction: 0.0,
+    });
+    let high_temperature_direct_route_blocked = matches!(
+        &direct_high_temp_route,
+        Err(QualifiedGraphError::QualityMismatch { .. })
+    );
+    assert!(high_temperature_direct_route_blocked);
+    assert!(grade_graph.graph().edges().is_empty());
+
+    // --- Bounded thermal-grade recovery. -----------------------------------------
+    // Instead of inventing 65 C heat, a heat pump consumes 20 kW electrical work
+    // and 60 kW of the stranded 42 C source heat to deliver 80 kW at 65 C.
+    let heat_pump = HeatPump::new(25_000.0, 4.0)?;
+    let upgraded = heat_pump.heating_step(20_000.0, 42.0, 65.0)?;
+    assert!(upgraded.conserved_within(1e-9));
+    assert!((upgraded.source_heat_w - 60_000.0).abs() < 1e-9);
+    assert!((upgraded.delivered_heat_w - 80_000.0).abs() < 1e-9);
+
+    let mut recovery_graph = QualifiedResourceGraph::default();
+    recovery_graph.add_node(
+        "compute",
+        [qualified_port(
+            "heat-out",
+            PortDirection::Output,
+            watts(ResourceKind::ThermalEnergy, upgraded.source_heat_w),
+            PortQualityContract::Provide(heat_profile(42.0)),
+        )],
+    )?;
+    recovery_graph.add_node(
+        "power-bus",
+        [qualified_port(
+            "power-out",
+            PortDirection::Output,
+            watts(ResourceKind::Electricity, 25_000.0),
+            PortQualityContract::NotApplicable,
+        )],
+    )?;
+    recovery_graph.add_node(
+        "heat-pump",
+        [
+            qualified_port(
+                "source-heat-in",
+                PortDirection::Input,
+                watts(ResourceKind::ThermalEnergy, upgraded.source_heat_w),
+                PortQualityContract::Require(heat_requirement(30.0, Some(50.0))),
+            ),
+            qualified_port(
+                "power-in",
+                PortDirection::Input,
+                watts(ResourceKind::Electricity, 25_000.0),
+                PortQualityContract::NotApplicable,
+            ),
+            qualified_port(
+                "upgraded-heat-out",
+                PortDirection::Output,
+                watts(ResourceKind::ThermalEnergy, upgraded.delivered_heat_w),
+                PortQualityContract::Provide(heat_profile(65.0)),
+            ),
+        ],
+    )?;
+    recovery_graph.add_node(
+        "high-temp-service",
+        [qualified_port(
+            "heat-in",
+            PortDirection::Input,
+            watts(ResourceKind::ThermalEnergy, upgraded.delivered_heat_w),
+            PortQualityContract::Require(heat_requirement(60.0, None)),
+        )],
+    )?;
+    recovery_graph.connect(ResourceEdge {
+        id: "source-heat".into(),
+        from_node: "compute".into(),
+        from_port: "heat-out".into(),
+        to_node: "heat-pump".into(),
+        to_port: "source-heat-in".into(),
+        amount: watts(ResourceKind::ThermalEnergy, upgraded.source_heat_w),
+        loss_fraction: 0.0,
     })?;
-    let quality = high_temperature_requirement.evaluate(&low_grade_heat)?;
-    assert!(!quality.compatible);
+    recovery_graph.connect(ResourceEdge {
+        id: "heat-pump-power".into(),
+        from_node: "power-bus".into(),
+        from_port: "power-out".into(),
+        to_node: "heat-pump".into(),
+        to_port: "power-in".into(),
+        amount: watts(ResourceKind::Electricity, upgraded.electrical_input_w),
+        loss_fraction: 0.0,
+    })?;
+    recovery_graph.connect(ResourceEdge {
+        id: "upgraded-heat".into(),
+        from_node: "heat-pump".into(),
+        from_port: "upgraded-heat-out".into(),
+        to_node: "high-temp-service".into(),
+        to_port: "heat-in".into(),
+        amount: watts(ResourceKind::ThermalEnergy, upgraded.delivered_heat_w),
+        loss_fraction: 0.0,
+    })?;
+    assert_eq!(recovery_graph.graph().edges().len(), 3);
+
+    // Recovery consumes 60 kW of the 110 kW stranded low-grade heat, reducing the
+    // required compute/thermal curtailment from 110 kW to 50 kW. At a degraded
+    // 130 kW compute-heat operating point, low-grade conservation closes again.
+    let after_recovery_balance = ResourceBalance {
+        key: watts(ResourceKind::ThermalEnergy, 0.0).key,
+        produced: 180_000.0,
+        consumed: building_delivered_w + upgraded.source_heat_w,
+        imported: 0.0,
+        exported: 0.0,
+        storage_delta: 0.0,
+        modeled_losses: building_loss_w,
+    };
+    assert!((after_recovery_balance.residual()? - 50_000.0).abs() < 1e-9);
+
+    let degraded_with_recovery = ResourceBalance {
+        key: watts(ResourceKind::ThermalEnergy, 0.0).key,
+        produced: 130_000.0,
+        consumed: building_delivered_w + upgraded.source_heat_w,
+        imported: 0.0,
+        exported: 0.0,
+        storage_delta: 0.0,
+        modeled_losses: building_loss_w,
+    };
+    assert!(degraded_with_recovery.conserved_within(1e-9)?);
 
     Ok(FailureLabReport {
         grid_loss_shed_fraction: shed_fraction,
         battery_reserve_after_kwh: battery.stored_energy_kwh(),
-        thermal_reduction_kw: failed_thermal_balance.residual()? / 1_000.0,
+        thermal_reduction_without_recovery_kw: failed_thermal_balance.residual()? / 1_000.0,
+        thermal_reduction_with_heat_pump_kw: after_recovery_balance.residual()? / 1_000.0,
+        heat_pump_delivered_kw: upgraded.delivered_heat_w / 1_000.0,
+        heat_pump_electrical_kw: upgraded.electrical_input_w / 1_000.0,
         parent_expiry_local_only: matches!(islanded.mode, CoordinationMode::LocalOnly),
-        high_temperature_route_blocked: !quality.compatible,
+        high_temperature_direct_route_blocked,
     })
 }
 
@@ -326,8 +485,11 @@ mod tests {
         let report = run_failure_lab().unwrap();
         assert!((report.grid_loss_shed_fraction - 0.15).abs() < 1e-9);
         assert!(report.battery_reserve_after_kwh > 0.0);
-        assert!((report.thermal_reduction_kw - 110.0).abs() < 1e-9);
+        assert!((report.thermal_reduction_without_recovery_kw - 110.0).abs() < 1e-9);
+        assert!((report.thermal_reduction_with_heat_pump_kw - 50.0).abs() < 1e-9);
+        assert!((report.heat_pump_delivered_kw - 80.0).abs() < 1e-9);
+        assert!((report.heat_pump_electrical_kw - 20.0).abs() < 1e-9);
         assert!(report.parent_expiry_local_only);
-        assert!(report.high_temperature_route_blocked);
+        assert!(report.high_temperature_direct_route_blocked);
     }
 }
