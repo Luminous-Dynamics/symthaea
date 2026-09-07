@@ -31,6 +31,7 @@ pub mod environment;
 pub mod events;
 pub mod evolvability;
 pub mod evolvability_comparison;
+pub mod evolution_birth;
 pub mod evolution_rng;
 pub mod exact_sign_test;
 pub mod genome;
@@ -62,6 +63,9 @@ pub use evolvability::{
 };
 pub use evolvability_comparison::{
     RecoveryComparison, RecoveryComparisonError, RecoveryLatencyComparison, compare_recovery,
+};
+pub use evolution_birth::{
+    EvolutionBirthPlanErrorV1, EvolutionBirthPlanV1, prepare_evolution_birth_v1,
 };
 pub use evolution_rng::{
     EvolutionRngSnapshotV1, EvolutionRngStreamsV1, INHERITANCE_SOURCE_SEED_OFFSET_V1,
