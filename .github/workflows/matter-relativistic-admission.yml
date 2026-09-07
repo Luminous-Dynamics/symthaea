@@ -1,0 +1,73 @@
+name: Matter Relativistic Admission
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_relativistic.rs'
+      - 'src/knowledge/mod.rs'
+      - 'crates/domains/symthaea-epistemic-types/src/matter.rs'
+      - '.github/workflows/matter-relativistic-admission.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  relativistic-admission:
+    name: Exact relativistic capability admission
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Lockfile must remain unchanged from PR base
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          test -z "$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- Cargo.lock)"
+
+      - name: Focused formatting
+        run: cargo fmt --check -p symthaea
+
+      - name: Relativistic admission regressions
+        run: cargo test --locked -p symthaea --lib knowledge::matter_relativistic::tests -- --nocapture
+
+      - name: Exact-capability and authority ratchets
+        shell: python
+        run: |
+          from pathlib import Path
+          text = Path('src/knowledge/matter_relativistic.rs').read_text()
+
+          required = (
+              'RelativisticElectronicRequirement',
+              'required_capability',
+              'solver.supports(required)',
+              'ScalarRelativisticElectronicStructure',
+              'SpinOrbitElectronicStructure',
+              'FourComponentRelativisticElectronicStructure',
+              'MatterClaim::local_computational',
+              'NonLocalValidationStage',
+              'BenchmarkWithoutReference',
+          )
+          for token in required:
+              if token not in text:
+                  raise SystemExit(f'missing relativistic admission contract: {token}')
+
+          forbidden = (
+              'supports_any_relativistic_electronic_structure()',
+              'pub experimental:',
+              'pub independent:',
+              'pub qualified:',
+              'pub confidence:',
+          )
+          for token in forbidden:
+              if token in text:
+                  raise SystemExit(f'forbidden relativistic authority shortcut: {token}')
+
+          print('exact relativistic capability/authority ratchets passed')
