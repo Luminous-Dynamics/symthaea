@@ -1,0 +1,193 @@
+name: EML Scientific Authority Boundary
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/eml-scientific-authority-boundary.yml'
+      - 'patches/science/eml-scientific-authority-boundary-v1.patch'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine/verification.rs'
+      - 'crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/eml-scientific-authority-boundary-v1.patch
+
+jobs:
+  qualify:
+    name: Prove EML authority leaks and qualify separation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates/core/symthaea-core/src || {
+            echo 'EML scientific-authority qualification branch must not materialize product source'
+            exit 1
+          }
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Prove current EML scientific-authority leaks
+        run: |
+          mkdir -p crates/core/symthaea-core/tests
+          cat > crates/core/symthaea-core/tests/eml_scientific_authority_negative_control.rs <<'RS'
+          use symthaea_core::hdc::abstract_thought::{
+              dynamic_grammar::DynamicGrammar,
+              normalize_expr,
+          };
+          use symthaea_core::hdc::conjecture_engine::{
+              attach_eml_metadata, conjecture_has_verified_eml_backend, BinOp, Conjecture,
+              ConjectureEngine, ConjectureStatus, Expr, MacroPromotionTier, MathDomain,
+              ObservedSequence,
+          };
+
+          fn proposed_conjecture(formula: Expr, source: &str) -> Conjecture {
+              let complexity = formula.complexity();
+              Conjecture {
+                  formula: formula.clone(),
+                  formula_str: format!("{formula}"),
+                  source: source.into(),
+                  domain: MathDomain::Physics,
+                  training_mse: 0.1,
+                  complexity,
+                  fitness: 0.1,
+                  status: ConjectureStatus::Proposed,
+                  confidence: 0.5,
+                  macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
+                  eml_compiled: None,
+                  eml_metrics: None,
+                  eml_verified_real: None,
+                  eml_real_domain: None,
+                  eml_verified_complex: None,
+                  eml_constructive_compiled: None,
+                  eml_constructive_metrics: None,
+                  eml_verified_constructive_real: None,
+              }
+          }
+
+          #[test]
+          fn current_eml_backend_can_singleton_fast_track_proposed_conjecture() {
+              let n = Expr::Var("n".into());
+              let formula = Expr::BinOp(
+                  BinOp::Add,
+                  Box::new(Expr::BinOp(
+                      BinOp::Pow,
+                      Box::new(n),
+                      Box::new(Expr::Const(2.0)),
+                  )),
+                  Box::new(Expr::Const(1.0)),
+              );
+              let mut conjecture = proposed_conjecture(formula.clone(), "eml-fast-track");
+              attach_eml_metadata(&mut conjecture);
+              assert!(conjecture_has_verified_eml_backend(&conjecture));
+
+              let mut engine = ConjectureEngine::new();
+              engine.conjectures.push(conjecture);
+              let mut grammar = DynamicGrammar::new();
+              grammar.observe_subtree(normalize_expr(&formula), &[0], &engine);
+
+              assert_eq!(grammar.candidates.len(), 1);
+              assert_eq!(grammar.candidates[0].strongly_verified_count, 1);
+              grammar.promote_eligible(&engine);
+              assert_eq!(grammar.operators.len(), 1);
+              assert_eq!(
+                  grammar.operators[0].promotion_tier,
+                  MacroPromotionTier::FastTrackVerified
+              );
+          }
+
+          #[test]
+          fn current_eml_backend_can_make_mediocre_numeric_fit_macro_safe() {
+              let data: Vec<(f64, f64)> = (1..=10)
+                  .map(|x| {
+                      let x = x as f64;
+                      (x, x)
+                  })
+                  .collect();
+              let sequence = ObservedSequence::new("eml-numeric", MathDomain::Physics, data);
+              let formula = Expr::BinOp(
+                  BinOp::Mul,
+                  Box::new(Expr::Const(0.95)),
+                  Box::new(Expr::Var("n".into())),
+              );
+              let mut conjecture = proposed_conjecture(formula, &sequence.name);
+              attach_eml_metadata(&mut conjecture);
+              assert!(conjecture_has_verified_eml_backend(&conjecture));
+
+              let mut engine = ConjectureEngine::new();
+              engine.observe(sequence);
+              engine.conjectures.push(conjecture);
+              engine.verify_numerical();
+
+              assert!(matches!(
+                  engine.conjectures[0].status,
+                  ConjectureStatus::NumericallyTested { .. }
+              ));
+              assert_eq!(
+                  engine.conjectures[0].macro_promotion_tier,
+                  MacroPromotionTier::RecurrentNumerical
+              );
+          }
+          RS
+          cargo test --locked -p symthaea-core --features abstract_thought --test eml_scientific_authority_negative_control
+          rm crates/core/symthaea-core/tests/eml_scientific_authority_negative_control.rs
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet scientific authority separation
+        run: |
+          META=crates/core/symthaea-core/src/hdc/conjecture_engine/conjecture_metadata.rs
+          VERIFY=crates/core/symthaea-core/src/hdc/conjecture_engine/verification.rs
+          GRAMMAR=crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
+          grep -F 'execution/representation property only' "$META"
+          grep -F 'let macro_safe_numeric_fit = test_mse < 1e-3 || mean_rel_error < 0.01;' "$VERIFY"
+          grep -F 'is_strongly_verified(&conjecture.status)' "$GRAMMAR"
+          grep -F 'EML rank is only an execution/canonicalization tiebreaker' "$GRAMMAR"
+          grep -F 'eml_equivalence_does_not_make_mediocre_numeric_fit_macro_safe' "$VERIFY"
+          grep -F 'eml_backend_equivalence_does_not_fast_track_proposed_conjecture' "$GRAMMAR"
+          if grep -F '|| conjecture_has_verified_eml_backend(conjecture)' "$VERIFY" "$GRAMMAR"; then
+            echo 'EML backend equivalence still grants scientific promotion authority'
+            exit 1
+          fi
+          if grep -F 'candidate_fast_track_rank' "$GRAMMAR"; then
+            echo 'obsolete EML-backed fast-track ranking still present'
+            exit 1
+          fi
+
+      - name: Run exact authority-boundary regressions
+        run: |
+          cargo fmt --check -p symthaea-core
+          cargo test --locked -p symthaea-core --features abstract_thought eml_equivalence_does_not_make_mediocre_numeric_fit_macro_safe -- --nocapture
+          cargo test --locked -p symthaea-core --features abstract_thought eml_backend_equivalence_does_not_fast_track_proposed_conjecture -- --nocapture
+          cargo check --locked -p symthaea-core --features abstract_thought
+          cargo clippy --locked -p symthaea-core --features abstract_thought --lib -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes that EML execution/representation equivalence cannot by itself make a held-out numeric fit grammar-admissible or grant singleton fast-track promotion in the qualified implementation.'
+          echo 'EML may still support canonicalization, execution validation, and ranking after independent scientific eligibility is established.'
+          echo 'PASS does not establish EML verifier completeness, conjecture truth, formal proof, evidence independence, replication, scientific disposition, or action authority.'
