@@ -206,8 +206,15 @@ impl DegradedOperationsSupervisor {
         }
     }
 
+    /// Clear ephemeral observation/recovery progress without widening the
+    /// currently active degraded-operation restriction.
+    ///
+    /// In particular, `RecoveryRequired`, `SafeHold`, `AutonomousReturn`, and
+    /// `OperatorLinkLost` survive a runtime reset. Returning to `Normal` must be
+    /// earned through the ordinary state machine; for `RecoveryRequired`, that
+    /// means `authorize_recovery_clear()` and its explicit authorization/dwell
+    /// requirements. Partial healthy-recovery dwell is deliberately discarded.
     pub fn reset_runtime(&mut self) {
-        self.mode = DegradedMode::Normal;
         self.operator_link_loss_steps = 0;
         self.consecutive_watchdog_failures = 0;
         self.healthy_recovery_steps = 0;
@@ -299,5 +306,69 @@ mod tests {
         assert!(!supervisor.authorize_recovery_clear(recovery, true));
         assert!(supervisor.authorize_recovery_clear(recovery, true));
         assert_eq!(supervisor.mode(), DegradedMode::Normal);
+    }
+
+    #[test]
+    fn recovery_required_survives_runtime_reset() {
+        let mut supervisor = DegradedOperationsSupervisor::new(DegradedPolicy {
+            watchdog_failure_limit: 1,
+            ..Default::default()
+        });
+        let mut observation = healthy();
+        observation.control_loop_healthy = false;
+        assert_eq!(
+            supervisor.update(observation).current,
+            DegradedMode::RecoveryRequired
+        );
+
+        supervisor.reset_runtime();
+
+        assert_eq!(supervisor.mode(), DegradedMode::RecoveryRequired);
+        assert_eq!(
+            supervisor.update(healthy()).current,
+            DegradedMode::RecoveryRequired
+        );
+    }
+
+    #[test]
+    fn runtime_reset_discards_partial_recovery_dwell() {
+        let mut supervisor = DegradedOperationsSupervisor::new(DegradedPolicy {
+            watchdog_failure_limit: 1,
+            recovery_dwell_steps: 2,
+            ..Default::default()
+        });
+        let mut failed = healthy();
+        failed.control_loop_healthy = false;
+        supervisor.update(failed);
+
+        let mut recovery = healthy();
+        recovery.at_surface_or_service_bay = true;
+        assert!(!supervisor.authorize_recovery_clear(recovery, true));
+
+        supervisor.reset_runtime();
+
+        assert_eq!(supervisor.mode(), DegradedMode::RecoveryRequired);
+        assert!(!supervisor.authorize_recovery_clear(recovery, true));
+        assert!(supervisor.authorize_recovery_clear(recovery, true));
+        assert_eq!(supervisor.mode(), DegradedMode::Normal);
+    }
+
+    #[test]
+    fn safe_hold_survives_runtime_reset() {
+        let mut supervisor = DegradedOperationsSupervisor::new(DegradedPolicy {
+            operator_link_grace_steps: 0,
+            ..Default::default()
+        });
+        let mut observation = healthy();
+        observation.operator_link_fresh = false;
+        observation.return_feasible = false;
+        assert_eq!(
+            supervisor.update(observation).current,
+            DegradedMode::SafeHold
+        );
+
+        supervisor.reset_runtime();
+
+        assert_eq!(supervisor.mode(), DegradedMode::SafeHold);
     }
 }
