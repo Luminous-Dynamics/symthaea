@@ -1,0 +1,90 @@
+name: Matter External Evidence Receipts
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-evidence-plane/src/external_receipt.rs'
+      - 'crates/core/symthaea-evidence-plane/src/lib.rs'
+      - '.github/workflows/matter-evidence-external-receipts.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  external-receipt-boundary:
+    name: Reference-only external evidence boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Lockfile must remain unchanged from PR base
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          test -z "$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- Cargo.lock)"
+
+      - name: Focused formatting
+        run: cargo fmt --check -p symthaea-evidence-plane
+
+      - name: Focused package check
+        run: cargo check --locked -p symthaea-evidence-plane --all-targets
+
+      - name: External receipt regressions
+        run: cargo test --locked -p symthaea-evidence-plane external_receipt::tests -- --nocapture --test-threads=1
+
+      - name: External authority semantic ratchet
+        shell: python
+        run: |
+          from pathlib import Path
+
+          src = Path('crates/core/symthaea-evidence-plane/src/external_receipt.rs').read_text()
+          lib = Path('crates/core/symthaea-evidence-plane/src/lib.rs').read_text()
+
+          required = (
+              'pub mod external_receipt;',
+              'EvidenceReferenceInterpretation::ReferenceOnly',
+              'DeclaredChronologyInterpretation::DeclaredChronologyOnly',
+              'pub struct ExternalEvidenceBundle',
+              'pub struct DeclaredTemporalRelation',
+              'require_preregistration_before',
+              'require_distinct_content',
+              'SameContentIdentity',
+              'NonIncreasingDeclaredChronology',
+          )
+          combined = lib + '\n' + src
+          for token in required:
+              if token not in combined:
+                  raise SystemExit(f'missing external evidence boundary token: {token}')
+
+          # Derived chronology must be output-only. Do not allow arbitrary JSON
+          # to mint a relation that bypasses bundle checks.
+          relation_head = src.split('pub struct DeclaredTemporalRelation', 1)[0].rsplit('#[derive', 1)[-1]
+          if 'Deserialize' in relation_head:
+              raise SystemExit('DeclaredTemporalRelation became deserializable')
+
+          forbidden_authority = (
+              'VerifiedChronology',
+              'VerifiedTimestamp',
+              'VerifiedExperimental',
+              'is_verified',
+              'verified: bool',
+              'attested: bool',
+              'experimental_truth',
+              'replication_verified',
+          )
+          for token in forbidden_authority:
+              if token in src:
+                  raise SystemExit(f'local external authority shortcut detected: {token}')
+
+          if 'This module validates local *reference shape* only.' not in src:
+              raise SystemExit('reference-only non-claim must remain explicit')
+
+          print('external evidence reference-only authority ratchet passed')
