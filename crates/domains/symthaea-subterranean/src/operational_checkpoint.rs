@@ -4,6 +4,8 @@
 
 #[path = "restore_semantics.rs"]
 pub mod restore_semantics;
+#[path = "authority_transitions.rs"]
+pub mod authority_transitions;
 
 use crate::actuator_isolation::ActuatorIsolationSupervisor;
 use crate::controller::{CheckpointError, ControllerCheckpoint};
