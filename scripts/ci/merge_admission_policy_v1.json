@@ -1,0 +1,32 @@
+{
+  "schema": "symthaea.merge-admission-policy.v1",
+  "repository": "Luminous-Dynamics/symthaea",
+  "target_branch": "main",
+  "decision_default": "incomplete",
+  "head_change_invalidates": true,
+  "base_change_invalidates": true,
+  "unknown_evidence_default": "reject",
+  "control_plane": {
+    "mode": "exact_base_equivalence",
+    "paths": [
+      ".github/workflows/ci.yml",
+      "scripts/ci/qualification_scope.py",
+      "scripts/ci/ci_lifecycle_jobs_v1.json",
+      "scripts/ci/validate_ci_lifecycle_registry.py",
+      "scripts/ci/apply_ci_lifecycle_tiering.py",
+      "docs/operations/CI_LIFECYCLE_TIERING_V1.md"
+    ],
+    "candidate_changes_require_independent_bootstrap": true
+  },
+  "full_integration": {
+    "workflow_path": ".github/workflows/ci.yml",
+    "accepted_events": ["pull_request", "workflow_dispatch"],
+    "required_status": "completed",
+    "required_conclusion": "success",
+    "require_exact_head": true,
+    "require_exact_base": true,
+    "require_no_required_job_skips": true
+  },
+  "focused_evidence_can_substitute_for_full_integration": false,
+  "tier1_can_substitute_for_full_integration": false
+}
