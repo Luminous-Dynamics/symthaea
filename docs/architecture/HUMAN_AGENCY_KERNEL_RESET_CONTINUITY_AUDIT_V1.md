@@ -4,200 +4,128 @@ Status: HAK-002 supporting audit / documentation only
 
 Parent: `HUMAN_AGENCY_KERNEL_AUTHORITY_AUGMENTATION_CONTRACT_V1.md`
 
-## 1. Question
+## 1. Why this audit changed
 
-When a system resets, restarts, restores a checkpoint, migrates state, or begins a new simulation, which facts are being forgotten and which facts are being *asserted*?
-
-The HAK authority-monotonicity principle requires special care here because resetting an implementation field to a convenient default can have authority semantics.
+This audit began from a valid HAK question:
 
 ```text
-zeroing a counter                 may be cleanup
-setting Unknown -> Healthy        is a claim
-setting Hold -> Nominal           widens authority
-setting Disconnected -> Connected is a claim
-clearing Revoked                  widens authority
-clearing partial positive quorum  may be conservative
+Can reset/restart silently widen authority?
 ```
 
-The core theorem is:
+The first source pass found several subterranean `reset_runtime()` methods that clear restrictive state. That looked like an operational-recovery bypass.
+
+A broader call-site audit changed the conclusion.
+
+The shared `EmbodimentBridge` trait documents `reset()` as:
 
 ```text
-OperationalReset != NewWorld
+Reset body to default state.
 ```
 
-and:
+Current call sites also use it as full scenario/test reinitialization: robotics bridge reset resets both the embodiment and FEP state, and platform tests call `reset()` expecting counters/body state to return to defaults.
+
+Therefore the repository does **not** currently establish that `SubterraneanEmbodiment::reset()` is an operational restart primitive.
+
+The corrected finding is:
 
 ```text
-OperationalReset cannot manufacture positive evidence or remove a durable restriction.
+Current reset is evidence of new-scenario/default-body semantics.
+It is NOT evidence of operational recovery.
 ```
 
-## 2. Four reset classes
+This distinction matters because a correct authority theorem applied to the wrong lifecycle operation would itself create a bug: preserving an emergency stop from simulation A into a deliberately new simulation B is not necessarily conservative; it may simply violate reset semantics.
 
-### 2.1 New simulation lineage
+## 2. Evidence hierarchy
 
-A deterministic simulation reset may intentionally construct an entirely new simulated world.
+### Established
 
-Semantics:
+1. `EmbodimentBridge::reset()` is documented as resetting the body to default state.
+2. Existing call sites exercise it as reinitialization/test-reset behavior.
+3. `SubterraneanOperationalCheckpoint` separately persists authority/recovery state, including operator authority, degraded supervision, partition recovery, and temporal assurance.
+4. Checkpoint restoration tests already demonstrate continuity of an operator hold and a latched temporal hold.
+5. The generic subterranean reset sets several simulated/runtime fields to configured nominal defaults.
+
+### Not established
+
+1. That the generic `reset()` API is used for live physical operational recovery.
+2. That clearing operator/degraded/partition state during a *new simulation lineage* is a security bypass.
+3. That the current physical deployment lifecycle reuses `reset()` after a process/power failure.
+
+### Architectural risk
+
+The names `reset()` and `reset_runtime()` are broad enough that future callers could mistake scenario reset for operational recovery. The right repair is therefore to make the lifecycle distinction explicit before changing local reset semantics.
+
+## 3. Four lifecycle operations
+
+### 3.1 New simulation/scenario lineage
+
+Purpose: deterministic scenario reinitialization.
 
 ```text
-old simulation lineage terminates
-new simulation lineage begins
+old simulated lineage terminates
+new simulated lineage begins
 ```
 
-It is legitimate for the new world to begin with configured nominal fixtures if those fixtures are explicitly part of the scenario initialization.
+Configured nominal state is legitimate because it is part of the new scenario fixture.
 
-Required safeguard:
+A new simulation need not inherit prior simulated stop/hold/recovery state unless the test explicitly models continuity.
 
-```text
-new simulation state MUST NOT be represented as continuity of a deployed operational authority lineage
-```
+### 3.2 Ephemeral computation reset
 
-### 2.2 Ephemeral computation reset
-
-Purpose: discard partial work that must not survive interruption.
+Purpose: discard partial computation while preserving the same operational lineage.
 
 Examples:
 
-- partial quorum accumulation;
-- in-progress negotiation state;
 - temporary buffers;
-- incomplete calculations;
+- partial quorum accumulation;
+- incomplete negotiations;
 - non-authoritative caches.
 
-Semantics:
+Rule:
 
 ```text
-provisional positive state may disappear
-negative/restrictive authority state must not disappear
-positive evidence must not be invented
+may discard provisional positive progress
+must not manufacture positive evidence
+must not silently remove durable same-lineage restrictions
 ```
 
-### 2.3 Operational restart/recovery
+### 3.3 Operational restart/recovery
 
-Purpose: continue a real authority lineage after process restart, watchdog restart, update, power interruption, or similar event.
+Purpose: continue a real authority lineage after process restart, watchdog restart, power interruption, update, or similar event.
 
-Required continuity domains include, where applicable:
+For this operation the authority-monotonicity theorem applies:
 
-- operator stop/hold/maintenance constraints;
-- revocation/refusal generations;
+```text
+Authority(after recovery initialization)
+    ⊆
+Authority(before interruption)
+```
+
+until fresh evidence or an explicitly authorized transition widens it.
+
+Operational recovery must define continuity for, where applicable:
+
+- operator constraints;
 - replay barriers;
+- revocation/refusal generations;
 - degraded/recovery latches;
-- partition/reconciliation state;
-- causal/temporal review latches;
+- partition/reconciliation truth;
+- temporal/causal review latches;
 - physical capability/failure state;
-- checkpoint validity;
 - evidence freshness;
-- update authority;
-- audit continuity.
+- audit/update lineage.
 
-A restart can make evidence unavailable. It cannot safely make unavailable evidence become positive evidence.
+### 3.4 Administrative factory reset
 
-### 2.4 Administrative factory reset
+Purpose: intentionally destroy a local lineage/configuration.
 
-A factory reset intentionally destroys prior local state/lineage.
+This is a privileged administrative/destructive operation, not an implicit recovery shortcut. A deployed post-factory-reset system should reacquire the evidence and authority required for operation.
 
-That is a privileged administrative action, not an implicit operational recovery path.
+## 4. Current subterranean lifecycle: two real paths
 
-A post-factory-reset deployed system should normally begin unqualified/restricted until deployment identity, configuration, physical state, policy, and required authority are re-established.
+### 4.1 Scenario reset path
 
-## 3. Current subterranean reset composition
-
-The current `SubterraneanEmbodiment::reset()` mixes all four reset classes.
-
-It resets the simulated plant and cognitive/runtime state, which is reasonable for a new simulation lineage, but the same method also resets authority-relevant operational state and is exposed through `EmbodimentBridge::reset()`.
-
-This means its semantics are ambiguous:
-
-```text
-Is this:
-  new deterministic scenario?
-  ephemeral process restart?
-  live operational recovery?
-  factory reset?
-```
-
-Until those meanings are split, the safest architectural rule is:
-
-```text
-SubterraneanEmbodiment::reset() is not evidence of operational recovery.
-```
-
-## 4. Finding RST-001 — operator authority
-
-Current authority recovery requires `ResumeNominal` quorum plus a clear physical-hazard check.
-
-The historical `OperatorAuthority::reset_runtime()` cleared the active operator constraint directly.
-
-That allowed:
-
-```text
-EmergencyStop / MaintenanceLock / Hold
-        ↓
-reset
-        ↓
-None
-```
-
-without the normal authority-widening transition.
-
-This finding has been isolated into an independent code tranche (`fix(subterranean): preserve operator authority across reset`).
-
-Repair theorem:
-
-```text
-reset may discard partial resume quorum
-reset must preserve active operator constraint and replay history
-```
-
-## 5. Finding RST-002 — degraded recovery latch
-
-`DegradedMode::RecoveryRequired` is intentionally sticky.
-
-Normal `update()` does not clear it merely because the operator link returns. The explicit clear path additionally requires:
-
-- external recovery authorization;
-- safe surface/service-bay location;
-- fresh operator link;
-- healthy control loop;
-- valid checkpoint;
-- reboot count below the policy limit;
-- configured healthy dwell.
-
-However, `DegradedOperationsSupervisor::reset_runtime()` currently performs:
-
-```text
-mode = Normal
-operator_link_loss_steps = 0
-consecutive_watchdog_failures = 0
-healthy_recovery_steps = 0
-```
-
-Therefore:
-
-```text
-RecoveryRequired
-   ↓ reset_runtime
-Normal
-```
-
-bypasses the domain's explicit recovery authorization and dwell theorem.
-
-Candidate repair:
-
-```text
-reset_ephemeral():
-  preserve mode
-  clear only provisional recovery progress/counters that are safe to forget
-
-clear_recovery():
-  remains the only RecoveryRequired -> Normal transition
-```
-
-Exact details remain domain-owned and need a focused code review.
-
-## 6. Finding RST-003 — manufactured health assertions
-
-`SubterraneanEmbodiment::reset()` currently assigns:
+`SubterraneanEmbodiment::reset()` resets the simulator plus cognitive/runtime state and writes nominal fixture values including:
 
 ```text
 operator_link_fresh = true
@@ -206,139 +134,132 @@ checkpoint_valid = true
 reboot_count_in_window = 0
 ```
 
-These are not all ordinary caches.
+Under *new-scenario* semantics these are fixture initialization values, not claims that a previous operational failure recovered.
 
-In an operational lineage they are positive assertions used by degraded-operation policy.
+They become unsafe only if this method is later reused as same-lineage operational recovery.
 
-A restart cannot establish these facts by resetting memory.
+### 4.2 Operational checkpoint path
 
-Candidate operational-restart state should instead use one of two patterns:
+`SubterraneanOperationalCheckpoint` explicitly contains:
 
-### Pattern A — explicit unknown state
+- controller state;
+- mission state;
+- operator authority;
+- degraded supervisor;
+- update manager;
+- sensor fusion;
+- actuator isolation;
+- field envelope;
+- partition recovery;
+- temporal assurance.
 
-```text
-operator_link = Unknown
-control_loop_health = Unknown
-checkpoint_validity = Unknown
-reboot_window = RestoredFromDurableEvidence | Unknown
-```
+`load_operational_checkpoint()` restores those objects rather than reconstructing them from nominal defaults.
 
-and fail closed until observations establish current health.
-
-### Pattern B — typed recovery evidence
-
-Construct a `RestartEvidence` / `RecoveryContext` from durable or freshly verified sources and initialize the supervisor from that evidence.
-
-Do not use boolean defaults as authority-bearing recovery evidence.
-
-## 7. Finding RST-004 — partition reconciliation bypass
-
-The partition-recovery module explicitly states:
+Existing tests already verify at least:
 
 ```text
-restored radio link != restored operational truth
+operator HoldPosition survives checkpoint restore
+latched temporal HoldForReview survives checkpoint restore
 ```
 
-After a partition it requires reconciliation dwell before team state becomes authoritative.
+That is evidence that the repository already has the beginnings of a distinct operational-continuity model.
 
-Current `PartitionRecoverySupervisor::reset_runtime()` sets:
+## 5. Corrected status of the earlier reset findings
+
+### RST-001 — operator authority reset
+
+Observation:
+
+`OperatorAuthority::reset_runtime()` clears the operator constraint when called by the generic embodiment reset.
+
+Initial interpretation:
 
 ```text
-mode = Connected
-partition_steps = 0
-reconciliation_steps = 0
-last_assessment = connected()
+reset bypasses ResumeNominal quorum
 ```
 
-and `connected()` means:
+Corrected interpretation:
 
 ```text
-motion_permitted = true
-team_state_authoritative = true
+NOT DEMONSTRATED as an operational bypass,
+because the only established caller is the new-scenario reset path.
 ```
 
-Thus reset can manufacture the exact state that reconciliation is designed to establish.
+A draft code patch that preserved operator restrictions across the existing reset was opened during the first audit and then **closed unmerged** after this semantic correction.
 
-Candidate repair theorem:
+### RST-002 — degraded RecoveryRequired reset
+
+Observation:
+
+The generic reset clears `RecoveryRequired` even though same-lineage recovery normally needs explicit authorization and healthy dwell.
+
+Corrected interpretation:
+
+This is appropriate for a deliberately new scenario unless `reset()` is reused as operational recovery.
+
+The first preservation patch was therefore **closed unmerged**.
+
+Future operational recovery must preserve/revalidate the latch according to domain rules.
+
+### RST-003 — partition reconciliation reset
+
+Observation:
+
+The generic reset initializes partition state as `Connected` with authoritative team state.
+
+Corrected interpretation:
+
+This is a valid new-scenario fixture. It is not valid evidence of reconnection in the prior lineage.
+
+The first preservation patch was **closed unmerged**.
+
+### RST-004 — temporal hold reset
+
+Observation:
+
+The scenario reset creates a fresh default temporal supervisor.
+
+Corrected interpretation:
+
+That is valid for a new scenario. Operational checkpoint restoration already preserves the temporal latch, with a regression test demonstrating continuity.
+
+No temporal reset hardening PR should be opened merely against scenario-reset semantics.
+
+### RST-005 — field/capability defaults
+
+Observation:
+
+Scenario reset restores nominal field/capability fixtures.
+
+Corrected interpretation:
+
+Valid for a freshly reset simulated plant. A future physical operational-recovery path must instead establish capability from physical/durable evidence.
+
+### RST-006 — optimistic health booleans
+
+Observation:
+
+Scenario reset assigns positive health booleans.
+
+Corrected interpretation:
+
+These are simulation fixtures today. They become an architectural hazard only if the same API is treated as operational restart/recovery.
+
+A future operational API should use explicit unknown/revalidated health or a typed recovery-evidence input rather than inheriting these fixture defaults.
+
+## 6. The actual open problem: lifecycle typing
+
+The repository currently has a narrow trait operation named simply:
 
 ```text
-reset cannot produce Connected/team_state_authoritative
-unless this is explicitly a new simulation lineage
+reset()
 ```
 
-For an operational reset, conservative behavior is likely:
+while the subterranean domain also has an explicit checkpoint continuity path.
 
-- preserve current partition/reconciliation mode and authority;
-- discard partial *positive* reconciliation dwell if continuity cannot be proven;
-- require fresh connectivity and revision observations before `Connected` is regained.
+The design opportunity is to make those meanings impossible to confuse.
 
-## 8. Finding RST-005 — temporal/causal hold bypass
-
-Temporal assurance can latch `HoldForReview` after invalid control timing, clock rejection, causal contradiction, or related uncertainty.
-
-The latch clears only after clean nominal temporal evidence for a configured dwell at a safe service location.
-
-The embodiment reset currently replaces the temporal supervisor with `TemporalAssuranceSupervisor::default()`.
-
-Default begins with:
-
-```text
-authority = Nominal
-hold_latched = false
-```
-
-Therefore an operational interpretation of reset could perform:
-
-```text
-HoldForReview
-   ↓ reset
-Nominal
-```
-
-without the clean-evidence dwell.
-
-Candidate repair theorem:
-
-```text
-temporal/causal uncertainty survives operational restart
-until continuity is restored or a domain-qualified recovery path clears it
-```
-
-## 9. Finding RST-006 — field-envelope/capability optimism
-
-The embodiment reset also resets field-envelope and capability state to nominal values.
-
-This may be perfectly correct for a fresh simulated plant because the simulator itself is reset.
-
-It is not a valid operational restart assumption for physical hardware.
-
-A physical restart should derive capability from current sensors, component health, maintenance state, and durable failure evidence before granting nominal work authority.
-
-Candidate rule:
-
-```text
-NewSimulation -> configured nominal fixture is allowed
-OperationalRestart -> nominal capability must be re-established from evidence
-```
-
-## 10. Why one generic reset cannot safely serve all roles
-
-The problem is not that `reset()` is intrinsically unsafe.
-
-The problem is semantic overloading.
-
-A single API currently spans:
-
-```text
-new simulated universe
-runtime cache cleanup
-fault recovery
-potential embodiment lifecycle reset
-```
-
-Those operations have different authority rules.
-
-HAK therefore recommends API names that reveal the lineage semantics, for example:
+Candidate conceptual split:
 
 ```text
 reset_simulation_lineage(...)
@@ -347,13 +268,17 @@ recover_operational_lineage(RecoveryEvidence)
 factory_reset(AdminAuthority)
 ```
 
-The exact names are illustrative.
+Names are illustrative; the semantic separation is the requirement.
 
-The important part is that call sites cannot accidentally choose an authority-widening operation because all of them are spelled `reset()`.
+This is tracked by the dedicated architecture issue:
 
-## 11. Candidate OperationalRecoveryContextV1
+```text
+arch(embodiment): split simulation reset from operational recovery
+```
 
-A future domain-owned recovery input could resemble:
+## 7. Candidate OperationalRecoveryContextV1
+
+A future *domain-owned* recovery input could expose the premises that nominal operation depends on:
 
 ```text
 OperationalRecoveryContextV1 {
@@ -378,91 +303,111 @@ OperationalRecoveryContextV1 {
 }
 ```
 
-This is not proposed as a generic HAK struct yet.
+This is not yet a proposed common Rust type.
 
-The purpose is to make the missing premise visible:
-
-```text
-recovery requires evidence about continuity
-```
-
-rather than treating process construction/default values as that evidence.
-
-## 12. Property tests for reset boundaries
-
-### RST-P1 — no authority widening
-
-For operational reset `R`:
+The point is the theorem:
 
 ```text
-Authority(R(state)) ⊆ Authority(state)
+operational recovery requires evidence about continuity
 ```
 
-until explicit fresh recovery evidence is processed.
-
-### RST-P2 — no positive evidence manufacture
-
-If a fact is `false`, stale, degraded, or unknown before restart, resetting memory alone cannot make it verified-positive.
-
-### RST-P3 — restriction persistence
-
-Durable restrictions survive reset:
-
-- revocations;
-- refusals where domain semantics require continuity;
-- emergency stops;
-- maintenance locks;
-- recovery-required latches;
-- causal review holds.
-
-### RST-P4 — provisional-positive loss is safe
-
-Partial authority-accruing state may be discarded conservatively:
-
-- one of two quorum approvals;
-- partial reconciliation dwell;
-- partial clean-health dwell;
-- unsigned/uncommitted action plans.
-
-### RST-P5 — simulation reset begins a new lineage
-
-A simulation reset that intentionally clears restrictions must produce a new lineage/scenario identity rather than masquerading as recovery of the previous one.
-
-## 13. Proposed code tranches
-
-Keep fixes independent so each theorem receives focused evidence.
+rather than:
 
 ```text
-RST-CODE-001  operator constraint reset continuity     [opened]
-RST-CODE-002  degraded RecoveryRequired continuity
-RST-CODE-003  partition reconciliation continuity
-RST-CODE-004  temporal review-latch continuity
-RST-CODE-005  split simulation reset from operational recovery
-RST-CODE-006  replace optimistic operational health defaults with typed evidence
+object construction/default values == recovery evidence
 ```
 
-Ordering recommendation:
+## 8. Property tests for a future operational-recovery API
+
+### RST-P1 — no same-lineage authority widening
 
 ```text
-001 -> 002 -> 003 -> 004 -> 005/006
+Authority(recover(state, evidence))
+    ⊆
+Authority(state)
 ```
 
-The first four repair concrete state-machine escapes. The final two redesign the lifecycle boundary once the local invariants are explicit.
+until evidence or explicit authority transitions justify widening.
 
-## 14. Non-claims
+### RST-P2 — no positive-evidence manufacture
+
+Memory loss alone cannot convert stale/false/unknown health into verified-positive health.
+
+### RST-P3 — durable restriction continuity
+
+Where the domain defines them as same-lineage durable, restrictions such as revocations, emergency stops, maintenance locks, recovery-required latches, and causal review holds survive interruption or require explicit revalidation.
+
+### RST-P4 — provisional-positive progress may be lost
+
+Partial quorum, reconciliation dwell, clean-health dwell, or unsigned plans may be conservatively discarded if their continuity cannot be established.
+
+### RST-P5 — simulation reset is allowed to start clean
+
+A scenario reset may clear simulated restrictions when it clearly starts a new scenario lineage.
+
+The test should verify *lineage separation*, not monotonicity across two unrelated simulated worlds.
+
+### RST-P6 — API non-confusion
+
+Code that performs operational recovery must not compile or route through the scenario-reset API by accident once the lifecycle split is introduced.
+
+## 9. Revised implementation sequence
+
+Do **not** land the first three reset-preservation patches against the existing scenario-reset API.
+
+Instead:
+
+```text
+RST-LIFE-001  define scenario-reset vs operational-recovery contract
+RST-LIFE-002  inventory EmbodimentBridge reset call sites across platforms
+RST-LIFE-003  define operational recovery evidence/provenance requirements
+RST-LIFE-004  add/strengthen checkpoint continuity property tests
+RST-LIFE-005  introduce typed lifecycle API with migration path
+RST-LIFE-006  only then patch domain-specific operational recovery gaps
+```
+
+The previously opened operator/degraded/partition preservation drafts were closed unmerged after the call-site evidence changed the interpretation.
+
+## 10. Meta-lesson for HAK
+
+This correction is itself an important HAK result.
+
+A safety rule is not sufficient; the *semantic object to which it applies* must also be correct.
+
+```text
+Authority monotonicity across one lineage: required.
+Authority monotonicity across unrelated new lineages: not generally meaningful.
+```
+
+So HAK review should always establish:
+
+```text
+identity of subject
+identity of resource
+identity of authority lineage
+identity of lifecycle operation
+```
+
+before proving attenuation/monotonicity.
+
+That is stronger than simply adding more fail-closed code.
+
+## 11. Non-claims
 
 This audit does not claim:
 
-- the current subterranean embodiment is deployed on physical machinery;
-- deterministic simulation reset should preserve the previous scenario's authority state;
-- every cached diagnostic value is authority-bearing;
-- all supervisor state must persist forever;
-- operational recovery should be impossible after a fault;
-- the proposed `OperationalRecoveryContextV1` is ready for implementation.
+- the current subterranean embodiment is physically deployed;
+- generic `reset()` is presently used for live recovery;
+- deterministic scenario reset must preserve previous scenario authority;
+- current operational checkpoint semantics are complete for physical deployment;
+- positive simulation fixture defaults are valid recovery evidence;
+- every platform needs identical recovery semantics;
+- a generic HAK lifecycle crate should be introduced now.
 
-The narrower finding is sufficient:
+The corrected conclusion is narrower:
 
 ```text
-A reset API must not be allowed to decide, accidentally and implicitly,
-that the conditions which previously restricted authority are now healthy.
+A new scenario may start clean.
+A continuing operational lineage may not use scenario reinitialization
+as proof that its prior restrictions, faults, or uncertainty disappeared.
 ```
