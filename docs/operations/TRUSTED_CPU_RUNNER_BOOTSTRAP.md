@@ -21,7 +21,7 @@ current published recovery branch
         ↓
 host-side bootstrap validation
         ↓
-reviewed runner infrastructure on main
+exact promotion onto main
         ↓
 main-only manual GitHub smoke
         ↓
@@ -83,16 +83,19 @@ The validator fails closed unless all of the following hold in one validation in
 
 If either public ref moves during Stage A, the validator refuses PASS. Detach at the new recovery head, obtain a fresh explicit operator authorization for that reviewed generation, and rerun rather than carrying stale bootstrap evidence forward.
 
-On success the validator emits a `symthaea.trusted-runner.bootstrap.v3` manifest in a unique `mktemp` path under `/tmp`. The manifest contains no credential. Record both the manifest contents and its printed SHA-256 before proceeding.
+On success the validator emits a `symthaea.trusted-runner.bootstrap.v4` manifest in a unique `mktemp` path under `/tmp`. The manifest contains no credential. Record both the manifest contents and its printed SHA-256 before proceeding.
 
 The manifest binds, among other provenance:
 
 - exact operator-authorized recovery commit;
 - exact recovery commit and source tree actually validated;
-- exact `main` commit observed for the complete validation interval;
+- exact `main` commit and tree observed for the complete validation interval;
+- the authorized recovery commit as the required ancestor of the promoted `main` generation;
+- the exact Stage-A-validated recovery tree as the only acceptable post-promotion `main` tree;
 - SHA-256 of the exact reviewed diff-path set;
 - Git blob identities for the runner module, routing policy, main-only smoke workflow, bootstrap validator, and persistent-host lifecycle contract;
 - pinned nixpkgs revision and repository Rust channel;
+- host Nix system and Nix implementation version used for Stage A;
 - `flake.lock` and `rust-toolchain.toml` SHA-256 values;
 - PASS state for explicit operator-authorization verification, runner policy, routing policy, locked Rust validation, and ref-stability checks.
 
@@ -118,7 +121,7 @@ Do not route any correctness job to the host yet. An online runner is not a qual
 
 If the recovery branch changes after Stage A, rerun Stage A against the newly reviewed and explicitly operator-authorized head before using the changed module or workflow content.
 
-## Stage C — land only the reviewed runner infrastructure
+## Stage C — land only the exact Stage-A-qualified generation
 
 The GitHub smoke becomes dispatchable only after its workflow exists on `main`.
 
@@ -133,13 +136,47 @@ The bootstrap merge/review surface must remain restricted to trusted-runner infr
 
 Do not bundle application, scientific-result, RCA policy, root Cargo/toolchain, build-script, or performance changes into this bootstrap transition.
 
-Before landing, compare the proposed merge surface with the exact diff-path set bound by the Stage A manifest. If the path set or any reviewed artifact blob changed, Stage A is stale and must be rerun after explicit authorization of the changed recovery generation.
+Before landing, the current public `main` head must still equal the `main_head` recorded in the Stage-A manifest. If `main` moved after Stage A, the manifest is stale: rerun Stage A against a freshly reviewed and explicitly authorized recovery generation.
 
-Also re-check that every `symthaea-trusted-cpu-v1` consumer is explicitly allowlisted by `nix/tests/eval-trusted-runner-routing.nix` and that no consumer has `push`, `pull_request`, or `schedule` triggers.
+The promotion operation must preserve the exact authorized recovery commit in `main` ancestry. **Do not squash or cherry-pick the recovery tranche.** A fast-forward or merge commit is acceptable only if the authorized recovery commit remains an ancestor of the resulting `main` generation.
+
+After landing, fetch public `main` again and verify both promotion predicates from the Stage-A manifest:
+
+```text
+promotion_required_ancestor
+        is an ancestor of new main
+
+AND
+
+new main tree
+        == promotion_expected_main_tree
+```
+
+The second condition is byte-level Git tree identity, not merely the same list of paths or a visually similar diff. It ensures the infrastructure that becomes dispatchable on `main` is exactly the tree Stage A validated.
+
+A review/merge tool may create a new merge commit identity, but it may not alter the promoted tree or discard the authorized recovery commit from ancestry. If either condition fails, do not dispatch the smoke; restore/review the landing and rerun Stage A if the recovery generation changes.
+
+Also compare the proposed merge surface with the exact diff-path set bound by the Stage-A manifest. If the path set or any reviewed artifact blob changed, Stage A is stale and must be rerun after explicit authorization of the changed recovery generation.
+
+Re-check that every `symthaea-trusted-cpu-v1` consumer is explicitly allowlisted by `nix/tests/eval-trusted-runner-routing.nix` and that no consumer has `push`, `pull_request`, or `schedule` triggers.
+
+This creates an explicit promotion theorem:
+
+```text
+Stage-A PASS for tree T
+        +
+landing preserves authorized recovery ancestry
+        +
+post-landing main tree == T
+        =
+eligible to attempt Stage-D smoke
+```
+
+Stage-C success is still not runner qualification.
 
 ## Stage D — main-only GitHub smoke
 
-Once the reviewed infrastructure exists on `main`, dispatch:
+Once the reviewed infrastructure exists on `main` and the Stage-C ancestry/tree predicates pass, dispatch:
 
 ```text
 Self-hosted NixOS Runner Smoke
@@ -194,6 +231,8 @@ trusted CPU correctness PASS != performance equivalence
 stale bootstrap manifest != current infrastructure authority
 current branch head != operator authorization
 runner process ephemeral != host ephemeral
+content-similar landing != exact qualified tree
+squash/cherry-pick of qualified recovery != preserved promotion ancestry
 ```
 
 The fallback exists to restore executable evidence, not to weaken what counts as evidence.
