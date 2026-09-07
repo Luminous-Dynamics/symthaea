@@ -31,6 +31,7 @@ pub mod environment;
 pub mod events;
 pub mod evolvability;
 pub mod evolvability_comparison;
+pub mod evolutionary_history;
 pub mod genome;
 pub mod hierarchy;
 pub mod ledger;
@@ -55,6 +56,10 @@ pub use events::GenesisEvent;
 pub use evolvability::{EvolvabilityError, RecoveryMetrics, analyze_recovery};
 pub use evolvability_comparison::{
     RecoveryComparison, RecoveryComparisonError, RecoveryLatencyComparison, compare_recovery,
+};
+pub use evolutionary_history::{
+    EvolutionaryHistoryError, EvolutionaryHistoryReportV1, GenomeDeltaV1, LineageHistoryV1,
+    MutationAncestryV1, analyze_evolutionary_history,
 };
 pub use genome::Genome;
 pub use hierarchy::HierarchicalStack;
