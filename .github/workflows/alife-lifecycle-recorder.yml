@@ -1,0 +1,76 @@
+name: ALife Lifecycle Recorder
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/src/lifecycle.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle_recorder.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - ".github/workflows/alife-lifecycle-recorder.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  recorder-contracts:
+    name: Lifecycle recorder contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record lock identity
+        run: sha256sum Cargo.lock
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-lifecycle-recorder
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test lifecycle recorder
+        run: cargo test --locked -p symthaea-alife lifecycle_recorder::
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze recorder-only production boundary
+        run: |
+          if grep -n -E 'LifecycleRecorderV1|record_(birth|death)' \
+            crates/domains/symthaea-alife/src/population.rs \
+            crates/domains/symthaea-alife/src/organism.rs; then
+            echo "Lifecycle recorder is unexpectedly wired into production transitions."
+            echo "Production emission belongs in the separately reviewed authority-wiring tranche."
+            exit 1
+          fi
