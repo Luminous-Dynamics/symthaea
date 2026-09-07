@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symthaea.required-ci-job-manifest.v1",
+  "title": "Symthaea Required CI Job Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "workflow_path",
+    "workflow_blob_sha",
+    "complete",
+    "profiles"
+  ],
+  "properties": {
+    "schema": {"const": "symthaea.required-ci-job-manifest.v1"},
+    "workflow_path": {"type": "string", "minLength": 1},
+    "workflow_blob_sha": {"type": "string", "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"},
+    "complete": {"type": "boolean"},
+    "profiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/profile"}
+    }
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "top_level_job_ids", "families"],
+      "properties": {
+        "event": {"type": "string", "minLength": 1},
+        "top_level_job_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"}
+        },
+        "families": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/family"}
+        }
+      }
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id",
+        "api_name_regex",
+        "min_instances",
+        "max_instances",
+        "required_disposition"
+      ],
+      "properties": {
+        "job_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"},
+        "api_name_regex": {"type": "string", "minLength": 1},
+        "min_instances": {"type": "integer", "minimum": 0},
+        "max_instances": {"type": "integer", "minimum": 0},
+        "required_disposition": {
+          "enum": ["success", "allowed_skip"]
+        }
+      }
+    }
+  }
+}
