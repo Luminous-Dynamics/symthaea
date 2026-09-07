@@ -1,0 +1,97 @@
+name: Matter Nuclear Historical Validation
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-nuclear/src/historical_validation.rs'
+      - 'crates/domains/symthaea-nuclear/src/ml_mass.rs'
+      - 'crates/domains/symthaea-nuclear/src/lib.rs'
+      - '.github/workflows/matter-nuclear-historical.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  historical-boundary:
+    name: Frozen-vintage historical prediction boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Lockfile must remain unchanged from PR base
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          test -z "$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- Cargo.lock)"
+
+      - name: Focused formatting
+        run: cargo fmt --check -p symthaea-nuclear
+
+      - name: Focused nuclear package check
+        run: cargo check --locked -p symthaea-nuclear
+
+      - name: Historical validation regressions
+        run: cargo test --locked -p symthaea-nuclear historical_validation::tests -- --nocapture --test-threads=1
+
+      - name: Chronology and provenance ratchets
+        shell: python
+        run: |
+          from pathlib import Path
+
+          src = Path('crates/domains/symthaea-nuclear/src/historical_validation.rs').read_text()
+
+          forbidden_training = (
+              'ame2020_reference_nuclei',
+              'MlMassPredictor::new()',
+          )
+          for token in forbidden_training:
+              if token in src:
+                  raise SystemExit(f'historical validation must not infer chronology from current corpus: {token}')
+
+          required = (
+              'chronology_evidence_id',
+              'ExternalArtifactSha256',
+              'SyntheticFixtureOnly',
+              'DeclaredChronologyOnly',
+              'RetrospectiveDataVintageBacktest',
+              'HistoricalModelKnowledge',
+              'latest_dependency_yyyymmdd',
+              'frozen_implementation_evidence_id',
+              'dependency_evidence_ids',
+              'ModelKnowledgePostdatesTrainingSnapshot',
+              'holdout_newly_measured',
+              'revised_previously_measured',
+              'MlMassPredictor::fit_measured_with_config(&self.training, config)',
+              'NonIncreasingSnapshotChronology',
+              'IndistinguishableSnapshots',
+          )
+          for token in required:
+              if token not in src:
+                  raise SystemExit(f'missing historical evidence contract token: {token}')
+
+          forbidden_authority_fields = (
+              'pub winner:',
+              'pub ranking:',
+              'pub qualified:',
+              'pub discovered:',
+              'pub scientifically_valid:',
+              'ProspectivePrediction',
+          )
+          for token in forbidden_authority_fields:
+              if token in src:
+                  raise SystemExit(f'forbidden historical authority shortcut: {token}')
+
+          if 'this crate does not independently prove publication chronology' not in src:
+              raise SystemExit('historical chronology non-claim must remain explicit')
+          if 'running implementation is identical to the archived implementation' not in src:
+              raise SystemExit('implementation-vintage non-claim must remain explicit')
+
+          print('historical chronology/model-vintage ratchets passed')
