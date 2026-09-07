@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Physical-agency composition primitives for Symthaea.
 //!
-//! PA-15 remains deliberately pre-execution. This crate can negotiate declared
+//! PA-16 remains deliberately pre-execution. This crate can negotiate declared
 //! simulator capabilities, preserve multi-objective candidate frontiers, bind
 //! deliberation to immutable world snapshots, validate strict typed-context
 //! simulation lineage, derive strict requests from selection receipts,
@@ -12,6 +12,12 @@
 //! evidence. It cannot construct actuator commands, depend on HAL, or mint
 //! physical execution authority.
 //!
+//! The public strict-confirmatory facade additionally requires every judged
+//! metric to be part of the exact solver request and binds the complete canonical
+//! claim definition into safety-evidence identity. Lower PA-13/14/15 minting
+//! primitives remain crate-private so callers cannot bypass the stronger v3
+//! contract.
+//!
 //! Capability manifests are declarations used to choose a suitable modelling
 //! path. They are **not** safety evidence and cannot discharge execution gates.
 //!
@@ -19,21 +25,36 @@
 //! research path. The PA-11+ strict path is intentionally separate and requires
 //! typed contexts, selection-derived world lineage, preregistered outcome claims,
 //! preregistered safety obligations, independent non-simulation safety evidence,
-//! and exact-run simulation evidence.
+//! exact-run simulation evidence, and full claim/request lineage binding.
 
 #![deny(unsafe_code)]
 
+pub mod confirmatory_contract;
 pub mod deliberation;
-pub mod outcome_claim;
+mod outcome_claim;
 pub mod portfolio;
-pub mod safety_preregistration;
+mod safety_preregistration;
 pub mod strict_context;
 pub mod strict_selection;
 mod qualification;
 mod qualification_lineage;
 mod strict_qualification;
 
+pub use confirmatory_contract::{
+    CanonicalClaimTranscript, ClaimBoundConfirmatorySimulationQualification,
+    ConfirmatoryContractError, canonical_claim_transcript, evaluate_confirmatory_claim,
+    prepare_confirmatory_simulation, preregister_confirmatory_safety,
+    qualify_confirmatory_simulation, required_confirmatory_safety_evidence_ref,
+    run_preregistered_safety_confirmatory_simulation,
+};
 pub use deliberation::{SnapshotDigestAlgorithm, WorldSnapshotRef};
+pub use outcome_claim::{
+    ClaimAggregation, ClaimCriterionResult, ClaimEvaluation, ClaimEvidenceTier,
+    ConfirmatoryClaimOutcome, ConfirmatorySimulationEvidence, CriterionEvidenceTier,
+    EvaluatedCriterion, MetricCriterion, MetricPredicate, MetricUncertaintyPolicy,
+    OutcomeClaimError, PreparedConfirmatorySimulation, SatisfiedSimulationClaim,
+    SimulationOutcomeClaim,
+};
 pub use qualification::{
     SimulationQualificationError,
     VerifiedSimulationEvidence as RegistryValidatedSimulationEvidence,
@@ -43,9 +64,11 @@ pub use qualification_lineage::{
     DeliberationBoundSimulationCandidate, DeliberationQualificationError,
     DeliberationSimulationBinding, qualify_selected_simulation_candidate,
 };
-pub use strict_qualification::{
-    StrictConfirmatoryQualificationError, StrictConfirmatorySimulationQualification,
+pub use safety_preregistration::{
+    FrozenSafetyObligation, PreparedSafetyConfirmatorySimulation, PreregisteredSafetyPlan,
+    SafetyPreregisteredConfirmatoryEvidence, SafetyPreregistrationError,
 };
+pub use strict_qualification::StrictConfirmatoryQualificationError;
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
