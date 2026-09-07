@@ -13,11 +13,14 @@
 //! physical execution authority.
 //!
 //! The public strict-confirmatory facade requires every judged metric to be part
-//! of the exact solver request and binds a semantic-canonical complete claim
+//! of the exact solver request and binds a normalized-canonical complete claim
 //! definition into safety-evidence identity. `AllCriteria` ordering is normalized,
-//! exact duplicate criteria are rejected, and signed zero has one identity.
-//! Lower PA-13/14/15/v3 minting primitives remain crate-private so callers cannot
-//! bypass the stronger v4 contract.
+//! exact duplicate criteria are rejected, signed zero has one identity, and
+//! mathematically unsatisfiable scalar conjunctions fail before solver execution.
+//! This is deliberately not described as a universal semantic normal form:
+//! metric units remain string identities and redundant-but-distinct criteria can
+//! remain distinct. Lower PA-13/14/15/v3 minting primitives remain crate-private
+//! so callers cannot bypass the stronger v4 contract.
 //!
 //! Capability manifests are declarations used to choose a suitable modelling
 //! path. They are **not** safety evidence and cannot discharge execution gates.
@@ -26,7 +29,7 @@
 //! research path. The PA-11+ strict path is intentionally separate and requires
 //! typed contexts, selection-derived world lineage, preregistered outcome claims,
 //! preregistered safety obligations, independent non-simulation safety evidence,
-//! exact-run simulation evidence, and semantic-canonical claim/request lineage.
+//! exact-run simulation evidence, and normalized-canonical claim/request lineage.
 
 #![deny(unsafe_code)]
 
