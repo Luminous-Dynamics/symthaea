@@ -2,6 +2,7 @@
   "schema": "symthaea.merge-admission-policy.v1",
   "repository": "Luminous-Dynamics/symthaea",
   "target_branch": "main",
+  "enforcement_ready": false,
   "decision_default": "incomplete",
   "head_change_invalidates": true,
   "base_change_invalidates": true,
