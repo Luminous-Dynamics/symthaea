@@ -17,10 +17,10 @@
   },
   "seed_panel": {
     "role": "confirmatory_holdout",
-    "count": 16,
+    "count": 40,
     "derivation": {
       "domain": "symthaea-alife-repeated-shock-confirmatory-v1",
-      "algorithm": "for counter i=0..15, SHA256(UTF8(domain + ':' + decimal(i))), take digest bytes 0..8 as little-endian u64; if zero map to one",
+      "algorithm": "for counter i=0..39, SHA256(UTF8(domain + ':' + decimal(i))), take digest bytes 0..8 as little-endian u64; if zero map to one",
       "hand_selected": false
     },
     "seeds": [
@@ -39,7 +39,31 @@
       17592408197378692141,
       13343008546568860547,
       16097389555979206192,
-      15862083981653974279
+      15862083981653974279,
+      18344599038902765040,
+      7008312810657728776,
+      1306834488679894066,
+      4372679621324025700,
+      13730306745188088751,
+      5751453270347864932,
+      16570857333899015420,
+      7940264925828727527,
+      16589336028364393260,
+      3156001643348996522,
+      11622197076422662742,
+      1168556173394120333,
+      2476422866515933943,
+      8753209998852904769,
+      17969082132932704355,
+      4093308098120817125,
+      2282620666718248714,
+      3771522338386459987,
+      7365977071739252469,
+      12860642604274352675,
+      7005063599374405693,
+      16810078571579127810,
+      16965868523007060625,
+      1890008846983216942
     ]
   },
   "simulation": {
@@ -119,9 +143,26 @@
     "alternative": "positive_directional_tendency",
     "alpha_numerator": 1,
     "alpha_denominator": 20,
-    "missingness_policy": "require_all_16_primary_outcomes",
+    "missingness_policy": "require_all_40_primary_outcomes",
     "tie_policy": "exact_zero_excluded_from_binomial_denominator",
     "secondary_metric_p_values": false
+  },
+  "power_design": {
+    "computed_before_discovery_outcome_observation": true,
+    "assumes_all_40_outcomes_non_tied": true,
+    "minimum_positive_for_alpha_0_05": 26,
+    "exact_null_tail_at_threshold": {
+      "numerator": 44360053772,
+      "denominator": 1099511627776
+    },
+    "prospective_power_by_true_positive_probability": {
+      "0.60": 0.317425160239034,
+      "0.65": 0.5720821478352985,
+      "0.70": 0.8074482452648238,
+      "0.75": 0.9455627519813652,
+      "0.80": 0.9920841461264805
+    },
+    "rationale": "40 seeds provides approximately 0.81 power for a true 0.70 directional tendency and approximately 0.95 power for 0.75 under the exact one-sided sign-test gate; the earlier 16-seed draft was strengthened before discovery outcomes were observed."
   },
   "analysis_freeze": {
     "do_not_change_seed_panel_after_discovery_results": true,
