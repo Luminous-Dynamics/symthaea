@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-resource-feasible-set"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Deterministic bounded feasible-set enumeration for resource planning"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "feasibility", "planning", "infrastructure"]
+categories = ["science", "simulation"]
+
+[dependencies]
+chrono = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-allocation = { path = "../symthaea-resource-allocation" }
+symthaea-resource-capacity = { path = "../symthaea-resource-capacity" }
+symthaea-resource-feasibility = { path = "../symthaea-resource-feasibility" }
+symthaea-resource-model = { path = "../symthaea-resource-model" }
+symthaea-resource-quality = { path = "../symthaea-resource-quality" }
+symthaea-resource-quality-evidence = { path = "../symthaea-resource-quality-evidence" }
+symthaea-resource-quality-qualification = { path = "../symthaea-resource-quality-qualification" }
+symthaea-resource-topology = { path = "../symthaea-resource-topology" }
