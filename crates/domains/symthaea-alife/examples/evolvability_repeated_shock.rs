@@ -6,13 +6,14 @@
 //! identical frozen control (`mutation_rate = 0.0`) under two identical resource shocks.
 //! Each shock receives the same fixed post-shock evaluation horizon, preventing the earlier shock
 //! from receiving more recovery time merely because it occurred earlier in the run.
-//! It deliberately makes no superiority assertion: the output is evidence for later analysis,
-//! not a preregistered claim that evolution must improve every recovery dimension.
+//! It reports both candidate-vs-control recovery and within-condition repeated-shock transfer.
+//! Neither report, by itself, proves evolution or learning caused an observed difference.
 
 use symthaea_alife::{
-    EncounterScheduler, InheritanceMode, OrganismConfig, PairingMode, PerturbationSchedule,
-    Population, PopulationConfig, ResourcePerturbation, analyze_genesis_events,
-    analyze_recovery_through, compare_recovery,
+    EncounterScheduler, EvolvabilityError, InheritanceMode, ObservatoryReport, OrganismConfig,
+    PairingMode, PerturbationSchedule, Population, PopulationConfig, RecoveryMetrics,
+    ResourcePerturbation, analyze_genesis_events, analyze_recovery_through, compare_recovery,
+    compare_repeated_shocks,
 };
 
 const TICKS: u64 = 1_400;
@@ -44,6 +45,41 @@ fn evaluation_end_tick(shock: ResourcePerturbation) -> u64 {
         .end_tick_exclusive()
         .checked_add(POST_SHOCK_EVALUATION_TICKS - 1)
         .expect("fixed evaluation horizon must fit in u64")
+}
+
+fn analyze_shock(
+    report: &ObservatoryReport,
+    shock: ResourcePerturbation,
+) -> Result<RecoveryMetrics, EvolvabilityError> {
+    analyze_recovery_through(
+        report,
+        shock,
+        BASELINE_LOOKBACK_TICKS,
+        RECOVERY_FRACTION,
+        evaluation_end_tick(shock),
+    )
+}
+
+fn print_candidate_control(
+    label: &str,
+    evolving: &Result<RecoveryMetrics, EvolvabilityError>,
+    frozen: &Result<RecoveryMetrics, EvolvabilityError>,
+) {
+    println!("{label} (fixed post-shock horizon: {POST_SHOCK_EVALUATION_TICKS} ticks)");
+    match (evolving, frozen) {
+        (Ok(evolving_recovery), Ok(frozen_recovery)) => {
+            let comparison = compare_recovery(evolving_recovery, frozen_recovery)
+                .expect("candidate/control experiment boundaries must match");
+            println!("  frozen recovery:   {frozen_recovery:#?}");
+            println!("  evolving recovery: {evolving_recovery:#?}");
+            println!("  comparison:        {comparison:#?}");
+        }
+        (evolving, frozen) => {
+            println!("  recovery comparison unavailable under current evidence boundary");
+            println!("  frozen analysis:   {frozen:#?}");
+            println!("  evolving analysis: {evolving:#?}");
+        }
+    }
 }
 
 fn main() {
@@ -95,37 +131,37 @@ fn main() {
     let evolving_report =
         analyze_genesis_events(&evolving_events).expect("valid evolving event stream");
 
-    for (label, shock) in [("shock-1", shock_1), ("shock-2", shock_2)] {
-        let evaluation_end_tick = evaluation_end_tick(shock);
-        let frozen_recovery = analyze_recovery_through(
-            &frozen_report,
-            shock,
-            BASELINE_LOOKBACK_TICKS,
-            RECOVERY_FRACTION,
-            evaluation_end_tick,
-        );
-        let evolving_recovery = analyze_recovery_through(
-            &evolving_report,
-            shock,
-            BASELINE_LOOKBACK_TICKS,
-            RECOVERY_FRACTION,
-            evaluation_end_tick,
-        );
+    let frozen_shock_1 = analyze_shock(&frozen_report, shock_1);
+    let frozen_shock_2 = analyze_shock(&frozen_report, shock_2);
+    let evolving_shock_1 = analyze_shock(&evolving_report, shock_1);
+    let evolving_shock_2 = analyze_shock(&evolving_report, shock_2);
 
-        println!("{label} (fixed post-shock horizon: {POST_SHOCK_EVALUATION_TICKS} ticks)");
-        match (evolving_recovery, frozen_recovery) {
-            (Ok(evolving_recovery), Ok(frozen_recovery)) => {
-                let comparison = compare_recovery(&evolving_recovery, &frozen_recovery)
-                    .expect("candidate/control experiment boundaries must match");
-                println!("  frozen recovery:   {frozen_recovery:#?}");
-                println!("  evolving recovery: {evolving_recovery:#?}");
-                println!("  comparison:        {comparison:#?}");
-            }
-            (evolving, frozen) => {
-                println!("  recovery comparison unavailable under current evidence boundary");
-                println!("  frozen analysis:   {frozen:#?}");
-                println!("  evolving analysis: {evolving:#?}");
-            }
+    print_candidate_control("shock-1", &evolving_shock_1, &frozen_shock_1);
+    print_candidate_control("shock-2", &evolving_shock_2, &frozen_shock_2);
+
+    println!("within-condition repeated-shock transfer");
+    match (&frozen_shock_1, &frozen_shock_2) {
+        (Ok(first), Ok(second)) => {
+            let transfer = compare_repeated_shocks(shock_1, first, shock_2, second)
+                .expect("frozen shocks must satisfy the preregistered matched-shock contract");
+            println!("  frozen:   {transfer:#?}");
+        }
+        (first, second) => {
+            println!("  frozen transfer unavailable under current evidence boundary");
+            println!("    shock-1: {first:#?}");
+            println!("    shock-2: {second:#?}");
+        }
+    }
+    match (&evolving_shock_1, &evolving_shock_2) {
+        (Ok(first), Ok(second)) => {
+            let transfer = compare_repeated_shocks(shock_1, first, shock_2, second)
+                .expect("evolving shocks must satisfy the preregistered matched-shock contract");
+            println!("  evolving: {transfer:#?}");
+        }
+        (first, second) => {
+            println!("  evolving transfer unavailable under current evidence boundary");
+            println!("    shock-1: {first:#?}");
+            println!("    shock-2: {second:#?}");
         }
     }
 }
