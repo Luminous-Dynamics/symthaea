@@ -1,0 +1,145 @@
+name: Web Research Claim-Source Lineage
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/web-research-claim-source-lineage.yml'
+      - 'patches/science/web-research-claim-source-lineage-v1.patch'
+      - 'src/web_research/researcher.rs'
+      - 'src/web_research/verifier.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  PATCH: patches/science/web-research-claim-source-lineage-v1.patch
+
+jobs:
+  qualify:
+    name: Prove confidence-as-support defect then qualify lineage repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only branch scope
+        run: |
+          test -f "$PATCH"
+          git diff --exit-code "${{ github.event.pull_request.base.sha || 'HEAD^' }}" -- \
+            Cargo.toml Cargo.lock src/web_research || {
+            echo 'qualification branch must not materialize the web-research Rust candidate'
+            exit 1
+          }
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Execute current-main confidence-as-support negative control
+        run: |
+          cat >> src/web_research/verifier.rs <<'RS'
+
+          #[cfg(test)]
+          mod qualification_claim_support_negative_control {
+              use super::*;
+
+              #[test]
+              fn high_result_confidence_is_currently_converted_into_claim_support() {
+                  let verifier = EpistemicVerifier::new();
+                  let url = "https://example.org/high-confidence-result".to_string();
+                  let result = WebResearchResult {
+                      url: url.clone(),
+                      relevance: 1.0,
+                      confidence: 0.99,
+                      ..WebResearchResult::default()
+                  };
+
+                  let verified = verifier.verify_from_results("Unrelated claim", &[result]);
+                  assert_eq!(verified.supporting_sources, vec![url]);
+                  assert_ne!(verified.status, EpistemicStatus::InsufficientEvidence);
+              }
+          }
+          RS
+
+          cargo test --locked -p symthaea --lib --features web_research_module \
+            qualification_claim_support_negative_control -- --nocapture
+          git checkout -- src/web_research/verifier.rs
+
+      - name: Freeze current researcher source-fanout defect
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('src/web_research/researcher.rs').read_text()
+          assert 'supports: Some(true), // Will be refined by verifier' in text
+          assert 'all_claims.extend(extraction.claims)' in text
+          print('negative control: current researcher marks every fetched source supportive before per-claim provenance binding')
+          PY
+
+      - name: Validate and apply exact repair candidate
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet claim-source separation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          researcher = Path('src/web_research/researcher.rs').read_text()
+          verifier = Path('src/web_research/verifier.rs').read_text()
+
+          assert 'Vec<(String, HashSet<String>)>' in researcher
+          assert 'supports: None' in researcher
+          assert 'asserting_urls.contains(&source.url).then_some(true)' in researcher
+          assert 'all_claims.extend(extraction.claims)' not in researcher
+
+          for forbidden in [
+              'supports: Some(r.confidence > 0.5)',
+              'credibility: r.confidence',
+          ]:
+              assert forbidden not in verifier, f'forbidden confidence/stance conflation remains: {forbidden}'
+
+          for required in [
+              'verified.supporting_sources',
+              'verified.contradicting_sources',
+              'supports: Some(true)',
+              'supports: Some(false)',
+              'credibility: 0.5',
+              'result_confidence_is_not_claim_support',
+              'explicit_claim_lineage_reconstructs_support',
+              'explicit_claim_lineage_reconstructs_contradiction',
+          ]:
+              assert required in verifier, f'missing lineage boundary: {required}'
+          PY
+
+      - name: Format exact candidate
+        run: cargo fmt --check -p symthaea
+
+      - name: Run focused epistemic verifier tests
+        run: |
+          cargo test --locked -p symthaea --lib --features web_research_module \
+            web_research::verifier::tests -- --nocapture
+
+      - name: Compile web-research feature
+        run: cargo check --locked -p symthaea --lib --features web_research_module
+
+      - name: Strict Clippy on web-research-enabled library
+        run: cargo clippy --locked -p symthaea --lib --features web_research_module -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes only that result confidence is no longer used as claim stance and that exact extracted-claim source lineage limits support assignment in the qualified paths.'
+          echo 'PASS does not establish semantic entailment, source truthfulness, source independence, scientific verification, or authority.'
