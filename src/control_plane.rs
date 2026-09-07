@@ -7,6 +7,7 @@ pub mod forge;
 pub mod forge_commitment;
 pub mod forge_profile;
 pub mod forge_wasm_features;
+pub mod forge_runtime;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
