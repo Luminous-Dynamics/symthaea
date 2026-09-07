@@ -31,6 +31,7 @@ pub mod environment;
 pub mod events;
 pub mod evolvability;
 pub mod evolvability_comparison;
+pub mod exact_sign_test;
 pub mod genome;
 pub mod hierarchy;
 pub mod ledger;
@@ -59,6 +60,10 @@ pub use evolvability::{
 };
 pub use evolvability_comparison::{
     RecoveryComparison, RecoveryComparisonError, RecoveryLatencyComparison, compare_recovery,
+};
+pub use exact_sign_test::{
+    ExactPositiveSignTestV1, ExactSignTestErrorV1, MAX_EXACT_SIGN_TEST_NON_TIES,
+    exact_positive_sign_test,
 };
 pub use genome::Genome;
 pub use hierarchy::HierarchicalStack;
