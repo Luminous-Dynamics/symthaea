@@ -18,9 +18,9 @@ use symthaea_physical_agency::strict_context::{
     ContextConsumptionEvidence, StrictSimulationRegistry,
 };
 use symthaea_physical_agency::{
-    ConfirmatoryClaimOutcome, MetricCriterion, MetricPredicate, MetricUncertaintyPolicy,
-    SafetyPreregistrationError, SimulationOutcomeClaim, evaluate_confirmatory_claim,
-    prepare_confirmatory_simulation, preregister_confirmatory_safety,
+    ConfirmatoryClaimOutcome, ConfirmatoryContractError, MetricCriterion, MetricPredicate,
+    MetricUncertaintyPolicy, SafetyPreregistrationError, SimulationOutcomeClaim,
+    evaluate_confirmatory_claim, prepare_confirmatory_simulation, preregister_confirmatory_safety,
     qualify_confirmatory_simulation, required_confirmatory_safety_evidence_ref,
     run_preregistered_safety_confirmatory_simulation,
 };
@@ -255,6 +255,19 @@ fn legacy_snapshot_cannot_enter_the_strict_confirmatory_path() {
 }
 
 #[test]
+fn claimed_metric_must_be_in_machine_request_before_solver_execution() {
+    let selected = cryptographic_selected();
+    let mut missing_metric = request("physis-v1-missing-metric");
+    missing_metric.requested_metrics.clear();
+
+    assert!(matches!(
+        prepare_confirmatory_simulation(&selected, missing_metric, claim()),
+        Err(ConfirmatoryContractError::ClaimMetricNotRequested(metric))
+            if metric == "diagnostic_quality"
+    ));
+}
+
+#[test]
 fn simulation_only_safety_argument_is_rejected_before_solver_execution() {
     let selected = cryptographic_selected();
     let prepared = prepare_confirmatory_simulation(
@@ -272,7 +285,7 @@ fn simulation_only_safety_argument_is_rejected_before_solver_execution() {
 
     assert!(matches!(
         preregister_confirmatory_safety(prepared, &safety),
-        Err(symthaea_physical_agency::ConfirmatoryContractError::Safety(
+        Err(ConfirmatoryContractError::Safety(
             SafetyPreregistrationError::MissingIndependentObligation
         ))
     ));
@@ -339,7 +352,7 @@ fn posthoc_replacement_safety_case_cannot_qualify_the_run() {
 }
 
 #[test]
-fn same_claim_id_with_different_threshold_has_different_v3_safety_identity() {
+fn same_claim_id_with_different_threshold_has_different_v4_safety_identity() {
     fn evidence_ref_for(threshold: f64) -> String {
         let selected = cryptographic_selected();
         let prepared = prepare_confirmatory_simulation(
