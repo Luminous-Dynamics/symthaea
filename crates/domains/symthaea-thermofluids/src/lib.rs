@@ -16,6 +16,8 @@
 //!   loss, continuity.
 //! - [`thermal`]: Carnot efficiency, Fourier conduction, Newton cooling, engine
 //!   work.
+//! - [`heat_pump`]: reversible heating-COP bound plus first-law-conserving
+//!   heat-pump feasibility screening.
 //!
 //! ## Example
 //!
@@ -26,4 +28,5 @@
 //! ```
 
 pub mod fluids;
+pub mod heat_pump;
 pub mod thermal;
