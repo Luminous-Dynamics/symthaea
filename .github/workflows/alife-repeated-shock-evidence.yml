@@ -1,0 +1,97 @@
+name: ALife Repeated-Shock Evidence
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/**"
+      - ".github/workflows/alife-repeated-shock-evidence.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  repeated-shock-evidence:
+    name: Qualified repeated-shock evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-repeated-shock-evidence
+
+      - name: Qualify ALife package
+        run: |
+          cargo fmt -p symthaea-alife -- --check
+          cargo check --locked -p symthaea-alife --all-targets
+          cargo test --locked -p symthaea-alife
+          cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Execute exact fixed seed sweep
+        run: |
+          mkdir -p target/alife-repeated-shock-evidence
+          cargo run --locked --release -p symthaea-alife \
+            --example evolvability_repeated_shock_sweep \
+            | tee target/alife-repeated-shock-evidence/sweep.txt
+
+      - name: Extract and independently verify protocol evidence
+        run: |
+          evidence=target/alife-repeated-shock-evidence
+          grep '^protocol_sha256=' "$evidence/sweep.txt" \
+            | sed 's/^protocol_sha256=//' \
+            > "$evidence/protocol.declared.sha256"
+          grep '^protocol_json=' "$evidence/sweep.txt" \
+            | sed 's/^protocol_json=//' \
+            > "$evidence/protocol.json"
+
+          test "$(wc -l < "$evidence/protocol.declared.sha256")" -eq 1
+          test "$(wc -l < "$evidence/protocol.json")" -eq 1
+
+          declared="$(cat "$evidence/protocol.declared.sha256")"
+          observed="$(sha256sum "$evidence/protocol.json" | awk '{print $1}')"
+          printf '%s\n' "$observed" > "$evidence/protocol.observed.sha256"
+          test "$declared" = "$observed"
+
+      - name: Record execution capsule metadata
+        run: |
+          evidence=target/alife-repeated-shock-evidence
+          {
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "example=evolvability_repeated_shock_sweep"
+            echo "protocol_sha256=$(cat "$evidence/protocol.observed.sha256")"
+          } > "$evidence/metadata.txt"
+
+      - name: Upload repeated-shock evidence capsule
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-repeated-shock-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/alife-repeated-shock-evidence/
+          retention-days: 30
