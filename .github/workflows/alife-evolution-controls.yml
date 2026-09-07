@@ -1,5 +1,6 @@
 name: ALife Evolution Controls
 
+# Contract-only qualification. Production Population wiring must remain absent on this branch.
 on:
   pull_request:
     paths:
