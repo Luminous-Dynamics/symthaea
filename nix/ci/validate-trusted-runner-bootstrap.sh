@@ -13,9 +13,15 @@ umask 077
 
 REPOSITORY_URL='https://github.com/Luminous-Dynamics/symthaea.git'
 RECOVERY_BRANCH='ci/nixos-ephemeral-runner-v1'
+EXPECTED_HEAD="${SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD:-}"
 
 if [[ "${GITHUB_ACTIONS:-}" == 'true' ]]; then
   echo 'bootstrap validator must run directly on the isolated host, not inside GitHub Actions' >&2
+  exit 1
+fi
+
+if [[ ! "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]; then
+  echo 'SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD must be an explicitly operator-authorized 40-hex commit SHA' >&2
   exit 1
 fi
 
@@ -38,6 +44,12 @@ fi
 initial_head="$(git rev-parse HEAD)"
 initial_tree="$(git rev-parse HEAD^{tree})"
 
+if [[ "$initial_head" != "$EXPECTED_HEAD" ]]; then
+  echo 'checked-out recovery generation is not the operator-authorized generation' >&2
+  printf 'authorized_head=%s\nworking_head=%s\n' "$EXPECTED_HEAD" "$initial_head" >&2
+  exit 1
+fi
+
 # Bootstrap evaluation must start from a pristine tracked/untracked/ignored
 # source tree. All Cargo/Nix build state belongs outside the repository.
 git diff --exit-code
@@ -53,6 +65,12 @@ refresh_public_refs() {
 refresh_public_refs
 main_head_start="$(git rev-parse refs/remotes/origin/main)"
 recovery_head_start="$(git rev-parse "refs/remotes/origin/${RECOVERY_BRANCH}")"
+
+if [[ "$recovery_head_start" != "$EXPECTED_HEAD" ]]; then
+  echo 'published recovery branch does not equal the operator-authorized generation' >&2
+  printf 'authorized_head=%s\nrecovery_head=%s\n' "$EXPECTED_HEAD" "$recovery_head_start" >&2
+  exit 1
+fi
 
 if [[ "$initial_head" != "$recovery_head_start" ]]; then
   echo 'working tree is not the current published trusted-runner recovery head' >&2
@@ -108,6 +126,7 @@ rust_toolchain_sha256="$(sha256sum rust-toolchain.toml | awk '{print $1}')"
 nixpkgs_rev="$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
 rust_channel="$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
 
+printf 'bootstrap_authorized_head=%s\n' "$EXPECTED_HEAD"
 printf 'bootstrap_recovery_head=%s\n' "$recovery_head_start"
 printf 'bootstrap_main_head=%s\n' "$main_head_start"
 printf 'bootstrap_source_tree=%s\n' "$initial_tree"
@@ -169,6 +188,12 @@ if [[ "$main_head_start" != "$main_head_end" || "$recovery_head_start" != "$reco
   exit 1
 fi
 
+if [[ "$recovery_head_end" != "$EXPECTED_HEAD" ]]; then
+  echo 'published recovery branch no longer equals the operator-authorized generation' >&2
+  printf 'authorized_head=%s\nrecovery_head=%s\n' "$EXPECTED_HEAD" "$recovery_head_end" >&2
+  exit 1
+fi
+
 if [[ "$initial_head" != "$recovery_head_end" ]]; then
   echo 'working tree no longer matches current published recovery head' >&2
   exit 1
@@ -181,10 +206,11 @@ git merge-base --is-ancestor "$main_head_end" "$recovery_head_end" || {
 
 manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v1.XXXXXX)"
 cat > "$manifest" <<EOF
-schema=symthaea.trusted-runner.bootstrap.v2
+schema=symthaea.trusted-runner.bootstrap.v3
 result=PASS
 repository=$REPOSITORY_URL
 recovery_branch=$RECOVERY_BRANCH
+operator_authorized_head=$EXPECTED_HEAD
 recovery_head=$recovery_head_end
 source_tree=$initial_tree
 main_head=$main_head_end
@@ -197,6 +223,7 @@ nixpkgs_rev=$nixpkgs_rev
 rust_channel=$rust_channel
 flake_lock_sha256=$flake_lock_sha256
 rust_toolchain_sha256=$rust_toolchain_sha256
+operator_authorization_checked=PASS
 runner_policy_eval=PASS
 routing_policy_eval=PASS
 minimal_locked_rust_check=PASS
