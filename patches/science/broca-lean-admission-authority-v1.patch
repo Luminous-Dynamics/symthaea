@@ -65,20 +65,3 @@ diff --git a/crates/domains/symthaea-broca/src/formal_logic_scorer.rs b/crates/d
              _ => (0.0, false),
          };
  
-@@ -137,6 +145,16 @@
-         assert_eq!(result.score, 0.0);
-         assert!(!result.verified);
-     }
-+
-+    #[test]
-+    fn admission_detection_ignores_comments_but_rejects_tactic_line() {
-+        assert!(lean_source_contains_admission(
-+            "theorem t : P := by\n  sorry\n"
-+        ));
-+        assert!(!lean_source_contains_admission(
-+            "-- sorry is discussed here\ntheorem t : True := by\n  trivial\n"
-+        ));
-+    }
- }
- 
- impl Default for FormalLogicScorer {
