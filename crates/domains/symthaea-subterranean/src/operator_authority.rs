@@ -306,9 +306,15 @@ impl OperatorAuthority {
         Ok(decision)
     }
 
+    /// Clear only ephemeral recovery-coordination state.
+    ///
+    /// An operational reset is not authority to widen the active operator
+    /// constraint. In particular, `EmergencyStop`, `MaintenanceLock`,
+    /// `HoldPosition`, `ReturnHome`, and explicit mission constraints survive
+    /// reset. Replay history also survives. Returning to nominal operation must
+    /// still pass through the normal `ResumeNominal` quorum and hazard checks.
     pub fn reset_runtime(&mut self) {
         self.pending_resume.clear();
-        self.constraint = OperatorConstraint::None;
         self.last_applied_proposal = None;
     }
 }
@@ -387,6 +393,70 @@ mod tests {
             .expect("second approval is valid");
         assert_eq!(decision, OperatorDecision::Cleared);
         assert_eq!(authority.constraint(), OperatorConstraint::None);
+    }
+
+    #[test]
+    fn runtime_reset_cannot_clear_emergency_stop() {
+        let mut authority = OperatorAuthority::default();
+        authority
+            .ingest(command(1, 1, 1, OperatorCommand::EmergencyStop), 20, true)
+            .expect("stop is valid");
+
+        authority.reset_runtime();
+
+        assert_eq!(authority.constraint(), OperatorConstraint::EmergencyStop);
+        assert_eq!(authority.last_applied_proposal(), None);
+    }
+
+    #[test]
+    fn runtime_reset_discards_partial_resume_quorum_without_widening_authority() {
+        let mut authority = OperatorAuthority::default();
+        authority
+            .ingest(command(1, 1, 1, OperatorCommand::MaintenanceLock), 20, true)
+            .expect("maintenance lock is valid");
+        let first = authority
+            .ingest(command(1, 2, 7, OperatorCommand::ResumeNominal), 21, true)
+            .expect("first approval is valid");
+        assert_eq!(
+            first,
+            OperatorDecision::PendingQuorum {
+                approvals: 1,
+                required: 2
+            }
+        );
+        assert_eq!(authority.pending_approvals(7), 1);
+
+        authority.reset_runtime();
+
+        assert_eq!(authority.constraint(), OperatorConstraint::MaintenanceLock);
+        assert_eq!(authority.pending_approvals(7), 0);
+
+        let after_reset = authority
+            .ingest(command(2, 1, 7, OperatorCommand::ResumeNominal), 22, true)
+            .expect("fresh approval is valid");
+        assert_eq!(
+            after_reset,
+            OperatorDecision::PendingQuorum {
+                approvals: 1,
+                required: 2
+            }
+        );
+        assert_eq!(authority.constraint(), OperatorConstraint::MaintenanceLock);
+    }
+
+    #[test]
+    fn runtime_reset_preserves_replay_barrier() {
+        let mut authority = OperatorAuthority::default();
+        let value = command(1, 1, 1, OperatorCommand::HoldPosition);
+        authority.ingest(value, 20, true).expect("hold is valid");
+
+        authority.reset_runtime();
+
+        assert_eq!(
+            authority.ingest(value, 21, true),
+            Err(OperatorAuthorityRejection::Replay)
+        );
+        assert_eq!(authority.constraint(), OperatorConstraint::HoldPosition);
     }
 
     #[test]
