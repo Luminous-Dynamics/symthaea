@@ -49,13 +49,16 @@ impl LifecycleRecorderV1 {
                 return Err(LifecycleRecorderErrorV1::InvalidFounderIdentity);
             }
             validate_organism_snapshot(founder)?;
-            recorder.push_transition(0, LifecycleTransitionV1::Founder {
-                agent_id: founder.id,
-                lineage_id: founder.lineage_id,
-                generation: founder.generation,
-                genome: genome_evidence(founder),
-                initial_energy_bits: founder.energy.to_bits(),
-            })?;
+            recorder.push_transition(
+                0,
+                LifecycleTransitionV1::Founder {
+                    agent_id: founder.id,
+                    lineage_id: founder.lineage_id,
+                    generation: founder.generation,
+                    genome: genome_evidence(founder),
+                    initial_energy_bits: founder.energy.to_bits(),
+                },
+            )?;
         }
         Ok(recorder)
     }
@@ -203,10 +206,12 @@ mod tests {
             .with_lineage(parent.lineage_id, parent.generation + 1);
         child.energy = 0.4;
 
-        let mut recorder =
-            LifecycleRecorderV1::from_founders(&[parent, donor]).expect("founders");
+        let founders = [parent, donor];
+        let parent = &founders[0];
+        let donor = &founders[1];
+        let mut recorder = LifecycleRecorderV1::from_founders(&founders).expect("founders");
         recorder
-            .record_birth(7, &parent, &donor, &child)
+            .record_birth(7, parent, donor, &child)
             .expect("birth");
         let ledger = analyze_lifecycle_events(recorder.events()).expect("valid lifecycle");
         assert!(ledger.reproductive_edges().contains(&(parent.id, child.id)));
@@ -217,12 +222,14 @@ mod tests {
     fn drain_preserves_global_sequence() {
         let mut ids = AgentIdAllocator::new();
         let founder = founder(&mut ids, 1);
-        let mut recorder = LifecycleRecorderV1::from_founders(&[founder]).expect("founder");
+        let founders = [founder];
+        let founder = &founders[0];
+        let mut recorder = LifecycleRecorderV1::from_founders(&founders).expect("founder");
         let drained = recorder.drain();
         assert_eq!(drained[0].sequence, 0);
         assert_eq!(recorder.next_sequence(), 1);
         recorder
-            .record_death(4, &founder, LifecycleDeathCauseV1::CullWeakest)
+            .record_death(4, founder, LifecycleDeathCauseV1::CullWeakest)
             .expect("death");
         assert_eq!(recorder.events()[0].sequence, 1);
     }
@@ -231,12 +238,14 @@ mod tests {
     fn time_cannot_move_backward() {
         let mut ids = AgentIdAllocator::new();
         let founder = founder(&mut ids, 1);
-        let mut recorder = LifecycleRecorderV1::from_founders(&[founder]).expect("founder");
+        let founders = [founder];
+        let founder = &founders[0];
+        let mut recorder = LifecycleRecorderV1::from_founders(&founders).expect("founder");
         recorder
-            .record_death(9, &founder, LifecycleDeathCauseV1::CullWeakest)
+            .record_death(9, founder, LifecycleDeathCauseV1::CullWeakest)
             .expect("death");
         assert_eq!(
-            recorder.record_death(8, &founder, LifecycleDeathCauseV1::CullWeakest),
+            recorder.record_death(8, founder, LifecycleDeathCauseV1::CullWeakest),
             Err(LifecycleRecorderErrorV1::NonMonotonicTick {
                 previous_tick: 9,
                 next_tick: 8,
