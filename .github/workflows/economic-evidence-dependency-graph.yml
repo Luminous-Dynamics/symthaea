@@ -1,0 +1,144 @@
+name: Economic Evidence Dependency Graph Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-economics/tests/evidence_dependency_graph_qualification.rs'
+      - '.github/workflows/economic-evidence-dependency-graph.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze evidence dependency theorem and qualification-only scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          test_path = Path('crates/domains/symthaea-economics/tests/evidence_dependency_graph_qualification.rs')
+          text = test_path.read_text()
+          science = Path('crates/domains/symthaea-economics/src/science.rs').read_text()
+
+          required = [
+              'enum DependencyDomain',
+              'SourceData,',
+              'SourceVintage,',
+              'MeasurementSpecification,',
+              'SamplingDesign,',
+              'TransformationArtifact,',
+              'ModelArtifact,',
+              'EstimatorArtifact,',
+              'IdentificationStrategy,',
+              'OutcomePolicy,',
+              'EvaluationProtocol,',
+              'struct DependencyInventory',
+              'struct EvidenceLineage',
+              'enum DependencyRelation',
+              'SameLineage',
+              'SharedDeclaredDependencies',
+              'DeclaredDisjointWithinScope',
+              'IncompleteInventory',
+              'struct ReplicationDependencyAudit',
+              'same_dataset_is_declared_dependency_even_with_different_models',
+              'same_identification_strategy_is_shared_even_with_different_data',
+              'no_overlap_with_incomplete_inventory_does_not_become_disjoint_evidence',
+              'fully_declared_no_overlap_is_only_disjoint_within_the_predeclared_scope',
+              'duplicate_publications_of_one_lineage_do_not_create_new_lineages',
+              'same_lineage_id_with_conflicting_inventory_fails_closed',
+              'known_dependency_graph_preserves_transitive_shared_lineage_clusters',
+              'five_publications_with_one_shared_data_line_do_not_become_five_independent_replications',
+              'evidence_targets_must_match_before_replication_relationship_is_assessed',
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f'missing evidence-dependency invariant: {needle}')
+
+          forbidden = [
+              'independent: bool',
+              'independent_count',
+              'replication_count',
+              'replication_score',
+              'evidence_strength',
+              'EvidenceChannel::IndependentReplication',
+              'author_id',
+              'institution_id',
+              'organization_id',
+              'fn rank(',
+              'fn score_lineage(',
+              'SystemTime::now',
+              'Utc::now',
+              'reqwest::',
+              'ureq::',
+          ]
+          for needle in forbidden:
+              if needle in text:
+                  raise SystemExit(f'evidence-dependency theorem acquired forbidden shortcut/authority: {needle}')
+
+          # The A0 evidence-channel vocabulary remains descriptive. This
+          # qualification lane must not mutate it into an automatic replication
+          # authority or dependency graph hidden in the foundation.
+          for needle in [
+              'DependencyInventory',
+              'EvidenceLineage',
+              'ReplicationDependencyAudit',
+              'DeclaredDisjointWithinScope',
+          ]:
+              if needle in science:
+                  raise SystemExit(
+                      f'foundation acquired evidence-dependency authority; re-audit layering: {needle}'
+                  )
+
+          base = subprocess.check_output(
+              ['git', 'merge-base', 'HEAD', 'origin/' + '${{ github.base_ref }}'],
+              text=True,
+          ).strip()
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', base, 'HEAD'],
+              text=True,
+          ).splitlines())
+          allowed = {
+              '.github/workflows/economic-evidence-dependency-graph.yml',
+              'crates/domains/symthaea-economics/tests/evidence_dependency_graph_qualification.rs',
+          }
+          if changed != allowed:
+              raise SystemExit(
+                  f'evidence dependency qualification must remain exactly two files; got {sorted(changed)}'
+              )
+
+          forbidden_product = {
+              'crates/domains/symthaea-economics/src/ontology.rs',
+              'crates/domains/symthaea-economics/src/etir.rs',
+              'crates/domains/symthaea-economics/src/theory.rs',
+              'crates/domains/symthaea-economics/src/science.rs',
+              'crates/domains/symthaea-economics/src/lib.rs',
+              'crates/domains/symthaea-economics/Cargo.toml',
+              'Cargo.lock',
+          }
+          touched = changed & forbidden_product
+          if touched:
+              raise SystemExit(f'qualification spike modified product/manifest state: {sorted(touched)}')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-economics -- --check
+
+      - name: Evidence dependency graph qualification test
+        run: cargo test --locked -p symthaea-economics --test evidence_dependency_graph_qualification
+
+      - name: Strict focused Clippy
+        run: cargo clippy --locked -p symthaea-economics --test evidence_dependency_graph_qualification -- -D warnings
