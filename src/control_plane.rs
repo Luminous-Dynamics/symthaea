@@ -3,6 +3,11 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Shared control-plane policy and audit helpers.
 
+pub mod attestation;
+pub mod attestation_crypto_profile;
+pub mod attestation_identity_namespace;
+pub mod attestation_profile;
+pub mod attestation_qualified_authority;
 pub mod forge;
 pub mod forge_commitment;
 pub mod forge_profile;
