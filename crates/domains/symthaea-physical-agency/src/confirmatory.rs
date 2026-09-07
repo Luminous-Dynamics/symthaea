@@ -12,9 +12,11 @@
 //! normal form: metric units remain typed only as strings and logically
 //! redundant-but-distinct criteria are still represented explicitly.
 //!
-//! The strict v4 profile also requires every preregistered Simulation safety
-//! obligation to cite the exact v4 confirmatory lineage. Additional simulation
-//! runs need a future typed multi-run evidence contract rather than opaque refs.
+//! The strict v4 profile permits exactly one `EvidenceKind::Simulation` safety
+//! obligation: it is structurally designated as the exact confirmatory-outcome
+//! obligation and must cite the exact v4 lineage. Additional simulation-derived
+//! safety claims require a future typed per-obligation/multi-run evidence
+//! contract rather than free-form obligation text plus opaque refs.
 //!
 //! The earlier v3 facade remains crate-private for regression coverage. External
 //! callers therefore cannot mint qualification from its order-sensitive claim
@@ -129,6 +131,28 @@ pub fn preregister_confirmatory_safety(
     prepared: PreparedConfirmatorySimulation,
     safety_case: &SafetyCase,
 ) -> Result<PreparedSafetyConfirmatorySimulation, ConfirmatoryContractError> {
+    let simulation_obligation_count = safety_case
+        .obligations
+        .iter()
+        .filter(|obligation| obligation.expected_evidence == EvidenceKind::Simulation)
+        .count();
+
+    match simulation_obligation_count {
+        1 => {}
+        0 => {
+            return Err(ConfirmatoryContractError::Safety(
+                SafetyPreregistrationError::MissingSimulationObligation,
+            ));
+        }
+        count => {
+            return Err(
+                ConfirmatoryContractError::MultipleSimulationObligationsRequireTypedBindings(
+                    count,
+                ),
+            );
+        }
+    }
+
     Ok(v3::preregister_confirmatory_safety(prepared, safety_case)?)
 }
 
@@ -167,13 +191,11 @@ pub fn required_confirmatory_safety_evidence_ref(
     Ok(reference)
 }
 
-/// Qualify only when every preregistered Simulation obligation cites v4.
+/// Qualify only when the preregistered Simulation obligation cites v4.
 ///
 /// The crate-private v3 facade is satisfied only on an ephemeral clone so the
-/// weaker v3 label never becomes externally sufficient evidence. The current
-/// strict profile does not accept opaque neighboring simulation receipts for
-/// additional Simulation obligations; those require a future typed multi-run
-/// evidence contract.
+/// weaker v3 label never becomes externally sufficient evidence. Exactly one
+/// Simulation obligation is permitted by the public preregistration path.
 pub fn qualify_confirmatory_simulation(
     evidence: &SafetyPreregisteredConfirmatoryEvidence,
     satisfied: &SatisfiedSimulationClaim,
@@ -491,6 +513,8 @@ pub enum ConfirmatoryContractError {
     DuplicateClaimCriterion,
     #[error("all_criteria claim is unsatisfiable for metric {metric_name:?} unit {unit:?}")]
     UnsatisfiableClaim { metric_name: String, unit: String },
+    #[error("strict v4 preregistration permits exactly one Simulation obligation; found {0}")]
+    MultipleSimulationObligationsRequireTypedBindings(usize),
     #[error("preregistered Simulation obligation {0:?} does not cite normalized-canonical v4 lineage")]
     SimulationObligationMissingNormalizedEvidence(String),
     #[error("completed safety case does not cite normalized-canonical v4 simulation lineage")]
