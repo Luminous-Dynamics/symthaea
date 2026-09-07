@@ -17,7 +17,8 @@ use std::collections::HashMap;
 use crate::agent_id::{AgentId, AgentIdAllocator};
 use crate::encounter::EncounterScheduler;
 use crate::events::GenesisEvent;
-use crate::genome::Genome;
+use crate::evolution_birth::prepare_evolution_birth_v1;
+use crate::evolution_rng::EvolutionRngStreamsV1;
 use crate::organism::{Action, Organism, OrganismConfig};
 
 /// How an offspring's genome is chosen at reproduction, per `ALIFE_PLAN_2026-07-08.md` Phase 4.
@@ -137,10 +138,12 @@ pub struct Population {
     pub organisms: Vec<Organism>,
     pub cfg: PopulationConfig,
     next_seed: u64,
-    /// Stream for mutation and (in `InheritanceMode::RandomPeer`) parent-selection randomness --
-    /// deliberately independent of any `Organism`'s own RNG, same precedent as
-    /// `predator_prey.rs`'s `PredatorPreySim::rng_state`.
-    rng_state: u64,
+    /// Independent deterministic streams for mutation and RandomPeer genome-source selection.
+    ///
+    /// The mutation stream preserves the historical `seed_base + 1_000_011` sequence exactly for
+    /// `FromParent`; RandomPeer source selection is domain-separated so merely sampling a source
+    /// can no longer shift later mutation draws.
+    evolution_rng: EvolutionRngStreamsV1,
     pub total_births: u64,
     pub total_deaths: u64,
     /// Genesis v0 (G0a): assigns every organism's persistent [`AgentId`] -- initial population at
@@ -173,7 +176,7 @@ impl Population {
             organisms,
             cfg,
             next_seed: seed_base.wrapping_add(initial_count as u64).max(1),
-            rng_state: seed_base.wrapping_add(1_000_011).max(1),
+            evolution_rng: EvolutionRngStreamsV1::new(seed_base),
             total_births: 0,
             total_deaths: 0,
             id_allocator,
@@ -187,13 +190,6 @@ impl Population {
     /// result, rather than let `step_social` grow this vector unbounded for the whole run.
     pub fn drain_event_log(&mut self) -> Vec<GenesisEvent> {
         std::mem::take(&mut self.event_log)
-    }
-
-    fn next_unit(&mut self) -> f64 {
-        self.rng_state ^= self.rng_state << 13;
-        self.rng_state ^= self.rng_state >> 7;
-        self.rng_state ^= self.rng_state << 17;
-        (self.rng_state as f64) / (u64::MAX as f64)
     }
 
     /// Remove up to `n` of the lowest-energy organisms (predation picks off the weak first —
@@ -249,25 +245,16 @@ impl Population {
             if tick.energy >= self.cfg.reproduction_energy_threshold {
                 self.organisms[i].energy = self.cfg.reproduction_energy_cost;
 
-                // Phase 4: the offspring's genome comes from a parent chosen per
-                // `self.cfg.inheritance`, mutated, then reapplied to the population's shared
-                // non-heritable constants (costs, thermodynamic constants, thresholds -- see
-                // `Genome`'s module docs for exactly which fields are heritable).
-                let parent_genome = match self.cfg.inheritance {
-                    InheritanceMode::FromParent => Genome::from_config(&self.organisms[i].cfg),
-                    InheritanceMode::RandomPeer => {
-                        let r = self.next_unit();
-                        let peer_idx = ((r * self.organisms.len() as f64) as usize)
-                            .min(self.organisms.len() - 1);
-                        Genome::from_config(&self.organisms[peer_idx].cfg)
-                    }
-                };
-                let offspring_genome = parent_genome.mutate(
-                    &mut self.rng_state,
+                let birth_plan = prepare_evolution_birth_v1(
+                    &self.organisms,
+                    i,
+                    self.cfg.inheritance,
                     self.cfg.mutation_rate,
                     self.cfg.mutation_std,
-                );
-                let offspring_cfg = offspring_genome.apply_to(self.cfg.organism_cfg);
+                    &mut self.evolution_rng,
+                )
+                .expect("live reproducer index must be valid");
+                let offspring_cfg = birth_plan.offspring_genome.apply_to(self.cfg.organism_cfg);
 
                 // Lineage tracks the physically-reproducing organism (`self.organisms[i]`)
                 // regardless of `InheritanceMode` -- `RandomPeer` only randomizes which genome
@@ -468,21 +455,16 @@ impl Population {
             if energy >= self.cfg.reproduction_energy_threshold {
                 self.organisms[i].energy = self.cfg.reproduction_energy_cost;
 
-                let parent_genome = match self.cfg.inheritance {
-                    InheritanceMode::FromParent => Genome::from_config(&self.organisms[i].cfg),
-                    InheritanceMode::RandomPeer => {
-                        let r = self.next_unit();
-                        let peer_idx = ((r * self.organisms.len() as f64) as usize)
-                            .min(self.organisms.len() - 1);
-                        Genome::from_config(&self.organisms[peer_idx].cfg)
-                    }
-                };
-                let offspring_genome = parent_genome.mutate(
-                    &mut self.rng_state,
+                let birth_plan = prepare_evolution_birth_v1(
+                    &self.organisms,
+                    i,
+                    self.cfg.inheritance,
                     self.cfg.mutation_rate,
                     self.cfg.mutation_std,
-                );
-                let offspring_cfg = offspring_genome.apply_to(self.cfg.organism_cfg);
+                    &mut self.evolution_rng,
+                )
+                .expect("live reproducer index must be valid");
+                let offspring_cfg = birth_plan.offspring_genome.apply_to(self.cfg.organism_cfg);
 
                 // Lineage tracks the physically-reproducing organism (`self.organisms[i]`)
                 // regardless of `InheritanceMode` -- `RandomPeer` only randomizes which genome
@@ -524,6 +506,7 @@ impl Population {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::genome::Genome;
 
     fn cfg() -> PopulationConfig {
         PopulationConfig {
@@ -647,5 +630,74 @@ mod tests {
             "population should have grown, got {}",
             pop.len()
         );
+    }
+
+    fn forced_birth_cfg(inheritance: InheritanceMode) -> PopulationConfig {
+        PopulationConfig {
+            death_energy_threshold: -1.0,
+            reproduction_energy_threshold: 0.0,
+            reproduction_energy_cost: 0.4,
+            organism_cfg: OrganismConfig::default(),
+            mutation_rate: 0.37,
+            mutation_std: 0.05,
+            inheritance,
+        }
+    }
+
+    #[test]
+    fn from_parent_population_births_preserve_historical_mutation_sequence() {
+        let seed = 0x5eed_u64;
+        let initial_count = 3usize;
+        let cfg = forced_birth_cfg(InheritanceMode::FromParent);
+        let mut pop = Population::new(cfg, initial_count, seed);
+        let summary = pop.step(|_| 1.0);
+        assert_eq!(summary.births_this_tick, initial_count as u64);
+        assert_eq!(pop.len(), initial_count * 2);
+
+        let mut legacy_state = seed.wrapping_add(1_000_011).max(1);
+        for parent_index in 0..initial_count {
+            let parent_genome = Genome::from_config(&pop.organisms[parent_index].cfg);
+            let expected = parent_genome.mutate(
+                &mut legacy_state,
+                cfg.mutation_rate,
+                cfg.mutation_std,
+            );
+            let observed = Genome::from_config(&pop.organisms[initial_count + parent_index].cfg);
+            assert_eq!(observed, expected, "offspring {parent_index}");
+        }
+        assert_eq!(pop.evolution_rng.snapshot().mutation_state, legacy_state);
+    }
+
+    #[test]
+    fn random_peer_population_consumes_the_separated_birth_plan_streams_exactly() {
+        let seed = 0xa11fe_u64;
+        let initial_count = 3usize;
+        let cfg = forced_birth_cfg(InheritanceMode::RandomPeer);
+        let mut pop = Population::new(cfg, initial_count, seed);
+        let summary = pop.step(|_| 1.0);
+        assert_eq!(summary.births_this_tick, initial_count as u64);
+        assert_eq!(pop.len(), initial_count * 2);
+
+        let parents = &pop.organisms[..initial_count];
+        let mut expected_rng = EvolutionRngStreamsV1::new(seed);
+        let mut expected_offspring = Vec::with_capacity(initial_count);
+        for parent_index in 0..initial_count {
+            let plan = prepare_evolution_birth_v1(
+                parents,
+                parent_index,
+                cfg.inheritance,
+                cfg.mutation_rate,
+                cfg.mutation_std,
+                &mut expected_rng,
+            )
+            .expect("valid reference birth plan");
+            expected_offspring.push(plan.offspring_genome);
+        }
+
+        for (index, expected) in expected_offspring.into_iter().enumerate() {
+            let observed = Genome::from_config(&pop.organisms[initial_count + index].cfg);
+            assert_eq!(observed, expected, "offspring {index}");
+        }
+        assert_eq!(pop.evolution_rng.snapshot(), expected_rng.snapshot());
     }
 }
