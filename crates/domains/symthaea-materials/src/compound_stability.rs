@@ -1,40 +1,59 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Compound Stability Predictor
+//! Advisory compound-composition stability screening.
 //!
-//! Predicts thermodynamic stability of compounds from elemental binding
-//! energies and mixing entropy. Connects nuclear physics (SEMF binding)
-//! to materials science (HDC similarity search).
+//! This module provides a cheap composition heuristic from electronegativity
+//! variance and ideal mixing entropy.  It is useful for ranking/exploration, but
+//! it is **not** thermodynamic phase-stability evidence.  In particular, the
+//! current formation-energy proxy is `-weighted_variance(electronegativity)`, so
+//! a multicomponent composition is structurally biased toward a non-positive
+//! proxy.  No crystal structure, competing phases/convex hull, periodic electronic
+//! relaxation, phonons, or synthesis pathway is evaluated here.
+//!
+//! Callers must therefore treat `formation_energy`, `confidence`, and `is_stable`
+//! as advisory screening outputs only.  The Matter Observatory crystal/phase
+//! admission boundary intentionally does not accept them as a substitute for
+//! explicit thermodynamic phase-competition evidence.
 
 use serde::{Deserialize, Serialize};
 
-/// Stability prediction for a compound.
+/// Advisory screening result for a compound composition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StabilityPrediction {
-    /// Estimated formation energy (eV/atom, negative = stable)
+    /// Heuristic formation-energy proxy (eV/atom).
+    ///
+    /// This is not a DFT formation enthalpy/free energy and must not be used as
+    /// energy-above-hull or convex-hull evidence.
     pub formation_energy: f64,
-    /// Confidence in the prediction (0-1)
+    /// Fixed heuristic score based primarily on composition cardinality.
+    ///
+    /// This is not a calibrated probability or statistical confidence interval.
     pub confidence: f64,
-    /// Whether the compound is predicted to be thermodynamically stable
+    /// Advisory screening flag from this simplified composition model.
+    ///
+    /// `true` does not establish thermodynamic phase stability, dynamical
+    /// stability, existence of a crystal structure, or synthesizability.
     pub is_stable: bool,
-    /// Mixing entropy contribution (eV/atom)
+    /// Ideal-mixing entropy contribution used by the screening heuristic (eV/atom).
     pub mixing_entropy: f64,
-    /// Elements involved
+    /// Elements involved.
     pub elements: Vec<(u16, f64)>, // (Z, mole fraction)
-    /// Human-readable formula
+    /// Human-readable formula.
     pub formula: String,
 }
 
-/// Predict compound stability from elemental composition.
+/// Produce an advisory stability *screen* from elemental composition.
 ///
 /// Uses a simplified model:
-/// - Formation energy estimated from elemental cohesive energies
-/// - Mixing entropy from ideal solution model: -kT Σ x_i ln(x_i)
-/// - Stability = formation_energy + T * mixing_entropy < 0
+/// - formation-energy proxy from electronegativity variance;
+/// - ideal-solution mixing entropy: `-kT Σ x_i ln(x_i)`;
+/// - advisory flag from the resulting simplified free-energy proxy.
 ///
-/// This is a first-order approximation — real DFT calculations are
-/// needed for accurate predictions, but this provides a useful screening.
+/// This function does not evaluate a crystal structure or competing phases and
+/// cannot establish thermodynamic phase stability.  Use a periodic, relaxed,
+/// phase-competition workflow (and dynamical stability where applicable) before
+/// promoting a candidate beyond heuristic screening.
 pub fn predict_stability(
     elements: &[(u16, f64)], // (Z, mole_fraction)
     temperature_k: f64,
@@ -49,24 +68,23 @@ pub fn predict_stability(
             .map(|(_, x)| x * x.ln())
             .sum::<f64>();
 
-    // Approximate formation energy from elemental cohesive energies
-    // Negative = exothermic formation = stable
-    // This uses a simplified Miedema-like model
+    // Advisory formation-energy proxy from electronegativity variance.
+    // This is not a crystal/DFT formation energy.
     let formation_energy = estimate_formation_energy(elements);
 
-    // Total free energy
+    // Simplified screening free-energy proxy.
     let free_energy = formation_energy - temperature_k * mixing_entropy;
     let is_stable = if elements.len() < 2 {
-        true // Pure elements are stable by definition
+        true // Pure-element screening convention only.
     } else {
         free_energy < 0.0
     };
 
-    // Confidence based on how many elements and how well-characterized
+    // Heuristic score; not calibrated probability/confidence.
     let confidence = if elements.len() <= 3 {
-        0.6 // Binary/ternary: reasonable confidence
+        0.6
     } else {
-        0.3 // Complex: lower confidence
+        0.3
     };
 
     let formula = if elements.is_empty() {
@@ -96,13 +114,15 @@ pub fn predict_stability(
     }
 }
 
-/// Simplified formation energy estimate (Miedema-inspired).
+/// Simplified composition proxy inspired by electronegativity-mismatch models.
 ///
-/// Uses electronegativity difference and atomic volume mismatch
-/// as proxies for formation energy.
+/// The current expression is the negative weighted variance of electronegativity,
+/// so it is non-positive for ordinary non-negative mole fractions.  That property
+/// is precisely why this value is advisory and cannot act as a thermodynamic
+/// phase-stability gate.
 fn estimate_formation_energy(elements: &[(u16, f64)]) -> f64 {
     if elements.len() < 2 {
-        return 0.0; // Pure element — no formation
+        return 0.0;
     }
 
     // Approximate electronegativity (Pauling scale, simplified)
@@ -147,22 +167,20 @@ fn estimate_formation_energy(elements: &[(u16, f64)]) -> f64 {
             82 => 2.33,
             83 => 2.02,
             92 => 1.38,
-            _ => 1.5, // Default estimate
+            _ => 1.5,
         }
     };
 
-    // Weighted average electronegativity
     let avg_en: f64 = elements.iter().map(|(z, x)| x * electroneg(*z)).sum();
 
-    // Formation energy ∝ -Σ x_i (χ_i - χ_avg)²
-    // Negative when electronegativities differ (ionic/polar bonding)
+    // Negative weighted variance.  This cannot establish a physical formation
+    // energy or phase stability; see the module-level documentation.
     let delta_en_sq: f64 = elements
         .iter()
         .map(|(z, x)| x * (electroneg(*z) - avg_en).powi(2))
         .sum();
 
-    // Scale factor (empirical, ~-1 eV per unit χ² difference)
-    -delta_en_sq * 1.0
+    -delta_en_sq
 }
 
 fn element_symbol(z: u16) -> &'static str {
@@ -209,22 +227,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pure_element_zero_formation() {
+    fn test_pure_element_zero_formation_proxy() {
         let pred = predict_stability(&[(26, 1.0)], 300.0);
         assert!(
             pred.formation_energy.abs() < 0.01,
-            "Pure Fe should have ~0 formation energy: {}",
+            "Pure Fe should have ~0 formation proxy: {}",
             pred.formation_energy
         );
     }
 
     #[test]
-    fn test_binary_compound_negative_formation() {
-        // NaCl-like: large electronegativity difference → negative formation energy
+    fn test_binary_compound_negative_screening_proxy() {
         let pred = predict_stability(&[(11, 0.5), (17, 0.5)], 300.0);
         assert!(
             pred.formation_energy < 0.0,
-            "NaCl should have negative formation energy: {}",
+            "NaCl-like composition should have a negative heuristic proxy: {}",
             pred.formation_energy
         );
         assert!(pred.is_stable);

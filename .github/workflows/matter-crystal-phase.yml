@@ -1,0 +1,83 @@
+name: Matter Crystal Phase Admission
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_crystal_phase.rs'
+      - 'src/knowledge/matter_crystal_phase_materials_tests.rs'
+      - 'src/knowledge/mod.rs'
+      - 'crates/domains/symthaea-materials/src/compound_stability.rs'
+      - '.github/workflows/matter-crystal-phase.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crystal-phase-admission:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify incremental scope and no lock drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='2d8e78d90c3e295d00e4ae8fca77d6ecf85045ad'
+          test -z "$(git diff --name-only "$BASE"...HEAD -- Cargo.lock Cargo.toml crates/domains/symthaea-materials/Cargo.toml)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- src/knowledge/matter_cross_scale.rs src/knowledge/matter_cross_scale_lineage.rs src/knowledge/matter_relativistic.rs src/knowledge/matter_relativistic_evidence.rs)"
+
+      - name: Ratchet fail-closed crystal semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_crystal_phase.rs
+          grep -q 'PeriodicElectronicStructure' "$FILE"
+          grep -q 'StructuralRelaxation' "$FILE"
+          grep -q 'ThermodynamicPhaseCompetition' "$FILE"
+          grep -q 'DynamicalStability' "$FILE"
+          grep -q 'HeuristicScreeningCannotEstablishPhaseStability' "$FILE"
+          grep -q 'PeriodicEvidenceMustBeRelativisticCrystalClaim' "$FILE"
+          grep -q 'bind_relativistic_execution_references' "$FILE"
+          grep -q 'CrystalOodStatusNotPropagated' "$FILE"
+          grep -q 'competing_phase_count == 0' "$FILE"
+          grep -q 'sampled_q_point_count == 0' "$FILE"
+          if grep -Eq 'MolecularVibrations|MolecularGradients' "$FILE"; then
+            echo 'crystal admission must not substitute molecular capabilities for crystal relaxation/phonon evidence' >&2
+            exit 1
+          fi
+          if grep -Eq 'if .*is_stable|is_stable *&&|is_stable *\|\|' "$FILE"; then
+            echo 'legacy advisory stability flag must never gate crystal admission' >&2
+            exit 1
+          fi
+
+      - name: Ratchet advisory-only legacy composition model
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=crates/domains/symthaea-materials/src/compound_stability.rs
+          grep -q 'not thermodynamic phase-stability evidence' "$FILE"
+          grep -q 'not a calibrated probability' "$FILE"
+          grep -q 'negative weighted variance' "$FILE"
+          grep -q 'cannot act as a thermodynamic' "$FILE"
+          grep -q 'real_legacy_stability_true_still_cannot_replace_phase_competition' src/knowledge/matter_crystal_phase_materials_tests.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Crystal admission regression tests
+        run: cargo test --locked --lib knowledge::matter_crystal_phase::tests --features materials
+
+      - name: Legacy composition-screen integration regression
+        run: cargo test --locked --lib knowledge::matter_crystal_phase_materials_tests --features materials
+
+      - name: Materials composition regression tests
+        run: cargo test --locked -p symthaea-materials compound_stability
