@@ -39,7 +39,7 @@ export SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD='<reviewed 40-hex recovery commit
 test "${#SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD}" -eq 40
 ```
 
-Clone the canonical public repository, detach at the current published recovery branch, prove that the checked-out commit is the separately authorized commit, and only then invoke the canonical validator explicitly through Bash:
+Clone the canonical public repository, detach at the current published recovery branch, prove that the checked-out commit is the separately authorized commit, and invoke the canonical validator explicitly through Bash:
 
 ```bash
 git clone https://github.com/Luminous-Dynamics/symthaea.git
@@ -51,6 +51,8 @@ test "$(git rev-parse HEAD)" = "$SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD"
 bash nix/ci/validate-trusted-runner-bootstrap.sh
 ```
 
+The explicit shell check above is an operator convenience, not the trust boundary by itself. The validator independently requires `SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD`, rejects missing or malformed values, and rechecks that exact authorization against the checkout plus both pre- and post-validation public recovery refs.
+
 This gives Stage A three distinct equalities rather than one circular notion of "current":
 
 ```text
@@ -61,12 +63,14 @@ operator-authorized head
 
 If any equality fails, stop. Do not update the expected value merely to match the branch; review the new recovery generation first and record a new operator authorization.
 
-Do not substitute a locally edited copy of the validator. The script requires a pristine checkout whose `HEAD` exactly matches the freshly fetched published recovery head.
+Do not substitute a locally edited copy of the validator. The script requires a pristine checkout whose `HEAD` exactly matches both the explicit operator authorization and the freshly fetched published recovery head.
 
 The validator fails closed unless all of the following hold in one validation interval:
 
+- `SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD` is a non-empty 40-hex commit SHA;
 - `origin` is the canonical public HTTPS Symthaea repository;
 - the working tree is pristine, including untracked and ignored files;
+- the checked-out commit exactly equals the operator-authorized recovery head;
 - the checked-out commit exactly equals the current published `ci/nixos-ephemeral-runner-v1` head;
 - current public `main` is an ancestor of that recovery head;
 - the complete `main...recovery` diff is exactly the reviewed trusted-runner/recovery infrastructure allowlist;
@@ -74,21 +78,23 @@ The validator fails closed unless all of the following hold in one validation in
 - the trusted-routing Nix evaluation succeeds and the trusted CPU capability consumer set is unchanged;
 - the minimal pinned Rust shell resolves and accepts locked metadata plus `symthaea-psych-bench` library compilation;
 - the source commit/tree and repository cleanliness are unchanged after evaluation;
-- a second public-ref refresh produces the same `main` and recovery SHAs seen at the beginning of validation.
+- a second public-ref refresh produces the same `main` and recovery SHAs seen at the beginning of validation;
+- the final published recovery head still equals the exact operator-authorized SHA.
 
 If either public ref moves during Stage A, the validator refuses PASS. Detach at the new recovery head, obtain a fresh explicit operator authorization for that reviewed generation, and rerun rather than carrying stale bootstrap evidence forward.
 
-On success the validator emits a `symthaea.trusted-runner.bootstrap.v2` manifest in a unique `mktemp` path under `/tmp`. The manifest contains no credential. Record both the manifest contents and its printed SHA-256 before proceeding.
+On success the validator emits a `symthaea.trusted-runner.bootstrap.v3` manifest in a unique `mktemp` path under `/tmp`. The manifest contains no credential. Record both the manifest contents and its printed SHA-256 before proceeding.
 
 The manifest binds, among other provenance:
 
-- exact recovery commit and source tree;
+- exact operator-authorized recovery commit;
+- exact recovery commit and source tree actually validated;
 - exact `main` commit observed for the complete validation interval;
 - SHA-256 of the exact reviewed diff-path set;
 - Git blob identities for the runner module, routing policy, main-only smoke workflow, and bootstrap validator;
 - pinned nixpkgs revision and repository Rust channel;
 - `flake.lock` and `rust-toolchain.toml` SHA-256 values;
-- PASS state for runner policy, routing policy, locked Rust validation, and ref-stability checks.
+- PASS state for explicit operator-authorization verification, runner policy, routing policy, locked Rust validation, and ref-stability checks.
 
 The operator authorization record plus this manifest jointly establish what was intended to be validated and what was actually validated. Neither one substitutes for the other.
 
