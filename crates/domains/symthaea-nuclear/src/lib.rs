@@ -23,6 +23,7 @@
 
 mod active_learning;
 pub mod ame2020;
+pub mod blind_models;
 pub mod blind_validation;
 mod conformal;
 pub mod constants;
@@ -57,6 +58,7 @@ pub mod space_nuclear;
 mod symbolic_regression;
 
 pub use ame2020::*;
+pub use blind_models::*;
 pub use blind_validation::*;
 pub use constants::*;
 pub use deformation::*;
