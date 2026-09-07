@@ -26,7 +26,15 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -56,7 +64,15 @@ jobs:
     needs: contracts
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -74,7 +90,7 @@ jobs:
       - name: Record exact evidence metadata
         run: |
           {
-            echo "git_sha=${GITHUB_SHA}"
+            echo "git_sha=$(git rev-parse HEAD)"
             echo "rustc=$(rustc --version)"
             echo "cargo=$(cargo --version)"
             echo "example=evolvability_repeated_shock_sweep"
@@ -85,6 +101,6 @@ jobs:
       - name: Upload ALife evolvability evidence
         uses: actions/upload-artifact@v4
         with:
-          name: alife-evolvability-${{ github.sha }}
+          name: alife-evolvability-${{ github.event.pull_request.head.sha || github.sha }}
           path: target/alife-evolvability/
           retention-days: 30
