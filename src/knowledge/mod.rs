@@ -42,6 +42,8 @@ pub mod graph;
 pub mod hdc_retrieval;
 pub mod llm_extraction;
 pub mod manager;
+#[cfg(feature = "nuclear")]
+pub mod matter_evidence_bindings;
 pub mod matter_observatory;
 pub mod persistence;
 pub mod reasoning_context;
