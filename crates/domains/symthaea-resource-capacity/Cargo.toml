@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-resource-capacity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Explicit temporal capacity semantics for multiscale resource scheduling"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "capacity", "infrastructure", "scheduling"]
+categories = ["science", "simulation"]
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-model = { path = "../symthaea-resource-model" }
+symthaea-resource-topology = { path = "../symthaea-resource-topology" }
