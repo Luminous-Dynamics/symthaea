@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-operating-envelope"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bounded parent-to-child operating authority for multiscale infrastructure"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["infrastructure", "control", "safety", "authority"]
+categories = ["science", "simulation"]
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-model = { path = "../symthaea-resource-model" }
+symthaea-resource-hierarchy = { path = "../symthaea-resource-hierarchy" }
