@@ -1,0 +1,100 @@
+name: Matter Crystal Solver Execution
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_crystal_execution.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-crystal-execution.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crystal-solver-execution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify child scope and frozen parents
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='3885c4e0ca83edef28128f6c2d970bcecaa9936f'
+          test -z "$(git diff --name-only "$BASE"...HEAD -- Cargo.lock Cargo.toml)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- crates/core/symthaea-evidence-plane crates/domains/symthaea-epistemic-types)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- src/knowledge/matter_crystal_phase.rs src/knowledge/matter_crystal_evidence_binding.rs)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- src/knowledge/matter_cross_scale.rs src/knowledge/matter_cross_scale_lineage.rs)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- src/knowledge/matter_relativistic.rs src/knowledge/matter_relativistic_evidence.rs)"
+
+      - name: Ratchet task-specific execution semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_crystal_execution.rs
+          grep -q 'CrystalSolverTask::PeriodicElectronicStructure' "$FILE"
+          grep -q 'CrystalSolverTask::StructuralRelaxation' "$FILE"
+          grep -q 'CrystalSolverTask::ThermodynamicPhaseCompetition' "$FILE"
+          grep -q 'CrystalSolverTask::LatticeDynamics' "$FILE"
+          grep -q 'receipts.len() != 4' "$FILE"
+          grep -q 'exit_code != 0' "$FILE"
+          grep -q 'ExecutionEvidenceMissingFromClaim' "$FILE"
+          grep -q 'SolverIdentityMismatch' "$FILE"
+          grep -q 'PeriodicCapabilityMissing' "$FILE"
+          if grep -Eq 'pub[[:space:]]+(converged|stable|confidence)[[:space:]]*:' "$FILE"; then
+            echo 'execution receipt must not encode scientific convergence/stability/confidence' >&2
+            exit 1
+          fi
+
+      - name: Ratchet canonical artifact provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_crystal_execution.rs
+          grep -q 'EvidenceRole::SolverExecution' "$FILE"
+          grep -q 'EvidenceRole::ArtifactContent' "$FILE"
+          grep -q 'EvidenceRole::ImplementationSnapshot' "$FILE"
+          grep -q 'EvidenceRole::DependencySnapshot' "$FILE"
+          grep -q 'DuplicateContentIdentity' "$FILE"
+          grep -q 'DependencyPostdatesExecution' "$FILE"
+          grep -q 'OutputPredatesExecution' "$FILE"
+          grep -q 'EvidenceReferenceInterpretation::ReferenceOnly' "$FILE"
+          grep -q 'DeclaredChronologyInterpretation::DeclaredChronologyOnly' "$FILE"
+
+      - name: Ratchet preregistration-before-execution declaration
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_crystal_execution.rs
+          grep -q 'require_preregistration_before' "$FILE"
+          grep -q 'IncompleteCriterionChronology' "$FILE"
+          grep -q 'ParentEvidenceBindingMismatch' "$FILE"
+          if grep -Eq 'VerifiedChronology|VerifiedPreregistration|ExperimentallyObserved|IndependentlyReplicated' "$FILE"; then
+            echo 'solver execution binding must not mint verified chronology or empirical authority' >&2
+            exit 1
+          fi
+
+      - name: Ratchet solver-neutral orchestration boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_crystal_execution.rs
+          if grep -Eq 'Command::new|std::process::Command|\.spawn\(|\.output\(\)|\.status\(\)' "$FILE"; then
+            echo 'generic execution contract must not directly spawn solver processes' >&2
+            exit 1
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Crystal execution regression tests
+        run: cargo test --locked --lib knowledge::matter_crystal_execution::tests
