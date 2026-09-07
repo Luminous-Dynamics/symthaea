@@ -12,7 +12,7 @@ index 6d882bc..0000000 100644
  
 -use symthaea_core::hdc::conjecture_engine::SymExpr;
 +use symthaea_core::hdc::conjecture_engine::{
-+    Expr, RegressorConfig, SymExpr, discover_invariants_autonomous, expr_to_sym,
++    RegressorConfig, SymExpr, discover_invariants_autonomous, expr_to_sym,
 +};
 @@ -326,13 +329,18 @@ fn problems() -> Vec<Problem> {
  // Build the SMT-LIB2 obligation for dE/dt ≠ 0.
