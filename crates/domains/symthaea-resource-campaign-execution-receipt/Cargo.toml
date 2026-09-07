@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-resource-campaign-execution-receipt"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Structurally matched realized-execution receipts for resource shadow campaigns"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "reproducibility", "execution", "receipt"]
+categories = ["science", "simulation"]
+
+[dependencies]
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-campaign-execution-profile = { path = "../symthaea-resource-campaign-execution-profile" }
