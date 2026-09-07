@@ -1,5 +1,5 @@
 diff --git a/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs b/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
-index 80149c3..0000000 100644
+index 80149c3..1111111 100644
 --- a/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
 +++ b/crates/core/symthaea-core/src/hdc/abstract_thought/dynamic_grammar.rs
 @@ -3,14 +3,16 @@
@@ -42,21 +42,18 @@ index 80149c3..0000000 100644
  /// A promoted macro-operator added to the GP grammar.
  #[derive(Debug, Clone)]
  pub struct MacroOperator {
-@@ -84,10 +98,16 @@ pub struct MacroOperator {
+@@ -84,7 +98,9 @@ pub struct MacroOperator {
      pub arity: usize,
      /// How this macro entered the pool.
      pub promotion_tier: MacroPromotionTier,
 -    /// Source conjecture indices that justified promotion
 +    /// Promotion-time conjecture indices retained for backwards-compatible
-+    /// diagnostics only. These indices are not stable lineage identities
-+    /// because `ConjectureEngine::conjectures` is subsequently re-sorted.
++    /// diagnostics only. These are not stable lineage identities because the
++    /// engine re-sorts its conjecture vector after later discovery runs.
      pub source_conjectures: Vec<usize>,
-+    /// Stable promotion-time source/formula snapshots. New scientific
-+    /// provenance consumers should use these rather than positional indices.
-+    pub source_snapshots: Vec<MacroSourceSnapshot>,
      /// Human-readable parents that justified promotion.
      pub parent_formulas: Vec<String>,
-@@ -99,7 +119,8 @@ pub struct MacroOperator {
+@@ -99,7 +115,8 @@ pub struct MacroOperator {
      pub var_count: usize,
      /// Canonical signature key for the macro's variable set.
      pub signature: String,
@@ -64,7 +61,26 @@ index 80149c3..0000000 100644
 +    /// Number of distinct source-sequence tags that contributed this macro.
 +    /// This is recurrence breadth, not an independent-replication count.
      pub source_count: usize,
-@@ -306,13 +327,14 @@ impl DynamicGrammar {
+     /// How many times this operator appeared in top conjectures during GP runs
+     pub usage_count: u64,
+@@ -137,6 +154,10 @@ pub struct DynamicGrammar {
+     pub cycle: u64,
+     /// Signature-partitioned operator index for variable-aware retrieval.
+     operators_by_signature: HashMap<String, Vec<usize>>,
++    /// Stable promotion-time source/formula snapshots keyed by macro canonical
++    /// identity. This sidecar avoids making mutable conjecture-vector indices
++    /// carry scientific lineage authority.
++    source_snapshots_by_operator: HashMap<String, Vec<MacroSourceSnapshot>>,
+     /// Lifetime count of promoted operators.
+     total_promoted: u64,
+@@ -158,6 +179,7 @@ impl DynamicGrammar {
+             min_sources: 2,
+             cycle: 0,
+             operators_by_signature: HashMap::new(),
++            source_snapshots_by_operator: HashMap::new(),
+             total_promoted: 0,
+             total_pruned: 0,
+@@ -306,13 +328,14 @@ impl DynamicGrammar {
      /// Promote eligible candidates to macro-operators.
      ///
      /// Two parallel paths:
@@ -79,7 +95,7 @@ index 80149c3..0000000 100644
 +    ///    claim. It lets unique strongly checked shapes
      ///    like Hardy-Ramanujan's `exp(c*sqrt(n))` enter the pool from a
      ///    single discovery.
-@@ -361,6 +383,20 @@ impl DynamicGrammar {
+@@ -361,6 +384,23 @@ impl DynamicGrammar {
              let mut parent_formulas: Vec<String> =
                  candidate.parent_formulas.iter().cloned().collect();
              parent_formulas.sort();
@@ -99,33 +115,36 @@ index 80149c3..0000000 100644
 +                    .then_with(|| a.parent_formula.cmp(&b.parent_formula))
 +            });
 +            source_snapshots.dedup();
++            self.source_snapshots_by_operator
++                .insert(candidate.canonical.clone(), source_snapshots);
  
              self.operators.push(MacroOperator {
-@@ -371,6 +407,7 @@ impl DynamicGrammar {
-                 arity,
-                 promotion_tier,
-                 source_conjectures: candidate.occurrences.clone(),
-+                source_snapshots,
-                 parent_formulas,
-                 vars_used: candidate.vars_used.clone(),
-                 var_count: candidate.var_count,
-diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
-index 7cfb3be..0000000 100644
---- a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
-+++ b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
-@@ -1,3 +1,3 @@
-@@
--                source_conjectures: vec![0],
-+                source_conjectures: vec![0],
-+                source_snapshots: vec![],
-                 parent_formulas: vec!["(n ^ 2)".into()],
-@@
--            source_conjectures: vec![0],
-+            source_conjectures: vec![0],
-+            source_snapshots: vec![],
-             parent_formulas: vec![format!("{}", one_d)],
-@@
--            source_conjectures: vec![1],
-+            source_conjectures: vec![1],
-+            source_snapshots: vec![],
-             parent_formulas: vec!["((vy * x) - (vx * y))".into()],
+@@ -394,6 +434,9 @@ impl DynamicGrammar {
+         self.total_pruned += (before - self.operators.len()) as u64;
+         if self.operators.len() != before {
+             self.rebuild_operator_index();
++            self.source_snapshots_by_operator.retain(|canonical, _| {
++                self.operators.iter().any(|op| op.canonical == *canonical)
++            });
+         }
+     }
+ 
+@@ -409,6 +452,18 @@ impl DynamicGrammar {
+         }
+     }
+ 
++    /// Stable promotion-time source/formula snapshots for one macro.
++    ///
++    /// These snapshots remain valid if `ConjectureEngine::conjectures` is
++    /// later re-sorted. They are local provenance labels, not proof that the
++    /// underlying datasets or evidence lineages are independent.
++    pub fn source_snapshots(&self, canonical: &str) -> &[MacroSourceSnapshot] {
++        self.source_snapshots_by_operator
++            .get(canonical)
++            .map(Vec::as_slice)
++            .unwrap_or(&[])
++    }
++
+     /// Instantiate a macro-operator template with random constants.
+     ///
+     /// Replaces `Const(1.0)` placeholders with random values from a seed.
