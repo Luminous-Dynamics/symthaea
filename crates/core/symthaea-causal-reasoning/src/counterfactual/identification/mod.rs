@@ -14,6 +14,7 @@ pub mod dag;
 pub mod discovery;
 pub mod estimation;
 pub mod id_algorithm;
+pub mod preflight;
 pub mod reasoner;
 
 #[cfg(test)]
@@ -24,4 +25,5 @@ pub use dag::*;
 pub use discovery::*;
 pub use estimation::*;
 pub use id_algorithm::*;
+pub use preflight::*;
 pub use reasoner::*;
