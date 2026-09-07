@@ -15,7 +15,8 @@
 use crate::{
     assess_independence, EvidenceLineageRef, IndependenceAssessment,
     IndependenceAssessmentError, IndependenceAttestationSet, IndependenceAttestationSetError,
-    IndependenceAuthorityPolicy, LineageRelationship, ObservationEnvelope, ObservationId,
+    IndependenceAuthorityPolicy, LineageRelationship, ObservationEnvelope,
+    SourceQualifiedObservationRef,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -44,9 +45,9 @@ impl Default for QualifiedIndependenceReasoningPolicy {
 /// Auditable witness for the lower bound established by positive attestations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndependenceCliqueWitness {
-    /// One observation-id set for each pairwise-independent shared-origin
-    /// component in the witness.
-    pub component_observation_ids: Vec<Vec<ObservationId>>,
+    /// One source-qualified observation-reference set for each pairwise-
+    /// independent shared-origin component in the witness.
+    pub component_observations: Vec<Vec<SourceQualifiedObservationRef>>,
     /// One active attestation id for every pair in the clique.
     pub attestation_ids: Vec<String>,
 }
@@ -84,10 +85,10 @@ pub enum QualifiedIndependenceError {
     #[error("qualified-independence reasoning policy must use non-zero limits")]
     InvalidPolicy,
     #[error(
-        "observation `{observation_id}` was ingested at {ingested_at_unix_ms} after historical query time {at_unix_ms}"
+        "observation `{observation_ref}` was ingested at {ingested_at_unix_ms} after historical query time {at_unix_ms}"
     )]
     ObservationNotYetIngested {
-        observation_id: ObservationId,
+        observation_ref: SourceQualifiedObservationRef,
         ingested_at_unix_ms: u64,
         at_unix_ms: u64,
     },
@@ -132,7 +133,7 @@ pub fn assess_qualified_independence(
     for observation in observations {
         if observation.ingested_at_unix_ms > at_unix_ms {
             return Err(QualifiedIndependenceError::ObservationNotYetIngested {
-                observation_id: observation.observation_id.clone(),
+                observation_ref: observation.source_qualified_ref(),
                 ingested_at_unix_ms: observation.ingested_at_unix_ms,
                 at_unix_ms,
             });
@@ -322,12 +323,12 @@ fn build_witness(
     observations: &[ObservationEnvelope],
     edge_attestations: &BTreeMap<(usize, usize), BTreeSet<String>>,
 ) -> IndependenceCliqueWitness {
-    let component_observation_ids = clique
+    let component_observations = clique
         .iter()
         .map(|component| {
             component_members[*component]
                 .iter()
-                .map(|index| observations[*index].observation_id.clone())
+                .map(|index| observations[*index].source_qualified_ref())
                 .collect()
         })
         .collect();
@@ -352,7 +353,7 @@ fn build_witness(
     attestation_ids.sort();
 
     IndependenceCliqueWitness {
-        component_observation_ids,
+        component_observations,
         attestation_ids,
     }
 }
@@ -466,7 +467,7 @@ mod tests {
     use super::*;
     use crate::{
         EntityRef, IndependenceAttestation, IndependenceAuthorityQualification, IndependenceBasis,
-        ObservationKind, ObservationLineage, ObservationQuality, ObservationSource,
+        ObservationId, ObservationKind, ObservationLineage, ObservationQuality, ObservationSource,
         ObservationValue, INDEPENDENCE_ATTESTATION_SCHEMA_VERSION,
     };
 
@@ -527,7 +528,10 @@ mod tests {
             issued_at_unix_ms: 100,
             valid_from_unix_ms: None,
             valid_until_unix_ms: None,
-            evidence_observation_ids: vec![],
+            evidence_observations: vec![
+                left_observation.source_qualified_ref(),
+                right_observation.source_qualified_ref(),
+            ],
         }
     }
 
@@ -548,7 +552,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(assessment.qualified_independent_lower_bound, 2);
-        assert_eq!(assessment.witness.component_observation_ids.len(), 2);
+        assert_eq!(assessment.witness.component_observations.len(), 2);
     }
 
     #[test]
@@ -572,9 +576,32 @@ mod tests {
         )
         .unwrap();
         assert_eq!(assessment.qualified_independent_lower_bound, 3);
-        assert_eq!(assessment.witness.component_observation_ids.len(), 3);
+        assert_eq!(assessment.witness.component_observations.len(), 3);
         assert_eq!(assessment.witness.attestation_ids.len(), 3);
         assert!(assessment.clique_search_complete);
+    }
+
+    #[test]
+    fn equal_raw_ids_from_different_sources_remain_distinct_components() {
+        let a = observation("same", "kubernetes");
+        let b = observation("same", "prometheus");
+        let set = IndependenceAttestationSet {
+            attestations: vec![attestation("ab", &a, &b)],
+        };
+        let assessment = assess_qualified_independence(
+            &[a, b],
+            &set,
+            &authority_policy(),
+            &QualifiedIndependenceReasoningPolicy::default(),
+            100,
+        )
+        .unwrap();
+        assert_eq!(assessment.base.shared_origin_components, 2);
+        assert_eq!(assessment.qualified_independent_lower_bound, 2);
+        assert_ne!(
+            assessment.witness.component_observations[0][0],
+            assessment.witness.component_observations[1][0]
+        );
     }
 
     #[test]

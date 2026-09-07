@@ -10,7 +10,9 @@
 //! are descriptive provenance only: distinct labels do not prove independent
 //! origins without a separately qualified independence authority.
 
-use crate::{EntityRef, LineageRelationship, ObservationEnvelope};
+use crate::{
+    EntityRef, LineageRelationship, ObservationEnvelope, SourceQualifiedObservationRef,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -18,7 +20,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// shared-origin component.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndependenceMetadataConflict {
-    pub observation_ids: Vec<String>,
+    pub observation_refs: Vec<SourceQualifiedObservationRef>,
     pub declared_groups: Vec<String>,
 }
 
@@ -72,8 +74,8 @@ pub enum IndependenceAssessmentError {
     EmptyCohort,
     #[error("observation {index} is invalid: {reason}")]
     InvalidObservation { index: usize, reason: String },
-    #[error("duplicate observation id `{0}` in evidence cohort")]
-    DuplicateObservationId(String),
+    #[error("duplicate source-qualified observation reference `{0}` in evidence cohort")]
+    DuplicateObservationReference(SourceQualifiedObservationRef),
     #[error("cohort mixes entities: expected {expected}, found {found}")]
     MixedEntity { expected: String, found: String },
     #[error("cohort mixes signals: expected `{expected}`, found `{found}`")]
@@ -85,8 +87,9 @@ pub enum IndependenceAssessmentError {
 /// The caller chooses the temporal cohort/window. This function deliberately
 /// refuses to compare different entities or signals, because provenance
 /// independence is meaningful only after semantic alignment. It also validates
-/// each envelope and rejects duplicate observation IDs so direct callers cannot
-/// bypass basic evidence-admission invariants.
+/// each envelope and rejects duplicate source-qualified observation references
+/// so direct callers cannot bypass basic evidence-admission invariants while
+/// equal source-local IDs from unrelated sources remain legal.
 pub fn assess_independence(
     observations: &[ObservationEnvelope],
 ) -> Result<IndependenceAssessment, IndependenceAssessmentError> {
@@ -96,7 +99,7 @@ pub fn assess_independence(
     let entity = first.entity.clone();
     let signal = first.signal.clone();
 
-    let mut observation_ids = BTreeSet::new();
+    let mut observation_refs = BTreeSet::new();
     for (index, observation) in observations.iter().enumerate() {
         observation
             .validate()
@@ -104,9 +107,10 @@ pub fn assess_independence(
                 index,
                 reason: reason.to_string(),
             })?;
-        if !observation_ids.insert(observation.observation_id.clone()) {
-            return Err(IndependenceAssessmentError::DuplicateObservationId(
-                observation.observation_id.to_string(),
+        let observation_ref = observation.source_qualified_ref();
+        if !observation_refs.insert(observation_ref.clone()) {
+            return Err(IndependenceAssessmentError::DuplicateObservationReference(
+                observation_ref,
             ));
         }
         if observation.entity != entity {
@@ -160,9 +164,9 @@ pub fn assess_independence(
             }
             _ => {
                 metadata_conflicts.push(IndependenceMetadataConflict {
-                    observation_ids: indices
+                    observation_refs: indices
                         .iter()
-                        .map(|index| observations[*index].observation_id.to_string())
+                        .map(|index| observations[*index].source_qualified_ref())
                         .collect(),
                     declared_groups: groups.into_iter().collect(),
                 });
@@ -336,6 +340,7 @@ mod tests {
         assert_eq!(assessment.independent_lower_bound, 1);
         assert_eq!(assessment.independent_upper_bound, 1);
         assert_eq!(assessment.metadata_conflicts.len(), 1);
+        assert_eq!(assessment.metadata_conflicts[0].observation_refs.len(), 2);
         assert!(!assessment.fully_resolved());
     }
 
@@ -350,13 +355,24 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_observation_ids_are_rejected_instead_of_counted_as_reports() {
-        let a = observation("same", "lineage-a", None, None);
-        let mut b = observation("same", "lineage-b", None, None);
-        b.source.integration_id = "source-b".into();
+    fn equal_raw_ids_from_different_sources_are_distinct_reports() {
+        let mut a = observation("a", "lineage-a", None, None);
+        let mut b = observation("b", "lineage-b", None, None);
+        a.observation_id = ObservationId::new("same-local-id");
+        b.observation_id = ObservationId::new("same-local-id");
+        let assessment = assess_independence(&[a, b]).unwrap();
+        assert_eq!(assessment.reports, 2);
+        assert_eq!(assessment.independent_upper_bound, 2);
+    }
+
+    #[test]
+    fn duplicate_source_qualified_reference_is_rejected() {
+        let a = observation("a", "lineage-a", None, None);
+        let mut b = a.clone();
+        b.lineage.lineage_id = "lineage-b".into();
         assert!(matches!(
             assess_independence(&[a, b]),
-            Err(IndependenceAssessmentError::DuplicateObservationId(_))
+            Err(IndependenceAssessmentError::DuplicateObservationReference(_))
         ));
     }
 

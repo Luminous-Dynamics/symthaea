@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Canonical runtime observation envelope for infrastructure integrations.
 
+use crate::observation_reference::SourceQualifiedObservationRef;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -9,11 +10,13 @@ use std::fmt;
 /// Current serialized observation schema version.
 pub const OBSERVATION_SCHEMA_VERSION: u16 = 1;
 
-/// Caller-supplied, stable identity for an observation.
+/// Caller-supplied, stable **source-local** identity for an observation.
 ///
 /// The library deliberately does not generate IDs internally: collectors that
 /// need replay/deduplication should derive deterministic IDs from their native
-/// event identity or explicitly generate them at the boundary.
+/// event identity or explicitly generate them at the boundary. Cross-source
+/// reasoning must use [`SourceQualifiedObservationRef`] rather than assuming the
+/// raw ID string is globally unique.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ObservationId(pub String);
 
@@ -193,7 +196,8 @@ pub struct ObservationLineage {
     /// upstream-origin metadata is an independent provenance signal, not part of
     /// this local identifier's namespace.
     pub lineage_id: String,
-    /// Parent observations when this value is derived/aggregated.
+    /// Source-local parent observations when this value is derived/aggregated.
+    /// The enclosing observation source supplies their namespace in v0.1.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parent_ids: Vec<ObservationId>,
     /// Measurements with the same non-empty group are conservatively declared
@@ -285,6 +289,20 @@ impl ObservationEnvelope {
         require_non_empty("source.measurement_method", &self.source.measurement_method)?;
         require_non_empty("lineage.lineage_id", &self.lineage.lineage_id)?;
 
+        for (field, value) in [
+            ("source.collector_id", self.source.collector_id.as_deref()),
+            ("source.upstream_origin", self.source.upstream_origin.as_deref()),
+            ("source.tenant", self.source.tenant.as_deref()),
+            (
+                "lineage.independence_group",
+                self.lineage.independence_group.as_deref(),
+            ),
+        ] {
+            if let Some(value) = value {
+                require_non_empty(field, value)?;
+            }
+        }
+
         validate_probability("quality.source_confidence", self.quality.source_confidence)?;
         validate_probability("quality.completeness", self.quality.completeness)?;
 
@@ -309,33 +327,59 @@ impl ObservationEnvelope {
             require_non_empty("lineage.transform.name", &transform.name)?;
         }
 
+        debug_assert!(self.source_qualified_ref().validate().is_ok());
         Ok(())
     }
 
     /// Assess whether two reports share known lineage. Positive independence is
-    /// never inferred from different adapter-supplied group labels.
+    /// never inferred from different adapter-supplied group labels. This method
+    /// also stays conservative for invalid/unadmitted envelopes: empty optional
+    /// provenance strings never become shared-origin evidence.
     pub fn lineage_relationship(&self, other: &Self) -> LineageRelationship {
-        if self.observation_id == other.observation_id {
+        let self_ref = self.source_qualified_ref();
+        let other_ref = other.source_qualified_ref();
+        if self_ref.validate().is_ok() && other_ref.validate().is_ok() && self_ref == other_ref {
             return LineageRelationship::SameObservation;
         }
-        if self.lineage.lineage_id == other.lineage.lineage_id
+
+        if !self.lineage.lineage_id.trim().is_empty()
+            && !other.lineage.lineage_id.trim().is_empty()
+            && !self.source.integration_id.trim().is_empty()
+            && !other.source.integration_id.trim().is_empty()
+            && self.lineage.lineage_id == other.lineage.lineage_id
             && self.source.integration_id == other.source.integration_id
             && self.source.collector_id == other.source.collector_id
             && self.source.tenant == other.source.tenant
         {
             return LineageRelationship::SharedOrigin;
         }
+
         if let (Some(a), Some(b)) = (
-            self.source.upstream_origin.as_deref(),
-            other.source.upstream_origin.as_deref(),
+            self.source
+                .upstream_origin
+                .as_deref()
+                .filter(|value| !value.trim().is_empty()),
+            other
+                .source
+                .upstream_origin
+                .as_deref()
+                .filter(|value| !value.trim().is_empty()),
         ) {
             if a == b {
                 return LineageRelationship::SharedOrigin;
             }
         }
+
         match (
-            self.lineage.independence_group.as_deref(),
-            other.lineage.independence_group.as_deref(),
+            self.lineage
+                .independence_group
+                .as_deref()
+                .filter(|value| !value.trim().is_empty()),
+            other
+                .lineage
+                .independence_group
+                .as_deref()
+                .filter(|value| !value.trim().is_empty()),
         ) {
             (Some(a), Some(b)) if a == b => LineageRelationship::SharedOrigin,
             _ => LineageRelationship::Unknown,
@@ -389,10 +433,9 @@ impl ObservationBatch {
                     collected_at_unix_ms: self.collected_at_unix_ms,
                 });
             }
-            if !ids.insert(observation.observation_id.clone()) {
-                return Err(BatchValidationError::DuplicateObservationId(
-                    observation.observation_id.clone(),
-                ));
+            let reference = observation.source_qualified_ref();
+            if !ids.insert(reference.clone()) {
+                return Err(BatchValidationError::DuplicateObservationReference(reference));
             }
         }
         Ok(())
@@ -441,8 +484,8 @@ pub enum BatchValidationError {
         ingested_at_unix_ms: u64,
         collected_at_unix_ms: u64,
     },
-    #[error("duplicate observation id {0} in batch")]
-    DuplicateObservationId(ObservationId),
+    #[error("duplicate source-qualified observation reference {0} in batch")]
+    DuplicateObservationReference(SourceQualifiedObservationRef),
 }
 
 fn require_non_empty(
@@ -519,7 +562,38 @@ mod tests {
 
     #[test]
     fn valid_observation_passes() {
-        assert!(sample("obs-1", "test", Some("sensor-a")).validate().is_ok());
+        let observation = sample("obs-1", "test", Some("sensor-a"));
+        assert!(observation.validate().is_ok());
+        assert!(observation.source_qualified_ref().validate().is_ok());
+    }
+
+    #[test]
+    fn optional_provenance_fields_cannot_be_present_but_empty() {
+        let mutations: [fn(&mut ObservationEnvelope); 4] = [
+            |observation| observation.source.collector_id = Some("".into()),
+            |observation| observation.source.upstream_origin = Some(" ".into()),
+            |observation| observation.source.tenant = Some("".into()),
+            |observation| observation.lineage.independence_group = Some("\t".into()),
+        ];
+        for mutate in mutations {
+            let mut observation = sample("obs-1", "test", None);
+            mutate(&mut observation);
+            assert!(matches!(
+                observation.validate(),
+                Err(ObservationValidationError::EmptyField(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn invalid_empty_provenance_cannot_create_shared_origin() {
+        let mut a = sample("a", "one", None);
+        let mut b = sample("b", "two", None);
+        a.source.upstream_origin = Some("".into());
+        b.source.upstream_origin = Some("".into());
+        a.lineage.independence_group = Some("".into());
+        b.lineage.independence_group = Some("".into());
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
     }
 
     #[test]
@@ -551,6 +625,21 @@ mod tests {
     fn missing_independence_metadata_is_unknown() {
         let a = sample("a", "one", None);
         let b = sample("b", "two", None);
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
+    fn equal_raw_observation_ids_across_integrations_are_not_same_observation() {
+        let a = sample("same", "one", None);
+        let b = sample("same", "two", None);
+        assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
+    }
+
+    #[test]
+    fn equal_raw_observation_ids_across_collectors_are_not_same_observation() {
+        let a = sample("same", "one", None);
+        let mut b = a.clone();
+        b.source.collector_id = Some("collector-b".into());
         assert_eq!(a.lineage_relationship(&b), LineageRelationship::Unknown);
     }
 
@@ -612,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_batch_ids_fail() {
+    fn duplicate_batch_references_fail() {
         let obs = sample("same", "test", None);
         let batch = ObservationBatch {
             integration_id: "test".into(),
@@ -621,8 +710,22 @@ mod tests {
         };
         assert!(matches!(
             batch.validate(),
-            Err(BatchValidationError::DuplicateObservationId(_))
+            Err(BatchValidationError::DuplicateObservationReference(_))
         ));
+    }
+
+    #[test]
+    fn equal_local_ids_from_distinct_collectors_are_allowed_in_one_batch() {
+        let a = sample("same", "test", None);
+        let mut b = a.clone();
+        b.source.collector_id = Some("collector-b".into());
+        b.lineage.lineage_id = "collector-b-lineage".into();
+        let batch = ObservationBatch {
+            integration_id: "test".into(),
+            collected_at_unix_ms: 2_000,
+            observations: vec![a, b],
+        };
+        assert!(batch.validate().is_ok());
     }
 
     #[test]
