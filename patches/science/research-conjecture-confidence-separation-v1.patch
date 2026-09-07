@@ -70,7 +70,8 @@ index 2a38f0d..0000000 100644
 +            );
          }
      }
-@@ -467,15 +490,41 @@ mod tests {
+@@ -467,15 +490,44 @@ mod tests {
+ 
          engine.generate_conjectures(3);
 +        let original_scores: Vec<f64> = engine
 +            .conjectures
@@ -97,8 +98,8 @@ index 2a38f0d..0000000 100644
 +            // not overwrite the Conjecture Engine's differently-scoped score.
 +            assert_eq!(pc.conjecture.confidence, original_score);
 +            assert!((pc.provenance.confidence - 0.2).abs() < f32::EPSILON);
-+        }
-+    }
+         }
+     }
 +
 +    #[test]
 +    fn test_confidence_coordinates_are_not_scalar_fused() {
@@ -128,7 +129,11 @@ index 2a38f0d..0000000 100644
 +        let coordinates = pc.confidence_coordinates();
 +        assert_eq!(coordinates.conjecture_score, 0.91);
 +        assert!((coordinates.data_provenance_confidence - 0.2).abs() < f32::EPSILON);
-+        assert_ne!(coordinates.conjecture_score, coordinates.data_provenance_confidence as f64);
-         }
-     }
++        assert_ne!(
++            coordinates.conjecture_score,
++            coordinates.data_provenance_confidence as f64
++        );
++    }
  
+     #[test]
+     fn test_dataset_from_numeric_series_roundtrips_context() {
