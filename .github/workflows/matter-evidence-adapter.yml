@@ -1,0 +1,92 @@
+name: Matter Nuclear Evidence Bindings
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_evidence_bindings.rs'
+      - 'src/knowledge/mod.rs'
+      - 'crates/core/symthaea-evidence-plane/src/external_receipt.rs'
+      - '.github/workflows/matter-evidence-adapter.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  nuclear-evidence-bindings:
+    name: Reference-only nuclear provenance bindings
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Lockfile and nuclear manifest must remain unchanged from PR base
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          test -z "$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- Cargo.lock crates/domains/symthaea-nuclear/Cargo.toml)"
+
+      - name: Focused formatting
+        run: cargo fmt --check
+
+      - name: Root nuclear feature check
+        run: cargo check --locked -p symthaea --features nuclear
+
+      - name: Nuclear evidence-binding regressions
+        run: cargo test --locked -p symthaea --features nuclear knowledge::matter_evidence_bindings::tests -- --nocapture --test-threads=1
+
+      - name: Binding authority semantic ratchet
+        shell: python
+        run: |
+          from pathlib import Path
+
+          src = Path('src/knowledge/matter_evidence_bindings.rs').read_text()
+          mod = Path('src/knowledge/mod.rs').read_text()
+
+          required = (
+              '#[cfg(feature = "nuclear")]\npub mod matter_evidence_bindings;',
+              'HistoricalSnapshotReferenceBinding',
+              'HistoricalSnapshotPairReferenceBinding',
+              'HistoricalModelKnowledgeReferenceBinding',
+              'PreregistrationReferenceBinding',
+              'EvidenceReferenceInterpretation::ReferenceOnly',
+              'DeclaredChronologyInterpretation::DeclaredChronologyOnly',
+              'SnapshotArtifactHashMismatch',
+              'ReferenceDateAfterKnowledgeCutoff',
+              'ClaimedUtcDate::new(knowledge.latest_dependency_yyyymmdd)',
+              'EvidenceRole::ArtifactContent',
+              'EvidenceRole::ChronologyAttestation',
+              'EvidenceRole::ImplementationSnapshot',
+              'EvidenceRole::DependencySnapshot',
+              'EvidenceRole::Preregistration',
+              'EvidenceRole::SolverExecution',
+              'require_distinct_content',
+          )
+          combined = mod + '\n' + src
+          for token in required:
+              if token not in combined:
+                  raise SystemExit(f'missing Matter evidence-binding invariant: {token}')
+
+          forbidden = (
+              'VerifiedChronology',
+              'VerifiedPreregistration',
+              'verified: bool',
+              'is_verified',
+              'promoted_to_experimental',
+              'ExperimentalAuthority',
+              'replication_verified',
+          )
+          for token in forbidden:
+              if token in src:
+                  raise SystemExit(f'forbidden local authority shortcut: {token}')
+
+          if 'They never turn a caller-' not in src:
+              raise SystemExit('reference-only adapter non-claim must remain explicit')
+
+          print('Matter nuclear evidence-binding authority ratchet passed')
