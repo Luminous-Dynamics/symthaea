@@ -1,11 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Semantic-canonical public confirmatory-simulation contract.
+//! Normalized-canonical public confirmatory-simulation contract.
 //!
 //! This facade strengthens the PA-16 v3 contract without widening physical
 //! authority. `AllCriteria` claim ordering is canonicalized, exact duplicate
-//! criteria are rejected, and IEEE-754 signed zero is normalized because the
-//! comparison semantics treat `-0.0` and `+0.0` identically.
+//! criteria are rejected, IEEE-754 signed zero is normalized because the
+//! comparison semantics treat `-0.0` and `+0.0` identically, and mathematically
+//! unsatisfiable scalar conjunctions fail before solver execution.
+//!
+//! "Normalized-canonical" is intentionally narrower than a universal semantic
+//! normal form: metric units remain typed only as strings and logically
+//! redundant-but-distinct criteria are still represented explicitly.
 //!
 //! The earlier v3 facade remains crate-private for regression coverage. External
 //! callers therefore cannot mint qualification from its order-sensitive claim
@@ -23,14 +28,15 @@ use crate::safety_preregistration::{
     SafetyPreregistrationError,
 };
 use crate::strict_context::StrictSimulationRegistry;
+use std::collections::BTreeMap;
 use symthaea_formal_safety::{EvidenceKind, SafetyCase};
 use symthaea_sim_bridge::SimulationRequest;
 use thiserror::Error;
 
-const SEMANTIC_CLAIM_TRANSCRIPT_DOMAIN: &[u8] =
-    b"symthaea.physical-agency.outcome-claim.semantic.v1";
+const NORMALIZED_CLAIM_TRANSCRIPT_DOMAIN: &[u8] =
+    b"symthaea.physical-agency.outcome-claim.normalized.v1";
 
-/// Canonical semantic identity of one preregistered outcome claim.
+/// Canonical normalized identity of one preregistered outcome claim.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanonicalClaimTranscript {
     bytes: Vec<u8>,
@@ -42,7 +48,7 @@ impl CanonicalClaimTranscript {
     }
 }
 
-/// Strict simulation qualification bound to the semantic-canonical claim.
+/// Strict simulation qualification bound to the normalized-canonical claim.
 ///
 /// This remains simulation evidence only. It grants no HAL access, actuator
 /// capability, execution permit, or physical authority.
@@ -137,10 +143,10 @@ pub fn evaluate_confirmatory_claim(
     Ok(v3::evaluate_confirmatory_claim(evidence)?)
 }
 
-/// Semantic-canonical v4 evidence reference.
+/// Normalized-canonical v4 evidence reference.
 ///
-/// PA-15's v2 exact-run lineage is nested directly with the semantic-canonical
-/// full claim transcript. The older order-sensitive v3 label is deliberately
+/// PA-15's v2 exact-run lineage is nested directly with the normalized complete
+/// claim transcript. The older order-sensitive v3 label is deliberately
 /// excluded from v4 identity.
 pub fn required_confirmatory_safety_evidence_ref(
     evidence: &SafetyPreregisteredConfirmatoryEvidence,
@@ -178,7 +184,7 @@ pub fn qualify_confirmatory_simulation(
                     .any(|reference| reference == &required_v4)
         })
     else {
-        return Err(ConfirmatoryContractError::MissingSemanticClaimBoundSafetyEvidence);
+        return Err(ConfirmatoryContractError::MissingNormalizedClaimBoundSafetyEvidence);
     };
 
     let required_v3 = v3::required_confirmatory_safety_evidence_ref(evidence, satisfied)?;
@@ -203,7 +209,7 @@ pub fn canonical_claim_transcript(
     claim: &SimulationOutcomeClaim,
 ) -> Result<CanonicalClaimTranscript, ConfirmatoryContractError> {
     // Reuse the lower contract's validation so unsupported schemas and invalid
-    // finite/order constraints fail before canonical encoding.
+    // finite/order constraints fail before normalized encoding.
     let _ = v3::canonical_claim_transcript(claim)?;
 
     let mut criteria = claim
@@ -216,8 +222,10 @@ pub fn canonical_claim_transcript(
         return Err(ConfirmatoryContractError::DuplicateClaimCriterion);
     }
 
+    validate_all_criteria_satisfiable(claim)?;
+
     let mut bytes = Vec::new();
-    push_bytes(&mut bytes, SEMANTIC_CLAIM_TRANSCRIPT_DOMAIN);
+    push_bytes(&mut bytes, NORMALIZED_CLAIM_TRANSCRIPT_DOMAIN);
     bytes.extend_from_slice(&claim.schema_version.to_le_bytes());
     push_bytes(&mut bytes, claim.claim_id.as_bytes());
     push_bytes(&mut bytes, claim.transition_id.as_bytes());
@@ -231,6 +239,149 @@ pub fn canonical_claim_transcript(
     }
 
     Ok(CanonicalClaimTranscript { bytes })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ClosedRange {
+    lower: Option<f64>,
+    upper: Option<f64>,
+}
+
+impl ClosedRange {
+    const ALL_REAL: Self = Self {
+        lower: None,
+        upper: None,
+    };
+}
+
+fn validate_all_criteria_satisfiable(
+    claim: &SimulationOutcomeClaim,
+) -> Result<(), ConfirmatoryContractError> {
+    let mut groups: BTreeMap<(String, String), Vec<&MetricPredicate>> = BTreeMap::new();
+    for criterion in &claim.criteria {
+        groups
+            .entry((criterion.metric_name.clone(), criterion.unit.clone()))
+            .or_default()
+            .push(&criterion.predicate);
+    }
+
+    for ((metric_name, unit), predicates) in groups {
+        let mut feasible = vec![ClosedRange::ALL_REAL];
+        for predicate in predicates {
+            feasible = intersect_range_sets(&feasible, &predicate_ranges(predicate));
+            if feasible.is_empty() {
+                return Err(ConfirmatoryContractError::UnsatisfiableClaim {
+                    metric_name,
+                    unit,
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn predicate_ranges(predicate: &MetricPredicate) -> Vec<ClosedRange> {
+    match predicate {
+        MetricPredicate::AtLeast(value) => vec![ClosedRange {
+            lower: Some(*value),
+            upper: None,
+        }],
+        MetricPredicate::AtMost(value) => vec![ClosedRange {
+            lower: None,
+            upper: Some(*value),
+        }],
+        MetricPredicate::InsideClosedInterval { lower, upper } => vec![ClosedRange {
+            lower: Some(*lower),
+            upper: Some(*upper),
+        }],
+        MetricPredicate::OutsideOpenInterval { lower, upper } => vec![
+            ClosedRange {
+                lower: None,
+                upper: Some(*lower),
+            },
+            ClosedRange {
+                lower: Some(*upper),
+                upper: None,
+            },
+        ],
+    }
+}
+
+fn intersect_range_sets(left: &[ClosedRange], right: &[ClosedRange]) -> Vec<ClosedRange> {
+    let mut intersections = Vec::new();
+    for left_range in left {
+        for right_range in right {
+            if let Some(intersection) = intersect_ranges(*left_range, *right_range) {
+                intersections.push(intersection);
+            }
+        }
+    }
+    normalize_ranges(intersections)
+}
+
+fn intersect_ranges(left: ClosedRange, right: ClosedRange) -> Option<ClosedRange> {
+    let lower = max_lower(left.lower, right.lower);
+    let upper = min_upper(left.upper, right.upper);
+    if matches!((lower, upper), (Some(lower), Some(upper)) if lower > upper) {
+        None
+    } else {
+        Some(ClosedRange { lower, upper })
+    }
+}
+
+fn normalize_ranges(mut ranges: Vec<ClosedRange>) -> Vec<ClosedRange> {
+    ranges.sort_by(|left, right| compare_lower(left.lower, right.lower));
+    let mut normalized: Vec<ClosedRange> = Vec::with_capacity(ranges.len());
+
+    for range in ranges {
+        if let Some(last) = normalized.last_mut() {
+            if ranges_overlap_or_touch(*last, range) {
+                last.upper = max_upper(last.upper, range.upper);
+                continue;
+            }
+        }
+        normalized.push(range);
+    }
+
+    normalized
+}
+
+fn compare_lower(left: Option<f64>, right: Option<f64>) -> std::cmp::Ordering {
+    match (left, right) {
+        (None, None) => std::cmp::Ordering::Equal,
+        (None, Some(_)) => std::cmp::Ordering::Less,
+        (Some(_), None) => std::cmp::Ordering::Greater,
+        (Some(left), Some(right)) => left.total_cmp(&right),
+    }
+}
+
+fn ranges_overlap_or_touch(left: ClosedRange, right: ClosedRange) -> bool {
+    match (left.upper, right.lower) {
+        (None, _) | (_, None) => true,
+        (Some(upper), Some(lower)) => lower <= upper,
+    }
+}
+
+fn max_lower(left: Option<f64>, right: Option<f64>) -> Option<f64> {
+    match (left, right) {
+        (None, value) | (value, None) => value,
+        (Some(left), Some(right)) => Some(left.max(right)),
+    }
+}
+
+fn min_upper(left: Option<f64>, right: Option<f64>) -> Option<f64> {
+    match (left, right) {
+        (None, value) | (value, None) => value,
+        (Some(left), Some(right)) => Some(left.min(right)),
+    }
+}
+
+fn max_upper(left: Option<f64>, right: Option<f64>) -> Option<f64> {
+    match (left, right) {
+        (None, _) | (_, None) => None,
+        (Some(left), Some(right)) => Some(left.max(right)),
+    }
 }
 
 fn canonical_criterion_bytes(criterion: &MetricCriterion) -> Vec<u8> {
@@ -303,8 +454,10 @@ pub enum ConfirmatoryContractError {
     ClaimMetricRequestedMultipleTimes(String),
     #[error("claim contains an exact duplicate criterion")]
     DuplicateClaimCriterion,
-    #[error("completed safety case does not cite semantic-canonical v4 simulation lineage")]
-    MissingSemanticClaimBoundSafetyEvidence,
+    #[error("all_criteria claim is unsatisfiable for metric {metric_name:?} unit {unit:?}")]
+    UnsatisfiableClaim { metric_name: String, unit: String },
+    #[error("completed safety case does not cite normalized-canonical v4 simulation lineage")]
+    MissingNormalizedClaimBoundSafetyEvidence,
     #[error("private v3 structural qualification unexpectedly lacked its exact simulation lineage")]
     InternalV3StructuralEvidenceMissing,
 }
@@ -374,7 +527,7 @@ mod tests {
     }
 
     #[test]
-    fn signed_zero_has_one_semantic_identity() {
+    fn signed_zero_has_one_normalized_identity() {
         let negative = claim(vec![criterion("offset", MetricPredicate::AtLeast(-0.0))]);
         let positive = claim(vec![criterion("offset", MetricPredicate::AtLeast(0.0))]);
         assert_eq!(
@@ -390,6 +543,64 @@ mod tests {
             canonical_claim_transcript(&claim(vec![duplicate.clone(), duplicate])),
             Err(ConfirmatoryContractError::DuplicateClaimCriterion)
         ));
+    }
+
+    #[test]
+    fn contradictory_lower_and_upper_bounds_are_rejected() {
+        let impossible = claim(vec![
+            criterion("quality", MetricPredicate::AtLeast(0.9)),
+            criterion("quality", MetricPredicate::AtMost(0.8)),
+        ]);
+        assert!(matches!(
+            canonical_claim_transcript(&impossible),
+            Err(ConfirmatoryContractError::UnsatisfiableClaim { metric_name, unit })
+                if metric_name == "quality" && unit == "1"
+        ));
+    }
+
+    #[test]
+    fn inside_and_outside_conflict_is_rejected() {
+        let impossible = claim(vec![
+            criterion(
+                "quality",
+                MetricPredicate::InsideClosedInterval {
+                    lower: 0.3,
+                    upper: 0.7,
+                },
+            ),
+            criterion(
+                "quality",
+                MetricPredicate::OutsideOpenInterval {
+                    lower: 0.2,
+                    upper: 0.8,
+                },
+            ),
+        ]);
+        assert!(matches!(
+            canonical_claim_transcript(&impossible),
+            Err(ConfirmatoryContractError::UnsatisfiableClaim { .. })
+        ));
+    }
+
+    #[test]
+    fn outside_open_interval_preserves_boundary_solutions() {
+        let feasible = claim(vec![
+            criterion(
+                "quality",
+                MetricPredicate::InsideClosedInterval {
+                    lower: 0.2,
+                    upper: 0.8,
+                },
+            ),
+            criterion(
+                "quality",
+                MetricPredicate::OutsideOpenInterval {
+                    lower: 0.2,
+                    upper: 0.8,
+                },
+            ),
+        ]);
+        assert!(canonical_claim_transcript(&feasible).is_ok());
     }
 
     #[test]
