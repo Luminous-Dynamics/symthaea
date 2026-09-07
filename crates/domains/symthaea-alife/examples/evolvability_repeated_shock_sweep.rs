@@ -4,15 +4,16 @@
 //!
 //! This example applies the already-defined repeated-shock transfer criterion unchanged across a
 //! fixed eight-seed panel. Frozen and evolving conditions share the same population and encounter
-//! seeds within each pair. The output is descriptive evidence: verdict counts and paired outcomes,
-//! not a statistical-significance or mechanism-causality claim.
+//! seeds within each pair. The output is descriptive evidence: verdict counts, paired outcomes,
+//! and a conservative difference-in-differences contrast — not a statistical-significance or
+//! mechanism-causality claim.
 
 use symthaea_alife::{
     EncounterScheduler, EvolvabilityError, GenesisEvent, InheritanceMode, ObservatoryReport,
     OrganismConfig, PairingMode, PerturbationSchedule, Population, PopulationConfig,
     RecoveryMetrics, RepeatShockErrorV1, RepeatShockTransferV1, RepeatShockTransferVerdictV1,
-    ResourcePerturbation, analyze_genesis_events, analyze_recovery_through,
-    compare_repeated_shocks,
+    RepeatedShockDidVerdictV1, ResourcePerturbation, analyze_genesis_events,
+    analyze_recovery_through, compare_repeated_shock_did, compare_repeated_shocks,
 };
 
 const SEEDS: &[u64] = &[1, 2, 3, 4, 5, 6, 7, 8];
@@ -46,6 +47,28 @@ impl VerdictCounts {
                 self.no_directional_change += 1
             }
             RepeatShockTransferVerdictV1::ParetoWorse => self.pareto_worse += 1,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct DidCounts {
+    pareto_evolving: usize,
+    mixed: usize,
+    no_directional_difference: usize,
+    pareto_frozen: usize,
+    unavailable: usize,
+}
+
+impl DidCounts {
+    fn record(&mut self, verdict: RepeatedShockDidVerdictV1) {
+        match verdict {
+            RepeatedShockDidVerdictV1::ParetoEvolving => self.pareto_evolving += 1,
+            RepeatedShockDidVerdictV1::Mixed => self.mixed += 1,
+            RepeatedShockDidVerdictV1::NoDirectionalDifference => {
+                self.no_directional_difference += 1
+            }
+            RepeatedShockDidVerdictV1::ParetoFrozen => self.pareto_frozen += 1,
         }
     }
 }
@@ -139,6 +162,7 @@ fn main() {
 
     let mut frozen_counts = VerdictCounts::default();
     let mut evolving_counts = VerdictCounts::default();
+    let mut did_counts = DidCounts::default();
     let mut paired_valid = 0usize;
     let mut evolving_only_pareto_improved = 0usize;
     let mut frozen_only_pareto_improved = 0usize;
@@ -191,6 +215,19 @@ fn main() {
                 (true, true) => both_pareto_improved += 1,
                 (false, false) => neither_pareto_improved += 1,
             }
+
+            match compare_repeated_shock_did(frozen, evolving) {
+                Ok(did) => {
+                    did_counts.record(did.verdict);
+                    println!("  paired difference-in-differences: {did:#?}");
+                }
+                Err(error) => {
+                    did_counts.unavailable += 1;
+                    println!("  paired difference-in-differences unavailable: {error:?}");
+                }
+            }
+        } else {
+            did_counts.unavailable += 1;
         }
     }
 
@@ -203,8 +240,10 @@ fn main() {
     println!("  frozen-only:   {frozen_only_pareto_improved}");
     println!("  both:          {both_pareto_improved}");
     println!("  neither:       {neither_pareto_improved}");
+    println!("paired repeated-shock difference-in-differences counts: {did_counts:#?}");
     println!(
-        "These counts are descriptive evidence only; no p-value, causal mechanism, or general \
-         population claim is established by this example."
+        "Difference-in-differences is a directional paired contrast over predeclared continuous \
+         recovery dimensions. These counts remain descriptive evidence only; no p-value, causal \
+         mutation mechanism, or population-level generalization is established by this example."
     );
 }
