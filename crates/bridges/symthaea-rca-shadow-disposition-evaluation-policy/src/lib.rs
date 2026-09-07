@@ -5,13 +5,17 @@
 //! RCA-003b.3d: preregister the exact shadow-disposition evaluation surface.
 //!
 //! The base/effective disposition policies predate the raw and canonical-lineage
-//! preflight contracts. This wrapper makes those exact profile semantics
-//! preregistration-bearing before any result-bearing disposition engine exists.
+//! preflight contracts. This wrapper makes those exact profile semantics and the
+//! future pure engine's decision contract preregistration-bearing before any
+//! result-bearing disposition engine exists.
 //!
 //! It accepts no case, preflight, witness, or lineage instance.
 
 #![deny(unsafe_code)]
 
+pub mod engine_contract;
+
+use engine_contract::shadow_disposition_engine_contract_profile_digest_v1;
 use serde::{Deserialize, Deserializer, Serialize};
 use symthaea_rca_effective_disposition_policy::RegisteredEffectiveShadowDispositionPolicyV1;
 use symthaea_rca_lineage_bound_disposition_preflight::lineage_bound_preflight_profile_digest_v1;
@@ -24,12 +28,13 @@ pub const SHADOW_DISPOSITION_EVALUATION_POLICY_PROFILE_V1: &str =
 pub const SHADOW_DISPOSITION_EVALUATION_POLICY_CONTRACT_V1: &str = concat!(
     "rca-shadow-disposition-evaluation-policy-v1\n",
     "input=registered_effective_shadow_disposition_policy_v1_only\n",
-    "binding=exact_effective_policy+raw_preflight_profile+canonical_lineage_bound_preflight_profile\n",
+    "binding=exact_effective_policy+raw_preflight_profile+canonical_lineage_bound_preflight_profile+pure_engine_contract_profile\n",
     "raw_preflight_profile_is_preregistration_bearing\n",
     "lineage_bound_preflight_profile_is_preregistration_bearing\n",
-    "profile_drift_requires_new_evaluation_policy_identity\n",
+    "engine_decision_contract_is_preregistration_bearing\n",
+    "profile_or_decision_semantic_drift_requires_new_evaluation_policy_identity\n",
     "evaluation_policy_id=blake3_explicit_complete_binding_v1\n",
-    "persistence=revalidate_effective_policy+current_preflight_profiles+identity\n",
+    "persistence=revalidate_effective_policy+current_preflight_profiles+current_engine_contract+identity\n",
     "registration_precedes_result_bearing_disposition_evaluation\n",
     "evaluation_policy_accepts_no_case_preflight_witness_or_lineage_instance\n",
     "evaluation_policy_is_not_disposition_belief_workspace_action_or_promotion_authority\n",
@@ -49,6 +54,7 @@ pub struct RegisteredShadowDispositionEvaluationPolicyV1 {
     evaluation_policy_id: String,
     raw_preflight_profile_digest: String,
     lineage_bound_preflight_profile_digest: String,
+    engine_contract_profile_digest: String,
     effective_policy: RegisteredEffectiveShadowDispositionPolicyV1,
 }
 
@@ -77,6 +83,10 @@ impl RegisteredShadowDispositionEvaluationPolicyV1 {
         &self.lineage_bound_preflight_profile_digest
     }
 
+    pub fn engine_contract_profile_digest(&self) -> &str {
+        &self.engine_contract_profile_digest
+    }
+
     pub fn effective_policy(&self) -> &RegisteredEffectiveShadowDispositionPolicyV1 {
         &self.effective_policy
     }
@@ -95,11 +105,13 @@ pub fn register_shadow_disposition_evaluation_policy_v1(
     let profile_contract_digest = shadow_disposition_evaluation_policy_profile_digest_v1();
     let raw_preflight_profile_digest = shadow_disposition_preflight_profile_digest_v1();
     let lineage_bound_preflight_profile_digest = lineage_bound_preflight_profile_digest_v1();
+    let engine_contract_profile_digest = shadow_disposition_engine_contract_profile_digest_v1();
     let evaluation_policy_id = evaluation_policy_id_v1(
         &profile_contract_digest,
         &effective_policy,
         &raw_preflight_profile_digest,
         &lineage_bound_preflight_profile_digest,
+        &engine_contract_profile_digest,
     );
 
     RegisteredShadowDispositionEvaluationPolicyV1 {
@@ -109,6 +121,7 @@ pub fn register_shadow_disposition_evaluation_policy_v1(
         evaluation_policy_id,
         raw_preflight_profile_digest,
         lineage_bound_preflight_profile_digest,
+        engine_contract_profile_digest,
         effective_policy,
     }
 }
@@ -122,6 +135,7 @@ struct RegisteredShadowDispositionEvaluationPolicyWireV1 {
     evaluation_policy_id: String,
     raw_preflight_profile_digest: String,
     lineage_bound_preflight_profile_digest: String,
+    engine_contract_profile_digest: String,
     effective_policy: RegisteredEffectiveShadowDispositionPolicyV1,
 }
 
@@ -148,6 +162,7 @@ impl<'de> Deserialize<'de> for RegisteredShadowDispositionEvaluationPolicyV1 {
         validate_digest(&wire.raw_preflight_profile_digest).map_err(serde::de::Error::custom)?;
         validate_digest(&wire.lineage_bound_preflight_profile_digest)
             .map_err(serde::de::Error::custom)?;
+        validate_digest(&wire.engine_contract_profile_digest).map_err(serde::de::Error::custom)?;
 
         let expected =
             register_shadow_disposition_evaluation_policy_v1(wire.effective_policy.clone());
@@ -156,6 +171,7 @@ impl<'de> Deserialize<'de> for RegisteredShadowDispositionEvaluationPolicyV1 {
             || wire.raw_preflight_profile_digest != expected.raw_preflight_profile_digest
             || wire.lineage_bound_preflight_profile_digest
                 != expected.lineage_bound_preflight_profile_digest
+            || wire.engine_contract_profile_digest != expected.engine_contract_profile_digest
             || wire.effective_policy != expected.effective_policy
         {
             return Err(serde::de::Error::custom(
@@ -171,6 +187,7 @@ fn evaluation_policy_id_v1(
     effective_policy: &RegisteredEffectiveShadowDispositionPolicyV1,
     raw_preflight_profile_digest: &str,
     lineage_bound_preflight_profile_digest: &str,
+    engine_contract_profile_digest: &str,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(POLICY_ID_DOMAIN);
@@ -203,6 +220,11 @@ fn evaluation_policy_id_v1(
         &mut hasher,
         b"lineage_bound_preflight_profile_digest",
         lineage_bound_preflight_profile_digest,
+    );
+    hash_text(
+        &mut hasher,
+        b"engine_contract_profile_digest",
+        engine_contract_profile_digest,
     );
     format!("blake3:{}", hasher.finalize().to_hex())
 }
@@ -334,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    fn evaluation_policy_binds_both_preflight_profiles() {
+    fn evaluation_policy_binds_preflight_and_engine_contract_profiles() {
         let registered = register_shadow_disposition_evaluation_policy_v1(effective_policy());
         assert_eq!(
             registered.raw_preflight_profile_digest(),
@@ -343,6 +365,10 @@ mod tests {
         assert_eq!(
             registered.lineage_bound_preflight_profile_digest(),
             lineage_bound_preflight_profile_digest_v1()
+        );
+        assert_eq!(
+            registered.engine_contract_profile_digest(),
+            shadow_disposition_engine_contract_profile_digest_v1()
         );
         assert!(registered.evaluation_policy_id().starts_with("blake3:"));
     }
@@ -387,6 +413,19 @@ mod tests {
         let mut value = serde_json::to_value(&registered).unwrap();
         value["lineage_bound_preflight_profile_digest"] = serde_json::Value::String(
             "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+                .into(),
+        );
+        assert!(
+            serde_json::from_value::<RegisteredShadowDispositionEvaluationPolicyV1>(value).is_err()
+        );
+    }
+
+    #[test]
+    fn tampered_engine_contract_profile_fails_closed() {
+        let registered = register_shadow_disposition_evaluation_policy_v1(effective_policy());
+        let mut value = serde_json::to_value(&registered).unwrap();
+        value["engine_contract_profile_digest"] = serde_json::Value::String(
+            "blake3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
                 .into(),
         );
         assert!(
