@@ -15,7 +15,9 @@ Do not solve that circular dependency by adding an automatic pull-request trigge
 The trust transition is intentionally:
 
 ```text
-queue-neutral recovery branch
+operator-authorized recovery commit
+        ↓
+current published recovery branch
         ↓
 host-side bootstrap validation
         ↓
@@ -30,15 +32,34 @@ trusted CPU correctness capability
 
 Perform this stage on the isolated/disposable NixOS host that will become the trusted CPU runner. The host should contain no unrelated credentials, personal data, production mounts, privileged container socket, or sensitive LAN access.
 
-Clone the canonical public repository, detach at the current published recovery branch, and invoke the canonical validator explicitly through Bash:
+Before cloning, obtain the exact recovery commit that the operator intends to authorize from the repository's runner-capacity record (issue #75 or another reviewed out-of-band record). **Do not infer authorization from whatever commit the recovery branch currently points to.** Export that exact reviewed SHA locally:
+
+```bash
+export SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD='<reviewed 40-hex recovery commit>'
+test "${#SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD}" -eq 40
+```
+
+Clone the canonical public repository, detach at the current published recovery branch, prove that the checked-out commit is the separately authorized commit, and only then invoke the canonical validator explicitly through Bash:
 
 ```bash
 git clone https://github.com/Luminous-Dynamics/symthaea.git
 cd symthaea
 git fetch origin ci/nixos-ephemeral-runner-v1
 git checkout --detach origin/ci/nixos-ephemeral-runner-v1
+
+test "$(git rev-parse HEAD)" = "$SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD"
 bash nix/ci/validate-trusted-runner-bootstrap.sh
 ```
+
+This gives Stage A three distinct equalities rather than one circular notion of "current":
+
+```text
+operator-authorized head
+        = checked-out head
+        = freshly fetched public recovery head
+```
+
+If any equality fails, stop. Do not update the expected value merely to match the branch; review the new recovery generation first and record a new operator authorization.
 
 Do not substitute a locally edited copy of the validator. The script requires a pristine checkout whose `HEAD` exactly matches the freshly fetched published recovery head.
 
@@ -55,7 +76,7 @@ The validator fails closed unless all of the following hold in one validation in
 - the source commit/tree and repository cleanliness are unchanged after evaluation;
 - a second public-ref refresh produces the same `main` and recovery SHAs seen at the beginning of validation.
 
-If either public ref moves during Stage A, the validator refuses PASS. Detach at the new recovery head and rerun rather than carrying stale bootstrap evidence forward.
+If either public ref moves during Stage A, the validator refuses PASS. Detach at the new recovery head, obtain a fresh explicit operator authorization for that reviewed generation, and rerun rather than carrying stale bootstrap evidence forward.
 
 On success the validator emits a `symthaea.trusted-runner.bootstrap.v2` manifest in a unique `mktemp` path under `/tmp`. The manifest contains no credential. Record both the manifest contents and its printed SHA-256 before proceeding.
 
@@ -68,6 +89,8 @@ The manifest binds, among other provenance:
 - pinned nixpkgs revision and repository Rust channel;
 - `flake.lock` and `rust-toolchain.toml` SHA-256 values;
 - PASS state for runner policy, routing policy, locked Rust validation, and ref-stability checks.
+
+The operator authorization record plus this manifest jointly establish what was intended to be validated and what was actually validated. Neither one substitutes for the other.
 
 Stage A is bootstrap evidence for the runner infrastructure only. It is **not** a substitute for any hosted or self-hosted scientific qualification workflow.
 
@@ -85,7 +108,7 @@ Only after Stage A succeeds:
 
 Do not route any correctness job to the host yet. An online runner is not a qualified runner.
 
-If the recovery branch changes after Stage A, rerun Stage A against the new exact head before using the changed module or workflow content.
+If the recovery branch changes after Stage A, rerun Stage A against the newly reviewed and explicitly operator-authorized head before using the changed module or workflow content.
 
 ## Stage C — land only the reviewed runner infrastructure
 
@@ -102,7 +125,7 @@ The bootstrap merge/review surface must remain restricted to trusted-runner infr
 
 Do not bundle application, scientific-result, RCA policy, root Cargo/toolchain, build-script, or performance changes into this bootstrap transition.
 
-Before landing, compare the proposed merge surface with the exact diff-path set bound by the Stage A manifest. If the path set or any reviewed artifact blob changed, Stage A is stale and must be rerun.
+Before landing, compare the proposed merge surface with the exact diff-path set bound by the Stage A manifest. If the path set or any reviewed artifact blob changed, Stage A is stale and must be rerun after explicit authorization of the changed recovery generation.
 
 Also re-check that every `symthaea-trusted-cpu-v1` consumer is explicitly allowlisted by `nix/tests/eval-trusted-runner-routing.nix` and that no consumer has `push`, `pull_request`, or `schedule` triggers.
 
@@ -159,6 +182,7 @@ cancelled for supersession != PASS or FAIL
 bootstrap policy PASS != scientific gate PASS
 trusted CPU correctness PASS != performance equivalence
 stale bootstrap manifest != current infrastructure authority
+current branch head != operator authorization
 ```
 
 The fallback exists to restore executable evidence, not to weaken what counts as evidence.
