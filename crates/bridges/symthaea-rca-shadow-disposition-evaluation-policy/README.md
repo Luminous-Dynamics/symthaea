@@ -40,6 +40,7 @@ RegisteredShadowDispositionEvaluationPolicyV1
 - exact decision-rule precedence;
 - exact decision-rule → primary-class mapping;
 - qualified-defeater blocker semantics;
+- qualified-contestation semantics;
 - conservative bilateral-disagreement behavior;
 - scoped unknown-independence semantics;
 - exact reason-trace field schema;
@@ -75,19 +76,19 @@ InsufficientTopology
 The exact rule → class mapping is:
 
 ```text
-QualifiedDefeaterBlocker                    -> BlockedByQualifiedDefeater
-QualifiedContestation                       -> Contested
-BilateralQualifiedDisagreementBelowContestation -> Underdetermined
-FullSupport                                 -> Supported
-FullOpposition                              -> Opposed
-TentativeSupport                            -> TentativelySupported
-TentativeOpposition                         -> TentativelyOpposed
-InsufficientTopology                        -> Underdetermined
+QualifiedDefeaterBlocker                         -> BlockedByQualifiedDefeater
+QualifiedContestation                            -> Contested
+BilateralQualifiedDisagreementBelowContestation  -> Underdetermined
+FullSupport                                      -> Supported
+FullOpposition                                   -> Opposed
+TentativeSupport                                 -> TentativelySupported
+TentativeOpposition                              -> TentativelyOpposed
+InsufficientTopology                             -> Underdetermined
 ```
 
 There is no count-margin, vote, relation-strength, posterior, or winner-take-all tie-breaker.
 
-## Exhaustive decision-lattice theorem
+## Qualified contestation
 
 The frozen predicates are:
 
@@ -104,11 +105,31 @@ TO  tentative opposition qualified
 Policy registration already guarantees:
 
 ```text
-S  => TS
-O  => TO
+S => TS
+O => TO
 ```
 
-Under only those two invariants there are exactly **72 admissible boolean states**. A test-only classifier in `engine_contract.rs` enumerates all 72 and proves every state selects exactly one frozen rule whose primary class exists in the frozen taxonomy.
+V1 additionally freezes the classifier condition:
+
+```text
+QualifiedContestation = CS && CO && TS && TO
+```
+
+`CS && CO` alone is not enough. `contested_side_requirements` are separately preregistered and could be lower than a side's tentative threshold. Requiring `TS && TO` ensures `Contested` always means both sides independently qualify at least tentatively before the stronger contested topology can select the primary class.
+
+If both tentative sides survive but qualified contestation is not established, V1 selects:
+
+```text
+BilateralQualifiedDisagreementBelowContestation -> Underdetermined
+```
+
+No count margin may erase either side.
+
+## Exhaustive decision-lattice theorem
+
+Under only the admissibility invariants `S => TS` and `O => TO`, there are exactly **72 admissible boolean states**. A test-only classifier in `engine_contract.rs` enumerates all 72 and proves every state selects exactly one frozen rule whose primary class exists in the frozen taxonomy.
+
+The contestation requirement above is decision logic, not an additional admissibility constraint, so the 72-state theorem remains stable.
 
 This proof is test-only. Production code in this tranche still exposes no classifier.
 
@@ -193,7 +214,7 @@ decision-semantic/audit-schema drift
 new evaluation-policy identity required
 ```
 
-The engine cannot decide what “winning,” “blocked,” or “auditable” means after observing the case.
+The engine cannot decide what “winning,” “blocked,” “contested,” or “auditable” means after observing the case.
 
 ## Registration timing
 
