@@ -1,0 +1,105 @@
+name: Matter Nuclear Exploration Semantics
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-nuclear/src/discovery.rs'
+      - 'crates/domains/symthaea-nuclear/examples/discovery_sweep.rs'
+      - 'crates/domains/symthaea-nuclear/examples/novel_isotope_search.rs'
+      - '.github/workflows/matter-nuclear-exploration.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  exploration-boundary:
+    name: Measured-only residual exploration boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Lockfile must remain unchanged from PR base
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          test -z "$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- Cargo.lock)"
+
+      - name: Focused formatting
+        run: cargo fmt --check -p symthaea-nuclear
+
+      - name: Focused nuclear package and examples check
+        run: cargo check --locked -p symthaea-nuclear --all-targets
+
+      - name: Exploration regressions
+        run: cargo test --locked -p symthaea-nuclear discovery::tests -- --nocapture --test-threads=1
+
+      - name: Exploration semantics ratchet
+        shell: python
+        run: |
+          from pathlib import Path
+
+          src = Path('crates/domains/symthaea-nuclear/src/discovery.rs').read_text()
+          examples = '\n'.join(
+              Path(path).read_text()
+              for path in (
+                  'crates/domains/symthaea-nuclear/examples/discovery_sweep.rs',
+                  'crates/domains/symthaea-nuclear/examples/novel_isotope_search.rs',
+              )
+          )
+
+          required = (
+              'NuclearExplorationEngine',
+              'HeuristicExplorationOnly',
+              'ExplorationCalibrationReceipt',
+              'binding_energy_mev_bits',
+              '.filter(|nucleus| nucleus.is_measured)',
+              'EstimatedDatumEnteredMeasuredCalibration',
+              '.filter(|datum| (datum.z, datum.n) != (z, n))',
+              'local_residual_dispersion_proxy_mev',
+              'residual_to_local_dispersion_ratio_proxy',
+              'exploration_priority_proxy',
+              'semf_geiger_nuttall_half_life_proxy_seconds',
+          )
+          for token in required:
+              if token not in src:
+                  raise SystemExit(f'missing exploration honesty token: {token}')
+
+          forbidden_public_authority = (
+              'pub sigma:',
+              'pub discovery_interest:',
+              'pub interest_score:',
+              'pub fraction_within_1sigma:',
+              'pub discovery_probability:',
+              'PredictionWithUncertainty',
+              'DiscoveryCandidate',
+          )
+          for token in forbidden_public_authority:
+              if token in src:
+                  raise SystemExit(f'legacy discovery/uncertainty authority returned: {token}')
+
+          forbidden_claims = (
+              'where new physics hides',
+              'discoveries are most likely',
+              'high-confidence novel candidates',
+              'model uncertainty quantified',
+              'No high-confidence novel candidates',
+          )
+          lower = (src + '\n' + examples).lower()
+          for token in forbidden_claims:
+              if token.lower() in lower:
+                  raise SystemExit(f'legacy exploration overclaim returned: {token}')
+
+          if 'do not establish calibrated uncertainty, statistical significance, nuclear existence/stability, decay lifetime, or discovery' not in src:
+              raise SystemExit('exploration non-claim must remain explicit')
+          if 'Estimated/extrapolated AME entries are excluded' not in examples:
+              raise SystemExit('examples must retain measured-only calibration boundary')
+
+          print('exploration proxy semantics ratchet passed')
