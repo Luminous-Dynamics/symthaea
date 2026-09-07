@@ -101,6 +101,7 @@ docs/operations/TRUSTED_CPU_RUNNER_BOOTSTRAP.md
 docs/operations/TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md
 nix/ci-rust-shell.nix
 nix/ci/validate-trusted-runner-bootstrap.sh
+nix/ci/validate-trusted-runner-promotion.sh
 nix/modules/default.nix
 nix/modules/github-actions-runner.nix
 nix/tests/eval-github-actions-runner.nix
@@ -122,6 +123,7 @@ runner_module_blob="$(git rev-parse "$recovery_head_start:nix/modules/github-act
 routing_policy_blob="$(git rev-parse "$recovery_head_start:nix/tests/eval-trusted-runner-routing.nix")"
 smoke_workflow_blob="$(git rev-parse "$recovery_head_start:.github/workflows/self-hosted-runner-smoke.yml")"
 bootstrap_validator_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-bootstrap.sh")"
+promotion_verifier_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-promotion.sh")"
 host_lifecycle_contract_blob="$(git rev-parse "$recovery_head_start:docs/operations/TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md")"
 
 flake_lock_sha256="$(sha256sum flake.lock | awk '{print $1}')"
@@ -144,6 +146,7 @@ printf 'bootstrap_rust_channel=%s\n' "$rust_channel"
 printf 'bootstrap_host_nix_system=%s\n' "$host_nix_system"
 printf 'bootstrap_host_nix_version=%s\n' "$host_nix_version"
 printf 'bootstrap_host_lifecycle_contract_blob=%s\n' "$host_lifecycle_contract_blob"
+printf 'bootstrap_promotion_verifier_blob=%s\n' "$promotion_verifier_blob"
 
 # These evaluations contact no GitHub API and consume no runner credential.
 nix build --no-link --no-write-lock-file \
@@ -215,9 +218,9 @@ git merge-base --is-ancestor "$main_head_end" "$recovery_head_end" || {
   exit 1
 }
 
-manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v4.XXXXXX)"
+manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v5.XXXXXX)"
 cat > "$manifest" <<EOF
-schema=symthaea.trusted-runner.bootstrap.v4
+schema=symthaea.trusted-runner.bootstrap.v5
 result=PASS
 repository=$REPOSITORY_URL
 recovery_branch=$RECOVERY_BRANCH
@@ -233,6 +236,7 @@ runner_module_blob=$runner_module_blob
 routing_policy_blob=$routing_policy_blob
 smoke_workflow_blob=$smoke_workflow_blob
 bootstrap_validator_blob=$bootstrap_validator_blob
+promotion_verifier_blob=$promotion_verifier_blob
 host_lifecycle_contract_blob=$host_lifecycle_contract_blob
 nixpkgs_rev=$nixpkgs_rev
 rust_channel=$rust_channel
