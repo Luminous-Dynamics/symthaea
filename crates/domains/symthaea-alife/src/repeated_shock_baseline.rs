@@ -8,6 +8,12 @@
 //! shock 2. This module makes that context explicit without changing the recovery metric or
 //! deciding whether a seed should be included in inference.
 //!
+//! The canonical repeated-shock sweep also uses a shared-pool resource rule proportional to
+//! `1 / population`. For that specific rule, the inverse-density fields below are the exact
+//! reciprocal *scale change implied by the baseline means*: a smaller second baseline implies a
+//! larger per-capita resource scale. They are context for possible density mediation, not proof of
+//! its causal contribution to recovery.
+//!
 //! These diagnostics are descriptive only. They are not eligibility gates and carry no p-values.
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -21,6 +27,12 @@ pub struct RepeatedShockBaselineShiftV1 {
     /// `ln(second / first)`. Symmetric in log space: equal proportional increases/decreases have
     /// equal magnitude and opposite sign.
     pub log_ratio: f64,
+    /// `first / second`, the reciprocal population ratio. Under a shared-pool resource scale
+    /// `pool / population`, this is the implied shock-2/shock-1 per-capita resource-scale ratio
+    /// when evaluated at the two baseline means.
+    pub inverse_density_ratio: f64,
+    /// `ln(first / second) == -log_ratio`.
+    pub inverse_density_log_shift: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -30,6 +42,12 @@ pub struct RelativeBaselineShiftV1 {
     pub candidate_to_reference_ratio_of_ratios: f64,
     /// Candidate log baseline shift minus reference log baseline shift.
     pub log_ratio_advantage: f64,
+    /// Reciprocal of `candidate_to_reference_ratio_of_ratios`. Under a `pool / population`
+    /// resource rule, values above one mean the candidate gained more inverse-density per-capita
+    /// resource scale (or lost less) across shocks than the reference.
+    pub candidate_to_reference_inverse_density_ratio: f64,
+    /// Candidate inverse-density log shift minus reference inverse-density log shift.
+    pub inverse_density_log_advantage: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,9 +76,13 @@ pub fn repeated_shock_baseline_shift(
         second_baseline_mean_observed_population / first_baseline_mean_observed_population;
     let fractional_change = second_to_first_ratio - 1.0;
     let log_ratio = second_to_first_ratio.ln();
+    let inverse_density_ratio = 1.0 / second_to_first_ratio;
+    let inverse_density_log_shift = -log_ratio;
     if !second_to_first_ratio.is_finite()
         || !fractional_change.is_finite()
         || !log_ratio.is_finite()
+        || !inverse_density_ratio.is_finite()
+        || !inverse_density_log_shift.is_finite()
     {
         return Err(RepeatedShockBaselineErrorV1::NonFiniteDerivedMetric);
     }
@@ -71,6 +93,8 @@ pub fn repeated_shock_baseline_shift(
         second_to_first_ratio,
         fractional_change,
         log_ratio,
+        inverse_density_ratio,
+        inverse_density_log_shift,
     })
 }
 
@@ -81,12 +105,22 @@ pub fn compare_relative_baseline_shift(
     let candidate_to_reference_ratio_of_ratios =
         candidate.second_to_first_ratio / reference.second_to_first_ratio;
     let log_ratio_advantage = candidate.log_ratio - reference.log_ratio;
-    if !candidate_to_reference_ratio_of_ratios.is_finite() || !log_ratio_advantage.is_finite() {
+    let candidate_to_reference_inverse_density_ratio =
+        candidate.inverse_density_ratio / reference.inverse_density_ratio;
+    let inverse_density_log_advantage =
+        candidate.inverse_density_log_shift - reference.inverse_density_log_shift;
+    if !candidate_to_reference_ratio_of_ratios.is_finite()
+        || !log_ratio_advantage.is_finite()
+        || !candidate_to_reference_inverse_density_ratio.is_finite()
+        || !inverse_density_log_advantage.is_finite()
+    {
         return Err(RepeatedShockBaselineErrorV1::NonFiniteDerivedMetric);
     }
     Ok(RelativeBaselineShiftV1 {
         candidate_to_reference_ratio_of_ratios,
         log_ratio_advantage,
+        candidate_to_reference_inverse_density_ratio,
+        inverse_density_log_advantage,
     })
 }
 
@@ -100,6 +134,8 @@ mod tests {
         assert_eq!(shift.second_to_first_ratio, 1.0);
         assert_eq!(shift.fractional_change, 0.0);
         assert_eq!(shift.log_ratio, 0.0);
+        assert_eq!(shift.inverse_density_ratio, 1.0);
+        assert_eq!(shift.inverse_density_log_shift, 0.0);
     }
 
     #[test]
@@ -109,6 +145,16 @@ mod tests {
         assert_eq!(small.second_to_first_ratio, large.second_to_first_ratio);
         assert_eq!(small.fractional_change, large.fractional_change);
         assert_eq!(small.log_ratio, large.log_ratio);
+        assert_eq!(small.inverse_density_ratio, large.inverse_density_ratio);
+        assert_eq!(small.inverse_density_log_shift, large.inverse_density_log_shift);
+    }
+
+    #[test]
+    fn inverse_density_fields_are_exact_reciprocals_for_shared_pool_context() {
+        let shift = repeated_shock_baseline_shift(20.0, 10.0).expect("positive baselines");
+        assert_eq!(shift.second_to_first_ratio, 0.5);
+        assert_eq!(shift.inverse_density_ratio, 2.0);
+        assert_eq!(shift.inverse_density_log_shift, -shift.log_ratio);
     }
 
     #[test]
@@ -118,15 +164,19 @@ mod tests {
         let relative = compare_relative_baseline_shift(&reference, &candidate).expect("finite");
         assert_eq!(relative.candidate_to_reference_ratio_of_ratios, 1.0);
         assert_eq!(relative.log_ratio_advantage, 0.0);
+        assert_eq!(relative.candidate_to_reference_inverse_density_ratio, 1.0);
+        assert_eq!(relative.inverse_density_log_advantage, 0.0);
     }
 
     #[test]
-    fn positive_relative_log_shift_means_candidate_declined_less() {
+    fn positive_population_shift_advantage_has_opposite_inverse_density_direction() {
         let reference = repeated_shock_baseline_shift(20.0, 10.0).expect("reference");
         let candidate = repeated_shock_baseline_shift(20.0, 15.0).expect("candidate");
         let relative = compare_relative_baseline_shift(&reference, &candidate).expect("finite");
         assert!(relative.candidate_to_reference_ratio_of_ratios > 1.0);
         assert!(relative.log_ratio_advantage > 0.0);
+        assert!(relative.candidate_to_reference_inverse_density_ratio < 1.0);
+        assert!(relative.inverse_density_log_advantage < 0.0);
     }
 
     #[test]
