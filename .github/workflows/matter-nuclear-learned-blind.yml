@@ -1,0 +1,116 @@
+name: Matter Nuclear Learned Blind Models
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-nuclear/src/ml_mass.rs'
+      - 'crates/domains/symthaea-nuclear/src/hdc_mass.rs'
+      - 'crates/domains/symthaea-nuclear/src/blind_learned.rs'
+      - 'crates/domains/symthaea-nuclear/src/blind_models.rs'
+      - 'crates/domains/symthaea-nuclear/src/blind_validation.rs'
+      - 'crates/domains/symthaea-nuclear/src/lib.rs'
+      - '.github/workflows/matter-nuclear-learned-blind.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  learned-blind-admission:
+    name: RF/HDC explicit-corpus blind admission
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Lockfile must remain unchanged from PR base
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          test -z "$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- Cargo.lock)"
+
+      - name: Focused formatting
+        run: cargo fmt --check -p symthaea-nuclear
+
+      - name: Focused nuclear package check
+        run: cargo check --locked -p symthaea-nuclear
+
+      - name: Explicit RF corpus regressions
+        run: cargo test --locked -p symthaea-nuclear ml_mass::tests::explicit_training_path -- --nocapture
+
+      - name: Learned blind admission regressions
+        run: cargo test --locked -p symthaea-nuclear blind_learned::tests -- --nocapture --test-threads=1
+
+      - name: Learned-model lineage and authority ratchets
+        shell: python
+        run: |
+          from pathlib import Path
+
+          learned = Path('crates/domains/symthaea-nuclear/src/blind_learned.rs').read_text()
+          ml = Path('crates/domains/symthaea-nuclear/src/ml_mass.rs').read_text()
+          hdc = Path('crates/domains/symthaea-nuclear/src/hdc_mass.rs').read_text()
+
+          forbidden_execution = (
+              'MlMassPredictor::new()',
+              'HdcMassPredictor::new()',
+          )
+          for token in forbidden_execution:
+              if token in learned:
+                  raise SystemExit(f'full-corpus constructor entered blind execution: {token}')
+
+          required_execution = (
+              'MlMassPredictor::fit_measured_with_config(&split.training, config)',
+              'HdcMassPredictor::train_on(&split.training, epochs, seed_offset)',
+              'binding_energy_mev_bits',
+              'LearnedTrainingConfig',
+              'Ame2020MeasuredTrainingPartition',
+              'ensemble_dispersion_proxy_mev',
+              'nearest_training_distance',
+          )
+          for token in required_execution:
+              if token not in learned:
+                  raise SystemExit(f'missing learned blind contract token: {token}')
+
+          required_rf_fit = (
+              'pub fn fit_measured_with_config',
+              'validate_training_corpus(nuclei, config)?',
+              'EstimatedMassInTraining',
+              'DuplicateTrainingNucleus',
+              'NonFiniteTrainingEnergy',
+              'InvalidConfig',
+          )
+          for token in required_rf_fit:
+              if token not in ml:
+                  raise SystemExit(f'missing RF explicit-corpus invariant: {token}')
+
+          # The HDC receipt's architecture_id denotes these exact implementation
+          # constants. If they change, this lane must force an intentional receipt
+          # identity update rather than silently reusing the old label.
+          hdc_architecture = (
+              'const N_HEADS: usize = 1;',
+              'const N_EVOLVE_STEPS: usize = 3;',
+              'const EVOLVE_DTS: [f32; N_EVOLVE_STEPS] = [0.01, 0.1, 1.0];',
+          )
+          for token in hdc_architecture:
+              if token not in hdc:
+                  raise SystemExit(f'HDC architecture drift requires receipt-id revision: {token}')
+
+          forbidden_authority = (
+              'pub winner:',
+              'pub ranking:',
+              'pub consensus:',
+              'pub independent:',
+              'pub qualified:',
+              'pub confidence:',
+          )
+          for token in forbidden_authority:
+              if token in learned:
+                  raise SystemExit(f'forbidden learned-model authority shortcut: {token}')
+
+          print('learned blind-model lineage/authority ratchets passed')
