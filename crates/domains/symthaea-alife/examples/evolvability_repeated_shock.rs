@@ -91,21 +91,28 @@ fn main() {
             shock,
             BASELINE_LOOKBACK_TICKS,
             RECOVERY_FRACTION,
-        )
-        .expect("frozen run must provide contiguous evidence through evaluation end");
+        );
         let evolving_recovery = analyze_recovery(
             &evolving_report,
             shock,
             BASELINE_LOOKBACK_TICKS,
             RECOVERY_FRACTION,
-        )
-        .expect("evolving run must provide contiguous evidence through evaluation end");
-        let comparison = compare_recovery(&evolving_recovery, &frozen_recovery)
-            .expect("candidate/control experiment boundaries must match");
+        );
 
         println!("{label}");
-        println!("  frozen recovery:   {frozen_recovery:#?}");
-        println!("  evolving recovery: {evolving_recovery:#?}");
-        println!("  comparison:        {comparison:#?}");
+        match (evolving_recovery, frozen_recovery) {
+            (Ok(evolving_recovery), Ok(frozen_recovery)) => {
+                let comparison = compare_recovery(&evolving_recovery, &frozen_recovery)
+                    .expect("candidate/control experiment boundaries must match");
+                println!("  frozen recovery:   {frozen_recovery:#?}");
+                println!("  evolving recovery: {evolving_recovery:#?}");
+                println!("  comparison:        {comparison:#?}");
+            }
+            (evolving, frozen) => {
+                println!("  recovery comparison unavailable under current evidence boundary");
+                println!("  frozen analysis:   {frozen:#?}");
+                println!("  evolving analysis: {evolving:#?}");
+            }
+        }
     }
 }
