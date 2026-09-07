@@ -77,14 +77,30 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   # Non-path policy still fails closed through explicit assertions.
   test '${if hasFailedAssertion "name must be non-empty" blankNameEval.config.assertions then "true" else "false"}' = 'true'
 
+  # Ephemeral runner registration is not enough by itself. Freeze the pinned
+  # nixpkgs lifecycle that backs Symthaea's current persistent-appliance recovery
+  # profile: state/runtime locations are service-private, the work directory is
+  # runtime-backed, and successful one-job deregistration causes a clean
+  # re-registration cycle on the same host.
+  test '${service.serviceConfig.Restart}' = 'on-success'
+  test '${lib.concatStringsSep "," service.serviceConfig.RuntimeDirectory}' = 'github-runner/symthaea-validation'
+  test '${lib.concatStringsSep "," service.serviceConfig.StateDirectory}' = 'github-runner/symthaea-validation'
+  test '${service.serviceConfig.WorkingDirectory}' = '%t/github-runner/symthaea-validation'
+
   # Pinned nixpkgs systemd hardening contract.
   test '${if service.serviceConfig.DynamicUser then "true" else "false"}' = 'true'
   test '${if service.serviceConfig.PrivateDevices then "true" else "false"}' = 'true'
   test '${if service.serviceConfig.PrivateMounts then "true" else "false"}' = 'true'
   test '${if service.serviceConfig.PrivateUsers then "true" else "false"}' = 'true'
   test '${if service.serviceConfig.PrivateTmp then "true" else "false"}' = 'true'
+  test '${if service.serviceConfig.ProtectClock then "true" else "false"}' = 'true'
+  test '${if service.serviceConfig.ProtectControlGroups then "true" else "false"}' = 'true'
   test '${if service.serviceConfig.ProtectHome then "true" else "false"}' = 'true'
+  test '${if service.serviceConfig.ProtectHostname then "true" else "false"}' = 'true'
+  test '${if service.serviceConfig.ProtectKernelLogs then "true" else "false"}' = 'true'
+  test '${if service.serviceConfig.ProtectKernelModules then "true" else "false"}' = 'true'
   test '${if service.serviceConfig.NoNewPrivileges then "true" else "false"}' = 'true'
+  test '${if service.serviceConfig.RemoveIPC then "true" else "false"}' = 'true'
   test '${if service.serviceConfig.RestrictNamespaces then "true" else "false"}' = 'true'
   test '${if service.serviceConfig.RestrictRealtime then "true" else "false"}' = 'true'
   test '${if service.serviceConfig.RestrictSUIDSGID then "true" else "false"}' = 'true'
@@ -93,6 +109,12 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   test '${service.serviceConfig.ProtectProc}' = 'invisible'
   test '${service.serviceConfig.UMask}' = '0066'
   test '${service.serviceConfig.StateDirectoryMode}' = '0700'
+
+  syscall_filter='${lib.concatStringsSep "," service.serviceConfig.SystemCallFilter}'
+  echo "$syscall_filter" | grep -F '~@mount'
+  echo "$syscall_filter" | grep -F '~@module'
+  echo "$syscall_filter" | grep -F '~@raw-io'
+  echo "$syscall_filter" | grep -F '~@reboot'
 
   # A root-owned 0400/0600 token file is intentionally supported. The pinned
   # nixpkgs service performs its first pre-start stage as root, copies the
@@ -118,12 +140,17 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   echo "$inaccessible" | grep -F -- '-${fakeToken}'
   echo "$inaccessible" | grep -F -- '.current-token'
 
-  # Protect the pinned upstream bootstrap lifecycle itself. The root pre-start
-  # copies the original token, keeps a private comparison copy, removes the
-  # temporary registration copy after configure, and disables runner self-update.
+  # Protect the pinned upstream bootstrap and cleanup lifecycle itself. The root
+  # pre-start copies the original token, keeps a private comparison copy, removes
+  # the temporary registration copy after configure, clears runner state in
+  # ephemeral mode, clears the runtime-backed work directory on every start,
+  # restarts after successful one-job deregistration, and disables self-update.
   grep -F -- 'install --mode=666' '${upstreamService}'
   grep -F -- 'install --mode=600' '${upstreamService}'
   grep -F 'rm "' '${upstreamService}' | grep -F 'newConfigTokenPath'
+  grep -F -- 'In ephemeral mode, we always want to start with a clean state' '${upstreamService}'
+  grep -F -- 'find -H "$WORK_DIRECTORY" -mindepth 1 -delete' '${upstreamService}'
+  grep -F -- 'Restart = if cfg.ephemeral then "on-success" else "no";' '${upstreamService}'
   grep -F -- '--disableupdate' '${upstreamService}'
 
   touch "$out"
