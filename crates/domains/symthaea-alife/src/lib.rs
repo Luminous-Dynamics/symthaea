@@ -35,6 +35,7 @@ pub mod evolution_rng;
 pub mod exact_sign_test;
 pub mod genome;
 pub mod hierarchy;
+pub mod inheritance_source;
 pub mod ledger;
 pub mod ma001;
 pub mod ma001l;
@@ -72,6 +73,9 @@ pub use exact_sign_test::{
 };
 pub use genome::Genome;
 pub use hierarchy::HierarchicalStack;
+pub use inheritance_source::{
+    GenomeSourceSelectionErrorV1, GenomeSourceSelectionV1, select_genome_source_v1,
+};
 pub use ledger::{InteractionRecord, compress_for_observation};
 pub use metabolism::{
     K_ALIFE_BOLTZMANN, landauer_minimum, prigogine_dissipation_cost, shannon_entropy_bits,
