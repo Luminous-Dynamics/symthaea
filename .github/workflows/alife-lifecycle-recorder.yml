@@ -7,6 +7,7 @@ on:
       - "Cargo.lock"
       - "crates/domains/symthaea-alife/src/lifecycle.rs"
       - "crates/domains/symthaea-alife/src/lifecycle_recorder.rs"
+      - "crates/domains/symthaea-alife/src/population.rs"
       - "crates/domains/symthaea-alife/src/lib.rs"
       - ".github/workflows/alife-lifecycle-recorder.yml"
   workflow_dispatch:
@@ -57,7 +58,7 @@ jobs:
         run: cargo check --locked -p symthaea-alife --all-targets
 
       - name: Test lifecycle recorder
-        run: cargo test --locked -p symthaea-alife lifecycle_recorder::
+        run: 'cargo test --locked -p symthaea-alife lifecycle_recorder::'
 
       - name: Test complete ALife package
         run: cargo test --locked -p symthaea-alife
@@ -65,12 +66,46 @@ jobs:
       - name: Strict package-local Clippy
         run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
 
-      - name: Freeze recorder-only production boundary
+      - name: Freeze recorder authority boundary
+        shell: bash
         run: |
-          if grep -n -E 'LifecycleRecorderV1|record_(birth|death)' \
-            crates/domains/symthaea-alife/src/population.rs \
-            crates/domains/symthaea-alife/src/organism.rs; then
-            echo "Lifecycle recorder is unexpectedly wired into production transitions."
-            echo "Production emission belongs in the separately reviewed authority-wiring tranche."
+          set -euo pipefail
+          population="crates/domains/symthaea-alife/src/population.rs"
+          source="crates/domains/symthaea-alife/src"
+
+          grep -q 'lifecycle_recorder: LifecycleRecorderV1' "$population" || {
+            echo "Population must privately own LifecycleRecorderV1."
+            exit 1
+          }
+
+          if grep -n -E 'pub[^\n]*lifecycle_recorder|pub fn [^(]*\([^)]*\)[^{]*(&mut |&)?LifecycleRecorderV1' "$population"; then
+            echo "Population must not expose mutable/raw recorder authority to callers."
+            exit 1
+          fi
+
+          test "$(grep -c 'record_birth_from_plan' "$population")" -eq 2 || {
+            echo "Both step paths must bind births to the exact EvolutionBirthPlanV1."
+            exit 1
+          }
+          test "$(grep -c 'LifecycleDeathCauseV1::PopulationEnergyThreshold' "$population")" -eq 2 || {
+            echo "Both step paths must emit typed threshold deaths."
+            exit 1
+          }
+          test "$(grep -c 'LifecycleDeathCauseV1::CullWeakest' "$population")" -eq 1 || {
+            echo "cull_weakest must emit its typed authoritative death."
+            exit 1
+          }
+          test "$(grep -c 'advance_epoch()' "$population")" -eq 2 || {
+            echo "Both population step paths must advance recorder epoch exactly once."
+            exit 1
+          }
+
+          unexpected="$(grep -R -n 'record_birth_from_plan' "$source" \
+            --include='*.rs' \
+            | grep -v '/population.rs:' \
+            | grep -v '/lifecycle_recorder.rs:' || true)"
+          if test -n "$unexpected"; then
+            echo "Birth-plan lifecycle emission escaped its authoritative owner:"
+            echo "$unexpected"
             exit 1
           fi
