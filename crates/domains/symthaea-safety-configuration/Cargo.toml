@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-safety-configuration"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Canonical safety-relevant configuration identity for Symthaea infrastructure"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["infrastructure", "safety", "configuration", "evidence"]
+categories = ["science", "simulation"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
