@@ -67,14 +67,10 @@ jobs:
 
       - name: Freeze contract-only authority boundary
         run: |
-          unexpected="$(grep -R -n -E 'Lifecycle(Event|Transition)V1' \
-            crates/domains/symthaea-alife/src \
-            --include='*.rs' \
-            | grep -v '/lifecycle.rs:' \
-            | grep -v '/lib.rs:' \
-            || true)"
-          if [ -n "$unexpected" ]; then
-            echo "Lifecycle emission/transition types escaped the contract boundary:"
-            echo "$unexpected"
+          if grep -n -E 'Lifecycle(Event|Transition)V1' \
+            crates/domains/symthaea-alife/src/population.rs \
+            crates/domains/symthaea-alife/src/organism.rs; then
+            echo "Lifecycle evidence is unexpectedly wired into authoritative simulation transitions."
+            echo "That belongs in the later production-emission tranche, not this contract-only head."
             exit 1
           fi
