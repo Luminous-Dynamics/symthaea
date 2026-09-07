@@ -7,6 +7,7 @@ pub mod attestation;
 pub mod attestation_crypto_profile;
 pub mod attestation_identity_namespace;
 pub mod attestation_profile;
+pub mod attestation_qualified_authority;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
