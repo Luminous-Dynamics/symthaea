@@ -63,11 +63,14 @@ pub enum RepeatShockErrorV1 {
     },
     ShockMultiplierMismatch,
     ShockDeltaMismatch,
+    MetricShockBoundaryMismatch,
+    InvalidMetricBaselineBoundary,
     BaselineLookbackMismatch {
         first_lookback: u64,
         second_lookback: u64,
     },
     RecoveryFractionMismatch,
+    InvalidMetricEvaluationBoundary,
     EvaluationHorizonMismatch {
         first_post_shock_ticks: u64,
         second_post_shock_ticks: u64,
@@ -76,7 +79,6 @@ pub enum RepeatShockErrorV1 {
         first_evaluation_end_tick: u64,
         second_shock_start_tick: u64,
     },
-    MetricShockBoundaryMismatch,
 }
 
 /// Compare two matched shocks within one condition.
@@ -107,8 +109,14 @@ pub fn compare_repeated_shocks(
         return Err(RepeatShockErrorV1::MetricShockBoundaryMismatch);
     }
 
-    let first_lookback = first.perturbation_start_tick - first.baseline_start_tick;
-    let second_lookback = second.perturbation_start_tick - second.baseline_start_tick;
+    let first_lookback = first
+        .perturbation_start_tick
+        .checked_sub(first.baseline_start_tick)
+        .ok_or(RepeatShockErrorV1::InvalidMetricBaselineBoundary)?;
+    let second_lookback = second
+        .perturbation_start_tick
+        .checked_sub(second.baseline_start_tick)
+        .ok_or(RepeatShockErrorV1::InvalidMetricBaselineBoundary)?;
     if first_lookback != second_lookback {
         return Err(RepeatShockErrorV1::BaselineLookbackMismatch {
             first_lookback,
@@ -119,10 +127,16 @@ pub fn compare_repeated_shocks(
         return Err(RepeatShockErrorV1::RecoveryFractionMismatch);
     }
 
-    let first_post_shock_ticks =
-        first.evaluation_end_tick - first.perturbation_end_tick_exclusive + 1;
-    let second_post_shock_ticks =
-        second.evaluation_end_tick - second.perturbation_end_tick_exclusive + 1;
+    let first_post_shock_ticks = first
+        .evaluation_end_tick
+        .checked_sub(first.perturbation_end_tick_exclusive)
+        .and_then(|delta| delta.checked_add(1))
+        .ok_or(RepeatShockErrorV1::InvalidMetricEvaluationBoundary)?;
+    let second_post_shock_ticks = second
+        .evaluation_end_tick
+        .checked_sub(second.perturbation_end_tick_exclusive)
+        .and_then(|delta| delta.checked_add(1))
+        .ok_or(RepeatShockErrorV1::InvalidMetricEvaluationBoundary)?;
     if first_post_shock_ticks != second_post_shock_ticks {
         return Err(RepeatShockErrorV1::EvaluationHorizonMismatch {
             first_post_shock_ticks,
