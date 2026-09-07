@@ -211,61 +211,17 @@ impl ActionRegistry {
                     channels,
                 })
             })
-            .register("WRITE_SERVO", |ctx| {
-                let id_raw = ctx.args.first().ok_or_else(|| {
-                    ActionError::ValidationFailed(
-                        "WRITE_SERVO requires an explicit servo_id".into(),
-                    )
-                })?;
-                let id = id_raw.parse::<u32>().map_err(|_| {
-                    ActionError::ValidationFailed(format!(
-                        "WRITE_SERVO servo_id must be a u32, got '{id_raw}'"
-                    ))
-                })?;
-
-                let value_raw = ctx.args.get(1).ok_or_else(|| {
-                    ActionError::ValidationFailed(
-                        "WRITE_SERVO requires an explicit value".into(),
-                    )
-                })?;
-                let value = value_raw.parse::<f32>().map_err(|_| {
-                    ActionError::ValidationFailed(format!(
-                        "WRITE_SERVO value must be an f32, got '{value_raw}'"
-                    ))
-                })?;
-                if !value.is_finite() {
-                    return Err(ActionError::ValidationFailed(
-                        "WRITE_SERVO value must be finite".into(),
-                    ));
-                }
-
-                Ok(ActionIR::WriteServo {
-                    servo_id: id,
-                    value,
-                })
+            .register("WRITE_SERVO", |_ctx| {
+                Err(ActionError::ValidationFailed(
+                    "WRITE_SERVO requires an explicit actuator capability/profile; legacy standard binding disabled"
+                        .into(),
+                ))
             })
-            .register("SWARM_GOSSIP", |ctx| {
-                let topic = ctx
-                    .args
-                    .first()
-                    .filter(|value| !value.trim().is_empty())
-                    .cloned()
-                    .ok_or_else(|| {
-                        ActionError::ValidationFailed(
-                            "SWARM_GOSSIP requires an explicit non-empty topic".into(),
-                        )
-                    })?;
-                let content = ctx.content.as_ref().filter(|value| !value.is_empty()).ok_or_else(
-                    || {
-                        ActionError::ValidationFailed(
-                            "SWARM_GOSSIP requires explicit non-empty content".into(),
-                        )
-                    },
-                )?;
-                Ok(ActionIR::SwarmGossip {
-                    topic,
-                    payload: content.as_bytes().to_vec(),
-                })
+            .register("SWARM_GOSSIP", |_ctx| {
+                Err(ActionError::ValidationFailed(
+                    "SWARM_GOSSIP requires an explicit swarm/network capability/profile; legacy standard binding disabled"
+                        .into(),
+                ))
             })
             .register("WASM_VERIFY", |_ctx| {
                 Err(ActionError::ValidationFailed(
@@ -339,76 +295,32 @@ mod tests {
     }
 
     #[test]
-    fn write_servo_rejects_missing_malformed_and_non_finite_values() {
+    fn write_servo_requires_explicit_actuator_profile() {
         let registry = ActionRegistry::standard();
-
-        assert!(
-            registry
-                .resolve("WRITE_SERVO", &ActionContext::default())
-                .is_err()
-        );
-
-        let malformed_id = ActionContext {
-            args: vec!["servo-zero".into(), "0.5".into()],
-            ..Default::default()
-        };
-        assert!(registry.resolve("WRITE_SERVO", &malformed_id).is_err());
-
-        let malformed_value = ActionContext {
-            args: vec!["3".into(), "half".into()],
-            ..Default::default()
-        };
-        assert!(registry.resolve("WRITE_SERVO", &malformed_value).is_err());
-
-        let nan = ActionContext {
-            args: vec!["3".into(), "NaN".into()],
-            ..Default::default()
-        };
-        assert!(registry.resolve("WRITE_SERVO", &nan).is_err());
-
-        let valid = ActionContext {
+        let context = ActionContext {
             args: vec!["3".into(), "0.5".into()],
             ..Default::default()
         };
-        let action = registry.resolve("WRITE_SERVO", &valid).unwrap();
-        match action {
-            ActionIR::WriteServo { servo_id, value } => {
-                assert_eq!(servo_id, 3);
-                assert_eq!(value, 0.5);
-            }
-            other => panic!("unexpected action: {other:?}"),
-        }
+
+        let err = registry
+            .resolve("WRITE_SERVO", &context)
+            .expect_err("standard WRITE_SERVO must fail closed without actuator authority");
+        assert!(format!("{err}").contains("explicit actuator capability/profile"));
     }
 
     #[test]
-    fn swarm_gossip_requires_explicit_topic_and_payload() {
+    fn swarm_gossip_requires_explicit_network_profile() {
         let registry = ActionRegistry::standard();
-
-        assert!(
-            registry
-                .resolve("SWARM_GOSSIP", &ActionContext::default())
-                .is_err()
-        );
-
-        let missing_payload = ActionContext {
-            args: vec!["research".into()],
-            ..Default::default()
-        };
-        assert!(registry.resolve("SWARM_GOSSIP", &missing_payload).is_err());
-
-        let valid = ActionContext {
+        let context = ActionContext {
             args: vec!["research".into()],
             content: Some("result".into()),
             ..Default::default()
         };
-        let action = registry.resolve("SWARM_GOSSIP", &valid).unwrap();
-        match action {
-            ActionIR::SwarmGossip { topic, payload } => {
-                assert_eq!(topic, "research");
-                assert_eq!(payload, b"result");
-            }
-            other => panic!("unexpected action: {other:?}"),
-        }
+
+        let err = registry
+            .resolve("SWARM_GOSSIP", &context)
+            .expect_err("standard SWARM_GOSSIP must fail closed without network authority");
+        assert!(format!("{err}").contains("explicit swarm/network capability/profile"));
     }
 
     #[test]
@@ -427,18 +339,44 @@ mod tests {
     }
 
     #[test]
-    fn forge_denial_aborts_primitive_sequence() {
+    fn effect_denial_aborts_primitive_sequence() {
         let executor = PrimitiveExecutor::new(ActionRegistry::standard());
-        let context = ActionContext {
+        let read_context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/input.txt")),
+            ..Default::default()
+        };
+        let servo_context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/input.txt")),
+            args: vec!["3".into(), "0.5".into()],
+            ..Default::default()
+        };
+        let swarm_context = ActionContext {
+            target_path: Some(PathBuf::from("/tmp/input.txt")),
+            args: vec!["research".into()],
+            content: Some("result".into()),
+            ..Default::default()
+        };
+        let forge_context = ActionContext {
             target_path: Some(PathBuf::from("/tmp/module.wasm")),
             ..Default::default()
         };
 
-        let result = executor.translate(
-            &["READ".to_string(), "WASM_VERIFY".to_string()],
-            &context,
-        );
-        assert!(result.is_err());
+        for (primitive, context) in [
+            ("WRITE_SERVO", servo_context),
+            ("SWARM_GOSSIP", swarm_context),
+            ("WASM_VERIFY", forge_context),
+        ] {
+            let result = executor.translate(
+                &["READ".to_string(), primitive.to_string()],
+                &context,
+            );
+            assert!(result.is_err(), "{primitive} denial must abort the whole sequence");
+        }
+
+        let read_only = executor
+            .translate(&["READ".to_string()], &read_context)
+            .expect("non-effectful READ remains available");
+        assert_eq!(read_only.len(), 1);
     }
 
     #[test]
