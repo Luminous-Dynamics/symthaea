@@ -1,0 +1,55 @@
+{
+  "schema": "symthaea.ci-lifecycle-jobs.v1",
+  "policy": {
+    "iteration_semantics": "Only explicitly allowlisted jobs may run in draft iteration mode. Every unlisted or newly added CI job is full-only until reviewed.",
+    "unknown_job_default": "full",
+    "tier1_green_is_merge_qualification": false,
+    "focused_domain_workflows_are_independent": true
+  },
+  "iteration_jobs": [
+    "governance",
+    "fmt",
+    "cls-field-count",
+    "workspace-targets",
+    "embodiment-safety-composition",
+    "orphan-modules",
+    "secrets-scan"
+  ],
+  "rationale": {
+    "governance": "Source-level Class A/B ownership gate; cheap and directly relevant to every PR review boundary.",
+    "fmt": "Fast deterministic source-format invariant.",
+    "cls-field-count": "Fast architectural ratchet protecting CognitiveLoopService decomposition.",
+    "workspace-targets": "Workspace/build-target and crate-registry integrity checks; prevents structurally invalid candidates from consuming larger qualification lanes.",
+    "embodiment-safety-composition": "Fast source-level safety-composition check; safety regressions should be visible during draft iteration.",
+    "orphan-modules": "Fast source-tree reachability ratchet covering source/tests/examples.",
+    "secrets-scan": "Repository secret-leak detection remains an always-on PR safety invariant despite not being a scientific qualification gate."
+  },
+  "full_only_examples": [
+    "doc-tests",
+    "muse",
+    "clippy",
+    "test",
+    "test-spark-engine",
+    "test-nextest",
+    "test-hardened-lib",
+    "test-cognitive-hardening",
+    "test-hardened-daemon",
+    "test-hardened-api",
+    "test-hardened-nix",
+    "test-integration",
+    "test-all-features",
+    "test-feature-matrix-critical",
+    "test-feature-matrix",
+    "psych-bench",
+    "feature-interactions",
+    "deny",
+    "audit",
+    "sbom",
+    "test-subcrates",
+    "genesis-benchmarks",
+    "stress-tests",
+    "compliance-safety-ethics",
+    "compliance-consciousness",
+    "compliance-robustness"
+  ]
+}
