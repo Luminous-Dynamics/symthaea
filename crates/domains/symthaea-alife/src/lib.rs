@@ -45,6 +45,7 @@ pub mod population;
 pub mod predator_prey;
 pub mod repeat_shock;
 pub mod repeat_shock_did;
+pub mod repeat_shock_relative;
 pub mod types;
 
 pub use agent_id::{AgentId, AgentIdAllocator};
@@ -82,5 +83,9 @@ pub use repeat_shock::{
 pub use repeat_shock_did::{
     RepeatedShockDidErrorV1, RepeatedShockDidV1, RepeatedShockDidVerdictV1,
     compare_repeated_shock_did,
+};
+pub use repeat_shock_relative::{
+    RepeatedShockRelativeErrorV1, RepeatedShockRelativeV1, RepeatedShockRelativeVerdictV1,
+    compare_repeated_shock_relative,
 };
 pub use types::BoundaryModulators;
