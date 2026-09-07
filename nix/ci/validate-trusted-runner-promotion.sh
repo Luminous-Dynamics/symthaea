@@ -31,7 +31,7 @@ if [[ ! "$EXPECTED_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
   exit 1
 fi
 
-for command in git sha256sum awk sort; do
+for command in git sha256sum awk sort mktemp; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "required command missing: $command" >&2
     exit 1
@@ -110,6 +110,12 @@ if [[ "$origin_url" != "$REPOSITORY_URL" && "$origin_url" != 'https://github.com
   exit 1
 fi
 
+local_head="$(git rev-parse HEAD)"
+local_tree="$(git rev-parse HEAD^{tree})"
+git diff --exit-code
+git diff --cached --exit-code
+test -z "$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"
+
 git -c protocol.version=2 fetch --no-tags origin \
   "+refs/heads/main:refs/remotes/origin/main" \
   "+refs/heads/${RECOVERY_BRANCH}:refs/remotes/origin/${RECOVERY_BRANCH}"
@@ -117,6 +123,19 @@ git -c protocol.version=2 fetch --no-tags origin \
 public_main="$(git rev-parse refs/remotes/origin/main)"
 public_main_tree="$(git rev-parse refs/remotes/origin/main^{tree})"
 public_recovery="$(git rev-parse "refs/remotes/origin/${RECOVERY_BRANCH}")"
+
+if [[ "$local_head" != "$public_main" || "$local_tree" != "$public_main_tree" ]]; then
+  echo 'promotion verifier must execute from a pristine detached checkout of exact current public main' >&2
+  printf 'local_head=%s\npublic_main=%s\nlocal_tree=%s\npublic_main_tree=%s\n' "$local_head" "$public_main" "$local_tree" "$public_main_tree" >&2
+  exit 1
+fi
+
+local_verifier_blob="$(git rev-parse "HEAD:nix/ci/validate-trusted-runner-promotion.sh")"
+if [[ "$local_verifier_blob" != "$promotion_verifier_blob" ]]; then
+  echo 'locally executed promotion verifier is not the exact Stage-A-qualified verifier blob' >&2
+  printf 'expected_blob=%s\nlocal_blob=%s\n' "$promotion_verifier_blob" "$local_verifier_blob" >&2
+  exit 1
+fi
 
 if [[ "$public_recovery" != "$operator_authorized_head" ]]; then
   echo 'published recovery branch moved after Stage A; manifest is stale' >&2
@@ -173,16 +192,31 @@ git -c protocol.version=2 fetch --no-tags origin \
 
 test "$(git rev-parse refs/remotes/origin/main)" = "$public_main"
 test "$(git rev-parse "refs/remotes/origin/${RECOVERY_BRANCH}")" = "$public_recovery"
+test "$(git rev-parse HEAD)" = "$local_head"
+test "$(git rev-parse HEAD^{tree})" = "$local_tree"
+git diff --exit-code
+git diff --cached --exit-code
+test -z "$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"
 
-printf 'schema=symthaea.trusted-runner.promotion.v1\n'
-printf 'result=PASS\n'
-printf 'bootstrap_manifest_sha256=%s\n' "$actual_manifest_sha256"
-printf 'authorized_recovery_head=%s\n' "$operator_authorized_head"
-printf 'promoted_main_head=%s\n' "$public_main"
-printf 'promoted_main_tree=%s\n' "$public_main_tree"
-printf 'promotion_ancestry_checked=PASS\n'
-printf 'promotion_tree_identity_checked=PASS\n'
-printf 'promotion_diff_surface_checked=PASS\n'
-printf 'promotion_artifact_blobs_checked=PASS\n'
-printf 'promotion_refs_stable=PASS\n'
-printf 'evidence_scope=stage-d-smoke-eligibility-only\n'
+promotion_manifest="$(mktemp /tmp/symthaea-trusted-runner-promotion-v1.XXXXXX)"
+cat > "$promotion_manifest" <<EOF
+schema=symthaea.trusted-runner.promotion.v1
+result=PASS
+bootstrap_manifest_sha256=$actual_manifest_sha256
+authorized_recovery_head=$operator_authorized_head
+promoted_main_head=$public_main
+promoted_main_tree=$public_main_tree
+promotion_verifier_blob=$promotion_verifier_blob
+promotion_ancestry_checked=PASS
+promotion_tree_identity_checked=PASS
+promotion_diff_surface_checked=PASS
+promotion_artifact_blobs_checked=PASS
+promotion_local_checkout_checked=PASS
+promotion_refs_stable=PASS
+evidence_scope=stage-d-smoke-eligibility-only
+EOF
+
+promotion_manifest_sha256="$(sha256sum "$promotion_manifest" | awk '{print $1}')"
+cat "$promotion_manifest"
+printf 'promotion_manifest_sha256=%s\n' "$promotion_manifest_sha256"
+printf 'promotion_manifest_path=%s\n' "$promotion_manifest"
