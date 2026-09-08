@@ -1,0 +1,192 @@
+{
+  "schema_version": "hak.check-evidence-binding-policy.v1",
+  "policy_id": "hak010-precommitted-check-binding-policy-v1",
+  "qualification_plan": {
+    "plan_id": "hak010-precommitted-check-binding-e5-v1",
+    "plan_digest": "sha256:ab3098fd6a83f13b3f8a4de6225217bd042f961bd04eff858662b28104681caf"
+  },
+  "workflow_path": ".github/workflows/hak-check-binding.yml",
+  "bindings": [
+    {
+      "obligation_kind": "RequiredCheck",
+      "obligation_id": "exact-head",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Assert exact-head checkout",
+      "step_number": 3,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "RequiredCheck",
+      "obligation_id": "compile",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Compile HAK binding tooling",
+      "step_number": 6,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "RequiredCheck",
+      "obligation_id": "plan-lint",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Lint HAK-010 qualification plan",
+      "step_number": 8,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "RequiredCheck",
+      "obligation_id": "policy-lint",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Lint HAK-010 check-binding policy",
+      "step_number": 9,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "RequiredCheck",
+      "obligation_id": "schema-validation",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Validate HAK-010 schema syntax",
+      "step_number": 7,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "RequiredCheck",
+      "obligation_id": "regressions",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "binding policy qualification-plan id mismatch",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "binding policy qualification-plan digest mismatch",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "binding policy workflow mismatch",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "binding policy missing required obligation",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "binding policy duplicate obligation",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "binding policy unknown obligation",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "provider evidence job-name selector mismatch",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "provider evidence step-name selector mismatch",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "provider evidence step-number selector mismatch",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "provider evidence disallowed job conclusion",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "provider evidence disallowed step conclusion",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "binding policy digest tampering",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "strict conformance uses provider evidence that does not satisfy precommitted selector",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    },
+    {
+      "obligation_kind": "NegativeCase",
+      "obligation_id": "schema accepts malformed policy digest",
+      "job_name": "HAK Precommitted Check Binding",
+      "step_name": "Run HAK-010 regressions",
+      "step_number": 10,
+      "accepted_job_conclusions": ["success"],
+      "accepted_step_conclusions": ["success"]
+    }
+  ],
+  "policy_digest": "sha256:f6bc2af498163ded5cf27931b3c71da0b2af9893844bd84b27a36cb98326928f"
+}
