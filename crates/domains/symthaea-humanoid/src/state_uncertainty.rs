@@ -11,6 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::execution::HumanoidAuthorityEnvelope;
 use crate::state_estimation::{StateEstimatorConfig, StateEstimatorReport};
 
 /// One observed estimator quantity relative to its configured rejection bound.
@@ -109,6 +110,21 @@ impl HumanoidStateUncertaintyEnvelope {
         remaining.clamp(0.0, 1.0) as f32
     }
 
+    /// Restrict an already established authority envelope with this state
+    /// evidence. Existing stricter epistemic limits are preserved.
+    pub fn restrict_authority(
+        self,
+        mut authority: HumanoidAuthorityEnvelope,
+    ) -> HumanoidAuthorityEnvelope {
+        let state_limit = self.epistemic_authority();
+        authority.epistemic = if authority.epistemic.is_finite() {
+            authority.epistemic.clamp(0.0, 1.0).min(state_limit)
+        } else {
+            0.0
+        };
+        authority
+    }
+
     pub fn fully_within_bounds(self) -> bool {
         self.accepted
             && self.contact_trust.is_finite()
@@ -165,6 +181,23 @@ mod tests {
             &StateEstimatorConfig::default(),
         );
         assert!((envelope.epistemic_authority() - 0.3).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn uncertainty_only_restricts_existing_authority() {
+        let config = StateEstimatorConfig::default();
+        let mut source = report();
+        source.orientation_innovation_rad = 0.5 * config.maximum_orientation_innovation_rad;
+        let uncertainty = HumanoidStateUncertaintyEnvelope::from_estimator_report(source, &config);
+
+        let admitted = uncertainty.restrict_authority(HumanoidAuthorityEnvelope::fully_admitted());
+        assert!((admitted.epistemic - 0.5).abs() < 1.0e-6);
+
+        let already_stricter = uncertainty.restrict_authority(HumanoidAuthorityEnvelope {
+            epistemic: 0.2,
+            ..HumanoidAuthorityEnvelope::fully_admitted()
+        });
+        assert!((already_stricter.epistemic - 0.2).abs() < 1.0e-6);
     }
 
     #[test]
