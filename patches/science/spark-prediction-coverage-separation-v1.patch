@@ -10,7 +10,7 @@ diff --git a/crates/domains/spark-engine/src/lib.rs b/crates/domains/spark-engin
 +    generate_proposal_markdown, greedy_sequence, prediction_coverage, rank_experiments,
 +    standard_candidate_experiments,
  };
- diff --git a/crates/domains/spark-engine/src/optimal_experiment.rs b/crates/domains/spark-engine/src/optimal_experiment.rs
+diff --git a/crates/domains/spark-engine/src/optimal_experiment.rs b/crates/domains/spark-engine/src/optimal_experiment.rs
 --- a/crates/domains/spark-engine/src/optimal_experiment.rs
 +++ b/crates/domains/spark-engine/src/optimal_experiment.rs
 @@
@@ -216,4 +216,3 @@ diff --git a/crates/domains/spark-engine/src/lib.rs b/crates/domains/spark-engin
 +        assert!((assessment.full_scope_eig_bits.unwrap() - legacy).abs() < 1e-12);
 +        assert!((assessment.conditional_eig_bits.unwrap() - legacy).abs() < 1e-12);
 +    }
-*** End Patch
