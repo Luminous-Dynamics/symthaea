@@ -24,19 +24,44 @@
         "repository": {"type": "string", "minLength": 1},
         "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
         "base_commit_sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
-        "branch": {"type": ["string", "null"]}
+        "branch": {"type": ["string", "null"], "minLength": 1}
       }
     },
     "qualification_plan": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["plan_kind", "plan_ref"],
+      "required": ["plan_kind", "plan_ref", "plan_digest", "precommit_status"],
       "properties": {
-        "plan_kind": {"enum": ["SelfDeclaredPlan", "IndependentPlan", "ProviderEnforcedPlan"]},
+        "plan_kind": {
+          "enum": ["UnspecifiedPlan", "SelfDeclaredPlan", "IndependentPlan", "ProviderEnforcedPlan"]
+        },
         "plan_ref": {"type": "string", "minLength": 1},
         "plan_digest": {"type": ["string", "null"]},
-        "precommit_status": {"enum": ["KnownPrecommitted", "NotEstablished", "NotApplicable"]}
-      }
+        "precommit_status": {
+          "enum": ["KnownPrecommitted", "NotEstablished", "NotApplicable"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"precommit_status": {"const": "NotEstablished"}}},
+          "then": {
+            "properties": {
+              "plan_kind": {"const": "UnspecifiedPlan"},
+              "plan_digest": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"precommit_status": {"const": "KnownPrecommitted"}}},
+          "then": {
+            "properties": {
+              "plan_kind": {
+                "enum": ["SelfDeclaredPlan", "IndependentPlan", "ProviderEnforcedPlan"]
+              }
+            }
+          }
+        }
+      ]
     },
     "execution": {
       "type": "object",
@@ -48,7 +73,8 @@
         "workflow_id",
         "workflow_name",
         "workflow_path",
-        "event"
+        "event",
+        "provider_record_ref"
       ],
       "properties": {
         "provider": {"const": "github-actions"},
@@ -112,9 +138,6 @@
     },
     "artifact_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "log_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
-    "receipt_digest": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
-    }
+    "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   }
 }

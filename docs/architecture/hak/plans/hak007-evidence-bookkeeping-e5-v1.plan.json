@@ -1,0 +1,65 @@
+{
+  "schema_version": "hak.qualification-plan.v1",
+  "plan_id": "hak007-evidence-bookkeeping-e5-v1",
+  "plan_kind": "SelfDeclaredPlan",
+  "scope": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "subject_kind": "git-commit",
+    "workflow_path": ".github/workflows/hak-evidence.yml"
+  },
+  "claims": [
+    {
+      "claim_id": "HAK007-EVID-LINT-001",
+      "statement": "HAK evidence bookkeeping rejects invalid observation/receipt state and identity combinations covered by the focused regression suite.",
+      "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK007-EVID-DIGEST-001",
+      "statement": "Terminal receipt canonical digest detects post-materialization content changes covered by the focused regression suite.",
+      "target_tier": "E5"
+    }
+  ],
+  "required_checks": [
+    {
+      "check_id": "exact-head",
+      "description": "Resolve and assert exact PR head checkout."
+    },
+    {
+      "check_id": "compile",
+      "description": "Compile scripts/hak_evidence_lint.py under Python 3.12."
+    },
+    {
+      "check_id": "plans",
+      "description": "Lint the machine-readable HAK-007 qualification plan."
+    },
+    {
+      "check_id": "observations",
+      "description": "Lint all materialized HAK execution observations."
+    },
+    {
+      "check_id": "regressions",
+      "description": "Run tests/python/test_hak_evidence_lint.py."
+    }
+  ],
+  "required_negative_cases": [
+    "nonterminal observation with terminal conclusion",
+    "observation claiming E5",
+    "subject mismatch",
+    "NotEstablished binding mislabeled as an established plan",
+    "mutable KnownPrecommitted plan identity",
+    "provider run-attempt mismatch",
+    "receipt smuggling interpretation",
+    "receipt digest tampering"
+  ],
+  "provider_policy": {
+    "allowed_providers": ["github-actions"],
+    "exact_head_required": true
+  },
+  "independence": {
+    "plan_authority": "self-declared by subject repository",
+    "execution_provider": "GitHub Actions hosted runner",
+    "claim_interpretation": "separate evidence interpretation required"
+  },
+  "evidence_target": "E5",
+  "supersedes_plan_ref": null
+}

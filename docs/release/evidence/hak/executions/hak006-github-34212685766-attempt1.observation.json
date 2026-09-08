@@ -8,10 +8,10 @@
     "branch": "architecture/hak-conformance-linter-v1"
   },
   "qualification_plan": {
-    "plan_kind": "SelfDeclaredPlan",
-    "plan_ref": "git:Luminous-Dynamics/symthaea@481f5065f1c40322a74c16cf5a6a56171eafc91c:.github/workflows/hak-conformance.yml",
+    "plan_kind": "UnspecifiedPlan",
+    "plan_ref": "urn:hak:qualification-plan:not-established",
     "plan_digest": null,
-    "precommit_status": "KnownPrecommitted"
+    "precommit_status": "NotEstablished"
   },
   "execution": {
     "provider": "github-actions",

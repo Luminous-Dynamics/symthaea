@@ -10,6 +10,8 @@ on:
       - 'docs/architecture/HUMAN_AGENCY_KERNEL_EVIDENCE_SUBJECTS_AND_QUALIFICATION_RECEIPTS_V1.md'
       - 'docs/architecture/hak/execution-observation-v1.schema.json'
       - 'docs/architecture/hak/qualification-receipt-v1.schema.json'
+      - 'docs/architecture/hak/qualification-plan-v1.schema.json'
+      - 'docs/architecture/hak/plans/**'
       - 'docs/release/evidence/hak/**'
       - '.github/workflows/hak-evidence.yml'
   workflow_dispatch:
@@ -56,6 +58,11 @@ jobs:
 
       - name: Compile evidence linter
         run: python -m py_compile scripts/hak_evidence_lint.py
+
+      - name: Lint HAK-007 qualification plan
+        run: |
+          python scripts/hak_evidence_lint.py \
+            docs/architecture/hak/plans/hak007-evidence-bookkeeping-e5-v1.plan.json
 
       - name: Lint materialized nonterminal observations
         shell: bash

@@ -16,6 +16,14 @@ OBSERVATION = (
     / "executions"
     / "hak006-github-34212685766-attempt1.observation.json"
 )
+PLAN = (
+    ROOT
+    / "docs"
+    / "architecture"
+    / "hak"
+    / "plans"
+    / "hak007-evidence-bookkeeping-e5-v1.plan.json"
+)
 
 spec = importlib.util.spec_from_file_location("hak_evidence_lint", SCRIPT)
 assert spec and spec.loader
@@ -29,13 +37,22 @@ def load_observation():
     return json.loads(OBSERVATION.read_text())
 
 
+def load_plan():
+    return json.loads(PLAN.read_text())
+
+
 def terminal_receipt():
     observation = load_observation()
     receipt = {
         "schema_version": "hak.qualification-receipt.v1",
         "receipt_id": "synthetic-receipt-for-regression-only",
         "subject": deepcopy(observation["subject"]),
-        "qualification_plan": deepcopy(observation["qualification_plan"]),
+        "qualification_plan": {
+            "plan_kind": "SelfDeclaredPlan",
+            "plan_ref": "git:Luminous-Dynamics/symthaea@1111111111111111111111111111111111111111:.github/workflows/hak-conformance.yml",
+            "plan_digest": None,
+            "precommit_status": "KnownPrecommitted",
+        },
         "execution": deepcopy(observation["execution"]),
         "terminal": {
             "status": "completed",
@@ -56,8 +73,38 @@ def terminal_receipt():
     return receipt
 
 
+def test_hak007_qualification_plan_is_valid():
+    hak.validate_qualification_plan(load_plan())
+
+
+def test_plan_duplicate_claim_ids_rejected():
+    doc = load_plan()
+    doc["claims"].append(deepcopy(doc["claims"][0]))
+    with pytest.raises(hak.EvidenceLintError):
+        hak.validate_qualification_plan(doc)
+
+
+def test_e5_plan_requires_exact_head():
+    doc = load_plan()
+    doc["provider_policy"]["exact_head_required"] = False
+    with pytest.raises(hak.EvidenceLintError):
+        hak.validate_qualification_plan(doc)
+
+
+def test_expected_subject_does_not_apply_to_plan():
+    with pytest.raises(hak.EvidenceLintError):
+        hak.validate_document(load_plan(), expected_subject=SUBJECT)
+
+
 def test_real_queued_observation_is_valid():
     hak.validate_observation(load_observation(), expected_subject=SUBJECT)
+
+
+def test_not_established_plan_requires_unspecified_kind():
+    doc = load_observation()
+    doc["qualification_plan"]["plan_kind"] = "SelfDeclaredPlan"
+    with pytest.raises(hak.EvidenceLintError):
+        hak.validate_observation(doc)
 
 
 def test_observation_cannot_have_terminal_conclusion():
@@ -94,17 +141,19 @@ def test_expected_subject_mismatch_rejected():
 
 
 def test_known_precommitted_plan_requires_immutable_identity():
-    doc = load_observation()
+    doc = terminal_receipt()
     doc["qualification_plan"]["plan_ref"] = "workflow:HAK Conformance"
+    doc["receipt_digest"] = hak.compute_receipt_digest(doc)
     with pytest.raises(hak.EvidenceLintError):
-        hak.validate_observation(doc)
+        hak.validate_receipt(doc)
 
 
 def test_self_declared_plan_path_must_match_execution_workflow():
-    doc = load_observation()
+    doc = terminal_receipt()
     doc["execution"]["workflow_path"] = ".github/workflows/other.yml"
+    doc["receipt_digest"] = hak.compute_receipt_digest(doc)
     with pytest.raises(hak.EvidenceLintError):
-        hak.validate_observation(doc)
+        hak.validate_receipt(doc)
 
 
 def test_provider_ref_attempt_must_match_execution():
