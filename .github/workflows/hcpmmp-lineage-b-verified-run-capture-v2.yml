@@ -1,0 +1,189 @@
+name: HCPMMP Lineage B Verified Run Capture v2
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/capture_hcpmmp1_neuromaps_lineage_b_verified_run.py'
+      - 'scripts/capture_hcpmmp1_neuromaps_lineage_b_qualified_run_v2.py'
+      - 'scripts/test_capture_hcpmmp1_neuromaps_lineage_b_verified_run.py'
+      - 'scripts/test_capture_hcpmmp1_neuromaps_lineage_b_qualified_run_v2.py'
+      - 'scripts/test_hcpmmp_lineage_b_verified_run_retained_package.py'
+      - 'scripts/hcpmmp_neuromaps_common.py'
+      - 'data/neuroscience/hcpmmp1_neuromaps_transform_method_v1.json'
+      - 'data/neuroscience/hcpmmp1_lineage_b_verified_run_capture_profile_v2.json'
+      - 'data/neuroscience/evidence/workbench_isolated_version_verification_5da8729f.json'
+      - 'docs/neuroscience/HCPMMP1_LINEAGE_B_VERIFIED_RUN_CAPTURE_V2.md'
+      - '.github/workflows/hcpmmp-lineage-b-verified-run-capture-v2.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PROFILE_FILE: data/neuroscience/hcpmmp1_lineage_b_verified_run_capture_profile_v2.json
+  VERIFICATION_FILE: data/neuroscience/evidence/workbench_isolated_version_verification_5da8729f.json
+  EXPECTED_PROFILE_SHA256: 975c7727ecb9faf7e3d46a039aa4e6601b7e2498b36443bf9012c51b4f2e9499
+  EXPECTED_VERIFICATION_SHA256: bd79a0280f0a9e5ad2308d6824ccda2f28d0b5cffa3bb4f89b3afa7089afe4d9
+
+jobs:
+  qualify:
+    name: Qualify verified Lineage-B run capture v2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_SHA"
+          printf 'qualified_head=%s\n' "$QUALIFICATION_SHA"
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax contract
+        run: |
+          python -m py_compile \
+            scripts/capture_hcpmmp1_neuromaps_lineage_b_verified_run.py \
+            scripts/capture_hcpmmp1_neuromaps_lineage_b_qualified_run_v2.py \
+            scripts/test_capture_hcpmmp1_neuromaps_lineage_b_verified_run.py \
+            scripts/test_capture_hcpmmp1_neuromaps_lineage_b_qualified_run_v2.py \
+            scripts/test_hcpmmp_lineage_b_verified_run_retained_package.py
+
+      - name: Exact retained qualification package roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum "$PROFILE_FILE" | awk '{print $1}')" = "$EXPECTED_PROFILE_SHA256"
+          test "$(sha256sum "$VERIFICATION_FILE" | awk '{print $1}')" = "$EXPECTED_VERIFICATION_SHA256"
+
+      - name: Reconstruct retained qualification package
+        run: |
+          PYTHONPATH=scripts python - <<'PY'
+          from pathlib import Path
+          import capture_hcpmmp1_neuromaps_lineage_b_verified_run as c
+          import capture_hcpmmp1_neuromaps_lineage_b_qualified_run_v2 as q
+
+          profile_raw = Path(q.PROFILE_PATH).read_bytes()
+          verification_raw = Path(q.VERIFICATION_PATH).read_bytes()
+          profile = c.verify_profile_bytes(profile_raw)
+          verification = c.verify_retained_workbench_bytes(profile, verification_raw)
+
+          assert c.digest_bytes(profile_raw) == q.QUALIFIED_PROFILE_FILE_SHA256
+          assert c.digest_bytes(verification_raw) == q.QUALIFIED_VERIFICATION_FILE_SHA256
+          assert profile['qualification_source']['pr'] == 976
+          assert profile['qualification_source']['head_sha'] == q.QUALIFIED_WORKBENCH_HEAD
+          assert profile['qualification_source']['workflow_run_id'] == 34265087269
+          assert verification['closure_digest'] == q.QUALIFIED_CLOSURE_DIGEST
+          assert verification['program_content_sha256'] == 'sha256:ad461ffeef56a0d807617e41ca65e38a2c25f1ec47abaea560a0bf843613db88'
+          assert verification['version_output_sha256'] == 'sha256:d4e353408c9d76bc7c4ffe476e4161e0dc443add050ad499baa2cb93c84630c5'
+          PY
+
+      - name: Adversarial capture contracts
+        run: |
+          PYTHONPATH=scripts python -m unittest -v scripts/test_capture_hcpmmp1_neuromaps_lineage_b_verified_run.py
+          PYTHONPATH=scripts python -m unittest -v scripts/test_capture_hcpmmp1_neuromaps_lineage_b_qualified_run_v2.py
+          PYTHONPATH=scripts python -m unittest -v scripts/test_hcpmmp_lineage_b_verified_run_retained_package.py
+
+      - name: No execution or network surface
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          files = [
+              Path('scripts/capture_hcpmmp1_neuromaps_lineage_b_verified_run.py'),
+              Path('scripts/capture_hcpmmp1_neuromaps_lineage_b_qualified_run_v2.py'),
+          ]
+          forbidden_import_roots = {'subprocess', 'socket', 'urllib', 'requests', 'http', 'ftplib'}
+          forbidden_os_calls = {
+              'system', 'popen', 'execl', 'execle', 'execlp', 'execlpe',
+              'execv', 'execve', 'execvp', 'execvpe',
+              'spawnl', 'spawnle', 'spawnlp', 'spawnlpe',
+              'spawnv', 'spawnve', 'spawnvp', 'spawnvpe',
+          }
+
+          for path in files:
+              source = path.read_text(encoding='utf-8')
+              tree = ast.parse(source, filename=str(path))
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for alias in node.names:
+                          if alias.name.split('.')[0] in forbidden_import_roots:
+                              raise SystemExit(f'{path}: forbidden import {alias.name}')
+                  elif isinstance(node, ast.ImportFrom):
+                      root = (node.module or '').split('.')[0]
+                      if root in forbidden_import_roots:
+                          raise SystemExit(f'{path}: forbidden import-from {node.module}')
+                  elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                      if isinstance(node.func.value, ast.Name) and node.func.value.id == 'os' and node.func.attr in forbidden_os_calls:
+                          raise SystemExit(f'{path}: forbidden process execution os.{node.func.attr}')
+              if '"-version"' in source or "'-version'" in source:
+                  raise SystemExit(f'{path}: ambient Workbench version probe reintroduced')
+          PY
+
+      - name: Trust-anchor and disclosure ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          QUALIFIED=scripts/capture_hcpmmp1_neuromaps_lineage_b_qualified_run_v2.py
+          LIB=scripts/capture_hcpmmp1_neuromaps_lineage_b_verified_run.py
+          DOC=docs/neuroscience/HCPMMP1_LINEAGE_B_VERIFIED_RUN_CAPTURE_V2.md
+
+          grep -Fq 'QUALIFIED_PROFILE_FILE_SHA256 = "sha256:975c7727ecb9faf7e3d46a039aa4e6601b7e2498b36443bf9012c51b4f2e9499"' "$QUALIFIED"
+          grep -Fq 'QUALIFIED_VERIFICATION_FILE_SHA256 = "sha256:bd79a0280f0a9e5ad2308d6824ccda2f28d0b5cffa3bb4f89b3afa7089afe4d9"' "$QUALIFIED"
+          grep -Fq 'PROFILE_PATH = ROOT / "data/neuroscience/hcpmmp1_lineage_b_verified_run_capture_profile_v2.json"' "$QUALIFIED"
+          grep -Fq 'VERIFICATION_PATH = ROOT / "data/neuroscience/evidence/workbench_isolated_version_verification_5da8729f.json"' "$QUALIFIED"
+          if grep -Fq -- '--verified-run-profile' "$QUALIFIED"; then
+            echo 'qualified wrapper must not accept a caller-selected trust profile' >&2
+            exit 1
+          fi
+          if grep -Fq -- '--workbench-verification' "$QUALIFIED"; then
+            echo 'qualified wrapper must not accept caller-selected verification evidence' >&2
+            exit 1
+          fi
+          grep -Fq 'profile_raw = profile_path.read_bytes()' "$LIB"
+          grep -Fq 'verification_raw = verification_path.read_bytes()' "$LIB"
+          grep -Fq 'MutuallyConsistentMetadata != QualifiedExternalTrustRoot' "$DOC"
+          grep -Fq 'run_manifest_captured = true' "$DOC"
+          grep -Fq 'does **not** itself set `run_manifest_captured = true`' "$DOC"
+
+      - name: Authority ratchet
+        run: |
+          PYTHONPATH=scripts python - <<'PY'
+          import capture_hcpmmp1_neuromaps_lineage_b_verified_run as c
+          import capture_hcpmmp1_neuromaps_lineage_b_qualified_run_v2 as q
+
+          profile = c.verify_profile_bytes(q.PROFILE_PATH.read_bytes())
+          profile_authority = profile['authority']
+          assert profile_authority['verified_workbench_observation_bound'] is True
+          for key, value in profile_authority.items():
+              if key != 'verified_workbench_observation_bound':
+                  assert value is False, key
+
+          expected_capture_true = {
+              'qualified_workbench_verification_bound',
+              'local_program_bytes_match',
+              'operator_input_bytes_captured',
+          }
+          for key, value in c.CAPTURE_AUTHORITY.items():
+              assert value is (key in expected_capture_true), key
+          PY
+
+      - name: Qualified CLI contract
+        run: |
+          PYTHONPATH=scripts python scripts/capture_hcpmmp1_neuromaps_lineage_b_qualified_run_v2.py --help
