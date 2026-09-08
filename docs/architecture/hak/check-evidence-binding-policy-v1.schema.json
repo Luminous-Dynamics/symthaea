@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/hak/check-evidence-binding-policy-v1.schema.json",
+  "title": "HAK Check Evidence Binding Policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "policy_id", "qualification_plan", "workflow_path",
+    "bindings", "policy_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "hak.check-evidence-binding-policy.v1"},
+    "policy_id": {"type": "string", "minLength": 1},
+    "qualification_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_id", "plan_digest"],
+      "properties": {
+        "plan_id": {"type": "string", "minLength": 1},
+        "plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "workflow_path": {"type": "string", "minLength": 1},
+    "bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "obligation_kind", "obligation_id", "job_name", "step_name",
+          "step_number", "accepted_job_conclusions", "accepted_step_conclusions"
+        ],
+        "properties": {
+          "obligation_kind": {"enum": ["RequiredCheck", "NegativeCase"]},
+          "obligation_id": {"type": "string", "minLength": 1},
+          "job_name": {"type": "string", "minLength": 1},
+          "step_name": {"type": "string", "minLength": 1},
+          "step_number": {"type": "integer", "minimum": 1},
+          "accepted_job_conclusions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"enum": ["success", "failure", "cancelled", "timed_out", "action_required", "neutral", "skipped", "stale", "startup_failure"]}
+          },
+          "accepted_step_conclusions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"enum": ["success", "failure", "cancelled", "timed_out", "action_required", "neutral", "skipped", "stale", "startup_failure"]}
+          }
+        }
+      }
+    },
+    "policy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
