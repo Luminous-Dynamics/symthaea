@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
 jobs:
   qualify:
     runs-on: ubuntu-latest
@@ -43,8 +47,6 @@ jobs:
           grep -q 'declaration_identity=blake3_explicit_complete_relation_body_plus_provenance' "$production"
           grep -q 'declaration_provenance_is_not_truth_or_epistemic_authority' "$production"
 
-          # Identity must bind the complete validated relation body and explicit
-          # declarer provenance under stable semantic tags.
           for field in \
             provenance_schema_version \
             declarer_id \
@@ -84,15 +86,11 @@ jobs:
             grep -q "\"$relation\"" "$production"
           done
 
-          # Serializer/debug/Rust Hash layout must not define canonical identity.
-          # Integer casts used only for explicit length-prefix encoding are fine;
-          # semantic enum identity is frozen above by explicit string tags.
           if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
             echo 'Relation declaration identity acquired incidental serialization or Rust-layout semantics.' >&2
             exit 1
           fi
 
-          # Provenance bookkeeping must not grant a downstream authority token.
           if grep -Eqi 'AdmittedCognitiveEvidence|CanonicalBelief|QualifiedEpistemicState|global.?workspace|action_author|external_effect|self.?improvement.*promotion|\.authorize[[:space:]]*\(' "$production"; then
             echo 'Relation declaration provenance crossed an epistemic/action authority boundary.' >&2
             exit 1

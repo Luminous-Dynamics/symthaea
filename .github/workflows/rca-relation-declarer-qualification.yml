@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
 jobs:
   qualify:
     runs-on: ubuntu-latest
@@ -48,15 +52,11 @@ jobs:
           grep -q 'eligibility_requires_exact_declaration_subject_version_method_join' "$production"
           grep -q 'eligible_result=is_issued_private_non_deserializable_capability' "$production"
           grep -q 'persistence_does_not_recreate_current_eligibility' "$production"
-
-          # Qualification and eligibility are distinct semantic profiles, not the
-          # same contract hashed under two labels.
           grep -q 'relation_declarer_qualification_profile_digest_v1' "$production"
           grep -q 'RELATION_DECLARER_QUALIFICATION_CONTRACT_V1.as_bytes()' "$production"
           grep -q 'relation_declaration_eligibility_profile_digest_v1' "$production"
           grep -q 'RELATION_DECLARATION_ELIGIBILITY_CONTRACT_V1.as_bytes()' "$production"
 
-          # V1 qualification must bind the complete use-specific field surface.
           for field in \
             subject_declarer_id \
             subject_declarer_version \
@@ -79,14 +79,8 @@ jobs:
           grep -q 'ShadowRuntimeDisposition' "$production"
           grep -q 'SupersedesNotDispositionRelation' "$production"
           grep -q 'sort_by_key' "$production"
-
-          # Direct self-signing is structurally rejected. This intentionally does
-          # not claim organizational or causal independence.
           grep -q 'value.qualifier_id == value.subject_declarer_id' "$production"
           grep -q 'SelfQualification' "$production"
-
-          # Registered qualification is persistable/revalidated, but current
-          # eligibility is an issued capability and must not be deserializable.
           grep -q 'pub struct RegisteredRelationDeclarerQualificationV1' "$production"
           grep -q 'pub struct DispositionEligibleRelationDeclarationV1' "$production"
           grep -q 'pub fn profile_contract_digest(&self)' "$production"
@@ -95,7 +89,6 @@ jobs:
             exit 1
           fi
 
-          # No canonical belief/action/promotion authority may enter this layer.
           if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|AdmittedCognitiveEvidence|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$production"; then
             echo 'Relation qualification crossed a downstream authority boundary.' >&2
             exit 1
@@ -119,7 +112,6 @@ jobs:
           grep -q '!record.allowed_relation_kinds.contains(&relation.relation)' "$production"
           grep -q 'context_raw.now_unix_ms < record.qualified_at_unix_ms' "$production"
           grep -q 'context_raw.now_unix_ms > record.valid_until_unix_ms' "$production"
-
           grep -q 'declaration_id' "$production"
           grep -q 'qualification_id' "$production"
           grep -q 'context_commitment' "$production"
