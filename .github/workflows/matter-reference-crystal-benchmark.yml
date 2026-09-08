@@ -1,0 +1,101 @@
+name: Matter Reference Crystal Benchmark Protocol
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_reference_crystal_benchmark.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-reference-crystal-benchmark.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "511d8337acb890fefc320b414798d3ac6684aa93"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-reference-crystal-benchmark.yml
+          src/knowledge/matter_reference_crystal_benchmark.rs
+          src/knowledge/mod.rs
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates scripts || true)"
+
+      - name: Ratchet execution-only authority ceiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_reference_crystal_benchmark.rs
+          grep -q 'ExecutionReferenceOnly' "$f"
+          grep -q 'WithheldByProtocol' "$f"
+          grep -q 'RestrictedDiagnostic' "$f"
+          grep -q 'restricted_phase_set_cannot_upgrade_benchmark_authority' "$f"
+          ! grep -q 'ThermodynamicHullQualified' "$f"
+          ! grep -q 'ExperimentallyValidated' "$f"
+
+      - name: Ratchet frozen numerical protocol
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_reference_crystal_benchmark.rs
+          grep -q 'energy_tolerance_ev_per_atom_bits' "$f"
+          grep -q 'force_tolerance_ev_per_angstrom_bits' "$f"
+          grep -q 'minimum_cutoff_samples' "$f"
+          grep -q 'minimum_kpoint_samples' "$f"
+          grep -q 'MIN_CONVERGENCE_SAMPLES' "$f"
+          grep -q 'phonon_q_grid' "$f"
+          grep -q 'phonon_q_shift_fractional_bits' "$f"
+          grep -q 'q_coordinate_tolerance_bits' "$f"
+          grep -q 'imaginary_frequency_tolerance_bits' "$f"
+          grep -q 'TargetAtomicNumbersNotStrictlyIncreasing' "$f"
+
+      - name: Ratchet fixed versus variable cell criteria
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_reference_crystal_benchmark.rs
+          grep -q 'RelaxationCellMode::FixedCell' "$f"
+          grep -q 'RelaxationCellMode::VariableCell' "$f"
+          grep -q 'MissingVariableCellStressTolerance' "$f"
+          grep -q 'MissingVariableCellChangeTolerance' "$f"
+          grep -q 'MissingVariableCellStressCriterion' "$f"
+          grep -q 'MissingVariableCellChangeCriterion' "$f"
+
+      - name: Ratchet canonical evidence roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_reference_crystal_benchmark.rs
+          grep -q 'EvidenceRole::ArtifactContent' "$f"
+          grep -q 'EvidenceRole::Preregistration' "$f"
+          grep -q 'EvidenceRole::ImplementationSnapshot' "$f"
+          grep -q 'EvidenceRole::DependencySnapshot' "$f"
+          grep -q 'CoreSemanticContentAlias' "$f"
+          grep -q 'LocallyValidatedDeclaredPreregistrationV1' "$f"
+          grep -q 'ReferenceOnly' "$f"
+
+      - name: Ratchet explicit phonon post-processing requirement
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_reference_crystal_benchmark.rs
+          grep -q 'ExplicitPostprocessingExecutionRequired' "$f"
+          grep -q 'DFPT dynamical matrices' "$f"
+          ! grep -q 'ph.x alone.*complete' "$f"
+
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Focused regression tests
+        run: cargo test --locked matter_reference_crystal_benchmark --lib
