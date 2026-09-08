@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/hak/provider-bound-check-evidence-v1.schema.json",
+  "title": "HAK Provider-Bound Check Evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "assurance_class",
+    "subject",
+    "plan",
+    "qualification_receipt",
+    "execution",
+    "obligation",
+    "provider_binding",
+    "collected_by",
+    "observed_at",
+    "evidence_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "hak.provider-bound-check-evidence.v1"},
+    "evidence_id": {"type": "string", "minLength": 1},
+    "assurance_class": {"const": "ProviderBound"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit_sha"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_ref", "plan_digest"],
+      "properties": {
+        "plan_ref": {"type": "string", "minLength": 1},
+        "plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "qualification_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_id", "receipt_digest"],
+      "properties": {
+        "receipt_id": {"type": "string", "minLength": 1},
+        "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "run_id", "run_attempt", "workflow_id", "workflow_path"],
+      "properties": {
+        "provider": {"const": "github-actions"},
+        "run_id": {"type": "integer", "minimum": 1},
+        "run_attempt": {"type": "integer", "minimum": 1},
+        "workflow_id": {"type": "integer", "minimum": 1},
+        "workflow_path": {"type": "string", "minLength": 1}
+      }
+    },
+    "obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"enum": ["RequiredCheck", "NegativeCase"]},
+        "id": {"type": "string", "minLength": 1}
+      }
+    },
+    "provider_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "job_id", "job_name", "job_status", "job_conclusion",
+        "step_number", "step_name", "step_status", "step_conclusion",
+        "provider_job_ref"
+      ],
+      "properties": {
+        "job_id": {"type": "integer", "minimum": 1},
+        "job_name": {"type": "string", "minLength": 1},
+        "job_status": {"const": "completed"},
+        "job_conclusion": {
+          "enum": ["success", "failure", "cancelled", "timed_out", "action_required", "neutral", "skipped", "stale", "startup_failure"]
+        },
+        "step_number": {"type": "integer", "minimum": 1},
+        "step_name": {"type": "string", "minLength": 1},
+        "step_status": {"const": "completed"},
+        "step_conclusion": {
+          "enum": ["success", "failure", "cancelled", "timed_out", "action_required", "neutral", "skipped", "stale", "startup_failure"]
+        },
+        "provider_job_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "collected_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "method"],
+      "properties": {
+        "identity": {"type": "string", "minLength": 1},
+        "method": {"type": "string", "minLength": 1}
+      }
+    },
+    "observed_at": {"type": "string", "format": "date-time"},
+    "evidence_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

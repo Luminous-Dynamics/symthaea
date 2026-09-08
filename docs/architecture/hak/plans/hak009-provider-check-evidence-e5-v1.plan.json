@@ -1,0 +1,81 @@
+{
+  "schema_version": "hak.qualification-plan.v1",
+  "plan_id": "hak009-provider-check-evidence-e5-v1",
+  "plan_kind": "SelfDeclaredPlan",
+  "scope": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "subject_kind": "git-commit",
+    "workflow_path": ".github/workflows/hak-check-evidence.yml"
+  },
+  "claims": [
+    {
+      "claim_id": "HAK009-JOIN-001",
+      "statement": "The audit-only HAK-009 linter rejects provider-bound check evidence whose subject, plan, terminal receipt, execution run/attempt, workflow, plan obligation, or provider job identity/metadata drifts from the exact source lineage.",
+      "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK009-CONSUME-001",
+      "statement": "Strict conformance consumption requires every Passed required check and negative case to reference an exact digest-bound ProviderBound evidence record with successful provider job and step conclusions.",
+      "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK009-NEGATIVE-001",
+      "statement": "A provider-bound record with a terminal failure remains structurally valid negative execution evidence and is not rewritten as missing evidence.",
+      "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK009-CLASS-001",
+      "statement": "HAK-009 tooling preserves the distinction between ProviderBound records and stronger cryptographically attested bundles; this tranche does not label ordinary provider metadata as cryptographically attested.",
+      "target_tier": "E5"
+    }
+  ],
+  "required_checks": [
+    {
+      "check_id": "exact-head",
+      "description": "Resolve, checkout, and assert the exact PR head."
+    },
+    {
+      "check_id": "compile",
+      "description": "Compile inherited HAK evidence/interpretation tooling and scripts/hak_check_evidence_lint.py under Python 3.12."
+    },
+    {
+      "check_id": "plan-lint",
+      "description": "Lint the HAK-009 machine-readable qualification plan."
+    },
+    {
+      "check_id": "schema-validation",
+      "description": "Validate HAK-009 schema syntax and representative documents with Draft 2020-12 jsonschema."
+    },
+    {
+      "check_id": "regressions",
+      "description": "Run focused HAK-009 linter and schema regression suites."
+    }
+  ],
+  "required_negative_cases": [
+    "provider-bound subject mismatch",
+    "provider-bound run-attempt mismatch",
+    "unknown plan obligation",
+    "provider-bound plan-digest mismatch",
+    "provider-bound receipt-digest mismatch",
+    "provider job reference mismatch",
+    "provider job missing from terminal qualification receipt",
+    "provider job metadata mismatch with terminal qualification receipt",
+    "provider-bound evidence digest tampering",
+    "Passed conformance without provider-bound evidence",
+    "Passed conformance with detached evidence reference",
+    "schema accepts non-ProviderBound assurance class",
+    "schema accepts missing qualification receipt digest",
+    "schema accepts nonterminal provider step"
+  ],
+  "provider_policy": {
+    "allowed_providers": ["github-actions"],
+    "exact_head_required": true
+  },
+  "independence": {
+    "plan_authority": "self-declared by subject repository",
+    "execution_provider": "GitHub Actions hosted runner",
+    "claim_interpretation": "limited to HAK-009 tooling behavior; provider cryptographic authenticity is explicitly outside these claims"
+  },
+  "evidence_target": "E5",
+  "supersedes_plan_ref": null
+}
