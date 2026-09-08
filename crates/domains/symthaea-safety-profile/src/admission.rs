@@ -16,21 +16,82 @@ use crate::{SafetyConfigurationProfile, SafetyConfigurationProfileError};
 use symthaea_safety_configuration::ConfigurationDigest;
 use thiserror::Error;
 
+/// Exact identity of one admitted authorization head.
+///
+/// All fields are private and the only production constructor derives them from
+/// one validated [`SafetyProfileAuthorizationTransition`]. Callers therefore
+/// cannot pair the generation from one transition with the digest or authority
+/// identity from another and present that inconsistent tuple as local state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SafetyProfileAuthorizationHeadIdentity {
+    generation: u64,
+    transition_digest: SafetyProfileAuthorizationTransitionDigest,
+    subject_node_id: String,
+    authority_root_id: String,
+    authority_root_digest: ProfileAuthorityRootDigest,
+}
+
+impl SafetyProfileAuthorizationHeadIdentity {
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    pub fn transition_digest(&self) -> SafetyProfileAuthorizationTransitionDigest {
+        self.transition_digest
+    }
+
+    pub fn subject_node_id(&self) -> &str {
+        &self.subject_node_id
+    }
+
+    pub fn authority_root_id(&self) -> &str {
+        &self.authority_root_id
+    }
+
+    pub fn authority_root_digest(&self) -> ProfileAuthorityRootDigest {
+        self.authority_root_digest
+    }
+}
+
 /// Exact persisted authorization head observed before evaluating a candidate.
 ///
 /// A generation number alone is insufficient because two conflicting transitions
-/// can share the same generation. Runtime state therefore carries the exact digest
-/// of the currently admitted transition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// can share the same generation. A current head therefore carries one derived,
+/// internally consistent transition identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SafetyProfileAuthorizationHead {
     /// Trusted authority root is provisioned, but no profile authorization has
     /// been admitted yet. Only a generation-1 Bootstrap transition can enter.
     Uninitialized,
-    /// Exact currently admitted transition.
-    Current {
-        generation: u64,
-        transition_digest: SafetyProfileAuthorizationTransitionDigest,
-    },
+    /// Exact currently admitted transition identity.
+    Current(SafetyProfileAuthorizationHeadIdentity),
+}
+
+impl SafetyProfileAuthorizationHead {
+    /// Derive a current-head identity from one exact validated transition.
+    ///
+    /// This is intentionally the only production path to `Current`: runtime code
+    /// must not synthesize generation/digest/root metadata independently.
+    pub fn from_transition(
+        transition: &SafetyProfileAuthorizationTransition,
+    ) -> Result<Self, SafetyProfileAuthorizationTransitionError> {
+        transition.validate()?;
+        let subject = transition.subject();
+        Ok(Self::Current(SafetyProfileAuthorizationHeadIdentity {
+            generation: transition.generation(),
+            transition_digest: transition.transition_digest()?,
+            subject_node_id: subject.subject_node_id().to_owned(),
+            authority_root_id: subject.authority_root_id().to_owned(),
+            authority_root_digest: subject.authority_root_digest(),
+        }))
+    }
+
+    pub fn identity(&self) -> Option<&SafetyProfileAuthorizationHeadIdentity> {
+        match self {
+            Self::Uninitialized => None,
+            Self::Current(identity) => Some(identity),
+        }
+    }
 }
 
 /// Trusted local policy inputs for authorization admission.
@@ -51,6 +112,23 @@ impl SafetyProfileAuthorizationAdmissionPolicy {
         if expected_subject_node_id.trim().is_empty() {
             return Err(SafetyProfileAuthorizationAdmissionError::EmptyExpectedNodeId);
         }
+
+        if let Some(identity) = current_head.identity() {
+            if identity.subject_node_id() != expected_subject_node_id {
+                return Err(
+                    SafetyProfileAuthorizationAdmissionError::PersistedHeadNodeMismatch {
+                        expected: expected_subject_node_id,
+                        observed: identity.subject_node_id().to_owned(),
+                    },
+                );
+            }
+            if identity.authority_root_digest() != trusted_authority_root_digest {
+                return Err(
+                    SafetyProfileAuthorizationAdmissionError::PersistedHeadAuthorityRootMismatch,
+                );
+            }
+        }
+
         Ok(Self {
             expected_subject_node_id,
             trusted_authority_root_digest,
@@ -66,8 +144,8 @@ impl SafetyProfileAuthorizationAdmissionPolicy {
         self.trusted_authority_root_digest
     }
 
-    pub fn current_head(&self) -> SafetyProfileAuthorizationHead {
-        self.current_head
+    pub fn current_head(&self) -> &SafetyProfileAuthorizationHead {
+        &self.current_head
     }
 
     /// Check one transition against exact local state and the exact profile artifact
@@ -115,7 +193,7 @@ impl SafetyProfileAuthorizationAdmissionPolicy {
             });
         }
 
-        match self.current_head {
+        match &self.current_head {
             SafetyProfileAuthorizationHead::Uninitialized => {
                 if transition.generation() != 1
                     || transition.predecessor()
@@ -127,32 +205,39 @@ impl SafetyProfileAuthorizationAdmissionPolicy {
                     });
                 }
             }
-            SafetyProfileAuthorizationHead::Current {
-                generation,
-                transition_digest,
-            } => {
-                let expected_generation = generation.checked_add(1).ok_or(
+            SafetyProfileAuthorizationHead::Current(identity) => {
+                let expected_generation = identity.generation().checked_add(1).ok_or(
                     SafetyProfileAuthorizationAdmissionError::GenerationExhausted {
-                        current: generation,
+                        current: identity.generation(),
                     },
                 )?;
                 if transition.generation() != expected_generation {
                     return Err(
                         SafetyProfileAuthorizationAdmissionError::GenerationNotSuccessor {
-                            current: generation,
+                            current: identity.generation(),
                             expected: expected_generation,
                             observed: transition.generation(),
                         },
                     );
                 }
 
-                let expected_predecessor =
-                    SafetyProfileAuthorizationPredecessor::Previous(transition_digest);
+                let expected_predecessor = SafetyProfileAuthorizationPredecessor::Previous(
+                    identity.transition_digest(),
+                );
                 if transition.predecessor() != expected_predecessor {
                     return Err(
                         SafetyProfileAuthorizationAdmissionError::PredecessorHeadMismatch {
                             expected: expected_predecessor,
                             observed: transition.predecessor(),
+                        },
+                    );
+                }
+
+                if subject.authority_root_id() != identity.authority_root_id() {
+                    return Err(
+                        SafetyProfileAuthorizationAdmissionError::AuthorityRootIdMismatch {
+                            expected: identity.authority_root_id().to_owned(),
+                            observed: subject.authority_root_id().to_owned(),
                         },
                     );
                 }
@@ -174,14 +259,14 @@ impl SafetyProfileAuthorizationAdmissionPolicy {
         }
 
         let canonical_transition_bytes = transition.canonical_signing_bytes()?;
-        let candidate_digest = transition.transition_digest()?;
+        let candidate_head = SafetyProfileAuthorizationHead::from_transition(transition)?;
 
         Ok(PolicyCheckedSafetyProfileAuthorization {
             transition: transition.clone(),
             profile: profile.clone(),
             canonical_transition_bytes,
-            expected_predecessor_head: self.current_head,
-            candidate_digest,
+            expected_predecessor_head: self.current_head.clone(),
+            candidate_head,
         })
     }
 }
@@ -198,7 +283,7 @@ pub struct PolicyCheckedSafetyProfileAuthorization {
     profile: SafetyConfigurationProfile,
     canonical_transition_bytes: Vec<u8>,
     expected_predecessor_head: SafetyProfileAuthorizationHead,
-    candidate_digest: SafetyProfileAuthorizationTransitionDigest,
+    candidate_head: SafetyProfileAuthorizationHead,
 }
 
 impl PolicyCheckedSafetyProfileAuthorization {
@@ -217,12 +302,13 @@ impl PolicyCheckedSafetyProfileAuthorization {
     /// Exact head that must still be current at commit time. A persistent registry
     /// should compare-and-swap this value rather than performing a separate
     /// unchecked read followed by a write.
-    pub fn expected_predecessor_head(&self) -> SafetyProfileAuthorizationHead {
-        self.expected_predecessor_head
+    pub fn expected_predecessor_head(&self) -> &SafetyProfileAuthorizationHead {
+        &self.expected_predecessor_head
     }
 
-    pub fn candidate_digest(&self) -> SafetyProfileAuthorizationTransitionDigest {
-        self.candidate_digest
+    /// Complete candidate head derived from the exact checked transition.
+    pub fn candidate_head(&self) -> &SafetyProfileAuthorizationHead {
+        &self.candidate_head
     }
 
     pub fn candidate_generation(&self) -> u64 {
@@ -238,10 +324,16 @@ pub enum SafetyProfileAuthorizationAdmissionError {
     Profile(#[from] SafetyConfigurationProfileError),
     #[error("expected safety-profile authorization node id must not be empty")]
     EmptyExpectedNodeId,
+    #[error("persisted safety-profile authorization head belongs to node {observed}, expected {expected}")]
+    PersistedHeadNodeMismatch { expected: String, observed: String },
+    #[error("persisted safety-profile authorization head does not use the externally trusted root")]
+    PersistedHeadAuthorityRootMismatch,
     #[error("safety-profile authorization node mismatch: expected {expected}, observed {observed}")]
     SubjectNodeMismatch { expected: String, observed: String },
     #[error("safety-profile authorization root does not match externally trusted root")]
     TrustedAuthorityRootMismatch,
+    #[error("safety-profile authorization root id mismatch with persisted lineage: expected {expected}, observed {observed}")]
+    AuthorityRootIdMismatch { expected: String, observed: String },
     #[error("safety-profile authorization is not yet valid: now {now_unix_ms}, valid from {valid_from_unix_ms}")]
     NotYetValid {
         now_unix_ms: i64,
@@ -326,7 +418,10 @@ mod tests {
         .unwrap()
     }
 
-    fn bootstrap(id: &str, profile: &SafetyConfigurationProfile) -> SafetyProfileAuthorizationTransition {
+    fn bootstrap(
+        id: &str,
+        profile: &SafetyConfigurationProfile,
+    ) -> SafetyProfileAuthorizationTransition {
         SafetyProfileAuthorizationTransition::bootstrap(subject(
             id,
             1,
@@ -337,8 +432,30 @@ mod tests {
         .unwrap()
     }
 
-    fn policy(head: SafetyProfileAuthorizationHead) -> SafetyProfileAuthorizationAdmissionPolicy {
+    fn current_head(
+        transition: &SafetyProfileAuthorizationTransition,
+    ) -> SafetyProfileAuthorizationHead {
+        SafetyProfileAuthorizationHead::from_transition(transition).unwrap()
+    }
+
+    fn policy(
+        head: SafetyProfileAuthorizationHead,
+    ) -> SafetyProfileAuthorizationAdmissionPolicy {
         SafetyProfileAuthorizationAdmissionPolicy::new("compute-campus", root(0x33), head).unwrap()
+    }
+
+    #[test]
+    fn current_head_identity_is_derived_from_one_exact_transition() {
+        let profile = profile();
+        let transition = bootstrap("auth-1", &profile);
+        let head = current_head(&transition);
+        let identity = head.identity().unwrap();
+
+        assert_eq!(identity.generation(), 1);
+        assert_eq!(identity.transition_digest(), transition.transition_digest().unwrap());
+        assert_eq!(identity.subject_node_id(), "compute-campus");
+        assert_eq!(identity.authority_root_id(), "facility-profile-root-v1");
+        assert_eq!(identity.authority_root_digest(), root(0x33));
     }
 
     #[test]
@@ -351,10 +468,10 @@ mod tests {
 
         assert_eq!(
             checked.expected_predecessor_head(),
-            SafetyProfileAuthorizationHead::Uninitialized
+            &SafetyProfileAuthorizationHead::Uninitialized
         );
         assert_eq!(checked.candidate_generation(), 1);
-        assert_eq!(checked.candidate_digest(), transition.transition_digest().unwrap());
+        assert_eq!(checked.candidate_head(), &current_head(&transition));
         assert_eq!(
             checked.canonical_transition_bytes(),
             transition.canonical_signing_bytes().unwrap()
@@ -377,54 +494,62 @@ mod tests {
         )
         .unwrap();
 
-        let exact_head = SafetyProfileAuthorizationHead::Current {
-            generation: 1,
-            transition_digest: head_a.transition_digest().unwrap(),
-        };
-        policy(exact_head)
+        policy(current_head(&head_a))
             .check(1_500, &candidate, &profile)
             .unwrap();
 
-        let conflicting_head = SafetyProfileAuthorizationHead::Current {
-            generation: 1,
-            transition_digest: head_b.transition_digest().unwrap(),
-        };
         assert!(matches!(
-            policy(conflicting_head).check(1_500, &candidate, &profile),
+            policy(current_head(&head_b)).check(1_500, &candidate, &profile),
             Err(SafetyProfileAuthorizationAdmissionError::PredecessorHeadMismatch { .. })
         ));
     }
 
     #[test]
-    fn replay_or_generation_gap_is_rejected_even_with_correct_root() {
+    fn policy_constructor_rejects_head_from_different_node_or_root() {
         let profile = profile();
-        let head = bootstrap("auth-1", &profile);
-        let head_state = SafetyProfileAuthorizationHead::Current {
-            generation: 1,
-            transition_digest: head.transition_digest().unwrap(),
-        };
-
-        let replay = bootstrap("auth-replay", &profile);
+        let other_node = SafetyProfileAuthorizationTransition::bootstrap(subject(
+            "other-node-auth",
+            1,
+            root(0x33),
+            "other-node",
+            &profile,
+        ))
+        .unwrap();
         assert!(matches!(
-            policy(head_state).check(1_500, &replay, &profile),
-            Err(SafetyProfileAuthorizationAdmissionError::GenerationNotSuccessor { .. })
+            SafetyProfileAuthorizationAdmissionPolicy::new(
+                "compute-campus",
+                root(0x33),
+                current_head(&other_node),
+            ),
+            Err(SafetyProfileAuthorizationAdmissionError::PersistedHeadNodeMismatch { .. })
         ));
 
-        // This transition is structurally valid by itself (non-bootstrap generation
-        // with a previous digest) only if constructed from a real predecessor. Build
-        // generation 2 first, then evaluate it against a head claiming generation 0
-        // to prove local generation state remains authoritative.
-        let generation_two = SafetyProfileAuthorizationTransition::successor(
-            subject("auth-2", 2, root(0x33), "compute-campus", &profile),
-            &head,
-        )
+        let other_root = SafetyProfileAuthorizationTransition::bootstrap(subject(
+            "other-root-auth",
+            1,
+            root(0x44),
+            "compute-campus",
+            &profile,
+        ))
         .unwrap();
-        let wrong_generation_head = SafetyProfileAuthorizationHead::Current {
-            generation: 0,
-            transition_digest: head.transition_digest().unwrap(),
-        };
+        assert_eq!(
+            SafetyProfileAuthorizationAdmissionPolicy::new(
+                "compute-campus",
+                root(0x33),
+                current_head(&other_root),
+            ),
+            Err(SafetyProfileAuthorizationAdmissionError::PersistedHeadAuthorityRootMismatch)
+        );
+    }
+
+    #[test]
+    fn replay_is_rejected_even_with_correct_root() {
+        let profile = profile();
+        let head = bootstrap("auth-1", &profile);
+        let replay = bootstrap("auth-replay", &profile);
+
         assert!(matches!(
-            policy(wrong_generation_head).check(1_500, &generation_two, &profile),
+            policy(current_head(&head)).check(1_500, &replay, &profile),
             Err(SafetyProfileAuthorizationAdmissionError::GenerationNotSuccessor { .. })
         ));
     }
@@ -475,16 +600,41 @@ mod tests {
     }
 
     #[test]
+    fn candidate_head_is_bound_to_checked_transition() {
+        let profile = profile();
+        let first = bootstrap("auth-1", &profile);
+        let second = SafetyProfileAuthorizationTransition::successor(
+            subject("auth-2", 2, root(0x33), "compute-campus", &profile),
+            &first,
+        )
+        .unwrap();
+
+        let checked = policy(current_head(&first))
+            .check(1_500, &second, &profile)
+            .unwrap();
+        assert_eq!(checked.candidate_head(), &current_head(&second));
+        assert_eq!(
+            checked.expected_predecessor_head(),
+            &current_head(&first)
+        );
+    }
+
+    #[test]
     fn generation_overflow_fails_closed() {
         let profile = profile();
-        let head = SafetyProfileAuthorizationHead::Current {
-            generation: u64::MAX,
-            transition_digest: SafetyProfileAuthorizationTransitionDigest::Blake3_256([0x55; 32]),
-        };
         let transition = bootstrap("auth-1", &profile);
+        let forged_for_boundary_test = SafetyProfileAuthorizationHead::Current(
+            SafetyProfileAuthorizationHeadIdentity {
+                generation: u64::MAX,
+                transition_digest: transition.transition_digest().unwrap(),
+                subject_node_id: "compute-campus".to_owned(),
+                authority_root_id: "facility-profile-root-v1".to_owned(),
+                authority_root_digest: root(0x33),
+            },
+        );
 
         assert_eq!(
-            policy(head).check(1_500, &transition, &profile),
+            policy(forged_for_boundary_test).check(1_500, &transition, &profile),
             Err(SafetyProfileAuthorizationAdmissionError::GenerationExhausted {
                 current: u64::MAX,
             })
