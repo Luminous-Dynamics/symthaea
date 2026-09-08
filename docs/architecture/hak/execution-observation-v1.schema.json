@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/hak/execution-observation-v1.schema.json",
+  "title": "HAK Execution Observation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation_id",
+    "subject",
+    "qualification_plan",
+    "execution",
+    "observation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hak.execution-observation.v1"
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit_sha"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "base_commit_sha": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "branch": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "qualification_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_kind", "plan_ref"],
+      "properties": {
+        "plan_kind": {
+          "enum": ["SelfDeclaredPlan", "IndependentPlan", "ProviderEnforcedPlan"]
+        },
+        "plan_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plan_digest": {
+          "type": ["string", "null"]
+        },
+        "precommit_status": {
+          "enum": ["KnownPrecommitted", "NotEstablished", "NotApplicable"]
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "run_id",
+        "run_attempt",
+        "workflow_id",
+        "workflow_name",
+        "workflow_path",
+        "event"
+      ],
+      "properties": {
+        "provider": {
+          "const": "github-actions"
+        },
+        "run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "workflow_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "workflow_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workflow_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider_record_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "conclusion", "provider_created_at", "provider_updated_at"],
+      "properties": {
+        "status": {
+          "enum": ["queued", "in_progress", "waiting", "requested"]
+        },
+        "conclusion": {
+          "type": "null"
+        },
+        "provider_created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "provider_updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "provider_started_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "terminal_receipt_exists": {
+          "const": false
+        },
+        "e5_qualified": {
+          "const": false
+        }
+      }
+    }
+  }
+}
