@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 pub mod actuation;
+pub mod capability_envelope;
 pub mod centroidal;
 pub mod contact;
 pub mod contact_inverse_dynamics;
@@ -61,6 +62,7 @@ pub mod types;
 pub mod vision_terrain;
 pub mod whole_body;
 pub use actuation::*;
+pub use capability_envelope::*;
 pub use centroidal::*;
 pub use contact_inverse_dynamics::*;
 pub use control_budget::*;
