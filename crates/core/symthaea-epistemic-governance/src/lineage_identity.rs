@@ -6,11 +6,13 @@
 //!
 //! `EvidenceLineageGraphV1::graph_id` is a legacy producer-supplied wire label.
 //! It is validated only for digest shape and MUST NOT be used as governance
-//! identity. This module derives identity from the validated graph contents while
-//! explicitly excluding that legacy label.
+//! identity. This module derives identity directly from typed validated graph
+//! semantics and explicitly excludes serde/wire representation from authority.
 
-use crate::lineage::ValidatedEvidenceLineageGraphV1;
-use serde_json::Value;
+use crate::lineage::{
+    CognitiveDerivationKindV1, ValidatedEvidenceLineageGraphV1,
+    COGNITIVE_LINEAGE_SCHEMA_VERSION,
+};
 
 pub const CANONICAL_EVIDENCE_LINEAGE_IDENTITY_SCHEMA_VERSION: u16 = 1;
 pub const CANONICAL_EVIDENCE_LINEAGE_IDENTITY_PROFILE_V1: &str =
@@ -19,12 +21,14 @@ pub const CANONICAL_EVIDENCE_LINEAGE_IDENTITY_PROFILE_V1: &str =
 pub const CANONICAL_EVIDENCE_LINEAGE_IDENTITY_CONTRACT_V1: &str = concat!(
     "rca-canonical-evidence-lineage-identity-v1\n",
     "input=validated_evidence_lineage_graph_v1\n",
+    "identity_source=typed_validated_semantics_not_serde_wire_projection\n",
     "legacy_wire_graph_id_is_explicitly_excluded_from_governance_identity\n",
     "identity_fields=graph_schema+node_schema+evidence_id+sorted_parent_ids+explicit_derivation_kind_tag\n",
     "node_input_order_does_not_change_identity\n",
     "parent_input_order_does_not_change_identity\n",
     "unrelated_node_addition_changes_identity\n",
     "derivation_or_parent_change_changes_identity\n",
+    "canonical_identity_derivation_is_infallible_after_validation\n",
     "identity=blake3_explicit_semantic_tree_v1\n",
     "canonical_lineage_identity_is_not_evidence_independence_or_downstream_authority\n",
 );
@@ -34,10 +38,9 @@ const GRAPH_ID_DOMAIN: &[u8] = b"symthaea:rca-canonical-evidence-lineage-graph:v
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CanonicalNodeV1 {
-    schema_version: u16,
     evidence_id: String,
     parent_ids: Vec<String>,
-    derivation_kind_tag: String,
+    derivation_kind: CognitiveDerivationKindV1,
 }
 
 pub fn canonical_evidence_lineage_identity_profile_digest_v1() -> String {
@@ -47,60 +50,28 @@ pub fn canonical_evidence_lineage_identity_profile_digest_v1() -> String {
     )
 }
 
-/// Derive a serializer-order-independent governance identity from a validated
-/// lineage graph. `graph_id` from the wire object is deliberately ignored.
+/// Derive a serializer-independent governance identity directly from one
+/// validated lineage graph. The producer-supplied wire `graph_id` is ignored.
+///
+/// Validation has already established the graph/node schema, digest shapes,
+/// closed ancestry, unique evidence ids, unique parents, and acyclicity. Identity
+/// derivation therefore has no remaining fallible wire-projection step.
 pub fn canonical_evidence_lineage_graph_id_v1(
     graph: &ValidatedEvidenceLineageGraphV1,
-) -> Result<String, CanonicalLineageIdentityError> {
-    let value = serde_json::to_value(graph)
-        .map_err(|error| CanonicalLineageIdentityError::Serialization(error.to_string()))?;
-    let object = value
-        .as_object()
-        .ok_or(CanonicalLineageIdentityError::UnexpectedWireShape("graph_object"))?;
-
-    let graph_schema = u16_field(object.get("schema_version"), "schema_version")?;
-    let nodes_value = object
-        .get("nodes")
-        .and_then(Value::as_array)
-        .ok_or(CanonicalLineageIdentityError::UnexpectedWireShape("nodes"))?;
-
-    let mut nodes = Vec::with_capacity(nodes_value.len());
-    for node_value in nodes_value {
-        let node = node_value
-            .as_object()
-            .ok_or(CanonicalLineageIdentityError::UnexpectedWireShape("node"))?;
-        let schema_version = u16_field(node.get("schema_version"), "node.schema_version")?;
-        let evidence_id = text_field(node.get("evidence_id"), "node.evidence_id")?.to_string();
-        let derivation_kind_tag =
-            text_field(node.get("derivation_kind"), "node.derivation_kind")?.to_string();
-        validate_derivation_tag(&derivation_kind_tag)?;
-
-        let parent_values = node
-            .get("parent_ids")
-            .and_then(Value::as_array)
-            .ok_or(CanonicalLineageIdentityError::UnexpectedWireShape(
-                "node.parent_ids",
-            ))?;
-        let mut parent_ids = parent_values
-            .iter()
-            .map(|value| {
-                value
-                    .as_str()
-                    .map(str::to_string)
-                    .ok_or(CanonicalLineageIdentityError::UnexpectedWireShape(
-                        "node.parent_id",
-                    ))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        parent_ids.sort();
-
-        nodes.push(CanonicalNodeV1 {
-            schema_version,
-            evidence_id,
-            parent_ids,
-            derivation_kind_tag,
-        });
-    }
+) -> String {
+    let mut nodes = graph
+        .nodes()
+        .iter()
+        .map(|node| {
+            let mut parent_ids = node.parent_ids().to_vec();
+            parent_ids.sort();
+            CanonicalNodeV1 {
+                evidence_id: node.evidence_id().to_string(),
+                parent_ids,
+                derivation_kind: node.derivation_kind(),
+            }
+        })
+        .collect::<Vec<_>>();
     nodes.sort_by(|left, right| left.evidence_id.cmp(&right.evidence_id));
 
     let profile_contract_digest = canonical_evidence_lineage_identity_profile_digest_v1();
@@ -119,64 +90,41 @@ pub fn canonical_evidence_lineage_graph_id_v1(
     hash_bytes(
         &mut hasher,
         b"graph_schema_version",
-        &graph_schema.to_le_bytes(),
+        &COGNITIVE_LINEAGE_SCHEMA_VERSION.to_le_bytes(),
     );
     hash_count(&mut hasher, b"node_count", nodes.len());
     for node in &nodes {
         hash_bytes(
             &mut hasher,
             b"node_schema_version",
-            &node.schema_version.to_le_bytes(),
+            &COGNITIVE_LINEAGE_SCHEMA_VERSION.to_le_bytes(),
         );
         hash_text(&mut hasher, b"evidence_id", &node.evidence_id);
         hash_text(
             &mut hasher,
             b"derivation_kind",
-            &node.derivation_kind_tag,
+            derivation_kind_tag(node.derivation_kind),
         );
         hash_count(&mut hasher, b"parent_count", node.parent_ids.len());
         for parent_id in &node.parent_ids {
             hash_text(&mut hasher, b"parent_id", parent_id);
         }
     }
-    Ok(format!("blake3:{}", hasher.finalize().to_hex()))
+    format!("blake3:{}", hasher.finalize().to_hex())
 }
 
-fn validate_derivation_tag(tag: &str) -> Result<(), CanonicalLineageIdentityError> {
-    if matches!(
-        tag,
-        "root_observation"
-            | "retrieval"
-            | "transformation"
-            | "inference"
-            | "simulation"
-            | "summary"
-            | "critique"
-            | "formal_derivation"
-            | "other"
-    ) {
-        Ok(())
-    } else {
-        Err(CanonicalLineageIdentityError::UnexpectedDerivationTag(
-            tag.to_string(),
-        ))
+fn derivation_kind_tag(kind: CognitiveDerivationKindV1) -> &'static str {
+    match kind {
+        CognitiveDerivationKindV1::RootObservation => "root_observation",
+        CognitiveDerivationKindV1::Retrieval => "retrieval",
+        CognitiveDerivationKindV1::Transformation => "transformation",
+        CognitiveDerivationKindV1::Inference => "inference",
+        CognitiveDerivationKindV1::Simulation => "simulation",
+        CognitiveDerivationKindV1::Summary => "summary",
+        CognitiveDerivationKindV1::Critique => "critique",
+        CognitiveDerivationKindV1::FormalDerivation => "formal_derivation",
+        CognitiveDerivationKindV1::Other => "other",
     }
-}
-
-fn u16_field(value: Option<&Value>, field: &'static str) -> Result<u16, CanonicalLineageIdentityError> {
-    let raw = value
-        .and_then(Value::as_u64)
-        .ok_or(CanonicalLineageIdentityError::UnexpectedWireShape(field))?;
-    u16::try_from(raw).map_err(|_| CanonicalLineageIdentityError::UnexpectedWireShape(field))
-}
-
-fn text_field<'a>(
-    value: Option<&'a Value>,
-    field: &'static str,
-) -> Result<&'a str, CanonicalLineageIdentityError> {
-    value
-        .and_then(Value::as_str)
-        .ok_or(CanonicalLineageIdentityError::UnexpectedWireShape(field))
 }
 
 fn hash_count(hasher: &mut blake3::Hasher, label: &[u8], count: usize) {
@@ -202,35 +150,11 @@ fn domain_hash(domain: &[u8], bytes: &[u8]) -> String {
     format!("blake3:{}", hasher.finalize().to_hex())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CanonicalLineageIdentityError {
-    Serialization(String),
-    UnexpectedWireShape(&'static str),
-    UnexpectedDerivationTag(String),
-}
-
-impl std::fmt::Display for CanonicalLineageIdentityError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Serialization(error) => write!(f, "failed to project validated lineage graph: {error}"),
-            Self::UnexpectedWireShape(field) => {
-                write!(f, "validated lineage graph has unexpected wire shape at {field}")
-            }
-            Self::UnexpectedDerivationTag(tag) => {
-                write!(f, "validated lineage graph has unknown derivation tag {tag}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for CanonicalLineageIdentityError {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::lineage::{
-        CognitiveDerivationKindV1, EvidenceLineageGraphV1, EvidenceLineageNodeV1,
-        ValidatedEvidenceLineageNodeV1, COGNITIVE_LINEAGE_SCHEMA_VERSION,
+        EvidenceLineageGraphV1, EvidenceLineageNodeV1, ValidatedEvidenceLineageNodeV1,
     };
 
     const A: &str = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -269,6 +193,46 @@ mod tests {
     }
 
     #[test]
+    fn explicit_derivation_tags_are_stable() {
+        assert_eq!(
+            derivation_kind_tag(CognitiveDerivationKindV1::RootObservation),
+            "root_observation"
+        );
+        assert_eq!(
+            derivation_kind_tag(CognitiveDerivationKindV1::Retrieval),
+            "retrieval"
+        );
+        assert_eq!(
+            derivation_kind_tag(CognitiveDerivationKindV1::Transformation),
+            "transformation"
+        );
+        assert_eq!(
+            derivation_kind_tag(CognitiveDerivationKindV1::Inference),
+            "inference"
+        );
+        assert_eq!(
+            derivation_kind_tag(CognitiveDerivationKindV1::Simulation),
+            "simulation"
+        );
+        assert_eq!(
+            derivation_kind_tag(CognitiveDerivationKindV1::Summary),
+            "summary"
+        );
+        assert_eq!(
+            derivation_kind_tag(CognitiveDerivationKindV1::Critique),
+            "critique"
+        );
+        assert_eq!(
+            derivation_kind_tag(CognitiveDerivationKindV1::FormalDerivation),
+            "formal_derivation"
+        );
+        assert_eq!(
+            derivation_kind_tag(CognitiveDerivationKindV1::Other),
+            "other"
+        );
+    }
+
+    #[test]
     fn legacy_graph_label_does_not_define_canonical_identity() {
         let nodes = vec![
             node(A, &[], CognitiveDerivationKindV1::RootObservation),
@@ -277,8 +241,8 @@ mod tests {
         let first = graph(E, nodes.clone());
         let second = graph(F, nodes);
         assert_eq!(
-            canonical_evidence_lineage_graph_id_v1(&first).unwrap(),
-            canonical_evidence_lineage_graph_id_v1(&second).unwrap()
+            canonical_evidence_lineage_graph_id_v1(&first),
+            canonical_evidence_lineage_graph_id_v1(&second)
         );
     }
 
@@ -301,8 +265,8 @@ mod tests {
             ],
         );
         assert_eq!(
-            canonical_evidence_lineage_graph_id_v1(&first).unwrap(),
-            canonical_evidence_lineage_graph_id_v1(&second).unwrap()
+            canonical_evidence_lineage_graph_id_v1(&first),
+            canonical_evidence_lineage_graph_id_v1(&second)
         );
     }
 
@@ -324,8 +288,8 @@ mod tests {
             ],
         );
         assert_ne!(
-            canonical_evidence_lineage_graph_id_v1(&first).unwrap(),
-            canonical_evidence_lineage_graph_id_v1(&second).unwrap()
+            canonical_evidence_lineage_graph_id_v1(&first),
+            canonical_evidence_lineage_graph_id_v1(&second)
         );
     }
 
@@ -346,8 +310,8 @@ mod tests {
             ],
         );
         assert_ne!(
-            canonical_evidence_lineage_graph_id_v1(&first).unwrap(),
-            canonical_evidence_lineage_graph_id_v1(&second).unwrap()
+            canonical_evidence_lineage_graph_id_v1(&first),
+            canonical_evidence_lineage_graph_id_v1(&second)
         );
     }
 
@@ -370,8 +334,8 @@ mod tests {
             ],
         );
         assert_ne!(
-            canonical_evidence_lineage_graph_id_v1(&first).unwrap(),
-            canonical_evidence_lineage_graph_id_v1(&second).unwrap()
+            canonical_evidence_lineage_graph_id_v1(&first),
+            canonical_evidence_lineage_graph_id_v1(&second)
         );
     }
 }
