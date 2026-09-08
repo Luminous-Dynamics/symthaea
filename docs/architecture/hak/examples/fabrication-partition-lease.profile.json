@@ -1,0 +1,70 @@
+{
+  "schema_version": "hak.conformance-profile.v1",
+  "profile_id": "HAK-CONF-FAB-LEASE-V1",
+  "domain": "symthaea-fabrication-kernel.partition-lease",
+  "implementation_lineage": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit": "2a8b8fd3ab38a9a7fd15dc8ebd98c5e74bbbdfd1"
+  },
+  "policy_lineage": "PartitionLeasePolicy/default@source-snapshot",
+  "obligations": [
+    {
+      "id": "FAB-LEASE-PROV-001",
+      "statement": "AuthorizedPartitionLease construction binds membership, consensus, holder, window, policy, and exact threshold-ceremony payload.",
+      "criticality": "critical",
+      "policy_sensitive": true,
+      "depends_on": [],
+      "status": {
+        "kind": "SourceObserved",
+        "evidence_refs": [
+          "repo://crates/domains/symthaea-fabrication-kernel/src/lease_authority.rs@2a8b8fd3ab38a9a7fd15dc8ebd98c5e74bbbdfd1"
+        ]
+      }
+    },
+    {
+      "id": "FAB-LEASE-CONS-001",
+      "statement": "An overlapping different active lease is rejected by the local lease tracker.",
+      "criticality": "critical",
+      "policy_sensitive": false,
+      "depends_on": ["FAB-LEASE-PROV-001"],
+      "status": {
+        "kind": "TestSourceObserved",
+        "evidence_refs": [
+          "repo://crates/domains/symthaea-fabrication-kernel/src/lease_authority.rs#tracker_rejects_overlapping_different_lease@2a8b8fd3ab38a9a7fd15dc8ebd98c5e74bbbdfd1"
+        ]
+      }
+    },
+    {
+      "id": "FAB-LEASE-EFFECT-001",
+      "statement": "Every effect requiring exclusive partition authority consumes one exact current accepted lease/fence.",
+      "criticality": "critical",
+      "policy_sensitive": true,
+      "depends_on": ["FAB-LEASE-CONS-001"],
+      "status": {"kind": "Unknown"}
+    },
+    {
+      "id": "FAB-LEASE-FLOOR-001",
+      "statement": "Baseline civic-standing obligations apply at the partition-lease boundary.",
+      "criticality": "informational",
+      "policy_sensitive": false,
+      "depends_on": [],
+      "status": {
+        "kind": "NotApplicable",
+        "reason": "The partition lease is non-human resource authority; human-facing downstream effects require separate profiles."
+      }
+    }
+  ],
+  "end_to_end_claims": [
+    {
+      "id": "FAB-LEASE-E2E-001",
+      "statement": "Exclusive partition authority is established and enforced through every relevant side-effect boundary.",
+      "required_evidence_tier": "E4",
+      "critical_obligations": [
+        "FAB-LEASE-PROV-001",
+        "FAB-LEASE-CONS-001",
+        "FAB-LEASE-EFFECT-001"
+      ],
+      "status": {"kind": "Unknown"}
+    }
+  ]
+}
