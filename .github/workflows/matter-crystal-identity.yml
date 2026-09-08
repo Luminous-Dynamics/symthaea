@@ -1,0 +1,84 @@
+name: Matter Ordered Periodic-Cell Identity
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_crystal_identity.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-crystal-identity.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "c5a7c6f2b50caed7bb0c25d5e23f566ee425aff0"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-crystal-identity.yml
+          src/knowledge/matter_crystal_identity.rs
+          src/knowledge/mod.rs
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates scripts || true)"
+
+      - name: Ratchet ordered-cell canonicalization
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_crystal_identity.rs
+          grep -q 'OrderedPeriodicCellReceipt' "$f"
+          grep -q 'OrderedPeriodicCellKey' "$f"
+          grep -q 'lattice_vectors_angstrom_bits' "$f"
+          grep -q 'fractional_bits' "$f"
+          grep -q 'rem_euclid(1.0)' "$f"
+          grep -q 'normalize_signed_zero' "$f"
+          grep -q 'sites.sort()' "$f"
+          grep -q 'SingularOrInvalidLattice' "$f"
+          grep -q 'CoincidentOrderedSites' "$f"
+          grep -q 'LocallyCanonicalizedDeclaredArtifactMappingV1' "$f"
+          grep -q 'SameArtifactContentDifferentCellIdentity' "$f"
+
+      - name: Ratchet cross-workflow structure identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_crystal_identity.rs
+          grep -q 'MainPeriodicStructureIsNotFinalRelaxedCell' "$f"
+          grep -q 'TargetPhaseIsNotFinalRelaxedCell' "$f"
+          grep -q 'DuplicateOrderedCellUnderDifferentPhaseLabels' "$f"
+          grep -q 'PhaseContainsElementOutsideTargetSystem' "$f"
+          grep -q 'RelaxationHandoffCellIdentityMismatch' "$f"
+          grep -q 'LatticeBatchMissingTargetStructure' "$f"
+          grep -q 'normalized_structure_evidence_id' "$f"
+          grep -q 'final_structure_evidence_id' "$f"
+
+      - name: Ratchet v1 epistemic limits and strict public route
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_crystal_identity.rs
+          grep -q 'does not parse and re-derive' "$f"
+          grep -q 'basis permutation' "$f"
+          grep -q 'Partial/disordered occupancy is out of scope' "$f"
+          grep -q '^mod matter_phonon_completeness;' src/knowledge/mod.rs
+          grep -q '^pub mod matter_crystal_identity;' src/knowledge/mod.rs
+          grep -q 'bind_phonon_complete_crystal_execution_plan' "$f"
+          ! grep -q 'CrystallographicallyEquivalent' "$f"
+          ! grep -q 'SpaceGroupCanonical' "$f"
+
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Focused regression tests
+        run: cargo test --locked matter_crystal_identity --lib

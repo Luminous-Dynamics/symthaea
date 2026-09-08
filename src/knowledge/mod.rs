@@ -47,10 +47,11 @@ pub mod matter_cross_scale_lineage;
 mod matter_crystal_capability_gate;
 pub mod matter_crystal_evidence_binding;
 pub mod matter_crystal_execution;
-mod matter_crystal_execution_plan;
 pub mod matter_crystal_execution_wire;
+pub mod matter_crystal_identity;
 pub mod matter_crystal_leaf_binding;
 pub mod matter_crystal_phase;
+mod matter_crystal_execution_plan;
 #[cfg(all(test, feature = "materials"))]
 mod matter_crystal_phase_materials_tests;
 #[cfg(feature = "nuclear")]
@@ -61,7 +62,7 @@ pub mod matter_observatory;
 mod matter_periodic_convergence_binding;
 mod matter_periodic_convergence_gate;
 pub mod matter_phase_competition_graph;
-pub mod matter_phonon_completeness;
+mod matter_phonon_completeness;
 pub mod matter_relativistic;
 pub mod matter_relativistic_evidence;
 mod matter_relaxation_completeness;
