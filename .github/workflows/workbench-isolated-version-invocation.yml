@@ -1,0 +1,289 @@
+name: Workbench Isolated Version Invocation
+
+on:
+  pull_request:
+    paths:
+      - 'flake.lock'
+      - 'data/neuroscience/workbench_execution_capsule_profile_v1.json'
+      - 'data/neuroscience/workbench_invocation_isolation_profile_v1.json'
+      - 'scripts/workbench_nix_closure_identity.py'
+      - 'scripts/workbench_nix_closure_capture.py'
+      - 'scripts/verify_workbench_nix_closure_capture.py'
+      - 'scripts/workbench_root_nar_membership.py'
+      - 'scripts/workbench_root_nar_capture.py'
+      - 'scripts/verify_workbench_root_nar_capture.py'
+      - 'scripts/verify_workbench_invocation_isolation_profile.py'
+      - 'scripts/workbench_isolated_version_invocation_capture.py'
+      - 'scripts/verify_workbench_isolated_version_invocation.py'
+      - 'scripts/test_workbench_isolated_version_invocation.py'
+      - 'docs/neuroscience/WORKBENCH_ISOLATED_VERSION_INVOCATION_V1.md'
+      - '.github/workflows/workbench-isolated-version-invocation.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  static-contracts:
+    name: Qualify isolated version invocation contracts only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_SHA"
+          printf 'qualified_head=%s\n' "$QUALIFICATION_SHA"
+
+      - name: Syntax
+        run: |
+          python3 -m py_compile \
+            scripts/workbench_isolated_version_invocation_capture.py \
+            scripts/verify_workbench_isolated_version_invocation.py \
+            scripts/test_workbench_isolated_version_invocation.py
+
+      - name: Adversarial contracts
+        run: PYTHONPATH=scripts python3 -m unittest -v scripts/test_workbench_isolated_version_invocation.py
+
+      - name: Producer/verifier independence ratchets
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          producer = Path('scripts/workbench_isolated_version_invocation_capture.py')
+          verifier = Path('scripts/verify_workbench_isolated_version_invocation.py')
+
+          verifier_tree = ast.parse(verifier.read_text(encoding='utf-8'))
+          imported = set()
+          for node in ast.walk(verifier_tree):
+              if isinstance(node, ast.Import):
+                  imported.update(alias.name.split('.')[0] for alias in node.names)
+              elif isinstance(node, ast.ImportFrom) and node.module:
+                  imported.add(node.module.split('.')[0])
+          forbidden = {'subprocess', 'socket', 'urllib', 'requests', 'httpx'}
+          assert not (imported & forbidden), imported & forbidden
+
+          producer_tree = ast.parse(producer.read_text(encoding='utf-8'))
+          calls = []
+          for node in ast.walk(producer_tree):
+              if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                  if isinstance(node.func.value, ast.Name) and node.func.value.id == 'subprocess':
+                      calls.append(node)
+                      for kw in node.keywords:
+                          assert not (
+                              kw.arg == 'shell'
+                              and isinstance(kw.value, ast.Constant)
+                              and kw.value.value is True
+                          )
+          assert calls, 'producer must contain the explicit Workbench observation surface'
+          PY
+
+      - name: Static authority ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          DOC=docs/neuroscience/WORKBENCH_ISOLATED_VERSION_INVOCATION_V1.md
+          PRODUCER=scripts/workbench_isolated_version_invocation_capture.py
+          VERIFIER=scripts/verify_workbench_isolated_version_invocation.py
+          grep -Fq 'argv = [str(executable), "-version"]' "$PRODUCER"
+          grep -Fq 'pre_executable_sha256' "$PRODUCER"
+          grep -Fq 'post_executable_sha256' "$PRODUCER"
+          grep -Fq 'stdout-then-stderr-v1' "$PRODUCER"
+          grep -Fq 'VerifiedIsolatedVersionInvocation != QualifiedScientificExecution' "$DOC"
+          grep -Fq '"invocation_executed": True' "$VERIFIER"
+          grep -Fq '"version_output_bound": True' "$VERIFIER"
+          grep -Fq '"same_host_repeatability_established": False' "$VERIFIER"
+          grep -Fq '"path_equivalence_established": False' "$VERIFIER"
+          grep -Fq '"cross_cpu_equivalence_established": False' "$VERIFIER"
+          grep -Fq '"workbench_execution_qualified": False' "$VERIFIER"
+          grep -Fq '"scientific_execution_qualified": False' "$VERIFIER"
+          grep -Fq '"transform_executed": False' "$VERIFIER"
+          grep -Fq '"fmq010_established": False' "$VERIFIER"
+          grep -Fq '"neural_alignment_established": False' "$VERIFIER"
+          grep -Fq '"consciousness_evidence": False' "$VERIFIER"
+
+  produce-real-evidence:
+    name: Observe isolated real Workbench version invocation
+    needs: static-contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$QUALIFICATION_SHA"
+
+      - name: Install pinned Nix 2.33.6
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          install_url: https://releases.nixos.org/nix/nix-2.33.6/install
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Exact Nix version ratchet
+        run: test "$(nix --version)" = 'nix (Nix) 2.33.6'
+
+      - name: Produce parent closure observation
+        id: closure
+        continue-on-error: true
+        run: |
+          python3 scripts/workbench_nix_closure_capture.py \
+            --profile data/neuroscience/workbench_execution_capsule_profile_v1.json \
+            --flake-lock flake.lock \
+            --out workbench-nix-closure-capture-v1
+
+      - name: Capture parent root NAR bytes
+        id: nar
+        if: steps.closure.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python3 scripts/workbench_root_nar_capture.py \
+            --closure-receipt-dir workbench-nix-closure-capture-v1 \
+            --out workbench-root-nar-capture-v1
+
+      - name: Observe isolated wb_command version
+        id: version
+        if: steps.closure.outcome == 'success' && steps.nar.outcome == 'success'
+        continue-on-error: true
+        run: |
+          PYTHONPATH=scripts python3 scripts/workbench_isolated_version_invocation_capture.py \
+            --closure-receipt-dir workbench-nix-closure-capture-v1 \
+            --isolation-profile data/neuroscience/workbench_invocation_isolation_profile_v1.json \
+            --parent-profile data/neuroscience/workbench_execution_capsule_profile_v1.json \
+            --out workbench-isolated-version-invocation-v1
+
+      - name: Publish raw evidence artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: workbench-isolated-version-evidence-${{ env.QUALIFICATION_SHA }}
+          path: |
+            workbench-nix-closure-capture-v1
+            workbench-root-nar-capture-v1
+            workbench-isolated-version-invocation-v1
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Require complete real observation
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ steps.closure.outcome }}' = 'success'
+          test '${{ steps.nar.outcome }}' = 'success'
+          test '${{ steps.version.outcome }}' = 'success'
+          test -f workbench-nix-closure-capture-v1/receipt.json
+          test -f workbench-root-nar-capture-v1/receipt.json
+          test -f workbench-root-nar-capture-v1/raw/root.nar
+          test -f workbench-isolated-version-invocation-v1/receipt.json
+          test -f workbench-isolated-version-invocation-v1/raw/wb-version.stdout
+          test -f workbench-isolated-version-invocation-v1/raw/wb-version.stderr
+
+  verify-on-fresh-runner:
+    name: Independently verify isolated Workbench version invocation
+    needs: produce-real-evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$QUALIFICATION_SHA"
+
+      - name: Require Nix to be absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v nix >/dev/null 2>&1 || command -v nix-store >/dev/null 2>&1; then
+            echo 'fresh verifier runner unexpectedly has Nix on PATH' >&2
+            exit 1
+          fi
+
+      - name: Download raw evidence artifact only
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: workbench-isolated-version-evidence-${{ env.QUALIFICATION_SHA }}
+          path: workbench-isolated-version-evidence
+
+      - name: Independently reconstruct and verify
+        run: |
+          PYTHONPATH=scripts python3 scripts/verify_workbench_isolated_version_invocation.py \
+            --closure-receipt-dir workbench-isolated-version-evidence/workbench-nix-closure-capture-v1 \
+            --nar-capture-dir workbench-isolated-version-evidence/workbench-root-nar-capture-v1 \
+            --version-capture-dir workbench-isolated-version-evidence/workbench-isolated-version-invocation-v1 \
+            --execution-profile data/neuroscience/workbench_execution_capsule_profile_v1.json \
+            --isolation-profile data/neuroscience/workbench_invocation_isolation_profile_v1.json \
+            --flake-lock flake.lock \
+            --closure-producer scripts/workbench_nix_closure_capture.py \
+            --normalizer scripts/workbench_nix_closure_identity.py \
+            --closure-verifier scripts/verify_workbench_nix_closure_capture.py \
+            --nar-capture-producer scripts/workbench_root_nar_capture.py \
+            --membership scripts/workbench_root_nar_membership.py \
+            --parent-nar-verifier scripts/verify_workbench_root_nar_capture.py \
+            --isolation-verifier scripts/verify_workbench_invocation_isolation_profile.py \
+            --version-producer scripts/workbench_isolated_version_invocation_capture.py \
+            > workbench-isolated-version-invocation-verification.json
+
+      - name: Require narrow invocation authority only
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          value = json.loads(Path('workbench-isolated-version-invocation-verification.json').read_text())
+          assert value['schema'] == 'symthaea-workbench-isolated-version-invocation-verification-v1'
+          assert value['status'] == 'verified-isolated-workbench-version-invocation'
+          assert value['version'] == '2.1.0'
+          authority = value['authority']
+          assert authority['program_membership_verified'] is True
+          assert authority['invocation_profile_verified'] is True
+          assert authority['invocation_executed'] is True
+          assert authority['version_output_bound'] is True
+          assert authority['same_host_repeatability_established'] is False
+          assert authority['path_equivalence_established'] is False
+          assert authority['cross_cpu_equivalence_established'] is False
+          assert authority['workbench_execution_qualified'] is False
+          assert authority['scientific_execution_qualified'] is False
+          assert authority['transform_executed'] is False
+          assert authority['atlas_correctness_established'] is False
+          assert authority['fmq010_established'] is False
+          assert authority['neural_alignment_established'] is False
+          assert authority['consciousness_evidence'] is False
+          print('version=' + value['version'])
+          print('version_output_sha256=' + value['version_output_sha256'])
+          print('program_content_sha256=' + value['program_content_sha256'])
+          print('entry_environment_sha256=' + value['entry_environment_sha256'])
+          PY
+
+      - name: Publish independent verification result
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: workbench-isolated-version-verification-${{ env.QUALIFICATION_SHA }}
+          path: workbench-isolated-version-invocation-verification.json
+          if-no-files-found: error
+          retention-days: 30
