@@ -1,0 +1,63 @@
+name: Matter Crystal Capability Gate
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_crystal_capability_gate.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-crystal-capability-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "d551e00f580cbcfb6cf4dcf05a904ed1eadefe71"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-crystal-capability-gate.yml
+          src/knowledge/matter_crystal_capability_gate.rs
+          src/knowledge/mod.rs
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates || true)"
+
+      - name: Ratchet capability semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_crystal_capability_gate.rs
+          m=src/knowledge/mod.rs
+          grep -q 'CrystalScientificCapability' "$f"
+          grep -q 'PeriodicElectronicStructure' "$f"
+          grep -q 'StructuralRelaxation' "$f"
+          grep -q 'ThermodynamicPhaseCompetition' "$f"
+          grep -q 'LatticeDynamics' "$f"
+          grep -q 'capability_manifest_evidence_id' "$f"
+          grep -q 'EvidenceRole::ArtifactContent' "$f"
+          grep -q 'DeclaredCapabilityOnly' "$f"
+          grep -q 'ManifestPostdatesUse' "$f"
+          grep -q 'ManifestNotRetainedByClaim' "$f"
+          grep -q 'solver_method' "$f"
+          grep -q 'bind_mixed_crystal_execution_plan' "$f"
+          grep -q '^mod matter_crystal_execution_plan;' "$m"
+          grep -q '^pub mod matter_crystal_capability_gate;' "$m"
+          ! grep -q '^pub mod matter_crystal_execution_plan;' "$m"
+          ! grep -qi 'verified capability' "$f"
+          ! grep -qi 'independent confirmation' "$f"
+
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Focused compile regression
+        run: cargo test --locked matter_crystal_capability_gate --lib
