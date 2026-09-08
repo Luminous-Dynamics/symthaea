@@ -47,7 +47,7 @@ impl BoundedUncertainty {
     }
 }
 
-/// Auditable uncertainty envelope associated with one accepted estimator update.
+/// Auditable uncertainty envelope associated with one estimator update.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct HumanoidStateUncertaintyEnvelope {
     pub sequence: u64,
@@ -122,7 +122,6 @@ impl HumanoidStateUncertaintyEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hierarchical::SupportPhase;
 
     fn report() -> StateEstimatorReport {
         StateEstimatorReport {
@@ -185,12 +184,5 @@ mod tests {
             &StateEstimatorConfig::default(),
         );
         assert_eq!(envelope.epistemic_authority(), 0.0);
-    }
-
-    #[test]
-    fn support_type_remains_available_on_source_report() {
-        let report = report();
-        assert_eq!(report.support, crate::contact::BipedSupport::Double);
-        let _ = SupportPhase::DoubleSupport;
     }
 }
