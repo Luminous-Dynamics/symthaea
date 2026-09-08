@@ -22,11 +22,26 @@ permissions:
 jobs:
   qualify:
     name: Qualify Lineage B generator provenance
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout explicit theorem source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Require exact PR-head checkout
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11'
 
@@ -49,7 +64,18 @@ jobs:
         run: |
           set -euo pipefail
           f=scripts/derive_hcpmmp1_neuromaps_lineage_b.py
-          grep -Fq "GENERATOR_FILE_KEYS={'common','gifti','derive'}" "$f"
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          tree=ast.parse(Path('scripts/derive_hcpmmp1_neuromaps_lineage_b.py').read_text(encoding='utf-8'))
+          value=None
+          for node in tree.body:
+              if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'GENERATOR_FILE_KEYS' for t in node.targets):
+                  value=ast.literal_eval(node.value)
+                  break
+          assert value == {'common','gifti','derive'}, value
+          PY
           grep -Fq 'generator_implementation_digest' "$f"
           grep -Fq 'generator implementation changed during derivation' "$f"
           grep -Fq 'verify_inputs(run)' "$f"
