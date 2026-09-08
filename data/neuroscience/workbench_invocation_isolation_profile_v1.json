@@ -1,0 +1,115 @@
+{
+  "schema": "symthaea-workbench-invocation-isolation-profile-v1",
+  "status": "candidate_profile_only",
+  "parent_execution_capsule_profile": "symthaea-workbench-execution-capsule-profile-v1",
+  "qualification_platform": "x86_64-linux",
+  "program_binding": {
+    "root_source": "independently-verified-closure-root",
+    "relative_main_program": "bin/wb_command",
+    "require_absolute_exec_path": true,
+    "host_path_lookup_allowed": false
+  },
+  "process_environment": {
+    "stage": "root-main-program-execve",
+    "inherit_host_environment": false,
+    "fixed": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "TZ": "UTC0",
+      "OMP_NUM_THREADS": "1",
+      "OMP_DYNAMIC": "FALSE",
+      "PATH": ""
+    },
+    "dynamic_bindings": {
+      "PWD": "invocation.cwd",
+      "HOME": "invocation.home",
+      "XDG_CONFIG_HOME": "invocation.xdg_config_home",
+      "XDG_CACHE_HOME": "invocation.xdg_cache_home",
+      "XDG_DATA_HOME": "invocation.xdg_data_home",
+      "XDG_STATE_HOME": "invocation.xdg_state_home",
+      "XDG_RUNTIME_DIR": "invocation.xdg_runtime_dir",
+      "XDG_CONFIG_DIRS": "invocation.xdg_config_dirs",
+      "XDG_DATA_DIRS": "invocation.xdg_data_dirs",
+      "TMPDIR": "invocation.tmpdir",
+      "TMP": "invocation.tmpdir",
+      "TEMP": "invocation.tmpdir"
+    },
+    "descendant_environment": {
+      "entry_environment_is_final_environment": false,
+      "verified_program_may_transform_environment": true,
+      "host_injection_after_execve_allowed": false,
+      "post_entry_environment_equivalence_assumed": false
+    }
+  },
+  "per_invocation_isolation": {
+    "cwd_policy": "fresh-private-empty-per-invocation",
+    "home_policy": "fresh-private-empty-per-invocation",
+    "xdg_config_home_policy": "fresh-private-empty-per-invocation",
+    "xdg_cache_home_policy": "fresh-private-empty-per-invocation",
+    "xdg_data_home_policy": "fresh-private-empty-per-invocation",
+    "xdg_state_home_policy": "fresh-private-empty-per-invocation",
+    "xdg_runtime_dir_policy": "fresh-private-empty-per-invocation",
+    "xdg_config_dirs_policy": "fresh-private-empty-per-invocation",
+    "xdg_data_dirs_policy": "fresh-private-empty-per-invocation",
+    "tmpdir_policy": "fresh-private-empty-per-invocation",
+    "dynamic_environment_must_match_created_roots": true,
+    "dynamic_environment_paths_must_be_absolute": true,
+    "directory_mode_octal": "0700",
+    "umask_octal": "0077",
+    "reuse_allowed": false,
+    "stale_destination_fails_closed": true,
+    "cleanup_must_be_confirmed": true,
+    "stdin_policy": "devnull",
+    "stdout_policy": "retain-exact-bytes",
+    "stderr_policy": "retain-exact-bytes",
+    "close_fds": true,
+    "pass_fds": []
+  },
+  "scientific_path_gate": {
+    "snapshot_root_path_is_scientific_identity": false,
+    "scratch_root_path_is_scientific_identity": false,
+    "working_directory_path_is_scientific_identity": false,
+    "bytewise_equivalence_assumed": false,
+    "semantic_equivalence_assumed": false,
+    "required_perturbation_axes": [
+      "snapshot_root",
+      "scratch_root",
+      "working_directory"
+    ]
+  },
+  "numerical_execution_gate": {
+    "same_x86_64_implies_equivalence": false,
+    "same_closure_implies_cross_cpu_equivalence": false,
+    "runtime_cpu_dispatch_known": true,
+    "known_dispatch_modes": [
+      "AVX512FMA",
+      "AVX512",
+      "AVX",
+      "SSE2",
+      "NAIVE"
+    ],
+    "same_host_repeatability_required": true,
+    "cross_cpu_equivalence_required_before_transfer": true,
+    "diagnostic_context": [
+      "cpu_vendor",
+      "cpu_family",
+      "cpu_model",
+      "cpu_stepping",
+      "cpu_flags_digest",
+      "kernel_release"
+    ]
+  },
+  "authority": {
+    "invocation_contract_defined": true,
+    "invocation_executed": false,
+    "path_equivalence_established": false,
+    "same_host_repeatability_established": false,
+    "cross_cpu_equivalence_established": false,
+    "workbench_execution_qualified": false,
+    "transform_executed": false,
+    "atlas_correctness_established": false,
+    "fmq010_established": false,
+    "neural_alignment_established": false,
+    "consciousness_evidence": false
+  }
+}
