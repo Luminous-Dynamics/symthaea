@@ -163,6 +163,10 @@ mod tests {
     const D: &str = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
     const E: &str = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     const F: &str = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    const PROFILE_DIGEST_V1: &str =
+        "blake3:ff23c2ba0796d14eefd10c327542e8f0287bab3d09cb3bb2515c86fd72803d4a";
+    const SIMPLE_GRAPH_ID_V1: &str =
+        "blake3:916114cbe9c4ff598097fd2702e965a4b3a763bfcc92e569fb986397371363d6";
 
     fn node(
         id: &str,
@@ -190,6 +194,26 @@ mod tests {
         }
         .validate()
         .unwrap()
+    }
+
+    #[test]
+    fn profile_contract_digest_known_answer_is_frozen_v1() {
+        assert_eq!(
+            canonical_evidence_lineage_identity_profile_digest_v1(),
+            PROFILE_DIGEST_V1
+        );
+    }
+
+    #[test]
+    fn canonical_graph_identity_known_answer_is_frozen_v1() {
+        let g = graph(
+            F,
+            vec![
+                node(A, &[], CognitiveDerivationKindV1::RootObservation),
+                node(B, &[A], CognitiveDerivationKindV1::Inference),
+            ],
+        );
+        assert_eq!(canonical_evidence_lineage_graph_id_v1(&g), SIMPLE_GRAPH_ID_V1);
     }
 
     #[test]
