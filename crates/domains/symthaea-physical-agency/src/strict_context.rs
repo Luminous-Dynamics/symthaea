@@ -125,7 +125,10 @@ impl SimulationContextRef {
             ));
         }
         if matches!(&self.kind, SimulationContextKind::WorldSnapshot)
-            && self.frame_id.as_deref().is_none_or(|frame| frame.is_empty())
+            && self
+                .frame_id
+                .as_deref()
+                .is_none_or(|frame| frame.is_empty())
         {
             return Err(StrictSimulationError::InvalidContext(
                 "world snapshots require a frame_id".into(),
@@ -177,7 +180,9 @@ impl ContextBoundSimulationRequest {
         validate_context_set(&self.contexts)
     }
 
-    pub fn canonical_transcript(&self) -> Result<CanonicalRequestTranscript, StrictSimulationError> {
+    pub fn canonical_transcript(
+        &self,
+    ) -> Result<CanonicalRequestTranscript, StrictSimulationError> {
         self.validate()?;
         let mut bytes = Vec::new();
         push_str(&mut bytes, "symthaea.physical-agency.sim-context.v1");
@@ -297,11 +302,9 @@ impl StrictSimulationRegistry {
         let expected_transcript = request.canonical_transcript()?;
         let expected_contexts = canonical_contexts(&request.contexts)?;
 
-        let backend = self
-            .find_backend(request.request.solver)
-            .ok_or(StrictSimulationError::SolverUnavailable(
-                request.request.solver,
-            ))?;
+        let backend = self.find_backend(request.request.solver).ok_or(
+            StrictSimulationError::SolverUnavailable(request.request.solver),
+        )?;
         let returned = backend
             .run_context_bound(request)
             .map_err(|error| StrictSimulationError::Bridge(error.to_string()))?;
@@ -562,8 +565,11 @@ mod tests {
             }
 
             let result = if matches!(self.0, Behavior::DryRun) {
-                SimulationResult::dry_run(&request.request.id, self.name(), 0.95)
-                    .with_metric("diagnostic_quality", 0.9, "1")
+                SimulationResult::dry_run(&request.request.id, self.name(), 0.95).with_metric(
+                    "diagnostic_quality",
+                    0.9,
+                    "1",
+                )
             } else {
                 SimulationResult::converged(&request.request.id, 0.95)
                     .with_uncertainty(UncertaintyEstimate::new(0.05, 0.02))
@@ -630,7 +636,9 @@ mod tests {
 
     #[test]
     fn exact_context_lineage_qualifies_structurally() {
-        let run = registry(Behavior::Good).run(&request(vec![world()])).unwrap();
+        let run = registry(Behavior::Good)
+            .run(&request(vec![world()]))
+            .unwrap();
         assert_eq!(run.backend(), "context-fixture");
         assert_eq!(run.contexts(), &[world()]);
         assert!(!run.request_transcript().as_bytes().is_empty());

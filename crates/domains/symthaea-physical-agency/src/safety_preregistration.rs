@@ -227,9 +227,12 @@ pub fn qualify_preregistered_safety_confirmatory_simulation(
         .iter()
         .filter(|obligation| obligation.expected_evidence == EvidenceKind::Simulation)
         .any(|obligation| {
-            completed
-                .get(obligation.id())
-                .is_some_and(|actual| actual.evidence_refs.iter().any(|item| item == &required_ref))
+            completed.get(obligation.id()).is_some_and(|actual| {
+                actual
+                    .evidence_refs
+                    .iter()
+                    .any(|item| item == &required_ref)
+            })
         });
     if !has_exact_simulation_evidence {
         return Err(SafetyPreregistrationError::MissingExactSimulationEvidence);
@@ -303,7 +306,10 @@ fn validate_completed_safety_case(
             ));
         }
         if obligation.evidence_refs.is_empty()
-            || obligation.evidence_refs.iter().any(|item| item.trim().is_empty())
+            || obligation
+                .evidence_refs
+                .iter()
+                .any(|item| item.trim().is_empty())
         {
             return Err(SafetyPreregistrationError::MissingObligationEvidence(
                 frozen.id.clone(),
@@ -354,14 +360,20 @@ pub enum SafetyPreregistrationError {
     PrematureEvidence(String),
     #[error("strict safety preregistration requires a Simulation obligation")]
     MissingSimulationObligation,
-    #[error("strict safety preregistration requires at least one independent non-Simulation obligation")]
+    #[error(
+        "strict safety preregistration requires at least one independent non-Simulation obligation"
+    )]
     MissingIndependentObligation,
-    #[error("completed safety case id {completed:?} does not match preregistered id {preregistered:?}")]
+    #[error(
+        "completed safety case id {completed:?} does not match preregistered id {preregistered:?}"
+    )]
     SafetyCaseIdMismatch {
         preregistered: String,
         completed: String,
     },
-    #[error("completed safety subject {completed:?} does not match preregistered subject {preregistered:?}")]
+    #[error(
+        "completed safety subject {completed:?} does not match preregistered subject {preregistered:?}"
+    )]
     CompletedSubjectMismatch {
         preregistered: String,
         completed: String,
@@ -378,7 +390,9 @@ pub enum SafetyPreregistrationError {
     SafetyCaseNotDischarged,
     #[error("preregistered Simulation obligations do not cite the exact confirmatory lineage")]
     MissingExactSimulationEvidence,
-    #[error("independent obligation {0:?} has no evidence distinct from the exact simulation lineage")]
+    #[error(
+        "independent obligation {0:?} has no evidence distinct from the exact simulation lineage"
+    )]
     IndependentEvidenceMissing(String),
 }
 
@@ -405,7 +419,7 @@ mod tests {
         PredictedOutcome, ProposedIntervention, TargetRegion,
     };
     use symthaea_sim_bridge::{
-        EngineeringDomain, ExecutionMode, Interval, SimulationEvidence, SimulationError,
+        EngineeringDomain, ExecutionMode, Interval, SimulationError, SimulationEvidence,
         SimulationMetric, SimulationRequest, SimulationResult, SolverKind, UncertaintyEstimate,
     };
 
@@ -440,8 +454,7 @@ mod tests {
                 value: 0.9,
                 unit: "1".into(),
                 uncertainty: Some(
-                    UncertaintyEstimate::new(0.03, 0.02)
-                        .with_interval(Interval::new(0.86, 0.94)),
+                    UncertaintyEstimate::new(0.03, 0.02).with_interval(Interval::new(0.86, 0.94)),
                 ),
             }];
             Ok(ContextBoundSimulationResult {
@@ -506,7 +519,8 @@ mod tests {
             SnapshotDigestAlgorithm::Blake3,
             "b".repeat(64),
         );
-        let frontier = match deliberate(&portfolio, &snapshot, PortfolioPolicy::default()).unwrap() {
+        let frontier = match deliberate(&portfolio, &snapshot, PortfolioPolicy::default()).unwrap()
+        {
             DeliberationOutcome::ParetoFrontier(frontier) => frontier,
             other => panic!("expected frontier, got {other:?}"),
         };
@@ -552,8 +566,7 @@ mod tests {
         safety
     }
 
-    fn run_with_plan(
-    ) -> (
+    fn run_with_plan() -> (
         SafetyPreregisteredConfirmatoryEvidence,
         SatisfiedSimulationClaim,
         SafetyCase,
@@ -563,7 +576,8 @@ mod tests {
         let prepared = preregister_confirmatory_safety(prepared(), &safety).unwrap();
         let mut registry = StrictSimulationRegistry::new();
         registry.register(FixtureBackend);
-        let evidence = run_preregistered_safety_confirmatory_simulation(&registry, &prepared).unwrap();
+        let evidence =
+            run_preregistered_safety_confirmatory_simulation(&registry, &prepared).unwrap();
         let satisfied = match evaluate_confirmatory_claim(evidence.confirmatory()).unwrap() {
             ConfirmatoryClaimOutcome::Satisfied(receipt) => receipt,
             other => panic!("expected satisfied claim, got {other:?}"),
@@ -571,11 +585,13 @@ mod tests {
         let exact = required_preregistered_safety_evidence_ref(&evidence, &satisfied).unwrap();
         for obligation in &mut completed.obligations {
             obligation.status = ObligationStatus::Discharged;
-            obligation.evidence_refs.push(if obligation.expected_evidence == EvidenceKind::Simulation {
-                exact.clone()
-            } else {
-                "independent-proof:fixture".into()
-            });
+            obligation.evidence_refs.push(
+                if obligation.expected_evidence == EvidenceKind::Simulation {
+                    exact.clone()
+                } else {
+                    "independent-proof:fixture".into()
+                },
+            );
         }
         (evidence, satisfied, completed)
     }
@@ -583,12 +599,9 @@ mod tests {
     #[test]
     fn preregistered_case_can_complete_and_strictly_qualify() {
         let (evidence, satisfied, completed) = run_with_plan();
-        let qualified = qualify_preregistered_safety_confirmatory_simulation(
-            &evidence,
-            &satisfied,
-            &completed,
-        )
-        .unwrap();
+        let qualified =
+            qualify_preregistered_safety_confirmatory_simulation(&evidence, &satisfied, &completed)
+                .unwrap();
         assert_eq!(qualified.assessment().proposal.id, "safety-p0");
         assert_eq!(qualified.output_digest(), "safety-output");
     }
@@ -609,7 +622,10 @@ mod tests {
     #[test]
     fn pre_discharged_obligation_cannot_be_preregistered() {
         let mut safety = open_safety_case();
-        let first = safety.obligations.remove(0).discharge("post-hoc-looking-evidence");
+        let first = safety
+            .obligations
+            .remove(0)
+            .discharge("post-hoc-looking-evidence");
         safety.obligations.insert(0, first);
         assert!(matches!(
             preregister_confirmatory_safety(prepared(), &safety),
@@ -630,11 +646,7 @@ mod tests {
                 .discharge("independent-proof:posthoc"),
         );
         assert!(matches!(
-            qualify_preregistered_safety_confirmatory_simulation(
-                &evidence,
-                &satisfied,
-                &posthoc,
-            ),
+            qualify_preregistered_safety_confirmatory_simulation(&evidence, &satisfied, &posthoc,),
             Err(SafetyPreregistrationError::SafetyCaseIdMismatch { .. })
         ));
     }
@@ -642,13 +654,11 @@ mod tests {
     #[test]
     fn obligation_claim_cannot_change_after_preregistration() {
         let (evidence, satisfied, mut completed) = run_with_plan();
-        completed.obligations[0].claim.push_str(" changed after run");
+        completed.obligations[0]
+            .claim
+            .push_str(" changed after run");
         assert!(matches!(
-            qualify_preregistered_safety_confirmatory_simulation(
-                &evidence,
-                &satisfied,
-                &completed,
-            ),
+            qualify_preregistered_safety_confirmatory_simulation(&evidence, &satisfied, &completed,),
             Err(SafetyPreregistrationError::ObligationDefinitionChanged(_))
         ));
     }
@@ -660,7 +670,8 @@ mod tests {
         let prepared = preregister_confirmatory_safety(prepared(), &safety).unwrap();
         let mut registry = StrictSimulationRegistry::new();
         registry.register(FixtureBackend);
-        let evidence = run_preregistered_safety_confirmatory_simulation(&registry, &prepared).unwrap();
+        let evidence =
+            run_preregistered_safety_confirmatory_simulation(&registry, &prepared).unwrap();
         let satisfied = match evaluate_confirmatory_claim(evidence.confirmatory()).unwrap() {
             ConfirmatoryClaimOutcome::Satisfied(receipt) => receipt,
             other => panic!("expected satisfied claim, got {other:?}"),
@@ -671,11 +682,7 @@ mod tests {
             obligation.evidence_refs.push(exact.clone());
         }
         assert!(matches!(
-            qualify_preregistered_safety_confirmatory_simulation(
-                &evidence,
-                &satisfied,
-                &completed,
-            ),
+            qualify_preregistered_safety_confirmatory_simulation(&evidence, &satisfied, &completed,),
             Err(SafetyPreregistrationError::IndependentEvidenceMissing(_))
         ));
     }
