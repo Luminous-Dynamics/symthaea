@@ -1,0 +1,37 @@
+{
+  "schema_version": "hak.execution-observation.v1",
+  "observation_id": "hak006-github-34212685766-attempt1-queued",
+  "subject": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit_sha": "98883dfb03594f777390abe557e307af99ff4b5d",
+    "base_commit_sha": "ae07c516d06560e36206f61a9e8a1c5e366578de",
+    "branch": "architecture/hak-conformance-linter-v1"
+  },
+  "qualification_plan": {
+    "plan_kind": "SelfDeclaredPlan",
+    "plan_ref": "git:Luminous-Dynamics/symthaea@481f5065f1c40322a74c16cf5a6a56171eafc91c:.github/workflows/hak-conformance.yml",
+    "plan_digest": null,
+    "precommit_status": "KnownPrecommitted"
+  },
+  "execution": {
+    "provider": "github-actions",
+    "run_id": 34212685766,
+    "run_attempt": 1,
+    "workflow_id": 353007168,
+    "workflow_name": "HAK Conformance",
+    "workflow_path": ".github/workflows/hak-conformance.yml",
+    "event": "pull_request",
+    "provider_record_ref": "github-actions:Luminous-Dynamics/symthaea:run/34212685766:attempt/1"
+  },
+  "observation": {
+    "status": "queued",
+    "conclusion": null,
+    "provider_created_at": "2026-09-08T09:55:38Z",
+    "provider_updated_at": "2026-09-08T09:55:39Z",
+    "provider_started_at": "2026-09-08T09:55:38Z"
+  },
+  "claims": {
+    "terminal_receipt_exists": false,
+    "e5_qualified": false
+  }
+}
