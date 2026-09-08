@@ -6,8 +6,8 @@
 //! mode additionally carries a persistent partner map. Restoring organisms without restoring these
 //! values changes who interacts with whom even when every organism is otherwise identical.
 //!
-//! This module defines persistence semantics only. It does not yet teach the live scheduler to emit
-//! or restore snapshots.
+//! The live scheduler may construct this raw persistence shape, but deserialization still does not
+//! create restore authority: callers must validate the raw snapshot before recreating a scheduler.
 //!
 //! A subtle production invariant matters here: the fixed-partner map is **not globally symmetric**.
 //! When a partner dies, the surviving agent can be rematched while the dead agent's stale mapping
@@ -92,6 +92,18 @@ pub enum EncounterSchedulerSnapshotErrorV1 {
 }
 
 impl EncounterSchedulerSnapshotV1 {
+    pub(crate) fn from_live_parts(
+        mode: PairingMode,
+        fixed_partners: Vec<EncounterFixedPartnerEntrySnapshotV1>,
+        rng_state: u64,
+    ) -> Self {
+        Self {
+            mode: EncounterPairingModeSnapshotV1::from_mode(mode),
+            fixed_partners,
+            rng_state,
+        }
+    }
+
     /// Consume raw persistence and produce scheduler restore authority only if the v1 structural
     /// invariants hold.
     pub fn validate(
