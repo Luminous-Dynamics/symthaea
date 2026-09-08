@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
 jobs:
   qualify:
     runs-on: ubuntu-latest
@@ -54,21 +58,13 @@ jobs:
           grep -q 'Root-normalized graph' "$doc"
           grep -q 'No count voting' "$doc"
 
-          # Root identity is deliberately derived only from declarer identity,
-          # optional version, method, and profile semantics. Evidence ids or
-          # relation ids must not manufacture new interpreter roots.
           grep -q 'b"declarer_id"' "$production"
           grep -q 'b"declarer_version"' "$production"
           grep -q 'b"declaration_method"' "$production"
           grep -q 'ROOT_ID_DOMAIN' "$production"
-
-          # Distinct roots remain unknown unless the exact pair qualification is
-          # actually found. Name inequality must never map directly to qualified.
           grep -q 'DistinctRootsIndependenceUnknown' "$production"
           grep -q 'IndependenceQualified' "$production"
           grep -q 'qualifications_by_pair' "$production"
-
-          # Expose the normalized root topology, not a convenience edge count.
           grep -q 'pub fn roots' "$production"
           grep -q 'pub fn root_pair_assessments' "$production"
           if grep -q 'qualified_independent_pair_count' "$production"; then
@@ -112,9 +108,6 @@ jobs:
           grep -q 'context_raw.now_unix_ms > record.valid_until_unix_ms' "$production"
           grep -q 'UnexpectedIndependenceQualificationPair' "$production"
           grep -q 'DuplicateIndependenceQualificationPair' "$production"
-
-          # Qualification persistence revalidates. Issued current lineage does not
-          # deserialize back into trusted state.
           grep -q 'impl.*Deserialize' "$src"
           grep -q 'pub struct InterpretationLineageV1' "$production"
           if grep -Eq 'impl[^\n]*Deserialize[^\n]*InterpretationLineageV1|derive\([^)]*Deserialize[^)]*\)[[:space:]]*pub struct InterpretationLineageV1' "$production"; then
