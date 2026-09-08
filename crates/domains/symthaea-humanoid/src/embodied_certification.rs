@@ -5,6 +5,9 @@
 //! This is deterministic simulation/bench evidence, not a physical safety
 //! certification. It is designed to make fallback, deadline, uncertainty, and
 //! dynamics-fidelity dependence visible in release artifacts.
+//!
+//! Every scenario is bound to one qualification-subject fingerprint. A mixed
+//! morphology/task/backend corpus is rejected rather than averaged together.
 
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +17,10 @@ use crate::hierarchical::HierarchicalControlReport;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbodiedControlCase {
     pub scenario_id: String,
+    /// Canonical `HumanoidQualificationSubject::fingerprint()`. Legacy/unbound
+    /// cases deserialize as zero and are invalid.
+    #[serde(default)]
+    pub subject_fingerprint: u64,
     pub dynamics_fidelity: DynamicsFidelity,
     pub active_contacts: usize,
     pub terrain_height_std_m: f64,
@@ -26,6 +33,7 @@ pub struct EmbodiedControlCase {
 impl EmbodiedControlCase {
     pub fn validate(&self) -> bool {
         !self.scenario_id.trim().is_empty()
+            && self.subject_fingerprint != 0
             && self.terrain_height_std_m.is_finite()
             && self.terrain_height_std_m >= 0.0
             && self.terrain_evidence_age_s.is_finite()
@@ -66,6 +74,9 @@ impl Default for EmbodiedCertificationCriteria {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmbodiedControlCertificate {
     pub schema_version: u32,
+    /// Common subject shared by every admitted scenario.
+    #[serde(default)]
+    pub subject_fingerprint: u64,
     pub scenario_fingerprint: u64,
     pub total_cases: usize,
     pub fallback_rate: f64,
@@ -91,6 +102,13 @@ pub fn certify_embodied_control(
         .collect::<Vec<_>>();
     let total = valid.len();
     let denominator = total.max(1) as f64;
+    let subject_fingerprint = valid
+        .first()
+        .map(|case| case.subject_fingerprint)
+        .unwrap_or(0);
+    let subject_mismatch = valid
+        .iter()
+        .any(|case| case.subject_fingerprint != subject_fingerprint);
     let fallback_rate = valid
         .iter()
         .filter(|case| {
@@ -144,6 +162,9 @@ pub fn certify_embodied_control(
     if total != cases.len() || total == 0 {
         failures.push("invalid or empty scenario corpus".to_string());
     }
+    if subject_mismatch {
+        failures.push("scenario corpus mixes qualification subjects".to_string());
+    }
     if fallback_rate > criteria.maximum_fallback_rate {
         failures.push(format!("fallback rate {fallback_rate:.4} exceeds limit"));
     }
@@ -174,7 +195,8 @@ pub fn certify_embodied_control(
         failures.push("no upper-body multi-contact case present".to_string());
     }
     EmbodiedControlCertificate {
-        schema_version: 2,
+        schema_version: 3,
+        subject_fingerprint,
         scenario_fingerprint: fingerprint_cases(&valid),
         total_cases: total,
         fallback_rate,
@@ -192,8 +214,15 @@ pub fn certify_embodied_control(
 }
 
 fn fingerprint_cases(cases: &[&EmbodiedControlCase]) -> u64 {
+    if cases.is_empty() {
+        return 0;
+    }
     let mut hash = 0xcbf2_9ce4_8422_2325u64;
     for case in cases {
+        for byte in case.subject_fingerprint.to_le_bytes() {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
         for byte in case.scenario_id.as_bytes() {
             hash ^= *byte as u64;
             hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
@@ -205,7 +234,7 @@ fn fingerprint_cases(cases: &[&EmbodiedControlCase]) -> u64 {
         hash ^= case.recovered as u64;
         hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
     }
-    hash
+    if hash == 0 { 1 } else { hash }
 }
 
 #[cfg(test)]
@@ -219,6 +248,8 @@ mod tests {
     fn incomplete_corpus_fails_closed() {
         let certificate = certify_embodied_control(&[], EmbodiedCertificationCriteria::default());
         assert!(!certificate.accepted);
+        assert_eq!(certificate.subject_fingerprint, 0);
+        assert_eq!(certificate.scenario_fingerprint, 0);
     }
 
     #[test]
@@ -229,6 +260,7 @@ mod tests {
             .synthesize(HumanoidTask::Stand, &state, &zero, &zero, 1.0, 0.0);
         let case = EmbodiedControlCase {
             scenario_id: "reduced-only".to_string(),
+            subject_fingerprint: 7,
             dynamics_fidelity: DynamicsFidelity::ReducedOrder,
             active_contacts: 2,
             terrain_height_std_m: 0.0,
@@ -240,11 +272,46 @@ mod tests {
         let certificate =
             certify_embodied_control(&[case], EmbodiedCertificationCriteria::default());
         assert!(!certificate.accepted);
+        assert_eq!(certificate.subject_fingerprint, 7);
         assert!(
             certificate
                 .failures
                 .iter()
                 .any(|failure| failure.contains("solver-derived"))
         );
+    }
+
+    #[test]
+    fn mixed_subject_corpus_fails_closed() {
+        let state = HumanoidState::default_for(HumanoidMorphology::Dmc21);
+        let zero = HumanoidCommand::zero();
+        let (_, report) = HierarchicalHumanoidController::new(HumanoidMorphology::Dmc21)
+            .synthesize(HumanoidTask::Stand, &state, &zero, &zero, 1.0, 0.0);
+        let make_case = |id: &str, subject_fingerprint| EmbodiedControlCase {
+            scenario_id: id.to_string(),
+            subject_fingerprint,
+            dynamics_fidelity: DynamicsFidelity::ReducedOrder,
+            active_contacts: 2,
+            terrain_height_std_m: 0.0,
+            terrain_evidence_age_s: 0.0,
+            report: report.clone(),
+            fell: false,
+            recovered: false,
+        };
+        let criteria = EmbodiedCertificationCriteria {
+            require_solver_derived_case: false,
+            require_floating_base_case: false,
+            require_upper_body_contact_case: false,
+            ..EmbodiedCertificationCriteria::default()
+        };
+        let certificate = certify_embodied_control(
+            &[make_case("a", 7), make_case("b", 8)],
+            criteria,
+        );
+        assert!(!certificate.accepted);
+        assert!(certificate
+            .failures
+            .iter()
+            .any(|failure| failure.contains("mixes qualification subjects")));
     }
 }
