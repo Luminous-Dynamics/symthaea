@@ -1,0 +1,133 @@
+name: HCPMMP Lineage B Evidence Verifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py'
+      - 'scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py'
+      - 'scripts/derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/hcpmmp_neuromaps_common.py'
+      - 'scripts/hcpmmp_neuromaps_gifti.py'
+      - 'data/neuroscience/hcpmmp1_neuromaps_transform_method_v1.json'
+      - 'data/neuroscience/hcp_mmp1_area_order_v1.json'
+      - 'docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_EVIDENCE_VERIFIER_V1.md'
+      - '.github/workflows/hcpmmp-lineage-b-evidence-verifier.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  qualify:
+    name: Qualify Lineage-B archival evidence verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Require exact qualification head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_SHA"
+          printf 'qualified_head=%s\n' "$QUALIFICATION_SHA"
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax contract
+        run: |
+          PYTHONPATH=scripts python -m py_compile \
+            scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py \
+            scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+
+      - name: Archival verifier contracts
+        run: PYTHONPATH=scripts python -m unittest -v scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+
+      - name: Non-execution and no-network ratchet
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path('scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py')
+          tree = ast.parse(path.read_text(encoding='utf-8'))
+
+          imported = set()
+          calls = set()
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  imported.update(alias.name.split('.')[0] for alias in node.names)
+              elif isinstance(node, ast.ImportFrom) and node.module:
+                  imported.add(node.module.split('.')[0])
+              elif isinstance(node, ast.Call):
+                  if isinstance(node.func, ast.Name):
+                      calls.add(node.func.id)
+                  elif isinstance(node.func, ast.Attribute):
+                      calls.add(node.func.attr)
+
+          forbidden_imports = {'subprocess', 'socket', 'urllib', 'requests', 'httpx'}
+          forbidden_calls = {'system', 'popen', 'Popen', 'run', 'run_wb', 'verify_inputs'}
+          assert not (imported & forbidden_imports), imported & forbidden_imports
+          assert not (calls & forbidden_calls), calls & forbidden_calls
+          PY
+
+      - name: Generator rebinding ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+          grep -Fq 'validate_generator_implementation' "$FILE"
+          grep -Fq "generator['digest']" "$FILE"
+          grep -Fq 'generator_implementation_digest' "$FILE"
+          grep -Fq 'generator per-module map tamper' docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_EVIDENCE_VERIFIER_V1.md
+
+      - name: Authority ratchet
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          verifier_path = Path('scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py')
+          doc = Path('docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_EVIDENCE_VERIFIER_V1.md').read_text(encoding='utf-8')
+          source = verifier_path.read_text(encoding='utf-8')
+          tree = ast.parse(source)
+
+          required_doc = (
+              'internal self-hash != retained evidence authority',
+              'independence_established = false',
+              'does not execute Workbench',
+              'not** that those implementation bytes are scientifically correct',
+          )
+          for phrase in required_doc:
+              assert phrase in doc, phrase
+
+          false_binding_seen = False
+          for node in ast.walk(tree):
+              if not isinstance(node, ast.Dict):
+                  continue
+              for key, value in zip(node.keys, node.values):
+                  if isinstance(key, ast.Constant) and key.value == 'independence_established':
+                      if isinstance(value, ast.Constant) and value.value is False:
+                          false_binding_seen = True
+                      if isinstance(value, ast.Constant) and value.value is True:
+                          raise AssertionError('verifier must not mint independence authority')
+          assert false_binding_seen, 'explicit false independence binding required'
+          PY
+
+      - name: CLI contract
+        run: PYTHONPATH=scripts python scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py --help
