@@ -12,7 +12,7 @@ use symthaea_core::hdc::ContinuousHV;
 
 use crate::controller::HumanoidController;
 use crate::encoder::HumanoidHdcEncoder;
-use crate::execution::HumanoidExecutionPipeline;
+use crate::execution::{HumanoidAuthorityEnvelope, HumanoidExecutionPipeline};
 use crate::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
 use crate::types::{
     ActuationMode, HumanoidCommand, HumanoidConfig, HumanoidPdGains, HumanoidTask,
@@ -154,15 +154,25 @@ impl HumanoidEmbodiment {
 
             let learned_residual = self.controller.forward(thought_hv, dt);
             let baseline = pd_standing_baseline(&state, &self.pd_gains);
+            // This in-process simulator explicitly admits the non-cognitive
+            // sources. Physical hardware must supply real operator,
+            // qualification, health, and epistemic restrictions instead.
+            let authority = HumanoidAuthorityEnvelope {
+                operator: 1.0,
+                qualification: 1.0,
+                physical: 1.0,
+                epistemic: 1.0,
+                cognitive: self.current_safety.motor_gain(),
+            };
             self.pipeline
-                .authorize(
+                .authorize_with_authority(
                     HumanoidTask::Stand,
                     &state,
                     &baseline,
                     &learned_residual,
                     Self::EMBODIMENT_BASELINE_WEIGHT,
                     0.0,
-                    self.current_safety.motor_gain(),
+                    authority,
                     ActuationMode::NormalizedTorque,
                     dt as f64,
                 )
