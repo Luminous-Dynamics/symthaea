@@ -1,7 +1,6 @@
 import importlib.util
 import json
 import sys
-from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -86,6 +85,14 @@ def test_real_terminal_job_mismatch_rejected():
         validate(plan, rec, conf, interp, cap)
 
 
+def test_provider_job_timestamp_mismatch_rejected():
+    plan, rec, conf, interp, cap = documents()
+    cap["provider_snapshot"]["job"]["completed_at"] = "2026-09-08T12:25:22Z"
+    redigest_capsule(cap)
+    with pytest.raises(hak.RealEvidenceLintError):
+        validate(plan, rec, conf, interp, cap)
+
+
 def test_cancelled_no_step_run_cannot_be_satisfied():
     plan, rec, conf, interp, cap = documents()
     conf["status"] = "Satisfied"
@@ -164,6 +171,6 @@ def test_capsule_interpretation_digest_mismatch_rejected():
 
 def test_capsule_digest_tampering_rejected():
     plan, rec, conf, interp, cap = documents()
-    cap["provider_snapshot"]["provider_updated_at"] = "2026-09-08T12:26:00Z"
+    cap["provider_snapshot"]["run_updated_at"] = "2026-09-08T12:26:00Z"
     with pytest.raises(hak.RealEvidenceLintError):
         validate(plan, rec, conf, interp, cap)

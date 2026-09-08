@@ -74,8 +74,11 @@ def validate_real_provider_capsule(plan: dict[str, Any], receipt: dict[str, Any]
     terminal = receipt["terminal"]
     _require(snapshot.get("status") == terminal["status"], "provider snapshot status must match receipt terminal")
     _require(snapshot.get("conclusion") == terminal["conclusion"], "provider snapshot conclusion must match receipt terminal")
-    _require(snapshot.get("run_started_at") == terminal["provider_started_at"], "provider snapshot run_started_at must match receipt")
-    _require(snapshot.get("provider_updated_at") == terminal["provider_completed_at"], "provider snapshot provider_updated_at must match receipt")
+    _text(snapshot.get("run_created_at"), "provider_snapshot.run_created_at")
+    run_started = _text(snapshot.get("run_started_at"), "provider_snapshot.run_started_at")
+    run_updated = _text(snapshot.get("run_updated_at"), "provider_snapshot.run_updated_at")
+    _require(run_started == terminal["provider_started_at"], "provider snapshot run_started_at must match receipt provider_started_at")
+    _require(run_updated == terminal["provider_completed_at"], "provider snapshot run_updated_at must match receipt provider_completed_at")
 
     job = _obj(snapshot.get("job"), "provider_snapshot.job")
     jobs = receipt.get("job_receipts") or []
@@ -84,6 +87,11 @@ def validate_real_provider_capsule(plan: dict[str, Any], receipt: dict[str, Any]
     receipt_job = matches[0]
     for field in ("name", "status", "conclusion"):
         _require(job.get(field) == receipt_job.get(field), f"provider snapshot job.{field} must match receipt job")
+    job_created = _text(job.get("created_at"), "provider_snapshot.job.created_at")
+    job_started = _text(job.get("started_at"), "provider_snapshot.job.started_at")
+    job_completed = _text(job.get("completed_at"), "provider_snapshot.job.completed_at")
+    _require(job_created <= job_started <= job_completed <= run_updated,
+             "provider job timestamps must satisfy created <= started <= completed <= run_updated")
     steps = _array(job.get("steps"), "provider_snapshot.job.steps")
 
     bindings = _obj(capsule.get("bindings"), "bindings")

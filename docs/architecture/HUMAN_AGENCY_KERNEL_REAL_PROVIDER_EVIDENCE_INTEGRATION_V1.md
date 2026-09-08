@@ -4,51 +4,67 @@ Status: audit-only integration candidate. No runtime authority changes.
 
 ## Purpose
 
-HAK-007 through HAK-010 define evidence subjects, terminal receipts, bounded interpretation, provider-bound per-check evidence, and precommitted check selectors. HAK-011 asks whether those semantics survive contact with a real provider execution rather than synthetic fixtures.
+HAK-007 through HAK-010 define evidence subjects, terminal receipts, bounded interpretation, provider-bound per-check evidence, and precommitted check selectors. HAK-011 tests whether those semantics survive contact with a real provider execution rather than synthetic fixtures.
 
-The first real subject is the completed GitHub Actions run:
-
-```text
-repository   = Luminous-Dynamics/symthaea
-workflow     = HAK Evidence
-run          = 34225891059
-attempt      = 1
-subject      = 227442e681effa9a0bb08bace7f17b76ca910493
-conclusion   = cancelled
-job          = 102059802264 / HAK Evidence Linter
-provider steps reported = 0
-```
-
-This is intentionally a negative execution. It is useful because it tests whether HAK preserves failure without fabricating missing evidence.
-
-## Core semantic result
+The first real subject is GitHub Actions run `34225891059`, attempt 1, for exact subject `227442e681effa9a0bb08bace7f17b76ca910493`. The run completed with conclusion `cancelled`. Its sole job, `102059802264 / HAK Evidence Linter`, also completed `cancelled`, and GitHub reported zero step records.
 
 ```text
 TerminalFailure != MissingEvidence
-```
-
-but also:
-
-```text
 PlanNotSatisfied != ClaimDisproven
+NoProviderSteps != PermissionToInferPassedChecks
 ```
 
-For this real run:
+## Provider timing scopes
+
+HAK-011 preserves run and job timing separately because they are not the same provider fact.
 
 ```text
-TerminalQualificationReceipt.conclusion = cancelled
-PlanConformance.status                  = NotSatisfied
-PerCheckProviderEvidence                = []
-ClaimInterpretation.status              = InsufficientEvidence
+RunTerminalObservation != JobCompletionTimestamp
 ```
 
-The run did not complete the qualification plan. That fact is real evidence. It does not establish that HAK-007's semantic claims are false.
+For the historical run, the materialized provider snapshot records:
+
+```text
+run_created_at  = 2026-09-08T12:24:24Z
+run_started_at  = 2026-09-08T12:24:24Z
+run_updated_at  = 2026-09-08T12:25:21Z
+
+job.created_at   = 2026-09-08T12:24:26Z
+job.started_at   = 2026-09-08T12:24:26Z
+job.completed_at = 2026-09-08T12:25:20Z
+```
+
+The HAK-007 receipt's `provider_started_at` and `provider_completed_at` bind the run-level observation (`run_started_at` and `run_updated_at`). Exact job timing remains separately preserved in the real provider capsule.
+
+The integration validator requires:
+
+```text
+job.created_at <= job.started_at <= job.completed_at <= run_updated_at
+```
+
+Changing one timing scope does not silently rewrite another.
+
+## Real evidence chain
+
+The materialized artifacts bind:
+
+```text
+Provider snapshot
+        ↓
+TerminalQualificationReceipt(cancelled)
+        ↓
+PlanConformance(NotSatisfied)
+        ↓
+EvidenceInterpretation(InsufficientEvidence)
+```
+
+This is intentionally a negative execution. The workflow did not complete its qualification plan. That fact is real evidence; it does not establish that HAK-007's semantic claims are false.
 
 ## No-step theorem
 
-GitHub reported the terminal job as cancelled and returned no step records for the job.
+GitHub reported the terminal job as cancelled and returned `steps = []`.
 
-Therefore HAK-011 requires:
+Therefore:
 
 ```text
 ProviderSteps = ∅
@@ -58,11 +74,11 @@ AND every required check = Missing
 AND every required negative case = Missing
 ```
 
-The evidence system must not reconstruct a plausible-looking Passed check from workflow source, expected step names, logs that do not exist, or knowledge of what the job would have done.
+The system must not reconstruct `Passed` checks from workflow source, expected step names, hypothetical execution, or missing logs.
 
 ## Materialized artifacts
 
-The real evidence directory contains:
+`docs/architecture/hak/evidence/real/` contains:
 
 ```text
 hak007-run-34225891059.receipt.json
@@ -71,81 +87,61 @@ hak007-run-34225891059.interpretation.json
 hak007-run-34225891059.capsule.json
 ```
 
-The capsule records the provider run/job snapshot observed through the connected GitHub integration and binds the canonical digests of the three HAK artifacts.
-
-It is not a cryptographic GitHub attestation.
+The capsule records provider run/job metadata observed through the connected GitHub integration and binds the canonical digests of the other HAK artifacts.
 
 ```text
 MaterializedProviderSnapshot != CryptographicAttestation
 ```
 
-## Claim semantics
+## Conformance versus claim interpretation
 
-The plan-conformance record is `NotSatisfied` because the terminal receipt is non-success.
+The plan-conformance record is `NotSatisfied` because the qualification receipt is non-success.
 
-The evidence interpretation is deliberately `InsufficientEvidence`, not `NotSatisfied`:
+The claim interpretation is `InsufficientEvidence`, not semantic `NotSatisfied`:
 
 ```text
 execution failed to complete
 !=
-semantic claim falsified
+underlying proposition falsified
 ```
 
-This distinction matters for CI cancellation, infrastructure failure, provider outage, runner eviction, and other execution failures that do not test the underlying proposition.
+This is important for cancellation, provider outage, runner eviction, infrastructure failure, and other conditions that prevent a planned test from being executed.
 
 ## Composition with HAK-009
 
-The real capsule contains no per-check ProviderBound evidence records because GitHub reported zero steps.
-
-HAK-009 strict conformance is still exercised. It accepts the honest absence because no conformance obligation is marked `Passed`.
-
-Thus:
+The historical capsule contains no per-check ProviderBound evidence because the provider reported no steps. HAK-009 strict conformance is still applied with an empty provider-evidence set. That is valid only because every obligation remains `Missing`.
 
 ```text
-MissingCheck -> no check evidence required
+MissingCheck -> no fabricated provider evidence
 PassedCheck  -> exact provider evidence required
 ```
 
-This prevents both evidence fabrication and evidence laundering.
-
 ## HAK-011 self-qualification
 
-HAK-011 has its own E5-target qualification plan and HAK-010 binding policy. The binding policy precommits the exact workflow job/step that may satisfy each HAK-011 required check and negative case.
+HAK-011 has its own E5-target qualification plan and HAK-010 precommitted binding policy. Its focused `HAK Real Provider Evidence` workflow binds exact-head checkout, compilation, schema validation, plan lint, policy lint, real-capsule validation, and regressions to fixed job/step selectors.
 
-The focused `HAK Real Provider Evidence` workflow validates:
-
-- exact-head checkout,
-- inherited HAK tooling compilation,
-- capsule schema,
-- HAK-011 plan,
-- HAK-011 precommitted binding policy,
-- the real cancelled-run capsule,
-- focused adversarial regressions.
-
-A green HAK-011 workflow qualifies only these integration-tooling claims. It does not retroactively qualify HAK-007, whose historical run was cancelled.
+A green HAK-011 workflow qualifies only the HAK-011 integration-tooling claims. It does not retroactively qualify the cancelled HAK-007 execution.
 
 ## Non-claims
 
 HAK-011 does not:
 
-- claim the cancelled HAK-007 run passed,
+- claim the historical cancelled run passed,
 - treat cancellation as semantic falsification,
 - fabricate provider step evidence,
 - authenticate GitHub metadata cryptographically,
 - grant runtime authority,
-- certify governance, consent, robotics, or safety behavior,
+- certify governance, consent, rescue, or actuator behavior,
 - promote provider success into truth,
 - convert model output into evidence authority.
 
 ## Next boundary
 
-Once HAK-011 has a successful exact-head run, the next useful exercise is to materialize that successful run using the same evidence model.
-
-Then the comparison is controlled:
+After a successful exact-head HAK-011 run exists, materialize it using the same evidence model and compare it against the cancelled run:
 
 ```text
 same evidence semantics
 different provider conclusion
 ```
 
-If successful and cancelled runs require different evidence rules, the model is wrong. Only their observed outcomes and resulting conformance/interpretation should differ.
+If successful and cancelled executions require different provenance rules, the evidence model is wrong. Only observed outcomes, conformance, and interpretation should differ.
