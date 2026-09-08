@@ -107,6 +107,7 @@ fn signing_key() -> SigningKey {
 fn policy() -> EffectOutcomePolicyV1 {
     EffectOutcomePolicyV1 {
         schema_version: EFFECT_OUTCOME_POLICY_SCHEMA_VERSION,
+        generation: 3,
         device: ResourceRef("iot:valve:72".into()),
         operation: Operation("qualification.effect".into()),
         allowed_verifier_ids: BTreeSet::from([VERIFIER_ID.to_owned()]),
@@ -193,13 +194,8 @@ fn current_guard(
 ) -> CurrentPhysicalEffectOutcomeGuard {
     let registry = EffectOutcomeTrustRegistry::genesis(snapshot).unwrap();
     let head = registry.head();
-    CurrentPhysicalEffectOutcomeGuard::new(
-        policy.clone(),
-        policy.digest().unwrap(),
-        registry,
-        head,
-    )
-    .unwrap()
+    CurrentPhysicalEffectOutcomeGuard::new(policy.clone(), policy.digest().unwrap(), registry, head)
+        .unwrap()
 }
 
 #[test]
@@ -233,11 +229,16 @@ fn execution_and_postcondition_requires_exact_execution_window_and_fresh_observa
     let proof = guard(&policy, snapshot.clone())
         .verify_evidence_at(evidence, &challenge, issued)
         .unwrap();
+    assert_eq!(proof.policy_generation(), policy.generation);
     assert_eq!(proof.challenge_digest(), challenge.digest().unwrap());
-    assert_eq!(proof.challenge_journal_generation(), challenge.journal_generation());
+    assert_eq!(
+        proof.challenge_journal_generation(),
+        challenge.journal_generation()
+    );
     assert_eq!(proof.challenge_journal_digest(), challenge.journal_digest());
 
     let current = current_guard(&policy, snapshot);
+    assert_eq!(current.anchored_policy_generation(), policy.generation);
     let fence = current.fence_current_at(&proof, issued + 1).unwrap();
     assert_eq!(fence.evidence_expires_at_unix_ms(), evidence_expires);
     assert_eq!(fence.valid_until_unix_ms(), evidence_expires);
@@ -276,7 +277,10 @@ fn complete_window_non_execution_proof_succeeds() {
             issued,
         )
         .unwrap();
-    assert_eq!(proof.evidence().body.claim.kind(), EffectOutcomeClaimKindV1::NonExecution);
+    assert_eq!(
+        proof.evidence().body.claim.kind(),
+        EffectOutcomeClaimKindV1::NonExecution
+    );
 }
 
 #[test]
@@ -310,7 +314,10 @@ fn partial_window_non_execution_is_rejected() {
         &challenge,
         issued,
     );
-    assert!(matches!(result, Err(EffectOutcomeError::NonExecutionCoverageIncomplete)));
+    assert!(matches!(
+        result,
+        Err(EffectOutcomeError::NonExecutionCoverageIncomplete)
+    ));
 }
 
 #[test]
@@ -397,7 +404,10 @@ fn wrong_profile_and_bad_signature_fail_closed() {
     );
     bad_signature.signature[0] ^= 0x01;
     let result = guard(&policy, snapshot).verify_evidence_at(bad_signature, &challenge, issued);
-    assert!(matches!(result, Err(EffectOutcomeError::InvalidEvidenceSignature)));
+    assert!(matches!(
+        result,
+        Err(EffectOutcomeError::InvalidEvidenceSignature)
+    ));
 }
 
 #[test]
@@ -479,7 +489,7 @@ fn each_natural_expiry_boundary_kills_current_use() {
     // Evidence expiry.
     let challenge = fresh_challenge();
     let issued = challenge.issued_at_unix_ms() + 10;
-    let snapshot = snapshot(
+    let evidence_snapshot = snapshot(
         &challenge,
         &signing,
         EffectOutcomeVerifierKeyStatus::Active,
@@ -493,7 +503,7 @@ fn each_natural_expiry_boundary_kills_current_use() {
         postcondition_observed_at_unix_ms: issued,
     };
     let evidence_expiry = issued + 200;
-    let proof = guard(&policy, snapshot.clone())
+    let proof = guard(&policy, evidence_snapshot.clone())
         .verify_evidence_at(
             signed_evidence(
                 &challenge,
@@ -507,7 +517,7 @@ fn each_natural_expiry_boundary_kills_current_use() {
             issued,
         )
         .unwrap();
-    let current = current_guard(&policy, snapshot);
+    let current = current_guard(&policy, evidence_snapshot);
     assert!(matches!(
         current.fence_current_at(&proof, evidence_expiry),
         Err(EffectOutcomeError::CurrentProofWindowElapsed)
@@ -517,14 +527,14 @@ fn each_natural_expiry_boundary_kills_current_use() {
     let challenge = fresh_challenge();
     let issued = challenge.issued_at_unix_ms() + 10;
     let key_expiry = issued + 200;
-    let snapshot = snapshot(
+    let key_snapshot = snapshot(
         &challenge,
         &signing,
         EffectOutcomeVerifierKeyStatus::Active,
         key_expiry,
         challenge.expires_at_unix_ms() + 1_000,
     );
-    let proof = guard(&policy, snapshot.clone())
+    let proof = guard(&policy, key_snapshot.clone())
         .verify_evidence_at(
             signed_evidence(
                 &challenge,
@@ -538,7 +548,7 @@ fn each_natural_expiry_boundary_kills_current_use() {
             issued,
         )
         .unwrap();
-    let current = current_guard(&policy, snapshot);
+    let current = current_guard(&policy, key_snapshot);
     assert!(matches!(
         current.fence_current_at(&proof, key_expiry),
         Err(EffectOutcomeError::VerifierKeyNotActive)
@@ -548,14 +558,14 @@ fn each_natural_expiry_boundary_kills_current_use() {
     let challenge = fresh_challenge();
     let issued = challenge.issued_at_unix_ms() + 10;
     let trust_expiry = issued + 200;
-    let snapshot = snapshot(
+    let trust_snapshot = snapshot(
         &challenge,
         &signing,
         EffectOutcomeVerifierKeyStatus::Active,
         challenge.expires_at_unix_ms() + 1_000,
         trust_expiry,
     );
-    let proof = guard(&policy, snapshot.clone())
+    let proof = guard(&policy, trust_snapshot.clone())
         .verify_evidence_at(
             signed_evidence(
                 &challenge,
@@ -569,7 +579,7 @@ fn each_natural_expiry_boundary_kills_current_use() {
             issued,
         )
         .unwrap();
-    let current = current_guard(&policy, snapshot);
+    let current = current_guard(&policy, trust_snapshot);
     assert!(matches!(
         current.fence_current_at(&proof, trust_expiry),
         Err(EffectOutcomeError::TrustSnapshotNotFresh)
@@ -578,14 +588,14 @@ fn each_natural_expiry_boundary_kills_current_use() {
     // Challenge expiry, with every other natural boundary later.
     let challenge = fresh_challenge();
     let issued = challenge.issued_at_unix_ms() + 10;
-    let snapshot = snapshot(
+    let challenge_snapshot = snapshot(
         &challenge,
         &signing,
         EffectOutcomeVerifierKeyStatus::Active,
         challenge.expires_at_unix_ms() + 1_000,
         challenge.expires_at_unix_ms() + 1_000,
     );
-    let proof = guard(&policy, snapshot.clone())
+    let proof = guard(&policy, challenge_snapshot.clone())
         .verify_evidence_at(
             signed_evidence(
                 &challenge,
@@ -599,7 +609,7 @@ fn each_natural_expiry_boundary_kills_current_use() {
             issued,
         )
         .unwrap();
-    let current = current_guard(&policy, snapshot);
+    let current = current_guard(&policy, challenge_snapshot);
     assert!(matches!(
         current.fence_current_at(&proof, challenge.expires_at_unix_ms()),
         Err(EffectOutcomeError::CurrentProofWindowElapsed)

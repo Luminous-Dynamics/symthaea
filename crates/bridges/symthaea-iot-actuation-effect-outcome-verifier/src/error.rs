@@ -22,6 +22,8 @@ pub enum EffectOutcomeError {
 
     #[error("unsupported physical-effect outcome policy schema")]
     UnsupportedPolicySchema,
+    #[error("physical-effect outcome policy generation is zero")]
+    PolicyGenerationZero,
     #[error("physical-effect outcome policy has an invalid device or operation")]
     InvalidPolicyTarget,
     #[error("physical-effect outcome policy verifier surface is invalid")]
@@ -65,7 +67,9 @@ pub enum EffectOutcomeError {
     NotGenesis,
     #[error("physical-effect outcome trust sequence overflow")]
     TrustSequenceOverflow,
-    #[error("physical-effect outcome trust sequence is not the exact successor: expected {expected}, proposed {proposed}")]
+    #[error(
+        "physical-effect outcome trust sequence is not the exact successor: expected {expected}, proposed {proposed}"
+    )]
     TrustSequenceNotNext { expected: u64, proposed: u64 },
     #[error("physical-effect outcome trust predecessor does not match")]
     TrustPredecessorMismatch,
@@ -143,6 +147,8 @@ pub enum EffectOutcomeError {
     #[error("physical-effect outcome signature is invalid")]
     InvalidEvidenceSignature,
 
+    #[error("verified outcome proof policy generation no longer matches current guard policy")]
+    CurrentProofPolicyGenerationMismatch,
     #[error("verified outcome proof policy no longer matches current guard policy")]
     CurrentProofPolicyMismatch,
     #[error("verified outcome proof trust head no longer matches current guard trust")]

@@ -77,7 +77,7 @@ impl PublishedEffectOutcomeTrustHeadV1 {
         }
     }
 
-    pub const fn matches_outcome_trust_head(self, head: EffectOutcomeTrustHead) -> bool {
+    pub fn matches_outcome_trust_head(self, head: EffectOutcomeTrustHead) -> bool {
         self.sequence == head.sequence && self.digest == head.digest
     }
 
@@ -275,10 +275,7 @@ impl DurableEffectReconciliationTrustPublicationStore {
     {
         roots.validate()?;
         let published_at_unix_ms = system_unix_ms()?;
-        let publication = EffectReconciliationTrustPublicationV1::genesis(
-            roots,
-            published_at_unix_ms,
-        )?;
+        let publication = EffectReconciliationTrustPublicationV1::genesis(roots, published_at_unix_ms)?;
         let expected_head = publication.head()?;
         let store = Self {
             root: root.into(),
@@ -800,11 +797,8 @@ mod tests {
     #[test]
     fn current_fence_blocks_authoritative_successor_publication() {
         let root = temp_root("fence-blocks-publish");
-        let initial = DurableEffectReconciliationTrustPublicationStore::initialize(
-            &root,
-            roots(),
-        )
-        .unwrap();
+        let initial = DurableEffectReconciliationTrustPublicationStore::initialize(&root, roots())
+            .unwrap();
         let head = initial.head();
         let fence_store =
             DurableEffectReconciliationTrustPublicationStore::open(&root, head).unwrap();

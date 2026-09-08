@@ -3,8 +3,8 @@
 //! Current fencing for one already verified physical-effect outcome proof.
 //!
 //! Historical verification establishes that one exact signed claim was valid at one instant. A
-//! later journal-closing boundary must not assume it remains current after verifier revocation,
-//! policy replacement, key expiry, trust-snapshot expiry or challenge expiry.
+//! later journal-closing boundary must not assume it remains current after policy-generation change,
+//! verifier revocation, key expiry, trust-snapshot expiry or challenge expiry.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -45,6 +45,10 @@ impl CurrentPhysicalEffectOutcomeGuard {
         })
     }
 
+    pub const fn anchored_policy_generation(&self) -> u64 {
+        self.policy.generation
+    }
+
     pub const fn anchored_policy_digest(&self) -> Digest32 {
         self.anchored_policy_digest
     }
@@ -66,6 +70,9 @@ impl CurrentPhysicalEffectOutcomeGuard {
         now_unix_ms: u64,
     ) -> Result<CurrentPhysicalEffectOutcomeFence<'a>, EffectOutcomeError> {
         self.policy.validate()?;
+        if proof.policy_generation() != self.policy.generation {
+            return Err(EffectOutcomeError::CurrentProofPolicyGenerationMismatch);
+        }
         if self.policy.digest()? != self.anchored_policy_digest
             || proof.policy_digest() != self.anchored_policy_digest
         {
@@ -145,7 +152,7 @@ impl CurrentPhysicalEffectOutcomeGuard {
 }
 
 /// Borrowed evidence that the exact signed outcome proof remains current under the exact guard
-/// policy/trust/key and every natural expiry boundary.
+/// policy generation/digest, trust/key and every natural expiry boundary.
 ///
 /// This is still not a journal-closing capability. A later writer must additionally compare the
 /// current rollback-protected effect-attempt head to the challenge head retained by `proof()`.

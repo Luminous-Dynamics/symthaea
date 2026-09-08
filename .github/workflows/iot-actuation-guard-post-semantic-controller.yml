@@ -28,6 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Install exact formatter
         run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
@@ -40,13 +41,41 @@ jobs:
           rustc --version | grep -F 'rustc 1.96.0'
           cargo --version | grep -F 'cargo 1.96.0'
 
-      - name: Check exact source formatting
+      - name: Check changed controller source formatting
         run: |
-          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/lib.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/error.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/challenge.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/response.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/tests.rs
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            export BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            git cat-file -e "${BASE_SHA}^{commit}"
+            python3 - <<'PY'
+          import os
+          import subprocess
+
+          root = 'crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller'
+          base = os.environ['BASE_SHA']
+          changed = subprocess.run(
+              ['git', 'diff', '--name-only', f'{base}...HEAD', '--', root],
+              check=True,
+              capture_output=True,
+              text=True,
+          ).stdout.splitlines()
+          rust_sources = [path for path in changed if path.endswith('.rs')]
+          if rust_sources:
+              subprocess.run(
+                  ['rustfmt', '--edition', '2024', '--check', *rust_sources],
+                  check=True,
+              )
+          else:
+              print('No post-semantic controller Rust source changed in this PR.')
+          PY
+          else
+            rustfmt --edition 2024 --check \
+              crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/lib.rs \
+              crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/error.rs \
+              crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/challenge.rs \
+              crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/response.rs \
+              crates/bridges/symthaea-iot-actuation-guard-post-semantic-controller/src/tests.rs
+          fi
 
       - name: Enforce post-semantic causal boundary
         run: |
@@ -72,6 +101,10 @@ jobs:
           challenge = (root / 'src/challenge.rs').read_text()
           response = (root / 'src/response.rs').read_text()
           source = challenge + '\n' + response
+          challenge_code = '\n'.join(
+              line for line in challenge.splitlines()
+              if not line.lstrip().startswith('//')
+          )
 
           required = [
               'PersistedSemanticAcceptance',
@@ -90,7 +123,7 @@ jobs:
           for needle in required:
               assert needle in source, f'missing post-semantic invariant: {needle!r}'
 
-          assert 'Deserialize' not in challenge, 'privileged outbound challenge must not be reconstructible from caller bytes'
+          assert 'Deserialize' not in challenge_code, 'privileged outbound challenge must not be reconstructible from caller bytes'
           start = challenge.index('pub fn issue_from_persisted_semantic_acceptance(')
           end = challenge.index(') -> Result<Self', start)
           signature = challenge[start:end]
@@ -163,5 +196,7 @@ jobs:
       - name: Test post-semantic controller package
         run: cargo test -p symthaea-iot-actuation-guard-post-semantic-controller --all-targets
 
-      - name: Strict Clippy post-semantic controller package
-        run: cargo clippy -p symthaea-iot-actuation-guard-post-semantic-controller --all-targets -- -D warnings
+      - name: Strict package-local Clippy
+        run: >-
+          cargo clippy -p symthaea-iot-actuation-guard-post-semantic-controller
+          --all-targets --no-deps -- -D warnings

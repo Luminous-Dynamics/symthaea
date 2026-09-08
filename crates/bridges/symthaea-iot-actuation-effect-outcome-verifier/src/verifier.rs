@@ -42,6 +42,10 @@ impl GuardPhysicalEffectOutcomeState {
         })
     }
 
+    pub const fn anchored_policy_generation(&self) -> u64 {
+        self.policy.generation
+    }
+
     pub const fn anchored_policy_digest(&self) -> Digest32 {
         self.anchored_policy_digest
     }
@@ -188,6 +192,7 @@ impl GuardPhysicalEffectOutcomeState {
             key_id,
             key_digest,
             trust_head: self.anchored_trust_head,
+            policy_generation: self.policy.generation,
             policy_digest: self.anchored_policy_digest,
             verified_at_unix_ms: now_unix_ms,
             verifier_key_not_after_unix_ms,
@@ -258,6 +263,7 @@ pub struct VerifiedPhysicalEffectOutcomeEvidence {
     key_id: String,
     key_digest: Digest32,
     trust_head: EffectOutcomeTrustHead,
+    policy_generation: u64,
     policy_digest: Digest32,
     verified_at_unix_ms: u64,
     verifier_key_not_after_unix_ms: u64,
@@ -308,6 +314,10 @@ impl VerifiedPhysicalEffectOutcomeEvidence {
 
     pub const fn trust_head(&self) -> EffectOutcomeTrustHead {
         self.trust_head
+    }
+
+    pub const fn policy_generation(&self) -> u64 {
+        self.policy_generation
     }
 
     pub const fn policy_digest(&self) -> Digest32 {

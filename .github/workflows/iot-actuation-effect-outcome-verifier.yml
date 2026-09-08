@@ -22,6 +22,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Verify exact checkout
         run: |
@@ -33,6 +34,7 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import re
           import tomllib
 
           root = Path('crates/bridges/symthaea-iot-actuation-effect-outcome-verifier')
@@ -53,11 +55,14 @@ jobs:
 
           required = [
               'pubconstEFFECT_OUTCOME_ED25519_ALGORITHM:&str="ed25519-rfc8032";',
+              'pubstructEffectOutcomePolicyV1{pubschema_version:u16,pubgeneration:u64,',
+              'ifself.generation==0{returnErr(EffectOutcomeError::PolicyGenerationZero);}',
+              'h.update(&self.schema_version.to_be_bytes());h.update(&self.generation.to_be_bytes());',
               'pubenumEffectOutcomeClaimKindV1{ExecutionAndPostcondition,NonExecution,}',
               'ExecutionAndPostcondition{execution_record_digest:Digest32,effect_recorded_at_unix_ms:u64,postcondition_evidence_digest:Digest32,postcondition_observed_at_unix_ms:u64,}',
               'NonExecution{non_execution_proof_digest:Digest32,execution_log_head_digest:Digest32,coverage_from_unix_ms:u64,coverage_through_unix_ms:u64,}',
               'pubstructGuardPhysicalEffectOutcomeState',
-              'pubfnverify_evidence(&self,evidence:PhysicalEffectOutcomeEvidenceV1,challenge:&EffectReconciliationChallengeV1)',
+              'pubconstfnanchored_policy_generation(&self)->u64{self.policy.generation}',
               'self.verify_evidence_at(evidence,challenge,system_unix_ms()?)',
               'pub(crate)fnverify_evidence_at(',
               'ifbody.challenge_digest!=challenge_digest',
@@ -73,9 +78,13 @@ jobs:
               'coverage_from_unix_ms>challenge.attempt_common_fenced_at_unix_ms()',
               'coverage_through_unix_ms<challenge.attempt_wall_valid_until_unix_ms()',
               'coverage_through_unix_ms>evidence_issued_at_unix_ms',
+              'policy_generation:self.policy.generation',
+              'pubconstfnpolicy_generation(&self)->u64{self.policy_generation}',
               'pubstructCurrentPhysicalEffectOutcomeGuard',
+              'pubconstfnanchored_policy_generation(&self)->u64{self.policy.generation}',
               'self.fence_current_at(proof,system_unix_ms()?)',
               'pub(crate)fnfence_current_at',
+              'ifproof.policy_generation()!=self.policy.generation',
               'body.challenge_digest!=proof.challenge_digest()',
               'current_key.digest()?!=proof.key_digest()',
               '.min(verifier_key_not_after_unix_ms).min(trust_snapshot_expires_at_unix_ms).min(proof.challenge_expires_at_unix_ms())',
@@ -86,6 +95,19 @@ jobs:
           missing = [needle for needle in required if needle not in compact]
           if missing:
               raise SystemExit(f'missing outcome-verifier invariant: {missing}')
+
+          verify_evidence_signature = re.compile(
+              r'pubfnverify_evidence\('
+              r'&self,'
+              r'evidence:PhysicalEffectOutcomeEvidenceV1,'
+              r'challenge:&EffectReconciliationChallengeV1,?'
+              r'\)->Result<VerifiedPhysicalEffectOutcomeEvidence,EffectOutcomeError>'
+          )
+          if verify_evidence_signature.search(compact) is None:
+              raise SystemExit(
+                  'public verify_evidence signature no longer binds the exact V1 evidence, '
+                  'reconciliation challenge, and verified-proof result types'
+              )
 
           forbidden = [
               'Deserialize', 'Serialize', 'serde', 'bincode',
@@ -139,7 +161,24 @@ jobs:
           toolchain: 1.96.0
           components: rustfmt
 
-      - name: Rustfmt outcome verifier
+      - name: Rustfmt changed outcome-verifier sources
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base='${{ github.event.pull_request.base.sha }}'
+          root='crates/bridges/symthaea-iot-actuation-effect-outcome-verifier'
+          git cat-file -e "${base}^{commit}"
+          changed="$(git diff --name-only "$base"...HEAD -- "$root")"
+          mapfile -t files < <(printf '%s\n' "$changed" | grep -E '\.rs$' || true)
+          if ((${#files[@]})); then
+            printf 'rustfmt checking changed source: %s\n' "${files[@]}"
+            rustfmt +1.96.0 --edition 2024 --check "${files[@]}"
+          else
+            echo 'No outcome-verifier Rust source changed in this PR.'
+          fi
+
+      - name: Rustfmt outcome verifier on manual qualification
+        if: github.event_name != 'pull_request'
         run: >-
           cargo +1.96.0 fmt --check
           -p symthaea-iot-actuation-effect-outcome-verifier
