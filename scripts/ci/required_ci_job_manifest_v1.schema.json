@@ -19,9 +19,26 @@
     "profiles": {
       "type": "object",
       "minProperties": 1,
+      "propertyNames": {"pattern": "^[A-Za-z0-9_-]+$"},
       "additionalProperties": {"$ref": "#/$defs/profile"}
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "complete": {"const": true}
+        }
+      },
+      "then": {
+        "properties": {
+          "profiles": {
+            "additionalProperties": {"$ref": "#/$defs/completeProfile"}
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "profile": {
       "type": "object",
@@ -36,6 +53,25 @@
         },
         "families": {
           "type": "array",
+          "items": {"$ref": "#/$defs/family"}
+        }
+      }
+    },
+    "completeProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "top_level_job_ids", "families"],
+      "properties": {
+        "event": {"type": "string", "minLength": 1},
+        "top_level_job_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"}
+        },
+        "families": {
+          "type": "array",
+          "minItems": 1,
           "items": {"$ref": "#/$defs/family"}
         }
       }
