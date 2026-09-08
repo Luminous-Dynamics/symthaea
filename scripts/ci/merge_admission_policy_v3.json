@@ -22,6 +22,7 @@
       "scripts/ci/merge_admission_manifest_v2.py",
       "scripts/ci/merge_admission_policy_v3.json",
       "scripts/ci/evaluate_merge_admission_v3.py",
+      "scripts/ci/run_merge_admission_v3.py",
       "scripts/ci/merge_admission_observation_v3.schema.json",
       "scripts/ci/merge_admission_receipt_v3.schema.json",
       "docs/operations/MERGE_ADMISSION_RECEIPT_V3.md"
