@@ -178,5 +178,7 @@ jobs:
       - name: Test semantic-persistence package
         run: cargo test -p symthaea-iot-actuation-guard-semantic-persistence --all-targets
 
-      - name: Strict Clippy semantic-persistence package
-        run: cargo clippy -p symthaea-iot-actuation-guard-semantic-persistence --all-targets -- -D warnings
+      - name: Strict package-local Clippy
+        run: >-
+          cargo clippy -p symthaea-iot-actuation-guard-semantic-persistence
+          --all-targets --no-deps -- -D warnings
