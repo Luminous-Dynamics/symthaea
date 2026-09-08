@@ -38,6 +38,23 @@ jobs:
             echo 'Evidence producers must not self-declare independence.' >&2
             exit 1
           fi
+      - name: Freeze canonical digest spelling and anti-alias boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/lineage.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'digest must be sha256:<64 lowercase hex> or blake3:<64 lowercase hex>' "$production"
+          grep -q "(b'a'..=b'f').contains(&byte)" "$production"
+          if grep -q 'is_ascii_hexdigit()' "$production"; then
+            echo 'Lineage digest validation again admits uppercase hex aliases.' >&2
+            exit 1
+          fi
+          grep -q 'uppercase_digest_spelling_fails_closed' "$src"
+          grep -q 'case_aliased_roots_cannot_enter_independence_graph' "$src"
+          grep -q 'validated_graph_exposes_read_only_semantic_nodes' "$src"
       - name: Format epistemic governance
         run: cargo +1.94.0 fmt --package symthaea-epistemic-governance -- --check
       - name: Test epistemic governance
