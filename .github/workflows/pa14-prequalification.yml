@@ -1,0 +1,61 @@
+name: PA14 Prequalification
+
+on:
+  push:
+    branches:
+      - physical-agency/pa-14-rustfmt-repair-work
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    name: PA-14 exact-command prequalification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-physical-agency-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-physical-agency-
+
+      - name: Format physical-agency sources
+        run: cargo fmt --check -p symthaea-physical-effects -p symthaea-physical-agency
+
+      - name: Check physical-agency crates
+        run: cargo check -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
+
+      - name: Test physical-effect contract and PHYSIS
+        run: cargo test -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
+
+      - name: Clippy physical-agency crates
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy -p symthaea-physical-effects -p symthaea-physical-agency --all-targets -- -D warnings 2>&1 | tee pa14-clippy.txt
+
+      - name: Upload clippy diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pa14-clippy-diagnostics
+          path: pa14-clippy.txt
+          if-no-files-found: ignore
+          retention-days: 7
