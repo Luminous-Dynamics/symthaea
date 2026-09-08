@@ -1,5 +1,6 @@
 {
   "schema": "symthaea.merge-admission-policy.v1",
+  "policy_path": "scripts/ci/merge_admission_policy_v1.json",
   "repository": "Luminous-Dynamics/symthaea",
   "target_branch": "main",
   "enforcement_ready": false,
@@ -20,12 +21,15 @@
       "scripts/ci/evaluate_merge_admission.py",
       "scripts/ci/merge_admission_observation_v1.schema.json",
       "scripts/ci/merge_admission_receipt_v1.schema.json",
+      "scripts/ci/required_ci_job_manifest_v1.schema.json",
+      "scripts/ci/required_ci_job_manifest_v1.json",
       "docs/operations/MERGE_ADMISSION_RECEIPT_V1.md"
     ],
     "candidate_changes_require_independent_bootstrap": true
   },
   "full_integration": {
     "workflow_path": ".github/workflows/ci.yml",
+    "required_job_manifest_path": "scripts/ci/required_ci_job_manifest_v1.json",
     "accepted_events": ["pull_request", "workflow_dispatch"],
     "required_status": "completed",
     "required_conclusion": "success",
