@@ -20,6 +20,15 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Verify explicit qualification toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(rustc +1.94.0 --version | awk '{print $2}')" = '1.94.0'
+          cargo +1.94.0 --version
+          rustfmt +1.94.0 --version
+          cargo +1.94.0 clippy --version
+
       - name: Freeze derived evidence-object identity boundary
         shell: bash
         run: |
@@ -38,15 +47,11 @@ jobs:
           grep -q 'claim_digest_is_payload_identity_not_evidence_object_identity' "$production"
           grep -q 'evidence_id_is_derived_never_producer_asserted' "$production"
 
-          # Identity must be an explicit canonical contract, not incidental Rust
-          # hashing/formatting or a general-purpose serializer.
           if grep -Eq 'DefaultHasher|std::hash|serde_json::|format!\([^\n]*\{:\?\}|authority[[:space:]]+as[[:space:]]+(u8|u16|u32|usize)' "$production"; then
             echo 'RCA evidence identity depends on unstable/incidental serialization or discriminants.' >&2
             exit 1
           fi
 
-          # Every provenance-bearing field in CognitiveEvidenceRefV1 is part of
-          # the v1 identity contract. Claim identity alone must never be the join key.
           for field in \
             evidence_schema_version \
             authority \
@@ -63,7 +68,6 @@ jobs:
             grep -q "$field" "$production"
           done
 
-          # Pin the negative tests that prevent claim/provenance collapse.
           grep -q 'claim_digest_is_not_evidence_object_identity' "$src"
           grep -q 'same_claim_from_different_provenance_stays_distinct' "$src"
           grep -q 'source_version_is_identity_bearing' "$src"
@@ -75,7 +79,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tree="$(cargo tree -p symthaea-epistemic-governance -e normal)"
+          tree="$(cargo +1.94.0 tree --locked -p symthaea-epistemic-governance -e normal)"
           printf '%s\n' "$tree" | grep -q 'symthaea-types'
           if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-shadow|symthaea-rca-observer-bridge'; then
             echo 'Generic epistemic governance must not depend on RCA runtime/shadow adapters.' >&2
@@ -83,13 +87,13 @@ jobs:
           fi
 
       - name: Format epistemic governance
-        run: cargo fmt -p symthaea-epistemic-governance -- --check
+        run: cargo +1.94.0 fmt -p symthaea-epistemic-governance -- --check
 
       - name: Test evidence identity
-        run: cargo test -p symthaea-epistemic-governance identity
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance identity
 
       - name: Test epistemic governance
-        run: cargo test -p symthaea-epistemic-governance
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance
 
       - name: Clippy epistemic governance
-        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
+        run: cargo +1.94.0 clippy --locked -p symthaea-epistemic-governance --all-targets -- -D warnings
