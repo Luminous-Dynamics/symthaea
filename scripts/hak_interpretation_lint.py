@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Audit-only HAK-008 plan-conformance and interpretation validator.
-
-This module evaluates evidence bookkeeping joins. It never grants runtime
-authority and never turns model output into qualification authority.
-"""
+"""Audit-only HAK-008 plan-conformance and interpretation validator."""
 
 from __future__ import annotations
 
@@ -108,25 +104,20 @@ def validate_plan_conformance(
     negatives = _unique_map(
         _array(record.get("negative_cases"), "negative_cases"), "negative_cases", "case"
     )
-    for field, items in (("checks", checks), ("negative_cases", negatives)):
+    for label, items in (("checks", checks), ("negative_cases", negatives)):
         for ident, item in items.items():
             _require(item.get("status") in CHECK_STATUSES,
-                     f"{field}[{ident}].status must be one of {sorted(CHECK_STATUSES)}")
+                     f"{label}[{ident}].status must be one of {sorted(CHECK_STATUSES)}")
             refs = item.get("evidence_refs", [])
             _require(isinstance(refs, list) and all(isinstance(x, str) and x for x in refs),
-                     f"{field}[{ident}].evidence_refs must be an array of non-empty strings")
+                     f"{label}[{ident}].evidence_refs must be non-empty strings")
 
     required_checks = {item["check_id"] for item in plan["required_checks"]}
     required_negatives = set(plan["required_negative_cases"])
-    missing_checks = sorted(required_checks - set(checks))
-    missing_negatives = sorted(required_negatives - set(negatives))
-
-    status = record.get("status")
-    _require(status in CONFORMANCE_STATUSES,
-             f"status must be one of {sorted(CONFORMANCE_STATUSES)}")
-
-    all_checks_pass = not missing_checks and all(checks[i]["status"] == "Passed" for i in required_checks)
-    all_negatives_pass = not missing_negatives and all(negatives[i]["status"] == "Passed" for i in required_negatives)
+    missing_checks = required_checks - set(checks)
+    missing_negatives = required_negatives - set(negatives)
+    all_checks_pass = not missing_checks and all(checks[x]["status"] == "Passed" for x in required_checks)
+    all_negatives_pass = not missing_negatives and all(negatives[x]["status"] == "Passed" for x in required_negatives)
     any_failed = any(item["status"] == "Failed" for item in checks.values()) or any(
         item["status"] == "Failed" for item in negatives.values()
     )
@@ -136,10 +127,14 @@ def validate_plan_conformance(
     _require(isinstance(limitations, list) and all(isinstance(x, str) and x for x in limitations),
              "limitations must be an array of non-empty strings")
 
+    status = record.get("status")
+    _require(status in CONFORMANCE_STATUSES,
+             f"status must be one of {sorted(CONFORMANCE_STATUSES)}")
     if status == "Satisfied":
         _require(receipt_success, "Satisfied conformance requires successful terminal receipt")
         _require(all_checks_pass, "Satisfied conformance requires every required check Passed")
-        _require(all_negatives_pass, "Satisfied conformance requires every required negative case Passed")
+        _require(all_negatives_pass,
+                 "Satisfied conformance requires every required negative case Passed")
     elif status == "NotSatisfied":
         _require(any_failed or not receipt_success,
                  "NotSatisfied requires a failed required item or non-success terminal receipt")
@@ -160,15 +155,30 @@ def validate_interpretation(
     receipts: dict[str, dict[str, Any]],
     conformances: dict[str, dict[str, Any]],
     record: dict[str, Any],
+    *,
+    plan_repo_path: str,
 ) -> None:
     evidence.validate_qualification_plan(plan)
-    for receipt in receipts.values():
+    for receipt_id, receipt in receipts.items():
         evidence.validate_receipt(receipt)
+        _require(receipt_id == receipt["receipt_id"],
+                 "receipt map key must equal receipt_id")
+
+    # A stored Satisfied label is not trusted. Every supplied conformance record
+    # is revalidated against its exact receipt and qualification plan.
+    for conformance_id, conf in conformances.items():
+        _require(conformance_id == conf.get("conformance_id"),
+                 "conformance map key must equal conformance_id")
+        bound_receipt = _obj(conf.get("receipt"), "conformance.receipt")
+        rid = bound_receipt.get("receipt_id")
+        _require(rid in receipts, f"conformance {conformance_id} references unknown receipt")
+        validate_plan_conformance(
+            plan, receipts[rid], conf, plan_repo_path=plan_repo_path
+        )
 
     _require(record.get("schema_version") == "hak.evidence-interpretation.v1",
              "interpretation schema_version must be hak.evidence-interpretation.v1")
     _text(record.get("record_id"), "record_id")
-
     subject = _obj(record.get("subject"), "subject")
     _require(subject.get("repository") == plan["scope"]["repository"],
              "interpretation subject repository must match plan")
@@ -186,7 +196,6 @@ def validate_interpretation(
     claim_items = _unique_map(_array(record.get("claims"), "claims"), "claims", "claim_id")
     _require(set(claim_items) == set(plan_claims),
              "interpretation must cover exactly the claims in the qualification plan")
-
     plan_target_rank = evidence.TIER_RANK[plan["evidence_target"]]
 
     for claim_id, claim in claim_items.items():
@@ -199,6 +208,12 @@ def validate_interpretation(
                  f"claim {claim_id} references unknown conformance")
         _require(isinstance(receipt_ids, list) and all(x in receipts for x in receipt_ids),
                  f"claim {claim_id} references unknown receipt")
+
+        # Supporting conformance must actually bind one of the supporting receipts.
+        for cid in conf_ids:
+            rid = conformances[cid]["receipt"]["receipt_id"]
+            _require(rid in receipt_ids,
+                     f"claim {claim_id} conformance receipt must be explicitly supporting")
 
         tier = claim.get("supported_tier")
         limitations = claim.get("limitations", [])
@@ -220,12 +235,14 @@ def validate_interpretation(
             _require(receipt_ids and all(receipts[x]["terminal"]["conclusion"] == "success" for x in receipt_ids),
                      f"Qualified claim {claim_id} requires successful supporting receipt")
         else:
-            _require(tier is None, f"non-Qualified claim {claim_id} must not claim supported_tier")
+            _require(tier is None,
+                     f"non-Qualified claim {claim_id} must not claim supported_tier")
             if status == "NotSatisfied":
                 _require(conf_ids and any(conformances[x]["status"] == "NotSatisfied" for x in conf_ids),
                          f"NotSatisfied claim {claim_id} requires NotSatisfied conformance")
             elif status == "InsufficientEvidence":
-                _require(limitations, f"InsufficientEvidence claim {claim_id} requires limitations")
+                _require(limitations,
+                         f"InsufficientEvidence claim {claim_id} requires limitations")
             elif status == "BlockedBy":
                 _require(blockers, f"BlockedBy claim {claim_id} requires blockers")
             elif status == "Revoked":
