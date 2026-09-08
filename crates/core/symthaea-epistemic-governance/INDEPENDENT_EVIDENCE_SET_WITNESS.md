@@ -154,6 +154,57 @@ Witness identity explicitly binds:
 
 Identity does not depend on JSON byte order, Rust `Hash`, debug formatting, the legacy producer graph label, or caller input order.
 
+## Interoperability known-answer vectors
+
+The exact v1 witness encoding is pinned through the public API in `tests/lineage_identity_vectors.rs`.
+
+Witness profile digest:
+
+```text
+blake3:56afd81e7d6db518a69563a185e486a0f3235e9cb5543f456415d3ca01559146
+```
+
+Minimal two-root graph `{A,B}` has canonical lineage generation:
+
+```text
+blake3:08b22bdc6eb5775186c3d1f2695fc8b45cd2e7de142178fce0b03f217a31af89
+```
+
+For selected evidence input `[A,B]`, the witness id is:
+
+```text
+blake3:907108bd4dd6283c72085e625e8dfc89ffd9785a795dcee328d651704afe7740
+```
+
+The complex vector uses the graph defined in `CANONICAL_EVIDENCE_LINEAGE_IDENTITY.md`: roots `A`, `B`, `D`, `E`, with derived item `C <- [B,A]`. Its canonical lineage generation is:
+
+```text
+blake3:9115d0bacd4e4a9f461d2803ad660ff47bf2e0828fae21021add160e6ec936a4
+```
+
+Selected input is deliberately unordered:
+
+```text
+[E,C,D]
+```
+
+The issued witness must expose exactly:
+
+```text
+items = [C,D,E]
+C.root_ids = [A,B]
+pairs = [(C,D),(C,E),(D,E)]
+distinct_root_ids = [A,B,D,E]
+```
+
+and its witness id is:
+
+```text
+blake3:9fd4ef214fe13a7fce258f62db66d4ed418021fe1f372238ae896f3c20414275
+```
+
+This complex vector pins selected-item sorting, multi-root ordering, three-item pair ordering, distinct-root union ordering, and complete-lineage composition. Any change to these v1 bytes requires an explicit profile/version transition.
+
 ## Authority separation
 
 ```text
@@ -191,6 +242,7 @@ Qualification must establish at least:
 - changing the selected item set changes witness identity;
 - adding an unrelated graph node changes the canonical lineage generation and witness identity even when the selected subset is unchanged;
 - changing only the legacy wire graph label does not change canonical lineage generation or witness identity;
+- simple and complex public known-answer vectors reproduce exactly;
 - the issued witness cannot deserialize into trusted state;
 - no caller-supplied graph identity, root sets, pair statuses, or independence counts exist in the issuance API;
 - no downstream belief/workspace/action/promotion authority enters this layer.
