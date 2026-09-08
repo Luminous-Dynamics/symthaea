@@ -15,7 +15,7 @@ env:
 jobs:
   qualify:
     name: Prequalify Physical Agency with Rust 1.96
-    runs-on: macos-14
+    runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
