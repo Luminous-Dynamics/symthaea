@@ -388,6 +388,12 @@ mod tests {
     const D: &str = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
     const E: &str = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     const F: &str = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    const WITNESS_PROFILE_DIGEST_V1: &str =
+        "blake3:56afd81e7d6db518a69563a185e486a0f3235e9cb5543f456415d3ca01559146";
+    const TWO_ROOT_LINEAGE_ID_V1: &str =
+        "blake3:08b22bdc6eb5775186c3d1f2695fc8b45cd2e7de142178fce0b03f217a31af89";
+    const TWO_ROOT_WITNESS_ID_V1: &str =
+        "blake3:907108bd4dd6283c72085e625e8dfc89ffd9785a795dcee328d651704afe7740";
 
     fn root(id: &str) -> ValidatedEvidenceLineageNodeV1 {
         EvidenceLineageNodeV1 {
@@ -423,6 +429,18 @@ mod tests {
 
     fn ids(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_string()).collect()
+    }
+
+    #[test]
+    fn independent_witness_known_answer_is_frozen_v1() {
+        let g = graph(vec![root(A), root(B)]);
+        let witness = issue_independent_evidence_set_witness_v1(&g, &ids(&[A, B])).unwrap();
+        assert_eq!(
+            independent_evidence_set_witness_profile_digest_v1(),
+            WITNESS_PROFILE_DIGEST_V1
+        );
+        assert_eq!(witness.lineage_graph_id(), TWO_ROOT_LINEAGE_ID_V1);
+        assert_eq!(witness.witness_id(), TWO_ROOT_WITNESS_ID_V1);
     }
 
     #[test]
