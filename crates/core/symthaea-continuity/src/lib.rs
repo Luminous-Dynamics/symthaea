@@ -8,12 +8,11 @@
 
 #![deny(unsafe_code)]
 
-pub mod compose;
+mod compose;
 pub mod contract;
 pub mod observation;
 mod witness;
 
-pub use compose::{compose_qualified_witness, ComposeError, ContinuityEvidenceSubmissionV1};
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
     ContinuityRequirementV1, ContractError, EquivalencePredicate, RequirementCriticality,
