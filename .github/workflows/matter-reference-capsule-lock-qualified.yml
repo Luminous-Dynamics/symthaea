@@ -1,0 +1,171 @@
+name: Matter Reference Capsule Committed Lock Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'research/matter-reference-capsule/uv.lock'
+      - 'research/matter-reference-capsule/uv.lock.source-manifest.json'
+      - 'research/matter-reference-capsule/uv.lock.provenance.json'
+  workflow_dispatch:
+
+concurrency:
+  group: matter-reference-capsule-lock-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-committed-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact head, ancestry, and final four-file scope
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent='e78974e7d1f77b3059a9da8e578920c875987e9e'
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "${{ github.event.pull_request.base.sha }}" = "$parent"
+          test "$(git merge-base HEAD "$parent")" = "$parent"
+          mapfile -t files < <(git diff --name-only "$parent"...HEAD | sort)
+          expected=(
+            '.github/workflows/matter-reference-capsule-lock-qualified.yml'
+            'research/matter-reference-capsule/uv.lock'
+            'research/matter-reference-capsule/uv.lock.provenance.json'
+            'research/matter-reference-capsule/uv.lock.source-manifest.json'
+          )
+          test "${#files[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do
+            test "${files[$i]}" = "${expected[$i]}"
+          done
+          test ! -e .github/workflows/matter-reference-capsule-lock-materialize.yml
+          git diff --check "$parent"...HEAD
+
+      - name: Verify exact retained artifact lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          root='research/matter-reference-capsule'
+          expected_lock='1ecb6c8a0752476c9731d0d44a4113c4ed1fabfee6e339724ee4534926bda646'
+          expected_manifest='6c584bd79636db399ba50df066189010fd29cadea8e944373559a2d9cab4253f'
+          test "$(sha256sum "$root/uv.lock" | awk '{print $1}')" = "$expected_lock"
+          test "$(sha256sum "$root/uv.lock.source-manifest.json" | awk '{print $1}')" = "$expected_manifest"
+
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path('research/matter-reference-capsule')
+          source = json.loads((root / 'uv.lock.source-manifest.json').read_text())
+          provenance = json.loads((root / 'uv.lock.provenance.json').read_text())
+
+          expected_lock = '1ecb6c8a0752476c9731d0d44a4113c4ed1fabfee6e339724ee4534926bda646'
+          expected_manifest = '6c584bd79636db399ba50df066189010fd29cadea8e944373559a2d9cab4253f'
+          expected_zip = '9255252d14d0643c0c98ac75f212e4d78371357c05427dca5d827f8d0bacf309'
+          expected_source_head = 'e78974e7d1f77b3059a9da8e578920c875987e9e'
+
+          assert source['schema_version'] == 'symthaea.matter.reference-capsule-orchestration/v1'
+          assert source['authority'] == 'CandidateLockOrchestrationOnly'
+          assert source['head_sha'] == expected_source_head
+          assert source['parent_sha'] == '9a92cd234db7b5701e1c60f847a2966c7f071976'
+          assert source['candidate_uv_lock_sha256'] == expected_lock
+          assert source['tooling']['python'] == '3.13.15'
+          assert source['tooling']['uv'] == 'uv 0.10.0'
+          assert source['runner']['requested_image'] == 'ubuntu-24.04'
+          assert source['runner']['image_os'] == 'ubuntu24'
+          assert source['scientific_execution'] == {
+              'environment_qualified': False,
+              'pseudopotential_installed': False,
+              'qe_executed': False,
+              'scientific_result_observed': False,
+              'sssp_download_executed': False,
+          }
+
+          assert provenance == {
+              'schema_version': 'symthaea.matter.committed-python-lock-provenance/v1',
+              'authority': 'CommittedLockProvenanceOnly',
+              'source_workflow_run_id': 34275228052,
+              'source_artifact_id': 10075431475,
+              'source_artifact_name': 'matter-reference-capsule-orchestration-e78974e7d1f77b3059a9da8e578920c875987e9e',
+              'source_artifact_zip_sha256': expected_zip,
+              'source_manifest_sha256': expected_manifest,
+              'source_head_sha': expected_source_head,
+              'uv_lock_sha256': expected_lock,
+          }
+
+          lock_sha = hashlib.sha256((root / 'uv.lock').read_bytes()).hexdigest()
+          manifest_sha = hashlib.sha256((root / 'uv.lock.source-manifest.json').read_bytes()).hexdigest()
+          assert lock_sha == provenance['uv_lock_sha256']
+          assert manifest_sha == provenance['source_manifest_sha256']
+          PY
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+
+      - name: Set up pinned uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0 commit behind v6
+        with:
+          version: '0.10.0'
+
+      - name: Validate committed lock without re-resolution
+        working-directory: research/matter-reference-capsule
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='1ecb6c8a0752476c9731d0d44a4113c4ed1fabfee6e339724ee4534926bda646'
+          before="$(sha256sum uv.lock | awk '{print $1}')"
+          test "$before" = "$expected"
+
+          uv lock --check
+          uv sync --frozen --no-dev --python python3.13
+          uv run --frozen python - <<'PY'
+          import importlib.metadata
+          assert importlib.metadata.version('aiida-core') == '2.9.2'
+          assert importlib.metadata.version('aiida-quantumespresso') == '5.0.0'
+          import aiida
+          import aiida_quantumespresso
+          PY
+
+          after="$(sha256sum uv.lock | awk '{print $1}')"
+          test "$after" = "$before"
+          git diff --exit-code -- uv.lock
+
+      - name: Ratchet no lock regeneration and authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          f='.github/workflows/matter-reference-capsule-lock-qualified.yml'
+          grep -Fq 'uv lock --check' "$f"
+          grep -Fq 'uv sync --frozen --no-dev' "$f"
+          if grep -E '(^|[[:space:]])uv lock([[:space:]]|$)' "$f" | grep -v -- '--check' | grep -q .; then
+            echo 'Committed-lock qualification must never regenerate the lock.' >&2
+            exit 1
+          fi
+          test -f research/matter-reference-capsule/uv.lock
+          grep -Fq 'ExecutionEnvironmentPreparedOnly' research/matter-reference-capsule/bootstrap.sh
+          grep -Fq 'pseudopotential identity is deliberately not selected' research/matter-reference-capsule/bootstrap.sh
+
+      - name: Preserve authority boundary
+        shell: bash
+        run: |
+          {
+            echo '### Committed Python lock status'
+            echo ''
+            echo 'The exact hosted-generated uv.lock is committed, content-addressed, and passes uv lock --check plus frozen sync on this exact head.'
+            echo ''
+            echo '**Authority: CommittedPythonLockQualified.**'
+            echo ''
+            echo 'This does not establish Nix/QE environment preparation, pseudopotential installation, solver execution, numerical convergence, or any scientific result.'
+          } >> "$GITHUB_STEP_SUMMARY"
