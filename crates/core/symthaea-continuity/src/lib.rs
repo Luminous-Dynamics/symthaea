@@ -4,12 +4,18 @@
 //!
 //! This crate deliberately separates observed facts from dependency claims,
 //! continuity requirements, verification evidence, and execution authority.
-//! An observation or dependency claim can never grant migration authority.
+//! None of these values grants migration authority by itself.
 
 #![deny(unsafe_code)]
 
+pub mod contract;
 pub mod observation;
 
+pub use contract::{
+    ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
+    ContinuityRequirementV1, ContractError, EquivalencePredicate, RequirementCriticality,
+    ValidatedContinuityContractV1,
+};
 pub use observation::{
     DependencyBasis, DependencyClaimId, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
     ObservationEnvelopeV1, ObservationError, ObservationId,
