@@ -8,10 +8,12 @@
 
 #![deny(unsafe_code)]
 
+pub mod compose;
 pub mod contract;
 pub mod observation;
-pub mod witness;
+mod witness;
 
+pub use compose::{compose_qualified_witness, ComposeError, ContinuityEvidenceSubmissionV1};
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
     ContinuityRequirementV1, ContractError, EquivalencePredicate, RequirementCriticality,
@@ -24,6 +26,5 @@ pub use observation::{
 pub use witness::{
     EvidenceClass, ObligationDispositionV1, QualifiedContinuityWitnessV1, TargetRealizationId,
     VerificationObligationId, VerificationPolicyEntryV1, VerificationPolicyId,
-    VerificationPolicyV1, WitnessError, WitnessEvaluationV1, WitnessId, WitnessLedgerV1,
-    WitnessManifestId, WitnessManifestV1,
+    VerificationPolicyV1, WitnessError, WitnessId, WitnessManifestId,
 };
