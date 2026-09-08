@@ -147,9 +147,13 @@ jobs:
           vectors=crates/core/symthaea-epistemic-governance/tests/lineage_identity_vectors.rs
 
           grep -q 'independent_evidence_witness_v1_known_answers' "$vectors"
+          grep -q 'canonical_multiroot_lineage_graph_id_v1_known_answer' "$vectors"
+          grep -q 'independent_multiroot_three_item_witness_v1_known_answers' "$vectors"
           grep -q 'blake3:56afd81e7d6db518a69563a185e486a0f3235e9cb5543f456415d3ca01559146' "$vectors"
           grep -q 'blake3:08b22bdc6eb5775186c3d1f2695fc8b45cd2e7de142178fce0b03f217a31af89' "$vectors"
           grep -q 'blake3:907108bd4dd6283c72085e625e8dfc89ffd9785a795dcee328d651704afe7740' "$vectors"
+          grep -q 'blake3:9115d0bacd4e4a9f461d2803ad660ff47bf2e0828fae21021add160e6ec936a4' "$vectors"
+          grep -q 'blake3:9fd4ef214fe13a7fce258f62db66d4ed418021fe1f372238ae896f3c20414275' "$vectors"
 
           grep -q 'multiroot_derived_item_is_one_independent_item_not_multiple_confirmations' "$src"
           grep -q 'shared_root_siblings_cannot_form_independent_set_witness' "$src"
