@@ -10,6 +10,8 @@
 
 #![deny(unsafe_code)]
 
+pub mod observation_admission;
+
 use symthaea_safety_configuration::{
     ConfigurationDigest, SafetyConfigurationManifest, SafetyConfigurationManifestError,
 };
