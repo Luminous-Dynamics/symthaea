@@ -15,6 +15,8 @@ use super::types::{
     FreeEnergyComponents, HiddenState, Observation, PerceptionResult,
 };
 
+mod live_snapshot;
+
 // =============================================================================
 // ACTIVE INFERENCE AGENT CONFIG
 // =============================================================================
