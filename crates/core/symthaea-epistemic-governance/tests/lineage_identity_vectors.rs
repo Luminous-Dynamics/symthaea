@@ -9,7 +9,8 @@ use symthaea_epistemic_governance::{
     },
     lineage::{
         CognitiveDerivationKindV1, EvidenceLineageGraphV1, EvidenceLineageNodeV1,
-        ValidatedEvidenceLineageNodeV1, COGNITIVE_LINEAGE_SCHEMA_VERSION,
+        ValidatedEvidenceLineageGraphV1, ValidatedEvidenceLineageNodeV1,
+        COGNITIVE_LINEAGE_SCHEMA_VERSION,
     },
     lineage_identity::{
         canonical_evidence_lineage_graph_id_v1,
@@ -33,7 +34,7 @@ fn root(id: &str) -> ValidatedEvidenceLineageNodeV1 {
     .expect("known-answer root must validate")
 }
 
-fn graph(nodes: Vec<ValidatedEvidenceLineageNodeV1>) -> symthaea_epistemic_governance::lineage::ValidatedEvidenceLineageGraphV1 {
+fn graph(nodes: Vec<ValidatedEvidenceLineageNodeV1>) -> ValidatedEvidenceLineageGraphV1 {
     EvidenceLineageGraphV1 {
         schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
         graph_id: LEGACY_GRAPH_LABEL.into(),
