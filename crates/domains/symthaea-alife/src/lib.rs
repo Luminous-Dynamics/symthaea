@@ -59,6 +59,7 @@ pub mod organism_snapshot;
 pub mod perturbation;
 pub mod population;
 pub mod population_config_snapshot;
+pub mod population_snapshot;
 pub mod predator_prey;
 pub mod repeat_shock;
 pub mod repeat_shock_did;
@@ -153,6 +154,9 @@ pub use population::{
 pub use population_config_snapshot::{
     InheritanceModeSnapshotV1, PopulationConfigSnapshotErrorV1, PopulationConfigSnapshotV1,
     PopulationOrganismTemplateSnapshotV1, ValidatedPopulationConfigSnapshotV1,
+};
+pub use population_snapshot::{
+    PopulationSnapshotErrorV1, PopulationSnapshotV1, ValidatedPopulationSnapshotV1,
 };
 pub use predator_prey::{PredatorPreyConfig, PredatorPreySim, PredatorPreyStep};
 pub use repeat_shock::{
