@@ -14,6 +14,7 @@ pub mod authorization;
 pub mod commit_preconditions;
 pub mod lifecycle;
 pub mod reinstatement;
+pub mod reinstatement_admission;
 pub mod revocation;
 pub mod revocation_admission;
 pub mod revocation_commit_preconditions;
