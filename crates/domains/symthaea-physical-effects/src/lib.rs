@@ -376,12 +376,12 @@ fn validate_optional_nonnegative(
     field: &'static str,
     value: Option<f64>,
 ) -> Result<(), EffectValidationError> {
-    if let Some(value) = value {
-        if !value.is_finite() || value < 0.0 {
-            return Err(EffectValidationError::InvalidBudget(format!(
-                "{field} must be finite and non-negative, got {value}"
-            )));
-        }
+    if let Some(value) = value
+        && (!value.is_finite() || value < 0.0)
+    {
+        return Err(EffectValidationError::InvalidBudget(format!(
+            "{field} must be finite and non-negative, got {value}"
+        )));
     }
     Ok(())
 }
