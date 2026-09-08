@@ -7,23 +7,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "hak_evidence_lint.py"
-OBSERVATION = (
-    ROOT
-    / "docs"
-    / "release"
-    / "evidence"
-    / "hak"
-    / "executions"
-    / "hak006-github-34212685766-attempt1.observation.json"
-)
-PLAN = (
-    ROOT
-    / "docs"
-    / "architecture"
-    / "hak"
-    / "plans"
-    / "hak007-evidence-bookkeeping-e5-v1.plan.json"
-)
+OBSERVATION = ROOT / "docs/release/evidence/hak/executions/hak006-github-34212685766-attempt1.observation.json"
+PLAN = ROOT / "docs/architecture/hak/plans/hak007-evidence-bookkeeping-e5-v1.plan.json"
+PLAN_REPO_PATH = "docs/architecture/hak/plans/hak007-evidence-bookkeeping-e5-v1.plan.json"
 
 spec = importlib.util.spec_from_file_location("hak_evidence_lint", SCRIPT)
 assert spec and spec.loader
@@ -31,6 +17,8 @@ hak = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hak)
 
 SUBJECT = "98883dfb03594f777390abe557e307af99ff4b5d"
+SYNTHETIC_SUBJECT = "2" * 40
+SYNTHETIC_PLAN_COMMIT = "1" * 40
 
 
 def load_observation():
@@ -41,36 +29,50 @@ def load_plan():
     return json.loads(PLAN.read_text())
 
 
-def terminal_receipt():
-    observation = load_observation()
-    receipt = {
+def terminal_receipt(workflow_path=".github/workflows/hak-evidence.yml"):
+    doc = {
         "schema_version": "hak.qualification-receipt.v1",
         "receipt_id": "synthetic-receipt-for-regression-only",
-        "subject": deepcopy(observation["subject"]),
+        "subject": {
+            "repository": "Luminous-Dynamics/symthaea",
+            "commit_sha": SYNTHETIC_SUBJECT,
+            "base_commit_sha": SUBJECT,
+            "branch": "synthetic",
+        },
         "qualification_plan": {
             "plan_kind": "SelfDeclaredPlan",
-            "plan_ref": "git:Luminous-Dynamics/symthaea@1111111111111111111111111111111111111111:.github/workflows/hak-conformance.yml",
+            "plan_ref": (
+                f"git:Luminous-Dynamics/symthaea@{SYNTHETIC_PLAN_COMMIT}:"
+                f"{PLAN_REPO_PATH}"
+            ),
             "plan_digest": None,
             "precommit_status": "KnownPrecommitted",
         },
-        "execution": deepcopy(observation["execution"]),
+        "execution": {
+            "provider": "github-actions",
+            "run_id": 999001,
+            "run_attempt": 1,
+            "workflow_id": 999002,
+            "workflow_name": "HAK Evidence",
+            "workflow_path": workflow_path,
+            "event": "pull_request",
+            "provider_record_ref": "github-actions:Luminous-Dynamics/symthaea:run/999001:attempt/1",
+        },
         "terminal": {
             "status": "completed",
             "conclusion": "success",
-            "provider_started_at": "2026-09-08T09:55:38Z",
-            "provider_completed_at": "2026-09-08T10:00:00Z",
+            "provider_started_at": "2026-09-08T10:00:00Z",
+            "provider_completed_at": "2026-09-08T10:01:00Z",
         },
-        "job_receipts": [
-            {
-                "job_id": 102017126847,
-                "name": "HAK Conformance Linter",
-                "status": "completed",
-                "conclusion": "success",
-            }
-        ],
+        "job_receipts": [{
+            "job_id": 999003,
+            "name": "HAK Evidence Linter",
+            "status": "completed",
+            "conclusion": "success",
+        }],
     }
-    receipt["receipt_digest"] = hak.compute_receipt_digest(receipt)
-    return receipt
+    doc["receipt_digest"] = hak.compute_receipt_digest(doc)
+    return doc
 
 
 def test_hak007_qualification_plan_is_valid():
@@ -142,31 +144,55 @@ def test_expected_subject_mismatch_rejected():
 
 def test_known_precommitted_plan_requires_immutable_identity():
     doc = terminal_receipt()
-    doc["qualification_plan"]["plan_ref"] = "workflow:HAK Conformance"
+    doc["qualification_plan"]["plan_ref"] = "workflow:HAK Evidence"
     doc["receipt_digest"] = hak.compute_receipt_digest(doc)
     with pytest.raises(hak.EvidenceLintError):
         hak.validate_receipt(doc)
 
 
-def test_self_declared_plan_path_must_match_execution_workflow():
+def test_plan_artifact_is_distinct_from_workflow_artifact():
     doc = terminal_receipt()
-    doc["execution"]["workflow_path"] = ".github/workflows/other.yml"
+    assert PLAN_REPO_PATH != doc["execution"]["workflow_path"]
+    hak.validate_receipt(doc)
+
+
+def test_plan_record_join_accepts_distinct_plan_and_workflow_paths():
+    hak.validate_plan_record_join(load_plan(), terminal_receipt(), plan_repo_path=PLAN_REPO_PATH)
+
+
+def test_plan_record_join_rejects_wrong_workflow():
+    with pytest.raises(hak.EvidenceLintError):
+        hak.validate_plan_record_join(
+            load_plan(), terminal_receipt(".github/workflows/other.yml"),
+            plan_repo_path=PLAN_REPO_PATH,
+        )
+
+
+def test_plan_record_join_rejects_wrong_plan_document_path():
+    with pytest.raises(hak.EvidenceLintError):
+        hak.validate_plan_record_join(
+            load_plan(), terminal_receipt(),
+            plan_repo_path="docs/architecture/hak/plans/not-the-plan.json",
+        )
+
+
+def test_plan_record_join_requires_precommitted_plan():
+    doc = terminal_receipt()
+    doc["qualification_plan"] = deepcopy(load_observation()["qualification_plan"])
     doc["receipt_digest"] = hak.compute_receipt_digest(doc)
     with pytest.raises(hak.EvidenceLintError):
-        hak.validate_receipt(doc)
+        hak.validate_plan_record_join(load_plan(), doc, plan_repo_path=PLAN_REPO_PATH)
 
 
 def test_provider_ref_attempt_must_match_execution():
     doc = load_observation()
-    doc["execution"]["provider_record_ref"] = (
-        "github-actions:Luminous-Dynamics/symthaea:run/34212685766:attempt/2"
-    )
+    doc["execution"]["provider_record_ref"] = "github-actions:Luminous-Dynamics/symthaea:run/34212685766:attempt/2"
     with pytest.raises(hak.EvidenceLintError):
         hak.validate_observation(doc)
 
 
 def test_synthetic_terminal_receipt_is_valid_bookkeeping():
-    hak.validate_receipt(terminal_receipt(), expected_subject=SUBJECT)
+    hak.validate_receipt(terminal_receipt(), expected_subject=SYNTHETIC_SUBJECT)
 
 
 def test_receipt_requires_completed_status():
