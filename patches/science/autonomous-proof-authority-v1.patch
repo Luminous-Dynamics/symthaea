@@ -2,7 +2,7 @@ diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs b/crates/cor
 index 7cfb3be..0000000 100644
 --- a/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
 +++ b/crates/core/symthaea-core/src/hdc/conjecture_engine.rs
-@@ -430,25 +430,49 @@ impl ConjectureEngine {
+@@ -430,37 +430,49 @@ impl ConjectureEngine {
 -    /// Ingest autonomously-discovered invariants from `discover_invariants_autonomous`
 -    /// into the conjecture pool so downstream reflection (subtree extraction,
 -    /// macro promotion) can act on them.
@@ -89,7 +89,7 @@ index 7cfb3be..0000000 100644
                      MacroPromotionTier::FastTrackVerified
                  } else {
                      MacroPromotionTier::Quarantined
-@@ -511,7 +535,7 @@ impl ConjectureEngine {
+@@ -511,5 +535,5 @@ impl ConjectureEngine {
              &extra_templates,
          );
 -        self.ingest_autonomous_invariants(source_tag, domain, &invariants);
