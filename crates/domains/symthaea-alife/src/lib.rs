@@ -56,7 +56,9 @@ pub mod repeat_shock_did;
 pub mod repeat_shock_relative;
 pub mod types;
 
-pub use agent_id::{AgentId, AgentIdAllocator};
+pub use agent_id::{
+    AgentId, AgentIdAllocator, AgentIdAllocatorRestoreErrorV1, AgentIdAllocatorSnapshotV1,
+};
 pub use coalition::{Coalition, detect_coalitions, detect_paying_coalitions};
 pub use earth_forcing::EarthForcedEnvironment;
 pub use encounter::{EncounterScheduler, PairingMode};
