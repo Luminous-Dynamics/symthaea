@@ -1,0 +1,129 @@
+name: Matter Reference Capsule Environment Lock Candidate
+
+on:
+  pull_request:
+    paths:
+      - 'research/matter-reference-capsule/pyproject.toml'
+      - 'research/matter-reference-capsule/shell.nix'
+      - 'research/matter-reference-capsule/bootstrap.sh'
+      - '.github/workflows/matter-reference-capsule-env-lock.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Exact scaffold scope
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only '${{ github.event.pull_request.base.sha }}' '${{ github.sha }}')"
+          printf '%s\n' "$changed"
+          test "$(printf '%s\n' "$changed" | sed '/^$/d' | wc -l)" -eq 4
+          grep -qx 'research/matter-reference-capsule/pyproject.toml' <<<"$changed"
+          grep -qx 'research/matter-reference-capsule/shell.nix' <<<"$changed"
+          grep -qx 'research/matter-reference-capsule/bootstrap.sh' <<<"$changed"
+          grep -qx '.github/workflows/matter-reference-capsule-env-lock.yml' <<<"$changed"
+          ! grep -qx 'flake.lock' <<<"$changed"
+          ! grep -qx 'Cargo.lock' <<<"$changed"
+
+      - name: Scaffold must not impersonate a locked environment
+        run: |
+          set -euo pipefail
+          test ! -e research/matter-reference-capsule/uv.lock
+          grep -q 'uv.lock is not committed' research/matter-reference-capsule/bootstrap.sh
+          grep -q 'uv sync.*--frozen' research/matter-reference-capsule/bootstrap.sh
+          grep -q 'ExecutionEnvironmentPreparedOnly' research/matter-reference-capsule/bootstrap.sh
+
+      - name: Validate pinned top-level Python contract
+        run: |
+          python3 - <<'PY'
+          import pathlib, tomllib
+          path = pathlib.Path('research/matter-reference-capsule/pyproject.toml')
+          project = tomllib.loads(path.read_text())['project']
+          assert project['requires-python'] == '>=3.13,<3.14'
+          assert project['dependencies'] == [
+              'aiida-core==2.9.2',
+              'aiida-quantumespresso==5.0.0',
+          ]
+          PY
+
+      - name: Validate root-lock Nix coupling
+        run: |
+          set -euo pipefail
+          f=research/matter-reference-capsule/shell.nix
+          grep -q 'builtins.readFile ../../flake.lock' "$f"
+          grep -q 'lock.nodes.root.inputs.nixpkgs' "$f"
+          grep -q 'inherit (nixpkgsLocked) type owner repo rev narHash' "$f"
+          grep -q 'pkgs.python313' "$f"
+          grep -q 'pkgs.uv' "$f"
+          grep -q 'pkgs.quantum-espresso' "$f"
+
+      - name: Validate bootstrap safety surface
+        run: |
+          set -euo pipefail
+          bash -n research/matter-reference-capsule/bootstrap.sh
+          f=research/matter-reference-capsule/bootstrap.sh
+          grep -q 'verdi presto.*--no-broker' "$f"
+          grep -q 'caching.default_enabled False' "$f"
+          grep -q 'computer configure core.local' "$f"
+          grep -q 'quantumespresso.pw' "$f"
+          grep -q 'quantumespresso.ph' "$f"
+          grep -q 'quantumespresso.q2r' "$f"
+          grep -q 'quantumespresso.matdyn' "$f"
+          grep -q 'pseudopotential identity is deliberately not selected' "$f"
+          ! grep -Eq 'pip install|uv add|curl .*UPF|wget .*UPF' "$f"
+
+  generate-lock-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.10.0'
+
+      - name: Resolve and exercise candidate Python lock
+        working-directory: research/matter-reference-capsule
+        run: |
+          set -euo pipefail
+          uv lock --python python3.13
+          uv lock --check
+          uv sync --frozen --no-dev --python python3.13
+          uv run --frozen python - <<'PY'
+          import importlib.metadata
+          assert importlib.metadata.version('aiida-core') == '2.9.2'
+          assert importlib.metadata.version('aiida-quantumespresso') == '5.0.0'
+          import aiida
+          import aiida_quantumespresso
+          PY
+          sha256sum uv.lock > uv.lock.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: matter-reference-capsule-uv-lock-${{ github.sha }}
+          path: |
+            research/matter-reference-capsule/uv.lock
+            research/matter-reference-capsule/uv.lock.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Preserve authority boundary
+        run: |
+          {
+            echo '### Environment status'
+            echo ''
+            echo 'A candidate uv.lock was resolved and exercised in this run.'
+            echo '**This does not qualify the reference-capsule environment until that exact lock is reviewed and committed in a child PR.**'
+          } >> "$GITHUB_STEP_SUMMARY"
