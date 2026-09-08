@@ -1,0 +1,207 @@
+name: RCA Shadow Disposition Policy
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-rca-shadow-disposition-policy/**'
+      - '.github/workflows/rca-shadow-disposition-policy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Freeze policy-only authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-policy/src/lib.rs
+          production=$(mktemp)
+          code=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+          grep -vE '^[[:space:]]*//|^[[:space:]]*/\*|^[[:space:]]*\*' "$production" > "$code"
+
+          grep -q 'SHADOW_DISPOSITION_POLICY_CONTRACT_V1' "$production"
+          grep -q 'policy_is_registered_before_result_bearing_case_evaluation' "$production"
+          grep -q 'policy_registration_is_not_case_evaluation_or_disposition' "$production"
+          grep -q 'policy_is_not_belief_workspace_action_or_promotion_authority' "$production"
+          grep -q 'pub struct RegisteredShadowDispositionPolicyV1' "$production"
+
+          if grep -Eq 'pub enum ShadowDisposition|pub struct ShadowDisposition|pub fn (evaluate|decide|dispose|compute_disposition|issue_disposition)' "$code"; then
+            echo 'Disposition engine API appeared in the policy-only tranche.' >&2
+            exit 1
+          fi
+          if grep -q 'BoundShadowEvidenceCaseV1' "$code"; then
+            echo 'Policy registration acquired a concrete bound-case input.' >&2
+            exit 1
+          fi
+          if grep -q 'IndependentEvidenceSetWitnessV1' "$code"; then
+            echo 'Policy registration acquired a concrete evidence-witness input.' >&2
+            exit 1
+          fi
+          if grep -q 'InterpretationLineageV1' "$code"; then
+            echo 'Policy registration acquired a concrete interpretation-lineage input.' >&2
+            exit 1
+          fi
+
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion' "$code"; then
+            echo 'Disposition policy crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Freeze evidence-item versus interpretation-root semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-policy/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'evidence_threshold_semantics=issued_pairwise_independent_evidence_items_v1' "$production"
+          grep -q 'interpretation_threshold_semantics=pairwise_independent_interpretation_root_set_v1' "$production"
+          grep -q 'distinct_evidence_root_count_does_not_satisfy_evidence_item_threshold' "$production"
+          grep -q 'candidate_module_root_id_and_pair_edge_counts_do_not_substitute_for_required_witnesses' "$production"
+          grep -q 'pub enum EvidenceSetSemanticsV1' "$production"
+          grep -q 'IssuedPairwiseIndependentItems' "$production"
+          grep -q 'pub enum InterpretationRootSetSemanticsV1' "$production"
+          grep -q 'PairwiseIndependentRoots' "$production"
+          grep -q 'min_pairwise_independent_evidence_items' "$production"
+          grep -q 'min_pairwise_independent_interpretation_roots' "$production"
+
+          if grep -q 'min_pairwise_independent_evidence_roots' "$production"; then
+            echo 'Policy regressed to ancestry-root count as evidence threshold.' >&2
+            exit 1
+          fi
+          if grep -q 'pub enum RootSetSemanticsV1' "$production"; then
+            echo 'Policy collapsed distinct evidence-item and interpretation-root semantics.' >&2
+            exit 1
+          fi
+
+          grep -q 'pair_count_for_roots' "$production"
+          grep -q 'root_count.saturating_sub(1)' "$production"
+          grep -q 'InterpretationPairCeilingBelowRootRequirement' "$production"
+          grep -q 'CaseCeilingBelowEvidenceItemRequirement' "$production"
+
+          grep -q 'strength_treatment=diagnostic_only_v1_no_arithmetic' "$production"
+          grep -q 'RelationStrengthTreatmentV1::DiagnosticOnly' "$production"
+          if grep -Eqi 'majority.?vote|sum.*strength|mean.*strength|average.*strength|bayes|posterior|normalize.*strength|multiply.*strength' "$production"; then
+            echo 'Policy acquired prohibited count/strength arithmetic semantics.' >&2
+            exit 1
+          fi
+
+      - name: Freeze exact lower-layer profile bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-policy/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'current_bound_case_profile_digest_v1' "$production"
+          grep -q 'current_evidence_set_witness_profile_digest_v1' "$production"
+          grep -q 'current_relation_eligibility_profile_digest_v1' "$production"
+          grep -q 'current_interpretation_lineage_profile_digest_v1' "$production"
+          grep -q 'BoundCaseProfileMismatch' "$production"
+          grep -q 'EvidenceSetWitnessProfileMismatch' "$production"
+          grep -q 'RelationEligibilityProfileMismatch' "$production"
+          grep -q 'InterpretationLineageProfileMismatch' "$production"
+
+          for field in \
+            proposition_id \
+            bound_case_profile_digest \
+            evidence_set_witness_profile_digest \
+            relation_eligibility_profile_digest \
+            interpretation_lineage_profile_digest \
+            evidence_set_semantics \
+            interpretation_root_set_semantics \
+            tentative_support \
+            support \
+            tentative_opposition \
+            opposition \
+            defeater \
+            contested_side \
+            strength_treatment \
+            defeater_mode \
+            unknown_interpretation_independence_mode \
+            contested_requires_qualified_support_and_opposition \
+            experiment_contract_schema_version \
+            registered_experiment_contract_digest \
+            max_case_items \
+            max_interpretation_pairs
+          do
+            grep -q "$field" "$production"
+          done
+
+          if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Policy identity acquired incidental serializer/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+
+      - name: Freeze preregistered experiment-contract binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-policy/src/lib.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'experiment_contract::EXPERIMENT_CONTRACT_SCHEMA_VERSION' "$production"
+          grep -q 'experiment_contract_schema_version' "$production"
+          grep -q 'registered_experiment_contract_digest' "$production"
+          grep -q 'evaluation_binding=exact_registered_rca_experiment_contract_schema+digest' "$production"
+          grep -q 'evaluation_details_are_transitively_bound_by_registered_experiment_contract_not_duplicated' "$production"
+          grep -q 'ExperimentContractSchemaMismatch' "$production"
+
+          if grep -Eq 'pub (evaluation_corpus_digest|seed_plan_digest|metric_contract_digest|evaluator_id|evaluator_version)[[:space:]]*:' "$production"; then
+            echo 'Disposition policy duplicated registered experiment-contract fields.' >&2
+            exit 1
+          fi
+
+      - name: Freeze negative policy tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/bridges/symthaea-rca-shadow-disposition-policy/src/lib.rs
+          grep -q 'policy_registers_against_exact_current_profiles' "$src"
+          grep -q 'evidence_item_and_interpretation_root_thresholds_are_distinct' "$src"
+          grep -q 'evaluation_binding_uses_exact_registered_experiment_contract_identity' "$src"
+          grep -q 'wrong_experiment_contract_schema_fails_closed' "$src"
+          grep -q 'strength_semantics_are_diagnostic_only_v1' "$src"
+          grep -q 'supported_cannot_be_weaker_than_tentative_support' "$src"
+          grep -q 'opposed_cannot_be_weaker_than_tentative_opposition' "$src"
+          grep -q 'zero_topology_requirements_fail_closed' "$src"
+          grep -q 'lower_layer_profile_drift_requires_new_policy' "$src"
+          grep -q 'contested_must_preserve_qualified_support_and_opposition' "$src"
+          grep -q 'experiment_and_resource_identity_are_policy_bearing' "$src"
+          grep -q 'threshold_change_requires_new_policy_identity' "$src"
+          grep -q 'registered_policy_revalidates_after_persistence' "$src"
+          grep -q 'policy_tampering_fails_closed' "$src"
+          grep -q 'evidence_resource_ceiling_must_make_item_threshold_feasible' "$src"
+          grep -q 'interpretation_pair_ceiling_must_make_root_set_feasible' "$src"
+
+      - name: Verify dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree -p symthaea-rca-shadow-disposition-policy -e normal)"
+          if printf '%s\n' "$tree" | grep -Eq '(^| )symthaea v|symthaea-core|symthaea-rca-observer|symthaea-rca-shadow-disposition-engine'; then
+            echo 'Policy crate acquired live cognition or disposition-engine dependency.' >&2
+            exit 1
+          fi
+
+      - name: Format policy crate
+        run: cargo fmt -p symthaea-rca-shadow-disposition-policy -- --check
+
+      - name: Test policy crate
+        run: cargo test -p symthaea-rca-shadow-disposition-policy
+
+      - name: Clippy policy crate
+        run: cargo clippy -p symthaea-rca-shadow-disposition-policy --all-targets -- -D warnings
