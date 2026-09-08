@@ -41,17 +41,20 @@ jobs:
 
           grep -q 'pub mod lineage_identity;' "$lib"
           grep -q 'CANONICAL_EVIDENCE_LINEAGE_IDENTITY_CONTRACT_V1' "$production"
+          grep -q 'identity_source=typed_validated_semantics_not_serde_wire_projection' "$production"
           grep -q 'legacy_wire_graph_id_is_explicitly_excluded_from_governance_identity' "$production"
+          grep -q 'canonical_identity_derivation_is_infallible_after_validation' "$production"
           grep -q 'canonical_evidence_lineage_graph_id_v1' "$production"
           grep -q 'producer graph label' "$doc"
-          grep -q 'canonical evidence-lineage generation identity' "$doc"
+          grep -q 'validated typed lineage semantics' "$doc"
+          grep -q 'canonical identity derivation is infallible after validation' "$doc"
 
-          if grep -q 'object.get("graph_id")' "$production"; then
+          if grep -q 'graph_id()' "$production" || grep -q 'object.get("graph_id")' "$production"; then
             echo 'Legacy producer graph_id entered canonical identity.' >&2
             exit 1
           fi
 
-      - name: Freeze complete semantic graph identity
+      - name: Freeze typed serializer-free semantic graph identity
         shell: bash
         run: |
           set -euo pipefail
@@ -59,6 +62,11 @@ jobs:
           production=$(mktemp)
           sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
 
+          grep -q 'graph[[:space:]]*\.nodes()' "$production" || grep -q '\.nodes()' "$production"
+          grep -q 'node.evidence_id()' "$production"
+          grep -q 'node.parent_ids()' "$production"
+          grep -q 'node.derivation_kind()' "$production"
+          grep -q 'fn derivation_kind_tag' "$production"
           grep -q 'GRAPH_ID_DOMAIN' "$production"
           grep -q 'b"profile_contract_digest"' "$production"
           grep -q 'b"identity_schema_version"' "$production"
@@ -72,13 +80,21 @@ jobs:
           grep -q 'parent_ids.sort()' "$production"
           grep -q 'nodes.sort_by' "$production"
 
+          for variant in RootObservation Retrieval Transformation Inference Simulation Summary Critique FormalDerivation Other
+          do
+            grep -q "CognitiveDerivationKindV1::$variant" "$production"
+          done
           for tag in root_observation retrieval transformation inference simulation summary critique formal_derivation other
           do
             grep -q "\"$tag\"" "$production"
           done
 
-          if grep -Eq 'serde_json::to_string|serde_json::to_vec|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
-            echo 'Canonical lineage identity acquired incidental byte/debug/Rust Hash semantics.' >&2
+          if grep -Eq 'serde_json::|serde::|Value::|as_object\(|as_array\(|object\.get\(|CanonicalLineageIdentityError|UnexpectedWireShape|UnexpectedDerivationTag|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Canonical lineage identity acquired serializer/wire/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+          if grep -Eq 'canonical_evidence_lineage_graph_id_v1[^\{]*Result<' "$production"; then
+            echo 'Canonical lineage identity became fallible after validated input.' >&2
             exit 1
           fi
 
@@ -87,6 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           src=crates/core/symthaea-epistemic-governance/src/lineage_identity.rs
+          grep -q 'explicit_derivation_tags_are_stable' "$src"
           grep -q 'legacy_graph_label_does_not_define_canonical_identity' "$src"
           grep -q 'node_and_parent_order_do_not_change_identity' "$src"
           grep -q 'unrelated_node_addition_changes_identity' "$src"
