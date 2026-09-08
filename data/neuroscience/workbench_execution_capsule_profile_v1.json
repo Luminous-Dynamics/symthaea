@@ -1,0 +1,56 @@
+{
+  "schema": "symthaea-workbench-execution-capsule-profile-v1",
+  "status": "candidate_profile_only",
+  "qualification_platform": "x86_64-linux",
+  "flake_selection": {
+    "root_input": "nixpkgs",
+    "locked_node": "nixpkgs_2",
+    "rev": "9ae611a455b90cf061d8f332b977e387bda8e1ca",
+    "nar_hash": "sha256-md8WlXOlfnIeHeOScMTTHFyf2d6iaTwPl2apR5EQ3P4="
+  },
+  "nixpkgs_package": {
+    "attribute": "connectome-workbench",
+    "package_path": "pkgs/by-name/co/connectome-workbench/package.nix",
+    "package_blob_sha": "01e021edc0f7795f946015bb2a69103cbffaa0ba",
+    "pname": "connectome-workbench",
+    "version": "2.1.0",
+    "main_program": "wb_command",
+    "upstream_tag": "v2.1.0",
+    "upstream_source_hash": "sha256-f1T0i4x7rr3u/3ZvJ4cEAb377e7YcaGMKa2uUslVqR0="
+  },
+  "execution_environment": {
+    "lang": "C",
+    "lc_all": "C",
+    "timezone": "UTC0",
+    "omp_num_threads": "1",
+    "omp_dynamic": "FALSE",
+    "home_policy": "fresh-private-empty",
+    "xdg_config_home_policy": "fresh-private-empty",
+    "xdg_cache_home_policy": "fresh-private-empty",
+    "tmpdir_policy": "fresh-private-empty"
+  },
+  "future_closure_receipt": {
+    "store_prefix": "/nix/store/",
+    "require_recursive_runtime_closure": true,
+    "require_per_path_nar_hash": true,
+    "require_per_path_references": true,
+    "closure_digest_algorithm": "sha256",
+    "closure_digest_serialization": "canonical-json-sorted-store-paths-v1",
+    "require_workbench_file_sha256": true,
+    "require_workbench_version_output_sha256": true,
+    "require_nix_version": true,
+    "require_platform_identity": true
+  },
+  "authority": {
+    "flake_selection_bound": true,
+    "nixpkgs_package_metadata_pinned": true,
+    "closure_realized": false,
+    "closure_qualified": false,
+    "transform_executed": false,
+    "scientific_execution_qualified": false,
+    "atlas_correctness_established": false,
+    "fmq010_established": false,
+    "neural_alignment_established": false,
+    "consciousness_evidence": false
+  }
+}
