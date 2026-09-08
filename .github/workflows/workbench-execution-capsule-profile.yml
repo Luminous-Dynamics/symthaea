@@ -1,0 +1,124 @@
+name: Workbench Execution Capsule Profile
+
+on:
+  pull_request:
+    paths:
+      - 'flake.lock'
+      - 'data/neuroscience/workbench_execution_capsule_profile_v1.json'
+      - 'scripts/verify_workbench_execution_capsule_profile.py'
+      - 'scripts/test_verify_workbench_execution_capsule_profile.py'
+      - 'docs/neuroscience/WORKBENCH_EXECUTION_CAPSULE_PROFILE_V1.md'
+      - '.github/workflows/workbench-execution-capsule-profile.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify Workbench capsule profile only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout explicit theorem source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Require exact PR-head checkout
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax
+        run: |
+          python -m py_compile \
+            scripts/verify_workbench_execution_capsule_profile.py \
+            scripts/test_verify_workbench_execution_capsule_profile.py
+
+      - name: Profile contracts
+        run: PYTHONPATH=scripts python -m unittest scripts/test_verify_workbench_execution_capsule_profile.py
+
+      - name: Exact current lock binding
+        run: |
+          python scripts/verify_workbench_execution_capsule_profile.py \
+            --profile data/neuroscience/workbench_execution_capsule_profile_v1.json \
+            --flake-lock flake.lock
+
+      - name: No authority escalation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=data/neuroscience/workbench_execution_capsule_profile_v1.json
+          DOC=docs/neuroscience/WORKBENCH_EXECUTION_CAPSULE_PROFILE_V1.md
+          python - <<'PY'
+          import json
+          p=json.load(open('data/neuroscience/workbench_execution_capsule_profile_v1.json'))
+          a=p['authority']
+          assert a['flake_selection_bound'] is True
+          assert a['nixpkgs_package_metadata_pinned'] is True
+          for k in (
+              'closure_realized','closure_qualified','transform_executed',
+              'scientific_execution_qualified','atlas_correctness_established',
+              'fmq010_established','neural_alignment_established','consciousness_evidence'):
+              assert a[k] is False, k
+          PY
+          grep -Fq 'candidate profile only' "$DOC"
+          grep -Fq 'no Nix closure has been realized or qualified' "$DOC"
+          grep -Fq 'v1 is `x86_64-linux` only' "$DOC"
+          grep -Fq 'WEC-012 Provenance migration' "$DOC"
+
+      - name: Profile identity ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=data/neuroscience/workbench_execution_capsule_profile_v1.json
+          grep -Fq '9ae611a455b90cf061d8f332b977e387bda8e1ca' "$PROFILE"
+          grep -Fq 'sha256-md8WlXOlfnIeHeOScMTTHFyf2d6iaTwPl2apR5EQ3P4=' "$PROFILE"
+          grep -Fq '01e021edc0f7795f946015bb2a69103cbffaa0ba' "$PROFILE"
+          grep -Fq '"version": "2.1.0"' "$PROFILE"
+          grep -Fq '"qualification_platform": "x86_64-linux"' "$PROFILE"
+
+      - name: Deliberately no realization or execution surface
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          expected_import_roots = {
+              Path('scripts/verify_workbench_execution_capsule_profile.py'): {
+                  '__future__', 'argparse', 'json', 'sys', 'pathlib', 'typing',
+              },
+              Path('scripts/test_verify_workbench_execution_capsule_profile.py'): {
+                  '__future__', 'copy', 'json', 'sys', 'tempfile', 'unittest',
+                  'pathlib', 'verify_workbench_execution_capsule_profile',
+              },
+          }
+          forbidden_dynamic_calls = {'__import__', 'eval', 'exec'}
+
+          for path, allowed in expected_import_roots.items():
+              tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+              imported = set()
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      imported.update(alias.name.split('.')[0] for alias in node.names)
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      imported.add(node.module.split('.')[0])
+                  elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                      assert node.func.id not in forbidden_dynamic_calls, (path, node.func.id)
+              assert imported <= allowed, (path, sorted(imported - allowed))
+          PY
