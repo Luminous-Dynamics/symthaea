@@ -1,4 +1,4 @@
-name: PA15 Rustfmt Repair
+name: PA15 Prequalification
 
 on:
   push:
@@ -6,39 +6,33 @@ on:
       - physical-agency/pa-15-rustfmt-repair-work
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  format:
-    name: Format Physical Agency with Rust 1.96
+  qualify:
+    name: Prequalify Physical Agency with Rust 1.96
     runs-on: macos-15
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Install exact formatter
+      - name: Install exact toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
-          components: rustfmt
+          components: rustfmt, clippy
 
-      - name: Format only Physical Agency packages
-        run: cargo fmt -p symthaea-physical-effects -p symthaea-physical-agency
+      - name: Verify formatting
+        run: cargo fmt --check -p symthaea-physical-effects -p symthaea-physical-agency
 
-      - name: Commit formatter-only tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          git add crates/domains/symthaea-physical-effects crates/domains/symthaea-physical-agency
-          if git diff --cached --quiet; then
-            echo "No formatting changes required"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "style(physical-agency): apply Rust 1.96 formatting"
-          git push origin HEAD:physical-agency/pa-15-rustfmt-repair-work
+      - name: Check Physical Agency packages
+        run: cargo check -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
+
+      - name: Test Physical Agency packages
+        run: cargo test -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
+
+      - name: Clippy Physical Agency packages
+        run: cargo clippy -p symthaea-physical-effects -p symthaea-physical-agency --all-targets -- -D warnings
