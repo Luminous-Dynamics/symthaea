@@ -1,0 +1,94 @@
+name: HAK Real Provider Evidence
+
+on:
+  pull_request:
+    branches:
+      - architecture/hak-precommitted-check-binding-v1
+    paths:
+      - 'scripts/hak_real_evidence_lint.py'
+      - 'tests/python/test_hak_real_evidence_lint.py'
+      - 'tests/python/test_hak_real_evidence_schema.py'
+      - 'docs/architecture/HUMAN_AGENCY_KERNEL_REAL_PROVIDER_EVIDENCE_INTEGRATION_V1.md'
+      - 'docs/architecture/hak/real-provider-evidence-capsule-v1.schema.json'
+      - 'docs/architecture/hak/plans/hak011-real-provider-evidence-integration-e5-v1.plan.json'
+      - 'docs/architecture/hak/policies/hak011-real-provider-evidence-binding-policy-v1.json'
+      - 'docs/architecture/hak/evidence/real/**'
+      - '.github/workflows/hak-real-evidence.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-evidence:
+    name: HAK Real Provider Evidence
+    runs-on: ubuntu-latest
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    steps:
+      - name: Resolve exact subject
+        id: subject
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.subject.outputs.sha }}
+          persist-credentials: false
+
+      - name: Assert exact-head checkout
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ steps.subject.outputs.sha }}"
+          echo "HAK-011 exact subject: $(git rev-parse HEAD)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install focused Python dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema
+
+      - name: Compile HAK real-evidence tooling
+        run: |
+          python -m py_compile scripts/hak_evidence_lint.py
+          python -m py_compile scripts/hak_interpretation_lint.py
+          python -m py_compile scripts/hak_check_evidence_lint.py
+          python -m py_compile scripts/hak_check_binding_lint.py
+          python -m py_compile scripts/hak_real_evidence_lint.py
+
+      - name: Validate HAK-011 schema syntax
+        run: python -m json.tool docs/architecture/hak/real-provider-evidence-capsule-v1.schema.json >/dev/null
+
+      - name: Lint HAK-011 qualification plan
+        run: |
+          python scripts/hak_evidence_lint.py \
+            docs/architecture/hak/plans/hak011-real-provider-evidence-integration-e5-v1.plan.json
+
+      - name: Lint HAK-011 check-binding policy
+        run: |
+          python scripts/hak_check_binding_lint.py \
+            --plan docs/architecture/hak/plans/hak011-real-provider-evidence-integration-e5-v1.plan.json \
+            --policy docs/architecture/hak/policies/hak011-real-provider-evidence-binding-policy-v1.json
+
+      - name: Validate real cancelled-run evidence capsule
+        run: |
+          python scripts/hak_real_evidence_lint.py \
+            --plan docs/architecture/hak/plans/hak007-evidence-bookkeeping-e5-v1.plan.json \
+            --receipt docs/architecture/hak/evidence/real/hak007-run-34225891059.receipt.json \
+            --conformance docs/architecture/hak/evidence/real/hak007-run-34225891059.conformance.json \
+            --interpretation docs/architecture/hak/evidence/real/hak007-run-34225891059.interpretation.json \
+            --capsule docs/architecture/hak/evidence/real/hak007-run-34225891059.capsule.json
+
+      - name: Run HAK-011 regressions
+        run: |
+          python -m pytest -q \
+            tests/python/test_hak_real_evidence_lint.py \
+            tests/python/test_hak_real_evidence_schema.py
