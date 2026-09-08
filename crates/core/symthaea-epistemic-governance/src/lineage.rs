@@ -136,6 +136,12 @@ impl EvidenceLineageGraphV1 {
 pub struct ValidatedEvidenceLineageGraphV1(EvidenceLineageGraphV1);
 
 impl ValidatedEvidenceLineageGraphV1 {
+    /// Read-only typed semantics for consumers that must bind the complete
+    /// validated lineage without depending on its serde wire representation.
+    pub fn nodes(&self) -> &[ValidatedEvidenceLineageNodeV1] {
+        &self.0.nodes
+    }
+
     pub fn root_ids(&self, evidence_id: &str) -> Result<HashSet<String>, CognitiveLineageError> {
         validate_digest(evidence_id)?;
         let index: HashMap<&str, &ValidatedEvidenceLineageNodeV1> = self
@@ -450,6 +456,16 @@ mod tests {
         }
         .validate()
         .unwrap()
+    }
+
+    #[test]
+    fn validated_graph_exposes_read_only_semantic_nodes() {
+        let g = graph(vec![root(A), derived(B, &[A])]);
+        assert_eq!(g.nodes().len(), 2);
+        assert_eq!(g.nodes()[0].evidence_id(), A);
+        assert_eq!(g.nodes()[1].evidence_id(), B);
+        assert_eq!(g.nodes()[1].parent_ids(), &[A.to_string()]);
+        assert_eq!(g.nodes()[1].derivation_kind(), CognitiveDerivationKindV1::Inference);
     }
 
     #[test]
