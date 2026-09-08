@@ -26,11 +26,26 @@ permissions:
 jobs:
   qualify:
     name: Qualify neuromaps-method Lineage B mechanism
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout explicit theorem source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Require exact PR-head checkout
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11'
 
@@ -95,11 +110,12 @@ jobs:
           PY
 
       - name: Authority ratchet
-        shell: bash
         run: |
-          set -euo pipefail
           python - <<'PY'
           import json
+          import re
+          from pathlib import Path
+
           i=json.load(open('data/neuroscience/hcpmmp1_neuromaps_transform_method_v1.json'))['independence_contract']
           assert i['same_atlas_root_required'] is True
           assert i['execution_independence_requires_external_proof'] is True
@@ -108,14 +124,14 @@ jobs:
           assert i['semantic_normalizer_independent'] is False
           assert i['independence_established_by_this_manifest'] is False
           assert i['external_provenance_review_required'] is True
+
+          text=Path('scripts/derive_hcpmmp1_neuromaps_lineage_b.py').read_text(encoding='utf-8')
+          forbidden=re.compile(r'''independence_established["']?\s*[:=]\s*true''', re.IGNORECASE)
+          assert forbidden.search(text) is None, 'source must not mint independence authority'
           PY
           grep -Fq 'independence_established = false' docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_V1.md
           grep -Fq 'operator_pinned_required' docs/neuroscience/HCPMMP1_NEUROMAPS_LINEAGE_B_V1.md
           grep -Fq 'must be distinct' scripts/hcpmmp_neuromaps_common.py
-          if grep -Eq 'independence_established["'"']?[[:space:]]*[:=][[:space:]]*true' scripts/derive_hcpmmp1_neuromaps_lineage_b.py; then
-            echo 'source must not mint independence authority' >&2
-            exit 1
-          fi
 
       - name: No network acquisition
         shell: bash
