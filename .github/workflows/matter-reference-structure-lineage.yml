@@ -1,0 +1,58 @@
+name: Matter Reference Structure Lineage
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/matter_reference_structure_lineage.py'
+      - '.github/workflows/matter-reference-structure-lineage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Exact scope ratchet
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only '${{ github.event.pull_request.base.sha }}' '${{ github.sha }}')"
+          printf '%s\n' "$changed"
+          test "$(printf '%s\n' "$changed" | sed '/^$/d' | wc -l)" -eq 2
+          grep -qx 'scripts/matter_reference_structure_lineage.py' <<<"$changed"
+          grep -qx '.github/workflows/matter-reference-structure-lineage.yml' <<<"$changed"
+          ! grep -qx 'Cargo.lock' <<<"$changed"
+
+      - name: Python syntax
+        run: python -m py_compile scripts/matter_reference_structure_lineage.py
+
+      - name: Dependency-free self-test
+        run: python scripts/matter_reference_structure_lineage.py self-test
+
+      - name: Structure lineage semantic ratchets
+        run: |
+          set -euo pipefail
+          f=scripts/matter_reference_structure_lineage.py
+          grep -q 'source_structure_uuid.*!=.*source_structure_uuid' "$f"
+          grep -q 'final relaxed StructureData node was not reused directly as phonon-parent SCF input' "$f"
+          grep -q 'final relaxed and phonon-parent SCF ordered-cell receipts are not bit-identical' "$f"
+          grep -q 'pw_input_structure_uuid' "$f"
+          grep -q 'ExactAiiDAStructureNodeReuseAndOrderedCellV1Equality' "$f"
+          grep -q 'ExecutionReferenceOnly' "$f"
+          grep -q 'WithheldByProtocol' "$f"
+          grep -q 'does not establish phonon stability or numerical convergence' "$f"
+          ! grep -Eq 'thermodynamic[_ -]phase[_ -]eligibility.*Eligible|phonon[_ -]stable.*true|Experimental' "$f"
+
+      - name: Exact-byte evidence ratchets
+        run: |
+          set -euo pipefail
+          f=scripts/matter_reference_structure_lineage.py
+          grep -q '_sha256_file(path)' "$f"
+          grep -q 'structure reference digest mismatch' "$f"
+          grep -q 'structure artifact values differ from ordered-cell receipt' "$f"
+          grep -q 'phonon-parent structure export CalcJob is not the pw.x node used by the phonon chain' "$f"
