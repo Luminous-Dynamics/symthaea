@@ -14,7 +14,7 @@ env:
 jobs:
   format:
     name: Format Physical Agency with Rust 1.96
-    runs-on: ubuntu-latest
+    runs-on: macos-15
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
