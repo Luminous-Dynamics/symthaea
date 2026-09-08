@@ -27,6 +27,7 @@ pub mod agent_id;
 pub mod coalition;
 pub mod earth_forcing;
 pub mod encounter;
+pub mod encounter_snapshot;
 pub mod environment;
 pub mod events;
 pub mod evolvability;
@@ -64,6 +65,11 @@ pub use agent_id::{
 pub use coalition::{Coalition, detect_coalitions, detect_paying_coalitions};
 pub use earth_forcing::EarthForcedEnvironment;
 pub use encounter::{EncounterScheduler, PairingMode};
+pub use encounter_snapshot::{
+    EncounterFixedPartnerEntrySnapshotV1, EncounterPairingModeSnapshotV1,
+    EncounterSchedulerSnapshotErrorV1, EncounterSchedulerSnapshotV1,
+    ValidatedEncounterSchedulerSnapshotV1,
+};
 pub use environment::Environment;
 pub use events::GenesisEvent;
 pub use evolvability::{
