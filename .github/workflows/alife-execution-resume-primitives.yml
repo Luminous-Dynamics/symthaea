@@ -1,0 +1,176 @@
+name: ALife Execution Resume Primitives
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/src/agent_id.rs"
+      - "crates/domains/symthaea-alife/src/evolution_rng.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle_recorder.rs"
+      - "crates/domains/symthaea-alife/src/organism_seed.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - ".github/workflows/alife-execution-resume-primitives.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  resume-primitives:
+    name: Execution resume primitive contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/agent_id.rs
+          sha256sum crates/domains/symthaea-alife/src/evolution_rng.rs
+          sha256sum crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs
+          sha256sum crates/domains/symthaea-alife/src/lifecycle_recorder.rs
+          sha256sum crates/domains/symthaea-alife/src/organism_seed.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-execution-resume-primitives
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test lifecycle checkpoints
+        run: 'cargo test --locked -p symthaea-alife lifecycle_checkpoint::'
+
+      - name: Test lifecycle recorder continuation
+        run: 'cargo test --locked -p symthaea-alife lifecycle_recorder::'
+
+      - name: Test identity restore
+        run: 'cargo test --locked -p symthaea-alife agent_id::'
+
+      - name: Test evolutionary RNG restore
+        run: 'cargo test --locked -p symthaea-alife evolution_rng::'
+
+      - name: Test organism seed restore
+        run: 'cargo test --locked -p symthaea-alife organism_seed::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze primitive authority boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          agent_id="crates/domains/symthaea-alife/src/agent_id.rs"
+          evolution_rng="crates/domains/symthaea-alife/src/evolution_rng.rs"
+          checkpoint="crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs"
+          recorder="crates/domains/symthaea-alife/src/lifecycle_recorder.rs"
+          seed="crates/domains/symthaea-alife/src/organism_seed.rs"
+
+          grep -q 'from_snapshot_for_lifecycle' "$agent_id"
+          grep -q 'exhaustion_fails_closed_without_emitting_sentinel_or_wrapping' "$agent_id"
+
+          grep -q 'from_snapshot' "$evolution_rng"
+          grep -q 'ZeroMutationState' "$evolution_rng"
+          grep -q 'ZeroInheritanceSourceState' "$evolution_rng"
+
+          grep -q 'pub struct ValidatedLifecycleCheckpointV1' "$checkpoint"
+          grep -q 'deserialized_checkpoint_requires_validation_capability' "$checkpoint"
+          grep -q 'tampered_serialized_checkpoint_fails_before_capability_creation' "$checkpoint"
+
+          grep -q 'from_validated_checkpoint' "$recorder"
+          grep -q 'validated_checkpoint_restores_only_recorder_continuation_authority' "$recorder"
+          ! grep -q 'pub fn set_next_sequence' "$recorder"
+          ! grep -q 'pub fn set_current_epoch' "$recorder"
+
+          grep -q 'from_snapshot_for_lifecycle' "$seed"
+          grep -q 'LifecycleIssuedCountMismatch' "$seed"
+          grep -q 'zero_seed_base_no_longer_duplicates_the_first_founder_seed' "$seed"
+          grep -q 'maximum_seed_is_used_once_then_exhaustion_fails_closed' "$seed"
+          grep -q 'lifecycle_bound_serialized_snapshot_restores_exact_future_seed_sequence' "$seed"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path("crates/domains/symthaea-alife/src/organism_seed.rs").read_text()
+          code = "\n".join(
+              line for line in text.splitlines()
+              if not line.lstrip().startswith("//")
+          )
+          if "wrapping_add(" in code:
+              raise SystemExit("organism seed allocator code must not wrap seed arithmetic")
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          population="crates/domains/symthaea-alife/src/population.rs"
+          fep_agent="crates/core/symthaea-fep/src/agent.rs"
+
+          # This lane qualifies prerequisites only. Keep these negative assertions until dedicated
+          # production-wiring and FEP-state tranches replace them with stronger positive theorems.
+          grep -q 'next_seed' "$population"
+          ! grep -q 'OrganismSeedAllocatorV1' "$population"
+          ! grep -q 'ActiveInferenceAgentSnapshotV1' "$fep_agent"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-execution-resume-primitives-evidence
+          {
+            echo "authority=alife_execution_resume_primitives_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "agent_id_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/agent_id.rs | cut -d' ' -f1)"
+            echo "evolution_rng_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/evolution_rng.rs | cut -d' ' -f1)"
+            echo "checkpoint_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs | cut -d' ' -f1)"
+            echo "recorder_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/lifecycle_recorder.rs | cut -d' ' -f1)"
+            echo "organism_seed_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/organism_seed.rs | cut -d' ' -f1)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "validated_lifecycle_checkpoint=true"
+            echo "lifecycle_recorder_continuation=true"
+            echo "agent_id_lifecycle_bound_restore=true"
+            echo "evolution_rng_validated_restore=true"
+            echo "organism_seed_lifecycle_bound_restore=true"
+            echo "population_seed_wiring_complete=false"
+            echo "active_inference_snapshot_complete=false"
+            echo "population_execution_resume_established=false"
+          } > target/alife-execution-resume-primitives-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-execution-resume-primitives-evidence
+          path: target/alife-execution-resume-primitives-evidence/qualification.txt
+          if-no-files-found: error
