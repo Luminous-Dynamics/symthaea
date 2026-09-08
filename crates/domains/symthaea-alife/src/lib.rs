@@ -48,6 +48,7 @@ pub mod ma001r;
 pub mod metabolism;
 pub mod observatory;
 pub mod organism;
+pub mod organism_seed;
 pub mod perturbation;
 pub mod population;
 pub mod predator_prey;
@@ -108,6 +109,9 @@ pub use observatory::{
     TransferEdgeSummary, analyze_genesis_events,
 };
 pub use organism::{Action, Organism, OrganismConfig, OrganismTick, PendingSocialLearning};
+pub use organism_seed::{
+    OrganismSeedAllocatorErrorV1, OrganismSeedAllocatorSnapshotV1, OrganismSeedAllocatorV1,
+};
 pub use perturbation::{PerturbationError, PerturbationSchedule, ResourcePerturbation};
 pub use population::{
     InheritanceMode, Population, PopulationConfig, StepSummary, resolve_pair_transfer,
