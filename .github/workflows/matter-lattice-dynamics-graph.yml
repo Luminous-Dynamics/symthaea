@@ -1,0 +1,75 @@
+name: Matter Lattice Dynamics Graph
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_lattice_dynamics_graph.rs'
+      - 'src/knowledge/matter_lattice_dynamics_binding.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-lattice-dynamics-graph.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "e9e508d3b926d834703c4058d5f0faed780f4210"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-lattice-dynamics-graph.yml
+          src/knowledge/matter_lattice_dynamics_binding.rs
+          src/knowledge/matter_lattice_dynamics_graph.rs
+          src/knowledge/mod.rs
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates || true)"
+
+      - name: Ratchet batched lattice graph semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          g=src/knowledge/matter_lattice_dynamics_graph.rs
+          b=src/knowledge/matter_lattice_dynamics_binding.rs
+          m=src/knowledge/mod.rs
+
+          grep -q 'LatticeQPointBatchReceipt' "$g"
+          grep -q 'LatticeQPointSampleReceipt' "$g"
+          grep -q 'bind_crystal_solver_leaf' "$g"
+          grep -q 'CrystalSolverTask::LatticeDynamics' "$g"
+          grep -q 'actual_sample_count' "$g"
+          grep -q 'QPointSampleCountMismatch' "$g"
+          grep -q 'DuplicateQPointCoordinates' "$g"
+          grep -q 'sampled_q_point_count' "$g"
+          grep -q 'minimum_frequency_bits' "$g"
+          grep -q 'imaginary_frequency_tolerance_bits' "$g"
+          grep -q 'BatchAliasesAggregateClaim' "$g"
+          grep -q 'DynamicalMatrixNotExecutionOutput' "$g"
+          grep -q 'AggregationInputSetMismatch' "$g"
+          grep -q 'require_preregistration_before' "$g"
+          grep -q 'BatchOodNotPropagated' "$g"
+          ! grep -q 'bind_execution_references' "$g"
+          ! grep -q 'EvidenceRole::SolverExecution' "$g"
+
+          grep -q 'LatticeQPointBatchReceipt' "$b"
+          grep -q 'pub fn bind_lattice_dynamics_execution_graph' "$b"
+          ! grep -q 'LatticeQPointLeafReceipt' "$b"
+          ! grep -q 'graph.q_points' "$b"
+          grep -q '^mod matter_lattice_dynamics_graph;' "$m"
+          grep -q '^pub mod matter_lattice_dynamics_binding;' "$m"
+          ! grep -q '^pub mod matter_lattice_dynamics_graph;' "$m"
+
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Focused regression tests
+        run: cargo test --locked matter_lattice_dynamics --lib
