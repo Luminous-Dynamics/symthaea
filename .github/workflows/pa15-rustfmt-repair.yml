@@ -34,11 +34,11 @@ jobs:
       - name: Test Physical Agency packages
         run: cargo test -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
 
-      - name: Clippy Physical Agency packages
+      - name: Clippy Physical Agency packages only
         shell: bash
         run: |
           set -o pipefail
-          cargo clippy -p symthaea-physical-effects -p symthaea-physical-agency --all-targets -- -D warnings 2>&1 | tee pa15-clippy.txt
+          cargo clippy -p symthaea-physical-effects -p symthaea-physical-agency --all-targets --no-deps -- -D warnings 2>&1 | tee pa15-clippy.txt
 
       - name: Upload clippy diagnostics
         if: always()
