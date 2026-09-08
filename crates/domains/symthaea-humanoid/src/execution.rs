@@ -3,16 +3,26 @@
 //! Authoritative humanoid execution boundary.
 //!
 //! Cognitive and learned systems may propose motion, but they do not own the
-//! transition to actuator authority. This module composes the deterministic
-//! hierarchical controller with the final morphology-aware safety projector.
+//! transition to actuator authority. This module composes deterministic
+//! hierarchical control, explicitly bounded pre-actuation modifiers, typed
+//! restrictive goal authority, and the final morphology-aware safety projector.
+//!
+//! Protective fall/recovery behavior is deliberately independent of goal
+//! authority: revoking a task must not revoke the torque needed to brace or
+//! recover. Protective output still crosses final physical safety projection.
 //!
 //! Backend-specific watchdog, e-stop, over-current, calibration, bus-fault, and
 //! servo enforcement remains an additional independent responsibility of the
 //! hardware abstraction layer.
 
+use crate::contact::ContactFrame;
+use crate::dynamics::RigidBodyDynamicsProvider;
+use crate::floating_base::FloatingBaseDynamicsProvider;
+use crate::full_dynamics::FullRigidBodyDynamicsProvider;
 use crate::hierarchical::{HierarchicalControlReport, HierarchicalHumanoidController};
 use crate::morphology::HumanoidMorphology;
 use crate::safety::{HumanoidSafetyProjector, SafetyProjectionReport};
+use crate::terrain::TerrainProbe;
 use crate::types::{ActuationMode, HumanoidCommand, HumanoidState, HumanoidTask};
 
 /// Independent sources that may restrict goal-directed motor authority.
@@ -93,15 +103,111 @@ fn restrictive_unit_interval(value: f32) -> f32 {
     }
 }
 
+/// Failure while modifying a prepared, still-non-authoritative command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreparedCommandError {
+    ActuatorCountMismatch,
+    NonFiniteRetainedPolicy,
+    NonFiniteProtectiveCommand,
+    ExplorationNoiseCountMismatch,
+    NonFiniteExplorationNoise,
+}
+
+impl std::fmt::Display for PreparedCommandError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            Self::ActuatorCountMismatch => "protective command actuator count mismatch",
+            Self::NonFiniteRetainedPolicy => "protective retained-policy fraction is non-finite",
+            Self::NonFiniteProtectiveCommand => "protective command contains a non-finite value",
+            Self::ExplorationNoiseCountMismatch => "exploration noise actuator count mismatch",
+            Self::NonFiniteExplorationNoise => "exploration noise contains a non-finite value",
+        };
+        f.write_str(message)
+    }
+}
+
+impl std::error::Error for PreparedCommandError {}
+
+/// A synthesized command that has **not** crossed the authority/safety boundary.
+///
+/// The underlying goal-directed command is deliberately private. Exploration
+/// modifies only that goal-directed component. Protective fall/recovery output
+/// is retained separately so task/cognitive/epistemic revocation cannot suppress
+/// the minimum force needed for deterministic protective behavior.
+#[derive(Debug, Clone)]
+pub struct HumanoidPreparedCommand {
+    goal_command: HumanoidCommand,
+    hierarchy: HierarchicalControlReport,
+    protective_override: Option<(HumanoidCommand, f32)>,
+    exploration_applied: bool,
+}
+
+impl HumanoidPreparedCommand {
+    /// Evidence from deterministic hierarchical synthesis is inspectable before
+    /// finalization, but the raw motor command is not.
+    pub fn hierarchy_report(&self) -> &HierarchicalControlReport {
+        &self.hierarchy
+    }
+
+    pub fn goal_control_effort(&self) -> f32 {
+        self.goal_command.control_effort()
+    }
+
+    /// Register a deterministic protective behavior to be blended only after
+    /// goal authority has been applied. Invalid inputs are rejected without
+    /// mutating the prepared command.
+    pub fn apply_protective_override(
+        &mut self,
+        protective: &HumanoidCommand,
+        retained_policy: f32,
+    ) -> Result<(), PreparedCommandError> {
+        if protective.num_actuators() != self.goal_command.num_actuators() {
+            return Err(PreparedCommandError::ActuatorCountMismatch);
+        }
+        if !retained_policy.is_finite() {
+            return Err(PreparedCommandError::NonFiniteRetainedPolicy);
+        }
+        if protective.torques.iter().any(|value| !value.is_finite()) {
+            return Err(PreparedCommandError::NonFiniteProtectiveCommand);
+        }
+        self.protective_override = Some((protective.clone(), retained_policy.clamp(0.0, 1.0)));
+        Ok(())
+    }
+
+    /// Apply exploration only to the goal-directed component while it is still
+    /// non-authoritative. Exact actuator cardinality is required so noise cannot
+    /// truncate a frame.
+    pub fn apply_exploration_noise(
+        &mut self,
+        noise: &[f32],
+    ) -> Result<(), PreparedCommandError> {
+        if noise.len() != self.goal_command.num_actuators() {
+            return Err(PreparedCommandError::ExplorationNoiseCountMismatch);
+        }
+        if noise.iter().any(|value| !value.is_finite()) {
+            return Err(PreparedCommandError::NonFiniteExplorationNoise);
+        }
+        for (value, noise) in self.goal_command.torques.iter_mut().zip(noise.iter()) {
+            *value = (*value + *noise).clamp(-1.0, 1.0);
+        }
+        self.exploration_applied = true;
+        Ok(())
+    }
+}
+
 /// Evidence emitted for every command that crosses the humanoid authority boundary.
 #[derive(Debug, Clone)]
 pub struct HumanoidExecutionReport {
     pub hierarchy: HierarchicalControlReport,
     pub safety: SafetyProjectionReport,
-    /// Per-source authority inputs used for this command.
+    /// Per-source goal authority inputs used for this command.
     pub authority: HumanoidAuthorityEnvelope,
-    /// Most-restrictive authority multiplier applied after deterministic synthesis.
+    /// Most-restrictive goal-authority multiplier.
     pub authority_scale: f32,
+    /// Whether independent protective behavior was blended after goal authority.
+    pub protective_override_applied: bool,
+    /// Whether exploration modified the goal-directed component before authority.
+    pub exploration_applied: bool,
 }
 
 /// Result of one authoritative command synthesis.
@@ -134,6 +240,120 @@ impl HumanoidExecutionPipeline {
         self.morphology
     }
 
+    /// Deterministic synthesis on the default estimated-contact/flat-terrain path.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare(
+        &self,
+        task: HumanoidTask,
+        state: &HumanoidState,
+        baseline: &HumanoidCommand,
+        learned_residual: &HumanoidCommand,
+        baseline_weight: f32,
+        free_energy: f64,
+    ) -> HumanoidPreparedCommand {
+        let (goal_command, hierarchy) = self.hierarchy.synthesize(
+            task,
+            state,
+            baseline,
+            learned_residual,
+            baseline_weight,
+            free_energy,
+        );
+        HumanoidPreparedCommand {
+            goal_command,
+            hierarchy,
+            protective_override: None,
+            exploration_applied: false,
+        }
+    }
+
+    /// Deterministic synthesis using the embodiment's real contact, terrain, and
+    /// dynamics providers. This is the path training/HIL/hardware should use when
+    /// richer evidence is available.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_with_environment<T>(
+        &self,
+        task: HumanoidTask,
+        state: &HumanoidState,
+        contacts: &ContactFrame,
+        environment: &T,
+        baseline: &HumanoidCommand,
+        learned_residual: &HumanoidCommand,
+        baseline_weight: f32,
+        free_energy: f64,
+    ) -> HumanoidPreparedCommand
+    where
+        T: TerrainProbe
+            + RigidBodyDynamicsProvider
+            + FullRigidBodyDynamicsProvider
+            + FloatingBaseDynamicsProvider
+            + ?Sized,
+    {
+        let (goal_command, hierarchy) = self.hierarchy.synthesize_with_environment(
+            task,
+            state,
+            contacts,
+            environment,
+            baseline,
+            learned_residual,
+            baseline_weight,
+            free_energy,
+        );
+        HumanoidPreparedCommand {
+            goal_command,
+            hierarchy,
+            protective_override: None,
+            exploration_applied: false,
+        }
+    }
+
+    /// Consume a prepared command and cross typed goal authority + final physical
+    /// projection. Protective output is blended after goal authority so loss of
+    /// task/cognitive/epistemic authority cannot disable deterministic bracing.
+    pub fn finalize_prepared(
+        &mut self,
+        mut prepared: HumanoidPreparedCommand,
+        state: &HumanoidState,
+        authority: HumanoidAuthorityEnvelope,
+        actuation_mode: ActuationMode,
+        dt: f64,
+    ) -> HumanoidExecutionResult {
+        let authority_scale = authority.effective_scale();
+        if authority_scale < 1.0 {
+            for torque in &mut prepared.goal_command.torques {
+                *torque *= authority_scale;
+            }
+        }
+
+        let protective_override_applied = prepared.protective_override.is_some();
+        if let Some((protective, retained_policy)) = prepared.protective_override.take() {
+            for (goal, protective) in prepared
+                .goal_command
+                .torques
+                .iter_mut()
+                .zip(protective.torques.iter())
+            {
+                *goal = (retained_policy * *goal + *protective).clamp(-1.0, 1.0);
+            }
+        }
+
+        let projected = self
+            .safety
+            .project(&prepared.goal_command, state, actuation_mode, dt);
+
+        HumanoidExecutionResult {
+            command: projected.command,
+            report: HumanoidExecutionReport {
+                hierarchy: prepared.hierarchy,
+                safety: projected.report,
+                authority,
+                authority_scale,
+                protective_override_applied,
+                exploration_applied: prepared.exploration_applied,
+            },
+        }
+    }
+
     /// Compatibility entry point for callers that still provide one scalar.
     #[allow(clippy::too_many_arguments)]
     pub fn authorize(
@@ -161,8 +381,7 @@ impl HumanoidExecutionPipeline {
         )
     }
 
-    /// Admit a baseline + learned residual through deterministic whole-body
-    /// synthesis and final command projection using independent authority sources.
+    /// Convenience path for ordinary callers with no pre-finalization modifiers.
     #[allow(clippy::too_many_arguments)]
     pub fn authorize_with_authority(
         &mut self,
@@ -176,7 +395,7 @@ impl HumanoidExecutionPipeline {
         actuation_mode: ActuationMode,
         dt: f64,
     ) -> HumanoidExecutionResult {
-        let (mut candidate, hierarchy) = self.hierarchy.synthesize(
+        let prepared = self.prepare(
             task,
             state,
             baseline,
@@ -184,27 +403,7 @@ impl HumanoidExecutionPipeline {
             baseline_weight,
             free_energy,
         );
-
-        let authority_scale = authority.effective_scale();
-        if authority_scale < 1.0 {
-            for torque in &mut candidate.torques {
-                *torque *= authority_scale;
-            }
-        }
-
-        let projected = self
-            .safety
-            .project(&candidate, state, actuation_mode, dt);
-
-        HumanoidExecutionResult {
-            command: projected.command,
-            report: HumanoidExecutionReport {
-                hierarchy,
-                safety: projected.report,
-                authority,
-                authority_scale,
-            },
-        }
+        self.finalize_prepared(prepared, state, authority, actuation_mode, dt)
     }
 
     /// Route a platform minimum-safe fallback through the same final physical
@@ -267,6 +466,83 @@ mod tests {
     }
 
     #[test]
+    fn prepared_command_requires_exact_exploration_cardinality() {
+        let morphology = HumanoidMorphology::Dmc21;
+        let pipeline = HumanoidExecutionPipeline::new(morphology);
+        let state = HumanoidState::standing_for(morphology);
+        let (baseline, residual) = zero_pair(morphology);
+        let mut prepared = pipeline.prepare(
+            HumanoidTask::Stand,
+            &state,
+            &baseline,
+            &residual,
+            1.0,
+            0.0,
+        );
+        let err = prepared.apply_exploration_noise(&[0.0; 2]).unwrap_err();
+        assert_eq!(err, PreparedCommandError::ExplorationNoiseCountMismatch);
+    }
+
+    #[test]
+    fn protective_behavior_survives_goal_authority_revocation() {
+        let morphology = HumanoidMorphology::Dmc21;
+        let mut pipeline = HumanoidExecutionPipeline::new(morphology);
+        let state = HumanoidState::standing_for(morphology);
+        let (baseline, residual) = zero_pair(morphology);
+        let mut prepared = pipeline.prepare(
+            HumanoidTask::Stand,
+            &state,
+            &baseline,
+            &residual,
+            1.0,
+            0.0,
+        );
+        let mut protective = HumanoidCommand::zero_for(morphology.num_actuators());
+        protective.torques[0] = 0.1;
+        prepared.apply_protective_override(&protective, 0.0).unwrap();
+        let result = pipeline.finalize_prepared(
+            prepared,
+            &state,
+            HumanoidAuthorityEnvelope::default(),
+            ActuationMode::NormalizedTorque,
+            0.025,
+        );
+        assert_eq!(result.report.authority_scale, 0.0);
+        assert!(result.report.protective_override_applied);
+        assert!(result.command.torques[0] > 0.0);
+    }
+
+    #[test]
+    fn protective_and_exploration_modifiers_are_evidenced() {
+        let morphology = HumanoidMorphology::Dmc21;
+        let mut pipeline = HumanoidExecutionPipeline::new(morphology);
+        let state = HumanoidState::standing_for(morphology);
+        let (baseline, residual) = zero_pair(morphology);
+        let mut prepared = pipeline.prepare(
+            HumanoidTask::Stand,
+            &state,
+            &baseline,
+            &residual,
+            1.0,
+            0.0,
+        );
+        let protective = HumanoidCommand::zero_for(morphology.num_actuators());
+        prepared.apply_protective_override(&protective, 0.35).unwrap();
+        prepared
+            .apply_exploration_noise(&vec![0.0; morphology.num_actuators()])
+            .unwrap();
+        let result = pipeline.finalize_prepared(
+            prepared,
+            &state,
+            HumanoidAuthorityEnvelope::fully_admitted(),
+            ActuationMode::NormalizedTorque,
+            0.025,
+        );
+        assert!(result.report.protective_override_applied);
+        assert!(result.report.exploration_applied);
+    }
+
+    #[test]
     fn non_finite_legacy_authority_fails_restrictive() {
         let morphology = HumanoidMorphology::Dmc21;
         let mut pipeline = HumanoidExecutionPipeline::new(morphology);
@@ -308,6 +584,8 @@ mod tests {
         assert_eq!(result.command.num_actuators(), morphology.num_actuators());
         assert!(!result.report.safety.rejected);
         assert_eq!(result.report.authority_scale, 1.0);
+        assert!(!result.report.protective_override_applied);
+        assert!(!result.report.exploration_applied);
     }
 
     #[test]
