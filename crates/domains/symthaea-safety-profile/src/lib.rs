@@ -9,6 +9,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod admission;
 pub mod authorization;
 pub mod transition;
 
