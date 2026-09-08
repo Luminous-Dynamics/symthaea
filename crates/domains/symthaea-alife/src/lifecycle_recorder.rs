@@ -15,7 +15,7 @@
 //!
 //! Callers do **not** supply event timestamps. The recorder owns `current_epoch`.
 //!
-//! A future production `Population` integration should use the clock as follows:
+//! Production [`crate::Population`] integration uses the clock as follows:
 //!
 //! 1. founders are emitted at epoch 0;
 //! 2. any out-of-band cull before the next population step is emitted at the current epoch;
@@ -30,7 +30,7 @@
 
 use crate::{
     EvolutionBirthPlanV1, Genome, GenomeEvidenceV1, LifecycleDeathCauseV1, LifecycleEventV1,
-    LifecycleTransitionV1, Organism,
+    LifecycleTransitionV1, Organism, ValidatedLifecycleCheckpointV1,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +77,28 @@ impl LifecycleRecorderV1 {
             })?;
         }
         Ok(recorder)
+    }
+
+    /// Continue only the lifecycle **evidence stream** from a canonically validated checkpoint.
+    ///
+    /// The recorder receives no raw sequence/epoch setters. Its continuation cursor can be
+    /// reconstructed only from [`ValidatedLifecycleCheckpointV1`], so arbitrary persisted integers
+    /// cannot become append authority merely because they deserialize.
+    ///
+    /// The returned recorder starts with an empty event buffer and preserves exactly:
+    ///
+    /// - the checkpoint's next global lifecycle sequence;
+    /// - the checkpoint's continuation epoch.
+    ///
+    /// This does **not** restore `Population`, organisms, cognitive state, identity allocation,
+    /// evolutionary RNG streams, organism seed state, or social event state. It is deliberately a
+    /// narrow evidence-continuation bridge rather than a simulation-resume API.
+    pub fn from_validated_checkpoint(checkpoint: &ValidatedLifecycleCheckpointV1) -> Self {
+        Self {
+            events: Vec::new(),
+            next_sequence: checkpoint.next_sequence(),
+            current_epoch: checkpoint.continuation_epoch(),
+        }
     }
 
     /// Record one authoritative birth at the recorder's current population-local epoch using exact
@@ -240,7 +262,9 @@ fn validate_organism_snapshot(organism: &Organism) -> Result<(), LifecycleRecord
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AgentIdAllocator, OrganismConfig, analyze_lifecycle_events};
+    use crate::{
+        AgentIdAllocator, LifecycleCheckpointV1, OrganismConfig, analyze_lifecycle_events,
+    };
 
     fn founder(ids: &mut AgentIdAllocator, seed: u64) -> Organism {
         let id = ids.allocate();
@@ -372,6 +396,45 @@ mod tests {
             .expect("death");
         assert_eq!(recorder.events()[0].sequence, 1);
         assert_eq!(recorder.events()[0].tick, 1);
+    }
+
+    #[test]
+    fn validated_checkpoint_restores_only_recorder_continuation_authority() {
+        let mut ids = AgentIdAllocator::new();
+        let founder = founder(&mut ids, 101);
+        let founders = [founder];
+        let founder = &founders[0];
+        let mut original = LifecycleRecorderV1::from_founders(&founders).expect("founder");
+        original.advance_epoch().expect("epoch 1");
+        let prefix = original.drain();
+
+        let checkpoint =
+            LifecycleCheckpointV1::from_complete_prefix(&prefix, original.current_epoch())
+                .expect("validated evidence checkpoint");
+        let mut restored = LifecycleRecorderV1::from_validated_checkpoint(&checkpoint);
+
+        assert!(restored.events().is_empty());
+        assert_eq!(restored.next_sequence(), original.next_sequence());
+        assert_eq!(restored.current_epoch(), original.current_epoch());
+
+        restored
+            .record_death(founder, LifecycleDeathCauseV1::CullWeakest)
+            .expect("continued death evidence");
+        let chunk = restored.drain();
+        assert_eq!(chunk[0].sequence, 1);
+        assert_eq!(chunk[0].tick, 1);
+
+        let continued = checkpoint
+            .validate_chunk(&chunk, restored.current_epoch())
+            .expect("continued chunk remains canonical");
+        let mut expected = prefix;
+        expected.extend_from_slice(&chunk);
+        assert_eq!(
+            continued
+                .reconstruct_complete_prefix()
+                .expect("reconstruct continued stream"),
+            expected
+        );
     }
 
     #[test]
