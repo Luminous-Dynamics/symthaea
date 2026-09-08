@@ -33,6 +33,7 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import re
           import tomllib
 
           root = Path('crates/bridges/symthaea-iot-actuation-effect-outcome-verifier')
@@ -61,7 +62,6 @@ jobs:
               'NonExecution{non_execution_proof_digest:Digest32,execution_log_head_digest:Digest32,coverage_from_unix_ms:u64,coverage_through_unix_ms:u64,}',
               'pubstructGuardPhysicalEffectOutcomeState',
               'pubconstfnanchored_policy_generation(&self)->u64{self.policy.generation}',
-              'pubfnverify_evidence(&self,evidence:PhysicalEffectOutcomeEvidenceV1,challenge:&EffectReconciliationChallengeV1)',
               'self.verify_evidence_at(evidence,challenge,system_unix_ms()?)',
               'pub(crate)fnverify_evidence_at(',
               'ifbody.challenge_digest!=challenge_digest',
@@ -94,6 +94,19 @@ jobs:
           missing = [needle for needle in required if needle not in compact]
           if missing:
               raise SystemExit(f'missing outcome-verifier invariant: {missing}')
+
+          verify_evidence_signature = re.compile(
+              r'pubfnverify_evidence\('
+              r'&self,'
+              r'evidence:PhysicalEffectOutcomeEvidenceV1,'
+              r'challenge:&EffectReconciliationChallengeV1,?'
+              r'\)->Result<VerifiedPhysicalEffectOutcomeEvidence,EffectOutcomeError>'
+          )
+          if verify_evidence_signature.search(compact) is None:
+              raise SystemExit(
+                  'public verify_evidence signature no longer binds the exact V1 evidence, '
+                  'reconciliation challenge, and verified-proof result types'
+              )
 
           forbidden = [
               'Deserialize', 'Serialize', 'serde', 'bincode',
