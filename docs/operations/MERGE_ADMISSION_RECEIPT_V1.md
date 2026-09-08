@@ -2,7 +2,8 @@
 
 ## Purpose
 
-Symthaea needs a hard semantic boundary between **evidence that a candidate was tested** and **authority to integrate that candidate**.
+Symthaea needs a hard semantic boundary between **evidence that a candidate was
+tested** and **authority to integrate that candidate**.
 
 The central theorem is:
 
@@ -17,8 +18,10 @@ A successful workflow run is evidence. It is not, by itself, proof that:
 - the run belongs to the exact candidate head now under review;
 - it was evaluated against the current target base;
 - the expected workflow generation executed;
-- every required job actually ran rather than being skipped;
-- the candidate did not alter the CI/governance control plane that interprets its own result;
+- the collector enumerated every job in the exact run attempt;
+- the enumerated jobs satisfy the trusted target-base required-job manifest;
+- the candidate did not alter the CI/governance control plane that interprets
+  its own result;
 - repository policy admits the result as sufficient for integration.
 
 `MergeAdmissionReceiptV1` makes those distinctions explicit.
@@ -33,12 +36,22 @@ It does not:
 - merge a pull request;
 - create a GitHub status/check;
 - sign a receipt;
-- claim that caller-supplied observations are authentic;
+- claim caller-supplied observations are authentic;
 - run candidate code;
 - replace code review;
 - weaken full integration qualification.
 
-The evaluator is intentionally useful before enforcement exists: it freezes the semantics that a future trusted collector/check must satisfy.
+The evaluator is useful before enforcement exists because it freezes the
+semantics that a future trusted collector/check must satisfy.
+
+The policy is permanently:
+
+```text
+enforcement_ready = false
+```
+
+for this generation. An `ADMITTED` v1 receipt is an unsigned policy-core
+disposition, not repository merge authority.
 
 ## Five dispositions
 
@@ -46,10 +59,12 @@ V1 does not reduce merge state to green/red.
 
 ```text
 ADMITTED
-    all v1 predicates are satisfied
+    all v1 policy predicates over the supplied trusted observation are satisfied
 
 INCOMPLETE
-    required evidence is absent, pending, cancelled, skipped, or not known complete
+    required evidence is absent, pending, cancelled, skipped, the GitHub job
+    census is not known complete, or the trusted required-job manifest is not
+    complete/satisfied
 
 STALE
     evidence belongs to a previous candidate head or previous target base
@@ -58,50 +73,54 @@ BOOTSTRAP_REQUIRED
     the candidate changes the merge-authority control plane itself
 
 REJECTED
-    evidence identity is wrong, malformed, contradictory, or contains an explicit failed required gate
+    evidence identity is wrong, malformed, contradictory, contains an explicit
+    failed required gate, or does not match the trusted manifest generation
 ```
 
-These states are intentionally non-equivalent.
+These states are intentionally non-equivalent:
 
 ```text
-not yet proven != stale proof != changed authority machinery != failed proof
+not yet proven
+    !=
+stale proof
+    !=
+changed authority machinery
+    !=
+failed/contradictory proof
 ```
 
-## Exact identity boundary
+## Exact run identity
+
+GitHub reruns preserve a workflow `run_id` while incrementing `run_attempt`.
+Therefore:
+
+```text
+run_id
+    !=
+exact execution identity
+
+(run_id, run_attempt)
+    =
+exact workflow execution attempt
+```
+
+Both fields are required positive integers and are bound into the receipt
+evidence digest.
+
+A rerun attempt is distinct evidence even when every other run attribute is
+unchanged.
+
+## Exact candidate/base identity
 
 Every observation binds:
 
 ```text
 repository
- target branch
- current target-base SHA
- candidate head SHA
- candidate tree SHA
- policy content digest
- control-plane blob identities
- full-integration workflow blob identity
- workflow run ID
- workflow event
- qualification head SHA
- qualification base SHA
- required-job observation set
+target branch
+current target-base SHA
+candidate head SHA
+candidate tree SHA
 ```
-
-The output receipt also binds the full evidence observation through:
-
-```text
-evidence_binding_sha256
-```
-
-and binds the complete receipt body through:
-
-```text
-receipt_sha256
-```
-
-These hashes are content addresses, not signatures.
-
-## Head currentness
 
 A successful run on head `H1` does not qualify head `H2`.
 
@@ -110,24 +129,21 @@ run.head_sha != candidate_head_sha
     -> STALE
 ```
 
-No branch-name match, textual lineage claim, or "latest successful run" substitution may override exact head identity.
-
-## Base currentness and TOCTOU
-
-A candidate qualified against target base `B1` is not automatically admitted after the target branch advances to `B2`.
+Likewise, a candidate qualified against target base `B1` is not automatically
+admitted after the target branch advances to `B2`.
 
 ```text
 run.base_sha != current_target_base_sha
     -> STALE
 ```
 
-This deliberately chooses correctness over convenience for v1.
-
-A future policy may admit a separately qualified equivalence/rebase theorem, but v1 contains no such shortcut.
+No branch-name match, textual lineage claim, or "latest successful run"
+substitution may override exact head/base identity.
 
 ## Control-plane equivalence
 
-For an ordinary candidate, the merge-authority control plane must be byte-identical to the current target-base generation.
+For an ordinary candidate, the merge-authority control plane must be
+byte-identical to the current target-base generation.
 
 Each governed path is observed as:
 
@@ -137,7 +153,7 @@ base_blob_sha | null
 candidate_blob_sha | null
 ```
 
-`null == null` means the path is absent from both trees and therefore unchanged.
+`null == null` means the path is absent from both trees and unchanged.
 
 Any difference means:
 
@@ -146,37 +162,48 @@ candidate changes authority/control plane
     -> BOOTSTRAP_REQUIRED
 ```
 
-This is stronger than trusting a workflow merely because it has the expected filename or display name.
+The governed surface includes the CI workflow, lifecycle scheduler inputs, the
+admission policy/evaluator, observation/receipt schemas, required-job
+manifest/schema, and normative contracts.
 
-### Why this matters
-
-Without this rule, a candidate could modify the workflow that determines whether its own expensive tests execute, then present a green result from that modified workflow as proof of merge readiness.
-
-V1 instead says:
+This closes the recursion:
 
 ```text
-normal product change
-    + unchanged trusted control plane
-    + exact current full integration
-        -> eligible for ordinary admission evaluation
-
-control-plane change
-        -> independent bootstrap/review path
+candidate changes judge
+candidate's changed judge says PASS
+    -> NOT ordinary admission
 ```
 
-## Bootstrap is explicit, not an error case
+## Policy and manifest bytes are themselves bound
 
-A CI/governance change is legitimate work. It simply cannot establish its own authority using the machinery it changes.
+It is insufficient for a trusted observation to merely *name* a base blob while
+the evaluator consumes different local bytes.
 
-The first merge of this v1 policy is itself such a bootstrap event because the target base does not yet contain this policy file.
+The evaluator therefore computes the Git blob object identity of the exact
+policy and required-job manifest bytes it is given and requires those object IDs
+to equal the target-base control-plane blob observations.
 
-The same applies to the lifecycle-tiering tranche while its routing files do not yet exist on `main`.
+Conceptually:
 
-A bootstrap procedure must therefore be independently reviewed/qualified, and only after it lands does its exact target-base generation become ordinary admission policy for later candidates.
+```text
+bytes consumed by evaluator
+    -> Git blob OID
+    == trusted target-base blob OID
+```
+
+for both:
+
+```text
+scripts/ci/merge_admission_policy_v1.json
+scripts/ci/required_ci_job_manifest_v1.json
+```
+
+This is in addition to SHA-256 content addresses embedded in the receipt.
 
 ## Trusted workflow identity
 
-The full-integration observation must use the exact configured workflow path and the exact workflow blob from the trusted target-base control plane.
+The full-integration observation must use the exact configured workflow path and
+the exact workflow blob from the trusted target-base control plane.
 
 ```text
 observed workflow path != policy workflow path
@@ -186,21 +213,137 @@ observed workflow blob != trusted base workflow blob
     -> REJECTED
 ```
 
-A similarly named workflow cannot substitute.
+The required-job manifest independently binds that same workflow path/blob. A
+similarly named workflow or manifest for a different workflow generation cannot
+substitute.
 
-## Required-job completeness
+## Job-census completeness is not manifest satisfaction
 
-A top-level workflow conclusion of `success` is insufficient if required jobs were omitted or skipped.
-
-The trusted collector must establish:
+This distinction is load-bearing.
 
 ```text
-job_set_complete == true
+complete GitHub API census
+    !=
+required qualification surface satisfied
 ```
 
-and provide the required-job observation set.
+A collector can truthfully paginate every job GitHub returned from an
+accidentally weakened workflow. That would be a **complete census of incomplete
+qualification**.
 
-Every required job must be:
+The observation therefore carries:
+
+```text
+job_census_complete
+job_census[]
+```
+
+where each census row binds:
+
+```text
+job_id
+API-visible job name
+status
+conclusion
+skipped
+```
+
+The collector is responsible only for establishing that the census is complete
+for the exact `(run_id, run_attempt)`.
+
+The collector does **not** assert `required_job_manifest_match=true`.
+
+## Required-job manifest
+
+Required-job selection is derived by the pure evaluator from the base-owned:
+
+```text
+scripts/ci/required_ci_job_manifest_v1.json
+```
+
+The manifest binds:
+
+```text
+manifest schema
+workflow path
+workflow blob identity
+complete flag
+event profiles
+top-level job IDs
+API-name family regexes
+minimum/maximum instance cardinalities
+required disposition:
+    success
+    allowed_skip
+```
+
+For a complete manifest, each top-level job ID must be represented exactly once
+by a family in every profile.
+
+At runtime the evaluator:
+
+1. chooses the profile for the exact workflow event;
+2. matches API-visible job names using `fullmatch`, not substring search;
+3. verifies each family cardinality;
+4. rejects jobs matching multiple families;
+5. rejects jobs absent from the complete profile;
+6. applies each family's required disposition;
+7. derives the exact required-job subset and its digest.
+
+Therefore:
+
+```text
+collector says census complete
+        +
+trusted manifest bytes
+        +
+pure evaluator
+        ->
+manifest satisfaction
+```
+
+—not:
+
+```text
+collector says "manifest passed"
+        ->
+authority
+```
+
+## Current manifest is deliberately incomplete
+
+The staged real manifest is bound to the audited `ci.yml` blob:
+
+```text
+a48366076b30eb8e12d22c927a3b8bf333181409
+```
+
+but currently carries:
+
+```text
+complete = false
+```
+
+with empty event profiles.
+
+That is intentional.
+
+Until an exact structural/job-family census is derived and separately validated
+against that workflow generation:
+
+```text
+workflow success
+    + complete GitHub job census
+    + incomplete manifest
+        -> INCOMPLETE
+```
+
+The bootstrap tranche therefore cannot accidentally become merge authority
+before its own required surface is known.
+
+## Job disposition
+
+For a family requiring `success`, every matched instance must be:
 
 ```text
 status == completed
@@ -208,50 +351,93 @@ conclusion == success
 skipped != true
 ```
 
-A skipped required job produces `INCOMPLETE`, not success.
+A skipped or pending required instance produces `INCOMPLETE`.
 
-An explicitly failed required job produces `REJECTED`.
+An explicitly failed required instance produces `REJECTED`.
 
-A cancelled full run produces `INCOMPLETE`; cancellation is not evidence that the candidate failed.
+For a family declared `allowed_skip`, an explicitly skipped instance is allowed,
+but an explicit failure remains `REJECTED`.
+
+Too few family instances produce `INCOMPLETE`.
+
+Too many, overlapping, or unmanifested instances produce `REJECTED`, because
+they indicate manifest/workflow shape drift rather than merely unfinished work.
+
+## Receipt evidence binding
+
+The receipt content-addresses:
+
+```text
+policy SHA-256
+required-job manifest SHA-256
+candidate/base identities
+control-plane blob identities
+workflow path/blob
+run ID
+run attempt
+event
+status/conclusion
+head/base
+job-census completeness
+job-census count + digest
+derived manifest satisfaction
+decision
+reasons
+```
+
+The derived satisfaction summary binds:
+
+```text
+profile
+family count
+required-job count
+required-job digest
+family-summary digest
+```
+
+Two workflow attempts, two job censuses, or two manifest generations therefore
+cannot silently collapse into one receipt identity.
+
+These hashes are content addresses, not signatures.
+
+## Bootstrap is explicit
+
+A CI/governance change is legitimate work. It simply cannot establish its own
+authority using the machinery it changes.
+
+The first merge of this policy is itself a bootstrap event because `main` does
+not yet contain the admission control plane.
+
+The lifecycle-tiering tranche is likewise bootstrap work while its routing files
+are absent from `main`.
+
+A bootstrap procedure must be independently reviewed/qualified. Only after that
+exact generation lands on the target base can it become ordinary admission
+policy for later candidates.
 
 ## Collector trust boundary
 
-The pure evaluator cannot authenticate its own input.
+The pure evaluator cannot authenticate GitHub facts by itself.
 
-Therefore:
+A future trusted collector must independently obtain, from GitHub's API or an
+equivalent trusted source:
 
-```text
-unsigned local receipt
-    !=
-repository-enforced merge authority
-```
+- current target-base SHA;
+- candidate head/tree identities;
+- control-plane blob identities;
+- exact workflow path/blob;
+- workflow `run_id` and `run_attempt`;
+- exact run head/base/event/status/conclusion;
+- **all pages** of the job census for that attempt.
 
-An enforcement deployment needs a **trusted collector** that obtains repository, ref, blob, workflow-run, and job data from GitHub's API (or another independently trusted source), not from a candidate-authored artifact.
+It must not accept candidate-provided census-completeness assertions.
 
-The trusted collector should be:
+The collector should remain read-only and base-owned. It should inspect existing
+unprivileged candidate execution evidence rather than execute arbitrary
+candidate code in a privileged context.
 
-- read-only with respect to candidate contents during evidence collection;
-- external/base-owned rather than candidate-selected;
-- exact-head and exact-base aware;
-- able to enumerate the complete required-job set;
-- unable to accept a candidate-provided `job_set_complete=true` assertion without independently establishing it;
-- separately versioned and content/provenance identified.
-
-The collector and evaluator can later produce a GitHub App check or equivalent admission signal that a repository ruleset requires.
-
-## Do not use privileged candidate execution as the shortcut
-
-Do not solve the trust problem by broadly running candidate code under `pull_request_target` with elevated base context.
-
-That mixes two different concerns:
-
-```text
-trusted observation/admission logic
-    vs
-untrusted candidate execution
-```
-
-The admission collector should inspect existing evidence and metadata. Candidate code should execute in the ordinary unprivileged qualification environment.
+Do not solve this with a broad `pull_request_target` path that checks out and
+runs candidate code with elevated credentials.
 
 ## Relationship to lifecycle tiering
 
@@ -267,135 +453,91 @@ Merge admission answers:
 what exact evidence is sufficient to integrate this exact candidate now?
 ```
 
-They must remain separate.
+They remain separate.
 
 ```text
 draft Tier-1 green
-    != full integration green
-    != merge admission
+    !=
+full integration green
+    !=
+merge admission
 ```
 
-The lifecycle scheduler may reduce expensive work on draft PRs. It cannot mint an admission receipt merely because the cheap tier passed.
+Lifecycle scheduling may reduce expensive work on draft PRs. It cannot mint
+merge authority.
 
 ## Relationship to focused scientific qualification
 
-Focused theorem gates remain valuable evidence, but v1 explicitly forbids:
+Focused theorem gates remain useful evidence, but v1 forbids:
 
 ```text
-focused evidence
+focused theorem evidence
     -> substitute for full repository integration
 ```
 
-unless a future policy revision defines and qualifies such a substitution rule.
+unless a later policy explicitly defines and qualifies such a substitution.
 
-This preserves the distinction between:
+This preserves:
 
 ```text
 scientific proposition qualification
+    !=
 repository integration qualification
+    !=
 merge authority
 ```
 
-## Receipt state machine
+## Required adversarial corpus
 
-Conceptually:
+The current pure-core test corpus includes at least:
 
-```text
-Candidate
-   |
-   v
-Collect exact evidence
-   |
-   +---- missing/pending/skipped --------> INCOMPLETE
-   |
-   +---- wrong identity/explicit fail ---> REJECTED
-   |
-   +---- old head/base ------------------> STALE
-   |
-   +---- control-plane changed ----------> BOOTSTRAP_REQUIRED
-   |
-   v
-All predicates satisfied
-   |
-   v
-ADMITTED
-```
-
-Any head or base movement invalidates the old admission state and requires a new evaluation.
-
-## Evidence monotonicity
-
-Authority may increase only through explicit verified transitions.
-
-```text
-run exists
-    != run completed
-    != run succeeded
-    != required jobs complete
-    != evidence current
-    != control plane trusted
-    != admitted
-```
-
-No aggregate score may skip these transitions.
-
-## Policy identity
-
-The evaluator computes `policy_sha256` from the exact policy bytes when invoked through the CLI.
-
-This means two semantically similar policies with different bytes are distinct policy artifacts for receipt provenance.
-
-Changing the policy is itself a control-plane event and therefore requires independent bootstrap under the previous trusted generation.
-
-## Current v1 policy
-
-The staged policy is:
-
-```text
-scripts/ci/merge_admission_policy_v1.json
-```
-
-It currently names the monolithic CI workflow plus the lifecycle/admission policy surfaces as the merge-authority control plane. Paths absent from both target base and candidate are equivalent; introducing/changing one is a bootstrap event.
-
-This is intentionally conservative while lifecycle tiering is still staged separately.
-
-## Required adversarial cases
-
-The v1 test corpus freezes at least these cases:
-
-1. exact current full success -> `ADMITTED`;
+1. exact current full success + complete manifest -> `ADMITTED`;
 2. no full integration -> `INCOMPLETE`;
-3. Tier-1/focused green with no full integration -> `INCOMPLETE`;
-4. successful old head -> `STALE`;
-5. successful old base -> `STALE`;
-6. candidate changes CI workflow -> `BOOTSTRAP_REQUIRED`;
-7. candidate changes admission policy -> `BOOTSTRAP_REQUIRED`;
-8. similarly named wrong workflow -> `REJECTED`;
-9. wrong workflow blob -> `REJECTED`;
-10. successful workflow with skipped required job -> `INCOMPLETE`;
-11. failed required job -> `REJECTED`;
-12. cancelled workflow -> `INCOMPLETE`;
-13. in-progress workflow -> `INCOMPLETE`;
-14. incomplete required-job census -> `INCOMPLETE`;
-15. duplicate job/control-plane observations -> `REJECTED`;
-16. wrong repository -> `REJECTED`;
-17. policy change changes receipt identity;
-18. workflow-run identity changes receipt identity;
-19. required-job evidence changes receipt identity.
+3. successful old head -> `STALE`;
+4. successful old base -> `STALE`;
+5. candidate changes workflow -> `BOOTSTRAP_REQUIRED`;
+6. candidate changes policy -> `BOOTSTRAP_REQUIRED`;
+7. candidate changes required-job manifest -> `BOOTSTRAP_REQUIRED`;
+8. policy bytes differ from observed target-base policy blob -> `REJECTED`;
+9. manifest bytes differ from observed target-base manifest blob -> `REJECTED`;
+10. manifest binds wrong workflow generation -> `REJECTED`;
+11. cancelled/in-progress workflow -> `INCOMPLETE`;
+12. incomplete GitHub job census -> `INCOMPLETE`;
+13. complete census missing a required family -> `INCOMPLETE`;
+14. explicit required-job failure -> `REJECTED`;
+15. required success job skipped -> `INCOMPLETE`;
+16. declared `allowed_skip` family may skip;
+17. complete census contains unmanifested job -> `REJECTED`;
+18. census job matches multiple families -> `REJECTED`;
+19. incomplete trusted manifest -> `INCOMPLETE`;
+20. duplicate job IDs -> refuse malformed observation;
+21. wrong repository -> `REJECTED`;
+22. unknown observation fields -> refuse;
+23. v1 cannot claim `enforcement_ready=true`;
+24. different `run_attempt` -> different evidence/receipt identity;
+25. changed job census -> different evidence identity;
+26. changed manifest -> different manifest/receipt identity.
 
 ## Enforcement-ready exit gate
 
-V1 should not be called repository-enforced merge authority until all are true:
+V1 must not be called repository-enforced merge authority until all are true:
 
-1. the pure evaluator test corpus passes on its exact head;
-2. a trusted collector independently obtains current base/head/tree/blob/run/job facts;
-3. the collector proves completeness of the required job set from a trusted base-owned manifest or equivalent source;
-4. collector implementation identity is itself governed;
-5. an admission result is published as a distinct check/status that cannot be produced by candidate code;
-6. repository rules require that admission check before merge;
-7. control-plane changes follow an independently reviewed bootstrap process;
-8. exact-head and exact-base staleness is enforced;
-9. lifecycle-skipped jobs cannot appear as successful required evidence;
-10. no `pull_request_target` path executes arbitrary candidate code with privileged credentials/secrets.
+1. the pure evaluator and schema corpus pass on its exact head;
+2. a trusted collector independently obtains current base/head/tree/blob/run/job
+   facts;
+3. collector pagination proves the complete job census for exact
+   `(run_id, run_attempt)`;
+4. the required-job manifest is structurally derived/validated against the exact
+   trusted workflow blob and flips to `complete=true`;
+5. manifest matching/cardinality/disposition logic is independently qualified;
+6. collector implementation identity is itself governed;
+7. an admission result is published as a distinct check/status candidate code
+   cannot mint;
+8. repository rules require that trusted admission check before merge;
+9. control-plane changes follow an independently reviewed bootstrap process;
+10. exact-head and exact-base staleness is enforced;
+11. lifecycle-skipped jobs cannot masquerade as successful required evidence;
+12. no privileged workflow executes arbitrary candidate code with secrets.
 
-Until then, the receipt remains an executable specification of merge semantics rather than an enforcement claim.
+Until then, receipts remain executable specifications of merge semantics rather
+than enforcement claims.
