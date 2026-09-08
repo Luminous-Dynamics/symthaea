@@ -13,6 +13,7 @@ pub mod admission;
 pub mod authorization;
 pub mod commit_preconditions;
 pub mod revocation;
+pub mod revocation_admission;
 pub mod transition;
 pub mod trusted_time;
 
