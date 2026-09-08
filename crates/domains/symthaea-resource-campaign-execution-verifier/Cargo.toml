@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-resource-campaign-execution-verifier"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Independent commitment reconstruction for resource campaign execution receipts"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["resources", "reproducibility", "execution", "verification"]
+categories = ["science", "simulation"]
+
+[dependencies]
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-resource-campaign-execution-receipt = { path = "../symthaea-resource-campaign-execution-receipt" }
+
+[dev-dependencies]
+symthaea-resource-campaign-execution-profile = { path = "../symthaea-resource-campaign-execution-profile" }
