@@ -1,0 +1,152 @@
+{
+  "schema_version": "symthaea.matter.reference-si-001-execution-recipe/v1",
+  "recipe_id": "matter-reference-si-001",
+  "benchmark_id": "matter-reference-si-v1",
+  "target_label": "silicon-diamond-reference",
+  "authority": "PreregisteredExecutionRecipeOnly",
+  "thermodynamic_phase_eligibility": "WithheldByProtocol",
+  "expected_results": null,
+  "target": {
+    "atomic_numbers": [14],
+    "prototype": "diamond",
+    "initial_structure": {
+      "representation": "AiiDA StructureData with QE-compatible fcc primitive cell",
+      "qe_ibrav": 2,
+      "conventional_lattice_parameter_angstrom": 5.6,
+      "cell_vectors_angstrom": [
+        [-2.8, 0.0, 2.8],
+        [0.0, 2.8, 2.8],
+        [-2.8, 2.8, 0.0]
+      ],
+      "sites_fractional": [
+        {"atomic_number": 14, "fractional": [0.0, 0.0, 0.0]},
+        {"atomic_number": 14, "fractional": [0.25, 0.25, 0.25]}
+      ],
+      "starting_value_interpretation": "round deliberately perturbed starting lattice parameter; not an acceptance/reference answer"
+    }
+  },
+  "software": {
+    "quantum_espresso_version": "7.5",
+    "aiida_core_version": "2.9.2",
+    "aiida_quantumespresso_version": "5.0.0",
+    "quantum_espresso_source": "root flake.lock -> exact nixpkgs quantum-espresso derivation",
+    "python_environment": "exact committed uv.lock required",
+    "calculation_caching": "disabled"
+  },
+  "pseudopotential": {
+    "family": "SSSP/1.3/PBE/precision",
+    "element": "Si",
+    "identity_source": "freeze-receipt.json + exported Si.upf from prospective pseudopotential freeze",
+    "cutoff_recommendations": "reference metadata only; not an acceptance criterion"
+  },
+  "electronic_common": {
+    "input_dft": "PBE",
+    "occupations": "fixed",
+    "scf_must_converge": true,
+    "conv_thr_ry": 1e-10,
+    "kpoint_offset_fractional": [0.5, 0.5, 0.5]
+  },
+  "cutoff_convergence": {
+    "structure": "initial_structure",
+    "fixed_kpoint_mesh": [6, 6, 6],
+    "ecutwfc_multipliers_of_sssp_recommendation": [0.75, 1.0, 1.25, 1.5],
+    "ecutrho_multipliers_of_sssp_recommendation": [0.75, 1.0, 1.25, 1.5],
+    "run_all_samples_even_if_early_plateau_is_observed": true,
+    "acceptance": {
+      "energy_tolerance_ev_per_atom": 0.001,
+      "required_final_consecutive_deltas_within_tolerance": 2
+    }
+  },
+  "kpoint_convergence": {
+    "structure": "initial_structure",
+    "ecutwfc_multiplier_of_sssp_recommendation": 1.5,
+    "ecutrho_multiplier_of_sssp_recommendation": 1.5,
+    "meshes": [
+      [6, 6, 6],
+      [8, 8, 8],
+      [10, 10, 10],
+      [12, 12, 12]
+    ],
+    "offset_fractional": [0.5, 0.5, 0.5],
+    "run_all_samples_even_if_early_plateau_is_observed": true,
+    "acceptance": {
+      "energy_tolerance_ev_per_atom": 0.001,
+      "required_final_consecutive_deltas_within_tolerance": 2
+    }
+  },
+  "production_resolution": {
+    "ecutwfc_multiplier_of_sssp_recommendation": 1.5,
+    "ecutrho_multiplier_of_sssp_recommendation": 1.5,
+    "kpoint_mesh": [12, 12, 12],
+    "kpoint_offset_fractional": [0.5, 0.5, 0.5]
+  },
+  "relaxation": {
+    "calculation": "vc-relax",
+    "qe_ibrav": 2,
+    "ion_dynamics": "bfgs",
+    "cell_dynamics": "bfgs",
+    "cell_dofree": "ibrav",
+    "target_pressure_kbar": 0.0,
+    "press_conv_thr_kbar": 0.5,
+    "forc_conv_thr_ry_per_bohr": 0.0003,
+    "etot_conv_thr_ry": 1e-5,
+    "nstep": 100,
+    "resolution": "production_resolution",
+    "acceptance": {
+      "max_force_ev_per_angstrom": 0.01,
+      "max_abs_stress_gpa": 0.1,
+      "max_relative_cell_change": 0.0001
+    },
+    "restart_policy": "only exact-parameter continuation after interruption; no scientific parameter retuning"
+  },
+  "production_scf": {
+    "structure": "exact final relaxation output StructureData",
+    "resolution": "production_resolution",
+    "must_be_phonon_parent": true,
+    "must_reuse_exact_final_relaxation_structure_node": true
+  },
+  "phonons": {
+    "ph": {
+      "ldisp": true,
+      "q_grid": [4, 4, 4],
+      "q_shift_fractional": [0.0, 0.0, 0.0],
+      "lshift_q": false,
+      "tr2_ph": 1e-14,
+      "epsil": false,
+      "parent": "production_scf"
+    },
+    "q2r": {
+      "zasr": "crystal"
+    },
+    "matdyn": {
+      "asr": "crystal",
+      "stability_sampling_mesh": [16, 16, 16],
+      "stability_sampling_shift_fractional": [0.0, 0.0, 0.0]
+    },
+    "acceptance": {
+      "imaginary_frequency_tolerance_thz": 0.1,
+      "interpretation": "global v1 numerical tolerance after translational ASR; does not classify acoustic versus optical branches"
+    }
+  },
+  "phase_stability": {
+    "coverage": "withheld",
+    "convex_hull_eligible": false
+  },
+  "execution_policy": {
+    "no_parameter_changes_after_first_scientific_execution": true,
+    "no_adaptive_extension_of_convergence_series": true,
+    "all_declared_samples_are_required": true,
+    "failed_criterion_means_benchmark_failure_not_retuning": true,
+    "expected_lattice_constant_not_encoded": true,
+    "expected_total_energy_not_encoded": true,
+    "expected_phonon_frequencies_not_encoded": true,
+    "reference_comparison_occurs_only_after_capsule_is_frozen": true
+  },
+  "limitations": [
+    "Si-001 is an execution/reference benchmark, not a thermodynamic hull study.",
+    "The initial 5.6 angstrom lattice parameter is a preregistered starting condition, not an expected result.",
+    "The v1 imaginary-frequency rule uses a global minimum-frequency tolerance and does not yet classify acoustic versus optical modes.",
+    "SSSP recommended cutoffs parameterize the fixed sweep but do not themselves establish convergence.",
+    "Successful completion does not constitute experimental validation or independent replication."
+  ]
+}
