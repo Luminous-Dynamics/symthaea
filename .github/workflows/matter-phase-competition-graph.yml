@@ -1,0 +1,114 @@
+name: Matter Phase Competition Graph
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_phase_competition_graph.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-phase-competition-graph.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phase-competition-graph:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact child scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='2881e440cbd32846a3a60ee8322b0f1220bd87fe'
+          CHANGED="$(git diff --name-only "$BASE"...HEAD)"
+          test -n "$CHANGED"
+          while IFS= read -r path; do
+            case "$path" in
+              src/knowledge/matter_phase_competition_graph.rs|src/knowledge/mod.rs|.github/workflows/matter-phase-competition-graph.yml) ;;
+              *) echo "unexpected phase-graph child drift: $path" >&2; exit 1 ;;
+            esac
+          done <<< "$CHANGED"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- Cargo.lock Cargo.toml)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- crates)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- src/knowledge/matter_crystal_execution.rs src/knowledge/matter_crystal_evidence_binding.rs src/knowledge/matter_crystal_phase.rs)"
+
+      - name: Ratchet many-execution phase semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_phase_competition_graph.rs
+          grep -q 'PhaseEnergyRole::TargetPhase' "$FILE"
+          grep -q 'PhaseEnergyRole::CompetingPhase' "$FILE"
+          grep -q 'TargetPhaseCardinality' "$FILE"
+          grep -q 'CompetingPhaseCountMismatch' "$FILE"
+          grep -q 'LeafCountMismatch' "$FILE"
+          grep -q 'LeafAliasesAggregateClaim' "$FILE"
+          grep -q 'DuplicatePhaseId' "$FILE"
+          grep -q 'DuplicateLeafExecutionIdentity' "$FILE"
+          grep -q 'DuplicateLeafExecutionContent' "$FILE"
+          grep -q 'CrystalSolverTask::PeriodicElectronicStructure' "$FILE"
+          grep -q 'LeafIsNotPeriodicEnergyTask' "$FILE"
+          if grep -q 'CrystalSolverTask::ThermodynamicPhaseCompetition' "$FILE"; then
+            echo 'phase competition must not be represented as one phase-competition solver leaf' >&2
+            exit 1
+          fi
+
+      - name: Ratchet exact admitted hull diagnostic
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_phase_competition_graph.rs
+          grep -q 'energy_above_hull_bits' "$FILE"
+          grep -q 'EnergyAboveHullMismatch' "$FILE"
+          grep -q 'competing_phase_count' "$FILE"
+          grep -q 'CompetingPhaseCountMismatch' "$FILE"
+          grep -q 'f64::from_bits' "$FILE"
+          grep -q 'InvalidEnergyAboveHull' "$FILE"
+
+      - name: Ratchet canonical leaf and aggregation evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_phase_competition_graph.rs
+          grep -q 'EvidenceRole::SolverExecution' "$FILE"
+          grep -q 'EvidenceRole::ArtifactContent' "$FILE"
+          grep -q 'EvidenceRole::ImplementationSnapshot' "$FILE"
+          grep -q 'EvidenceRole::DependencySnapshot' "$FILE"
+          grep -q 'LeafExecutionDateMismatch' "$FILE"
+          grep -q 'LeafDependencyPostdatesExecution' "$FILE"
+          grep -q 'LeafOutputPredatesExecution' "$FILE"
+          grep -q 'AggregationDateMismatch' "$FILE"
+          grep -q 'AggregationDependencyPostdatesOutput' "$FILE"
+          grep -q 'AggregationPredatesLeafExecution' "$FILE"
+          grep -q 'AggregationOutputAliasesLeafOutput' "$FILE"
+          grep -q 'AggregateOutputMissingFromClaim' "$FILE"
+
+      - name: Ratchet preregistration and OOD propagation
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=src/knowledge/matter_phase_competition_graph.rs
+          test "$(grep -c 'require_preregistration_before' "$FILE")" -ge 2
+          grep -q 'LeafOodNotPropagated' "$FILE"
+          grep -q 'EvidenceReferenceInterpretation::ReferenceOnly' "$FILE"
+          grep -q 'DeclaredChronologyInterpretation::DeclaredChronologyOnly' "$FILE"
+          if grep -Eq 'VerifiedChronology|VerifiedPreregistration|ExperimentallyObserved|IndependentlyReplicated' "$FILE"; then
+            echo 'phase graph must not mint stronger chronology or empirical authority' >&2
+            exit 1
+          fi
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Phase graph regression tests
+        run: cargo test --locked --lib knowledge::matter_phase_competition_graph::tests
