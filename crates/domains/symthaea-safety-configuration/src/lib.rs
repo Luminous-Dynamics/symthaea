@@ -8,6 +8,8 @@
 
 #![deny(unsafe_code)]
 
+pub mod observation;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
