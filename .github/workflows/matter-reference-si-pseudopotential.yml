@@ -1,0 +1,96 @@
+name: Matter Reference Si Pseudopotential Freeze
+
+on:
+  pull_request:
+    paths:
+      - 'research/matter-reference-capsule/freeze_si_pseudo.py'
+      - '.github/workflows/matter-reference-si-pseudopotential.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Enforce exact parent and two-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent='d98e19344008b2719def10d12eb3d2298aa1f8b5'
+          test "$(git merge-base HEAD "$parent")" = "$parent"
+          mapfile -t files < <(git diff --name-only "$parent"...HEAD | sort)
+          expected=(
+            '.github/workflows/matter-reference-si-pseudopotential.yml'
+            'research/matter-reference-capsule/freeze_si_pseudo.py'
+          )
+          test "${#files[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do
+            test "${files[$i]}" = "${expected[$i]}"
+          done
+          git diff --check "$parent"...HEAD
+
+      - name: Syntax and dependency-free self-test
+        run: |
+          set -euo pipefail
+          python -m py_compile research/matter-reference-capsule/freeze_si_pseudo.py
+          python research/matter-reference-capsule/freeze_si_pseudo.py self-test
+
+      - name: Ratchet exact SSSP acquisition semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          f='research/matter-reference-capsule/freeze_si_pseudo.py'
+          grep -Fq 'FAMILY_VERSION = "1.3"' "$f"
+          grep -Fq 'FAMILY_FUNCTIONAL = "PBE"' "$f"
+          grep -Fq 'FAMILY_PROTOCOL = "precision"' "$f"
+          grep -Fq 'BUNDLE_FILENAME = "SSSP_1.3_PBE_precision.aiida_pseudo"' "$f"
+          grep -Fq '"--download-only"' "$f"
+          grep -Fq '"--from-download"' "$f"
+          grep -Fq 'EXPECTED_INNER_NAMES = {"archive.tar.gz", "metadata.json", "configuration.json"}' "$f"
+          if grep -Eq '(^|[^A-Za-z])(requests|urllib)([^A-Za-z]|$)|https?://' "$f"; then
+            echo 'Direct network implementation is forbidden; acquisition must go through the official aiida-pseudo CLI.' >&2
+            exit 1
+          fi
+
+      - name: Ratchet prospective freeze and content identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          f='research/matter-reference-capsule/freeze_si_pseudo.py'
+          grep -Fq 'uv_lock_sha256' "$f"
+          grep -Fq 'QueryBuilder().append(orm.ProcessNode).count()' "$f"
+          grep -Fq 'process_count_before != 0' "$f"
+          grep -Fq 'process_count_after != 0' "$f"
+          grep -Fq 'family.get_pseudo(element=ELEMENT)' "$f"
+          grep -Fq 'with pseudo.open(mode="rb") as handle:' "$f"
+          grep -Fq 'hashlib.md5(upf_bytes, usedforsecurity=False).hexdigest()' "$f"
+          grep -Fq 'upf_sha256 = _sha256_bytes(upf_bytes)' "$f"
+          grep -Fq 'upf_path = out / "Si.upf"' "$f"
+          grep -Fq 'recommended_cutoffs_reference_only' "$f"
+          grep -Fq 'AUTHORITY_FREEZE = "PreExecutionPseudopotentialFrozen"' "$f"
+
+      - name: Ratchet non-promotion boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          f='research/matter-reference-capsule/freeze_si_pseudo.py'
+          grep -Fq 'does not execute QE' "$f"
+          grep -Fq 'production settings require independent convergence' "$f"
+          grep -Fq 'not experimental validation' "$f"
+          if grep -Eq 'pw\.x|ph\.x|q2r\.x|matdyn\.x|run_get_node|submit\(' "$f"; then
+            echo 'Pseudopotential freeze must not execute scientific solver jobs.' >&2
+            exit 1
+          fi
