@@ -40,6 +40,7 @@ pub mod hierarchy;
 pub mod inheritance_source;
 pub mod ledger;
 pub mod lifecycle;
+pub mod lifecycle_checkpoint;
 pub mod lifecycle_recorder;
 pub mod ma001;
 pub mod ma001l;
@@ -92,6 +93,9 @@ pub use lifecycle::{
     AgentLifecycleRecordV1, ExtinctionEvidenceV1, GenomeEvidenceV1, LifecycleDeathCauseV1,
     LifecycleError, LifecycleEventV1, LifecycleLedgerV1, LifecycleTransitionV1,
     analyze_lifecycle_events,
+};
+pub use lifecycle_checkpoint::{
+    LifecycleCheckpointErrorV1, LifecycleCheckpointV1, ValidatedLifecycleCheckpointV1,
 };
 pub use lifecycle_recorder::{LifecycleRecorderErrorV1, LifecycleRecorderV1};
 pub use metabolism::{
