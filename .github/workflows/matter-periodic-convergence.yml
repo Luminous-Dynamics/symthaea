@@ -1,0 +1,79 @@
+name: Matter Periodic Energy Convergence
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_periodic_convergence_gate.rs'
+      - 'src/knowledge/matter_periodic_convergence_binding.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-periodic-convergence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "87e3781438090873505e30be6651791763f910e8"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-periodic-convergence.yml
+          src/knowledge/matter_periodic_convergence_binding.rs
+          src/knowledge/matter_periodic_convergence_gate.rs
+          src/knowledge/mod.rs
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates || true)"
+
+      - name: Ratchet convergence theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          g=src/knowledge/matter_periodic_convergence_gate.rs
+          b=src/knowledge/matter_periodic_convergence_binding.rs
+          m=src/knowledge/mod.rs
+
+          grep -q 'MIN_AXIS_SAMPLES: usize = 3' "$g"
+          grep -q 'wavefunction_cutoff_ev_bits' "$g"
+          grep -q 'charge_density_cutoff_ev_bits' "$g"
+          grep -q 'k_grid' "$g"
+          grep -q 'normalized_structure_artifact_id' "$g"
+          grep -q 'fixed_settings_artifact_id' "$g"
+          grep -q 'pseudopotential_snapshot_id' "$g"
+          grep -q 'CriterionMissingFromSampleClaim' "$g"
+          grep -q 'require_preregistration_before' "$g"
+          grep -q 'NonResolutionSettingsDrift' "$g"
+          grep -q 'FinalEnergyPlateauNotReached' "$g"
+          grep -q 'AxisBridgeEnergyMismatch' "$g"
+          grep -q 'ProductionIsNotFinalKPointSample' "$g"
+          grep -q 'SampleOodNotPropagated' "$g"
+          grep -q 'ObservedFinalTwoDeltasWithinDeclaredTolerance' "$g"
+          grep -q 'bind_crystal_solver_leaf' "$g"
+          ! grep -qi 'complete basis' "$g"
+          ! grep -qi 'verified convergence' "$g"
+
+          grep -q 'ExecutionReusedAcrossStudies' "$b"
+          grep -q 'ExecutionContentReusedAcrossStudies' "$b"
+          grep -q 'EnergyOutputReusedAcrossStudies' "$b"
+          grep -q 'pub fn bind_strictly_converged_crystal_execution_plan' "$b"
+
+          grep -q '^mod matter_crystal_capability_gate;' "$m"
+          grep -q '^mod matter_periodic_convergence_gate;' "$m"
+          grep -q '^pub mod matter_periodic_convergence_binding;' "$m"
+          ! grep -q '^pub mod matter_crystal_capability_gate;' "$m"
+          ! grep -q '^pub mod matter_periodic_convergence_gate;' "$m"
+
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Focused compile regression
+        run: cargo test --locked matter_periodic_convergence --lib
