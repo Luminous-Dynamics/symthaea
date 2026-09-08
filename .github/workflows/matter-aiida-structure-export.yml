@@ -1,0 +1,90 @@
+name: Matter AiiDA Ordered-Cell Structure Export
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/matter_aiida_structure_export.py'
+      - '.github/workflows/matter-aiida-structure-export.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "67b19e1c3e013d2097de9eb7ac119884125c3fc3"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-aiida-structure-export.yml
+          scripts/matter_aiida_structure_export.py
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates src || true)"
+
+      - name: Python syntax and dependency-free self-test
+        run: |
+          python -m py_compile scripts/matter_aiida_structure_export.py
+          python scripts/matter_aiida_structure_export.py self-test
+
+      - name: Ratchet public AiiDA StructureData boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/matter_aiida_structure_export.py
+          grep -q 'from aiida import load_profile, orm' "$f"
+          grep -q 'orm.CalcJobNode' "$f"
+          grep -q 'orm.StructureData' "$f"
+          grep -q 'structure.cell' "$f"
+          grep -q 'structure.sites' "$f"
+          grep -q 'structure.kinds' "$f"
+          ! grep -q 'aiida.tools.importexport' "$f"
+          ! grep -q 'aiida.orm.nodes' "$f"
+
+      - name: Ratchet ordered-cell derivation semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/matter_aiida_structure_export.py
+          grep -q 'pbc != (True, True, True)' "$f"
+          grep -q 'ordered-cell v1 refuses alloy, vacancy, partial, or disordered' "$f"
+          grep -q '_inverse3' "$f"
+          grep -q '_fractional' "$f"
+          grep -q '_f64_bits' "$f"
+          grep -q 'fractional_bits' "$f"
+          grep -q 'sites.sort' "$f"
+          grep -q 'coincident fully occupied periodic sites' "$f"
+          grep -q 'lattice_vectors_angstrom_bits' "$f"
+
+      - name: Ratchet leaf-capsule provenance and task limits
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/matter_aiida_structure_export.py
+          grep -q 'calcjob_uuid' "$f"
+          grep -q 'live CalcJob UUID does not match the leaf export capsule' "$f"
+          grep -q 'ph.x structure lineage must be inherited' "$f"
+          grep -q 'output_structure' "$f"
+          grep -q 'evidence-bundle.augmented.json' "$f"
+          grep -q 'ordered-cell-receipts.json' "$f"
+          grep -q 'leaf_export_manifest_sha256' "$f"
+          grep -q 'leaf_execution_sha256' "$f"
+
+      - name: Ratchet exact-byte and epistemic limits
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/matter_aiida_structure_export.py
+          grep -q 'persisted JSON bytes failed digest round-trip' "$f"
+          grep -q 'does not establish basis-transform' "$f"
+          grep -q 'ph.x structure lineage is intentionally not inferred' "$f"
+          ! grep -q 'CrystallographicallyEquivalent' "$f"
+          ! grep -q 'SpaceGroupCanonical' "$f"
