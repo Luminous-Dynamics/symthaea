@@ -37,6 +37,7 @@ pub mod evolution_rng;
 pub mod evolutionary_history;
 pub mod exact_sign_test;
 pub mod genesis_event_batch;
+pub mod genesis_social_runner;
 pub mod genesis_tick;
 pub mod genome;
 pub mod hierarchy;
@@ -99,6 +100,7 @@ pub use genesis_event_batch::{
     GenesisTickBatchErrorV1, GenesisTickBatchV1, GenesisTickChunkSummaryV1,
     ValidatedGenesisTickBatchV1, validate_genesis_tick_chunk,
 };
+pub use genesis_social_runner::{GenesisSocialRunnerErrorV1, GenesisSocialRunnerV1};
 pub use genesis_tick::{
     GenesisTickCursorErrorV1, GenesisTickCursorSnapshotV1, GenesisTickCursorV1,
     GenesisTickReservationV1,
