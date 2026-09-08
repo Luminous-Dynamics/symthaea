@@ -101,6 +101,10 @@ jobs:
           challenge = (root / 'src/challenge.rs').read_text()
           response = (root / 'src/response.rs').read_text()
           source = challenge + '\n' + response
+          challenge_code = '\n'.join(
+              line for line in challenge.splitlines()
+              if not line.lstrip().startswith('//')
+          )
 
           required = [
               'PersistedSemanticAcceptance',
@@ -119,7 +123,7 @@ jobs:
           for needle in required:
               assert needle in source, f'missing post-semantic invariant: {needle!r}'
 
-          assert 'Deserialize' not in challenge, 'privileged outbound challenge must not be reconstructible from caller bytes'
+          assert 'Deserialize' not in challenge_code, 'privileged outbound challenge must not be reconstructible from caller bytes'
           start = challenge.index('pub fn issue_from_persisted_semantic_acceptance(')
           end = challenge.index(') -> Result<Self', start)
           signature = challenge[start:end]
