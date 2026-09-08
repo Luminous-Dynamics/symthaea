@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
 jobs:
   qualify:
     runs-on: ubuntu-latest
@@ -18,6 +22,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.94.0
         with:
           components: rustfmt, clippy
+
+      - name: Verify explicit qualification toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(rustc +1.94.0 --version | awk '{print $2}')" = '1.94.0'
+          cargo +1.94.0 --version
+          rustfmt +1.94.0 --version
+          cargo +1.94.0 clippy --version
 
       - name: Freeze relation declaration identity boundary
         shell: bash
@@ -34,8 +47,6 @@ jobs:
           grep -q 'declaration_identity=blake3_explicit_complete_relation_body_plus_provenance' "$production"
           grep -q 'declaration_provenance_is_not_truth_or_epistemic_authority' "$production"
 
-          # Identity must bind the complete validated relation body and explicit
-          # declarer provenance under stable semantic tags.
           for field in \
             provenance_schema_version \
             declarer_id \
@@ -75,15 +86,11 @@ jobs:
             grep -q "\"$relation\"" "$production"
           done
 
-          # Serializer/debug/Rust Hash layout must not define canonical identity.
-          # Integer casts used only for explicit length-prefix encoding are fine;
-          # semantic enum identity is frozen above by explicit string tags.
           if grep -Eq 'serde_json::|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
             echo 'Relation declaration identity acquired incidental serialization or Rust-layout semantics.' >&2
             exit 1
           fi
 
-          # Provenance bookkeeping must not grant a downstream authority token.
           if grep -Eqi 'AdmittedCognitiveEvidence|CanonicalBelief|QualifiedEpistemicState|global.?workspace|action_author|external_effect|self.?improvement.*promotion|\.authorize[[:space:]]*\(' "$production"; then
             echo 'Relation declaration provenance crossed an epistemic/action authority boundary.' >&2
             exit 1
@@ -105,20 +112,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tree="$(cargo tree -p symthaea-epistemic-governance -e normal)"
+          tree="$(cargo +1.94.0 tree --locked -p symthaea-epistemic-governance -e normal)"
           if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-(shadow|observer|evidence|shadow-case)'; then
             echo 'Generic epistemic governance acquired an RCA runtime/bridge dependency.' >&2
             exit 1
           fi
 
       - name: Format epistemic governance
-        run: cargo fmt -p symthaea-epistemic-governance -- --check
+        run: cargo +1.94.0 fmt -p symthaea-epistemic-governance -- --check
 
       - name: Test relation declaration provenance
-        run: cargo test -p symthaea-epistemic-governance --lib relation_provenance
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance --lib relation_provenance
 
       - name: Test epistemic governance
-        run: cargo test -p symthaea-epistemic-governance
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance
 
       - name: Clippy epistemic governance
-        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
+        run: cargo +1.94.0 clippy --locked -p symthaea-epistemic-governance --all-targets -- -D warnings

@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
 jobs:
   qualify:
     runs-on: ubuntu-latest
@@ -18,6 +22,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.94.0
         with:
           components: rustfmt, clippy
+
+      - name: Verify explicit qualification toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(rustc +1.94.0 --version | awk '{print $2}')" = '1.94.0'
+          cargo +1.94.0 --version
+          rustfmt +1.94.0 --version
+          cargo +1.94.0 clippy --version
 
       - name: Freeze evidence versus interpretation independence
         shell: bash
@@ -45,21 +58,13 @@ jobs:
           grep -q 'Root-normalized graph' "$doc"
           grep -q 'No count voting' "$doc"
 
-          # Root identity is deliberately derived only from declarer identity,
-          # optional version, method, and profile semantics. Evidence ids or
-          # relation ids must not manufacture new interpreter roots.
           grep -q 'b"declarer_id"' "$production"
           grep -q 'b"declarer_version"' "$production"
           grep -q 'b"declaration_method"' "$production"
           grep -q 'ROOT_ID_DOMAIN' "$production"
-
-          # Distinct roots remain unknown unless the exact pair qualification is
-          # actually found. Name inequality must never map directly to qualified.
           grep -q 'DistinctRootsIndependenceUnknown' "$production"
           grep -q 'IndependenceQualified' "$production"
           grep -q 'qualifications_by_pair' "$production"
-
-          # Expose the normalized root topology, not a convenience edge count.
           grep -q 'pub fn roots' "$production"
           grep -q 'pub fn root_pair_assessments' "$production"
           if grep -q 'qualified_independent_pair_count' "$production"; then
@@ -103,9 +108,6 @@ jobs:
           grep -q 'context_raw.now_unix_ms > record.valid_until_unix_ms' "$production"
           grep -q 'UnexpectedIndependenceQualificationPair' "$production"
           grep -q 'DuplicateIndependenceQualificationPair' "$production"
-
-          # Qualification persistence revalidates. Issued current lineage does not
-          # deserialize back into trusted state.
           grep -q 'impl.*Deserialize' "$src"
           grep -q 'pub struct InterpretationLineageV1' "$production"
           if grep -Eq 'impl[^\n]*Deserialize[^\n]*InterpretationLineageV1|derive\([^)]*Deserialize[^)]*\)[[:space:]]*pub struct InterpretationLineageV1' "$production"; then
@@ -171,20 +173,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tree="$(cargo tree -p symthaea-epistemic-governance -e normal)"
+          tree="$(cargo +1.94.0 tree --locked -p symthaea-epistemic-governance -e normal)"
           if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-(shadow|observer|evidence|shadow-case|bound-shadow-case|disposition)'; then
             echo 'Generic epistemic governance acquired an RCA runtime/bridge dependency.' >&2
             exit 1
           fi
 
       - name: Format epistemic governance
-        run: cargo fmt -p symthaea-epistemic-governance -- --check
+        run: cargo +1.94.0 fmt -p symthaea-epistemic-governance -- --check
 
       - name: Test interpretation lineage
-        run: cargo test -p symthaea-epistemic-governance --lib interpretation_lineage
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance --lib interpretation_lineage
 
       - name: Test epistemic governance
-        run: cargo test -p symthaea-epistemic-governance
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance
 
       - name: Clippy epistemic governance
-        run: cargo clippy -p symthaea-epistemic-governance --all-targets -- -D warnings
+        run: cargo +1.94.0 clippy --locked -p symthaea-epistemic-governance --all-targets -- -D warnings
