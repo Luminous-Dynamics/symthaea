@@ -7,9 +7,9 @@ description = "Artificial life for Symthaea: organisms as Markov blankets minimi
 
 [dependencies]
 serde = { workspace = true }
+sha2 = { workspace = true }
 symthaea-fep = { workspace = true }
 symthaea-earth-system = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
-sha2 = { workspace = true }
