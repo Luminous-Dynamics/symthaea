@@ -124,20 +124,26 @@ fn validate_selected_world_context(
         .filter(|context| matches!(&context.kind, SimulationContextKind::WorldSnapshot))
         .collect::<Vec<_>>();
     if worlds.len() != 1 {
-        return Err(SelectionBoundSimulationError::WorldContextCount(worlds.len()));
+        return Err(SelectionBoundSimulationError::WorldContextCount(
+            worlds.len(),
+        ));
     }
 
     let context = worlds[0];
     let snapshot = selected.world_snapshot();
     let expected_algorithm = strict_digest_algorithm(snapshot.digest_algorithm())?;
     if context.digest_algorithm != expected_algorithm {
-        return Err(SelectionBoundSimulationError::SelectedSnapshotAlgorithmMismatch {
-            selected: snapshot.digest_algorithm(),
-            context: context.digest_algorithm,
-        });
+        return Err(
+            SelectionBoundSimulationError::SelectedSnapshotAlgorithmMismatch {
+                selected: snapshot.digest_algorithm(),
+                context: context.digest_algorithm,
+            },
+        );
     }
     if context.frame_id.as_deref() != Some(snapshot.frame_id())
-        || !context.digest.eq_ignore_ascii_case(snapshot.snapshot_digest())
+        || !context
+            .digest
+            .eq_ignore_ascii_case(snapshot.snapshot_digest())
     {
         return Err(SelectionBoundSimulationError::SelectedSnapshotMismatch {
             selected_frame: snapshot.frame_id().to_string(),
@@ -191,7 +197,7 @@ mod tests {
         PredictedOutcome, ProposedIntervention, TargetRegion,
     };
     use symthaea_sim_bridge::{
-        EngineeringDomain, ExecutionMode, SimulationEvidence, SimulationError, SimulationResult,
+        EngineeringDomain, ExecutionMode, SimulationError, SimulationEvidence, SimulationResult,
         SolverKind, UncertaintyEstimate,
     };
 
@@ -280,7 +286,8 @@ mod tests {
             transition,
             candidates: vec![candidate],
         };
-        let frontier = match deliberate(&portfolio, &snapshot, PortfolioPolicy::default()).unwrap() {
+        let frontier = match deliberate(&portfolio, &snapshot, PortfolioPolicy::default()).unwrap()
+        {
             DeliberationOutcome::ParetoFrontier(frontier) => frontier,
             other => panic!("expected frontier, got {other:?}"),
         };
@@ -341,10 +348,8 @@ mod tests {
 
     #[test]
     fn legacy_non_cryptographic_snapshot_identifier_cannot_enter_strict_path() {
-        let selected = selected_from_snapshot(WorldSnapshotRef::new(
-            "world",
-            "legacy-snapshot-name",
-        ));
+        let selected =
+            selected_from_snapshot(WorldSnapshotRef::new("world", "legacy-snapshot-name"));
         assert_eq!(
             prepare_selected_simulation(&selected, request()).unwrap_err(),
             SelectionBoundSimulationError::LegacySnapshotDigest

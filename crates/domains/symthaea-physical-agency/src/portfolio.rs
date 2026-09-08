@@ -257,21 +257,20 @@ impl PortfolioPolicy {
             "policy.max_aleatoric_uncertainty",
             self.max_aleatoric_uncertainty,
         )?;
-        validate_unit_interval(
-            "policy.max_model_disagreement",
-            self.max_model_disagreement,
-        )?;
+        validate_unit_interval("policy.max_model_disagreement", self.max_model_disagreement)?;
         validate_unit_interval("policy.min_safety_margin", self.min_safety_margin)?;
         Ok(())
     }
 
     fn admits(&self, candidate: &CandidateAssessment) -> Result<bool, PortfolioError> {
         let outcome = &candidate.proposal.predicted_outcome;
-        Ok(candidate.conservative_success_probability()? >= self.min_success_probability
-            && candidate.effective_epistemic_uncertainty()? <= self.max_epistemic_uncertainty
-            && outcome.aleatoric_uncertainty <= self.max_aleatoric_uncertainty
-            && candidate.model_disagreement()? <= self.max_model_disagreement
-            && candidate.safety_margin >= self.min_safety_margin)
+        Ok(
+            candidate.conservative_success_probability()? >= self.min_success_probability
+                && candidate.effective_epistemic_uncertainty()? <= self.max_epistemic_uncertainty
+                && outcome.aleatoric_uncertainty <= self.max_aleatoric_uncertainty
+                && candidate.model_disagreement()? <= self.max_model_disagreement
+                && candidate.safety_margin >= self.min_safety_margin,
+        )
     }
 }
 
@@ -288,9 +287,7 @@ pub struct CandidatePortfolio {
 
 impl CandidatePortfolio {
     pub fn validate(&self) -> Result<(), PortfolioError> {
-        self.transition
-            .validate()
-            .map_err(PortfolioError::Effect)?;
+        self.transition.validate().map_err(PortfolioError::Effect)?;
 
         for candidate in &self.candidates {
             candidate.validate()?;
@@ -596,15 +593,7 @@ mod tests {
             0.9,
             0.05,
         );
-        let weak = candidate(
-            "weak",
-            PhysicalModality::Photonic,
-            0.8,
-            10.0,
-            0.7,
-            0.8,
-            0.1,
-        );
+        let weak = candidate("weak", PhysicalModality::Photonic, 0.8, 10.0, 0.7, 0.8, 0.1);
         assert!(strong.dominates(&weak).unwrap());
 
         let portfolio = CandidatePortfolio {
@@ -689,15 +678,7 @@ mod tests {
 
     #[test]
     fn mismatched_transition_is_rejected() {
-        let mut wrong = candidate(
-            "wrong",
-            PhysicalModality::Thermal,
-            0.9,
-            2.0,
-            0.5,
-            0.9,
-            0.1,
-        );
+        let mut wrong = candidate("wrong", PhysicalModality::Thermal, 0.9, 2.0, 0.5, 0.9, 0.1);
         wrong.proposal.transition_id = "another-transition".into();
         let portfolio = CandidatePortfolio {
             transition: transition(),
@@ -789,15 +770,7 @@ mod tests {
 
     #[test]
     fn non_finite_model_prediction_fails_closed() {
-        let mut bad = candidate(
-            "bad",
-            PhysicalModality::Mechanical,
-            0.9,
-            1.0,
-            0.5,
-            0.9,
-            0.1,
-        );
+        let mut bad = candidate("bad", PhysicalModality::Mechanical, 0.9, 1.0, 0.5, 0.9, 0.1);
         bad.model_predictions[0].success_probability = f64::NAN;
         assert!(bad.validate().is_err());
     }

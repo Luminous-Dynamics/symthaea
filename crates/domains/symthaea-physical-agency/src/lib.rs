@@ -24,11 +24,11 @@
 pub mod deliberation;
 pub mod outcome_claim;
 pub mod portfolio;
+mod qualification;
+mod qualification_lineage;
 pub mod strict_context;
 pub mod strict_qualification;
 pub mod strict_selection;
-mod qualification;
-mod qualification_lineage;
 
 pub use deliberation::{SnapshotDigestAlgorithm, WorldSnapshotRef};
 pub use qualification::{
@@ -206,7 +206,8 @@ impl CapabilityCatalog {
         if self.manifests.contains_key(&manifest.backend_name) {
             return Err(CapabilityError::DuplicateBackend(manifest.backend_name));
         }
-        self.manifests.insert(manifest.backend_name.clone(), manifest);
+        self.manifests
+            .insert(manifest.backend_name.clone(), manifest);
         Ok(())
     }
 
@@ -323,7 +324,9 @@ mod tests {
     fn unknown_backend_is_rejected() {
         let catalog = CapabilityCatalog::new();
         let requirement = CapabilityRequirement::new(SolverKind::FiniteElement);
-        let error = catalog.negotiate(&MockFeaBackend, &requirement).unwrap_err();
+        let error = catalog
+            .negotiate(&MockFeaBackend, &requirement)
+            .unwrap_err();
         assert_eq!(error, CapabilityError::UnknownBackend("mock-fea".into()));
     }
 
@@ -358,12 +361,16 @@ mod tests {
 
         assert!(!decision.is_accepted());
         assert_eq!(decision.missing.len(), 2);
-        assert!(decision
-            .missing
-            .contains(&BackendCapability::SystemIdentification));
-        assert!(decision
-            .missing
-            .contains(&BackendCapability::UncertaintyQuantification));
+        assert!(
+            decision
+                .missing
+                .contains(&BackendCapability::SystemIdentification)
+        );
+        assert!(
+            decision
+                .missing
+                .contains(&BackendCapability::UncertaintyQuantification)
+        );
     }
 
     #[test]

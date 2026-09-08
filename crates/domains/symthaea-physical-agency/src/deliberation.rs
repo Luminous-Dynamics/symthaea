@@ -236,9 +236,7 @@ pub enum DeliberationError {
     EmptySnapshotField(&'static str),
     #[error("cryptographic world-snapshot digest must be exactly 32 hexadecimal bytes")]
     InvalidCryptographicSnapshotDigest,
-    #[error(
-        "target frame {target_frame:?} does not match world snapshot frame {snapshot_frame:?}"
-    )]
+    #[error("target frame {target_frame:?} does not match world snapshot frame {snapshot_frame:?}")]
     SnapshotFrameMismatch {
         target_frame: String,
         snapshot_frame: String,
@@ -307,11 +305,11 @@ mod tests {
 
     #[test]
     fn only_frontier_member_can_mint_selection_receipt() {
-        let frontier = match deliberate(&portfolio(), &snapshot(), PortfolioPolicy::default()).unwrap()
-        {
-            DeliberationOutcome::ParetoFrontier(frontier) => frontier,
-            other => panic!("expected frontier, got {other:?}"),
-        };
+        let frontier =
+            match deliberate(&portfolio(), &snapshot(), PortfolioPolicy::default()).unwrap() {
+                DeliberationOutcome::ParetoFrontier(frontier) => frontier,
+                other => panic!("expected frontier, got {other:?}"),
+            };
 
         assert_eq!(frontier.world_snapshot(), &snapshot());
         assert!(frontier.select("acoustic").is_some());

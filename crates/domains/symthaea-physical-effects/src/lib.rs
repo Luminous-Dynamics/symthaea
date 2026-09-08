@@ -75,17 +75,7 @@ pub enum Reversibility {
 /// The ordering is intentional. Higher variants imply strictly more authority.
 /// This crate does not mint that authority.
 #[derive(
-    Debug,
-    Default,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
+    Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum AuthorityClass {
@@ -409,8 +399,7 @@ mod tests {
         assert!(AuthorityClass::SimulationOnly.allows(AuthorityClass::SimulationOnly));
         assert!(!AuthorityClass::PassiveObservation.allows(AuthorityClass::ReversibleActuation));
         assert!(
-            AuthorityClass::ControlledEnergyTransfer
-                .allows(AuthorityClass::DiagnosticExcitation)
+            AuthorityClass::ControlledEnergyTransfer.allows(AuthorityClass::DiagnosticExcitation)
         );
     }
 

@@ -313,7 +313,10 @@ pub fn qualify_simulation_candidate(
     let required_ref = evidence.safety_evidence_ref();
     let exact_evidence_bound = safety_case.obligations.iter().any(|obligation| {
         obligation.expected_evidence == EvidenceKind::Simulation
-            && obligation.evidence_refs.iter().any(|reference| reference == &required_ref)
+            && obligation
+                .evidence_refs
+                .iter()
+                .any(|reference| reference == &required_ref)
     });
     if !exact_evidence_bound {
         return Err(SimulationQualificationError::SafetyCaseMissingExactEvidence);
@@ -429,8 +432,13 @@ mod tests {
         }
 
         fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
-            Ok(SimulationResult::dry_run(&request.id, self.name(), 1.0)
-                .with_metric("diagnostic_score", 1.0, "1"))
+            Ok(
+                SimulationResult::dry_run(&request.id, self.name(), 1.0).with_metric(
+                    "diagnostic_score",
+                    1.0,
+                    "1",
+                ),
+            )
         }
     }
 
@@ -505,14 +513,9 @@ mod tests {
     fn registry_verified_evidence_and_exact_bound_case_can_qualify() {
         let evidence = verified_evidence();
         let case = discharged_case("p-1", &evidence.safety_evidence_ref());
-        let qualified = qualify_simulation_candidate(
-            &transition(),
-            &proposal(),
-            &binding(),
-            &evidence,
-            &case,
-        )
-        .unwrap();
+        let qualified =
+            qualify_simulation_candidate(&transition(), &proposal(), &binding(), &evidence, &case)
+                .unwrap();
 
         assert_eq!(qualified.proposal_id(), "p-1");
         assert_eq!(qualified.transition_id(), "t-1");
@@ -535,13 +538,7 @@ mod tests {
         let evidence = verified_evidence();
         let case = discharged_case("p-1", "solver-run:some-neighboring-result");
         assert_eq!(
-            qualify_simulation_candidate(
-                &transition(),
-                &proposal(),
-                &binding(),
-                &evidence,
-                &case,
-            ),
+            qualify_simulation_candidate(&transition(), &proposal(), &binding(), &evidence, &case,),
             Err(SimulationQualificationError::SafetyCaseMissingExactEvidence)
         );
     }
@@ -551,13 +548,7 @@ mod tests {
         let evidence = verified_evidence();
         let case = discharged_case("another-proposal", &evidence.safety_evidence_ref());
         assert!(matches!(
-            qualify_simulation_candidate(
-                &transition(),
-                &proposal(),
-                &binding(),
-                &evidence,
-                &case,
-            ),
+            qualify_simulation_candidate(&transition(), &proposal(), &binding(), &evidence, &case,),
             Err(SimulationQualificationError::SafetyCaseSubjectMismatch { .. })
         ));
     }
@@ -569,13 +560,7 @@ mod tests {
         let mut proposal = proposal();
         proposal.required_authority = AuthorityClass::DiagnosticExcitation;
         assert_eq!(
-            qualify_simulation_candidate(
-                &transition(),
-                &proposal,
-                &binding(),
-                &evidence,
-                &case,
-            ),
+            qualify_simulation_candidate(&transition(), &proposal, &binding(), &evidence, &case,),
             Err(SimulationQualificationError::NonSimulationAuthority)
         );
     }
@@ -587,13 +572,7 @@ mod tests {
         let mut binding = binding();
         binding.expected_backend = "another-backend".into();
         assert!(matches!(
-            qualify_simulation_candidate(
-                &transition(),
-                &proposal(),
-                &binding,
-                &evidence,
-                &case,
-            ),
+            qualify_simulation_candidate(&transition(), &proposal(), &binding, &evidence, &case,),
             Err(SimulationQualificationError::BackendBindingMismatch { .. })
         ));
     }
@@ -608,13 +587,7 @@ mod tests {
         let evidence = execute_verified_simulation(&registry, &request()).unwrap();
         let case = discharged_case("p-1", &evidence.safety_evidence_ref());
         assert_eq!(
-            qualify_simulation_candidate(
-                &transition(),
-                &proposal(),
-                &binding(),
-                &evidence,
-                &case,
-            ),
+            qualify_simulation_candidate(&transition(), &proposal(), &binding(), &evidence, &case,),
             Err(SimulationQualificationError::ResultOutsideUncertaintyBudget)
         );
     }
