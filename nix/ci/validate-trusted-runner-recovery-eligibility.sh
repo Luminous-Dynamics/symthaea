@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #
-# Queue-neutral Stage-E eligibility verifier. It joins the exact promotion.v1
+# Queue-neutral Stage-E eligibility verifier. It joins the exact promotion.v2
 # and smoke.v1 evidence objects before any trusted recovery workload is eligible.
 
 set -euo pipefail
@@ -74,7 +74,7 @@ promotion_runner_module_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" runner
 promotion_routing_policy_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" routing_policy_blob)"
 recovery_eligibility_verifier_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" recovery_eligibility_verifier_blob)"
 
-[[ "$promotion_schema" == 'symthaea.trusted-runner.promotion.v1' ]]
+[[ "$promotion_schema" == 'symthaea.trusted-runner.promotion.v2' ]]
 [[ "$promotion_result" == 'PASS' ]]
 for value in "$authorized_recovery_head" "$promoted_main_head" "$promoted_main_tree" "$promotion_smoke_workflow_blob" "$promotion_runner_module_blob" "$promotion_routing_policy_blob" "$recovery_eligibility_verifier_blob"; do
   [[ "$value" =~ ^[0-9a-f]{40}$ ]]
@@ -153,7 +153,6 @@ local_verifier_blob="$(git rev-parse HEAD:nix/ci/validate-trusted-runner-recover
 [[ "$(git rev-parse HEAD:nix/modules/github-actions-runner.nix)" == "$smoke_runner_module_blob" ]]
 [[ "$(git rev-parse HEAD:nix/tests/eval-trusted-runner-routing.nix)" == "$smoke_routing_policy_blob" ]]
 
-# Close the Stage-E observation window.
 git -c protocol.version=2 fetch --no-tags origin \
   "+refs/heads/main:refs/remotes/origin/main" \
   "+refs/heads/${RECOVERY_BRANCH}:refs/remotes/origin/${RECOVERY_BRANCH}"
