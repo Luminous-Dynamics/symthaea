@@ -36,6 +36,7 @@ pub mod evolution_birth;
 pub mod evolution_rng;
 pub mod evolutionary_history;
 pub mod exact_sign_test;
+pub mod genesis_event_checkpoint;
 pub mod genome;
 pub mod hierarchy;
 pub mod inheritance_source;
@@ -92,6 +93,10 @@ pub use evolutionary_history::{
 pub use exact_sign_test::{
     ExactPositiveSignTestV1, ExactSignTestErrorV1, MAX_EXACT_SIGN_TEST_NON_TIES,
     exact_positive_sign_test,
+};
+pub use genesis_event_checkpoint::{
+    GenesisEventCheckpointErrorV1, GenesisEventCheckpointV1,
+    ValidatedGenesisEventCheckpointV1,
 };
 pub use genome::Genome;
 pub use hierarchy::HierarchicalStack;
