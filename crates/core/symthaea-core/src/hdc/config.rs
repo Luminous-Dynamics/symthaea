@@ -7,10 +7,9 @@
 //! across all Symthaea components. It ensures consistency between STT, TTS,
 //! and core consciousness systems.
 //!
-//! It also owns the stable identity contract for HDC-LTC temporal evolution.
-//! HDC-LTC exposes several evolution routines with materially different numerical
-//! and behavioral semantics; those semantics must be explicit in experiments,
-//! checkpoints, and qualification evidence rather than inferred from a method name.
+//! It also owns the stable identity contract for HDC-LTC temporal evolution and
+//! the versioned persistent learner snapshot that binds complete recurrent state
+//! to that temporal semantics.
 //!
 //! ## Design Goals
 //!
@@ -48,6 +47,7 @@
 //! | Extended | 32,768 | 128 KB | High precision |
 //! | Ultra | 65,536 | 256 KB | Maximum capacity |
 
+use super::hdc_ltc_unified::HdcLtcUnifiedNetwork;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
@@ -178,6 +178,126 @@ impl HdcLtcTemporalSemanticsReceiptV1 {
             return Err("dt must be finite and non-negative");
         }
         Ok(())
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPLETE HDC-LTC LEARNER SNAPSHOT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const HDC_LTC_ARCHITECTURE_DOMAIN_V1: &[u8] = b"symthaea.hdc-ltc.architecture.v1\0";
+const HDC_LTC_PARAMETER_DOMAIN_V1: &[u8] = b"symthaea.hdc-ltc.complete-state.v1\0";
+const HDC_LTC_SNAPSHOT_DOMAIN_V1: &[u8] = b"symthaea.hdc-ltc.learner-snapshot.v1\0";
+
+fn hdc_ltc_digest(domain: &[u8], bytes: &[u8]) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain);
+    hasher.update(bytes);
+    *hasher.finalize().as_bytes()
+}
+
+/// Durable snapshot of the *complete* serializable HDC-LTC learner.
+///
+/// This is deliberately different from `NetworkStateSnapshot`, whose job is a
+/// cheap allocation-reusing save/restore of mutable evolution state for pure
+/// prediction and which explicitly excludes learning parameters. This snapshot
+/// serializes the entire `HdcLtcUnifiedNetwork`, including recurrent weights,
+/// masks, gates, momentum, running statistics, evolution clocks, layer bindings,
+/// cached outputs, and network configuration.
+///
+/// The v1 payload uses the workspace-pinned `bincode` representation. It is an
+/// implementation-lineage identity, not a claim of cross-language canonical wire
+/// compatibility. A change of encoding contract requires a new schema/domain.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HdcLtcLearnerSnapshotV1 {
+    pub schema_id: String,
+    pub evolution_profile: HdcLtcEvolutionProfile,
+    pub architecture_digest: [u8; 32],
+    pub parameter_digest: [u8; 32],
+    pub snapshot_digest: [u8; 32],
+    network_bytes: Vec<u8>,
+}
+
+impl HdcLtcLearnerSnapshotV1 {
+    pub const SCHEMA_ID: &'static str = "symthaea.hdc-ltc.learner-snapshot.v1";
+
+    pub fn capture(
+        network: &HdcLtcUnifiedNetwork,
+        evolution_profile: HdcLtcEvolutionProfile,
+    ) -> Result<Self, String> {
+        let architecture_bytes = bincode::serialize(network.config())
+            .map_err(|err| format!("serialize HDC-LTC architecture: {err}"))?;
+        let network_bytes = bincode::serialize(network)
+            .map_err(|err| format!("serialize complete HDC-LTC learner: {err}"))?;
+
+        let architecture_digest =
+            hdc_ltc_digest(HDC_LTC_ARCHITECTURE_DOMAIN_V1, &architecture_bytes);
+        let parameter_digest = hdc_ltc_digest(HDC_LTC_PARAMETER_DOMAIN_V1, &network_bytes);
+
+        let mut commitment = Vec::with_capacity(
+            Self::SCHEMA_ID.len()
+                + evolution_profile.schema_id().len()
+                + architecture_digest.len()
+                + parameter_digest.len()
+                + network_bytes.len()
+                + 16,
+        );
+        commitment.extend_from_slice(Self::SCHEMA_ID.as_bytes());
+        commitment.push(0);
+        commitment.extend_from_slice(evolution_profile.schema_id().as_bytes());
+        commitment.push(0);
+        commitment.extend_from_slice(&architecture_digest);
+        commitment.extend_from_slice(&parameter_digest);
+        commitment.extend_from_slice(&(network_bytes.len() as u64).to_le_bytes());
+        commitment.extend_from_slice(&network_bytes);
+        let snapshot_digest = hdc_ltc_digest(HDC_LTC_SNAPSHOT_DOMAIN_V1, &commitment);
+
+        Ok(Self {
+            schema_id: Self::SCHEMA_ID.to_string(),
+            evolution_profile,
+            architecture_digest,
+            parameter_digest,
+            snapshot_digest,
+            network_bytes,
+        })
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_id != Self::SCHEMA_ID {
+            return Err("unsupported HDC-LTC learner snapshot schema".into());
+        }
+        let network: HdcLtcUnifiedNetwork = bincode::deserialize(&self.network_bytes)
+            .map_err(|err| format!("decode complete HDC-LTC learner: {err}"))?;
+        let expected = Self::capture(&network, self.evolution_profile)?;
+        if self.architecture_digest != expected.architecture_digest {
+            return Err("HDC-LTC architecture digest mismatch".into());
+        }
+        if self.parameter_digest != expected.parameter_digest {
+            return Err("HDC-LTC complete-state digest mismatch".into());
+        }
+        if self.snapshot_digest != expected.snapshot_digest {
+            return Err("HDC-LTC learner snapshot digest mismatch".into());
+        }
+        Ok(())
+    }
+
+    pub fn model_identity(&self) -> Result<HdcLtcModelIdentityV1, String> {
+        self.validate()?;
+        Ok(HdcLtcModelIdentityV1::new(
+            self.evolution_profile,
+            self.architecture_digest,
+            self.parameter_digest,
+        ))
+    }
+
+    pub fn restore(&self) -> Result<HdcLtcUnifiedNetwork, String> {
+        self.validate()?;
+        bincode::deserialize(&self.network_bytes)
+            .map_err(|err| format!("restore complete HDC-LTC learner: {err}"))
+    }
+
+    pub fn encoded_network(&self) -> &[u8] {
+        &self.network_bytes
     }
 }
 
@@ -465,9 +585,100 @@ pub fn stt_expansion_factor() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::genesis::GenesisSeed;
+    use crate::hdc::hdc_ltc_unified::{UnifiedConfig, UnifiedNetworkConfig};
+    use crate::hdc::unified_hv::ContinuousHV;
 
     fn temporal_identity(profile: HdcLtcEvolutionProfile) -> HdcLtcModelIdentityV1 {
         HdcLtcModelIdentityV1::new(profile, [1; 32], [2; 32])
+    }
+
+    fn snapshot_test_network() -> HdcLtcUnifiedNetwork {
+        HdcLtcUnifiedNetwork::from_genesis(
+            UnifiedNetworkConfig {
+                layer_sizes: vec![2, 2],
+                neuron_config: UnifiedConfig {
+                    dimension: 128,
+                    ..UnifiedConfig::default()
+                },
+                use_layer_binding: true,
+                skip_connections: false,
+            },
+            &GenesisSeed::from_phrase("hdc-ltc-complete-snapshot-test"),
+        )
+    }
+
+    #[test]
+    fn complete_learner_snapshot_round_trip_preserves_future_evolution() {
+        let mut original = snapshot_test_network();
+        let prefix = ContinuousHV::random(128, 11);
+        original.evolve_closed_form(0.01, &prefix);
+
+        // Mutate learning parameters as well as evolution state so this proves
+        // more than the existing lightweight NetworkStateSnapshot contract.
+        let learning_input = ContinuousHV::random(128, 12);
+        if let Some(layer) = original.layer_mut(0) {
+            layer[0].hebbian_update(&learning_input, Some(0.003));
+        }
+
+        let snapshot = HdcLtcLearnerSnapshotV1::capture(
+            &original,
+            HdcLtcEvolutionProfile::AdaptiveClosedGateV1,
+        )
+        .unwrap();
+        let wire = bincode::serialize(&snapshot).unwrap();
+        let decoded: HdcLtcLearnerSnapshotV1 = bincode::deserialize(&wire).unwrap();
+        decoded.validate().unwrap();
+        let mut restored = decoded.restore().unwrap();
+
+        let future = ContinuousHV::random(128, 22);
+        original.evolve_closed_form(0.025, &future);
+        restored.evolve_closed_form(0.025, &future);
+
+        assert_eq!(original.output().values, restored.output().values);
+        assert_eq!(
+            bincode::serialize(&original).unwrap(),
+            bincode::serialize(&restored).unwrap()
+        );
+    }
+
+    #[test]
+    fn complete_learner_snapshot_tamper_fails_closed() {
+        let snapshot = HdcLtcLearnerSnapshotV1::capture(
+            &snapshot_test_network(),
+            HdcLtcEvolutionProfile::AdaptiveClosedGateV1,
+        )
+        .unwrap();
+
+        let mut tampered_digest = snapshot.clone();
+        tampered_digest.snapshot_digest[0] ^= 0xff;
+        assert!(tampered_digest.validate().is_err());
+
+        let mut tampered_payload = snapshot;
+        let last = tampered_payload.network_bytes.len() - 1;
+        tampered_payload.network_bytes[last] ^= 0x01;
+        assert!(tampered_payload.validate().is_err());
+    }
+
+    #[test]
+    fn complete_learner_snapshot_binds_temporal_semantics() {
+        let network = snapshot_test_network();
+        let adaptive = HdcLtcLearnerSnapshotV1::capture(
+            &network,
+            HdcLtcEvolutionProfile::AdaptiveClosedGateV1,
+        )
+        .unwrap();
+        let iterative = HdcLtcLearnerSnapshotV1::capture(
+            &network,
+            HdcLtcEvolutionProfile::SubsteppedExponentialV1,
+        )
+        .unwrap();
+
+        assert_ne!(adaptive.snapshot_digest, iterative.snapshot_digest);
+        assert_ne!(
+            adaptive.model_identity().unwrap().evolution_profile,
+            iterative.model_identity().unwrap().evolution_profile
+        );
     }
 
     #[test]
