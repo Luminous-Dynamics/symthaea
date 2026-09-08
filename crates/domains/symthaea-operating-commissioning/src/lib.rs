@@ -10,6 +10,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod authorization;
 pub mod identity;
 
 use chrono::{DateTime, Utc};
