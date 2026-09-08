@@ -75,17 +75,7 @@ pub enum Reversibility {
 /// The ordering is intentional. Higher variants imply strictly more authority.
 /// This crate does not mint that authority.
 #[derive(
-    Debug,
-    Default,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
+    Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum AuthorityClass {
@@ -386,12 +376,12 @@ fn validate_optional_nonnegative(
     field: &'static str,
     value: Option<f64>,
 ) -> Result<(), EffectValidationError> {
-    if let Some(value) = value {
-        if !value.is_finite() || value < 0.0 {
-            return Err(EffectValidationError::InvalidBudget(format!(
-                "{field} must be finite and non-negative, got {value}"
-            )));
-        }
+    if let Some(value) = value
+        && (!value.is_finite() || value < 0.0)
+    {
+        return Err(EffectValidationError::InvalidBudget(format!(
+            "{field} must be finite and non-negative, got {value}"
+        )));
     }
     Ok(())
 }
@@ -409,8 +399,7 @@ mod tests {
         assert!(AuthorityClass::SimulationOnly.allows(AuthorityClass::SimulationOnly));
         assert!(!AuthorityClass::PassiveObservation.allows(AuthorityClass::ReversibleActuation));
         assert!(
-            AuthorityClass::ControlledEnergyTransfer
-                .allows(AuthorityClass::DiagnosticExcitation)
+            AuthorityClass::ControlledEnergyTransfer.allows(AuthorityClass::DiagnosticExcitation)
         );
     }
 

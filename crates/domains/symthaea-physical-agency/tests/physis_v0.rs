@@ -13,8 +13,7 @@ use symthaea_physical_agency::portfolio::{
 use symthaea_physical_agency::{
     BackendCapabilities, BackendCapability, BackendCapabilityManifest, CapabilityCatalog,
     CapabilityRequirement, DeliberationQualificationError, DeliberationSimulationBinding,
-    WorldSnapshotRef, execute_registry_validated_simulation,
-    qualify_selected_simulation_candidate,
+    WorldSnapshotRef, execute_registry_validated_simulation, qualify_selected_simulation_candidate,
 };
 use symthaea_physical_effects::{
     AbstentionReason, AuthorityClass, DesiredTransition, EffectKind, MechanismRef,
@@ -135,10 +134,12 @@ fn physis_v0_preserves_world_and_deliberation_lineage_through_simulation_qualifi
     let requirement = CapabilityRequirement::new(SolverKind::Custom)
         .requiring(BackendCapability::UncertaintyQuantification)
         .requiring(BackendCapability::BatchedCounterfactuals);
-    assert!(capabilities
-        .negotiate(&backend, &requirement)
-        .unwrap()
-        .is_accepted());
+    assert!(
+        capabilities
+            .negotiate(&backend, &requirement)
+            .unwrap()
+            .is_accepted()
+    );
 
     let acoustic = assessment(
         proposal("acoustic-p", PhysicalModality::Acoustic, 0.89, 0.10),
@@ -235,13 +236,9 @@ fn physis_v0_preserves_world_and_deliberation_lineage_through_simulation_qualifi
         .discharge(validated.safety_evidence_ref()),
     );
 
-    let qualified = qualify_selected_simulation_candidate(
-        &selected,
-        &binding,
-        &validated,
-        &safety_case,
-    )
-    .unwrap();
+    let qualified =
+        qualify_selected_simulation_candidate(&selected, &binding, &validated, &safety_case)
+            .unwrap();
 
     assert_eq!(qualified.proposal_id(), "acoustic-p");
     assert_eq!(qualified.backend(), "physis-solver");
@@ -317,9 +314,7 @@ fn physis_v0_transition_contract_rejects_out_of_envelope_candidate() {
         transition: transition(),
         candidates: vec![over_budget],
     };
-    assert!(
-        deliberate(&portfolio, &snapshot(), PortfolioPolicy::default()).is_err()
-    );
+    assert!(deliberate(&portfolio, &snapshot(), PortfolioPolicy::default()).is_err());
 }
 
 #[test]
@@ -329,7 +324,12 @@ fn physis_v0_transition_uncertainty_gate_overrides_permissive_selection_policy()
     strict_transition.uncertainty.max_epistemic = 0.2;
 
     let disputed = assessment(
-        proposal("policy-permitted-dispute", PhysicalModality::Acoustic, 0.85, 0.1),
+        proposal(
+            "policy-permitted-dispute",
+            PhysicalModality::Acoustic,
+            0.85,
+            0.1,
+        ),
         vec![
             ModelPrediction {
                 model_id: "policy-model-a".into(),

@@ -367,15 +367,14 @@ pub fn evaluate_confirmatory_claim(
                 .output_digest
                 .clone()
                 .ok_or(OutcomeClaimError::MissingOutputDigest)?;
-            let evidence_tier = if evaluation
-                .criteria
-                .iter()
-                .any(|criterion| criterion.evidence_tier == CriterionEvidenceTier::PointEstimate)
-            {
-                ClaimEvidenceTier::PointEstimateAllowed
-            } else {
-                ClaimEvidenceTier::IntervalBound
-            };
+            let evidence_tier =
+                if evaluation.criteria.iter().any(|criterion| {
+                    criterion.evidence_tier == CriterionEvidenceTier::PointEstimate
+                }) {
+                    ClaimEvidenceTier::PointEstimateAllowed
+                } else {
+                    ClaimEvidenceTier::IntervalBound
+                };
             Ok(ConfirmatoryClaimOutcome::Satisfied(
                 SatisfiedSimulationClaim {
                     claim: evidence.claim().clone(),
@@ -414,7 +413,9 @@ fn evaluate_criterion(
     let metric = matching[0];
     match criterion.uncertainty_policy {
         MetricUncertaintyPolicy::RequireInterval => {
-            let interval = metric.uncertainty.and_then(|uncertainty| uncertainty.interval);
+            let interval = metric
+                .uncertainty
+                .and_then(|uncertainty| uncertainty.interval);
             let Some(interval) = interval else {
                 return Ok(EvaluatedCriterion {
                     criterion: criterion.clone(),
@@ -433,7 +434,10 @@ fn evaluate_criterion(
             })
         }
         MetricUncertaintyPolicy::AllowPointEstimate => {
-            if let Some(interval) = metric.uncertainty.and_then(|uncertainty| uncertainty.interval) {
+            if let Some(interval) = metric
+                .uncertainty
+                .and_then(|uncertainty| uncertainty.interval)
+            {
                 Ok(EvaluatedCriterion {
                     criterion: criterion.clone(),
                     result: evaluate_interval(&criterion.predicate, interval),
@@ -456,12 +460,8 @@ fn evaluate_criterion(
 
 fn evaluate_point(predicate: &MetricPredicate, value: f64) -> ClaimCriterionResult {
     match predicate {
-        MetricPredicate::AtLeast(threshold) => {
-            bool_result(value >= *threshold)
-        }
-        MetricPredicate::AtMost(threshold) => {
-            bool_result(value <= *threshold)
-        }
+        MetricPredicate::AtLeast(threshold) => bool_result(value >= *threshold),
+        MetricPredicate::AtMost(threshold) => bool_result(value <= *threshold),
         MetricPredicate::InsideClosedInterval { lower, upper } => {
             bool_result(value >= *lower && value <= *upper)
         }
@@ -554,7 +554,7 @@ mod tests {
         PredictedOutcome, ProposedIntervention, TargetRegion,
     };
     use symthaea_sim_bridge::{
-        EngineeringDomain, ExecutionMode, SimulationEvidence, SimulationError, SimulationMetric,
+        EngineeringDomain, ExecutionMode, SimulationError, SimulationEvidence, SimulationMetric,
         SimulationResult, SolverKind, UncertaintyEstimate,
     };
 
@@ -649,7 +649,8 @@ mod tests {
             SnapshotDigestAlgorithm::Blake3,
             "a".repeat(64),
         );
-        let frontier = match deliberate(&portfolio, &snapshot, PortfolioPolicy::default()).unwrap() {
+        let frontier = match deliberate(&portfolio, &snapshot, PortfolioPolicy::default()).unwrap()
+        {
             DeliberationOutcome::ParetoFrontier(frontier) => frontier,
             other => panic!("expected frontier, got {other:?}"),
         };
@@ -689,8 +690,7 @@ mod tests {
             value,
             unit: "1".into(),
             uncertainty: interval.map(|(lower, upper)| {
-                UncertaintyEstimate::new(0.05, 0.02)
-                    .with_interval(Interval::new(lower, upper))
+                UncertaintyEstimate::new(0.05, 0.02).with_interval(Interval::new(lower, upper))
             }),
         }
     }
@@ -698,9 +698,12 @@ mod tests {
     #[test]
     fn confirmatory_claim_is_frozen_before_run_and_can_mint_satisfied_receipt() {
         let selected = selected();
-        let prepared =
-            prepare_confirmatory_simulation(&selected, request(), claim(MetricUncertaintyPolicy::RequireInterval))
-                .unwrap();
+        let prepared = prepare_confirmatory_simulation(
+            &selected,
+            request(),
+            claim(MetricUncertaintyPolicy::RequireInterval),
+        )
+        .unwrap();
         assert_eq!(prepared.claim().claim_id, "claim-0");
 
         let mut registry = StrictSimulationRegistry::new();

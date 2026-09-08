@@ -295,7 +295,7 @@ mod tests {
         PredictedOutcome, ProposedIntervention, TargetRegion,
     };
     use symthaea_sim_bridge::{
-        EngineeringDomain, ExecutionMode, Interval, SimulationEvidence, SimulationError,
+        EngineeringDomain, ExecutionMode, Interval, SimulationError, SimulationEvidence,
         SimulationMetric, SimulationRequest, SimulationResult, SolverKind, UncertaintyEstimate,
     };
 
@@ -331,9 +331,9 @@ mod tests {
                 name: "diagnostic_quality".into(),
                 value: 0.88,
                 unit: "1".into(),
-                uncertainty: self.interval.map(|interval| {
-                    UncertaintyEstimate::new(0.04, 0.02).with_interval(interval)
-                }),
+                uncertainty: self
+                    .interval
+                    .map(|interval| UncertaintyEstimate::new(0.04, 0.02).with_interval(interval)),
             }];
             Ok(ContextBoundSimulationResult {
                 result,
@@ -397,7 +397,8 @@ mod tests {
             SnapshotDigestAlgorithm::Blake3,
             "a".repeat(64),
         );
-        let frontier = match deliberate(&portfolio, &snapshot, PortfolioPolicy::default()).unwrap() {
+        let frontier = match deliberate(&portfolio, &snapshot, PortfolioPolicy::default()).unwrap()
+        {
             DeliberationOutcome::ParetoFrontier(frontier) => frontier,
             other => panic!("expected frontier, got {other:?}"),
         };
@@ -476,7 +477,13 @@ mod tests {
         satisfied: &SatisfiedSimulationClaim,
     ) -> SafetyCase {
         let reference = required_confirmatory_safety_evidence_ref(evidence, satisfied).unwrap();
-        let proposal = evidence.selection_evidence().selected().assessment().proposal.id.clone();
+        let proposal = evidence
+            .selection_evidence()
+            .selected()
+            .assessment()
+            .proposal
+            .id
+            .clone();
         let mut safety = SafetyCase::new(&proposal);
         safety.add_obligation(
             ProofObligation::new("exact confirmatory evidence", EvidenceKind::Simulation)
@@ -522,7 +529,13 @@ mod tests {
             Some(Interval::new(0.84, 0.92)),
             MetricUncertaintyPolicy::RequireInterval,
         );
-        let proposal = evidence.selection_evidence().selected().assessment().proposal.id.clone();
+        let proposal = evidence
+            .selection_evidence()
+            .selected()
+            .assessment()
+            .proposal
+            .id
+            .clone();
         let mut safety = SafetyCase::new(&proposal);
         safety.add_obligation(
             ProofObligation::new("neighboring simulation", EvidenceKind::Simulation)
@@ -541,14 +554,23 @@ mod tests {
 
         let result_a = evidence_a.selection_evidence().validated().result();
         let result_b = evidence_b.selection_evidence().validated().result();
-        assert_eq!(result_a.evidence.input_digest, result_b.evidence.input_digest);
-        assert_eq!(result_a.evidence.output_digest, result_b.evidence.output_digest);
-        assert_ne!(satisfied_a.request_transcript(), satisfied_b.request_transcript());
+        assert_eq!(
+            result_a.evidence.input_digest,
+            result_b.evidence.input_digest
+        );
+        assert_eq!(
+            result_a.evidence.output_digest,
+            result_b.evidence.output_digest
+        );
+        assert_ne!(
+            satisfied_a.request_transcript(),
+            satisfied_b.request_transcript()
+        );
 
-        let reference_a = required_confirmatory_safety_evidence_ref(&evidence_a, &satisfied_a)
-            .unwrap();
-        let reference_b = required_confirmatory_safety_evidence_ref(&evidence_b, &satisfied_b)
-            .unwrap();
+        let reference_a =
+            required_confirmatory_safety_evidence_ref(&evidence_a, &satisfied_a).unwrap();
+        let reference_b =
+            required_confirmatory_safety_evidence_ref(&evidence_b, &satisfied_b).unwrap();
         assert_ne!(reference_a, reference_b);
 
         let safety_a = discharged_case(&evidence_a, &satisfied_a);

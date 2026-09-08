@@ -3,13 +3,14 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Physical-agency composition primitives for Symthaea.
 //!
-//! PA-14 remains deliberately pre-execution. This crate can negotiate declared
+//! PA-15 remains deliberately pre-execution. This crate can negotiate declared
 //! simulator capabilities, preserve multi-objective candidate frontiers, bind
 //! deliberation to immutable world snapshots, validate strict typed-context
 //! simulation lineage, derive strict requests from selection receipts,
-//! preregister/evaluate typed outcome claims, and structurally qualify exact
-//! confirmatory simulation + safety-case evidence. It cannot construct actuator
-//! commands, depend on HAL, or mint physical execution authority.
+//! preregister/evaluate typed outcome claims, preregister the safety-obligation
+//! set before execution, and structurally qualify exact confirmatory simulation
+//! evidence. It cannot construct actuator commands, depend on HAL, or mint
+//! physical execution authority.
 //!
 //! Capability manifests are declarations used to choose a suitable modelling
 //! path. They are **not** safety evidence and cannot discharge execution gates.
@@ -17,18 +18,20 @@
 //! The legacy PA-04/PA-08 simulation qualifier remains available for the older
 //! research path. The PA-11+ strict path is intentionally separate and requires
 //! typed contexts, selection-derived world lineage, preregistered outcome claims,
-//! and exact-run safety evidence.
+//! preregistered safety obligations, independent non-simulation safety evidence,
+//! and exact-run simulation evidence.
 
 #![deny(unsafe_code)]
 
 pub mod deliberation;
 pub mod outcome_claim;
 pub mod portfolio;
-pub mod strict_context;
-pub mod strict_qualification;
-pub mod strict_selection;
 mod qualification;
 mod qualification_lineage;
+pub mod safety_preregistration;
+pub mod strict_context;
+mod strict_qualification;
+pub mod strict_selection;
 
 pub use deliberation::{SnapshotDigestAlgorithm, WorldSnapshotRef};
 pub use qualification::{
@@ -39,6 +42,9 @@ pub use qualification::{
 pub use qualification_lineage::{
     DeliberationBoundSimulationCandidate, DeliberationQualificationError,
     DeliberationSimulationBinding, qualify_selected_simulation_candidate,
+};
+pub use strict_qualification::{
+    StrictConfirmatoryQualificationError, StrictConfirmatorySimulationQualification,
 };
 
 use serde::{Deserialize, Serialize};
@@ -206,7 +212,8 @@ impl CapabilityCatalog {
         if self.manifests.contains_key(&manifest.backend_name) {
             return Err(CapabilityError::DuplicateBackend(manifest.backend_name));
         }
-        self.manifests.insert(manifest.backend_name.clone(), manifest);
+        self.manifests
+            .insert(manifest.backend_name.clone(), manifest);
         Ok(())
     }
 
@@ -323,7 +330,9 @@ mod tests {
     fn unknown_backend_is_rejected() {
         let catalog = CapabilityCatalog::new();
         let requirement = CapabilityRequirement::new(SolverKind::FiniteElement);
-        let error = catalog.negotiate(&MockFeaBackend, &requirement).unwrap_err();
+        let error = catalog
+            .negotiate(&MockFeaBackend, &requirement)
+            .unwrap_err();
         assert_eq!(error, CapabilityError::UnknownBackend("mock-fea".into()));
     }
 
@@ -358,12 +367,16 @@ mod tests {
 
         assert!(!decision.is_accepted());
         assert_eq!(decision.missing.len(), 2);
-        assert!(decision
-            .missing
-            .contains(&BackendCapability::SystemIdentification));
-        assert!(decision
-            .missing
-            .contains(&BackendCapability::UncertaintyQuantification));
+        assert!(
+            decision
+                .missing
+                .contains(&BackendCapability::SystemIdentification)
+        );
+        assert!(
+            decision
+                .missing
+                .contains(&BackendCapability::UncertaintyQuantification)
+        );
     }
 
     #[test]

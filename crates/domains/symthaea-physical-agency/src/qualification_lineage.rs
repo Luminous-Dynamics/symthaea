@@ -167,10 +167,12 @@ pub fn qualify_selected_simulation_candidate(
     let assessment = selected.assessment();
 
     if binding.world_snapshot_digest != selected.world_snapshot().snapshot_digest() {
-        return Err(DeliberationQualificationError::WorldSnapshotBindingMismatch {
-            selected: selected.world_snapshot().snapshot_digest().to_string(),
-            binding: binding.world_snapshot_digest.clone(),
-        });
+        return Err(
+            DeliberationQualificationError::WorldSnapshotBindingMismatch {
+                selected: selected.world_snapshot().snapshot_digest().to_string(),
+                binding: binding.world_snapshot_digest.clone(),
+            },
+        );
     }
 
     // Revalidate the assessment even though the selection receipt could only
