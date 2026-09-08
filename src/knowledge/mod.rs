@@ -53,6 +53,8 @@ pub mod matter_crystal_phase;
 mod matter_crystal_phase_materials_tests;
 #[cfg(feature = "nuclear")]
 pub mod matter_evidence_bindings;
+pub mod matter_lattice_dynamics_binding;
+mod matter_lattice_dynamics_graph;
 pub mod matter_observatory;
 pub mod matter_phase_competition_graph;
 pub mod matter_relativistic;
