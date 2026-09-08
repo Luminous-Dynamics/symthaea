@@ -40,13 +40,29 @@ Any semantic graph change receives a different identity, including:
 
 This matters because evidence-set independence can otherwise be replayed across lineage generations whose selected local subset looks identical.
 
-## Encoding
+## Typed semantic encoding
 
-The implementation does **not** hash raw JSON bytes.
+The implementation does **not** derive governance identity from JSON, serde field names, serde enum tags, debug formatting, Rust `Hash`, or raw serialized bytes.
 
-The validated graph is projected to its serde semantic value tree only so private validated-node contents can be read without widening the lineage API. The identity routine then explicitly extracts the known v1 fields, sorts nodes and parents, maps derivation kinds through their explicit snake-case wire tags, and feeds those values into a domain-separated, length-prefixed BLAKE3 encoding.
+The input is already a `ValidatedEvidenceLineageGraphV1`. Canonical identity reads its typed, read-only semantic node view directly. Each validated node supplies its evidence id, complete parent-id set, and typed `CognitiveDerivationKindV1`. Parent ids and nodes are canonicalized, the derivation enum is mapped through an exhaustive v1 semantic-tag match, schema versions are bound from the validated v1 contract, and those exact values are fed into a domain-separated, length-prefixed BLAKE3 encoding.
 
-JSON object order, whitespace, debug formatting, Rust `Hash`, and the legacy graph label therefore do not define identity.
+The path is therefore:
+
+```text
+validated typed lineage semantics
+        -> explicit canonical semantic tree
+        -> domain-separated BLAKE3
+```
+
+not:
+
+```text
+validated object
+        -> serializer/wire projection
+        -> identity
+```
+
+Because validation has already established the supported schema, digest shapes, closed ancestry, unique ids/parents, and acyclicity, canonical identity derivation is infallible after validation. Persistence may continue to use serde, but persistence representation does not define governance identity.
 
 ## Authority boundary
 
@@ -76,5 +92,7 @@ Qualification must establish:
 - adding an unrelated node changes identity;
 - changing derivation kind changes identity;
 - changing a parent edge changes identity;
-- only known v1 derivation tags are admitted into the identity encoding;
+- every v1 derivation variant has one explicit stable semantic tag;
+- no serde/wire projection participates in canonical identity production;
+- canonical identity derivation cannot fail after graph validation;
 - the canonical identity remains a generic governance dependency with no RCA runtime dependency.
