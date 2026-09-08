@@ -11,7 +11,7 @@ use symthaea_iot_actuation_guard_semantic_persistence::{
 };
 use symthaea_iot_authority::{InclusiveRangeI64, SAFETY_ENVELOPE_SCHEMA_VERSION, SafetyEnvelope};
 use symthaea_iot_device_protocol::{
-    DEVICE_ENFORCEMENT_CONFIG_SCHEMA_VERSION, DeviceEnforcementConfigV1,
+    DEVICE_ENFORCEMENT_CONFIG_SCHEMA_VERSION, DeviceEnforcementConfigV1, DeviceProtocolError,
     DeviceSemanticCheckpointV1, DeviceSemanticHead,
 };
 
@@ -67,6 +67,13 @@ fn genesis_head(config: &DeviceEnforcementConfigV1) -> DeviceSemanticHead {
         .unwrap()
         .head()
         .unwrap()
+}
+
+fn assert_device_protocol_error_conversion<T: From<DeviceProtocolError>>() {}
+
+#[test]
+fn current_fence_accepts_protocol_errors_only_through_typed_error_boundary() {
+    assert_device_protocol_error_conversion::<CurrentSemanticHeadFenceError>();
 }
 
 #[test]

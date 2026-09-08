@@ -10,7 +10,9 @@
 use std::fs::File;
 use std::sync::MutexGuard;
 
-use symthaea_iot_device_protocol::{DeviceSemanticCheckpointV1, DeviceSemanticHead};
+use symthaea_iot_device_protocol::{
+    DeviceProtocolError, DeviceSemanticCheckpointV1, DeviceSemanticHead,
+};
 use thiserror::Error;
 
 use crate::{DurableSemanticAcceptanceStore, SemanticPersistenceError};
@@ -77,4 +79,10 @@ pub enum CurrentSemanticHeadFenceError {
         expected: DeviceSemanticHead,
         current: DeviceSemanticHead,
     },
+}
+
+impl From<DeviceProtocolError> for CurrentSemanticHeadFenceError {
+    fn from(source: DeviceProtocolError) -> Self {
+        Self::Store(SemanticPersistenceError::SemanticPolicy(source))
+    }
 }
