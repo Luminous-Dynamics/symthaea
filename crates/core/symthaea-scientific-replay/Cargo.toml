@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-scientific-replay"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Narrow deterministic replay boundary for persisted scientific disposition records"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
