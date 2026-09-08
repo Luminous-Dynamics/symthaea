@@ -47,11 +47,15 @@ jobs:
           grep -q 'claim_digest_is_payload_identity_not_evidence_object_identity' "$production"
           grep -q 'evidence_id_is_derived_never_producer_asserted' "$production"
 
+          # Identity must be an explicit canonical contract, not incidental Rust
+          # hashing/formatting or a general-purpose serializer.
           if grep -Eq 'DefaultHasher|std::hash|serde_json::|format!\([^\n]*\{:\?\}|authority[[:space:]]+as[[:space:]]+(u8|u16|u32|usize)' "$production"; then
             echo 'RCA evidence identity depends on unstable/incidental serialization or discriminants.' >&2
             exit 1
           fi
 
+          # Every provenance-bearing field in CognitiveEvidenceRefV1 is part of
+          # the v1 identity contract. Claim identity alone must never be the join key.
           for field in \
             evidence_schema_version \
             authority \
@@ -68,6 +72,7 @@ jobs:
             grep -q "$field" "$production"
           done
 
+          # Pin the negative tests that prevent claim/provenance collapse.
           grep -q 'claim_digest_is_not_evidence_object_identity' "$src"
           grep -q 'same_claim_from_different_provenance_stays_distinct' "$src"
           grep -q 'source_version_is_identity_bearing' "$src"
