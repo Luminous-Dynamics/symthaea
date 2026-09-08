@@ -48,7 +48,7 @@ jobs:
               'compile_error!("theprivilegedeffect-reconciliationtrustpublicationstoreisLinux-only")',
               'pubstructEffectReconciliationTrustRootsV1{pubdevice:ResourceRef,puboutcome_policy:EffectReconciliationPolicyAnchorV1,puboutcome_trust_head:PublishedEffectOutcomeTrustHeadV1,}',
               'pubconstfnfrom_outcome_trust_head(head:EffectOutcomeTrustHead)->Self',
-              'pubconstfnmatches_outcome_trust_head(self,head:EffectOutcomeTrustHead)->bool',
+              'pubfnmatches_outcome_trust_head(self,head:EffectOutcomeTrustHead)->bool',
               'pubstructDurableEffectReconciliationTrustPublicationStore',
               'pubfnpublish_successor(',
               'pubfnfence_current(',
