@@ -53,11 +53,12 @@
         "candidate_blob_sha": {"$ref": "#/$defs/nullableObjectId"}
       }
     },
-    "requiredJob": {
+    "jobObservation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "status", "conclusion", "skipped"],
+      "required": ["job_id", "name", "status", "conclusion", "skipped"],
       "properties": {
+        "job_id": {"type": "integer", "minimum": 1},
         "name": {"type": "string", "minLength": 1},
         "status": {"type": ["string", "null"]},
         "conclusion": {"type": ["string", "null"]},
@@ -71,27 +72,29 @@
         "workflow_path",
         "workflow_blob_sha",
         "run_id",
+        "run_attempt",
         "event",
         "status",
         "conclusion",
         "head_sha",
         "base_sha",
-        "job_set_complete",
-        "required_jobs"
+        "job_census_complete",
+        "job_census"
       ],
       "properties": {
         "workflow_path": {"type": "string", "minLength": 1},
         "workflow_blob_sha": {"$ref": "#/$defs/objectId"},
         "run_id": {"type": "integer", "minimum": 1},
+        "run_attempt": {"type": "integer", "minimum": 1},
         "event": {"type": "string", "minLength": 1},
         "status": {"type": ["string", "null"]},
         "conclusion": {"type": ["string", "null"]},
         "head_sha": {"$ref": "#/$defs/objectId"},
         "base_sha": {"$ref": "#/$defs/objectId"},
-        "job_set_complete": {"type": "boolean"},
-        "required_jobs": {
+        "job_census_complete": {"type": "boolean"},
+        "job_census": {
           "type": "array",
-          "items": {"$ref": "#/$defs/requiredJob"}
+          "items": {"$ref": "#/$defs/jobObservation"}
         }
       }
     }
