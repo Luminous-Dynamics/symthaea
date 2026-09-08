@@ -1,0 +1,173 @@
+name: ALife Genesis Social Runner
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/genesis_tick.rs"
+      - "crates/domains/symthaea-alife/src/genesis_event_batch.rs"
+      - "crates/domains/symthaea-alife/src/genesis_social_runner.rs"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/src/events.rs"
+      - "crates/domains/symthaea-alife/src/observatory.rs"
+      - ".github/workflows/alife-genesis-social-runner.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualified-social-runner:
+    name: Qualified Genesis social evidence theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/genesis_tick.rs
+          sha256sum crates/domains/symthaea-alife/src/genesis_event_batch.rs
+          sha256sum crates/domains/symthaea-alife/src/genesis_social_runner.rs
+          sha256sum crates/domains/symthaea-alife/src/population.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-genesis-social-runner
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test Genesis tick contract
+        run: 'cargo test --locked -p symthaea-alife genesis_tick::'
+
+      - name: Test complete tick-batch contract
+        run: 'cargo test --locked -p symthaea-alife genesis_event_batch::'
+
+      - name: Test qualified social runner
+        run: 'cargo test --locked -p symthaea-alife genesis_social_runner::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze qualified runner authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner="crates/domains/symthaea-alife/src/genesis_social_runner.rs"
+          batch="crates/domains/symthaea-alife/src/genesis_event_batch.rs"
+          tick="crates/domains/symthaea-alife/src/genesis_tick.rs"
+
+          grep -q 'pub struct GenesisSocialRunnerV1' "$runner"
+          grep -q 'pub fn population(&self) -> &Population' "$runner"
+          ! grep -q 'pub fn population_mut' "$runner"
+          ! grep -q -- '-> &mut Population' "$runner"
+          grep -q 'GenesisTickBatchV1::new' "$runner"
+          grep -q 'batch.validate()' "$runner"
+          grep -q 'self.tick_cursor.commit(reservation)' "$runner"
+          grep -q 'self.qualified = false' "$runner"
+          grep -q 'catch_unwind' "$runner"
+          grep -q 'resume_unwind' "$runner"
+          grep -q 'pub fn cull_weakest' "$runner"
+          grep -q 'pub fn drain_lifecycle_events' "$runner"
+
+          grep -q 'population_before' "$batch"
+          grep -q 'PartnerNotReciprocal' "$batch"
+          grep -q 'validate_genesis_tick_chunk' "$batch"
+          grep -q 'checked_add(1)' "$tick"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path("crates/domains/symthaea-alife/src/genesis_social_runner.rs").read_text()
+          body = text.split("pub fn step_social(", 1)[1].split("pub fn cull_weakest", 1)[0]
+
+          preflight = body.index(".preflight()")
+          delegate = body.index("self.population.step_social")
+          batch = body.index("GenesisTickBatchV1::new")
+          validate = body.index("batch.validate()")
+          commit = body.index("self.tick_cursor.commit(reservation)")
+
+          if not (preflight < delegate < batch < validate < commit):
+              raise SystemExit("qualified social step ordering theorem drifted")
+
+          if "self.population.drain_event_log()" not in body:
+              raise SystemExit("legacy flat rows are not consumed into complete batches")
+
+          if "self.qualified = false" not in body:
+              raise SystemExit("post-step qualification failure no longer fails closed")
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner="crates/domains/symthaea-alife/src/genesis_social_runner.rs"
+          population="crates/domains/symthaea-alife/src/population.rs"
+
+          # This profile is qualified only when callers stay inside the wrapper API.
+          grep -q 'issue #910' "$runner"
+
+          # Do not overclaim full population authority closure or resume.
+          grep -q 'pub organisms: Vec<Organism>' "$population"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$runner"
+          ! grep -q 'from_snapshot' "$runner"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-genesis-social-runner-evidence
+          {
+            echo "authority=qualified_genesis_social_runner_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "runner_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/genesis_social_runner.rs | cut -d' ' -f1)"
+            echo "batch_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/genesis_event_batch.rs | cut -d' ' -f1)"
+            echo "tick_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/genesis_tick.rs | cut -d' ' -f1)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "qualified_social_execution_profile=true"
+            echo "complete_behavioral_tick_batches=true"
+            echo "empty_tick_evidence=true"
+            echo "caught_panic_invalidates_runner=true"
+            echo "raw_population_authority_closed=false"
+            echo "population_snapshot_complete=false"
+            echo "population_execution_resume_established=false"
+          } > target/alife-genesis-social-runner-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-genesis-social-runner-evidence
+          path: target/alife-genesis-social-runner-evidence/qualification.txt
+          if-no-files-found: error
