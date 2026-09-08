@@ -272,6 +272,30 @@ def lint_manifest(data: Any) -> list[str]:
             errors.append(f"{prefix}.status.kind: invalid status kind")
             continue
 
+        evidence_refs = status.get("evidence_refs")
+        if kind in EVIDENCE_REQUIRED:
+            if not _string_list(evidence_refs) or not evidence_refs:
+                errors.append(
+                    f"{prefix}.status.evidence_refs: {kind} requires at least one exact evidence ref"
+                )
+        elif evidence_refs is not None and not _string_list(evidence_refs):
+            errors.append(f"{prefix}.status.evidence_refs: expected array of strings")
+
+        if kind == "NotApplicable" and not _nonempty_string(status.get("reason")):
+            errors.append(f"{prefix}.status.reason: NotApplicable requires a reason")
+
+        if kind == "OpenFinding" and not _nonempty_string(status.get("finding_ref")):
+            errors.append(f"{prefix}.status.finding_ref: OpenFinding requires a reference")
+
+        if kind == "BlockedBy":
+            blockers = status.get("blockers")
+            if not _string_list(blockers) or not blockers:
+                errors.append(f"{prefix}.status.blockers: BlockedBy requires blockers")
+            else:
+                for blocker in blockers:
+                    if blocker not in obligation_by_id:
+                        errors.append(f"{prefix}: unknown blocker {blocker!r}")
+
         claim_tier = status.get("evidence_tier")
         if kind == "Qualified":
             if claim_tier not in TIER_RANK:
@@ -280,9 +304,6 @@ def lint_manifest(data: Any) -> list[str]:
                 errors.append(
                     f"{prefix}: Qualified claim tier {claim_tier} is below required {required_tier}"
                 )
-            evidence_refs = status.get("evidence_refs")
-            if not _string_list(evidence_refs) or not evidence_refs:
-                errors.append(f"{prefix}.status.evidence_refs: Qualified claim requires evidence")
             if claim_tier in TIER_RANK and TIER_RANK[claim_tier] >= TIER_RANK["E5"]:
                 if implementation_commit is None:
                     errors.append(
@@ -292,7 +313,6 @@ def lint_manifest(data: Any) -> list[str]:
                 for oid in critical:
                     obligation = obligation_by_id.get(oid)
                     if obligation is None:
-                        errors.append(f"{prefix}: unknown critical obligation {oid!r}")
                         continue
                     ostatus = obligation.get("status")
                     if not isinstance(ostatus, dict) or ostatus.get("kind") != "Qualified":

@@ -144,3 +144,39 @@ def test_cli_json_output(tmp_path, capsys):
     assert rc == 0
     assert out["valid"] is True
     assert out["disclaimer"] == "LintPass != HAKQualification"
+
+
+def test_claim_open_finding_requires_reference():
+    claim = {
+        "id": "C1",
+        "statement": "claim finding",
+        "required_evidence_tier": "E2",
+        "critical_obligations": ["O1"],
+        "status": {"kind": "OpenFinding"},
+    }
+    errors = lint.lint_manifest(manifest([obligation()], [claim]))
+    assert any("OpenFinding requires a reference" in error for error in errors)
+
+
+def test_claim_not_applicable_requires_reason():
+    claim = {
+        "id": "C1",
+        "statement": "claim exclusion",
+        "required_evidence_tier": "E2",
+        "critical_obligations": ["O1"],
+        "status": {"kind": "NotApplicable"},
+    }
+    errors = lint.lint_manifest(manifest([obligation()], [claim]))
+    assert any("NotApplicable requires a reason" in error for error in errors)
+
+
+def test_claim_blocked_by_requires_known_blocker():
+    claim = {
+        "id": "C1",
+        "statement": "blocked claim",
+        "required_evidence_tier": "E2",
+        "critical_obligations": ["O1"],
+        "status": {"kind": "BlockedBy", "blockers": ["MISSING"]},
+    }
+    errors = lint.lint_manifest(manifest([obligation()], [claim]))
+    assert any("unknown blocker 'MISSING'" in error for error in errors)
