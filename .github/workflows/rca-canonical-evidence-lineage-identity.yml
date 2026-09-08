@@ -111,8 +111,12 @@ jobs:
 
           grep -q 'canonical_lineage_profile_digest_v1_known_answer' "$vectors"
           grep -q 'canonical_two_node_lineage_graph_id_v1_known_answer' "$vectors"
+          grep -q 'canonical_multiroot_lineage_graph_id_v1_known_answer' "$vectors"
+          grep -q 'independent_multiroot_three_item_witness_v1_known_answers' "$vectors"
           grep -q 'blake3:ff23c2ba0796d14eefd10c327542e8f0287bab3d09cb3bb2515c86fd72803d4a' "$vectors"
           grep -q 'blake3:916114cbe9c4ff598097fd2702e965a4b3a763bfcc92e569fb986397371363d6' "$vectors"
+          grep -q 'blake3:9115d0bacd4e4a9f461d2803ad660ff47bf2e0828fae21021add160e6ec936a4' "$vectors"
+          grep -q 'blake3:9fd4ef214fe13a7fce258f62db66d4ed418021fe1f372238ae896f3c20414275' "$vectors"
 
           grep -q 'explicit_derivation_tags_are_stable' "$src"
           grep -q 'legacy_graph_label_does_not_define_canonical_identity' "$src"
