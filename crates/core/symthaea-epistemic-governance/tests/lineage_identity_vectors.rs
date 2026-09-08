@@ -20,18 +20,29 @@ use symthaea_epistemic_governance::{
 
 const A: &str = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const B: &str = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const C: &str = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const D: &str = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+const E: &str = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const LEGACY_GRAPH_LABEL: &str =
     "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
-fn root(id: &str) -> ValidatedEvidenceLineageNodeV1 {
+fn node(
+    id: &str,
+    parents: &[&str],
+    derivation_kind: CognitiveDerivationKindV1,
+) -> ValidatedEvidenceLineageNodeV1 {
     EvidenceLineageNodeV1 {
         schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
         evidence_id: id.into(),
-        parent_ids: vec![],
-        derivation_kind: CognitiveDerivationKindV1::RootObservation,
+        parent_ids: parents.iter().map(|parent| (*parent).to_string()).collect(),
+        derivation_kind,
     }
     .validate()
-    .expect("known-answer root must validate")
+    .expect("known-answer node must validate")
+}
+
+fn root(id: &str) -> ValidatedEvidenceLineageNodeV1 {
+    node(id, &[], CognitiveDerivationKindV1::RootObservation)
 }
 
 fn graph(nodes: Vec<ValidatedEvidenceLineageNodeV1>) -> ValidatedEvidenceLineageGraphV1 {
@@ -44,6 +55,16 @@ fn graph(nodes: Vec<ValidatedEvidenceLineageNodeV1>) -> ValidatedEvidenceLineage
     .expect("known-answer graph must validate")
 }
 
+fn complex_graph() -> ValidatedEvidenceLineageGraphV1 {
+    graph(vec![
+        root(E),
+        node(C, &[B, A], CognitiveDerivationKindV1::Inference),
+        root(B),
+        root(D),
+        root(A),
+    ])
+}
+
 #[test]
 fn canonical_lineage_profile_digest_v1_known_answer() {
     assert_eq!(
@@ -54,20 +75,24 @@ fn canonical_lineage_profile_digest_v1_known_answer() {
 
 #[test]
 fn canonical_two_node_lineage_graph_id_v1_known_answer() {
-    let derived = EvidenceLineageNodeV1 {
-        schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
-        evidence_id: B.into(),
-        parent_ids: vec![A.into()],
-        derivation_kind: CognitiveDerivationKindV1::Inference,
-    }
-    .validate()
-    .expect("known-answer derived node must validate");
-
-    let graph = graph(vec![root(A), derived]);
+    let graph = graph(vec![
+        root(A),
+        node(B, &[A], CognitiveDerivationKindV1::Inference),
+    ]);
 
     assert_eq!(
         canonical_evidence_lineage_graph_id_v1(&graph),
         "blake3:916114cbe9c4ff598097fd2702e965a4b3a763bfcc92e569fb986397371363d6"
+    );
+}
+
+#[test]
+fn canonical_multiroot_lineage_graph_id_v1_known_answer() {
+    let graph = complex_graph();
+
+    assert_eq!(
+        canonical_evidence_lineage_graph_id_v1(&graph),
+        "blake3:9115d0bacd4e4a9f461d2803ad660ff47bf2e0828fae21021add160e6ec936a4"
     );
 }
 
@@ -92,4 +117,51 @@ fn independent_evidence_witness_v1_known_answers() {
         witness.witness_id(),
         "blake3:907108bd4dd6283c72085e625e8dfc89ffd9785a795dcee328d651704afe7740"
     );
+}
+
+#[test]
+fn independent_multiroot_three_item_witness_v1_known_answers() {
+    let graph = complex_graph();
+    let witness = issue_independent_evidence_set_witness_v1(
+        &graph,
+        &[E.to_string(), C.to_string(), D.to_string()],
+    )
+    .expect("multi-root item plus disjoint roots must issue an independent witness");
+
+    assert_eq!(
+        witness.lineage_graph_id(),
+        "blake3:9115d0bacd4e4a9f461d2803ad660ff47bf2e0828fae21021add160e6ec936a4"
+    );
+    assert_eq!(
+        witness.witness_id(),
+        "blake3:9fd4ef214fe13a7fce258f62db66d4ed418021fe1f372238ae896f3c20414275"
+    );
+
+    let item_ids = witness
+        .items()
+        .iter()
+        .map(|item| item.evidence_id())
+        .collect::<Vec<_>>();
+    assert_eq!(item_ids, vec![C, D, E]);
+
+    let first_roots = witness.items()[0]
+        .root_ids()
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    assert_eq!(first_roots, vec![A, B]);
+
+    let pairs = witness
+        .pairs()
+        .iter()
+        .map(|pair| (pair.left_evidence_id(), pair.right_evidence_id()))
+        .collect::<Vec<_>>();
+    assert_eq!(pairs, vec![(C, D), (C, E), (D, E)]);
+
+    let distinct_roots = witness
+        .distinct_root_ids()
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    assert_eq!(distinct_roots, vec![A, B, D, E]);
 }
