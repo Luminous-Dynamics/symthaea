@@ -135,11 +135,15 @@ jobs:
             exit 1
           fi
 
-      - name: Freeze adversarial witness tests
+      - name: Freeze adversarial and known-answer witness tests
         shell: bash
         run: |
           set -euo pipefail
           src=crates/core/symthaea-epistemic-governance/src/evidence_set_witness.rs
+          grep -q 'independent_witness_known_answer_is_frozen_v1' "$src"
+          grep -q 'blake3:56afd81e7d6db518a69563a185e486a0f3235e9cb5543f456415d3ca01559146' "$src"
+          grep -q 'blake3:08b22bdc6eb5775186c3d1f2695fc8b45cd2e7de142178fce0b03f217a31af89' "$src"
+          grep -q 'blake3:907108bd4dd6283c72085e625e8dfc89ffd9785a795dcee328d651704afe7740' "$src"
           grep -q 'multiroot_derived_item_is_one_independent_item_not_multiple_confirmations' "$src"
           grep -q 'shared_root_siblings_cannot_form_independent_set_witness' "$src"
           grep -q 'ancestor_and_descendant_cannot_form_independent_set_witness' "$src"
