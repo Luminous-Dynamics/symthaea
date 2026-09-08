@@ -1,0 +1,179 @@
+{
+  "schema": "symthaea.integration-train.v1",
+  "base_subject": "95a32182d5830ecb6efa36c625cad8102e67c81b",
+  "ordered_tranches": [
+    {
+      "commit_sha": "e87194e5997fc9c6a9311692e0167e484e9a04b9",
+      "predecessor_sha": "95a32182d5830ecb6efa36c625cad8102e67c81b",
+      "theorem_id": "resources.r1.topology.v1",
+      "claim": "Potential topology is distinct from committed resource flow.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-topology/Cargo.toml",
+        "crates/domains/symthaea-resource-topology/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:695"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 695
+    },
+    {
+      "commit_sha": "23029a9baa641f9c5a01430b2a6f1a86297ee54f",
+      "predecessor_sha": "e87194e5997fc9c6a9311692e0167e484e9a04b9",
+      "theorem_id": "resources.r1.capacity.v1",
+      "claim": "Temporal capacity semantics are explicit rather than inferred from units.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-capacity/Cargo.toml",
+        "crates/domains/symthaea-resource-capacity/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:699"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 699
+    },
+    {
+      "commit_sha": "9b64822631b59aa1dd37b36c9f974603946fed81",
+      "predecessor_sha": "23029a9baa641f9c5a01430b2a6f1a86297ee54f",
+      "theorem_id": "resources.r1.allocation.v1",
+      "claim": "Time-scoped allocations conserve source, link, and destination capacity.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-allocation/Cargo.toml",
+        "crates/domains/symthaea-resource-allocation/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:707"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 707
+    },
+    {
+      "commit_sha": "8aa3010252cafd3768c62c5c5cce1301e01761b6",
+      "predecessor_sha": "9b64822631b59aa1dd37b36c9f974603946fed81",
+      "theorem_id": "resources.r1.flow-snapshot.v1",
+      "claim": "Admitted allocations materialize into independently revalidated committed-flow snapshots.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-flow-snapshot/Cargo.toml",
+        "crates/domains/symthaea-resource-flow-snapshot/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:713"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 713
+    },
+    {
+      "commit_sha": "5ddf851a6577947d5ca9317b8db8b03f4e2ba208",
+      "predecessor_sha": "8aa3010252cafd3768c62c5c5cce1301e01761b6",
+      "theorem_id": "resources.r1.quality-evidence.v1",
+      "claim": "Resource quality claims bind to exact topology subjects, validity windows, and evidence classes.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-quality-evidence/Cargo.toml",
+        "crates/domains/symthaea-resource-quality-evidence/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:723"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 723
+    },
+    {
+      "commit_sha": "15dee79314127cfad4afd2921f1ea09591e6e35b",
+      "predecessor_sha": "5ddf851a6577947d5ca9317b8db8b03f4e2ba208",
+      "theorem_id": "resources.r1.quality-qualification.v1",
+      "claim": "Quality evidence qualifies only under explicit fail-closed consumer policy.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-quality-qualification/Cargo.toml",
+        "crates/domains/symthaea-resource-quality-qualification/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:728"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 728
+    },
+    {
+      "commit_sha": "a5126705953b43e55e1b31dc774e838208a97f1a",
+      "predecessor_sha": "15dee79314127cfad4afd2921f1ea09591e6e35b",
+      "theorem_id": "resources.r1.quality-interval.v1",
+      "claim": "Quality must remain qualified across the complete allocation interval.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-quality-interval/Cargo.toml",
+        "crates/domains/symthaea-resource-quality-interval/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:732"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 732
+    },
+    {
+      "commit_sha": "fc4c9d7d6bd44391f55c60d88d084898e709f33e",
+      "predecessor_sha": "a5126705953b43e55e1b31dc774e838208a97f1a",
+      "theorem_id": "resources.r1.feasibility.v1",
+      "claim": "One candidate is feasible only when quantity and full-interval quality both qualify against the same base state.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-feasibility/Cargo.toml",
+        "crates/domains/symthaea-resource-feasibility/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:736"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 736
+    },
+    {
+      "commit_sha": "99ae477f46b17a04df390abf33b0b308c3220781",
+      "predecessor_sha": "fc4c9d7d6bd44391f55c60d88d084898e709f33e",
+      "theorem_id": "resources.r1.feasible-set.v1",
+      "claim": "A bounded discovery universe yields a canonical closed set of independently feasible alternatives and typed rejections.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-feasible-set/Cargo.toml",
+        "crates/domains/symthaea-resource-feasible-set/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:754"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 754
+    }
+  ],
+  "cumulative_tip_sha": "99ae477f46b17a04df390abf33b0b308c3220781",
+  "train_id": "sha256:e11e11ed99c02f4f9889565287aa623116a18f7a1b79e081d6d6ba926d3e1267"
+}
