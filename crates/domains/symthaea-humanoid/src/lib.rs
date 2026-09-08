@@ -39,6 +39,7 @@ pub mod oracle_dataset;
 pub mod oracle_generator_certification;
 #[cfg(feature = "osqp-backend")]
 pub mod osqp_backend;
+pub mod physical_health;
 pub mod plugin;
 pub mod qp_certification;
 pub mod recovery;
@@ -89,6 +90,7 @@ pub use oracle_dataset::*;
 pub use oracle_generator_certification::*;
 #[cfg(feature = "osqp-backend")]
 pub use osqp_backend::*;
+pub use physical_health::*;
 pub use qp_certification::*;
 pub use recovery_certification::*;
 pub use release_pipeline::*;
