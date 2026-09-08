@@ -1,0 +1,136 @@
+name: ALife Genesis Evidence Checkpoint
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/genesis_event_batch.rs"
+      - "crates/domains/symthaea-alife/src/genesis_evidence_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/genesis_social_runner.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs"
+      - ".github/workflows/alife-genesis-evidence-checkpoint.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Genesis behavior-lifecycle cross-evidence theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-genesis-evidence-checkpoint
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test complete behavioral batches
+        run: 'cargo test --locked -p symthaea-alife genesis_event_batch::'
+
+      - name: Test lifecycle checkpoint
+        run: 'cargo test --locked -p symthaea-alife lifecycle_checkpoint::'
+
+      - name: Test cross-evidence checkpoint
+        run: 'cargo test --locked -p symthaea-alife genesis_evidence_checkpoint::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze cross-evidence authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="crates/domains/symthaea-alife/src/genesis_evidence_checkpoint.rs"
+          grep -q 'CrossClockMismatch' "$file"
+          grep -q 'BehaviorLivingSetMismatch' "$file"
+          grep -q 'BehaviorIdentityMismatch' "$file"
+          grep -q 'LifecycleDeathCauseV1::CullWeakest' "$file"
+          grep -q 'LifecycleDeathCauseV1::PopulationEnergyThreshold' "$file"
+          grep -q 'validate_genesis_tick_chunk' "$file"
+          grep -q '.lifecycle_checkpoint' "$file"
+          grep -q '.validate()' "$file"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('crates/domains/symthaea-alife/src/genesis_evidence_checkpoint.rs').read_text()
+          body = p.split('pub fn validate_after(', 1)[1].split('impl ValidatedGenesisEvidenceCheckpointV1', 1)[0]
+          chunk = body.index('validate_genesis_tick_chunk')
+          lifecycle = body.index('.lifecycle_checkpoint')
+          cross_clock = body.index('CrossClockMismatch')
+          cross_batch = body.index('validate_behavior_against_lifecycle')
+          if not (chunk < lifecycle < cross_clock < cross_batch):
+              raise SystemExit('cross-evidence validation order drifted')
+          if 'lifecycle.continuation_epoch() != self.behavior_next_tick' not in body:
+              raise SystemExit('exact behavior/lifecycle continuation clock comparison missing')
+
+          alive = p.split('fn alive_at_social_step_start', 1)[1]
+          if 'CullWeakest' not in alive or 'PopulationEnergyThreshold' not in alive:
+              raise SystemExit('cause-sensitive pre/post-step death semantics missing')
+          PY
+
+      - name: Freeze non-claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="crates/domains/symthaea-alife/src/genesis_evidence_checkpoint.rs"
+          runner="crates/domains/symthaea-alife/src/genesis_social_runner.rs"
+          ! grep -q 'PopulationSnapshotV1' "$file"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$file"
+          ! grep -q 'checkpoint_evidence' "$runner"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-genesis-evidence-checkpoint
+          {
+            echo "authority=genesis_behavior_lifecycle_cross_evidence_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "checkpoint_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/genesis_evidence_checkpoint.rs | cut -d' ' -f1)"
+            echo "behavior_lifecycle_cross_validation=true"
+            echo "pre_step_living_set_reconstructed=true"
+            echo "cause_sensitive_death_ordering=true"
+            echo "runner_rolling_checkpoint_integration=false"
+            echo "population_snapshot_complete=false"
+            echo "population_execution_resume_established=false"
+          } > target/alife-genesis-evidence-checkpoint/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-genesis-evidence-checkpoint
+          path: target/alife-genesis-evidence-checkpoint/qualification.txt
+          if-no-files-found: error
