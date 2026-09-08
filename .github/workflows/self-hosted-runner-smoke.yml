@@ -93,6 +93,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          command -v base64 >/dev/null 2>&1
+          command -v wc >/dev/null 2>&1
+          command -v tr >/dev/null 2>&1
           test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
           test "$GITHUB_REF" = 'refs/heads/main'
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
@@ -142,8 +145,13 @@ jobs:
           EOF
 
           smoke_sha256="$(sha256sum "$manifest" | awk '{print $1}')"
+          smoke_bytes="$(wc -c < "$manifest" | tr -d '[:space:]')"
+          smoke_base64="$(base64 < "$manifest" | tr -d '\n')"
+
           cat "$manifest"
           printf 'smoke_manifest_sha256=%s\n' "$smoke_sha256"
+          printf 'smoke_manifest_bytes=%s\n' "$smoke_bytes"
+          printf 'smoke_manifest_base64=%s\n' "$smoke_base64"
           printf 'smoke_manifest_path=%s\n' "$manifest"
 
           {
@@ -154,6 +162,8 @@ jobs:
             echo "- Main tree: \`$source_tree\`"
             echo "- Runner: \`${RUNNER_NAME:-unknown}\` / \`${RUNNER_OS:-unknown}\` / \`${RUNNER_ARCH:-unknown}\`"
             echo "- Smoke manifest SHA-256: \`$smoke_sha256\`"
+            echo "- Smoke manifest bytes: \`$smoke_bytes\`"
             echo
+            echo 'Exact smoke manifest bytes are emitted in the job log as smoke_manifest_base64 for post-run reconstruction.'
             echo 'Correctness/reproducibility runner-smoke evidence only; no performance or scientific qualification authority.'
           } >> "$GITHUB_STEP_SUMMARY"
