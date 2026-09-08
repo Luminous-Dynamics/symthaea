@@ -194,13 +194,8 @@ fn current_guard(
 ) -> CurrentPhysicalEffectOutcomeGuard {
     let registry = EffectOutcomeTrustRegistry::genesis(snapshot).unwrap();
     let head = registry.head();
-    CurrentPhysicalEffectOutcomeGuard::new(
-        policy.clone(),
-        policy.digest().unwrap(),
-        registry,
-        head,
-    )
-    .unwrap()
+    CurrentPhysicalEffectOutcomeGuard::new(policy.clone(), policy.digest().unwrap(), registry, head)
+        .unwrap()
 }
 
 #[test]
@@ -236,7 +231,10 @@ fn execution_and_postcondition_requires_exact_execution_window_and_fresh_observa
         .unwrap();
     assert_eq!(proof.policy_generation(), policy.generation);
     assert_eq!(proof.challenge_digest(), challenge.digest().unwrap());
-    assert_eq!(proof.challenge_journal_generation(), challenge.journal_generation());
+    assert_eq!(
+        proof.challenge_journal_generation(),
+        challenge.journal_generation()
+    );
     assert_eq!(proof.challenge_journal_digest(), challenge.journal_digest());
 
     let current = current_guard(&policy, snapshot);
@@ -279,7 +277,10 @@ fn complete_window_non_execution_proof_succeeds() {
             issued,
         )
         .unwrap();
-    assert_eq!(proof.evidence().body.claim.kind(), EffectOutcomeClaimKindV1::NonExecution);
+    assert_eq!(
+        proof.evidence().body.claim.kind(),
+        EffectOutcomeClaimKindV1::NonExecution
+    );
 }
 
 #[test]
@@ -313,7 +314,10 @@ fn partial_window_non_execution_is_rejected() {
         &challenge,
         issued,
     );
-    assert!(matches!(result, Err(EffectOutcomeError::NonExecutionCoverageIncomplete)));
+    assert!(matches!(
+        result,
+        Err(EffectOutcomeError::NonExecutionCoverageIncomplete)
+    ));
 }
 
 #[test]
@@ -400,7 +404,10 @@ fn wrong_profile_and_bad_signature_fail_closed() {
     );
     bad_signature.signature[0] ^= 0x01;
     let result = guard(&policy, snapshot).verify_evidence_at(bad_signature, &challenge, issued);
-    assert!(matches!(result, Err(EffectOutcomeError::InvalidEvidenceSignature)));
+    assert!(matches!(
+        result,
+        Err(EffectOutcomeError::InvalidEvidenceSignature)
+    ));
 }
 
 #[test]
