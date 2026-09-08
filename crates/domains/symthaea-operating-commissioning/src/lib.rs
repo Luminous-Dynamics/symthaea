@@ -10,6 +10,8 @@
 
 #![deny(unsafe_code)]
 
+pub mod identity;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
