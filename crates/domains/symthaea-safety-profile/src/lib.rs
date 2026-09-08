@@ -11,6 +11,7 @@
 
 pub mod admission;
 pub mod authorization;
+pub mod commit_preconditions;
 pub mod transition;
 
 use serde::{Deserialize, Serialize};
