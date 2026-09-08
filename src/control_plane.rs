@@ -16,6 +16,7 @@ pub mod forge_compilation;
 pub mod forge_compiled_artifact_preflight;
 pub mod forge_compilation_attestation;
 pub mod forge_current_compilation_attestation;
+pub mod forge_verification_pre_admission;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
