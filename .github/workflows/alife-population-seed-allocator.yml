@@ -1,0 +1,171 @@
+name: ALife Population Seed Allocator
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/agent_id.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle.rs"
+      - "crates/domains/symthaea-alife/src/organism_seed.rs"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - ".github/workflows/alife-population-seed-allocator.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  population-seed-allocator:
+    name: Production organism seed allocation theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/population.rs
+          sha256sum crates/domains/symthaea-alife/src/organism_seed.rs
+          sha256sum crates/domains/symthaea-alife/src/agent_id.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-population-seed-allocator
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test production seed allocation
+        run: 'cargo test --locked -p symthaea-alife population::tests::population_seed_allocator_'
+
+      - name: Test step seed-identity coupling
+        run: 'cargo test --locked -p symthaea-alife seed_and_identity_issue_counts_locked'
+
+      - name: Test seed allocator contract
+        run: 'cargo test --locked -p symthaea-alife organism_seed::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze production seed authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          population="crates/domains/symthaea-alife/src/population.rs"
+          allocator="crates/domains/symthaea-alife/src/organism_seed.rs"
+
+          grep -q 'organism_seed_allocator: OrganismSeedAllocatorV1' "$population"
+          grep -q 'OrganismSeedAllocatorV1::new(seed_base)' "$population"
+          grep -q 'population_seed_allocator_issues_one_unique_seed_per_founder_from_zero_base' "$population"
+          grep -q 'step_births_keep_seed_and_identity_issue_counts_locked' "$population"
+          grep -q 'step_social_births_keep_seed_and_identity_issue_counts_locked' "$population"
+          grep -q 'zero_seed_base_no_longer_duplicates_the_first_founder_seed' "$allocator"
+          grep -q 'maximum_seed_is_used_once_then_exhaustion_fails_closed' "$allocator"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path("crates/domains/symthaea-alife/src/population.rs").read_text()
+
+          struct = text.split("pub struct Population {", 1)[1].split("}\n\nimpl Population", 1)[0]
+          if "next_seed:" in struct:
+              raise SystemExit("legacy raw next_seed field remains in Population")
+          if struct.count("organism_seed_allocator: OrganismSeedAllocatorV1") != 1:
+              raise SystemExit("Population must own exactly one organism seed allocator")
+
+          constructor = text.split("pub fn new(cfg: PopulationConfig, initial_count: usize, seed_base: u64) -> Self {", 1)[1]
+          constructor = constructor.split("pub fn drain_event_log", 1)[0]
+          if constructor.count("organism_seed_allocator") < 3:
+              raise SystemExit("founder construction is not visibly allocator-owned")
+          if ".allocate()" not in constructor:
+              raise SystemExit("founder construction does not allocate a seed")
+          if "seed_base.wrapping_add" in constructor:
+              raise SystemExit("legacy founder seed arithmetic remains executable")
+
+          production = text.split("impl Population {", 1)[1].split("#[cfg(test)]", 1)[0]
+          production_code = "\n".join(
+              line for line in production.splitlines()
+              if not line.lstrip().startswith("//")
+          )
+          if "self.next_seed" in production_code:
+              raise SystemExit("legacy next_seed execution path remains")
+          if "self.next_seed.wrapping_add" in production_code:
+              raise SystemExit("legacy wrapping seed increment remains")
+
+          if production_code.count(".organism_seed_allocator") != 2:
+              raise SystemExit(
+                  "expected exactly two production reproduction seed-allocation sites; re-audit Population birth paths"
+              )
+          if production_code.count("organism construction seed space exhausted during reproduction") != 1:
+              raise SystemExit("non-social reproduction seed fail-closed boundary drifted")
+          if production_code.count("organism construction seed space exhausted during social reproduction") != 1:
+              raise SystemExit("social reproduction seed fail-closed boundary drifted")
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          population="crates/domains/symthaea-alife/src/population.rs"
+
+          # Production seed wiring is now positive. Complete persistence/resume remains separate.
+          ! grep -q 'PopulationSnapshotV1' "$population"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$population"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-population-seed-allocator-evidence
+          {
+            echo "authority=population_organism_seed_allocator_wiring_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "population_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/population.rs | cut -d' ' -f1)"
+            echo "organism_seed_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/organism_seed.rs | cut -d' ' -f1)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "population_seed_wiring_complete=true"
+            echo "zero_seed_duplicate_repaired=true"
+            echo "seed_identity_issue_counts_locked=true"
+            echo "seed_exhaustion_fails_closed=true"
+            echo "population_snapshot_complete=false"
+            echo "population_execution_capsule_complete=false"
+            echo "alife_population_execution_resume_established=false"
+          } > target/alife-population-seed-allocator-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-population-seed-allocator-evidence
+          path: target/alife-population-seed-allocator-evidence/qualification.txt
+          if-no-files-found: error
