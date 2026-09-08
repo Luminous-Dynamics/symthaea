@@ -1,0 +1,234 @@
+name: Matter Reference Capsule Orchestration Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/matter-reference-capsule-orchestration.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: matter-reference-capsule-orchestration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-current-head:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact revision and parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Verify exact head, parent, and orchestration-only scope
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent='9a92cd234db7b5701e1c60f847a2966c7f071976'
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "${{ github.event.pull_request.base.sha }}" = "$parent"
+          test "$(git rev-parse HEAD^)" = "$parent"
+          mapfile -t files < <(git diff --name-only HEAD^..HEAD | sort)
+          test "${#files[@]}" -eq 1
+          test "${files[0]}" = '.github/workflows/matter-reference-capsule-orchestration.yml'
+          git diff --check HEAD^..HEAD
+
+      - name: Validate frozen pre-execution contracts without network dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          root='research/matter-reference-capsule'
+          test ! -e "$root/uv.lock"
+
+          python3 - <<'PY'
+          import pathlib, tomllib
+          project = tomllib.loads(pathlib.Path('research/matter-reference-capsule/pyproject.toml').read_text())['project']
+          assert project['requires-python'] == '>=3.13,<3.14'
+          assert project['dependencies'] == [
+              'aiida-core==2.9.2',
+              'aiida-quantumespresso==5.0.0',
+          ]
+          PY
+
+          f="$root/shell.nix"
+          grep -q 'builtins.readFile ../../flake.lock' "$f"
+          grep -q 'lock.nodes.root.inputs.nixpkgs' "$f"
+          grep -q 'inherit (nixpkgsLocked) type owner repo rev narHash' "$f"
+          grep -q 'pkgs.python313' "$f"
+          grep -q 'pkgs.uv' "$f"
+          grep -q 'pkgs.quantum-espresso' "$f"
+
+          bash -n "$root/bootstrap.sh"
+          grep -q 'uv.lock is not committed' "$root/bootstrap.sh"
+          grep -q 'uv sync.*--frozen' "$root/bootstrap.sh"
+          grep -q 'ExecutionEnvironmentPreparedOnly' "$root/bootstrap.sh"
+          grep -q 'verdi presto.*--no-broker' "$root/bootstrap.sh"
+          grep -q 'caching.default_enabled False' "$root/bootstrap.sh"
+          grep -q 'pseudopotential identity is deliberately not selected' "$root/bootstrap.sh"
+          ! grep -Eq 'pip install|uv add|curl .*UPF|wget .*UPF' "$root/bootstrap.sh"
+
+          python3 -m py_compile "$root/freeze_si_pseudo.py" "$root/validate_si_001_protocol.py"
+          python3 "$root/freeze_si_pseudo.py" self-test
+          python3 "$root/validate_si_001_protocol.py" "$root/si-001-protocol.json"
+          python3 "$root/validate_si_001_protocol.py" "$root/si-001-protocol.json" --self-test
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+
+      - name: Set up pinned uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0 commit behind v6
+        with:
+          version: '0.10.0'
+
+      - name: Resolve and exercise exact candidate Python lock
+        working-directory: research/matter-reference-capsule
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e uv.lock
+          uv lock --python python3.13
+          uv lock --check
+          uv sync --frozen --no-dev --python python3.13
+          uv run --frozen python - <<'PY'
+          import importlib.metadata
+          assert importlib.metadata.version('aiida-core') == '2.9.2'
+          assert importlib.metadata.version('aiida-quantumespresso') == '5.0.0'
+          import aiida
+          import aiida_quantumespresso
+          PY
+          sha256sum uv.lock > uv.lock.sha256
+
+      - name: Write content-addressed orchestration manifest
+        env:
+          QUALIFICATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          QUALIFICATION_PARENT_SHA: 9a92cd234db7b5701e1c60f847a2966c7f071976
+          CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+          SETUP_PYTHON_ACTION_SHA: a26af69be951a213d495a4c3e4e4022e16d87065
+          SETUP_UV_ACTION_SHA: d0cc045d04ccac9d8b7881df0226f9e82c39688e
+          UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import platform
+          import subprocess
+
+          root = pathlib.Path('.')
+          exact_head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if exact_head != os.environ['QUALIFICATION_HEAD_SHA']:
+              raise SystemExit('qualified head environment does not match checked-out HEAD')
+
+          inputs = [
+              'flake.lock',
+              'research/matter-reference-capsule/pyproject.toml',
+              'research/matter-reference-capsule/shell.nix',
+              'research/matter-reference-capsule/bootstrap.sh',
+              'research/matter-reference-capsule/freeze_si_pseudo.py',
+              'research/matter-reference-capsule/si-001-protocol.json',
+              'research/matter-reference-capsule/validate_si_001_protocol.py',
+              '.github/workflows/matter-reference-capsule-env-lock.yml',
+              '.github/workflows/matter-reference-si-pseudopotential.yml',
+              '.github/workflows/matter-reference-si-001-recipe.yml',
+              '.github/workflows/matter-reference-capsule-orchestration.yml',
+          ]
+
+          def sha256(path: pathlib.Path) -> str:
+              digest = hashlib.sha256()
+              with path.open('rb') as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          missing = [path for path in inputs if not (root / path).is_file()]
+          if missing:
+              raise SystemExit(f'missing orchestration input(s): {missing}')
+
+          lock = root / 'research/matter-reference-capsule/uv.lock'
+          lock_sha = sha256(lock)
+          recorded = (lock.parent / 'uv.lock.sha256').read_text().split()[0]
+          if recorded != lock_sha:
+              raise SystemExit('uv.lock.sha256 does not match uv.lock')
+
+          manifest = {
+              'schema_version': 'symthaea.matter.reference-capsule-orchestration/v1',
+              'authority': 'CandidateLockOrchestrationOnly',
+              'head_sha': exact_head,
+              'parent_sha': os.environ['QUALIFICATION_PARENT_SHA'],
+              'runner': {
+                  'requested_image': 'ubuntu-24.04',
+                  'image_os': os.environ.get('ImageOS'),
+                  'image_version': os.environ.get('ImageVersion'),
+                  'architecture': platform.machine(),
+              },
+              'tooling': {
+                  'python': platform.python_version(),
+                  'uv': subprocess.check_output(['uv', '--version'], text=True).strip(),
+                  'actions': {
+                      'checkout': os.environ['CHECKOUT_ACTION_SHA'],
+                      'setup_python': os.environ['SETUP_PYTHON_ACTION_SHA'],
+                      'setup_uv': os.environ['SETUP_UV_ACTION_SHA'],
+                      'upload_artifact': os.environ['UPLOAD_ARTIFACT_ACTION_SHA'],
+                  },
+              },
+              'input_sha256': {path: sha256(root / path) for path in inputs},
+              'candidate_uv_lock_sha256': lock_sha,
+              'bound_frozen_layers': {
+                  'environment_scaffold_parent': 'd98e19344008b2719def10d12eb3d2298aa1f8b5',
+                  'si_pseudopotential_freeze_parent': '72a301d6c19b70af46e0831b2905ec981f470810',
+                  'si_001_recipe_parent': '9a92cd234db7b5701e1c60f847a2966c7f071976',
+              },
+              'scientific_execution': {
+                  'sssp_download_executed': False,
+                  'pseudopotential_installed': False,
+                  'qe_executed': False,
+                  'scientific_result_observed': False,
+                  'environment_qualified': False,
+              },
+              'next_required_transition': 'review-and-commit-exact-uv-lock-in-child-pr',
+          }
+          out = root / 'research/matter-reference-capsule/orchestration-manifest.json'
+          out.write_text(json.dumps(manifest, sort_keys=True, separators=(',', ':'), allow_nan=False) + '\n')
+          parsed = json.loads(out.read_text())
+          if parsed['head_sha'] != exact_head or parsed['candidate_uv_lock_sha256'] != lock_sha:
+              raise SystemExit('persisted orchestration manifest failed self-verification')
+          print(json.dumps(manifest, indent=2, sort_keys=True))
+          PY
+          sha256sum research/matter-reference-capsule/orchestration-manifest.json \
+            > research/matter-reference-capsule/orchestration-manifest.sha256
+
+      - name: Upload exact lock candidate and orchestration manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: matter-reference-capsule-orchestration-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            research/matter-reference-capsule/uv.lock
+            research/matter-reference-capsule/uv.lock.sha256
+            research/matter-reference-capsule/orchestration-manifest.json
+            research/matter-reference-capsule/orchestration-manifest.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Preserve pre-execution authority boundary
+        shell: bash
+        run: |
+          {
+            echo '### Matter Reference Capsule orchestration'
+            echo ''
+            echo 'The frozen environment scaffold, Si pseudopotential freeze contract, and Si-001 recipe were validated on one exact head.'
+            echo 'A candidate uv.lock was resolved, frozen-synced, exercised, hashed, and retained with a content-addressed orchestration manifest.'
+            echo ''
+            echo '**No SSSP download, pseudopotential installation, Quantum ESPRESSO calculation, scientific result, or environment qualification is established by this run.**'
+            echo 'The exact uv.lock must still be independently reviewed and committed in a child PR before live pseudopotential acquisition is permitted.'
+          } >> "$GITHUB_STEP_SUMMARY"
