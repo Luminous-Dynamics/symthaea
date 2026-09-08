@@ -1,0 +1,179 @@
+name: ALife Lifecycle Checkpoint
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/src/lifecycle.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/evolutionary_history.rs"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - ".github/workflows/alife-lifecycle-checkpoint.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  checkpoint-contracts:
+    name: Lossless lifecycle checkpoint contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-lifecycle-checkpoint
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test lossless checkpoint contracts
+        run: 'cargo test --locked -p symthaea-alife lifecycle_checkpoint::'
+
+      - name: Test canonical lifecycle validator
+        run: 'cargo test --locked -p symthaea-alife lifecycle::'
+
+      - name: Test evolutionary-history preservation target
+        run: 'cargo test --locked -p symthaea-alife evolutionary_history::'
+
+      - name: Test production lifecycle emission boundary
+        run: cargo test --locked -p symthaea-alife --test population_lifecycle_emission
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze checkpoint authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs"
+
+          grep -q 'normalization_reconstructs_the_exact_typed_prefix' "$file"
+          grep -q 'validates_a_drained_suffix_equivalently_to_the_complete_stream' "$file"
+          grep -q 'evolutionary_history_survives_checkpoint_compaction' "$file"
+          grep -q 'deserialized_checkpoint_requires_validation_capability' "$file"
+          grep -q 'tampered_serialized_checkpoint_fails_before_capability_creation' "$file"
+          grep -q 'pub struct ValidatedLifecycleCheckpointV1' "$file"
+          grep -q 'analyze_lifecycle_events(&events)' "$file"
+          grep -q 'silent_epoch_metadata_is_consistency_checked_not_event_derived' "$file"
+
+          python3 - <<'PY'
+          import pathlib, re
+
+          text = pathlib.Path("crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs").read_text()
+
+          raw = re.search(r"pub struct LifecycleCheckpointV1 \{(.*?)\n\}", text, re.S)
+          if not raw:
+              raise SystemExit("missing LifecycleCheckpointV1")
+          public_fields = re.findall(r"^\s*pub\s+\w+\s*:", raw.group(1), re.M)
+          if public_fields:
+              raise SystemExit(f"raw checkpoint exposes authority fields: {public_fields}")
+
+          if "pub struct LifecycleCheckpointAgentV1" in text:
+              raise SystemExit("normalized persistence agent became public")
+          if "struct LifecycleCheckpointAgentV1" not in text:
+              raise SystemExit("missing private normalized persistence agent")
+
+          validated_decl = "#[derive(Debug, Clone, PartialEq, Eq)]\npub struct ValidatedLifecycleCheckpointV1"
+          if validated_decl not in text:
+              raise SystemExit("validated checkpoint capability must remain non-serializable")
+
+          raw_start = text.index("impl LifecycleCheckpointV1 {")
+          validated_start = text.index("impl ValidatedLifecycleCheckpointV1 {")
+          raw_impl = text[raw_start:validated_start]
+          forbidden_raw_queries = (
+              "pub fn next_sequence(",
+              "pub fn continuation_epoch(",
+              "pub fn founder_count(",
+              "pub fn birth_count(",
+              "pub fn death_count(",
+              "pub fn alive_ids(",
+              "pub fn extinction(",
+              "pub fn validate_chunk(",
+              "pub fn ledger(",
+              "pub fn reconstruct_complete_prefix(",
+          )
+          leaked = [name for name in forbidden_raw_queries if name in raw_impl]
+          if leaked:
+              raise SystemExit(f"raw persisted checkpoint exposes scientific authority: {leaked}")
+
+          required_validated_queries = (
+              "pub fn reconstruct_complete_prefix(",
+              "pub fn validate_chunk(",
+              "pub fn ledger(",
+              "pub fn next_sequence(",
+              "pub fn continuation_epoch(",
+              "pub fn alive_ids(",
+              "pub fn extinction(",
+          )
+          validated_impl = text[validated_start:]
+          missing = [name for name in required_validated_queries if name not in validated_impl]
+          if missing:
+              raise SystemExit(f"validated capability lost required query/continuation surface: {missing}")
+
+          if "pub fn validate(\n        self," not in raw_impl:
+              raise SystemExit("raw persisted checkpoint no longer requires explicit consuming validation")
+          PY
+
+      - name: Write checkpoint qualification metadata
+        run: |
+          mkdir -p target/alife-lifecycle-checkpoint-evidence
+          {
+            echo "authority=validated_lossless_lifecycle_checkpoint_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "checkpoint_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs | cut -d' ' -f1)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "lossless_typed_prefix_reconstruction=true"
+            echo "canonical_revalidation=true"
+            echo "evolutionary_history_preserved=true"
+            echo "serialized_checkpoint_is_untrusted_until_validated=true"
+            echo "validated_capability_required_for_scientific_queries=true"
+            echo "validated_capability_is_nonserializable=true"
+            echo "silent_epoch_is_consistency_checked_metadata_not_event_derived=true"
+          } > target/alife-lifecycle-checkpoint-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-lifecycle-checkpoint-evidence
+          path: target/alife-lifecycle-checkpoint-evidence/qualification.txt
+          if-no-files-found: error
