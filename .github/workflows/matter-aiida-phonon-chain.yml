@@ -1,0 +1,86 @@
+name: Matter AiiDA QE Phonon Chain Export
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/matter_aiida_qe_phonon_chain_export.py'
+      - '.github/workflows/matter-aiida-phonon-chain.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "34bee1ac32461221db189ecb1f104a27b7e167fa"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-aiida-phonon-chain.yml
+          scripts/matter_aiida_qe_phonon_chain_export.py
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates src || true)"
+
+      - name: Python syntax and dependency-free invariants
+        run: |
+          python -m py_compile scripts/matter_aiida_qe_phonon_chain_export.py
+          python scripts/matter_aiida_qe_phonon_chain_export.py self-test
+
+      - name: Ratchet explicit AiiDA process chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/matter_aiida_qe_phonon_chain_export.py
+          grep -q 'aiida.calculations:quantumespresso.pw' "$f"
+          grep -q 'aiida.calculations:quantumespresso.ph' "$f"
+          grep -q 'aiida.calculations:quantumespresso.q2r' "$f"
+          grep -q 'aiida.calculations:quantumespresso.matdyn' "$f"
+          grep -q 'pw.remote_folder -> ph.parent_folder' "$f"
+          grep -q 'ph.remote_folder -> q2r.parent_folder' "$f"
+          grep -q 'q2r.force_constants -> matdyn.force_constants' "$f"
+          grep -q 'output_phonon_bands' "$f"
+
+      - name: Ratchet execution and cache/import boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/matter_aiida_qe_phonon_chain_export.py
+          grep -q 'is_created_from_cache' "$f"
+          grep -q 'imported remote-folder execution is refused' "$f"
+          grep -q 'must be sealed and finished_ok' "$f"
+          grep -q 'code UUID drifted from preflight' "$f"
+          grep -q 'preflight was created after ph.x began' "$f"
+          grep -q 'process chronology is not monotone' "$f"
+
+      - name: Ratchet sampling and post-processing artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/matter_aiida_qe_phonon_chain_export.py
+          grep -q 'ph-qpoints.json' "$f"
+          grep -q 'matdyn-kpoints.json' "$f"
+          grep -q 'force-constants-tree.json' "$f"
+          grep -q 'phonon-bands.json' "$f"
+          grep -q 'phonon-chain-preflight.json' "$f"
+          grep -q 'matdyn_asr_declared' "$f"
+
+      - name: Ratchet exact-byte provenance and epistemic limits
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=scripts/matter_aiida_qe_phonon_chain_export.py
+          grep -q '_sha256_file' "$f"
+          grep -q 'persisted JSON digest mismatch' "$f"
+          grep -q 'successful execution does not prove reciprocal-grid completeness or physical convergence' "$f"
+          grep -q 'thermodynamic phase stability is not established' "$f"
+          ! grep -q 'experimentally validated' "$f"
+          ! grep -q 'thermodynamically stable' "$f"
