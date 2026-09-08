@@ -1,0 +1,60 @@
+name: Matter Crystal Execution Plan
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_crystal_execution_plan.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-crystal-execution-plan.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "7fa48c956270ccddb3cfc505015a53f94c44d7df"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-crystal-execution-plan.yml
+          src/knowledge/matter_crystal_execution_plan.rs
+          src/knowledge/mod.rs
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates || true)"
+
+      - name: Ratchet derivation composition
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_crystal_execution_plan.rs
+          grep -q 'MixedCrystalExecutionPlanReceipt' "$f"
+          grep -q 'bind_crystal_solver_leaf' "$f"
+          grep -q 'bind_structural_relaxation_execution_graph' "$f"
+          grep -q 'bind_phase_competition_execution_graph' "$f"
+          grep -q 'bind_lattice_dynamics_execution_graph' "$f"
+          grep -q 'PeriodicElectronicStructure' "$f"
+          grep -q 'SharedCrystalExecutionReuse' "$f"
+          grep -q 'independent_confirmation: false' "$f"
+          grep -q 'PhaseTargetEnergy' "$f"
+          grep -q 'ForbiddenCrossSlotExecutionReuse' "$f"
+          grep -q 'SameExecutionContentDifferentIds' "$f"
+          grep -q 'periodic.claim == target.claim' "$f"
+          grep -q 'periodic.execution == target.execution' "$f"
+          ! grep -q 'receipts.len() != 4' "$f"
+          ! grep -q 'confidence' "$f"
+
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Focused regression tests
+        run: cargo test --locked matter_crystal_execution_plan --lib
