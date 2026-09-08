@@ -145,6 +145,7 @@ pub mod generative_model;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
+pub mod markov_boundary_snapshot;
 mod motor;
 mod td_learning;
 pub mod types;
@@ -184,4 +185,8 @@ pub use bridge::{CognitiveLoopFEPBridge, EnhancedFEPBridge};
 pub use markov_blanket::{
     BlanketPermeability, BlanketTelemetry, MarkovBoundaryOperator, MarkovPartition,
     PermeabilityInputs, SwarmCoalition, TopologyBoundaryInputs, identify_coalitions,
+};
+pub use markov_boundary_snapshot::{
+    MARKOV_BOUNDARY_HISTORY_CAP_V1, MarkovBoundarySnapshotErrorV1, MarkovBoundarySnapshotV1,
+    ValidatedMarkovBoundarySnapshotV1,
 };
