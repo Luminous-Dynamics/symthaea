@@ -27,8 +27,14 @@ impl AgentId {
     }
 }
 
-/// Monotonic allocator — every call to [`AgentIdAllocator::allocate`] returns a fresh id, never
-/// reused, so a later death/birth can never cause one individual's id to be handed to another.
+/// Monotonic allocator — every successful call to [`AgentIdAllocator::allocate`] returns a fresh
+/// id, never reused, so a later death/birth can never cause one individual's id to be handed to
+/// another.
+///
+/// `u64::MAX` is permanently reserved for [`AgentId::UNALLOCATED`]. Once every allocatable value
+/// `0..u64::MAX` has been consumed, allocation fails closed by panicking before changing allocator
+/// state. This boundary is astronomically remote in practice, but making it explicit prevents a
+/// release-build integer wrap from violating the crate's identity theorem.
 #[derive(Debug, Clone)]
 pub struct AgentIdAllocator {
     next: u64,
@@ -42,10 +48,17 @@ impl AgentIdAllocator {
     /// Allocate a fresh id.
     ///
     /// Deliberately *not* named `next`: this is an infallible monotonic allocator, not an
-    /// [`Iterator`]. It returns `AgentId`, never `Option<AgentId>`, and has no end — reading it
-    /// as `Iterator::next` would wrongly suggest it can be exhausted or driven by `for`/adapters.
+    /// [`Iterator`]. It returns `AgentId`, never `Option<AgentId>`, and cannot silently wrap or
+    /// emit [`AgentId::UNALLOCATED`]. Exhausting the finite 64-bit identity space is treated as a
+    /// fatal invariant boundary and panics without mutating allocator state.
     pub fn allocate(&mut self) -> AgentId {
+        assert_ne!(
+            self.next,
+            AgentId::UNALLOCATED.0,
+            "AgentIdAllocator exhausted: refusing to emit the reserved UNALLOCATED sentinel or reuse an identity"
+        );
         let id = AgentId(self.next);
+        // The assertion above proves `self.next < u64::MAX`, so this increment cannot overflow.
         self.next += 1;
         id
     }
@@ -80,5 +93,27 @@ mod tests {
         for _ in 0..10_000 {
             assert_ne!(alloc.allocate(), AgentId::UNALLOCATED);
         }
+    }
+
+    #[test]
+    fn exhaustion_fails_closed_without_emitting_sentinel_or_wrapping() {
+        let mut alloc = AgentIdAllocator {
+            next: u64::MAX - 1,
+        };
+
+        let last = alloc.allocate();
+        assert_eq!(last.raw(), u64::MAX - 1);
+        assert_eq!(alloc.next, u64::MAX);
+        assert_ne!(last, AgentId::UNALLOCATED);
+
+        let before = alloc.next;
+        let exhausted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = alloc.allocate();
+        }));
+        assert!(exhausted.is_err(), "exhausted allocator must fail closed");
+        assert_eq!(
+            alloc.next, before,
+            "failed allocation must not wrap or consume additional identity state"
+        );
     }
 }
