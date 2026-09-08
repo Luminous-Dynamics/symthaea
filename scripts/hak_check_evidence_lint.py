@@ -62,6 +62,24 @@ def _plan_obligations(plan: dict[str, Any]) -> tuple[set[str], set[str]]:
     return checks, negatives
 
 
+def _bind_provider_job_to_terminal_receipt(receipt: dict[str, Any], provider: dict[str, Any]) -> None:
+    jobs = receipt.get("job_receipts")
+    _require(isinstance(jobs, list) and jobs,
+             "provider-bound check evidence requires terminal receipt job_receipts")
+    job_id = provider["job_id"]
+    matches = [job for job in jobs if job.get("job_id") == job_id]
+    _require(len(matches) == 1,
+             "provider_binding.job_id must identify exactly one terminal receipt job")
+    source = matches[0]
+    for source_field, provider_field in (
+        ("name", "job_name"),
+        ("status", "job_status"),
+        ("conclusion", "job_conclusion"),
+    ):
+        _require(provider.get(provider_field) == source.get(source_field),
+                 f"provider_binding.{provider_field} must match terminal receipt job")
+
+
 def validate_provider_bound_check_evidence(
     plan: dict[str, Any],
     receipt: dict[str, Any],
@@ -141,6 +159,7 @@ def validate_provider_bound_check_evidence(
              "provider_job_ref repository must match subject repository")
     _require(int(match.group("job_id")) == job_id,
              "provider_job_ref job id must match provider_binding.job_id")
+    _bind_provider_job_to_terminal_receipt(receipt, provider)
 
     collector = _obj(doc.get("collected_by"), "collected_by")
     _text(collector.get("identity"), "collected_by.identity")
