@@ -15,13 +15,92 @@ use crate::morphology::HumanoidMorphology;
 use crate::safety::{HumanoidSafetyProjector, SafetyProjectionReport};
 use crate::types::{ActuationMode, HumanoidCommand, HumanoidState, HumanoidTask};
 
+/// Independent sources that may restrict goal-directed motor authority.
+///
+/// Every source is interpreted in `[0, 1]` and composition is most-restrictive
+/// wins. Non-finite values fail closed to zero. No single source can grant more
+/// authority than another source has admitted.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HumanoidAuthorityEnvelope {
+    /// Human/operator or authenticated task authority.
+    pub operator: f32,
+    /// Maximum authority supported by current qualification evidence.
+    pub qualification: f32,
+    /// Authority admitted by current body/hardware health before final projection.
+    pub physical: f32,
+    /// Authority admitted by perception/state-estimation confidence.
+    pub epistemic: f32,
+    /// Cognitive subsystem restriction (for example degraded cognition/Φ).
+    pub cognitive: f32,
+}
+
+impl HumanoidAuthorityEnvelope {
+    /// Explicit fully-admitted envelope. Callers should use this only when every
+    /// source has independently been established; `Default` is fail-closed.
+    pub const fn fully_admitted() -> Self {
+        Self {
+            operator: 1.0,
+            qualification: 1.0,
+            physical: 1.0,
+            epistemic: 1.0,
+            cognitive: 1.0,
+        }
+    }
+
+    /// Legacy scalar compatibility: a single scalar restricts every source.
+    pub const fn from_scalar(scale: f32) -> Self {
+        Self {
+            operator: scale,
+            qualification: scale,
+            physical: scale,
+            epistemic: scale,
+            cognitive: scale,
+        }
+    }
+
+    /// Most-restrictive effective authority. Invalid inputs fail closed.
+    pub fn effective_scale(self) -> f32 {
+        [
+            self.operator,
+            self.qualification,
+            self.physical,
+            self.epistemic,
+            self.cognitive,
+        ]
+        .into_iter()
+        .map(restrictive_unit_interval)
+        .fold(1.0, f32::min)
+    }
+}
+
+impl Default for HumanoidAuthorityEnvelope {
+    fn default() -> Self {
+        Self {
+            operator: 0.0,
+            qualification: 0.0,
+            physical: 0.0,
+            epistemic: 0.0,
+            cognitive: 0.0,
+        }
+    }
+}
+
+fn restrictive_unit_interval(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
 /// Evidence emitted for every command that crosses the humanoid authority boundary.
 #[derive(Debug, Clone)]
 pub struct HumanoidExecutionReport {
     pub hierarchy: HierarchicalControlReport,
     pub safety: SafetyProjectionReport,
-    /// Restrictive authority multiplier applied after deterministic synthesis.
-    /// This can reduce requested motion but cannot bypass hierarchy or safety.
+    /// Per-source authority inputs used for this command.
+    pub authority: HumanoidAuthorityEnvelope,
+    /// Most-restrictive authority multiplier applied after deterministic synthesis.
     pub authority_scale: f32,
 }
 
@@ -55,13 +134,7 @@ impl HumanoidExecutionPipeline {
         self.morphology
     }
 
-    /// Admit a baseline + learned residual through deterministic whole-body
-    /// synthesis and final command projection.
-    ///
-    /// `authority_scale` is deliberately restrictive-only. Non-finite values
-    /// fail closed to zero requested motion. A caller can reduce the synthesized
-    /// command, but it cannot use this parameter to exceed the controller's
-    /// normalized authority or bypass final safety projection.
+    /// Compatibility entry point for callers that still provide one scalar.
     #[allow(clippy::too_many_arguments)]
     pub fn authorize(
         &mut self,
@@ -75,6 +148,34 @@ impl HumanoidExecutionPipeline {
         actuation_mode: ActuationMode,
         dt: f64,
     ) -> HumanoidExecutionResult {
+        self.authorize_with_authority(
+            task,
+            state,
+            baseline,
+            learned_residual,
+            baseline_weight,
+            free_energy,
+            HumanoidAuthorityEnvelope::from_scalar(authority_scale),
+            actuation_mode,
+            dt,
+        )
+    }
+
+    /// Admit a baseline + learned residual through deterministic whole-body
+    /// synthesis and final command projection using independent authority sources.
+    #[allow(clippy::too_many_arguments)]
+    pub fn authorize_with_authority(
+        &mut self,
+        task: HumanoidTask,
+        state: &HumanoidState,
+        baseline: &HumanoidCommand,
+        learned_residual: &HumanoidCommand,
+        baseline_weight: f32,
+        free_energy: f64,
+        authority: HumanoidAuthorityEnvelope,
+        actuation_mode: ActuationMode,
+        dt: f64,
+    ) -> HumanoidExecutionResult {
         let (mut candidate, hierarchy) = self.hierarchy.synthesize(
             task,
             state,
@@ -84,11 +185,7 @@ impl HumanoidExecutionPipeline {
             free_energy,
         );
 
-        let authority_scale = if authority_scale.is_finite() {
-            authority_scale.clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
+        let authority_scale = authority.effective_scale();
         if authority_scale < 1.0 {
             for torque in &mut candidate.torques {
                 *torque *= authority_scale;
@@ -104,6 +201,7 @@ impl HumanoidExecutionPipeline {
             report: HumanoidExecutionReport {
                 hierarchy,
                 safety: projected.report,
+                authority,
                 authority_scale,
             },
         }
@@ -143,7 +241,33 @@ mod tests {
     }
 
     #[test]
-    fn non_finite_authority_fails_restrictive() {
+    fn default_authority_is_fail_closed() {
+        assert_eq!(HumanoidAuthorityEnvelope::default().effective_scale(), 0.0);
+    }
+
+    #[test]
+    fn most_restrictive_source_wins() {
+        let authority = HumanoidAuthorityEnvelope {
+            operator: 1.0,
+            qualification: 0.8,
+            physical: 0.6,
+            epistemic: 0.4,
+            cognitive: 0.9,
+        };
+        assert!((authority.effective_scale() - 0.4).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn non_finite_authority_source_fails_restrictive() {
+        let authority = HumanoidAuthorityEnvelope {
+            cognitive: f32::NAN,
+            ..HumanoidAuthorityEnvelope::fully_admitted()
+        };
+        assert_eq!(authority.effective_scale(), 0.0);
+    }
+
+    #[test]
+    fn non_finite_legacy_authority_fails_restrictive() {
         let morphology = HumanoidMorphology::Dmc21;
         let mut pipeline = HumanoidExecutionPipeline::new(morphology);
         let state = HumanoidState::standing_for(morphology);
@@ -170,19 +294,20 @@ mod tests {
         let mut pipeline = HumanoidExecutionPipeline::new(morphology);
         let state = HumanoidState::standing_for(morphology);
         let (baseline, residual) = zero_pair(morphology);
-        let result = pipeline.authorize(
+        let result = pipeline.authorize_with_authority(
             HumanoidTask::Stand,
             &state,
             &baseline,
             &residual,
             1.0,
             0.0,
-            1.0,
+            HumanoidAuthorityEnvelope::fully_admitted(),
             ActuationMode::NormalizedTorque,
             0.025,
         );
         assert_eq!(result.command.num_actuators(), morphology.num_actuators());
         assert!(!result.report.safety.rejected);
+        assert_eq!(result.report.authority_scale, 1.0);
     }
 
     #[test]
