@@ -2,12 +2,6 @@
 
 Status: HAK-007 architecture/evidence/tooling candidate
 
-Frozen qualification subject:
-
-```text
-architecture/hak-evidence-subject-receipts-v1@54b71c22c1dc3b068b7bac033219ff91571ed2c8
-```
-
 Parent stack:
 
 - HAK-001 — semantic separation;
@@ -25,6 +19,25 @@ Subject != Plan != Execution != Receipt != Interpretation
 ```
 
 No artifact may silently stand in for another.
+
+## Non-self-reference rule
+
+A Git subject must not attempt to embed its own final commit SHA as authoritative self-identity. Writing that SHA changes the subject and immediately makes the embedded identity stale.
+
+Therefore:
+
+```text
+SubjectGitIdentity
+must be bound externally by execution/receipt metadata
+```
+
+not:
+
+```text
+subject file claims hash(subject commit)
+```
+
+The exact qualification subject is supplied by PR/provider metadata and later recorded in execution observations or terminal receipts.
 
 ## Qualification plan
 
@@ -101,13 +114,7 @@ Therefore:
 PlanArtifactIdentity != WorkflowArtifactIdentity
 ```
 
-while:
-
-```text
-PlanExecutionConformance
-```
-
-remains a separately testable proof obligation.
+while `PlanExecutionConformance` remains a separately testable proof obligation.
 
 ## Receipt integrity
 
@@ -159,9 +166,9 @@ Thus it may later establish exact-head hosted execution facts, but HAK-007 forbi
 
 ## HAK-007 qualification rule
 
-HAK-007 has a machine-readable self-declared E5-target plan. Its focused workflow must execute that plan on the exact frozen subject above. Any run on a superseded head remains historical evidence only.
+HAK-007 has a machine-readable self-declared E5-target plan. Its focused workflow resolves the exact PR head externally, checks out that exact subject, and asserts the checkout identity before executing the plan.
 
-A green run can support only the claims explicitly named by the plan and only after a separate interpretation step confirms plan conformance.
+Any run on a superseded head remains historical evidence only. A green run can support only the claims explicitly named by the plan and only after a separate interpretation step confirms plan conformance.
 
 ## Non-claims
 
