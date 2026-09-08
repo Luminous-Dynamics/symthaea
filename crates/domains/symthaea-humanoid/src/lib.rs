@@ -3,6 +3,7 @@
 
 pub mod actuation;
 pub mod capability_envelope;
+pub mod capability_request;
 pub mod centroidal;
 pub mod contact;
 pub mod contact_inverse_dynamics;
@@ -66,6 +67,7 @@ pub mod vision_terrain;
 pub mod whole_body;
 pub use actuation::*;
 pub use capability_envelope::*;
+pub use capability_request::*;
 pub use centroidal::*;
 pub use contact_inverse_dynamics::*;
 pub use control_budget::*;
