@@ -37,6 +37,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
           test "$GITHUB_REF" = 'refs/heads/main'
           git init .
           git remote add origin https://github.com/Luminous-Dynamics/symthaea.git
@@ -53,6 +54,7 @@ jobs:
           nix --version
           git --version
           printf 'source_commit=%s\n' "$(git rev-parse HEAD)"
+          printf 'source_tree=%s\n' "$(git rev-parse HEAD^{tree})"
           printf 'nixpkgs_rev=%s\n' "$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
           printf 'rust_channel=%s\n' "$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
           sha256sum flake.lock rust-toolchain.toml
@@ -87,11 +89,71 @@ jobs:
               cargo check --locked -p symthaea-psych-bench --lib
             '
 
-      - name: Verify source tree stayed immutable
+      - name: Verify immutability and emit smoke evidence
         shell: bash
         run: |
           set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/main'
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git diff --exit-code
           git diff --cached --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"
+
+          source_tree="$(git rev-parse HEAD^{tree})"
+          smoke_workflow_blob="$(git rev-parse HEAD:.github/workflows/self-hosted-runner-smoke.yml)"
+          runner_module_blob="$(git rev-parse HEAD:nix/modules/github-actions-runner.nix)"
+          routing_policy_blob="$(git rev-parse HEAD:nix/tests/eval-trusted-runner-routing.nix)"
+          nixpkgs_rev="$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
+          rust_channel="$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel')"
+          flake_lock_sha256="$(sha256sum flake.lock | awk '{print $1}')"
+          rust_toolchain_sha256="$(sha256sum rust-toolchain.toml | awk '{print $1}')"
+          host_nix_system="$(nix eval --raw --impure --expr builtins.currentSystem)"
+          host_nix_version="$(nix --version | awk '{print $3}')"
+
+          manifest="$RUNNER_TEMP/symthaea-trusted-runner-smoke-v1.txt"
+          cat > "$manifest" <<EOF
+          schema=symthaea.trusted-runner.smoke.v1
+          result=PASS
+          github_run_id=$GITHUB_RUN_ID
+          github_run_attempt=$GITHUB_RUN_ATTEMPT
+          github_repository=$GITHUB_REPOSITORY
+          github_event_name=$GITHUB_EVENT_NAME
+          github_ref=$GITHUB_REF
+          github_sha=$GITHUB_SHA
+          source_tree=$source_tree
+          runner_name=${RUNNER_NAME:-unknown}
+          runner_os=${RUNNER_OS:-unknown}
+          runner_arch=${RUNNER_ARCH:-unknown}
+          smoke_workflow_blob=$smoke_workflow_blob
+          runner_module_blob=$runner_module_blob
+          routing_policy_blob=$routing_policy_blob
+          nixpkgs_rev=$nixpkgs_rev
+          rust_channel=$rust_channel
+          host_nix_system=$host_nix_system
+          host_nix_version=$host_nix_version
+          flake_lock_sha256=$flake_lock_sha256
+          rust_toolchain_sha256=$rust_toolchain_sha256
+          runner_policy_eval=PASS
+          routing_policy_eval=PASS
+          minimal_locked_rust_check=PASS
+          source_immutability_checked=PASS
+          evidence_scope=trusted-cpu-correctness-smoke-only
+          EOF
+
+          smoke_sha256="$(sha256sum "$manifest" | awk '{print $1}')"
+          cat "$manifest"
+          printf 'smoke_manifest_sha256=%s\n' "$smoke_sha256"
+          printf 'smoke_manifest_path=%s\n' "$manifest"
+
+          {
+            echo '## Trusted NixOS CPU runner smoke: PASS'
+            echo
+            echo "- GitHub run: \`$GITHUB_RUN_ID\` attempt \`$GITHUB_RUN_ATTEMPT\`"
+            echo "- Main commit: \`$GITHUB_SHA\`"
+            echo "- Main tree: \`$source_tree\`"
+            echo "- Runner: \`${RUNNER_NAME:-unknown}\` / \`${RUNNER_OS:-unknown}\` / \`${RUNNER_ARCH:-unknown}\`"
+            echo "- Smoke manifest SHA-256: \`$smoke_sha256\`"
+            echo
+            echo 'Correctness/reproducibility runner-smoke evidence only; no performance or scientific qualification authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
