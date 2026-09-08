@@ -1,0 +1,202 @@
+name: HCPMMP Lineage B Qualified Archival Replay
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/hcpmmp_neuromaps_common.py'
+      - 'scripts/hcpmmp_neuromaps_gifti.py'
+      - 'data/neuroscience/hcpmmp1_neuromaps_transform_method_v1.json'
+      - 'data/neuroscience/hcp_mmp1_area_order_v1.json'
+      - 'docs/neuroscience/HCPMMP1_LINEAGE_B_QUALIFIED_ARCHIVAL_REPLAY_V1.md'
+      - '.github/workflows/hcpmmp-lineage-b-archival-replay.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  QUALIFIED_VERIFIER_SHA: 633376c58ff03973c50461451cb465c786dbad7c
+
+jobs:
+  replay:
+    name: Replay qualified #525 verifier against current Lineage-B generator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact current qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert exact current subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_SHA"
+          printf 'subject_head=%s\n' "$QUALIFICATION_SHA"
+
+      - name: Checkout exact qualified #525 verifier source separately
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 633376c58ff03973c50461451cb465c786dbad7c
+          path: .qualified-verifier-source
+          persist-credentials: false
+
+      - name: Assert exact qualified verifier root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .qualified-verifier-source rev-parse HEAD)" = "$QUALIFIED_VERIFIER_SHA"
+          test -f .qualified-verifier-source/scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+          test -f .qualified-verifier-source/scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+          printf 'qualified_verifier_head=%s\n' "$QUALIFIED_VERIFIER_SHA"
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Construct verifier-only replay overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .crosslineage-replay
+          mkdir -p .crosslineage-replay/scripts
+          cp .qualified-verifier-source/scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py \
+             .crosslineage-replay/scripts/
+          cp .qualified-verifier-source/scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py \
+             .crosslineage-replay/scripts/
+          ln -s "$GITHUB_WORKSPACE/data" .crosslineage-replay/data
+
+          cmp \
+            .qualified-verifier-source/scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py \
+            .crosslineage-replay/scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+          cmp \
+            .qualified-verifier-source/scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py \
+            .crosslineage-replay/scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py
+
+          test ! -e .crosslineage-replay/scripts/derive_hcpmmp1_neuromaps_lineage_b.py
+          test ! -e .crosslineage-replay/scripts/hcpmmp_neuromaps_common.py
+          test ! -e .crosslineage-replay/scripts/hcpmmp_neuromaps_gifti.py
+
+      - name: Prove import topology
+        run: |
+          PYTHONPATH=.crosslineage-replay/scripts:scripts python - <<'PY'
+          from pathlib import Path
+          import derive_hcpmmp1_neuromaps_lineage_b as derive
+          import hcpmmp_neuromaps_common as common
+          import hcpmmp_neuromaps_gifti as gifti
+          import verify_hcpmmp1_neuromaps_lineage_b_evidence as verifier
+
+          workspace = Path.cwd().resolve()
+          overlay = (workspace / '.crosslineage-replay/scripts').resolve()
+          current = (workspace / 'scripts').resolve()
+
+          verifier_path = Path(verifier.__file__).resolve()
+          derive_path = Path(derive.__file__).resolve()
+          common_path = Path(common.__file__).resolve()
+          gifti_path = Path(gifti.__file__).resolve()
+
+          assert verifier_path.parent == overlay, verifier_path
+          assert derive_path.parent == current, derive_path
+          assert common_path.parent == current, common_path
+          assert gifti_path.parent == current, gifti_path
+
+          print('verifier_source=' + str(verifier_path))
+          print('derive_source=' + str(derive_path))
+          print('common_source=' + str(common_path))
+          print('gifti_source=' + str(gifti_path))
+          PY
+
+      - name: Prove replay crosses a generator revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT=scripts/derive_hcpmmp1_neuromaps_lineage_b.py
+          HISTORICAL=.qualified-verifier-source/scripts/derive_hcpmmp1_neuromaps_lineage_b.py
+          test -f "$HISTORICAL"
+          if cmp -s "$CURRENT" "$HISTORICAL"; then
+            echo 'replay did not cross a generator revision; historical derive unexpectedly equals current derive' >&2
+            exit 1
+          fi
+          printf 'current_derive_sha256=%s\n' "$(sha256sum "$CURRENT" | awk '{print $1}')"
+          printf 'qualified_verifier_historical_derive_sha256=%s\n' "$(sha256sum "$HISTORICAL" | awk '{print $1}')"
+
+      - name: Replay all qualified archival verifier contracts
+        run: |
+          PYTHONPATH=.crosslineage-replay/scripts:scripts \
+            python .crosslineage-replay/scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py -v
+
+      - name: Emit compatibility roots
+        run: |
+          PYTHONPATH=.crosslineage-replay/scripts:scripts python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import derive_hcpmmp1_neuromaps_lineage_b as derive
+
+          def sha(path: Path) -> str:
+              return 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
+
+          receipt = {
+              'schema': 'symthaea-hcpmmp1-lineage-b-qualified-archival-replay-v1',
+              'subject_head': os.environ['QUALIFICATION_SHA'],
+              'qualified_verifier_head': os.environ['QUALIFIED_VERIFIER_SHA'],
+              'qualified_verifier_source_sha256': sha(Path('.crosslineage-replay/scripts/verify_hcpmmp1_neuromaps_lineage_b_evidence.py')),
+              'qualified_verifier_test_sha256': sha(Path('.crosslineage-replay/scripts/test_verify_hcpmmp1_neuromaps_lineage_b_evidence.py')),
+              'current_generator_implementation_digest': derive.generator_implementation()['digest'],
+              'contracts_passed': 10,
+              'authority': {
+                  'qualified_verifier_source_bound': True,
+                  'cross_lineage_contract_compatibility_established': True,
+                  'real_evidence_bundle_verified': False,
+                  'scientific_execution_qualified': False,
+                  'atlas_correctness_established': False,
+                  'fmq010_established': False,
+                  'neural_alignment_established': False,
+                  'consciousness_evidence': False,
+              },
+          }
+          Path('qualified-archival-replay-receipt.json').write_text(
+              json.dumps(receipt, sort_keys=True, separators=(',', ':')) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(receipt, sort_keys=True))
+          PY
+
+      - name: Authority ratchet
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          value = json.loads(Path('qualified-archival-replay-receipt.json').read_text())
+          assert value['schema'] == 'symthaea-hcpmmp1-lineage-b-qualified-archival-replay-v1'
+          assert value['contracts_passed'] == 10
+          authority = value['authority']
+          assert authority == {
+              'qualified_verifier_source_bound': True,
+              'cross_lineage_contract_compatibility_established': True,
+              'real_evidence_bundle_verified': False,
+              'scientific_execution_qualified': False,
+              'atlas_correctness_established': False,
+              'fmq010_established': False,
+              'neural_alignment_established': False,
+              'consciousness_evidence': False,
+          }
+          PY
+
+      - name: Publish replay receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hcpmmp-lineage-b-qualified-archival-replay-${{ env.QUALIFICATION_SHA }}
+          path: qualified-archival-replay-receipt.json
+          if-no-files-found: error
+          retention-days: 30
