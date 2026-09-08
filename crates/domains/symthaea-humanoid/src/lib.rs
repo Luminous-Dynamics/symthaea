@@ -40,6 +40,7 @@ pub mod oracle_dataset;
 pub mod oracle_generator_certification;
 #[cfg(feature = "osqp-backend")]
 pub mod osqp_backend;
+pub mod payload_capability;
 pub mod physical_health;
 pub mod plugin;
 pub mod qp_certification;
@@ -94,6 +95,7 @@ pub use oracle_dataset::*;
 pub use oracle_generator_certification::*;
 #[cfg(feature = "osqp-backend")]
 pub use osqp_backend::*;
+pub use payload_capability::*;
 pub use physical_health::*;
 pub use qp_certification::*;
 pub use qualification::*;
