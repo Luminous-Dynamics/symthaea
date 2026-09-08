@@ -1,0 +1,158 @@
+name: ALife Encounter Snapshot
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/agent_id.rs"
+      - "crates/domains/symthaea-alife/src/encounter.rs"
+      - "crates/domains/symthaea-alife/src/encounter_snapshot.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - ".github/workflows/alife-encounter-snapshot.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  encounter-snapshot:
+    name: Validated encounter scheduler snapshot contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/encounter_snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/encounter.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-encounter-snapshot
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test encounter snapshot contract
+        run: 'cargo test --locked -p symthaea-alife encounter_snapshot::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze scheduler persistence theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot="crates/domains/symthaea-alife/src/encounter_snapshot.rs"
+          encounter="crates/domains/symthaea-alife/src/encounter.rs"
+
+          grep -q 'pub struct EncounterSchedulerSnapshotV1' "$snapshot"
+          grep -q 'pub struct ValidatedEncounterSchedulerSnapshotV1' "$snapshot"
+          grep -q 'ZeroRngState' "$snapshot"
+          grep -q 'RandomModeHasFixedPartners' "$snapshot"
+          grep -q 'FixedPartnersNotStrictlySorted' "$snapshot"
+          grep -q 'stale_asymmetric_fixed_entries_are_legitimate_scheduler_history' "$snapshot"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          snapshot = Path("crates/domains/symthaea-alife/src/encounter_snapshot.rs").read_text()
+          encounter = Path("crates/domains/symthaea-alife/src/encounter.rs").read_text()
+
+          raw = snapshot.split("pub struct EncounterSchedulerSnapshotV1 {", 1)[1].split("}\n", 1)[0]
+          if "pub " in raw.replace("pub(crate)", ""):
+              raise SystemExit("raw scheduler snapshot exposes public mutable authority fields")
+
+          validated_decl = snapshot.split("pub struct ValidatedEncounterSchedulerSnapshotV1", 1)[0]
+          if "Serialize, Deserialize" in validated_decl.rsplit("#[derive", 1)[-1]:
+              raise SystemExit("validated scheduler capability must not be serializable")
+
+          live_struct = encounter.split("pub struct EncounterScheduler {", 1)[1].split("}\n", 1)[0]
+          for field in ("mode: PairingMode", "fixed_partners: HashMap<AgentId, AgentId>", "rng_state: u64"):
+              if field not in live_struct:
+                  raise SystemExit(f"live scheduler causal surface changed: missing {field}")
+
+          constructor = encounter.split("pub fn new(mode: PairingMode, seed: u64) -> Self {", 1)[1]
+          constructor = constructor.split("fn next_unit", 1)[0]
+          if "rng_state: if seed == 0 { 1 } else { seed }" not in constructor:
+              raise SystemExit("live scheduler zero-seed normalization changed")
+
+          random_body = encounter.split("fn pair_random", 1)[1].split("fn pair_fixed", 1)[0]
+          if "fixed_partners" in random_body:
+              raise SystemExit("Random pairing began mutating fixed-partner state")
+
+          fixed_body = encounter.split("fn pair_fixed", 1)[1].split("}\n}", 1)[0]
+          if "self.fixed_partners.insert" not in fixed_body:
+              raise SystemExit("FixedPartners no longer persists pairing assignments")
+          if "self.fixed_partners.remove" in fixed_body or "self.fixed_partners.retain" in fixed_body:
+              raise SystemExit(
+                  "fixed-partner stale-entry semantics changed; re-audit snapshot reachability"
+              )
+          PY
+
+      - name: Freeze negative claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          encounter="crates/domains/symthaea-alife/src/encounter.rs"
+
+          # Contract-only tranche: live private-state emission/restoration remains absent.
+          ! grep -q 'EncounterSchedulerSnapshotV1' "$encounter"
+
+      - name: Write scheduler snapshot qualification metadata
+        run: |
+          mkdir -p target/alife-encounter-snapshot-evidence
+          {
+            echo "authority=validated_encounter_scheduler_snapshot_contract_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "encounter_snapshot_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/encounter_snapshot.rs | cut -d' ' -f1)"
+            echo "encounter_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/encounter.rs | cut -d' ' -f1)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "scheduler_rng_state_validated=true"
+            echo "fixed_partner_state_canonicalized=true"
+            echo "stale_asymmetric_history_preserved=true"
+            echo "live_encounter_snapshot_wiring_complete=false"
+            echo "population_execution_capsule_complete=false"
+            echo "alife_population_execution_resume_established=false"
+          } > target/alife-encounter-snapshot-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-encounter-snapshot-evidence
+          path: target/alife-encounter-snapshot-evidence/qualification.txt
+          if-no-files-found: error
