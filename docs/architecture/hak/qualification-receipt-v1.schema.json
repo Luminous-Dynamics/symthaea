@@ -10,16 +10,12 @@
     "subject",
     "qualification_plan",
     "execution",
-    "terminal"
+    "terminal",
+    "receipt_digest"
   ],
   "properties": {
-    "schema_version": {
-      "const": "hak.qualification-receipt.v1"
-    },
-    "receipt_id": {
-      "type": "string",
-      "minLength": 1
-    },
+    "schema_version": {"const": "hak.qualification-receipt.v1"},
+    "receipt_id": {"type": "string", "minLength": 1},
     "subject": {
       "type": "object",
       "additionalProperties": false,
@@ -27,10 +23,7 @@
       "properties": {
         "repository": {"type": "string", "minLength": 1},
         "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-        "base_commit_sha": {
-          "type": ["string", "null"],
-          "pattern": "^[0-9a-f]{40}$"
-        },
+        "base_commit_sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
         "branch": {"type": ["string", "null"]}
       }
     },
@@ -39,14 +32,10 @@
       "additionalProperties": false,
       "required": ["plan_kind", "plan_ref"],
       "properties": {
-        "plan_kind": {
-          "enum": ["SelfDeclaredPlan", "IndependentPlan", "ProviderEnforcedPlan"]
-        },
+        "plan_kind": {"enum": ["SelfDeclaredPlan", "IndependentPlan", "ProviderEnforcedPlan"]},
         "plan_ref": {"type": "string", "minLength": 1},
         "plan_digest": {"type": ["string", "null"]},
-        "precommit_status": {
-          "enum": ["KnownPrecommitted", "NotEstablished", "NotApplicable"]
-        }
+        "precommit_status": {"enum": ["KnownPrecommitted", "NotEstablished", "NotApplicable"]}
       }
     },
     "execution": {
@@ -75,12 +64,7 @@
     "terminal": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "status",
-        "conclusion",
-        "provider_started_at",
-        "provider_completed_at"
-      ],
+      "required": ["status", "conclusion", "provider_started_at", "provider_completed_at"],
       "properties": {
         "status": {"const": "completed"},
         "conclusion": {
@@ -126,14 +110,11 @@
         }
       }
     },
-    "artifact_refs": {
-      "type": "array",
-      "items": {"type": "string", "minLength": 1}
-    },
-    "log_refs": {
-      "type": "array",
-      "items": {"type": "string", "minLength": 1}
-    },
-    "receipt_digest": {"type": ["string", "null"]}
+    "artifact_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "log_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "receipt_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
   }
 }

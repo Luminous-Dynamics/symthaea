@@ -8,6 +8,7 @@ claim adequacy, or issue HAK qualification.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -15,6 +16,12 @@ from pathlib import Path
 from typing import Any
 
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+GIT_PLAN_REF = re.compile(r"^git:(?P<repo>[^@]+)@(?P<sha>[0-9a-f]{40}):(?P<path>.+)$")
+GITHUB_PROVIDER_REF = re.compile(
+    r"^github-actions:(?P<repo>[^:]+):run/(?P<run_id>[1-9][0-9]*):attempt/(?P<attempt>[1-9][0-9]*)$"
+)
+SHA256_REF = re.compile(r"^sha256:[0-9a-f]{64}$")
+
 NONTERMINAL_STATUSES = {"queued", "in_progress", "waiting", "requested"}
 TERMINAL_CONCLUSIONS = {
     "success",
@@ -99,6 +106,13 @@ def _validate_plan(plan: dict[str, Any]) -> None:
             "qualification_plan.plan_digest must be null or non-empty",
         )
 
+    if precommit == "KnownPrecommitted":
+        immutable_git_ref = GIT_PLAN_REF.fullmatch(plan_ref) is not None
+        _require(
+            immutable_git_ref or plan_digest is not None,
+            "KnownPrecommitted plan requires exact git commit+path or plan_digest",
+        )
+
 
 def _validate_execution(execution: dict[str, Any]) -> None:
     _require(
@@ -121,10 +135,53 @@ def _validate_execution(execution: dict[str, Any]) -> None:
         )
 
 
+def _validate_cross_bindings(
+    subject: dict[str, Any],
+    plan: dict[str, Any],
+    execution: dict[str, Any],
+) -> None:
+    plan_ref = plan["plan_ref"]
+    git_plan = GIT_PLAN_REF.fullmatch(plan_ref)
+    if git_plan is not None and plan.get("plan_kind") == "SelfDeclaredPlan":
+        _require(
+            git_plan.group("repo") == subject["repository"],
+            "self-declared git plan repository must match subject.repository",
+        )
+        _require(
+            git_plan.group("path") == execution["workflow_path"],
+            "self-declared git plan path must match execution.workflow_path",
+        )
+
+    provider_ref = execution.get("provider_record_ref")
+    if provider_ref is not None:
+        match = GITHUB_PROVIDER_REF.fullmatch(provider_ref)
+        _require(
+            match is not None,
+            "github-actions provider_record_ref must bind repository/run/attempt",
+        )
+        assert match is not None
+        _require(
+            match.group("repo") == subject["repository"],
+            "provider_record_ref repository must match subject.repository",
+        )
+        _require(
+            int(match.group("run_id")) == execution["run_id"],
+            "provider_record_ref run_id must match execution.run_id",
+        )
+        _require(
+            int(match.group("attempt")) == execution["run_attempt"],
+            "provider_record_ref attempt must match execution.run_attempt",
+        )
+
+
 def _validate_common(doc: dict[str, Any], expected_subject: str | None) -> None:
-    _validate_subject(_as_dict(doc.get("subject"), "subject"), expected_subject)
-    _validate_plan(_as_dict(doc.get("qualification_plan"), "qualification_plan"))
-    _validate_execution(_as_dict(doc.get("execution"), "execution"))
+    subject = _as_dict(doc.get("subject"), "subject")
+    plan = _as_dict(doc.get("qualification_plan"), "qualification_plan")
+    execution = _as_dict(doc.get("execution"), "execution")
+    _validate_subject(subject, expected_subject)
+    _validate_plan(plan)
+    _validate_execution(execution)
+    _validate_cross_bindings(subject, plan, execution)
 
 
 def _forbid_interpretation_fields(doc: dict[str, Any], label: str) -> None:
@@ -193,6 +250,18 @@ def _validate_job_receipts(jobs: Any) -> None:
         )
 
 
+def compute_receipt_digest(doc: dict[str, Any]) -> str:
+    payload = {key: value for key, value in doc.items() if key != "receipt_digest"}
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    digest = hashlib.sha256(b"hak.qualification-receipt.v1\0" + encoded).hexdigest()
+    return f"sha256:{digest}"
+
+
 def validate_receipt(doc: dict[str, Any], expected_subject: str | None = None) -> None:
     _require(
         doc.get("schema_version") == "hak.qualification-receipt.v1",
@@ -223,11 +292,14 @@ def validate_receipt(doc: dict[str, Any], expected_subject: str | None = None) -
     _validate_job_receipts(doc.get("job_receipts"))
 
     receipt_digest = doc.get("receipt_digest")
-    if receipt_digest is not None:
-        _require(
-            isinstance(receipt_digest, str) and receipt_digest.strip(),
-            "receipt_digest must be null or non-empty",
-        )
+    _require(
+        isinstance(receipt_digest, str) and SHA256_REF.fullmatch(receipt_digest) is not None,
+        "receipt_digest must be sha256:<64 lowercase hex>",
+    )
+    _require(
+        receipt_digest == compute_receipt_digest(doc),
+        "receipt_digest does not match canonical receipt content",
+    )
 
 
 def validate_document(doc: dict[str, Any], expected_subject: str | None = None) -> str:

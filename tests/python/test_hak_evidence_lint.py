@@ -31,7 +31,7 @@ def load_observation():
 
 def terminal_receipt():
     observation = load_observation()
-    return {
+    receipt = {
         "schema_version": "hak.qualification-receipt.v1",
         "receipt_id": "synthetic-receipt-for-regression-only",
         "subject": deepcopy(observation["subject"]),
@@ -51,8 +51,9 @@ def terminal_receipt():
                 "conclusion": "success",
             }
         ],
-        "receipt_digest": None,
     }
+    receipt["receipt_digest"] = hak.compute_receipt_digest(receipt)
+    return receipt
 
 
 def test_real_queued_observation_is_valid():
@@ -92,6 +93,29 @@ def test_expected_subject_mismatch_rejected():
         hak.validate_observation(load_observation(), expected_subject="0" * 40)
 
 
+def test_known_precommitted_plan_requires_immutable_identity():
+    doc = load_observation()
+    doc["qualification_plan"]["plan_ref"] = "workflow:HAK Conformance"
+    with pytest.raises(hak.EvidenceLintError):
+        hak.validate_observation(doc)
+
+
+def test_self_declared_plan_path_must_match_execution_workflow():
+    doc = load_observation()
+    doc["execution"]["workflow_path"] = ".github/workflows/other.yml"
+    with pytest.raises(hak.EvidenceLintError):
+        hak.validate_observation(doc)
+
+
+def test_provider_ref_attempt_must_match_execution():
+    doc = load_observation()
+    doc["execution"]["provider_record_ref"] = (
+        "github-actions:Luminous-Dynamics/symthaea:run/34212685766:attempt/2"
+    )
+    with pytest.raises(hak.EvidenceLintError):
+        hak.validate_observation(doc)
+
+
 def test_synthetic_terminal_receipt_is_valid_bookkeeping():
     hak.validate_receipt(terminal_receipt(), expected_subject=SUBJECT)
 
@@ -99,6 +123,7 @@ def test_synthetic_terminal_receipt_is_valid_bookkeeping():
 def test_receipt_requires_completed_status():
     doc = terminal_receipt()
     doc["terminal"]["status"] = "in_progress"
+    doc["receipt_digest"] = hak.compute_receipt_digest(doc)
     with pytest.raises(hak.EvidenceLintError):
         hak.validate_receipt(doc)
 
@@ -106,6 +131,7 @@ def test_receipt_requires_completed_status():
 def test_receipt_requires_terminal_conclusion():
     doc = terminal_receipt()
     doc["terminal"]["conclusion"] = None
+    doc["receipt_digest"] = hak.compute_receipt_digest(doc)
     with pytest.raises(hak.EvidenceLintError):
         hak.validate_receipt(doc)
 
@@ -113,6 +139,7 @@ def test_receipt_requires_terminal_conclusion():
 def test_receipt_cannot_smuggle_evidence_tier():
     doc = terminal_receipt()
     doc["evidence_tier"] = "E5"
+    doc["receipt_digest"] = hak.compute_receipt_digest(doc)
     with pytest.raises(hak.EvidenceLintError):
         hak.validate_receipt(doc)
 
@@ -120,6 +147,7 @@ def test_receipt_cannot_smuggle_evidence_tier():
 def test_receipt_cannot_smuggle_e5_interpretation():
     doc = terminal_receipt()
     doc["e5_qualified"] = True
+    doc["receipt_digest"] = hak.compute_receipt_digest(doc)
     with pytest.raises(hak.EvidenceLintError):
         hak.validate_receipt(doc)
 
@@ -127,8 +155,23 @@ def test_receipt_cannot_smuggle_e5_interpretation():
 def test_receipt_job_must_be_terminal():
     doc = terminal_receipt()
     doc["job_receipts"][0]["status"] = "queued"
+    doc["receipt_digest"] = hak.compute_receipt_digest(doc)
     with pytest.raises(hak.EvidenceLintError):
         hak.validate_receipt(doc)
+
+
+def test_receipt_digest_detects_tampering():
+    doc = terminal_receipt()
+    doc["job_receipts"][0]["name"] = "silently changed after receipt"
+    with pytest.raises(hak.EvidenceLintError):
+        hak.validate_receipt(doc)
+
+
+def test_receipt_digest_is_domain_separated_sha256():
+    doc = terminal_receipt()
+    assert doc["receipt_digest"].startswith("sha256:")
+    assert len(doc["receipt_digest"]) == len("sha256:") + 64
+    hak.validate_receipt(doc)
 
 
 def test_run_attempt_must_be_positive():
