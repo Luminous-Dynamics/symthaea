@@ -7,6 +7,10 @@
 //! Multiple evidence objects do not imply multiple independent observations.
 //! Independence is derived from a closed ancestry graph; an evidence producer
 //! cannot self-assert that its own output is independent corroboration.
+//! Content-addressed ids use one canonical lowercase digest spelling so aliases
+//! of the same digest cannot manufacture distinct lineage roots.
+//! Every independence classification is defined only for evidence ids that
+//! resolve inside the validated graph.
 
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -136,6 +140,12 @@ impl EvidenceLineageGraphV1 {
 pub struct ValidatedEvidenceLineageGraphV1(EvidenceLineageGraphV1);
 
 impl ValidatedEvidenceLineageGraphV1 {
+    /// Read-only typed semantics for consumers that must bind the complete
+    /// validated lineage without depending on its serde wire representation.
+    pub fn nodes(&self) -> &[ValidatedEvidenceLineageNodeV1] {
+        &self.0.nodes
+    }
+
     pub fn root_ids(&self, evidence_id: &str) -> Result<HashSet<String>, CognitiveLineageError> {
         validate_digest(evidence_id)?;
         let index: HashMap<&str, &ValidatedEvidenceLineageNodeV1> = self
@@ -170,15 +180,16 @@ impl ValidatedEvidenceLineageGraphV1 {
     }
 
     /// `Independent` is returned only for complete, disjoint root sets.
+    /// Every classification, including `SameEvidence`, requires graph membership.
     pub fn assess_independence(
         &self,
         left: &str,
         right: &str,
     ) -> Result<EvidenceIndependenceV1, CognitiveLineageError> {
+        let left_roots = self.root_ids(left)?;
         if left == right {
             return Ok(EvidenceIndependenceV1::SameEvidence);
         }
-        let left_roots = self.root_ids(left)?;
         let right_roots = self.root_ids(right)?;
 
         if is_ancestor(self, left, right)? || is_ancestor(self, right, left)? {
@@ -352,7 +363,7 @@ impl std::fmt::Display for CognitiveLineageError {
                 "unsupported cognitive lineage schema version {found}; expected {COGNITIVE_LINEAGE_SCHEMA_VERSION}"
             ),
             Self::MalformedDigest => {
-                f.write_str("digest must be sha256:<64 hex> or blake3:<64 hex>")
+                f.write_str("digest must be sha256:<64 lowercase hex> or blake3:<64 lowercase hex>")
             }
             Self::SelfParent { evidence_id } => {
                 write!(f, "evidence {evidence_id} cannot parent itself")
@@ -402,7 +413,9 @@ fn validate_digest(digest: &str) -> Result<(), CognitiveLineageError> {
     };
     if !matches!(algorithm, "sha256" | "blake3")
         || hex.len() != 64
-        || !hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || !hex
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     {
         return Err(CognitiveLineageError::MalformedDigest);
     }
@@ -450,6 +463,74 @@ mod tests {
         }
         .validate()
         .unwrap()
+    }
+
+    #[test]
+    fn validated_graph_exposes_read_only_semantic_nodes() {
+        let g = graph(vec![root(A), derived(B, &[A])]);
+        assert_eq!(g.nodes().len(), 2);
+        assert_eq!(g.nodes()[0].evidence_id(), A);
+        assert_eq!(g.nodes()[1].evidence_id(), B);
+        assert_eq!(g.nodes()[1].parent_ids(), &[A.to_string()]);
+        assert_eq!(g.nodes()[1].derivation_kind(), CognitiveDerivationKindV1::Inference);
+    }
+
+    #[test]
+    fn uppercase_digest_spelling_fails_closed() {
+        let uppercase = A.to_ascii_uppercase().replacen("SHA256:", "sha256:", 1);
+        let raw = EvidenceLineageNodeV1 {
+            schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
+            evidence_id: uppercase,
+            parent_ids: vec![],
+            derivation_kind: CognitiveDerivationKindV1::RootObservation,
+        };
+        assert_eq!(raw.validate(), Err(CognitiveLineageError::MalformedDigest));
+    }
+
+    #[test]
+    fn case_aliased_roots_cannot_enter_independence_graph() {
+        let canonical = root(A);
+        let uppercase = A.to_ascii_uppercase().replacen("SHA256:", "sha256:", 1);
+        let alias = EvidenceLineageNodeV1 {
+            schema_version: COGNITIVE_LINEAGE_SCHEMA_VERSION,
+            evidence_id: uppercase,
+            parent_ids: vec![],
+            derivation_kind: CognitiveDerivationKindV1::RootObservation,
+        };
+        assert_eq!(alias.validate(), Err(CognitiveLineageError::MalformedDigest));
+
+        let g = graph(vec![canonical]);
+        assert_eq!(g.nodes().len(), 1);
+        assert_eq!(g.root_ids(A).unwrap(), HashSet::from([A.to_string()]));
+    }
+
+    #[test]
+    fn same_malformed_id_fails_before_same_evidence_classification() {
+        let g = graph(vec![root(A)]);
+        assert_eq!(
+            g.assess_independence("not-a-digest", "not-a-digest"),
+            Err(CognitiveLineageError::MalformedDigest)
+        );
+    }
+
+    #[test]
+    fn same_unknown_id_fails_before_same_evidence_classification() {
+        let g = graph(vec![root(A)]);
+        assert_eq!(
+            g.assess_independence(B, B),
+            Err(CognitiveLineageError::UnknownEvidenceId {
+                evidence_id: B.to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn known_same_evidence_is_classified_after_membership_validation() {
+        let g = graph(vec![root(A)]);
+        assert_eq!(
+            g.assess_independence(A, A).unwrap(),
+            EvidenceIndependenceV1::SameEvidence
+        );
     }
 
     #[test]
