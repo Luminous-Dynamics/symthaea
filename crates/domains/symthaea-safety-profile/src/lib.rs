@@ -9,6 +9,8 @@
 
 #![deny(unsafe_code)]
 
+pub mod authorization;
+
 use serde::{Deserialize, Serialize};
 use symthaea_safety_configuration::{
     ConfigurationComponent, ConfigurationDigest, SafetyConfigurationManifest,
