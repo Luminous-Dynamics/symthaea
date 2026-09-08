@@ -1,0 +1,109 @@
+name: Workbench Nix Closure Identity
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/workbench_nix_closure_identity.py'
+      - 'scripts/test_workbench_nix_closure_identity.py'
+      - 'docs/neuroscience/WORKBENCH_NIX_CLOSURE_IDENTITY_V1.md'
+      - '.github/workflows/workbench-nix-closure-identity.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify pure closure identity only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'qualified_head=%s\n' "$actual"
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+
+      - name: Syntax
+        run: |
+          python -m py_compile \
+            scripts/workbench_nix_closure_identity.py \
+            scripts/test_workbench_nix_closure_identity.py
+
+      - name: Adversarial contracts
+        run: PYTHONPATH=scripts python -m unittest -v scripts/test_workbench_nix_closure_identity.py
+
+      - name: Pure implementation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          paths = [
+              Path('scripts/workbench_nix_closure_identity.py'),
+              Path('scripts/test_workbench_nix_closure_identity.py'),
+          ]
+          allowed = {
+              'argparse', 'copy', 'hashlib', 'json', 're', 'sys', 'tempfile',
+              'typing', 'unittest', 'pathlib', 'workbench_nix_closure_identity',
+              '__future__',
+          }
+
+          for path in paths:
+              tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+              imported = set()
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      imported.update(alias.name.split('.')[0] for alias in node.names)
+                  elif isinstance(node, ast.ImportFrom):
+                      imported.add((node.module or '').split('.')[0])
+              assert imported <= allowed, (path, sorted(imported - allowed))
+          PY
+
+      - name: Authority ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=scripts python - <<'PY'
+          import workbench_nix_closure_identity as closure
+
+          root = '/nix/store/0123456789abcdfghijklmnpqrsvwxyz-workbench'
+          identity = closure.compile_identity(root, [{
+              'path': root,
+              'nar_sha256': 'sha256:' + 'a' * 64,
+              'references': [],
+          }])
+
+          assert set(identity) == closure.IDENTITY_KEYS
+          assert 'qualified' not in identity
+          assert 'authority' not in identity
+          assert 'closure_realized' not in identity
+          assert 'scientific_execution_qualified' not in identity
+          assert closure.validate_identity(identity) == identity
+          PY
+
+          grep -Fq 'validated-identity-only' scripts/workbench_nix_closure_identity.py
+          grep -Fq 'no Nix closure has been realized, captured, or qualified' docs/neuroscience/WORKBENCH_NIX_CLOSURE_IDENTITY_V1.md
+          grep -Fq 'SuppliedEntries = Reachable(R)' docs/neuroscience/WORKBENCH_NIX_CLOSURE_IDENTITY_V1.md
+          grep -Fq 'RawObservationRoot != NormalizedClosureRoot' docs/neuroscience/WORKBENCH_NIX_CLOSURE_IDENTITY_V1.md
+          grep -Fq 'QualificationEnvelopeRoot' docs/neuroscience/WORKBENCH_NIX_CLOSURE_IDENTITY_V1.md
