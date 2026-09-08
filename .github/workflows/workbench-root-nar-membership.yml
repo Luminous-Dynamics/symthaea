@@ -1,0 +1,93 @@
+name: Workbench Root NAR Membership
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/workbench_root_nar_membership.py'
+      - 'scripts/test_workbench_root_nar_membership.py'
+      - 'scripts/test_workbench_root_nar_target_spelling.py'
+      - 'docs/neuroscience/WORKBENCH_ROOT_NAR_MEMBERSHIP_V1.md'
+      - '.github/workflows/workbench-root-nar-membership.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  qualify:
+    name: Qualify pure NAR membership only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.QUALIFICATION_SHA }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$QUALIFICATION_SHA"
+          printf 'qualified_head=%s\n' "$actual"
+
+      - name: Syntax
+        run: |
+          python3 -m py_compile \
+            scripts/workbench_root_nar_membership.py \
+            scripts/test_workbench_root_nar_membership.py \
+            scripts/test_workbench_root_nar_target_spelling.py
+
+      - name: Synthetic NAR adversarial contracts
+        run: |
+          PYTHONPATH=scripts python3 -m unittest \
+            scripts/test_workbench_root_nar_membership.py \
+            scripts/test_workbench_root_nar_target_spelling.py
+
+      - name: No Nix, subprocess, network, or shell surface
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          files = [
+              Path('scripts/workbench_root_nar_membership.py'),
+              Path('scripts/test_workbench_root_nar_membership.py'),
+              Path('scripts/test_workbench_root_nar_target_spelling.py'),
+          ]
+          forbidden = {'subprocess', 'socket', 'urllib', 'requests', 'httpx'}
+          for path in files:
+              tree = ast.parse(path.read_text(encoding='utf-8'))
+              imported = set()
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      imported.update(alias.name.split('.')[0] for alias in node.names)
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      imported.add(node.module.split('.')[0])
+              assert not (imported & forbidden), (path, imported & forbidden)
+          PY
+
+      - name: Parser-shape ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCRIPT=scripts/workbench_root_nar_membership.py
+          DOC=docs/neuroscience/WORKBENCH_ROOT_NAR_MEMBERSHIP_V1.md
+          grep -Fq 'MAGIC = b"nix-archive-1"' "$SCRIPT"
+          grep -Fq 'names must be strictly increasing' "$SCRIPT"
+          grep -Fq 'non-zero NAR padding' "$SCRIPT"
+          grep -Fq 'file SHA-256 does not match verified root NAR hash' "$SCRIPT"
+          grep -Fq '"nar_bytes_match_verified_root": True' "$SCRIPT"
+          grep -Fq '"target_membership_verified": True' "$SCRIPT"
+          grep -Fq '"workbench_execution_qualified": False' "$SCRIPT"
+          grep -Fq 'ProgramMembership != ProgramExecution' "$DOC"
+          grep -Fq 'no real Workbench root NAR has been captured or verified by this PR' "$DOC"
