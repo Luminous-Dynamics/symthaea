@@ -6,6 +6,8 @@
 //! The public bridge deliberately does not apply learned motor output directly.
 //! Goal-directed commands cross the shared [`HumanoidExecutionPipeline`], which
 //! composes deterministic whole-body control with final command projection.
+//! The state used for control is fused through the humanoid estimator, and its
+//! explicit bounded uncertainty restricts epistemic goal authority.
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
@@ -14,8 +16,12 @@ use crate::controller::HumanoidController;
 use crate::encoder::HumanoidHdcEncoder;
 use crate::execution::{HumanoidAuthorityEnvelope, HumanoidExecutionPipeline};
 use crate::simulator::{HumanoidPhysicsSimulator, SimpleHumanoidSimulator};
+use crate::state_estimation::{
+    FusedHumanoidStateEstimator, ProprioceptiveMeasurement, StateEstimatorConfig,
+};
+use crate::state_uncertainty::HumanoidStateUncertaintyEnvelope;
 use crate::types::{
-    ActuationMode, HumanoidCommand, HumanoidConfig, HumanoidPdGains, HumanoidTask,
+    ActuationMode, HumanoidCommand, HumanoidConfig, HumanoidPdGains, HumanoidState, HumanoidTask,
     pd_standing_baseline,
 };
 
@@ -38,6 +44,12 @@ pub struct HumanoidEmbodiment {
     pd_gains: HumanoidPdGains,
     simulator: SimpleHumanoidSimulator,
     encoder: HumanoidHdcEncoder,
+    state_estimator: FusedHumanoidStateEstimator,
+    state_estimator_config: StateEstimatorConfig,
+    observation_sequence: u64,
+    last_state_uncertainty: Option<HumanoidStateUncertaintyEnvelope>,
+    last_epistemic_authority: f32,
+    rejected_state_updates: u64,
     last_perception: Option<ContinuousHV>,
     total_steps: usize,
     current_safety: MotorSafetyLevel,
@@ -63,12 +75,26 @@ impl HumanoidEmbodiment {
         let morphology = config.morphology;
         let simulator = SimpleHumanoidSimulator::new();
         let num_actuators = simulator.state().joint_angles.len();
+        let state_estimator_config = StateEstimatorConfig::default();
+        let mut state_estimator = FusedHumanoidStateEstimator::with_config(
+            morphology,
+            state_estimator_config.clone(),
+        );
+        state_estimator
+            .reset(simulator.state())
+            .expect("validated simulator state must initialize humanoid estimator");
         Self {
             controller: HumanoidController::new(genesis, &config),
             pipeline: HumanoidExecutionPipeline::new(morphology),
             pd_gains: HumanoidPdGains::for_morphology(morphology),
             simulator,
             encoder: HumanoidHdcEncoder::new(genesis, 32),
+            state_estimator,
+            state_estimator_config,
+            observation_sequence: 0,
+            last_state_uncertainty: None,
+            last_epistemic_authority: 0.0,
+            rejected_state_updates: 0,
             last_perception: None,
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
@@ -108,6 +134,18 @@ impl HumanoidEmbodiment {
         self.fallback_stage
     }
 
+    pub fn last_state_uncertainty(&self) -> Option<HumanoidStateUncertaintyEnvelope> {
+        self.last_state_uncertainty
+    }
+
+    pub fn last_epistemic_authority(&self) -> f32 {
+        self.last_epistemic_authority
+    }
+
+    pub fn rejected_state_updates(&self) -> u64 {
+        self.rejected_state_updates
+    }
+
     fn apply_standing_lock(&self, cmd: &mut HumanoidCommand) {
         // Zero all torques as the default safe state.
         for t in cmd.torques.iter_mut() {
@@ -123,6 +161,42 @@ impl HumanoidEmbodiment {
         }
     }
 
+    /// Fuse the current backend observation and derive the restrictive epistemic
+    /// authority supported by this exact estimator update. Rejected evidence
+    /// retains the previous state estimate but revokes goal authority for the tick.
+    fn estimated_control_state(&mut self) -> (HumanoidState, f32) {
+        let raw_state = self.simulator.state().clone();
+        let contact_frame = self.simulator.contact_frame();
+        self.observation_sequence = self.observation_sequence.saturating_add(1);
+        let mut measurement = ProprioceptiveMeasurement::from_simulator(
+            self.pipeline.morphology(),
+            self.observation_sequence,
+            raw_state,
+            contact_frame,
+        );
+        measurement.received_at_s = self.simulator.state().timestamp;
+
+        match self.state_estimator.update(&measurement) {
+            Ok((estimate, report)) => {
+                let estimate = estimate.clone();
+                let uncertainty = HumanoidStateUncertaintyEnvelope::from_estimator_report(
+                    report,
+                    &self.state_estimator_config,
+                );
+                let authority = uncertainty.epistemic_authority();
+                self.last_state_uncertainty = Some(uncertainty);
+                self.last_epistemic_authority = authority;
+                (estimate, authority)
+            }
+            Err(_) => {
+                self.rejected_state_updates = self.rejected_state_updates.saturating_add(1);
+                self.last_state_uncertainty = None;
+                self.last_epistemic_authority = 0.0;
+                (self.state_estimator.estimate().clone(), 0.0)
+            }
+        }
+    }
+
     pub fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
         let phi_level = MotorSafetyLevel::from_phi(phi);
         self.current_safety = match self.safety_override {
@@ -133,10 +207,12 @@ impl HumanoidEmbodiment {
             self.current_safety = self.current_safety.max(m);
         }
 
-        let state = self.simulator.state().clone();
-        let cmd = if matches!(self.current_safety, MotorSafetyLevel::Red) {
-            // Red revokes goal-directed authority. Minimum-safe fallback retains
-            // the force it needs to execute, but still crosses final projection.
+        let (state, epistemic_authority) = self.estimated_control_state();
+        let goal_authority_revoked = epistemic_authority <= 0.0;
+        let cmd = if matches!(self.current_safety, MotorSafetyLevel::Red) || goal_authority_revoked {
+            // Red or rejected state evidence revokes goal-directed authority.
+            // StandingLock retains independent minimum-safe authority and still
+            // crosses final projection.
             self.fallback_cycles_in_stage = self.fallback_cycles_in_stage.saturating_add(1);
             let mut fallback = HumanoidCommand::zero_for(self.num_actuators);
             self.apply_standing_lock(&mut fallback);
@@ -154,14 +230,14 @@ impl HumanoidEmbodiment {
 
             let learned_residual = self.controller.forward(thought_hv, dt);
             let baseline = pd_standing_baseline(&state, &self.pd_gains);
-            // This in-process simulator explicitly admits the non-cognitive
-            // sources. Physical hardware must supply real operator,
-            // qualification, health, and epistemic restrictions instead.
+            // This in-process simulator explicitly admits operator,
+            // qualification, and physical-health authority. Epistemic authority
+            // comes from the live estimator evidence; cognition may only reduce it.
             let authority = HumanoidAuthorityEnvelope {
                 operator: 1.0,
                 qualification: 1.0,
                 physical: 1.0,
-                epistemic: 1.0,
+                epistemic: epistemic_authority,
                 cognitive: self.current_safety.motor_gain(),
             };
             self.pipeline
@@ -195,6 +271,8 @@ impl HumanoidEmbodiment {
 
         let success = self.simulator.state().root_height.is_finite()
             && self.simulator.state().root_height > 0.2;
+        let observation_confidence =
+            grounding_from_prediction_error(pred_error).min(self.last_epistemic_authority);
 
         EmbodimentResult {
             num_actuators: self.num_actuators,
@@ -203,7 +281,7 @@ impl HumanoidEmbodiment {
             prediction_error: pred_error,
             safety_level: self.current_safety,
             epistemic_grounding: GROUNDING_SENSORIMOTOR,
-            observation_confidence: grounding_from_prediction_error(pred_error),
+            observation_confidence,
         }
     }
 
@@ -218,6 +296,14 @@ impl HumanoidEmbodiment {
         self.controller.reset();
         self.pipeline.reset();
         self.encoder.reset();
+        let reset_state = self.simulator.state().clone();
+        self.state_estimator
+            .reset(&reset_state)
+            .expect("validated reset state must reinitialize humanoid estimator");
+        self.observation_sequence = 0;
+        self.last_state_uncertainty = None;
+        self.last_epistemic_authority = 0.0;
+        self.rejected_state_updates = 0;
         self.last_perception = None;
         self.total_steps = 0;
         self.current_safety = MotorSafetyLevel::Green;
@@ -251,7 +337,8 @@ impl HumanoidEmbodiment {
             platform: "humanoid".to_string(),
             num_actuators: self.num_actuators,
             epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
-            observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
+            observation_confidence: grounding_from_prediction_error(self.last_prediction_error)
+                .min(self.last_epistemic_authority),
             platform_specific: Vec::new(),
         }
     }
@@ -321,6 +408,19 @@ mod tests {
         let hv = ContinuousHV::random(16384, 42);
         let r = bridge.step(&hv, 0.025, 0.7);
         assert_eq!(r.num_actuators, 21);
+    }
+
+    #[test]
+    fn test_state_evidence_restricts_runtime_authority() {
+        let mut bridge = HumanoidEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        let hv = ContinuousHV::random(16384, 42);
+        bridge.step(&hv, 0.025, 0.9);
+        let uncertainty = bridge
+            .last_state_uncertainty()
+            .expect("accepted simulator observation must produce uncertainty evidence");
+        assert!(uncertainty.accepted);
+        assert!(bridge.last_epistemic_authority().is_finite());
+        assert!((0.0..=1.0).contains(&bridge.last_epistemic_authority()));
     }
 
     #[test]
@@ -399,6 +499,7 @@ mod tests {
         assert_eq!(t.total_steps, 1);
         assert_eq!(t.platform, "humanoid");
         assert_eq!(t.num_actuators, 21);
+        assert!((0.0..=1.0).contains(&t.observation_confidence));
     }
 
     #[test]
@@ -408,6 +509,9 @@ mod tests {
         bridge.step(&hv, 0.025, 0.7);
         bridge.reset();
         assert_eq!(bridge.total_steps(), 0);
+        assert!(bridge.last_state_uncertainty().is_none());
+        assert_eq!(bridge.last_epistemic_authority(), 0.0);
+        assert_eq!(bridge.rejected_state_updates(), 0);
     }
 
     #[test]
