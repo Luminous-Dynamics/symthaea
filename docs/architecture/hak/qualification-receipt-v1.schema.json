@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/hak/qualification-receipt-v1.schema.json",
+  "title": "HAK Qualification Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "subject",
+    "qualification_plan",
+    "execution",
+    "terminal",
+    "receipt_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "hak.qualification-receipt.v1"},
+    "receipt_id": {"type": "string", "minLength": 1},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit_sha"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "base_commit_sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+        "branch": {"type": ["string", "null"], "minLength": 1}
+      }
+    },
+    "qualification_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_kind", "plan_ref", "plan_digest", "precommit_status"],
+      "properties": {
+        "plan_kind": {
+          "enum": ["UnspecifiedPlan", "SelfDeclaredPlan", "IndependentPlan", "ProviderEnforcedPlan"]
+        },
+        "plan_ref": {"type": "string", "minLength": 1},
+        "plan_digest": {"type": ["string", "null"]},
+        "precommit_status": {
+          "enum": ["KnownPrecommitted", "NotEstablished", "NotApplicable"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"precommit_status": {"const": "NotEstablished"}}},
+          "then": {
+            "properties": {
+              "plan_kind": {"const": "UnspecifiedPlan"},
+              "plan_digest": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"precommit_status": {"const": "KnownPrecommitted"}}},
+          "then": {
+            "properties": {
+              "plan_kind": {
+                "enum": ["SelfDeclaredPlan", "IndependentPlan", "ProviderEnforcedPlan"]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "run_id",
+        "run_attempt",
+        "workflow_id",
+        "workflow_name",
+        "workflow_path",
+        "event",
+        "provider_record_ref"
+      ],
+      "properties": {
+        "provider": {"const": "github-actions"},
+        "run_id": {"type": "integer", "minimum": 1},
+        "run_attempt": {"type": "integer", "minimum": 1},
+        "workflow_id": {"type": "integer", "minimum": 1},
+        "workflow_name": {"type": "string", "minLength": 1},
+        "workflow_path": {"type": "string", "minLength": 1},
+        "event": {"type": "string", "minLength": 1},
+        "provider_record_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "conclusion", "provider_started_at", "provider_completed_at"],
+      "properties": {
+        "status": {"const": "completed"},
+        "conclusion": {
+          "enum": [
+            "success",
+            "failure",
+            "cancelled",
+            "timed_out",
+            "action_required",
+            "neutral",
+            "skipped",
+            "stale",
+            "startup_failure"
+          ]
+        },
+        "provider_started_at": {"type": "string", "format": "date-time"},
+        "provider_completed_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "job_receipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["job_id", "name", "status", "conclusion"],
+        "properties": {
+          "job_id": {"type": "integer", "minimum": 1},
+          "name": {"type": "string", "minLength": 1},
+          "status": {"const": "completed"},
+          "conclusion": {
+            "enum": [
+              "success",
+              "failure",
+              "cancelled",
+              "timed_out",
+              "action_required",
+              "neutral",
+              "skipped",
+              "stale",
+              "startup_failure"
+            ]
+          }
+        }
+      }
+    },
+    "artifact_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "log_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

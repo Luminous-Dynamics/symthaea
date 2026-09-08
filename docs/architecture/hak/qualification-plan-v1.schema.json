@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/hak/qualification-plan-v1.schema.json",
+  "title": "HAK Qualification Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "plan_kind",
+    "scope",
+    "claims",
+    "required_checks",
+    "required_negative_cases",
+    "provider_policy",
+    "independence",
+    "evidence_target",
+    "supersedes_plan_ref"
+  ],
+  "properties": {
+    "schema_version": {"const": "hak.qualification-plan.v1"},
+    "plan_id": {"type": "string", "minLength": 1},
+    "plan_kind": {
+      "enum": ["SelfDeclaredPlan", "IndependentPlan", "ProviderEnforcedPlan"]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "subject_kind", "workflow_path"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "subject_kind": {"const": "git-commit"},
+        "workflow_path": {"type": "string", "minLength": 1}
+      }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "statement", "target_tier"],
+        "properties": {
+          "claim_id": {"type": "string", "minLength": 1},
+          "statement": {"type": "string", "minLength": 1},
+          "target_tier": {"enum": ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"]}
+        }
+      }
+    },
+    "required_checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check_id", "description"],
+        "properties": {
+          "check_id": {"type": "string", "minLength": 1},
+          "description": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "required_negative_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "provider_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_providers", "exact_head_required"],
+      "properties": {
+        "allowed_providers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "exact_head_required": {"type": "boolean"}
+      }
+    },
+    "independence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plan_authority", "execution_provider", "claim_interpretation"],
+      "properties": {
+        "plan_authority": {"type": "string", "minLength": 1},
+        "execution_provider": {"type": "string", "minLength": 1},
+        "claim_interpretation": {"type": "string", "minLength": 1}
+      }
+    },
+    "evidence_target": {"enum": ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"]},
+    "supersedes_plan_ref": {"type": ["string", "null"], "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_target": {"enum": ["E5", "E6", "E7", "E8"]}
+        }
+      },
+      "then": {
+        "properties": {
+          "provider_policy": {
+            "properties": {
+              "exact_head_required": {"const": true}
+            }
+          }
+        }
+      }
+    }
+  ]
+}

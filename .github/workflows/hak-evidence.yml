@@ -1,0 +1,75 @@
+name: HAK Evidence
+
+on:
+  pull_request:
+    branches:
+      - architecture/hak-conformance-linter-v1
+    paths:
+      - 'scripts/hak_evidence_lint.py'
+      - 'tests/python/test_hak_evidence_lint.py'
+      - 'docs/architecture/HUMAN_AGENCY_KERNEL_EVIDENCE_SUBJECTS_AND_QUALIFICATION_RECEIPTS_V1.md'
+      - 'docs/architecture/hak/execution-observation-v1.schema.json'
+      - 'docs/architecture/hak/qualification-receipt-v1.schema.json'
+      - 'docs/architecture/hak/qualification-plan-v1.schema.json'
+      - 'docs/architecture/hak/plans/**'
+      - 'docs/release/evidence/hak/**'
+      - '.github/workflows/hak-evidence.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evidence-linter:
+    name: HAK Evidence Linter
+    runs-on: ubuntu-latest
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    steps:
+      - name: Resolve exact subject
+        id: subject
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.subject.outputs.sha }}
+          persist-credentials: false
+
+      - name: Assert exact-head checkout
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ steps.subject.outputs.sha }}"
+          echo "HAK evidence exact subject: $(git rev-parse HEAD)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+
+      - name: Compile evidence linter
+        run: python -m py_compile scripts/hak_evidence_lint.py
+
+      - name: Lint HAK-007 qualification plan
+        run: |
+          python scripts/hak_evidence_lint.py \
+            docs/architecture/hak/plans/hak007-evidence-bookkeeping-e5-v1.plan.json
+
+      - name: Lint materialized nonterminal observations
+        shell: bash
+        run: |
+          mapfile -t observations < <(find docs/release/evidence/hak/executions -type f -name '*.observation.json' -print | sort)
+          test "${#observations[@]}" -gt 0
+          python scripts/hak_evidence_lint.py "${observations[@]}"
+
+      - name: Run plan-execution join and evidence regressions
+        run: python -m pytest -q tests/python/test_hak_evidence_lint.py
