@@ -1,0 +1,120 @@
+name: Workbench Invocation Isolation Profile
+
+on:
+  pull_request:
+    paths:
+      - 'data/neuroscience/workbench_execution_capsule_profile_v1.json'
+      - 'data/neuroscience/workbench_invocation_isolation_profile_v1.json'
+      - 'scripts/verify_workbench_invocation_isolation_profile.py'
+      - 'scripts/check_workbench_invocation_isolation_profile_static.py'
+      - 'scripts/test_verify_workbench_invocation_isolation_profile.py'
+      - 'docs/neuroscience/WORKBENCH_INVOCATION_ISOLATION_PROFILE_V1.md'
+      - '.github/workflows/workbench-invocation-isolation-profile.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  qualify:
+    name: Qualify invocation isolation profile only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.QUALIFICATION_SHA }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$QUALIFICATION_SHA"
+          printf 'qualified_head=%s\n' "$actual"
+
+      - name: Syntax
+        run: |
+          python3 -m py_compile \
+            scripts/verify_workbench_invocation_isolation_profile.py \
+            scripts/check_workbench_invocation_isolation_profile_static.py \
+            scripts/test_verify_workbench_invocation_isolation_profile.py
+
+      - name: Adversarial profile contracts
+        run: PYTHONPATH=scripts python3 -m unittest scripts/test_verify_workbench_invocation_isolation_profile.py
+
+      - name: Independent dynamic-binding consistency
+        run: python3 scripts/check_workbench_invocation_isolation_profile_static.py
+
+      - name: Exact parent-profile binding
+        run: |
+          python3 scripts/verify_workbench_invocation_isolation_profile.py \
+            --profile data/neuroscience/workbench_invocation_isolation_profile_v1.json \
+            --parent-profile data/neuroscience/workbench_execution_capsule_profile_v1.json
+
+      - name: No execution or observation surface
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          files = [
+              Path('scripts/verify_workbench_invocation_isolation_profile.py'),
+              Path('scripts/check_workbench_invocation_isolation_profile_static.py'),
+              Path('scripts/test_verify_workbench_invocation_isolation_profile.py'),
+          ]
+          forbidden_imports = {'subprocess', 'socket', 'urllib', 'requests', 'httpx'}
+          for path in files:
+              tree = ast.parse(path.read_text(encoding='utf-8'))
+              imported = set()
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      imported.update(alias.name.split('.')[0] for alias in node.names)
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      imported.add(node.module.split('.')[0])
+              assert not (imported & forbidden_imports), (path, imported & forbidden_imports)
+          PY
+
+      - name: Static isolation and authority ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=data/neuroscience/workbench_invocation_isolation_profile_v1.json
+          DOC=docs/neuroscience/WORKBENCH_INVOCATION_ISOLATION_PROFILE_V1.md
+          grep -Fq '"stage": "root-main-program-execve"' "$PROFILE"
+          grep -Fq '"inherit_host_environment": false' "$PROFILE"
+          grep -Fq '"host_path_lookup_allowed": false' "$PROFILE"
+          grep -Fq '"PATH": ""' "$PROFILE"
+          grep -Fq '"PWD": "invocation.cwd"' "$PROFILE"
+          grep -Fq '"TMPDIR": "invocation.tmpdir"' "$PROFILE"
+          grep -Fq '"TMP": "invocation.tmpdir"' "$PROFILE"
+          grep -Fq '"TEMP": "invocation.tmpdir"' "$PROFILE"
+          grep -Fq '"XDG_RUNTIME_DIR": "invocation.xdg_runtime_dir"' "$PROFILE"
+          grep -Fq '"XDG_CONFIG_DIRS": "invocation.xdg_config_dirs"' "$PROFILE"
+          grep -Fq '"XDG_DATA_DIRS": "invocation.xdg_data_dirs"' "$PROFILE"
+          grep -Fq '"entry_environment_is_final_environment": false' "$PROFILE"
+          grep -Fq '"verified_program_may_transform_environment": true' "$PROFILE"
+          grep -Fq '"host_injection_after_execve_allowed": false' "$PROFILE"
+          grep -Fq '"post_entry_environment_equivalence_assumed": false' "$PROFILE"
+          grep -Fq '"dynamic_environment_must_match_created_roots": true' "$PROFILE"
+          grep -Fq '"dynamic_environment_paths_must_be_absolute": true' "$PROFILE"
+          grep -Fq 'fresh-private-empty-per-invocation' "$PROFILE"
+          grep -Fq '"same_x86_64_implies_equivalence": false' "$PROFILE"
+          grep -Fq '"same_closure_implies_cross_cpu_equivalence": false' "$PROFILE"
+          grep -Fq '"invocation_executed": false' "$PROFILE"
+          grep -Fq '"workbench_execution_qualified": false' "$PROFILE"
+          grep -Fq '"fmq010_established": false' "$PROFILE"
+          grep -Fq '"neural_alignment_established": false' "$PROFILE"
+          grep -Fq '"consciousness_evidence": false' "$PROFILE"
+          grep -Fq '99bf66b28572005f6419330d3f58b6262637412d' "$DOC"
+          grep -Fq 'RunnerEntryEnvironment' "$DOC"
+          grep -Fq 'IsolatedInvocationProfile != ReproducibleExecution' "$DOC"
