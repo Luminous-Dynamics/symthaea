@@ -10,6 +10,7 @@
 #![deny(unsafe_code)]
 
 pub mod authorization;
+pub mod transition;
 
 use serde::{Deserialize, Serialize};
 use symthaea_safety_configuration::{
