@@ -10,7 +10,7 @@
   "claims": [
     {
       "claim_id": "HAK008-CONFORMANCE-001",
-      "statement": "A stored plan-conformance status is revalidated against the exact qualification plan and receipt before interpretation may rely on it.",
+      "statement": "A stored plan-conformance status is revalidated against the exact qualification plan content and exact receipt before interpretation may rely on it.",
       "target_tier": "E5"
     },
     {
@@ -21,6 +21,11 @@
     {
       "claim_id": "HAK008-FAILURE-001",
       "statement": "A valid terminal failure remains valid negative execution evidence and can support NotSatisfied without becoming invalid evidence.",
+      "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK008-PROVENANCE-001",
+      "statement": "Interpretation binds the exact subject, qualification-plan digest, receipt digests, conformance digests, and responsible interpreter provenance; model assistance cannot replace or widen that authority.",
       "target_tier": "E5"
     }
   ],
@@ -42,8 +47,12 @@
       "description": "Lint the HAK-008 machine-readable qualification plan with HAK-007 tooling."
     },
     {
+      "check_id": "schema-validation",
+      "description": "Validate HAK-008 JSON Schema syntax and validate representative conformance/interpretation documents against the schemas."
+    },
+    {
       "check_id": "regressions",
-      "description": "Run tests/python/test_hak_interpretation_lint.py."
+      "description": "Run the focused HAK-008 interpretation and schema regression suites."
     }
   ],
   "required_negative_cases": [
@@ -51,6 +60,13 @@
     "Satisfied conformance backed by non-success receipt",
     "Indeterminate conformance without limitation",
     "forged Satisfied conformance label",
+    "receipt qualification-plan digest mismatch",
+    "conformance qualification-plan digest mismatch",
+    "interpretation qualification-plan digest mismatch",
+    "interpretation subject mismatch",
+    "interpretation plan-ref mismatch",
+    "receipt digest binding mismatch",
+    "conformance digest binding mismatch",
     "Qualified interpretation above claim target tier",
     "provider success without Satisfied conformance",
     "non-Qualified claim smuggling supported tier",
@@ -58,7 +74,10 @@
     "interpretation missing a plan claim",
     "conformance digest tampering",
     "interpretation digest tampering",
-    "model assistance attempting to exceed evidence ceiling"
+    "model assistance without model provenance",
+    "model assistance attempting to exceed evidence ceiling",
+    "schema accepts stale ModelAssistedReview authority kind",
+    "schema accepts missing plan digest binding"
   ],
   "provider_policy": {
     "allowed_providers": ["github-actions"],
@@ -67,7 +86,7 @@
   "independence": {
     "plan_authority": "self-declared by subject repository",
     "execution_provider": "GitHub Actions hosted runner",
-    "claim_interpretation": "separate interpretation of hosted result remains required"
+    "claim_interpretation": "separate bounded interpretation of hosted result remains required"
   },
   "evidence_target": "E5",
   "supersedes_plan_ref": null

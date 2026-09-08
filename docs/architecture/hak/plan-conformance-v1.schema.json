@@ -5,8 +5,16 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "conformance_id", "subject", "plan", "receipt",
-    "evaluator", "status", "checks", "negative_cases", "limitations",
+    "schema_version",
+    "conformance_id",
+    "subject",
+    "plan",
+    "receipt",
+    "evaluator",
+    "status",
+    "checks",
+    "negative_cases",
+    "limitations",
     "conformance_digest"
   ],
   "properties": {
@@ -14,19 +22,27 @@
     "conformance_id": {"type": "string", "minLength": 1},
     "subject": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["repository", "commit_sha"],
       "properties": {
         "repository": {"type": "string", "minLength": 1},
-        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "base_commit_sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+        "branch": {"type": ["string", "null"], "minLength": 1}
       }
     },
     "plan": {
       "type": "object",
-      "required": ["plan_ref"],
-      "properties": {"plan_ref": {"type": "string", "minLength": 1}}
+      "additionalProperties": false,
+      "required": ["plan_ref", "plan_digest"],
+      "properties": {
+        "plan_ref": {"type": "string", "minLength": 1},
+        "plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
     },
     "receipt": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["receipt_id", "receipt_digest"],
       "properties": {
         "receipt_id": {"type": "string", "minLength": 1},
@@ -35,17 +51,60 @@
     },
     "evaluator": {
       "type": "object",
-      "required": ["identity", "policy_ref", "model_assisted"],
+      "additionalProperties": false,
+      "required": ["kind", "identity", "policy_ref", "model_assisted", "model_ref"],
       "properties": {
+        "kind": {"enum": ["DeterministicPolicy", "HumanReviewer", "ReviewCommittee"]},
         "identity": {"type": "string", "minLength": 1},
         "policy_ref": {"type": "string", "minLength": 1},
-        "model_assisted": {"type": "boolean"}
-      }
+        "model_assisted": {"type": "boolean"},
+        "model_ref": {"type": ["string", "null"], "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"model_assisted": {"const": true}}, "required": ["model_assisted"]},
+          "then": {"properties": {"model_ref": {"type": "string", "minLength": 1}}},
+          "else": {"properties": {"model_ref": {"type": "null"}}}
+        }
+      ]
     },
     "status": {"enum": ["Satisfied", "NotSatisfied", "Indeterminate"]},
-    "checks": {"type": "array"},
-    "negative_cases": {"type": "array"},
-    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check_id", "status", "evidence_refs"],
+        "properties": {
+          "check_id": {"type": "string", "minLength": 1},
+          "status": {"enum": ["Passed", "Failed", "Missing"]},
+          "evidence_refs": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "negative_cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case", "status", "evidence_refs"],
+        "properties": {
+          "case": {"type": "string", "minLength": 1},
+          "status": {"enum": ["Passed", "Failed", "Missing"]},
+          "evidence_refs": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
     "conformance_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   }
 }

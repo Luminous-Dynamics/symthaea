@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/hak_interpretation_lint.py'
       - 'tests/python/test_hak_interpretation_lint.py'
+      - 'tests/python/test_hak_interpretation_schema.py'
       - 'docs/architecture/HUMAN_AGENCY_KERNEL_PLAN_CONFORMANCE_AND_INTERPRETATION_V1.md'
       - 'docs/architecture/hak/plan-conformance-v1.schema.json'
       - 'docs/architecture/hak/evidence-interpretation-v1.schema.json'
@@ -51,8 +52,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install focused test dependency
-        run: python -m pip install --disable-pip-version-check pytest
+      - name: Install focused test dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema
 
       - name: Compile inherited evidence linter
         run: python -m py_compile scripts/hak_evidence_lint.py
@@ -60,7 +61,7 @@ jobs:
       - name: Compile interpretation linter
         run: python -m py_compile scripts/hak_interpretation_lint.py
 
-      - name: Validate JSON schemas
+      - name: Validate JSON schema syntax
         run: |
           python -m json.tool docs/architecture/hak/plan-conformance-v1.schema.json >/dev/null
           python -m json.tool docs/architecture/hak/evidence-interpretation-v1.schema.json >/dev/null
@@ -71,4 +72,7 @@ jobs:
             docs/architecture/hak/plans/hak008-plan-conformance-interpretation-e5-v1.plan.json
 
       - name: Run HAK-008 regressions
-        run: python -m pytest -q tests/python/test_hak_interpretation_lint.py
+        run: |
+          python -m pytest -q \
+            tests/python/test_hak_interpretation_lint.py \
+            tests/python/test_hak_interpretation_schema.py

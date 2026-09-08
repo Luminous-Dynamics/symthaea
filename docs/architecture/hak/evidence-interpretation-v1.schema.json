@@ -5,39 +5,87 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "record_id", "subject", "interpreter", "claims",
+    "schema_version",
+    "record_id",
+    "plan_ref",
+    "plan_digest",
+    "subject",
+    "receipt_bindings",
+    "conformance_bindings",
+    "interpreter",
+    "claims",
     "interpretation_digest"
   ],
   "properties": {
     "schema_version": {"const": "hak.evidence-interpretation.v1"},
     "record_id": {"type": "string", "minLength": 1},
+    "plan_ref": {"type": "string", "minLength": 1},
+    "plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "subject": {
       "type": "object",
+      "additionalProperties": false,
       "required": ["repository", "commit_sha"],
       "properties": {
         "repository": {"type": "string", "minLength": 1},
         "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
       }
     },
+    "receipt_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["receipt_id", "receipt_digest"],
+        "properties": {
+          "receipt_id": {"type": "string", "minLength": 1},
+          "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "conformance_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["conformance_id", "conformance_digest"],
+        "properties": {
+          "conformance_id": {"type": "string", "minLength": 1},
+          "conformance_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
+    },
     "interpreter": {
       "type": "object",
-      "required": ["kind", "identity", "policy_ref", "model_assisted"],
+      "additionalProperties": false,
+      "required": ["kind", "identity", "policy_ref", "model_assisted", "model_ref"],
       "properties": {
-        "kind": {
-          "enum": ["DeterministicPolicy", "HumanReviewer", "ReviewCommittee", "ModelAssistedReview"]
-        },
+        "kind": {"enum": ["DeterministicPolicy", "HumanReviewer", "ReviewCommittee"]},
         "identity": {"type": "string", "minLength": 1},
         "policy_ref": {"type": "string", "minLength": 1},
-        "model_assisted": {"type": "boolean"}
-      }
+        "model_assisted": {"type": "boolean"},
+        "model_ref": {"type": ["string", "null"], "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"model_assisted": {"const": true}}, "required": ["model_assisted"]},
+          "then": {"properties": {"model_ref": {"type": "string", "minLength": 1}}},
+          "else": {"properties": {"model_ref": {"type": "null"}}}
+        }
+      ]
     },
     "claims": {
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "required": [
-          "claim_id", "status", "supported_tier", "supporting_conformance_ids",
-          "supporting_receipt_ids", "limitations", "blockers"
+          "claim_id",
+          "status",
+          "supported_tier",
+          "supporting_conformance_ids",
+          "supporting_receipt_ids",
+          "limitations",
+          "blockers"
         ],
         "properties": {
           "claim_id": {"type": "string", "minLength": 1},
@@ -48,12 +96,49 @@
             "type": ["string", "null"],
             "enum": [null, "E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"]
           },
-          "supporting_conformance_ids": {"type": "array", "items": {"type": "string", "minLength": 1}},
-          "supporting_receipt_ids": {"type": "array", "items": {"type": "string", "minLength": 1}},
-          "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}},
-          "blockers": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "supporting_conformance_ids": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "supporting_receipt_ids": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "limitations": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
+          "blockers": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          },
           "revocation_ref": {"type": "string", "minLength": 1}
-        }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"status": {"const": "Qualified"}}, "required": ["status"]},
+            "then": {
+              "properties": {
+                "supported_tier": {"enum": ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"]},
+                "supporting_conformance_ids": {"minItems": 1},
+                "supporting_receipt_ids": {"minItems": 1}
+              }
+            },
+            "else": {"properties": {"supported_tier": {"type": "null"}}}
+          },
+          {
+            "if": {"properties": {"status": {"const": "InsufficientEvidence"}}, "required": ["status"]},
+            "then": {"properties": {"limitations": {"minItems": 1}}}
+          },
+          {
+            "if": {"properties": {"status": {"const": "BlockedBy"}}, "required": ["status"]},
+            "then": {"properties": {"blockers": {"minItems": 1}}}
+          },
+          {
+            "if": {"properties": {"status": {"const": "Revoked"}}, "required": ["status"]},
+            "then": {"required": ["revocation_ref"]}
+          }
+        ]
       }
     },
     "interpretation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
