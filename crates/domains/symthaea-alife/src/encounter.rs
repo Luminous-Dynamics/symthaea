@@ -12,6 +12,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::agent_id::AgentId;
+use crate::encounter_snapshot::{
+    EncounterFixedPartnerEntrySnapshotV1, EncounterSchedulerSnapshotV1,
+    ValidatedEncounterSchedulerSnapshotV1,
+};
 
 /// How partners are chosen each tick.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,6 +48,36 @@ impl EncounterScheduler {
             mode,
             fixed_partners: HashMap::new(),
             rng_state: if seed == 0 { 1 } else { seed },
+        }
+    }
+
+    /// Persist the complete scheduler-owned causal state in canonical key order.
+    ///
+    /// This returns raw persistence rather than restore authority. A deserialized snapshot must
+    /// still pass [`EncounterSchedulerSnapshotV1::validate`] before it can recreate a live scheduler.
+    pub fn snapshot_v1(&self) -> EncounterSchedulerSnapshotV1 {
+        let mut fixed_partners = self
+            .fixed_partners
+            .iter()
+            .map(|(&agent_id, &partner_id)| {
+                EncounterFixedPartnerEntrySnapshotV1::new(agent_id, partner_id)
+            })
+            .collect::<Vec<_>>();
+        fixed_partners.sort_by_key(|entry| entry.agent_id().raw());
+        EncounterSchedulerSnapshotV1::from_live_parts(self.mode, fixed_partners, self.rng_state)
+    }
+
+    /// Recreate a scheduler only from a previously validated snapshot capability.
+    pub fn from_validated_snapshot_v1(snapshot: &ValidatedEncounterSchedulerSnapshotV1) -> Self {
+        let fixed_partners = snapshot
+            .fixed_partners()
+            .iter()
+            .map(|entry| (entry.agent_id(), entry.partner_id()))
+            .collect::<HashMap<_, _>>();
+        Self {
+            mode: snapshot.mode(),
+            fixed_partners,
+            rng_state: snapshot.rng_state(),
         }
     }
 
@@ -135,6 +169,13 @@ mod tests {
         (0..n).map(|_| alloc.allocate()).collect()
     }
 
+    fn round_trip_snapshot(scheduler: &EncounterScheduler) -> ValidatedEncounterSchedulerSnapshotV1 {
+        let json = serde_json::to_string(&scheduler.snapshot_v1()).expect("serialize scheduler");
+        let raw: EncounterSchedulerSnapshotV1 =
+            serde_json::from_str(&json).expect("deserialize scheduler");
+        raw.validate().expect("validate scheduler snapshot")
+    }
+
     #[test]
     fn random_pairing_covers_every_agent_at_most_once_and_leaves_at_most_one_unpaired() {
         let living = ids(17); // odd on purpose
@@ -164,6 +205,21 @@ mod tests {
         let mut a = EncounterScheduler::new(PairingMode::Random, 1);
         let mut b = EncounterScheduler::new(PairingMode::Random, 2);
         assert_ne!(a.pair(&living), b.pair(&living));
+    }
+
+    #[test]
+    fn random_pairing_future_is_identical_after_snapshot_round_trip_restore() {
+        let living = ids(20);
+        let mut uninterrupted = EncounterScheduler::new(PairingMode::Random, 123);
+        for _ in 0..7 {
+            let _ = uninterrupted.pair(&living);
+        }
+
+        let validated = round_trip_snapshot(&uninterrupted);
+        let mut restored = EncounterScheduler::from_validated_snapshot_v1(&validated);
+        for _ in 0..64 {
+            assert_eq!(uninterrupted.pair(&living), restored.pair(&living));
+        }
     }
 
     #[test]
@@ -265,6 +321,34 @@ mod tests {
         // And it must actually persist as a real fixed pairing across further ticks.
         for _ in 0..20 {
             assert_eq!(sched.pair(&survivors), rematched);
+        }
+    }
+
+    #[test]
+    fn fixed_partner_stale_history_and_future_pairings_survive_snapshot_restore() {
+        let all = ids(6);
+        let original = all[..4].to_vec();
+        let mut uninterrupted = EncounterScheduler::new(PairingMode::FixedPartners, 11);
+        let first = uninterrupted.pair(&original);
+        let survivors = first.iter().map(|&(a, _)| a).collect::<Vec<_>>();
+        let rematched = uninterrupted.pair(&survivors);
+        assert_eq!(rematched.len(), 1);
+
+        let validated = round_trip_snapshot(&uninterrupted);
+        assert!(
+            validated.fixed_partners().len() > survivors.len(),
+            "snapshot must preserve stale dead-agent mappings, not normalize them away"
+        );
+        let mut restored = EncounterScheduler::from_validated_snapshot_v1(&validated);
+
+        for _ in 0..20 {
+            assert_eq!(uninterrupted.pair(&survivors), restored.pair(&survivors));
+        }
+
+        let mut expanded = survivors;
+        expanded.extend_from_slice(&all[4..6]);
+        for _ in 0..20 {
+            assert_eq!(uninterrupted.pair(&expanded), restored.pair(&expanded));
         }
     }
 }
