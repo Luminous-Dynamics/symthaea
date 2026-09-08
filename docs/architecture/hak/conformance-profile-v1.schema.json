@@ -1,0 +1,79 @@
+{
+  "$id": "https://luminousdynamics.org/schemas/hak/conformance-profile-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "domain": {"minLength": 1, "type": "string"},
+    "end_to_end_claims": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "critical_obligations": {"items": {"minLength": 1, "type": "string"}, "minItems": 1, "type": "array", "uniqueItems": true},
+          "id": {"minLength": 1, "type": "string"},
+          "required_evidence_tier": {"enum": ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"]},
+          "statement": {"minLength": 1, "type": "string"},
+          "status": {
+            "additionalProperties": false,
+            "properties": {
+              "blockers": {"items": {"minLength": 1, "type": "string"}, "minItems": 1, "type": "array"},
+              "evidence_refs": {"items": {"minLength": 1, "type": "string"}, "minItems": 1, "type": "array"},
+              "evidence_tier": {"enum": ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"]},
+              "finding_ref": {"minLength": 1, "type": "string"},
+              "kind": {"enum": ["BlockedBy", "InfrastructureFailed", "NotApplicable", "OpenFinding", "PropertyViolated", "Qualified", "Queued", "SourceObserved", "Specified", "TestFailed", "TestSourceObserved", "Unknown"]},
+              "reason": {"minLength": 1, "type": "string"}
+            },
+            "required": ["kind"],
+            "type": "object"
+          }
+        },
+        "required": ["id", "statement", "required_evidence_tier", "critical_obligations", "status"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "implementation_lineage": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+        "repository": {"minLength": 1, "type": "string"}
+      },
+      "required": ["repository"],
+      "type": "object"
+    },
+    "obligations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "criticality": {"enum": ["informational", "supporting", "required", "critical"]},
+          "depends_on": {"items": {"minLength": 1, "type": "string"}, "type": "array", "uniqueItems": true},
+          "id": {"minLength": 1, "type": "string"},
+          "policy_lineage": {"minLength": 1, "type": ["string", "null"]},
+          "policy_sensitive": {"type": "boolean"},
+          "statement": {"minLength": 1, "type": "string"},
+          "status": {
+            "additionalProperties": false,
+            "properties": {
+              "blockers": {"items": {"minLength": 1, "type": "string"}, "minItems": 1, "type": "array"},
+              "evidence_refs": {"items": {"minLength": 1, "type": "string"}, "minItems": 1, "type": "array"},
+              "evidence_tier": {"enum": ["E0", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"]},
+              "finding_ref": {"minLength": 1, "type": "string"},
+              "kind": {"enum": ["BlockedBy", "InfrastructureFailed", "NotApplicable", "OpenFinding", "PropertyViolated", "Qualified", "Queued", "SourceObserved", "Specified", "TestFailed", "TestSourceObserved", "Unknown"]},
+              "reason": {"minLength": 1, "type": "string"}
+            },
+            "required": ["kind"],
+            "type": "object"
+          }
+        },
+        "required": ["id", "statement", "criticality", "status"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "policy_lineage": {"minLength": 1, "type": ["string", "null"]},
+    "profile_id": {"minLength": 1, "type": "string"},
+    "schema_version": {"const": "hak.conformance-profile.v1"}
+  },
+  "required": ["schema_version", "profile_id", "domain", "implementation_lineage", "obligations"],
+  "title": "HAK Conformance Profile v1",
+  "type": "object"
+}
