@@ -68,7 +68,15 @@ jobs:
           grep -Fq 'os.O_EXCL' "$SRC"
           grep -Fq '0o600' "$SRC"
           grep -Fq '0o700' "$SRC"
-          grep -Fq 'os.rename' "$SRC"
+          grep -Fq '_fsync_dir(staging)' "$SRC"
+          grep -Fq '_fsync_dir(parent)' "$SRC"
+          grep -Fq '_atomic_rename_noreplace(staging, final)' "$SRC"
+          grep -Fq 'renameat2' "$SRC"
+          grep -Fq '_RENAME_NOREPLACE = 1' "$SRC"
+          if grep -Fq 'os.rename(staging, final)' "$SRC"; then
+            echo 'ordinary check-then-rename publication must not return' >&2
+            exit 1
+          fi
           grep -Fq 'BUNDLE_RECEIPT_PROFILE' "$SRC"
           grep -Fq 'never deliberately truncates or replaces' "$DOC"
           grep -Fq 'does not establish' "$DOC"
