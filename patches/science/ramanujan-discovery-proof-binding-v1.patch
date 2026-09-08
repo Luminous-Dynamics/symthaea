@@ -2,23 +2,23 @@ diff --git a/crates/bridges/symthaea-physics-bridge/examples/verify_invariants_f
 index 6d882bc..0000000 100644
 --- a/crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs
 +++ b/crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs
-@@ -31,11 +31,14 @@
+@@ -31,7 +31,9 @@
  use std::env;
  use std::fs;
  use std::io::Write;
 -use std::path::PathBuf;
 +use std::path::{Path, PathBuf};
  use std::process::{Command, ExitCode, Stdio};
- 
+
 -use symthaea_core::hdc::conjecture_engine::SymExpr;
 +use symthaea_core::hdc::conjecture_engine::{
 +    RegressorConfig, SymExpr, discover_invariants_autonomous, expr_to_sym,
 +};
-@@ -326,13 +329,18 @@ fn problems() -> Vec<Problem> {
+@@ -326,24 +329,28 @@ fn problems() -> Vec<Problem> {
  // Build the SMT-LIB2 obligation for dE/dt ≠ 0.
  // If Z3 returns `unsat`, the invariant is formally conserved.
  // ───────────────────────────────────────────────────────────────────────────
- 
+
 -fn build_obligation(problem: &Problem) -> Option<String> {
 +fn build_obligation_for_energy(
 +    problem: &Problem,
@@ -33,30 +33,30 @@ index 6d882bc..0000000 100644
          total_deriv = add(total_deriv, mul(partial, dvar_dt.clone()));
      }
      let total_deriv = total_deriv.simplify();
- 
+
      let mut vars: Vec<String> = Vec::new();
      variables_in(&total_deriv, &mut vars);
 -    variables_in(&problem.energy, &mut vars);
 +    variables_in(energy, &mut vars);
      vars.sort();
      vars.dedup();
- 
+
      let deriv_smt = sym_to_smt(&total_deriv)?;
 -    let energy_smt = sym_to_smt(&problem.energy)?;
 +    let energy_smt = sym_to_smt(energy)?;
- 
+
      let mut out = String::new();
      out.push_str("(set-logic QF_NRA)\n");
-@@ -341,6 +349,7 @@ fn build_obligation(problem: &Problem) -> Option<String> {
+@@ -341,4 +349,5 @@ fn build_obligation(problem: &Problem) -> Option<String> {
      ));
      out.push_str(&format!("; Problem: {}\n", problem.description));
 +    out.push_str(&format!("; Proof target origin: {}\n", proof_target_origin));
      out.push_str(&format!("; Invariant (Lean-ready): {}\n", energy_smt));
      out.push_str(&format!("; Claim: dE/dt = 0 identically.\n"));
-@@ -355,6 +364,15 @@ fn build_obligation(problem: &Problem) -> Option<String> {
+@@ -355,4 +364,11 @@ fn build_obligation(problem: &Problem) -> Option<String> {
      Some(out)
  }
- 
+
 +/// Historical/reference path: prove the verifier's explicitly declared target.
 +/// This is a valid formal proof of that target, but it is not by itself a
 +/// machine binding to an independently discovered `Expr`.
@@ -65,10 +65,10 @@ index 6d882bc..0000000 100644
 +}
 +
  fn run_z3(smt: &str) -> Result<String, String> {
-@@ -381,6 +399,94 @@ fn dump_dir() -> PathBuf {
+@@ -381,4 +399,97 @@ fn dump_dir() -> PathBuf {
          .unwrap_or_else(|_| PathBuf::from("papers/ramanujan/proofs"))
  }
- 
+
 +fn harmonic_rhs(state: &[f64], _t: f64) -> Vec<f64> {
 +    vec![state[1], -state[0]]
 +}
@@ -163,18 +163,18 @@ index 6d882bc..0000000 100644
 +}
 +
  fn main() -> ExitCode {
-@@ -410,7 +516,7 @@ fn main() -> ExitCode {
+@@ -410,6 +516,6 @@ fn main() -> ExitCode {
              continue;
          }
- 
+
 -        let obligation = match build_obligation(&p) {
 +        let obligation = match build_reference_obligation(&p) {
              Some(s) => s,
              None => {
-@@ -465,6 +571,18 @@ fn main() -> ExitCode {
+@@ -465,12 +571,20 @@ fn main() -> ExitCode {
          }
      }
- 
+
 +    let discovery_binding_ok = match run_discovery_bound_harmonic_pilot(&dir) {
 +        Ok(()) => true,
 +        Err(error) => {
@@ -189,7 +189,7 @@ index 6d882bc..0000000 100644
 +        "# summary: {} reference targets formally proven | {} skipped (transcendental) | {} sat/unknown | {} z3 errors | discovery-bound harmonic={}",
 +        proven, skipped_transcendental, sat_or_unknown, z3_unavailable, discovery_binding_ok
      );
- 
+
 -    if z3_unavailable > 0 {
 +    if z3_unavailable > 0 || !discovery_binding_ok {
          ExitCode::from(1)
