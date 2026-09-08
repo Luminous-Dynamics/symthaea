@@ -1,0 +1,198 @@
+name: Autonomous Proof Authority
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/autonomous-proof-authority.yml'
+      - 'patches/science/autonomous-proof-authority-v1.patch'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine.rs'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine/autonomous.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/autonomous-proof-authority-v1.patch
+
+jobs:
+  qualify:
+    name: Prove caller-forgeable proof bit and qualify trusted ingestion split
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates/core src || {
+            echo 'qualification branch must not materialize product source'
+            exit 1
+          }
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Prove current public-ingestion authority leak
+        run: |
+          mkdir -p crates/core/symthaea-core/tests
+          cat > crates/core/symthaea-core/tests/autonomous_ingest_authority_negative_control.rs <<'RS'
+          use symthaea_core::hdc::conjecture_engine::{
+              AutonomousInvariant, BinOp, ConjectureEngine, ConjectureStatus, Expr,
+              MacroPromotionTier, MathDomain,
+          };
+
+          #[test]
+          fn caller_can_currently_mint_symbolic_fast_track_with_public_boolean() {
+              let formula = Expr::BinOp(
+                  BinOp::Pow,
+                  Box::new(Expr::Var("x".into())),
+                  Box::new(Expr::Const(2.0)),
+              );
+              let forged = AutonomousInvariant {
+                  formula: formula.clone(),
+                  formula_str: format!("{formula}"),
+                  variance: 0.0,
+                  mean_value: 1.0,
+                  complexity: formula.complexity(),
+                  symbolically_proven: true,
+              };
+              let mut engine = ConjectureEngine::new();
+              engine.ingest_autonomous_invariants("caller-supplied", MathDomain::Physics, &[forged]);
+              assert!(matches!(
+                  engine.conjectures[0].status,
+                  ConjectureStatus::SymbolicallyChecked
+              ));
+              assert_eq!(
+                  engine.conjectures[0].macro_promotion_tier,
+                  MacroPromotionTier::FastTrackVerified
+              );
+          }
+          RS
+          cargo test --locked -p symthaea-core --test autonomous_ingest_authority_negative_control
+          rm crates/core/symthaea-core/tests/autonomous_ingest_authority_negative_control.rs
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet public-untrusted/private-trusted boundary
+        run: |
+          FILE=crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+          grep -F 'caller-supplied autonomous invariants as **untrusted data**' "$FILE"
+          grep -F 'ingest_autonomous_invariants_inner(source_tag, domain, invariants, false)' "$FILE"
+          grep -F 'fn ingest_engine_verified_autonomous_invariants(' "$FILE"
+          grep -F 'accept_internal_symbolic_proof && inv.symbolically_proven' "$FILE"
+          grep -F 'self.ingest_engine_verified_autonomous_invariants(source_tag, domain, &invariants);' "$FILE"
+
+      - name: Prove caller-supplied proof bit is quarantined after repair
+        run: |
+          cat > crates/core/symthaea-core/tests/autonomous_ingest_authority_repaired.rs <<'RS'
+          use symthaea_core::hdc::conjecture_engine::{
+              AutonomousInvariant, BinOp, ConjectureEngine, ConjectureStatus, Expr,
+              MacroPromotionTier, MathDomain,
+          };
+
+          #[test]
+          fn caller_supplied_symbolic_boolean_is_data_not_authority() {
+              let formula = Expr::BinOp(
+                  BinOp::Pow,
+                  Box::new(Expr::Var("x".into())),
+                  Box::new(Expr::Const(2.0)),
+              );
+              let forged = AutonomousInvariant {
+                  formula: formula.clone(),
+                  formula_str: format!("{formula}"),
+                  variance: 0.0,
+                  mean_value: 1.0,
+                  complexity: formula.complexity(),
+                  symbolically_proven: true,
+              };
+              let mut engine = ConjectureEngine::new();
+              engine.ingest_autonomous_invariants("caller-supplied", MathDomain::Physics, &[forged]);
+              assert!(matches!(
+                  engine.conjectures[0].status,
+                  ConjectureStatus::NumericallyTested { .. }
+              ));
+              assert_eq!(
+                  engine.conjectures[0].macro_promotion_tier,
+                  MacroPromotionTier::Quarantined
+              );
+          }
+          RS
+          cargo test --locked -p symthaea-core --test autonomous_ingest_authority_repaired
+          rm crates/core/symthaea-core/tests/autonomous_ingest_authority_repaired.rs
+
+      - name: Prove engine-owned discovery transaction retains symbolic authority
+        run: |
+          cat > crates/core/symthaea-core/tests/autonomous_internal_authority_repaired.rs <<'RS'
+          use symthaea_core::hdc::conjecture_engine::{
+              ConjectureEngine, ConjectureStatus, MacroPromotionTier, MathDomain,
+              RegressorConfig, SymExpr,
+          };
+
+          fn harmonic_rhs(state: &[f64], _t: f64) -> Vec<f64> {
+              vec![state[1], -state[0]]
+          }
+
+          #[test]
+          fn engine_owned_discovery_can_retain_its_own_symbolic_check() {
+              let dynamics = vec![
+                  ("x", SymExpr::Var("v".into())),
+                  ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+              ];
+              let config = RegressorConfig {
+                  population_size: 120,
+                  generations: 40,
+                  max_depth: 4,
+                  max_complexity: 12,
+                  seed: 42,
+                  ..RegressorConfig::default()
+              };
+              let mut engine = ConjectureEngine::new();
+              let invariants = engine.discover_and_ingest_autonomous_invariants(
+                  "engine-owned-harmonic",
+                  MathDomain::Physics,
+                  harmonic_rhs,
+                  &[1.0, 0.0],
+                  &["x", "v"],
+                  Some(&dynamics),
+                  &config,
+                  10.0,
+                  0.02,
+              );
+              assert!(invariants.iter().any(|inv| inv.symbolically_proven));
+              assert!(engine.conjectures.iter().any(|conjecture| {
+                  matches!(conjecture.status, ConjectureStatus::SymbolicallyChecked)
+                      && conjecture.macro_promotion_tier == MacroPromotionTier::FastTrackVerified
+              }));
+          }
+          RS
+          cargo test --locked -p symthaea-core --test autonomous_internal_authority_repaired
+          rm crates/core/symthaea-core/tests/autonomous_internal_authority_repaired.rs
+
+      - name: Format, check, and lint
+        run: |
+          cargo fmt --check -p symthaea-core
+          cargo check --locked -p symthaea-core
+          cargo clippy --locked -p symthaea-core --lib -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes that caller-controlled AutonomousInvariant.symbolically_proven cannot mint SymbolicallyChecked/FastTrackVerified through the public ingestion API, while the engine-owned discovery transaction can retain its immediately produced symbolic-check authority.'
+          echo 'It does not make AutonomousInvariant unforgeable, establish cryptographic proof receipts, validate caller-supplied dynamics as physically true, prove experimental validity, or establish action authority.'
