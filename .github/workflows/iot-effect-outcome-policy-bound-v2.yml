@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Verify exact checkout
         run: |
@@ -33,9 +34,13 @@ jobs:
       - name: Prove V1 wire and verifier sources were not rewritten
         if: github.event_name == 'pull_request'
         run: |
+          set -euo pipefail
           base='${{ github.event.pull_request.base.sha }}'
           forbidden='crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/evidence.rs|crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/policy.rs|crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/verifier.rs|crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/current.rs|crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/src/trust.rs|crates/bridges/symthaea-iot-actuation-effect-reconciliation-challenge/'
-          if git diff --name-only "$base"...HEAD | grep -E "$forbidden"; then
+          git cat-file -e "${base}^{commit}"
+          changed="$(git diff --name-only "$base"...HEAD)"
+          if printf '%s\n' "$changed" | grep -Eq "$forbidden"; then
+            printf '%s\n' "$changed" | grep -E "$forbidden" >&2 || true
             echo 'V2 tranche must not rewrite V1 wire/current/trust semantics' >&2
             exit 1
           fi
