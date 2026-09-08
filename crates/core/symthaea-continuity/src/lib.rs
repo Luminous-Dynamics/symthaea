@@ -8,8 +8,10 @@
 
 #![deny(unsafe_code)]
 
+mod compose;
 pub mod contract;
 pub mod observation;
+mod witness;
 
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
@@ -19,4 +21,9 @@ pub use contract::{
 pub use observation::{
     DependencyBasis, DependencyClaimId, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
     ObservationEnvelopeV1, ObservationError, ObservationId,
+};
+pub use witness::{
+    EvidenceClass, ObligationDispositionV1, QualifiedContinuityWitnessV1, TargetRealizationId,
+    VerificationObligationId, VerificationPolicyEntryV1, VerificationPolicyId,
+    VerificationPolicyV1, WitnessError, WitnessId, WitnessManifestId,
 };
