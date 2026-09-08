@@ -12,6 +12,7 @@
 
 pub mod admission;
 pub mod authorization;
+pub mod commit_preconditions;
 pub mod identity;
 
 use chrono::{DateTime, Utc};
