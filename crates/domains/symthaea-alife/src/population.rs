@@ -254,6 +254,15 @@ impl Population {
     /// existing caller passes a pure closure, which trivially also satisfies `FnMut`, so this is
     /// a non-breaking relaxation.
     pub fn step(&mut self, mut resource_for: impl FnMut(usize) -> f64) -> StepSummary {
+        // Epoch exhaustion must be detected before a stateful resource source is advanced and
+        // before any organism/counter/allocator mutation. `advance_epoch` retains its own checked
+        // guard; this preflight makes the whole step fail at the stable boundary instead of after
+        // executing the population transition.
+        self.lifecycle_recorder
+            .current_epoch()
+            .checked_add(1)
+            .expect("population lifecycle epoch exhausted before step execution");
+
         let n = self.organisms.len();
         let resource = resource_for(n);
 
@@ -362,10 +371,22 @@ impl Population {
         mut resource_for: impl FnMut(usize) -> f64,
         scheduler: &mut EncounterScheduler,
     ) -> StepSummary {
+        // Both clocks are preflighted before the potentially-stateful resource closure and before
+        // encounter scheduling. This prevents overflow from consuming external environment or
+        // scheduler state and prevents social tick labels from wrapping/reusing an old tick.
+        self.lifecycle_recorder
+            .current_epoch()
+            .checked_add(1)
+            .expect("population lifecycle epoch exhausted before social step execution");
+        let next_social_tick = self
+            .current_tick
+            .checked_add(1)
+            .expect("population social event tick exhausted before social step execution");
+
         let n = self.organisms.len();
         let resource = resource_for(n);
         let tick_number = self.current_tick;
-        self.current_tick += 1;
+        self.current_tick = next_social_tick;
         let energy_before: Vec<f64> = self.organisms.iter().map(|o| o.energy).collect();
 
         // Phase 1: pairing, from pre-tick population order.
@@ -570,7 +591,7 @@ impl Population {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::genome::Genome;
+    use crate::{LifecycleCheckpointV1, genome::Genome};
 
     fn cfg() -> PopulationConfig {
         PopulationConfig {
@@ -580,6 +601,13 @@ mod tests {
             organism_cfg: OrganismConfig::default(),
             ..Default::default()
         }
+    }
+
+    fn install_lifecycle_epoch(pop: &mut Population, epoch: u64) {
+        let checkpoint =
+            LifecycleCheckpointV1::from_complete_prefix(pop.lifecycle_events(), epoch)
+                .expect("canonical lifecycle prefix with requested continuation epoch");
+        pop.lifecycle_recorder = LifecycleRecorderV1::from_validated_checkpoint(&checkpoint);
     }
 
     #[test]
@@ -676,6 +704,106 @@ mod tests {
         assert_eq!(removed, 4);
         assert!(pop.is_empty());
         assert_eq!(pop.cull_weakest(5), 0);
+    }
+
+    #[test]
+    fn step_preflights_lifecycle_epoch_before_resource_or_population_mutation() {
+        let mut pop = Population::new(cfg(), 1, 7);
+        install_lifecycle_epoch(&mut pop, u64::MAX);
+
+        let before_energy = pop.organisms[0].energy.to_bits();
+        let before_seed = pop.organism_seed_allocator.snapshot();
+        let before_id = pop.id_allocator.snapshot();
+        let before_rng = pop.evolution_rng.snapshot();
+        let before_births = pop.total_births;
+        let before_deaths = pop.total_deaths;
+        let mut resource_called = false;
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = pop.step(|_| {
+                resource_called = true;
+                0.5
+            });
+        }));
+
+        assert!(result.is_err(), "exhausted lifecycle epoch must fail closed");
+        assert!(!resource_called, "resource source must not advance on preflight failure");
+        assert_eq!(pop.lifecycle_epoch(), u64::MAX);
+        assert!(pop.lifecycle_events().is_empty());
+        assert_eq!(pop.organisms[0].energy.to_bits(), before_energy);
+        assert_eq!(pop.organism_seed_allocator.snapshot(), before_seed);
+        assert_eq!(pop.id_allocator.snapshot(), before_id);
+        assert_eq!(pop.evolution_rng.snapshot(), before_rng);
+        assert_eq!(pop.total_births, before_births);
+        assert_eq!(pop.total_deaths, before_deaths);
+    }
+
+    #[test]
+    fn step_social_preflights_event_tick_before_resource_scheduler_or_population_mutation() {
+        let mut pop = Population::new(cfg(), 2, 7);
+        pop.current_tick = u64::MAX;
+        let mut scheduler = EncounterScheduler::new(crate::PairingMode::Random, 99);
+
+        let before_energy: Vec<_> = pop.organisms.iter().map(|o| o.energy.to_bits()).collect();
+        let before_seed = pop.organism_seed_allocator.snapshot();
+        let before_id = pop.id_allocator.snapshot();
+        let before_rng = pop.evolution_rng.snapshot();
+        let before_lifecycle_epoch = pop.lifecycle_epoch();
+        let mut resource_called = false;
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = pop.step_social(
+                |_| {
+                    resource_called = true;
+                    0.5
+                },
+                &mut scheduler,
+            );
+        }));
+
+        assert!(result.is_err(), "exhausted social tick must fail closed");
+        assert!(!resource_called, "resource source must not advance on tick preflight failure");
+        assert_eq!(pop.current_tick, u64::MAX);
+        assert!(pop.event_log.is_empty());
+        assert_eq!(pop.lifecycle_epoch(), before_lifecycle_epoch);
+        assert_eq!(
+            pop.organisms.iter().map(|o| o.energy.to_bits()).collect::<Vec<_>>(),
+            before_energy
+        );
+        assert_eq!(pop.organism_seed_allocator.snapshot(), before_seed);
+        assert_eq!(pop.id_allocator.snapshot(), before_id);
+        assert_eq!(pop.evolution_rng.snapshot(), before_rng);
+    }
+
+    #[test]
+    fn step_social_preflights_lifecycle_epoch_before_resource_or_event_clock_mutation() {
+        let mut pop = Population::new(cfg(), 2, 7);
+        install_lifecycle_epoch(&mut pop, u64::MAX);
+        let mut scheduler = EncounterScheduler::new(crate::PairingMode::Random, 99);
+
+        let before_tick = pop.current_tick;
+        let before_energy: Vec<_> = pop.organisms.iter().map(|o| o.energy.to_bits()).collect();
+        let mut resource_called = false;
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = pop.step_social(
+                |_| {
+                    resource_called = true;
+                    0.5
+                },
+                &mut scheduler,
+            );
+        }));
+
+        assert!(result.is_err(), "exhausted lifecycle epoch must fail social step closed");
+        assert!(!resource_called, "resource source must not advance on epoch preflight failure");
+        assert_eq!(pop.current_tick, before_tick);
+        assert!(pop.event_log.is_empty());
+        assert_eq!(pop.lifecycle_epoch(), u64::MAX);
+        assert_eq!(
+            pop.organisms.iter().map(|o| o.energy.to_bits()).collect::<Vec<_>>(),
+            before_energy
+        );
     }
 
     #[test]
