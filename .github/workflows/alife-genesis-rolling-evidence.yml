@@ -1,0 +1,138 @@
+name: ALife Genesis Rolling Evidence
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/genesis_evidence_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/genesis_rolling_evidence.rs"
+      - "crates/domains/symthaea-alife/src/genesis_social_runner.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs"
+      - ".github/workflows/alife-genesis-rolling-evidence.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Atomic rolling Genesis evidence theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-genesis-rolling-evidence
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test rolling evidence
+        run: 'cargo test --locked -p symthaea-alife genesis_rolling_evidence::'
+
+      - name: Test cross-evidence checkpoint
+        run: 'cargo test --locked -p symthaea-alife genesis_evidence_checkpoint::'
+
+      - name: Test lifecycle checkpoint continuation
+        run: 'cargo test --locked -p symthaea-alife lifecycle_checkpoint::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze rolling authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="crates/domains/symthaea-alife/src/genesis_rolling_evidence.rs"
+          grep -q 'runner: GenesisSocialRunnerV1' "$file"
+          ! grep -q 'pub fn runner_mut' "$file"
+          ! grep -q -- '-> &mut GenesisSocialRunnerV1' "$file"
+          grep -q 'pub fn checkpoint_evidence' "$file"
+          grep -q 'self.runner.drain_completed_batches()' "$file"
+          grep -q 'self.runner.drain_lifecycle_events()' "$file"
+          grep -q 'previous.validate_chunk' "$file"
+          grep -q 'LifecycleCheckpointV1::from_complete_prefix' "$file"
+          grep -q 'raw.validate_after(behavior_start_tick)' "$file"
+          grep -q 'self.qualified = false' "$file"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('crates/domains/symthaea-alife/src/genesis_rolling_evidence.rs').read_text()
+          body = p.split('pub fn checkpoint_evidence(', 1)[1].split('pub fn into_population', 1)[0]
+          behavior = body.index('drain_completed_batches')
+          lifecycle = body.index('drain_lifecycle_events')
+          lifecycle_validate = min(
+              body.index('previous.validate_chunk'),
+              body.index('LifecycleCheckpointV1::from_complete_prefix'),
+          )
+          cross = body.index('raw.validate_after(behavior_start_tick)')
+          advance_behavior = body.index('self.behavior_next_tick = validated.behavior_next_tick()')
+          advance_lifecycle = body.index('self.lifecycle = Some(validated.lifecycle().clone())')
+          if not (behavior < lifecycle < lifecycle_validate < cross < advance_behavior < advance_lifecycle):
+              raise SystemExit('rolling evidence ordering theorem drifted')
+          if 'self.lifecycle.take()' not in body:
+              raise SystemExit('rolling lifecycle prefix is not single-owner during validation')
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="crates/domains/symthaea-alife/src/genesis_rolling_evidence.rs"
+          ! grep -q 'PopulationSnapshotV1' "$file"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$file"
+          ! grep -q 'EncounterSchedulerSnapshotV1' "$file"
+          ! grep -q 'from_snapshot' "$file"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-genesis-rolling-evidence
+          {
+            echo "authority=atomic_rolling_genesis_evidence_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "rolling_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/genesis_rolling_evidence.rs | cut -d' ' -f1)"
+            echo "atomic_behavior_lifecycle_checkpoint=true"
+            echo "validated_lifecycle_prefix_retained=true"
+            echo "continuation_advances_only_after_combined_validation=true"
+            echo "scheduler_state_bound=false"
+            echo "population_snapshot_complete=false"
+            echo "population_execution_resume_established=false"
+          } > target/alife-genesis-rolling-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-genesis-rolling-evidence
+          path: target/alife-genesis-rolling-evidence/qualification.txt
+          if-no-files-found: error
