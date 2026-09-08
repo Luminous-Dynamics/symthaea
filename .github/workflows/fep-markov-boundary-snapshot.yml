@@ -1,0 +1,168 @@
+name: FEP Markov Boundary Snapshot
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-fep/Cargo.toml"
+      - "crates/core/symthaea-fep/src/markov_boundary_snapshot.rs"
+      - "crates/core/symthaea-fep/src/markov_blanket.rs"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - ".github/workflows/fep-markov-boundary-snapshot.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  markov-boundary-snapshot:
+    name: Validated Markov-boundary snapshot contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/core/symthaea-fep/src/markov_boundary_snapshot.rs
+          sha256sum crates/core/symthaea-fep/src/markov_blanket.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: fep-markov-boundary-snapshot
+
+      - name: Check FEP formatting
+        run: cargo fmt -p symthaea-fep -- --check
+
+      - name: Check FEP targets
+        run: cargo check --locked -p symthaea-fep --all-targets
+
+      - name: Test Markov-boundary snapshot contract
+        run: 'cargo test --locked -p symthaea-fep markov_boundary_snapshot::'
+
+      - name: Test complete FEP package
+        run: cargo test --locked -p symthaea-fep
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-fep --all-targets --no-deps -- -D warnings
+
+      - name: Freeze snapshot authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot="crates/core/symthaea-fep/src/markov_boundary_snapshot.rs"
+          blanket="crates/core/symthaea-fep/src/markov_blanket.rs"
+
+          grep -q 'pub struct MarkovBoundarySnapshotV1' "$snapshot"
+          grep -q 'pub struct ValidatedMarkovBoundarySnapshotV1' "$snapshot"
+          grep -q 'pub fn validate(' "$snapshot"
+          grep -q 'HistoryCapacityMismatch' "$snapshot"
+          grep -q 'UnwrittenHistoryNotCanonical' "$snapshot"
+          grep -q 'PrehistoryStateNotCanonical' "$snapshot"
+          grep -q 'history_capacity_is_part_of_the_v1_contract' "$snapshot"
+          grep -q 'unwritten_partial_ring_tail_must_remain_canonical' "$snapshot"
+          grep -q 'topology_adjusted_ema_is_valid_before_first_history_write' "$snapshot"
+          grep -q 'history_and_ema_may_diverge_after_topology_constraints' "$snapshot"
+          grep -q 'permeability_outside_live_clamp_fails_closed' "$snapshot"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          snapshot = Path("crates/core/symthaea-fep/src/markov_boundary_snapshot.rs").read_text()
+          blanket = Path("crates/core/symthaea-fep/src/markov_blanket.rs").read_text()
+
+          raw = snapshot.split("pub struct MarkovBoundarySnapshotV1 {", 1)[1].split("}\n", 1)[0]
+          if "pub " in raw.replace("pub(crate)", ""):
+              raise SystemExit("raw Markov-boundary snapshot exposes public authority fields")
+
+          validated_decl = snapshot.split("pub struct ValidatedMarkovBoundarySnapshotV1", 1)[0]
+          if "Serialize, Deserialize" in validated_decl.rsplit("#[derive", 1)[-1]:
+              raise SystemExit("validated Markov-boundary capability must not be serializable")
+
+          def number(text, name, ty):
+              m = re.search(rf"const {name}: {ty} = ([0-9.]+);", text)
+              if not m:
+                  raise SystemExit(f"missing constant {name}")
+              return m.group(1)
+
+          live_cap = number(blanket, "HISTORY_CAP", "usize")
+          snap_cap = number(snapshot, "MARKOV_BOUNDARY_HISTORY_CAP_V1", "usize")
+          if live_cap != snap_cap:
+              raise SystemExit(f"history capacity drift: live={live_cap} snapshot={snap_cap}")
+
+          live_floor = number(blanket, "PERMEABILITY_FLOOR", "f64")
+          snap_floor = number(snapshot, "PERMEABILITY_FLOOR_V1", "f64")
+          if live_floor != snap_floor:
+              raise SystemExit(f"permeability floor drift: live={live_floor} snapshot={snap_floor}")
+
+          live_ceiling = number(blanket, "PERMEABILITY_CEILING", "f64")
+          snap_ceiling = number(snapshot, "PERMEABILITY_CEILING_V1", "f64")
+          if live_ceiling != snap_ceiling:
+              raise SystemExit(
+                  f"permeability ceiling drift: live={live_ceiling} snapshot={snap_ceiling}"
+              )
+
+          if "history: vec![0.5; HISTORY_CAP]" not in blanket:
+              raise SystemExit("live pristine history initialization changed")
+
+          topology = blanket.split("pub fn apply_topology_constraints", 1)[1].split("/// Partition dimensions.", 1)[0]
+          if "permeability_ema" not in topology:
+              raise SystemExit("topology path no longer mutates EMA; contract assumptions changed")
+          if "self.history[" in topology or "history_idx" in topology or "history_count" in topology:
+              raise SystemExit("topology path now mutates history; re-audit EMA/history contract")
+          PY
+
+          # Contract-only tranche: live private-state wiring remains deliberately absent.
+          ! grep -q 'MarkovBoundarySnapshotV1' "$blanket"
+
+      - name: Write snapshot qualification metadata
+        run: |
+          mkdir -p target/fep-markov-boundary-snapshot-evidence
+          {
+            echo "authority=validated_markov_boundary_snapshot_contract_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "snapshot_source_sha256=$(sha256sum crates/core/symthaea-fep/src/markov_boundary_snapshot.rs | cut -d' ' -f1)"
+            echo "markov_boundary_source_sha256=$(sha256sum crates/core/symthaea-fep/src/markov_blanket.rs | cut -d' ' -f1)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "structural_state_validation=true"
+            echo "ema_history_distinction_preserved=true"
+            echo "live_constant_crosscheck=true"
+            echo "fixed_ring_capacity=true"
+            echo "live_markov_boundary_snapshot_wiring_complete=false"
+            echo "organism_snapshot_complete=false"
+            echo "alife_population_execution_resume_established=false"
+          } > target/fep-markov-boundary-snapshot-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fep-markov-boundary-snapshot-evidence
+          path: target/fep-markov-boundary-snapshot-evidence/qualification.txt
+          if-no-files-found: error
