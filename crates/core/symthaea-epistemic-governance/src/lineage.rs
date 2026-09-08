@@ -9,6 +9,8 @@
 //! cannot self-assert that its own output is independent corroboration.
 //! Content-addressed ids use one canonical lowercase digest spelling so aliases
 //! of the same digest cannot manufacture distinct lineage roots.
+//! Every independence classification is defined only for evidence ids that
+//! resolve inside the validated graph.
 
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -178,15 +180,16 @@ impl ValidatedEvidenceLineageGraphV1 {
     }
 
     /// `Independent` is returned only for complete, disjoint root sets.
+    /// Every classification, including `SameEvidence`, requires graph membership.
     pub fn assess_independence(
         &self,
         left: &str,
         right: &str,
     ) -> Result<EvidenceIndependenceV1, CognitiveLineageError> {
+        let left_roots = self.root_ids(left)?;
         if left == right {
             return Ok(EvidenceIndependenceV1::SameEvidence);
         }
-        let left_roots = self.root_ids(left)?;
         let right_roots = self.root_ids(right)?;
 
         if is_ancestor(self, left, right)? || is_ancestor(self, right, left)? {
@@ -499,6 +502,35 @@ mod tests {
         let g = graph(vec![canonical]);
         assert_eq!(g.nodes().len(), 1);
         assert_eq!(g.root_ids(A).unwrap(), HashSet::from([A.to_string()]));
+    }
+
+    #[test]
+    fn same_malformed_id_fails_before_same_evidence_classification() {
+        let g = graph(vec![root(A)]);
+        assert_eq!(
+            g.assess_independence("not-a-digest", "not-a-digest"),
+            Err(CognitiveLineageError::MalformedDigest)
+        );
+    }
+
+    #[test]
+    fn same_unknown_id_fails_before_same_evidence_classification() {
+        let g = graph(vec![root(A)]);
+        assert_eq!(
+            g.assess_independence(B, B),
+            Err(CognitiveLineageError::UnknownEvidenceId {
+                evidence_id: B.to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn known_same_evidence_is_classified_after_membership_validation() {
+        let g = graph(vec![root(A)]);
+        assert_eq!(
+            g.assess_independence(A, A).unwrap(),
+            EvidenceIndependenceV1::SameEvidence
+        );
     }
 
     #[test]

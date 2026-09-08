@@ -55,6 +55,25 @@ jobs:
           grep -q 'uppercase_digest_spelling_fails_closed' "$src"
           grep -q 'case_aliased_roots_cannot_enter_independence_graph' "$src"
           grep -q 'validated_graph_exposes_read_only_semantic_nodes' "$src"
+      - name: Freeze membership before independence classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/lineage.rs
+          grep -q 'same_malformed_id_fails_before_same_evidence_classification' "$src"
+          grep -q 'same_unknown_id_fails_before_same_evidence_classification' "$src"
+          grep -q 'known_same_evidence_is_classified_after_membership_validation' "$src"
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('crates/core/symthaea-epistemic-governance/src/lineage.rs').read_text()
+          start = source.index('pub fn assess_independence')
+          end = source.index('impl TryFrom<EvidenceLineageGraphV1>', start)
+          body = source[start:end]
+          membership = body.index('let left_roots = self.root_ids(left)?;')
+          equality = body.index('if left == right')
+          if membership >= equality:
+              raise SystemExit('SameEvidence classification bypasses graph membership validation')
+          PY
       - name: Format epistemic governance
         run: cargo +1.94.0 fmt --package symthaea-epistemic-governance -- --check
       - name: Test epistemic governance
