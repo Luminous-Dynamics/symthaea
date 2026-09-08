@@ -4,6 +4,7 @@
 //! Shared control-plane policy and audit helpers.
 
 pub mod attestation;
+pub mod attestation_currentness;
 pub mod attestation_crypto_profile;
 pub mod attestation_identity_namespace;
 pub mod attestation_profile;
