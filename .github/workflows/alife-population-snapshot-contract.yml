@@ -1,0 +1,170 @@
+name: ALife Population Snapshot Contract
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/agent_id.rs"
+      - "crates/domains/symthaea-alife/src/evolution_rng.rs"
+      - "crates/domains/symthaea-alife/src/genesis_evidence_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle.rs"
+      - "crates/domains/symthaea-alife/src/organism_seed.rs"
+      - "crates/domains/symthaea-alife/src/organism_snapshot.rs"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/src/population_config_snapshot.rs"
+      - "crates/domains/symthaea-alife/src/population_snapshot.rs"
+      - ".github/workflows/alife-population-snapshot-contract.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Lifecycle-bound population state theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/population_snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/population_config_snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/lifecycle.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-population-snapshot-contract
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test population config persistence
+        run: 'cargo test --locked -p symthaea-alife population_config_snapshot::'
+
+      - name: Test population snapshot contract
+        run: 'cargo test --locked -p symthaea-alife population_snapshot::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze population authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="crates/domains/symthaea-alife/src/population_snapshot.rs"
+
+          grep -q 'validate_for_genesis_social' "$file"
+          grep -q 'evidence.behavior_next_tick()' "$file"
+          grep -q 'OrganismSeedAllocatorV1::from_snapshot_for_lifecycle' "$file"
+          grep -q 'AgentIdAllocator::from_snapshot_for_lifecycle' "$file"
+          grep -q 'EvolutionRngStreamsV1::from_snapshot' "$file"
+          grep -q 'lifecycle.birth_count()' "$file"
+          grep -q 'lifecycle.death_count()' "$file"
+          grep -q 'lifecycle.alive_ids()' "$file"
+          grep -q 'record.genome.to_genome().apply_to(config.config().organism_cfg)' "$file"
+          grep -q 'validation_preserves_causal_population_order_instead_of_sorting_ids' "$file"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path('crates/domains/symthaea-alife/src/population_snapshot.rs').read_text()
+          body = text.split('pub fn validate_for_genesis_social', 1)[1].split('impl ValidatedPopulationSnapshotV1', 1)[0]
+
+          required = [
+              'self.current_tick != evidence.behavior_next_tick()',
+              'OrganismSeedAllocatorV1::from_snapshot_for_lifecycle',
+              'AgentIdAllocator::from_snapshot_for_lifecycle',
+              'EvolutionRngStreamsV1::from_snapshot',
+              'self.total_births != expected_births',
+              'self.total_deaths != expected_deaths',
+              'observed_live != expected_live',
+              'record.lineage_id != organism.lineage_id()',
+              'record.generation != organism.generation()',
+              'record.genome.to_genome().apply_to(config.config().organism_cfg)',
+          ]
+          for token in required:
+              if token not in body:
+                  raise SystemExit(f'population authority theorem lost: {token}')
+
+          # Population Vec order is causal. The validator may build a set for membership checks but
+          # must never sort the validated organism vector itself.
+          if '.sort(' in body or '.sort_by(' in body or '.sort_by_key(' in body:
+              raise SystemExit('population validator started canonicalizing causal organism order')
+
+          push = body.index('organisms.push(validated)')
+          finish = body.index('Ok(ValidatedPopulationSnapshotV1')
+          if not push < finish:
+              raise SystemExit('validated organism order no longer flows directly to capability')
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="crates/domains/symthaea-alife/src/population_snapshot.rs"
+          ! grep -q 'EncounterSchedulerSnapshotV1' "$file"
+          ! grep -q 'EnvironmentSnapshot' "$file"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$file"
+          ! grep -q 'impl Population {' "$file"
+          ! grep -q 'from_validated_snapshot_v1' "$file"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-population-snapshot-contract-evidence
+          {
+            echo "authority=population_snapshot_contract_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "snapshot_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/population_snapshot.rs | cut -d' ' -f1)"
+            echo "causal_population_order_preserved=true"
+            echo "lifecycle_bound_identity_allocator=true"
+            echo "lifecycle_bound_seed_allocator=true"
+            echo "lifecycle_bound_counters=true"
+            echo "behavior_clock_bound=true"
+            echo "genome_plus_template_policy_binding=true"
+            echo "snapshot_origin_authenticated=false"
+            echo "scheduler_state_bound=false"
+            echo "environment_state_bound=false"
+            echo "live_population_restore=false"
+            echo "population_execution_resume_established=false"
+          } > target/alife-population-snapshot-contract-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-population-snapshot-contract-evidence
+          path: target/alife-population-snapshot-contract-evidence/qualification.txt
+          if-no-files-found: error
