@@ -147,6 +147,7 @@ pub mod hierarchical;
 pub mod markov_blanket;
 pub mod markov_boundary_snapshot;
 mod motor;
+pub mod snapshot_shape;
 mod td_learning;
 pub mod types;
 
@@ -189,4 +190,8 @@ pub use markov_blanket::{
 pub use markov_boundary_snapshot::{
     MARKOV_BOUNDARY_HISTORY_CAP_V1, MarkovBoundarySnapshotErrorV1, MarkovBoundarySnapshotV1,
     ValidatedMarkovBoundarySnapshotV1,
+};
+pub use snapshot_shape::{
+    ActiveInferenceAgentSnapshotShapeV1, MarkovBoundarySnapshotShapeV1,
+    active_inference_snapshot_shape_v1, markov_boundary_snapshot_shape_v1,
 };
