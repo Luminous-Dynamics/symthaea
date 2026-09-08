@@ -1,0 +1,226 @@
+name: Workbench Nix Closure Capture Verifier
+
+on:
+  pull_request:
+    paths:
+      - 'flake.lock'
+      - 'data/neuroscience/workbench_execution_capsule_profile_v1.json'
+      - 'scripts/workbench_nix_closure_identity.py'
+      - 'scripts/workbench_nix_closure_capture.py'
+      - 'scripts/verify_workbench_nix_closure_capture.py'
+      - 'scripts/test_verify_workbench_nix_closure_capture.py'
+      - 'docs/neuroscience/WORKBENCH_NIX_CLOSURE_CAPTURE_V1.md'
+      - 'docs/neuroscience/WORKBENCH_NIX_CLOSURE_CAPTURE_VERIFIER_V1.md'
+      - '.github/workflows/workbench-nix-closure-capture-verifier.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  static-verifier-contracts:
+    name: Qualify hostile verifier contracts only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.QUALIFICATION_SHA }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$QUALIFICATION_SHA"
+          printf 'qualified_head=%s\n' "$actual"
+
+      - name: Syntax
+        run: |
+          python3 -m py_compile \
+            scripts/workbench_nix_closure_identity.py \
+            scripts/verify_workbench_nix_closure_capture.py \
+            scripts/test_verify_workbench_nix_closure_capture.py
+
+      - name: Hostile receipt contracts
+        run: PYTHONPATH=scripts python3 -m unittest scripts/test_verify_workbench_nix_closure_capture.py
+
+      - name: Verifier independence ratchet
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path('scripts/verify_workbench_nix_closure_capture.py')
+          tree = ast.parse(path.read_text(encoding='utf-8'))
+          imported = set()
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  imported.update(alias.name for alias in node.names)
+              elif isinstance(node, ast.ImportFrom) and node.module:
+                  imported.add(node.module)
+
+          assert 'workbench_nix_closure_capture' not in imported
+          assert 'subprocess' not in imported
+
+          forbidden_calls = {'system', 'popen', 'spawnl', 'spawnle', 'spawnlp', 'spawnlpe', 'spawnv', 'spawnve', 'spawnvp', 'spawnvpe'}
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                  assert node.func.attr.lower() not in forbidden_calls
+          PY
+
+      - name: Static authority ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          DOC=docs/neuroscience/WORKBENCH_NIX_CLOSURE_CAPTURE_VERIFIER_V1.md
+          SCRIPT=scripts/verify_workbench_nix_closure_capture.py
+          grep -Fq 'receipt is verified' "$DOC"
+          grep -Fq 'VerifiedReceipt != QualifiedExecution' "$DOC"
+          grep -Fq 'RawObservationRoot != NormalizedClosureRoot' "$DOC"
+          grep -Fq '"capture_receipt_verified": True' "$SCRIPT"
+          grep -Fq '"workbench_execution_qualified": False' "$SCRIPT"
+          grep -Fq '"fmq010_established": False' "$SCRIPT"
+          grep -Fq '"neural_alignment_established": False' "$SCRIPT"
+          grep -Fq '"consciousness_evidence": False' "$SCRIPT"
+
+  produce-real-receipt:
+    name: Produce real receipt in Nix-bearing job
+    needs: static-verifier-contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.QUALIFICATION_SHA }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$QUALIFICATION_SHA"
+          printf 'qualified_head=%s\n' "$actual"
+
+      - name: Install pinned Nix 2.33.6
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          install_url: https://releases.nixos.org/nix/nix-2.33.6/install
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Exact Nix version ratchet
+        run: test "$(nix --version)" = 'nix (Nix) 2.33.6'
+
+      - name: Revalidate selected Workbench profile
+        run: |
+          python3 scripts/verify_workbench_execution_capsule_profile.py \
+            --profile data/neuroscience/workbench_execution_capsule_profile_v1.json \
+            --flake-lock flake.lock
+
+      - name: Produce raw receipt
+        id: capture
+        continue-on-error: true
+        run: |
+          python3 scripts/workbench_nix_closure_capture.py \
+            --profile data/neuroscience/workbench_execution_capsule_profile_v1.json \
+            --flake-lock flake.lock \
+            --out workbench-nix-closure-capture-v1
+
+      - name: Publish verifier input artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: workbench-nix-closure-verifier-input-${{ env.QUALIFICATION_SHA }}
+          path: workbench-nix-closure-capture-v1
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Require producer to have emitted a receipt
+        if: always()
+        run: test -f workbench-nix-closure-capture-v1/receipt.json
+
+  verify-on-fresh-runner:
+    name: Verify artifact without Nix/store consultation
+    needs: produce-real-receipt
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.QUALIFICATION_SHA }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$QUALIFICATION_SHA"
+          printf 'qualified_head=%s\n' "$actual"
+
+      - name: Require Nix to be absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v nix >/dev/null 2>&1; then
+            echo 'verifier runner unexpectedly has Nix on PATH' >&2
+            exit 1
+          fi
+
+      - name: Download producer receipt only
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: workbench-nix-closure-verifier-input-${{ env.QUALIFICATION_SHA }}
+          path: workbench-nix-closure-capture-v1
+
+      - name: Require closed receipt root
+        run: test -f workbench-nix-closure-capture-v1/receipt.json
+
+      - name: Independently reconstruct receipt
+        run: |
+          PYTHONPATH=scripts python3 scripts/verify_workbench_nix_closure_capture.py \
+            --receipt-dir workbench-nix-closure-capture-v1 \
+            --profile data/neuroscience/workbench_execution_capsule_profile_v1.json \
+            --flake-lock flake.lock \
+            --producer scripts/workbench_nix_closure_capture.py \
+            --normalizer scripts/workbench_nix_closure_identity.py \
+            > workbench-nix-closure-capture-verification.json
+
+      - name: Require complete verified observation without authority promotion
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          value = json.loads(Path('workbench-nix-closure-capture-verification.json').read_text())
+          assert value['schema'] == 'symthaea-workbench-nix-closure-capture-verification-v1'
+          assert value['status'] == 'verified-complete-observation'
+          authority = value['authority']
+          assert authority['capture_receipt_verified'] is True
+          assert authority['workbench_execution_qualified'] is False
+          assert authority['transform_executed'] is False
+          assert authority['fmq010_established'] is False
+          assert authority['neural_alignment_established'] is False
+          assert authority['consciousness_evidence'] is False
+          PY
+
+      - name: Publish independent verification result
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: workbench-nix-closure-verification-${{ env.QUALIFICATION_SHA }}
+          path: workbench-nix-closure-capture-verification.json
+          if-no-files-found: error
+          retention-days: 30
