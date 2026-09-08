@@ -50,8 +50,6 @@ if [[ "$initial_head" != "$EXPECTED_HEAD" ]]; then
   exit 1
 fi
 
-# Bootstrap evaluation must start from a pristine tracked/untracked/ignored
-# source tree. All Cargo/Nix build state belongs outside the repository.
 git diff --exit-code
 git diff --cached --exit-code
 test -z "$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"
@@ -85,9 +83,6 @@ git merge-base --is-ancestor "$main_head_start" "$recovery_head_start" || {
   exit 1
 }
 
-# Freeze the bootstrap merge surface. Stage A must fail if application code,
-# scientific-result code, root Cargo/toolchain state, unrelated Nix modules, or
-# any unreviewed workflow enters the recovery branch.
 expected_paths="$(cat <<'EOF'
 .github/workflows/self-hosted-ai-assurance-foundation-recovery.yml
 .github/workflows/self-hosted-rca-canonical-lineage-recovery.yml
@@ -102,6 +97,7 @@ docs/operations/TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md
 nix/ci-rust-shell.nix
 nix/ci/validate-trusted-runner-bootstrap.sh
 nix/ci/validate-trusted-runner-promotion.sh
+nix/ci/validate-trusted-runner-recovery-eligibility.sh
 nix/modules/default.nix
 nix/modules/github-actions-runner.nix
 nix/tests/eval-github-actions-runner.nix
@@ -124,6 +120,7 @@ routing_policy_blob="$(git rev-parse "$recovery_head_start:nix/tests/eval-truste
 smoke_workflow_blob="$(git rev-parse "$recovery_head_start:.github/workflows/self-hosted-runner-smoke.yml")"
 bootstrap_validator_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-bootstrap.sh")"
 promotion_verifier_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-promotion.sh")"
+recovery_eligibility_verifier_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-recovery-eligibility.sh")"
 host_lifecycle_contract_blob="$(git rev-parse "$recovery_head_start:docs/operations/TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md")"
 
 flake_lock_sha256="$(sha256sum flake.lock | awk '{print $1}')"
@@ -147,8 +144,8 @@ printf 'bootstrap_host_nix_system=%s\n' "$host_nix_system"
 printf 'bootstrap_host_nix_version=%s\n' "$host_nix_version"
 printf 'bootstrap_host_lifecycle_contract_blob=%s\n' "$host_lifecycle_contract_blob"
 printf 'bootstrap_promotion_verifier_blob=%s\n' "$promotion_verifier_blob"
+printf 'bootstrap_recovery_eligibility_verifier_blob=%s\n' "$recovery_eligibility_verifier_blob"
 
-# These evaluations contact no GitHub API and consume no runner credential.
 nix build --no-link --no-write-lock-file \
   --impure \
   --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-github-actions-runner.nix { inherit pkgs; }'
@@ -162,7 +159,6 @@ cleanup() {
   rm -rf -- "$state_dir"
 }
 trap cleanup EXIT
-
 export CARGO_HOME="$state_dir/cargo-home"
 export CARGO_TARGET_DIR="$state_dir/cargo-target"
 mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
@@ -180,47 +176,27 @@ nix develop --no-write-lock-file \
     cargo check --locked -p symthaea-psych-bench --lib
   '
 
-# Bootstrap validation may populate only temp/Nix state, never the repository.
 test "$(git rev-parse HEAD)" = "$initial_head"
 test "$(git rev-parse HEAD^{tree})" = "$initial_tree"
 git diff --exit-code
 git diff --cached --exit-code
 test -z "$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"
 
-# Close the ref-movement window. A PASS is valid only if both public refs are
-# unchanged across the complete validation interval. If main or the recovery
-# branch moved, rerun Stage A on the new exact head rather than carrying a stale
-# PASS forward.
 refresh_public_refs
 main_head_end="$(git rev-parse refs/remotes/origin/main)"
 recovery_head_end="$(git rev-parse "refs/remotes/origin/${RECOVERY_BRANCH}")"
 
 if [[ "$main_head_start" != "$main_head_end" || "$recovery_head_start" != "$recovery_head_end" ]]; then
   echo 'public branch state changed during bootstrap validation; refusing stale PASS' >&2
-  printf 'main_start=%s\nmain_end=%s\n' "$main_head_start" "$main_head_end" >&2
-  printf 'recovery_start=%s\nrecovery_end=%s\n' "$recovery_head_start" "$recovery_head_end" >&2
   exit 1
 fi
+[[ "$recovery_head_end" == "$EXPECTED_HEAD" ]]
+[[ "$initial_head" == "$recovery_head_end" ]]
+git merge-base --is-ancestor "$main_head_end" "$recovery_head_end"
 
-if [[ "$recovery_head_end" != "$EXPECTED_HEAD" ]]; then
-  echo 'published recovery branch no longer equals the operator-authorized generation' >&2
-  printf 'authorized_head=%s\nrecovery_head=%s\n' "$EXPECTED_HEAD" "$recovery_head_end" >&2
-  exit 1
-fi
-
-if [[ "$initial_head" != "$recovery_head_end" ]]; then
-  echo 'working tree no longer matches current published recovery head' >&2
-  exit 1
-fi
-
-git merge-base --is-ancestor "$main_head_end" "$recovery_head_end" || {
-  echo 'recovery branch ceased to contain current main during validation' >&2
-  exit 1
-}
-
-manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v5.XXXXXX)"
+manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v6.XXXXXX)"
 cat > "$manifest" <<EOF
-schema=symthaea.trusted-runner.bootstrap.v5
+schema=symthaea.trusted-runner.bootstrap.v6
 result=PASS
 repository=$REPOSITORY_URL
 recovery_branch=$RECOVERY_BRANCH
@@ -237,6 +213,7 @@ routing_policy_blob=$routing_policy_blob
 smoke_workflow_blob=$smoke_workflow_blob
 bootstrap_validator_blob=$bootstrap_validator_blob
 promotion_verifier_blob=$promotion_verifier_blob
+recovery_eligibility_verifier_blob=$recovery_eligibility_verifier_blob
 host_lifecycle_contract_blob=$host_lifecycle_contract_blob
 nixpkgs_rev=$nixpkgs_rev
 rust_channel=$rust_channel
@@ -251,7 +228,6 @@ minimal_locked_rust_check=PASS
 refs_unchanged_during_validation=PASS
 evidence_scope=runner-bootstrap-correctness-only
 EOF
-
 manifest_sha256="$(sha256sum "$manifest" | awk '{print $1}')"
 cat "$manifest"
 printf 'bootstrap_manifest_sha256=%s\n' "$manifest_sha256"
