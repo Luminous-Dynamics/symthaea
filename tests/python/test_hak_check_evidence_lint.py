@@ -1,6 +1,5 @@
 import importlib.util
 import sys
-from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -24,9 +23,12 @@ fixtures = importlib.util.module_from_spec(fixture_spec)
 fixture_spec.loader.exec_module(fixtures)
 
 
-def record(plan, receipt, *, kind="RequiredCheck", obligation_id=None, conclusion="success", suffix="1"):
+def record(plan, receipt, *, kind="RequiredCheck", obligation_id=None, step_conclusion=None, suffix="1"):
     if obligation_id is None:
         obligation_id = plan["required_checks"][0]["check_id"]
+    source_job = receipt["job_receipts"][0]
+    if step_conclusion is None:
+        step_conclusion = source_job["conclusion"]
     doc = {
         "schema_version": "hak.provider-bound-check-evidence.v1",
         "evidence_id": f"check-evidence-{suffix}",
@@ -52,15 +54,17 @@ def record(plan, receipt, *, kind="RequiredCheck", obligation_id=None, conclusio
         },
         "obligation": {"kind": kind, "id": obligation_id},
         "provider_binding": {
-            "job_id": 2000 + int(suffix),
-            "job_name": "HAK evidence synthetic job",
-            "job_status": "completed",
-            "job_conclusion": conclusion,
-            "step_number": 1,
+            "job_id": source_job["job_id"],
+            "job_name": source_job["name"],
+            "job_status": source_job["status"],
+            "job_conclusion": source_job["conclusion"],
+            "step_number": int(suffix),
             "step_name": "synthetic obligation step",
             "step_status": "completed",
-            "step_conclusion": conclusion,
-            "provider_job_ref": f"github-actions:Luminous-Dynamics/symthaea:job/{2000 + int(suffix)}",
+            "step_conclusion": step_conclusion,
+            "provider_job_ref": (
+                f"github-actions:{receipt['subject']['repository']}:job/{source_job['job_id']}"
+            ),
         },
         "collected_by": {
             "identity": "test:provider-collector",
@@ -143,6 +147,29 @@ def test_provider_job_ref_mismatch_rejected():
         validate(plan, receipt, doc)
 
 
+def test_provider_job_must_exist_in_terminal_receipt():
+    plan = fixtures.load_plan()
+    receipt = fixtures.receipt(plan)
+    doc = record(plan, receipt)
+    doc["provider_binding"]["job_id"] = 9999
+    doc["provider_binding"]["provider_job_ref"] = (
+        "github-actions:Luminous-Dynamics/symthaea:job/9999"
+    )
+    doc["evidence_digest"] = hak.compute_check_evidence_digest(doc)
+    with pytest.raises(hak.CheckEvidenceLintError):
+        validate(plan, receipt, doc)
+
+
+def test_provider_job_metadata_must_match_terminal_receipt():
+    plan = fixtures.load_plan()
+    receipt = fixtures.receipt(plan)
+    doc = record(plan, receipt)
+    doc["provider_binding"]["job_name"] = "different job"
+    doc["evidence_digest"] = hak.compute_check_evidence_digest(doc)
+    with pytest.raises(hak.CheckEvidenceLintError):
+        validate(plan, receipt, doc)
+
+
 def test_digest_tampering_rejected():
     plan = fixtures.load_plan()
     receipt = fixtures.receipt(plan)
@@ -154,8 +181,8 @@ def test_digest_tampering_rejected():
 
 def test_failed_provider_step_is_still_valid_negative_evidence_record():
     plan = fixtures.load_plan()
-    receipt = fixtures.receipt(plan)
-    validate(plan, receipt, record(plan, receipt, conclusion="failure"))
+    receipt = fixtures.receipt(plan, conclusion="failure")
+    validate(plan, receipt, record(plan, receipt, step_conclusion="failure"))
 
 
 def evidence_for_all_passed_obligations(plan, receipt, conformance):
