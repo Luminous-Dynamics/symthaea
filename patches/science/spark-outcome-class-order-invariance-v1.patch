@@ -1,0 +1,241 @@
+diff --git a/crates/domains/spark-engine/src/bayesian.rs b/crates/domains/spark-engine/src/bayesian.rs
+index d398cf4..0000000 100644
+--- a/crates/domains/spark-engine/src/bayesian.rs
++++ b/crates/domains/spark-engine/src/bayesian.rs
+@@ -11,7 +11,7 @@
+ //!   physics demands a skeptical prior.
+ //!
+ 
+-use crate::experimental_design::ExperimentDesign;
++use crate::experimental_design::{ExpectedOutcome, ExperimentDesign};
+ use crate::hypothesis_models::HypothesisType;
+ use serde::{Deserialize, Serialize};
+@@ -50,6 +50,24 @@ pub struct OutcomeClasses {
+     pub untested: Vec<HypothesisType>,
+ }
+ 
++fn predictions_overlap_under_signature_model(a: &ExpectedOutcome, b: &ExpectedOutcome) -> bool {
++    let ranges_overlap = a.predicted_rate_range.0 <= b.predicted_rate_range.1
++        && b.predicted_rate_range.0 <= a.predicted_rate_range.1;
++    let energy_close =
++        (a.predicted_energy_mev - b.predicted_energy_mev).abs() < ENERGY_RESOLUTION_MEV;
++    ranges_overlap && energy_close
++}
++
++fn canonical_hypothesis_rank(hypothesis: HypothesisType) -> usize {
++    ALL_HYPOTHESES
++        .iter()
++        .position(|candidate| *candidate == hypothesis)
++        .expect("all Spark hypotheses must have a canonical order")
++}
++
+ impl OutcomeClasses {
+-    /// Group a design's expected outcomes into distinguishable classes.
++    /// Group a design's expected outcomes into conservative ambiguity classes.
++    ///
++    /// Pairwise interval overlap is not transitive, so a representative-greedy
++    /// partition is order-dependent. V1 therefore takes the connected-component
++    /// closure of the pairwise signature-overlap graph and canonicalizes every
++    /// component by [`ALL_HYPOTHESES`] order. This is deliberately conservative:
++    /// transitive closure may merge endpoints that are directly distinguishable.
++    /// A richer measurement likelihood should eventually replace this hard-class
++    /// approximation rather than reintroducing input-order dependence.
+     pub fn from_design(design: &ExperimentDesign) -> Self {
+         let outcomes = &design.expected_outcomes;
+-        let mut classes: Vec<Vec<usize>> = Vec::new();
+-        for (i, o) in outcomes.iter().enumerate() {
+-            let mut placed = false;
+-            for class in &mut classes {
+-                let rep = &outcomes[class[0]];
+-                let ranges_overlap = o.predicted_rate_range.0 <= rep.predicted_rate_range.1
+-                    && rep.predicted_rate_range.0 <= o.predicted_rate_range.1;
+-                let energy_close = (o.predicted_energy_mev - rep.predicted_energy_mev).abs()
+-                    < ENERGY_RESOLUTION_MEV;
+-                if ranges_overlap && energy_close {
+-                    class.push(i);
+-                    placed = true;
+-                    break;
++        let mut visited = vec![false; outcomes.len()];
++        let mut classes: Vec<Vec<HypothesisType>> = Vec::new();
++
++        // Seed components in canonical hypothesis order so class ordering is
++        // independent of the order of `expected_outcomes`.
++        for seed_hypothesis in ALL_HYPOTHESES {
++            let Some(seed_idx) = outcomes
++                .iter()
++                .position(|outcome| outcome.hypothesis == seed_hypothesis)
++            else {
++                continue;
++            };
++            if visited[seed_idx] {
++                continue;
++            }
++
++            let mut stack = vec![seed_idx];
++            let mut component = Vec::new();
++            visited[seed_idx] = true;
++
++            while let Some(idx) = stack.pop() {
++                component.push(outcomes[idx].hypothesis);
++                for neighbor_idx in 0..outcomes.len() {
++                    if !visited[neighbor_idx]
++                        && predictions_overlap_under_signature_model(
++                            &outcomes[idx],
++                            &outcomes[neighbor_idx],
++                        )
++                    {
++                        visited[neighbor_idx] = true;
++                        stack.push(neighbor_idx);
++                    }
+                 }
+             }
+-            if !placed {
+-                classes.push(vec![i]);
+-            }
++
++            component.sort_by_key(|hypothesis| canonical_hypothesis_rank(*hypothesis));
++            classes.push(component);
+         }
+ 
+         let tested: Vec<HypothesisType> = outcomes.iter().map(|o| o.hypothesis).collect();
+@@ -69,10 +87,7 @@ impl OutcomeClasses {
+             .collect();
+ 
+-        Self {
+-            classes: classes
+-                .into_iter()
+-                .map(|idxs| idxs.into_iter().map(|i| outcomes[i].hypothesis).collect())
+-                .collect(),
+-            untested,
+-        }
++        Self { classes, untested }
+     }
+@@ -95,22 +110,23 @@ impl OutcomeClasses {
+         observed: &ObservedOutcome,
+     ) -> Option<usize> {
+         for (k, class) in self.classes.iter().enumerate() {
+-            let rep_h = class[0];
+-            let rep = design
+-                .expected_outcomes
+-                .iter()
+-                .find(|o| o.hypothesis == rep_h)
+-                .expect("class member must exist in design outcomes");
+-            let rate_ok = observed.neutron_rate_per_s >= rep.predicted_rate_range.0
+-                && observed.neutron_rate_per_s <= rep.predicted_rate_range.1;
+-            let energy_ok = match observed.neutron_energy_mev {
+-                Some(e) if rep.predicted_energy_mev > 0.0 => {
+-                    (e - rep.predicted_energy_mev).abs() < ENERGY_RESOLUTION_MEV
++            let matches_any_member = class.iter().any(|hypothesis| {
++                let predicted = design
++                    .expected_outcomes
++                    .iter()
++                    .find(|outcome| outcome.hypothesis == *hypothesis)
++                    .expect("class member must exist in design outcomes");
++                let rate_ok = observed.neutron_rate_per_s >= predicted.predicted_rate_range.0
++                    && observed.neutron_rate_per_s <= predicted.predicted_rate_range.1;
++                let energy_ok = match observed.neutron_energy_mev {
++                    Some(energy) if predicted.predicted_energy_mev > 0.0 => {
++                        (energy - predicted.predicted_energy_mev).abs() < ENERGY_RESOLUTION_MEV
++                    }
++                    _ => true,
++                };
++                rate_ok && energy_ok
++            });
++            if matches_any_member {
++                return Some(k);
+                 }
+-                _ => true,
+-            };
+-            if rate_ok && energy_ok {
+-                return Some(k);
+-            }
+         }
+         None
+     }
+@@ -380,6 +396,53 @@ pub(crate) mod tests {
+         assert_eq!(classes.untested.len(), 2);
+     }
+ 
++    #[test]
++    fn test_outcome_classes_order_invariant_for_overlap_chain() {
++        let a = outcome(HypothesisType::HotSpots, (0.0, 2.0), 2.45);
++        let b = outcome(HypothesisType::PhononCascade, (1.0, 3.0), 2.45);
++        let c = outcome(HypothesisType::SuperScreening, (2.5, 4.0), 2.45);
++
++        let abc = OutcomeClasses::from_design(&design(vec![a.clone(), b.clone(), c.clone()]));
++        let bac = OutcomeClasses::from_design(&design(vec![b.clone(), a.clone(), c.clone()]));
++        let cba = OutcomeClasses::from_design(&design(vec![c, b, a]));
++
++        assert_eq!(abc.classes, bac.classes);
++        assert_eq!(abc.classes, cba.classes);
++        assert_eq!(
++            abc.classes,
++            vec![vec![
++                HypothesisType::HotSpots,
++                HypothesisType::PhononCascade,
++                HypothesisType::SuperScreening,
++            ]]
++        );
++    }
++
++    #[test]
++    fn test_matching_class_checks_non_representative_members() {
++        let d = design(vec![
++            outcome(HypothesisType::HotSpots, (0.0, 2.0), 2.45),
++            outcome(HypothesisType::PhononCascade, (1.0, 3.0), 2.45),
++        ]);
++        let classes = OutcomeClasses::from_design(&d);
++        assert_eq!(classes.classes.len(), 1);
++
++        // 2.75 lies outside HotSpots but inside PhononCascade. A class is
++        // supported by all of its members, not only its canonical first member.
++        assert_eq!(
++            classes.matching_class(
++                &d,
++                &ObservedOutcome {
++                    neutron_rate_per_s: 2.75,
++                    neutron_energy_mev: Some(2.45),
++                },
++            ),
++            Some(0)
++        );
++    }
++
+     #[test]
+     fn test_update_boosts_matching_hypothesis() {
+         let d = design(vec![
+diff --git a/crates/domains/spark-engine/src/optimal_experiment.rs b/crates/domains/spark-engine/src/optimal_experiment.rs
+index 8d6f83d..0000000 100644
+--- a/crates/domains/spark-engine/src/optimal_experiment.rs
++++ b/crates/domains/spark-engine/src/optimal_experiment.rs
+@@ -331,6 +331,30 @@ mod tests {
+         assert!(eig.abs() < 1e-9, "single-class design leaked info: {eig}");
+     }
+ 
++    #[test]
++    fn test_eig_is_invariant_to_prediction_order() {
++        let a = outcome(HypothesisType::HotSpots, (0.0, 2.0), 2.45);
++        let b = outcome(HypothesisType::PhononCascade, (1.0, 3.0), 2.45);
++        let c = outcome(HypothesisType::SuperScreening, (2.5, 4.0), 2.45);
++        let belief = HypothesisBelief::uniform();
++
++        let eig_abc = expected_information_gain(
++            &crate::bayesian::tests::design(vec![a.clone(), b.clone(), c.clone()]),
++            &belief,
++        );
++        let eig_bac = expected_information_gain(
++            &crate::bayesian::tests::design(vec![b.clone(), a.clone(), c.clone()]),
++            &belief,
++        );
++        let eig_cba = expected_information_gain(
++            &crate::bayesian::tests::design(vec![c, b, a]),
++            &belief,
++        );
++
++        assert!((eig_abc - eig_bac).abs() < 1e-12);
++        assert!((eig_abc - eig_cba).abs() < 1e-12);
++    }
++
+     #[test]
+     fn test_ranking_sorted_by_eig_per_dollar() {
+         let designs = standard_candidate_experiments();
