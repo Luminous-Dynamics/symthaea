@@ -71,5 +71,5 @@ jobs:
           test "${#observations[@]}" -gt 0
           python scripts/hak_evidence_lint.py "${observations[@]}"
 
-      - name: Run HAK evidence regressions
+      - name: Run plan-execution join and evidence regressions
         run: python -m pytest -q tests/python/test_hak_evidence_lint.py
