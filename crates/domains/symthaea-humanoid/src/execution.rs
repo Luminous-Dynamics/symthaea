@@ -113,6 +113,10 @@ impl HumanoidExecutionPipeline {
     /// command projector. Safe fallback intentionally bypasses goal-directed
     /// hierarchy: it is the independent behavior used when goal authority has
     /// already been revoked.
+    ///
+    /// Entering fallback revokes the previous goal-directed command history
+    /// before projection. This prevents a slew limiter from preserving stale
+    /// unsafe authority while the minimum-safe behavior takes over.
     pub fn authorize_fallback(
         &mut self,
         fallback: &HumanoidCommand,
@@ -120,6 +124,7 @@ impl HumanoidExecutionPipeline {
         actuation_mode: ActuationMode,
         dt: f64,
     ) -> crate::safety::ProjectedCommand {
+        self.safety.reset();
         self.safety.project(fallback, state, actuation_mode, dt)
     }
 
