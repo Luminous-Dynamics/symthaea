@@ -64,10 +64,15 @@ jobs:
 
           grep -q 'lineage_generation=canonical_validated_graph_content_identity_v1' "$production"
           grep -q 'legacy_producer_graph_id_is_not_witness_authority' "$production"
-          grep -q 'canonical_evidence_lineage_graph_id_v1(graph)' "$production"
+          grep -q 'let lineage_graph_id = canonical_evidence_lineage_graph_id_v1(graph);' "$production"
           grep -q 'pub fn lineage_graph_id' "$production"
           grep -q 'b"lineage_graph_id"' "$production"
           grep -q 'unrelated_lineage_change_changes_witness_identity_even_if_selected_subset_is_same' "$production"
+
+          if grep -Eq 'CanonicalLineageIdentityError|LineageIdentity\(|map_err\(EvidenceSetWitnessError::LineageIdentity\)' "$production"; then
+            echo 'Evidence-set witness reintroduced a fallible serializer-derived lineage identity path.' >&2
+            exit 1
+          fi
 
       - name: Freeze exact pairwise-independent set witness
         shell: bash
