@@ -8,6 +8,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod frozen_observation;
 pub mod observation;
 pub mod state;
 
