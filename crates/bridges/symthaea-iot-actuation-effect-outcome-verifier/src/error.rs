@@ -67,7 +67,9 @@ pub enum EffectOutcomeError {
     NotGenesis,
     #[error("physical-effect outcome trust sequence overflow")]
     TrustSequenceOverflow,
-    #[error("physical-effect outcome trust sequence is not the exact successor: expected {expected}, proposed {proposed}")]
+    #[error(
+        "physical-effect outcome trust sequence is not the exact successor: expected {expected}, proposed {proposed}"
+    )]
     TrustSequenceNotNext { expected: u64, proposed: u64 },
     #[error("physical-effect outcome trust predecessor does not match")]
     TrustPredecessorMismatch,
