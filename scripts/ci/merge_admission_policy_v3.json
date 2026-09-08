@@ -19,7 +19,7 @@
       "docs/operations/CI_LIFECYCLE_TIERING_V1.md",
       "scripts/ci/required_ci_job_manifest_v1.schema.json",
       "scripts/ci/required_ci_job_manifest_v1.json",
-      "scripts/ci/merge_admission_manifest_v1.py",
+      "scripts/ci/merge_admission_manifest_v2.py",
       "scripts/ci/merge_admission_policy_v3.json",
       "scripts/ci/evaluate_merge_admission_v3.py",
       "scripts/ci/merge_admission_observation_v3.schema.json",
