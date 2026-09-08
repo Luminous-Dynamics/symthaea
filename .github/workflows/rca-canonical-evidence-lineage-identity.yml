@@ -98,11 +98,15 @@ jobs:
             exit 1
           fi
 
-      - name: Freeze adversarial identity tests
+      - name: Freeze adversarial and known-answer identity tests
         shell: bash
         run: |
           set -euo pipefail
           src=crates/core/symthaea-epistemic-governance/src/lineage_identity.rs
+          grep -q 'profile_contract_digest_known_answer_is_frozen_v1' "$src"
+          grep -q 'canonical_graph_identity_known_answer_is_frozen_v1' "$src"
+          grep -q 'blake3:ff23c2ba0796d14eefd10c327542e8f0287bab3d09cb3bb2515c86fd72803d4a' "$src"
+          grep -q 'blake3:916114cbe9c4ff598097fd2702e965a4b3a763bfcc92e569fb986397371363d6' "$src"
           grep -q 'explicit_derivation_tags_are_stable' "$src"
           grep -q 'legacy_graph_label_does_not_define_canonical_identity' "$src"
           grep -q 'node_and_parent_order_do_not_change_identity' "$src"
