@@ -138,6 +138,7 @@
 //! - Sutton, R.S. & Barto, A.G. (2018). Reinforcement Learning: An Introduction (2nd ed.)
 
 mod agent;
+pub mod agent_snapshot;
 mod bridge;
 pub mod free_energy;
 pub mod generative_model;
@@ -171,6 +172,10 @@ pub use haptic_semantic_binder::HapticSemanticBinder;
 pub use free_energy::{ExpectedFreeEnergyComputer, FreeEnergyCalculator, PrecisionEstimator};
 
 pub use agent::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
+pub use agent_snapshot::{
+    ActiveInferenceAgentSnapshotErrorV1, ActiveInferenceAgentSnapshotV1,
+    ValidatedActiveInferenceAgentSnapshotV1,
+};
 
 pub use motor::MotorSystem;
 
