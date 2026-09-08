@@ -1,0 +1,81 @@
+name: Matter Phonon Reciprocal-Grid Completeness
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_phonon_completeness.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-phonon-completeness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "2d4a194754a42f237ac22b59b2838bee549e7a16"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-phonon-completeness.yml
+          src/knowledge/matter_phonon_completeness.rs
+          src/knowledge/mod.rs
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates scripts || true)"
+
+      - name: Ratchet reciprocal-grid semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_phonon_completeness.rs
+          grep -q 'reciprocal_grid: \[u32; 3\]' "$f"
+          grep -q 'reciprocal_shift_fractional_bits' "$f"
+          grep -q 'coordinate_tolerance_bits' "$f"
+          grep -q 'coordinate_criterion_evidence_id' "$f"
+          grep -q 'grid_index: \[u32; 3\]' "$f"
+          grep -q 'multiplicity' "$f"
+          grep -q 'periodic_unit_distance' "$f"
+          grep -q 'MultiplicityDoesNotReconstructFullGrid' "$f"
+          grep -q 'UnreducedGridCoverageMismatch' "$f"
+          grep -q 'DeclaredIrreducibleReduction' "$f"
+          grep -q 'DeclaredReciprocalGridCoverage' "$f"
+          grep -q 'require_preregistration_before' "$f"
+
+      - name: Ratchet canonical dependency roles and ASR configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_phonon_completeness.rs
+          grep -q 'EvidenceRole::DependencySnapshot' "$f"
+          grep -q 'GridSnapshotNotExecutionDependency' "$f"
+          grep -q 'SymmetrySnapshotNotExecutionDependency' "$f"
+          grep -q 'AcousticSumRuleTreatment' "$f"
+          grep -q 'aggregation_configuration_artifact_id' "$f"
+          grep -q 'AsrConfigurationIsNotAggregationConfiguration' "$f"
+          grep -q 'EvidenceRole::ArtifactContent' "$f"
+          grep -q 'DeclaredChronologyOnly' "$f"
+          ! grep -q 'symmetry.*verified' "$f"
+          ! grep -q 'BrillouinZoneComplete' "$f"
+
+      - name: Ratchet strict public boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '^mod matter_relaxation_completeness;' src/knowledge/mod.rs
+          grep -q '^pub mod matter_phonon_completeness;' src/knowledge/mod.rs
+          grep -q 'bind_relaxation_complete_crystal_execution_plan' src/knowledge/matter_phonon_completeness.rs
+
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Focused regression tests
+        run: cargo test --locked matter_phonon_completeness --lib
