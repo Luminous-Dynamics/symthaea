@@ -288,7 +288,7 @@ mod tests {
     fn subject() -> HumanoidQualificationSubject {
         HumanoidQualificationSubject::new(
             HumanoidMorphology::Dmc21,
-            HumanoidTask::Carry,
+            HumanoidTask::Grasp,
             ActuationMode::NormalizedTorque,
             "test-backend-v1",
         )
