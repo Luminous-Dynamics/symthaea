@@ -1,0 +1,85 @@
+{
+  "schema_version": "hak.qualification-plan.v1",
+  "plan_id": "hak010-precommitted-check-binding-e5-v1",
+  "plan_kind": "SelfDeclaredPlan",
+  "scope": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "subject_kind": "git-commit",
+    "workflow_path": ".github/workflows/hak-check-binding.yml"
+  },
+  "claims": [
+    {
+      "claim_id": "HAK010-PRECOMMIT-001",
+      "statement": "A HAK check-evidence binding policy is bound to the exact qualification-plan content and workflow and covers exactly the plan obligations without duplicate, missing, or unknown obligation bindings.",
+      "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK010-SELECTOR-001",
+      "statement": "ProviderBound check evidence can satisfy a precommitted obligation only when its provider job name, step name, step number, and terminal conclusions match the exact selector fixed by the binding policy.",
+      "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK010-POSTHOC-001",
+      "statement": "A later successful provider step cannot be substituted post hoc for a different precommitted obligation selector without validation failure.",
+      "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK010-DIGEST-001",
+      "statement": "Canonical binding-policy digest validation detects the tested forms of post-materialization policy tampering.",
+      "target_tier": "E5"
+    }
+  ],
+  "required_checks": [
+    {
+      "check_id": "exact-head",
+      "description": "Resolve, checkout, and assert the exact PR head."
+    },
+    {
+      "check_id": "compile",
+      "description": "Compile inherited HAK evidence stack plus scripts/hak_check_binding_lint.py under Python 3.12."
+    },
+    {
+      "check_id": "plan-lint",
+      "description": "Lint the HAK-010 machine-readable qualification plan."
+    },
+    {
+      "check_id": "policy-lint",
+      "description": "Lint the HAK-010 precommitted obligation-to-job/step binding policy against the exact HAK-010 plan."
+    },
+    {
+      "check_id": "schema-validation",
+      "description": "Validate HAK-010 schema syntax and representative binding-policy documents with Draft 2020-12 jsonschema."
+    },
+    {
+      "check_id": "regressions",
+      "description": "Run focused HAK-010 binding-policy and schema regression suites."
+    }
+  ],
+  "required_negative_cases": [
+    "binding policy qualification-plan id mismatch",
+    "binding policy qualification-plan digest mismatch",
+    "binding policy workflow mismatch",
+    "binding policy missing required obligation",
+    "binding policy duplicate obligation",
+    "binding policy unknown obligation",
+    "provider evidence job-name selector mismatch",
+    "provider evidence step-name selector mismatch",
+    "provider evidence step-number selector mismatch",
+    "provider evidence disallowed job conclusion",
+    "provider evidence disallowed step conclusion",
+    "binding policy digest tampering",
+    "strict conformance uses provider evidence that does not satisfy precommitted selector",
+    "schema accepts malformed policy digest"
+  ],
+  "provider_policy": {
+    "allowed_providers": ["github-actions"],
+    "exact_head_required": true
+  },
+  "independence": {
+    "plan_authority": "self-declared by subject repository",
+    "execution_provider": "GitHub Actions hosted runner",
+    "claim_interpretation": "limited to HAK-010 precommit/binding tooling behavior; semantic adequacy of chosen selectors remains reviewable"
+  },
+  "evidence_target": "E5",
+  "supersedes_plan_ref": null
+}
