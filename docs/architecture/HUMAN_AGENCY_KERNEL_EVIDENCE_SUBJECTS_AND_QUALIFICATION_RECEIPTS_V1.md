@@ -2,6 +2,12 @@
 
 Status: HAK-007 architecture/evidence/tooling candidate
 
+Frozen qualification subject:
+
+```text
+architecture/hak-evidence-subject-receipts-v1@54b71c22c1dc3b068b7bac033219ff91571ed2c8
+```
+
 Parent stack:
 
 - HAK-001 — semantic separation;
@@ -75,7 +81,7 @@ For a self-declared plan, record-level validation may establish:
 plan repository == subject repository
 ```
 
-It must **not** require:
+It must not require:
 
 ```text
 plan document path == execution workflow path
@@ -151,9 +157,9 @@ because the workflow existed before execution but no complete HAK qualification-
 
 Thus it may later establish exact-head hosted execution facts, but HAK-007 forbids retroactively calling it `PlanQualifiedE5`.
 
-## Current HAK-007 qualification rule
+## HAK-007 qualification rule
 
-HAK-007 has a machine-readable self-declared E5-target plan. Its focused workflow must execute that plan on the exact PR head. Any run on a superseded head remains historical evidence only.
+HAK-007 has a machine-readable self-declared E5-target plan. Its focused workflow must execute that plan on the exact frozen subject above. Any run on a superseded head remains historical evidence only.
 
 A green run can support only the claims explicitly named by the plan and only after a separate interpretation step confirms plan conformance.
 
