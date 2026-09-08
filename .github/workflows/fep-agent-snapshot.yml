@@ -1,0 +1,139 @@
+name: FEP Agent Snapshot
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-fep/Cargo.toml"
+      - "crates/core/symthaea-fep/src/agent_snapshot.rs"
+      - "crates/core/symthaea-fep/src/agent.rs"
+      - "crates/core/symthaea-fep/src/free_energy.rs"
+      - "crates/core/symthaea-fep/src/generative_model.rs"
+      - "crates/core/symthaea-fep/src/td_learning.rs"
+      - "crates/core/symthaea-fep/src/types.rs"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - ".github/workflows/fep-agent-snapshot.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  agent-snapshot:
+    name: Validated active-inference snapshot contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/core/symthaea-fep/src/agent_snapshot.rs
+          sha256sum crates/core/symthaea-fep/src/agent.rs
+          sha256sum crates/core/symthaea-fep/src/generative_model.rs
+          sha256sum crates/core/symthaea-fep/src/td_learning.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: fep-agent-snapshot
+
+      - name: Check FEP formatting
+        run: cargo fmt -p symthaea-fep -- --check
+
+      - name: Check FEP targets
+        run: cargo check --locked -p symthaea-fep --all-targets
+
+      - name: Test snapshot contract
+        run: 'cargo test --locked -p symthaea-fep agent_snapshot::'
+
+      - name: Test complete FEP package
+        run: cargo test --locked -p symthaea-fep
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-fep --all-targets --no-deps -- -D warnings
+
+      - name: Freeze snapshot authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot="crates/core/symthaea-fep/src/agent_snapshot.rs"
+          agent="crates/core/symthaea-fep/src/agent.rs"
+          blanket="crates/core/symthaea-fep/src/markov_blanket.rs"
+
+          grep -q 'pub struct ActiveInferenceAgentSnapshotV1' "$snapshot"
+          grep -q 'pub struct ValidatedActiveInferenceAgentSnapshotV1' "$snapshot"
+          grep -q 'pub fn validate(' "$snapshot"
+          grep -q 'ZeroRngState' "$snapshot"
+          grep -q 'TimestampPerceptionMismatch' "$snapshot"
+          grep -q 'TdPresenceMismatch' "$snapshot"
+          grep -q 'EligibilityPresenceMismatch' "$snapshot"
+          grep -q 'impossible_model_shape_fails_before_capability_creation' "$snapshot"
+          grep -q 'invalid_action_history_fails_closed' "$snapshot"
+          grep -q 'timestamp_must_match_perception_cycle_authority' "$snapshot"
+          grep -q 'zero_rng_state_fails_closed' "$snapshot"
+
+          # Contract-only tranche: live private-state wiring and Markov-boundary snapshotting remain
+          # deliberately absent and therefore cannot be accidentally claimed by this lane.
+          ! grep -q 'ActiveInferenceAgentSnapshotV1' "$agent"
+          ! grep -q 'MarkovBoundarySnapshotV1' "$blanket"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path("crates/core/symthaea-fep/src/agent_snapshot.rs").read_text()
+          raw = text.split("pub struct ActiveInferenceAgentSnapshotV1 {", 1)[1].split("}\n", 1)[0]
+          if "pub " in raw.replace("pub(crate)", ""):
+              raise SystemExit("raw snapshot exposes public authority fields")
+          validated_decl = text.split("pub struct ValidatedActiveInferenceAgentSnapshotV1", 1)[0]
+          if "Serialize, Deserialize" in validated_decl.rsplit("#[derive", 1)[-1]:
+              raise SystemExit("validated capability must not be serializable")
+          PY
+
+      - name: Write snapshot qualification metadata
+        run: |
+          mkdir -p target/fep-agent-snapshot-evidence
+          {
+            echo "authority=validated_active_inference_snapshot_contract_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "snapshot_source_sha256=$(sha256sum crates/core/symthaea-fep/src/agent_snapshot.rs | cut -d' ' -f1)"
+            echo "agent_source_sha256=$(sha256sum crates/core/symthaea-fep/src/agent.rs | cut -d' ' -f1)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "snapshot_structural_validation=true"
+            echo "snapshot_rng_fail_closed=true"
+            echo "snapshot_timestamp_crosscheck=true"
+            echo "live_agent_snapshot_wiring_complete=false"
+            echo "markov_boundary_snapshot_complete=false"
+            echo "alife_population_execution_resume_established=false"
+          } > target/fep-agent-snapshot-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fep-agent-snapshot-evidence
+          path: target/fep-agent-snapshot-evidence/qualification.txt
+          if-no-files-found: error
