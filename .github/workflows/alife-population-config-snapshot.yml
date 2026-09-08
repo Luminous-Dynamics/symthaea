@@ -1,0 +1,192 @@
+name: ALife Population Config Snapshot
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/organism.rs"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/src/population_config_snapshot.rs"
+      - ".github/workflows/alife-population-config-snapshot.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Population policy persistence theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/population.rs
+          sha256sum crates/domains/symthaea-alife/src/organism.rs
+          sha256sum crates/domains/symthaea-alife/src/population_config_snapshot.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-population-config-snapshot
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test population config snapshot
+        run: 'cargo test --locked -p symthaea-alife population_config_snapshot::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze complete policy field coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          population = Path('crates/domains/symthaea-alife/src/population.rs').read_text()
+          organism = Path('crates/domains/symthaea-alife/src/organism.rs').read_text()
+          snapshot = Path('crates/domains/symthaea-alife/src/population_config_snapshot.rs').read_text()
+
+          def public_fields(source: str, struct_name: str):
+              match = re.search(rf'pub struct {struct_name}\s*\{{(.*?)\n\}}', source, re.S)
+              if not match:
+                  raise SystemExit(f'cannot locate {struct_name}')
+              return re.findall(r'pub\s+(\w+)\s*:', match.group(1))
+
+          population_fields = public_fields(population, 'PopulationConfig')
+          organism_fields = public_fields(organism, 'OrganismConfig')
+
+          expected_population = [
+              'death_energy_threshold',
+              'reproduction_energy_threshold',
+              'reproduction_energy_cost',
+              'organism_cfg',
+              'mutation_rate',
+              'mutation_std',
+              'inheritance',
+          ]
+          expected_organism = [
+              'set_point',
+              'metabolic_cost',
+              'forage_activity_cost',
+              'forage_efficiency',
+              'goal_precision',
+              'effective_temperature',
+              'dissipation_rate',
+              'death_energy_threshold',
+              'action_temperature',
+              'perceptual_grain',
+              'spoilage_sigma',
+              'resource_preference',
+              'resource_prior',
+              'social_enabled',
+              'transfer_quantum',
+          ]
+
+          if population_fields != expected_population:
+              raise SystemExit(f'PopulationConfig field surface drifted: {population_fields!r}')
+          if organism_fields != expected_organism:
+              raise SystemExit(f'OrganismConfig field surface drifted: {organism_fields!r}')
+
+          required_population_tokens = [
+              'death_energy_threshold_bits',
+              'reproduction_energy_threshold_bits',
+              'reproduction_energy_cost_bits',
+              'organism_cfg',
+              'mutation_rate_bits',
+              'mutation_std_bits',
+              'inheritance',
+          ]
+          required_organism_tokens = [
+              'set_point_bits',
+              'metabolic_cost_bits',
+              'forage_activity_cost_bits',
+              'forage_efficiency_bits',
+              'goal_precision_bits',
+              'effective_temperature_bits',
+              'dissipation_rate_bits',
+              'death_energy_threshold_bits',
+              'action_temperature_bits',
+              'perceptual_grain_bits',
+              'spoilage_sigma_bits',
+              'resource_preference_bits',
+              'resource_prior_bits',
+              'social_enabled',
+              'transfer_quantum_bits',
+          ]
+          for token in required_population_tokens + required_organism_tokens:
+              if token not in snapshot:
+                  raise SystemExit(f'population config snapshot omitted {token}')
+
+          if 'config.action_temperature <= 0.0' not in snapshot:
+              raise SystemExit('newborn action-temperature fail-closed boundary missing')
+          if 'value.is_finite()' not in snapshot:
+              raise SystemExit('non-finite population policy rejection missing')
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="crates/domains/symthaea-alife/src/population_config_snapshot.rs"
+          ! grep -q 'PopulationSnapshotV1' "$file"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$file"
+          ! grep -q 'from_validated_snapshot_v1' "$file"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-population-config-snapshot-evidence
+          {
+            echo "authority=population_config_snapshot_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "snapshot_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/population_config_snapshot.rs | cut -d' ' -f1)"
+            echo "population_policy_field_coverage=true"
+            echo "newborn_template_field_coverage=true"
+            echo "bit_exact_float_persistence=true"
+            echo "population_snapshot_complete=false"
+            echo "population_execution_resume_established=false"
+          } > target/alife-population-config-snapshot-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-population-config-snapshot-evidence
+          path: target/alife-population-config-snapshot-evidence/qualification.txt
+          if-no-files-found: error
