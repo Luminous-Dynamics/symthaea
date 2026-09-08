@@ -1,0 +1,43 @@
+{
+  "schema": "symthaea.merge-admission-policy.v3",
+  "repository": "Luminous-Dynamics/symthaea",
+  "target_branch": "main",
+  "policy_path": "scripts/ci/merge_admission_policy_v3.json",
+  "enforcement_ready": false,
+  "decision_default": "incomplete",
+  "head_change_invalidates": true,
+  "base_change_invalidates": true,
+  "unknown_evidence_default": "reject",
+  "control_plane": {
+    "mode": "exact_base_equivalence",
+    "paths": [
+      ".github/workflows/ci.yml",
+      "scripts/ci/qualification_scope.py",
+      "scripts/ci/ci_lifecycle_jobs_v1.json",
+      "scripts/ci/validate_ci_lifecycle_registry.py",
+      "scripts/ci/apply_ci_lifecycle_tiering.py",
+      "docs/operations/CI_LIFECYCLE_TIERING_V1.md",
+      "scripts/ci/required_ci_job_manifest_v1.schema.json",
+      "scripts/ci/required_ci_job_manifest_v1.json",
+      "scripts/ci/merge_admission_manifest_v1.py",
+      "scripts/ci/merge_admission_policy_v3.json",
+      "scripts/ci/evaluate_merge_admission_v3.py",
+      "scripts/ci/merge_admission_observation_v3.schema.json",
+      "scripts/ci/merge_admission_receipt_v3.schema.json",
+      "docs/operations/MERGE_ADMISSION_RECEIPT_V3.md"
+    ],
+    "candidate_changes_require_independent_bootstrap": true
+  },
+  "full_integration": {
+    "workflow_path": ".github/workflows/ci.yml",
+    "required_job_manifest_path": "scripts/ci/required_ci_job_manifest_v1.json",
+    "accepted_events": ["pull_request", "workflow_dispatch"],
+    "required_status": "completed",
+    "required_conclusion": "success",
+    "require_exact_head": true,
+    "require_exact_base": true,
+    "require_complete_job_census": true
+  },
+  "focused_evidence_can_substitute_for_full_integration": false,
+  "tier1_can_substitute_for_full_integration": false
+}
