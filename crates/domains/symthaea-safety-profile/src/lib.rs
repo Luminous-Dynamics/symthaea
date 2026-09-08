@@ -13,6 +13,7 @@ pub mod admission;
 pub mod authorization;
 pub mod commit_preconditions;
 pub mod transition;
+pub mod trusted_time;
 
 use serde::{Deserialize, Serialize};
 use symthaea_safety_configuration::{
