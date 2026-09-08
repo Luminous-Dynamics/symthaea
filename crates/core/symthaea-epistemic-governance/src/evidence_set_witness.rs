@@ -17,9 +17,7 @@
 
 use crate::{
     lineage::{CognitiveLineageError, EvidenceIndependenceV1, ValidatedEvidenceLineageGraphV1},
-    lineage_identity::{
-        canonical_evidence_lineage_graph_id_v1, CanonicalLineageIdentityError,
-    },
+    lineage_identity::canonical_evidence_lineage_graph_id_v1,
 };
 use serde::Serialize;
 use std::collections::HashSet;
@@ -165,8 +163,7 @@ pub fn issue_independent_evidence_set_witness_v1(
         return Err(EvidenceSetWitnessError::EmptySelection);
     }
 
-    let lineage_graph_id = canonical_evidence_lineage_graph_id_v1(graph)
-        .map_err(EvidenceSetWitnessError::LineageIdentity)?;
+    let lineage_graph_id = canonical_evidence_lineage_graph_id_v1(graph);
 
     let mut selected = selected_evidence_ids.to_vec();
     selected.sort();
@@ -343,7 +340,6 @@ pub enum EvidenceSetWitnessError {
         right_evidence_id: String,
     },
     Lineage(CognitiveLineageError),
-    LineageIdentity(CanonicalLineageIdentityError),
 }
 
 impl std::fmt::Display for EvidenceSetWitnessError {
@@ -372,7 +368,6 @@ impl std::fmt::Display for EvidenceSetWitnessError {
                 "selected evidence pair {left_evidence_id} / {right_evidence_id} reported independent despite ancestry-root overlap"
             ),
             Self::Lineage(error) => write!(f, "lineage validation failed: {error}"),
-            Self::LineageIdentity(error) => write!(f, "lineage identity derivation failed: {error}"),
         }
     }
 }
