@@ -1,0 +1,200 @@
+name: ALife Genesis Event Checkpoint
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/events.rs"
+      - "crates/domains/symthaea-alife/src/observatory.rs"
+      - "crates/domains/symthaea-alife/src/organism.rs"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/src/genesis_event_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - ".github/workflows/alife-genesis-event-checkpoint.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  genesis-event-checkpoint:
+    name: Behavioral event continuation theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/genesis_event_checkpoint.rs
+          sha256sum crates/domains/symthaea-alife/src/events.rs
+          sha256sum crates/domains/symthaea-alife/src/observatory.rs
+          sha256sum crates/domains/symthaea-alife/src/population.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-genesis-event-checkpoint
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test Genesis event checkpoint contract
+        run: 'cargo test --locked -p symthaea-alife genesis_event_checkpoint::'
+
+      - name: Test observatory event semantics
+        run: 'cargo test --locked -p symthaea-alife observatory::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze behavioral continuation authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          checkpoint="crates/domains/symthaea-alife/src/genesis_event_checkpoint.rs"
+          cargo_toml="crates/domains/symthaea-alife/Cargo.toml"
+
+          grep -q 'pub struct GenesisEventCheckpointV1' "$checkpoint"
+          grep -q 'pub struct ValidatedGenesisEventCheckpointV1' "$checkpoint"
+          grep -q 'validate_against_complete_prefix' "$checkpoint"
+          grep -q 'pub fn validate_chunk' "$checkpoint"
+          grep -q 'Sha256' "$checkpoint"
+          grep -q 'MissingReciprocalPartner' "$checkpoint"
+          grep -q 'TransferWithoutTransferAction' "$checkpoint"
+          grep -q 'InternalTickGap' "$checkpoint"
+          grep -q 'EventAfterTerminalSilence' "$checkpoint"
+          grep -q 'silent_tick_count_is_consistency_metadata_not_event_derived_fact' "$checkpoint"
+          grep -q '^sha2 = { workspace = true }$' "$cargo_toml"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          text = Path("crates/domains/symthaea-alife/src/genesis_event_checkpoint.rs").read_text()
+
+          raw = text.split("pub struct GenesisEventCheckpointV1 {", 1)[1].split("}\n\n/// Non-serializable", 1)[0]
+          for field in (
+              "next_social_tick",
+              "total_events",
+              "last_observed_tick",
+              "terminal_silence",
+              "chain_sha256",
+          ):
+              if re.search(rf"\bpub\s+{field}\s*:", raw):
+                  raise SystemExit(f"raw checkpoint field became public: {field}")
+
+          validated_decl = text.split("pub struct ValidatedGenesisEventCheckpointV1", 1)[0].splitlines()[-3:]
+          if any("Serialize" in line or "Deserialize" in line for line in validated_decl):
+              raise SystemExit("validated event checkpoint must remain non-serializable authority")
+
+          if "CHAIN_ROOT_DOMAIN_V1" not in text or "CHAIN_EVENT_DOMAIN_V1" not in text:
+              raise SystemExit("event chain lost domain separation")
+          if "hasher.update(event.resource_before.to_bits().to_le_bytes())" not in text:
+              raise SystemExit("event chain no longer binds exact resource_before bits")
+          if "hasher.update(event.resource_after.to_bits().to_le_bytes())" not in text:
+              raise SystemExit("event chain no longer binds exact resource_after bits")
+          if "hasher.update(event.transfer_amount.to_bits().to_le_bytes())" not in text:
+              raise SystemExit("event chain no longer binds exact transfer bits")
+          PY
+
+      - name: Freeze live-source relationship
+        shell: bash
+        run: |
+          set -euo pipefail
+          population="crates/domains/symthaea-alife/src/population.rs"
+          observatory="crates/domains/symthaea-alife/src/observatory.rs"
+
+          grep -q 'pub fn drain_event_log' "$population"
+          grep -q 'std::mem::take(&mut self.event_log)' "$population"
+          grep -q 'let tick_number = self.current_tick' "$population"
+          grep -q 'self.event_log.push(GenesisEvent' "$population"
+          grep -q 'for i in 0..n' "$population"
+          grep -q 'DuplicateAgentTick' "$observatory"
+          grep -q 'NonMonotonicTick' "$observatory"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path("crates/domains/symthaea-alife/src/population.rs").read_text()
+          social = text.split("pub fn step_social", 1)[1].split("pub fn len", 1)[0]
+          event_push = social.find("self.event_log.push(GenesisEvent")
+          phase4 = social.find("// Phase 4:")
+          if event_push < 0 or phase4 < 0 or event_push > phase4:
+              raise SystemExit("Genesis event emission no longer occurs before social birth/death removal")
+
+          # Remaining explicit blockers: the event contract must not silently overclaim these.
+          if "self.current_tick += 1" not in social:
+              raise SystemExit(
+                  "social tick arithmetic changed; replace the explicit incomplete claim with a new checked-clock theorem"
+              )
+          if "pub organisms: Vec<Organism>" not in text:
+              raise SystemExit(
+                  "raw population membership authority changed; re-audit #910 claim boundary"
+              )
+          if "GenesisEventCheckpointV1" in text:
+              raise SystemExit("live Population event-checkpoint wiring must remain a separate production tranche")
+          PY
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-genesis-event-checkpoint-evidence
+          {
+            echo "authority=genesis_behavioral_event_continuation_checkpoint_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "checkpoint_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/genesis_event_checkpoint.rs | cut -d' ' -f1)"
+            echo "events_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/events.rs | cut -d' ' -f1)"
+            echo "observatory_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/observatory.rs | cut -d' ' -f1)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "compact_event_chain_sha256=true"
+            echo "archive_backed_revalidation_required=true"
+            echo "pair_reciprocity_validated=true"
+            echo "internal_tick_gap_rejected=true"
+            echo "terminal_silence_tracked=true"
+            echo "silent_tick_count_origin_authenticated=false"
+            echo "live_population_event_checkpoint_wiring_complete=false"
+            echo "social_tick_checked_overflow_complete=false"
+            echo "raw_population_membership_private=false"
+            echo "population_snapshot_complete=false"
+            echo "population_execution_capsule_complete=false"
+            echo "alife_population_execution_resume_established=false"
+          } > target/alife-genesis-event-checkpoint-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-genesis-event-checkpoint-evidence
+          path: target/alife-genesis-event-checkpoint-evidence/qualification.txt
+          if-no-files-found: error
