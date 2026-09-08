@@ -1,0 +1,59 @@
+name: PA15 Fresh Diagnostic 20260908
+
+on:
+  push:
+    branches:
+      - physical-agency/pa-15-fresh-diag-20260908
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pa15-fresh-diagnostic-20260908-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    name: Diagnose unchanged PA-15 product bytes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout diagnostic subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Assert product parent
+        shell: bash
+        env:
+          EXPECTED_PRODUCT_PARENT: 2689cc4babb545c4f88781af5985d0079e858ed1
+        run: |
+          set -euo pipefail
+          actual_parent="$(git rev-parse HEAD^)"
+          echo "diagnostic_head=$(git rev-parse HEAD)"
+          echo "product_parent=${actual_parent}"
+          test "${actual_parent}" = "${EXPECTED_PRODUCT_PARENT}"
+          git diff --name-only "${EXPECTED_PRODUCT_PARENT}" HEAD | grep -Fx '.github/workflows/pa15-fresh-diagnostic-20260908.yml'
+          test "$(git diff --name-only "${EXPECTED_PRODUCT_PARENT}" HEAD | wc -l | tr -d ' ')" = "1"
+
+      - name: Install exact Rust toolchain
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Format Physical Agency packages
+        run: cargo fmt --check -p symthaea-physical-effects -p symthaea-physical-agency
+
+      - name: Check Physical Agency packages
+        run: cargo check -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
+
+      - name: Test Physical Agency packages
+        run: cargo test -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
+
+      - name: Clippy Physical Agency packages
+        run: cargo clippy -p symthaea-physical-effects -p symthaea-physical-agency --all-targets -- -D warnings
