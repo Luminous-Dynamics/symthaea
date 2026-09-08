@@ -19,6 +19,7 @@ use crate::release_pipeline::{
 use crate::types::{ActuationMode, HumanoidTask};
 
 pub const HUMANOID_QUALIFICATION_SUBJECT_SCHEMA_VERSION: u32 = 1;
+pub const SUPPORTED_EMBODIED_CONTROL_CERTIFICATE_SCHEMA_VERSION: u32 = 3;
 
 /// Minimum release stages required before evidence can grant motor authority.
 /// A custom release policy may be stricter, but not weaker, than this floor.
@@ -147,6 +148,9 @@ pub fn evaluate_humanoid_qualification(
     if release.schema_version != HUMANOID_RELEASE_PIPELINE_SCHEMA_VERSION {
         failures.push("release pipeline schema is not supported".to_string());
     }
+    if certificate.schema_version != SUPPORTED_EMBODIED_CONTROL_CERTIFICATE_SCHEMA_VERSION {
+        failures.push("embodied-control certificate schema is not supported".to_string());
+    }
     if release.release_id.trim().is_empty() || release.policy_id != policy.policy_id {
         failures.push("release identity or policy binding does not match".to_string());
     }
@@ -252,21 +256,65 @@ const fn actuation_mode_id(value: ActuationMode) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::release_pipeline::ReleaseStageEvidence;
+
+    fn subject(task: HumanoidTask) -> HumanoidQualificationSubject {
+        HumanoidQualificationSubject::new(
+            HumanoidMorphology::Dmc21,
+            task,
+            ActuationMode::NormalizedTorque,
+            "simple-sim-v1",
+        )
+    }
+
+    fn release_for(subject: &HumanoidQualificationSubject, generated_at: u64) -> HumanoidReleasePipelineReport {
+        let fingerprint = subject.fingerprint();
+        let stages = MOTOR_AUTHORITY_REQUIRED_STAGES
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(index, stage)| ReleaseStageEvidence {
+                stage,
+                artifact_id: format!("artifact-{index}"),
+                artifact_sha256: format!("{:064x}", index + 1),
+                producer_id: format!("producer-{index}"),
+                passed: true,
+                generated_unix_millis: generated_at,
+                subject_fingerprint: fingerprint,
+            })
+            .collect();
+        evaluate_release_pipeline(
+            "release-1",
+            &HumanoidReleasePipelinePolicy::default(),
+            stages,
+            generated_at,
+        )
+    }
+
+    fn certificate_for(subject: &HumanoidQualificationSubject) -> EmbodiedControlCertificate {
+        EmbodiedControlCertificate {
+            schema_version: SUPPORTED_EMBODIED_CONTROL_CERTIFICATE_SCHEMA_VERSION,
+            subject_fingerprint: subject.fingerprint(),
+            scenario_fingerprint: 42,
+            total_cases: 10,
+            fallback_rate: 0.0,
+            budget_miss_rate: 0.0,
+            fall_rate: 0.0,
+            recovery_rate: 1.0,
+            maximum_terrain_height_std_m: 0.0,
+            maximum_terrain_evidence_age_s: 0.0,
+            solver_derived_cases: 10,
+            floating_base_cases: 10,
+            upper_body_contact_cases: 1,
+            accepted: true,
+            failures: Vec::new(),
+        }
+    }
 
     #[test]
     fn subject_fingerprint_changes_with_task() {
-        let stand = HumanoidQualificationSubject::new(
-            HumanoidMorphology::Dmc21,
-            HumanoidTask::Stand,
-            ActuationMode::NormalizedTorque,
-            "simple-sim-v1",
-        );
-        let run = HumanoidQualificationSubject::new(
-            HumanoidMorphology::Dmc21,
-            HumanoidTask::Run,
-            ActuationMode::NormalizedTorque,
-            "simple-sim-v1",
-        );
+        let stand = subject(HumanoidTask::Stand);
+        let run = subject(HumanoidTask::Run);
         assert_ne!(stand.fingerprint(), 0);
         assert_ne!(stand.fingerprint(), run.fingerprint());
     }
@@ -280,6 +328,77 @@ mod tests {
             "",
         );
         assert_eq!(subject.fingerprint(), 0);
+    }
+
+    #[test]
+    fn current_subject_bound_evidence_grants_binary_qualification() {
+        let subject = subject(HumanoidTask::Stand);
+        let release = release_for(&subject, 1_000);
+        assert!(release.passed, "{:?}", release.failures);
+        let certificate = certificate_for(&subject);
+        let decision = evaluate_humanoid_qualification(
+            &subject,
+            &HumanoidReleasePipelinePolicy::default(),
+            &release,
+            &certificate,
+            1_000,
+        );
+        assert!(decision.qualified, "{:?}", decision.failures);
+        assert_eq!(decision.qualification_authority(), 1.0);
+    }
+
+    #[test]
+    fn task_mismatch_revokes_qualification() {
+        let stand = subject(HumanoidTask::Stand);
+        let run = subject(HumanoidTask::Run);
+        let release = release_for(&stand, 1_000);
+        let certificate = certificate_for(&stand);
+        let decision = evaluate_humanoid_qualification(
+            &run,
+            &HumanoidReleasePipelinePolicy::default(),
+            &release,
+            &certificate,
+            1_000,
+        );
+        assert!(!decision.qualified);
+        assert_eq!(decision.qualification_authority(), 0.0);
+    }
+
+    #[test]
+    fn evidence_that_ages_out_loses_qualification() {
+        let subject = subject(HumanoidTask::Stand);
+        let policy = HumanoidReleasePipelinePolicy::default();
+        let release = release_for(&subject, 1_000);
+        let certificate = certificate_for(&subject);
+        let stale_now = 1_000 + policy.maximum_evidence_age_millis + 1;
+        let decision = evaluate_humanoid_qualification(
+            &subject,
+            &policy,
+            &release,
+            &certificate,
+            stale_now,
+        );
+        assert!(!decision.qualified);
+        assert!(decision
+            .failures
+            .iter()
+            .any(|failure| failure.contains("stale evidence")));
+    }
+
+    #[test]
+    fn unsupported_certificate_schema_fails_closed() {
+        let subject = subject(HumanoidTask::Stand);
+        let release = release_for(&subject, 1_000);
+        let mut certificate = certificate_for(&subject);
+        certificate.schema_version += 1;
+        let decision = evaluate_humanoid_qualification(
+            &subject,
+            &HumanoidReleasePipelinePolicy::default(),
+            &release,
+            &certificate,
+            1_000,
+        );
+        assert!(!decision.qualified);
     }
 
     #[test]
