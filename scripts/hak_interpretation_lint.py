@@ -49,8 +49,8 @@ def _unique_map(items: list[Any], field: str, id_field: str) -> dict[str, dict[s
     return result
 
 
-def _digest(prefix: bytes, doc: dict[str, Any], field: str) -> str:
-    payload = {k: v for k, v in doc.items() if k != field}
+def _digest(prefix: bytes, doc: dict[str, Any], omitted_field: str | None = None) -> str:
+    payload = doc if omitted_field is None else {k: v for k, v in doc.items() if k != omitted_field}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     return "sha256:" + hashlib.sha256(prefix + encoded).hexdigest()
 
@@ -69,6 +69,10 @@ def _validate_responsible_actor(actor: dict[str, Any], field: str) -> None:
         _require(model_ref in (None, ""), f"{field}.model_ref requires model_assisted=true")
 
 
+def compute_plan_digest(plan: dict[str, Any]) -> str:
+    return _digest(b"hak.qualification-plan.v1\0", plan)
+
+
 def compute_conformance_digest(doc: dict[str, Any]) -> str:
     return _digest(b"hak.plan-conformance.v1\0", doc, "conformance_digest")
 
@@ -84,6 +88,10 @@ def validate_plan_conformance(
     evidence.validate_receipt(receipt)
     evidence.validate_plan_record_join(plan, receipt, plan_repo_path=plan_repo_path)
 
+    expected_plan_digest = compute_plan_digest(plan)
+    _require(receipt["qualification_plan"].get("plan_digest") == expected_plan_digest,
+             "receipt plan_digest must match the exact loaded qualification plan content")
+
     _require(record.get("schema_version") == "hak.plan-conformance.v1",
              "conformance schema_version must be hak.plan-conformance.v1")
     _text(record.get("conformance_id"), "conformance_id")
@@ -96,6 +104,8 @@ def validate_plan_conformance(
     plan_binding = _obj(record.get("plan"), "plan")
     _require(plan_binding.get("plan_ref") == receipt["qualification_plan"]["plan_ref"],
              "conformance plan_ref must match receipt")
+    _require(plan_binding.get("plan_digest") == expected_plan_digest,
+             "conformance plan_digest must match loaded qualification plan")
     receipt_binding = _obj(record.get("receipt"), "receipt")
     _require(receipt_binding.get("receipt_id") == receipt["receipt_id"],
              "conformance receipt_id must match receipt")
@@ -160,9 +170,14 @@ def validate_interpretation(
     plan_repo_path: str,
 ) -> None:
     evidence.validate_qualification_plan(plan)
+    expected_plan_digest = compute_plan_digest(plan)
+
     for receipt_id, receipt in receipts.items():
         evidence.validate_receipt(receipt)
         _require(receipt_id == receipt["receipt_id"], "receipt map key must equal receipt_id")
+        _require(receipt["qualification_plan"].get("plan_digest") == expected_plan_digest,
+                 f"receipt {receipt_id} plan_digest must match loaded qualification plan")
+
     for conformance_id, conf in conformances.items():
         _require(conformance_id == conf.get("conformance_id"),
                  "conformance map key must equal conformance_id")
@@ -174,6 +189,8 @@ def validate_interpretation(
              "interpretation schema_version must be hak.evidence-interpretation.v1")
     _text(record.get("record_id"), "record_id")
     plan_ref = _text(record.get("plan_ref"), "plan_ref")
+    _require(record.get("plan_digest") == expected_plan_digest,
+             "interpretation plan_digest must match loaded qualification plan")
     subject = _obj(record.get("subject"), "subject")
     _require(subject.get("repository") == plan["scope"]["repository"],
              "interpretation subject repository must match plan")
@@ -212,6 +229,8 @@ def validate_interpretation(
                  f"conformance {cid} subject must match interpretation subject")
         _require(conf["plan"]["plan_ref"] == plan_ref,
                  f"conformance {cid} plan_ref must match interpretation plan_ref")
+        _require(conf["plan"].get("plan_digest") == expected_plan_digest,
+                 f"conformance {cid} plan_digest must match interpretation plan")
 
     plan_claims = {x["claim_id"]: x for x in plan["claims"]}
     claims = _unique_map(_array(record.get("claims"), "claims"), "claims", "claim_id")
