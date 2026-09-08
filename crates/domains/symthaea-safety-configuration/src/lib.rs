@@ -9,6 +9,7 @@
 #![deny(unsafe_code)]
 
 pub mod observation;
+pub mod state;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
