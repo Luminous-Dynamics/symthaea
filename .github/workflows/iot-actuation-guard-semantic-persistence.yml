@@ -28,6 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Install exact formatter
         run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt
@@ -40,10 +41,36 @@ jobs:
           rustc --version | grep -F 'rustc 1.96.0'
           cargo --version | grep -F 'cargo 1.96.0'
 
-      - name: Check exact source formatting
+      - name: Check changed semantic-persistence source formatting
         run: |
-          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-semantic-persistence/src/lib.rs
-          rustfmt --edition 2024 --check crates/bridges/symthaea-iot-actuation-guard-semantic-persistence/tests/durable.rs
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            export BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            git cat-file -e "${BASE_SHA}^{commit}"
+            python3 - <<'PY'
+          import os
+          import subprocess
+
+          root = 'crates/bridges/symthaea-iot-actuation-guard-semantic-persistence'
+          base = os.environ['BASE_SHA']
+          changed = subprocess.run(
+              ['git', 'diff', '--name-only', f'{base}...HEAD', '--', root],
+              check=True,
+              capture_output=True,
+              text=True,
+          ).stdout.splitlines()
+          rust_sources = [path for path in changed if path.endswith('.rs')]
+          if rust_sources:
+              subprocess.run(
+                  ['rustfmt', '--edition', '2024', '--check', *rust_sources],
+                  check=True,
+              )
+          else:
+              print('No semantic-persistence Rust source changed in this PR.')
+          PY
+          else
+            cargo fmt --check -p symthaea-iot-actuation-guard-semantic-persistence
+          fi
 
       - name: Enforce semantic-persistence TCB
         run: |
