@@ -11,6 +11,7 @@
 #![deny(unsafe_code)]
 
 pub mod observation_admission;
+pub mod observation_commit_preconditions;
 
 use symthaea_safety_configuration::{
     ConfigurationDigest, SafetyConfigurationManifest, SafetyConfigurationManifestError,
