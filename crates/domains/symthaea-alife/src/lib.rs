@@ -49,6 +49,7 @@ pub mod metabolism;
 pub mod observatory;
 pub mod organism;
 pub mod organism_seed;
+pub mod organism_snapshot;
 pub mod perturbation;
 pub mod population;
 pub mod predator_prey;
@@ -111,6 +112,10 @@ pub use observatory::{
 pub use organism::{Action, Organism, OrganismConfig, OrganismTick, PendingSocialLearning};
 pub use organism_seed::{
     OrganismSeedAllocatorErrorV1, OrganismSeedAllocatorSnapshotV1, OrganismSeedAllocatorV1,
+};
+pub use organism_snapshot::{
+    OrganismConfigSnapshotV1, OrganismLedgerEntrySnapshotV1, OrganismSnapshotErrorV1,
+    OrganismSnapshotV1, ValidatedOrganismSnapshotV1,
 };
 pub use perturbation::{PerturbationError, PerturbationSchedule, ResourcePerturbation};
 pub use population::{
