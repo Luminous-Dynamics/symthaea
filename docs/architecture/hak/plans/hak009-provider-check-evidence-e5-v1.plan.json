@@ -10,7 +10,7 @@
   "claims": [
     {
       "claim_id": "HAK009-JOIN-001",
-      "statement": "The audit-only HAK-009 linter rejects provider-bound check evidence whose subject, plan, terminal receipt, execution run/attempt, workflow, or plan obligation drifts from the exact source lineage.",
+      "statement": "The audit-only HAK-009 linter rejects provider-bound check evidence whose subject, plan, terminal receipt, execution run/attempt, workflow, plan obligation, or provider job identity/metadata drifts from the exact source lineage.",
       "target_tier": "E5"
     },
     {
@@ -58,6 +58,8 @@
     "provider-bound plan-digest mismatch",
     "provider-bound receipt-digest mismatch",
     "provider job reference mismatch",
+    "provider job missing from terminal qualification receipt",
+    "provider job metadata mismatch with terminal qualification receipt",
     "provider-bound evidence digest tampering",
     "Passed conformance without provider-bound evidence",
     "Passed conformance with detached evidence reference",
