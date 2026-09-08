@@ -18,6 +18,7 @@ class MergeAdmissionPolicyV3Tests(unittest.TestCase):
             "scripts/ci/required_ci_job_manifest_v1.schema.json",
             "scripts/ci/required_ci_job_manifest_v1.json",
             "scripts/ci/merge_admission_manifest_v2.py",
+            "scripts/ci/validate_required_ci_job_manifest_v3.py",
             "scripts/ci/merge_admission_policy_v3.json",
             "scripts/ci/evaluate_merge_admission_v3.py",
             "scripts/ci/run_merge_admission_v3.py",
