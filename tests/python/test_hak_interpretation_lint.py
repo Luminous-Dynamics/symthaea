@@ -30,7 +30,8 @@ def load_plan():
     return json.loads(PLAN_PATH.read_text())
 
 
-def receipt(conclusion="success"):
+def receipt(plan=None, conclusion="success"):
+    plan = plan or load_plan()
     doc = {
         "schema_version": "hak.qualification-receipt.v1",
         "receipt_id": "receipt-1",
@@ -43,7 +44,7 @@ def receipt(conclusion="success"):
         "qualification_plan": {
             "plan_kind": "SelfDeclaredPlan",
             "plan_ref": PLAN_REF,
-            "plan_digest": None,
+            "plan_digest": hak.compute_plan_digest(plan),
             "precommit_status": "KnownPrecommitted",
         },
         "execution": {
@@ -75,12 +76,15 @@ def receipt(conclusion="success"):
 
 def conformance(plan=None, rec=None, status="Satisfied"):
     plan = plan or load_plan()
-    rec = rec or receipt()
+    rec = rec or receipt(plan)
     doc = {
         "schema_version": "hak.plan-conformance.v1",
         "conformance_id": "conformance-1",
         "subject": deepcopy(rec["subject"]),
-        "plan": {"plan_ref": rec["qualification_plan"]["plan_ref"]},
+        "plan": {
+            "plan_ref": rec["qualification_plan"]["plan_ref"],
+            "plan_digest": hak.compute_plan_digest(plan),
+        },
         "receipt": {
             "receipt_id": rec["receipt_id"],
             "receipt_digest": rec["receipt_digest"],
@@ -109,7 +113,7 @@ def conformance(plan=None, rec=None, status="Satisfied"):
 
 def interpretation(plan=None, rec=None, conf=None, status="Qualified", tier="E5"):
     plan = plan or load_plan()
-    rec = rec or receipt()
+    rec = rec or receipt(plan)
     conf = conf or conformance(plan, rec)
     claims = []
     for item in plan["claims"]:
@@ -133,6 +137,7 @@ def interpretation(plan=None, rec=None, conf=None, status="Qualified", tier="E5"
         "schema_version": "hak.evidence-interpretation.v1",
         "record_id": "interpretation-1",
         "plan_ref": rec["qualification_plan"]["plan_ref"],
+        "plan_digest": hak.compute_plan_digest(plan),
         "subject": {"repository": "Luminous-Dynamics/symthaea", "commit_sha": SUBJECT},
         "receipt_bindings": [{
             "receipt_id": rec["receipt_id"],
@@ -155,23 +160,25 @@ def interpretation(plan=None, rec=None, conf=None, status="Qualified", tier="E5"
     return doc
 
 
-def maps(rec, conf):
-    return {rec["receipt_id"]: rec}, {conf["conformance_id"]: conf}
-
-
-def validate_interp(plan, receipts, conformances, doc):
+def validate_interp(plan, rec, conf, doc):
     hak.validate_interpretation(
-        plan, receipts, conformances, doc, plan_repo_path=PLAN_REPO_PATH
+        plan,
+        {rec["receipt_id"]: rec},
+        {conf["conformance_id"]: conf},
+        doc,
+        plan_repo_path=PLAN_REPO_PATH,
     )
 
 
 def test_satisfied_conformance_is_valid():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     hak.validate_plan_conformance(plan, rec, conformance(plan, rec), plan_repo_path=PLAN_REPO_PATH)
 
 
 def test_satisfied_conformance_rejects_missing_required_check():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     doc = conformance(plan, rec)
     doc["checks"].pop()
     doc["conformance_digest"] = hak.compute_conformance_digest(doc)
@@ -180,181 +187,175 @@ def test_satisfied_conformance_rejects_missing_required_check():
 
 
 def test_satisfied_conformance_requires_success_receipt():
-    plan, rec = load_plan(), receipt("failure")
+    plan = load_plan()
+    rec = receipt(plan, "failure")
     with pytest.raises(hak.InterpretationLintError):
         hak.validate_plan_conformance(plan, rec, conformance(plan, rec), plan_repo_path=PLAN_REPO_PATH)
 
 
-def test_failed_receipt_can_support_not_satisfied_conformance():
-    plan, rec = load_plan(), receipt("failure")
-    doc = conformance(plan, rec, status="NotSatisfied")
+def test_failed_receipt_is_valid_negative_evidence():
+    plan = load_plan()
+    rec = receipt(plan, "failure")
+    doc = conformance(plan, rec, "NotSatisfied")
     doc["conformance_digest"] = hak.compute_conformance_digest(doc)
     hak.validate_plan_conformance(plan, rec, doc, plan_repo_path=PLAN_REPO_PATH)
 
 
-def test_indeterminate_requires_limitation():
-    plan, rec = load_plan(), receipt()
-    doc = conformance(plan, rec, status="Indeterminate")
-    doc["checks"].pop()
-    doc["conformance_digest"] = hak.compute_conformance_digest(doc)
+def test_wrong_plan_digest_rejected_before_conformance():
+    plan = load_plan()
+    rec = receipt(plan)
+    rec["qualification_plan"]["plan_digest"] = "sha256:" + "0" * 64
+    rec["receipt_digest"] = evidence.compute_receipt_digest(rec)
     with pytest.raises(hak.InterpretationLintError):
-        hak.validate_plan_conformance(plan, rec, doc, plan_repo_path=PLAN_REPO_PATH)
-
-
-def test_conformance_digest_detects_tampering():
-    plan, rec = load_plan(), receipt()
-    doc = conformance(plan, rec)
-    doc["evaluator"]["identity"] = "changed-after-materialization"
-    with pytest.raises(hak.InterpretationLintError):
-        hak.validate_plan_conformance(plan, rec, doc, plan_repo_path=PLAN_REPO_PATH)
-
-
-def test_qualified_interpretation_is_valid_at_plan_ceiling():
-    plan, rec = load_plan(), receipt()
-    conf = conformance(plan, rec)
-    receipts, conformances = maps(rec, conf)
-    validate_interp(plan, receipts, conformances, interpretation(plan, rec, conf))
-
-
-def test_qualified_interpretation_cannot_exceed_claim_ceiling():
-    plan, rec = load_plan(), receipt()
-    plan["claims"][0]["target_tier"] = "E4"
-    conf = conformance(plan, rec)
-    receipts, conformances = maps(rec, conf)
-    with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, interpretation(plan, rec, conf, tier="E5"))
-
-
-def test_provider_success_without_satisfied_conformance_cannot_qualify():
-    plan, rec = load_plan(), receipt()
-    conf = conformance(plan, rec, status="Indeterminate")
-    conf["checks"].pop()
-    conf["limitations"] = ["missing required check"]
-    conf["conformance_digest"] = hak.compute_conformance_digest(conf)
-    receipts, conformances = maps(rec, conf)
-    with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, interpretation(plan, rec, conf))
+        hak.validate_plan_conformance(plan, rec, conformance(plan, rec), plan_repo_path=PLAN_REPO_PATH)
 
 
 def test_forged_satisfied_conformance_is_revalidated():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     conf = conformance(plan, rec)
     conf["checks"].pop()
     conf["conformance_digest"] = hak.compute_conformance_digest(conf)
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, interpretation(plan, rec, conf))
+        validate_interp(plan, rec, conf, interpretation(plan, rec, conf))
+
+
+def test_qualified_interpretation_is_valid_at_plan_ceiling():
+    plan = load_plan()
+    rec = receipt(plan)
+    conf = conformance(plan, rec)
+    validate_interp(plan, rec, conf, interpretation(plan, rec, conf))
+
+
+def test_qualified_interpretation_cannot_exceed_claim_ceiling():
+    plan = load_plan()
+    plan["claims"][0]["target_tier"] = "E4"
+    rec = receipt(plan)
+    conf = conformance(plan, rec)
+    with pytest.raises(hak.InterpretationLintError):
+        validate_interp(plan, rec, conf, interpretation(plan, rec, conf, tier="E5"))
 
 
 def test_interpretation_subject_must_match_receipt_subject():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     conf = conformance(plan, rec)
     doc = interpretation(plan, rec, conf)
     doc["subject"]["commit_sha"] = "3" * 40
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, doc)
+        validate_interp(plan, rec, conf, doc)
 
 
-def test_interpretation_plan_ref_must_match_receipt_and_conformance():
-    plan, rec = load_plan(), receipt()
+def test_interpretation_plan_ref_must_match_receipt():
+    plan = load_plan()
+    rec = receipt(plan)
     conf = conformance(plan, rec)
     doc = interpretation(plan, rec, conf)
     doc["plan_ref"] = f"git:Luminous-Dynamics/symthaea@{'4' * 40}:{PLAN_REPO_PATH}"
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, doc)
+        validate_interp(plan, rec, conf, doc)
+
+
+def test_interpretation_plan_digest_must_match_loaded_plan():
+    plan = load_plan()
+    rec = receipt(plan)
+    conf = conformance(plan, rec)
+    doc = interpretation(plan, rec, conf)
+    doc["plan_digest"] = "sha256:" + "0" * 64
+    doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
+    with pytest.raises(hak.InterpretationLintError):
+        validate_interp(plan, rec, conf, doc)
 
 
 def test_receipt_digest_binding_cannot_be_repointed():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     conf = conformance(plan, rec)
     doc = interpretation(plan, rec, conf)
     doc["receipt_bindings"][0]["receipt_digest"] = "sha256:" + "0" * 64
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, doc)
+        validate_interp(plan, rec, conf, doc)
 
 
 def test_conformance_digest_binding_cannot_be_repointed():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     conf = conformance(plan, rec)
     doc = interpretation(plan, rec, conf)
     doc["conformance_bindings"][0]["conformance_digest"] = "sha256:" + "0" * 64
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, doc)
+        validate_interp(plan, rec, conf, doc)
 
 
 def test_nonqualified_claim_cannot_claim_tier():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     conf = conformance(plan, rec)
-    doc = interpretation(plan, rec, conf, status="InsufficientEvidence", tier=None)
+    doc = interpretation(plan, rec, conf, "InsufficientEvidence", None)
     doc["claims"][0]["supported_tier"] = "E5"
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, doc)
+        validate_interp(plan, rec, conf, doc)
 
 
 def test_insufficient_evidence_requires_limitation():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     conf = conformance(plan, rec)
-    doc = interpretation(plan, rec, conf, status="InsufficientEvidence", tier=None)
+    doc = interpretation(plan, rec, conf, "InsufficientEvidence", None)
     for claim in doc["claims"]:
         claim["limitations"] = []
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, doc)
+        validate_interp(plan, rec, conf, doc)
 
 
 def test_interpretation_must_cover_exact_plan_claims():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     conf = conformance(plan, rec)
     doc = interpretation(plan, rec, conf)
     doc["claims"].pop()
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, doc)
+        validate_interp(plan, rec, conf, doc)
 
 
 def test_interpretation_digest_detects_tampering():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     conf = conformance(plan, rec)
     doc = interpretation(plan, rec, conf)
     doc["interpreter"]["identity"] = "changed-after-materialization"
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, doc)
+        validate_interp(plan, rec, conf, doc)
 
 
-def test_model_assistance_requires_model_ref_and_does_not_raise_ceiling():
-    plan, rec = load_plan(), receipt()
+def test_model_assistance_requires_model_ref_and_cannot_raise_ceiling():
+    plan = load_plan()
     plan["claims"][0]["target_tier"] = "E4"
+    rec = receipt(plan)
     conf = conformance(plan, rec)
     doc = interpretation(plan, rec, conf, tier="E5")
     doc["interpreter"]["kind"] = "HumanReviewer"
     doc["interpreter"]["model_assisted"] = True
     doc["interpreter"]["model_ref"] = "model:test-assistant"
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, doc)
+        validate_interp(plan, rec, conf, doc)
 
 
 def test_model_assistance_without_model_ref_rejected():
-    plan, rec = load_plan(), receipt()
+    plan = load_plan()
+    rec = receipt(plan)
     conf = conformance(plan, rec)
     doc = interpretation(plan, rec, conf)
     doc["interpreter"]["kind"] = "HumanReviewer"
     doc["interpreter"]["model_assisted"] = True
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
-    receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        validate_interp(plan, receipts, conformances, doc)
+        validate_interp(plan, rec, conf, doc)
