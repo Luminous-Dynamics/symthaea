@@ -36,6 +36,7 @@ pub mod evolution_birth;
 pub mod evolution_rng;
 pub mod evolutionary_history;
 pub mod exact_sign_test;
+pub mod genesis_event_batch;
 pub mod genesis_tick;
 pub mod genome;
 pub mod hierarchy;
@@ -93,6 +94,10 @@ pub use evolutionary_history::{
 pub use exact_sign_test::{
     ExactPositiveSignTestV1, ExactSignTestErrorV1, MAX_EXACT_SIGN_TEST_NON_TIES,
     exact_positive_sign_test,
+};
+pub use genesis_event_batch::{
+    GenesisTickBatchErrorV1, GenesisTickBatchV1, GenesisTickChunkSummaryV1,
+    ValidatedGenesisTickBatchV1, validate_genesis_tick_chunk,
 };
 pub use genesis_tick::{
     GenesisTickCursorErrorV1, GenesisTickCursorSnapshotV1, GenesisTickCursorV1,
