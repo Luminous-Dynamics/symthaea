@@ -21,3 +21,5 @@ symthaea-operating-envelope = { path = "../symthaea-operating-envelope" }
 symthaea-resource-hierarchy = { path = "../symthaea-resource-hierarchy" }
 symthaea-resource-model = { path = "../symthaea-resource-model" }
 symthaea-safety-configuration = { path = "../symthaea-safety-configuration" }
+symthaea-safety-profile = { path = "../symthaea-safety-profile" }
+symthaea-safety-qualification = { path = "../symthaea-safety-qualification" }
