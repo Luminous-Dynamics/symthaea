@@ -50,13 +50,31 @@ jobs:
           grep -q 'distinct evidence-root count' "$doc"
           grep -q 'independent evidence-item count' "$doc"
 
-          # Issuance accepts validated lineage + selected ids only. Callers do not
-          # supply root sets, pair labels, or independence counts.
           grep -q 'pub fn issue_independent_evidence_set_witness_v1' "$production"
           grep -q 'graph: &ValidatedEvidenceLineageGraphV1' "$production"
           grep -q 'selected_evidence_ids: &\[String\]' "$production"
-          if grep -Eq 'pub fn issue_independent_evidence_set_witness_v1[^\{]*(root_ids|pair_status|independence_count)' "$production"; then
-            echo 'Evidence-set witness issuer acquired caller-authored independence semantics.' >&2
+          if grep -Eq 'pub fn issue_independent_evidence_set_witness_v1[^\{]*(root_ids|pair_status|independence_count|lineage_graph_id)' "$production"; then
+            echo 'Evidence-set witness issuer acquired caller-authored independence or lineage identity semantics.' >&2
+            exit 1
+          fi
+
+      - name: Freeze canonical lineage-generation binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/evidence_set_witness.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'lineage_generation=canonical_validated_graph_content_identity_v1' "$production"
+          grep -q 'legacy_producer_graph_id_is_not_witness_authority' "$production"
+          grep -q 'let lineage_graph_id = canonical_evidence_lineage_graph_id_v1(graph);' "$production"
+          grep -q 'pub fn lineage_graph_id' "$production"
+          grep -q 'b"lineage_graph_id"' "$production"
+          grep -q 'unrelated_lineage_change_changes_witness_identity_even_if_selected_subset_is_same' "$production"
+
+          if grep -Eq 'CanonicalLineageIdentityError|LineageIdentity\(|map_err\(EvidenceSetWitnessError::LineageIdentity\)' "$production"; then
+            echo 'Evidence-set witness reintroduced a fallible serializer-derived lineage identity path.' >&2
             exit 1
           fi
 
@@ -68,7 +86,7 @@ jobs:
           production=$(mktemp)
           sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
 
-          grep -q 'graph.root_ids' "$production"
+          grep -q 'graph.*root_ids' "$production" || grep -q '.root_ids' "$production"
           grep -q 'graph.*assess_independence' "$production" || grep -q '.assess_independence' "$production"
           grep -q 'status != EvidenceIndependenceV1::Independent' "$production"
           grep -q 'has_root_overlap' "$production"
@@ -77,8 +95,6 @@ jobs:
           grep -q 'selected.sort' "$production"
           grep -q 'pair_count(items.len())' "$production"
 
-          # Exact selected-item topology is exposed; no convenience API may turn
-          # ancestry-root count or pair-edge count into an independence count.
           grep -q 'pub fn items' "$production"
           grep -q 'pub fn pairs' "$production"
           grep -q 'pub fn distinct_root_ids' "$production"
@@ -97,6 +113,7 @@ jobs:
 
           grep -q 'WITNESS_ID_DOMAIN' "$production"
           grep -q 'b"profile_contract_digest"' "$production"
+          grep -q 'b"lineage_graph_id"' "$production"
           grep -q 'b"item_count"' "$production"
           grep -q 'b"evidence_id"' "$production"
           grep -q 'b"item_root_count"' "$production"
@@ -122,11 +139,22 @@ jobs:
             exit 1
           fi
 
-      - name: Freeze adversarial witness tests
+      - name: Freeze adversarial and external known-answer witness tests
         shell: bash
         run: |
           set -euo pipefail
           src=crates/core/symthaea-epistemic-governance/src/evidence_set_witness.rs
+          vectors=crates/core/symthaea-epistemic-governance/tests/lineage_identity_vectors.rs
+
+          grep -q 'independent_evidence_witness_v1_known_answers' "$vectors"
+          grep -q 'canonical_multiroot_lineage_graph_id_v1_known_answer' "$vectors"
+          grep -q 'independent_multiroot_three_item_witness_v1_known_answers' "$vectors"
+          grep -q 'blake3:56afd81e7d6db518a69563a185e486a0f3235e9cb5543f456415d3ca01559146' "$vectors"
+          grep -q 'blake3:08b22bdc6eb5775186c3d1f2695fc8b45cd2e7de142178fce0b03f217a31af89' "$vectors"
+          grep -q 'blake3:907108bd4dd6283c72085e625e8dfc89ffd9785a795dcee328d651704afe7740' "$vectors"
+          grep -q 'blake3:9115d0bacd4e4a9f461d2803ad660ff47bf2e0828fae21021add160e6ec936a4' "$vectors"
+          grep -q 'blake3:9fd4ef214fe13a7fce258f62db66d4ed418021fe1f372238ae896f3c20414275' "$vectors"
+
           grep -q 'multiroot_derived_item_is_one_independent_item_not_multiple_confirmations' "$src"
           grep -q 'shared_root_siblings_cannot_form_independent_set_witness' "$src"
           grep -q 'ancestor_and_descendant_cannot_form_independent_set_witness' "$src"
@@ -134,6 +162,8 @@ jobs:
           grep -q 'duplicate_selected_item_fails_closed' "$src"
           grep -q 'unknown_item_fails_through_lineage_validation' "$src"
           grep -q 'selected_item_change_changes_witness_identity' "$src"
+          grep -q 'unrelated_lineage_change_changes_witness_identity' "$src"
+          grep -q 'legacy_graph_label_does_not_change_witness_identity' "$src"
           grep -q 'issued_witness_serializes_for_audit_only' "$src"
 
       - name: Verify governance dependency direction
@@ -148,6 +178,9 @@ jobs:
 
       - name: Format epistemic governance
         run: cargo +1.94.0 fmt -p symthaea-epistemic-governance -- --check
+
+      - name: Test external lineage and witness known-answer vectors
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance --test lineage_identity_vectors
 
       - name: Test evidence set witness
         run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance --lib evidence_set_witness

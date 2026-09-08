@@ -1,0 +1,166 @@
+name: RCA Canonical Evidence Lineage Identity
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-epistemic-governance/**'
+      - '.github/workflows/rca-canonical-evidence-lineage-identity.yml'
+      - '.github/workflows/rca-independent-evidence-set-witness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify explicit qualification toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(rustc +1.94.0 --version | awk '{print $2}')" = '1.94.0'
+          cargo +1.94.0 --version
+          rustfmt +1.94.0 --version
+          cargo +1.94.0 clippy --version
+
+      - name: Freeze legacy-label versus canonical-identity boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/lineage_identity.rs
+          lib=crates/core/symthaea-epistemic-governance/src/lib.rs
+          doc=crates/core/symthaea-epistemic-governance/CANONICAL_EVIDENCE_LINEAGE_IDENTITY.md
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'pub mod lineage_identity;' "$lib"
+          grep -q 'CANONICAL_EVIDENCE_LINEAGE_IDENTITY_CONTRACT_V1' "$production"
+          grep -q 'identity_source=typed_validated_semantics_not_serde_wire_projection' "$production"
+          grep -q 'legacy_wire_graph_id_is_explicitly_excluded_from_governance_identity' "$production"
+          grep -q 'canonical_identity_derivation_is_infallible_after_validation' "$production"
+          grep -q 'canonical_evidence_lineage_graph_id_v1' "$production"
+          grep -q 'producer graph label' "$doc"
+          grep -q 'validated typed lineage semantics' "$doc"
+          grep -q 'canonical identity derivation is infallible after validation' "$doc"
+
+          if grep -q 'graph_id()' "$production" || grep -q 'object.get("graph_id")' "$production"; then
+            echo 'Legacy producer graph_id entered canonical identity.' >&2
+            exit 1
+          fi
+
+      - name: Freeze typed serializer-free semantic graph identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/lineage_identity.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+
+          grep -q 'graph[[:space:]]*\.nodes()' "$production" || grep -q '\.nodes()' "$production"
+          grep -q 'node.evidence_id()' "$production"
+          grep -q 'node.parent_ids()' "$production"
+          grep -q 'node.derivation_kind()' "$production"
+          grep -q 'fn derivation_kind_tag' "$production"
+          grep -q 'GRAPH_ID_DOMAIN' "$production"
+          grep -q 'b"profile_contract_digest"' "$production"
+          grep -q 'b"identity_schema_version"' "$production"
+          grep -q 'b"graph_schema_version"' "$production"
+          grep -q 'b"node_count"' "$production"
+          grep -q 'b"node_schema_version"' "$production"
+          grep -q 'b"evidence_id"' "$production"
+          grep -q 'b"derivation_kind"' "$production"
+          grep -q 'b"parent_count"' "$production"
+          grep -q 'b"parent_id"' "$production"
+          grep -q 'parent_ids.sort()' "$production"
+          grep -q 'nodes.sort_by' "$production"
+
+          for variant in RootObservation Retrieval Transformation Inference Simulation Summary Critique FormalDerivation Other
+          do
+            grep -q "CognitiveDerivationKindV1::$variant" "$production"
+          done
+          for tag in root_observation retrieval transformation inference simulation summary critique formal_derivation other
+          do
+            grep -q "\"$tag\"" "$production"
+          done
+
+          if grep -Eq 'serde_json::|serde::|Value::|as_object\(|as_array\(|object\.get\(|CanonicalLineageIdentityError|UnexpectedWireShape|UnexpectedDerivationTag|DefaultHasher|std::hash|format!\("\{:\?\}"' "$production"; then
+            echo 'Canonical lineage identity acquired serializer/wire/debug/Rust Hash semantics.' >&2
+            exit 1
+          fi
+          if grep -Eq 'canonical_evidence_lineage_graph_id_v1[^\{]*Result<' "$production"; then
+            echo 'Canonical lineage identity became fallible after validated input.' >&2
+            exit 1
+          fi
+
+      - name: Freeze adversarial and external known-answer identity tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/lineage_identity.rs
+          vectors=crates/core/symthaea-epistemic-governance/tests/lineage_identity_vectors.rs
+
+          grep -q 'canonical_lineage_profile_digest_v1_known_answer' "$vectors"
+          grep -q 'canonical_two_node_lineage_graph_id_v1_known_answer' "$vectors"
+          grep -q 'canonical_multiroot_lineage_graph_id_v1_known_answer' "$vectors"
+          grep -q 'independent_multiroot_three_item_witness_v1_known_answers' "$vectors"
+          grep -q 'blake3:ff23c2ba0796d14eefd10c327542e8f0287bab3d09cb3bb2515c86fd72803d4a' "$vectors"
+          grep -q 'blake3:916114cbe9c4ff598097fd2702e965a4b3a763bfcc92e569fb986397371363d6' "$vectors"
+          grep -q 'blake3:9115d0bacd4e4a9f461d2803ad660ff47bf2e0828fae21021add160e6ec936a4' "$vectors"
+          grep -q 'blake3:9fd4ef214fe13a7fce258f62db66d4ed418021fe1f372238ae896f3c20414275' "$vectors"
+
+          grep -q 'explicit_derivation_tags_are_stable' "$src"
+          grep -q 'legacy_graph_label_does_not_define_canonical_identity' "$src"
+          grep -q 'node_and_parent_order_do_not_change_identity' "$src"
+          grep -q 'unrelated_node_addition_changes_identity' "$src"
+          grep -q 'derivation_change_changes_identity' "$src"
+          grep -q 'parent_change_changes_identity' "$src"
+
+      - name: Freeze no downstream authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/core/symthaea-epistemic-governance/src/lineage_identity.rs
+          production=$(mktemp)
+          sed '/^#\[cfg(test)\]/,$d' "$src" > "$production"
+          if grep -Eqi 'CanonicalBelief|CanonicalEpistemicClaim|global.?workspace|action_author|external_effect|self.?improvement.*promotion|ShadowDisposition' "$production"; then
+            echo 'Canonical lineage identity crossed a downstream authority boundary.' >&2
+            exit 1
+          fi
+
+      - name: Verify governance dependency direction
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo +1.94.0 tree --locked -p symthaea-epistemic-governance -e normal)"
+          if printf '%s\n' "$tree" | grep -Eq 'symthaea-rca-(shadow|observer|evidence|shadow-case|bound-shadow-case|disposition)'; then
+            echo 'Generic lineage identity acquired an RCA runtime/bridge dependency.' >&2
+            exit 1
+          fi
+
+      - name: Format epistemic governance
+        run: cargo +1.94.0 fmt -p symthaea-epistemic-governance -- --check
+
+      - name: Test canonical lineage identity
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance --lib lineage_identity
+
+      - name: Test canonical lineage known-answer vectors
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance --test lineage_identity_vectors
+
+      - name: Test evidence set witness
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance --lib evidence_set_witness
+
+      - name: Test epistemic governance
+        run: cargo +1.94.0 test --locked -p symthaea-epistemic-governance
+
+      - name: Clippy epistemic governance
+        run: cargo +1.94.0 clippy --locked -p symthaea-epistemic-governance --all-targets -- -D warnings
