@@ -1,0 +1,74 @@
+{
+  "schema_version": "hak.qualification-plan.v1",
+  "plan_id": "hak008-plan-conformance-interpretation-e5-v1",
+  "plan_kind": "SelfDeclaredPlan",
+  "scope": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "subject_kind": "git-commit",
+    "workflow_path": ".github/workflows/hak-interpretation.yml"
+  },
+  "claims": [
+    {
+      "claim_id": "HAK008-CONFORMANCE-001",
+      "statement": "A stored plan-conformance status is revalidated against the exact qualification plan and receipt before interpretation may rely on it.",
+      "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK008-CEILING-001",
+      "statement": "Qualified interpretation cannot claim an evidence tier above either the precommitted claim target or the plan evidence target.",
+      "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK008-FAILURE-001",
+      "statement": "A valid terminal failure remains valid negative execution evidence and can support NotSatisfied without becoming invalid evidence.",
+      "target_tier": "E5"
+    }
+  ],
+  "required_checks": [
+    {
+      "check_id": "exact-head",
+      "description": "Resolve, checkout, and assert the exact PR head."
+    },
+    {
+      "check_id": "compile-evidence",
+      "description": "Compile the inherited HAK-007 evidence linter."
+    },
+    {
+      "check_id": "compile-interpretation",
+      "description": "Compile scripts/hak_interpretation_lint.py under Python 3.12."
+    },
+    {
+      "check_id": "plan-lint",
+      "description": "Lint the HAK-008 machine-readable qualification plan with HAK-007 tooling."
+    },
+    {
+      "check_id": "regressions",
+      "description": "Run tests/python/test_hak_interpretation_lint.py."
+    }
+  ],
+  "required_negative_cases": [
+    "Satisfied conformance missing a required check",
+    "Satisfied conformance backed by non-success receipt",
+    "Indeterminate conformance without limitation",
+    "forged Satisfied conformance label",
+    "Qualified interpretation above claim target tier",
+    "provider success without Satisfied conformance",
+    "non-Qualified claim smuggling supported tier",
+    "InsufficientEvidence without limitation",
+    "interpretation missing a plan claim",
+    "conformance digest tampering",
+    "interpretation digest tampering",
+    "model assistance attempting to exceed evidence ceiling"
+  ],
+  "provider_policy": {
+    "allowed_providers": ["github-actions"],
+    "exact_head_required": true
+  },
+  "independence": {
+    "plan_authority": "self-declared by subject repository",
+    "execution_provider": "GitHub Actions hosted runner",
+    "claim_interpretation": "separate interpretation of hosted result remains required"
+  },
+  "evidence_target": "E5",
+  "supersedes_plan_ref": null
+}
