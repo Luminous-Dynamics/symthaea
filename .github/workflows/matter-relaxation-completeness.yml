@@ -1,0 +1,71 @@
+name: Matter Relaxation Physical Completeness
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_relaxation_completeness.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-relaxation-completeness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "4f44bad70b0e1cbef516433fa9ee6b2d2ae0d561"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-relaxation-completeness.yml
+          src/knowledge/matter_relaxation_completeness.rs
+          src/knowledge/mod.rs
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates scripts || true)"
+
+      - name: Ratchet fixed-cell versus variable-cell semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_relaxation_completeness.rs
+          grep -q 'RelaxationCellMode' "$f"
+          grep -q 'FixedCell' "$f"
+          grep -q 'VariableCell' "$f"
+          grep -q 'VariableMetricsRequired' "$f"
+          grep -q 'VariableMetricsForbiddenForFixedCell' "$f"
+          grep -q 'maximum_absolute_stress_gpa_bits' "$f"
+          grep -q 'maximum_relative_cell_change_bits' "$f"
+          grep -q 'StressCriterionNotMet' "$f"
+          grep -q 'CellChangeCriterionNotMet' "$f"
+          grep -q 'require_preregistration_before' "$f"
+          grep -q 'ModeDeclarationPostdatesRelaxation' "$f"
+          grep -q 'ModeDeclarationMissingFromStepClaim' "$f"
+          grep -q 'diagnostic_artifact_id != graph.result.diagnostic_evidence_id' "$f"
+          grep -q 'DeclaredChronologyOnly' "$f"
+          grep -q 'ForceCriterionUnderDeclaredFixedCell' "$f"
+          grep -q 'ForceStressAndCellCriteriaWithinDeclaredTolerances' "$f"
+          ! grep -q 'RelaxationConverged' "$f"
+          ! grep -q 'trusted timestamp' "$f"
+
+      - name: Ratchet strict public boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '^mod matter_periodic_convergence_binding;' src/knowledge/mod.rs
+          grep -q '^pub mod matter_relaxation_completeness;' src/knowledge/mod.rs
+          grep -q 'bind_strictly_converged_crystal_execution_plan' src/knowledge/matter_relaxation_completeness.rs
+
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Focused regression tests
+        run: cargo test --locked matter_relaxation_completeness --lib
