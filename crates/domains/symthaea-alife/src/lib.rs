@@ -36,6 +36,7 @@ pub mod evolution_birth;
 pub mod evolution_rng;
 pub mod evolutionary_history;
 pub mod exact_sign_test;
+pub mod genesis_evidence_checkpoint;
 pub mod genesis_event_batch;
 pub mod genesis_social_runner;
 pub mod genesis_tick;
@@ -95,6 +96,10 @@ pub use evolutionary_history::{
 pub use exact_sign_test::{
     ExactPositiveSignTestV1, ExactSignTestErrorV1, MAX_EXACT_SIGN_TEST_NON_TIES,
     exact_positive_sign_test,
+};
+pub use genesis_evidence_checkpoint::{
+    GenesisEvidenceCheckpointErrorV1, GenesisEvidenceCheckpointV1,
+    ValidatedGenesisEvidenceCheckpointV1,
 };
 pub use genesis_event_batch::{
     GenesisTickBatchErrorV1, GenesisTickBatchV1, GenesisTickChunkSummaryV1,
