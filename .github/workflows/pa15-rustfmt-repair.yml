@@ -1,0 +1,44 @@
+name: PA15 Rustfmt Repair
+
+on:
+  push:
+    branches:
+      - physical-agency/pa-15-rustfmt-repair-work
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  format:
+    name: Format Physical Agency with Rust 1.96
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install exact formatter
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format only Physical Agency packages
+        run: cargo fmt -p symthaea-physical-effects -p symthaea-physical-agency
+
+      - name: Commit formatter-only tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add crates/domains/symthaea-physical-effects crates/domains/symthaea-physical-agency
+          if git diff --cached --quiet; then
+            echo "No formatting changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style(physical-agency): apply Rust 1.96 formatting"
+          git push origin HEAD:physical-agency/pa-15-rustfmt-repair-work
