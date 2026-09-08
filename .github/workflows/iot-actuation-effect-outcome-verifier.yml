@@ -22,6 +22,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Verify exact checkout
         run: |
@@ -160,7 +161,24 @@ jobs:
           toolchain: 1.96.0
           components: rustfmt
 
-      - name: Rustfmt outcome verifier
+      - name: Rustfmt changed outcome-verifier sources
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base='${{ github.event.pull_request.base.sha }}'
+          root='crates/bridges/symthaea-iot-actuation-effect-outcome-verifier'
+          git cat-file -e "${base}^{commit}"
+          changed="$(git diff --name-only "$base"...HEAD -- "$root")"
+          mapfile -t files < <(printf '%s\n' "$changed" | grep -E '\.rs$' || true)
+          if ((${#files[@]})); then
+            printf 'rustfmt checking changed source: %s\n' "${files[@]}"
+            rustfmt +1.96.0 --edition 2024 --check "${files[@]}"
+          else
+            echo 'No outcome-verifier Rust source changed in this PR.'
+          fi
+
+      - name: Rustfmt outcome verifier on manual qualification
+        if: github.event_name != 'pull_request'
         run: >-
           cargo +1.96.0 fmt --check
           -p symthaea-iot-actuation-effect-outcome-verifier
