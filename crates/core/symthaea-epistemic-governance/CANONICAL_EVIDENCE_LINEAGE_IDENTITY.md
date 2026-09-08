@@ -62,7 +62,58 @@ validated object
         -> identity
 ```
 
-Because validation has already established the supported schema, digest shapes, closed ancestry, unique ids/parents, and acyclicity, canonical identity derivation is infallible after validation. Persistence may continue to use serde, but persistence representation does not define governance identity.
+Because validation has already established the supported schema, canonical lowercase digest shapes, closed ancestry, unique ids/parents, and acyclicity, canonical identity derivation is infallible after validation. Persistence may continue to use serde, but persistence representation does not define governance identity.
+
+## Interoperability known-answer vectors
+
+The exact v1 byte contract is pinned outside the implementation module in `tests/lineage_identity_vectors.rs`. A non-Rust verifier should reproduce these values from the semantic encoding above rather than copying serialized Rust objects.
+
+Profile contract digest:
+
+```text
+blake3:ff23c2ba0796d14eefd10c327542e8f0287bab3d09cb3bb2515c86fd72803d4a
+```
+
+Minimal graph:
+
+```text
+A = sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+B = sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+A: RootObservation, parents=[]
+B: Inference,       parents=[A]
+```
+
+Canonical graph identity:
+
+```text
+blake3:916114cbe9c4ff598097fd2702e965a4b3a763bfcc92e569fb986397371363d6
+```
+
+Complex ordering graph:
+
+```text
+A = sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+B = sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+C = sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+D = sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+E = sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+
+input node order = [E, C, B, D, A]
+E: RootObservation, parents=[]
+C: Inference,       input parents=[B,A]
+B: RootObservation, parents=[]
+D: RootObservation, parents=[]
+A: RootObservation, parents=[]
+```
+
+Canonicalization sorts nodes by evidence id and `C`'s parents to `[A,B]`. The resulting graph identity is:
+
+```text
+blake3:9115d0bacd4e4a9f461d2803ad660ff47bf2e0828fae21021add160e6ec936a4
+```
+
+Changing either pinned value without an explicit v1 profile/version transition is a compatibility break.
 
 ## Authority boundary
 
@@ -95,4 +146,5 @@ Qualification must establish:
 - every v1 derivation variant has one explicit stable semantic tag;
 - no serde/wire projection participates in canonical identity production;
 - canonical identity derivation cannot fail after graph validation;
+- simple and complex known-answer vectors reproduce exactly through the public API;
 - the canonical identity remains a generic governance dependency with no RCA runtime dependency.
