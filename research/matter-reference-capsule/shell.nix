@@ -28,7 +28,7 @@ pkgs.mkShell {
 
     echo ""
     echo "Symthaea Matter Reference Capsule shell"
-    echo "  nixpkgs node: $nixpkgsNodeName"
+    echo "  nixpkgs node: ${nixpkgsNodeName}"
     echo "  nixpkgs rev:  ${nixpkgsLocked.rev}"
     echo "  QE store:     $SYMTHAEA_QE_STORE"
     echo "  Python:       $SYMTHAEA_PYTHON"
