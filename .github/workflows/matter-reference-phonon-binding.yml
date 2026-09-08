@@ -1,0 +1,88 @@
+name: Matter Reference Phonon Protocol Binding
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_reference_phonon_binding.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-reference-phonon-binding.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "fb94ef22c357e67489158b7bb8090540b40b34c8"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-reference-phonon-binding.yml
+          src/knowledge/matter_reference_phonon_binding.rs
+          src/knowledge/mod.rs
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates scripts || true)"
+
+      - name: Ratchet protocol-match semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_reference_phonon_binding.rs
+          grep -q 'ReciprocalGridMismatch' "$f"
+          grep -q 'ReciprocalShiftMismatch' "$f"
+          grep -q 'AcousticSumRuleMismatch' "$f"
+          grep -q 'phonon_q_grid' "$f"
+          grep -q 'phonon_q_shift_fractional_bits' "$f"
+          grep -q 'acoustic_sum_rule' "$f"
+
+      - name: Ratchet explicit post-processing evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_reference_phonon_binding.rs
+          grep -q 'pw_execution_evidence_id' "$f"
+          grep -q 'ph_execution_evidence_id' "$f"
+          grep -q 'q2r_execution_evidence_id' "$f"
+          grep -q 'matdyn_execution_evidence_id' "$f"
+          grep -q 'force_constants_evidence_id' "$f"
+          grep -q 'phonon_bands_evidence_id' "$f"
+          grep -q 'EvidenceRole::SolverExecution' "$f"
+          grep -q 'EvidenceRole::ArtifactContent' "$f"
+          grep -q 'ExplicitPostprocessingChainBound' "$f"
+
+      - name: Ratchet authority non-promotion
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_reference_phonon_binding.rs
+          grep -q 'authority: benchmark.authority' "$f"
+          grep -q 'thermodynamic_phase_eligibility: benchmark.thermodynamic_phase_eligibility' "$f"
+          grep -q 'LocallyValidatedDeclaredChainMappingV1' "$f"
+          grep -q 'ReferenceOnly' "$f"
+          ! grep -q 'ExperimentallySupported' "$f"
+          ! grep -q 'ThermodynamicallyQualified' "$f"
+
+      - name: Ratchet strict evidence identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=src/knowledge/matter_reference_phonon_binding.rs
+          grep -q 'DuplicateSemanticEvidenceId' "$f"
+          grep -q 'ExecutionContentAlias' "$f"
+          grep -q 'SemanticArtifactContentAlias' "$f"
+          grep -q 'require_unique_content' "$f"
+
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Focused regression tests
+        run: cargo test --locked matter_reference_phonon_binding --lib

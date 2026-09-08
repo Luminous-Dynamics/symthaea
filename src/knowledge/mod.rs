@@ -64,6 +64,7 @@ mod matter_periodic_convergence_gate;
 pub mod matter_phase_competition_graph;
 mod matter_phonon_completeness;
 pub mod matter_reference_crystal_benchmark;
+pub mod matter_reference_phonon_binding;
 pub mod matter_relativistic;
 pub mod matter_relativistic_evidence;
 mod matter_relaxation_completeness;
