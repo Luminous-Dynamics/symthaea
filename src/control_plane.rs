@@ -14,6 +14,7 @@ pub mod forge_profile;
 pub mod forge_compilation;
 pub mod forge_compiled_artifact_preflight;
 pub mod forge_compilation_attestation;
+pub mod forge_compilation_attestation_currentness;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
