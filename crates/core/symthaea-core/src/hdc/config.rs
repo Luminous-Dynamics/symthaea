@@ -7,6 +7,11 @@
 //! across all Symthaea components. It ensures consistency between STT, TTS,
 //! and core consciousness systems.
 //!
+//! It also owns the stable identity contract for HDC-LTC temporal evolution.
+//! HDC-LTC exposes several evolution routines with materially different numerical
+//! and behavioral semantics; those semantics must be explicit in experiments,
+//! checkpoints, and qualification evidence rather than inferred from a method name.
+//!
 //! ## Design Goals
 //!
 //! 1. **Single Source of Truth**: All dimension constants flow from here
@@ -43,10 +48,138 @@
 //! | Extended | 32,768 | 128 KB | High precision |
 //! | Ultra | 65,536 | 256 KB | Maximum capacity |
 
+use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
 /// Global HDC configuration (set once at startup)
 static HDC_CONFIG: OnceLock<HdcConfig> = OnceLock::new();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HDC-LTC TEMPORAL SEMANTICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Stable identity for one HDC-LTC temporal evolution policy.
+///
+/// This enum names semantics, not a performance implementation. Two kernels may
+/// share one profile only when they implement the same temporal update rule
+/// within the tolerance established by their qualification evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HdcLtcEvolutionProfile {
+    /// Learned CfC-style gate used by `HdcLtcUnifiedNeuron::evolve_closed_form`.
+    AdaptiveClosedGateV1,
+    /// Single frozen-equilibrium exponential step used by
+    /// `HdcLtcUnifiedNeuron::evolve_closed_form_exact`.
+    FrozenEquilibriumExponentialV1,
+    /// Recomputed-equilibrium sub-stepping used by
+    /// `HdcLtcUnifiedNeuron::evolve_closed_form_iterative`.
+    SubsteppedExponentialV1,
+    /// Numerical RK4 reference integration.
+    Rk4ReferenceV1,
+}
+
+impl HdcLtcEvolutionProfile {
+    pub const fn schema_id(self) -> &'static str {
+        match self {
+            Self::AdaptiveClosedGateV1 => "symthaea.hdc-ltc.evolution.adaptive-closed-gate.v1",
+            Self::FrozenEquilibriumExponentialV1 => {
+                "symthaea.hdc-ltc.evolution.frozen-equilibrium-exponential.v1"
+            }
+            Self::SubsteppedExponentialV1 => {
+                "symthaea.hdc-ltc.evolution.substepped-exponential.v1"
+            }
+            Self::Rk4ReferenceV1 => "symthaea.hdc-ltc.evolution.rk4-reference.v1",
+        }
+    }
+
+    /// Whether this profile is intended as a numerical reference rather than a
+    /// learned/control-time evolution policy.
+    pub const fn is_reference(self) -> bool {
+        matches!(self, Self::Rk4ReferenceV1)
+    }
+}
+
+/// Versioned identity for one HDC-LTC model under one temporal semantics profile.
+///
+/// Digest construction is deliberately owned by the snapshot/qualification layer;
+/// this type only prevents an evidence record from carrying an unbound all-zero
+/// architecture or parameter identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HdcLtcModelIdentityV1 {
+    pub schema_id: String,
+    pub evolution_profile: HdcLtcEvolutionProfile,
+    pub architecture_digest: [u8; 32],
+    pub parameter_digest: [u8; 32],
+}
+
+impl HdcLtcModelIdentityV1 {
+    pub const SCHEMA_ID: &'static str = "symthaea.hdc-ltc.model-identity.v1";
+
+    pub fn new(
+        evolution_profile: HdcLtcEvolutionProfile,
+        architecture_digest: [u8; 32],
+        parameter_digest: [u8; 32],
+    ) -> Self {
+        Self {
+            schema_id: Self::SCHEMA_ID.to_string(),
+            evolution_profile,
+            architecture_digest,
+            parameter_digest,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.schema_id != Self::SCHEMA_ID {
+            return Err("unsupported HDC-LTC model identity schema");
+        }
+        if self.architecture_digest == [0; 32] {
+            return Err("architecture digest must be non-zero");
+        }
+        if self.parameter_digest == [0; 32] {
+            return Err("parameter digest must be non-zero");
+        }
+        Ok(())
+    }
+}
+
+/// Evidence describing one requested HDC-LTC temporal evolution interval.
+///
+/// This is not a safety or capability certificate. It records exactly which
+/// temporal semantics and model identity were used for a finite, non-negative
+/// interval so downstream evidence cannot silently conflate evolution methods.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HdcLtcTemporalSemanticsReceiptV1 {
+    pub schema_id: String,
+    pub model: HdcLtcModelIdentityV1,
+    pub dt_seconds: f32,
+}
+
+impl HdcLtcTemporalSemanticsReceiptV1 {
+    pub const SCHEMA_ID: &'static str = "symthaea.hdc-ltc.temporal-semantics-receipt.v1";
+
+    pub fn new(model: HdcLtcModelIdentityV1, dt_seconds: f32) -> Result<Self, &'static str> {
+        model.validate()?;
+        if !dt_seconds.is_finite() || dt_seconds < 0.0 {
+            return Err("dt must be finite and non-negative");
+        }
+        Ok(Self {
+            schema_id: Self::SCHEMA_ID.to_string(),
+            model,
+            dt_seconds,
+        })
+    }
+
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.schema_id != Self::SCHEMA_ID {
+            return Err("unsupported temporal semantics receipt schema");
+        }
+        self.model.validate()?;
+        if !self.dt_seconds.is_finite() || self.dt_seconds < 0.0 {
+            return Err("dt must be finite and non-negative");
+        }
+        Ok(())
+    }
+}
 
 /// HDC configuration parameters
 ///
@@ -332,6 +465,59 @@ pub fn stt_expansion_factor() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn temporal_identity(profile: HdcLtcEvolutionProfile) -> HdcLtcModelIdentityV1 {
+        HdcLtcModelIdentityV1::new(profile, [1; 32], [2; 32])
+    }
+
+    #[test]
+    fn temporal_profiles_have_distinct_stable_schema_ids() {
+        let profiles = [
+            HdcLtcEvolutionProfile::AdaptiveClosedGateV1,
+            HdcLtcEvolutionProfile::FrozenEquilibriumExponentialV1,
+            HdcLtcEvolutionProfile::SubsteppedExponentialV1,
+            HdcLtcEvolutionProfile::Rk4ReferenceV1,
+        ];
+        for (index, left) in profiles.iter().enumerate() {
+            for right in profiles.iter().skip(index + 1) {
+                assert_ne!(left.schema_id(), right.schema_id());
+            }
+        }
+        assert!(HdcLtcEvolutionProfile::Rk4ReferenceV1.is_reference());
+        assert!(!HdcLtcEvolutionProfile::AdaptiveClosedGateV1.is_reference());
+    }
+
+    #[test]
+    fn temporal_receipt_rejects_invalid_time() {
+        assert!(HdcLtcTemporalSemanticsReceiptV1::new(
+            temporal_identity(HdcLtcEvolutionProfile::AdaptiveClosedGateV1),
+            f32::NAN,
+        )
+        .is_err());
+        assert!(HdcLtcTemporalSemanticsReceiptV1::new(
+            temporal_identity(HdcLtcEvolutionProfile::AdaptiveClosedGateV1),
+            -0.001,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn temporal_identity_rejects_zero_digests() {
+        assert!(HdcLtcModelIdentityV1::new(
+            HdcLtcEvolutionProfile::AdaptiveClosedGateV1,
+            [0; 32],
+            [2; 32],
+        )
+        .validate()
+        .is_err());
+        assert!(HdcLtcModelIdentityV1::new(
+            HdcLtcEvolutionProfile::AdaptiveClosedGateV1,
+            [1; 32],
+            [0; 32],
+        )
+        .validate()
+        .is_err());
+    }
 
     #[test]
     fn test_config_constants() {
