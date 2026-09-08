@@ -1,0 +1,68 @@
+{
+  "schema": "symthaea-ci-source-tree-identity-profile-v1",
+  "pull_request": {
+    "theorem_qualification": {
+      "lane": "exact-pr-head",
+      "checkout_ref_expression": "${{ github.event.pull_request.head.sha }}",
+      "expected_commit_expression": "${{ github.event.pull_request.head.sha }}",
+      "meaning": "theorem-source-identity"
+    },
+    "merge_compatibility": {
+      "lane": "pr-merge-compatibility",
+      "checkout_ref_expression": "${{ github.sha }}",
+      "expected_commit_expression": "${{ github.sha }}",
+      "meaning": "integration-compatibility-only"
+    }
+  },
+  "repository_identity": {
+    "base_repository_id_expression": "${{ github.repository_id }}",
+    "head_repository_id_expression": "${{ github.event.pull_request.head.repo.id }}",
+    "retain_base_repository_name": true,
+    "retain_head_repository_name": true
+  },
+  "workflow_definition_context": {
+    "workflow_ref_expression": "${{ github.workflow_ref }}",
+    "workflow_sha_expression": "${{ github.workflow_sha }}",
+    "retain_workflow_ref": true,
+    "retain_workflow_sha": true,
+    "workflow_definition_identity_separate": true
+  },
+  "workflow_dispatch": {
+    "counts_as_exact_pr_head_qualification": false,
+    "counts_as_pr_merge_compatibility": false
+  },
+  "observation": {
+    "observed_commit_command": "git rev-parse HEAD",
+    "observed_tree_command": "git rev-parse HEAD^{tree}",
+    "require_observed_commit_equals_expected": true,
+    "event_merge_sha_optional_for_exact_head": true,
+    "retain_repository_names": true,
+    "retain_repository_ids": true,
+    "retain_event_head_sha": true,
+    "retain_event_merge_sha": true,
+    "retain_observed_tree_sha": true,
+    "tree_sha_is_diagnostic_only": true
+  },
+  "separation": {
+    "head_qualification_is_merge_compatibility": false,
+    "merge_compatibility_is_head_qualification": false,
+    "exact_head_identity_excludes_merge_sha": true,
+    "exact_head_identity_excludes_tree_sha": true,
+    "exact_head_identity_excludes_workflow_definition": true,
+    "merge_identity_excludes_head_sha": true,
+    "merge_identity_excludes_tree_sha": true,
+    "merge_identity_excludes_workflow_definition": true
+  },
+  "authority": {
+    "source_tree_identity_contract_defined": true,
+    "source_tree_observed": false,
+    "source_tree_identity_verified": false,
+    "focused_theorem_passed": false,
+    "merge_compatibility_passed": false,
+    "scientific_execution_qualified": false,
+    "transform_executed": false,
+    "fmq010_established": false,
+    "neural_alignment_established": false,
+    "consciousness_evidence": false
+  }
+}

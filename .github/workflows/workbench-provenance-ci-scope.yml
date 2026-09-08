@@ -1,0 +1,110 @@
+name: Workbench Provenance CI Scope
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/workbench-provenance-ci-scope.yml'
+      - 'docs/ci/WORKBENCH_PROVENANCE_CI_SCOPE_V1.md'
+      - 'scripts/classify_workbench_provenance_ci_scope.py'
+      - 'scripts/render_workbench_provenance_ci_paths_ignore.py'
+      - 'scripts/test_classify_workbench_provenance_ci_scope.py'
+      - 'scripts/test_render_workbench_provenance_ci_paths_ignore.py'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify Workbench provenance CI scope only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Syntax
+        run: |
+          python3 -m py_compile \
+            scripts/classify_workbench_provenance_ci_scope.py \
+            scripts/render_workbench_provenance_ci_paths_ignore.py \
+            scripts/test_classify_workbench_provenance_ci_scope.py \
+            scripts/test_render_workbench_provenance_ci_paths_ignore.py
+
+      - name: Adversarial routing and renderer contracts
+        run: |
+          PYTHONPATH=scripts python3 -m unittest \
+            scripts/test_classify_workbench_provenance_ci_scope.py \
+            scripts/test_render_workbench_provenance_ci_paths_ignore.py
+
+      - name: Exact ci.yml deployment transformation when changed
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet "$BASE_SHA" HEAD -- .github/workflows/ci.yml; then
+            echo 'ci.yml unchanged; renderer theorem qualified without deployment.'
+            exit 0
+          fi
+          git show "$BASE_SHA:.github/workflows/ci.yml" > /tmp/workbench-ci-base.yml
+          PYTHONPATH=scripts python3 - <<'PY'
+          from pathlib import Path
+          import render_workbench_provenance_ci_paths_ignore as renderer
+
+          base = Path('/tmp/workbench-ci-base.yml').read_bytes()
+          candidate = Path('.github/workflows/ci.yml').read_bytes()
+          renderer.verify_render(base, candidate)
+          print('ci.yml exact Workbench paths-ignore transformation: PASS')
+          PY
+
+      - name: No execution/network/scientific observation surface
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          files = [
+              Path('scripts/classify_workbench_provenance_ci_scope.py'),
+              Path('scripts/render_workbench_provenance_ci_paths_ignore.py'),
+              Path('scripts/test_classify_workbench_provenance_ci_scope.py'),
+              Path('scripts/test_render_workbench_provenance_ci_paths_ignore.py'),
+          ]
+          forbidden = {'subprocess', 'socket', 'urllib', 'requests', 'httpx'}
+          for path in files:
+              tree = ast.parse(path.read_text(encoding='utf-8'))
+              imported = set()
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      imported.update(alias.name.split('.')[0] for alias in node.names)
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      imported.add(node.module.split('.')[0])
+              assert not (imported & forbidden), (path, imported & forbidden)
+          PY
+
+      - name: Static fail-closed policy ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLASSIFIER=scripts/classify_workbench_provenance_ci_scope.py
+          RENDERER=scripts/render_workbench_provenance_ci_paths_ignore.py
+          DOC=docs/ci/WORKBENCH_PROVENANCE_CI_SCOPE_V1.md
+          grep -Fq 'global_ci_may_skip' "$CLASSIFIER"
+          grep -Fq 'focused_workbench_qualification_still_required' "$CLASSIFIER"
+          grep -Fq 'bool(canonical) and not disallowed' "$CLASSIFIER"
+          grep -Fq 'EXPECTED_INPUT_GIT_BLOB = "a48366076b30eb8e12d22c927a3b8bf333181409"' "$RENDERER"
+          grep -Fq 'PATCHED_PULL_REQUEST_PREFIX' "$RENDERER"
+          grep -Fq 'candidate differs from exact v1 transformation' "$RENDERER"
+          grep -Fq 'one disallowed path -> full CI' "$DOC"
+          grep -Fq 'GlobalCiMaySkip' "$DOC"
+          grep -Fq 'Exact deployment transformation' "$DOC"
+          ! grep -Fq 'crates/**' "$CLASSIFIER"
+          ! grep -Fq 'docs/neuroscience/**' "$CLASSIFIER"
+          ! grep -Fq '".github/workflows/ci.yml"' "$RENDERER"

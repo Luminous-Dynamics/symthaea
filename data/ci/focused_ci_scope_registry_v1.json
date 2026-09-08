@@ -1,0 +1,129 @@
+{
+  "schema": "symthaea-focused-ci-scope-registry-v1",
+  "default_policy": "full-ci-required",
+  "unknown_path_policy": "full-ci-required",
+  "ambiguous_owner_policy": "registry-invalid",
+  "mixed_composition_group_policy": "full-ci-required",
+  "scientific_authority": false,
+  "meta_qualifier_workflow": ".github/workflows/focused-ci-scope-registry.yml",
+  "scopes": [
+    {
+      "id": "workbench-execution-capsule-profile-v1",
+      "composition_group": "workbench-provenance-v1",
+      "composable": true,
+      "global_ci_eligible": false,
+      "qualification_source_mode": "exact-pr-head",
+      "qualification_source_identity_qualified": false,
+      "executing_workflow_identity_qualified": false,
+      "merge_compatibility_separate": true,
+      "scientific_authority": false,
+      "focused_workflow": ".github/workflows/workbench-execution-capsule-profile.yml",
+      "focused_workflow_git_blob": "a34f09f06b1dc5e4938bc70fd8de0a2a7dc2cea1",
+      "files": [
+        ".github/workflows/workbench-execution-capsule-profile.yml",
+        "data/neuroscience/workbench_execution_capsule_profile_v1.json",
+        "docs/neuroscience/WORKBENCH_EXECUTION_CAPSULE_PROFILE_V1.md",
+        "scripts/test_verify_workbench_execution_capsule_profile.py",
+        "scripts/verify_workbench_execution_capsule_profile.py"
+      ]
+    },
+    {
+      "id": "workbench-nix-closure-identity-v1",
+      "composition_group": "workbench-provenance-v1",
+      "composable": true,
+      "global_ci_eligible": false,
+      "qualification_source_mode": "exact-pr-head",
+      "qualification_source_identity_qualified": false,
+      "executing_workflow_identity_qualified": false,
+      "merge_compatibility_separate": true,
+      "scientific_authority": false,
+      "focused_workflow": ".github/workflows/workbench-nix-closure-identity.yml",
+      "focused_workflow_git_blob": "b69b87183abc54b6b4e124cc7c9b09b3d98b043b",
+      "files": [
+        ".github/workflows/workbench-nix-closure-identity.yml",
+        "docs/neuroscience/WORKBENCH_NIX_CLOSURE_IDENTITY_V1.md",
+        "scripts/test_workbench_nix_closure_identity.py",
+        "scripts/workbench_nix_closure_identity.py"
+      ]
+    },
+    {
+      "id": "workbench-nix-closure-capture-v1",
+      "composition_group": "workbench-provenance-v1",
+      "composable": true,
+      "global_ci_eligible": false,
+      "qualification_source_mode": "exact-pr-head",
+      "qualification_source_identity_qualified": false,
+      "executing_workflow_identity_qualified": false,
+      "merge_compatibility_separate": true,
+      "scientific_authority": false,
+      "focused_workflow": ".github/workflows/workbench-nix-closure-capture.yml",
+      "focused_workflow_git_blob": "89be74793b9a133c8d460807a417910524e8309f",
+      "files": [
+        ".github/workflows/workbench-nix-closure-capture.yml",
+        "docs/neuroscience/WORKBENCH_NIX_CLOSURE_CAPTURE_V1.md",
+        "scripts/test_workbench_nix_closure_capture.py",
+        "scripts/workbench_nix_closure_capture.py"
+      ]
+    },
+    {
+      "id": "workbench-nix-closure-capture-verifier-v1",
+      "composition_group": "workbench-provenance-v1",
+      "composable": true,
+      "global_ci_eligible": false,
+      "qualification_source_mode": "exact-pr-head",
+      "qualification_source_identity_qualified": false,
+      "executing_workflow_identity_qualified": false,
+      "merge_compatibility_separate": true,
+      "scientific_authority": false,
+      "focused_workflow": ".github/workflows/workbench-nix-closure-capture-verifier.yml",
+      "focused_workflow_git_blob": "db11a58d4a76b6b7b24bee624cf0a07926904ba3",
+      "files": [
+        ".github/workflows/workbench-nix-closure-capture-verifier.yml",
+        "docs/neuroscience/WORKBENCH_NIX_CLOSURE_CAPTURE_VERIFIER_V1.md",
+        "scripts/test_verify_workbench_nix_closure_capture.py",
+        "scripts/verify_workbench_nix_closure_capture.py"
+      ]
+    },
+    {
+      "id": "workbench-invocation-isolation-profile-v1",
+      "composition_group": "workbench-provenance-v1",
+      "composable": true,
+      "global_ci_eligible": false,
+      "qualification_source_mode": "exact-pr-head",
+      "qualification_source_identity_qualified": false,
+      "executing_workflow_identity_qualified": false,
+      "merge_compatibility_separate": true,
+      "scientific_authority": false,
+      "focused_workflow": ".github/workflows/workbench-invocation-isolation-profile.yml",
+      "focused_workflow_git_blob": "6007cbc410e7e9046acf9a172ec2ca262dbd0f06",
+      "files": [
+        ".github/workflows/workbench-invocation-isolation-profile.yml",
+        "data/neuroscience/workbench_invocation_isolation_profile_v1.json",
+        "docs/neuroscience/WORKBENCH_INVOCATION_ISOLATION_PROFILE_V1.md",
+        "scripts/check_workbench_invocation_isolation_profile_static.py",
+        "scripts/test_verify_workbench_invocation_isolation_profile.py",
+        "scripts/verify_workbench_invocation_isolation_profile.py"
+      ]
+    },
+    {
+      "id": "workbench-root-nar-membership-v1",
+      "composition_group": "workbench-provenance-v1",
+      "composable": true,
+      "global_ci_eligible": false,
+      "qualification_source_mode": "exact-pr-head",
+      "qualification_source_identity_qualified": false,
+      "executing_workflow_identity_qualified": false,
+      "merge_compatibility_separate": true,
+      "scientific_authority": false,
+      "focused_workflow": ".github/workflows/workbench-root-nar-membership.yml",
+      "focused_workflow_git_blob": "49d0f64d4118eba05185543d7d214ffab2003b0a",
+      "files": [
+        ".github/workflows/workbench-root-nar-membership.yml",
+        "docs/neuroscience/WORKBENCH_ROOT_NAR_MEMBERSHIP_V1.md",
+        "scripts/test_workbench_root_nar_membership.py",
+        "scripts/test_workbench_root_nar_target_spelling.py",
+        "scripts/workbench_root_nar_membership.py"
+      ]
+    }
+  ]
+}

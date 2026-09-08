@@ -1,0 +1,293 @@
+name: CI Source Tree Identity
+
+on:
+  pull_request:
+    paths:
+      - 'data/ci/ci_source_tree_identity_profile_v1.json'
+      - 'scripts/verify_ci_source_tree_identity.py'
+      - 'scripts/test_verify_ci_source_tree_identity.py'
+      - 'docs/ci/CI_SOURCE_TREE_IDENTITY_V1.md'
+      - '.github/workflows/ci-source-tree-identity.yml'
+      - 'data/ci/focused_ci_scope_registry_v1.json'
+      - 'scripts/verify_focused_ci_scope_registry.py'
+      - 'docs/ci/FOCUSED_CI_SCOPE_REGISTRY_V1.md'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify CI source identity contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout explicit theorem source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Syntax
+        run: |
+          python3 -m py_compile \
+            scripts/verify_ci_source_tree_identity.py \
+            scripts/test_verify_ci_source_tree_identity.py
+
+      - name: Source identity adversarial contracts
+        run: |
+          PYTHONPATH=scripts python3 -m unittest -v \
+            scripts/test_verify_ci_source_tree_identity.py
+
+      - name: Validate canonical profile
+        run: |
+          python3 scripts/verify_ci_source_tree_identity.py \
+            --profile data/ci/ci_source_tree_identity_profile_v1.json \
+            > /tmp/ci-source-profile.json
+          grep -Fq '"source_tree_identity_contract_defined":true' /tmp/ci-source-profile.json
+          grep -Fq '"source_tree_identity_verified":false' /tmp/ci-source-profile.json
+
+      - name: Checkout executing workflow definition source separately
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: workflow-definition-source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Require executing workflow bytes to equal theorem-head workflow bytes
+        if: github.event_name == 'pull_request'
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          rel=Path('.github/workflows/ci-source-tree-identity.yml')
+          head=rel.read_bytes()
+          executed=(Path('workflow-definition-source') / rel).read_bytes()
+          def blob(data):
+              return hashlib.sha1(f'blob {len(data)}\0'.encode('ascii') + data).hexdigest()
+          head_blob=blob(head)
+          executed_blob=blob(executed)
+          assert head_blob == executed_blob, (head_blob, executed_blob)
+          Path('/tmp/ci-source-workflow-definition.json').write_text(
+              json.dumps({
+                  'workflow_ref': os.environ['WORKFLOW_REF'],
+                  'workflow_sha': os.environ['WORKFLOW_SHA'],
+                  'theorem_head_workflow_git_blob': head_blob,
+                  'executing_workflow_git_blob': executed_blob,
+                  'workflow_definition_bytes_match': True,
+              }, sort_keys=True, separators=(',', ':')) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Observe exact PR-head source identity
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REPOSITORY: ${{ github.repository }}
+          BASE_REPOSITORY_ID: ${{ github.repository_id }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REPOSITORY_ID: ${{ github.event.pull_request.head.repo.id }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_MERGE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          export OBSERVED_CHECKOUT_SHA="$(git rev-parse HEAD)"
+          export OBSERVED_TREE_SHA="$(git rev-parse 'HEAD^{tree}')"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          value = {
+              'schema': 'symthaea-ci-source-tree-observation-v1',
+              'repository': os.environ['BASE_REPOSITORY'],
+              'repository_id': os.environ['BASE_REPOSITORY_ID'],
+              'head_repository': os.environ['HEAD_REPOSITORY'],
+              'head_repository_id': os.environ['HEAD_REPOSITORY_ID'],
+              'workflow_ref': os.environ['WORKFLOW_REF'],
+              'workflow_sha': os.environ['WORKFLOW_SHA'],
+              'event_name': 'pull_request',
+              'lane': 'exact-pr-head',
+              'event_head_sha': os.environ['EVENT_HEAD_SHA'],
+              'event_merge_sha': os.environ['EVENT_MERGE_SHA'],
+              'observed_checkout_sha': os.environ['OBSERVED_CHECKOUT_SHA'],
+              'observed_tree_sha': os.environ['OBSERVED_TREE_SHA'],
+          }
+          Path('/tmp/ci-source-head-observation.json').write_text(
+              json.dumps(value, sort_keys=True, separators=(',', ':')) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          python3 scripts/verify_ci_source_tree_identity.py \
+            --profile data/ci/ci_source_tree_identity_profile_v1.json \
+            --observation /tmp/ci-source-head-observation.json \
+            > /tmp/ci-source-head-identity.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          value=json.loads(Path('/tmp/ci-source-head-identity.json').read_text())
+          assert value['expected_checkout_sha'] == value['observed_checkout_sha']
+          assert value['identity_preimage']['checkout_commit_sha'] == value['event_head_sha']
+          assert value['tree_sha_identity_binding'] == 'diagnostic-only'
+          assert value['workflow_definition_identity_binding'] == 'separate-qualification-envelope'
+          authority=value['authority']
+          assert authority['source_tree_identity_verified'] is True
+          assert authority['exact_pr_head_source_verified'] is True
+          assert authority['pr_merge_source_verified'] is False
+          assert authority['focused_theorem_passed'] is False
+          assert authority['scientific_execution_qualified'] is False
+          PY
+
+      - name: Checkout explicit PR merge source separately
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          path: merge-source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Observe PR-merge source identity separately
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REPOSITORY: ${{ github.repository }}
+          BASE_REPOSITORY_ID: ${{ github.repository_id }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REPOSITORY_ID: ${{ github.event.pull_request.head.repo.id }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_MERGE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          export OBSERVED_CHECKOUT_SHA="$(git -C merge-source rev-parse HEAD)"
+          export OBSERVED_TREE_SHA="$(git -C merge-source rev-parse 'HEAD^{tree}')"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          value = {
+              'schema': 'symthaea-ci-source-tree-observation-v1',
+              'repository': os.environ['BASE_REPOSITORY'],
+              'repository_id': os.environ['BASE_REPOSITORY_ID'],
+              'head_repository': os.environ['HEAD_REPOSITORY'],
+              'head_repository_id': os.environ['HEAD_REPOSITORY_ID'],
+              'workflow_ref': os.environ['WORKFLOW_REF'],
+              'workflow_sha': os.environ['WORKFLOW_SHA'],
+              'event_name': 'pull_request',
+              'lane': 'pr-merge-compatibility',
+              'event_head_sha': os.environ['EVENT_HEAD_SHA'],
+              'event_merge_sha': os.environ['EVENT_MERGE_SHA'],
+              'observed_checkout_sha': os.environ['OBSERVED_CHECKOUT_SHA'],
+              'observed_tree_sha': os.environ['OBSERVED_TREE_SHA'],
+          }
+          Path('/tmp/ci-source-merge-observation.json').write_text(
+              json.dumps(value, sort_keys=True, separators=(',', ':')) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          python3 scripts/verify_ci_source_tree_identity.py \
+            --profile data/ci/ci_source_tree_identity_profile_v1.json \
+            --observation /tmp/ci-source-merge-observation.json \
+            > /tmp/ci-source-merge-identity.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          value=json.loads(Path('/tmp/ci-source-merge-identity.json').read_text())
+          assert value['expected_checkout_sha'] == value['observed_checkout_sha']
+          assert value['identity_preimage']['checkout_commit_sha'] == value['event_merge_sha']
+          assert value['workflow_definition_identity_binding'] == 'separate-qualification-envelope'
+          authority=value['authority']
+          assert authority['source_tree_identity_verified'] is True
+          assert authority['exact_pr_head_source_verified'] is False
+          assert authority['pr_merge_source_verified'] is True
+          assert authority['merge_compatibility_passed'] is False
+          assert authority['scientific_execution_qualified'] is False
+          PY
+
+      - name: Require head/merge authority separation
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          head=json.loads(Path('/tmp/ci-source-head-identity.json').read_text())
+          merge=json.loads(Path('/tmp/ci-source-merge-identity.json').read_text())
+          assert head['lane'] == 'exact-pr-head'
+          assert merge['lane'] == 'pr-merge-compatibility'
+          assert head['authority']['pr_merge_source_verified'] is False
+          assert merge['authority']['exact_pr_head_source_verified'] is False
+          assert head['identity_preimage']['lane'] != merge['identity_preimage']['lane']
+          PY
+
+      - name: No process/network/scientific surface in pure verifier
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          forbidden={'subprocess','socket','urllib','requests','httpx'}
+          for path in (
+              Path('scripts/verify_ci_source_tree_identity.py'),
+              Path('scripts/test_verify_ci_source_tree_identity.py'),
+          ):
+              tree=ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+              imported=set()
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      imported.update(alias.name.split('.')[0] for alias in node.names)
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      imported.add(node.module.split('.')[0])
+              assert not (imported & forbidden), (path, sorted(imported & forbidden))
+          PY
+
+      - name: Static source-identity ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=data/ci/ci_source_tree_identity_profile_v1.json
+          SCRIPT=scripts/verify_ci_source_tree_identity.py
+          DOC=docs/ci/CI_SOURCE_TREE_IDENTITY_V1.md
+          SELF=.github/workflows/ci-source-tree-identity.yml
+          grep -Fq '${{ github.event.pull_request.head.sha }}' "$PROFILE"
+          grep -Fq '${{ github.workflow_sha }}' "$PROFILE"
+          grep -Fq 'tree_sha_is_diagnostic_only' "$PROFILE"
+          grep -Fq 'exact_head_identity_excludes_merge_sha' "$PROFILE"
+          grep -Fq 'exact_head_identity_excludes_workflow_definition' "$PROFILE"
+          grep -Fq 'merge_identity_excludes_head_sha' "$PROFILE"
+          grep -Fq 'source_repository_id' "$SCRIPT"
+          grep -Fq 'tree_sha_identity_binding' "$SCRIPT"
+          grep -Fq 'workflow_definition_identity_binding' "$SCRIPT"
+          grep -Fq 'TheoremQualification != MergeCompatibility' "$DOC"
+          grep -Fq 'global_ci_eligible = false' "$DOC"
+          python3 - <<'PY'
+          from pathlib import Path
+          text=Path('.github/workflows/ci-source-tree-identity.yml').read_text(encoding='utf-8')
+          head_ref="ref: $" + "{{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          workflow_ref="ref: $" + "{{ github.workflow_sha }}"
+          assert head_ref in text
+          assert workflow_ref in text
+          PY
+
+      - name: Publish source identities
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-source-identities-${{ github.event.pull_request.head.sha }}
+          path: |
+            /tmp/ci-source-workflow-definition.json
+            /tmp/ci-source-head-observation.json
+            /tmp/ci-source-head-identity.json
+            /tmp/ci-source-merge-observation.json
+            /tmp/ci-source-merge-identity.json
+          if-no-files-found: error
+          retention-days: 30

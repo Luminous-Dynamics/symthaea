@@ -1,0 +1,197 @@
+name: Focused CI Scope Registry
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify focused CI admission control plane
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout explicit theorem source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require exact PR-head checkout
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Syntax
+        run: |
+          python3 -m py_compile \
+            scripts/collect_ci_changed_paths.py \
+            scripts/test_collect_ci_changed_paths.py \
+            scripts/verify_ci_source_tree_identity.py \
+            scripts/test_verify_ci_source_tree_identity.py \
+            scripts/verify_ci_workflow_definition_identity.py \
+            scripts/test_verify_ci_workflow_definition_identity.py \
+            scripts/verify_focused_ci_scope_registry.py \
+            scripts/test_verify_focused_ci_scope_registry.py \
+            scripts/classify_workbench_provenance_ci_scope.py \
+            scripts/render_workbench_provenance_ci_paths_ignore.py \
+            scripts/test_classify_workbench_provenance_ci_scope.py \
+            scripts/test_render_workbench_provenance_ci_paths_ignore.py
+
+      - name: CI provenance adversarial contracts
+        run: |
+          PYTHONPATH=scripts python3 -m unittest -v \
+            scripts/test_collect_ci_changed_paths.py \
+            scripts/test_verify_ci_source_tree_identity.py \
+            scripts/test_verify_ci_workflow_definition_identity.py \
+            scripts/test_verify_focused_ci_scope_registry.py \
+            scripts/test_classify_workbench_provenance_ci_scope.py \
+            scripts/test_render_workbench_provenance_ci_paths_ignore.py
+
+      - name: Validate canonical contracts
+        run: |
+          python3 scripts/verify_ci_source_tree_identity.py \
+            --profile data/ci/ci_source_tree_identity_profile_v1.json \
+            > /tmp/ci-source-profile.json
+          python3 scripts/verify_focused_ci_scope_registry.py \
+            --registry data/ci/focused_ci_scope_registry_v1.json \
+            > /tmp/focused-ci-registry.json
+          grep -Fq '"source_tree_identity_contract_defined":true' /tmp/ci-source-profile.json
+          grep -Fq '"scientific_authority":false' /tmp/focused-ci-registry.json
+
+      - name: Collect exact pull-request changed-path set
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+          git diff --name-only -z --no-renames "${BASE_SHA}...${HEAD_SHA}" > /tmp/changed-paths.z
+          python3 scripts/collect_ci_changed_paths.py \
+            --input /tmp/changed-paths.z \
+            --output /tmp/changed-paths.json
+
+      - name: Compile fail-closed admission decision
+        if: github.event_name == 'pull_request'
+        run: |
+          PYTHONPATH=scripts python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import verify_focused_ci_scope_registry as registry
+
+          raw = registry.load_json(Path('data/ci/focused_ci_scope_registry_v1.json'))
+          changed = json.loads(Path('/tmp/changed-paths.json').read_text(encoding='utf-8'))
+          result = registry.admit_changed_paths(raw, changed, repository_root=Path('.'))
+          Path('/tmp/focused-ci-admission.json').write_text(
+              json.dumps(result, sort_keys=True, separators=(',', ':')) + '\n',
+              encoding='utf-8',
+          )
+          assert result['scientific_authority'] is False
+          assert result['global_ci_required'] is (not result['global_ci_may_skip'])
+          if result['global_ci_may_skip']:
+              assert result['touched_scopes']
+              assert result['head_qualifier_blobs_verified'] is True
+              assert not result['unowned_paths']
+              assert not result['control_plane_paths']
+              assert not result['changed_qualifier_workflows']
+              assert not result['reasons']
+          PY
+          cat /tmp/focused-ci-admission.json
+
+      - name: Current Workbench pilot must remain ineligible
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          value=json.loads(Path('data/ci/focused_ci_scope_registry_v1.json').read_text())
+          assert len(value['scopes']) == 6
+          for scope in value['scopes']:
+              assert scope['global_ci_eligible'] is False
+              assert scope['qualification_source_identity_qualified'] is False
+              assert scope['executing_workflow_identity_qualified'] is False
+              assert scope['qualification_source_mode'] == 'exact-pr-head'
+              assert scope['merge_compatibility_separate'] is True
+              assert scope['scientific_authority'] is False
+          PY
+
+      - name: Reconcile Workbench pilot with reviewed 28-file surface
+        run: |
+          PYTHONPATH=scripts python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import render_workbench_provenance_ci_paths_ignore as narrow
+          import verify_focused_ci_scope_registry as registry
+          raw=json.loads(Path('data/ci/focused_ci_scope_registry_v1.json').read_text())
+          valid=registry.validate_registry(raw)
+          owned={path for scope in valid['scopes'] for path in scope['files']}
+          assert owned == set(narrow.EXEMPT_PATHS)
+          assert len(owned) == 28
+          PY
+
+      - name: No process/network/scientific authority in pure control-plane code
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          files=[
+              Path('scripts/collect_ci_changed_paths.py'),
+              Path('scripts/verify_ci_source_tree_identity.py'),
+              Path('scripts/verify_ci_workflow_definition_identity.py'),
+              Path('scripts/verify_focused_ci_scope_registry.py'),
+          ]
+          forbidden={'subprocess','socket','urllib','requests','httpx'}
+          for path in files:
+              tree=ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+              imported=set()
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      imported.update(alias.name.split('.')[0] for alias in node.names)
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      imported.add(node.module.split('.')[0])
+              assert not (imported & forbidden), (path, sorted(imported & forbidden))
+          PY
+
+      - name: Static admission ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          REG=data/ci/focused_ci_scope_registry_v1.json
+          VER=scripts/verify_focused_ci_scope_registry.py
+          DOC=docs/ci/FOCUSED_CI_SCOPE_REGISTRY_V1.md
+          NARROW=docs/ci/WORKBENCH_PROVENANCE_CI_SCOPE_V1.md
+          grep -Fq '"default_policy": "full-ci-required"' "$REG"
+          grep -Fq '"unknown_path_policy": "full-ci-required"' "$REG"
+          grep -Fq '"scientific_authority": false' "$REG"
+          grep -Fq '"global_ci_eligible": false' "$REG"
+          grep -Fq '"qualification_source_identity_qualified": false' "$REG"
+          grep -Fq '"executing_workflow_identity_qualified": false' "$REG"
+          grep -Fq 'executing-workflow-identity-not-qualified' "$VER"
+          grep -Fq 'head-qualifier-blob-unverified' "$VER"
+          grep -Fq 'head-qualifier-blob-unavailable' "$VER"
+          grep -Fq 'head-qualifier-blob-drift' "$VER"
+          grep -Fq 'FocusedCiAdmission' "$DOC"
+          grep -Fq 'executing_workflow_identity_qualified' "$DOC"
+          grep -Fq 'superseded for deployment' "$NARROW"
+
+      - name: Publish admission evidence
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: focused-ci-admission-${{ github.event.pull_request.head.sha }}
+          path: |
+            /tmp/changed-paths.json
+            /tmp/focused-ci-admission.json
+          if-no-files-found: error
+          retention-days: 30
