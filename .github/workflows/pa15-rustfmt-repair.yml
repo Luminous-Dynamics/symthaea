@@ -15,7 +15,7 @@ env:
 jobs:
   qualify:
     name: Prequalify Physical Agency with Rust 1.96
-    runs-on: windows-latest
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -35,4 +35,16 @@ jobs:
         run: cargo test -p symthaea-physical-effects -p symthaea-physical-agency --all-targets
 
       - name: Clippy Physical Agency packages
-        run: cargo clippy -p symthaea-physical-effects -p symthaea-physical-agency --all-targets -- -D warnings
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo clippy -p symthaea-physical-effects -p symthaea-physical-agency --all-targets -- -D warnings 2>&1 | tee pa15-clippy.txt
+
+      - name: Upload clippy diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pa15-clippy-diagnostics
+          path: pa15-clippy.txt
+          if-no-files-found: error
+          retention-days: 7
