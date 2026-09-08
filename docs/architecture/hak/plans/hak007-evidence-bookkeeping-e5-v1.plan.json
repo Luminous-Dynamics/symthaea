@@ -17,6 +17,11 @@
       "claim_id": "HAK007-EVID-DIGEST-001",
       "statement": "Terminal receipt canonical digest detects post-materialization content changes covered by the focused regression suite.",
       "target_tier": "E5"
+    },
+    {
+      "claim_id": "HAK007-PLAN-JOIN-001",
+      "statement": "Qualification plan identity and execution workflow identity remain distinct, while an explicit plan-execution join rejects workflow or plan-document mismatch.",
+      "target_tier": "E5"
     }
   ],
   "required_checks": [
@@ -37,6 +42,10 @@
       "description": "Lint all materialized HAK execution observations."
     },
     {
+      "check_id": "plan-execution-join",
+      "description": "Exercise explicit plan-to-execution conformance with distinct plan-document and workflow identities."
+    },
+    {
       "check_id": "regressions",
       "description": "Run tests/python/test_hak_evidence_lint.py."
     }
@@ -49,7 +58,10 @@
     "mutable KnownPrecommitted plan identity",
     "provider run-attempt mismatch",
     "receipt smuggling interpretation",
-    "receipt digest tampering"
+    "receipt digest tampering",
+    "qualification plan artifact conflated with execution workflow artifact",
+    "execution workflow does not conform to qualification plan scope",
+    "supplied qualification plan document does not match plan_ref path"
   ],
   "provider_policy": {
     "allowed_providers": ["github-actions"],
