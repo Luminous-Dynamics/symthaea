@@ -1,0 +1,193 @@
+name: ALife Organism Snapshot
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/agent_id.rs"
+      - "crates/domains/symthaea-alife/src/ledger.rs"
+      - "crates/domains/symthaea-alife/src/organism.rs"
+      - "crates/domains/symthaea-alife/src/organism_snapshot.rs"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - "crates/core/symthaea-fep/src/agent_snapshot.rs"
+      - "crates/core/symthaea-fep/src/markov_boundary_snapshot.rs"
+      - "crates/core/symthaea-fep/src/snapshot_shape.rs"
+      - ".github/workflows/alife-organism-snapshot.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  organism-snapshot:
+    name: Validated stable-boundary organism snapshot contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/organism_snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/organism.rs
+          sha256sum crates/domains/symthaea-alife/src/population.rs
+          sha256sum crates/core/symthaea-fep/src/agent_snapshot.rs
+          sha256sum crates/core/symthaea-fep/src/markov_boundary_snapshot.rs
+          sha256sum crates/core/symthaea-fep/src/snapshot_shape.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-organism-snapshot
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test organism snapshot contract
+        run: 'cargo test --locked -p symthaea-alife organism_snapshot::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze cross-domain organism theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot="crates/domains/symthaea-alife/src/organism_snapshot.rs"
+          organism="crates/domains/symthaea-alife/src/organism.rs"
+          population="crates/domains/symthaea-alife/src/population.rs"
+
+          grep -q 'pub struct OrganismSnapshotV1' "$snapshot"
+          grep -q 'pub struct ValidatedOrganismSnapshotV1' "$snapshot"
+          grep -q 'pub fn validate(self)' "$snapshot"
+          grep -q 'config_snapshot_round_trip_preserves_every_float_bit' "$snapshot"
+          grep -q 'asocial_population_organism_may_legitimately_retain_encounter_history' "$snapshot"
+          grep -q 'LedgerNotStrictlySorted' "$snapshot"
+          grep -q 'LedgerZeroEncounterCount' "$snapshot"
+          grep -q 'ActionTemperatureMismatch' "$snapshot"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          snapshot = Path("crates/domains/symthaea-alife/src/organism_snapshot.rs").read_text()
+          organism = Path("crates/domains/symthaea-alife/src/organism.rs").read_text()
+          population = Path("crates/domains/symthaea-alife/src/population.rs").read_text()
+
+          def usize_const(text, name):
+              m = re.search(rf"(?:pub )?const {name}: usize = ([0-9]+);", text)
+              if not m:
+                  raise SystemExit(f"missing usize constant {name}")
+              return int(m.group(1))
+
+          if usize_const(snapshot, "ASOCIAL_DIM_V1") != usize_const(organism, "OBS_DIM"):
+              raise SystemExit("asocial organism dimension drift")
+          if usize_const(snapshot, "SOCIAL_DIM_V1") != usize_const(organism, "SOCIAL_DIM"):
+              raise SystemExit("social organism dimension drift")
+          if usize_const(snapshot, "ASOCIAL_ACTIONS_V1") != usize_const(organism, "COUNT"):
+              raise SystemExit("asocial action-count drift")
+          if usize_const(snapshot, "SOCIAL_ACTIONS_V1") != usize_const(organism, "SOCIAL_COUNT"):
+              raise SystemExit("social action-count drift")
+
+          if "let num_actions = if cfg.social_enabled" not in organism:
+              raise SystemExit("live organism action-space selection changed")
+          if "Action::SOCIAL_COUNT" not in organism or "Action::COUNT" not in organism:
+              raise SystemExit("live organism action constants are no longer constructor authority")
+
+          constructor = organism.split("pub fn new(cfg: OrganismConfig, seed: u64) -> Self {", 1)[1]
+          constructor = constructor.split("pub fn with_id", 1)[0]
+          if "sensory_dim: 1" not in constructor or "active_dim: 1" not in constructor:
+              raise SystemExit("live Markov-boundary geometry changed")
+
+          phase3 = population.split(
+              "// Phase 3: apply cross-organism transfer credit + ledger updates", 1
+          )[1].split("// Phase 3.5", 1)[0]
+          if phase3.count(".ledger.entry(") < 2:
+              raise SystemExit("step_social no longer records both factual encounter ledgers")
+          if "social_enabled" in phase3:
+              raise SystemExit(
+                  "step_social ledger semantics gained a social_enabled gate; re-audit snapshot theorem"
+              )
+
+          raw = snapshot.split("pub struct OrganismSnapshotV1 {", 1)[1].split("}\n", 1)[0]
+          if "pub " in raw.replace("pub(crate)", ""):
+              raise SystemExit("raw organism snapshot exposes public mutable authority fields")
+          if "PendingSocialLearning" in raw:
+              raise SystemExit("stable-boundary snapshot must not persist mid-step pending learning")
+
+          validated_decl = snapshot.split("pub struct ValidatedOrganismSnapshotV1", 1)[0]
+          if "Serialize, Deserialize" in validated_decl.rsplit("#[derive", 1)[-1]:
+              raise SystemExit("validated organism capability must not be serializable")
+          PY
+
+      - name: Freeze negative claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          organism="crates/domains/symthaea-alife/src/organism.rs"
+          population="crates/domains/symthaea-alife/src/population.rs"
+
+          # Contract-only tranche. Live emission/restoration and population capsules remain absent.
+          ! grep -q 'OrganismSnapshotV1' "$organism"
+          ! grep -q 'OrganismSnapshotV1' "$population"
+
+      - name: Write organism snapshot qualification metadata
+        run: |
+          mkdir -p target/alife-organism-snapshot-evidence
+          {
+            echo "authority=validated_population_organism_snapshot_contract_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "organism_snapshot_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/organism_snapshot.rs | cut -d' ' -f1)"
+            echo "organism_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/organism.rs | cut -d' ' -f1)"
+            echo "population_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/population.rs | cut -d' ' -f1)"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "nested_fep_validation_required=true"
+            echo "cross_domain_shape_validation=true"
+            echo "bit_exact_organism_config=true"
+            echo "deterministic_ledger_order=true"
+            echo "asocial_ledger_history_allowed=true"
+            echo "stable_step_boundary_only=true"
+            echo "live_organism_snapshot_wiring_complete=false"
+            echo "population_execution_capsule_complete=false"
+            echo "alife_population_execution_resume_established=false"
+          } > target/alife-organism-snapshot-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-organism-snapshot-evidence
+          path: target/alife-organism-snapshot-evidence/qualification.txt
+          if-no-files-found: error
