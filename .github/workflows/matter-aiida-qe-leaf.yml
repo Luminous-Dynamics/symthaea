@@ -1,0 +1,116 @@
+name: Matter AiiDA QE Leaf Export
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/matter_aiida_qe_leaf_export.py'
+      - '.github/workflows/matter-aiida-qe-leaf.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  aiida-qe-leaf-export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact child scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='77ed5efb3f63e26548f596696941ee7328b13740'
+          CHANGED="$(git diff --name-only "$BASE"...HEAD)"
+          test -n "$CHANGED"
+          while IFS= read -r path; do
+            case "$path" in
+              scripts/matter_aiida_qe_leaf_export.py|.github/workflows/matter-aiida-qe-leaf.yml) ;;
+              *) echo "unexpected AiiDA leaf child drift: $path" >&2; exit 1 ;;
+            esac
+          done <<< "$CHANGED"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- Cargo.lock Cargo.toml)"
+          test -z "$(git diff --name-only "$BASE"...HEAD -- src crates)"
+
+      - name: Python syntax
+        run: python3 -m py_compile scripts/matter_aiida_qe_leaf_export.py
+
+      - name: Dependency-free adapter invariants
+        run: python3 scripts/matter_aiida_qe_leaf_export.py self-test
+
+      - name: Ratchet exact-byte content identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=scripts/matter_aiida_qe_leaf_export.py
+          grep -q 'path.write_bytes(payload)' "$FILE"
+          grep -q '_sha256_file(path) != digest' "$FILE"
+          grep -q 'literal bytes no longer match preflight SHA-256' "$FILE"
+          grep -q 'digest == _sha256_file(path)' "$FILE"
+          if grep -q 'payload + b"\\n"' "$FILE"; then
+            echo 'JSON hashing/writing must not disagree on trailing bytes' >&2
+            exit 1
+          fi
+
+      - name: Ratchet fail-closed AiiDA leaf semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=scripts/matter_aiida_qe_leaf_export.py
+          grep -q 'orm.CalcJobNode' "$FILE"
+          grep -q 'is_finished_ok' "$FILE"
+          grep -q 'is_sealed' "$FILE"
+          grep -q 'is_created_from_cache' "$FILE"
+          grep -q 'cached CalcJob is not a new solver execution' "$FILE"
+          grep -q "PW_PROCESS_TYPE = \"aiida.calculations:quantumespresso.pw\"" "$FILE"
+          grep -q "PH_PROCESS_TYPE = \"aiida.calculations:quantumespresso.ph\"" "$FILE"
+          grep -q "CONTROL.calculation='scf'" "$FILE"
+          grep -q "CONTROL.calculation='relax' or 'vc-relax'" "$FILE"
+          grep -q 'thermodynamic_phase_competition is not a leaf CalcJob' "$FILE"
+          grep -q 'preflight was created after the AiiDA process record began' "$FILE"
+          grep -q 'aiida-core version drifted since preflight' "$FILE"
+          grep -q 'aiida-quantumespresso version drifted since preflight' "$FILE"
+
+      - name: Ratchet public provenance surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=scripts/matter_aiida_qe_leaf_export.py
+          grep -q 'from aiida import load_profile, orm' "$FILE"
+          grep -q 'node.base.repository.as_path()' "$FILE"
+          grep -q 'output_parameters' "$FILE"
+          if grep -Eq '^\s*(from|import)\s+aiida\.(tools\.importexport|repository|storage|manage\.manager|orm\.[A-Za-z0-9_]+\.)' "$FILE"; then
+            echo 'AiiDA leaf exporter must use supported public API surfaces only' >&2
+            exit 1
+          fi
+          if grep -Eq 'subprocess\.|os\.system|requests\.|urllib\.request' "$FILE"; then
+            echo 'exporter must inspect AiiDA provenance, not spawn/fetch external work' >&2
+            exit 1
+          fi
+
+      - name: Ratchet Symthaea wire and evidence compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=scripts/matter_aiida_qe_leaf_export.py
+          grep -q 'symthaea.matter.crystal-solver-execution/v1' "$FILE"
+          grep -q '"SolverExecution"' "$FILE"
+          grep -q '"ArtifactContent"' "$FILE"
+          grep -q '"ImplementationSnapshot"' "$FILE"
+          grep -q '"DependencySnapshot"' "$FILE"
+          grep -q 'distinct execution semantic references resolve to identical content' "$FILE"
+          if grep -Eq 'ExperimentallyObserved|IndependentlyReplicated|VerifiedChronology|VerifiedPreregistration' "$FILE"; then
+            echo 'AiiDA leaf export must not mint stronger scientific authority' >&2
+            exit 1
+          fi
+
+      - name: Deliberate live-integration boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=scripts/matter_aiida_qe_leaf_export.py
+          grep -q 'Chronology remains declared' "$FILE"
+          grep -q 'Process success is not convergence' "$FILE"
+          echo 'Static adapter qualification does not establish a live AiiDA/QE execution.'
