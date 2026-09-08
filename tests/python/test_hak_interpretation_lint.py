@@ -148,6 +148,12 @@ def maps(rec, conf):
     return {rec["receipt_id"]: rec}, {conf["conformance_id"]: conf}
 
 
+def validate_interp(plan, receipts, conformances, doc):
+    hak.validate_interpretation(
+        plan, receipts, conformances, doc, plan_repo_path=PLAN_REPO_PATH
+    )
+
+
 def test_satisfied_conformance_is_valid():
     plan, rec = load_plan(), receipt()
     hak.validate_plan_conformance(plan, rec, conformance(plan, rec), plan_repo_path=PLAN_REPO_PATH)
@@ -198,7 +204,7 @@ def test_qualified_interpretation_is_valid_at_plan_ceiling():
     conf = conformance(plan, rec)
     doc = interpretation(plan, rec, conf)
     receipts, conformances = maps(rec, conf)
-    hak.validate_interpretation(plan, receipts, conformances, doc)
+    validate_interp(plan, receipts, conformances, doc)
 
 
 def test_qualified_interpretation_cannot_exceed_claim_ceiling():
@@ -208,7 +214,7 @@ def test_qualified_interpretation_cannot_exceed_claim_ceiling():
     doc = interpretation(plan, rec, conf, tier="E5")
     receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        hak.validate_interpretation(plan, receipts, conformances, doc)
+        validate_interp(plan, receipts, conformances, doc)
 
 
 def test_provider_success_without_satisfied_conformance_cannot_qualify():
@@ -220,7 +226,18 @@ def test_provider_success_without_satisfied_conformance_cannot_qualify():
     doc = interpretation(plan, rec, conf)
     receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        hak.validate_interpretation(plan, receipts, conformances, doc)
+        validate_interp(plan, receipts, conformances, doc)
+
+
+def test_forged_satisfied_conformance_is_revalidated():
+    plan, rec = load_plan(), receipt()
+    conf = conformance(plan, rec)
+    conf["checks"].pop()
+    conf["conformance_digest"] = hak.compute_conformance_digest(conf)
+    doc = interpretation(plan, rec, conf)
+    receipts, conformances = maps(rec, conf)
+    with pytest.raises(hak.InterpretationLintError):
+        validate_interp(plan, receipts, conformances, doc)
 
 
 def test_nonqualified_claim_cannot_claim_tier():
@@ -231,7 +248,7 @@ def test_nonqualified_claim_cannot_claim_tier():
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
     receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        hak.validate_interpretation(plan, receipts, conformances, doc)
+        validate_interp(plan, receipts, conformances, doc)
 
 
 def test_insufficient_evidence_requires_limitation():
@@ -243,7 +260,7 @@ def test_insufficient_evidence_requires_limitation():
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
     receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        hak.validate_interpretation(plan, receipts, conformances, doc)
+        validate_interp(plan, receipts, conformances, doc)
 
 
 def test_interpretation_must_cover_exact_plan_claims():
@@ -254,7 +271,7 @@ def test_interpretation_must_cover_exact_plan_claims():
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
     receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        hak.validate_interpretation(plan, receipts, conformances, doc)
+        validate_interp(plan, receipts, conformances, doc)
 
 
 def test_interpretation_digest_detects_tampering():
@@ -264,7 +281,7 @@ def test_interpretation_digest_detects_tampering():
     doc["interpreter"]["identity"] = "changed-after-materialization"
     receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        hak.validate_interpretation(plan, receipts, conformances, doc)
+        validate_interp(plan, receipts, conformances, doc)
 
 
 def test_model_assistance_does_not_change_evidence_ceiling():
@@ -277,4 +294,4 @@ def test_model_assistance_does_not_change_evidence_ceiling():
     doc["interpretation_digest"] = hak.compute_interpretation_digest(doc)
     receipts, conformances = maps(rec, conf)
     with pytest.raises(hak.InterpretationLintError):
-        hak.validate_interpretation(plan, receipts, conformances, doc)
+        validate_interp(plan, receipts, conformances, doc)
