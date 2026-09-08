@@ -1,0 +1,100 @@
+name: HCPMMP Lineage B Atomic No-Replace Publication
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/test_hcpmmp_neuromaps_atomic_publish.py'
+      - 'scripts/test_hcpmmp_neuromaps_bundle_custody.py'
+      - 'scripts/test_derive_hcpmmp1_neuromaps_lineage_b.py'
+      - 'scripts/test_hcpmmp_neuromaps_generator_provenance.py'
+      - 'docs/neuroscience/HCPMMP1_LINEAGE_B_ATOMIC_NOREPLACE_PUBLICATION_V1.md'
+      - '.github/workflows/hcpmmp-lineage-b-atomic-noreplace-publish.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  qualify:
+    name: Qualify atomic no-replace Lineage-B publication
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_SHA"
+          printf 'qualified_head=%s\n' "$QUALIFICATION_SHA"
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax
+        run: |
+          python -m py_compile \
+            scripts/derive_hcpmmp1_neuromaps_lineage_b.py \
+            scripts/test_hcpmmp_neuromaps_atomic_publish.py
+
+      - name: Focused atomic publication contracts
+        run: PYTHONPATH=scripts python -m unittest -v scripts/test_hcpmmp_neuromaps_atomic_publish.py
+
+      - name: Preserve existing bundle custody
+        run: PYTHONPATH=scripts python -m unittest -v scripts/test_hcpmmp_neuromaps_bundle_custody.py
+
+      - name: Preserve Lineage-B scientific and provenance contracts
+        run: |
+          PYTHONPATH=scripts python -m unittest -v scripts/test_derive_hcpmmp1_neuromaps_lineage_b.py
+          PYTHONPATH=scripts python -m unittest -v scripts/test_hcpmmp_neuromaps_generator_provenance.py
+
+      - name: Atomic no-replace topology ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=scripts/derive_hcpmmp1_neuromaps_lineage_b.py
+          DOC=docs/neuroscience/HCPMMP1_LINEAGE_B_ATOMIC_NOREPLACE_PUBLICATION_V1.md
+          grep -Fq '_atomic_rename_noreplace' "$SRC"
+          grep -Fq 'renameat2' "$SRC"
+          grep -Fq '_RENAME_NOREPLACE = 1' "$SRC"
+          grep -Fq 'errno.EEXIST' "$SRC"
+          grep -Fq 'atomic no-replace rename unavailable' "$SRC"
+          grep -Fq 'filesystem/kernel lacks atomic no-replace rename' "$SRC"
+          if grep -Fq 'os.rename(staging, final)' "$SRC"; then
+            echo 'check-then-rename publication fallback reintroduced' >&2
+            exit 1
+          fi
+          grep -Fq 'AtomicVisibility' "$DOC"
+          grep -Fq 'NoReplace' "$DOC"
+          grep -Fq 'VisibilityCommit != DurabilityConfirmation' "$DOC"
+          grep -Fq 'ArchivalVerifierCompatibility != LocalAncestry' "$DOC"
+          grep -Fq 'AtomicNoReplaceEvidenceCustody != ScientificValidity' "$DOC"
+
+      - name: Generator-root consequence ratchet
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=scripts/derive_hcpmmp1_neuromaps_lineage_b.py
+          grep -Fq '"derive": digest_file(Path(__file__).resolve())' "$SRC"
+          grep -Fq 'GENERATOR_FILE_KEYS = {"common", "gifti", "derive"}' "$SRC"
+
+      - name: CLI contract
+        run: |
+          PYTHONPATH=scripts python scripts/derive_hcpmmp1_neuromaps_lineage_b.py --help
+          PYTHONPATH=scripts python scripts/derive_hcpmmp1_neuromaps_lineage_b.py derive --help
+          PYTHONPATH=scripts python scripts/derive_hcpmmp1_neuromaps_lineage_b.py verify-evidence --help

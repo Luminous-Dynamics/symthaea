@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
+import errno
 import json
 import os
 import shutil
@@ -73,6 +75,8 @@ EVIDENCE_KEYS = {
 }
 GENERATOR_IMPLEMENTATION_KEYS = {"digest", "files"}
 GENERATOR_FILE_KEYS = {"common", "gifti", "derive"}
+_AT_FDCWD = -100
+_RENAME_NOREPLACE = 1
 
 
 def run_wb(wb: Path, args: list[str]) -> None:
@@ -158,6 +162,51 @@ def _path_exists(path: Path) -> bool:
     return os.path.lexists(path)
 
 
+def _atomic_rename_noreplace(source: Path, destination: Path) -> None:
+    """Atomically publish one directory without replacing any existing destination.
+
+    The Lineage-B qualification platform is Linux. There is no safe fallback to
+    check-then-rename: such a fallback would reintroduce the overwrite race this
+    primitive exists to close.
+    """
+
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        renameat2 = libc.renameat2
+    except (AttributeError, OSError) as exc:
+        raise ContractError(
+            "output custody: atomic no-replace rename unavailable"
+        ) from exc
+
+    renameat2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    renameat2.restype = ctypes.c_int
+    ctypes.set_errno(0)
+    rc = renameat2(
+        _AT_FDCWD,
+        os.fsencode(source),
+        _AT_FDCWD,
+        os.fsencode(destination),
+        _RENAME_NOREPLACE,
+    )
+    if rc == 0:
+        return
+
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise ContractError("output custody: destination appeared before atomic publish")
+    if error_number in {errno.ENOSYS, errno.EINVAL, errno.ENOTSUP}:
+        raise ContractError(
+            "output custody: filesystem/kernel lacks atomic no-replace rename"
+        )
+    raise OSError(error_number, os.strerror(error_number), str(destination))
+
+
 def _publish_bundle(
     outdir: Path,
     left: dict[str, Any],
@@ -197,9 +246,7 @@ def _publish_bundle(
         _write_private(evidence_path, canonical_json_bytes(evidence) + b"\n")
         _fsync_dir(staging)
 
-        if _path_exists(final):
-            raise ContractError("output custody: destination appeared before publish")
-        os.rename(staging, final)
+        _atomic_rename_noreplace(staging, final)
         staging = None
         _fsync_dir(parent)
         return evidence
