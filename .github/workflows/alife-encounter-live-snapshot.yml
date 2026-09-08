@@ -1,0 +1,122 @@
+name: ALife Encounter Live Snapshot
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/encounter.rs"
+      - "crates/domains/symthaea-alife/src/encounter_snapshot.rs"
+      - ".github/workflows/alife-encounter-live-snapshot.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Encounter scheduler split-run equivalence
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-encounter-live-snapshot
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test encounter snapshot contract
+        run: 'cargo test --locked -p symthaea-alife encounter_snapshot::'
+
+      - name: Test live encounter scheduler
+        run: 'cargo test --locked -p symthaea-alife encounter::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze live snapshot theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          live="crates/domains/symthaea-alife/src/encounter.rs"
+          contract="crates/domains/symthaea-alife/src/encounter_snapshot.rs"
+
+          grep -q 'pub fn snapshot_v1(&self) -> EncounterSchedulerSnapshotV1' "$live"
+          grep -q 'pub fn from_validated_snapshot_v1' "$live"
+          grep -q 'fixed_partners.sort_by_key' "$live"
+          grep -q 'EncounterSchedulerSnapshotV1::from_live_parts' "$live"
+          grep -q 'ValidatedEncounterSchedulerSnapshotV1' "$live"
+          grep -q 'random_pairing_future_is_identical_after_snapshot_round_trip_restore' "$live"
+          grep -q 'fixed_partner_stale_history_and_future_pairings_survive_snapshot_restore' "$live"
+          grep -q 'from_live_parts' "$contract"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('crates/domains/symthaea-alife/src/encounter.rs').read_text()
+          snap = p.split('pub fn snapshot_v1', 1)[1].split('pub fn from_validated_snapshot_v1', 1)[0]
+          if 'sort_by_key' not in snap:
+              raise SystemExit('scheduler snapshot no longer canonicalizes fixed-map key order')
+          restore = p.split('pub fn from_validated_snapshot_v1', 1)[1].split('fn next_unit', 1)[0]
+          for required in ('snapshot.mode()', 'snapshot.fixed_partners()', 'snapshot.rng_state()'):
+              if required not in restore:
+                  raise SystemExit(f'missing validated restore surface: {required}')
+          PY
+
+      - name: Freeze non-claims
+        run: |
+          set -euo pipefail
+          live="crates/domains/symthaea-alife/src/encounter.rs"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$live"
+          ! grep -q 'PopulationSnapshotV1' "$live"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-encounter-live-snapshot
+          {
+            echo "authority=encounter_scheduler_live_snapshot_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "encounter_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/encounter.rs | cut -d' ' -f1)"
+            echo "snapshot_contract_sha256=$(sha256sum crates/domains/symthaea-alife/src/encounter_snapshot.rs | cut -d' ' -f1)"
+            echo "random_future_pairing_equivalence=true"
+            echo "fixed_partner_future_pairing_equivalence=true"
+            echo "stale_fixed_map_preserved=true"
+            echo "population_execution_resume_established=false"
+          } > target/alife-encounter-live-snapshot/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-encounter-live-snapshot
+          path: target/alife-encounter-live-snapshot/qualification.txt
+          if-no-files-found: error
