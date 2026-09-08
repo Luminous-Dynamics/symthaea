@@ -361,3 +361,257 @@ pub enum CommissioningAuthorizationError {
     #[error("commissioning authorization string field {0} exceeds canonical u32 length")]
     StringTooLong(&'static str),
 }
+
+/// Lineage-bearing commissioning-authorization transitions.
+///
+/// A valid detached signature over a commissioning authorization is not sufficient
+/// to establish history. Successor generations must authenticate the digest of the
+/// exact predecessor transition so two same-generation branches cannot later be
+/// silently converged by counter value alone.
+pub mod transition {
+    use super::{
+        CommissioningAuthorizationError, CommissioningAuthorizationSubject,
+        CommissioningAuthorityRootDigest,
+    };
+    use crate::ConfigurationDigest;
+    use thiserror::Error;
+
+    pub const COMMISSIONING_AUTHORIZATION_TRANSITION_SCHEMA_V1: &str =
+        "symthaea-commissioning-authorization-transition-v1";
+    const DOMAIN_SEPARATOR: &[u8] = b"symthaea:commissioning-authorization-transition:v1\0";
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum CommissioningAuthorizationTransitionDigest {
+        Blake3_256([u8; 32]),
+    }
+
+    impl CommissioningAuthorizationTransitionDigest {
+        pub fn blake3_256(bytes: &[u8]) -> Self {
+            Self::Blake3_256(ConfigurationDigest::blake3_256(bytes).into_blake3_256())
+        }
+
+        pub fn into_blake3_256(self) -> [u8; 32] {
+            match self {
+                Self::Blake3_256(bytes) => bytes,
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum CommissioningAuthorizationPredecessor {
+        Bootstrap,
+        Previous(CommissioningAuthorizationTransitionDigest),
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct CommissioningAuthorizationTransition {
+        schema_version: String,
+        predecessor: CommissioningAuthorizationPredecessor,
+        subject: CommissioningAuthorizationSubject,
+    }
+
+    impl CommissioningAuthorizationTransition {
+        pub fn bootstrap(
+            subject: CommissioningAuthorizationSubject,
+        ) -> Result<Self, CommissioningAuthorizationTransitionError> {
+            subject.validate()?;
+            if subject.commissioning_generation() != 1 {
+                return Err(
+                    CommissioningAuthorizationTransitionError::BootstrapGenerationMustBeOne {
+                        observed: subject.commissioning_generation(),
+                    },
+                );
+            }
+            let transition = Self {
+                schema_version: COMMISSIONING_AUTHORIZATION_TRANSITION_SCHEMA_V1.to_owned(),
+                predecessor: CommissioningAuthorizationPredecessor::Bootstrap,
+                subject,
+            };
+            transition.validate()?;
+            Ok(transition)
+        }
+
+        pub fn successor(
+            previous: &Self,
+            subject: CommissioningAuthorizationSubject,
+        ) -> Result<Self, CommissioningAuthorizationTransitionError> {
+            previous.validate()?;
+            subject.validate()?;
+
+            let current = previous.generation();
+            let expected = current.checked_add(1).ok_or(
+                CommissioningAuthorizationTransitionError::GenerationExhausted { current },
+            )?;
+            let observed = subject.commissioning_generation();
+            if observed != expected {
+                return Err(
+                    CommissioningAuthorizationTransitionError::GenerationNotSuccessor {
+                        current,
+                        expected,
+                        observed,
+                    },
+                );
+            }
+            if subject.subject_node_id() != previous.subject.subject_node_id() {
+                return Err(
+                    CommissioningAuthorizationTransitionError::SubjectNodeChanged {
+                        predecessor: previous.subject.subject_node_id().to_owned(),
+                        successor: subject.subject_node_id().to_owned(),
+                    },
+                );
+            }
+            if subject.authority_root_id() != previous.subject.authority_root_id() {
+                return Err(
+                    CommissioningAuthorizationTransitionError::AuthorityRootIdChanged {
+                        predecessor: previous.subject.authority_root_id().to_owned(),
+                        successor: subject.authority_root_id().to_owned(),
+                    },
+                );
+            }
+            if subject.authority_root_digest() != previous.subject.authority_root_digest() {
+                return Err(CommissioningAuthorizationTransitionError::AuthorityRootChanged);
+            }
+
+            let transition = Self {
+                schema_version: COMMISSIONING_AUTHORIZATION_TRANSITION_SCHEMA_V1.to_owned(),
+                predecessor: CommissioningAuthorizationPredecessor::Previous(
+                    previous.transition_digest()?,
+                ),
+                subject,
+            };
+            transition.validate()?;
+            Ok(transition)
+        }
+
+        pub fn validate(&self) -> Result<(), CommissioningAuthorizationTransitionError> {
+            if self.schema_version != COMMISSIONING_AUTHORIZATION_TRANSITION_SCHEMA_V1 {
+                return Err(
+                    CommissioningAuthorizationTransitionError::UnsupportedSchemaVersion(
+                        self.schema_version.clone(),
+                    ),
+                );
+            }
+            self.subject.validate()?;
+            match (self.subject.commissioning_generation(), self.predecessor) {
+                (1, CommissioningAuthorizationPredecessor::Bootstrap) => Ok(()),
+                (1, CommissioningAuthorizationPredecessor::Previous(_)) => Err(
+                    CommissioningAuthorizationTransitionError::GenerationOneHasPredecessor,
+                ),
+                (generation, CommissioningAuthorizationPredecessor::Bootstrap) => Err(
+                    CommissioningAuthorizationTransitionError::NonInitialGenerationUsesBootstrap {
+                        generation,
+                    },
+                ),
+                (_, CommissioningAuthorizationPredecessor::Previous(_)) => Ok(()),
+            }
+        }
+
+        pub fn canonical_signing_bytes(
+            &self,
+        ) -> Result<Vec<u8>, CommissioningAuthorizationTransitionError> {
+            self.validate()?;
+            let subject_bytes = self.subject.canonical_signing_bytes()?;
+            let mut out = Vec::with_capacity(448);
+            out.extend_from_slice(DOMAIN_SEPARATOR);
+            push_bytes(
+                &mut out,
+                "schema_version",
+                self.schema_version.as_bytes(),
+            )?;
+            push_predecessor(&mut out, self.predecessor);
+            push_bytes(&mut out, "subject", &subject_bytes)?;
+            Ok(out)
+        }
+
+        pub fn transition_digest(
+            &self,
+        ) -> Result<CommissioningAuthorizationTransitionDigest, CommissioningAuthorizationTransitionError>
+        {
+            Ok(CommissioningAuthorizationTransitionDigest::blake3_256(
+                &self.canonical_signing_bytes()?,
+            ))
+        }
+
+        pub fn predecessor(&self) -> CommissioningAuthorizationPredecessor {
+            self.predecessor
+        }
+
+        pub fn subject(&self) -> &CommissioningAuthorizationSubject {
+            &self.subject
+        }
+
+        pub fn generation(&self) -> u64 {
+            self.subject.commissioning_generation()
+        }
+
+        pub fn authority_root_digest(&self) -> CommissioningAuthorityRootDigest {
+            self.subject.authority_root_digest()
+        }
+    }
+
+    fn push_bytes(
+        out: &mut Vec<u8>,
+        field: &'static str,
+        bytes: &[u8],
+    ) -> Result<(), CommissioningAuthorizationTransitionError> {
+        let len = u32::try_from(bytes.len())
+            .map_err(|_| CommissioningAuthorizationTransitionError::FieldTooLong(field))?;
+        out.extend_from_slice(&len.to_be_bytes());
+        out.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    fn push_predecessor(
+        out: &mut Vec<u8>,
+        predecessor: CommissioningAuthorizationPredecessor,
+    ) {
+        match predecessor {
+            CommissioningAuthorizationPredecessor::Bootstrap => out.push(0),
+            CommissioningAuthorizationPredecessor::Previous(digest) => {
+                out.push(1);
+                match digest {
+                    CommissioningAuthorizationTransitionDigest::Blake3_256(bytes) => {
+                        out.push(1);
+                        out.extend_from_slice(&bytes);
+                    }
+                }
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Error)]
+    pub enum CommissioningAuthorizationTransitionError {
+        #[error(transparent)]
+        Subject(#[from] CommissioningAuthorizationError),
+        #[error("unsupported commissioning-authorization transition schema version {0}")]
+        UnsupportedSchemaVersion(String),
+        #[error("bootstrap commissioning-authorization generation must be 1, observed {observed}")]
+        BootstrapGenerationMustBeOne { observed: u64 },
+        #[error("commissioning-authorization generation 1 must not carry a predecessor")]
+        GenerationOneHasPredecessor,
+        #[error("commissioning-authorization generation {generation} cannot use bootstrap predecessor")]
+        NonInitialGenerationUsesBootstrap { generation: u64 },
+        #[error("commissioning-authorization generation space exhausted at {current}")]
+        GenerationExhausted { current: u64 },
+        #[error("commissioning-authorization generation must be exact successor of {current}: expected {expected}, observed {observed}")]
+        GenerationNotSuccessor {
+            current: u64,
+            expected: u64,
+            observed: u64,
+        },
+        #[error("commissioning-authorization subject node changed across transition: predecessor {predecessor}, successor {successor}")]
+        SubjectNodeChanged {
+            predecessor: String,
+            successor: String,
+        },
+        #[error("commissioning-authorization authority-root id changed across transition: predecessor {predecessor}, successor {successor}")]
+        AuthorityRootIdChanged {
+            predecessor: String,
+            successor: String,
+        },
+        #[error("commissioning-authorization authority root changed without a root-transition policy")]
+        AuthorityRootChanged,
+        #[error("commissioning-authorization transition field {0} exceeds canonical u32 length")]
+        FieldTooLong(&'static str),
+    }
+}
