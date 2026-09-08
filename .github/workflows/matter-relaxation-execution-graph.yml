@@ -1,0 +1,69 @@
+name: Matter Structural Relaxation Graph
+
+on:
+  pull_request:
+    paths:
+      - 'src/knowledge/matter_relaxation_execution_graph.rs'
+      - 'src/knowledge/matter_relaxation_execution_binding.rs'
+      - 'src/knowledge/mod.rs'
+      - '.github/workflows/matter-relaxation-execution-graph.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact parent and focused scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "ebfff36e7f9038a788e00a627364028ab83dd1c8"
+          git diff --name-only HEAD^ HEAD | sort > /tmp/files
+          cat >/tmp/expected <<'EOF'
+          .github/workflows/matter-relaxation-execution-graph.yml
+          src/knowledge/matter_relaxation_execution_binding.rs
+          src/knowledge/matter_relaxation_execution_graph.rs
+          src/knowledge/mod.rs
+          EOF
+          diff -u /tmp/expected /tmp/files
+          test -z "$(git diff HEAD^ HEAD -- Cargo.lock Cargo.toml crates || true)"
+
+      - name: Ratchet relaxation graph semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          g=src/knowledge/matter_relaxation_execution_graph.rs
+          b=src/knowledge/matter_relaxation_execution_binding.rs
+          m=src/knowledge/mod.rs
+          grep -q 'bind_crystal_solver_leaf' "$g"
+          grep -q 'CrystalSolverTask::StructuralRelaxation' "$g"
+          grep -q 'NonContiguousStepIndex' "$g"
+          grep -q 'OverlappingRelaxationSteps' "$g"
+          grep -q 'BrokenStructureHandoff' "$g"
+          grep -q 'FinalStepIsNotTargetClaim' "$g"
+          grep -q 'max_force_bits' "$g"
+          grep -q 'force_tolerance_bits' "$g"
+          grep -q 'require_preregistration_before' "$g"
+          grep -q 'StepOodNotPropagated' "$g"
+          ! grep -q 'bind_execution_references' "$g"
+          ! grep -q 'EvidenceRole::SolverExecution' "$g"
+
+          grep -q 'StructureMissingFromStepClaim' "$b"
+          grep -q 'OutputStructureNotExecutionOutput' "$b"
+          grep -q 'DiagnosticNotFinalExecutionOutput' "$b"
+          grep -q 'pub fn bind_structural_relaxation_execution_graph' "$b"
+          grep -q '^mod matter_relaxation_execution_graph;' "$m"
+          grep -q '^pub mod matter_relaxation_execution_binding;' "$m"
+          ! grep -q '^pub mod matter_relaxation_execution_graph;' "$m"
+
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Focused regression tests
+        run: cargo test --locked matter_relaxation_execution --lib
