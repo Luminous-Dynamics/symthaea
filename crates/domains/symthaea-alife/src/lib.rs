@@ -72,8 +72,8 @@ pub use evolution_birth::{
     EvolutionBirthPlanErrorV1, EvolutionBirthPlanV1, prepare_evolution_birth_v1,
 };
 pub use evolution_rng::{
-    EvolutionRngSnapshotV1, EvolutionRngStreamsV1, INHERITANCE_SOURCE_SEED_OFFSET_V1,
-    LEGACY_MUTATION_SEED_OFFSET_V1,
+    EvolutionRngRestoreErrorV1, EvolutionRngSnapshotV1, EvolutionRngStreamsV1,
+    INHERITANCE_SOURCE_SEED_OFFSET_V1, LEGACY_MUTATION_SEED_OFFSET_V1,
 };
 pub use evolutionary_history::{
     EvolutionaryHistoryError, EvolutionaryHistoryReportV1, GenomeDeltaV1, LineageHistoryV1,

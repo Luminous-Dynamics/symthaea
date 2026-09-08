@@ -2,34 +2,44 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Deterministic RNG-stream contract for evolutionary controls.
 //!
-//! `Population` historically uses one xorshift64 state for two logically distinct concerns:
+//! `Population` historically used one xorshift64 state for two logically distinct concerns:
 //!
 //! 1. choosing a genome source under `InheritanceMode::RandomPeer`;
 //! 2. mutating the chosen genome.
 //!
-//! That means merely enabling the RandomPeer control consumes an extra draw before mutation and
-//! shifts all later mutation randomness. This module freezes the replacement contract before the
-//! hot population transition code is changed.
-//!
-//! No production simulation path uses these streams yet. The later wiring tranche should replace
-//! the shared population RNG with this type while preserving the mutation stream's legacy seed
-//! exactly for `FromParent` runs.
+//! The production population now owns [`EvolutionRngStreamsV1`], keeping those concerns on
+//! independent deterministic streams so source-selection work cannot shift later mutation draws.
+//! This module also defines the exact persistence/restore boundary needed by future execution
+//! checkpoints: snapshots may deserialize from untrusted storage, but zero xorshift states are
+//! rejected before they can become live RNG authority.
+
+use serde::{Deserialize, Serialize};
 
 use crate::Genome;
 
 /// The historical population mutation/source RNG started from this offset.
 ///
-/// Keeping this exact value for the new mutation stream preserves the pre-split `FromParent`
+/// Keeping this exact value for the mutation stream preserves the pre-split `FromParent`
 /// mutation sequence, because that mode never consumed RandomPeer source-selection draws.
 pub const LEGACY_MUTATION_SEED_OFFSET_V1: u64 = 1_000_011;
 
 /// Independent deterministic seed domain for RandomPeer genome-source selection.
 pub const INHERITANCE_SOURCE_SEED_OFFSET_V1: u64 = 2_000_033;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Persistable exact states for both deterministic evolutionary RNG streams.
+///
+/// Fields remain public for existing measurement/tests, but a deserialized snapshot is not itself
+/// executable authority. Use [`EvolutionRngStreamsV1::from_snapshot`] to validate and restore it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvolutionRngSnapshotV1 {
     pub mutation_state: u64,
     pub inheritance_source_state: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvolutionRngRestoreErrorV1 {
+    ZeroMutationState,
+    ZeroInheritanceSourceState,
 }
 
 /// Two independent xorshift64 states for evolutionary randomness.
@@ -49,6 +59,26 @@ impl EvolutionRngStreamsV1 {
                 .wrapping_add(INHERITANCE_SOURCE_SEED_OFFSET_V1)
                 .max(1),
         }
+    }
+
+    /// Restore the exact deterministic evolutionary RNG state from persisted evidence.
+    ///
+    /// Xorshift64's all-zero state is absorbing: once entered, every future draw remains zero.
+    /// Fresh streams can never start at zero, and nonzero xorshift states never evolve into zero,
+    /// so a zero value in persisted state is invalid/corrupt rather than a legitimate checkpoint.
+    pub fn from_snapshot(
+        snapshot: EvolutionRngSnapshotV1,
+    ) -> Result<Self, EvolutionRngRestoreErrorV1> {
+        if snapshot.mutation_state == 0 {
+            return Err(EvolutionRngRestoreErrorV1::ZeroMutationState);
+        }
+        if snapshot.inheritance_source_state == 0 {
+            return Err(EvolutionRngRestoreErrorV1::ZeroInheritanceSourceState);
+        }
+        Ok(Self {
+            mutation_state: snapshot.mutation_state,
+            inheritance_source_state: snapshot.inheritance_source_state,
+        })
     }
 
     /// Mutable mutation state consumed by [`Genome::mutate`].
@@ -165,5 +195,56 @@ mod tests {
                 b.next_inheritance_source_unit().to_bits()
             );
         }
+    }
+
+    #[test]
+    fn validated_restore_preserves_both_future_streams_exactly() {
+        let genome = Genome::from_config(&OrganismConfig::default());
+        let mut uninterrupted = EvolutionRngStreamsV1::new(0x51eed);
+
+        for _ in 0..7 {
+            uninterrupted.next_inheritance_source_unit();
+        }
+        for _ in 0..5 {
+            let _ = genome.mutate(uninterrupted.mutation_state_mut(), 0.63, 0.07);
+        }
+
+        let persisted = uninterrupted.snapshot();
+        let encoded = serde_json::to_string(&persisted).expect("serialize RNG snapshot");
+        let decoded: EvolutionRngSnapshotV1 =
+            serde_json::from_str(&encoded).expect("deserialize RNG snapshot");
+        let mut restored =
+            EvolutionRngStreamsV1::from_snapshot(decoded).expect("validated RNG restore");
+
+        assert_eq!(restored.snapshot(), uninterrupted.snapshot());
+        for _ in 0..32 {
+            assert_eq!(
+                restored.next_inheritance_source_unit().to_bits(),
+                uninterrupted.next_inheritance_source_unit().to_bits()
+            );
+            assert_eq!(
+                genome.mutate(restored.mutation_state_mut(), 0.41, 0.03),
+                genome.mutate(uninterrupted.mutation_state_mut(), 0.41, 0.03)
+            );
+        }
+        assert_eq!(restored.snapshot(), uninterrupted.snapshot());
+    }
+
+    #[test]
+    fn zero_state_snapshots_fail_closed_before_becoming_live_streams() {
+        assert_eq!(
+            EvolutionRngStreamsV1::from_snapshot(EvolutionRngSnapshotV1 {
+                mutation_state: 0,
+                inheritance_source_state: 1,
+            }),
+            Err(EvolutionRngRestoreErrorV1::ZeroMutationState)
+        );
+        assert_eq!(
+            EvolutionRngStreamsV1::from_snapshot(EvolutionRngSnapshotV1 {
+                mutation_state: 1,
+                inheritance_source_state: 0,
+            }),
+            Err(EvolutionRngRestoreErrorV1::ZeroInheritanceSourceState)
+        );
     }
 }
