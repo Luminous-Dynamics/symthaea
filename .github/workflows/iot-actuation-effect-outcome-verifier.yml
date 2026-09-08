@@ -5,6 +5,7 @@ on:
     paths:
       - 'crates/bridges/symthaea-iot-actuation-effect-outcome-verifier/**'
       - 'crates/bridges/symthaea-iot-actuation-effect-reconciliation-challenge/**'
+      - 'crates/bridges/symthaea-iot-effect-outcome-policy-bound-protocol/**'
       - '.github/workflows/iot-actuation-effect-outcome-verifier.yml'
   workflow_dispatch:
 
@@ -29,7 +30,7 @@ jobs:
             test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           fi
 
-      - name: Freeze outcome-verifier TCB contract
+      - name: Freeze outcome-verifier V1 TCB contract
         shell: python
         run: |
           from pathlib import Path
@@ -93,7 +94,7 @@ jobs:
           ]
           missing = [needle for needle in required if needle not in compact]
           if missing:
-              raise SystemExit(f'missing outcome-verifier invariant: {missing}')
+              raise SystemExit(f'missing outcome-verifier V1 invariant: {missing}')
 
           verify_evidence_signature = re.compile(
               r'pubfnverify_evidence\('
@@ -124,7 +125,7 @@ jobs:
           ]
           found = [needle for needle in forbidden if needle in compact]
           if found:
-              raise SystemExit(f'outcome verifier crossed reviewed TCB boundary: {found}')
+              raise SystemExit(f'outcome verifier V1 crossed reviewed TCB boundary: {found}')
 
           if 'pubfnverify_evidence_at' in compact or 'pubfnfence_current_at' in compact:
               raise SystemExit('deterministic time injection escaped crate-private qualification scope')
@@ -136,7 +137,8 @@ jobs:
           manifest = tomllib.loads((root / 'Cargo.toml').read_text())
           expected = {
               'blake3', 'ed25519-dalek', 'symthaea-authority',
-              'symthaea-iot-actuation-effect-reconciliation-challenge', 'thiserror',
+              'symthaea-iot-actuation-effect-reconciliation-challenge',
+              'symthaea-iot-effect-outcome-policy-bound-protocol', 'thiserror',
           }
           actual = set(manifest.get('dependencies', {}))
           if actual != expected:
