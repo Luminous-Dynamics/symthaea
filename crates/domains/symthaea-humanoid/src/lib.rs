@@ -72,6 +72,7 @@ pub mod terrain_mpc;
 pub mod training;
 pub mod typed_actuation_capability;
 pub mod types;
+pub mod verified_qualification;
 pub mod vision_terrain;
 pub mod whole_body;
 pub use actuation::*;
@@ -133,6 +134,7 @@ pub use terrain_capability::*;
 pub use terrain_mpc::*;
 pub use typed_actuation_capability::*;
 pub use types::*;
+pub use verified_qualification::*;
 pub use vision_terrain::*;
 pub use whole_body::*;
 
