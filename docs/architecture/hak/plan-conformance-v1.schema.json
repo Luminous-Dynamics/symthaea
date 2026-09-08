@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/hak/plan-conformance-v1.schema.json",
+  "title": "HAK Plan Conformance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "conformance_id", "subject", "plan", "receipt",
+    "evaluator", "status", "checks", "negative_cases", "limitations",
+    "conformance_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "hak.plan-conformance.v1"},
+    "conformance_id": {"type": "string", "minLength": 1},
+    "subject": {
+      "type": "object",
+      "required": ["repository", "commit_sha"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
+      }
+    },
+    "plan": {
+      "type": "object",
+      "required": ["plan_ref"],
+      "properties": {"plan_ref": {"type": "string", "minLength": 1}}
+    },
+    "receipt": {
+      "type": "object",
+      "required": ["receipt_id", "receipt_digest"],
+      "properties": {
+        "receipt_id": {"type": "string", "minLength": 1},
+        "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "required": ["identity", "policy_ref", "model_assisted"],
+      "properties": {
+        "identity": {"type": "string", "minLength": 1},
+        "policy_ref": {"type": "string", "minLength": 1},
+        "model_assisted": {"type": "boolean"}
+      }
+    },
+    "status": {"enum": ["Satisfied", "NotSatisfied", "Indeterminate"]},
+    "checks": {"type": "array"},
+    "negative_cases": {"type": "array"},
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "conformance_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
