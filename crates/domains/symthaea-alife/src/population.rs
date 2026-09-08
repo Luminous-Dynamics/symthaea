@@ -22,6 +22,7 @@ use crate::evolution_rng::EvolutionRngStreamsV1;
 use crate::lifecycle::{LifecycleDeathCauseV1, LifecycleEventV1};
 use crate::lifecycle_recorder::LifecycleRecorderV1;
 use crate::organism::{Action, Organism, OrganismConfig};
+use crate::organism_seed::OrganismSeedAllocatorV1;
 
 /// How an offspring's genome is chosen at reproduction, per `ALIFE_PLAN_2026-07-08.md` Phase 4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -139,7 +140,9 @@ pub fn resolve_pair_transfer(
 pub struct Population {
     pub organisms: Vec<Organism>,
     pub cfg: PopulationConfig,
-    next_seed: u64,
+    /// Monotonic, never-reused construction-seed authority. Exactly one seed is issued for each
+    /// persistent organism identity (founder or offspring), matching lifecycle history.
+    organism_seed_allocator: OrganismSeedAllocatorV1,
     /// Independent deterministic streams for mutation and RandomPeer genome-source selection.
     ///
     /// The mutation stream preserves the historical `seed_base + 1_000_011` sequence exactly for
@@ -171,10 +174,13 @@ pub struct Population {
 impl Population {
     pub fn new(cfg: PopulationConfig, initial_count: usize, seed_base: u64) -> Self {
         let mut id_allocator = AgentIdAllocator::new();
+        let mut organism_seed_allocator = OrganismSeedAllocatorV1::new(seed_base);
         let organisms = (0..initial_count)
-            .map(|i| {
-                Organism::new(cfg.organism_cfg, seed_base.wrapping_add(i as u64).max(1))
-                    .with_id(id_allocator.allocate())
+            .map(|_| {
+                let seed = organism_seed_allocator
+                    .allocate()
+                    .expect("organism construction seed space exhausted while creating founders");
+                Organism::new(cfg.organism_cfg, seed).with_id(id_allocator.allocate())
             })
             .collect::<Vec<_>>();
         let lifecycle_recorder = LifecycleRecorderV1::from_founders(&organisms)
@@ -182,7 +188,7 @@ impl Population {
         Self {
             organisms,
             cfg,
-            next_seed: seed_base.wrapping_add(initial_count as u64).max(1),
+            organism_seed_allocator,
             evolution_rng: EvolutionRngStreamsV1::new(seed_base),
             total_births: 0,
             total_deaths: 0,
@@ -295,10 +301,13 @@ impl Population {
                 // gets copied, not who gave birth.
                 let parent_lineage_id = self.organisms[i].lineage_id;
                 let parent_generation = self.organisms[i].generation;
-                let mut offspring = Organism::new(offspring_cfg, self.next_seed)
+                let offspring_seed = self
+                    .organism_seed_allocator
+                    .allocate()
+                    .expect("organism construction seed space exhausted during reproduction");
+                let mut offspring = Organism::new(offspring_cfg, offspring_seed)
                     .with_id(self.id_allocator.allocate())
                     .with_lineage(parent_lineage_id, parent_generation + 1);
-                self.next_seed = self.next_seed.wrapping_add(1).max(1);
                 offspring.energy = self.cfg.reproduction_energy_cost;
                 self.lifecycle_recorder
                     .record_birth_from_plan(&birth_plan, &offspring)
@@ -517,10 +526,13 @@ impl Population {
                 // gets copied, not who gave birth.
                 let parent_lineage_id = self.organisms[i].lineage_id;
                 let parent_generation = self.organisms[i].generation;
-                let mut offspring = Organism::new(offspring_cfg, self.next_seed)
+                let offspring_seed = self
+                    .organism_seed_allocator
+                    .allocate()
+                    .expect("organism construction seed space exhausted during social reproduction");
+                let mut offspring = Organism::new(offspring_cfg, offspring_seed)
                     .with_id(self.id_allocator.allocate())
                     .with_lineage(parent_lineage_id, parent_generation + 1);
-                self.next_seed = self.next_seed.wrapping_add(1).max(1);
                 offspring.energy = self.cfg.reproduction_energy_cost;
                 self.lifecycle_recorder
                     .record_birth_from_plan(&birth_plan, &offspring)
@@ -694,6 +706,47 @@ mod tests {
             mutation_std: 0.05,
             inheritance,
         }
+    }
+
+    #[test]
+    fn population_seed_allocator_issues_one_unique_seed_per_founder_from_zero_base() {
+        let pop = Population::new(cfg(), 2, 0);
+        let snapshot = pop.organism_seed_allocator.snapshot();
+        assert_eq!(snapshot.start_seed(), 1);
+        assert_eq!(snapshot.issued_count(), 2);
+        assert_eq!(snapshot.next_seed(), Some(3));
+        assert_eq!(pop.id_allocator.snapshot().next_raw(), snapshot.issued_count());
+    }
+
+    #[test]
+    fn step_births_keep_seed_and_identity_issue_counts_locked() {
+        let initial_count = 3usize;
+        let mut pop = Population::new(
+            forced_birth_cfg(InheritanceMode::FromParent),
+            initial_count,
+            42,
+        );
+        let summary = pop.step(|_| 1.0);
+        assert_eq!(summary.births_this_tick, initial_count as u64);
+        let seeds = pop.organism_seed_allocator.snapshot();
+        assert_eq!(seeds.issued_count(), (initial_count * 2) as u64);
+        assert_eq!(pop.id_allocator.snapshot().next_raw(), seeds.issued_count());
+    }
+
+    #[test]
+    fn step_social_births_keep_seed_and_identity_issue_counts_locked() {
+        let initial_count = 4usize;
+        let mut pop = Population::new(
+            forced_birth_cfg(InheritanceMode::FromParent),
+            initial_count,
+            42,
+        );
+        let mut scheduler = EncounterScheduler::new(crate::PairingMode::Random, 99);
+        let summary = pop.step_social(|_| 1.0, &mut scheduler);
+        assert_eq!(summary.births_this_tick, initial_count as u64);
+        let seeds = pop.organism_seed_allocator.snapshot();
+        assert_eq!(seeds.issued_count(), (initial_count * 2) as u64);
+        assert_eq!(pop.id_allocator.snapshot().next_raw(), seeds.issued_count());
     }
 
     #[test]
