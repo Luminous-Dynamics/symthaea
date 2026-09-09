@@ -4,7 +4,11 @@
 pub mod actuation;
 pub mod actuation_capability;
 pub mod actuator_controllability;
-pub mod authority_source_attestation;
+// Internal compatibility layer. Public motor authority uses the v2 verified
+// source boundary below, which binds scheme identity and the full verification
+// decision into the runtime evidence identity.
+mod authority_source_attestation;
+pub mod verified_authority_source;
 pub mod capability_envelope;
 pub mod capability_request;
 pub mod cartesian_hand_reference;
@@ -56,9 +60,10 @@ pub mod physical_health;
 pub mod plugin;
 pub mod qp_certification;
 pub mod qualification;
-// Final public operational Reach authority facade: source attestations are
-// mandatory for operator/physical/epistemic/cognitive authority.
-pub mod reach_attested_authority;
+// Internal v1 attested facade. The public operational path is
+// `reach_verified_authority`, which accepts only v2 verifier decisions.
+mod reach_attested_authority;
+pub mod reach_verified_authority;
 pub mod reach_authority_commitment;
 pub mod reach_authority_committed_evidence;
 // Internal implementation detail: authority-committed stages are necessary, but
@@ -76,7 +81,7 @@ mod reach_episode_promotion;
 pub mod reach_execution;
 pub mod reach_execution_evidence;
 // Internal implementation detail: manifest-aware motor authority is necessary,
-// but the exported path additionally requires authenticated source attestations.
+// but the exported path additionally requires authenticated source verification.
 mod reach_manifest_authority;
 // Internal implementation detail: manifest-bound qualification/promotion is
 // necessary, but the actual motor receipt must record the strongest identities.
@@ -131,7 +136,7 @@ pub mod whole_body_lowering;
 pub use actuation::*;
 pub use actuation_capability::*;
 pub use actuator_controllability::*;
-pub use authority_source_attestation::*;
+pub use verified_authority_source::*;
 pub use capability_envelope::*;
 pub use capability_request::*;
 pub use cartesian_hand_reference::*;
@@ -175,7 +180,7 @@ pub use payload_capability::*;
 pub use physical_health::*;
 pub use qp_certification::*;
 pub use qualification::*;
-pub use reach_attested_authority::*;
+pub use reach_verified_authority::*;
 pub use reach_authority_commitment::*;
 pub use reach_authority_committed_evidence::*;
 pub use reach_episode_evidence::*;
