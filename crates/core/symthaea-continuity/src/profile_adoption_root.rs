@@ -147,9 +147,7 @@ impl RootBoundPolicyCheckedVerifierProfileAdoptionV1 {
                 || identity.authority_root_digest()
                     != authority_root_snapshot.authority_root_digest())
         {
-            return Err(
-                VerifierProfileAdoptionRootBindingError::PredecessorRootSnapshotMismatch,
-            );
+            return Err(VerifierProfileAdoptionRootBindingError::PredecessorRootSnapshotMismatch);
         }
 
         let transition_digest = checked.transition().transition_digest()?;
