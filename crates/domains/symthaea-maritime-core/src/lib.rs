@@ -3,9 +3,10 @@
 //! Shared, mission-neutral maritime autonomy primitives.
 //!
 //! This crate intentionally stops below mission-specific applications. It defines
-//! platform state, health, authority, degraded-operation, fleet-assurance and
-//! progressive-failure recording contracts reusable by AUVs, USVs, research
-//! vessels, logistics craft and other maritime platforms.
+//! platform state, health, authority, degraded-operation, fleet-assurance,
+//! progressive-failure recording and authenticated-session evidence contracts
+//! reusable by AUVs, USVs, research vessels, logistics craft and other maritime
+//! platforms.
 
 pub mod authority;
 pub mod degraded;
@@ -13,6 +14,7 @@ pub mod fleet;
 pub mod health;
 pub mod prelude;
 pub mod resilience;
+pub mod session;
 pub mod state;
 
 pub use authority::*;
@@ -20,4 +22,5 @@ pub use degraded::*;
 pub use fleet::*;
 pub use health::*;
 pub use resilience::*;
+pub use session::*;
 pub use state::*;
