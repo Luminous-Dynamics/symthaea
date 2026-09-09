@@ -10,20 +10,18 @@
 //! retrieved global fact != support article
 //! retrieved global fact != technology applicability
 //! retrieved global fact != sharing permission
+//! retrieved global fact != standards authority
 //! retrieved global fact != promotion authority
 //! ```
-//!
-//! The adapter never inserts query text into the global graph and never mutates
-//! global knowledge confidence/currentness merely because support searched it.
 
 use super::{KnowledgeEncoder, KnowledgeManager};
 use symthaea_support::types::SupportCategory;
 use symthaea_support::{
-    KnowledgeOriginV1, KnowledgeShareabilityV1, KnowledgeSourceErrorV1, SupportKnowledgeHitV1,
-    SupportKnowledgeQueryV1, SupportKnowledgeSourceV1,
+    KnowledgeAuthorityClassV1, KnowledgeLifecycleV1, KnowledgeOriginV1,
+    KnowledgeShareabilityV1, KnowledgeSourceErrorV1, KnowledgeStabilityV1,
+    SupportKnowledgeHitV1, SupportKnowledgeQueryV1, SupportKnowledgeSourceV1,
 };
 
-/// Read-only view of Symthaea's global semantic graph for IT support retrieval.
 pub struct GlobalKnowledgeSupportAdapterV1<'a> {
     manager: &'a KnowledgeManager,
     encoder: KnowledgeEncoder,
@@ -44,10 +42,6 @@ impl SupportKnowledgeSourceV1 for GlobalKnowledgeSupportAdapterV1<'_> {
         query: &SupportKnowledgeQueryV1,
     ) -> Result<Vec<SupportKnowledgeHitV1>, KnowledgeSourceErrorV1> {
         query.validate()?;
-
-        // Deliberately use a local encoder and immutable graph iteration rather
-        // than KnowledgeManager::process(): a support lookup must not teach the
-        // query back into global knowledge as though it were an observed fact.
         let query_hv = self.encoder.encode_token(query.text.trim());
         let mut hits = Vec::new();
 
@@ -76,12 +70,10 @@ impl SupportKnowledgeSourceV1 for GlobalKnowledgeSupportAdapterV1<'_> {
                 provider_quality: None,
                 category,
                 origin: KnowledgeOriginV1::GlobalSemanticGraph,
-                // The global graph currently does not establish support-specific
-                // publication/privacy rights for a fact.
+                lifecycle: KnowledgeLifecycleV1::Unknown,
+                authority: KnowledgeAuthorityClassV1::Unknown,
+                stability: KnowledgeStabilityV1::Unspecified,
                 shareability: KnowledgeShareabilityV1::NotEstablished,
-                // The global TemporalFact currently does not bind exact product /
-                // version / build / platform applicability. Do not copy query
-                // context into the hit and pretend applicability was established.
                 technology: None,
             });
         }
@@ -140,6 +132,8 @@ mod tests {
         assert_eq!(manager.graph().len(), before);
         assert!(hits.iter().all(|hit| {
             hit.origin == KnowledgeOriginV1::GlobalSemanticGraph
+                && hit.lifecycle == KnowledgeLifecycleV1::Unknown
+                && hit.authority == KnowledgeAuthorityClassV1::Unknown
                 && hit.shareability == KnowledgeShareabilityV1::NotEstablished
                 && hit.technology.is_none()
         }));
@@ -172,7 +166,6 @@ mod tests {
                 purpose: KnowledgeQueryPurposeV1::LocalReasoning,
             })
             .unwrap();
-
         assert!(hits.iter().all(|hit| hit.technology.is_none()));
     }
 

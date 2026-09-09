@@ -3,9 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Provider-neutral knowledge-source boundary for IT support.
 //!
-//! The support crate must not depend upward on the desktop/root KnowledgeManager.
-//! Instead, knowledge providers implement this small read interface. Retrieval is
-//! deliberately separate from federation/promotion authority.
+//! Retrieval relevance, epistemic confidence, source authority, lifecycle,
+//! stability, applicability, and sharing rights are deliberately independent.
 
 use crate::technology::TechnologyIdentityV1;
 use crate::types::SupportCategory;
@@ -56,6 +55,49 @@ pub enum KnowledgeOriginV1 {
     Other(String),
 }
 
+/// Lifecycle of the source artifact, not of the proposition itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KnowledgeLifecycleV1 {
+    Active,
+    Draft,
+    Deprecated,
+    Superseded,
+    Withdrawn,
+    Historic,
+    Unknown,
+}
+
+/// Institutional/normative role of a source. A more authoritative source is not
+/// automatically more factually correct, and this value is never folded into
+/// `confidence` by the retrieval layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KnowledgeAuthorityClassV1 {
+    NormativeStandard,
+    Registry,
+    BestCurrentPractice,
+    OfficialGuidance,
+    VendorDocumentation,
+    SecurityKnowledgeBase,
+    CommunityReference,
+    Informational,
+    Experimental,
+    InternalKnowledge,
+    Unknown,
+}
+
+/// Maturity/stability of the source schema or convention. This is separate from
+/// lifecycle because an active source can still describe development-stage APIs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KnowledgeStabilityV1 {
+    Development,
+    Alpha,
+    Beta,
+    ReleaseCandidate,
+    Stable,
+    Mixed,
+    Unspecified,
+}
+
 /// Retrieval never mints a `Federatable` state. Publication requires a distinct
 /// promotion/authorization transition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,11 +115,14 @@ pub struct SupportKnowledgeHitV1 {
     pub similarity: f32,
     /// Epistemic confidence only when the provider actually establishes one.
     pub confidence: Option<f32>,
-    /// Provider-specific quality signal (for example support-resolution phi).
-    /// It is deliberately not relabeled as factual confidence.
+    /// Provider-specific quality signal (for example support-resolution phi or
+    /// extraction quality). It is deliberately not factual confidence.
     pub provider_quality: Option<f32>,
     pub category: Option<SupportCategory>,
     pub origin: KnowledgeOriginV1,
+    pub lifecycle: KnowledgeLifecycleV1,
+    pub authority: KnowledgeAuthorityClassV1,
+    pub stability: KnowledgeStabilityV1,
     pub shareability: KnowledgeShareabilityV1,
     /// `None` means technology applicability is not established.
     pub technology: Option<TechnologyIdentityV1>,
@@ -115,8 +160,8 @@ pub trait SupportKnowledgeSourceV1 {
 }
 
 /// Merge heterogeneous hits without collapsing confidence, relevance, quality,
-/// origin, or shareability into one scalar. Relevance is primary; established
-/// confidence is only a tie-breaker.
+/// lifecycle, authority, stability, origin, or shareability into one scalar.
+/// Relevance is primary; established confidence is only a tie-breaker.
 pub fn merge_knowledge_hits_v1(
     sources: impl IntoIterator<Item = Vec<SupportKnowledgeHitV1>>,
     limit: usize,
@@ -147,7 +192,8 @@ fn prefer_new_hit(candidate: &SupportKnowledgeHitV1, existing: &SupportKnowledge
     compare_hits(candidate, existing) == std::cmp::Ordering::Less
 }
 
-/// Ordering suitable for `sort_by`: strongest hit sorts first.
+/// Ordering suitable for `sort_by`: strongest retrieval match sorts first.
+/// Source authority/lifecycle/stability are intentionally not hidden ranking weights.
 fn compare_hits(a: &SupportKnowledgeHitV1, b: &SupportKnowledgeHitV1) -> std::cmp::Ordering {
     b.similarity
         .partial_cmp(&a.similarity)
@@ -187,8 +233,12 @@ impl fmt::Display for KnowledgeSourceErrorV1 {
             Self::ZeroLimit => write!(f, "knowledge query limit must be non-zero"),
             Self::EmptySourceId => write!(f, "knowledge hit source id is empty"),
             Self::EmptyTitle => write!(f, "knowledge hit title is empty"),
-            Self::InvalidUnitValue { label, value } => write!(f, "invalid knowledge {label} value {value}"),
-            Self::InvalidTechnology(message) => write!(f, "invalid technology identity: {message}"),
+            Self::InvalidUnitValue { label, value } => {
+                write!(f, "invalid knowledge {label} value {value}")
+            }
+            Self::InvalidTechnology(message) => {
+                write!(f, "invalid technology identity: {message}")
+            }
             Self::Provider(message) => write!(f, "knowledge provider error: {message}"),
         }
     }
@@ -208,6 +258,9 @@ mod tests {
             provider_quality: None,
             category: None,
             origin: KnowledgeOriginV1::GlobalSemanticGraph,
+            lifecycle: KnowledgeLifecycleV1::Unknown,
+            authority: KnowledgeAuthorityClassV1::Unknown,
+            stability: KnowledgeStabilityV1::Unspecified,
             shareability: KnowledgeShareabilityV1::NotEstablished,
             technology: None,
         }
@@ -216,15 +269,27 @@ mod tests {
     #[test]
     fn query_requires_text_and_nonzero_limit() {
         let empty = SupportKnowledgeQueryV1 {
-            text: " ".into(), limit: 5, category: None, technology: None,
+            text: " ".into(),
+            limit: 5,
+            category: None,
+            technology: None,
             purpose: KnowledgeQueryPurposeV1::LocalReasoning,
         };
-        assert!(matches!(empty.validate(), Err(KnowledgeSourceErrorV1::EmptyQuery)));
+        assert!(matches!(
+            empty.validate(),
+            Err(KnowledgeSourceErrorV1::EmptyQuery)
+        ));
         let zero = SupportKnowledgeQueryV1 {
-            text: "dns".into(), limit: 0, category: None, technology: None,
+            text: "dns".into(),
+            limit: 0,
+            category: None,
+            technology: None,
             purpose: KnowledgeQueryPurposeV1::LocalReasoning,
         };
-        assert!(matches!(zero.validate(), Err(KnowledgeSourceErrorV1::ZeroLimit)));
+        assert!(matches!(
+            zero.validate(),
+            Err(KnowledgeSourceErrorV1::ZeroLimit)
+        ));
     }
 
     #[test]
@@ -233,8 +298,10 @@ mod tests {
             [
                 vec![hit("a", 0.7, Some(0.9)), hit("b", 0.9, Some(0.5))],
                 vec![hit("a", 0.8, Some(0.8)), hit("c", 0.6, None)],
-            ], 3,
-        ).unwrap();
+            ],
+            3,
+        )
+        .unwrap();
         let ids: Vec<&str> = merged.iter().map(|item| item.source_id.as_str()).collect();
         assert_eq!(ids, vec!["b", "a", "c"]);
     }
@@ -244,8 +311,22 @@ mod tests {
         let merged = merge_knowledge_hits_v1(
             [vec![hit("a", 0.8, None)], vec![hit("a", 0.8, Some(0.2))]],
             1,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(merged[0].confidence, Some(0.2));
+    }
+
+    #[test]
+    fn lifecycle_and_authority_do_not_secretly_change_relevance_order() {
+        let mut high_similarity = hit("historic", 0.9, None);
+        high_similarity.lifecycle = KnowledgeLifecycleV1::Historic;
+        high_similarity.authority = KnowledgeAuthorityClassV1::Informational;
+        let mut lower_similarity = hit("standard", 0.7, None);
+        lower_similarity.lifecycle = KnowledgeLifecycleV1::Active;
+        lower_similarity.authority = KnowledgeAuthorityClassV1::NormativeStandard;
+        let merged = merge_knowledge_hits_v1([vec![high_similarity, lower_similarity]], 2).unwrap();
+        assert_eq!(merged[0].source_id, "historic");
+        assert_eq!(merged[0].lifecycle, KnowledgeLifecycleV1::Historic);
     }
 
     #[test]
@@ -257,7 +338,11 @@ mod tests {
 
     #[test]
     fn retrieval_has_no_federatable_state() {
-        for state in [KnowledgeShareabilityV1::LocalOnly, KnowledgeShareabilityV1::ReviewRequired, KnowledgeShareabilityV1::NotEstablished] {
+        for state in [
+            KnowledgeShareabilityV1::LocalOnly,
+            KnowledgeShareabilityV1::ReviewRequired,
+            KnowledgeShareabilityV1::NotEstablished,
+        ] {
             assert_ne!(format!("{state:?}"), "Federatable");
         }
     }

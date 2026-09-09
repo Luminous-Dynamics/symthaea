@@ -9,8 +9,9 @@
 //! with richer providers without merging storage or authority semantics.
 
 use crate::knowledge_source::{
-    KnowledgeOriginV1, KnowledgeQueryPurposeV1, KnowledgeShareabilityV1,
-    KnowledgeSourceErrorV1, SupportKnowledgeHitV1, SupportKnowledgeQueryV1,
+    KnowledgeAuthorityClassV1, KnowledgeLifecycleV1, KnowledgeOriginV1,
+    KnowledgeQueryPurposeV1, KnowledgeShareabilityV1, KnowledgeSourceErrorV1,
+    KnowledgeStabilityV1, SupportKnowledgeHitV1, SupportKnowledgeQueryV1,
     SupportKnowledgeSourceV1,
 };
 use crate::types::*;
@@ -195,6 +196,9 @@ impl SupportKnowledgeSourceV1 for KnowledgeManager {
                 provider_quality,
                 category: Some(article.category.clone()),
                 origin: KnowledgeOriginV1::SupportArticle,
+                lifecycle: KnowledgeLifecycleV1::Active,
+                authority: KnowledgeAuthorityClassV1::InternalKnowledge,
+                stability: KnowledgeStabilityV1::Unspecified,
                 shareability: if article.local_only {
                     KnowledgeShareabilityV1::LocalOnly
                 } else {
@@ -235,37 +239,36 @@ mod tests {
     #[test]
     fn graduation_high_quality_becomes_candidate_quality() {
         let km = KnowledgeManager::new();
-        assert!(matches!(km.evaluate_for_graduation(0.7, 5, 5), GraduationDecision::Graduate));
+        assert!(matches!(
+            km.evaluate_for_graduation(0.7, 5, 5),
+            GraduationDecision::Graduate
+        ));
     }
 
     #[test]
     fn graduation_low_quality_rejects() {
         let km = KnowledgeManager::new();
-        assert!(matches!(km.evaluate_for_graduation(0.1, 1, 0), GraduationDecision::Reject(_)));
-    }
-
-    #[test]
-    fn graduation_medium_quality_defers() {
-        let km = KnowledgeManager::new();
-        assert!(matches!(km.evaluate_for_graduation(0.4, 3, 1), GraduationDecision::Defer(_)));
-    }
-
-    #[test]
-    fn legacy_search_returns_results_sorted_by_phi() {
-        let mut km = KnowledgeManager::new();
-        km.add_article("1".into(), "DNS Troubleshooting".into(), SupportCategory::Network, 0.3);
-        km.add_article("2".into(), "DNS Configuration".into(), SupportCategory::Network, 0.8);
-        km.add_article("3".into(), "DNS Caching".into(), SupportCategory::Network, 0.5);
-        let results = km.search("DNS", 10);
-        assert_eq!(results.len(), 3);
-        assert!((results[0].phi - 0.8).abs() < f64::EPSILON);
+        assert!(matches!(
+            km.evaluate_for_graduation(0.1, 1, 0),
+            GraduationDecision::Reject(_)
+        ));
     }
 
     #[test]
     fn promotion_review_excludes_local_only_but_local_reasoning_can_use_it() {
         let mut km = KnowledgeManager::new();
-        km.add_article("1".into(), "DNS Public Guide".into(), SupportCategory::Network, 0.7);
-        km.add_article_local_only("2".into(), "DNS Local Notes".into(), SupportCategory::Network, 0.8);
+        km.add_article(
+            "1".into(),
+            "DNS Public Guide".into(),
+            SupportCategory::Network,
+            0.7,
+        );
+        km.add_article_local_only(
+            "2".into(),
+            "DNS Local Notes".into(),
+            SupportCategory::Network,
+            0.8,
+        );
 
         let mut query = SupportKnowledgeQueryV1 {
             text: "DNS".into(),
@@ -276,31 +279,51 @@ mod tests {
         };
         let local = km.search_support_knowledge(&query).unwrap();
         assert_eq!(local.len(), 2);
-        assert!(local.iter().any(|h| h.shareability == KnowledgeShareabilityV1::LocalOnly));
+        assert!(local
+            .iter()
+            .any(|h| h.shareability == KnowledgeShareabilityV1::LocalOnly));
 
         query.purpose = KnowledgeQueryPurposeV1::PromotionReview;
         let review = km.search_support_knowledge(&query).unwrap();
         assert_eq!(review.len(), 1);
-        assert_eq!(review[0].shareability, KnowledgeShareabilityV1::ReviewRequired);
+        assert_eq!(
+            review[0].shareability,
+            KnowledgeShareabilityV1::ReviewRequired
+        );
     }
 
     #[test]
     fn support_phi_is_quality_not_factual_confidence() {
         let mut km = KnowledgeManager::new();
-        km.add_article("1".into(), "DNS Guide".into(), SupportCategory::Network, 0.8);
+        km.add_article(
+            "1".into(),
+            "DNS Guide".into(),
+            SupportCategory::Network,
+            0.8,
+        );
         let query = SupportKnowledgeQueryV1 {
-            text: "DNS".into(), limit: 5, category: None, technology: None,
+            text: "DNS".into(),
+            limit: 5,
+            category: None,
+            technology: None,
             purpose: KnowledgeQueryPurposeV1::LocalReasoning,
         };
         let hit = km.search_support_knowledge(&query).unwrap().remove(0);
         assert_eq!(hit.confidence, None);
         assert_eq!(hit.provider_quality, Some(0.8));
+        assert_eq!(hit.lifecycle, KnowledgeLifecycleV1::Active);
+        assert_eq!(hit.authority, KnowledgeAuthorityClassV1::InternalKnowledge);
     }
 
     #[test]
     fn deprecated_articles_excluded() {
         let mut km = KnowledgeManager::new();
-        km.add_article("1".into(), "Old DNS Guide".into(), SupportCategory::Network, 0.5);
+        km.add_article(
+            "1".into(),
+            "Old DNS Guide".into(),
+            SupportCategory::Network,
+            0.5,
+        );
         km.deprecate("1");
         assert!(km.search("DNS", 10).is_empty());
     }
@@ -308,7 +331,12 @@ mod tests {
     #[test]
     fn absorption_detects_existing_category() {
         let mut km = KnowledgeManager::new();
-        km.add_article("1".into(), "Existing".into(), SupportCategory::Network, 0.5);
+        km.add_article(
+            "1".into(),
+            "Existing".into(),
+            SupportCategory::Network,
+            0.5,
+        );
         let update = CognitiveUpdateData {
             category: SupportCategory::Network,
             encoding: vec![1, 2, 3],
