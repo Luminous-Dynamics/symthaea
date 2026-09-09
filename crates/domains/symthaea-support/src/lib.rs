@@ -19,6 +19,7 @@ pub mod knowledge_source;
 pub mod logparse_adapter;
 pub mod predictive;
 pub mod privacy;
+pub mod protocol_evidence;
 pub mod scrubber;
 pub mod standards_registry;
 pub mod system_state;
@@ -52,6 +53,13 @@ pub use knowledge_source::{
 pub use logparse_adapter::{
     LogObservationAdapterConfigV1, LogObservationAdapterError, LogObservationAdapterV1,
     LogObservationPolicyV1,
+};
+pub use protocol_evidence::{
+    DnsProtocolEventV1, IcmpProtocolEventV1, ProtocolEvidenceBasisV1,
+    ProtocolEvidenceErrorV1, ProtocolEvidenceRecordV1, ProtocolEventV1,
+    ProtocolObservationAdapterConfigV1, ProtocolObservationAdapterV1,
+    ProtocolObservationRetentionPolicyV1, ProtocolSubjectRoleV1, QuicProtocolEventV1,
+    TcpProtocolEventV1, TlsProtocolEventV1, TransportProtocolV1,
 };
 pub use standards_registry::{
     ClaimModalityV1, SourceCaptureV1, SourceDocumentIdV1, SourceDocumentKindV1,
