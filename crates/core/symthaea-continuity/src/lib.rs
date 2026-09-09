@@ -17,6 +17,7 @@ pub mod profile_adoption;
 pub mod profile_adoption_admission;
 pub mod profile_adoption_authority;
 pub mod profile_adoption_commit;
+pub mod profile_adoption_registry_commit;
 pub mod verifier;
 mod witness;
 
@@ -56,6 +57,10 @@ pub use profile_adoption_authority::{
 pub use profile_adoption_commit::{
     VerifierAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionCommitError,
     VerifierProfileAdoptionCommitPreconditionsV1, VerifierProfileAdoptionCommitStateV1,
+};
+pub use profile_adoption_registry_commit::{
+    VerifierProfileAdoptionRegistryCommitError,
+    VerifierProfileAdoptionRegistryCommitPreconditionsV1,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
