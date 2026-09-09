@@ -11,6 +11,9 @@
 
 #![deny(unsafe_code)]
 
+pub mod safety_case;
+pub use safety_case::domain_awareness_safety_case;
+
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
