@@ -201,3 +201,9 @@ mod tests {
         }
     }
 }
+
+mod snapshot;
+pub use snapshot::{
+    EarthForcedEnvironmentSnapshotErrorV1, EarthForcedEnvironmentSnapshotV1,
+    ValidatedEarthForcedEnvironmentSnapshotV1,
+};
