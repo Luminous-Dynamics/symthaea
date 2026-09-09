@@ -6,14 +6,12 @@ use symthaea_maritime_core::{
 
 const EVIDENCE_FIXTURE: &str =
     include_str!("../fixtures/xenia-verified-machine-session-evidence-v1.json");
-const CONTEXT_FIXTURE: &str =
-    include_str!("../fixtures/xenia-machine-session-authority-context-v1.json");
 
 #[test]
 fn xenia_v1_session_evidence_projects_into_provider_neutral_contract() {
     // Xenia carries provider-specific `schema` and negotiated-context fields.
     // Serde intentionally ignores those here: maritime core owns only the
-    // provider-neutral subset needed for point-of-use authority evaluation.
+    // provider-neutral immutable subset needed for point-of-use evaluation.
     let session: AuthenticatedMachineSession = serde_json::from_str(EVIDENCE_FIXTURE).unwrap();
 
     assert_eq!(session.session_id, "session-fixture-001");
@@ -30,9 +28,18 @@ fn xenia_v1_session_evidence_projects_into_provider_neutral_contract() {
 }
 
 #[test]
-fn xenia_live_authority_context_drives_fail_closed_session_evaluation() {
+fn fresh_local_authority_context_drives_fail_closed_session_evaluation() {
     let session: AuthenticatedMachineSession = serde_json::from_str(EVIDENCE_FIXTURE).unwrap();
-    let context: MachineSessionContext = serde_json::from_str(CONTEXT_FIXTURE).unwrap();
+
+    // Intentionally constructed in-process. Current time, authority generation
+    // and revocation state are not a cross-repo wire fixture and must be
+    // refreshed from the local authority source at the point of use.
+    let context = MachineSessionContext {
+        now_ms: 1_700_000_030_000,
+        authority_epoch: 9,
+        trusted_time_available: true,
+        revoked: false,
+    };
 
     assert_eq!(
         evaluate_machine_session(&session, context),
