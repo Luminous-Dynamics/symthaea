@@ -55,14 +55,18 @@ pub mod plugin;
 pub mod qp_certification;
 pub mod qualification;
 pub mod reach_episode_evidence;
+// Internal implementation detail: episode-complete evidence is necessary, but
+// operational promotion must additionally bind the exact qualification protocols.
+mod reach_episode_promotion;
 pub mod reach_execution;
 pub mod reach_execution_evidence;
+pub mod reach_operational_promotion;
 pub mod reach_outcome_evidence;
 pub mod reach_policy_identity;
 pub mod reach_qualification_campaign;
 pub mod reach_qualification_lineage;
-// Step-level Reach promotion remains internal until episode-complete promotion
-// proves the full behavioral capability rather than only controller-step quality.
+// Internal implementation detail: step-level qualification is necessary evidence,
+// but it is not sufficient to expose an operational Reach capability on its own.
 mod reach_qualification_promotion;
 pub mod recovery;
 pub mod recovery_benchmark;
@@ -141,6 +145,7 @@ pub use qualification::*;
 pub use reach_episode_evidence::*;
 pub use reach_execution::*;
 pub use reach_execution_evidence::*;
+pub use reach_operational_promotion::*;
 pub use reach_outcome_evidence::*;
 pub use reach_policy_identity::*;
 pub use reach_qualification_campaign::*;
