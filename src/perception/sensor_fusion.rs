@@ -17,6 +17,9 @@
 //!   role-filler HDC pattern as `SpectrumManager::perception_hv` (3ac2af34c6).
 //!   Identical readings produce identical HVs; different bucket values
 //!   produce HDC-orthogonal HVs.
+//! - `SemanticImuFusionV1` — non-breaking adapter into the universal R3.1
+//!   sensorimotor schema. It preserves missing-vs-zero semantics and does not
+//!   implement the legacy infallible `ImuFusion` trait.
 //!
 //! ## Later arcs
 //!
@@ -27,6 +30,12 @@
 #![cfg(feature = "sensor-fusion")]
 
 use symthaea_core::hdc::{BinaryHV, ContinuousHV};
+use symthaea_core::hdc::sensorimotor_contingencies::{
+    MissingObservationReasonV1, SensorimotorAddressV1, SensorimotorComponentV1,
+    SensorimotorFrameV1, SensorimotorHdcEncoderV1, SensorimotorMeasurementV1,
+    SensorimotorObservationV1, SensorimotorQuantityV1, SensorimotorSubjectV1,
+    SensorimotorUnitV1, SensorimotorValueContractV1,
+};
 
 /// 6-axis inertial measurement unit reading.
 ///
@@ -133,6 +142,170 @@ impl ImuFusion for RoleFillerImuFusion {
     }
 }
 
+// ─── Universal semantic IMU adapter (R3.2) ──────────────────────────
+
+const SEMANTIC_ACCEL_MIN: f64 = -40.0;
+const SEMANTIC_ACCEL_MAX: f64 = 40.0;
+const SEMANTIC_ACCEL_BINS: u16 = 161;
+const SEMANTIC_GYRO_MIN: f64 = -20.0;
+const SEMANTIC_GYRO_MAX: f64 = 20.0;
+const SEMANTIC_GYRO_BINS: u16 = 401;
+
+fn semantic_imu_address(
+    quantity: SensorimotorQuantityV1,
+    component: SensorimotorComponentV1,
+    unit: SensorimotorUnitV1,
+    min: f64,
+    max: f64,
+    bins: u16,
+) -> SensorimotorAddressV1 {
+    SensorimotorAddressV1::new(
+        SensorimotorSubjectV1::BodyRoot,
+        quantity,
+        SensorimotorFrameV1::Body,
+        component,
+        SensorimotorValueContractV1 {
+            unit,
+            min,
+            max,
+            bins,
+        },
+    )
+}
+
+fn semantic_axis_observation(address: SensorimotorAddressV1, value: f32) -> SensorimotorObservationV1 {
+    if value.is_finite() {
+        SensorimotorObservationV1::Measured(SensorimotorMeasurementV1 {
+            address,
+            value: f64::from(value),
+        })
+    } else {
+        SensorimotorObservationV1::Missing {
+            address,
+            reason: MissingObservationReasonV1::Invalid,
+        }
+    }
+}
+
+/// Timestamped universal semantic view of one six-axis IMU sample.
+///
+/// Timestamp/source transport remain explicit outside the HDC vector. The six
+/// facts describe body-root motion, not a particular IMU model, so the same
+/// semantic roles can align across humanoid, multirotor, vehicle, quadruped,
+/// AUV, and other embodiments.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SemanticImuFrameV1 {
+    pub capture_timestamp_us: u64,
+    pub observations: [SensorimotorObservationV1; 6],
+}
+
+impl SemanticImuFrameV1 {
+    pub fn from_reading(reading: &ImuReading) -> Self {
+        let [ax, ay, az] = reading.accel;
+        let [gx, gy, gz] = reading.gyro;
+        Self {
+            capture_timestamp_us: reading.timestamp_us,
+            observations: [
+                semantic_axis_observation(
+                    semantic_imu_address(
+                        SensorimotorQuantityV1::LinearAcceleration,
+                        SensorimotorComponentV1::X,
+                        SensorimotorUnitV1::MeterPerSecondSquared,
+                        SEMANTIC_ACCEL_MIN,
+                        SEMANTIC_ACCEL_MAX,
+                        SEMANTIC_ACCEL_BINS,
+                    ),
+                    ax,
+                ),
+                semantic_axis_observation(
+                    semantic_imu_address(
+                        SensorimotorQuantityV1::LinearAcceleration,
+                        SensorimotorComponentV1::Y,
+                        SensorimotorUnitV1::MeterPerSecondSquared,
+                        SEMANTIC_ACCEL_MIN,
+                        SEMANTIC_ACCEL_MAX,
+                        SEMANTIC_ACCEL_BINS,
+                    ),
+                    ay,
+                ),
+                semantic_axis_observation(
+                    semantic_imu_address(
+                        SensorimotorQuantityV1::LinearAcceleration,
+                        SensorimotorComponentV1::Z,
+                        SensorimotorUnitV1::MeterPerSecondSquared,
+                        SEMANTIC_ACCEL_MIN,
+                        SEMANTIC_ACCEL_MAX,
+                        SEMANTIC_ACCEL_BINS,
+                    ),
+                    az,
+                ),
+                semantic_axis_observation(
+                    semantic_imu_address(
+                        SensorimotorQuantityV1::AngularVelocity,
+                        SensorimotorComponentV1::X,
+                        SensorimotorUnitV1::RadianPerSecond,
+                        SEMANTIC_GYRO_MIN,
+                        SEMANTIC_GYRO_MAX,
+                        SEMANTIC_GYRO_BINS,
+                    ),
+                    gx,
+                ),
+                semantic_axis_observation(
+                    semantic_imu_address(
+                        SensorimotorQuantityV1::AngularVelocity,
+                        SensorimotorComponentV1::Y,
+                        SensorimotorUnitV1::RadianPerSecond,
+                        SEMANTIC_GYRO_MIN,
+                        SEMANTIC_GYRO_MAX,
+                        SEMANTIC_GYRO_BINS,
+                    ),
+                    gy,
+                ),
+                semantic_axis_observation(
+                    semantic_imu_address(
+                        SensorimotorQuantityV1::AngularVelocity,
+                        SensorimotorComponentV1::Z,
+                        SensorimotorUnitV1::RadianPerSecond,
+                        SEMANTIC_GYRO_MIN,
+                        SEMANTIC_GYRO_MAX,
+                        SEMANTIC_GYRO_BINS,
+                    ),
+                    gz,
+                ),
+            ],
+        }
+    }
+}
+
+/// Non-breaking adapter from `ImuReading` into R3.1 universal sensorimotor HDC.
+///
+/// This intentionally does **not** implement `ImuFusion`. The legacy trait is
+/// infallible and returns a concrete HV, so it cannot represent an entirely
+/// missing/invalid observation without inventing a synthetic measurement. This
+/// adapter instead returns `Ok(None)` when no valid axis is available.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SemanticImuFusionV1 {
+    encoder: SensorimotorHdcEncoderV1,
+}
+
+impl SemanticImuFusionV1 {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn frame(&self, reading: &ImuReading) -> SemanticImuFrameV1 {
+        SemanticImuFrameV1::from_reading(reading)
+    }
+
+    pub fn fuse(
+        &self,
+        reading: &ImuReading,
+    ) -> Result<Option<ContinuousHV>, &'static str> {
+        let frame = self.frame(reading);
+        self.encoder.encode_observations(&frame.observations)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -205,5 +378,71 @@ mod tests {
         assert_eq!(gyro_bucket(0.0), 200);
         assert_eq!(gyro_bucket(20.0), 400);
         assert_eq!(gyro_bucket(-20.0), 0);
+    }
+
+    #[test]
+    fn semantic_imu_preserves_timestamp_and_six_physical_roles() {
+        let input = ImuReading {
+            accel: [1.0, 2.0, 9.8],
+            gyro: [0.1, 0.2, 0.3],
+            timestamp_us: 123_456,
+        };
+        let frame = SemanticImuFrameV1::from_reading(&input);
+        assert_eq!(frame.capture_timestamp_us, 123_456);
+        assert_eq!(frame.observations.len(), 6);
+        assert!(frame.observations.iter().all(|o| matches!(o, SensorimotorObservationV1::Measured(_))));
+
+        let first = frame.observations[0].address();
+        assert_eq!(first.subject, SensorimotorSubjectV1::BodyRoot);
+        assert_eq!(first.quantity, SensorimotorQuantityV1::LinearAcceleration);
+        assert_eq!(first.frame, SensorimotorFrameV1::Body);
+        assert_eq!(first.component, SensorimotorComponentV1::X);
+        assert_eq!(first.value_contract.unit, SensorimotorUnitV1::MeterPerSecondSquared);
+    }
+
+    #[test]
+    fn semantic_imu_invalid_axis_is_missing_not_zero() {
+        let frame = SemanticImuFrameV1::from_reading(&reading(
+            [f32::NAN, 0.0, 9.8],
+            [0.0, 0.0, 0.0],
+        ));
+        assert!(matches!(
+            &frame.observations[0],
+            SensorimotorObservationV1::Missing {
+                reason: MissingObservationReasonV1::Invalid,
+                ..
+            }
+        ));
+        assert!(matches!(
+            &frame.observations[1],
+            SensorimotorObservationV1::Measured(SensorimotorMeasurementV1 { value, .. }) if *value == 0.0
+        ));
+    }
+
+    #[test]
+    fn semantic_imu_all_invalid_yields_no_fused_measurement() {
+        let f = SemanticImuFusionV1::new();
+        let invalid = reading(
+            [f32::NAN, f32::INFINITY, f32::NEG_INFINITY],
+            [f32::NAN, f32::INFINITY, f32::NEG_INFINITY],
+        );
+        assert!(f.fuse(&invalid).unwrap().is_none());
+    }
+
+    #[test]
+    fn semantic_imu_measured_zero_still_yields_representation() {
+        let f = SemanticImuFusionV1::new();
+        let hv = f.fuse(&ImuReading::zero()).unwrap().unwrap();
+        assert_eq!(hv.values.len(), 16_384);
+        assert!(hv.values.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn semantic_imu_fusion_is_deterministic() {
+        let f = SemanticImuFusionV1::new();
+        let input = reading([1.2, -0.5, 9.81], [0.02, -0.03, 0.04]);
+        let a = f.fuse(&input).unwrap().unwrap();
+        let b = f.fuse(&input).unwrap().unwrap();
+        assert_eq!(a.values, b.values);
     }
 }
