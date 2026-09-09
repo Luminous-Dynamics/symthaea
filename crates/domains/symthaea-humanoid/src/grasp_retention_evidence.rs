@@ -159,11 +159,11 @@ impl HumanoidGraspRetentionPolicy {
             || subject.task != HumanoidTask::Grasp
             || !contact_policy.validate_for(subject)
             || minimum_stabilization_samples < 2
-            || minimum_retention_samples < minimum_stabilization_samples
+            || minimum_retention_samples <= minimum_stabilization_samples
             || !minimum_stabilization_duration_s.is_finite()
             || minimum_stabilization_duration_s <= 0.0
             || !minimum_retention_duration_s.is_finite()
-            || minimum_retention_duration_s < minimum_stabilization_duration_s
+            || minimum_retention_duration_s <= minimum_stabilization_duration_s
             || !maximum_inter_sample_gap_s.is_finite()
             || maximum_inter_sample_gap_s <= 0.0
             || maximum_episode_samples < minimum_retention_samples
@@ -203,11 +203,11 @@ impl HumanoidGraspRetentionPolicy {
             && self.hand == contact_policy.hand()
             && self.contact_policy_digest == contact_policy.policy_digest()
             && self.minimum_stabilization_samples >= 2
-            && self.minimum_retention_samples >= self.minimum_stabilization_samples
+            && self.minimum_retention_samples > self.minimum_stabilization_samples
             && self.minimum_stabilization_duration_s.is_finite()
             && self.minimum_stabilization_duration_s > 0.0
             && self.minimum_retention_duration_s.is_finite()
-            && self.minimum_retention_duration_s >= self.minimum_stabilization_duration_s
+            && self.minimum_retention_duration_s > self.minimum_stabilization_duration_s
             && self.maximum_inter_sample_gap_s.is_finite()
             && self.maximum_inter_sample_gap_s > 0.0
             && self.maximum_episode_samples >= self.minimum_retention_samples
@@ -315,6 +315,7 @@ impl HumanoidGraspRetentionEpisode {
             && self.started_at_s.is_finite()
             && self.ended_at_s.is_finite()
             && self.ended_at_s >= self.started_at_s
+            && self.final_continuous_samples <= self.sample_digests.len()
             && self.final_continuous_duration_s.is_finite()
             && self.final_continuous_duration_s >= 0.0
             && self.retained_at_end == (self.final_phase == HumanoidGraspRetentionPhase::Retained)
@@ -381,24 +382,19 @@ pub fn evaluate_humanoid_grasp_retention(
         let gap_break = previous_time_s
             .map(|previous| sample.sampled_at_s - previous > retention_policy.maximum_inter_sample_gap_s)
             .unwrap_or(false);
+        let gap_broke_active_run = gap_break && current_run_start_s.is_some();
         let accepted_measured = sample.accepted_contact && sample.source.is_measured();
 
-        if gap_break {
+        if gap_broke_active_run {
             continuity_breaks += 1;
             current_run_start_s = None;
             current_run_samples = 0;
-            if acquisition_count > 0 {
-                final_phase = HumanoidGraspRetentionPhase::Lost;
-            }
+            final_phase = HumanoidGraspRetentionPhase::Lost;
         }
 
         if accepted_measured {
             if current_run_start_s.is_none() {
-                if acquisition_count > 0 {
-                    acquisition_count += 1;
-                } else {
-                    acquisition_count = 1;
-                }
+                acquisition_count += 1;
                 current_run_start_s = Some(sample.sampled_at_s);
                 current_run_samples = 1;
                 final_phase = HumanoidGraspRetentionPhase::ContactAcquired;
@@ -422,8 +418,10 @@ pub fn evaluate_humanoid_grasp_retention(
                 final_phase = HumanoidGraspRetentionPhase::Retained;
             }
         } else {
-            if current_run_start_s.is_some() || acquisition_count > 0 {
+            if current_run_start_s.is_some() {
                 continuity_breaks += 1;
+                final_phase = HumanoidGraspRetentionPhase::Lost;
+            } else if acquisition_count > 0 {
                 final_phase = HumanoidGraspRetentionPhase::Lost;
             } else {
                 final_phase = HumanoidGraspRetentionPhase::Approach;
@@ -467,9 +465,6 @@ pub fn evaluate_humanoid_grasp_retention(
     }
 
     let retained_at_end = failures.is_empty() && final_phase == HumanoidGraspRetentionPhase::Retained;
-    if retained_at_end {
-        failures.clear();
-    }
 
     let mut episode = HumanoidGraspRetentionEpisode {
         schema_version: HUMANOID_GRASP_RETENTION_EPISODE_SCHEMA_VERSION,
@@ -704,6 +699,14 @@ mod tests {
     }
 
     #[test]
+    fn retention_policy_must_be_stricter_than_stabilization() {
+        let contact = contact_policy();
+        assert!(HumanoidGraspRetentionPolicy::new(
+            &subject(), &contact, 3, 0.04, 3, 0.04, 0.03, 64, 2.0,
+        ).is_none());
+    }
+
+    #[test]
     fn one_good_contact_cannot_prove_retention() {
         let contact = contact_policy();
         let retention = retention_policy(&contact);
@@ -772,21 +775,21 @@ mod tests {
     }
 
     #[test]
-    fn large_sample_gap_breaks_continuity() {
+    fn large_sample_gap_breaks_continuity_once() {
         let contact = contact_policy();
         let retention = retention_policy(&contact);
         let samples = vec![
             sample(&contact, 1.00, 1, true),
             sample(&contact, 1.02, 2, true),
-            sample(&contact, 1.10, 3, true),
+            sample(&contact, 1.10, 3, false),
             sample(&contact, 1.12, 4, true),
             sample(&contact, 1.14, 5, true),
         ];
         let episode = evaluate_humanoid_grasp_retention(
             &subject(), &samples, &contact, &retention,
         ).unwrap();
+        assert_eq!(episode.continuity_breaks(), 1);
         assert!(!episode.retained_at_end());
-        assert!(episode.continuity_breaks() >= 1);
     }
 
     #[test]
