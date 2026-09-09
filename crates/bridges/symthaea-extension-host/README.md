@@ -10,7 +10,8 @@ extensions.
 - manifest JSON parses and passes structural validation;
 - runtime/ABI/resource requests fit local host policy;
 - the base control component asks for no host imports;
-- Wasmtime can instantiate it within memory/fuel/time limits;
+- Wasmtime can compile and instantiate the component;
+- guest execution is bounded by configured store/fuel/epoch limits;
 - the guest's ID, version, ABI and SHA-256 manifest digest match the exact
   manifest bytes presented to the host;
 - the guest can report health.
@@ -21,7 +22,8 @@ It does **not** prove:
 - whether that signer is trusted;
 - whether the extension is admitted to the capability registry;
 - whether an invocation is authorized;
-- whether a domain result is scientifically correct.
+- whether a domain result is scientifically correct;
+- that JIT compilation itself is CPU/time/memory-contained.
 
 Those are separate layers by design.
 
@@ -35,19 +37,51 @@ host capability.
 Later capability hosts should add only the narrow WIT imports corresponding to
 permissions explicitly granted by policy.
 
-## Resource containment
+## Lean Wasmtime build
 
-The host combines:
+The host disables Wasmtime's broad default Cargo feature set and opts into only:
 
-- component/manifest byte-size ceilings before compilation;
-- Wasmtime `StoreLimits` for guest linear memory and instance/table/memory
-  counts;
+- `std`;
+- `runtime`;
+- `cranelift`;
+- `component-model`.
+
+Async execution, cache, GC, threads, profiling, coredumps, WAT parsing, pooling,
+and other unrelated embedding surfaces are therefore not pulled into this
+control host merely because Wasmtime supports them.
+
+## Execution containment
+
+After compilation the host combines:
+
+- `StoreLimits` for guest linear memory and instance/table/memory counts;
 - fuel metering for deterministic compute exhaustion;
-- epoch interruption for an independent wall-time deadline;
+- epoch interruption for an independent execution wall-time deadline;
 - output-size checks for the control-plane response.
 
-The extension-requested envelope must also fit within an independent local
-`ControlHostPolicy` ceiling.
+Before compilation it applies manifest/component byte-size ceilings and validates
+the manifest/resource request against an independent local `ControlHostPolicy`.
+
+### Important compilation boundary
+
+`Component::new` performs compilation **before** the store exists. Store memory
+limits, fuel, and epoch deadlines therefore do not constrain compiler CPU,
+memory, or wall time.
+
+For curated/development plugins, the current byte-size ceiling is useful defense
+in depth. It is not sufficient to claim hostile-input compilation containment.
+Before this host is promoted for arbitrary public packages, compilation should
+move behind a separately supervised worker/process with explicit CPU, memory,
+wall-time, and crash containment. The resulting compiled artifact/receipt should
+then be bound to the exact component digest and Wasmtime/compiler profile.
+
+This distinction is intentional:
+
+```text
+PackageSizeBounded
+    != CompilationResourceBounded
+    != GuestExecutionBounded
+```
 
 ## Placement
 
@@ -55,9 +89,9 @@ This crate intentionally lives under `crates/bridges`, not `crates/core`.
 Wasmtime is a runtime cost and should not become part of Symthaea's default core
 substrate merely because public extensions exist.
 
-## Next layer
+## Admission layer
 
-The next security layer is package/signer admission:
+Technical compatibility remains separate from trust and authority:
 
 ```text
 component + exact manifest bytes
@@ -69,13 +103,13 @@ technical control inspection  <-- this crate
 signature validity
         |
         v
-signer authorization
+signer authorization/currentness
         |
         v
-capability admission
+local capability admission
         |
         v
-per-invocation routing + authorization
+point-of-use routing + authorization
 ```
 
 Do not collapse these states into a single `trusted: bool`.
