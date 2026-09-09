@@ -19,6 +19,7 @@ pub mod profile_adoption_commit;
 pub mod profile_adoption_commit_evidence;
 pub mod profile_adoption_grant;
 pub mod profile_adoption_grant_commit;
+pub mod profile_adoption_registry_store;
 pub mod profile_adoption_registry_write;
 pub mod profile_adoption_root;
 pub mod profile_adoption_runtime;
@@ -72,6 +73,13 @@ pub use profile_adoption_grant::{
 pub use profile_adoption_grant_commit::{
     GrantBoundVerifierProfileAdoptionCommitPreconditionsV1,
     VerifierProfileAdoptionGrantCommitError,
+};
+pub use profile_adoption_registry_store::{
+    StoreObservedVerifierProfileAdoptionCasIdV1, StoreObservedVerifierProfileAdoptionCasV1,
+    VerifierProfileAdoptionAtomicRegistryStoreV1, VerifierProfileAdoptionRegistryCasError,
+    VerifierProfileAdoptionRegistryCasObservationError,
+    VerifierProfileAdoptionRegistryCasObservationV1,
+    perform_verifier_profile_adoption_registry_cas,
 };
 pub use profile_adoption_registry_write::{
     VERIFIER_PROFILE_ADOPTION_REGISTRY_WRITE_CLAIM_SCHEMA_V1,
