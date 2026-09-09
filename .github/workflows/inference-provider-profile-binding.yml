@@ -1,0 +1,66 @@
+name: Inference Provider Profile Binding
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_profile_execution.rs"
+      - "src/language/inference_current_profile_executor.rs"
+      - "src/language/inference_executor.rs"
+      - "src/language/inference_credential.rs"
+      - "tests/inference_provider_profile_binding.rs"
+      - "docs/architecture/INFERENCE_PROVIDER_PROFILE_BINDING_V1.md"
+      - ".github/workflows/inference-provider-profile-binding.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-provider-profile-binding-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-provider-profile-binding:
+    name: Inference Provider Profile Binding
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: >-
+          rustfmt --edition 2024 --check
+          src/language/inference_profile_execution.rs
+          src/language/inference_current_profile_executor.rs
+          src/language/inference_executor.rs
+          src/language/inference_credential.rs
+          tests/inference_provider_profile_binding.rs
+
+      - name: Compile and run IF-11 profile-binding regressions
+        run: cargo test --locked --test inference_provider_profile_binding
+
+      - name: Focused profile-binding Clippy
+        run: cargo clippy --locked --test inference_provider_profile_binding -- -D warnings -A dead-code
+
+      - name: Ratchet current-profile authority boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'symthaea.inference.provider-execution-binding.v3' src/language/inference_profile_execution.rs
+          grep -F 'qualified_at_tick' src/language/inference_profile_execution.rs
+          grep -F 'from_current_profile' src/language/inference_current_profile_executor.rs
+          grep -F 'clock: Arc<C>' src/language/inference_current_profile_executor.rs
+          grep -F 'ProviderProfileRejected' src/language/inference_current_profile_executor.rs
+          grep -F 'account-scope id' docs/architecture/INFERENCE_PROVIDER_PROFILE_BINDING_V1.md
+          grep -F 'deployment-aware IF-8 router identity' docs/architecture/INFERENCE_PROVIDER_PROFILE_BINDING_V1.md
+          if sed -n '/pub async fn execute_current(/,/^    }/p' src/language/inference_current_profile_executor.rs | grep -q 'now_tick:'; then
+            echo 'execute_current must not accept caller-controlled profile time' >&2
+            exit 1
+          fi

@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! IF-9 credential-bound inference executor.
+//! Credential-bound inference executor.
 //!
 //! A credential lease carries both the secret material used on the wire and the
 //! exact non-secret credential identity/epoch used in inference bindings.
@@ -19,6 +19,8 @@ use super::inference_executor::{
 #[cfg(not(test))]
 use super::inference_permit::PreparedInferenceExecution;
 #[cfg(not(test))]
+use super::inference_provider_registry::QualifiedProviderCandidate;
+#[cfg(not(test))]
 use super::openai_compatible_transport::{BearerCredential, TransportConfigError, TransportCredential};
 
 #[cfg(test)]
@@ -34,6 +36,8 @@ use crate::inference_executor::{
 };
 #[cfg(test)]
 use crate::inference_permit::PreparedInferenceExecution;
+#[cfg(test)]
+use crate::inference_provider_registry::QualifiedProviderCandidate;
 #[cfg(test)]
 use crate::openai_compatible_transport::{BearerCredential, TransportConfigError, TransportCredential};
 
@@ -63,12 +67,22 @@ impl InferenceCredentialHandle {
         if credential_id.trim().is_empty() {
             return Err(InferenceCredentialError::EmptyCredentialId);
         }
-        Ok(Self { credential_id, expected_epoch, mode })
+        Ok(Self {
+            credential_id,
+            expected_epoch,
+            mode,
+        })
     }
 
-    pub fn credential_id(&self) -> &str { &self.credential_id }
-    pub const fn expected_epoch(&self) -> u64 { self.expected_epoch }
-    pub const fn mode(&self) -> InferenceCredentialMode { self.mode }
+    pub fn credential_id(&self) -> &str {
+        &self.credential_id
+    }
+    pub const fn expected_epoch(&self) -> u64 {
+        self.expected_epoch
+    }
+    pub const fn mode(&self) -> InferenceCredentialMode {
+        self.mode
+    }
 }
 
 /// Non-clone credential capability. Secret material is deliberately absent from Debug.
@@ -115,15 +129,18 @@ impl InferenceCredentialLease {
         })
     }
 
-    pub fn binding(&self) -> &CredentialStateBinding { &self.binding }
-    pub const fn mode(&self) -> InferenceCredentialMode { self.mode }
+    pub fn binding(&self) -> &CredentialStateBinding {
+        &self.binding
+    }
+    pub const fn mode(&self) -> InferenceCredentialMode {
+        self.mode
+    }
 
     fn into_parts(self) -> (CredentialStateBinding, TransportCredential) {
         (self.binding, self.transport)
     }
 }
 
-/// Resolver boundary for future OS-keyring/Xenia-backed credential stores.
 pub trait InferenceCredentialResolver {
     fn resolve(
         &self,
@@ -131,7 +148,6 @@ pub trait InferenceCredentialResolver {
     ) -> Result<InferenceCredentialLease, InferenceCredentialResolveError>;
 }
 
-/// Validate that a resolver returned exactly the handle the caller requested.
 pub fn resolve_credential<R: InferenceCredentialResolver>(
     resolver: &R,
     handle: &InferenceCredentialHandle,
@@ -186,8 +202,12 @@ impl<C: InferenceTickSource> CredentialBoundOpenAiExecutor<C> {
         Ok(Self { inner, binding })
     }
 
-    pub fn credential_binding(&self) -> &CredentialStateBinding { &self.binding }
-    pub fn endpoint_binding(&self) -> &EndpointStateBinding { self.inner.endpoint_binding() }
+    pub fn credential_binding(&self) -> &CredentialStateBinding {
+        &self.binding
+    }
+    pub fn endpoint_binding(&self) -> &EndpointStateBinding {
+        self.inner.endpoint_binding()
+    }
 
     #[allow(clippy::too_many_arguments)]
     pub async fn execute(
@@ -205,6 +225,31 @@ impl<C: InferenceTickSource> CredentialBoundOpenAiExecutor<C> {
                 policy,
                 request,
                 candidate,
+                &self.binding,
+                quota,
+                controls,
+            )
+            .await
+    }
+
+    /// Additive IF-11 path. Credential identity remains inseparable from the secret
+    /// while the exact provider profile is rebound by the private executor.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn execute_profile_bound(
+        &self,
+        prepared: PreparedInferenceExecution,
+        policy: &InferencePolicy,
+        request: &InferenceRequest,
+        profile: &QualifiedProviderCandidate,
+        quota: &QuotaStateBinding,
+        controls: InferenceGenerationControls,
+    ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {
+        self.inner
+            .execute_profile_bound(
+                prepared,
+                policy,
+                request,
+                profile,
                 &self.binding,
                 quota,
                 controls,
@@ -236,6 +281,31 @@ impl<C: InferenceTickSource> CredentialBoundOpenAiExecutor<C> {
             )
             .await
     }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn execute_streaming_profile_bound(
+        &self,
+        prepared: PreparedInferenceExecution,
+        policy: &InferencePolicy,
+        request: &InferenceRequest,
+        profile: &QualifiedProviderCandidate,
+        quota: &QuotaStateBinding,
+        controls: InferenceGenerationControls,
+        on_token: &mut (dyn for<'a> FnMut(&'a str) + Send),
+    ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {
+        self.inner
+            .execute_streaming_profile_bound(
+                prepared,
+                policy,
+                request,
+                profile,
+                &self.binding,
+                quota,
+                controls,
+                on_token,
+            )
+            .await
+    }
 }
 
 #[derive(Debug)]
@@ -246,10 +316,14 @@ pub enum InferenceCredentialError {
 }
 
 impl From<InferenceBindingError> for InferenceCredentialError {
-    fn from(value: InferenceBindingError) -> Self { Self::Binding(value) }
+    fn from(value: InferenceBindingError) -> Self {
+        Self::Binding(value)
+    }
 }
 impl From<TransportConfigError> for InferenceCredentialError {
-    fn from(value: TransportConfigError) -> Self { Self::Transport(value) }
+    fn from(value: TransportConfigError) -> Self {
+        Self::Transport(value)
+    }
 }
 
 impl fmt::Display for InferenceCredentialError {
@@ -287,7 +361,9 @@ pub enum InferenceCredentialExecutorError {
 }
 
 impl From<InferenceExecutorConfigError> for InferenceCredentialExecutorError {
-    fn from(value: InferenceExecutorConfigError) -> Self { Self::Executor(value) }
+    fn from(value: InferenceExecutorConfigError) -> Self {
+        Self::Executor(value)
+    }
 }
 
 impl fmt::Display for InferenceCredentialExecutorError {
