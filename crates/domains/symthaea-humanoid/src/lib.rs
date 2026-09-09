@@ -81,6 +81,7 @@ pub mod reach_qualification_lineage;
 // Internal implementation detail: step-level qualification is necessary evidence,
 // but it is not sufficient to expose an operational Reach capability on its own.
 mod reach_qualification_promotion;
+pub mod reach_spatial_goal_commitment;
 pub mod recovery;
 pub mod recovery_benchmark;
 pub mod recovery_certification;
@@ -166,6 +167,7 @@ pub use reach_outcome_evidence::*;
 pub use reach_policy_identity::*;
 pub use reach_qualification_campaign::*;
 pub use reach_qualification_lineage::*;
+pub use reach_spatial_goal_commitment::*;
 pub use recovery_certification::*;
 pub use release_pipeline::*;
 pub use reproducible_oracle_build::*;
