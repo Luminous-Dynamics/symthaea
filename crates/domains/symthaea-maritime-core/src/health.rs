@@ -2,10 +2,13 @@
 use serde::{Deserialize, Serialize};
 
 /// Severity is ordered from fully healthy to locally unsafe.
+/// `Unknown` is deliberately worse than an advisory: absence of health evidence
+/// must not silently become a healthy result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum HealthSeverity {
     Healthy,
     Advisory,
+    Unknown,
     Degraded,
     Critical,
     Unsafe,
@@ -32,12 +35,17 @@ impl PlatformHealth {
             .iter()
             .map(|component| component.severity)
             .max()
-            .unwrap_or(HealthSeverity::Healthy)
+            .unwrap_or(HealthSeverity::Unknown)
     }
 
     /// Fleet summaries must never hide a locally unsafe component behind an average.
     pub fn is_locally_safe(&self) -> bool {
         self.worst_severity() < HealthSeverity::Unsafe
+    }
+
+    /// Full-health claims require positive evidence, not merely absence of faults.
+    pub fn is_fully_observed_nominal(&self) -> bool {
+        !self.components.is_empty() && self.worst_severity() <= HealthSeverity::Advisory
     }
 }
 
@@ -67,5 +75,17 @@ mod tests {
         };
         assert_eq!(report.worst_severity(), HealthSeverity::Unsafe);
         assert!(!report.is_locally_safe());
+        assert!(!report.is_fully_observed_nominal());
+    }
+
+    #[test]
+    fn missing_health_evidence_is_unknown_not_healthy() {
+        let report = PlatformHealth {
+            platform_id: "usv-8".into(),
+            observed_at_ms: 10,
+            components: Vec::new(),
+        };
+        assert_eq!(report.worst_severity(), HealthSeverity::Unknown);
+        assert!(!report.is_fully_observed_nominal());
     }
 }
