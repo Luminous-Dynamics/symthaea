@@ -1,0 +1,199 @@
+name: Scientific Qualified Reconstruction Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-scientific-replay/tests/qualified_reconstruction.rs"
+      - ".github/workflows/scientific-qualified-reconstruction.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  reconstruction-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision and parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Verify exact checkout and parent
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git rev-parse HEAD^)" = "${{ github.event.pull_request.base.sha }}"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Scope and authority audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          test_text = Path(
+              "crates/core/symthaea-scientific-replay/tests/qualified_reconstruction.rs"
+          ).read_text()
+          lib_text = Path(
+              "crates/core/symthaea-scientific-replay/src/lib.rs"
+          ).read_text()
+
+          # Synthetic qualification must not add a production reconstruction API.
+          for token in [
+              "pub mod qualified_reconstruction",
+              "pub struct QualifiedScientificReconstructionV1",
+              "pub struct ReplayVerifiedScientificDispositionV1",
+              "pub struct CurrentWithinScientificViewDispositionV1",
+              "pub struct QualifiedScientificViewStateV1",
+          ]:
+              assert token not in lib_text, f"production authority leaked: {token}"
+              assert token not in test_text, f"fixture used production authority name: {token}"
+
+          # Fixture-positive objects are private to the qualification binary.
+          for token in [
+              "struct QualifiedFixtureReconstruction",
+              "struct FixtureReplayWitness",
+          ]:
+              assert token in test_text, f"missing fixture capability: {token}"
+              assert f"pub {token}" not in test_text, f"fixture capability became public: {token}"
+
+          assert "Serialize" not in test_text
+          assert "Deserialize" not in test_text
+
+          required = [
+              "AccountingMismatch",
+              "AliasSemanticMismatch",
+              "AliasChain",
+              "PredicateDependencyCycle",
+              "MissingPolicyPredicate",
+              "ExtraPredicateSpec",
+              "closed_world_receipt_id",
+              "predicate_dependency_graph_id",
+              "reason_subgraph_id",
+              "derivation_profile_id",
+              "derivation_artifact_id",
+              "derivation_execution_lineage_id",
+              "predicate_derivation_execution_lineage",
+              "owner_reconstruction_artifact",
+              "owner_reconstruction_execution_lineage",
+              "evaluate_disposition_material_v1",
+              "qualify_fixture",
+              "verify_fixture_replay",
+              "verify_persisted_disposition_evaluation_v1",
+              "lower_evaluation_must_validate_before_reconstruction_capability",
+              "unresolved_opposition_remains_unknown_not_absent",
+              "negative_by_absence_predicate_carries_closed_world_receipt",
+              "every_predicate_receipt_carries_derivation_lineage",
+              "owner_and_predicate_execution_lineages_are_independent_material",
+              "scientific_reason_cycle_is_allowed_but_predicate_cycle_fails_closed",
+              "reason_rewiring_changes_reconstruction_identity_without_changing_predicates",
+              "changed_predicate_derivation_execution_invalidates_old_lower_record",
+              "same_predicate_vector_with_different_dependency_graph_is_distinct",
+              "duplicate_alias_chain_fails_closed",
+              "alias_role_mismatch_fails_closed",
+              "fn exact_id(",
+          ]
+          for token in required:
+              assert token in test_text, f"missing reconstruction invariant: {token}"
+
+          # Fixture IDs are deterministic structural test identities only. This
+          # tranche must not quietly turn them into production cryptographic
+          # content identities; SCI-014B owns that separate theorem.
+          for token in [
+              "sha256(",
+              "Sha256",
+              "sha2::",
+              "blake3::",
+              "ContentDigest",
+              "QualifiedScientificReconstructionV1",
+          ]:
+              assert token not in test_text, f"production identity machinery leaked into fixture: {token}"
+
+          # Lower policy/input validation must occur before the private
+          # reconstruction capability is constructed.
+          validation = test_text.index("evaluate_disposition_material_v1(&inputs, &policy)?")
+          witness = test_text.index("Ok(QualifiedFixtureReconstruction")
+          assert validation < witness, "reconstruction capability minted before lower validation"
+
+          # Derivation execution and owner reconstruction execution are distinct
+          # material lineages; they must never collapse into one fixture field.
+          assert "predicate_derivation_execution_lineage: String" in test_text
+          assert "owner_reconstruction_execution_lineage: String" in test_text
+          assert "owner_execution_lineage: String" not in test_text
+
+          # V1 rejects predicate recursion; no implementation-defined fixed-point semantics.
+          for token in [
+              "FixedPoint",
+              "fixed_point",
+              "StronglyConnected",
+              "recursive_evaluate",
+              "max_iterations",
+          ]:
+              assert token not in test_text, f"unqualified recursion semantics present: {token}"
+
+          forbidden = [
+              "SystemTime",
+              "std::env",
+              "std::fs",
+              "TcpStream",
+              "UdpSocket",
+              "reqwest",
+              "tokio",
+              "thread_rng",
+              "rand::",
+              "ScientificMethodEngine",
+              "HypothesisStatus",
+              "evidence_count",
+              "rank_hypotheses",
+              "find_contradictions",
+          ]
+          code_without_docs = "\n".join(
+              line for line in test_text.splitlines() if not line.startswith("//!")
+          )
+          for token in forbidden:
+              assert token not in code_without_docs, f"ambient/legacy authority present: {token}"
+          PY
+
+          base_sha="${{ github.event.pull_request.base.sha || '' }}"
+          if [[ -n "$base_sha" ]]; then
+            test "$(git rev-parse HEAD^)" = "$base_sha"
+            actual="$(git diff --name-only HEAD^..HEAD | sort)"
+            expected=$'.github/workflows/scientific-qualified-reconstruction.yml\ncrates/core/symthaea-scientific-replay/tests/qualified_reconstruction.rs'
+            test "$actual" = "$expected" || {
+              echo "Unexpected SCI-014A scope:"
+              printf '%s\n' "$actual"
+              exit 1
+            }
+            test -z "$(git diff --name-only HEAD^..HEAD -- Cargo.toml Cargo.lock)"
+            git diff --exit-code HEAD^..HEAD -- crates/core/symthaea-scientific-replay/src/lib.rs
+          else
+            echo "workflow_dispatch: PR-relative scope audit not applicable"
+          fi
+
+      - name: Formatting
+        run: cargo fmt -p symthaea-scientific-replay -- --check
+
+      - name: Check
+        run: cargo check --locked -p symthaea-scientific-replay --all-targets
+
+      - name: Focused tests
+        run: cargo test --locked -p symthaea-scientific-replay --test qualified_reconstruction
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-scientific-replay --all-targets --no-deps -- -D warnings
