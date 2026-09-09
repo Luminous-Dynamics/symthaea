@@ -17,6 +17,7 @@ pub mod profile_adoption;
 pub mod profile_adoption_admission;
 pub mod profile_adoption_commit;
 pub mod profile_adoption_root;
+pub mod profile_adoption_time;
 pub mod verifier;
 mod witness;
 
@@ -56,6 +57,11 @@ pub use profile_adoption_root::{
     RootBoundPolicyCheckedVerifierProfileAdoptionV1,
     VerifierProfileAdoptionAuthorityRootSnapshotId,
     VerifierProfileAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionRootBindingError,
+};
+pub use profile_adoption_time::{
+    TimeBoundVerifierProfileAdoptionCommitPreconditionsV1,
+    VerifierProfileAdoptionClockObservationId, VerifierProfileAdoptionClockObservationV1,
+    VerifierProfileAdoptionTimeError,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
