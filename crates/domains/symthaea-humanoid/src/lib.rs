@@ -55,6 +55,7 @@ pub mod physical_health;
 pub mod plugin;
 pub mod qp_certification;
 pub mod qualification;
+pub mod reach_authority_commitment;
 pub mod reach_cryptographic_authority;
 pub mod reach_episode_evidence;
 // Internal implementation detail: episode-complete evidence is necessary, but
@@ -150,6 +151,7 @@ pub use payload_capability::*;
 pub use physical_health::*;
 pub use qp_certification::*;
 pub use qualification::*;
+pub use reach_authority_commitment::*;
 pub use reach_cryptographic_authority::*;
 pub use reach_episode_evidence::*;
 pub use reach_execution::*;
