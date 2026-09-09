@@ -52,7 +52,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/continuity-contract.yml)" -eq 1
-          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/continuity-contract.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/continuity-contract.yml)" -eq 2
           if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/continuity-contract.yml; then
             echo 'mutable major-version GitHub Action tag found in continuity qualification workflow' >&2
             exit 1
@@ -78,26 +78,36 @@ jobs:
         env:
           QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           CONTINUITY_CONTRACT_RECEIPT: ${{ runner.temp }}/continuity-contract-qualification-v1.tsv
+          CONTINUITY_FORMAT_PATCH: ${{ runner.temp }}/symthaea-continuity-rustfmt.patch
         run: bash scripts/qualify-continuity-contract.sh
 
-      - name: Publish receipt digest
+      - name: Publish receipt and repair digests
         if: always()
         shell: bash
         env:
           RECEIPT: ${{ runner.temp }}/continuity-contract-qualification-v1.tsv
+          FORMAT_PATCH: ${{ runner.temp }}/symthaea-continuity-rustfmt.patch
         run: |
           set -euo pipefail
-          if [[ ! -f "$RECEIPT" ]]; then
+          if [[ -f "$RECEIPT" ]]; then
+            receipt_digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
+            echo "continuity-contract receipt_sha256=$receipt_digest"
+            {
+              echo
+              echo "- receipt SHA-256: \`$receipt_digest\`"
+              echo '- receipt bytes are not independently signed; this digest is witnessed by the workflow log.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
             echo 'No qualification receipt was produced; execution did not reach the receipt-bearing verifier.'
-            exit 0
           fi
-          digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
-          echo "continuity-contract receipt_sha256=$digest"
-          {
-            echo
-            echo "- receipt SHA-256: \`$digest\`"
-            echo '- receipt bytes are not independently signed; this digest is witnessed by the workflow log.'
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f "$FORMAT_PATCH" ]]; then
+            patch_digest="$(sha256sum "$FORMAT_PATCH" | awk '{print $1}')"
+            echo "continuity-contract rustfmt_patch_sha256=$patch_digest"
+            {
+              echo "- rustfmt repair patch SHA-256: \`$patch_digest\`"
+              echo '- repair patch was produced by the repository-pinned rustfmt from the exact qualified head.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload qualification receipt
         if: always()
@@ -106,4 +116,13 @@ jobs:
           name: continuity-contract-qualification-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/continuity-contract-qualification-v1.tsv
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload rustfmt repair patch
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-contract-rustfmt-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/symthaea-continuity-rustfmt.patch
+          if-no-files-found: ignore
           retention-days: 14
