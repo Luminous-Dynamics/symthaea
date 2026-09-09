@@ -8,12 +8,18 @@
 
 #![deny(unsafe_code)]
 
+pub mod auth_wire;
 mod compose;
 pub mod contract;
 pub mod observation;
 pub mod verifier;
 mod witness;
 
+pub use auth_wire::{
+    CONTINUITY_VERIFICATION_CLAIM_AUTH_SCHEMA, CONTINUITY_VERIFICATION_CLAIM_HASH_ALGORITHM,
+    CONTINUITY_VERIFICATION_XENIA_PURPOSE, canonical_verification_claim_bytes,
+    canonical_verification_claim_digest,
+};
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
     ContinuityRequirementV1, ContractError, EquivalencePredicate, RequirementCriticality,
