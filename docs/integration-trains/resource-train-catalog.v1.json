@@ -1,0 +1,73 @@
+{
+  "schema": "symthaea.integration-train-catalog.v1",
+  "program_id": "resources.planning-research.v1",
+  "trains": [
+    {
+      "name": "B1",
+      "train_id": "sha256:8c0abc71bdf2d0dd500bb20c591306f59569b4a9898be049da061bd839e56147",
+      "manifest_branch": "evidence/resource-b1-integration-train-v1",
+      "manifest_path": "docs/integration-trains/resource-b1-bundle-feasibility.v1.json",
+      "base_subject": "99ae477f46b17a04df390abf33b0b308c3220781",
+      "cumulative_tip_sha": "ce3d20a42a278c46f7fe10e43d2d51b26ddeffbb",
+      "role": "parallel bounded bundle feasibility",
+      "status": "SourceManifestOnly"
+    },
+    {
+      "name": "R1",
+      "train_id": "sha256:e11e11ed99c02f4f9889565287aa623116a18f7a1b79e081d6d6ba926d3e1267",
+      "manifest_branch": "evidence/resource-r1-integration-train-v1",
+      "manifest_path": "docs/integration-trains/resource-r1-deterministic-feasibility.v1.json",
+      "base_subject": "95a32182d5830ecb6efa36c625cad8102e67c81b",
+      "cumulative_tip_sha": "99ae477f46b17a04df390abf33b0b308c3220781",
+      "role": "deterministic resource feasibility",
+      "status": "SourceManifestOnly"
+    },
+    {
+      "name": "R2",
+      "train_id": "sha256:cc3a3716d7a29fb83c243cb9a719712d89a854c3474a6b7b739933e262494e79",
+      "manifest_branch": "evidence/resource-r2-integration-train-v1",
+      "manifest_path": "docs/integration-trains/resource-r2-single-choice-planning.v1.json",
+      "base_subject": "99ae477f46b17a04df390abf33b0b308c3220781",
+      "cumulative_tip_sha": "e2076ccc24f9b411722cb9655bc9e9135691ae23",
+      "role": "evidence-qualified single-choice planning",
+      "status": "SourceManifestOnly"
+    },
+    {
+      "name": "R3",
+      "train_id": "sha256:9d9fa660c788b3b7f24e43822196c1ca3e046ac2fc299149b019c7d4f729ede4",
+      "manifest_branch": "evidence/resource-r3-integration-train-v1",
+      "manifest_path": "docs/integration-trains/resource-r3-shadow-benchmark-reproducibility.v1.json",
+      "base_subject": "e2076ccc24f9b411722cb9655bc9e9135691ae23",
+      "cumulative_tip_sha": "7350ee0a5cab0ccaa48b6691e8d52875143b102b",
+      "role": "shadow benchmark and reproducibility",
+      "status": "SourceManifestOnly"
+    }
+  ],
+  "edges": [
+    {
+      "from": "R1",
+      "to": "B1",
+      "relation": "parallel_successor",
+      "boundary_sha": "99ae477f46b17a04df390abf33b0b308c3220781"
+    },
+    {
+      "from": "R1",
+      "to": "R2",
+      "relation": "linear_successor",
+      "boundary_sha": "99ae477f46b17a04df390abf33b0b308c3220781"
+    },
+    {
+      "from": "R2",
+      "to": "R3",
+      "relation": "linear_successor",
+      "boundary_sha": "e2076ccc24f9b411722cb9655bc9e9135691ae23"
+    }
+  ],
+  "non_claims": [
+    "does not establish execution authority",
+    "does not establish hosted qualification",
+    "does not linearize B1 with R2",
+    "does not merge or close pull requests"
+  ],
+  "catalog_id": "sha256:9d18b6a535c102a6bcff168dd14686f5906917475da0b561b2e545bfbc400964"
+}
