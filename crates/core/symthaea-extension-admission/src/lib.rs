@@ -4,22 +4,23 @@
 //! Typed admission contracts for Symthaea extensions.
 //!
 //! Discovery, technical compatibility, signature validity, signer authorization,
-//! capability admission, and point-of-use activation are different facts. This
-//! crate models only the host-owned admission decision and its live
-//! policy/trust-currentness check. It performs no cryptography and grants no
-//! authority by itself.
+//! persisted admission evidence, and point-of-use authority are distinct facts.
+//! This crate models the host-owned admission decision and its live
+//! policy/trust-currentness check. It performs no cryptography.
 //!
-//! The important boundary is:
+//! The load-bearing boundary is:
 //!
 //! ```text
-//! serialized AdmissionRecord
+//! serialized AdmissionRecordEvidence
+//!     != AdmissionRecord
 //!     != ActiveAdmission
 //! ```
 //!
-//! `AdmissionRecord` is immutable issuance evidence. `ActiveAdmission` is a
-//! non-serializable point-of-use value created only after the record is checked
-//! against the current manifest, admission-policy generation, trust generation,
-//! and live revocation state.
+//! [`AdmissionRecord`] is an in-process host-issued authority record. It may be
+//! serialized for audit evidence, but deliberately does **not** implement
+//! `Deserialize`; persisted bytes cannot recreate authority. Parse persisted
+//! data as [`AdmissionRecordEvidence`] and rerun the admission pipeline to mint a
+//! new `AdmissionRecord` after restart.
 
 #![deny(unsafe_code)]
 
@@ -46,11 +47,6 @@ impl Sha256Digest {
 }
 
 /// Host-local or externally-resolved principal identity.
-///
-/// This is intentionally opaque. Xenia/Mycelix/local trust infrastructure may
-/// supply stronger semantics without this crate duplicating their identity
-/// systems. Text is canonical: leading/trailing whitespace is rejected rather
-/// than silently normalized.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct PrincipalId(String);
@@ -67,10 +63,7 @@ impl PrincipalId {
     }
 }
 
-/// Host-assigned authorization floor.
-///
-/// This is not a quality/evidence score. A more-trusted publisher does not make
-/// a solver or model more accurate.
+/// Host-assigned authorization floor, never a provider-quality score.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default,
 )]
@@ -83,14 +76,34 @@ pub enum TrustLevel {
     Privileged,
 }
 
-/// Immutable host admission decision.
+/// In-process host-issued admission authority.
 ///
-/// The record binds the exact manifest bytes, exact executable/package payload,
-/// exact admission policy, and trust-snapshot generation that produced the
-/// decision. Signature evidence is deliberately external; `signer` records the
-/// already-resolved identity, not a claim that this crate verified it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// This type intentionally implements `Serialize` but not `Deserialize`. Code
+/// that only possesses stored bytes can reconstruct evidence, not authority.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct AdmissionRecord {
+    extension: ExtensionId,
+    extension_version: String,
+    manifest_sha256: Sha256Digest,
+    payload_sha256: Sha256Digest,
+    policy_sha256: Sha256Digest,
+    issuer: PrincipalId,
+    signer: Option<PrincipalId>,
+    trust: TrustLevel,
+    granted_capabilities: Vec<CapabilityId>,
+    granted_permissions: PermissionSet,
+    generation: u64,
+    trust_generation: u64,
+}
+
+/// Deserializable audit/transport representation of an admission decision.
+///
+/// There is deliberately no API that upgrades this type back into
+/// [`AdmissionRecord`] or [`ActiveAdmission`]. A host that restarts must rerun
+/// package inspection, signer verification, and admission policy evaluation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdmissionRecordEvidence {
     extension: ExtensionId,
     extension_version: String,
     manifest_sha256: Sha256Digest,
@@ -122,30 +135,17 @@ impl AdmissionRecord {
         trust_generation: u64,
     ) -> Result<Self, AdmissionProblem> {
         let extension_version = extension_version.into();
-        if extension_version.trim().is_empty() {
-            return Err(AdmissionProblem::EmptyVersion);
-        }
-        if extension_version != extension_version.trim() {
-            return Err(AdmissionProblem::NonCanonicalVersion);
-        }
-        if generation == 0 {
-            return Err(AdmissionProblem::ZeroGeneration);
-        }
-        if trust_generation == 0 {
-            return Err(AdmissionProblem::ZeroTrustGeneration);
-        }
-        if granted_capabilities.is_empty() {
-            return Err(AdmissionProblem::EmptyCapabilityGrant);
-        }
+        canonicalize_capability_grants(&mut granted_capabilities)?;
+        validate_record_fields(
+            &extension_version,
+            &issuer,
+            signer.as_ref(),
+            &granted_capabilities,
+            generation,
+            trust_generation,
+        )?;
 
-        granted_capabilities.sort();
-        let before = granted_capabilities.len();
-        granted_capabilities.dedup();
-        if granted_capabilities.len() != before {
-            return Err(AdmissionProblem::DuplicateCapabilityGrant);
-        }
-
-        let record = Self {
+        Ok(Self {
             extension,
             extension_version,
             manifest_sha256,
@@ -158,162 +158,160 @@ impl AdmissionRecord {
             granted_permissions,
             generation,
             trust_generation,
-        };
-        record.validate()?;
-        Ok(record)
+        })
     }
 
-    /// Validate the record's own canonical structure after deserialization.
     pub fn validate(&self) -> Result<(), AdmissionProblem> {
-        if self.extension_version.trim().is_empty() {
-            return Err(AdmissionProblem::EmptyVersion);
-        }
-        if self.extension_version != self.extension_version.trim() {
-            return Err(AdmissionProblem::NonCanonicalVersion);
-        }
-        if self.generation == 0 {
-            return Err(AdmissionProblem::ZeroGeneration);
-        }
-        if self.trust_generation == 0 {
-            return Err(AdmissionProblem::ZeroTrustGeneration);
-        }
-        validate_principal(self.issuer.as_str())?;
-        if let Some(signer) = &self.signer {
-            validate_principal(signer.as_str())?;
-        }
-        if self.granted_capabilities.is_empty() {
-            return Err(AdmissionProblem::EmptyCapabilityGrant);
-        }
-        if !self
-            .granted_capabilities
-            .windows(2)
-            .all(|pair| pair[0] < pair[1])
-        {
-            return Err(AdmissionProblem::NonCanonicalCapabilityGrant);
-        }
-        Ok(())
+        validate_record_fields(
+            &self.extension_version,
+            &self.issuer,
+            self.signer.as_ref(),
+            &self.granted_capabilities,
+            self.generation,
+            self.trust_generation,
+        )
     }
 
-    /// Prove that this admission cannot widen the extension's own declaration.
+    /// Prove that this admission cannot widen the extension's declaration.
     pub fn validate_against_manifest(
         &self,
         manifest: &ExtensionManifest,
     ) -> Result<(), AdmissionProblem> {
         self.validate()?;
-        manifest
-            .validate()
-            .map_err(|_| AdmissionProblem::InvalidManifest)?;
-
-        if self.extension != manifest.id {
-            return Err(AdmissionProblem::ExtensionMismatch);
-        }
-        if self.extension_version != manifest.version {
-            return Err(AdmissionProblem::VersionMismatch);
-        }
-
-        let provided: BTreeSet<_> = manifest
-            .provides
-            .iter()
-            .map(|capability| &capability.id)
-            .collect();
-        if self
-            .granted_capabilities
-            .iter()
-            .any(|capability| !provided.contains(capability))
-        {
-            return Err(AdmissionProblem::CapabilityNotDeclared);
-        }
-
-        if !permissions_are_subset(&self.granted_permissions, &manifest.permissions) {
-            return Err(AdmissionProblem::PermissionExceedsManifest);
-        }
-
-        Ok(())
+        validate_record_against_manifest(
+            &self.extension,
+            &self.extension_version,
+            &self.granted_capabilities,
+            &self.granted_permissions,
+            manifest,
+        )
     }
 
-    /// Revalidate immutable issuance against live policy/trust generations and
-    /// revocation state, returning a non-serializable point-of-use admission.
-    ///
-    /// The validated manifest is retained inside the active value. This prevents
-    /// an admission activated against manifest A from being replayed against a
-    /// different in-process manifest B that happens to reuse the same ID/version.
+    /// Revalidate this in-process admission against current policy/trust state.
     pub fn activate(
         &self,
         manifest: &ExtensionManifest,
         context: AdmissionContext,
     ) -> Result<ActiveAdmission, AdmissionProblem> {
         self.validate_against_manifest(manifest)?;
-        if context.revoked {
-            return Err(AdmissionProblem::Revoked);
-        }
-        if context.current_generation != self.generation {
-            return Err(AdmissionProblem::GenerationMismatch {
-                admitted: self.generation,
-                current: context.current_generation,
-            });
-        }
-        if context.current_trust_generation != self.trust_generation {
-            return Err(AdmissionProblem::TrustGenerationMismatch {
-                admitted: self.trust_generation,
-                current: context.current_trust_generation,
-            });
-        }
+        validate_currentness(self.generation, self.trust_generation, context)?;
         Ok(ActiveAdmission {
             record: self.clone(),
             manifest: manifest.clone(),
         })
     }
 
+    /// Produce a persistable evidence-only representation.
+    pub fn evidence(&self) -> AdmissionRecordEvidence {
+        AdmissionRecordEvidence::from(self)
+    }
+
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
     }
-
     pub fn extension_version(&self) -> &str {
         &self.extension_version
     }
-
     pub fn manifest_sha256(&self) -> Sha256Digest {
         self.manifest_sha256
     }
-
     pub fn payload_sha256(&self) -> Sha256Digest {
         self.payload_sha256
     }
-
     pub fn policy_sha256(&self) -> Sha256Digest {
         self.policy_sha256
     }
-
     pub fn issuer(&self) -> &PrincipalId {
         &self.issuer
     }
-
     pub fn signer(&self) -> Option<&PrincipalId> {
         self.signer.as_ref()
     }
-
     pub fn trust(&self) -> TrustLevel {
         self.trust
     }
-
     pub fn granted_capabilities(&self) -> &[CapabilityId] {
         &self.granted_capabilities
     }
-
     pub fn granted_permissions(&self) -> &PermissionSet {
         &self.granted_permissions
     }
-
     pub fn generation(&self) -> u64 {
         self.generation
     }
-
     pub fn trust_generation(&self) -> u64 {
         self.trust_generation
     }
 }
 
-/// Live host facts checked at the instant an admission is used.
+impl From<&AdmissionRecord> for AdmissionRecordEvidence {
+    fn from(record: &AdmissionRecord) -> Self {
+        Self {
+            extension: record.extension.clone(),
+            extension_version: record.extension_version.clone(),
+            manifest_sha256: record.manifest_sha256,
+            payload_sha256: record.payload_sha256,
+            policy_sha256: record.policy_sha256,
+            issuer: record.issuer.clone(),
+            signer: record.signer.clone(),
+            trust: record.trust,
+            granted_capabilities: record.granted_capabilities.clone(),
+            granted_permissions: record.granted_permissions.clone(),
+            generation: record.generation,
+            trust_generation: record.trust_generation,
+        }
+    }
+}
+
+impl AdmissionRecordEvidence {
+    /// Validate canonical transport structure only. This establishes no current
+    /// authority and intentionally returns no routable token.
+    pub fn validate(&self) -> Result<(), AdmissionProblem> {
+        validate_record_fields(
+            &self.extension_version,
+            &self.issuer,
+            self.signer.as_ref(),
+            &self.granted_capabilities,
+            self.generation,
+            self.trust_generation,
+        )
+    }
+
+    pub fn validate_against_manifest(
+        &self,
+        manifest: &ExtensionManifest,
+    ) -> Result<(), AdmissionProblem> {
+        self.validate()?;
+        validate_record_against_manifest(
+            &self.extension,
+            &self.extension_version,
+            &self.granted_capabilities,
+            &self.granted_permissions,
+            manifest,
+        )
+    }
+
+    pub fn extension(&self) -> &ExtensionId {
+        &self.extension
+    }
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+    pub fn trust_generation(&self) -> u64 {
+        self.trust_generation
+    }
+    pub fn manifest_sha256(&self) -> Sha256Digest {
+        self.manifest_sha256
+    }
+    pub fn payload_sha256(&self) -> Sha256Digest {
+        self.payload_sha256
+    }
+    pub fn policy_sha256(&self) -> Sha256Digest {
+        self.policy_sha256
+    }
+}
+
+/// Live host facts checked at the instant an in-process admission is used.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AdmissionContext {
     pub current_generation: u64,
@@ -331,12 +329,8 @@ impl AdmissionContext {
     }
 }
 
-/// Non-serializable proof that one admission record is current for one exact
-/// in-process manifest.
-///
-/// This type intentionally does not implement `Clone` or serde. Obtain a fresh
-/// value at point of use after checking current policy/trust generations and
-/// revocation state.
+/// Non-serializable proof that one in-process admission is current for one exact
+/// manifest. This type intentionally does not implement `Clone` or serde.
 #[derive(Debug, PartialEq, Eq)]
 pub struct ActiveAdmission {
     record: AdmissionRecord,
@@ -347,43 +341,33 @@ impl ActiveAdmission {
     pub fn extension(&self) -> &ExtensionId {
         self.record.extension()
     }
-
     pub fn trust(&self) -> TrustLevel {
         self.record.trust()
     }
-
     pub fn generation(&self) -> u64 {
         self.record.generation()
     }
-
     pub fn trust_generation(&self) -> u64 {
         self.record.trust_generation()
     }
-
     pub fn manifest_sha256(&self) -> Sha256Digest {
         self.record.manifest_sha256()
     }
-
     pub fn payload_sha256(&self) -> Sha256Digest {
         self.record.payload_sha256()
     }
-
     pub fn policy_sha256(&self) -> Sha256Digest {
         self.record.policy_sha256()
     }
-
-    /// Exact structural manifest match proven during activation.
     pub fn matches_manifest(&self, manifest: &ExtensionManifest) -> bool {
         &self.manifest == manifest
     }
-
     pub fn allows_capability(&self, capability: &CapabilityId) -> bool {
         self.record
             .granted_capabilities()
             .binary_search(capability)
             .is_ok()
     }
-
     pub fn granted_permissions(&self) -> &PermissionSet {
         self.record.granted_permissions()
     }
@@ -407,6 +391,110 @@ pub enum AdmissionProblem {
     Revoked,
     GenerationMismatch { admitted: u64, current: u64 },
     TrustGenerationMismatch { admitted: u64, current: u64 },
+}
+
+fn canonicalize_capability_grants(
+    capabilities: &mut Vec<CapabilityId>,
+) -> Result<(), AdmissionProblem> {
+    if capabilities.is_empty() {
+        return Err(AdmissionProblem::EmptyCapabilityGrant);
+    }
+    capabilities.sort();
+    let before = capabilities.len();
+    capabilities.dedup();
+    if capabilities.len() != before {
+        return Err(AdmissionProblem::DuplicateCapabilityGrant);
+    }
+    Ok(())
+}
+
+fn validate_record_fields(
+    extension_version: &str,
+    issuer: &PrincipalId,
+    signer: Option<&PrincipalId>,
+    granted_capabilities: &[CapabilityId],
+    generation: u64,
+    trust_generation: u64,
+) -> Result<(), AdmissionProblem> {
+    if extension_version.trim().is_empty() {
+        return Err(AdmissionProblem::EmptyVersion);
+    }
+    if extension_version != extension_version.trim() {
+        return Err(AdmissionProblem::NonCanonicalVersion);
+    }
+    if generation == 0 {
+        return Err(AdmissionProblem::ZeroGeneration);
+    }
+    if trust_generation == 0 {
+        return Err(AdmissionProblem::ZeroTrustGeneration);
+    }
+    validate_principal(issuer.as_str())?;
+    if let Some(signer) = signer {
+        validate_principal(signer.as_str())?;
+    }
+    if granted_capabilities.is_empty() {
+        return Err(AdmissionProblem::EmptyCapabilityGrant);
+    }
+    if !granted_capabilities.windows(2).all(|pair| pair[0] < pair[1]) {
+        return Err(AdmissionProblem::NonCanonicalCapabilityGrant);
+    }
+    Ok(())
+}
+
+fn validate_record_against_manifest(
+    extension: &ExtensionId,
+    extension_version: &str,
+    granted_capabilities: &[CapabilityId],
+    granted_permissions: &PermissionSet,
+    manifest: &ExtensionManifest,
+) -> Result<(), AdmissionProblem> {
+    manifest
+        .validate()
+        .map_err(|_| AdmissionProblem::InvalidManifest)?;
+    if extension != &manifest.id {
+        return Err(AdmissionProblem::ExtensionMismatch);
+    }
+    if extension_version != manifest.version {
+        return Err(AdmissionProblem::VersionMismatch);
+    }
+    let provided: BTreeSet<_> = manifest
+        .provides
+        .iter()
+        .map(|capability| &capability.id)
+        .collect();
+    if granted_capabilities
+        .iter()
+        .any(|capability| !provided.contains(capability))
+    {
+        return Err(AdmissionProblem::CapabilityNotDeclared);
+    }
+    if !permissions_are_subset(granted_permissions, &manifest.permissions) {
+        return Err(AdmissionProblem::PermissionExceedsManifest);
+    }
+    Ok(())
+}
+
+fn validate_currentness(
+    generation: u64,
+    trust_generation: u64,
+    context: AdmissionContext,
+) -> Result<(), AdmissionProblem> {
+    if context.revoked {
+        return Err(AdmissionProblem::Revoked);
+    }
+    if context.current_generation != generation {
+        return Err(AdmissionProblem::GenerationMismatch {
+            admitted: generation,
+            current: context.current_generation,
+        });
+    }
+    if context.current_trust_generation != trust_generation {
+        return Err(AdmissionProblem::TrustGenerationMismatch {
+            admitted: trust_generation,
+            current: context.current_trust_generation,
+        });
+    }
+    Ok(())
 }
 
 fn validate_principal(value: &str) -> Result<(), AdmissionProblem> {
@@ -442,13 +530,7 @@ fn network_is_subset(granted: &NetworkPermission, requested: &NetworkPermission)
     }
 }
 
-fn filesystem_is_subset(
-    granted: &FilesystemPermission,
-    requested: &FilesystemPermission,
-) -> bool {
-    // Paths are exact opaque grants here; this crate deliberately performs no
-    // parent-directory or symlink interpretation. A concrete host is responsible
-    // for mapping a granted path to its sandbox/runtime semantics.
+fn filesystem_is_subset(granted: &FilesystemPermission, requested: &FilesystemPermission) -> bool {
     match (granted, requested) {
         (FilesystemPermission::None, _) => true,
         (FilesystemPermission::ReadOnly(granted), FilesystemPermission::ReadOnly(requested))
@@ -531,13 +613,11 @@ mod tests {
     #[test]
     fn active_admission_requires_current_policy_trust_and_exact_manifest() {
         let manifest = manifest();
-        let record = record();
-        let active = record
+        let active = record()
             .activate(&manifest, AdmissionContext::active(7, 13))
             .unwrap();
-        assert_eq!(active.extension(), &manifest.id);
-        assert_eq!(active.trust_generation(), 13);
         assert!(active.matches_manifest(&manifest));
+        assert_eq!(active.trust_generation(), 13);
         assert!(active.allows_capability(&CapabilityId::new(
             "engineering.simulation.circuit"
         )));
@@ -547,21 +627,33 @@ mod tests {
     }
 
     #[test]
-    fn active_admission_rejects_same_id_version_manifest_substitution() {
-        let manifest = manifest();
-        let active = record()
-            .activate(&manifest, AdmissionContext::active(7, 13))
-            .unwrap();
-        let mut substituted = manifest.clone();
-        substituted.description = "changed after activation".into();
-        assert!(!active.matches_manifest(&substituted));
+    fn stored_bytes_round_trip_only_as_evidence() {
+        let serialized = serde_json::to_vec(&record()).unwrap();
+        let evidence: AdmissionRecordEvidence = serde_json::from_slice(&serialized).unwrap();
+        evidence.validate().unwrap();
+        evidence.validate_against_manifest(&manifest()).unwrap();
+        assert_eq!(evidence.generation(), 7);
+        assert_eq!(evidence.trust_generation(), 13);
     }
 
     #[test]
-    fn live_revocation_fails_without_rewriting_issuance_record() {
+    fn noncanonical_stored_evidence_fails_closed() {
+        let mut value = serde_json::to_value(record().evidence()).unwrap();
+        value["granted_capabilities"] = serde_json::json!([
+            "engineering.simulation.process",
+            "engineering.simulation.circuit"
+        ]);
+        let evidence: AdmissionRecordEvidence = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            evidence.validate(),
+            Err(AdmissionProblem::NonCanonicalCapabilityGrant)
+        );
+    }
+
+    #[test]
+    fn live_revocation_and_generation_changes_fail_closed() {
         let manifest = manifest();
         let record = record();
-        assert_eq!(record.generation(), 7);
         assert_eq!(
             record.activate(
                 &manifest,
@@ -569,51 +661,40 @@ mod tests {
                     current_generation: 7,
                     current_trust_generation: 13,
                     revoked: true,
-                }
+                },
             ),
             Err(AdmissionProblem::Revoked)
         );
-        assert_eq!(record.generation(), 7);
+        assert!(matches!(
+            record.activate(&manifest, AdmissionContext::active(8, 13)),
+            Err(AdmissionProblem::GenerationMismatch { .. })
+        ));
+        assert!(matches!(
+            record.activate(&manifest, AdmissionContext::active(7, 14)),
+            Err(AdmissionProblem::TrustGenerationMismatch { .. })
+        ));
     }
 
     #[test]
-    fn policy_generation_replacement_invalidates_old_admission() {
-        assert_eq!(
-            record().activate(&manifest(), AdmissionContext::active(8, 13)),
-            Err(AdmissionProblem::GenerationMismatch {
-                admitted: 7,
-                current: 8,
-            })
-        );
-    }
+    fn manifest_and_permission_escalation_fail_closed() {
+        let mut substituted = manifest();
+        substituted.description = "changed after activation".into();
+        let active = record()
+            .activate(&manifest(), AdmissionContext::active(7, 13))
+            .unwrap();
+        assert!(!active.matches_manifest(&substituted));
 
-    #[test]
-    fn trust_generation_replacement_invalidates_old_admission() {
+        let mut overgrant = record();
+        overgrant.granted_capabilities = vec![CapabilityId::new("robotics.motion.command")];
         assert_eq!(
-            record().activate(&manifest(), AdmissionContext::active(7, 14)),
-            Err(AdmissionProblem::TrustGenerationMismatch {
-                admitted: 13,
-                current: 14,
-            })
-        );
-    }
-
-    #[test]
-    fn capability_grant_cannot_exceed_manifest() {
-        let mut record = record();
-        record.granted_capabilities = vec![CapabilityId::new("robotics.motion.command")];
-        assert_eq!(
-            record.validate_against_manifest(&manifest()),
+            overgrant.validate_against_manifest(&manifest()),
             Err(AdmissionProblem::CapabilityNotDeclared)
         );
-    }
 
-    #[test]
-    fn permission_grant_cannot_exceed_manifest() {
-        let mut record = record();
-        record.granted_permissions.network = NetworkPermission::Unrestricted;
+        let mut permission_overgrant = record();
+        permission_overgrant.granted_permissions.network = NetworkPermission::Unrestricted;
         assert_eq!(
-            record.validate_against_manifest(&manifest()),
+            permission_overgrant.validate_against_manifest(&manifest()),
             Err(AdmissionProblem::PermissionExceedsManifest)
         );
     }
@@ -623,20 +704,6 @@ mod tests {
         assert_eq!(
             PrincipalId::new(" did:example:publisher "),
             Err(AdmissionProblem::InvalidPrincipal)
-        );
-    }
-
-    #[test]
-    fn deserialized_noncanonical_capability_order_fails_closed() {
-        let mut value = serde_json::to_value(record()).unwrap();
-        value["granted_capabilities"] = serde_json::json!([
-            "engineering.simulation.process",
-            "engineering.simulation.circuit"
-        ]);
-        let decoded: AdmissionRecord = serde_json::from_value(value).unwrap();
-        assert_eq!(
-            decoded.validate(),
-            Err(AdmissionProblem::NonCanonicalCapabilityGrant)
         );
     }
 }
