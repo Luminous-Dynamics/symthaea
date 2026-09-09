@@ -54,6 +54,7 @@ pub mod lifecycle_recorder;
 pub mod ma001;
 pub mod ma001l;
 pub mod ma001r;
+pub mod matched_stochastic_replay;
 pub mod metabolism;
 pub mod observatory;
 pub mod observed_stochastic_tape;
@@ -150,6 +151,11 @@ pub use lifecycle_checkpoint::{
     LifecycleCheckpointErrorV1, LifecycleCheckpointV1, ValidatedLifecycleCheckpointV1,
 };
 pub use lifecycle_recorder::{LifecycleRecorderErrorV1, LifecycleRecorderV1};
+pub use matched_stochastic_replay::{
+    MatchedInheritanceSelectionV1, MatchedRandomOriginV1, MatchedSchedulerOrderV1,
+    MatchedSeedV1, MatchedStochasticReplayErrorV1, MatchedStochasticReplayV1,
+    MatchedUnitSampleV1,
+};
 pub use metabolism::{
     K_ALIFE_BOLTZMANN, landauer_minimum, prigogine_dissipation_cost, shannon_entropy_bits,
 };
