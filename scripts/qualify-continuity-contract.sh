@@ -20,6 +20,7 @@ expected_sha="${QUALIFIED_SHA:-$actual_sha}"
 receipt_path="${CONTINUITY_CONTRACT_RECEIPT:-${TMPDIR:-/tmp}/symthaea-continuity-contract-qualification-v1.tsv}"
 format_patch_path="${CONTINUITY_FORMAT_PATCH:-${TMPDIR:-/tmp}/symthaea-continuity-rustfmt.patch}"
 format_source_dir="${CONTINUITY_FORMAT_SOURCE_DIR:-${TMPDIR:-/tmp}/symthaea-continuity-rustfmt-source}"
+lock_patch_path="${CONTINUITY_LOCK_PATCH:-${TMPDIR:-/tmp}/symthaea-continuity-cargo-lock.patch}"
 status="FAIL"
 stage="preflight"
 source_state="unverified"
@@ -27,6 +28,10 @@ format_patch_state="not-produced"
 format_source_state="not-produced"
 repair_probe_status="not-run"
 repair_probe_stage="not-run"
+lock_patch_state="not-produced"
+lock_probe_status="not-run"
+lock_probe_stage="not-run"
+lock_probe_source_state="not-run"
 
 sha256_file() {
     local path="$1"
@@ -95,6 +100,12 @@ write_receipt() {
         printf 'repair_probe_scope\tformatter-derived-non-qualifying\n'
         printf 'repair_probe_status\t%s\n' "$repair_probe_status"
         printf 'repair_probe_terminal_stage\t%s\n' "$repair_probe_stage"
+        printf 'lock_patch_state\t%s\n' "$lock_patch_state"
+        printf 'lock_patch_sha256\t%s\n' "$(sha256_file "$lock_patch_path")"
+        printf 'lock_probe_scope\toffline-lock-repair-derived-non-qualifying\n'
+        printf 'lock_probe_status\t%s\n' "$lock_probe_status"
+        printf 'lock_probe_terminal_stage\t%s\n' "$lock_probe_stage"
+        printf 'lock_probe_source_state\t%s\n' "$lock_probe_source_state"
         printf 'execution_provider\t%s\n' "$provider"
         printf 'runner_label\t%s\n' "${CONTINUITY_RUNNER_LABEL:-unknown}"
         printf 'runner_os\t%s\n' "${RUNNER_OS:-unknown}"
@@ -144,7 +155,9 @@ write_receipt() {
             echo "- format repair artifact: \`$format_patch_state\`"
             echo "- formatter source snapshot: \`$format_source_state\`"
             echo "- formatter-repair diagnostic probe: \`$repair_probe_status\` at \`$repair_probe_stage\`"
-            echo '- repair probe is diagnostic only and cannot change exact-head FAIL/PASS status'
+            echo "- Cargo.lock repair artifact: \`$lock_patch_state\`"
+            echo "- offline lock-repair diagnostic probe: \`$lock_probe_status\` at \`$lock_probe_stage\`"
+            echo '- repair probes are diagnostic only and cannot change exact-head FAIL/PASS status'
             echo '- scope: continuity software contracts only'
             echo '- full repository CI: independent'
             echo '- real-world availability/scientific/execution authority: none'
@@ -205,7 +218,7 @@ if [[ -n "$untracked" ]]; then
 fi
 source_state="clean-exact-checkout"
 
-rm -f "$format_patch_path"
+rm -f "$format_patch_path" "$lock_patch_path"
 rm -rf "$format_source_dir"
 
 echo "continuity-contract qualified_sha=$actual_sha"
@@ -236,10 +249,6 @@ if ! cargo fmt -p symthaea-continuity -- --check; then
     echo "continuity-contract rustfmt_source_dir=$format_source_dir"
     git diff --stat -- crates/core/symthaea-continuity >&2 || true
 
-    # Diagnostic-only probe. The exact committed head has already failed at
-    # formatting and remains FAIL regardless of these results. We intentionally
-    # probe the repository-pinned rustfmt repair so the next semantic/compiler
-    # defect can be surfaced without laundering repaired bytes into qualification.
     repair_probe_status="FAIL"
     repair_probe_stage="check_all_targets"
     set +e
@@ -270,7 +279,54 @@ if ! cargo fmt -p symthaea-continuity -- --check; then
 fi
 
 stage="check_all_targets"
-cargo check --locked -p symthaea-continuity --all-targets
+if ! cargo check --locked -p symthaea-continuity --all-targets; then
+    # Exact-head qualification already failed at the locked compiler gate. Probe a
+    # strictly offline Cargo.lock repair so we can learn whether lock drift is the
+    # only blocker without qualifying the derived lockfile.
+    lock_probe_status="FAIL"
+    lock_probe_stage="generate_lockfile_offline"
+    set +e
+    cargo generate-lockfile --offline
+    probe_rc=$?
+    if ! git diff --quiet -- Cargo.lock; then
+        git diff --binary -- Cargo.lock > "$lock_patch_path"
+        lock_patch_state="generated-offline-from-exact-head"
+        lock_probe_source_state="cargo-lock-derived-from-exact-head"
+        echo "continuity-contract cargo_lock_patch=$lock_patch_path"
+        echo "continuity-contract cargo_lock_patch_sha256=$(sha256_file "$lock_patch_path")"
+        git diff --stat -- Cargo.lock >&2 || true
+    else
+        lock_patch_state="no-lock-diff"
+        lock_probe_source_state="exact-lock-unchanged"
+    fi
+    if [[ "$probe_rc" -eq 0 ]]; then
+        lock_probe_stage="check_all_targets_with_repaired_lock"
+        cargo check --locked -p symthaea-continuity --all-targets
+        probe_rc=$?
+    fi
+    if [[ "$probe_rc" -eq 0 ]]; then
+        lock_probe_stage="clippy_all_targets_with_repaired_lock"
+        cargo clippy --locked -p symthaea-continuity --all-targets -- -D warnings
+        probe_rc=$?
+    fi
+    if [[ "$probe_rc" -eq 0 ]]; then
+        lock_probe_stage="unit_and_integration_tests_with_repaired_lock"
+        cargo test --locked -p symthaea-continuity
+        probe_rc=$?
+    fi
+    if [[ "$probe_rc" -eq 0 ]]; then
+        lock_probe_stage="doc_tests_with_repaired_lock"
+        cargo test --locked -p symthaea-continuity --doc
+        probe_rc=$?
+    fi
+    if [[ "$probe_rc" -eq 0 ]]; then
+        lock_probe_status="PASS"
+        lock_probe_stage="complete"
+    fi
+    set -e
+    echo "continuity-contract lock_probe_status=$lock_probe_status lock_probe_stage=$lock_probe_stage"
+    exit 1
+fi
 
 stage="clippy_all_targets"
 cargo clippy --locked -p symthaea-continuity --all-targets -- -D warnings
