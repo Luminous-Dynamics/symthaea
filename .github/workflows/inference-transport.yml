@@ -1,0 +1,50 @@
+name: Inference Transport
+
+on:
+  pull_request:
+    paths:
+      - "src/language/openai_compatible_transport.rs"
+      - "tests/openai_compatible_transport.rs"
+      - "docs/architecture/INFERENCE_TRANSPORT_V1.md"
+      - ".github/workflows/inference-transport.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-transport-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-transport:
+    name: Inference Transport
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: rustfmt --edition 2024 --check src/language/openai_compatible_transport.rs tests/openai_compatible_transport.rs
+
+      - name: Compile and run IF-1 transport regressions
+        run: cargo test --locked --test openai_compatible_transport
+
+      - name: Focused transport Clippy
+        run: cargo clippy --locked --test openai_compatible_transport -- -D warnings -A dead-code
+
+      - name: Ratchet secret and authority boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'BearerCredential([REDACTED])' src/language/openai_compatible_transport.rs
+          grep -F 'Provider error bodies can echo prompt/context' src/language/openai_compatible_transport.rs
+          grep -F 'This transport does not import or evaluate IF-0 policy' docs/architecture/INFERENCE_TRANSPORT_V1.md
+          grep -F 'no current runtime behavior change' docs/architecture/INFERENCE_TRANSPORT_V1.md
