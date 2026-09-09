@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hak.traversal-coverage-set.v1",
+  "title": "HAK Traversal Coverage Set v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "canonicalization_profile",
+    "digest_domain",
+    "coverage_scope",
+    "population_qualification",
+    "normalization_input_replay",
+    "normalization_policy_content_verification",
+    "selector",
+    "traversal_binding",
+    "source_assurance",
+    "pages",
+    "aggregate",
+    "coverage_set_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "hak.traversal-coverage-set.v1"},
+    "canonicalization_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "artifact_ref", "raw_sha256"],
+      "properties": {
+        "profile_id": {"const": "hak.canonical-json.v1"},
+        "artifact_ref": {"const": "git:Luminous-Dynamics/symthaea@cf440ce4f813bb30a6b1948e5caac96feda10610:docs/architecture/hak/canonical-json-v1.profile.json"},
+        "raw_sha256": {"const": "sha256:f76152db3cce567bb4d24ca46b5ed94d95db698daa8882a6fcdb38828d40e830"}
+      }
+    },
+    "digest_domain": {"const": "hak.traversal-coverage-set.v1"},
+    "coverage_scope": {"const": "VerifiedRetainedTraversalPagesOnly"},
+    "population_qualification": {"const": "NotEstablished"},
+    "normalization_input_replay": {"const": "NotEstablished"},
+    "normalization_policy_content_verification": {"const": "NotEstablished"},
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "coverage_policy"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "coverage_policy": {
+          "anyOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["policy_id", "policy_digest", "artifact_ref"],
+              "properties": {
+                "policy_id": {"type": "string", "minLength": 1},
+                "policy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "artifact_ref": {"type": "string", "pattern": "^git:[^@]+@[0-9a-f]{40}:.+$"}
+              }
+            }
+          ]
+        }
+      }
+    },
+    "traversal_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["traversal_digest", "hak017_collection_digest", "pages_verified"],
+      "properties": {
+        "traversal_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "hak017_collection_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "pages_verified": {"type": "integer", "minimum": 1, "maximum": 9007199254740991}
+      }
+    },
+    "source_assurance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider_authentication",
+        "raw_response_content_verification",
+        "entity_projection_verification",
+        "continuation_source_verification",
+        "temporal_snapshot_verification"
+      ],
+      "properties": {
+        "provider_authentication": {"const": "NotEstablished"},
+        "raw_response_content_verification": {"const": "NotEstablished"},
+        "entity_projection_verification": {"const": "NotEstablished"},
+        "continuation_source_verification": {"const": "NotEstablished"},
+        "temporal_snapshot_verification": {"const": "NotEstablished"}
+      }
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {"$ref": "#/$defs/assessedPage"},
+          {"$ref": "#/$defs/unassessedPage"}
+        ]
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coverage_state", "assessed_pages", "unassessed_pages", "failed_pages", "observed_counts"],
+      "properties": {
+        "coverage_state": {"enum": ["Present", "PartiallyPresent", "Absent", "NotApplicable", "Failed", "Indeterminate"]},
+        "assessed_pages": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "unassessed_pages": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "failed_pages": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "observed_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["applicable", "matches", "missing"],
+          "properties": {
+            "applicable": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+            "matches": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+            "missing": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+          }
+        }
+      }
+    },
+    "coverage_set_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "assessedPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal", "page_id", "response_ref", "raw_response_digest", "disposition",
+        "receipt_digest", "normalization_execution_status", "coverage_digest", "profile_binding_digest",
+        "source_status", "coverage_state", "applicable", "matches", "missing"
+      ],
+      "properties": {
+        "ordinal": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "page_id": {"type": "string", "minLength": 1},
+        "response_ref": {"type": "string", "minLength": 1},
+        "raw_response_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "disposition": {"const": "Assessed"},
+        "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "normalization_execution_status": {"enum": ["Succeeded", "Partial", "Failed"]},
+        "coverage_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "profile_binding_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "source_status": {"enum": ["Present", "Absent", "Failed"]},
+        "coverage_state": {"enum": ["Present", "PartiallyPresent", "Absent", "NotApplicable", "Failed"]},
+        "applicable": {"anyOf": [{"type": "integer", "minimum": 0, "maximum": 9007199254740991}, {"type": "null"}]},
+        "matches": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "missing": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+      }
+    },
+    "unassessedPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "page_id", "response_ref", "raw_response_digest", "disposition", "reason"],
+      "properties": {
+        "ordinal": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "page_id": {"type": "string", "minLength": 1},
+        "response_ref": {"type": "string", "minLength": 1},
+        "raw_response_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "disposition": {"const": "Unassessed"},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
