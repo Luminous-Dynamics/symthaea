@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hak.selector-coverage-profile-binding.v1",
+  "title": "HAK Selector Coverage Profile Binding v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "coverage",
+    "canonicalization_profile",
+    "binding_semantics",
+    "binding_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "hak.selector-coverage-profile-binding.v1"},
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "coverage_digest"],
+      "properties": {
+        "schema_version": {"const": "hak.selector-coverage.v1"},
+        "coverage_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "canonicalization_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "artifact_ref", "raw_sha256"],
+      "properties": {
+        "profile_id": {"const": "hak.canonical-json.v1"},
+        "artifact_ref": {
+          "const": "git:Luminous-Dynamics/symthaea@cf440ce4f813bb30a6b1948e5caac96feda10610:docs/architecture/hak/canonical-json-v1.profile.json"
+        },
+        "raw_sha256": {
+          "const": "sha256:f76152db3cce567bb4d24ca46b5ed94d95db698daa8882a6fcdb38828d40e830"
+        }
+      }
+    },
+    "binding_semantics": {
+      "const": {
+        "profile_name_is_not_profile_identity": true,
+        "raw_digest_identifies_exact_profile_bytes": true,
+        "artifact_ref_identifies_profile_provenance": true
+      }
+    },
+    "binding_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
