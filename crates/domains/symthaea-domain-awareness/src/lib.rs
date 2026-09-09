@@ -11,7 +11,9 @@
 
 #![deny(unsafe_code)]
 
+pub mod operational_domain;
 pub mod safety_case;
+pub mod spatial;
 pub use safety_case::domain_awareness_safety_case;
 
 use std::collections::BTreeSet;

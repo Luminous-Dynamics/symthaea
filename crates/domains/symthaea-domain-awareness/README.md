@@ -13,6 +13,7 @@ ObservationEnvelope
     -> IdentityHypothesis[] / BehaviorHypothesis[]
     -> EpistemicState
     -> RiskAssessment
+    -> SpatialSafetyKernel / OperationalDesignDomain
     -> downstream independent safety + authority boundary
 ```
 
@@ -34,6 +35,32 @@ ObservationEnvelope
 7. **Risk is not authority.** `RiskAssessment::review_priority` exists only to
    prioritize protective review; downstream actuation requires an independent
    safety and authorization layer.
+8. **Spatial rules are time-bounded evidence.** Protected, authorized, keep-out,
+   corridor, emergency, and uncertain volumes carry validity windows, authority
+   provenance, and evidence references.
+9. **Missing spatial evidence fails closed.** `SpatialSafetyKernel` returns
+   `Restricted` or `Incomplete`; it never manufactures a safe volume.
+10. **Leaving the ODD can only reduce capability.** Environmental, sensing,
+    navigation, communications, operator, and model-assurance degradation cannot
+    expand the operational envelope.
+
+## Spatial safety
+
+`spatial` provides a pure 4-D (3-D space + time) evaluator. The initial geometry
+is deliberately conservative and simple (`AxisAlignedBounds`), with explicit
+coordinate frames and temporal validity. It emits assessments only and produces
+no actuator commands.
+
+## Operational Design Domain
+
+`operational_domain` defines the evidence required for an operation to remain
+inside its reviewed design envelope. Current conditions include visibility,
+wind, optional sea state, navigation quality, required sensor modalities,
+communications, operator availability, and model assurance.
+
+Model assurance is represented as `Aligned`, `Restricted`, `Unsafe`, or
+`Incomplete`, making it straightforward to bridge the helicopter digital-twin
+divergence monitor later without silently retuning or trusting a diverged model.
 
 ## Intended integrations
 
