@@ -2,15 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Final operational Reach authority with precommitted live-evidence policies.
 //!
-//! Behavioral qualification alone does not define which live physical-health or
-//! estimator configuration may be trusted at runtime. Likewise, a valid signature
-//! is insufficient if operations did not precommit which verifier policy/keyset is
-//! authoritative. This facade freezes both before motor authority can be minted.
+//! Behavioral qualification alone does not define which live physical-health,
+//! estimator, or cognitive-restriction configuration may be trusted at runtime.
+//! Likewise, a valid signature is insufficient if operations did not precommit
+//! which verifier policy/keyset is authoritative. This facade freezes all of
+//! those identities before motor authority can be minted.
 
 use crate::authority_evidence_policy::{
     HumanoidPolicyVerifiedEpistemicAuthorityEvidence,
     HumanoidPolicyVerifiedPhysicalAuthorityEvidence,
 };
+use crate::cognitive_authority_evidence::HumanoidPolicyVerifiedCognitiveAuthorityEvidence;
 use crate::evidence_digest::{HumanoidEvidenceDigest, HumanoidEvidenceHasher};
 use crate::execution_authority_scope::{
     HumanoidExecutionAuthorityScopeIssueFailure, HumanoidScopedSkillAuthorityReceipt,
@@ -55,8 +57,8 @@ pub use crate::reach_manifest_authority::{
     promote_humanoid_reach_manifest_to_operational,
 };
 
-pub const HUMANOID_REACH_RUNTIME_EVIDENCE_POLICY_SCHEMA_VERSION: u32 = 1;
-pub const HUMANOID_REACH_RUNTIME_AUTHORITY_APPROVAL_SCHEMA_VERSION: u32 = 1;
+pub const HUMANOID_REACH_RUNTIME_EVIDENCE_POLICY_SCHEMA_VERSION: u32 = 2;
+pub const HUMANOID_REACH_RUNTIME_AUTHORITY_APPROVAL_SCHEMA_VERSION: u32 = 2;
 
 /// Exact live-evidence and trust-root policy for operational Reach.
 pub struct HumanoidReachRuntimeEvidencePolicy {
@@ -66,6 +68,7 @@ pub struct HumanoidReachRuntimeEvidencePolicy {
     base: HumanoidReachManifestOperationalPolicy,
     physical_evidence_policy_digest: HumanoidEvidenceDigest,
     epistemic_evidence_policy_digest: HumanoidEvidenceDigest,
+    cognitive_evidence_policy_digest: HumanoidEvidenceDigest,
     operator_verifier_digest: HumanoidEvidenceDigest,
     physical_verifier_digest: HumanoidEvidenceDigest,
     epistemic_verifier_digest: HumanoidEvidenceDigest,
@@ -80,6 +83,7 @@ impl std::fmt::Debug for HumanoidReachRuntimeEvidencePolicy {
             .field("base_policy_digest", &self.base.policy_digest())
             .field("physical_evidence_policy_digest", &self.physical_evidence_policy_digest)
             .field("epistemic_evidence_policy_digest", &self.epistemic_evidence_policy_digest)
+            .field("cognitive_evidence_policy_digest", &self.cognitive_evidence_policy_digest)
             .field("policy_digest", &self.policy_digest)
             .finish()
     }
@@ -93,6 +97,7 @@ impl HumanoidReachRuntimeEvidencePolicy {
         base: HumanoidReachManifestOperationalPolicy,
         physical_evidence_policy_digest: HumanoidEvidenceDigest,
         epistemic_evidence_policy_digest: HumanoidEvidenceDigest,
+        cognitive_evidence_policy_digest: HumanoidEvidenceDigest,
         operator_verifier_digest: HumanoidEvidenceDigest,
         physical_verifier_digest: HumanoidEvidenceDigest,
         epistemic_verifier_digest: HumanoidEvidenceDigest,
@@ -105,6 +110,7 @@ impl HumanoidReachRuntimeEvidencePolicy {
             base,
             physical_evidence_policy_digest,
             epistemic_evidence_policy_digest,
+            cognitive_evidence_policy_digest,
             operator_verifier_digest,
             physical_verifier_digest,
             epistemic_verifier_digest,
@@ -138,6 +144,10 @@ impl HumanoidReachRuntimeEvidencePolicy {
         self.epistemic_evidence_policy_digest
     }
 
+    pub const fn cognitive_evidence_policy_digest(&self) -> HumanoidEvidenceDigest {
+        self.cognitive_evidence_policy_digest
+    }
+
     pub const fn operator_verifier_digest(&self) -> HumanoidEvidenceDigest {
         self.operator_verifier_digest
     }
@@ -167,6 +177,7 @@ impl HumanoidReachRuntimeEvidencePolicy {
             && self.base.validate_for(subject)
             && !self.physical_evidence_policy_digest.is_zero()
             && !self.epistemic_evidence_policy_digest.is_zero()
+            && !self.cognitive_evidence_policy_digest.is_zero()
             && !self.operator_verifier_digest.is_zero()
             && !self.physical_verifier_digest.is_zero()
             && !self.epistemic_verifier_digest.is_zero()
@@ -299,10 +310,10 @@ pub enum HumanoidReachRuntimeAuthorityIssueFailure {
     InvalidApproval,
     InvalidPhysicalEvidencePolicy,
     InvalidEpistemicEvidencePolicy,
+    InvalidCognitiveEvidencePolicy,
     InvalidPhysicalVerifier,
     InvalidEpistemicVerifier,
     InvalidCognitiveVerifier,
-    InvalidCognitiveSource,
     PermitSubjectMismatch,
     InvalidTime,
     InvalidRequestedValidity,
@@ -321,7 +332,7 @@ pub fn issue_humanoid_reach_runtime_authority_receipt(
     operator_approval: &HumanoidReachRuntimeAuthorityApproval,
     physical: &HumanoidPolicyVerifiedPhysicalAuthorityEvidence,
     epistemic: &HumanoidPolicyVerifiedEpistemicAuthorityEvidence,
-    cognitive: &HumanoidVerifiedAuthoritySource,
+    cognitive: &HumanoidPolicyVerifiedCognitiveAuthorityEvidence,
     now_s: f64,
     now_unix_millis: u64,
     requested_valid_until_s: f64,
@@ -359,14 +370,16 @@ pub fn issue_humanoid_reach_runtime_authority_receipt(
     {
         return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidEpistemicEvidencePolicy);
     }
+    if !cognitive.validate_for(subject, now_s)
+        || cognitive.evidence_policy_digest() != policy.cognitive_evidence_policy_digest
+    {
+        return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidCognitiveEvidencePolicy);
+    }
     if physical.verifier_digest() != policy.physical_verifier_digest {
         return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidPhysicalVerifier);
     }
     if epistemic.verifier_digest() != policy.epistemic_verifier_digest {
         return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidEpistemicVerifier);
-    }
-    if !cognitive.validate_for(subject, HumanoidVerifiedAuthorityKind::Cognitive, now_s) {
-        return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidCognitiveSource);
     }
     if cognitive.verifier_digest() != policy.cognitive_verifier_digest {
         return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidCognitiveVerifier);
@@ -462,13 +475,14 @@ fn digest_subject(subject: &HumanoidQualificationSubject) -> Option<HumanoidEvid
 }
 
 fn digest_runtime_policy(policy: &HumanoidReachRuntimeEvidencePolicy) -> HumanoidEvidenceDigest {
-    let mut h = HumanoidEvidenceHasher::new("reach.runtime-evidence-policy.v1");
+    let mut h = HumanoidEvidenceHasher::new("reach.runtime-evidence-policy.v2");
     h.u32(policy.schema_version)
         .string(&policy.policy_id)
         .digest(policy.subject_digest)
         .digest(policy.base.policy_digest())
         .digest(policy.physical_evidence_policy_digest)
         .digest(policy.epistemic_evidence_policy_digest)
+        .digest(policy.cognitive_evidence_policy_digest)
         .digest(policy.operator_verifier_digest)
         .digest(policy.physical_verifier_digest)
         .digest(policy.epistemic_verifier_digest)
@@ -477,7 +491,7 @@ fn digest_runtime_policy(policy: &HumanoidReachRuntimeEvidencePolicy) -> Humanoi
 }
 
 fn digest_runtime_approval(approval: &HumanoidReachRuntimeAuthorityApproval) -> HumanoidEvidenceDigest {
-    let mut h = HumanoidEvidenceHasher::new("reach.runtime-authority-approval.v1");
+    let mut h = HumanoidEvidenceHasher::new("reach.runtime-authority-approval.v2");
     h.u32(approval.schema_version)
         .string(&approval.approval_id)
         .digest(approval.subject_digest)
