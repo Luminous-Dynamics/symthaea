@@ -12,6 +12,7 @@ pub mod auth_wire;
 mod compose;
 pub mod contract;
 pub mod distributed;
+pub mod distributed_state;
 pub mod exact_policy;
 pub mod failure_domain;
 pub mod observation;
@@ -36,6 +37,13 @@ pub use distributed::{
     DISTRIBUTED_CHANGE_BUDGET_SCHEMA_V1, DistributedChangeBudgetError, DistributedChangeBudgetId,
     DistributedChangeBudgetV1, MutualExclusionSetV1, RecoveryPathClassV1,
     ValidatedDistributedChangeBudgetV1,
+};
+pub use distributed_state::{
+    DISTRIBUTED_STATE_CONTEXT_SCHEMA_V1, PARTICIPANT_STATE_CLAIM_SCHEMA_V1,
+    AuthenticatedParticipantStateEvidenceId, DistributedStateContextId,
+    DistributedStateContextV1, DistributedStateError, ParticipantOperationalStateV1,
+    ParticipantSetDigest, ParticipantStateClaimId, ParticipantStateClaimV1,
+    ValidatedDistributedStateContextV1,
 };
 pub use exact_policy::{
     ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1,
