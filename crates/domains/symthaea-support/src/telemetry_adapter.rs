@@ -91,12 +91,19 @@ impl ExternalTelemetryRecordV1 {
         if self.unit.as_deref().is_some_and(|v| v.trim().is_empty()) {
             return Err(TelemetryAdapterErrorV1::EmptyField("metric unit"));
         }
-        for key in self
+        if self.status.as_deref().is_some_and(|v| v.trim().is_empty()) {
+            return Err(TelemetryAdapterErrorV1::EmptyField("status"));
+        }
+        if let Some(value) = &self.metric_value {
+            validate_state_value(value, "metric value")?;
+        }
+        for (key, value) in self
             .resource_attributes
-            .keys()
-            .chain(self.attributes.keys())
+            .iter()
+            .chain(self.attributes.iter())
         {
             require_nonempty(key, "telemetry attribute key")?;
+            validate_state_value(value, "telemetry attribute value")?;
         }
         Ok(())
     }
@@ -151,6 +158,20 @@ impl TelemetryObservationAdapterV1 {
     ) -> Result<Self, TelemetryAdapterErrorV1> {
         require_nonempty(&config.source_id, "source id")?;
         require_nonempty(&config.collector, "collector")?;
+        if config
+            .collector_version
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(TelemetryAdapterErrorV1::EmptyField("collector version"));
+        }
+        if config
+            .artifact_digest
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            return Err(TelemetryAdapterErrorV1::EmptyField("artifact digest"));
+        }
         if !config.normalization_confidence.is_finite()
             || !(0.0..=1.0).contains(&config.normalization_confidence)
         {
@@ -388,6 +409,21 @@ fn sanitize_key(key: &str) -> String {
     }
 }
 
+fn validate_state_value(
+    value: &StateValueV1,
+    field: &'static str,
+) -> Result<(), TelemetryAdapterErrorV1> {
+    if let StateValueV1::F64(number) = value {
+        if !number.is_finite() {
+            return Err(TelemetryAdapterErrorV1::NonFiniteValue {
+                field,
+                value: *number,
+            });
+        }
+    }
+    Ok(())
+}
+
 fn require_nonempty(value: &str, field: &'static str) -> Result<(), TelemetryAdapterErrorV1> {
     if value.trim().is_empty() {
         Err(TelemetryAdapterErrorV1::EmptyField(field))
@@ -400,6 +436,7 @@ fn require_nonempty(value: &str, field: &'static str) -> Result<(), TelemetryAda
 pub enum TelemetryAdapterErrorV1 {
     EmptyField(&'static str),
     InvalidConfidence(f32),
+    NonFiniteValue { field: &'static str, value: f64 },
     Serialization(String),
     State(SystemStateGraphError),
 }
@@ -409,7 +446,12 @@ impl fmt::Display for TelemetryAdapterErrorV1 {
         match self {
             Self::EmptyField(field) => write!(f, "empty telemetry adapter field {field}"),
             Self::InvalidConfidence(value) => write!(f, "invalid normalization confidence {value}"),
-            Self::Serialization(message) => write!(f, "telemetry identity serialization failed: {message}"),
+            Self::NonFiniteValue { field, value } => {
+                write!(f, "non-finite telemetry {field}: {value}")
+            }
+            Self::Serialization(message) => {
+                write!(f, "telemetry identity serialization failed: {message}")
+            }
             Self::State(err) => write!(f, "invalid telemetry observation: {err}"),
         }
     }
@@ -601,5 +643,78 @@ mod tests {
         assert!(adapter(Default::default())
             .normalize(EntityId("host:a".into()), &record, 100, None)
             .is_err());
+    }
+
+    #[test]
+    fn non_finite_metric_value_is_rejected_before_identity_serialization() {
+        let mut record = metric_record();
+        record.metric_value = Some(StateValueV1::F64(f64::NAN));
+        let err = adapter(Default::default())
+            .normalize(EntityId("host:a".into()), &record, 100, None)
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            TelemetryAdapterErrorV1::NonFiniteValue {
+                field: "metric value",
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn non_finite_attribute_is_rejected_even_when_retention_denies_it() {
+        let mut record = metric_record();
+        record
+            .attributes
+            .insert("bad.value".into(), StateValueV1::F64(f64::INFINITY));
+        let err = adapter(Default::default())
+            .normalize(EntityId("host:a".into()), &record, 100, None)
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            TelemetryAdapterErrorV1::NonFiniteValue {
+                field: "telemetry attribute value",
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn empty_optional_provenance_metadata_is_rejected() {
+        let err = TelemetryObservationAdapterV1::new(
+            TelemetryObservationAdapterConfigV1 {
+                source_id: "otel:collector-a".into(),
+                collector: "symthaea-otel-adapter-v1".into(),
+                collector_version: Some(" ".into()),
+                artifact_digest: None,
+                max_age_ms: Some(30_000),
+                normalization_confidence: 1.0,
+            },
+            Default::default(),
+        )
+        .err()
+        .expect("empty collector version must fail");
+        assert!(matches!(
+            err,
+            TelemetryAdapterErrorV1::EmptyField("collector version")
+        ));
+
+        let err = TelemetryObservationAdapterV1::new(
+            TelemetryObservationAdapterConfigV1 {
+                source_id: "otel:collector-a".into(),
+                collector: "symthaea-otel-adapter-v1".into(),
+                collector_version: Some("1".into()),
+                artifact_digest: Some(" ".into()),
+                max_age_ms: Some(30_000),
+                normalization_confidence: 1.0,
+            },
+            Default::default(),
+        )
+        .err()
+        .expect("empty artifact digest must fail");
+        assert!(matches!(
+            err,
+            TelemetryAdapterErrorV1::EmptyField("artifact digest")
+        ));
     }
 }
