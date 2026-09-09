@@ -9,17 +9,127 @@
 //! bind + binary→continuous conversion while preserving V1 output exactly.
 //!
 //! This is a performance implementation, not a new physical semantic schema.
-//! `SensorimotorAddressV1::semantic_digest()` remains authoritative for physical
-//! role identity. The codebook's encoding profile is separately named.
+//! `SensorimotorAddressV1::semantic_digest()` remains the exact v1 observation-
+//! contract identity. `physical_role_digest()` is narrower: it identifies what
+//! physical role is measured while deliberately excluding range and bin count.
+//! The codebook's encoding profile is separately named from both identities.
 
 use super::{
-    sensorimotor_role_hv_v1, sensorimotor_value_bin_v1, sensorimotor_value_level_hv_v1,
-    SensorimotorAddressV1, SensorimotorHdcEncodingProfileV1, SensorimotorMeasurementV1,
-    SensorimotorObservationV1,
+    feed_component, feed_frame, feed_quantity, feed_subject, feed_unit, sensorimotor_role_hv_v1,
+    sensorimotor_value_bin_v1, sensorimotor_value_level_hv_v1, SensorimotorAddressV1,
+    SensorimotorHdcEncodingProfileV1, SensorimotorMeasurementV1, SensorimotorObservationV1,
+    SensorimotorValueContractV1,
 };
 use crate::hdc::{BinaryHV, ContinuousHV};
 use std::collections::HashMap;
 use std::fmt;
+
+const SENSORIMOTOR_PHYSICAL_ROLE_DOMAIN_V1: &[u8] =
+    b"symthaea.sensorimotor.physical-role.v1\0";
+
+/// Relationship between two validated numeric ranges for the same physical role.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SensorimotorRangeRelationV1 {
+    Exact,
+    ContainsOther,
+    ContainedByOther,
+    Overlaps,
+    Disjoint,
+}
+
+/// Relationship between two complete sensorimotor address contracts.
+///
+/// `SamePhysicalRole` does not imply representation equivalence under HDC v1:
+/// v1's role/value basis is still derived from the exact contract digest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SensorimotorContractRelationV1 {
+    DifferentPhysicalRole,
+    ExactContract,
+    SamePhysicalRole {
+        range_relation: SensorimotorRangeRelationV1,
+        same_bins: bool,
+    },
+}
+
+impl SensorimotorAddressV1 {
+    /// Version of the narrower physical-role identity contract.
+    pub const PHYSICAL_ROLE_SCHEMA_ID: &'static str = "symthaea.sensorimotor.physical-role.v1";
+
+    /// Exact 256-bit identity of *what physical role is measured*.
+    ///
+    /// Includes subject, physical quantity, reference frame, component, and
+    /// unit. Deliberately excludes numeric range and quantization bins so two
+    /// sensors can identify the same physical role even when their envelopes or
+    /// resolution differ.
+    ///
+    /// This does not replace `semantic_digest()`, whose existing v1 semantics
+    /// remain unchanged as the exact observation/encoding-contract identity.
+    pub fn physical_role_digest(&self) -> Result<[u8; 32], &'static str> {
+        self.validate()?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(SENSORIMOTOR_PHYSICAL_ROLE_DOMAIN_V1);
+        feed_subject(&mut hasher, &self.subject);
+        feed_quantity(&mut hasher, &self.quantity);
+        feed_frame(&mut hasher, &self.frame);
+        feed_component(&mut hasher, self.component);
+        feed_unit(&mut hasher, &self.value_contract.unit);
+        Ok(*hasher.finalize().as_bytes())
+    }
+
+    /// Explicit name for the existing exact v1 contract digest.
+    ///
+    /// Kept as an alias rather than renaming `semantic_digest()` so all existing
+    /// R3.1-R3.5 identities and serialized/evidence expectations remain stable.
+    pub fn contract_digest(&self) -> Result<[u8; 32], &'static str> {
+        self.semantic_digest()
+    }
+
+    pub fn same_physical_role(&self, other: &Self) -> Result<bool, &'static str> {
+        Ok(self.physical_role_digest()? == other.physical_role_digest()?)
+    }
+
+    /// Classify two validated contracts without conflating role identity with
+    /// representational equivalence.
+    pub fn contract_relation(
+        &self,
+        other: &Self,
+    ) -> Result<SensorimotorContractRelationV1, &'static str> {
+        self.validate()?;
+        other.validate()?;
+
+        if self.physical_role_digest()? != other.physical_role_digest()? {
+            return Ok(SensorimotorContractRelationV1::DifferentPhysicalRole);
+        }
+        if self.contract_digest()? == other.contract_digest()? {
+            return Ok(SensorimotorContractRelationV1::ExactContract);
+        }
+
+        Ok(SensorimotorContractRelationV1::SamePhysicalRole {
+            range_relation: sensorimotor_range_relation_v1(
+                &self.value_contract,
+                &other.value_contract,
+            ),
+            same_bins: self.value_contract.bins == other.value_contract.bins,
+        })
+    }
+}
+
+fn sensorimotor_range_relation_v1(
+    left: &SensorimotorValueContractV1,
+    right: &SensorimotorValueContractV1,
+) -> SensorimotorRangeRelationV1 {
+    if left.min == right.min && left.max == right.max {
+        SensorimotorRangeRelationV1::Exact
+    } else if left.min <= right.min && left.max >= right.max {
+        SensorimotorRangeRelationV1::ContainsOther
+    } else if right.min <= left.min && right.max >= left.max {
+        SensorimotorRangeRelationV1::ContainedByOther
+    } else if left.max < right.min || right.max < left.min {
+        SensorimotorRangeRelationV1::Disjoint
+    } else {
+        SensorimotorRangeRelationV1::Overlaps
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PreparedSensorimotorCodebookErrorV1 {
@@ -330,5 +440,106 @@ mod tests {
         };
         let prepared = PreparedSensorimotorCodebookV1::prepare(&[x]).unwrap();
         assert!(prepared.encode_observation(&missing).unwrap().is_none());
+    }
+
+    #[test]
+    fn physical_role_identity_ignores_range_and_resolution() {
+        let base = address(SensorimotorComponentV1::X);
+        let mut wider = base.clone();
+        wider.value_contract.min = -40.0;
+        wider.value_contract.max = 40.0;
+        wider.value_contract.bins = 401;
+
+        assert_eq!(
+            base.physical_role_digest().unwrap(),
+            wider.physical_role_digest().unwrap()
+        );
+        assert_ne!(base.contract_digest().unwrap(), wider.contract_digest().unwrap());
+        assert!(base.same_physical_role(&wider).unwrap());
+        assert_eq!(
+            base.contract_relation(&wider).unwrap(),
+            SensorimotorContractRelationV1::SamePhysicalRole {
+                range_relation: SensorimotorRangeRelationV1::ContainedByOther,
+                same_bins: false,
+            }
+        );
+    }
+
+    #[test]
+    fn contract_relation_distinguishes_exact_overlap_and_disjoint() {
+        let base = address(SensorimotorComponentV1::X);
+        assert_eq!(
+            base.contract_relation(&base).unwrap(),
+            SensorimotorContractRelationV1::ExactContract
+        );
+
+        let mut overlap = base.clone();
+        overlap.value_contract.min = 10.0;
+        overlap.value_contract.max = 30.0;
+        assert_eq!(
+            base.contract_relation(&overlap).unwrap(),
+            SensorimotorContractRelationV1::SamePhysicalRole {
+                range_relation: SensorimotorRangeRelationV1::Overlaps,
+                same_bins: true,
+            }
+        );
+
+        let mut disjoint = base.clone();
+        disjoint.value_contract.min = 21.0;
+        disjoint.value_contract.max = 30.0;
+        assert_eq!(
+            base.contract_relation(&disjoint).unwrap(),
+            SensorimotorContractRelationV1::SamePhysicalRole {
+                range_relation: SensorimotorRangeRelationV1::Disjoint,
+                same_bins: true,
+            }
+        );
+    }
+
+    #[test]
+    fn physical_role_identity_changes_with_component_and_frame() {
+        let x = address(SensorimotorComponentV1::X);
+        let y = address(SensorimotorComponentV1::Y);
+        assert_ne!(x.physical_role_digest().unwrap(), y.physical_role_digest().unwrap());
+
+        let mut world = x.clone();
+        world.frame = SensorimotorFrameV1::World;
+        assert_ne!(
+            x.physical_role_digest().unwrap(),
+            world.physical_role_digest().unwrap()
+        );
+        assert_eq!(
+            x.contract_relation(&world).unwrap(),
+            SensorimotorContractRelationV1::DifferentPhysicalRole
+        );
+    }
+
+    #[test]
+    fn physical_role_identity_includes_unit() {
+        let meter = SensorimotorAddressV1::new(
+            SensorimotorSubjectV1::BodyRoot,
+            SensorimotorQuantityV1::Custom("test_quantity".into()),
+            SensorimotorFrameV1::Body,
+            SensorimotorComponentV1::Scalar,
+            SensorimotorValueContractV1 {
+                unit: SensorimotorUnitV1::Meter,
+                min: 0.0,
+                max: 1.0,
+                bins: 17,
+            },
+        );
+        let mut radian = meter.clone();
+        radian.value_contract.unit = SensorimotorUnitV1::Radian;
+
+        assert_ne!(
+            meter.physical_role_digest().unwrap(),
+            radian.physical_role_digest().unwrap()
+        );
+    }
+
+    #[test]
+    fn contract_digest_alias_preserves_existing_semantic_identity() {
+        let role = address(SensorimotorComponentV1::Z);
+        assert_eq!(role.contract_digest().unwrap(), role.semantic_digest().unwrap());
     }
 }
