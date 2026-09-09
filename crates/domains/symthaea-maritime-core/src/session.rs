@@ -48,9 +48,11 @@ impl AuthenticatedMachineSession {
 
 /// Current trust facts supplied at the point where session-derived authority is used.
 ///
-/// This context is intentionally separate from immutable handshake evidence. Providers should
-/// recompute or refresh it from their authoritative time, enrollment and revocation state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// This context is intentionally separate from immutable handshake evidence and deliberately
+/// does **not** implement serde serialization. Providers must freshly construct it from their
+/// authoritative time, enrollment and revocation state at the point of use; replaying a stale
+/// serialized `revoked = false` context must not be a supported integration path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MachineSessionContext {
     pub now_ms: u64,
     pub authority_epoch: u64,
