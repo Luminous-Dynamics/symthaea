@@ -256,10 +256,14 @@ fn hash_journal(entries: &BTreeMap<ExecutionAttemptId, JournalAttemptEntryV1>) -
                 hasher.update(&[1]);
                 hasher.update(receipt_id.as_bytes());
             }
-            None => hasher.update(&[0]),
+            None => {
+                hasher.update(&[0]);
+            }
         }
         match entry.disposition {
-            JournalAttemptDispositionV1::AwaitingReconciliation => hasher.update(&[0]),
+            JournalAttemptDispositionV1::AwaitingReconciliation => {
+                hasher.update(&[0]);
+            }
             JournalAttemptDispositionV1::Completed(outcome) => {
                 hasher.update(&[1]);
                 hasher.update(&[outcome_tag(outcome)]);
