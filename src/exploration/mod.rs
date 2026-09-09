@@ -10,6 +10,8 @@
 pub mod archive;
 /// Evidence-aware Pareto admission that keeps support separate from reported confidence.
 pub mod evidence_admission;
+/// Transitive root analysis for declared method/data evidence lineages.
+pub mod evidence_ancestry;
 /// Content-addressed binding from evidence-plane runs into generativity evidence.
 pub mod evidence_binding;
 /// Declared method/data lineage diversity over mechanically qualified evidence.
