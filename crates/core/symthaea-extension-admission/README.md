@@ -20,18 +20,28 @@ ExtensionManifest
 An `AdmissionRecord` is immutable, serializable issuance evidence. It binds the
 exact manifest SHA-256, executable/package payload SHA-256, admission-policy
 SHA-256, issuer, optional already-resolved signer identity, trust floor,
-capability grant, permission grant, and admission generation.
+capability/permission grants, policy/admission generation, and signer-trust
+generation.
 
 An `ActiveAdmission` is intentionally non-Serde and non-Clone. It can be created
 only by revalidating an `AdmissionRecord` against:
 
 1. the current exact `ExtensionManifest` value;
-2. the current admission generation; and
-3. live non-revocation state.
+2. the current policy/admission generation;
+3. the current signer-trust generation; and
+4. live non-revocation state.
 
 The active value retains the exact manifest it was activated against, so it
 cannot be replayed against a different manifest that merely reuses the same
 extension ID and version.
+
+The two generations answer different questions:
+
+- **policy/admission generation** — is this still the current authority grant?
+- **trust generation** — is the signer/key authorization snapshot used to issue
+  this grant still current?
+
+Either changing invalidates the point-of-use admission.
 
 ## Attenuation only
 
@@ -50,14 +60,14 @@ containment.
 ## Point-of-use rule
 
 Runtime registries may cache discovery metadata and quality telemetry. They
-should not cache `ActiveAdmission` across revocation/generation checks.
-
-The intended path is:
+should not cache `ActiveAdmission` across policy/trust/revocation checks.
 
 ```text
 serialized AdmissionRecord
         + current manifest
-        + live generation/revocation context
+        + current policy generation
+        + current trust generation
+        + live revocation state
         -> ActiveAdmission
         -> one routing/invocation decision
 ```
