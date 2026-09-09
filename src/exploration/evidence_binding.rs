@@ -4,20 +4,25 @@
 //! Content-addressed binding between Symthaea's evidence plane and generativity.
 //!
 //! This bridge deliberately does **not** turn evidence into action authority. It provides
-//! a deterministic BLAKE3 content identity for one `RunEvidence` envelope after
+//! a deterministic BLAKE3 content identity for one `RunEvidence` record after
 //! independently re-checking the declared/measured integrity contract.
 //!
-//! The digest is a content-integrity identity, not authentication: a BLAKE3 hash proves
-//! that bytes are the same, not who produced them. Signatures, trusted execution, remote
-//! attestation, or Mycelix provenance remain separate layers.
+//! The digest is content integrity, not authentication: it proves that committed content
+//! is unchanged, not who produced it. Signatures, trusted execution, remote attestation,
+//! or Mycelix provenance remain separate layers.
+//!
+//! The evidence plane's existing `config_hash` is explicitly non-cryptographic. The
+//! envelope commits that stored metadata string but does not upgrade it into exact or
+//! security-sensitive configuration identity; `RunEvidence` does not retain the original
+//! configuration object.
 
 #![deny(unsafe_code)]
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use symthaea_evidence_plane::{
-    check_integrity, EvidenceCounters, Expectation, FailedExpectation, RunEvidence,
+    check_integrity, Expectation, FailedExpectation, RunEvidence,
 };
 
 use super::generativity::{GenerativityAssessment, GenerativityEvidence};
@@ -25,21 +30,21 @@ use super::generativity::{GenerativityAssessment, GenerativityEvidence};
 /// Versioned canonicalization contract used before BLAKE3 hashing.
 pub const EVIDENCE_ENVELOPE_SCHEMA: &str = "symthaea-evidence-plane-envelope-v1";
 
-/// A verified, content-addressed summary of one evidence-plane run.
+/// A constructor-qualified, content-addressed summary of one evidence-plane run.
 ///
-/// `config_hash_metadata` is copied from the evidence plane for diagnostics only. The
-/// evidence-plane crate explicitly documents that `config_hash` is non-cryptographic;
-/// this bridge never promotes it into a security identifier. `envelope_digest` is the
-/// content-addressed identity of the complete canonical envelope.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Fields are intentionally private and this type intentionally does not implement
+/// `Deserialize`. Safe callers cannot manufacture a "qualified" envelope from arbitrary
+/// wire data and then call [`Self::bind_qualified`]; construction must pass through
+/// [`Self::from_run`], which recomputes the evidence-plane integrity contract.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct EvidencePlaneEnvelope {
-    pub schema: String,
-    pub run_id: String,
-    pub config_hash_metadata: String,
-    pub integrity_satisfied: bool,
-    pub violation_count: usize,
-    /// Lowercase hex BLAKE3 digest over the canonical envelope.
-    pub envelope_digest: String,
+    schema: String,
+    run_id: String,
+    config_hash_metadata: String,
+    integrity_satisfied: bool,
+    violation_count: usize,
+    /// Lowercase hex BLAKE3 digest over the canonicalized `RunEvidence` record.
+    envelope_digest: String,
 }
 
 impl EvidencePlaneEnvelope {
@@ -87,16 +92,40 @@ impl EvidencePlaneEnvelope {
         })
     }
 
+    pub fn schema(&self) -> &str {
+        &self.schema
+    }
+
+    pub fn run_id(&self) -> &str {
+        &self.run_id
+    }
+
+    /// Non-cryptographic metadata copied from `RunEvidence`; never use as authority.
+    pub fn config_hash_metadata(&self) -> &str {
+        &self.config_hash_metadata
+    }
+
+    pub fn integrity_satisfied(&self) -> bool {
+        self.integrity_satisfied
+    }
+
+    pub fn violation_count(&self) -> usize {
+        self.violation_count
+    }
+
+    pub fn envelope_digest(&self) -> &str {
+        &self.envelope_digest
+    }
+
     /// Attach this envelope as explicit evidence, including failed-integrity runs.
     ///
     /// Failed runs are useful negative evidence, but their kind is visibly different so
-    /// callers cannot accidentally present them as qualified evidence-plane executions.
+    /// consumers can require the qualified kind when that distinction matters.
     pub fn bind_observation(
         &self,
         assessment: &mut GenerativityAssessment,
         note: Option<String>,
-    ) -> Result<(), EvidenceEnvelopeError> {
-        self.validate()?;
+    ) {
         assessment.evidence.push(GenerativityEvidence {
             evidence_id: format!("evidence-plane:{}", self.run_id),
             kind: if self.integrity_satisfied {
@@ -107,7 +136,6 @@ impl EvidencePlaneEnvelope {
             reference: Some(format!("blake3:{}", self.envelope_digest)),
             note,
         });
-        Ok(())
     }
 
     /// Attach only if the declared/measured evidence-plane contract was satisfied.
@@ -116,36 +144,12 @@ impl EvidencePlaneEnvelope {
         assessment: &mut GenerativityAssessment,
         note: Option<String>,
     ) -> Result<(), EvidenceEnvelopeError> {
-        self.validate()?;
         if !self.integrity_satisfied {
             return Err(EvidenceEnvelopeError::IntegrityNotSatisfied {
                 violations: self.violation_count,
             });
         }
-        self.bind_observation(assessment, note)
-    }
-
-    pub fn validate(&self) -> Result<(), EvidenceEnvelopeError> {
-        if self.schema != EVIDENCE_ENVELOPE_SCHEMA {
-            return Err(EvidenceEnvelopeError::UnsupportedSchema(self.schema.clone()));
-        }
-        if self.run_id.trim().is_empty() {
-            return Err(EvidenceEnvelopeError::EmptyRunId);
-        }
-        if self.envelope_digest.len() != 64
-            || !self
-                .envelope_digest
-                .bytes()
-                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
-        {
-            return Err(EvidenceEnvelopeError::InvalidDigest);
-        }
-        if self.integrity_satisfied && self.violation_count != 0 {
-            return Err(EvidenceEnvelopeError::EnvelopeStateMismatch);
-        }
-        if !self.integrity_satisfied && self.violation_count == 0 {
-            return Err(EvidenceEnvelopeError::EnvelopeStateMismatch);
-        }
+        self.bind_observation(assessment, note);
         Ok(())
     }
 }
@@ -153,15 +157,12 @@ impl EvidencePlaneEnvelope {
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvidenceEnvelopeError {
     EmptyRunId,
-    UnsupportedSchema(String),
-    InvalidDigest,
     NonFiniteMeasurement { name: String, value: f64 },
     NonFiniteExpectation { name: String, value: f64 },
     CachedIntegrityMismatch {
         recorded_satisfied: bool,
         recomputed_satisfied: bool,
     },
-    EnvelopeStateMismatch,
     IntegrityNotSatisfied { violations: usize },
 }
 
@@ -169,10 +170,6 @@ impl std::fmt::Display for EvidenceEnvelopeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyRunId => write!(f, "evidence-plane run_id must not be empty"),
-            Self::UnsupportedSchema(schema) => {
-                write!(f, "unsupported evidence-envelope schema: {schema}")
-            }
-            Self::InvalidDigest => write!(f, "evidence-envelope digest must be lowercase BLAKE3 hex"),
             Self::NonFiniteMeasurement { name, value } => {
                 write!(f, "evidence measurement '{name}' must be finite, got {value}")
             }
@@ -185,10 +182,6 @@ impl std::fmt::Display for EvidenceEnvelopeError {
             } => write!(
                 f,
                 "cached RunEvidence integrity disagrees with recomputation: recorded={recorded_satisfied}, recomputed={recomputed_satisfied}"
-            ),
-            Self::EnvelopeStateMismatch => write!(
-                f,
-                "evidence-envelope integrity_satisfied and violation_count disagree"
             ),
             Self::IntegrityNotSatisfied { violations } => write!(
                 f,
@@ -284,8 +277,12 @@ fn put_f64(hasher: &mut blake3::Hasher, value: f64) {
 
 fn put_expectation(hasher: &mut blake3::Hasher, expectation: Expectation) {
     match expectation {
-        Expectation::MustBeZero => hasher.update(&[0]),
-        Expectation::MustBePositive => hasher.update(&[1]),
+        Expectation::MustBeZero => {
+            hasher.update(&[0]);
+        }
+        Expectation::MustBePositive => {
+            hasher.update(&[1]);
+        }
         Expectation::MustExceed(value) => {
             hasher.update(&[2]);
             put_f64(hasher, value);
@@ -304,14 +301,7 @@ mod tests {
     use symthaea_evidence_plane::{EvidenceCounters, Expectation, RunEvidence, RunId};
 
     use super::*;
-    use crate::exploration::generativity::{
-        GenerativityEstimate, GenerativityVector, GENERATIVITY_SCHEMA_VERSION,
-    };
-
-    #[derive(Debug)]
-    struct Config {
-        mode: &'static str,
-    }
+    use crate::exploration::generativity::{GenerativityEstimate, GenerativityVector};
 
     fn run_with_order(reverse: bool) -> RunEvidence {
         let mut declared = BTreeMap::new();
@@ -329,7 +319,7 @@ mod tests {
 
         RunEvidence::new(
             RunId::new("generativity:test:run"),
-            &Config { mode: "active" },
+            &("mode", "active"),
             declared,
             measured,
         )
@@ -356,8 +346,8 @@ mod tests {
     fn digest_is_stable_across_measurement_insertion_order() {
         let a = EvidencePlaneEnvelope::from_run(&run_with_order(false)).unwrap();
         let b = EvidencePlaneEnvelope::from_run(&run_with_order(true)).unwrap();
-        assert_eq!(a.envelope_digest, b.envelope_digest);
-        assert!(a.integrity_satisfied);
+        assert_eq!(a.envelope_digest(), b.envelope_digest());
+        assert!(a.integrity_satisfied());
     }
 
     #[test]
@@ -366,7 +356,7 @@ mod tests {
         let mut changed = run_with_order(false);
         changed.measured.record("mechanism_calls", 5.0);
         let b = EvidencePlaneEnvelope::from_run(&changed).unwrap();
-        assert_ne!(a.envelope_digest, b.envelope_digest);
+        assert_ne!(a.envelope_digest(), b.envelope_digest());
     }
 
     #[test]
@@ -397,13 +387,13 @@ mod tests {
         let measured = EvidenceCounters::new();
         let run = RunEvidence::new(
             RunId::new("failed"),
-            &Config { mode: "active" },
+            &("mode", "active"),
             declared,
             measured,
         );
         let envelope = EvidencePlaneEnvelope::from_run(&run).unwrap();
-        assert!(!envelope.integrity_satisfied);
-        assert_eq!(envelope.violation_count, 1);
+        assert!(!envelope.integrity_satisfied());
+        assert_eq!(envelope.violation_count(), 1);
 
         let mut assessment = GenerativityAssessment::new("subject", "context", vector());
         assert!(matches!(
@@ -412,10 +402,7 @@ mod tests {
         ));
         assert!(assessment.evidence.is_empty());
 
-        envelope
-            .bind_observation(&mut assessment, Some("negative evidence".into()))
-            .unwrap();
-        assert_eq!(assessment.schema, GENERATIVITY_SCHEMA_VERSION);
+        envelope.bind_observation(&mut assessment, Some("negative evidence".into()));
         assert_eq!(assessment.evidence.len(), 1);
         assert_eq!(
             assessment.evidence[0].kind,
@@ -432,10 +419,16 @@ mod tests {
             .unwrap();
         let evidence = assessment.evidence.last().unwrap();
         assert_eq!(evidence.kind, "symthaea-evidence-plane/qualified-v1");
-        assert_eq!(
-            evidence.reference.as_deref(),
-            Some(format!("blake3:{}", envelope.envelope_digest).as_str())
-        );
+        let expected = format!("blake3:{}", envelope.envelope_digest());
+        assert_eq!(evidence.reference.as_deref(), Some(expected.as_str()));
         assert!(assessment.validate().is_ok());
+    }
+
+    #[test]
+    fn envelope_exports_config_hash_only_as_metadata() {
+        let envelope = EvidencePlaneEnvelope::from_run(&run_with_order(false)).unwrap();
+        assert_eq!(envelope.schema(), EVIDENCE_ENVELOPE_SCHEMA);
+        assert_eq!(envelope.run_id(), "generativity:test:run");
+        assert!(!envelope.config_hash_metadata().is_empty());
     }
 }
