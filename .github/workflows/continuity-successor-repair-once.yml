@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 env:
-  EXPECTED_PARENT_SHA: 3b40f4a3d5ba49397f12bcad877862f78135a990
+  EXPECTED_PARENT_SHA: df199f974dd8aa7e9e97dad2abbcfd3001ce835b
   TARGET_BRANCH: ci/continuity-verifier-grant-exact-head-v1
   WORKFLOW_PATH: .github/workflows/continuity-successor-repair-once.yml
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
@@ -103,15 +103,14 @@ jobs:
         run: |
           set -euo pipefail
           git rm "$WORKFLOW_PATH"
-          mapfile -t changed < <(git diff --name-only)
-          test "${#changed[@]}" -eq 2
-          printf '%s\n' "${changed[@]}" | sort > "$RUNNER_TEMP/changed"
+          git add Cargo.lock
+
+          git diff --cached --name-only | sort > "$RUNNER_TEMP/changed"
           printf '%s\n' "$WORKFLOW_PATH" Cargo.lock | sort > "$RUNNER_TEMP/expected"
           cmp "$RUNNER_TEMP/expected" "$RUNNER_TEMP/changed"
           echo 'commit-scope=PASS'
 
           git config user.name 'Luminous Continuity Qualification'
           git config user.email 'actions@users.noreply.github.com'
-          git add Cargo.lock
           git commit -m 'chore(continuity): admit witnessed minimal workspace lock node'
           git push origin "HEAD:$TARGET_BRANCH"
