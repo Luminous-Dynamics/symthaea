@@ -85,6 +85,9 @@ impl MycelixMaritimeEvidenceV1 {
         if self.platform_id != next.platform_id {
             return Err("platform changed");
         }
+        if next.generation < self.generation {
+            return Err("generation regression");
+        }
         if next.sequence != self.sequence.checked_add(1).ok_or("sequence overflow")? {
             return Err("sequence discontinuity");
         }
@@ -137,7 +140,14 @@ fn mycelix_v1_chained_fixture_independently_binds_exact_root() {
     assert_eq!(root.verify_successor(&chained), Ok(()));
     assert_eq!(chained.content_digest(), CHAINED_DIGEST);
 
-    let mut tampered = root;
+    let mut tampered = root.clone();
     tampered.payload_json = r#"{"severity":"unsafe"}"#.into();
     assert!(tampered.verify_successor(&chained).is_err());
+
+    // Generation is a monotonic lineage marker, independent of observation time.
+    // A successor may stay in generation 7 or advance, but never claim generation 6.
+    let mut regressed = chained;
+    regressed.generation = root.generation - 1;
+    regressed.previous_event_digest = Some(root.content_digest());
+    assert!(root.verify_successor(&regressed).is_err());
 }
