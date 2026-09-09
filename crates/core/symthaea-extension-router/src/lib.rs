@@ -12,7 +12,7 @@
 //!
 //! Routing deliberately separates **authorization** from **quality**:
 //!
-//! - a current [`ActiveAdmission`] is mandatory;
+//! - a current [`ActiveAdmission`] for the exact registered manifest is mandatory;
 //! - admission capability and minimum trust are hard gates;
 //! - trust above the requested minimum does not improve provider quality;
 //! - eligible providers are ranked by readiness, evidence, measured reliability,
@@ -144,6 +144,7 @@ pub struct RoutingRequest {
 pub enum RejectionReason {
     MissingAdmission,
     DuplicateAdmission,
+    AdmissionManifestMismatch,
     CapabilityNotAdmitted,
     TrustBelowMinimum,
     MissingObservation,
@@ -327,6 +328,9 @@ fn assess_candidate<'a>(
     let observation = observation_matches[0];
 
     let mut reasons = Vec::new();
+    if !admission.matches_manifest(manifest) {
+        reasons.push(RejectionReason::AdmissionManifestMismatch);
+    }
     if !admission.allows_capability(&request.capability) {
         reasons.push(RejectionReason::CapabilityNotAdmitted);
     }
@@ -574,7 +578,7 @@ mod tests {
     fn capability_admission_is_narrower_than_manifest_claim() {
         let capability = "science.orbits.propagate";
         let other = CapabilityId::new("science.orbits.inspect");
-        let manifest = manifest(
+        let mut manifest = manifest(
             "org.example.orbit",
             capability,
             EffectClass::Pure,
@@ -582,6 +586,11 @@ mod tests {
             1024,
             10_000,
         );
+        manifest.provides.push(CapabilityDescriptor {
+            id: other.clone(),
+            description: "inspect an orbit".into(),
+            effect: EffectClass::ReadOnly,
+        });
         let active = admission(&manifest, TrustLevel::Trusted, vec![other], 1, 10);
         let mut registry = ExtensionRegistry::new();
         registry.register(manifest).unwrap();
@@ -600,6 +609,46 @@ mod tests {
         assert!(assessments[0]
             .rejection_reasons
             .contains(&RejectionReason::CapabilityNotAdmitted));
+    }
+
+    #[test]
+    fn exact_manifest_binding_rejects_same_id_version_substitution() {
+        let capability = "science.example.compute";
+        let admitted_manifest = manifest(
+            "org.example.compute",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
+        let active = admission(
+            &admitted_manifest,
+            TrustLevel::Trusted,
+            vec![CapabilityId::new(capability)],
+            1,
+            15,
+        );
+        let mut substituted = admitted_manifest.clone();
+        substituted.description = "substituted manifest".into();
+
+        let mut registry = ExtensionRegistry::new();
+        registry.register(substituted).unwrap();
+        let observations = vec![observation("org.example.compute", 5, 10_000, Some(1))];
+
+        let error = ExtensionRouter::route(
+            &registry,
+            &request(capability),
+            &[active],
+            &observations,
+        )
+        .unwrap_err();
+        let RoutingError::NoEligibleProvider { assessments, .. } = error else {
+            panic!("expected no eligible provider");
+        };
+        assert!(assessments[0]
+            .rejection_reasons
+            .contains(&RejectionReason::AdmissionManifestMismatch));
     }
 
     #[test]
@@ -702,12 +751,19 @@ mod tests {
             1024,
             10_000,
         );
-        let active = admission(
+        let first = admission(
             &manifest,
             TrustLevel::Trusted,
             vec![CapabilityId::new(capability)],
             1,
             50,
+        );
+        let second = admission(
+            &manifest,
+            TrustLevel::Trusted,
+            vec![CapabilityId::new(capability)],
+            1,
+            51,
         );
         let mut registry = ExtensionRegistry::new();
         registry.register(manifest).unwrap();
@@ -716,7 +772,7 @@ mod tests {
         let error = ExtensionRouter::route(
             &registry,
             &request(capability),
-            &[active.clone(), active],
+            &[first, second],
             &observations,
         )
         .unwrap_err();
