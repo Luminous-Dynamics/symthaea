@@ -1,0 +1,27 @@
+{
+  "schema": "symthaea.integration-train.v1",
+  "base_subject": "7350ee0a5cab0ccaa48b6691e8d52875143b102b",
+  "ordered_tranches": [
+    {
+      "commit_sha": "60f45c5efcca01c8f46d4509831223a197d4e215",
+      "predecessor_sha": "7350ee0a5cab0ccaa48b6691e8d52875143b102b",
+      "theorem_id": "RES-QUAL-FMT-1",
+      "claim": "apply the exact rustfmt repair surfaced by Resource Stack Qualification run 3",
+      "changed_files": [
+        "crates/domains/symthaea-resource-accounting/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "pr:1058",
+        "run:34215218821"
+      ],
+      "non_claims": [
+        "does not establish compilation, Clippy, tests, or doctests",
+        "does not establish execution authority",
+        "does not establish hosted qualification"
+      ],
+      "origin_pr": 1058
+    }
+  ],
+  "cumulative_tip_sha": "60f45c5efcca01c8f46d4509831223a197d4e215",
+  "train_id": "sha256:5d88a1a7ae3ddcbe83230783a850c6071274f57ade03c1191a55aec6598fe673"
+}
