@@ -83,8 +83,16 @@ pub struct HumanoidGraspContactObservation {
     site: HumanoidContactSite,
     in_contact: bool,
     contact_point_world_m: [f64; 3],
+    /// Unit surface normal pointing outward from the object toward the hand.
     outward_normal_world_unit: [f64; 3],
+    /// Canonical force exerted by the hand **on the object**, expressed in world
+    /// axes at the contact point. Raw solver/sensor conventions must be converted
+    /// before constructing this observation. Compression therefore points opposite
+    /// the outward normal and produces positive `normal_force_n()`.
     force_world_n: [f64; 3],
+    /// Canonical torque exerted by the hand **on the object**, expressed in world
+    /// axes about the contact point. Wrist-sensor torques must be translated to the
+    /// contact point before entering this evidence boundary.
     torque_world_nm: [f64; 3],
     /// Velocity of the hand contact point relative to the object at the contact
     /// point. Positive projection along the outward normal means separation.
@@ -214,8 +222,6 @@ impl HumanoidGraspContactObservation {
         now_s - self.timestamp_s
     }
 
-    /// Positive means the hand is pushing into the object, opposite the object's
-    /// outward surface normal.
     pub fn normal_force_n(&self) -> f64 {
         -dot3(self.force_world_n, self.outward_normal_world_unit)
     }
@@ -226,6 +232,10 @@ impl HumanoidGraspContactObservation {
             self.force_world_n,
             scale3(self.outward_normal_world_unit, signed_outward),
         ))
+    }
+
+    pub fn contact_torque_nm(&self) -> f64 {
+        norm3(self.torque_world_nm)
     }
 
     pub fn separation_speed_mps(&self) -> f64 {
@@ -267,6 +277,8 @@ pub struct HumanoidGraspContactPolicy {
     require_measured_source: bool,
     minimum_normal_force_n: f64,
     maximum_normal_force_n: f64,
+    maximum_tangential_force_n: f64,
+    maximum_contact_torque_nm: f64,
     maximum_tangential_speed_mps: f64,
     maximum_separation_speed_mps: f64,
     maximum_closing_speed_mps: f64,
@@ -284,6 +296,8 @@ impl HumanoidGraspContactPolicy {
         require_measured_source: bool,
         minimum_normal_force_n: f64,
         maximum_normal_force_n: f64,
+        maximum_tangential_force_n: f64,
+        maximum_contact_torque_nm: f64,
         maximum_tangential_speed_mps: f64,
         maximum_separation_speed_mps: f64,
         maximum_closing_speed_mps: f64,
@@ -299,6 +313,10 @@ impl HumanoidGraspContactPolicy {
             || minimum_normal_force_n < 0.0
             || !maximum_normal_force_n.is_finite()
             || maximum_normal_force_n <= minimum_normal_force_n
+            || !maximum_tangential_force_n.is_finite()
+            || maximum_tangential_force_n < 0.0
+            || !maximum_contact_torque_nm.is_finite()
+            || maximum_contact_torque_nm < 0.0
             || !maximum_tangential_speed_mps.is_finite()
             || maximum_tangential_speed_mps < 0.0
             || !maximum_separation_speed_mps.is_finite()
@@ -318,6 +336,8 @@ impl HumanoidGraspContactPolicy {
             require_measured_source,
             minimum_normal_force_n,
             maximum_normal_force_n,
+            maximum_tangential_force_n,
+            maximum_contact_torque_nm,
             maximum_tangential_speed_mps,
             maximum_separation_speed_mps,
             maximum_closing_speed_mps,
@@ -339,6 +359,10 @@ impl HumanoidGraspContactPolicy {
             && self.minimum_normal_force_n >= 0.0
             && self.maximum_normal_force_n.is_finite()
             && self.maximum_normal_force_n > self.minimum_normal_force_n
+            && self.maximum_tangential_force_n.is_finite()
+            && self.maximum_tangential_force_n >= 0.0
+            && self.maximum_contact_torque_nm.is_finite()
+            && self.maximum_contact_torque_nm >= 0.0
             && self.maximum_tangential_speed_mps.is_finite()
             && self.maximum_tangential_speed_mps >= 0.0
             && self.maximum_separation_speed_mps.is_finite()
@@ -363,6 +387,8 @@ pub enum HumanoidGraspContactFailureKind {
     SourceNotMeasured,
     NormalForceTooLow,
     NormalForceTooHigh,
+    TangentialForceTooHigh,
+    ContactTorqueTooHigh,
     TangentialSlipTooFast,
     SeparationTooFast,
     ClosingTooFast,
@@ -388,6 +414,7 @@ pub struct HumanoidGraspContactAssessment {
     age_s: f64,
     normal_force_n: f64,
     tangential_force_n: f64,
+    contact_torque_nm: f64,
     tangential_speed_mps: f64,
     separation_speed_mps: f64,
     closing_speed_mps: f64,
@@ -407,6 +434,7 @@ impl HumanoidGraspContactAssessment {
     pub const fn policy_digest(&self) -> HumanoidEvidenceDigest { self.policy_digest }
     pub const fn normal_force_n(&self) -> f64 { self.normal_force_n }
     pub const fn tangential_force_n(&self) -> f64 { self.tangential_force_n }
+    pub const fn contact_torque_nm(&self) -> f64 { self.contact_torque_nm }
     pub const fn tangential_speed_mps(&self) -> f64 { self.tangential_speed_mps }
     pub fn failures(&self) -> &[HumanoidGraspContactFailureKind] { &self.failures }
     pub const fn accepted(&self) -> bool { self.accepted }
@@ -452,6 +480,7 @@ pub fn assess_humanoid_grasp_contact(
     let age_s = observation.age_s(now_s);
     let normal_force_n = observation.normal_force_n();
     let tangential_force_n = observation.tangential_force_n();
+    let contact_torque_nm = observation.contact_torque_nm();
     let tangential_speed_mps = observation.tangential_speed_mps();
     let separation_speed_mps = observation.separation_speed_mps();
     let closing_speed_mps = observation.closing_speed_mps();
@@ -481,6 +510,12 @@ pub fn assess_humanoid_grasp_contact(
     if normal_force_n > policy.maximum_normal_force_n {
         failures.push(HumanoidGraspContactFailureKind::NormalForceTooHigh);
     }
+    if tangential_force_n > policy.maximum_tangential_force_n {
+        failures.push(HumanoidGraspContactFailureKind::TangentialForceTooHigh);
+    }
+    if contact_torque_nm > policy.maximum_contact_torque_nm {
+        failures.push(HumanoidGraspContactFailureKind::ContactTorqueTooHigh);
+    }
     if tangential_speed_mps > policy.maximum_tangential_speed_mps {
         failures.push(HumanoidGraspContactFailureKind::TangentialSlipTooFast);
     }
@@ -503,6 +538,7 @@ pub fn assess_humanoid_grasp_contact(
         age_s,
         normal_force_n,
         tangential_force_n,
+        contact_torque_nm,
         tangential_speed_mps,
         separation_speed_mps,
         closing_speed_mps,
@@ -571,6 +607,8 @@ fn digest_policy(value: &HumanoidGraspContactPolicy) -> HumanoidEvidenceDigest {
         .bool(value.require_measured_source)
         .f64(value.minimum_normal_force_n)
         .f64(value.maximum_normal_force_n)
+        .f64(value.maximum_tangential_force_n)
+        .f64(value.maximum_contact_torque_nm)
         .f64(value.maximum_tangential_speed_mps)
         .f64(value.maximum_separation_speed_mps)
         .f64(value.maximum_closing_speed_mps);
@@ -589,6 +627,7 @@ fn digest_assessment(value: &HumanoidGraspContactAssessment) -> HumanoidEvidence
         .f64(value.age_s)
         .f64(value.normal_force_n)
         .f64(value.tangential_force_n)
+        .f64(value.contact_torque_nm)
         .f64(value.tangential_speed_mps)
         .f64(value.separation_speed_mps)
         .f64(value.closing_speed_mps)
@@ -653,9 +692,11 @@ fn failure_id(failure: HumanoidGraspContactFailureKind) -> u64 {
         HumanoidGraspContactFailureKind::SourceNotMeasured => 6,
         HumanoidGraspContactFailureKind::NormalForceTooLow => 7,
         HumanoidGraspContactFailureKind::NormalForceTooHigh => 8,
-        HumanoidGraspContactFailureKind::TangentialSlipTooFast => 9,
-        HumanoidGraspContactFailureKind::SeparationTooFast => 10,
-        HumanoidGraspContactFailureKind::ClosingTooFast => 11,
+        HumanoidGraspContactFailureKind::TangentialForceTooHigh => 9,
+        HumanoidGraspContactFailureKind::ContactTorqueTooHigh => 10,
+        HumanoidGraspContactFailureKind::TangentialSlipTooFast => 11,
+        HumanoidGraspContactFailureKind::SeparationTooFast => 12,
+        HumanoidGraspContactFailureKind::ClosingTooFast => 13,
     }
 }
 
@@ -696,7 +737,7 @@ mod tests {
         HumanoidGraspContactPolicy::new(
             &subject(), HandSide::Right, 0.05, 0.8,
             HumanoidManipulationContactSource::SolverWrench.quality_rank(),
-            true, 2.0, 50.0, 0.01, 0.005, 0.02,
+            true, 2.0, 50.0, 15.0, 2.0, 0.01, 0.005, 0.02,
         ).unwrap()
     }
 
@@ -726,6 +767,32 @@ mod tests {
         let assessment = assess_humanoid_grasp_contact(&subject(), &o, &p, 1.01).unwrap();
         assert!(!assessment.accepted());
         assert!(assessment.failures().contains(&HumanoidGraspContactFailureKind::TangentialSlipTooFast));
+    }
+
+    #[test]
+    fn excessive_tangential_force_is_rejected() {
+        let o = HumanoidGraspContactObservation::new(
+            &subject(), "object-17", HumanoidEvidenceDigest::from_bytes([7; 32]),
+            HandSide::Right, HumanoidContactSite::RightHand, true,
+            [0.4, -0.2, 1.1], [1.0, 0.0, 0.0], [-12.0, 20.0, 0.0], [0.0; 3], [0.0; 3],
+            0.95, HumanoidManipulationContactSource::ForceTorqueSensor, 1.0,
+        ).unwrap();
+        let p = policy();
+        let assessment = assess_humanoid_grasp_contact(&subject(), &o, &p, 1.01).unwrap();
+        assert!(assessment.failures().contains(&HumanoidGraspContactFailureKind::TangentialForceTooHigh));
+    }
+
+    #[test]
+    fn excessive_contact_torque_is_rejected() {
+        let o = HumanoidGraspContactObservation::new(
+            &subject(), "object-17", HumanoidEvidenceDigest::from_bytes([7; 32]),
+            HandSide::Right, HumanoidContactSite::RightHand, true,
+            [0.4, -0.2, 1.1], [1.0, 0.0, 0.0], [-12.0, 0.0, 0.0], [0.0, 0.0, 3.0], [0.0; 3],
+            0.95, HumanoidManipulationContactSource::ForceTorqueSensor, 1.0,
+        ).unwrap();
+        let p = policy();
+        let assessment = assess_humanoid_grasp_contact(&subject(), &o, &p, 1.01).unwrap();
+        assert!(assessment.failures().contains(&HumanoidGraspContactFailureKind::ContactTorqueTooHigh));
     }
 
     #[test]
