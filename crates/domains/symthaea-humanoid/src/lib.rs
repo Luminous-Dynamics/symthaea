@@ -76,6 +76,7 @@ pub mod typed_actuation_capability;
 pub mod types;
 pub mod vision_terrain;
 pub mod whole_body;
+pub mod whole_body_intent;
 pub use actuation::*;
 pub use actuation_capability::*;
 pub use actuator_controllability::*;
@@ -138,6 +139,7 @@ pub use typed_actuation_capability::*;
 pub use types::*;
 pub use vision_terrain::*;
 pub use whole_body::*;
+pub use whole_body_intent::*;
 
 pub use crate::control::GaitControlProfile;
 pub use control::{
