@@ -2,8 +2,12 @@
 
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("../fixtures/mycelix-maritime-evidence-v1-root.json");
-const EXPECTED_DIGEST: &str = "2ec31adc7f4ca9200d6c3464171ca639b3075da93e4118bfd7b4688232dfdbc4";
+const ROOT_FIXTURE: &str = include_str!("../fixtures/mycelix-maritime-evidence-v1-root.json");
+const CHAINED_FIXTURE: &str =
+    include_str!("../fixtures/mycelix-maritime-evidence-v1-chained.json");
+const ROOT_DIGEST: &str = "2ec31adc7f4ca9200d6c3464171ca639b3075da93e4118bfd7b4688232dfdbc4";
+const CHAINED_DIGEST: &str =
+    "95b18b682028d2a463633f32ff4aecbdf415d988b83de60f22f5526166d6bdfe";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -76,6 +80,20 @@ impl MycelixMaritimeEvidenceV1 {
         }
         hasher.finalize().to_hex().to_string()
     }
+
+    fn verify_successor(&self, next: &Self) -> Result<(), &'static str> {
+        if self.platform_id != next.platform_id {
+            return Err("platform changed");
+        }
+        if next.sequence != self.sequence.checked_add(1).ok_or("sequence overflow")? {
+            return Err("sequence discontinuity");
+        }
+        let digest = self.content_digest();
+        if next.previous_event_digest.as_deref() != Some(digest.as_str()) {
+            return Err("predecessor binding mismatch");
+        }
+        Ok(())
+    }
 }
 
 fn hash_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
@@ -84,8 +102,8 @@ fn hash_bytes(hasher: &mut blake3::Hasher, bytes: &[u8]) {
 }
 
 #[test]
-fn mycelix_v1_fixture_matches_cross_repo_wire_contract() {
-    let envelope: MycelixMaritimeEvidenceV1 = serde_json::from_str(FIXTURE).unwrap();
+fn mycelix_v1_root_fixture_matches_cross_repo_wire_contract() {
+    let envelope: MycelixMaritimeEvidenceV1 = serde_json::from_str(ROOT_FIXTURE).unwrap();
 
     assert_eq!(envelope.schema_version, 1);
     assert_eq!(envelope.platform_id, "auv-01");
@@ -102,5 +120,24 @@ fn mycelix_v1_fixture_matches_cross_repo_wire_contract() {
         vec!["mycelix-position:measurement:fixture-001".to_string()]
     );
     assert!(envelope.previous_event_digest.is_none());
-    assert_eq!(envelope.content_digest(), EXPECTED_DIGEST);
+    assert_eq!(envelope.content_digest(), ROOT_DIGEST);
+}
+
+#[test]
+fn mycelix_v1_chained_fixture_independently_binds_exact_root() {
+    let root: MycelixMaritimeEvidenceV1 = serde_json::from_str(ROOT_FIXTURE).unwrap();
+    let chained: MycelixMaritimeEvidenceV1 = serde_json::from_str(CHAINED_FIXTURE).unwrap();
+
+    assert_eq!(chained.sequence, 43);
+    assert_eq!(chained.kind, MaritimeEvidenceKindV1::CommunicationsState);
+    assert_eq!(
+        chained.previous_event_digest.as_deref(),
+        Some(ROOT_DIGEST)
+    );
+    assert_eq!(root.verify_successor(&chained), Ok(()));
+    assert_eq!(chained.content_digest(), CHAINED_DIGEST);
+
+    let mut tampered = root;
+    tampered.payload_json = r#"{"severity":"unsafe"}"#.into();
+    assert!(tampered.verify_successor(&chained).is_err());
 }
