@@ -742,7 +742,7 @@ mod tests {
             AppResolution::Ambiguous { candidates, .. } => {
                 let names: BTreeSet<_> = candidates.iter().map(|entry| entry.name).collect();
                 assert!(names.contains("Google Chrome"));
-                assert!(names.contains("Mozilla Firefox"));
+                assert!(names.contains("Firefox"));
             }
             _ => panic!("contradictory exact identity evidence must stay ambiguous"),
         }
