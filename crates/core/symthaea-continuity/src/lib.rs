@@ -10,6 +10,7 @@
 
 pub mod auth_wire;
 pub mod capability;
+pub mod capability_graph;
 mod compose;
 pub mod contract;
 pub mod exact_policy;
@@ -26,6 +27,10 @@ pub use auth_wire::{
 pub use capability::{
     CAPABILITY_DEFINITION_SCHEMA_V1, CapabilityDefinitionId, CapabilityDefinitionV1,
     CapabilityError, CapabilityId, CapabilityRequirementV1,
+};
+pub use capability_graph::{
+    CAPABILITY_GRAPH_SNAPSHOT_SCHEMA_V1, CapabilityGraphError, CapabilityGraphSnapshotId,
+    CapabilityGraphSnapshotV1, ValidatedCapabilityGraphV1,
 };
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
