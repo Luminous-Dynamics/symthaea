@@ -24,19 +24,25 @@ const AUTH_DOMAIN: &[u8] =
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerifierProfileId([u8; 32]);
 impl VerifierProfileId {
-    pub fn as_bytes(&self) -> &[u8; 32] { &self.0 }
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerificationEvidenceClaimId([u8; 32]);
 impl VerificationEvidenceClaimId {
-    pub fn as_bytes(&self) -> &[u8; 32] { &self.0 }
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct AuthenticatedVerificationEvidenceId([u8; 32]);
 impl AuthenticatedVerificationEvidenceId {
-    pub fn as_bytes(&self) -> &[u8; 32] { &self.0 }
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
 }
 
 /// Provisioned verifier identity and the strongest evidence class it may issue.
@@ -61,24 +67,58 @@ impl VerifierProfileV1 {
         evidence_class: EvidenceClass,
     ) -> Result<Self, VerificationAdmissionError> {
         let profile_name = checked_text("profile_name", profile_name.into())?;
-        if root_digest == [0; 32] { return Err(VerificationAdmissionError::ZeroVerifierRootDigest); }
-        if root_epoch == 0 { return Err(VerificationAdmissionError::ZeroVerifierRootEpoch); }
-        let profile_id = VerifierProfileId(hash_profile(&profile_name, root_digest, root_epoch, evidence_class));
-        Ok(Self { profile_name, root_digest, root_epoch, evidence_class, profile_id })
+        if root_digest == [0; 32] {
+            return Err(VerificationAdmissionError::ZeroVerifierRootDigest);
+        }
+        if root_epoch == 0 {
+            return Err(VerificationAdmissionError::ZeroVerifierRootEpoch);
+        }
+        let profile_id = VerifierProfileId(hash_profile(
+            &profile_name,
+            root_digest,
+            root_epoch,
+            evidence_class,
+        ));
+        Ok(Self {
+            profile_name,
+            root_digest,
+            root_epoch,
+            evidence_class,
+            profile_id,
+        })
     }
-    pub fn id(&self) -> VerifierProfileId { self.profile_id }
-    pub fn profile_name(&self) -> &str { &self.profile_name }
-    pub fn root_digest(&self) -> [u8; 32] { self.root_digest }
-    pub fn root_epoch(&self) -> u64 { self.root_epoch }
-    pub fn evidence_class(&self) -> EvidenceClass { self.evidence_class }
+    pub fn id(&self) -> VerifierProfileId {
+        self.profile_id
+    }
+    pub fn profile_name(&self) -> &str {
+        &self.profile_name
+    }
+    pub fn root_digest(&self) -> [u8; 32] {
+        self.root_digest
+    }
+    pub fn root_epoch(&self) -> u64 {
+        self.root_epoch
+    }
+    pub fn evidence_class(&self) -> EvidenceClass {
+        self.evidence_class
+    }
     pub fn validate(&self) -> Result<(), VerificationAdmissionError> {
         checked_text("profile_name", self.profile_name.clone())?;
-        if self.root_digest == [0; 32] { return Err(VerificationAdmissionError::ZeroVerifierRootDigest); }
-        if self.root_epoch == 0 { return Err(VerificationAdmissionError::ZeroVerifierRootEpoch); }
+        if self.root_digest == [0; 32] {
+            return Err(VerificationAdmissionError::ZeroVerifierRootDigest);
+        }
+        if self.root_epoch == 0 {
+            return Err(VerificationAdmissionError::ZeroVerifierRootEpoch);
+        }
         let expected = VerifierProfileId(hash_profile(
-            &self.profile_name, self.root_digest, self.root_epoch, self.evidence_class,
+            &self.profile_name,
+            self.root_digest,
+            self.root_epoch,
+            self.evidence_class,
         ));
-        if expected != self.profile_id { return Err(VerificationAdmissionError::VerifierProfileIdentityMismatch); }
+        if expected != self.profile_id {
+            return Err(VerificationAdmissionError::VerifierProfileIdentityMismatch);
+        }
         Ok(())
     }
 }
@@ -130,37 +170,87 @@ impl VerificationEvidenceClaimV1 {
         outcome: VerificationOutcomeV1,
         raw_evidence_digest: [u8; 32],
     ) -> Result<Self, VerificationAdmissionError> {
-        if transaction_challenge == [0; 32] { return Err(VerificationAdmissionError::ZeroTransactionChallenge); }
-        if observed_at_unix_ms == 0 { return Err(VerificationAdmissionError::ZeroObservationTime); }
-        if raw_evidence_digest == [0; 32] { return Err(VerificationAdmissionError::ZeroRawEvidenceDigest); }
+        if transaction_challenge == [0; 32] {
+            return Err(VerificationAdmissionError::ZeroTransactionChallenge);
+        }
+        if observed_at_unix_ms == 0 {
+            return Err(VerificationAdmissionError::ZeroObservationTime);
+        }
+        if raw_evidence_digest == [0; 32] {
+            return Err(VerificationAdmissionError::ZeroRawEvidenceDigest);
+        }
         let claim_id = VerificationEvidenceClaimId(hash_claim(
-            contract_id, target_realization_id, requirement_id, verifier_profile_id,
-            transaction_challenge, observed_at_unix_ms, outcome, raw_evidence_digest,
+            contract_id,
+            target_realization_id,
+            requirement_id,
+            verifier_profile_id,
+            transaction_challenge,
+            observed_at_unix_ms,
+            outcome,
+            raw_evidence_digest,
         ));
         Ok(Self {
-            contract_id, target_realization_id, requirement_id, verifier_profile_id,
-            transaction_challenge, observed_at_unix_ms, outcome, raw_evidence_digest, claim_id,
+            contract_id,
+            target_realization_id,
+            requirement_id,
+            verifier_profile_id,
+            transaction_challenge,
+            observed_at_unix_ms,
+            outcome,
+            raw_evidence_digest,
+            claim_id,
         })
     }
-    pub fn id(&self) -> VerificationEvidenceClaimId { self.claim_id }
-    pub fn contract_id(&self) -> ContinuityContractId { self.contract_id }
-    pub fn target_realization_id(&self) -> TargetRealizationId { self.target_realization_id }
-    pub fn requirement_id(&self) -> ContinuityRequirementId { self.requirement_id }
-    pub fn verifier_profile_id(&self) -> VerifierProfileId { self.verifier_profile_id }
-    pub fn transaction_challenge(&self) -> [u8; 32] { self.transaction_challenge }
-    pub fn observed_at_unix_ms(&self) -> u64 { self.observed_at_unix_ms }
-    pub fn outcome(&self) -> VerificationOutcomeV1 { self.outcome }
-    pub fn raw_evidence_digest(&self) -> [u8; 32] { self.raw_evidence_digest }
+    pub fn id(&self) -> VerificationEvidenceClaimId {
+        self.claim_id
+    }
+    pub fn contract_id(&self) -> ContinuityContractId {
+        self.contract_id
+    }
+    pub fn target_realization_id(&self) -> TargetRealizationId {
+        self.target_realization_id
+    }
+    pub fn requirement_id(&self) -> ContinuityRequirementId {
+        self.requirement_id
+    }
+    pub fn verifier_profile_id(&self) -> VerifierProfileId {
+        self.verifier_profile_id
+    }
+    pub fn transaction_challenge(&self) -> [u8; 32] {
+        self.transaction_challenge
+    }
+    pub fn observed_at_unix_ms(&self) -> u64 {
+        self.observed_at_unix_ms
+    }
+    pub fn outcome(&self) -> VerificationOutcomeV1 {
+        self.outcome
+    }
+    pub fn raw_evidence_digest(&self) -> [u8; 32] {
+        self.raw_evidence_digest
+    }
     pub fn validate(&self) -> Result<(), VerificationAdmissionError> {
-        if self.transaction_challenge == [0; 32] { return Err(VerificationAdmissionError::ZeroTransactionChallenge); }
-        if self.observed_at_unix_ms == 0 { return Err(VerificationAdmissionError::ZeroObservationTime); }
-        if self.raw_evidence_digest == [0; 32] { return Err(VerificationAdmissionError::ZeroRawEvidenceDigest); }
+        if self.transaction_challenge == [0; 32] {
+            return Err(VerificationAdmissionError::ZeroTransactionChallenge);
+        }
+        if self.observed_at_unix_ms == 0 {
+            return Err(VerificationAdmissionError::ZeroObservationTime);
+        }
+        if self.raw_evidence_digest == [0; 32] {
+            return Err(VerificationAdmissionError::ZeroRawEvidenceDigest);
+        }
         let expected = VerificationEvidenceClaimId(hash_claim(
-            self.contract_id, self.target_realization_id, self.requirement_id,
-            self.verifier_profile_id, self.transaction_challenge, self.observed_at_unix_ms,
-            self.outcome, self.raw_evidence_digest,
+            self.contract_id,
+            self.target_realization_id,
+            self.requirement_id,
+            self.verifier_profile_id,
+            self.transaction_challenge,
+            self.observed_at_unix_ms,
+            self.outcome,
+            self.raw_evidence_digest,
         ));
-        if expected != self.claim_id { return Err(VerificationAdmissionError::VerificationClaimIdentityMismatch); }
+        if expected != self.claim_id {
+            return Err(VerificationAdmissionError::VerificationClaimIdentityMismatch);
+        }
         Ok(())
     }
 }
@@ -183,23 +273,42 @@ pub(crate) fn policy_check_verification_evidence(
 ) -> Result<ProfilePolicyCheckedVerificationEvidenceV1, VerificationAdmissionError> {
     profile.validate()?;
     claim.validate()?;
-    if expected_challenge == [0; 32] { return Err(VerificationAdmissionError::ZeroTransactionChallenge); }
+    if expected_challenge == [0; 32] {
+        return Err(VerificationAdmissionError::ZeroTransactionChallenge);
+    }
     if policy.verifier_profile_id() != profile.profile_name() {
         return Err(VerificationAdmissionError::VerifierProfilePolicyMismatch);
     }
     if claim.verifier_profile_id() != profile.id() {
         return Err(VerificationAdmissionError::VerifierProfileClaimMismatch);
     }
-    if claim.contract_id() != contract.id() { return Err(VerificationAdmissionError::ContractMismatch); }
-    if claim.target_realization_id() != target { return Err(VerificationAdmissionError::TargetMismatch); }
-    if claim.transaction_challenge() != expected_challenge { return Err(VerificationAdmissionError::ChallengeMismatch); }
-    if !contract.requirements().iter().any(|r| r.id() == claim.requirement_id()) {
+    if claim.contract_id() != contract.id() {
+        return Err(VerificationAdmissionError::ContractMismatch);
+    }
+    if claim.target_realization_id() != target {
+        return Err(VerificationAdmissionError::TargetMismatch);
+    }
+    if claim.transaction_challenge() != expected_challenge {
+        return Err(VerificationAdmissionError::ChallengeMismatch);
+    }
+    if !contract
+        .requirements()
+        .iter()
+        .any(|r| r.id() == claim.requirement_id())
+    {
         return Err(VerificationAdmissionError::UnknownRequirement);
     }
-    if !policy.entries().iter().any(|e| e.requirement_id() == claim.requirement_id()) {
+    if !policy
+        .entries()
+        .iter()
+        .any(|e| e.requirement_id() == claim.requirement_id())
+    {
         return Err(VerificationAdmissionError::RequirementOutsideVerificationPolicy);
     }
-    Ok(ProfilePolicyCheckedVerificationEvidenceV1 { claim, profile: profile.clone() })
+    Ok(ProfilePolicyCheckedVerificationEvidenceV1 {
+        claim,
+        profile: profile.clone(),
+    })
 }
 
 /// Profile-policy evidence after a separate current verifier-authority theorem has
@@ -225,7 +334,9 @@ impl AuthorityCheckedVerificationEvidenceV1 {
         self.adoption_transition_digest
     }
 
-    pub(crate) fn authority_root_snapshot_id(&self) -> VerifierProfileAdoptionAuthorityRootSnapshotId {
+    pub(crate) fn authority_root_snapshot_id(
+        &self,
+    ) -> VerifierProfileAdoptionAuthorityRootSnapshotId {
         self.authority_root_snapshot_id
     }
 
@@ -253,21 +364,27 @@ impl AuthorityCheckedVerificationEvidenceV1 {
             return Err(VerificationAdmissionError::AuthorityRootSnapshotMismatch);
         }
         if subject.evidence_class_ceiling() > profile_checked.profile.evidence_class() {
-            return Err(VerificationAdmissionError::AuthorityEvidenceClassExceedsProfile {
-                profile: profile_checked.profile.evidence_class(),
-                authorized: subject.evidence_class_ceiling(),
-            });
+            return Err(
+                VerificationAdmissionError::AuthorityEvidenceClassExceedsProfile {
+                    profile: profile_checked.profile.evidence_class(),
+                    authorized: subject.evidence_class_ceiling(),
+                },
+            );
         }
         if !scope_allows_claim(subject.scope(), &profile_checked.claim) {
             return Err(VerificationAdmissionError::RequirementOutsideAdoptionScope);
         }
         let observed_at = profile_checked.claim.observed_at_unix_ms();
-        if observed_at < subject.valid_from_unix_ms() || observed_at >= subject.valid_until_unix_ms() {
-            return Err(VerificationAdmissionError::EvidenceObservationOutsideAdoptionValidity {
-                observed_at_unix_ms: observed_at,
-                valid_from_unix_ms: subject.valid_from_unix_ms(),
-                valid_until_unix_ms: subject.valid_until_unix_ms(),
-            });
+        if observed_at < subject.valid_from_unix_ms()
+            || observed_at >= subject.valid_until_unix_ms()
+        {
+            return Err(
+                VerificationAdmissionError::EvidenceObservationOutsideAdoptionValidity {
+                    observed_at_unix_ms: observed_at,
+                    valid_from_unix_ms: subject.valid_from_unix_ms(),
+                    valid_until_unix_ms: subject.valid_until_unix_ms(),
+                },
+            );
         }
         let adoption_transition_digest = adoption
             .transition_digest()
@@ -318,10 +435,14 @@ impl AuthenticatedVerificationEvidenceV1 {
     pub(crate) fn adoption_transition_digest(&self) -> VerifierProfileAdoptionTransitionDigest {
         self.checked.adoption_transition_digest()
     }
-    pub(crate) fn authority_root_snapshot_id(&self) -> VerifierProfileAdoptionAuthorityRootSnapshotId {
+    pub(crate) fn authority_root_snapshot_id(
+        &self,
+    ) -> VerifierProfileAdoptionAuthorityRootSnapshotId {
         self.checked.authority_root_snapshot_id()
     }
-    pub(crate) fn id(&self) -> AuthenticatedVerificationEvidenceId { self.evidence_id }
+    pub(crate) fn id(&self) -> AuthenticatedVerificationEvidenceId {
+        self.evidence_id
+    }
     pub(crate) fn disposition(&self) -> ObligationDispositionV1 {
         let evidence_digest = *self.evidence_id.as_bytes();
         match self.checked.profile_checked.claim.outcome() {
@@ -330,9 +451,15 @@ impl AuthenticatedVerificationEvidenceV1 {
                 evidence_class: self.checked.effective_evidence_class(),
             },
             VerificationOutcomeV1::Failed => ObligationDispositionV1::Failed { evidence_digest },
-            VerificationOutcomeV1::Inconclusive => ObligationDispositionV1::Inconclusive { evidence_digest },
-            VerificationOutcomeV1::InfrastructureFailure => ObligationDispositionV1::InfrastructureFailure { evidence_digest },
-            VerificationOutcomeV1::NotExecuted => ObligationDispositionV1::NotExecuted { evidence_digest },
+            VerificationOutcomeV1::Inconclusive => {
+                ObligationDispositionV1::Inconclusive { evidence_digest }
+            }
+            VerificationOutcomeV1::InfrastructureFailure => {
+                ObligationDispositionV1::InfrastructureFailure { evidence_digest }
+            }
+            VerificationOutcomeV1::NotExecuted => {
+                ObligationDispositionV1::NotExecuted { evidence_digest }
+            }
         }
     }
 
@@ -352,11 +479,18 @@ impl AuthenticatedVerificationEvidenceV1 {
             checked.authority_root_snapshot_id,
             authentication_evidence_digest,
         ));
-        Ok(Self { checked, authentication_evidence_digest, evidence_id })
+        Ok(Self {
+            checked,
+            authentication_evidence_digest,
+            evidence_id,
+        })
     }
 }
 
-fn scope_allows_claim(scope: &VerifierAdoptionScopeV1, claim: &VerificationEvidenceClaimV1) -> bool {
+fn scope_allows_claim(
+    scope: &VerifierAdoptionScopeV1,
+    claim: &VerificationEvidenceClaimV1,
+) -> bool {
     match scope {
         VerifierAdoptionScopeV1::AllContinuityVerification => true,
         VerifierAdoptionScopeV1::Contract { contract_id } => *contract_id == claim.contract_id(),
@@ -412,14 +546,18 @@ pub enum VerificationAdmissionError {
     AuthorityVerifierProfileMismatch,
     #[error("adoption authority root snapshot does not match the adoption transition")]
     AuthorityRootSnapshotMismatch,
-    #[error("authorized evidence class {authorized:?} exceeds verifier profile maximum {profile:?}")]
+    #[error(
+        "authorized evidence class {authorized:?} exceeds verifier profile maximum {profile:?}"
+    )]
     AuthorityEvidenceClassExceedsProfile {
         profile: EvidenceClass,
         authorized: EvidenceClass,
     },
     #[error("verification claim requirement is outside the verifier adoption authority scope")]
     RequirementOutsideAdoptionScope,
-    #[error("verification evidence observation {observed_at_unix_ms} is outside verifier adoption validity [{valid_from_unix_ms}, {valid_until_unix_ms})")]
+    #[error(
+        "verification evidence observation {observed_at_unix_ms} is outside verifier adoption validity [{valid_from_unix_ms}, {valid_until_unix_ms})"
+    )]
     EvidenceObservationOutsideAdoptionValidity {
         observed_at_unix_ms: u64,
         valid_from_unix_ms: u64,
@@ -431,9 +569,15 @@ pub enum VerificationAdmissionError {
 
 fn checked_text(field: &'static str, value: String) -> Result<String, VerificationAdmissionError> {
     let trimmed = value.trim();
-    if trimmed.is_empty() { return Err(VerificationAdmissionError::BlankText { field }); }
-    if trimmed.len() > 1024 { return Err(VerificationAdmissionError::TextTooLong { field }); }
-    if trimmed.chars().any(char::is_control) { return Err(VerificationAdmissionError::ControlCharacters { field }); }
+    if trimmed.is_empty() {
+        return Err(VerificationAdmissionError::BlankText { field });
+    }
+    if trimmed.len() > 1024 {
+        return Err(VerificationAdmissionError::TextTooLong { field });
+    }
+    if trimmed.chars().any(char::is_control) {
+        return Err(VerificationAdmissionError::ControlCharacters { field });
+    }
     Ok(trimmed.to_string())
 }
 
@@ -532,34 +676,67 @@ mod tests {
 
     fn contract_with_seed(seed: u8) -> ValidatedContinuityContractV1 {
         let obs = ObservationEnvelopeV1::new(
-            format!("machine-{seed}"), "workflow.dependency", "fixture", "1",
-            1_700_000_000_000 + seed as u64, ObservationCoverage::Complete,
-            EvidenceBasis::Tested, [seed; 32], vec![],
-        ).unwrap();
+            format!("machine-{seed}"),
+            "workflow.dependency",
+            "fixture",
+            "1",
+            1_700_000_000_000 + seed as u64,
+            ObservationCoverage::Complete,
+            EvidenceBasis::Tested,
+            [seed; 32],
+            vec![],
+        )
+        .unwrap();
         let dep = DependencyClaimV1::new(
-            "role:research", "requires", format!("capability-{seed}"), DependencyBasis::Observed,
-            vec![obs.id()], vec![],
-        ).unwrap();
+            "role:research",
+            "requires",
+            format!("capability-{seed}"),
+            DependencyBasis::Observed,
+            vec![obs.id()],
+            vec![],
+        )
+        .unwrap();
         let req = ContinuityRequirementV1::new(
-            dep.id(), format!("cuda-workflow-{seed}"), RequirementCriticality::Must,
-            EquivalencePredicate::BehavioralScenario { scenario_id: format!("cuda-fixture-{seed}") },
-            ApprovalBasis::ExplicitPolicy, [seed.wrapping_add(20); 32],
-        ).unwrap();
+            dep.id(),
+            format!("cuda-workflow-{seed}"),
+            RequirementCriticality::Must,
+            EquivalencePredicate::BehavioralScenario {
+                scenario_id: format!("cuda-fixture-{seed}"),
+            },
+            ApprovalBasis::ExplicitPolicy,
+            [seed.wrapping_add(20); 32],
+        )
+        .unwrap();
         ContinuityContractV1::new(
             format!("research-fleet-{seed}"),
             [seed.wrapping_add(40); 32],
             vec![req],
-        ).unwrap().validate().unwrap()
+        )
+        .unwrap()
+        .validate()
+        .unwrap()
     }
-    fn contract() -> ValidatedContinuityContractV1 { contract_with_seed(1) }
+    fn contract() -> ValidatedContinuityContractV1 {
+        contract_with_seed(1)
+    }
     fn profile() -> VerifierProfileV1 {
-        VerifierProfileV1::new("hardware-verifier-v1", [9; 32], 7, EvidenceClass::HardwareVerified).unwrap()
+        VerifierProfileV1::new(
+            "hardware-verifier-v1",
+            [9; 32],
+            7,
+            EvidenceClass::HardwareVerified,
+        )
+        .unwrap()
     }
     fn policy(contract: &ValidatedContinuityContractV1) -> VerificationPolicyV1 {
         VerificationPolicyV1::new(
             "hardware-verifier-v1",
-            vec![VerificationPolicyEntryV1::new(contract.requirements()[0].id(), EvidenceClass::Simulated)],
-        ).unwrap()
+            vec![VerificationPolicyEntryV1::new(
+                contract.requirements()[0].id(),
+                EvidenceClass::Simulated,
+            )],
+        )
+        .unwrap()
     }
     fn claim_at(
         contract: &ValidatedContinuityContractV1,
@@ -569,11 +746,23 @@ mod tests {
         observed_at_unix_ms: u64,
     ) -> VerificationEvidenceClaimV1 {
         VerificationEvidenceClaimV1::new(
-            contract.id(), target, contract.requirements()[0].id(), profile.id(), challenge,
-            observed_at_unix_ms, VerificationOutcomeV1::Satisfied, [8; 32],
-        ).unwrap()
+            contract.id(),
+            target,
+            contract.requirements()[0].id(),
+            profile.id(),
+            challenge,
+            observed_at_unix_ms,
+            VerificationOutcomeV1::Satisfied,
+            [8; 32],
+        )
+        .unwrap()
     }
-    fn claim(contract: &ValidatedContinuityContractV1, target: TargetRealizationId, profile: &VerifierProfileV1, challenge: [u8; 32]) -> VerificationEvidenceClaimV1 {
+    fn claim(
+        contract: &ValidatedContinuityContractV1,
+        target: TargetRealizationId,
+        profile: &VerifierProfileV1,
+        challenge: [u8; 32],
+    ) -> VerificationEvidenceClaimV1 {
         claim_at(contract, target, profile, challenge, 1_700_000_000_111)
     }
     fn profile_checked_from_claim(
@@ -590,7 +779,8 @@ mod tests {
             profile,
             challenge,
             claim,
-        ).unwrap()
+        )
+        .unwrap()
     }
     fn profile_checked(
         contract: &ValidatedContinuityContractV1,
@@ -627,14 +817,16 @@ mod tests {
             AUTH_VALID_UNTIL,
             ceiling,
             scope,
-        ).unwrap();
+        )
+        .unwrap();
         let transition = VerifierProfileAdoptionTransitionV1::bootstrap(subject).unwrap();
         let root = VerifierProfileAdoptionAuthorityRootSnapshotV1::new(
             "organization:test",
             "adoption-root-1",
             [0x55; 32],
             root_epoch,
-        ).unwrap();
+        )
+        .unwrap();
         (transition, root)
     }
 
@@ -643,7 +835,10 @@ mod tests {
         let contract = contract();
         let target = TargetRealizationId::from_digest([4; 32]).unwrap();
         let profile = profile();
-        assert_eq!(claim(&contract, target, &profile, [5; 32]).verifier_profile_id(), profile.id());
+        assert_eq!(
+            claim(&contract, target, &profile, [5; 32]).verifier_profile_id(),
+            profile.id()
+        );
     }
 
     #[test]
@@ -652,8 +847,18 @@ mod tests {
         let a = TargetRealizationId::from_digest([4; 32]).unwrap();
         let b = TargetRealizationId::from_digest([6; 32]).unwrap();
         let profile = profile();
-        let result = policy_check_verification_evidence(&contract, b, &policy(&contract), &profile, [5; 32], claim(&contract, a, &profile, [5; 32]));
-        assert_eq!(result.unwrap_err(), VerificationAdmissionError::TargetMismatch);
+        let result = policy_check_verification_evidence(
+            &contract,
+            b,
+            &policy(&contract),
+            &profile,
+            [5; 32],
+            claim(&contract, a, &profile, [5; 32]),
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            VerificationAdmissionError::TargetMismatch
+        );
     }
 
     #[test]
@@ -661,14 +866,30 @@ mod tests {
         let contract = contract();
         let target = TargetRealizationId::from_digest([4; 32]).unwrap();
         let profile = profile();
-        let result = policy_check_verification_evidence(&contract, target, &policy(&contract), &profile, [6; 32], claim(&contract, target, &profile, [5; 32]));
-        assert_eq!(result.unwrap_err(), VerificationAdmissionError::ChallengeMismatch);
+        let result = policy_check_verification_evidence(
+            &contract,
+            target,
+            &policy(&contract),
+            &profile,
+            [6; 32],
+            claim(&contract, target, &profile, [5; 32]),
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            VerificationAdmissionError::ChallengeMismatch
+        );
     }
 
     #[test]
     fn root_epoch_changes_profile_identity() {
         let a = profile();
-        let b = VerifierProfileV1::new("hardware-verifier-v1", [9; 32], 8, EvidenceClass::HardwareVerified).unwrap();
+        let b = VerifierProfileV1::new(
+            "hardware-verifier-v1",
+            [9; 32],
+            8,
+            EvidenceClass::HardwareVerified,
+        )
+        .unwrap();
         assert_ne!(a.id(), b.id());
     }
 
@@ -685,17 +906,19 @@ mod tests {
             EvidenceClass::DifferentiallyVerified,
             9,
         );
-        let authority_checked = AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
-            checked,
-            &adoption,
-            &root,
-        ).unwrap();
+        let authority_checked =
+            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(checked, &adoption, &root)
+                .unwrap();
         let authenticated = AuthenticatedVerificationEvidenceV1::authenticate_for_test(
             authority_checked,
             [0x77; 32],
-        ).unwrap();
+        )
+        .unwrap();
 
-        assert_eq!(authenticated.effective_evidence_class(), EvidenceClass::DifferentiallyVerified);
+        assert_eq!(
+            authenticated.effective_evidence_class(),
+            EvidenceClass::DifferentiallyVerified
+        );
         assert!(matches!(
             authenticated.disposition(),
             ObligationDispositionV1::Satisfied {
@@ -715,7 +938,8 @@ mod tests {
             [0x0a; 32],
             8,
             EvidenceClass::HardwareVerified,
-        ).unwrap();
+        )
+        .unwrap();
         let checked = profile_checked(&contract, target, &profile_a, [5; 32]);
         let (adoption, root) = authority_context(
             &profile_b,
@@ -725,11 +949,8 @@ mod tests {
             9,
         );
         assert_eq!(
-            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
-                checked,
-                &adoption,
-                &root,
-            ).unwrap_err(),
+            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(checked, &adoption, &root,)
+                .unwrap_err(),
             VerificationAdmissionError::AuthorityVerifierProfileMismatch
         );
     }
@@ -744,16 +965,15 @@ mod tests {
         let (adoption, root) = authority_context(
             &profile,
             "adopt-foreign-scope",
-            VerifierAdoptionScopeV1::Contract { contract_id: foreign.id() },
+            VerifierAdoptionScopeV1::Contract {
+                contract_id: foreign.id(),
+            },
             EvidenceClass::HardwareVerified,
             9,
         );
         assert_eq!(
-            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
-                checked,
-                &adoption,
-                &root,
-            ).unwrap_err(),
+            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(checked, &adoption, &root,)
+                .unwrap_err(),
             VerificationAdmissionError::RequirementOutsideAdoptionScope
         );
     }
@@ -763,13 +983,7 @@ mod tests {
         let contract = contract();
         let target = TargetRealizationId::from_digest([4; 32]).unwrap();
         let profile = profile();
-        let early = claim_at(
-            &contract,
-            target,
-            &profile,
-            [5; 32],
-            AUTH_VALID_FROM - 1,
-        );
+        let early = claim_at(&contract, target, &profile, [5; 32], AUTH_VALID_FROM - 1);
         let checked = profile_checked_from_claim(&contract, target, &profile, [5; 32], early);
         let (adoption, root) = authority_context(
             &profile,
@@ -779,11 +993,8 @@ mod tests {
             9,
         );
         assert_eq!(
-            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
-                checked,
-                &adoption,
-                &root,
-            ).unwrap_err(),
+            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(checked, &adoption, &root,)
+                .unwrap_err(),
             VerificationAdmissionError::EvidenceObservationOutsideAdoptionValidity {
                 observed_at_unix_ms: AUTH_VALID_FROM - 1,
                 valid_from_unix_ms: AUTH_VALID_FROM,
@@ -814,19 +1025,33 @@ mod tests {
         );
         let a = AuthenticatedVerificationEvidenceV1::authenticate_for_test(
             AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
-                checked.clone(), &adoption_a, &root_a,
-            ).unwrap(),
+                checked.clone(),
+                &adoption_a,
+                &root_a,
+            )
+            .unwrap(),
             [0x77; 32],
-        ).unwrap();
+        )
+        .unwrap();
         let b = AuthenticatedVerificationEvidenceV1::authenticate_for_test(
             AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
-                checked, &adoption_b, &root_b,
-            ).unwrap(),
+                checked,
+                &adoption_b,
+                &root_b,
+            )
+            .unwrap(),
             [0x77; 32],
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_ne!(a.id(), b.id());
-        assert_ne!(a.adoption_transition_digest(), b.adoption_transition_digest());
-        assert_ne!(a.authority_root_snapshot_id(), b.authority_root_snapshot_id());
+        assert_ne!(
+            a.adoption_transition_digest(),
+            b.adoption_transition_digest()
+        );
+        assert_ne!(
+            a.authority_root_snapshot_id(),
+            b.authority_root_snapshot_id()
+        );
     }
 }

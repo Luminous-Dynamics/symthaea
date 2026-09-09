@@ -12,9 +12,7 @@ use thiserror::Error;
 const OBSERVATION_DOMAIN: &[u8] = b"symthaea.continuity.observation.v1\0";
 const DEPENDENCY_DOMAIN: &[u8] = b"symthaea.continuity.dependency-claim.v1\0";
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ObservationId([u8; 32]);
 
 impl ObservationId {
@@ -23,9 +21,7 @@ impl ObservationId {
     }
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct DependencyClaimId([u8; 32]);
 
 impl DependencyClaimId {

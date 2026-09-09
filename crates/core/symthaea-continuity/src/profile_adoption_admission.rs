@@ -16,9 +16,8 @@ use thiserror::Error;
 
 use crate::contract::{ContinuityRequirementId, ValidatedContinuityContractV1};
 use crate::profile_adoption::{
-    VerifierAdoptionScopeV1, VerifierProfileAdoptionError,
-    VerifierProfileAdoptionPredecessorV1, VerifierProfileAdoptionTransitionDigest,
-    VerifierProfileAdoptionTransitionV1,
+    VerifierAdoptionScopeV1, VerifierProfileAdoptionError, VerifierProfileAdoptionPredecessorV1,
+    VerifierProfileAdoptionTransitionDigest, VerifierProfileAdoptionTransitionV1,
 };
 use crate::verifier::{VerifierProfileId, VerifierProfileV1};
 
@@ -221,38 +220,45 @@ impl VerifierProfileAdoptionAdmissionPolicyV1 {
         transition: &VerifierProfileAdoptionTransitionV1,
         profile: &VerifierProfileV1,
         scope_contract: Option<&ValidatedContinuityContractV1>,
-    ) -> Result<PolicyCheckedVerifierProfileAdoptionV1, VerifierProfileAdoptionAdmissionError>
-    {
+    ) -> Result<PolicyCheckedVerifierProfileAdoptionV1, VerifierProfileAdoptionAdmissionError> {
         transition.validate()?;
         let subject = transition.subject();
         subject.validate_against_profile(profile)?;
 
         if subject.authority_subject() != self.expected_authority_subject {
-            return Err(VerifierProfileAdoptionAdmissionError::AuthoritySubjectMismatch {
-                expected: self.expected_authority_subject.clone(),
-                observed: subject.authority_subject().to_owned(),
-            });
+            return Err(
+                VerifierProfileAdoptionAdmissionError::AuthoritySubjectMismatch {
+                    expected: self.expected_authority_subject.clone(),
+                    observed: subject.authority_subject().to_owned(),
+                },
+            );
         }
         if subject.authority_root_id() != self.trusted_authority_root_id {
-            return Err(VerifierProfileAdoptionAdmissionError::TrustedAuthorityRootIdMismatch {
-                expected: self.trusted_authority_root_id.clone(),
-                observed: subject.authority_root_id().to_owned(),
-            });
+            return Err(
+                VerifierProfileAdoptionAdmissionError::TrustedAuthorityRootIdMismatch {
+                    expected: self.trusted_authority_root_id.clone(),
+                    observed: subject.authority_root_id().to_owned(),
+                },
+            );
         }
         if subject.authority_root_digest() != self.trusted_authority_root_digest {
             return Err(VerifierProfileAdoptionAdmissionError::TrustedAuthorityRootMismatch);
         }
         if subject.verifier_role_id() != self.expected_verifier_role_id {
-            return Err(VerifierProfileAdoptionAdmissionError::VerifierRoleMismatch {
-                expected: self.expected_verifier_role_id.clone(),
-                observed: subject.verifier_role_id().to_owned(),
-            });
+            return Err(
+                VerifierProfileAdoptionAdmissionError::VerifierRoleMismatch {
+                    expected: self.expected_verifier_role_id.clone(),
+                    observed: subject.verifier_role_id().to_owned(),
+                },
+            );
         }
         if profile.profile_name() != self.expected_verifier_role_id {
-            return Err(VerifierProfileAdoptionAdmissionError::LocalProfileRoleMismatch {
-                expected: self.expected_verifier_role_id.clone(),
-                observed: profile.profile_name().to_owned(),
-            });
+            return Err(
+                VerifierProfileAdoptionAdmissionError::LocalProfileRoleMismatch {
+                    expected: self.expected_verifier_role_id.clone(),
+                    observed: profile.profile_name().to_owned(),
+                },
+            );
         }
 
         if now_unix_ms < subject.valid_from_unix_ms() {
@@ -271,8 +277,7 @@ impl VerifierProfileAdoptionAdmissionPolicyV1 {
         match &self.current_head {
             VerifierProfileAdoptionHeadV1::Uninitialized => {
                 if transition.generation() != 1
-                    || transition.predecessor()
-                        != VerifierProfileAdoptionPredecessorV1::Bootstrap
+                    || transition.predecessor() != VerifierProfileAdoptionPredecessorV1::Bootstrap
                 {
                     return Err(VerifierProfileAdoptionAdmissionError::ExpectedBootstrap {
                         observed_generation: transition.generation(),
@@ -296,9 +301,8 @@ impl VerifierProfileAdoptionAdmissionPolicyV1 {
                     );
                 }
 
-                let expected_predecessor = VerifierProfileAdoptionPredecessorV1::Previous(
-                    identity.transition_digest(),
-                );
+                let expected_predecessor =
+                    VerifierProfileAdoptionPredecessorV1::Previous(identity.transition_digest());
                 if transition.predecessor() != expected_predecessor {
                     return Err(
                         VerifierProfileAdoptionAdmissionError::PredecessorHeadMismatch {
@@ -460,17 +464,27 @@ pub enum VerifierProfileAdoptionAdmissionError {
     PolicyControlCharacters { field: &'static str },
     #[error("trusted verifier-adoption authority root digest must be non-zero")]
     ZeroTrustedAuthorityRootDigest,
-    #[error("persisted verifier-adoption head authority subject mismatch: expected {expected}, observed {observed}")]
+    #[error(
+        "persisted verifier-adoption head authority subject mismatch: expected {expected}, observed {observed}"
+    )]
     PersistedHeadAuthoritySubjectMismatch { expected: String, observed: String },
-    #[error("persisted verifier-adoption head authority root id mismatch: expected {expected}, observed {observed}")]
+    #[error(
+        "persisted verifier-adoption head authority root id mismatch: expected {expected}, observed {observed}"
+    )]
     PersistedHeadAuthorityRootIdMismatch { expected: String, observed: String },
     #[error("persisted verifier-adoption head does not use the externally trusted authority root")]
     PersistedHeadAuthorityRootMismatch,
-    #[error("persisted verifier-adoption head role mismatch: expected {expected}, observed {observed}")]
+    #[error(
+        "persisted verifier-adoption head role mismatch: expected {expected}, observed {observed}"
+    )]
     PersistedHeadVerifierRoleMismatch { expected: String, observed: String },
-    #[error("verifier-adoption authority subject mismatch: expected {expected}, observed {observed}")]
+    #[error(
+        "verifier-adoption authority subject mismatch: expected {expected}, observed {observed}"
+    )]
     AuthoritySubjectMismatch { expected: String, observed: String },
-    #[error("verifier-adoption authority root id mismatch: expected {expected}, observed {observed}")]
+    #[error(
+        "verifier-adoption authority root id mismatch: expected {expected}, observed {observed}"
+    )]
     TrustedAuthorityRootIdMismatch { expected: String, observed: String },
     #[error("verifier-adoption authority root digest does not match externally trusted root")]
     TrustedAuthorityRootMismatch,
@@ -478,12 +492,16 @@ pub enum VerifierProfileAdoptionAdmissionError {
     VerifierRoleMismatch { expected: String, observed: String },
     #[error("local verifier profile role mismatch: expected {expected}, observed {observed}")]
     LocalProfileRoleMismatch { expected: String, observed: String },
-    #[error("verifier-profile adoption is not yet valid: now {now_unix_ms}, valid from {valid_from_unix_ms}")]
+    #[error(
+        "verifier-profile adoption is not yet valid: now {now_unix_ms}, valid from {valid_from_unix_ms}"
+    )]
     NotYetValid {
         now_unix_ms: u64,
         valid_from_unix_ms: u64,
     },
-    #[error("verifier-profile adoption is expired: now {now_unix_ms}, valid until {valid_until_unix_ms}")]
+    #[error(
+        "verifier-profile adoption is expired: now {now_unix_ms}, valid until {valid_until_unix_ms}"
+    )]
     Expired {
         now_unix_ms: u64,
         valid_until_unix_ms: u64,
@@ -495,7 +513,9 @@ pub enum VerifierProfileAdoptionAdmissionError {
     },
     #[error("verifier-adoption generation space exhausted at {current}")]
     GenerationExhausted { current: u64 },
-    #[error("verifier-adoption generation must be exact successor of {current}: expected {expected}, observed {observed}")]
+    #[error(
+        "verifier-adoption generation must be exact successor of {current}: expected {expected}, observed {observed}"
+    )]
     GenerationNotSuccessor {
         current: u64,
         expected: u64,
@@ -514,12 +534,16 @@ pub enum VerifierProfileAdoptionAdmissionError {
     PersistedLineageAuthorityRootMismatch,
     #[error("candidate verifier role does not match persisted verifier-adoption lineage")]
     PersistedLineageVerifierRoleMismatch,
-    #[error("contract- or requirement-scoped verifier adoption requires the exact validated contract")]
+    #[error(
+        "contract- or requirement-scoped verifier adoption requires the exact validated contract"
+    )]
     MissingScopeContract,
     #[error("verifier-adoption scope contract does not match the supplied exact contract")]
     ScopeContractMismatch,
     #[error("verifier-adoption scope names a requirement absent from the exact contract")]
-    UnknownScopedRequirement { requirement: ContinuityRequirementId },
+    UnknownScopedRequirement {
+        requirement: ContinuityRequirementId,
+    },
 }
 
 #[cfg(test)]
@@ -588,7 +612,10 @@ mod tests {
         .unwrap()
     }
 
-    fn bootstrap(profile: &VerifierProfileV1, adoption_id: &str) -> VerifierProfileAdoptionTransitionV1 {
+    fn bootstrap(
+        profile: &VerifierProfileV1,
+        adoption_id: &str,
+    ) -> VerifierProfileAdoptionTransitionV1 {
         bootstrap_for(
             profile,
             adoption_id,
@@ -603,7 +630,9 @@ mod tests {
         VerifierProfileAdoptionHeadV1::from_transition(transition).unwrap()
     }
 
-    fn policy(current_head: VerifierProfileAdoptionHeadV1) -> VerifierProfileAdoptionAdmissionPolicyV1 {
+    fn policy(
+        current_head: VerifierProfileAdoptionHeadV1,
+    ) -> VerifierProfileAdoptionAdmissionPolicyV1 {
         VerifierProfileAdoptionAdmissionPolicyV1::new(
             "organization:test",
             "adoption-root-1",
@@ -671,7 +700,10 @@ mod tests {
         let identity = current.identity().unwrap();
 
         assert_eq!(identity.generation(), 1);
-        assert_eq!(identity.transition_digest(), transition.transition_digest().unwrap());
+        assert_eq!(
+            identity.transition_digest(),
+            transition.transition_digest().unwrap()
+        );
         assert_eq!(identity.authority_subject(), "organization:test");
         assert_eq!(identity.authority_root_id(), "adoption-root-1");
         assert_eq!(identity.authority_root_digest(), [0x55; 32]);
@@ -705,7 +737,10 @@ mod tests {
         let profile = profile(9, 7);
         let head_a = bootstrap(&profile, "adopt-a");
         let head_b = bootstrap(&profile, "adopt-b");
-        assert_ne!(head_a.transition_digest().unwrap(), head_b.transition_digest().unwrap());
+        assert_ne!(
+            head_a.transition_digest().unwrap(),
+            head_b.transition_digest().unwrap()
+        );
 
         let candidate = VerifierProfileAdoptionTransitionV1::successor(
             subject(
@@ -754,9 +789,20 @@ mod tests {
             .check(1_500, &second, &profile_b, None)
             .unwrap();
         assert_eq!(checked.profile().id(), profile_b.id());
-        assert_eq!(checked.candidate_head().identity().unwrap().verifier_profile_id(), profile_b.id());
+        assert_eq!(
+            checked
+                .candidate_head()
+                .identity()
+                .unwrap()
+                .verifier_profile_id(),
+            profile_b.id()
+        );
         assert_ne!(
-            checked.expected_predecessor_head().identity().unwrap().verifier_profile_id(),
+            checked
+                .expected_predecessor_head()
+                .identity()
+                .unwrap()
+                .verifier_profile_id(),
             profile_b.id()
         );
     }
@@ -768,8 +814,12 @@ mod tests {
         let transition = bootstrap(&profile_a, "adopt-1");
 
         assert!(matches!(
-            policy(VerifierProfileAdoptionHeadV1::Uninitialized)
-                .check(1_500, &transition, &profile_b, None),
+            policy(VerifierProfileAdoptionHeadV1::Uninitialized).check(
+                1_500,
+                &transition,
+                &profile_b,
+                None
+            ),
             Err(VerifierProfileAdoptionAdmissionError::Adoption(
                 VerifierProfileAdoptionError::VerifierProfileMismatch
             ))
@@ -795,7 +845,9 @@ mod tests {
                 "hardware-verifier-v1",
                 head(&wrong_subject),
             ),
-            Err(VerifierProfileAdoptionAdmissionError::PersistedHeadAuthoritySubjectMismatch { .. })
+            Err(
+                VerifierProfileAdoptionAdmissionError::PersistedHeadAuthoritySubjectMismatch { .. }
+            )
         ));
 
         let wrong_root = bootstrap_for(
@@ -911,7 +963,9 @@ mod tests {
         );
         let exact = policy(VerifierProfileAdoptionHeadV1::Uninitialized);
 
-        exact.check(1_500, &transition, &profile, Some(&contract_a)).unwrap();
+        exact
+            .check(1_500, &transition, &profile, Some(&contract_a))
+            .unwrap();
         assert_eq!(
             exact.check(1_500, &transition, &profile, None),
             Err(VerifierProfileAdoptionAdmissionError::MissingScopeContract)
@@ -928,7 +982,8 @@ mod tests {
         let contract_a = contract(10);
         let contract_b = contract(20);
         let required = contract_a.requirements()[0].id();
-        let exact_scope = VerifierAdoptionScopeV1::requirements(contract_a.id(), vec![required]).unwrap();
+        let exact_scope =
+            VerifierAdoptionScopeV1::requirements(contract_a.id(), vec![required]).unwrap();
         let transition = bootstrap_for(
             &profile,
             "requirement-scope",
@@ -942,11 +997,9 @@ mod tests {
             .unwrap();
 
         let foreign_requirement = contract_b.requirements()[0].id();
-        let forged_scope = VerifierAdoptionScopeV1::requirements(
-            contract_a.id(),
-            vec![foreign_requirement],
-        )
-        .unwrap();
+        let forged_scope =
+            VerifierAdoptionScopeV1::requirements(contract_a.id(), vec![foreign_requirement])
+                .unwrap();
         let forged = bootstrap_for(
             &profile,
             "foreign-requirement",
@@ -956,11 +1009,17 @@ mod tests {
             forged_scope,
         );
         assert_eq!(
-            policy(VerifierProfileAdoptionHeadV1::Uninitialized)
-                .check(1_500, &forged, &profile, Some(&contract_a)),
-            Err(VerifierProfileAdoptionAdmissionError::UnknownScopedRequirement {
-                requirement: foreign_requirement,
-            })
+            policy(VerifierProfileAdoptionHeadV1::Uninitialized).check(
+                1_500,
+                &forged,
+                &profile,
+                Some(&contract_a)
+            ),
+            Err(
+                VerifierProfileAdoptionAdmissionError::UnknownScopedRequirement {
+                    requirement: foreign_requirement,
+                }
+            )
         );
     }
 
@@ -968,8 +1027,8 @@ mod tests {
     fn generation_overflow_fails_closed() {
         let profile = profile(9, 7);
         let transition = bootstrap(&profile, "adopt-1");
-        let forged_boundary_head = VerifierProfileAdoptionHeadV1::Current(
-            VerifierProfileAdoptionHeadIdentityV1 {
+        let forged_boundary_head =
+            VerifierProfileAdoptionHeadV1::Current(VerifierProfileAdoptionHeadIdentityV1 {
                 generation: u64::MAX,
                 transition_digest: transition.transition_digest().unwrap(),
                 authority_subject: "organization:test".to_owned(),
@@ -977,14 +1036,11 @@ mod tests {
                 authority_root_digest: [0x55; 32],
                 verifier_role_id: "hardware-verifier-v1".to_owned(),
                 verifier_profile_id: profile.id(),
-            },
-        );
+            });
 
         assert_eq!(
             policy(forged_boundary_head).check(1_500, &transition, &profile, None),
-            Err(VerifierProfileAdoptionAdmissionError::GenerationExhausted {
-                current: u64::MAX,
-            })
+            Err(VerifierProfileAdoptionAdmissionError::GenerationExhausted { current: u64::MAX })
         );
     }
 }

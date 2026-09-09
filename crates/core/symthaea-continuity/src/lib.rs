@@ -61,13 +61,12 @@ pub use profile_adoption_grant::{
     bind_root_bound_adoption_to_authority_grant,
 };
 pub use profile_adoption_grant_commit::{
-    GrantBoundVerifierProfileAdoptionCommitPreconditionsV1,
-    VerifierProfileAdoptionGrantCommitError,
+    GrantBoundVerifierProfileAdoptionCommitPreconditionsV1, VerifierProfileAdoptionGrantCommitError,
 };
 pub use profile_adoption_root::{
     RootBoundPolicyCheckedVerifierProfileAdoptionV1,
-    VerifierProfileAdoptionAuthorityRootSnapshotId,
-    VerifierProfileAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionRootBindingError,
+    VerifierProfileAdoptionAuthorityRootSnapshotId, VerifierProfileAdoptionAuthorityRootSnapshotV1,
+    VerifierProfileAdoptionRootBindingError,
 };
 pub use profile_adoption_time::{
     TimeBoundVerifierProfileAdoptionCommitPreconditionsV1,

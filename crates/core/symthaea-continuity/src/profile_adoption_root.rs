@@ -23,11 +23,11 @@
 
 use thiserror::Error;
 
-use crate::profile_adoption_admission::{
-    PolicyCheckedVerifierProfileAdoptionV1, VerifierProfileAdoptionHeadV1,
-};
 use crate::profile_adoption::{
     VerifierProfileAdoptionTransitionDigest, VerifierProfileAdoptionTransitionV1,
+};
+use crate::profile_adoption_admission::{
+    PolicyCheckedVerifierProfileAdoptionV1, VerifierProfileAdoptionHeadV1,
 };
 use crate::verifier::VerifierProfileV1;
 
@@ -213,10 +213,12 @@ impl RootBoundPolicyCheckedVerifierProfileAdoptionV1 {
             return Err(VerifierProfileAdoptionRootBindingError::AuthorityRootDigestChanged);
         }
         if current.provisioning_epoch() != self.authority_root_snapshot.provisioning_epoch() {
-            return Err(VerifierProfileAdoptionRootBindingError::ProvisioningEpochChanged {
-                expected: self.authority_root_snapshot.provisioning_epoch(),
-                observed: current.provisioning_epoch(),
-            });
+            return Err(
+                VerifierProfileAdoptionRootBindingError::ProvisioningEpochChanged {
+                    expected: self.authority_root_snapshot.provisioning_epoch(),
+                    observed: current.provisioning_epoch(),
+                },
+            );
         }
         if current.id() != self.authority_root_snapshot.id() {
             return Err(VerifierProfileAdoptionRootBindingError::RootSnapshotIdentityChanged);
@@ -255,7 +257,9 @@ pub enum VerifierProfileAdoptionRootBindingError {
     AuthorityRootIdChanged,
     #[error("adoption-authority root digest changed since policy admission")]
     AuthorityRootDigestChanged,
-    #[error("adoption-authority provisioning epoch changed: expected {expected}, observed {observed}")]
+    #[error(
+        "adoption-authority provisioning epoch changed: expected {expected}, observed {observed}"
+    )]
     ProvisioningEpochChanged { expected: u64, observed: u64 },
     #[error("adoption-authority root snapshot identity changed")]
     RootSnapshotIdentityChanged,
@@ -368,12 +372,16 @@ mod tests {
         let checked = checked();
         let expected_bytes = checked.canonical_transition_bytes().to_vec();
         let expected_digest = checked.transition().transition_digest().unwrap();
-        let bound = RootBoundPolicyCheckedVerifierProfileAdoptionV1::bind(checked, root(9)).unwrap();
+        let bound =
+            RootBoundPolicyCheckedVerifierProfileAdoptionV1::bind(checked, root(9)).unwrap();
 
         assert_eq!(bound.authority_root_snapshot().provisioning_epoch(), 9);
         assert_eq!(bound.canonical_transition_bytes(), expected_bytes);
         assert_eq!(bound.transition_digest(), expected_digest);
-        assert_eq!(bound.authority_root_snapshot().authority_root_digest(), [0x55; 32]);
+        assert_eq!(
+            bound.authority_root_snapshot().authority_root_digest(),
+            [0x55; 32]
+        );
         bound.require_current_authority_root(&root(9)).unwrap();
     }
 
@@ -381,16 +389,22 @@ mod tests {
     fn same_key_reprovisioned_under_new_epoch_fails_currentness() {
         let first = root(9);
         let second = root(10);
-        assert_eq!(first.authority_root_digest(), second.authority_root_digest());
+        assert_eq!(
+            first.authority_root_digest(),
+            second.authority_root_digest()
+        );
         assert_ne!(first.id(), second.id());
 
-        let bound = RootBoundPolicyCheckedVerifierProfileAdoptionV1::bind(checked(), first).unwrap();
+        let bound =
+            RootBoundPolicyCheckedVerifierProfileAdoptionV1::bind(checked(), first).unwrap();
         assert_eq!(
             bound.require_current_authority_root(&second),
-            Err(VerifierProfileAdoptionRootBindingError::ProvisioningEpochChanged {
-                expected: 9,
-                observed: 10,
-            })
+            Err(
+                VerifierProfileAdoptionRootBindingError::ProvisioningEpochChanged {
+                    expected: 9,
+                    observed: 10,
+                }
+            )
         );
     }
 
