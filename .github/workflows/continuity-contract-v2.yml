@@ -1,0 +1,147 @@
+# Exact-head software-contract qualification for symthaea-continuity.
+# V2 keeps the qualified checkout immutable and runs all repair diagnostics in
+# detached worktrees. Diagnostics are evidence only and cannot upgrade FAIL to PASS.
+
+name: Continuity Contract Qualification v2
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/continuity-contract-v2.yml'
+      - 'scripts/qualify-continuity-contract-v2.sh'
+      - 'crates/core/symthaea-continuity/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.cargo/config.toml'
+      - 'rust-toolchain*'
+  workflow_dispatch:
+
+concurrency:
+  group: continuity-contract-v2-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+  CONTINUITY_RUNNER_LABEL: ubuntu-24.04
+
+jobs:
+  continuity-contract-v2:
+    name: Immutable exact-head continuity contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout exact qualified head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify pinned workflow actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/continuity-contract-v2.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/continuity-contract-v2.yml)" -eq 4
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/continuity-contract-v2.yml; then
+            echo 'mutable major-version GitHub Action tag found in continuity qualification workflow' >&2
+            exit 1
+          fi
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+          rustc --version
+          cargo --version
+
+      - name: Qualify continuity contracts
+        env:
+          QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          CONTINUITY_CONTRACT_RECEIPT: ${{ runner.temp }}/continuity-contract-qualification-v2.tsv
+          CONTINUITY_FORMAT_PATCH: ${{ runner.temp }}/symthaea-continuity-rustfmt-v2.patch
+          CONTINUITY_FORMAT_SOURCE_DIR: ${{ runner.temp }}/symthaea-continuity-rustfmt-v2-source
+          CONTINUITY_LOCK_PATCH: ${{ runner.temp }}/symthaea-continuity-cargo-lock-v2.patch
+          CONTINUITY_WORKFLOW_PATH: .github/workflows/continuity-contract-v2.yml
+        run: bash scripts/qualify-continuity-contract-v2.sh
+
+      - name: Publish receipt and repair digests
+        if: always()
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/continuity-contract-qualification-v2.tsv
+          FORMAT_PATCH: ${{ runner.temp }}/symthaea-continuity-rustfmt-v2.patch
+          LOCK_PATCH: ${{ runner.temp }}/symthaea-continuity-cargo-lock-v2.patch
+        run: |
+          set -euo pipefail
+          if [[ -f "$RECEIPT" ]]; then
+            digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
+            echo "continuity-contract-v2 receipt_sha256=$digest"
+            {
+              echo
+              echo "- receipt SHA-256: \`$digest\`"
+              echo '- receipt bytes are not independently signed; the workflow log witnesses this digest.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No v2 qualification receipt was produced.' >&2
+          fi
+          if [[ -f "$FORMAT_PATCH" ]]; then
+            digest="$(sha256sum "$FORMAT_PATCH" | awk '{print $1}')"
+            echo "continuity-contract-v2 rustfmt_patch_sha256=$digest"
+          fi
+          if [[ -f "$LOCK_PATCH" ]]; then
+            digest="$(sha256sum "$LOCK_PATCH" | awk '{print $1}')"
+            echo "continuity-contract-v2 cargo_lock_patch_sha256=$digest"
+          fi
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-contract-v2-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/continuity-contract-qualification-v2.tsv
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload rustfmt repair patch
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-contract-v2-rustfmt-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/symthaea-continuity-rustfmt-v2.patch
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload rustfmt source snapshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-contract-v2-rustfmt-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/symthaea-continuity-rustfmt-v2-source
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Cargo.lock repair patch
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-contract-v2-cargo-lock-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/symthaea-continuity-cargo-lock-v2.patch
+          if-no-files-found: ignore
+          retention-days: 14
