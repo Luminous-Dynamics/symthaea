@@ -1,0 +1,27 @@
+{
+  "schema": "symthaea.qualification-admission-request.v1",
+  "program_id": "resources.planning-research.v1",
+  "catalog_id": "sha256:d1e649465956ffd2ecd0198aa8d20e80ac4b3ff5e8ebd432a6135ac87f7d825d",
+  "catalog_branch": "evidence/resource-train-catalog-v2",
+  "catalog_path": "docs/integration-trains/resource-train-catalog.v2.json",
+  "target_train": {
+    "name": "R4",
+    "train_id": "sha256:5d88a1a7ae3ddcbe83230783a850c6071274f57ade03c1191a55aec6598fe673",
+    "subject_sha": "60f45c5efcca01c8f46d4509831223a197d4e215"
+  },
+  "qualification_profile": "resources.stack-qualification.v1",
+  "reason": "requalify the exact cumulative resource stack after the hosted rustfmt repair",
+  "evidence_refs": [
+    "issue:986",
+    "pr:1058",
+    "run:34215218821"
+  ],
+  "non_claims": [
+    "does not authorize merge",
+    "does not establish execution authority",
+    "does not establish hosted qualification",
+    "does not select a CI provider",
+    "does not state a qualification outcome"
+  ],
+  "admission_id": "sha256:f1614461697124283ec569210d639bf8bb851fe26ce71d21cfd5350a4d08ec94"
+}
