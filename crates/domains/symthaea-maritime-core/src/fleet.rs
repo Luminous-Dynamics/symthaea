@@ -50,7 +50,7 @@ impl FleetAssuranceReport {
         self.members
             .iter()
             .filter_map(|(key, member)| {
-                ( !member_identity_consistent(key, member)
+                (!member_identity_consistent(key, member)
                     || member.quarantined
                     || !member.admitted
                     || member.generation != self.expected_generation
