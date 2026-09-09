@@ -50,13 +50,15 @@ impl HumanoidEpistemicStatePermit {
 /// state and a caller-supplied local time observation.
 ///
 /// Intentionally not `Clone`, `Copy`, `Serialize`, or `Deserialize`. A later
-/// physical execution admission should consume this value and re-check its
-/// `valid_until_s` against the same trusted local time domain.
+/// physical execution admission should consume this value and re-check its full
+/// lower/upper time bounds against the same trusted local time domain.
 #[derive(Debug)]
 pub struct VerifiedCurrentHumanoidEpistemicState {
     estimator_session_id: String,
     validation_epoch: NonZeroU64,
     sequence: u64,
+    sampled_at_s: f64,
+    received_at_s: f64,
     valid_until_s: f64,
     uncertainty: HumanoidStateUncertaintyEnvelope,
 }
@@ -74,6 +76,14 @@ impl VerifiedCurrentHumanoidEpistemicState {
         self.sequence
     }
 
+    pub const fn sampled_at_s(&self) -> f64 {
+        self.sampled_at_s
+    }
+
+    pub const fn received_at_s(&self) -> f64 {
+        self.received_at_s
+    }
+
     pub const fn valid_until_s(&self) -> f64 {
         self.valid_until_s
     }
@@ -86,8 +96,11 @@ impl VerifiedCurrentHumanoidEpistemicState {
         self.uncertainty.epistemic_authority()
     }
 
+    /// Currentness is a closed interval rooted at the owner's receipt event.
+    /// A witness cannot become valid before the observation was received, even
+    /// if a caller later asks about an earlier time in the same clock domain.
     pub fn is_current_at(&self, now_s: f64) -> bool {
-        now_s.is_finite() && now_s <= self.valid_until_s
+        now_s.is_finite() && now_s >= self.received_at_s && now_s <= self.valid_until_s
     }
 
     /// Epistemic state may only tighten an already established authority value.
@@ -253,6 +266,8 @@ impl HumanoidVerifiedStateEstimator {
             estimator_session_id: permit.estimator_session_id,
             validation_epoch: permit.validation_epoch,
             sequence: permit.sequence,
+            sampled_at_s: permit.sampled_at_s,
+            received_at_s: permit.received_at_s,
             valid_until_s,
             uncertainty: permit.uncertainty,
         })
@@ -339,6 +354,9 @@ mod tests {
         let verified = estimator.accept_current(permit, 1.01).unwrap();
         assert_eq!(verified.sequence(), 1);
         assert_eq!(verified.estimator_session_id(), "estimator-session-17");
+        assert_eq!(verified.sampled_at_s(), 1.0);
+        assert_eq!(verified.received_at_s(), 1.0);
+        assert!(!verified.is_current_at(0.999));
         assert!(verified.is_current_at(1.01));
         assert!(verified.epistemic_authority() > 0.0);
     }
