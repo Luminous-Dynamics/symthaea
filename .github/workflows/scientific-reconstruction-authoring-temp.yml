@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   normalize:
-    if: github.actor != 'github-actions[bot]'
+    if: ${{ github.actor != 'github-actions[bot]' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -36,49 +36,22 @@ jobs:
           module = Path('crates/core/symthaea-scientific-replay/src/qualified_reconstruction.rs')
           text = module.read_text()
 
-          old = '''    node_contributions: BTreeMap<String, Option<String>>,
-'''
+          old = '    node_contributions: BTreeMap<String, Option<String>>,\n'
           assert old in text
           text = text.replace(old, '', 1)
 
-          old = '''    for candidate in view.candidates.values() {
-        if node_contributions.get(&candidate.reason_id)
-            != Some(&Some(candidate.contribution_id.clone()))
-        {
-            return Err(ReconstructionErrorV1::CandidateReasonMismatch {
-                contribution_id: candidate.contribution_id.clone(),
-                reason_id: candidate.reason_id.clone(),
-            });
-        }
-    }
-'''
-          new = '''    for candidate in view.candidates.values() {
-        match node_contributions.get(&candidate.reason_id) {
-            Some(Some(contribution_id)) if contribution_id == &candidate.contribution_id => {}
-            _ => {
-                return Err(ReconstructionErrorV1::CandidateReasonMismatch {
-                    contribution_id: candidate.contribution_id.clone(),
-                    reason_id: candidate.reason_id.clone(),
-                });
-            }
-        }
-    }
-'''
+          old = "    for candidate in view.candidates.values() {\n        if node_contributions.get(&candidate.reason_id)\n            != Some(&Some(candidate.contribution_id.clone()))\n        {\n            return Err(ReconstructionErrorV1::CandidateReasonMismatch {\n                contribution_id: candidate.contribution_id.clone(),\n                reason_id: candidate.reason_id.clone(),\n            });\n        }\n    }\n"
+          new = "    for candidate in view.candidates.values() {\n        match node_contributions.get(&candidate.reason_id) {\n            Some(Some(contribution_id)) if contribution_id == &candidate.contribution_id => {}\n            _ => {\n                return Err(ReconstructionErrorV1::CandidateReasonMismatch {\n                    contribution_id: candidate.contribution_id.clone(),\n                    reason_id: candidate.reason_id.clone(),\n                });\n            }\n        }\n    }\n"
           assert old in text
           text = text.replace(old, new, 1)
 
-          old = '''        node_contributions,
-        canonical_nodes,
-'''
-          new = '''        canonical_nodes,
-'''
+          old = '        node_contributions,\n        canonical_nodes,\n'
+          new = '        canonical_nodes,\n'
           assert old in text
           text = text.replace(old, new, 1)
 
-          old = '''                if dependencies.as_slice() != [source_predicate_id.as_str()] {
-'''
-          new = '''                if dependencies.len() != 1 || dependencies[0] != *source_predicate_id {
-'''
+          old = '                if dependencies.as_slice() != [source_predicate_id.as_str()] {\n'
+          new = '                if dependencies.len() != 1 || dependencies[0] != *source_predicate_id {\n'
           assert old in text
           text = text.replace(old, new, 1)
           module.write_text(text)
