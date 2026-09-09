@@ -10,41 +10,43 @@
 
 use std::collections::BTreeSet;
 
-use crate::evidence_digest::HumanoidEvidenceDigest;
+use crate::execution_authority_scope::HumanoidScopedSkillAuthorityReceipt;
 use crate::qualification::HumanoidQualificationSubject;
 use crate::reach_authority_committed_evidence::{
     HumanoidReachAuthorityCommittedEpisodeCase, HumanoidReachAuthorityCommittedTrial,
 };
 use crate::reach_authority_committed_promotion::{
-    HumanoidReachAuthorityCommittedEpisodeStageArtifact,
-    HumanoidReachAuthorityCommittedOperationalArtifact,
-    HumanoidReachAuthorityCommittedPromotionFailure,
-    HumanoidReachAuthorityCommittedStageIssueFailure,
-    HumanoidReachAuthorityCommittedStepStageArtifact,
     issue_humanoid_reach_authority_committed_episode_stage,
     issue_humanoid_reach_authority_committed_operational_authority_receipt,
     issue_humanoid_reach_authority_committed_step_stage,
     promote_humanoid_reach_authority_committed_to_operational,
 };
 use crate::reach_episode_evidence::HumanoidReachEpisodePolicy;
-use crate::reach_episode_promotion::HumanoidReachEpisodeCampaignPolicy;
 use crate::reach_execution_evidence::HumanoidReachCommandEvidencePolicy;
 use crate::reach_outcome_evidence::HumanoidReachOutcomeEvidencePolicy;
 use crate::reach_qualification_lineage::HumanoidReachLineageCampaignPolicy;
 use crate::skill_authority_receipt::HumanoidAuthoritySourceSnapshot;
 use crate::skill_permit::HumanoidSkillExecutionPermit;
-use crate::execution_authority_scope::HumanoidScopedSkillAuthorityReceipt;
 
 pub use crate::reach_authority_committed_promotion::{
+    HumanoidReachAuthorityCommittedEpisodeStageArtifact as HumanoidReachStrongEpisodeStageArtifact,
     HumanoidReachAuthorityCommittedOperationalArtifact as HumanoidReachStrongOperationalArtifact,
     HumanoidReachAuthorityCommittedStepStageArtifact as HumanoidReachStrongStepStageArtifact,
-    HumanoidReachAuthorityCommittedEpisodeStageArtifact as HumanoidReachStrongEpisodeStageArtifact,
 };
 pub use crate::reach_cryptographic_authority::{
     HumanoidReachCryptographicAuthorityIssueFailure,
     HumanoidReachCryptographicOperatorApproval,
     HumanoidReachCryptographicOperationalPolicy,
     HumanoidReachCryptographicStageRequirement,
+};
+pub use crate::reach_episode_promotion::{
+    HumanoidReachEpisodeCampaignAssessment,
+    HumanoidReachEpisodeCampaignFailureKind,
+    HumanoidReachEpisodeCampaignPolicy,
+    HumanoidReachEpisodeScenarioAssessment,
+    HumanoidReachEpisodeScenarioFailureKind,
+    HumanoidReachEpisodeScenarioRequirement,
+    assess_humanoid_reach_episode_campaign,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,7 +60,12 @@ pub enum HumanoidReachStrongDiversityFailure {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HumanoidReachStrongStageIssueFailure {
     Diversity(HumanoidReachStrongDiversityFailure),
-    Lower(HumanoidReachAuthorityCommittedStageIssueFailure),
+    LowerStageIssue,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HumanoidReachStrongPromotionFailure {
+    LowerPromotion,
 }
 
 /// Issue a step-stage artifact only when every required scenario satisfies the
@@ -71,7 +78,7 @@ pub fn issue_humanoid_reach_strong_step_stage(
     outcome_policy: &HumanoidReachOutcomeEvidencePolicy,
     trials: &[HumanoidReachAuthorityCommittedTrial],
     issued_unix_millis: u64,
-) -> Result<HumanoidReachAuthorityCommittedStepStageArtifact, HumanoidReachStrongStageIssueFailure> {
+) -> Result<HumanoidReachStrongStepStageArtifact, HumanoidReachStrongStageIssueFailure> {
     validate_step_diversity(step_policy, trials)
         .map_err(HumanoidReachStrongStageIssueFailure::Diversity)?;
     issue_humanoid_reach_authority_committed_step_stage(
@@ -82,7 +89,7 @@ pub fn issue_humanoid_reach_strong_step_stage(
         trials,
         issued_unix_millis,
     )
-    .map_err(HumanoidReachStrongStageIssueFailure::Lower)
+    .map_err(|_| HumanoidReachStrongStageIssueFailure::LowerStageIssue)
 }
 
 /// Issue an episode-stage artifact only when authority diversity is satisfied by
@@ -96,7 +103,7 @@ pub fn issue_humanoid_reach_strong_episode_stage(
     outcome_policy: &HumanoidReachOutcomeEvidencePolicy,
     cases: &[HumanoidReachAuthorityCommittedEpisodeCase],
     issued_unix_millis: u64,
-) -> Result<HumanoidReachAuthorityCommittedEpisodeStageArtifact, HumanoidReachStrongStageIssueFailure> {
+) -> Result<HumanoidReachStrongEpisodeStageArtifact, HumanoidReachStrongStageIssueFailure> {
     validate_episode_authority_diversity(campaign_policy, cases)
         .map_err(HumanoidReachStrongStageIssueFailure::Diversity)?;
     issue_humanoid_reach_authority_committed_episode_stage(
@@ -108,21 +115,21 @@ pub fn issue_humanoid_reach_strong_episode_stage(
         cases,
         issued_unix_millis,
     )
-    .map_err(HumanoidReachStrongStageIssueFailure::Lower)
+    .map_err(|_| HumanoidReachStrongStageIssueFailure::LowerStageIssue)
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn promote_humanoid_reach_strong_to_operational(
     subject: &HumanoidQualificationSubject,
     policy: &HumanoidReachCryptographicOperationalPolicy,
-    simulation_step: &HumanoidReachAuthorityCommittedStepStageArtifact,
-    simulation_episode: &HumanoidReachAuthorityCommittedEpisodeStageArtifact,
-    hil_step: &HumanoidReachAuthorityCommittedStepStageArtifact,
-    hil_episode: &HumanoidReachAuthorityCommittedEpisodeStageArtifact,
-    physical_step: &HumanoidReachAuthorityCommittedStepStageArtifact,
-    physical_episode: &HumanoidReachAuthorityCommittedEpisodeStageArtifact,
+    simulation_step: &HumanoidReachStrongStepStageArtifact,
+    simulation_episode: &HumanoidReachStrongEpisodeStageArtifact,
+    hil_step: &HumanoidReachStrongStepStageArtifact,
+    hil_episode: &HumanoidReachStrongEpisodeStageArtifact,
+    physical_step: &HumanoidReachStrongStepStageArtifact,
+    physical_episode: &HumanoidReachStrongEpisodeStageArtifact,
     now_unix_millis: u64,
-) -> Result<HumanoidReachAuthorityCommittedOperationalArtifact, HumanoidReachAuthorityCommittedPromotionFailure> {
+) -> Result<HumanoidReachStrongOperationalArtifact, HumanoidReachStrongPromotionFailure> {
     promote_humanoid_reach_authority_committed_to_operational(
         subject,
         policy,
@@ -134,13 +141,14 @@ pub fn promote_humanoid_reach_strong_to_operational(
         physical_episode,
         now_unix_millis,
     )
+    .map_err(|_| HumanoidReachStrongPromotionFailure::LowerPromotion)
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn issue_humanoid_reach_strong_operational_authority_receipt(
     subject: &HumanoidQualificationSubject,
     permit: &HumanoidSkillExecutionPermit<'_>,
-    qualification: &HumanoidReachAuthorityCommittedOperationalArtifact,
+    qualification: &HumanoidReachStrongOperationalArtifact,
     policy: &HumanoidReachCryptographicOperationalPolicy,
     operator_approval: &HumanoidReachCryptographicOperatorApproval,
     physical: HumanoidAuthoritySourceSnapshot,
@@ -256,6 +264,7 @@ fn validate_episode_authority_diversity(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::evidence_digest::HumanoidEvidenceDigest;
 
     #[test]
     fn digest_diversity_uses_full_sha_identity() {
