@@ -1,8 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Diagnostic Planner — Orders diagnostics by expected information gain
+//! Diagnostic Planner — legacy symptom heuristics plus model-based information gain.
+//!
+//! `plan_diagnostics` preserves the existing lightweight symptom router. Its
+//! `expected_info_gain` values are heuristic priorities, not entropy-derived
+//! information gain. For true expected information gain, use
+//! `rank_modelled_tests`, which delegates to the Bayesian diagnostic-belief kernel.
 
+use crate::diagnostic_beliefs::{
+    rank_tests_by_information_gain, DiagnosticBeliefError, DiagnosticTestModelV1,
+    ExpectedInformationGainV1, HypothesisDistributionV1,
+};
 use crate::types::*;
 
 pub struct DiagnosticPlanner;
@@ -12,13 +21,13 @@ impl DiagnosticPlanner {
         Self
     }
 
-    /// Plan diagnostics based on reported symptoms.
-    /// Orders by expected information gain (highest first).
+    /// Plan diagnostics from reported symptoms using the legacy fixed-priority
+    /// heuristic. This remains intentionally cheap and backwards-compatible.
     pub fn plan_diagnostics(&self, symptoms: &[String]) -> DiagnosticPlan {
         let text = symptoms.join(" ").to_lowercase();
         let mut steps = Vec::new();
 
-        // Always start with service status check (highest baseline info gain)
+        // Heuristic priority only; not a measured Shannon information gain.
         steps.push(DiagnosticStep {
             diagnostic_type: DiagnosticType::ServiceStatus,
             description: "Check status of all core services".to_string(),
@@ -79,7 +88,6 @@ impl DiagnosticPlanner {
             });
         }
 
-        // Sort by expected info gain (descending)
         steps.sort_by(|a, b| {
             b.expected_info_gain
                 .partial_cmp(&a.expected_info_gain)
@@ -99,6 +107,16 @@ impl DiagnosticPlanner {
             expected_resolution_confidence: confidence,
         }
     }
+
+    /// Rank tests using actual expected entropy reduction under an explicit
+    /// hypothesis prior and P(outcome | hypothesis) likelihood models.
+    pub fn rank_modelled_tests(
+        &self,
+        prior: &HypothesisDistributionV1,
+        tests: &[DiagnosticTestModelV1],
+    ) -> Result<Vec<ExpectedInformationGainV1>, DiagnosticBeliefError> {
+        rank_tests_by_information_gain(prior, tests)
+    }
 }
 
 impl Default for DiagnosticPlanner {
@@ -110,6 +128,8 @@ impl Default for DiagnosticPlanner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::diagnostic_beliefs::{DiagnosticOutcomeId, DiagnosticTestId, HypothesisId};
+    use std::collections::BTreeMap;
 
     #[test]
     fn network_symptoms_produce_network_check_first() {
@@ -137,12 +157,11 @@ mod tests {
             "disk full".to_string(),
             "memory oom".to_string(),
         ]);
-        // Should have ServiceStatus + NetworkCheck + DiskSpace + MemoryUsage = 4 steps
         assert!(plan.steps.len() >= 4);
     }
 
     #[test]
-    fn steps_sorted_by_info_gain_descending() {
+    fn legacy_steps_remain_sorted_by_heuristic_priority() {
         let planner = DiagnosticPlanner::new();
         let plan = planner.plan_diagnostics(&[
             "network issues".to_string(),
@@ -151,13 +170,39 @@ mod tests {
             "holochain conductor".to_string(),
         ]);
         for i in 0..plan.steps.len() - 1 {
-            assert!(
-                plan.steps[i].expected_info_gain >= plan.steps[i + 1].expected_info_gain,
-                "Steps not sorted: {} >= {} failed at index {}",
-                plan.steps[i].expected_info_gain,
-                plan.steps[i + 1].expected_info_gain,
-                i
-            );
+            assert!(plan.steps[i].expected_info_gain >= plan.steps[i + 1].expected_info_gain);
         }
+    }
+
+    #[test]
+    fn modelled_path_uses_true_information_gain() {
+        let dns = HypothesisId("dns".into());
+        let server = HypothesisId("server".into());
+        let prior = HypothesisDistributionV1::from_weights([
+            (dns.clone(), 1.0),
+            (server.clone(), 1.0),
+        ])
+        .unwrap();
+        let test = DiagnosticTestModelV1 {
+            id: DiagnosticTestId("dns-query".into()),
+            description: "Query configured resolver".into(),
+            outcomes: BTreeMap::from([
+                (
+                    DiagnosticOutcomeId("fail".into()),
+                    BTreeMap::from([(dns.clone(), 0.9), (server.clone(), 0.1)]),
+                ),
+                (
+                    DiagnosticOutcomeId("pass".into()),
+                    BTreeMap::from([(dns, 0.1), (server, 0.9)]),
+                ),
+            ]),
+        };
+
+        let ranked = DiagnosticPlanner::new()
+            .rank_modelled_tests(&prior, &[test])
+            .unwrap();
+        assert_eq!(ranked.len(), 1);
+        assert!(ranked[0].information_gain_bits > 0.0);
+        assert!(ranked[0].expected_posterior_entropy_bits < ranked[0].prior_entropy_bits);
     }
 }
