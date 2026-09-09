@@ -13,6 +13,7 @@ mod compose;
 pub mod contract;
 pub mod distributed;
 pub mod exact_policy;
+pub mod failure_domain;
 pub mod observation;
 pub mod profile_adoption;
 pub mod scope;
@@ -38,6 +39,11 @@ pub use distributed::{
 };
 pub use exact_policy::{
     ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1,
+};
+pub use failure_domain::{
+    FAILURE_DOMAIN_POLICY_SCHEMA_V1, FailureDomainGroupV1, FailureDomainKindV1,
+    FailureDomainPolicyError, FailureDomainPolicyId, FailureDomainPolicyV1,
+    ValidatedFailureDomainPolicyV1,
 };
 pub use observation::{
     DependencyBasis, DependencyClaimId, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
