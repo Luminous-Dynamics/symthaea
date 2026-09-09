@@ -27,7 +27,7 @@ pub struct LogObservationPolicyV1 {
     pub retain_fields: bool,
     /// Currentness validity horizon for the normalized observation.
     pub max_age_ms: Option<u64>,
-    /// Adapter confidence in the syntactic normalization, not confidence that the
+    /// Adapter confidence in syntactic normalization, not confidence that the
     /// source event's message is objectively true.
     pub normalization_confidence: f32,
 }
@@ -135,46 +135,90 @@ impl LogObservationAdapterV1 {
         }
 
         if self.policy.retain_fields {
-            for (key, value) in &event.fields {
-                let sanitized_key = sanitize_fact_key(key);
-                let scrubbed = self.scrubber.scrub(value).scrubbed_text;
-                facts.insert(
-                    format!("log.field.{sanitized_key}"),
-                    StateValueV1::Text(scrubbed),
-                );
-            }
+            let scrubbed_fields: BTreeMap<&str, String> = event
+                .fields
+                .iter()
+                .map(|(key, value)| (key.as_str(), self.scrubber.scrub(value).scrubbed_text))
+                .collect();
+            let serialized = serde_json::to_string(&scrubbed_fields)
+                .map_err(|err| LogObservationAdapterError::Serialization(err.to_string()))?;
+            facts.insert("log.fields_json".into(), StateValueV1::Text(serialized));
         }
 
+        let provenance = ObservationProvenanceV1 {
+            source_id: self.config.source_id.clone(),
+            source_kind: source_kind(event.source),
+            collector: self.config.collector.clone(),
+            collector_version: self.config.collector_version.clone(),
+            schema_version: self.config.schema_version.clone(),
+            artifact_digest: self.config.artifact_digest.clone(),
+        };
+        let clock = ObservationClockV1 {
+            event_time_unix_ms: Some(event_time_unix_ms),
+            observed_at_unix_ms,
+            ingested_at_unix_ms,
+            max_age_ms: self.policy.max_age_ms,
+            clock_uncertainty_ms: None,
+        };
+        let confidence = self.policy.normalization_confidence;
+        let id = self.observation_id(
+            &subject,
+            &provenance,
+            &clock,
+            confidence,
+            &facts,
+            event,
+        )?;
+
         let observation = SystemObservationV1 {
-            id: ObservationId(self.observation_id(&subject, event)),
+            id: ObservationId(id),
             subject,
-            provenance: ObservationProvenanceV1 {
-                source_id: self.config.source_id.clone(),
-                source_kind: source_kind(event.source),
-                collector: self.config.collector.clone(),
-                collector_version: self.config.collector_version.clone(),
-                schema_version: self.config.schema_version.clone(),
-                artifact_digest: self.config.artifact_digest.clone(),
-            },
-            clock: ObservationClockV1 {
-                event_time_unix_ms: Some(event_time_unix_ms),
-                observed_at_unix_ms,
-                ingested_at_unix_ms,
-                max_age_ms: self.policy.max_age_ms,
-                clock_uncertainty_ms: None,
-            },
-            confidence: self.policy.normalization_confidence,
+            provenance,
+            clock,
+            confidence,
             facts,
         };
         observation.validate()?;
         Ok(observation)
     }
 
-    fn observation_id(&self, subject: &EntityId, event: &LogEvent) -> String {
+    /// The observation identity binds the full retained normalized evidence plus
+    /// the source event payload. Raw payload bytes are hashed but never retained
+    /// by the default policy. Collection/ingestion clocks are part of identity so
+    /// a later re-observation of the same source event is distinct evidence.
+    fn observation_id(
+        &self,
+        subject: &EntityId,
+        provenance: &ObservationProvenanceV1,
+        clock: &ObservationClockV1,
+        confidence: f32,
+        facts: &BTreeMap<String, StateValueV1>,
+        event: &LogEvent,
+    ) -> Result<String, LogObservationAdapterError> {
+        #[derive(Serialize)]
+        struct IdentityMaterial<'a> {
+            subject: &'a EntityId,
+            provenance: &'a ObservationProvenanceV1,
+            clock: &'a ObservationClockV1,
+            confidence: f32,
+            facts: &'a BTreeMap<String, StateValueV1>,
+        }
+
+        let material = serde_json::to_vec(&IdentityMaterial {
+            subject,
+            provenance,
+            clock,
+            confidence,
+            facts,
+        })
+        .map_err(|err| LogObservationAdapterError::Serialization(err.to_string()))?;
+
         let mut hasher = blake3::Hasher::new();
         hash_part(&mut hasher, b"symthaea-log-observation-v1");
-        hash_part(&mut hasher, subject.0.as_bytes());
-        hash_part(&mut hasher, self.config.source_id.as_bytes());
+        hash_part(&mut hasher, &material);
+        // Bind source payload even when privacy policy omits it from `facts`, so
+        // two distinct source events that normalize to the same metadata cannot
+        // collapse into one observation identity.
         hash_part(&mut hasher, source_tag(event.source).as_bytes());
         hash_part(&mut hasher, event.timestamp.to_rfc3339().as_bytes());
         hash_part(&mut hasher, event.provider.as_bytes());
@@ -188,31 +232,13 @@ impl LogObservationAdapterV1 {
             hash_part(&mut hasher, key.as_bytes());
             hash_part(&mut hasher, value.as_bytes());
         }
-        format!("log:{}", hasher.finalize().to_hex())
+        Ok(format!("log:{}", hasher.finalize().to_hex()))
     }
 }
 
 fn hash_part(hasher: &mut blake3::Hasher, bytes: &[u8]) {
     hasher.update(&(bytes.len() as u64).to_le_bytes());
     hasher.update(bytes);
-}
-
-fn sanitize_fact_key(key: &str) -> String {
-    let normalized: String = key
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.') {
-                ch.to_ascii_lowercase()
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    if normalized.is_empty() {
-        "unnamed".into()
-    } else {
-        normalized
-    }
 }
 
 fn source_kind(source: Source) -> ObservationSourceKindV1 {
@@ -252,6 +278,7 @@ pub enum LogObservationAdapterError {
     EmptySubject,
     InvalidConfidence(f32),
     PreEpochTimestamp(i64),
+    Serialization(String),
     State(SystemStateGraphError),
 }
 
@@ -261,7 +288,10 @@ impl fmt::Display for LogObservationAdapterError {
             Self::EmptyConfig(field) => write!(f, "empty log adapter config field {field}"),
             Self::EmptySubject => write!(f, "log observation subject is empty"),
             Self::InvalidConfidence(value) => write!(f, "invalid normalization confidence {value}"),
-            Self::PreEpochTimestamp(value) => write!(f, "pre-epoch log timestamp {value}ms is unsupported"),
+            Self::PreEpochTimestamp(value) => {
+                write!(f, "pre-epoch log timestamp {value}ms is unsupported")
+            }
+            Self::Serialization(message) => write!(f, "failed to serialize observation identity: {message}"),
             Self::State(err) => write!(f, "invalid normalized observation: {err}"),
         }
     }
@@ -279,7 +309,6 @@ impl From<SystemStateGraphError> for LogObservationAdapterError {
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
-    use std::collections::BTreeMap;
 
     fn event() -> LogEvent {
         LogEvent {
@@ -316,11 +345,19 @@ mod tests {
     #[test]
     fn default_policy_does_not_retain_raw_message_or_fields() {
         let obs = adapter(Default::default())
-            .normalize(EntityId("host:server-01".into()), &event(), 1_700_000_000_100, None)
+            .normalize(
+                EntityId("host:server-01".into()),
+                &event(),
+                1_700_000_000_100,
+                None,
+            )
             .unwrap();
         assert!(!obs.facts.contains_key("log.message"));
-        assert!(!obs.facts.keys().any(|key| key.starts_with("log.field.")));
-        assert_eq!(obs.facts["log.component"], StateValueV1::Text("sshd".into()));
+        assert!(!obs.facts.contains_key("log.fields_json"));
+        assert_eq!(
+            obs.facts["log.component"],
+            StateValueV1::Text("sshd".into())
+        );
     }
 
     #[test]
@@ -331,7 +368,12 @@ mod tests {
             ..Default::default()
         };
         let obs = adapter(policy)
-            .normalize(EntityId("host:server-01".into()), &event(), 1_700_000_000_100, None)
+            .normalize(
+                EntityId("host:server-01".into()),
+                &event(),
+                1_700_000_000_100,
+                None,
+            )
             .unwrap();
         let message = match &obs.facts["log.message"] {
             StateValueV1::Text(value) => value,
@@ -340,24 +382,83 @@ mod tests {
         assert!(!message.contains("192.168.1.44"));
         assert!(!message.contains("sk-abcdefghijklmnopqr"));
         assert!(message.contains("[REDACTED_IP_"));
-        let email = match &obs.facts["log.field.user_name"] {
+
+        let fields = match &obs.facts["log.fields_json"] {
             StateValueV1::Text(value) => value,
-            _ => panic!("field must be text"),
+            _ => panic!("fields must be serialized text"),
         };
-        assert!(!email.contains("admin@example.com"));
+        assert!(!fields.contains("192.168.1.44"));
+        assert!(!fields.contains("admin@example.com"));
     }
 
     #[test]
-    fn observation_identity_is_content_deterministic() {
+    fn exact_normalization_replay_has_same_identity() {
         let adapter = adapter(Default::default());
         let first = adapter
-            .normalize(EntityId("host:server-01".into()), &event(), 1_700_000_000_100, None)
+            .normalize(
+                EntityId("host:server-01".into()),
+                &event(),
+                1_700_000_000_100,
+                Some(1_700_000_000_120),
+            )
             .unwrap();
         let second = adapter
-            .normalize(EntityId("host:server-01".into()), &event(), 1_700_000_000_999, None)
+            .normalize(
+                EntityId("host:server-01".into()),
+                &event(),
+                1_700_000_000_100,
+                Some(1_700_000_000_120),
+            )
             .unwrap();
-        assert_eq!(first.id, second.id);
-        assert_ne!(first.clock.observed_at_unix_ms, second.clock.observed_at_unix_ms);
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn recollection_at_different_time_is_distinct_evidence() {
+        let adapter = adapter(Default::default());
+        let first = adapter
+            .normalize(
+                EntityId("host:server-01".into()),
+                &event(),
+                1_700_000_000_100,
+                None,
+            )
+            .unwrap();
+        let second = adapter
+            .normalize(
+                EntityId("host:server-01".into()),
+                &event(),
+                1_700_000_000_999,
+                None,
+            )
+            .unwrap();
+        assert_ne!(first.id, second.id);
+    }
+
+    #[test]
+    fn omitted_payload_still_contributes_to_identity() {
+        let adapter = adapter(Default::default());
+        let first_event = event();
+        let mut second_event = event();
+        second_event.message = "different private payload".into();
+        let first = adapter
+            .normalize(
+                EntityId("host:server-01".into()),
+                &first_event,
+                1_700_000_000_100,
+                None,
+            )
+            .unwrap();
+        let second = adapter
+            .normalize(
+                EntityId("host:server-01".into()),
+                &second_event,
+                1_700_000_000_100,
+                None,
+            )
+            .unwrap();
+        assert_ne!(first.id, second.id);
+        assert!(!first.facts.contains_key("log.message"));
     }
 
     #[test]
