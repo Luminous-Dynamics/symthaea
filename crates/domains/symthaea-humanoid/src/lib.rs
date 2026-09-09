@@ -12,6 +12,7 @@ pub mod verified_authority_source;
 pub mod authority_source_signing;
 pub mod authority_evidence_artifacts;
 pub mod verified_authority_artifacts;
+pub mod authority_evidence_policy;
 pub mod capability_envelope;
 pub mod capability_request;
 pub mod cartesian_hand_reference;
@@ -63,10 +64,12 @@ pub mod physical_health;
 pub mod plugin;
 pub mod qp_certification;
 pub mod qualification;
-// Internal v1 attested facade. The public operational path is
-// `reach_verified_authority`, which accepts only v2 verifier decisions.
+// Internal v1 attested facade. Public authority uses the v2 source verifier.
 mod reach_attested_authority;
-pub mod reach_verified_authority;
+// Internal verified-source facade. The exported operational path additionally
+// precommits accepted evidence policies and verifier trust roots.
+mod reach_verified_authority;
+pub mod reach_runtime_authority;
 pub mod reach_authority_commitment;
 pub mod reach_authority_committed_evidence;
 // Internal implementation detail: authority-committed stages are necessary, but
@@ -84,7 +87,8 @@ mod reach_episode_promotion;
 pub mod reach_execution;
 pub mod reach_execution_evidence;
 // Internal implementation detail: manifest-aware motor authority is necessary,
-// but the exported path additionally requires authenticated source verification.
+// but the exported path additionally requires authenticated source verification
+// and runtime evidence-policy precommitment.
 mod reach_manifest_authority;
 // Internal implementation detail: manifest-bound qualification/promotion is
 // necessary, but the actual motor receipt must record the strongest identities.
@@ -143,6 +147,7 @@ pub use verified_authority_source::*;
 pub use authority_source_signing::*;
 pub use authority_evidence_artifacts::*;
 pub use verified_authority_artifacts::*;
+pub use authority_evidence_policy::*;
 pub use capability_envelope::*;
 pub use capability_request::*;
 pub use cartesian_hand_reference::*;
@@ -186,7 +191,12 @@ pub use payload_capability::*;
 pub use physical_health::*;
 pub use qp_certification::*;
 pub use qualification::*;
-pub use reach_verified_authority::*;
+pub use reach_runtime_authority::*;
+// These two public types occur in the runtime authority API even though their
+// implementation module is intentionally private.
+pub use reach_manifest_authority::{
+    HumanoidReachManifestOperationalArtifact, HumanoidReachManifestOperationalPolicy,
+};
 pub use reach_authority_commitment::*;
 pub use reach_authority_committed_evidence::*;
 pub use reach_episode_evidence::*;
