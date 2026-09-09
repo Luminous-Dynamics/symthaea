@@ -30,7 +30,7 @@ pub struct AuthenticatedMachineSession {
 impl AuthenticatedMachineSession {
     /// Cross the provider-verification boundary into maritime core.
     ///
-    /// Calling this function is an explicit assertion by the adapter that the provider-native
+    /// Calling this function is an explicit assertion by the adapter that provider-native
     /// cryptographic/session verification has already succeeded. Maritime core validates the
     /// portable claim shape but intentionally does not duplicate provider cryptography.
     pub fn from_verified_provider(
@@ -84,17 +84,18 @@ impl AuthenticatedMachineSession {
     }
 
     pub fn validate_shape(&self) -> Result<(), &'static str> {
-        if self.schema.trim().is_empty() {
-            return Err("schema must not be empty");
-        }
-        if self.session_id.trim().is_empty() {
-            return Err("session_id must not be empty");
-        }
-        if self.peer_identity_binding.trim().is_empty() {
-            return Err("peer_identity_binding must not be empty");
-        }
-        if self.evidence_binding.trim().is_empty() {
-            return Err("evidence_binding must not be empty");
+        for value in [
+            self.schema.as_str(),
+            self.session_id.as_str(),
+            self.peer_identity_binding.as_str(),
+            self.evidence_binding.as_str(),
+        ] {
+            if value.trim().is_empty() {
+                return Err("session evidence text fields must not be empty");
+            }
+            if value.trim() != value || value.chars().any(char::is_control) {
+                return Err("session evidence text fields must be canonical printable text");
+            }
         }
         if self.expires_at_ms <= self.authenticated_at_ms {
             return Err("session must have a positive validity interval");
@@ -251,6 +252,18 @@ mod tests {
                 "session-1",
                 "binding",
                 200,
+                200,
+                9,
+                "evidence"
+            )
+            .is_err()
+        );
+        assert!(
+            AuthenticatedMachineSession::from_verified_provider(
+                TEST_SCHEMA,
+                " session-1",
+                "binding",
+                100,
                 200,
                 9,
                 "evidence"
