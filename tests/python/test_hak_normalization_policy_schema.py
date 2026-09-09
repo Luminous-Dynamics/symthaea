@@ -27,8 +27,12 @@ def test_schema_rejects_missing_path_semantics():
     doc=deepcopy(POLICY); doc.pop("path_semantics")
     with pytest.raises(ValidationError): Draft202012Validator(POLICY_SCHEMA).validate(doc)
 
-def test_schema_rejects_missing_required_container_paths():
-    doc=deepcopy(POLICY); doc["resource_profiles"][0].pop("required_container_paths")
+def test_schema_rejects_missing_required_containers():
+    doc=deepcopy(POLICY); doc["resource_profiles"][0].pop("required_containers")
+    with pytest.raises(ValidationError): Draft202012Validator(POLICY_SCHEMA).validate(doc)
+
+def test_schema_rejects_invalid_container_type():
+    doc=deepcopy(POLICY); doc["resource_profiles"][0]["required_containers"][0]["container_type"]="scalar"
     with pytest.raises(ValidationError): Draft202012Validator(POLICY_SCHEMA).validate(doc)
 
 def test_schema_rejects_unknown_binding_status():

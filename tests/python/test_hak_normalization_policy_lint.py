@@ -19,13 +19,13 @@ def redigest_binding(d): d["binding_digest"]=hak.compute_binding_digest(d)
 def test_policy_valid(): hak.validate_policy(load(POLICY))
 def test_historical_binding_valid(): hak.validate_binding(load(OBS),load(BIND),load(POLICY))
 
-def test_steps_container_is_presence_shape_not_whole_subtree_selection():
+def test_steps_container_is_typed_shape_not_whole_subtree_selection():
     p=load(POLICY)
     profile=next(x for x in p["resource_profiles"] if x["resource_kind"]=="WorkflowJobStepsObservation")
-    assert profile["required_container_paths"]==["steps"]
+    assert profile["required_containers"]==[{"path":"steps","container_type":"array"}]
     assert "steps" not in profile["required_paths"]
     assert "steps" not in profile["optional_paths"]
-    assert p["path_semantics"]["required_container_paths"]=="RequireAndSelectContainerShapeOnly"
+    assert p["path_semantics"]["required_containers"]=="RequireTypedContainerAndSelectShapeOnly"
     hak.validate_policy(p)
 
 def test_symbolic_profile_ref_is_not_policy_identity():
@@ -45,18 +45,22 @@ def test_required_optional_overlap_rejected():
     with pytest.raises(hak.NormalizationPolicyLintError): hak.validate_policy(p)
 
 def test_required_container_exact_overlap_with_selected_path_rejected():
-    p=load(POLICY); p["resource_profiles"][0]["required_container_paths"].append(p["resource_profiles"][0]["required_paths"][0]); redigest_policy(p)
+    p=load(POLICY); p["resource_profiles"][0]["required_containers"].append({"path":p["resource_profiles"][0]["required_paths"][0],"container_type":"array"}); redigest_policy(p)
+    with pytest.raises(hak.NormalizationPolicyLintError): hak.validate_policy(p)
+
+def test_invalid_required_container_type_rejected():
+    p=load(POLICY); p["resource_profiles"][0]["required_containers"][0]["container_type"]="scalar"; redigest_policy(p)
     with pytest.raises(hak.NormalizationPolicyLintError): hak.validate_policy(p)
 
 def test_container_prefix_of_selected_descendant_is_allowed():
     p=load(POLICY)
     profile=next(x for x in p["resource_profiles"] if x["resource_kind"]=="WorkflowJobStepsObservation")
-    assert "steps" in profile["required_container_paths"]
+    assert {"path":"steps","container_type":"array"} in profile["required_containers"]
     assert "steps[*].name" in profile["optional_paths"]
     hak.validate_policy(p)
 
-def test_missing_required_container_path_semantics_rejected():
-    p=load(POLICY); p["path_semantics"].pop("required_container_paths"); redigest_policy(p)
+def test_missing_required_container_semantics_rejected():
+    p=load(POLICY); p["path_semantics"].pop("required_containers"); redigest_policy(p)
     with pytest.raises(hak.NormalizationPolicyLintError): hak.validate_policy(p)
 
 def test_duplicate_selected_path_rejected():

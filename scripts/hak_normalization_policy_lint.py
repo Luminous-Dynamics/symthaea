@@ -15,10 +15,11 @@ POLICY_SCHEMA = "hak.normalization-policy.v1"
 BINDING_SCHEMA = "hak.normalization-observation-binding.v1"
 RESOURCE_KINDS = {"WorkflowRunObservation","WorkflowJobsObservation","WorkflowJobStepsObservation"}
 PATH_SEMANTICS = {
-    "required_container_paths": "RequireAndSelectContainerShapeOnly",
+    "required_containers": "RequireTypedContainerAndSelectShapeOnly",
     "required_paths": "SelectValueAndRequirePresence",
     "optional_paths": "SelectValueIfPresent",
 }
+CONTAINER_TYPES = {"array","object"}
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 GIT_REF = re.compile(r"^git:[^@]+@[0-9a-f]{40}:.+$")
 
@@ -75,19 +76,35 @@ def validate_policy(doc: dict[str,Any]) -> None:
         kind=item.get("resource_kind")
         _require(kind in RESOURCE_KINDS,f"resource_profiles[{i}].resource_kind invalid")
         _require(kind not in seen_kinds,f"duplicate resource profile: {kind}"); seen_kinds.add(kind)
-        categories={}
-        for label in ("required_container_paths","required_paths","optional_paths"):
-            paths=_array(item.get(label),f"resource_profiles[{i}].{label}")
+
+        containers=_array(item.get("required_containers"),f"resource_profiles[{i}].required_containers")
+        container_paths=[]
+        for j,raw_container in enumerate(containers):
+            container=_obj(raw_container,f"resource_profiles[{i}].required_containers[{j}]")
+            _require(set(container)=={"path","container_type"},
+                     f"resource_profiles[{i}].required_containers[{j}] must contain exactly path/container_type")
+            path=_text(container.get("path"),f"resource_profiles[{i}].required_containers[{j}].path")
+            _require(container.get("container_type") in CONTAINER_TYPES,
+                     f"resource_profiles[{i}].required_containers[{j}].container_type invalid")
+            container_paths.append(path)
+        _require(len(set(container_paths))==len(container_paths),
+                 f"resource_profiles[{i}].required_containers contains duplicate paths")
+
+        required=_array(item.get("required_paths"),f"resource_profiles[{i}].required_paths")
+        optional=_array(item.get("optional_paths"),f"resource_profiles[{i}].optional_paths")
+        for label,paths in (("required_paths",required),("optional_paths",optional)):
             for j,path in enumerate(paths):
                 _text(path,f"resource_profiles[{i}].{label}[{j}]")
             _require(len(set(paths))==len(paths),f"resource_profiles[{i}].{label} contains duplicates")
-            categories[label]=paths
-        _require(any(categories.values()),f"resource_profiles[{i}] must select or require at least one path")
-        labels=list(categories)
-        for a_index,a in enumerate(labels):
-            for b in labels[a_index+1:]:
-                overlap=set(categories[a]).intersection(categories[b])
-                _require(not overlap,f"resource_profiles[{i}] {a}/{b} paths overlap: {sorted(overlap)}")
+
+        _require(bool(container_paths or required or optional),
+                 f"resource_profiles[{i}] must select or require at least one path")
+        _require(set(required).isdisjoint(optional),
+                 f"resource_profiles[{i}] required_paths/optional_paths overlap")
+        for label,paths in (("required_paths",required),("optional_paths",optional)):
+            overlap=set(container_paths).intersection(paths)
+            _require(not overlap,
+                     f"resource_profiles[{i}] required_containers/{label} paths overlap: {sorted(overlap)}")
 
     _text(doc.get("omission_semantics"),"omission_semantics")
     _text(doc.get("redaction_semantics"),"redaction_semantics")
