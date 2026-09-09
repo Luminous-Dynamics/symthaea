@@ -87,6 +87,8 @@ pub struct CollisionReviewAssessment {
 ///
 /// The fail-closed behavior for missing DCPA/TCPA or insufficient source diversity is
 /// intentional: this boundary refuses to infer safe passage from scanty relative-motion data.
+/// Direct observations such as immediate proximity are retained even when derived CPA evidence
+/// is unavailable so incident/evidence logs do not lose the strongest known fact.
 pub fn assess_collision_review(
     observation: ContactMotionObservation,
     policy: CollisionReviewPolicy,
@@ -97,6 +99,9 @@ pub fn assess_collision_review(
     let mut reasons = Vec::new();
     if observation.source_count < policy.minimum_source_count {
         reasons.push(CollisionReviewReason::InsufficientSourceDiversity);
+    }
+    if observation.range_m <= policy.immediate_proximity_m {
+        reasons.push(CollisionReviewReason::ImmediateProximity);
     }
 
     let (dcpa_m, tcpa_s) = match (observation.dcpa_m, observation.tcpa_s) {
@@ -110,9 +115,6 @@ pub fn assess_collision_review(
         }
     };
 
-    if observation.range_m <= policy.immediate_proximity_m {
-        reasons.push(CollisionReviewReason::ImmediateProximity);
-    }
     if (0.0..=policy.lookahead_s).contains(&tcpa_s) && dcpa_m <= policy.minimum_dcpa_m {
         reasons.push(CollisionReviewReason::ProjectedCloseApproach);
     }
@@ -172,6 +174,30 @@ mod tests {
         assert!(assessment
             .reasons
             .contains(&CollisionReviewReason::InsufficientSourceDiversity));
+    }
+
+    #[test]
+    fn immediate_proximity_is_preserved_when_cpa_evidence_is_missing() {
+        let assessment = assess_collision_review(
+            ContactMotionObservation {
+                range_m: 40.0,
+                dcpa_m: None,
+                tcpa_s: None,
+                source_count: 2,
+            },
+            policy(),
+        )
+        .unwrap();
+        assert_eq!(
+            assessment.disposition,
+            CollisionReviewDisposition::ColregReviewRequired
+        );
+        assert!(assessment
+            .reasons
+            .contains(&CollisionReviewReason::ImmediateProximity));
+        assert!(assessment
+            .reasons
+            .contains(&CollisionReviewReason::InsufficientRelativeMotionEvidence));
     }
 
     #[test]
