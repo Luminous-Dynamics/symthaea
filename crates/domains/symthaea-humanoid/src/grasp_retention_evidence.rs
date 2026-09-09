@@ -19,8 +19,8 @@
 
 use crate::evidence_digest::{HumanoidEvidenceDigest, HumanoidEvidenceHasher};
 use crate::grasp_contact_evidence::{
-    HumanoidGraspContactAssessment, HumanoidGraspContactObservation,
-    HumanoidGraspContactPolicy, HumanoidManipulationContactSource,
+    HumanoidGraspContactAssessment, HumanoidGraspContactObservation, HumanoidGraspContactPolicy,
+    HumanoidManipulationContactSource,
 };
 use crate::morphology::HandSide;
 use crate::qualification::HumanoidQualificationSubject;
@@ -116,14 +116,37 @@ impl HumanoidGraspRetentionSample {
             && self.sample_digest == digest_sample(self)
     }
 
-    pub fn object_id(&self) -> &str { &self.object_id }
-    pub const fn object_state_digest(&self) -> HumanoidEvidenceDigest { self.object_state_digest }
-    pub const fn hand(&self) -> HandSide { self.hand }
-    pub const fn contact_policy_digest(&self) -> HumanoidEvidenceDigest { self.contact_policy_digest }
-    pub const fn source(&self) -> HumanoidManipulationContactSource { self.source }
-    pub const fn sampled_at_s(&self) -> f64 { self.sampled_at_s }
-    pub const fn accepted_contact(&self) -> bool { self.accepted_contact }
-    pub const fn sample_digest(&self) -> HumanoidEvidenceDigest { self.sample_digest }
+    pub fn object_id(&self) -> &str {
+        &self.object_id
+    }
+
+    pub const fn object_state_digest(&self) -> HumanoidEvidenceDigest {
+        self.object_state_digest
+    }
+
+    pub const fn hand(&self) -> HandSide {
+        self.hand
+    }
+
+    pub const fn contact_policy_digest(&self) -> HumanoidEvidenceDigest {
+        self.contact_policy_digest
+    }
+
+    pub const fn source(&self) -> HumanoidManipulationContactSource {
+        self.source
+    }
+
+    pub const fn sampled_at_s(&self) -> f64 {
+        self.sampled_at_s
+    }
+
+    pub const fn accepted_contact(&self) -> bool {
+        self.accepted_contact
+    }
+
+    pub const fn sample_digest(&self) -> HumanoidEvidenceDigest {
+        self.sample_digest
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -218,7 +241,9 @@ impl HumanoidGraspRetentionPolicy {
             && self.policy_digest == digest_policy(self)
     }
 
-    pub const fn policy_digest(&self) -> HumanoidEvidenceDigest { self.policy_digest }
+    pub const fn policy_digest(&self) -> HumanoidEvidenceDigest {
+        self.policy_digest
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -281,18 +306,53 @@ pub struct HumanoidGraspRetentionEpisode {
 }
 
 impl HumanoidGraspRetentionEpisode {
-    pub fn object_id(&self) -> &str { &self.object_id }
-    pub const fn hand(&self) -> HandSide { self.hand }
-    pub const fn final_phase(&self) -> HumanoidGraspRetentionPhase { self.final_phase }
-    pub const fn final_continuous_samples(&self) -> usize { self.final_continuous_samples }
-    pub const fn final_continuous_duration_s(&self) -> f64 { self.final_continuous_duration_s }
-    pub const fn continuity_breaks(&self) -> usize { self.continuity_breaks }
-    pub const fn reacquisitions(&self) -> usize { self.reacquisitions }
-    pub const fn ever_retained(&self) -> bool { self.ever_retained }
-    pub fn failures(&self) -> &[HumanoidGraspRetentionFailureKind] { &self.failures }
-    pub const fn retained_at_end(&self) -> bool { self.retained_at_end }
-    pub const fn episode_digest(&self) -> HumanoidEvidenceDigest { self.episode_digest }
-    pub fn object_state_digests(&self) -> &[HumanoidEvidenceDigest] { &self.object_state_digests }
+    pub fn object_id(&self) -> &str {
+        &self.object_id
+    }
+
+    pub const fn hand(&self) -> HandSide {
+        self.hand
+    }
+
+    pub const fn final_phase(&self) -> HumanoidGraspRetentionPhase {
+        self.final_phase
+    }
+
+    pub const fn final_continuous_samples(&self) -> usize {
+        self.final_continuous_samples
+    }
+
+    pub const fn final_continuous_duration_s(&self) -> f64 {
+        self.final_continuous_duration_s
+    }
+
+    pub const fn continuity_breaks(&self) -> usize {
+        self.continuity_breaks
+    }
+
+    pub const fn reacquisitions(&self) -> usize {
+        self.reacquisitions
+    }
+
+    pub const fn ever_retained(&self) -> bool {
+        self.ever_retained
+    }
+
+    pub fn failures(&self) -> &[HumanoidGraspRetentionFailureKind] {
+        &self.failures
+    }
+
+    pub const fn retained_at_end(&self) -> bool {
+        self.retained_at_end
+    }
+
+    pub const fn episode_digest(&self) -> HumanoidEvidenceDigest {
+        self.episode_digest
+    }
+
+    pub fn object_state_digests(&self) -> &[HumanoidEvidenceDigest] {
+        &self.object_state_digests
+    }
 
     pub fn validate_for(
         &self,
@@ -380,7 +440,9 @@ pub fn evaluate_humanoid_grasp_retention(
         }
 
         let gap_break = previous_time_s
-            .map(|previous| sample.sampled_at_s - previous > retention_policy.maximum_inter_sample_gap_s)
+            .map(|previous| {
+                sample.sampled_at_s - previous > retention_policy.maximum_inter_sample_gap_s
+            })
             .unwrap_or(false);
         let gap_broke_active_run = gap_break && current_run_start_s.is_some();
         let accepted_measured = sample.accepted_contact && sample.source.is_measured();
@@ -418,6 +480,9 @@ pub fn evaluate_humanoid_grasp_retention(
                 final_phase = HumanoidGraspRetentionPhase::Retained;
             }
         } else {
+            // A large gap already records the continuity break for this sample;
+            // do not count the same physical discontinuity twice when the sample
+            // is also rejected.
             if current_run_start_s.is_some() {
                 continuity_breaks += 1;
                 final_phase = HumanoidGraspRetentionPhase::Lost;
@@ -464,7 +529,8 @@ pub fn evaluate_humanoid_grasp_retention(
         failures.push(HumanoidGraspRetentionFailureKind::RetentionLostAtEnd);
     }
 
-    let retained_at_end = failures.is_empty() && final_phase == HumanoidGraspRetentionPhase::Retained;
+    let retained_at_end =
+        failures.is_empty() && final_phase == HumanoidGraspRetentionPhase::Retained;
 
     let mut episode = HumanoidGraspRetentionEpisode {
         schema_version: HUMANOID_GRASP_RETENTION_EPISODE_SCHEMA_VERSION,
@@ -601,7 +667,10 @@ fn failure_id(failure: HumanoidGraspRetentionFailureKind) -> u64 {
 }
 
 fn hand_id(hand: HandSide) -> u64 {
-    match hand { HandSide::Right => 1, HandSide::Left => 2 }
+    match hand {
+        HandSide::Right => 1,
+        HandSide::Left => 2,
+    }
 }
 
 fn source_id(source: HumanoidManipulationContactSource) -> u64 {
@@ -640,8 +709,8 @@ mod tests {
     use super::*;
     use crate::contact_site::HumanoidContactSite;
     use crate::grasp_contact_evidence::{
-        assess_humanoid_grasp_contact, HumanoidGraspContactPolicy,
-        HumanoidManipulationContactSource,
+        HumanoidGraspContactPolicy, HumanoidManipulationContactSource,
+        assess_humanoid_grasp_contact,
     };
     use crate::morphology::HumanoidMorphology;
 
@@ -656,21 +725,26 @@ mod tests {
 
     fn contact_policy() -> HumanoidGraspContactPolicy {
         HumanoidGraspContactPolicy::new(
-            &subject(), HandSide::Right, 0.05, 0.8,
+            &subject(),
+            HandSide::Right,
+            0.05,
+            0.8,
             HumanoidManipulationContactSource::SolverWrench.quality_rank(),
-            true, 2.0, 50.0, 15.0, 2.0, 0.02, 0.01, 0.02,
-        ).unwrap()
+            true,
+            2.0,
+            50.0,
+            15.0,
+            2.0,
+            0.02,
+            0.01,
+            0.02,
+        )
+        .unwrap()
     }
 
     fn retention_policy(contact: &HumanoidGraspContactPolicy) -> HumanoidGraspRetentionPolicy {
-        HumanoidGraspRetentionPolicy::new(
-            &subject(), contact,
-            3, 0.04,
-            5, 0.08,
-            0.03,
-            64,
-            2.0,
-        ).unwrap()
+        HumanoidGraspRetentionPolicy::new(&subject(), contact, 3, 0.04, 5, 0.08, 0.03, 64, 2.0)
+            .unwrap()
     }
 
     fn sample(
@@ -685,25 +759,49 @@ mod tests {
             HumanoidManipulationContactSource::KinematicEstimate
         };
         let observation = HumanoidGraspContactObservation::new(
-            &subject(), "object-a", HumanoidEvidenceDigest::from_bytes([state_byte; 32]),
-            HandSide::Right, HumanoidContactSite::RightHand,
+            &subject(),
+            "object-a",
+            HumanoidEvidenceDigest::from_bytes([state_byte; 32]),
+            HandSide::Right,
+            HumanoidContactSite::RightHand,
             accepted_contact,
-            [0.2, 0.0, 1.0], [1.0, 0.0, 0.0],
-            if accepted_contact { [-10.0, 0.2, 0.0] } else { [0.0; 3] },
-            [0.0; 3], [0.0; 3], 0.95, source, timestamp_s,
-        ).unwrap();
-        let assessment = assess_humanoid_grasp_contact(
-            &subject(), &observation, contact, timestamp_s + 0.001,
-        ).unwrap();
+            [0.2, 0.0, 1.0],
+            [1.0, 0.0, 0.0],
+            if accepted_contact {
+                [-10.0, 0.2, 0.0]
+            } else {
+                [0.0; 3]
+            },
+            [0.0; 3],
+            [0.0; 3],
+            0.95,
+            source,
+            timestamp_s,
+        )
+        .unwrap();
+        let assessment =
+            assess_humanoid_grasp_contact(&subject(), &observation, contact, timestamp_s + 0.001)
+                .unwrap();
         HumanoidGraspRetentionSample::bind(&subject(), &observation, &assessment, contact).unwrap()
     }
 
     #[test]
     fn retention_policy_must_be_stricter_than_stabilization() {
         let contact = contact_policy();
-        assert!(HumanoidGraspRetentionPolicy::new(
-            &subject(), &contact, 3, 0.04, 3, 0.04, 0.03, 64, 2.0,
-        ).is_none());
+        assert!(
+            HumanoidGraspRetentionPolicy::new(
+                &subject(),
+                &contact,
+                3,
+                0.04,
+                3,
+                0.04,
+                0.03,
+                64,
+                2.0,
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -711,11 +809,13 @@ mod tests {
         let contact = contact_policy();
         let retention = retention_policy(&contact);
         let samples = vec![sample(&contact, 1.0, 1, true)];
-        let episode = evaluate_humanoid_grasp_retention(
-            &subject(), &samples, &contact, &retention,
-        ).unwrap();
+        let episode =
+            evaluate_humanoid_grasp_retention(&subject(), &samples, &contact, &retention).unwrap();
         assert!(!episode.retained_at_end());
-        assert_eq!(episode.final_phase(), HumanoidGraspRetentionPhase::ContactAcquired);
+        assert_eq!(
+            episode.final_phase(),
+            HumanoidGraspRetentionPhase::ContactAcquired
+        );
     }
 
     #[test]
@@ -727,9 +827,8 @@ mod tests {
             .enumerate()
             .map(|(index, time)| sample(&contact, time, index as u8 + 1, true))
             .collect::<Vec<_>>();
-        let episode = evaluate_humanoid_grasp_retention(
-            &subject(), &samples, &contact, &retention,
-        ).unwrap();
+        let episode =
+            evaluate_humanoid_grasp_retention(&subject(), &samples, &contact, &retention).unwrap();
         assert!(episode.retained_at_end(), "{:?}", episode.failures());
         assert_eq!(episode.final_phase(), HumanoidGraspRetentionPhase::Retained);
         assert_eq!(episode.final_continuous_samples(), 5);
@@ -746,13 +845,16 @@ mod tests {
             .map(|(index, time)| sample(&contact, time, index as u8 + 1, true))
             .collect::<Vec<_>>();
         samples.push(sample(&contact, 1.10, 9, false));
-        let episode = evaluate_humanoid_grasp_retention(
-            &subject(), &samples, &contact, &retention,
-        ).unwrap();
+        let episode =
+            evaluate_humanoid_grasp_retention(&subject(), &samples, &contact, &retention).unwrap();
         assert!(!episode.retained_at_end());
         assert!(episode.ever_retained());
         assert_eq!(episode.final_phase(), HumanoidGraspRetentionPhase::Lost);
-        assert!(episode.failures().contains(&HumanoidGraspRetentionFailureKind::RetentionLostAtEnd));
+        assert!(
+            episode
+                .failures()
+                .contains(&HumanoidGraspRetentionFailureKind::RetentionLostAtEnd)
+        );
     }
 
     #[test]
@@ -764,13 +866,15 @@ mod tests {
             sample(&contact, 1.02, 2, true),
             sample(&contact, 1.04, 3, false),
         ];
-        for (index, time) in [1.06, 1.08, 1.10, 1.12, 1.14].into_iter().enumerate() {
+        // Keep the final sample comfortably beyond the 0.08 s retention boundary
+        // so this test exercises reacquisition semantics, not binary-float edge
+        // representation of an exactly-threshold duration.
+        for (index, time) in [1.06, 1.08, 1.10, 1.12, 1.15].into_iter().enumerate() {
             samples.push(sample(&contact, time, index as u8 + 10, true));
         }
-        let episode = evaluate_humanoid_grasp_retention(
-            &subject(), &samples, &contact, &retention,
-        ).unwrap();
-        assert!(episode.retained_at_end());
+        let episode =
+            evaluate_humanoid_grasp_retention(&subject(), &samples, &contact, &retention).unwrap();
+        assert!(episode.retained_at_end(), "{:?}", episode.failures());
         assert_eq!(episode.reacquisitions(), 1);
     }
 
@@ -785,9 +889,8 @@ mod tests {
             sample(&contact, 1.12, 4, true),
             sample(&contact, 1.14, 5, true),
         ];
-        let episode = evaluate_humanoid_grasp_retention(
-            &subject(), &samples, &contact, &retention,
-        ).unwrap();
+        let episode =
+            evaluate_humanoid_grasp_retention(&subject(), &samples, &contact, &retention).unwrap();
         assert_eq!(episode.continuity_breaks(), 1);
         assert!(!episode.retained_at_end());
     }
@@ -798,20 +901,33 @@ mod tests {
         let retention = retention_policy(&contact);
         let first = sample(&contact, 1.0, 1, true);
         let observation = HumanoidGraspContactObservation::new(
-            &subject(), "object-b", HumanoidEvidenceDigest::from_bytes([2; 32]),
-            HandSide::Right, HumanoidContactSite::RightHand, true,
-            [0.2, 0.0, 1.0], [1.0, 0.0, 0.0], [-10.0, 0.0, 0.0], [0.0; 3], [0.0; 3],
-            0.95, HumanoidManipulationContactSource::ForceTorqueSensor, 1.02,
-        ).unwrap();
-        let assessment = assess_humanoid_grasp_contact(
-            &subject(), &observation, &contact, 1.021,
-        ).unwrap();
-        let second = HumanoidGraspRetentionSample::bind(
-            &subject(), &observation, &assessment, &contact,
-        ).unwrap();
+            &subject(),
+            "object-b",
+            HumanoidEvidenceDigest::from_bytes([2; 32]),
+            HandSide::Right,
+            HumanoidContactSite::RightHand,
+            true,
+            [0.2, 0.0, 1.0],
+            [1.0, 0.0, 0.0],
+            [-10.0, 0.0, 0.0],
+            [0.0; 3],
+            [0.0; 3],
+            0.95,
+            HumanoidManipulationContactSource::ForceTorqueSensor,
+            1.02,
+        )
+        .unwrap();
+        let assessment = assess_humanoid_grasp_contact(&subject(), &observation, &contact, 1.021)
+            .unwrap();
+        let second =
+            HumanoidGraspRetentionSample::bind(&subject(), &observation, &assessment, &contact)
+                .unwrap();
         assert_eq!(
             evaluate_humanoid_grasp_retention(
-                &subject(), &[first, second], &contact, &retention,
+                &subject(),
+                &[first, second],
+                &contact,
+                &retention,
             ),
             Err(HumanoidGraspRetentionEpisodeFailure::ObjectSubstitution)
         );
@@ -826,9 +942,7 @@ mod tests {
             sample(&contact, 1.01, 2, true),
         ];
         assert_eq!(
-            evaluate_humanoid_grasp_retention(
-                &subject(), &samples, &contact, &retention,
-            ),
+            evaluate_humanoid_grasp_retention(&subject(), &samples, &contact, &retention),
             Err(HumanoidGraspRetentionEpisodeFailure::TimestampNotStrictlyIncreasing)
         );
     }
