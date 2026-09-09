@@ -55,6 +55,8 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{HiddenState, Observation};
 
+mod live_snapshot;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MARKOV PARTITION
 // ═══════════════════════════════════════════════════════════════════════════════
