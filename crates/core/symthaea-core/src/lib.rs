@@ -70,6 +70,8 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Evidence primitives for explicit embodiment availability, source, time, and metric semantics.
+pub mod embodiment_evidence;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
