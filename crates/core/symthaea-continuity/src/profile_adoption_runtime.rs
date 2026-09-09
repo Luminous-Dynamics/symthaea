@@ -42,12 +42,6 @@ use crate::profile_adoption_time::{
 use crate::verifier::VerifierProfileV1;
 use crate::witness::EvidenceClass;
 
-/// Historical non-Serde policy baseline derived from the canonical #1198 commit
-/// preconditions.
-///
-/// This is deliberately not proof that a registry write happened. Its purpose is to
-/// retain the exact local policy lineage that a later cryptographically authenticated
-/// committed-adoption receipt must corroborate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifierProfileRuntimeAuthorityBaselineV1 {
     transition_digest: VerifierProfileAdoptionTransitionDigest,
@@ -99,10 +93,6 @@ impl VerifierProfileRuntimeAuthorityBaselineV1 {
     }
 }
 
-/// Non-Serde current-use policy envelope.
-///
-/// It is intentionally weaker than a future `CurrentlyAuthorizedVerifierProfile`:
-/// no cryptographic proof or committed-adoption receipt is present here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PolicyCurrentVerifierRuntimeEnvelopeV1 {
     transition_digest: VerifierProfileAdoptionTransitionDigest,
@@ -173,12 +163,6 @@ impl PolicyCurrentVerifierRuntimeEnvelopeV1 {
     }
 }
 
-/// Re-evaluate one exact adoption transition for current runtime policy use.
-///
-/// `current_grant == None` is explicit local revocation. A newer grant may narrow
-/// authority immediately. A wider grant never widens beyond the signed adoption.
-/// Grant rollback, same-epoch equivocation, root reprovisioning, head supersession,
-/// clock-lineage changes, and boundary-straddling time uncertainty all fail closed.
 #[allow(clippy::too_many_arguments)]
 pub fn check_current_verifier_runtime_policy(
     baseline: &VerifierProfileRuntimeAuthorityBaselineV1,
@@ -363,7 +347,8 @@ fn ground_scope(
     match scope {
         VerifierAdoptionScopeV1::AllContinuityVerification => Ok(()),
         VerifierAdoptionScopeV1::Contract { contract_id } => {
-            let contract = contract.ok_or(VerifierProfileRuntimeAuthorityError::MissingScopeContract)?;
+            let contract =
+                contract.ok_or(VerifierProfileRuntimeAuthorityError::MissingScopeContract)?;
             if contract.id() != *contract_id {
                 return Err(VerifierProfileRuntimeAuthorityError::ScopeContractMismatch);
             }
@@ -373,7 +358,8 @@ fn ground_scope(
             contract_id,
             requirement_ids,
         } => {
-            let contract = contract.ok_or(VerifierProfileRuntimeAuthorityError::MissingScopeContract)?;
+            let contract =
+                contract.ok_or(VerifierProfileRuntimeAuthorityError::MissingScopeContract)?;
             if contract.id() != *contract_id {
                 return Err(VerifierProfileRuntimeAuthorityError::ScopeContractMismatch);
             }
@@ -383,9 +369,22 @@ fn ground_scope(
                     .iter()
                     .any(|item| item.id() == *requirement)
                 {
-                    return Err(VerifierProfileRuntimeAuthorityError::UnknownScopeRequirement {
-                        owner,
-                        requirement: *requirement,
+                    return Err(match owner {
+                        ScopeOwner::Adoption => {
+                            VerifierProfileRuntimeAuthorityError::UnknownAdoptionRequirement {
+                                requirement: *requirement,
+                            }
+                        }
+                        ScopeOwner::Grant => {
+                            VerifierProfileRuntimeAuthorityError::UnknownGrantRequirement {
+                                requirement: *requirement,
+                            }
+                        }
+                        ScopeOwner::Effective => {
+                            VerifierProfileRuntimeAuthorityError::UnknownEffectiveRequirement {
+                                requirement: *requirement,
+                            }
+                        }
                     });
                 }
             }
@@ -430,7 +429,10 @@ pub enum VerifierProfileRuntimeAuthorityError {
         observed_epoch: u64,
     },
     #[error("clock uncertainty {observed_ms}ms exceeds runtime policy maximum {maximum_ms}ms")]
-    ClockUncertaintyExceedsPolicy { observed_ms: u64, maximum_ms: u64 },
+    ClockUncertaintyExceedsPolicy {
+        observed_ms: u64,
+        maximum_ms: u64,
+    },
     #[error("current clock interval [{earliest_unix_ms}, {latest_unix_ms}] lies outside adoption validity [{valid_from_unix_ms}, {valid_until_unix_ms})")]
     ClockIntervalOutsideAdoptionValidity {
         earliest_unix_ms: u64,
@@ -442,11 +444,12 @@ pub enum VerifierProfileRuntimeAuthorityError {
     MissingScopeContract,
     #[error("runtime verifier scope references a different continuity contract")]
     ScopeContractMismatch,
-    #[error("{owner:?} scope references requirement outside the exact contract: {requirement:?}")]
-    UnknownScopeRequirement {
-        owner: ScopeOwner,
-        requirement: ContinuityRequirementId,
-    },
+    #[error("signed adoption scope references requirement outside the exact contract: {requirement:?}")]
+    UnknownAdoptionRequirement { requirement: ContinuityRequirementId },
+    #[error("current local grant scope references requirement outside the exact contract: {requirement:?}")]
+    UnknownGrantRequirement { requirement: ContinuityRequirementId },
+    #[error("effective runtime scope references requirement outside the exact contract: {requirement:?}")]
+    UnknownEffectiveRequirement { requirement: ContinuityRequirementId },
     #[error("signed adoption and current local grant have no effective verifier scope")]
     NoEffectiveScope,
 }
