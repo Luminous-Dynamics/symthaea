@@ -49,6 +49,7 @@ write_receipt() {
     local rustc_host="unavailable"
     local cargo_version="unavailable"
     local target_list="none"
+    local tmp_path="${receipt_path}.tmp.$$"
 
     set +e
 
@@ -77,7 +78,7 @@ write_receipt() {
         target_list="$(IFS=,; printf '%s' "${authority_targets[*]}")"
     fi
 
-    mkdir -p "$(dirname "$receipt_path")"
+    mkdir -p "$(dirname "$receipt_path")" || return 1
     {
         printf 'schema\tsymthaea-evidence-contract-qualification-v1\n'
         printf 'status\t%s\n' "$final_status"
@@ -120,7 +121,14 @@ write_receipt() {
         printf 'github_job\t%s\n' "${GITHUB_JOB:-not-applicable}"
         printf 'github_run_id\t%s\n' "${GITHUB_RUN_ID:-not-applicable}"
         printf 'github_run_attempt\t%s\n' "${GITHUB_RUN_ATTEMPT:-not-applicable}"
-    } > "$receipt_path"
+    } > "$tmp_path" || {
+        rm -f "$tmp_path"
+        return 1
+    }
+    mv "$tmp_path" "$receipt_path" || {
+        rm -f "$tmp_path"
+        return 1
+    }
 
     echo "evidence-contract receipt=$receipt_path status=$final_status stage=$failure_stage"
 
@@ -137,14 +145,28 @@ write_receipt() {
             echo '- full repository CI: independent'
             echo '- empirical/scientific claim authority: none'
             echo '- receipt attestation: none (run/artifact context is the external witness)'
-        } >> "$GITHUB_STEP_SUMMARY"
+        } >> "$GITHUB_STEP_SUMMARY" || true
     fi
+    return 0
 }
 
 finish() {
     local exit_code=$?
     trap - EXIT
-    write_receipt "$exit_code"
+
+    # Success is verifier-owned: falling off the script or an early `exit 0`
+    # before the explicit terminal PASS is a failure, not an implicit green.
+    if [[ "$exit_code" -eq 0 && "$status" != "PASS" ]]; then
+        echo "error: verifier exited without reaching terminal PASS (stage=$stage)" >&2
+        exit_code=1
+    fi
+
+    if ! write_receipt "$exit_code"; then
+        echo "error: qualification receipt could not be persisted to $receipt_path" >&2
+        if [[ "$exit_code" -eq 0 ]]; then
+            exit_code=1
+        fi
+    fi
     exit "$exit_code"
 }
 trap finish EXIT
@@ -185,6 +207,15 @@ if [[ -n "$untracked" ]]; then
 fi
 source_state="clean-exact-checkout"
 
+# Discover the narrow authority-test family before execution so even an early
+# failure receipt states which source-defined integration targets were in scope.
+mapfile -t authority_targets < <(
+    find crates/domains/symthaea-psych-bench/tests \
+        -maxdepth 1 -type f -name 'butlin_*authority*_regression.rs' -printf '%f\n' \
+        | sed 's/\.rs$//' \
+        | LC_ALL=C sort
+)
+
 echo "evidence-contract qualified_sha=$actual_sha"
 echo "evidence-contract committed_tree=$head_tree"
 echo "evidence-contract scope=software-contract-only"
@@ -208,16 +239,6 @@ cargo test --locked -p symthaea-psych-bench --lib benchmarks::butlin
 stage="butlin_structural_contract"
 cargo test --locked -p symthaea-psych-bench --test butlin_regression
 
-# Authority diagnostics use a naming convention so a PR that adds a focused
-# fail-closed regression is automatically exercised without enumerating every
-# future authority issue in this script. Only this narrow family is discovered;
-# broad/full-battery regression tests remain outside this theorem.
-mapfile -t authority_targets < <(
-    find crates/domains/symthaea-psych-bench/tests \
-        -maxdepth 1 -type f -name 'butlin_*authority*_regression.rs' -printf '%f\n' \
-        | sed 's/\.rs$//' \
-        | LC_ALL=C sort
-)
 for target in "${authority_targets[@]}"; do
     stage="authority_integration_${target}"
     cargo test --locked -p symthaea-psych-bench --test "$target"
@@ -225,6 +246,34 @@ done
 
 stage="butlin_backend_contracts"
 cargo test --locked -p symthaea-psych-bench --features symthaea-backend --lib -- butlin
+
+# Qualification is read-only. Tests may create ignored build outputs, but the
+# source/evidence checkout itself must remain the exact committed subject.
+stage="postflight_source_immutability"
+if [[ "$(git rev-parse HEAD)" != "$actual_sha" ]]; then
+    source_state="head-changed-during-tests"
+    echo "error: HEAD changed during qualification" >&2
+    exit 1
+fi
+if ! git diff --quiet --ignore-submodules --; then
+    source_state="tracked-source-mutated-during-tests"
+    echo "error: tracked source/evidence bytes changed during qualification" >&2
+    git diff --stat >&2 || true
+    exit 1
+fi
+if ! git diff --cached --quiet --ignore-submodules --; then
+    source_state="staged-source-mutated-during-tests"
+    echo "error: staged source/evidence bytes appeared during qualification" >&2
+    exit 1
+fi
+post_untracked="$(git ls-files --others --exclude-standard)"
+if [[ -n "$post_untracked" ]]; then
+    source_state="untracked-source-created-during-tests"
+    echo "error: untracked source/evidence files appeared during qualification" >&2
+    printf '%s\n' "$post_untracked" >&2
+    exit 1
+fi
+source_state="clean-exact-checkout-postflight"
 
 status="PASS"
 stage="complete"
