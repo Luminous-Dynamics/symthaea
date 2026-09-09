@@ -1,22 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Final operational Reach authority with precommitted live-evidence policies.
+//! Final operational Reach authority built on the task-generic live-authority kernel.
 //!
-//! Behavioral qualification alone does not define which live physical-health,
-//! estimator, or cognitive-restriction configuration may be trusted at runtime.
-//! Likewise, a valid signature is insufficient if operations did not precommit
-//! which verifier policy/keyset is authoritative. This facade freezes all of
-//! those identities before motor authority can be minted.
+//! Reach owns behavioral qualification. The generic kernel owns live Physical,
+//! Epistemic and Cognitive evidence, verifier trust roots and scoped Operator
+//! approval. This separation lets later skills reuse the same live trust boundary.
 
-use crate::authority_evidence_policy::{
-    HumanoidPolicyVerifiedEpistemicAuthorityEvidence,
-    HumanoidPolicyVerifiedPhysicalAuthorityEvidence,
-};
-use crate::cognitive_authority_evidence::HumanoidPolicyVerifiedCognitiveAuthorityEvidence;
 use crate::evidence_digest::{HumanoidEvidenceDigest, HumanoidEvidenceHasher};
 use crate::execution_authority_scope::{
     HumanoidExecutionAuthorityScopeIssueFailure, HumanoidScopedSkillAuthorityReceipt,
     scope_verified_operational_authority_receipt,
+};
+use crate::live_authority_kernel::{
+    HumanoidLiveAuthorityApproval, HumanoidLiveAuthorityPolicy,
+    HumanoidVerifiedLiveAuthorityEvidence,
 };
 use crate::qualification::HumanoidQualificationSubject;
 use crate::reach_manifest_authority::{
@@ -28,9 +25,7 @@ use crate::skill_authority_receipt::{
 };
 use crate::skill_permit::HumanoidSkillExecutionPermit;
 use crate::types::{ActuationMode, HumanoidTask};
-use crate::verified_authority_source::{
-    HumanoidVerifiedAuthorityKind, HumanoidVerifiedAuthoritySource,
-};
+use crate::verified_authority_source::HumanoidVerifiedAuthoritySource;
 
 pub use crate::reach_manifest_authority::{
     HumanoidReachBaseOperationalPolicy,
@@ -57,22 +52,16 @@ pub use crate::reach_manifest_authority::{
     promote_humanoid_reach_manifest_to_operational,
 };
 
-pub const HUMANOID_REACH_RUNTIME_EVIDENCE_POLICY_SCHEMA_VERSION: u32 = 2;
-pub const HUMANOID_REACH_RUNTIME_AUTHORITY_APPROVAL_SCHEMA_VERSION: u32 = 2;
+/// Schema v3 replaces Reach-local live-evidence fields with one generic live policy digest.
+pub const HUMANOID_REACH_RUNTIME_EVIDENCE_POLICY_SCHEMA_VERSION: u32 = 3;
 
-/// Exact live-evidence and trust-root policy for operational Reach.
+/// Reach-specific operational policy = behavioral qualification + generic live authority policy.
 pub struct HumanoidReachRuntimeEvidencePolicy {
     schema_version: u32,
     policy_id: String,
     subject_digest: HumanoidEvidenceDigest,
     base: HumanoidReachManifestOperationalPolicy,
-    physical_evidence_policy_digest: HumanoidEvidenceDigest,
-    epistemic_evidence_policy_digest: HumanoidEvidenceDigest,
-    cognitive_evidence_policy_digest: HumanoidEvidenceDigest,
-    operator_verifier_digest: HumanoidEvidenceDigest,
-    physical_verifier_digest: HumanoidEvidenceDigest,
-    epistemic_verifier_digest: HumanoidEvidenceDigest,
-    cognitive_verifier_digest: HumanoidEvidenceDigest,
+    live: HumanoidLiveAuthorityPolicy,
     policy_digest: HumanoidEvidenceDigest,
 }
 
@@ -81,40 +70,25 @@ impl std::fmt::Debug for HumanoidReachRuntimeEvidencePolicy {
         f.debug_struct("HumanoidReachRuntimeEvidencePolicy")
             .field("policy_id", &self.policy_id)
             .field("base_policy_digest", &self.base.policy_digest())
-            .field("physical_evidence_policy_digest", &self.physical_evidence_policy_digest)
-            .field("epistemic_evidence_policy_digest", &self.epistemic_evidence_policy_digest)
-            .field("cognitive_evidence_policy_digest", &self.cognitive_evidence_policy_digest)
+            .field("live_policy_digest", &self.live.policy_digest())
             .field("policy_digest", &self.policy_digest)
             .finish()
     }
 }
 
 impl HumanoidReachRuntimeEvidencePolicy {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         subject: &HumanoidQualificationSubject,
         policy_id: impl Into<String>,
         base: HumanoidReachManifestOperationalPolicy,
-        physical_evidence_policy_digest: HumanoidEvidenceDigest,
-        epistemic_evidence_policy_digest: HumanoidEvidenceDigest,
-        cognitive_evidence_policy_digest: HumanoidEvidenceDigest,
-        operator_verifier_digest: HumanoidEvidenceDigest,
-        physical_verifier_digest: HumanoidEvidenceDigest,
-        epistemic_verifier_digest: HumanoidEvidenceDigest,
-        cognitive_verifier_digest: HumanoidEvidenceDigest,
+        live: HumanoidLiveAuthorityPolicy,
     ) -> Option<Self> {
         let mut value = Self {
             schema_version: HUMANOID_REACH_RUNTIME_EVIDENCE_POLICY_SCHEMA_VERSION,
             policy_id: policy_id.into(),
             subject_digest: digest_subject(subject)?,
             base,
-            physical_evidence_policy_digest,
-            epistemic_evidence_policy_digest,
-            cognitive_evidence_policy_digest,
-            operator_verifier_digest,
-            physical_verifier_digest,
-            epistemic_verifier_digest,
-            cognitive_verifier_digest,
+            live,
             policy_digest: HumanoidEvidenceDigest::ZERO,
         };
         if !value.validate_shape(subject) {
@@ -136,32 +110,8 @@ impl HumanoidReachRuntimeEvidencePolicy {
         &self.base
     }
 
-    pub const fn physical_evidence_policy_digest(&self) -> HumanoidEvidenceDigest {
-        self.physical_evidence_policy_digest
-    }
-
-    pub const fn epistemic_evidence_policy_digest(&self) -> HumanoidEvidenceDigest {
-        self.epistemic_evidence_policy_digest
-    }
-
-    pub const fn cognitive_evidence_policy_digest(&self) -> HumanoidEvidenceDigest {
-        self.cognitive_evidence_policy_digest
-    }
-
-    pub const fn operator_verifier_digest(&self) -> HumanoidEvidenceDigest {
-        self.operator_verifier_digest
-    }
-
-    pub const fn physical_verifier_digest(&self) -> HumanoidEvidenceDigest {
-        self.physical_verifier_digest
-    }
-
-    pub const fn epistemic_verifier_digest(&self) -> HumanoidEvidenceDigest {
-        self.epistemic_verifier_digest
-    }
-
-    pub const fn cognitive_verifier_digest(&self) -> HumanoidEvidenceDigest {
-        self.cognitive_verifier_digest
+    pub fn live_policy(&self) -> &HumanoidLiveAuthorityPolicy {
+        &self.live
     }
 
     pub fn validate_for(&self, subject: &HumanoidQualificationSubject) -> bool {
@@ -175,132 +125,35 @@ impl HumanoidReachRuntimeEvidencePolicy {
             && digest_subject(subject) == Some(self.subject_digest)
             && valid_id(&self.policy_id)
             && self.base.validate_for(subject)
-            && !self.physical_evidence_policy_digest.is_zero()
-            && !self.epistemic_evidence_policy_digest.is_zero()
-            && !self.cognitive_evidence_policy_digest.is_zero()
-            && !self.operator_verifier_digest.is_zero()
-            && !self.physical_verifier_digest.is_zero()
-            && !self.epistemic_verifier_digest.is_zero()
-            && !self.cognitive_verifier_digest.is_zero()
+            && self.live.validate_for(subject)
     }
 }
 
-/// Operator approval for one exact runtime-evidence policy and deployment scope.
-pub struct HumanoidReachRuntimeAuthorityApproval {
-    schema_version: u32,
-    approval_id: String,
-    subject_digest: HumanoidEvidenceDigest,
-    runtime_policy_digest: HumanoidEvidenceDigest,
-    operational_scope_id: String,
+/// Convenience binder that prevents callers from supplying the wrong operational
+/// policy digest to the generic approval kernel.
+#[allow(clippy::too_many_arguments)]
+pub fn bind_humanoid_reach_runtime_operator_approval(
+    subject: &HumanoidQualificationSubject,
+    policy: &HumanoidReachRuntimeEvidencePolicy,
+    operational_scope_id: impl Into<String>,
+    approval_id: impl Into<String>,
+    operator: &HumanoidVerifiedAuthoritySource,
     approved_at_s: f64,
     valid_until_s: f64,
-    operator_verification_digest: HumanoidEvidenceDigest,
-    operator_source: HumanoidAuthoritySourceSnapshot,
-    approval_digest: HumanoidEvidenceDigest,
-}
-
-impl std::fmt::Debug for HumanoidReachRuntimeAuthorityApproval {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HumanoidReachRuntimeAuthorityApproval")
-            .field("approval_id", &self.approval_id)
-            .field("runtime_policy_digest", &self.runtime_policy_digest)
-            .field("operational_scope_id", &self.operational_scope_id)
-            .field("operator_verification_digest", &self.operator_verification_digest)
-            .field("approval_digest", &self.approval_digest)
-            .finish()
+) -> Option<HumanoidLiveAuthorityApproval> {
+    if !policy.validate_for(subject) {
+        return None;
     }
-}
-
-impl HumanoidReachRuntimeAuthorityApproval {
-    #[allow(clippy::too_many_arguments)]
-    pub fn bind_verified_operator(
-        subject: &HumanoidQualificationSubject,
-        policy: &HumanoidReachRuntimeEvidencePolicy,
-        operational_scope_id: impl Into<String>,
-        approval_id: impl Into<String>,
-        operator: &HumanoidVerifiedAuthoritySource,
-        approved_at_s: f64,
-        valid_until_s: f64,
-    ) -> Option<Self> {
-        let operational_scope_id = operational_scope_id.into();
-        let approval_id = approval_id.into();
-        if !policy.validate_for(subject)
-            || !valid_id(&operational_scope_id)
-            || !valid_id(&approval_id)
-            || !operator.validate_for(subject, HumanoidVerifiedAuthorityKind::Operator, approved_at_s)
-            || operator.verifier_digest() != policy.operator_verifier_digest
-            || !valid_until_s.is_finite()
-            || valid_until_s < approved_at_s
-            || valid_until_s > operator.valid_until_s()
-        {
-            return None;
-        }
-        let mut value = Self {
-            schema_version: HUMANOID_REACH_RUNTIME_AUTHORITY_APPROVAL_SCHEMA_VERSION,
-            approval_id,
-            subject_digest: digest_subject(subject)?,
-            runtime_policy_digest: policy.policy_digest,
-            operational_scope_id,
-            approved_at_s,
-            valid_until_s,
-            operator_verification_digest: operator.verification_digest(),
-            operator_source: operator.source_snapshot(),
-            approval_digest: HumanoidEvidenceDigest::ZERO,
-        };
-        value.approval_digest = digest_runtime_approval(&value);
-        value.validate_at(subject, policy, approved_at_s).then_some(value)
-    }
-
-    pub const fn approval_digest(&self) -> HumanoidEvidenceDigest {
-        self.approval_digest
-    }
-
-    pub fn operational_scope_id(&self) -> &str {
-        &self.operational_scope_id
-    }
-
-    pub fn validate_at(
-        &self,
-        subject: &HumanoidQualificationSubject,
-        policy: &HumanoidReachRuntimeEvidencePolicy,
-        now_s: f64,
-    ) -> bool {
-        self.schema_version == HUMANOID_REACH_RUNTIME_AUTHORITY_APPROVAL_SCHEMA_VERSION
-            && digest_subject(subject) == Some(self.subject_digest)
-            && policy.validate_for(subject)
-            && self.runtime_policy_digest == policy.policy_digest
-            && valid_id(&self.approval_id)
-            && valid_id(&self.operational_scope_id)
-            && self.operator_verification_digest != HumanoidEvidenceDigest::ZERO
-            && now_s.is_finite()
-            && now_s >= self.approved_at_s
-            && now_s <= self.valid_until_s
-            && self.operator_source.validate_at(now_s)
-            && self.valid_until_s <= self.operator_source.valid_until_s
-            && !self.approval_digest.is_zero()
-            && self.approval_digest == digest_runtime_approval(self)
-    }
-
-    fn derived_operator_source(
-        &self,
-        subject: &HumanoidQualificationSubject,
-        policy: &HumanoidReachRuntimeEvidencePolicy,
-        now_s: f64,
-    ) -> Option<HumanoidAuthoritySourceSnapshot> {
-        if !self.validate_at(subject, policy, now_s) {
-            return None;
-        }
-        let source = HumanoidAuthoritySourceSnapshot {
-            evidence_id: format!(
-                "reach-operator-runtime-policy-sha256:{}",
-                self.approval_digest.to_hex()
-            ),
-            scale: self.operator_source.scale,
-            evaluated_at_s: self.operator_source.evaluated_at_s.max(self.approved_at_s),
-            valid_until_s: self.operator_source.valid_until_s.min(self.valid_until_s),
-        };
-        source.validate_at(now_s).then_some(source)
-    }
+    HumanoidLiveAuthorityApproval::bind_verified_operator(
+        subject,
+        policy.live_policy(),
+        policy.policy_digest(),
+        operational_scope_id,
+        approval_id,
+        operator,
+        approved_at_s,
+        valid_until_s,
+    )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -308,12 +161,7 @@ pub enum HumanoidReachRuntimeAuthorityIssueFailure {
     InvalidPolicy,
     InvalidQualification,
     InvalidApproval,
-    InvalidPhysicalEvidencePolicy,
-    InvalidEpistemicEvidencePolicy,
-    InvalidCognitiveEvidencePolicy,
-    InvalidPhysicalVerifier,
-    InvalidEpistemicVerifier,
-    InvalidCognitiveVerifier,
+    InvalidLiveEvidence,
     PermitSubjectMismatch,
     InvalidTime,
     InvalidRequestedValidity,
@@ -321,18 +169,16 @@ pub enum HumanoidReachRuntimeAuthorityIssueFailure {
     Scope(HumanoidExecutionAuthorityScopeIssueFailure),
 }
 
-/// Mint operational motor authority only when live evidence and verifier identities
-/// match the precommitted runtime policy.
+/// Mint operational Reach authority from task-specific qualification plus the
+/// generic, policy-bound live authority bundle.
 #[allow(clippy::too_many_arguments)]
 pub fn issue_humanoid_reach_runtime_authority_receipt(
     subject: &HumanoidQualificationSubject,
     permit: &HumanoidSkillExecutionPermit<'_>,
     qualification: &HumanoidReachManifestOperationalArtifact,
     policy: &HumanoidReachRuntimeEvidencePolicy,
-    operator_approval: &HumanoidReachRuntimeAuthorityApproval,
-    physical: &HumanoidPolicyVerifiedPhysicalAuthorityEvidence,
-    epistemic: &HumanoidPolicyVerifiedEpistemicAuthorityEvidence,
-    cognitive: &HumanoidPolicyVerifiedCognitiveAuthorityEvidence,
+    operator_approval: &HumanoidLiveAuthorityApproval,
+    live_evidence: &HumanoidVerifiedLiveAuthorityEvidence,
     now_s: f64,
     now_unix_millis: u64,
     requested_valid_until_s: f64,
@@ -343,46 +189,42 @@ pub fn issue_humanoid_reach_runtime_authority_receipt(
     if !now_s.is_finite() || now_s < 0.0 || now_unix_millis == 0 {
         return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidTime);
     }
+
     let future_unix_millis = map_monotonic_expiry_to_unix(
         now_s,
         now_unix_millis,
         requested_valid_until_s,
     )
     .ok_or(HumanoidReachRuntimeAuthorityIssueFailure::InvalidRequestedValidity)?;
+
     if !qualification.validate_at(subject, policy.base_policy(), now_unix_millis)
         || !qualification.validate_at(subject, policy.base_policy(), future_unix_millis)
     {
         return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidQualification);
     }
-    if !operator_approval.validate_at(subject, policy, now_s)
-        || !operator_approval.validate_at(subject, policy, requested_valid_until_s)
-    {
+
+    if !operator_approval.validate_at(
+        subject,
+        policy.live_policy(),
+        policy.policy_digest(),
+        now_s,
+    ) || !operator_approval.validate_at(
+        subject,
+        policy.live_policy(),
+        policy.policy_digest(),
+        requested_valid_until_s,
+    ) {
         return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidApproval);
     }
 
-    if !physical.validate_for(subject, now_s)
-        || physical.evidence_policy_digest() != policy.physical_evidence_policy_digest
+    if !live_evidence.validate_at(subject, policy.live_policy(), now_s)
+        || !live_evidence.validate_at(
+            subject,
+            policy.live_policy(),
+            requested_valid_until_s,
+        )
     {
-        return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidPhysicalEvidencePolicy);
-    }
-    if !epistemic.validate_for(subject, now_s)
-        || epistemic.evidence_policy_digest() != policy.epistemic_evidence_policy_digest
-    {
-        return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidEpistemicEvidencePolicy);
-    }
-    if !cognitive.validate_for(subject, now_s)
-        || cognitive.evidence_policy_digest() != policy.cognitive_evidence_policy_digest
-    {
-        return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidCognitiveEvidencePolicy);
-    }
-    if physical.verifier_digest() != policy.physical_verifier_digest {
-        return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidPhysicalVerifier);
-    }
-    if epistemic.verifier_digest() != policy.epistemic_verifier_digest {
-        return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidEpistemicVerifier);
-    }
-    if cognitive.verifier_digest() != policy.cognitive_verifier_digest {
-        return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidCognitiveVerifier);
+        return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidLiveEvidence);
     }
 
     let subjects = permit
@@ -401,16 +243,20 @@ pub fn issue_humanoid_reach_runtime_authority_receipt(
 
     if !requested_valid_until_s.is_finite()
         || requested_valid_until_s <= now_s
-        || requested_valid_until_s > physical.valid_until_s()
-        || requested_valid_until_s > epistemic.valid_until_s()
-        || requested_valid_until_s > cognitive.valid_until_s()
+        || requested_valid_until_s > live_evidence.valid_until_s()
     {
         return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidRequestedValidity);
     }
 
     let operator = operator_approval
-        .derived_operator_source(subject, policy, now_s)
+        .derived_operator_source(
+            subject,
+            policy.live_policy(),
+            policy.policy_digest(),
+            now_s,
+        )
         .ok_or(HumanoidReachRuntimeAuthorityIssueFailure::InvalidApproval)?;
+
     let qualification_source = HumanoidAuthoritySourceSnapshot {
         evidence_id: format!(
             "reach-qualified-manifest-sha256:{}",
@@ -424,14 +270,15 @@ pub fn issue_humanoid_reach_runtime_authority_receipt(
         return Err(HumanoidReachRuntimeAuthorityIssueFailure::InvalidRequestedValidity);
     }
 
+    let (physical, epistemic, cognitive) = live_evidence.source_snapshots();
     let inner = issue_humanoid_skill_authority_receipt(
         permit,
         HumanoidSkillAuthorityEvidence {
             operator,
             qualification: qualification_source,
-            physical: physical.inner().source_snapshot(),
-            epistemic: epistemic.inner().source_snapshot(),
-            cognitive: cognitive.source_snapshot(),
+            physical,
+            epistemic,
+            cognitive,
         },
         now_s,
     )
@@ -440,7 +287,7 @@ pub fn issue_humanoid_reach_runtime_authority_receipt(
     scope_verified_operational_authority_receipt(
         inner,
         permit,
-        operator_approval.operational_scope_id.clone(),
+        operator_approval.operational_scope_id().to_string(),
         now_s,
     )
     .map_err(HumanoidReachRuntimeAuthorityIssueFailure::Scope)
@@ -465,7 +312,7 @@ fn digest_subject(subject: &HumanoidQualificationSubject) -> Option<HumanoidEvid
     if !subject.validate() || subject.task != HumanoidTask::Reach {
         return None;
     }
-    let mut h = HumanoidEvidenceHasher::new("reach.runtime-evidence-policy-subject.v1");
+    let mut h = HumanoidEvidenceHasher::new("reach.runtime-evidence-policy-subject.v3");
     h.u32(subject.schema_version)
         .string(subject.morphology.schema_id())
         .u64(task_id(subject.task))
@@ -475,35 +322,12 @@ fn digest_subject(subject: &HumanoidQualificationSubject) -> Option<HumanoidEvid
 }
 
 fn digest_runtime_policy(policy: &HumanoidReachRuntimeEvidencePolicy) -> HumanoidEvidenceDigest {
-    let mut h = HumanoidEvidenceHasher::new("reach.runtime-evidence-policy.v2");
+    let mut h = HumanoidEvidenceHasher::new("reach.runtime-evidence-policy.v3");
     h.u32(policy.schema_version)
         .string(&policy.policy_id)
         .digest(policy.subject_digest)
         .digest(policy.base.policy_digest())
-        .digest(policy.physical_evidence_policy_digest)
-        .digest(policy.epistemic_evidence_policy_digest)
-        .digest(policy.cognitive_evidence_policy_digest)
-        .digest(policy.operator_verifier_digest)
-        .digest(policy.physical_verifier_digest)
-        .digest(policy.epistemic_verifier_digest)
-        .digest(policy.cognitive_verifier_digest);
-    h.finish()
-}
-
-fn digest_runtime_approval(approval: &HumanoidReachRuntimeAuthorityApproval) -> HumanoidEvidenceDigest {
-    let mut h = HumanoidEvidenceHasher::new("reach.runtime-authority-approval.v2");
-    h.u32(approval.schema_version)
-        .string(&approval.approval_id)
-        .digest(approval.subject_digest)
-        .digest(approval.runtime_policy_digest)
-        .string(&approval.operational_scope_id)
-        .f64(approval.approved_at_s)
-        .f64(approval.valid_until_s)
-        .digest(approval.operator_verification_digest)
-        .string(&approval.operator_source.evidence_id)
-        .f32(approval.operator_source.scale)
-        .f64(approval.operator_source.evaluated_at_s)
-        .f64(approval.operator_source.valid_until_s);
+        .digest(policy.live.policy_digest());
     h.finish()
 }
 
