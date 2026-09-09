@@ -53,7 +53,8 @@ impl HumanoidReachAuthorityCommittedTrial {
         .map_err(HumanoidReachAuthorityCommittedTrialBindFailure::Lower)?;
         if inner.trial.authority_receipt_fingerprint != result.authority_receipt.receipt_fingerprint
             || inner.trial.authority_scope_fingerprint != result.authority_receipt.scope_fingerprint
-            || inner.trial.authority_scope_id != result.authority_receipt.scope_id
+            || inner.trial.authority_scope_id.as_str()
+                != result.authority_receipt.scope_id.as_str()
         {
             return Err(HumanoidReachAuthorityCommittedTrialBindFailure::AuthorityLineageMismatch);
         }
@@ -122,7 +123,7 @@ impl HumanoidReachAuthorityCommittedEpisodeStep {
         .map_err(HumanoidReachAuthorityCommittedEpisodeStepBindFailure::Lower)?;
         if inner.authority_receipt_fingerprint != result.authority_receipt.receipt_fingerprint
             || inner.authority_scope_fingerprint != result.authority_receipt.scope_fingerprint
-            || inner.authority_scope_id != result.authority_receipt.scope_id
+            || inner.authority_scope_id.as_str() != result.authority_receipt.scope_id.as_str()
         {
             return Err(HumanoidReachAuthorityCommittedEpisodeStepBindFailure::AuthorityLineageMismatch);
         }
@@ -199,7 +200,7 @@ impl HumanoidReachAuthorityCommittedEpisodeCase {
         self.inner.validate_shape()
             && self.steps.len() == self.inner.steps.len()
             && self.steps.iter().all(HumanoidReachAuthorityCommittedEpisodeStep::validate)
-            && self.steps.iter().zip(&self.inner.steps).all(|(a, b)| a.inner == *b)
+            && self.steps.iter().zip(&self.inner.steps).all(|(a, b)| &a.inner == b)
             && !self.case_digest.is_zero()
             && self.case_digest == digest_case(&self.inner, &self.steps)
     }
