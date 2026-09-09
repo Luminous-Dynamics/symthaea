@@ -11,6 +11,7 @@
 pub mod auth_wire;
 mod compose;
 pub mod contract;
+pub mod exact_policy;
 pub mod observation;
 pub mod verifier;
 mod witness;
@@ -25,6 +26,9 @@ pub use contract::{
     ContinuityRequirementV1, ContractError, EquivalencePredicate, RequirementCriticality,
     ValidatedContinuityContractV1,
 };
+pub use exact_policy::{
+    ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1,
+};
 pub use observation::{
     DependencyBasis, DependencyClaimId, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
     ObservationEnvelopeV1, ObservationError, ObservationId,
@@ -35,6 +39,6 @@ pub use verifier::{
 };
 pub use witness::{
     EvidenceClass, ObligationDispositionV1, QualifiedContinuityWitnessV1, TargetRealizationId,
-    VerificationObligationId, VerificationPolicyEntryV1, VerificationPolicyId,
-    VerificationPolicyV1, WitnessError, WitnessId, WitnessManifestId,
+    VerificationObligationId, VerificationPolicyEntryV1, WitnessError, WitnessId,
+    WitnessManifestId,
 };
