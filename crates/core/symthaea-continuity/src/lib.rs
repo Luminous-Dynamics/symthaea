@@ -16,6 +16,7 @@ pub mod observation;
 pub mod profile_adoption;
 pub mod scope;
 pub mod subject_contract;
+pub mod subject_witness;
 pub mod verifier;
 mod witness;
 
@@ -49,6 +50,10 @@ pub use scope::{
 pub use subject_contract::{
     SubjectBoundContinuityContractId, SubjectBoundContinuityContractV1,
     SubjectContractBindingError,
+};
+pub use subject_witness::{
+    SubjectBoundQualifiedContinuityWitnessId, SubjectBoundQualifiedContinuityWitnessV1,
+    SubjectWitnessBindingError,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
