@@ -1,0 +1,67 @@
+# One-shot mechanical formatter for the continuity qualification branch.
+# The job deletes this workflow before committing, so it cannot persist or loop.
+
+name: Continuity Rustfmt Once
+
+on:
+  push:
+    branches:
+      - ci/continuity-contract-exact-head-v1
+
+permissions:
+  contents: write
+
+env:
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+
+jobs:
+  format-once:
+    name: Apply pinned rustfmt once
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout qualification branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ci/continuity-contract-exact-head-v1
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --no-self-update
+          rustup override set "$channel"
+          test "$(rustfmt --version | awk '{print $2}')" = "$channel-stable" || rustfmt --version
+
+      - name: Apply package rustfmt and prove scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-continuity
+          rm .github/workflows/continuity-format-once.yml
+
+          # The formatter may change only Rust sources in this package; deleting
+          # this one-shot workflow is the sole allowed change outside the crate.
+          bad="$(git diff --name-only | grep -v '^crates/core/symthaea-continuity/.*\.rs$' | grep -v '^\.github/workflows/continuity-format-once\.yml$' || true)"
+          if [[ -n "$bad" ]]; then
+            echo 'unexpected files changed by one-shot formatter:' >&2
+            printf '%s\n' "$bad" >&2
+            exit 1
+          fi
+          git diff --check
+          test -n "$(git status --short)"
+
+      - name: Commit exact mechanical formatting result
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add crates/core/symthaea-continuity .github/workflows/continuity-format-once.yml
+          git diff --cached --check
+          git commit -m 'style(continuity): apply pinned rustfmt 1.96'
+          git push origin HEAD:ci/continuity-contract-exact-head-v1
