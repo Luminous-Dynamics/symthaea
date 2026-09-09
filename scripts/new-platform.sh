@@ -12,6 +12,7 @@
 # - its controller emits zero command until platform-specific control is implemented;
 # - inter-frame HDC change is named temporal novelty, not prediction error;
 # - legacy prediction/confidence fields use restrictive "not qualified" sentinels;
+# - its placeholder simulator owns model dt independently of legacy bridge dt;
 # - it implements the current EmbodimentBridge + PlatformPlugin shape;
 # - it does NOT invent a hardware-safe fallback for an unknown morphology.
 #
@@ -400,7 +401,7 @@ mod tests {
             simulator.step(&${STRUCT_PREFIX}Command::zero(), 0.005);
         }
         assert!(simulator.state().is_valid());
-        assert_eq!(*simulator.state(), ${STRUCT_PREFIX}State::home());
+        assert_eq!(simulator.state(), &${STRUCT_PREFIX}State::home());
     }
 
     #[test]
@@ -449,6 +450,7 @@ pub struct ${STRUCT_PREFIX}Embodiment {
     controller: ${STRUCT_PREFIX}Controller,
     simulator: Simple${STRUCT_PREFIX}Simulator,
     encoder: ${STRUCT_PREFIX}HdcEncoder,
+    simulation_dt: f64,
     last_perception: Option<ContinuousHV>,
     last_temporal_novelty: Option<f32>,
     total_steps: usize,
@@ -466,6 +468,7 @@ impl ${STRUCT_PREFIX}Embodiment {
             controller: ${STRUCT_PREFIX}Controller::new(),
             simulator: Simple${STRUCT_PREFIX}Simulator::new(),
             encoder: ${STRUCT_PREFIX}HdcEncoder::new(genesis, 32),
+            simulation_dt: config.physics_dt(),
             last_perception: None,
             last_temporal_novelty: None,
             total_steps: 0,
@@ -487,6 +490,10 @@ impl ${STRUCT_PREFIX}Embodiment {
             .safety_override
             .map_or(phi_level, |override_level| phi_level.max(override_level));
 
+        // `dt` is the legacy bridge/controller integration input. The generated
+        // simulator owns independent model time so cognitive/substrate dt cannot
+        // silently redefine physical seconds (#1284).
+        let valid_controller_dt = dt.is_finite() && dt > 0.0;
         let mut command = self.controller.forward(thought_hv, dt);
         let gain = self.current_safety.motor_gain();
         for torque in &mut command.torques {
@@ -494,11 +501,8 @@ impl ${STRUCT_PREFIX}Embodiment {
         }
         self.last_control_effort = command.control_effort();
 
-        let valid_dt = dt.is_finite() && dt > 0.0;
-        if valid_dt {
-            // Development simulator time only. Do not derive hardware plant time from
-            // cognitive tau; #1284 owns the v2 clock/plant-time migration.
-            self.simulator.step(&command, dt as f64);
+        if valid_controller_dt {
+            self.simulator.step(&command, self.simulation_dt);
         }
 
         let perception = self.encoder.encode(self.simulator.state());
@@ -511,7 +515,7 @@ impl ${STRUCT_PREFIX}Embodiment {
         EmbodimentResult {
             num_actuators: NUM_ACTUATORS,
             control_effort: self.last_control_effort,
-            success: valid_dt && command.is_valid() && self.simulator.state().is_valid(),
+            success: valid_controller_dt && command.is_valid() && self.simulator.state().is_valid(),
             // No predictive model exists. Never put temporal novelty in this field.
             prediction_error: LEGACY_NO_PREDICTION_SENTINEL,
             safety_level: self.current_safety,
@@ -525,6 +529,11 @@ impl ${STRUCT_PREFIX}Embodiment {
         let perception = self.encoder.encode(self.simulator.state());
         self.last_perception = Some(perception.clone());
         perception
+    }
+
+    /// Fixed placeholder simulator model timestep, independent of bridge/controller dt.
+    pub fn simulation_dt(&self) -> f64 {
+        self.simulation_dt
     }
 
     /// Inter-frame HDC change. This is novelty, not predicted-vs-observed residual.
@@ -639,13 +648,14 @@ mod tests {
         let mut body = ${STRUCT_PREFIX}Embodiment::new(&GenesisSeed::from_phrase("test"));
         let thought = ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 42);
         body.step(&thought, 0.005, 0.7);
-        body.step(&thought, 0.005, 0.7);
+        body.step(&thought, 0.010, 0.7);
         assert!(body.temporal_state_novelty().is_some());
         assert_eq!(body.telemetry().prediction_error, LEGACY_NO_PREDICTION_SENTINEL);
+        assert!((body.simulation_dt() - 0.005).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn invalid_dt_fails_step_without_advancing_placeholder_physics() {
+    fn invalid_controller_dt_fails_step_without_advancing_placeholder_physics() {
         let mut body = ${STRUCT_PREFIX}Embodiment::new(&GenesisSeed::from_phrase("test"));
         let thought = ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 42);
         let result = body.step(&thought, f32::NAN, 0.7);
@@ -714,7 +724,7 @@ RUST
 trap - EXIT
 
 echo
-echo "✓ Created $CRATE_DIR/ with 6 source files"
+echo "✓ Created $CRATE_DIR/ with 7 source files"
 echo
 echo "Required first-party integration steps:"
 echo "  1. Add EmbodimentPlatform::$STRUCT_PREFIX in crates/core/symthaea-core/src/embodiment.rs"
