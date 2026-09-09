@@ -26,7 +26,8 @@ use crate::execution::{
     HumanoidPreparedCommand,
 };
 use crate::floating_base::FloatingBaseDynamicsProvider;
-use crate::full_dynamics::{FullRigidBodyDynamicsProvider, FullRigidBodyDynamicsSnapshot};
+use crate::frozen_dynamics::FrozenHumanoidDynamicsEnvironment;
+use crate::full_dynamics::FullRigidBodyDynamicsProvider;
 use crate::skill_runtime::HumanoidSkillIntent;
 use crate::spatial_goal::HumanoidSpatiallyBoundSkillPermit;
 use crate::terrain::TerrainProbe;
@@ -49,11 +50,25 @@ pub enum HumanoidPermittedReachPreparationFailure {
     CartesianReference(HumanoidCartesianHandReferenceFailure),
 }
 
+/// Exact snapshot identities frozen for one preparation cycle. Optional reduced
+/// and floating-base contracts remain explicit rather than being promoted to
+/// evidence when the backend did not provide them.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HumanoidFrozenDynamicsLineage {
+    pub rigid_model_id: Option<String>,
+    pub rigid_sampled_at_s: Option<f64>,
+    pub full_model_id: String,
+    pub full_sampled_at_s: f64,
+    pub floating_model_id: Option<String>,
+    pub floating_sampled_at_s: Option<f64>,
+}
+
 /// Non-authoritative evidence emitted when one Reach command has been prepared.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidPermittedReachPreparationReport {
     pub validation_epoch: u64,
     pub goal_id: String,
+    pub dynamics: HumanoidFrozenDynamicsLineage,
     pub cartesian_reference: HumanoidCartesianHandReferenceReport,
 }
 
@@ -124,6 +139,11 @@ impl<'pipeline, 'permit> HumanoidPermittedReachPreparedCommand<'pipeline, 'permi
 /// dynamics, centroidal correction, typed authority, final projection, and HAL
 /// therefore remain downstream of manipulation reference generation.
 ///
+/// Every exposed body-dynamics contract is sampled exactly once into a frozen
+/// per-cycle adapter. Cartesian lowering and the existing hierarchy therefore
+/// consume the same full-dynamics snapshot rather than independently sampling a
+/// live backend at two different instants.
+///
 /// This path intentionally supports Reach only. Grasp/Carry/HumanContact remain
 /// rejected until their contact-force and retention semantics are implemented in
 /// the native whole-body solver.
@@ -147,7 +167,9 @@ where
         + FloatingBaseDynamicsProvider
         + ?Sized,
 {
-    if pipeline.morphology() != intent.morphology || pipeline.morphology() != permit.semantic().morphology() {
+    if pipeline.morphology() != intent.morphology
+        || pipeline.morphology() != permit.semantic().morphology()
+    {
         return Err(HumanoidPermittedReachPreparationFailure::PipelineMorphologyMismatch);
     }
     if intent.actuation_mode != permit.semantic().actuation_mode() {
@@ -163,14 +185,15 @@ where
         return Err(HumanoidPermittedReachPreparationFailure::InvalidReachIntent);
     }
 
-    let dynamics: FullRigidBodyDynamicsSnapshot = environment
-        .full_dynamics_snapshot(state, contacts)
+    let frozen = FrozenHumanoidDynamicsEnvironment::capture(environment, state, contacts);
+    let dynamics = frozen
+        .full_snapshot()
         .ok_or(HumanoidPermittedReachPreparationFailure::MissingFullDynamics)?;
     let cartesian = lower_permitted_cartesian_hand_reference(
         &permit,
         intent,
         state,
-        &dynamics,
+        dynamics,
         cartesian_profile,
         now_s,
     )
@@ -197,16 +220,29 @@ where
         HumanoidTask::Reach,
         state,
         contacts,
-        environment,
+        &frozen,
         &baseline,
         &learned_residual,
         1.0,
         0.0,
     );
 
+    let dynamics_lineage = HumanoidFrozenDynamicsLineage {
+        rigid_model_id: frozen.rigid_snapshot().map(|snapshot| snapshot.model_id.clone()),
+        rigid_sampled_at_s: frozen.rigid_snapshot().map(|snapshot| snapshot.sampled_at_s),
+        full_model_id: dynamics.model_id.clone(),
+        full_sampled_at_s: dynamics.sampled_at_s,
+        floating_model_id: frozen
+            .floating_snapshot()
+            .map(|snapshot| snapshot.model_id.clone()),
+        floating_sampled_at_s: frozen
+            .floating_snapshot()
+            .map(|snapshot| snapshot.sampled_at_s),
+    };
     let report = HumanoidPermittedReachPreparationReport {
         validation_epoch: permit.semantic().epoch(),
         goal_id: permit.goal().goal_id.clone(),
+        dynamics: dynamics_lineage,
         cartesian_reference: cartesian.report,
     };
 
@@ -224,8 +260,14 @@ where
 fn valid_pd_gains(gains: &HumanoidPdGains, actuators: usize) -> bool {
     gains.kp.len() == actuators
         && gains.kd.len() == actuators
-        && gains.kp.iter().all(|value| value.is_finite() && *value >= 0.0)
-        && gains.kd.iter().all(|value| value.is_finite() && *value >= 0.0)
+        && gains
+            .kp
+            .iter()
+            .all(|value| value.is_finite() && *value >= 0.0)
+        && gains
+            .kd
+            .iter()
+            .all(|value| value.is_finite() && *value >= 0.0)
 }
 
 fn valid_reach_intent(intent: &HumanoidWholeBodyMotionIntent) -> bool {
@@ -275,9 +317,14 @@ fn valid_reach_intent(intent: &HumanoidWholeBodyMotionIntent) -> bool {
     if intent.invariants.len() != required.len() {
         return false;
     }
-    required
-        .into_iter()
-        .all(|needle| intent.invariants.iter().filter(|value| **value == needle).count() == 1)
+    required.into_iter().all(|needle| {
+        intent
+            .invariants
+            .iter()
+            .filter(|value| **value == needle)
+            .count()
+            == 1
+    })
 }
 
 #[cfg(test)]
@@ -343,7 +390,13 @@ mod tests {
     #[test]
     fn pd_gain_cardinality_and_finiteness_are_checked() {
         let gains = HumanoidPdGains::for_morphology(HumanoidMorphology::Dmc21);
-        assert!(valid_pd_gains(&gains, HumanoidMorphology::Dmc21.num_actuators()));
-        assert!(!valid_pd_gains(&gains, HumanoidMorphology::Dexterous53.num_actuators()));
+        assert!(valid_pd_gains(
+            &gains,
+            HumanoidMorphology::Dmc21.num_actuators()
+        ));
+        assert!(!valid_pd_gains(
+            &gains,
+            HumanoidMorphology::Dexterous53.num_actuators()
+        ));
     }
 }
