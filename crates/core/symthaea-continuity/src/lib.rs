@@ -10,6 +10,7 @@
 
 pub mod auth_wire;
 mod compose;
+pub mod commit_currentness;
 pub mod contract;
 pub mod distributed;
 pub mod distributed_currentness;
@@ -31,6 +32,14 @@ pub use auth_wire::{
     CONTINUITY_VERIFICATION_CLAIM_AUTH_SCHEMA, CONTINUITY_VERIFICATION_CLAIM_HASH_ALGORITHM,
     CONTINUITY_VERIFICATION_XENIA_PURPOSE, canonical_verification_claim_bytes,
     canonical_verification_claim_digest,
+};
+pub use commit_currentness::{
+    LOCAL_COMMIT_CURRENTNESS_POLICY_SCHEMA_V1, LOCAL_COMMIT_STATE_CLAIM_SCHEMA_V1,
+    AuthenticatedLocalCommitStateEvidenceId, LocalCommitCurrentnessError,
+    LocalCommitCurrentnessPolicyId, LocalCommitCurrentnessPolicyV1,
+    LocalCommitObservationOutcomeV1, LocalCommitStateClaimId, LocalCommitStateClaimV1,
+    QualifiedLocalCommitCurrentnessId, QualifiedLocalCommitCurrentnessV1,
+    ValidatedLocalCommitCurrentnessPolicyV1,
 };
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
