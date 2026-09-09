@@ -17,11 +17,12 @@ permissions:
   contents: write
 
 env:
-  EXPECTED_PARENT_SHA: 0f0cf3c2880954bacf0298c930df2ed52e4bbfa7
+  EXPECTED_PARENT_SHA: 6c67fe19bd9a4396924b5440f9d00da4bad69084
   TARGET_BRANCH: ci/continuity-verifier-grant-exact-head-v1
   WORKFLOW_PATH: .github/workflows/continuity-successor-repair-once.yml
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
   WITNESSED_PATCH_SHA256: d9318bf4d128d828397c7a728abed0db6477b12266e04062df72ccdbd824311a
+  WITNESSED_PATCH_B64: ZGlmZiAtLWdpdCBhL0NhcmdvLmxvY2sgYi9DYXJnby5sb2NrCmluZGV4IDFkNWI2YzMuLjk1MmUxZDYgMTAwNjQ0Ci0tLSBhL0NhcmdvLmxvY2sKKysrIGIvQ2FyZ28ubG9jawpAQCAtMTg1MjAsNiArMTg1MjAsMTUgQEAgZGVwZW5kZW5jaWVzID0gWwogICJzZXJkZSIsCiBdCiAKK1tbcGFja2FnZV1dCituYW1lID0gInN5bXRoYWVhLWNvbnRpbnVpdHkiCit2ZXJzaW9uID0gIjAuMS4wIgorZGVwZW5kZW5jaWVzID0gWworICJibGFrZTMiLAorICJzZXJkZSIsCisgInRoaXNlcnJvciAxLjAuNjkiLAorXQorCiBbW3BhY2thZ2VdXQogbmFtZSA9ICJzeW10aGFlYS1jb250aW51dW0tcGh5c2ljcyIKIHZlcnNpb24gPSAiMC4xLjAiCg==
 
 jobs:
   admit-lock:
@@ -50,28 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
-          cat > "$RUNNER_TEMP/continuity-lock.patch" <<'PATCH'
-          diff --git a/Cargo.lock b/Cargo.lock
-          index 1d5b6c3..952e1d6 100644
-          --- a/Cargo.lock
-          +++ b/Cargo.lock
-          @@ -18520,6 +18520,15 @@ dependencies = [
-            "serde",
-           ]
-           
-          +[[package]]
-          +name = "symthaea-continuity"
-          +version = "0.1.0"
-          +dependencies = [
-          + "blake3",
-          + "serde",
-          + "thiserror 1.0.69",
-          +]
-          +
-           [[package]]
-           name = "symthaea-continuum-physics"
-           version = "0.1.0"
-          PATCH
+          printf '%s' "$WITNESSED_PATCH_B64" | base64 -d > "$RUNNER_TEMP/continuity-lock.patch"
           test "$(sha256sum "$RUNNER_TEMP/continuity-lock.patch" | awk '{print $1}')" = "$WITNESSED_PATCH_SHA256"
           git apply --check "$RUNNER_TEMP/continuity-lock.patch"
           git apply "$RUNNER_TEMP/continuity-lock.patch"
@@ -110,6 +90,7 @@ jobs:
               raise SystemExit('added package node is not the reviewed symthaea-continuity node')
           PY
 
+          test "$(sha256sum <(git diff --binary -- Cargo.lock) | awk '{print $1}')" = "$WITNESSED_PATCH_SHA256"
           read -r additions deletions < <(git diff --numstat -- Cargo.lock)
           test "$additions" = 9
           test "$deletions" = 0
