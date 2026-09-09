@@ -19,6 +19,7 @@ pub mod profile_adoption_authority;
 pub mod profile_adoption_commit;
 pub mod profile_adoption_currentness;
 pub mod profile_adoption_registry_commit;
+pub mod profile_adoption_runtime;
 pub mod verifier;
 mod witness;
 
@@ -69,6 +70,10 @@ pub use profile_adoption_currentness::{
 pub use profile_adoption_registry_commit::{
     VerifierProfileAdoptionRegistryCommitError,
     VerifierProfileAdoptionRegistryCommitPreconditionsV1,
+};
+pub use profile_adoption_runtime::{
+    PolicyCurrentVerifierRuntimeEnvelopeV1, VerifierProfileRuntimePolicyError,
+    check_verifier_runtime_policy,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
