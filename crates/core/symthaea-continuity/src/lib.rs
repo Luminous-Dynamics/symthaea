@@ -21,6 +21,7 @@ pub mod distributed_qualification;
 pub mod distributed_state;
 pub mod exact_policy;
 pub mod execution_capability;
+pub mod execution_journal;
 pub mod failure_domain;
 pub mod observation;
 pub mod profile_adoption;
@@ -91,6 +92,10 @@ pub use execution_capability::{
     ExecutionBackendId, ExecutionBackendProfileV1, ExecutionCapabilityError,
     ExecutionEpochAnchorModeV1, ExecutionSessionId, ExecutionSessionV1,
     OneUseExecutionCapabilityId, OneUseExecutionCapabilityV1, PreparedExecutionAttemptV1,
+};
+pub use execution_journal::{
+    ExecutionJournalDigest, ExecutionJournalError, JournalAttemptDispositionV1,
+    JournalAttemptEntryV1, ReconstructedExecutionJournalV1,
 };
 pub use failure_domain::{
     FAILURE_DOMAIN_POLICY_SCHEMA_V1, FailureDomainGroupV1, FailureDomainKindV1,
