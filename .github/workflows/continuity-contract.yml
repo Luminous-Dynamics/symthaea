@@ -52,7 +52,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/continuity-contract.yml)" -eq 1
-          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/continuity-contract.yml)" -eq 3
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/continuity-contract.yml)" -eq 4
           if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/continuity-contract.yml; then
             echo 'mutable major-version GitHub Action tag found in continuity qualification workflow' >&2
             exit 1
@@ -80,6 +80,7 @@ jobs:
           CONTINUITY_CONTRACT_RECEIPT: ${{ runner.temp }}/continuity-contract-qualification-v1.tsv
           CONTINUITY_FORMAT_PATCH: ${{ runner.temp }}/symthaea-continuity-rustfmt.patch
           CONTINUITY_FORMAT_SOURCE_DIR: ${{ runner.temp }}/symthaea-continuity-rustfmt-source
+          CONTINUITY_LOCK_PATCH: ${{ runner.temp }}/symthaea-continuity-cargo-lock.patch
         run: bash scripts/qualify-continuity-contract.sh
 
       - name: Publish receipt and repair digests
@@ -88,6 +89,7 @@ jobs:
         env:
           RECEIPT: ${{ runner.temp }}/continuity-contract-qualification-v1.tsv
           FORMAT_PATCH: ${{ runner.temp }}/symthaea-continuity-rustfmt.patch
+          LOCK_PATCH: ${{ runner.temp }}/symthaea-continuity-cargo-lock.patch
         run: |
           set -euo pipefail
           if [[ -f "$RECEIPT" ]]; then
@@ -107,6 +109,14 @@ jobs:
             {
               echo "- rustfmt repair patch SHA-256: \`$patch_digest\`"
               echo '- repair patch was produced by the repository-pinned rustfmt from the exact qualified head.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ -f "$LOCK_PATCH" ]]; then
+            lock_digest="$(sha256sum "$LOCK_PATCH" | awk '{print $1}')"
+            echo "continuity-contract cargo_lock_patch_sha256=$lock_digest"
+            {
+              echo "- Cargo.lock repair patch SHA-256: \`$lock_digest\`"
+              echo '- lock repair patch was produced offline from the exact failed head; it is diagnostic and non-qualifying.'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -134,5 +144,14 @@ jobs:
         with:
           name: continuity-contract-rustfmt-source-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/symthaea-continuity-rustfmt-source
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload Cargo.lock repair patch
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-contract-cargo-lock-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/symthaea-continuity-cargo-lock.patch
           if-no-files-found: ignore
           retention-days: 14
