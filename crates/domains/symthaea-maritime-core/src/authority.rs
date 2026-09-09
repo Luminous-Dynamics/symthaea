@@ -21,6 +21,15 @@ pub enum MaritimeCapability {
     PublishTelemetry,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthorityContext {
+    pub now_ms: u64,
+    pub authority_epoch: u64,
+    /// A lease expiry check is not meaningful when the platform cannot establish
+    /// trusted time. Callers must fall back to platform-local safe behavior instead.
+    pub trusted_time_available: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthorityLease {
     pub lease_id: String,
@@ -34,10 +43,11 @@ pub struct AuthorityLease {
 }
 
 impl AuthorityLease {
-    pub fn permits(&self, capability: MaritimeCapability, now_ms: u64, epoch: u64) -> bool {
-        epoch == self.authority_epoch
-            && now_ms >= self.issued_at_ms
-            && now_ms < self.expires_at_ms
+    pub fn permits(&self, capability: MaritimeCapability, context: AuthorityContext) -> bool {
+        context.trusted_time_available
+            && context.authority_epoch == self.authority_epoch
+            && context.now_ms >= self.issued_at_ms
+            && context.now_ms < self.expires_at_ms
             && self.capabilities.contains(&capability)
     }
 
@@ -62,8 +72,16 @@ impl AuthorityLease {
 mod tests {
     use super::*;
 
+    fn context(now_ms: u64, epoch: u64) -> AuthorityContext {
+        AuthorityContext {
+            now_ms,
+            authority_epoch: epoch,
+            trusted_time_available: true,
+        }
+    }
+
     #[test]
-    fn lease_is_epoch_and_time_bounded() {
+    fn lease_is_epoch_time_and_capability_bounded() {
         let lease = AuthorityLease {
             lease_id: "lease-1".into(),
             platform_id: "usv-1".into(),
@@ -73,9 +91,25 @@ mod tests {
             capabilities: BTreeSet::from([MaritimeCapability::Navigate]),
             evidence_binding: "sha256:example".into(),
         };
-        assert!(lease.permits(MaritimeCapability::Navigate, 150, 9));
-        assert!(!lease.permits(MaritimeCapability::Navigate, 200, 9));
-        assert!(!lease.permits(MaritimeCapability::Navigate, 150, 10));
-        assert!(!lease.permits(MaritimeCapability::Dock, 150, 9));
+        assert!(lease.permits(MaritimeCapability::Navigate, context(150, 9)));
+        assert!(!lease.permits(MaritimeCapability::Navigate, context(200, 9)));
+        assert!(!lease.permits(MaritimeCapability::Navigate, context(150, 10)));
+        assert!(!lease.permits(MaritimeCapability::Dock, context(150, 9)));
+    }
+
+    #[test]
+    fn lease_fails_closed_without_trusted_time() {
+        let lease = AuthorityLease {
+            lease_id: "lease-1".into(),
+            platform_id: "usv-1".into(),
+            authority_epoch: 9,
+            issued_at_ms: 100,
+            expires_at_ms: 200,
+            capabilities: BTreeSet::from([MaritimeCapability::Navigate]),
+            evidence_binding: "sha256:example".into(),
+        };
+        let mut ctx = context(150, 9);
+        ctx.trusted_time_available = false;
+        assert!(!lease.permits(MaritimeCapability::Navigate, ctx));
     }
 }
