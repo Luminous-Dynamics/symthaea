@@ -1,0 +1,10 @@
+{
+  "schema": "xenia-verified-machine-session-evidence-v1",
+  "session_id": "session-fixture-001",
+  "peer_identity_binding": "xenia-signing-identity-v1:blake3-256:5555555555555555555555555555555555555555555555555555555555555555",
+  "authenticated_at_ms": 1700000000000,
+  "expires_at_ms": 1700000060000,
+  "authority_epoch": 9,
+  "evidence_binding": "xenia-handshake-transcript-v1:blake3-256:2222222222222222222222222222222222222222222222222222222222222222",
+  "negotiated_context_binding": "xenia-negotiated-session-context:blake3-256:3333333333333333333333333333333333333333333333333333333333333333"
+}
