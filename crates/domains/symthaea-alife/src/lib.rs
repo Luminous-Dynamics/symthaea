@@ -56,6 +56,7 @@ pub mod ma001l;
 pub mod ma001r;
 pub mod metabolism;
 pub mod observatory;
+pub mod observed_stochastic_coverage;
 pub mod observed_stochastic_recorder;
 pub mod observed_stochastic_tape;
 pub mod organism;
@@ -157,6 +158,10 @@ pub use metabolism::{
 pub use observatory::{
     AgentTrajectorySummary, LineageSummary, ObservatoryError, ObservatoryReport,
     TransferEdgeSummary, analyze_genesis_events,
+};
+pub use observed_stochastic_coverage::{
+    ObservedStochasticCoverageCountsV1, ObservedStochasticCoverageErrorV1,
+    ValidatedObservedStochasticCoverageV1, validate_observed_stochastic_coverage_v1,
 };
 pub use observed_stochastic_recorder::{
     ObservedStochasticRecorderCountsV1, ObservedStochasticRecorderErrorV1,
