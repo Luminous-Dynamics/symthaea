@@ -13,6 +13,7 @@ pub mod dependency_impact;
 pub mod diagnostic_beliefs;
 pub mod diagnostics;
 pub mod federation;
+pub mod it_qualification;
 pub mod knowledge;
 pub mod knowledge_source;
 #[cfg(feature = "logparse-adapter")]
@@ -42,6 +43,16 @@ pub use diagnostic_beliefs::{
     rank_tests_by_information_gain, CausalHypothesisV1, DiagnosticBeliefError,
     DiagnosticOutcomeId, DiagnosticTestId, DiagnosticTestModelV1, ExpectedInformationGainV1,
     HypothesisDistributionV1, HypothesisId, HypothesisStatusV1,
+};
+pub use it_qualification::{
+    case_digest_v1, qualification_failures_v1, AdversarialConditionV1,
+    DomainQualificationAssessmentV1, DomainQualificationPolicyV1, DomainQualificationStatusV1,
+    FailingQualificationCaseV1, ItCompetencyLevelV1, ItCoverageCellV1, ItDomainV1,
+    ItQualificationCaseV1, ItQualificationErrorV1, ItQualificationMatrixV1,
+    ItQualificationResultV1, QualificationCaseIdV1, QualificationCaseKeyV1,
+    QualificationEvidenceClassV1, QualificationFailureDimensionV1, QualificationMetricsV1,
+    QualificationResultIdV1, QualificationRunContextV1, QualificationRunIdV1,
+    QualificationThresholdV1,
 };
 pub use knowledge_source::{
     merge_knowledge_hits_v1, KnowledgeAuthorityClassV1, KnowledgeLifecycleV1,
