@@ -16,6 +16,7 @@ pub mod commit_preconditions;
 pub mod identity;
 pub mod observed_admission;
 pub mod observed_authorization;
+pub mod observed_commit_preconditions;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
