@@ -14,3 +14,4 @@ categories = ["science", "aerospace", "data-structures"]
 [dependencies]
 serde = { workspace = true }
 uuid = { workspace = true }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
