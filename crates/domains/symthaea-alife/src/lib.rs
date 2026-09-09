@@ -25,6 +25,7 @@
 
 pub mod agent_id;
 pub mod causal_replay_estimand;
+pub mod causal_replay_fidelity;
 pub mod causal_replay_session;
 pub mod coalition;
 pub mod counterfactual_randomness;
@@ -81,6 +82,12 @@ pub use causal_replay_estimand::{
     CausalRescueEstimandV1, CausalRescueExperimentSpecErrorV1, CausalRescueExperimentSpecV1,
     CausalRescuePrimaryMetricV1, CausalRescueShamFidelityV1,
     ValidatedCausalRescueExperimentSpecV1,
+};
+pub use causal_replay_fidelity::{
+    CausalRescueShamFidelityErrorV1, CausalRescueShamFidelityReceiptV1,
+    FidelityQualifiedCausalRescueEffectV1, GenesisEarthEndpointFingerprintV1,
+    compute_fidelity_qualified_primary_effect_v1, genesis_earth_endpoint_fingerprint_v1,
+    verify_sham_fidelity_v1,
 };
 pub use causal_replay_session::{
     CausalRescueOutcomeProtocolV1, CausalRescueReplaySessionErrorV1,
