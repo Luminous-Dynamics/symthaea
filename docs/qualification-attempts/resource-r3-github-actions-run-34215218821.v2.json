@@ -1,0 +1,52 @@
+{
+  "schema": "symthaea.resource-qualification-attempt-observation.v2",
+  "qualification_profile": "resources.stack-qualification.v1",
+  "provider": "github-actions",
+  "repository": "Luminous-Dynamics/symthaea",
+  "provider_attempt": {
+    "workflow_name": "Resource Stack Qualification",
+    "run_id": 34215218821,
+    "run_number": 3,
+    "job_id": 102025268120,
+    "pull_request": 833
+  },
+  "subject": {
+    "admission_subject_id": "sha256:9c0769e927ffbc7fb2d0ec943d859f75a3ab32f73c30561db6e9c3881f2c50d0",
+    "admission_request_id": "sha256:e937bd324855f2c8a8e97c286f180674d43776c61af23ee373d4ebcc20e15f0b",
+    "requested_head_sha": "7350ee0a5cab0ccaa48b6691e8d52875143b102b",
+    "requested_base_sha": "fb513e0b1224e08b572cadb38ea56a710521a27c",
+    "checked_out_sha": "b98eb868f820aec8a61a46194c557d0ae723923f"
+  },
+  "execution_environment": {
+    "runner_os": "ubuntu-24.04.4",
+    "runner_image": "ubuntu-24.04",
+    "runner_image_version": "20260831.293.1",
+    "rustc": "1.96.0 (ac68faa20 2026-05-25)",
+    "target": "x86_64-unknown-linux-gnu"
+  },
+  "execution": {
+    "started_at": "2026-09-09T10:07:31Z",
+    "completed_at": "2026-09-09T10:07:50Z",
+    "terminal_disposition": "FormattingFailed"
+  },
+  "theorem_progress": [
+    {"name": "CargoLockFreshness", "disposition": "Passed"},
+    {"name": "ResourceNamespaceBijection", "disposition": "Passed"},
+    {"name": "ResourcePackageDiscovery", "disposition": "Passed"},
+    {"name": "Rustfmt", "disposition": "Failed"},
+    {"name": "CargoCheck", "disposition": "NotExecuted"},
+    {"name": "Clippy", "disposition": "NotExecuted"},
+    {"name": "Tests", "disposition": "NotExecuted"},
+    {"name": "DocTests", "disposition": "NotExecuted"}
+  ],
+  "failure_evidence_refs": [
+    "github-actions:job:102025268120",
+    "github-actions:run:34215218821"
+  ],
+  "non_claims": [
+    "does not establish hosted qualification",
+    "does not establish later theorems",
+    "does not establish the PR head itself was the checked-out commit"
+  ],
+  "observation_id": "sha256:07c428a25fab005330c5c9a4ecf9424bae98014c130b36e94b79da3abdcfcb94"
+}
