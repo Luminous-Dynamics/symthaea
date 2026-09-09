@@ -15,6 +15,7 @@ pub mod exact_policy;
 pub mod observation;
 pub mod profile_adoption;
 pub mod scope;
+pub mod subject_contract;
 pub mod verifier;
 mod witness;
 
@@ -44,6 +45,10 @@ pub use profile_adoption::{
 pub use scope::{
     CONTINUITY_SUBJECT_SCHEMA_V1, ContinuityScopeV1, ContinuitySubjectError,
     ContinuitySubjectId, ContinuitySubjectV1,
+};
+pub use subject_contract::{
+    SubjectBoundContinuityContractId, SubjectBoundContinuityContractV1,
+    SubjectContractBindingError,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
