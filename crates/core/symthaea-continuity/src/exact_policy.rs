@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::verifier::{
-    PolicyCheckedVerificationEvidenceV1, VerificationAdmissionError,
+    ProfilePolicyCheckedVerificationEvidenceV1, VerificationAdmissionError,
     VerificationEvidenceClaimV1, VerifierProfileId, VerifierProfileV1,
     policy_check_verification_evidence,
 };
@@ -117,10 +117,12 @@ impl ExactVerificationPolicyV1 {
     }
 }
 
-/// Exact-context admission used by future authentication/composition adapters.
+/// Exact profile-policy admission used by future authority/authentication adapters.
 ///
 /// A same-name profile with a different root, epoch, or evidence class is rejected
-/// before the lower-level name-based witness policy is consulted.
+/// before the lower-level name-based witness policy is consulted. Success is still
+/// only `ProfilePolicyCheckedVerificationEvidenceV1`; it is deliberately not
+/// organizational authority and cannot be authenticated directly.
 pub(crate) fn policy_check_exact_verification_evidence(
     contract: &ValidatedContinuityContractV1,
     target: TargetRealizationId,
@@ -128,7 +130,7 @@ pub(crate) fn policy_check_exact_verification_evidence(
     profile: &VerifierProfileV1,
     expected_challenge: [u8; 32],
     claim: VerificationEvidenceClaimV1,
-) -> Result<PolicyCheckedVerificationEvidenceV1, ExactVerificationPolicyError> {
+) -> Result<ProfilePolicyCheckedVerificationEvidenceV1, ExactVerificationPolicyError> {
     policy.validate_against_profile(profile)?;
     Ok(policy_check_verification_evidence(
         contract,
