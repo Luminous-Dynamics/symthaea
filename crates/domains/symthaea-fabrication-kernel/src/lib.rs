@@ -24,7 +24,16 @@ pub mod clock;
 pub mod clock_continuity;
 pub mod containment_replay;
 pub mod containment_state;
-pub mod crypto_digest;
+/// Compatibility surface for the shared evidence-plane SHA-256 primitive.
+///
+/// Fabrication keeps its historical module path while implementation authority
+/// moves to `symthaea-evidence-plane`. The explicit re-export list prevents
+/// future evidence-plane additions from silently expanding fabrication's API.
+pub mod crypto_digest {
+    pub use symthaea_evidence_plane::crypto_digest::{
+        DigestParseError, Sha256, Sha256Digest, sha256,
+    };
+}
 pub mod csg;
 pub mod design_loop;
 pub mod evidence_anchor;

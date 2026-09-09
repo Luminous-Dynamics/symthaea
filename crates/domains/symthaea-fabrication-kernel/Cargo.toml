@@ -13,6 +13,7 @@ analytical = []
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-atelier = { path = "../symthaea-atelier" }
 symthaea-canvas = { path = "../symthaea-canvas" }
+symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
