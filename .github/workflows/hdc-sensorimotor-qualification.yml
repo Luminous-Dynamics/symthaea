@@ -10,7 +10,9 @@ on:
       - 'src/perception/sensorimotor_alignment.rs'
       - 'src/perception/sensorimotor_alignment_timing.rs'
       - 'src/perception/mod.rs'
+      - 'crates/domains/symthaea-humanoid/Cargo.toml'
       - 'crates/domains/symthaea-humanoid/src/actuation.rs'
+      - 'crates/domains/symthaea-humanoid/src/backend_action_evidence.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_action.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_action_causality.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_state.rs'
@@ -108,4 +110,10 @@ jobs:
         run: |
           cargo test -p symthaea-humanoid \
             semantic_action_causality \
+            -- --test-threads=1
+
+      - name: Run backend-applied action evidence regressions
+        run: |
+          cargo test -p symthaea-humanoid \
+            backend_action_evidence \
             -- --test-threads=1
