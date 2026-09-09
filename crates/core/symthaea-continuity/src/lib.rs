@@ -13,6 +13,7 @@ mod compose;
 pub mod contract;
 pub mod exact_policy;
 pub mod observation;
+pub mod profile_adoption;
 pub mod verifier;
 mod witness;
 
@@ -32,6 +33,12 @@ pub use exact_policy::{
 pub use observation::{
     DependencyBasis, DependencyClaimId, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
     ObservationEnvelopeV1, ObservationError, ObservationId,
+};
+pub use profile_adoption::{
+    VERIFIER_PROFILE_ADOPTION_SUBJECT_SCHEMA_V1, VERIFIER_PROFILE_ADOPTION_TRANSITION_SCHEMA_V1,
+    VerifierAdoptionScopeV1, VerifierProfileAdoptionError, VerifierProfileAdoptionPredecessorV1,
+    VerifierProfileAdoptionSubjectId, VerifierProfileAdoptionSubjectV1,
+    VerifierProfileAdoptionTransitionDigest, VerifierProfileAdoptionTransitionV1,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
