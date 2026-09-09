@@ -25,6 +25,7 @@ pub mod profile_adoption;
 pub mod scope;
 pub mod subject_contract;
 pub mod subject_witness;
+pub mod transition_authority;
 pub mod verifier;
 mod witness;
 
@@ -103,6 +104,15 @@ pub use subject_contract::{
 pub use subject_witness::{
     SubjectBoundQualifiedContinuityWitnessId, SubjectBoundQualifiedContinuityWitnessV1,
     SubjectWitnessBindingError,
+};
+pub use transition_authority::{
+    TRANSITION_AUTHORITY_CLAIM_SCHEMA_V1, TRANSITION_AUTHORITY_POLICY_SCHEMA_V1,
+    TRANSITION_AUTHORITY_PROFILE_SCHEMA_V1, TRANSITION_AUTHORITY_XENIA_PURPOSE,
+    AuthenticatedTransitionAuthorityId, TransitionAuthorityClaimId, TransitionAuthorityClaimV1,
+    TransitionAuthorityError, TransitionAuthorityPolicyId, TransitionAuthorityPolicyV1,
+    TransitionAuthorityProfileId, TransitionAuthorityProfileV1,
+    ValidatedTransitionAuthorityPolicyV1, canonical_transition_authority_claim_bytes,
+    canonical_transition_authority_claim_digest,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
