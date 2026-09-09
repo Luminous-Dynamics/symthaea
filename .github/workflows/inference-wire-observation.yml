@@ -1,0 +1,51 @@
+name: Inference Wire Observation
+
+on:
+  pull_request:
+    paths:
+      - "src/language/openai_compatible_transport.rs"
+      - "tests/inference_wire_observation.rs"
+      - "docs/architecture/INFERENCE_WIRE_OBSERVATION_V1.md"
+      - ".github/workflows/inference-wire-observation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-wire-observation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-wire-observation:
+    name: Inference Wire Observation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: rustfmt --edition 2024 --check src/language/openai_compatible_transport.rs tests/inference_wire_observation.rs
+
+      - name: Compile and run IF-5 wire observation regressions
+        run: cargo test --locked --test inference_wire_observation
+
+      - name: Focused wire-observation Clippy
+        run: cargo clippy --locked --test inference_wire_observation -- -D warnings -A dead-code
+
+      - name: Ratchet privacy and epistemic boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'never provider error bodies or prompt content' src/language/openai_compatible_transport.rs
+          grep -F 'Provider error bodies can echo prompt/context' src/language/openai_compatible_transport.rs
+          grep -F 'metadata_conflict' src/language/openai_compatible_transport.rs
+          grep -F 'provider observations, not quota authority' docs/architecture/INFERENCE_WIRE_OBSERVATION_V1.md
+          grep -F 'no receipt integration yet' docs/architecture/INFERENCE_WIRE_OBSERVATION_V1.md
