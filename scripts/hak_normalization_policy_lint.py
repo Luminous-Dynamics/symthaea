@@ -2,8 +2,9 @@
 """Audit-only HAK-013 normalization policy validator.
 
 This validates content-bound normalization policy bookkeeping and observation-policy
-binding semantics. It does not authenticate provider responses, prove omitted-field
-completeness for historical observations, or grant runtime authority.
+binding semantics. It does not execute provider selectors, authenticate provider
+responses, prove omitted-field completeness for historical observations, or grant
+runtime authority.
 """
 from __future__ import annotations
 import argparse, hashlib, json, re
@@ -13,6 +14,11 @@ from typing import Any
 POLICY_SCHEMA = "hak.normalization-policy.v1"
 BINDING_SCHEMA = "hak.normalization-observation-binding.v1"
 RESOURCE_KINDS = {"WorkflowRunObservation","WorkflowJobsObservation","WorkflowJobStepsObservation"}
+PATH_SEMANTICS = {
+    "required_container_paths": "RequireAndSelectContainerShapeOnly",
+    "required_paths": "SelectValueAndRequirePresence",
+    "optional_paths": "SelectValueIfPresent",
+}
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 GIT_REF = re.compile(r"^git:[^@]+@[0-9a-f]{40}:.+$")
 
@@ -55,6 +61,12 @@ def validate_policy(doc: dict[str,Any]) -> None:
     transform=_obj(doc.get("transform"),"transform")
     _require(transform.get("method")=="FieldSelectionNoSemanticTransform","transform.method must be FieldSelectionNoSemanticTransform")
     _require(isinstance(transform.get("version"),int) and transform["version"]>0,"transform.version must be positive")
+
+    semantics=_obj(doc.get("path_semantics"),"path_semantics")
+    _require(set(semantics)==set(PATH_SEMANTICS),"path_semantics must define exactly the HAK-013 path categories")
+    for field, expected in PATH_SEMANTICS.items():
+        _require(semantics.get(field)==expected, f"path_semantics.{field} must be {expected}")
+
     seen_kinds=set()
     profiles=_array(doc.get("resource_profiles"),"resource_profiles")
     _require(profiles,"resource_profiles must be non-empty")
@@ -63,16 +75,20 @@ def validate_policy(doc: dict[str,Any]) -> None:
         kind=item.get("resource_kind")
         _require(kind in RESOURCE_KINDS,f"resource_profiles[{i}].resource_kind invalid")
         _require(kind not in seen_kinds,f"duplicate resource profile: {kind}"); seen_kinds.add(kind)
-        required=_array(item.get("required_paths"),f"resource_profiles[{i}].required_paths")
-        optional=_array(item.get("optional_paths"),f"resource_profiles[{i}].optional_paths")
-        _require(required,f"resource_profiles[{i}].required_paths must be non-empty")
-        all_paths=[]
-        for label,paths in (("required_paths",required),("optional_paths",optional)):
-            for j,p in enumerate(paths): _text(p,f"resource_profiles[{i}].{label}[{j}]")
+        categories={}
+        for label in ("required_container_paths","required_paths","optional_paths"):
+            paths=_array(item.get(label),f"resource_profiles[{i}].{label}")
+            for j,path in enumerate(paths):
+                _text(path,f"resource_profiles[{i}].{label}[{j}]")
             _require(len(set(paths))==len(paths),f"resource_profiles[{i}].{label} contains duplicates")
-            all_paths.extend(paths)
-        _require(set(required).isdisjoint(optional),f"resource_profiles[{i}] required/optional paths overlap")
-        _require(len(set(all_paths))==len(all_paths),f"resource_profiles[{i}] selected field paths must be unique")
+            categories[label]=paths
+        _require(any(categories.values()),f"resource_profiles[{i}] must select or require at least one path")
+        labels=list(categories)
+        for a_index,a in enumerate(labels):
+            for b in labels[a_index+1:]:
+                overlap=set(categories[a]).intersection(categories[b])
+                _require(not overlap,f"resource_profiles[{i}] {a}/{b} paths overlap: {sorted(overlap)}")
+
     _text(doc.get("omission_semantics"),"omission_semantics")
     _text(doc.get("redaction_semantics"),"redaction_semantics")
     supersedes=doc.get("supersedes_policy_id")

@@ -13,6 +13,8 @@ NormalizationProfileRef != NormalizationPolicyIdentity
 ProfileName != PrecommittedSelectionPolicy
 ProjectionCompleteness != SourceNormalizationCompleteness
 ContentBoundPolicy != PrecommittedPolicy
+PresenceRequirement != FieldSelection
+ContainerExists != IncludeEntireSubtree
 ```
 
 A symbolic profile name is useful for human readability and compatibility, but it is not an immutable policy identity.
@@ -26,7 +28,8 @@ A normalization policy now binds:
 - explicit allow-list inclusion rule;
 - unknown-field handling;
 - transform method/version;
-- resource-specific required and optional provider paths;
+- explicit path-category semantics;
+- resource-specific required container, required selected, and optional selected provider paths;
 - omission semantics;
 - redaction semantics;
 - policy supersession identifier;
@@ -40,7 +43,43 @@ WorkflowJobsObservation
 WorkflowJobStepsObservation
 ```
 
-Each resource profile has disjoint required and optional paths. Fields outside the explicit policy scope are intentionally omitted and are not evidence of absence.
+## Path semantics
+
+HAK-013 separates three concepts that must not be collapsed:
+
+```text
+required_container_paths
+    = RequireAndSelectContainerShapeOnly
+
+required_paths
+    = SelectValueAndRequirePresence
+
+optional_paths
+    = SelectValueIfPresent
+```
+
+A required container path proves that a container exists and permits the normalized representation to preserve its container shape, including an empty array/object, but it does **not** authorize copying arbitrary descendant fields.
+
+This is important for the GitHub Actions steps source. The policy now says:
+
+```text
+required_container_paths = ["steps"]
+required_paths           = []
+optional_paths           = [
+    "steps[*].name",
+    "steps[*].status",
+    "steps[*].conclusion",
+    "steps[*].number",
+    "steps[*].started_at",
+    "steps[*].completed_at"
+]
+```
+
+Therefore `steps = []` can be preserved faithfully, while `steps` does not mean copying every unknown field from every future GitHub step object.
+
+Exact overlap between container/required/optional categories is rejected. A container path may intentionally be a prefix of selected descendants because those declarations have different semantics.
+
+The precise selector grammar and execution behavior belong to the next prospective execution layer; HAK-013 only makes the categories explicit and content-bound.
 
 ## Policy identity
 
@@ -53,36 +92,11 @@ SHA256(
 )
 ```
 
-Therefore:
-
-```text
-profile_ref
-    = compatibility / human-facing name
-
-policy_id + policy_digest
-    = content identity
-```
-
-A future observation that claims to be bound to this policy must identify the exact policy content, not merely repeat the symbolic profile name.
+Therefore `profile_ref` is a compatibility/human-facing name while `policy_id + policy_digest` is content identity. A future observation that claims to be bound to this policy must identify the exact policy content, not merely repeat the symbolic profile name.
 
 ## Historical HAK-007 observation
 
-The existing HAK-007 source observation is intentionally **not** upgraded.
-
-Its HAK-013 binding states:
-
-```text
-binding_status          = RetrospectiveUnbound
-policy_identity         = null
-commitment_relation     = NotEstablished
-raw_response_retained   = false
-normalization_replayability
-    = NotReplayableWithoutRawResponse
-omitted_field_completeness
-    = NotEstablished
-```
-
-This preserves the historical truth:
+The existing HAK-007 source observation is intentionally **not** upgraded. Its HAK-013 binding remains `RetrospectiveUnbound`, has no policy identity, no established commitment relation, no retained raw response, no replayability claim, and no omitted-field completeness claim.
 
 ```text
 same symbolic profile name
@@ -90,93 +104,75 @@ same symbolic profile name
 proof that an exact content-bound policy existed before collection
 ```
 
-Because raw provider bytes were not retained, HAK-013 also refuses to establish omitted-field completeness for that historical observation.
-
 ## Prospective collection
 
 For future observations, the stronger target is:
 
 ```text
 ExactNormalizationPolicy
-        +
++
 RawProviderResponse (when retained)
-        +
++
 TemporalEvidenceOfPolicyAvailability
-        ↓
-PolicyBoundNormalizedObservation
+-> PolicyBoundNormalizedObservation
 ```
 
-HAK-013 does not yet claim that temporal relation automatically. A binding that says `PreObservationEstablished` must carry a separate temporal evidence reference. Static policy existence alone is insufficient.
+HAK-013 does not yet prove that temporal relation automatically.
 
 ```text
 PolicyExistsNow != PolicyWasPrecommittedThen
+NormalizationPolicyDefined != NormalizationPolicyExecutedByCollector
 ```
+
+The latter composition boundary is tracked separately in #1035.
 
 ## Replayability and completeness
 
-HAK-013 keeps replayability and source completeness separate from policy identity.
-
 ```text
-BoundToPolicy
-!=
-RawResponseRetained
-
-RawResponseRetained
-!=
-ProviderAuthenticated
+BoundToPolicy != RawResponseRetained
+RawResponseRetained != ProviderAuthenticated
 ```
 
 The v1 validator allows `EstablishedWithinPolicyScope` only when the observation is bound to a content-identified policy and the raw provider response was retained. Historical unbound evidence cannot make that claim.
 
 ## Adversarial checks
 
-The focused suite rejects:
+The focused suite rejects symbolic profile names used as policy identity, policy digest tampering, duplicate resource profiles, exact overlap between required and optional selected paths, exact overlap between required container and selected paths, duplicate selected paths, missing required-container path semantics, missing omission semantics, retrospective binding upgrades, unsupported precommit claims, historical omitted-field completeness/replayability claims, observation/profile mismatch, and binding digest tampering.
 
-- symbolic profile names used as policy identity;
-- policy digest tampering;
-- duplicate resource profiles;
-- required/optional path overlap;
-- duplicate selected field paths;
-- missing omission semantics;
-- retrospective bindings upgraded without policy identity;
-- precommit claims without temporal evidence;
-- omitted-field completeness claims on the historical fixture;
-- replayability claims without raw provider bytes;
-- observation/profile mismatch;
-- binding digest tampering.
+It also positively checks that a container path may be a prefix of an explicitly selected child path without authorizing the entire subtree.
 
 ## Self-qualification
 
-HAK-013 has an E5-target qualification plan and a HAK-010 precommitted obligation-to-step binding policy. The dedicated workflow is:
+HAK-013 has an E5-target qualification plan and a HAK-010 precommitted obligation-to-step binding policy. The dedicated workflow is `.github/workflows/hak-normalization-policy.yml`.
 
-`.github/workflows/hak-normalization-policy.yml`
+A green focused run qualifies only HAK-013's normalization-policy bookkeeping claims. It does not authenticate GitHub, retroactively qualify HAK-012, establish the historical HAK-007 normalization as precommitted, prove selector execution semantics, or prove semantic truth.
 
-A green focused run qualifies only HAK-013's normalization-policy bookkeeping claims. It does not authenticate GitHub, retroactively qualify HAK-012, establish the historical HAK-007 normalization as precommitted, or prove semantic truth.
+Any hosted run on an earlier HAK-013 head is historical evidence only after this path-semantics correction.
 
 ## Non-claims
 
-HAK-013 does not:
-
-- authenticate provider responses;
-- preserve historical raw response bytes that were never retained;
-- prove historical omitted-field completeness;
-- infer precommit timing from current Git history alone;
-- make a policy digest equivalent to provider attestation;
-- make projection completeness equivalent to source completeness;
-- grant runtime authority;
-- certify scientific, governance, consent, or robotics behavior.
+HAK-013 does not authenticate provider responses, execute selector/path semantics against raw provider data, preserve historical raw response bytes that were never retained, prove historical omitted-field completeness, infer precommit timing from current Git history alone, make a policy digest equivalent to provider attestation, make projection completeness equivalent to source completeness, grant runtime authority, or certify scientific/governance/consent/robotics behavior.
 
 ## Next boundary
 
-The next prospective collection layer should combine this content-bound policy with exact retrieval representation, collection-time bounds, raw-response retention where feasible, and typed re-observation lineage.
+Issue #1035 defines the next prospective collection layer:
 
 ```text
-CanonicalResourceIdentity
-!= RetrievalRepresentation
+RawProviderResponse
++
+ExactNormalizationPolicy
++
+VersionedSelectorInterpreter
+-> NormalizationExecutionReceipt
+-> ProviderSourceObservation
+```
 
-NormalizationPolicyIdentity
-!= ObservationLineage
+That layer must define deterministic selector grammar semantics and establish that the exact content-bound policy was actually executed.
 
-NewerObservation
-!= ErasureOfCounterevidence
+Separately, provider source lineage still needs to preserve:
+
+```text
+CanonicalResourceIdentity != RetrievalRepresentation
+NormalizationPolicyIdentity != ObservationLineage
+NewerObservation != ErasureOfCounterevidence
 ```

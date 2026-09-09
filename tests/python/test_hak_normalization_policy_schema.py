@@ -23,6 +23,14 @@ def test_schema_rejects_missing_policy_digest():
     doc=deepcopy(POLICY); doc.pop("policy_digest")
     with pytest.raises(ValidationError): Draft202012Validator(POLICY_SCHEMA).validate(doc)
 
+def test_schema_rejects_missing_path_semantics():
+    doc=deepcopy(POLICY); doc.pop("path_semantics")
+    with pytest.raises(ValidationError): Draft202012Validator(POLICY_SCHEMA).validate(doc)
+
+def test_schema_rejects_missing_required_container_paths():
+    doc=deepcopy(POLICY); doc["resource_profiles"][0].pop("required_container_paths")
+    with pytest.raises(ValidationError): Draft202012Validator(POLICY_SCHEMA).validate(doc)
+
 def test_schema_rejects_unknown_binding_status():
     doc=deepcopy(BINDING); doc["binding_status"]="Precommitted"
     with pytest.raises(ValidationError): Draft202012Validator(BINDING_SCHEMA).validate(doc)

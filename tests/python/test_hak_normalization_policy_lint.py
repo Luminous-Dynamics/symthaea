@@ -19,6 +19,15 @@ def redigest_binding(d): d["binding_digest"]=hak.compute_binding_digest(d)
 def test_policy_valid(): hak.validate_policy(load(POLICY))
 def test_historical_binding_valid(): hak.validate_binding(load(OBS),load(BIND),load(POLICY))
 
+def test_steps_container_is_presence_shape_not_whole_subtree_selection():
+    p=load(POLICY)
+    profile=next(x for x in p["resource_profiles"] if x["resource_kind"]=="WorkflowJobStepsObservation")
+    assert profile["required_container_paths"]==["steps"]
+    assert "steps" not in profile["required_paths"]
+    assert "steps" not in profile["optional_paths"]
+    assert p["path_semantics"]["required_container_paths"]=="RequireAndSelectContainerShapeOnly"
+    hak.validate_policy(p)
+
 def test_symbolic_profile_ref_is_not_policy_identity():
     b=load(BIND); b["binding_status"]="BoundToPolicy"; b["policy_identity"]=b["profile_ref"]; redigest_binding(b)
     with pytest.raises(hak.NormalizationPolicyLintError): hak.validate_binding(load(OBS),b,load(POLICY))
@@ -33,6 +42,21 @@ def test_duplicate_resource_profile_rejected():
 
 def test_required_optional_overlap_rejected():
     p=load(POLICY); p["resource_profiles"][0]["optional_paths"].append(p["resource_profiles"][0]["required_paths"][0]); redigest_policy(p)
+    with pytest.raises(hak.NormalizationPolicyLintError): hak.validate_policy(p)
+
+def test_required_container_exact_overlap_with_selected_path_rejected():
+    p=load(POLICY); p["resource_profiles"][0]["required_container_paths"].append(p["resource_profiles"][0]["required_paths"][0]); redigest_policy(p)
+    with pytest.raises(hak.NormalizationPolicyLintError): hak.validate_policy(p)
+
+def test_container_prefix_of_selected_descendant_is_allowed():
+    p=load(POLICY)
+    profile=next(x for x in p["resource_profiles"] if x["resource_kind"]=="WorkflowJobStepsObservation")
+    assert "steps" in profile["required_container_paths"]
+    assert "steps[*].name" in profile["optional_paths"]
+    hak.validate_policy(p)
+
+def test_missing_required_container_path_semantics_rejected():
+    p=load(POLICY); p["path_semantics"].pop("required_container_paths"); redigest_policy(p)
     with pytest.raises(hak.NormalizationPolicyLintError): hak.validate_policy(p)
 
 def test_duplicate_selected_path_rejected():
