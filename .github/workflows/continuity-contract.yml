@@ -52,7 +52,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/continuity-contract.yml)" -eq 1
-          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/continuity-contract.yml)" -eq 2
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/continuity-contract.yml)" -eq 3
           if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/continuity-contract.yml; then
             echo 'mutable major-version GitHub Action tag found in continuity qualification workflow' >&2
             exit 1
@@ -79,6 +79,7 @@ jobs:
           QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           CONTINUITY_CONTRACT_RECEIPT: ${{ runner.temp }}/continuity-contract-qualification-v1.tsv
           CONTINUITY_FORMAT_PATCH: ${{ runner.temp }}/symthaea-continuity-rustfmt.patch
+          CONTINUITY_FORMAT_SOURCE_DIR: ${{ runner.temp }}/symthaea-continuity-rustfmt-source
         run: bash scripts/qualify-continuity-contract.sh
 
       - name: Publish receipt and repair digests
@@ -124,5 +125,14 @@ jobs:
         with:
           name: continuity-contract-rustfmt-repair-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/symthaea-continuity-rustfmt.patch
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload rustfmt source snapshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-contract-rustfmt-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/symthaea-continuity-rustfmt-source
           if-no-files-found: ignore
           retention-days: 14
