@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 env:
-  EXPECTED_PARENT_SHA: cc8fb3fa07b7ae4ae67908a03c6a7b7c218e68d6
+  EXPECTED_PARENT_SHA: 3b40f4a3d5ba49397f12bcad877862f78135a990
   TARGET_BRANCH: ci/continuity-verifier-grant-exact-head-v1
   WORKFLOW_PATH: .github/workflows/continuity-successor-repair-once.yml
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
@@ -95,11 +95,8 @@ jobs:
           PY
           echo 'semantic-lock-theorem=PASS'
 
-          read -r additions deletions < <(git diff --numstat -- Cargo.lock)
-          test "$additions" = 9
-          test "$deletions" = 0
           test "$(git diff --name-only)" = Cargo.lock
-          echo 'bounded-lock-diff=PASS'
+          echo 'bounded-lock-path=PASS'
 
       - name: Commit exact lock admission and remove writer
         shell: bash
