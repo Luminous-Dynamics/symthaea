@@ -22,15 +22,13 @@ Each layer answers a different question:
 - **ContinuitySubject** — what exact operational scope is being named?
 - **CapabilityRealization** — which exact typed subject is declared to realize which exact capability-definition revision?
 - **Observation** — what evidence-bearing statement was captured about an exact subject?
-- **AvailabilityAssessment** — under an explicit evidence/currentness policy and explicit evaluation context, should a realization be treated as available, unavailable, or unknown for analysis?
+- **AvailabilityAssessment** — under explicit evidence/currentness rules and evaluation context, should a realization be treated as available, unavailable, or unknown for analysis?
 - **VerifiedSufficiency** — does available evidence satisfy an exact continuity requirement / verifier policy for an exact target?
 - **Authority** — may any actor or machine take an operational action?
 
 No identity or result in an earlier layer grants a result in a later layer by itself.
 
-## 2. Why existing V1 values must not be silently reused
-
-Two current V1 shapes are intentionally insufficient for typed capability realization.
+## 2. Existing V1 values that must not be silently reused
 
 ### 2.1 `ObservationEnvelopeV1::subject` is free-form text
 
@@ -42,17 +40,11 @@ Therefore:
 ObservationEnvelopeV1.subject == "cluster-a"
 ```
 
-must **not** be interpreted as cryptographic or structural equality with any particular:
-
-```text
-ContinuitySubjectId
-```
-
-Even if a namespace/logical label happens to look identical.
+must **not** be interpreted as structural or cryptographic equality with any particular `ContinuitySubjectId`, even if labels happen to match.
 
 A typed realization layer must not accept a legacy `ObservationId` as subject-bound evidence merely by parsing or comparing its subject string.
 
-### 2.2 `TargetRealizationId` is a generic digest wrapper
+### 2.2 `TargetRealizationId` is a generic witness target digest
 
 The existing witness-layer `TargetRealizationId::from_digest()` domain-separates an arbitrary nonzero digest. It does not structurally bind:
 
@@ -60,13 +52,42 @@ The existing witness-layer `TargetRealizationId::from_digest()` domain-separates
 - `CapabilityDefinitionId`;
 - `ContinuitySubjectId`.
 
-It therefore remains valid for its existing witness purpose but must not be renamed, aliased, or silently reinterpreted as the new capability-realization identity.
+It remains valid for its existing witness purpose but must not be renamed, aliased, or silently reinterpreted as the new capability-realization identity.
 
 Any future bridge between a typed `CapabilityRealizationId` and `TargetRealizationId` must be explicit, versioned, and reviewable.
 
-## 3. Required new identity: capability realization
+## 3. Exact subject resolution is required before realization binding
 
-After the subject and capability lineages independently qualify and converge, the first runtime type should be conceptually equivalent to:
+An individually valid `ContinuitySubjectV1` is not enough to establish membership in the exact operational subject universe used by an analysis.
+
+The subject lineage therefore requires a closed-world boundary equivalent to the `ValidatedContinuitySubjectSnapshotV1` introduced by the typed-subject snapshot child of #1092.
+
+That boundary establishes only:
+
+- canonical exact subject identities;
+- exact `ContinuitySubjectSnapshotId`;
+- closed parent references;
+- bounded/acyclic containment structure;
+- exact subject lookup.
+
+It does not establish physical existence, ownership, currentness, availability, or authority.
+
+A future realization validator must receive both:
+
+```text
+ValidatedCapabilityGraphV1
+ValidatedContinuitySubjectSnapshotV1
+```
+
+and require its exact capability definition and exact subject to resolve in those inputs.
+
+The realization identity itself should **not** include either whole snapshot identity. Unrelated graph or registry membership changes must not change the structural identity of the same exact `(CapabilityDefinitionId, ContinuitySubjectId)` binding.
+
+The downstream validated realization wrapper or enclosing realization-snapshot artifact may retain the exact graph/subject-snapshot validation context as provenance.
+
+## 4. Required new identity: capability realization
+
+After subject and capability lineages independently qualify and converge, the first runtime convergence type should be conceptually equivalent to:
 
 ```text
 CapabilityRealizationV1 {
@@ -78,15 +99,15 @@ CapabilityRealizationV1 {
 }
 ```
 
-### 3.1 Identity semantics
+### 4.1 Identity semantics
 
 `CapabilityRealizationId` must be a new domain-separated content identity over the exact canonical tuple above.
 
 Validation must establish all of the following before returning a downstream-trusted wrapper:
 
-1. the exact `CapabilityDefinitionId` resolves in the supplied validated graph;
+1. `CapabilityDefinitionId` resolves in the supplied validated capability graph;
 2. its stable `CapabilityId` equals the stored `capability_id`;
-3. the exact `ContinuitySubjectId` resolves in the supplied validated subject set / registry boundary;
+3. `ContinuitySubjectId` resolves in the supplied validated subject snapshot;
 4. the stored `realization_id` equals the domain-separated hash of canonical fields.
 
 The realization identity proves only structural binding.
@@ -100,7 +121,7 @@ It does **not** prove that:
 - the subject is owned by the caller;
 - any actor may operate or modify the subject.
 
-### 3.2 V1 multiplicity rule
+### 4.2 V1 multiplicity rule
 
 V1 should deliberately define at most one structural realization binding for an exact:
 
@@ -110,11 +131,11 @@ V1 should deliberately define at most one structural realization binding for an 
 
 pair.
 
-If multiple independently meaningful realizations on the same apparent operational object must later be distinguished, they should be represented as distinct typed subjects where appropriate, or introduced through an explicitly versioned future realization-instance model. V1 must not add an unconstrained free-form instance label merely to manufacture uniqueness.
+If multiple independently meaningful implementations on one apparent operational object must later be distinguished, model them as distinct typed subjects where appropriate or introduce an explicitly versioned realization-instance model. V1 must not add a free-form instance label merely to manufacture uniqueness.
 
-## 4. Required new evidence boundary: typed subject observations
+## 5. Required evidence boundary: typed subject observations
 
-Typed availability must consume observations whose **own canonical identity payload** binds an exact `ContinuitySubjectId`.
+Typed availability must consume observations whose **own canonical identity payload** binds exact `ContinuitySubjectId`.
 
 A future value should be conceptually equivalent to:
 
@@ -134,40 +155,36 @@ SubjectObservationEnvelopeV2 {
 }
 ```
 
-The exact name is not load-bearing; the trust boundary is.
+The exact type name is not load-bearing; the typed-subject identity boundary is.
 
-### 4.1 No string-match upgrade
+### 5.1 No string-match upgrade
 
-There must be no implicit conversion of:
+There must be no implicit conversion of `ObservationEnvelopeV1.subject: String` into `ContinuitySubjectId` by:
 
-```text
-ObservationEnvelopeV1.subject: String
-```
+- label equality;
+- namespace convention;
+- path convention;
+- hostname or DNS name;
+- serial number;
+- provider-specific naming;
+- adapter-local inference.
 
-into:
-
-```text
-ContinuitySubjectId
-```
-
-by label equality, namespace convention, path convention, hostname, DNS name, serial number, or adapter-local guess.
-
-### 4.2 Legacy observation migration
+### 5.2 Legacy observation migration
 
 If historical V1 observations need to participate in the typed system, conversion must produce a new evidence-bearing artifact that explicitly records:
 
 - source legacy `ObservationId`;
 - target `ContinuitySubjectId`;
 - mapping method / mapper identity;
-- mapping evidence digest or reference;
+- mapping evidence digest/reference;
 - limitations / ambiguity;
-- a new domain-separated typed-observation or mapping-attestation identity.
+- a new domain-separated mapping-attestation or typed-observation identity.
 
-The legacy observation remains unchanged. The adapter proves only that a mapping assertion was made under explicit provenance; it does not rewrite history.
+The legacy observation remains unchanged. The adapter records a mapping assertion under provenance; it does not rewrite history.
 
-## 5. Currentness must be explicit, deterministic, and separate from observation identity
+## 6. Currentness must be explicit and deterministic
 
-An observation capture timestamp is not itself a currentness decision.
+Observation capture time is not itself a currentness decision.
 
 Currentness evaluation must distinguish at least:
 
@@ -179,7 +196,7 @@ evaluation time
 
 and must not hide a wall-clock read inside identity construction or deterministic verification.
 
-A future currentness policy should have its own canonical identity and explicitly bound limits, conceptually:
+A future policy should have its own canonical identity and explicit finite bounds, conceptually:
 
 ```text
 CapabilityCurrentnessPolicyV1 {
@@ -193,15 +210,15 @@ CapabilityCurrentnessPolicyV1 {
 
 Exact fields may be refined during implementation review, but these invariants are required:
 
-- all age/skew bounds are explicit and finite;
+- age/skew bounds are explicit and finite;
 - zero/overflow/inert values are rejected where applicable;
 - evaluation receives `evaluation_time_unix_ms` explicitly;
-- evidence captured implausibly in the future is never silently treated as fresh;
-- currentness policy identity changes when any bound changes.
+- implausibly future-dated evidence is never silently treated as fresh;
+- policy identity changes when any bound changes.
 
-Currentness policy should not absorb evidence-strength or operational-sufficiency policy. Those are different trust decisions.
+Currentness policy must not absorb evidence-strength or operational-sufficiency policy. Those are separate trust decisions.
 
-## 6. Required new assessment boundary: availability
+## 7. Required assessment boundary: availability
 
 Capability realization existence must not imply availability.
 
@@ -219,7 +236,7 @@ CapabilityAvailabilityAssessmentV1 {
 }
 ```
 
-### 6.1 Canonical requirements
+### 7.1 Canonical requirements
 
 The assessment identity must commit to:
 
@@ -229,11 +246,11 @@ The assessment identity must commit to:
 - explicit assessment time;
 - exact currentness-policy identity.
 
-An empty evidence set must not yield `Available` unless a separately specified, explicit evidence policy permits a non-observational basis. V1 should prefer failing closed to inventing availability from structure alone.
+An empty evidence set must not yield `Available` unless a separately specified explicit evidence policy permits a non-observational basis. V1 should prefer failing closed to inventing availability from structure alone.
 
-### 6.2 Tri-state, not boolean
+### 7.2 Tri-state, not boolean
 
-V1 should preserve at least:
+V1 must preserve at least:
 
 - `Available`;
 - `Unavailable`;
@@ -241,11 +258,11 @@ V1 should preserve at least:
 
 Stale, incomplete, ambiguous, contradictory, or insufficiently scoped evidence must be representable without coercing uncertainty into `false` or `true`.
 
-If `Degraded` is later needed, it should be introduced only with explicit capability/service semantics rather than as an unqualified fourth confidence label.
+If `Degraded` is later needed, introduce it only with explicit capability/service semantics rather than as an unqualified confidence label.
 
-## 7. Availability is not sufficiency
+## 8. Availability is not sufficiency
 
-Even a structurally valid, current, `Available` realization may be insufficient for a continuity requirement.
+Even a structurally valid, current, `Available` realization may be insufficient for an exact continuity requirement.
 
 Examples include:
 
@@ -266,15 +283,15 @@ Available(realization)
 Satisfies(continuity_requirement)
 ```
 
-Sufficiency belongs in an explicit verifier / obligation layer that binds the exact requirement, target, evidence, policy, and currentness context.
+Sufficiency belongs in an explicit verifier / obligation layer binding exact requirement, target, evidence, policy, and currentness context.
 
-## 8. Activation assumptions must remain assumptions
+## 9. Activation assumptions remain assumptions
 
 CC-03B intentionally calls its inputs `available` and `activatable` **assumptions**.
 
 A typed availability assessment must not silently mutate those semantics.
 
-The future bridge should be explicit, for example conceptually:
+The future bridge must be explicit, conceptually:
 
 ```text
 AvailabilityAssessment
@@ -284,20 +301,20 @@ CapabilityActivationAssumption
 
 That admission boundary must state:
 
-- which assessment dispositions are accepted;
+- accepted assessment dispositions;
 - currentness requirements;
-- exact source graph / realization compatibility;
+- exact graph / realization compatibility;
 - required evidence or verifier class;
-- how contradictory assessments are handled;
-- which evaluation timestamp was used.
+- contradictory-assessment handling;
+- exact evaluation timestamp.
 
 The resulting activation-assumption identity must remain reproducible from admitted inputs.
 
-## 9. Counterfactual support must never masquerade as realization evidence
+## 10. Counterfactual support is never realization evidence
 
 CC-03C asks what would happen **if** modeled support capabilities were treated as available.
 
-Therefore a counterfactual support set must never be fed directly into:
+A counterfactual support set must never be fed directly into:
 
 - realization registration;
 - availability evidence;
@@ -306,7 +323,7 @@ Therefore a counterfactual support set must never be fed directly into:
 - procurement;
 - execution authority.
 
-The only safe direction is:
+The safe direction is:
 
 ```text
 counterfactual option
@@ -320,9 +337,9 @@ counterfactual option
     -> fact about the world
 ```
 
-## 10. Failure domains and resources come after typed realization/currentness
+## 11. Failure domains and resources come after realization/currentness
 
-Ranking or selecting recovery options before typed realizations exist would erase correlated risk and physical constraints.
+Ranking recovery options before typed realizations exist would erase correlated risk and physical constraints.
 
 After realization/currentness qualify, a later layer may bind explicit properties such as:
 
@@ -338,9 +355,9 @@ These properties must be evidence-bearing or policy-declared, not inferred from 
 
 Only after this layer qualifies should multi-objective decision support be considered.
 
-## 11. Decision support still does not grant authority
+## 12. Decision support still does not grant authority
 
-Any future ranking must preserve the theorem:
+Any future ranking must preserve:
 
 ```text
 RecoveryCandidate
@@ -354,13 +371,13 @@ RecoveryCandidate
 
 A ranking function may describe trade-offs. It must not become an implicit authority path.
 
-## 12. Explicit bridge to existing witness `TargetRealizationId`
+## 13. Explicit bridge to existing witness `TargetRealizationId`
 
-The witness subsystem already has a `TargetRealizationId` used to bind an exact witness target.
+The witness subsystem already has `TargetRealizationId` for exact witness targets.
 
 V1 convergence must preserve that existing identity contract.
 
-If capability realization becomes a legal witness target, introduce an explicit bridge/profile such as conceptually:
+If a capability realization becomes a legal witness target, introduce an explicit bridge/profile conceptually similar to:
 
 ```text
 CapabilityRealizationWitnessTargetV1 {
@@ -371,41 +388,45 @@ CapabilityRealizationWitnessTargetV1 {
 }
 ```
 
-The exact implementation may differ, but the following are mandatory:
+Exact implementation may differ, but these rules are mandatory:
 
 - no type alias;
 - no semantic rename of existing `TargetRealizationId`;
-- no hidden call that makes arbitrary target digests indistinguishable from typed capability realizations;
-- the bridge must be canonical, versioned, domain-separated, and testable.
+- no hidden call making arbitrary target digests indistinguishable from typed capability realizations;
+- canonical, versioned, domain-separated, testable bridge semantics.
 
-## 13. Convergence / merge gates
+## 14. Convergence / merge gates
 
-Runtime implementation of this contract should not begin by mechanically mixing evidence lineages.
+Runtime implementation must not begin by mechanically mixing unqualified evidence lineages.
 
 Required order:
 
-1. typed continuity subjects qualify at their exact head;
-2. canonical capability identity + graph validation qualify;
-3. assumption-scoped activation closure qualifies;
-4. counterfactual frontier qualifies if used by downstream discovery;
-5. converge the qualified subject + capability heads into a new exact implementation parent;
-6. implement `CapabilityRealizationV1` as the first convergence child;
-7. implement typed subject observations as a separate child;
-8. implement deterministic currentness policy/evaluation as a separate child;
-9. implement availability assessment as a separate child;
-10. only then bridge admitted availability into activation assumptions;
-11. only after that add failure-domain/resource constraints;
-12. defer ranking, planning, and authority integration until each earlier boundary has independent evidence.
+1. typed continuity subjects qualify at exact head;
+2. closed typed subject snapshot / registry boundary qualifies at exact head;
+3. canonical capability identity + graph validation qualify;
+4. assumption-scoped activation closure qualifies;
+5. counterfactual frontier qualifies if used by downstream discovery;
+6. converge the qualified subject-snapshot + capability heads into a new exact implementation parent;
+7. implement `CapabilityRealizationV1` as the first convergence child;
+8. implement typed subject observations as a separate child;
+9. implement deterministic currentness policy/evaluation as a separate child;
+10. implement availability assessment as a separate child;
+11. only then bridge admitted availability into activation assumptions;
+12. only after that add failure-domain/resource constraints;
+13. defer ranking, planning, and authority integration until every earlier boundary has independent evidence.
 
-Any environment/toolchain change after evidence begins follows the repository's existing reproducibility-lineage rule: do not mix incompatible evidence roots.
+Any environment/toolchain change after evidence begins follows the repository's reproducibility-lineage rule: do not mix incompatible evidence roots.
 
-## 14. Required implementation tests
+## 15. Required implementation tests
 
 The convergence implementation must eventually prove at least:
 
-- same capability definition + same subject -> deterministic same realization identity;
+- same exact capability definition + same exact subject -> deterministic same realization identity;
 - capability revision change -> different realization identity;
 - subject change -> different realization identity;
+- unrelated capability-graph or subject-snapshot membership changes do not rewrite the structural realization identity;
+- realization validation fails if exact definition is absent from supplied graph;
+- realization validation fails if exact subject is absent from supplied subject snapshot;
 - stable `CapabilityId` alone cannot substitute for exact `CapabilityDefinitionId`;
 - free-form observation subject string cannot satisfy typed subject binding;
 - legacy observation mapping requires explicit mapping evidence / identity;
@@ -415,11 +436,11 @@ The convergence implementation must eventually prove at least:
 - `Unknown` survives incomplete/ambiguous evidence;
 - availability does not imply requirement sufficiency;
 - typed realization cannot silently alias existing `TargetRealizationId`;
-- counterfactual support cannot be admitted as observed availability without an explicit independent evidence path.
+- counterfactual support cannot be admitted as observed availability without an independent evidence path.
 
-## 15. Non-claims
+## 16. Non-claims
 
-This document adds no runtime type, observation adapter, realization registry, currentness evaluator, availability assessment, verifier, planner, work order, procurement action, human assignment, migration action, governance action, or execution authority.
+This document adds no runtime realization type, observation adapter, realization registry, currentness evaluator, availability assessment, verifier, planner, work order, procurement action, human assignment, migration action, governance action, or execution authority.
 
 It does not claim that any current capability, subject, realization, observation, or counterfactual option corresponds to a real operational resource.
 
