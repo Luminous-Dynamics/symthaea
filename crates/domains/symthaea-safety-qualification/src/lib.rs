@@ -11,6 +11,7 @@
 #![deny(unsafe_code)]
 
 pub mod frozen_observation_admission;
+pub mod frozen_observation_commit_preconditions;
 pub mod observation_admission;
 pub mod observation_commit_preconditions;
 
