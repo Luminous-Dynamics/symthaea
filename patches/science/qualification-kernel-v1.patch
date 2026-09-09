@@ -4,26 +4,27 @@ diff --git a/crates/core/symthaea-evidence-plane/src/lib.rs b/crates/core/symtha
 @@ -45,6 +45,7 @@
  //! and `SYMTHAEA_COGNITIVE_ARCHITECTURE_AUDIT_ADDENDUM_2026-07-28.md` (§0.1)
  //! at the monorepo root for the audit trail behind this crate.
- 
+
 +pub mod qualification;
  pub mod seed_plan;
  pub mod task_validator;
- 
+
 diff --git a/crates/core/symthaea-evidence-plane/src/qualification.rs b/crates/core/symthaea-evidence-plane/src/qualification.rs
 new file mode 100644
 --- /dev/null
 +++ b/crates/core/symthaea-evidence-plane/src/qualification.rs
-@@ -0,0 +1,336 @@
+@@ -0,0 +1,467 @@
 +// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 +//! Qualification observations, deterministic interpretation, and bounded reporting authority.
 +//!
 +//! Observation != interpretation != authority. Missing checks are derived from the profile,
-+//! never fabricated as observations. V1 does not bind candidate/base/patch, workflow, runner,
-+//! toolchain, or environment identity and therefore cannot authorize materialization.
++//! never fabricated as observations. V1 structurally binds the exact profile semantics used for
++//! interpretation, but does not bind candidate/base/patch, workflow, runner, toolchain, or
++//! environment identity and therefore cannot authorize materialization.
 +
-+use std::collections::{BTreeMap, BTreeSet};
++use std::collections::BTreeMap;
 +
 +use serde::{Deserialize, Serialize};
 +
@@ -95,6 +96,7 @@ new file mode 100644
 +#[derive(Debug, Clone, PartialEq, Eq)]
 +pub enum QualificationError {
 +    InvalidProfile,
++    InvalidObservation(String),
 +    DuplicateRequirement(String),
 +    DuplicateObservation(String),
 +    UnknownObservation(String),
@@ -103,29 +105,77 @@ new file mode 100644
 +    AuthorityMismatch,
 +}
 +
++fn profile_requirements(
++    profile: &QualificationProfileV1,
++) -> Result<BTreeMap<String, CheckRole>, QualificationError> {
++    if profile.id.trim().is_empty()
++        || profile.id.trim() != profile.id
++        || profile.version == 0
++        || profile.requirements.is_empty()
++    {
++        return Err(QualificationError::InvalidProfile);
++    }
++
++    let mut required = BTreeMap::new();
++    let mut scientific = 0usize;
++    for requirement in &profile.requirements {
++        if requirement.id.trim().is_empty() || requirement.id.trim() != requirement.id {
++            return Err(QualificationError::InvalidProfile);
++        }
++        if required
++            .insert(requirement.id.clone(), requirement.role)
++            .is_some()
++        {
++            return Err(QualificationError::DuplicateRequirement(
++                requirement.id.clone(),
++            ));
++        }
++        if requirement.role == CheckRole::Scientific {
++            scientific += 1;
++        }
++    }
++    // A qualification profile with no scientific proposition could otherwise
++    // mint "Qualified" from premise/admissibility checks alone.
++    if scientific == 0 {
++        return Err(QualificationError::InvalidProfile);
++    }
++    Ok(required)
++}
++
++fn profiles_match(
++    left: &QualificationProfileV1,
++    right: &QualificationProfileV1,
++) -> Result<bool, QualificationError> {
++    if left.id != right.id || left.version != right.version {
++        return Ok(false);
++    }
++    Ok(profile_requirements(left)? == profile_requirements(right)?)
++}
++
 +fn validated<'a>(
 +    profile: &QualificationProfileV1,
 +    observations: &'a [Observation],
 +) -> Result<BTreeMap<&'a str, CheckOutcome>, QualificationError> {
-+    if profile.id.trim().is_empty() || profile.version == 0 || profile.requirements.is_empty() {
-+        return Err(QualificationError::InvalidProfile);
-+    }
-+    let mut required = BTreeSet::new();
-+    for requirement in &profile.requirements {
-+        if requirement.id.trim().is_empty() {
-+            return Err(QualificationError::InvalidProfile);
-+        }
-+        if !required.insert(requirement.id.as_str()) {
-+            return Err(QualificationError::DuplicateRequirement(requirement.id.clone()));
-+        }
-+    }
++    let required = profile_requirements(profile)?;
 +    let mut observed = BTreeMap::new();
 +    for observation in observations {
-+        if !required.contains(observation.id.as_str()) {
-+            return Err(QualificationError::UnknownObservation(observation.id.clone()));
++        if observation.id.trim().is_empty() || observation.id.trim() != observation.id {
++            return Err(QualificationError::InvalidObservation(
++                observation.id.clone(),
++            ));
 +        }
-+        if observed.insert(observation.id.as_str(), observation.outcome).is_some() {
-+            return Err(QualificationError::DuplicateObservation(observation.id.clone()));
++        if !required.contains_key(observation.id.as_str()) {
++            return Err(QualificationError::UnknownObservation(
++                observation.id.clone(),
++            ));
++        }
++        if observed
++            .insert(observation.id.as_str(), observation.outcome)
++            .is_some()
++        {
++            return Err(QualificationError::DuplicateObservation(
++                observation.id.clone(),
++            ));
 +        }
 +    }
 +    Ok(observed)
@@ -150,8 +200,11 @@ new file mode 100644
 +        match observations.get(requirement.id.as_str()).copied() {
 +            Some(CheckOutcome::Passed) => {}
 +            Some(CheckOutcome::Failed) => return Stage::Failed,
-+            Some(CheckOutcome::TimedOut | CheckOutcome::InfrastructureError) => interrupted = true,
-+            Some(CheckOutcome::Skipped | CheckOutcome::Cancelled) | None => incomplete = true,
++            Some(CheckOutcome::InfrastructureError) => interrupted = true,
++            // Timeout alone does not establish whether the candidate, the
++            // instrument, or the infrastructure caused the timeout.
++            Some(CheckOutcome::TimedOut | CheckOutcome::Skipped | CheckOutcome::Cancelled)
++            | None => incomplete = true,
 +        }
 +    }
 +    if interrupted {
@@ -191,10 +244,12 @@ new file mode 100644
 +}
 +
 +/// Serializable receipt. Cached interpretation and authority are untrusted until `validate`.
++///
++/// The full profile is retained so a validator can reject silent semantic drift under the
++/// same `(id, version)`. Requirement ordering is not semantic.
 +#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 +pub struct QualificationReceiptV1 {
-+    pub profile_id: String,
-+    pub profile_version: u32,
++    pub profile: QualificationProfileV1,
 +    pub observations: Vec<Observation>,
 +    pub disposition: QualificationDisposition,
 +    pub authority: QualificationAuthority,
@@ -207,8 +262,7 @@ new file mode 100644
 +    ) -> Result<Self, QualificationError> {
 +        let disposition = evaluate(profile, &observations)?;
 +        Ok(Self {
-+            profile_id: profile.id.clone(),
-+            profile_version: profile.version,
++            profile: profile.clone(),
 +            observations,
 +            disposition,
 +            authority: QualificationAuthority::derive(disposition),
@@ -216,7 +270,7 @@ new file mode 100644
 +    }
 +
 +    pub fn validate(&self, profile: &QualificationProfileV1) -> Result<(), QualificationError> {
-+        if self.profile_id != profile.id || self.profile_version != profile.version {
++        if !profiles_match(&self.profile, profile)? {
 +            return Err(QualificationError::ProfileMismatch);
 +        }
 +        let disposition = evaluate(profile, &self.observations)?;
@@ -239,19 +293,33 @@ new file mode 100644
 +            id: "science-rust-v1".into(),
 +            version: 1,
 +            requirements: vec![
-+                Requirement { id: "premise".into(), role: CheckRole::Premise },
-+                Requirement { id: "theorem".into(), role: CheckRole::Scientific },
-+                Requirement { id: "ratchet".into(), role: CheckRole::Scientific },
-+                Requirement { id: "hygiene".into(), role: CheckRole::Admissibility },
++                Requirement {
++                    id: "premise".into(),
++                    role: CheckRole::Premise,
++                },
++                Requirement {
++                    id: "theorem".into(),
++                    role: CheckRole::Scientific,
++                },
++                Requirement {
++                    id: "ratchet".into(),
++                    role: CheckRole::Scientific,
++                },
++                Requirement {
++                    id: "hygiene".into(),
++                    role: CheckRole::Admissibility,
++                },
 +            ],
 +        }
 +    }
++
 +    fn o(id: &str, outcome: CheckOutcome) -> Observation {
 +        Observation {
 +            id: id.into(),
 +            outcome,
 +        }
 +    }
++
 +    fn pass() -> Vec<Observation> {
 +        ["premise", "theorem", "ratchet", "hygiene"]
 +            .into_iter()
@@ -271,7 +339,10 @@ new file mode 100644
 +    fn theorem_pass_hygiene_fail_preserves_theorem_success() {
 +        let mut x = pass();
 +        x[3].outcome = CheckOutcome::Failed;
-+        assert_eq!(evaluate(&p(), &x).unwrap(), QualificationDisposition::CandidateHygieneFailure);
++        assert_eq!(
++            evaluate(&p(), &x).unwrap(),
++            QualificationDisposition::CandidateHygieneFailure
++        );
 +    }
 +
 +    #[test]
@@ -285,22 +356,53 @@ new file mode 100644
 +            o("theorem", CheckOutcome::Failed),
 +            o("ratchet", CheckOutcome::Passed),
 +        ];
-+        assert_eq!(evaluate(&p(), &x).unwrap(), QualificationDisposition::CandidateRejected);
++        assert_eq!(
++            evaluate(&p(), &x).unwrap(),
++            QualificationDisposition::CandidateRejected
++        );
 +    }
 +
 +    #[test]
-+    fn missing_and_cancelled_are_incomplete_but_explicit_infra_is_distinct() {
++    fn missing_cancelled_and_timeout_are_incomplete_but_explicit_infra_is_distinct() {
 +        let mut x = pass();
 +        x.pop();
-+        assert_eq!(evaluate(&p(), &x).unwrap(), QualificationDisposition::Incomplete);
++        assert_eq!(
++            evaluate(&p(), &x).unwrap(),
++            QualificationDisposition::Incomplete
++        );
 +        let mut x = pass();
 +        x[1].outcome = CheckOutcome::Cancelled;
-+        assert_eq!(evaluate(&p(), &x).unwrap(), QualificationDisposition::Incomplete);
++        assert_eq!(
++            evaluate(&p(), &x).unwrap(),
++            QualificationDisposition::Incomplete
++        );
++        let mut x = pass();
++        x[1].outcome = CheckOutcome::TimedOut;
++        assert_eq!(
++            evaluate(&p(), &x).unwrap(),
++            QualificationDisposition::Incomplete
++        );
 +        let mut x = pass();
 +        x[1].outcome = CheckOutcome::InfrastructureError;
 +        assert_eq!(
 +            evaluate(&p(), &x).unwrap(),
 +            QualificationDisposition::InfrastructureInterrupted
++        );
++    }
++
++    #[test]
++    fn profiles_without_scientific_requirements_cannot_qualify() {
++        let profile = QualificationProfileV1 {
++            id: "hygiene-only".into(),
++            version: 1,
++            requirements: vec![Requirement {
++                id: "fmt".into(),
++                role: CheckRole::Admissibility,
++            }],
++        };
++        assert_eq!(
++            evaluate(&profile, &[o("fmt", CheckOutcome::Passed)]),
++            Err(QualificationError::InvalidProfile)
 +        );
 +    }
 +
@@ -316,12 +418,40 @@ new file mode 100644
 +            evaluate(&p(), &[o("future", CheckOutcome::Passed)]),
 +            Err(QualificationError::UnknownObservation(_))
 +        ));
++        assert!(matches!(
++            evaluate(&p(), &[o(" theorem", CheckOutcome::Passed)]),
++            Err(QualificationError::InvalidObservation(_))
++        ));
 +        let empty = QualificationProfileV1 {
 +            id: "x".into(),
 +            version: 1,
 +            requirements: vec![],
 +        };
-+        assert_eq!(evaluate(&empty, &[]), Err(QualificationError::InvalidProfile));
++        assert_eq!(
++            evaluate(&empty, &[]),
++            Err(QualificationError::InvalidProfile)
++        );
++    }
++
++    #[test]
++    fn exact_profile_semantics_are_bound_but_requirement_order_is_not() {
++        let r = QualificationReceiptV1::new(&p(), pass()).unwrap();
++
++        let mut drifted = p();
++        drifted
++            .requirements
++            .iter_mut()
++            .find(|requirement| requirement.id == "hygiene")
++            .unwrap()
++            .role = CheckRole::Scientific;
++        assert_eq!(
++            r.validate(&drifted),
++            Err(QualificationError::ProfileMismatch)
++        );
++
++        let mut reordered = p();
++        reordered.requirements.reverse();
++        r.validate(&reordered).unwrap();
 +    }
 +
 +    #[test]
@@ -332,6 +462,7 @@ new file mode 100644
 +            r.validate(&p()),
 +            Err(QualificationError::DispositionMismatch)
 +        );
++
 +        let mut x = pass();
 +        x[3].outcome = CheckOutcome::Failed;
 +        let mut r = QualificationReceiptV1::new(&p(), x).unwrap();
