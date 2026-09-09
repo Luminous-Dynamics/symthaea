@@ -9,6 +9,7 @@
 
 pub mod actions;
 pub mod change_timeline;
+pub mod dependency_impact;
 pub mod diagnostic_beliefs;
 pub mod diagnostics;
 pub mod federation;
@@ -30,6 +31,11 @@ pub mod types;
 pub use change_timeline::{
     temporal_relation, ChangeClockV1, ChangeId, ChangeKindV1, ChangeTimelineError,
     ChangeTimelineV1, FailureWindowV1, SystemChangeV1, TemporalRelationV1,
+};
+pub use dependency_impact::{
+    analyze_dependency_impact_v1, DependencyImpactAnalysisV1, DependencyImpactErrorV1,
+    DependencyImpactPolicyV1, ImpactEvidenceRequirementV1, ImpactEvidenceSummaryV1,
+    ImpactPathStepV1, ImpactPropagationRuleV1, ImpactTraversalV1, PotentialImpactV1,
 };
 pub use diagnostic_beliefs::{
     rank_tests_by_information_gain, CausalHypothesisV1, DiagnosticBeliefError,
