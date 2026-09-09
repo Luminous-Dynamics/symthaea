@@ -1,0 +1,70 @@
+name: Inference Test Target Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "scripts/check-inference-test-targets.py"
+      - ".github/workflows/inference-*.yml"
+      - "tests/inference_*.rs"
+      - "tests/openai_compatible_transport.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-test-target-bootstrap-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-test-target-bootstrap:
+    name: Inference Test Target Bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - name: Materialize workflow-proven test registrations
+        run: python3 scripts/check-inference-test-targets.py --fix
+
+      - name: Verify registration closure
+        run: python3 scripts/check-inference-test-targets.py
+
+      - name: Reject malformed generated manifest diff
+        run: git diff --check -- Cargo.toml
+
+      - name: Compile and run all inference qualification targets
+        run: >-
+          cargo test --locked
+          --test inference_binding_receipt
+          --test inference_contract
+          --test inference_credential
+          --test inference_executor
+          --test inference_http_status_evidence
+          --test inference_permit
+          --test inference_provider_manifest_rejection
+          --test inference_provider_profile_binding
+          --test inference_provider_registry
+          --test inference_resource_execution
+          --test inference_resource_guard
+          --test inference_resource_scope
+          --test inference_router
+          --test inference_wire_observation
+          --test inference_wire_receipt
+          --test openai_compatible_transport
+
+      - name: Keep legacy catch-all quarantined
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq '^name = "inference_integration"$' Cargo.toml; then
+            echo 'legacy inference_integration must remain unregistered' >&2
+            exit 1
+          fi
