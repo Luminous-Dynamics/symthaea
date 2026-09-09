@@ -1,0 +1,156 @@
+name: ALife Counterfactual Random Field
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/counterfactual_randomness.rs"
+      - "crates/domains/symthaea-alife/src/evolution_intervention.rs"
+      - "crates/domains/symthaea-alife/src/genome.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - ".github/workflows/alife-counterfactual-random-field.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Stateless matched-randomness addressing theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/counterfactual_randomness.rs
+          sha256sum crates/domains/symthaea-alife/src/evolution_intervention.rs
+          sha256sum crates/domains/symthaea-alife/src/genome.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-counterfactual-random-field
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test counterfactual random field
+        run: 'cargo test --locked -p symthaea-alife counterfactual_randomness::'
+
+      - name: Test intervention contract remains compatible
+        run: 'cargo test --locked -p symthaea-alife evolution_intervention::'
+
+      - name: Strict ALife Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze stateless addressing theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/counterfactual_randomness.rs"
+
+          grep -q 'pub struct CounterfactualRandomFieldV1' "$src"
+          grep -q 'root_seed: u64' "$src"
+          grep -q 'pub struct CounterfactualDrawKeyV1' "$src"
+          grep -q 'domain: CounterfactualRandomDomainV1' "$src"
+          grep -q 'tick: u64' "$src"
+          grep -q 'subject_id: u64' "$src"
+          grep -q 'counterpart_id: u64' "$src"
+          grep -q 'ordinal: u64' "$src"
+          grep -q 'pub fn draw_u64(&self' "$src"
+          grep -q 'pub fn draw_unit_f64(&self' "$src"
+          grep -q 'same_semantic_key_is_bit_exact_independent_of_query_order' "$src"
+          grep -q 'insertion_or_removal_of_other_agents_does_not_shift_shared_scheduler_priorities' "$src"
+          grep -q 'unrelated_birth_queries_do_not_phase_shift_a_shared_mutation_draw' "$src"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('crates/domains/symthaea-alife/src/counterfactual_randomness.rs').read_text()
+          production = text.split('#[cfg(test)]', 1)[0]
+          if '&mut self' in production:
+              raise SystemExit('counterfactual random field acquired mutable cursor/state')
+          for forbidden in ['Cell<', 'RefCell<', 'Mutex<', 'AtomicU64', 'rng_state:']:
+              if forbidden in production:
+                  raise SystemExit(f'counterfactual random field acquired hidden mutable state: {forbidden}')
+          PY
+
+      - name: Freeze domain separation and Genome v1 address coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/counterfactual_randomness.rs"
+          for domain in SchedulerPriority InheritanceCandidatePriority MutationOccurrence MutationPerturbation OffspringConstructionSeed AgentActionSample; do
+            grep -q "$domain" "$src"
+          done
+          for trait_name in SetPoint ForageEfficiency ActionTemperature PerceptualGrain; do
+            grep -q "GenomeTraitV1::$trait_name" "$src"
+          done
+          grep -q 'stochastic_domains_are_separated_for_the_same_subject_coordinates' "$src"
+          grep -q 'every_genome_v1_trait_gets_a_distinct_mutation_address' "$src"
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/counterfactual_randomness.rs"
+          ! grep -q 'impl Population' "$src"
+          ! grep -q 'impl EncounterScheduler' "$src"
+          ! grep -q 'impl GenesisEarthExecutionV1' "$src"
+          ! grep -q 'statistical_adequacy_established=true' "$src"
+          ! grep -q 'causal_rescue_established=true' "$src"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-counterfactual-random-field-evidence
+          {
+            echo "authority=counterfactual_random_field_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "source_sha256=$(sha256sum crates/domains/symthaea-alife/src/counterfactual_randomness.rs | cut -d' ' -f1)"
+            echo "stateless_semantic_addressing=true"
+            echo "query_order_independence_executed=true"
+            echo "shared_event_no_phase_shift_executed=true"
+            echo "domain_separation_executed=true"
+            echo "genome_v1_address_coverage=true"
+            echo "live_scheduler_adapter=false"
+            echo "live_evolution_adapter=false"
+            echo "live_action_adapter=false"
+            echo "statistical_adequacy_established=false"
+            echo "causal_rescue_established=false"
+          } > target/alife-counterfactual-random-field-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-counterfactual-random-field-evidence
+          path: target/alife-counterfactual-random-field-evidence/qualification.txt
+          if-no-files-found: error
