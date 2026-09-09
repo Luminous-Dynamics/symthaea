@@ -1,0 +1,400 @@
+diff --git a/crates/core/symthaea-evidence-plane/src/lib.rs b/crates/core/symthaea-evidence-plane/src/lib.rs
+--- a/crates/core/symthaea-evidence-plane/src/lib.rs
++++ b/crates/core/symthaea-evidence-plane/src/lib.rs
+@@ -45,6 +45,7 @@
+ //! and `SYMTHAEA_COGNITIVE_ARCHITECTURE_AUDIT_ADDENDUM_2026-07-28.md` (§0.1)
+ //! at the monorepo root for the audit trail behind this crate.
+ 
++pub mod qualification_artifact_identity;
+ pub mod seed_plan;
+ pub mod task_validator;
+ 
+diff --git a/crates/core/symthaea-evidence-plane/src/qualification_artifact_identity.rs b/crates/core/symthaea-evidence-plane/src/qualification_artifact_identity.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/core/symthaea-evidence-plane/src/qualification_artifact_identity.rs
+@@ -0,0 +1,384 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
++//! Exact identity envelope for qualification candidates.
++//!
++//! Identity != provenance != execution != authority. This module validates
++//! already-computed identifiers; it deliberately does not hash files, inspect
++//! Git repositories, authenticate provenance, or authorize materialization.
++
++use std::collections::BTreeSet;
++
++use serde::{Deserialize, Serialize};
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
++pub enum DigestAlgorithm {
++    Sha256,
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
++pub enum DigestDomain {
++    CandidatePatchBytes,
++    WorkflowBytes,
++    QualificationProfileSemantics,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
++pub struct ContentDigestV1 {
++    pub algorithm: DigestAlgorithm,
++    pub domain: DigestDomain,
++    pub hex: String,
++}
++
++impl ContentDigestV1 {
++    pub fn sha256(
++        domain: DigestDomain,
++        hex: impl Into<String>,
++    ) -> Result<Self, ArtifactIdentityError> {
++        let value = Self {
++            algorithm: DigestAlgorithm::Sha256,
++            domain,
++            hex: hex.into(),
++        };
++        value.validate("content_digest")?;
++        Ok(value)
++    }
++
++    fn validate(&self, field: &'static str) -> Result<(), ArtifactIdentityError> {
++        let expected_len = match self.algorithm {
++            DigestAlgorithm::Sha256 => 64,
++        };
++        if self.hex.len() != expected_len || !is_lower_hex(&self.hex) {
++            return Err(ArtifactIdentityError::InvalidDigest(field));
++        }
++        Ok(())
++    }
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
++pub enum GitHashAlgorithm {
++    Sha1,
++    Sha256,
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
++pub enum GitObjectKind {
++    Commit,
++    Tree,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
++pub struct GitObjectIdV1 {
++    pub algorithm: GitHashAlgorithm,
++    pub kind: GitObjectKind,
++    pub hex: String,
++}
++
++impl GitObjectIdV1 {
++    pub fn new(
++        algorithm: GitHashAlgorithm,
++        kind: GitObjectKind,
++        hex: impl Into<String>,
++    ) -> Result<Self, ArtifactIdentityError> {
++        let value = Self {
++            algorithm,
++            kind,
++            hex: hex.into(),
++        };
++        value.validate("git_object")?;
++        Ok(value)
++    }
++
++    fn validate(&self, field: &'static str) -> Result<(), ArtifactIdentityError> {
++        let expected_len = match self.algorithm {
++            GitHashAlgorithm::Sha1 => 40,
++            GitHashAlgorithm::Sha256 => 64,
++        };
++        if self.hex.len() != expected_len || !is_lower_hex(&self.hex) {
++            return Err(ArtifactIdentityError::InvalidGitObject(field));
++        }
++        Ok(())
++    }
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct QualificationArtifactIdentityV1 {
++    pub repository: String,
++    pub base_commit: GitObjectIdV1,
++    pub candidate_patch: ContentDigestV1,
++    pub result_tree: GitObjectIdV1,
++    pub workflow: ContentDigestV1,
++    pub profile_semantics: ContentDigestV1,
++    pub changed_paths: Vec<String>,
++}
++
++impl QualificationArtifactIdentityV1 {
++    pub fn validate(&self) -> Result<(), ArtifactIdentityError> {
++        validate_repository(&self.repository)?;
++        self.base_commit.validate("base_commit")?;
++        self.result_tree.validate("result_tree")?;
++        self.candidate_patch.validate("candidate_patch")?;
++        self.workflow.validate("workflow")?;
++        self.profile_semantics.validate("profile_semantics")?;
++
++        if self.base_commit.kind != GitObjectKind::Commit {
++            return Err(ArtifactIdentityError::WrongGitObjectKind("base_commit"));
++        }
++        if self.result_tree.kind != GitObjectKind::Tree {
++            return Err(ArtifactIdentityError::WrongGitObjectKind("result_tree"));
++        }
++        if self.candidate_patch.domain != DigestDomain::CandidatePatchBytes {
++            return Err(ArtifactIdentityError::WrongDigestDomain("candidate_patch"));
++        }
++        if self.workflow.domain != DigestDomain::WorkflowBytes {
++            return Err(ArtifactIdentityError::WrongDigestDomain("workflow"));
++        }
++        if self.profile_semantics.domain != DigestDomain::QualificationProfileSemantics {
++            return Err(ArtifactIdentityError::WrongDigestDomain("profile_semantics"));
++        }
++        validate_changed_paths(&self.changed_paths)?;
++        Ok(())
++    }
++}
++
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub enum ArtifactIdentityError {
++    InvalidRepository,
++    InvalidDigest(&'static str),
++    WrongDigestDomain(&'static str),
++    InvalidGitObject(&'static str),
++    WrongGitObjectKind(&'static str),
++    InvalidChangedPaths,
++    IdentityMismatch,
++}
++
++/// Opaque witness that two independently supplied, valid identity envelopes
++/// matched exactly. It carries no scientific or materialization authority.
++#[derive(Debug, Clone)]
++pub struct VerifiedArtifactIdentity {
++    identity: QualificationArtifactIdentityV1,
++}
++
++impl VerifiedArtifactIdentity {
++    pub fn identity(&self) -> &QualificationArtifactIdentityV1 {
++        &self.identity
++    }
++}
++
++pub fn verify_artifact_identity(
++    observed: &QualificationArtifactIdentityV1,
++    expected: &QualificationArtifactIdentityV1,
++) -> Result<VerifiedArtifactIdentity, ArtifactIdentityError> {
++    observed.validate()?;
++    expected.validate()?;
++    if observed != expected {
++        return Err(ArtifactIdentityError::IdentityMismatch);
++    }
++    Ok(VerifiedArtifactIdentity {
++        identity: observed.clone(),
++    })
++}
++
++fn is_lower_hex(value: &str) -> bool {
++    value
++        .bytes()
++        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
++}
++
++fn validate_repository(repository: &str) -> Result<(), ArtifactIdentityError> {
++    if repository.trim() != repository {
++        return Err(ArtifactIdentityError::InvalidRepository);
++    }
++    let mut parts = repository.split('/');
++    let owner = parts.next().unwrap_or_default();
++    let name = parts.next().unwrap_or_default();
++    if owner.is_empty()
++        || name.is_empty()
++        || parts.next().is_some()
++        || owner.chars().any(char::is_whitespace)
++        || name.chars().any(char::is_whitespace)
++    {
++        return Err(ArtifactIdentityError::InvalidRepository);
++    }
++    Ok(())
++}
++
++fn validate_changed_paths(paths: &[String]) -> Result<(), ArtifactIdentityError> {
++    if paths.is_empty() {
++        return Err(ArtifactIdentityError::InvalidChangedPaths);
++    }
++
++    let mut previous: Option<&str> = None;
++    let mut unique = BTreeSet::new();
++    for path in paths {
++        let canonical = path.trim() == path
++            && !path.is_empty()
++            && !path.starts_with('/')
++            && !path.contains('\\')
++            && path
++                .split('/')
++                .all(|segment| !segment.is_empty() && segment != "." && segment != "..");
++        if !canonical {
++            return Err(ArtifactIdentityError::InvalidChangedPaths);
++        }
++        if let Some(previous) = previous {
++            if previous >= path.as_str() {
++                return Err(ArtifactIdentityError::InvalidChangedPaths);
++            }
++        }
++        if !unique.insert(path.as_str()) {
++            return Err(ArtifactIdentityError::InvalidChangedPaths);
++        }
++        previous = Some(path);
++    }
++    Ok(())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn digest(domain: DigestDomain, byte: &str) -> ContentDigestV1 {
++        ContentDigestV1::sha256(domain, byte.repeat(32)).unwrap()
++    }
++
++    fn oid(kind: GitObjectKind, byte: char) -> GitObjectIdV1 {
++        GitObjectIdV1::new(GitHashAlgorithm::Sha1, kind, byte.to_string().repeat(40)).unwrap()
++    }
++
++    fn identity() -> QualificationArtifactIdentityV1 {
++        QualificationArtifactIdentityV1 {
++            repository: "Luminous-Dynamics/symthaea".into(),
++            base_commit: oid(GitObjectKind::Commit, 'a'),
++            candidate_patch: digest(DigestDomain::CandidatePatchBytes, "11"),
++            result_tree: oid(GitObjectKind::Tree, 'b'),
++            workflow: digest(DigestDomain::WorkflowBytes, "22"),
++            profile_semantics: digest(DigestDomain::QualificationProfileSemantics, "33"),
++            changed_paths: vec![
++                "crates/core/symthaea-evidence-plane/src/lib.rs".into(),
++                "crates/core/symthaea-evidence-plane/src/qualification_artifact_identity.rs".into(),
++            ],
++        }
++    }
++
++    #[test]
++    fn exact_identity_returns_only_opaque_identity_witness() {
++        let value = identity();
++        let verified = verify_artifact_identity(&value, &value).unwrap();
++        assert_eq!(verified.identity(), &value);
++    }
++
++    #[test]
++    fn each_authoritative_coordinate_is_bound() {
++        let expected = identity();
++
++        let mut cases = Vec::new();
++        let mut value = expected.clone();
++        value.repository = "Luminous-Dynamics/other".into();
++        cases.push(value);
++
++        let mut value = expected.clone();
++        value.base_commit = oid(GitObjectKind::Commit, 'c');
++        cases.push(value);
++
++        let mut value = expected.clone();
++        value.candidate_patch = digest(DigestDomain::CandidatePatchBytes, "44");
++        cases.push(value);
++
++        let mut value = expected.clone();
++        value.result_tree = oid(GitObjectKind::Tree, 'd');
++        cases.push(value);
++
++        let mut value = expected.clone();
++        value.workflow = digest(DigestDomain::WorkflowBytes, "55");
++        cases.push(value);
++
++        let mut value = expected.clone();
++        value.profile_semantics = digest(DigestDomain::QualificationProfileSemantics, "66");
++        cases.push(value);
++
++        let mut value = expected.clone();
++        value.changed_paths.push("extra".into());
++        value.changed_paths.sort();
++        cases.push(value);
++
++        for value in cases {
++            assert_eq!(
++                verify_artifact_identity(&value, &expected),
++                Err(ArtifactIdentityError::IdentityMismatch)
++            );
++        }
++    }
++
++    #[test]
++    fn digest_domains_and_git_object_kinds_are_not_interchangeable() {
++        let mut value = identity();
++        value.candidate_patch.domain = DigestDomain::WorkflowBytes;
++        assert_eq!(
++            value.validate(),
++            Err(ArtifactIdentityError::WrongDigestDomain("candidate_patch"))
++        );
++
++        let mut value = identity();
++        value.result_tree.kind = GitObjectKind::Commit;
++        assert_eq!(
++            value.validate(),
++            Err(ArtifactIdentityError::WrongGitObjectKind("result_tree"))
++        );
++    }
++
++    #[test]
++    fn malformed_identifiers_fail_closed() {
++        assert!(
++            ContentDigestV1::sha256(DigestDomain::CandidatePatchBytes, "AA".repeat(32)).is_err()
++        );
++        assert!(ContentDigestV1::sha256(DigestDomain::CandidatePatchBytes, "11").is_err());
++        assert!(
++            GitObjectIdV1::new(
++                GitHashAlgorithm::Sha1,
++                GitObjectKind::Commit,
++                "a".repeat(64)
++            )
++            .is_err()
++        );
++        assert!(
++            GitObjectIdV1::new(
++                GitHashAlgorithm::Sha256,
++                GitObjectKind::Commit,
++                "a".repeat(40)
++            )
++            .is_err()
++        );
++    }
++
++    #[test]
++    fn changed_path_scope_must_be_canonical_sorted_and_unique() {
++        for paths in [
++            vec![],
++            vec!["b".into(), "a".into()],
++            vec!["a".into(), "a".into()],
++            vec!["../a".into()],
++            vec!["/a".into()],
++            vec!["a\\b".into()],
++        ] {
++            let mut value = identity();
++            value.changed_paths = paths;
++            assert_eq!(
++                value.validate(),
++                Err(ArtifactIdentityError::InvalidChangedPaths)
++            );
++        }
++    }
++
++    #[test]
++    fn serde_does_not_bypass_validation() {
++        let mut value = identity();
++        value.candidate_patch.hex = "not-a-digest".into();
++        let json = serde_json::to_string(&value).unwrap();
++        let decoded: QualificationArtifactIdentityV1 = serde_json::from_str(&json).unwrap();
++        assert_eq!(
++            decoded.validate(),
++            Err(ArtifactIdentityError::InvalidDigest("candidate_patch"))
++        );
++    }
++}
