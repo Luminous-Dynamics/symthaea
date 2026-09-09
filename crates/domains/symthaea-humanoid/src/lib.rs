@@ -43,6 +43,7 @@ pub mod oracle_generator_certification;
 pub mod osqp_backend;
 pub mod plugin;
 pub mod predictive_baseline;
+pub mod predictive_qualification;
 pub mod predictor_context;
 pub mod qp_certification;
 pub mod recovery;
@@ -99,6 +100,7 @@ pub use oracle_generator_certification::*;
 #[cfg(feature = "osqp-backend")]
 pub use osqp_backend::*;
 pub use predictive_baseline::*;
+pub use predictive_qualification::*;
 pub use predictor_context::*;
 pub use qp_certification::*;
 pub use recovery_certification::*;
@@ -122,6 +124,29 @@ pub use whole_body::*;
 // that semantic explicit avoids moving from borrowed prediction records during
 // deterministic digest validation.
 impl Copy for HumanoidPredictedValueV1 {}
+
+// R4.4 reports are self-validating, but promotion decisions must also bind the
+// report back to the exact frozen experiment that produced it. Keeping this
+// cross-artifact check at the crate boundary avoids making the report module
+// depend on private fields of the experiment while preserving an explicit API.
+impl HumanoidPredictiveQualificationReportV1 {
+    pub fn validate_against_experiment_v1(
+        &self,
+        experiment: &HumanoidPredictiveExperimentV1,
+    ) -> Result<(), HumanoidPredictiveQualificationErrorV1> {
+        self.validate()?;
+        experiment.validate()?;
+        let descriptor = experiment.predictor().descriptor();
+        if self.experiment_digest_hex != experiment.experiment_digest_hex()
+            || self.predictor_descriptor_digest_hex != descriptor.descriptor_digest_hex()?
+            || self.split_manifest_digest_hex != experiment.manifest().manifest_digest_hex
+            || self.output_contract_digest_hex != descriptor.output_role_digest_hex
+        {
+            return Err(HumanoidPredictiveQualificationErrorV1::ReportSummaryMismatch);
+        }
+        Ok(())
+    }
+}
 
 pub use crate::control::GaitControlProfile;
 pub use control::{
