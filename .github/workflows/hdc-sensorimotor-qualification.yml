@@ -16,6 +16,7 @@ on:
       - 'crates/domains/symthaea-humanoid/src/continuous_predictor.rs'
       - 'crates/domains/symthaea-humanoid/src/contextual_cfc.rs'
       - 'crates/domains/symthaea-humanoid/src/predictive_baseline.rs'
+      - 'crates/domains/symthaea-humanoid/src/predictive_qualification.rs'
       - 'crates/domains/symthaea-humanoid/src/predictor_context.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_action.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_action_causality.rs'
@@ -151,4 +152,10 @@ jobs:
         run: |
           cargo test -p symthaea-humanoid \
             contextual_cfc \
+            -- --test-threads=1
+
+      - name: Run predictive qualification evidence regressions
+        run: |
+          cargo test -p symthaea-humanoid \
+            predictive_qualification \
             -- --test-threads=1
