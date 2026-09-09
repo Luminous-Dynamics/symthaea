@@ -18,6 +18,8 @@ pub struct DependencyState {
     pub fleet_link_available: bool,
     pub remote_operator_available: bool,
     pub trusted_time_available: bool,
+    /// Informational dependency flag; `navigation` remains the decisive quality signal
+    /// because underwater platforms normally operate without continuous external fixes.
     pub external_positioning_available: bool,
 }
 
@@ -31,7 +33,9 @@ pub fn baseline_envelope(
     match health.worst_severity() {
         HealthSeverity::Unsafe => return OperatingEnvelope::FailStop,
         HealthSeverity::Critical => return OperatingEnvelope::RecoverOrSurface,
-        _ => {}
+        HealthSeverity::Degraded => return OperatingEnvelope::SafeTransit,
+        HealthSeverity::Unknown => return OperatingEnvelope::ReducedCapability,
+        HealthSeverity::Healthy | HealthSeverity::Advisory => {}
     }
 
     if navigation == NavigationQuality::Unavailable {
@@ -95,5 +99,24 @@ mod tests {
             &health(HealthSeverity::Unsafe),
         );
         assert_eq!(envelope, OperatingEnvelope::FailStop);
+    }
+
+    #[test]
+    fn missing_health_evidence_never_returns_normal() {
+        let envelope = baseline_envelope(
+            DependencyState {
+                fleet_link_available: true,
+                remote_operator_available: true,
+                trusted_time_available: true,
+                external_positioning_available: true,
+            },
+            NavigationQuality::Nominal,
+            &PlatformHealth {
+                platform_id: "node".into(),
+                observed_at_ms: 1,
+                components: Vec::new(),
+            },
+        );
+        assert_eq!(envelope, OperatingEnvelope::ReducedCapability);
     }
 }
