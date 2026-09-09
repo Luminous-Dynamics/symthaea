@@ -3,6 +3,8 @@ use crate::{HealthSeverity, NavigationQuality, PlatformHealth};
 use serde::{Deserialize, Serialize};
 
 /// Coarse operating envelope used when dependencies disappear or become untrusted.
+///
+/// Declaration order is also restriction order: larger values are never broader.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum OperatingEnvelope {
     Normal,
@@ -25,32 +27,36 @@ pub struct DependencyState {
 
 /// Deterministic, conservative baseline policy. Platform-specific controllers may
 /// further restrict the returned envelope, but should not silently broaden it.
+///
+/// Independent degradations are composed by taking the most restrictive envelope.
+/// This is load-bearing: an earlier, less severe fault must never mask a later,
+/// more severe loss (for example Unknown health must not hide unavailable navigation).
 pub fn baseline_envelope(
     dependencies: DependencyState,
     navigation: NavigationQuality,
     health: &PlatformHealth,
 ) -> OperatingEnvelope {
-    match health.worst_severity() {
-        HealthSeverity::Unsafe => return OperatingEnvelope::FailStop,
-        HealthSeverity::Critical => return OperatingEnvelope::RecoverOrSurface,
-        HealthSeverity::Degraded => return OperatingEnvelope::SafeTransit,
-        HealthSeverity::Unknown => return OperatingEnvelope::ReducedCapability,
-        HealthSeverity::Healthy | HealthSeverity::Advisory => {}
-    }
+    let mut envelope = match health.worst_severity() {
+        HealthSeverity::Unsafe => OperatingEnvelope::FailStop,
+        HealthSeverity::Critical => OperatingEnvelope::RecoverOrSurface,
+        HealthSeverity::Degraded => OperatingEnvelope::SafeTransit,
+        HealthSeverity::Unknown => OperatingEnvelope::ReducedCapability,
+        HealthSeverity::Healthy | HealthSeverity::Advisory => OperatingEnvelope::Normal,
+    };
 
     if navigation == NavigationQuality::Unavailable {
-        return OperatingEnvelope::HoldOrLoiter;
+        envelope = envelope.max(OperatingEnvelope::HoldOrLoiter);
     }
 
     if !dependencies.trusted_time_available {
-        return OperatingEnvelope::SafeTransit;
+        envelope = envelope.max(OperatingEnvelope::SafeTransit);
     }
 
     if !dependencies.fleet_link_available || !dependencies.remote_operator_available {
-        return OperatingEnvelope::ReducedCapability;
+        envelope = envelope.max(OperatingEnvelope::ReducedCapability);
     }
 
-    OperatingEnvelope::Normal
+    envelope
 }
 
 #[cfg(test)]
@@ -71,15 +77,21 @@ mod tests {
         }
     }
 
+    fn nominal_dependencies() -> DependencyState {
+        DependencyState {
+            fleet_link_available: true,
+            remote_operator_available: true,
+            trusted_time_available: true,
+            external_positioning_available: true,
+        }
+    }
+
     #[test]
     fn fleet_partition_degrades_without_forcing_failure() {
+        let mut dependencies = nominal_dependencies();
+        dependencies.fleet_link_available = false;
         let envelope = baseline_envelope(
-            DependencyState {
-                fleet_link_available: false,
-                remote_operator_available: true,
-                trusted_time_available: true,
-                external_positioning_available: true,
-            },
+            dependencies,
             NavigationQuality::Nominal,
             &health(HealthSeverity::Healthy),
         );
@@ -89,12 +101,7 @@ mod tests {
     #[test]
     fn unsafe_local_health_fail_stops_even_with_perfect_connectivity() {
         let envelope = baseline_envelope(
-            DependencyState {
-                fleet_link_available: true,
-                remote_operator_available: true,
-                trusted_time_available: true,
-                external_positioning_available: true,
-            },
+            nominal_dependencies(),
             NavigationQuality::Nominal,
             &health(HealthSeverity::Unsafe),
         );
@@ -104,12 +111,7 @@ mod tests {
     #[test]
     fn missing_health_evidence_never_returns_normal() {
         let envelope = baseline_envelope(
-            DependencyState {
-                fleet_link_available: true,
-                remote_operator_available: true,
-                trusted_time_available: true,
-                external_positioning_available: true,
-            },
+            nominal_dependencies(),
             NavigationQuality::Nominal,
             &PlatformHealth {
                 platform_id: "node".into(),
@@ -118,5 +120,39 @@ mod tests {
             },
         );
         assert_eq!(envelope, OperatingEnvelope::ReducedCapability);
+    }
+
+    #[test]
+    fn combined_failures_choose_the_most_restrictive_envelope() {
+        let mut dependencies = nominal_dependencies();
+        dependencies.fleet_link_available = false;
+        dependencies.trusted_time_available = false;
+
+        // Unknown health alone is only ReducedCapability, but unavailable
+        // navigation must still tighten the result to HoldOrLoiter.
+        let unknown_health = PlatformHealth {
+            platform_id: "node".into(),
+            observed_at_ms: 1,
+            components: Vec::new(),
+        };
+        assert_eq!(
+            baseline_envelope(
+                dependencies,
+                NavigationQuality::Unavailable,
+                &unknown_health,
+            ),
+            OperatingEnvelope::HoldOrLoiter
+        );
+
+        // Critical local health remains more restrictive than the same
+        // dependency/navigation losses.
+        assert_eq!(
+            baseline_envelope(
+                dependencies,
+                NavigationQuality::Unavailable,
+                &health(HealthSeverity::Critical),
+            ),
+            OperatingEnvelope::RecoverOrSurface
+        );
     }
 }

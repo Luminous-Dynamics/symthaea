@@ -43,6 +43,9 @@ impl MaritimeState {
         if self.platform_id.trim().is_empty() {
             return Err("platform_id must not be empty");
         }
+        if self.platform_id.trim() != self.platform_id {
+            return Err("platform_id must not contain outer whitespace");
+        }
         if !(0.0..=1.0).contains(&self.energy_remaining_fraction) {
             return Err("energy_remaining_fraction must be finite and within [0, 1]");
         }
@@ -57,15 +60,17 @@ impl MaritimeState {
                 return Err("depth_m must be finite and non-negative when present");
             }
         }
-        if let Some(lat) = self.latitude_deg {
-            if !(-90.0..=90.0).contains(&lat) {
-                return Err("latitude_deg must be finite and within [-90, 90]");
+        match (self.latitude_deg, self.longitude_deg) {
+            (Some(lat), Some(lon)) => {
+                if !(-90.0..=90.0).contains(&lat) {
+                    return Err("latitude_deg must be finite and within [-90, 90]");
+                }
+                if !(-180.0..=180.0).contains(&lon) {
+                    return Err("longitude_deg must be finite and within [-180, 180]");
+                }
             }
-        }
-        if let Some(lon) = self.longitude_deg {
-            if !(-180.0..=180.0).contains(&lon) {
-                return Err("longitude_deg must be finite and within [-180, 180]");
-            }
+            (None, None) => {}
+            _ => return Err("latitude_deg and longitude_deg must be present or absent together"),
         }
         Ok(())
     }
@@ -110,6 +115,17 @@ mod tests {
 
         state = valid_state();
         state.depth_m = Some(f32::NAN);
+        assert!(state.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_ambiguous_platform_identity_and_partial_coordinates() {
+        let mut state = valid_state();
+        state.platform_id = " auv-01".into();
+        assert!(state.validate().is_err());
+
+        state = valid_state();
+        state.longitude_deg = None;
         assert!(state.validate().is_err());
     }
 }

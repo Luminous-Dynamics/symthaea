@@ -20,13 +20,25 @@ pub struct FleetAssuranceReport {
     pub members: BTreeMap<String, FleetMemberReport>,
 }
 
+fn member_identity_consistent(key: &str, member: &FleetMemberReport) -> bool {
+    !key.trim().is_empty()
+        && key == member.platform_id
+        && member.platform_id == member.health.platform_id
+        && member.platform_id.trim() == member.platform_id
+}
+
 impl FleetAssuranceReport {
     /// Admission is intentionally all-members, not an aggregate score. Missing or
     /// unknown health evidence cannot satisfy a full-admission claim.
+    ///
+    /// The map key, member identity and nested health identity must also agree so a
+    /// healthy report for one platform cannot be accidentally attributed to another.
     pub fn all_members_admitted(&self) -> bool {
         !self.members.is_empty()
-            && self.members.values().all(|member| {
-                member.admitted
+            && !self.fleet_id.trim().is_empty()
+            && self.members.iter().all(|(key, member)| {
+                member_identity_consistent(key, member)
+                    && member.admitted
                     && !member.quarantined
                     && member.generation == self.expected_generation
                     && member.envelope == OperatingEnvelope::Normal
@@ -36,13 +48,15 @@ impl FleetAssuranceReport {
 
     pub fn degraded_members(&self) -> Vec<&FleetMemberReport> {
         self.members
-            .values()
-            .filter(|member| {
-                member.quarantined
+            .iter()
+            .filter_map(|(key, member)| {
+                (!member_identity_consistent(key, member)
+                    || member.quarantined
                     || !member.admitted
                     || member.generation != self.expected_generation
                     || member.envelope != OperatingEnvelope::Normal
-                    || member.health.worst_severity() >= HealthSeverity::Unknown
+                    || member.health.worst_severity() >= HealthSeverity::Unknown)
+                    .then_some(member)
             })
             .collect()
     }
@@ -98,5 +112,36 @@ mod tests {
         };
         assert!(!report.all_members_admitted());
         assert_eq!(report.degraded_members().len(), 1);
+    }
+
+    #[test]
+    fn map_key_or_nested_health_identity_mismatch_fails_closed() {
+        let keyed_wrong = FleetAssuranceReport {
+            fleet_id: "fleet".into(),
+            expected_generation: 4,
+            members: BTreeMap::from([("b".into(), member("a", HealthSeverity::Healthy))]),
+        };
+        assert!(!keyed_wrong.all_members_admitted());
+        assert_eq!(keyed_wrong.degraded_members().len(), 1);
+
+        let mut nested_wrong = member("a", HealthSeverity::Healthy);
+        nested_wrong.health.platform_id = "b".into();
+        let report = FleetAssuranceReport {
+            fleet_id: "fleet".into(),
+            expected_generation: 4,
+            members: BTreeMap::from([("a".into(), nested_wrong)]),
+        };
+        assert!(!report.all_members_admitted());
+        assert_eq!(report.degraded_members().len(), 1);
+    }
+
+    #[test]
+    fn empty_fleet_identity_cannot_claim_full_admission() {
+        let report = FleetAssuranceReport {
+            fleet_id: String::new(),
+            expected_generation: 4,
+            members: BTreeMap::from([("a".into(), member("a", HealthSeverity::Healthy))]),
+        };
+        assert!(!report.all_members_admitted());
     }
 }
