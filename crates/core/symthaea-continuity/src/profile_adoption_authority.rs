@@ -195,14 +195,17 @@ pub fn bind_policy_checked_adoption_to_authority_grant(
 
     validate_scope_shape(subject.scope())?;
     validate_scope_shape(authority_grant.allowed_scope())?;
-    if !scope_is_subset(subject.scope(), authority_grant.allowed_scope()) {
-        return Err(VerifierAdoptionAuthorityGrantError::ScopeExceedsAuthorityGrant);
-    }
+    // Ground trusted local policy before comparing candidate subset semantics. A
+    // malformed/foreign authority grant must fail as invalid policy rather than be
+    // mistaken for a merely narrower grant.
     ground_scopes_in_contract(
         subject.scope(),
         authority_grant.allowed_scope(),
         scope_contract,
     )?;
+    if !scope_is_subset(subject.scope(), authority_grant.allowed_scope()) {
+        return Err(VerifierAdoptionAuthorityGrantError::ScopeExceedsAuthorityGrant);
+    }
 
     Ok(AuthorityGrantedVerifierProfileAdoptionV1 {
         checked,
@@ -249,8 +252,8 @@ fn ground_scopes_in_contract(
     }
 
     let contract = scope_contract.ok_or(VerifierAdoptionAuthorityGrantError::MissingScopeContract)?;
-    ground_one_scope(candidate, contract, false)?;
     ground_one_scope(allowed, contract, true)?;
+    ground_one_scope(candidate, contract, false)?;
     Ok(())
 }
 
