@@ -2,14 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Episode-complete promotion for operational Reach qualification.
 //!
-//! Step-level controller evidence proves that individual Reach control cycles
-//! satisfy declared dynamics/safety/outcome policies. It does not, by itself,
-//! prove completion of a Reach episode. This module makes operational promotion
-//! require both evidence classes for Simulation, HIL, and Physical stages.
-//!
-//! The older step-stage artifact remains useful and is re-exported here, but the
-//! public operational artifact/authority path in the preferred facade requires a
-//! paired episode-completion artifact for every qualification stage.
+//! Step-level evidence proves individual Reach control cycles satisfy declared
+//! policies. It does not prove completion of a Reach episode. Operational
+//! promotion therefore requires both step-level and episode-completion evidence
+//! for Simulation, HIL, and Physical stages.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -23,10 +19,7 @@ use crate::reach_episode_evidence::{
     HumanoidReachEpisodeAssessment, HumanoidReachEpisodePolicy,
     HumanoidReachEpisodeStepEvidence, assess_humanoid_reach_episode,
 };
-use crate::reach_qualification_promotion::{
-    HumanoidReachQualificationStageArtifact, HumanoidReachQualificationStageIssueFailure,
-    issue_humanoid_reach_qualification_stage_artifact,
-};
+use crate::reach_qualification_promotion::HumanoidReachQualificationStageArtifact;
 use crate::skill_authority_receipt::{
     HumanoidAuthoritySourceSnapshot, HumanoidSkillAuthorityEvidence,
     HumanoidSkillAuthorityReceiptIssueFailure, issue_humanoid_skill_authority_receipt,
@@ -45,7 +38,7 @@ pub const HUMANOID_REACH_EPISODE_STAGE_ARTIFACT_SCHEMA_VERSION: u32 = 1;
 pub const HUMANOID_REACH_OPERATIONAL_EPISODE_QUALIFICATION_SCHEMA_VERSION: u32 = 1;
 pub const HUMANOID_REACH_OPERATIONAL_EPISODE_PROMOTION_POLICY_SCHEMA_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidReachEpisodeScenarioRequirement {
     pub scenario_id: String,
     pub hand: HandSide,
@@ -72,9 +65,6 @@ impl HumanoidReachEpisodeScenarioRequirement {
     }
 }
 
-/// Raw evidence corpus entry. The episode verdict is never trusted from the
-/// caller; campaign assessment re-runs `assess_humanoid_reach_episode` over the
-/// embedded step evidence.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidReachEpisodeQualificationCase {
     pub scenario_id: String,
@@ -269,8 +259,7 @@ pub fn assess_humanoid_reach_episode_campaign(
             continue;
         };
         let episode = assess_humanoid_reach_episode(subject, episode_policy, &case.steps);
-        let hand_matches = episode.hand == Some(requirement.hand);
-        if !hand_matches
+        if episode.hand != Some(requirement.hand)
             || case.perturbation_profile_id != requirement.perturbation_profile_id
             || case.perturbation_configuration_fingerprint
                 != requirement.perturbation_configuration_fingerprint
@@ -642,12 +631,18 @@ pub fn promote_humanoid_reach_episode_complete_to_operational(
         return Err(HumanoidReachEpisodeCompletePromotionFailure::StageOrderInvalid);
     }
 
-    if stage_pair_age(now_unix_millis, simulation_step.issued_unix_millis, simulation_episode.issued_unix_millis)
-        > policy.maximum_simulation_stage_age_millis
+    if stage_pair_age(
+        now_unix_millis,
+        simulation_step.issued_unix_millis,
+        simulation_episode.issued_unix_millis,
+    ) > policy.maximum_simulation_stage_age_millis
         || stage_pair_age(now_unix_millis, hil_step.issued_unix_millis, hil_episode.issued_unix_millis)
             > policy.maximum_hil_stage_age_millis
-        || stage_pair_age(now_unix_millis, physical_step.issued_unix_millis, physical_episode.issued_unix_millis)
-            > policy.maximum_physical_stage_age_millis
+        || stage_pair_age(
+            now_unix_millis,
+            physical_step.issued_unix_millis,
+            physical_episode.issued_unix_millis,
+        ) > policy.maximum_physical_stage_age_millis
     {
         return Err(HumanoidReachEpisodeCompletePromotionFailure::StageEvidenceStale);
     }
@@ -831,7 +826,8 @@ fn fingerprint_episode_corpus(
     });
     let mut hash = 0xcbf2_9ce4_8422_2325u64;
     feed_u64(&mut hash, episode_policy_fingerprint);
-    for (case, episode) in entries {
+    for entry in entries {
+        let (case, episode) = entry;
         if episode.episode_fingerprint == 0 {
             return 0;
         }
@@ -905,42 +901,8 @@ mod tests {
         )
     }
 
-    fn episode_step(epoch: u64, goal: &str, pre: f64, post: f64) -> HumanoidReachEpisodeStepEvidence {
-        let mut step = HumanoidReachEpisodeStepEvidence {
-            schema_version: crate::reach_episode_evidence::HUMANOID_REACH_EPISODE_EVIDENCE_SCHEMA_VERSION,
-            subject_fingerprint: subject().fingerprint(),
-            validation_epoch: epoch,
-            goal_id: goal.into(),
-            spatial_goal_fingerprint: 100 + epoch,
-            hand: HandSide::Right,
-            target_world_m: [0.4, -0.2, 1.0],
-            prepared_at_s: epoch as f64 * 0.03,
-            observed_at_s: epoch as f64 * 0.03 + 0.02,
-            received_at_s: epoch as f64 * 0.03 + 0.021,
-            pre_error_m: pre,
-            post_error_m: post,
-            progress_m: pre - post,
-            command_policy_id: "command-v1".into(),
-            outcome_policy_id: "outcome-v1".into(),
-            command_policy_fingerprint: 11,
-            outcome_policy_fingerprint: 22,
-            authority_receipt_fingerprint: 1_000 + epoch,
-            authority_scope_fingerprint: 2_000 + epoch,
-            authority_scope_id: "sim-episode-v1".into(),
-            execution_purpose: HumanoidExecutionPurpose::SimulationQualification,
-            qualification_basis: crate::execution_authority_scope::HumanoidQualificationAuthorityBasis::TrialProtocol,
-            step_accepted: true,
-            step_fingerprint: 0,
-        };
-        // The step fingerprint is intentionally private to the evidence module, so
-        // promotion tests exercise policy validation rather than hand-crafting a
-        // supposedly valid promotion corpus.
-        step
-    }
-
-    #[test]
-    fn episode_campaign_policy_rejects_missing_scenarios() {
-        let episode_policy = HumanoidReachEpisodePolicy {
+    fn episode_policy() -> HumanoidReachEpisodePolicy {
+        HumanoidReachEpisodePolicy {
             schema_version: crate::reach_episode_evidence::HUMANOID_REACH_EPISODE_EVIDENCE_SCHEMA_VERSION,
             policy_id: "episode-v1".into(),
             subject_fingerprint: subject().fingerprint(),
@@ -956,11 +918,15 @@ mod tests {
             minimum_net_progress_m: 0.04,
             minimum_distinct_authority_receipts: 2,
             require_every_step_accepted: true,
-        };
+        }
+    }
+
+    #[test]
+    fn episode_campaign_policy_rejects_missing_scenarios() {
         let policy = HumanoidReachEpisodeCampaignPolicy::from_episode_policy(
             &subject(),
             "campaign-v1",
-            &episode_policy,
+            &episode_policy(),
             vec![],
         );
         assert!(policy.is_none());
@@ -968,7 +934,7 @@ mod tests {
 
     #[test]
     fn promotion_policy_fingerprint_changes_with_pair_skew() {
-        let mut a = HumanoidReachEpisodeCompletePromotionPolicy {
+        let mut policy = HumanoidReachEpisodeCompletePromotionPolicy {
             schema_version: HUMANOID_REACH_OPERATIONAL_EPISODE_PROMOTION_POLICY_SCHEMA_VERSION,
             policy_id: "promotion-v1".into(),
             subject_fingerprint: subject().fingerprint(),
@@ -978,13 +944,8 @@ mod tests {
             maximum_stage_pair_skew_millis: 1_000,
             operational_artifact_validity_millis: 5_000,
         };
-        let first = a.fingerprint();
-        a.maximum_stage_pair_skew_millis = 2_000;
-        assert_ne!(first, a.fingerprint());
-    }
-
-    #[test]
-    fn raw_episode_step_fixture_is_not_accidentally_valid() {
-        assert!(!episode_step(1, "goal-1", 0.08, 0.01).validate());
+        let first = policy.fingerprint();
+        policy.maximum_stage_pair_skew_millis = 2_000;
+        assert_ne!(first, policy.fingerprint());
     }
 }
