@@ -14,6 +14,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::execution_authority_scope::{
+    HumanoidExecutionPurpose, HumanoidQualificationAuthorityBasis,
+};
 use crate::morphology::HandSide;
 use crate::qualification::HumanoidQualificationSubject;
 use crate::reach_execution::HumanoidPermittedReachExecutionResult;
@@ -26,12 +29,8 @@ pub const HUMANOID_REACH_QUALIFICATION_CAMPAIGN_SCHEMA_VERSION: u32 = 1;
 pub struct HumanoidReachScenarioCell {
     pub scenario_id: String,
     pub hand: HandSide,
-    /// Inclusive lower bound on the exact squared normalized ellipsoid radius
-    /// produced by spatial workspace admission.
     pub minimum_workspace_utilization_sq: f64,
-    /// Inclusive upper bound. Admitted Reach targets should remain <= 1.0.
     pub maximum_workspace_utilization_sq: f64,
-    /// Exact perturbation/fault/randomization profile identity used by the trial.
     pub perturbation_profile_id: String,
 }
 
@@ -84,6 +83,11 @@ pub struct HumanoidReachQualificationCampaignPolicy {
     pub schema_version: u32,
     pub campaign_id: String,
     pub subject_fingerprint: u64,
+    /// Campaigns are qualification evidence, so Operational purpose is rejected.
+    pub required_execution_purpose: HumanoidExecutionPurpose,
+    pub required_authority_scope_id: String,
+    pub required_command_policy_id: String,
+    pub required_outcome_policy_id: String,
     pub required_scenarios: Vec<HumanoidReachScenarioRequirement>,
 }
 
@@ -95,6 +99,10 @@ impl HumanoidReachQualificationCampaignPolicy {
             || subject.task != HumanoidTask::Reach
             || self.subject_fingerprint == 0
             || self.subject_fingerprint != subject.fingerprint()
+            || !is_qualification_purpose(self.required_execution_purpose)
+            || !valid_id(&self.required_authority_scope_id)
+            || !valid_id(&self.required_command_policy_id)
+            || !valid_id(&self.required_outcome_policy_id)
             || self.required_scenarios.is_empty()
             || self.required_scenarios.iter().any(|requirement| !requirement.validate())
         {
@@ -107,7 +115,6 @@ impl HumanoidReachQualificationCampaignPolicy {
     }
 }
 
-/// One already-bound trial admitted into a declared campaign cell.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidReachQualificationTrial {
     pub schema_version: u32,
@@ -121,7 +128,13 @@ pub struct HumanoidReachQualificationTrial {
     pub validation_epoch: u64,
     pub goal_id: String,
     pub spatial_goal_fingerprint: u64,
+    pub command_policy_id: String,
+    pub outcome_policy_id: String,
     pub authority_receipt_fingerprint: u64,
+    pub authority_scope_fingerprint: u64,
+    pub authority_scope_id: String,
+    pub execution_purpose: HumanoidExecutionPurpose,
+    pub qualification_basis: HumanoidQualificationAuthorityBasis,
     pub authority_effective_scale: f32,
     pub step_accepted: bool,
     pub trial_fingerprint: u64,
@@ -139,7 +152,13 @@ impl HumanoidReachQualificationTrial {
             && self.validation_epoch != 0
             && valid_id(&self.goal_id)
             && self.spatial_goal_fingerprint != 0
+            && valid_id(&self.command_policy_id)
+            && valid_id(&self.outcome_policy_id)
             && self.authority_receipt_fingerprint != 0
+            && self.authority_scope_fingerprint != 0
+            && valid_id(&self.authority_scope_id)
+            && is_qualification_purpose(self.execution_purpose)
+            && self.qualification_basis == HumanoidQualificationAuthorityBasis::TrialProtocol
             && self.authority_effective_scale.is_finite()
             && (0.0..=1.0).contains(&self.authority_effective_scale)
             && self.trial_fingerprint != 0
@@ -152,22 +171,22 @@ pub enum HumanoidReachQualificationTrialBindFailure {
     InvalidSubject,
     SubjectIsNotReach,
     InvalidScenario,
+    InvalidPerturbationProfile,
     ScenarioDoesNotMatchExecution,
     InvalidTrialId,
     StepIdentityMismatch,
+    StepPolicyIdentityInvalid,
     AuthorityIdentityMismatch,
     AuthorityEnvelopeMismatch,
     InvalidAuthorityLineage,
+    NonQualificationAuthorityScope,
 }
 
-/// Bind one completed Reach execution + already assessed command/outcome step to
-/// an exact campaign cell.
-///
-/// The result is only a campaign trial description. It cannot recreate permits,
-/// authority receipts, commands, or outcome evidence.
+#[allow(clippy::too_many_arguments)]
 pub fn bind_humanoid_reach_qualification_trial(
     subject: &HumanoidQualificationSubject,
     scenario: &HumanoidReachScenarioCell,
+    perturbation_profile_id: impl Into<String>,
     trial_id: impl Into<String>,
     trial_seed: u64,
     result: &HumanoidPermittedReachExecutionResult,
@@ -182,6 +201,10 @@ pub fn bind_humanoid_reach_qualification_trial(
     if !scenario.validate() {
         return Err(HumanoidReachQualificationTrialBindFailure::InvalidScenario);
     }
+    let perturbation_profile_id = perturbation_profile_id.into();
+    if !valid_id(&perturbation_profile_id) {
+        return Err(HumanoidReachQualificationTrialBindFailure::InvalidPerturbationProfile);
+    }
     let trial_id = trial_id.into();
     if !valid_id(&trial_id) {
         return Err(HumanoidReachQualificationTrialBindFailure::InvalidTrialId);
@@ -189,7 +212,7 @@ pub fn bind_humanoid_reach_qualification_trial(
     if !scenario.admits(
         result.preparation.hand,
         result.preparation.workspace_utilization_sq,
-        &scenario.perturbation_profile_id,
+        &perturbation_profile_id,
     ) {
         return Err(HumanoidReachQualificationTrialBindFailure::ScenarioDoesNotMatchExecution);
     }
@@ -199,18 +222,35 @@ pub fn bind_humanoid_reach_qualification_trial(
         || step.validation_epoch != result.preparation.validation_epoch
         || step.goal_id != result.preparation.goal_id
         || step.spatial_goal_fingerprint != result.preparation.spatial_goal_fingerprint
+        || step.command.subject_fingerprint != subject_fingerprint
+        || step.command.validation_epoch != result.preparation.validation_epoch
+        || step.command.goal_id != result.preparation.goal_id
+        || step.outcome.subject_fingerprint != subject_fingerprint
+        || step.outcome.validation_epoch != result.preparation.validation_epoch
+        || step.outcome.goal_id != result.preparation.goal_id
+        || step.outcome.spatial_goal_fingerprint != result.preparation.spatial_goal_fingerprint
     {
         return Err(HumanoidReachQualificationTrialBindFailure::StepIdentityMismatch);
+    }
+    if !valid_id(&step.command.policy_id) || !valid_id(&step.outcome.policy_id) {
+        return Err(HumanoidReachQualificationTrialBindFailure::StepPolicyIdentityInvalid);
     }
 
     let authority = &result.authority_receipt;
     if authority.receipt_fingerprint == 0
+        || authority.scope_fingerprint == 0
         || authority.validation_epoch != result.preparation.validation_epoch
         || authority.requirement_subject_fingerprints.as_slice() != [subject_fingerprint]
     {
         return Err(HumanoidReachQualificationTrialBindFailure::AuthorityIdentityMismatch);
     }
-    if !authority.issued_at_s.is_finite()
+    if !is_qualification_purpose(authority.execution_purpose)
+        || authority.qualification_basis != HumanoidQualificationAuthorityBasis::TrialProtocol
+    {
+        return Err(HumanoidReachQualificationTrialBindFailure::NonQualificationAuthorityScope);
+    }
+    if !valid_id(&authority.scope_id)
+        || !authority.issued_at_s.is_finite()
         || !authority.valid_until_s.is_finite()
         || !authority.finalized_at_s.is_finite()
         || authority.issued_at_s < 0.0
@@ -271,7 +311,7 @@ pub fn bind_humanoid_reach_qualification_trial(
         schema_version: HUMANOID_REACH_QUALIFICATION_CAMPAIGN_SCHEMA_VERSION,
         subject_fingerprint,
         scenario_id: scenario.scenario_id.clone(),
-        perturbation_profile_id: scenario.perturbation_profile_id.clone(),
+        perturbation_profile_id,
         trial_id,
         trial_seed,
         hand: result.preparation.hand,
@@ -279,7 +319,13 @@ pub fn bind_humanoid_reach_qualification_trial(
         validation_epoch: result.preparation.validation_epoch,
         goal_id: result.preparation.goal_id.clone(),
         spatial_goal_fingerprint: result.preparation.spatial_goal_fingerprint,
+        command_policy_id: step.command.policy_id.clone(),
+        outcome_policy_id: step.outcome.policy_id.clone(),
         authority_receipt_fingerprint: authority.receipt_fingerprint,
+        authority_scope_fingerprint: authority.scope_fingerprint,
+        authority_scope_id: authority.scope_id.clone(),
+        execution_purpose: authority.execution_purpose,
+        qualification_basis: authority.qualification_basis,
         authority_effective_scale,
         step_accepted: step.step_accepted,
         trial_fingerprint: 0,
@@ -318,6 +364,8 @@ pub enum HumanoidReachCampaignFailureKind {
     SubjectMismatch,
     UnknownScenario,
     ScenarioMetadataMismatch,
+    EvidencePolicyMismatch,
+    AuthorityScopeMismatch,
     DuplicateTrialId,
     RequiredScenarioFailed,
 }
@@ -331,7 +379,6 @@ pub struct HumanoidReachQualificationCampaignAssessment {
     pub total_trials: usize,
     pub total_accepted_trials: usize,
     pub scenarios: Vec<HumanoidReachScenarioAssessment>,
-    /// Internal campaign acceptance only; not legal/product safety certification.
     pub campaign_accepted: bool,
     pub failures: Vec<HumanoidReachCampaignFailureKind>,
 }
@@ -375,6 +422,17 @@ pub fn assess_humanoid_reach_qualification_campaign(
             &trial.perturbation_profile_id,
         ) {
             failures.push(HumanoidReachCampaignFailureKind::ScenarioMetadataMismatch);
+        }
+        if trial.command_policy_id != policy.required_command_policy_id
+            || trial.outcome_policy_id != policy.required_outcome_policy_id
+        {
+            failures.push(HumanoidReachCampaignFailureKind::EvidencePolicyMismatch);
+        }
+        if trial.execution_purpose != policy.required_execution_purpose
+            || trial.qualification_basis != HumanoidQualificationAuthorityBasis::TrialProtocol
+            || trial.authority_scope_id != policy.required_authority_scope_id
+        {
+            failures.push(HumanoidReachCampaignFailureKind::AuthorityScopeMismatch);
         }
         if !seen_trial_ids.insert((trial.scenario_id.clone(), trial.trial_id.clone())) {
             failures.push(HumanoidReachCampaignFailureKind::DuplicateTrialId);
@@ -469,11 +527,17 @@ fn fingerprint_trial(trial: &HumanoidReachQualificationTrial) -> u64 {
         || !valid_id(&trial.perturbation_profile_id)
         || !valid_id(&trial.trial_id)
         || !valid_id(&trial.goal_id)
+        || !valid_id(&trial.command_policy_id)
+        || !valid_id(&trial.outcome_policy_id)
+        || !valid_id(&trial.authority_scope_id)
         || trial.validation_epoch == 0
         || trial.spatial_goal_fingerprint == 0
         || trial.authority_receipt_fingerprint == 0
+        || trial.authority_scope_fingerprint == 0
         || !trial.workspace_utilization_sq.is_finite()
         || !trial.authority_effective_scale.is_finite()
+        || !is_qualification_purpose(trial.execution_purpose)
+        || trial.qualification_basis != HumanoidQualificationAuthorityBasis::TrialProtocol
     {
         return 0;
     }
@@ -489,7 +553,13 @@ fn fingerprint_trial(trial: &HumanoidReachQualificationTrial) -> u64 {
     feed_u64(&mut hash, trial.validation_epoch);
     feed_bytes(&mut hash, trial.goal_id.as_bytes());
     feed_u64(&mut hash, trial.spatial_goal_fingerprint);
+    feed_bytes(&mut hash, trial.command_policy_id.as_bytes());
+    feed_bytes(&mut hash, trial.outcome_policy_id.as_bytes());
     feed_u64(&mut hash, trial.authority_receipt_fingerprint);
+    feed_u64(&mut hash, trial.authority_scope_fingerprint);
+    feed_bytes(&mut hash, trial.authority_scope_id.as_bytes());
+    feed_u64(&mut hash, purpose_id(trial.execution_purpose));
+    feed_u64(&mut hash, basis_id(trial.qualification_basis));
     feed_u64(&mut hash, trial.authority_effective_scale.to_bits() as u64);
     feed_u64(&mut hash, trial.step_accepted as u64);
     if hash == 0 { 1 } else { hash }
@@ -499,7 +569,13 @@ fn fingerprint_campaign(
     policy: &HumanoidReachQualificationCampaignPolicy,
     trials: &[HumanoidReachQualificationTrial],
 ) -> u64 {
-    if !valid_id(&policy.campaign_id) || policy.subject_fingerprint == 0 || trials.is_empty() {
+    if !valid_id(&policy.campaign_id)
+        || policy.subject_fingerprint == 0
+        || !valid_id(&policy.required_authority_scope_id)
+        || !valid_id(&policy.required_command_policy_id)
+        || !valid_id(&policy.required_outcome_policy_id)
+        || trials.is_empty()
+    {
         return 0;
     }
     let mut sorted = trials.iter().collect::<Vec<_>>();
@@ -510,12 +586,63 @@ fn fingerprint_campaign(
             .then(left.trial_seed.cmp(&right.trial_seed))
     });
     let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    feed_u64(&mut hash, policy.schema_version as u64);
     feed_bytes(&mut hash, policy.campaign_id.as_bytes());
     feed_u64(&mut hash, policy.subject_fingerprint);
+    feed_u64(&mut hash, purpose_id(policy.required_execution_purpose));
+    feed_bytes(&mut hash, policy.required_authority_scope_id.as_bytes());
+    feed_bytes(&mut hash, policy.required_command_policy_id.as_bytes());
+    feed_bytes(&mut hash, policy.required_outcome_policy_id.as_bytes());
+    for requirement in &policy.required_scenarios {
+        feed_bytes(&mut hash, requirement.cell.scenario_id.as_bytes());
+        feed_u64(&mut hash, hand_id(requirement.cell.hand));
+        feed_u64(
+            &mut hash,
+            requirement.cell.minimum_workspace_utilization_sq.to_bits(),
+        );
+        feed_u64(
+            &mut hash,
+            requirement.cell.maximum_workspace_utilization_sq.to_bits(),
+        );
+        feed_bytes(&mut hash, requirement.cell.perturbation_profile_id.as_bytes());
+        feed_u64(&mut hash, requirement.minimum_trials as u64);
+        feed_u64(&mut hash, requirement.maximum_failure_rate.to_bits());
+        feed_u64(&mut hash, requirement.minimum_distinct_spatial_goals as u64);
+        feed_u64(
+            &mut hash,
+            requirement.minimum_distinct_authority_receipts as u64,
+        );
+        feed_u64(&mut hash, requirement.require_unique_trial_seeds as u64);
+    }
     for trial in sorted {
         feed_u64(&mut hash, trial.trial_fingerprint);
     }
     if hash == 0 { 1 } else { hash }
+}
+
+fn is_qualification_purpose(purpose: HumanoidExecutionPurpose) -> bool {
+    matches!(
+        purpose,
+        HumanoidExecutionPurpose::SimulationQualification
+            | HumanoidExecutionPurpose::HilQualification
+            | HumanoidExecutionPurpose::PhysicalQualification
+    )
+}
+
+fn purpose_id(purpose: HumanoidExecutionPurpose) -> u64 {
+    match purpose {
+        HumanoidExecutionPurpose::SimulationQualification => 1,
+        HumanoidExecutionPurpose::HilQualification => 2,
+        HumanoidExecutionPurpose::PhysicalQualification => 3,
+        HumanoidExecutionPurpose::Operational => 4,
+    }
+}
+
+fn basis_id(basis: HumanoidQualificationAuthorityBasis) -> u64 {
+    match basis {
+        HumanoidQualificationAuthorityBasis::TrialProtocol => 1,
+        HumanoidQualificationAuthorityBasis::QualifiedCapability => 2,
+    }
 }
 
 fn valid_id(value: &str) -> bool {
@@ -591,6 +718,10 @@ mod tests {
             schema_version: HUMANOID_REACH_QUALIFICATION_CAMPAIGN_SCHEMA_VERSION,
             campaign_id: "reach-campaign-test-v1".into(),
             subject_fingerprint: subject().fingerprint(),
+            required_execution_purpose: HumanoidExecutionPurpose::SimulationQualification,
+            required_authority_scope_id: "reach-sim-qualification-v1".into(),
+            required_command_policy_id: "reach-command-policy-test-v1".into(),
+            required_outcome_policy_id: "reach-outcome-policy-test-v1".into(),
             required_scenarios: vec![
                 requirement("right-interior", HandSide::Right, 0.0, 0.49),
                 requirement("left-boundary", HandSide::Left, 0.81, 1.0),
@@ -617,7 +748,13 @@ mod tests {
             validation_epoch: index + 1,
             goal_id: format!("goal-{index}"),
             spatial_goal_fingerprint: 1_000 + index,
+            command_policy_id: "reach-command-policy-test-v1".into(),
+            outcome_policy_id: "reach-outcome-policy-test-v1".into(),
             authority_receipt_fingerprint: 2_000 + index,
+            authority_scope_fingerprint: 3_000 + index,
+            authority_scope_id: "reach-sim-qualification-v1".into(),
+            execution_purpose: HumanoidExecutionPurpose::SimulationQualification,
+            qualification_basis: HumanoidQualificationAuthorityBasis::TrialProtocol,
             authority_effective_scale: 1.0,
             step_accepted: accepted,
             trial_fingerprint: 0,
@@ -664,13 +801,7 @@ mod tests {
     fn pooled_success_rate_cannot_hide_failing_required_cell() {
         let mut trials = Vec::new();
         for index in 1..=20 {
-            trials.push(trial(
-                "right-interior",
-                HandSide::Right,
-                0.3,
-                index,
-                true,
-            ));
+            trials.push(trial("right-interior", HandSide::Right, 0.3, index, true));
         }
         trials.push(trial("left-boundary", HandSide::Left, 0.85, 30, false));
         trials.push(trial("left-boundary", HandSide::Left, 0.95, 31, false));
@@ -686,11 +817,10 @@ mod tests {
 
     #[test]
     fn reused_authority_receipt_cannot_satisfy_independent_trial_requirement() {
-        let mut a = trial("right-interior", HandSide::Right, 0.25, 1, true);
+        let a = trial("right-interior", HandSide::Right, 0.25, 1, true);
         let mut b = trial("right-interior", HandSide::Right, 0.35, 2, true);
         b.authority_receipt_fingerprint = a.authority_receipt_fingerprint;
         b.trial_fingerprint = fingerprint_trial(&b);
-        a.trial_fingerprint = fingerprint_trial(&a);
         let trials = vec![
             a,
             b,
@@ -710,6 +840,36 @@ mod tests {
     }
 
     #[test]
+    fn operational_authority_cannot_enter_qualification_campaign() {
+        let mut trials = vec![
+            trial("right-interior", HandSide::Right, 0.25, 1, true),
+            trial("right-interior", HandSide::Right, 0.35, 2, true),
+            trial("left-boundary", HandSide::Left, 0.85, 3, true),
+            trial("left-boundary", HandSide::Left, 0.95, 4, true),
+        ];
+        trials[0].execution_purpose = HumanoidExecutionPurpose::Operational;
+        trials[0].qualification_basis = HumanoidQualificationAuthorityBasis::QualifiedCapability;
+        trials[0].trial_fingerprint = fingerprint_trial(&trials[0]);
+        let assessment = assess_humanoid_reach_qualification_campaign(&subject(), &policy(), &trials);
+        assert!(!assessment.campaign_accepted);
+    }
+
+    #[test]
+    fn mixed_evidence_policies_fail_closed() {
+        let mut trials = vec![
+            trial("right-interior", HandSide::Right, 0.25, 1, true),
+            trial("right-interior", HandSide::Right, 0.35, 2, true),
+            trial("left-boundary", HandSide::Left, 0.85, 3, true),
+            trial("left-boundary", HandSide::Left, 0.95, 4, true),
+        ];
+        trials[0].outcome_policy_id = "easier-policy-v2".into();
+        trials[0].trial_fingerprint = fingerprint_trial(&trials[0]);
+        let assessment = assess_humanoid_reach_qualification_campaign(&subject(), &policy(), &trials);
+        assert!(!assessment.campaign_accepted);
+        assert!(assessment.failures.contains(&HumanoidReachCampaignFailureKind::EvidencePolicyMismatch));
+    }
+
+    #[test]
     fn workspace_band_is_checked_from_admitted_geometry() {
         let cell = HumanoidReachScenarioCell {
             scenario_id: "boundary".into(),
@@ -721,5 +881,6 @@ mod tests {
         assert!(cell.admits(HandSide::Left, 0.9, "nominal-v1"));
         assert!(!cell.admits(HandSide::Left, 0.4, "nominal-v1"));
         assert!(!cell.admits(HandSide::Right, 0.9, "nominal-v1"));
+        assert!(!cell.admits(HandSide::Left, 0.9, "different-perturbation"));
     }
 }
