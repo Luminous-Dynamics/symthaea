@@ -14,6 +14,8 @@ pub mod evidence_binding;
 pub mod generativity;
 /// Typed outcomes that keep surprise reduction distinct from broader discovery value.
 pub mod outcome;
+/// Re-verifiable persistence boundary for evidence-backed generativity assessments.
+pub mod persisted_evidence;
 
 pub use symthaea_exploration::*;
 
