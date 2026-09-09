@@ -56,6 +56,7 @@ pub mod ma001l;
 pub mod ma001r;
 pub mod metabolism;
 pub mod observatory;
+pub mod observed_stochastic_tape;
 pub mod organism;
 pub mod organism_seed;
 pub mod organism_snapshot;
@@ -155,6 +156,12 @@ pub use metabolism::{
 pub use observatory::{
     AgentTrajectorySummary, LineageSummary, ObservatoryError, ObservatoryReport,
     TransferEdgeSummary, analyze_genesis_events,
+};
+pub use observed_stochastic_tape::{
+    ObservedSchedulerOrderKindV1, ObservedSchedulerOrderV1, ObservedStochasticDomainV1,
+    ObservedStochasticDrawV1, ObservedStochasticKeyV1, ObservedStochasticTapeErrorV1,
+    ObservedStochasticTapeSubjectV1, ObservedStochasticTapeV1, ObservedStochasticValueV1,
+    ValidatedObservedStochasticTapeV1,
 };
 pub use organism::{Action, Organism, OrganismConfig, OrganismTick, PendingSocialLearning};
 pub use organism_seed::{
