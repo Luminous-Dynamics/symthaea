@@ -1,59 +1,25 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Public safe composition surface for continuity witnesses.
+//! Internal composition of verifier-owned evidence into a closed-world witness.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::contract::{ContinuityRequirementId, ValidatedContinuityContractV1};
+use crate::verifier::AuthenticatedVerificationEvidenceV1;
 use crate::witness::{
-    ObligationDispositionV1, QualifiedContinuityWitnessV1, TargetRealizationId,
-    VerificationPolicyV1, WitnessError, WitnessLedgerV1, WitnessManifestV1,
+    QualifiedContinuityWitnessV1, TargetRealizationId, VerificationPolicyV1, WitnessError,
+    WitnessLedgerV1, WitnessManifestV1,
 };
 
-/// One caller-supplied disposition keyed by the contract requirement it addresses.
-///
-/// Callers never construct witness obligations or manifests directly. The verifier
-/// derives those from the validated contract, target, and verification policy.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ContinuityEvidenceSubmissionV1 {
-    requirement_id: ContinuityRequirementId,
-    disposition: ObligationDispositionV1,
-}
-
-impl ContinuityEvidenceSubmissionV1 {
-    pub fn new(
-        requirement_id: ContinuityRequirementId,
-        disposition: ObligationDispositionV1,
-    ) -> Self {
-        Self {
-            requirement_id,
-            disposition,
-        }
-    }
-
-    pub fn requirement_id(&self) -> ContinuityRequirementId {
-        self.requirement_id
-    }
-
-    pub fn disposition(&self) -> &ObligationDispositionV1 {
-        &self.disposition
-    }
-}
-
-/// Compose a qualified continuity witness without exposing a deserializable
-/// manifest/ledger construction path to external callers.
-///
-/// The function derives the closed-world obligation set internally and requires
-/// submitted requirement IDs to be unique and known. Missing submissions remain
-/// visible to `WitnessLedgerV1::finalize()` as an incomplete witness.
-pub fn compose_qualified_witness(
+/// Compose one qualified witness exclusively from verifier-owned authenticated
+/// evidence. No caller-supplied evidence class crosses this boundary.
+pub(crate) fn compose_qualified_witness(
     contract: &ValidatedContinuityContractV1,
     target: TargetRealizationId,
     policy: &VerificationPolicyV1,
-    submissions: Vec<ContinuityEvidenceSubmissionV1>,
+    evidence: Vec<AuthenticatedVerificationEvidenceV1>,
 ) -> Result<QualifiedContinuityWitnessV1, ComposeError> {
     let manifest = WitnessManifestV1::new(contract, target, policy)?;
     let mut by_requirement = BTreeMap::new();
@@ -63,34 +29,35 @@ pub fn compose_qualified_witness(
 
     let mut seen = BTreeSet::new();
     let mut ledger = WitnessLedgerV1::new(manifest);
-    for submission in submissions {
-        if !seen.insert(submission.requirement_id) {
-            return Err(ComposeError::DuplicateRequirementSubmission {
-                requirement: submission.requirement_id,
+    for item in evidence {
+        let requirement_id = item.requirement_id();
+        if !seen.insert(requirement_id) {
+            return Err(ComposeError::DuplicateRequirementEvidence {
+                requirement: requirement_id,
             });
         }
-        let obligation = by_requirement
-            .get(&submission.requirement_id)
+        let obligation_id = by_requirement
+            .get(&requirement_id)
             .copied()
-            .ok_or(ComposeError::UnknownRequirementSubmission {
-                requirement: submission.requirement_id,
+            .ok_or(ComposeError::UnknownRequirementEvidence {
+                requirement: requirement_id,
             })?;
-        ledger.record(obligation, submission.disposition)?;
+        ledger.record(obligation_id, item.disposition())?;
     }
 
     Ok(ledger.finalize()?.qualify()?)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum ComposeError {
+pub(crate) enum ComposeError {
     #[error(transparent)]
     Witness(#[from] WitnessError),
-    #[error("submission references requirement outside the validated contract: {requirement:?}")]
-    UnknownRequirementSubmission {
+    #[error("authenticated evidence references requirement outside the validated contract: {requirement:?}")]
+    UnknownRequirementEvidence {
         requirement: ContinuityRequirementId,
     },
-    #[error("requirement received more than one submitted disposition: {requirement:?}")]
-    DuplicateRequirementSubmission {
+    #[error("requirement received more than one authenticated evidence item: {requirement:?}")]
+    DuplicateRequirementEvidence {
         requirement: ContinuityRequirementId,
     },
 }
@@ -106,6 +73,10 @@ mod tests {
         DependencyBasis, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
         ObservationEnvelopeV1,
     };
+    use crate::verifier::{
+        policy_check_verification_evidence, AuthenticatedVerificationEvidenceV1,
+        VerificationEvidenceClaimV1, VerificationOutcomeV1, VerifierProfileV1,
+    };
     use crate::witness::{EvidenceClass, VerificationPolicyEntryV1};
 
     fn contract() -> ValidatedContinuityContractV1 {
@@ -116,7 +87,7 @@ mod tests {
             "1",
             1_700_000_000_000,
             ObservationCoverage::Complete,
-            EvidenceBasis::Declared,
+            EvidenceBasis::Tested,
             [1; 32],
             vec![],
         )
@@ -147,85 +118,102 @@ mod tests {
             .unwrap()
     }
 
-    #[test]
-    fn safe_composition_yields_qualified_witness() {
-        let contract = contract();
-        let requirement = contract.requirements()[0].id();
-        let policy = VerificationPolicyV1::new(
+    fn profile() -> VerifierProfileV1 {
+        VerifierProfileV1::new(
             "fixture-verifier",
-            vec![VerificationPolicyEntryV1::new(
-                requirement,
-                EvidenceClass::Simulated,
-            )],
+            [8; 32],
+            1,
+            EvidenceClass::HardwareVerified,
+        )
+        .unwrap()
+    }
+
+    fn policy(contract: &ValidatedContinuityContractV1) -> VerificationPolicyV1 {
+        VerificationPolicyV1::new(
+            "fixture-verifier",
+            contract
+                .requirements()
+                .iter()
+                .map(|requirement| {
+                    VerificationPolicyEntryV1::new(requirement.id(), EvidenceClass::Simulated)
+                })
+                .collect(),
+        )
+        .unwrap()
+    }
+
+    fn authenticated(
+        contract: &ValidatedContinuityContractV1,
+        target: TargetRealizationId,
+        profile: &VerifierProfileV1,
+        challenge: [u8; 32],
+        evidence_digest: [u8; 32],
+    ) -> AuthenticatedVerificationEvidenceV1 {
+        let policy = policy(contract);
+        let claim = VerificationEvidenceClaimV1::new(
+            contract.id(),
+            target,
+            contract.requirements()[0].id(),
+            profile.id(),
+            challenge,
+            1_700_000_000_100,
+            VerificationOutcomeV1::Satisfied,
+            evidence_digest,
         )
         .unwrap();
-        let qualified = compose_qualified_witness(
-            &contract,
-            TargetRealizationId::from_digest([4; 32]).unwrap(),
+        let checked = policy_check_verification_evidence(
+            contract,
+            target,
             &policy,
-            vec![ContinuityEvidenceSubmissionV1::new(
-                requirement,
-                ObligationDispositionV1::Satisfied {
-                    evidence_digest: [5; 32],
-                    evidence_class: EvidenceClass::HardwareVerified,
-                },
-            )],
+            profile,
+            challenge,
+            claim,
         )
         .unwrap();
-        assert_eq!(qualified.contract_id(), contract.id());
+        AuthenticatedVerificationEvidenceV1::authenticate_for_test(checked, [9; 32]).unwrap()
     }
 
     #[test]
-    fn missing_submission_remains_incomplete() {
+    fn verifier_owned_evidence_can_qualify_witness() {
         let contract = contract();
-        let requirement = contract.requirements()[0].id();
-        let policy = VerificationPolicyV1::new(
-            "fixture-verifier",
-            vec![VerificationPolicyEntryV1::new(
-                requirement,
-                EvidenceClass::Simulated,
-            )],
+        let target = TargetRealizationId::from_digest([4; 32]).unwrap();
+        let profile = profile();
+        let qualified = compose_qualified_witness(
+            &contract,
+            target,
+            &policy(&contract),
+            vec![authenticated(&contract, target, &profile, [5; 32], [6; 32])],
         )
         .unwrap();
+        assert_eq!(qualified.contract_id(), contract.id());
+        assert_eq!(qualified.target_realization_id(), target);
+    }
+
+    #[test]
+    fn missing_authenticated_evidence_remains_incomplete() {
+        let contract = contract();
+        let target = TargetRealizationId::from_digest([4; 32]).unwrap();
         assert!(matches!(
-            compose_qualified_witness(
-                &contract,
-                TargetRealizationId::from_digest([6; 32]).unwrap(),
-                &policy,
-                vec![],
-            ),
+            compose_qualified_witness(&contract, target, &policy(&contract), vec![]),
             Err(ComposeError::Witness(WitnessError::IncompleteWitness { .. }))
         ));
     }
 
     #[test]
-    fn duplicate_requirement_submission_fails_before_ledger_finalization() {
+    fn duplicate_authenticated_requirement_fails_closed() {
         let contract = contract();
-        let requirement = contract.requirements()[0].id();
-        let policy = VerificationPolicyV1::new(
-            "fixture-verifier",
-            vec![VerificationPolicyEntryV1::new(
-                requirement,
-                EvidenceClass::Observed,
-            )],
-        )
-        .unwrap();
-        let disposition = ObligationDispositionV1::Satisfied {
-            evidence_digest: [7; 32],
-            evidence_class: EvidenceClass::Observed,
-        };
-        let result = compose_qualified_witness(
-            &contract,
-            TargetRealizationId::from_digest([8; 32]).unwrap(),
-            &policy,
-            vec![
-                ContinuityEvidenceSubmissionV1::new(requirement, disposition.clone()),
-                ContinuityEvidenceSubmissionV1::new(requirement, disposition),
-            ],
-        );
+        let target = TargetRealizationId::from_digest([4; 32]).unwrap();
+        let profile = profile();
+        let first = authenticated(&contract, target, &profile, [5; 32], [6; 32]);
+        let second = authenticated(&contract, target, &profile, [5; 32], [7; 32]);
         assert!(matches!(
-            result,
-            Err(ComposeError::DuplicateRequirementSubmission { .. })
+            compose_qualified_witness(
+                &contract,
+                target,
+                &policy(&contract),
+                vec![first, second],
+            ),
+            Err(ComposeError::DuplicateRequirementEvidence { .. })
         ));
     }
 }

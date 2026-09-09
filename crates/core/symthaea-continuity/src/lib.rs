@@ -11,6 +11,7 @@
 mod compose;
 pub mod contract;
 pub mod observation;
+pub mod verifier;
 mod witness;
 
 pub use contract::{
@@ -21,6 +22,10 @@ pub use contract::{
 pub use observation::{
     DependencyBasis, DependencyClaimId, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
     ObservationEnvelopeV1, ObservationError, ObservationId,
+};
+pub use verifier::{
+    AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
+    VerificationEvidenceClaimV1, VerificationOutcomeV1, VerifierProfileId, VerifierProfileV1,
 };
 pub use witness::{
     EvidenceClass, ObligationDispositionV1, QualifiedContinuityWitnessV1, TargetRealizationId,
