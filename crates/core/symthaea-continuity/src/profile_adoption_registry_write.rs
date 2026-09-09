@@ -34,7 +34,9 @@ const CLAIM_DOMAIN: &[u8] =
 /// Verifier profile/root rotation intentionally does not change this slot. Adoption
 /// authority root rotation is also not encoded here: root trust/currentness remains
 /// a separate local theorem rather than part of logical role identity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub struct VerifierProfileAdoptionRegistrySlotIdV1([u8; 32]);
 
 impl VerifierProfileAdoptionRegistrySlotIdV1 {
@@ -42,7 +44,10 @@ impl VerifierProfileAdoptionRegistrySlotIdV1 {
         &self.0
     }
 
-    pub fn derive(authority_subject: &str, verifier_role_id: &str) -> Result<Self, VerifierProfileAdoptionRegistryWriteError> {
+    pub fn derive(
+        authority_subject: &str,
+        verifier_role_id: &str,
+    ) -> Result<Self, VerifierProfileAdoptionRegistryWriteError> {
         checked_text("authority_subject", authority_subject)?;
         checked_text("verifier_role_id", verifier_role_id)?;
         let mut bytes = Vec::new();
@@ -55,7 +60,9 @@ impl VerifierProfileAdoptionRegistrySlotIdV1 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub struct VerifierProfileAdoptionRegistryWriteClaimIdV1([u8; 32]);
 
 impl VerifierProfileAdoptionRegistryWriteClaimIdV1 {
@@ -77,6 +84,7 @@ pub struct VerifierProfileAdoptionRegistryWriteClaimV1 {
     slot_id: VerifierProfileAdoptionRegistrySlotIdV1,
     commit_evidence_id: VerifierProfileAdoptionCommitEvidenceIdV1,
     predecessor_transition_digest: Option<VerifierProfileAdoptionTransitionDigest>,
+    predecessor_commit_evidence_id: Option<VerifierProfileAdoptionCommitEvidenceIdV1>,
     candidate_transition_digest: VerifierProfileAdoptionTransitionDigest,
     candidate_generation: u64,
     store_revision_before: u64,
@@ -91,29 +99,33 @@ impl VerifierProfileAdoptionRegistryWriteClaimV1 {
         registry_id: impl Into<String>,
         registry_epoch: u64,
         commit_evidence: &VerifierProfileAdoptionCommitEvidenceV1,
+        predecessor_commit_evidence_id: Option<VerifierProfileAdoptionCommitEvidenceIdV1>,
         store_revision_before: u64,
         store_revision_after: u64,
         transaction_challenge: [u8; 32],
     ) -> Result<Self, VerifierProfileAdoptionRegistryWriteError> {
         commit_evidence.validate()?;
-        let registry_id = checked_text("registry_id", &registry_id.into())?.to_owned();
+        let registry_id = registry_id.into();
+        let registry_id = checked_text("registry_id", &registry_id)?.to_owned();
         if registry_epoch == 0 {
             return Err(VerifierProfileAdoptionRegistryWriteError::ZeroRegistryEpoch);
         }
         if transaction_challenge == [0; 32] {
             return Err(VerifierProfileAdoptionRegistryWriteError::ZeroTransactionChallenge);
         }
-        let expected_after = store_revision_before
-            .checked_add(1)
-            .ok_or(VerifierProfileAdoptionRegistryWriteError::StoreRevisionExhausted {
+        let expected_after = store_revision_before.checked_add(1).ok_or(
+            VerifierProfileAdoptionRegistryWriteError::StoreRevisionExhausted {
                 current: store_revision_before,
-            })?;
+            },
+        )?;
         if store_revision_after != expected_after {
-            return Err(VerifierProfileAdoptionRegistryWriteError::StoreRevisionNotSuccessor {
-                before: store_revision_before,
-                expected_after,
-                observed_after: store_revision_after,
-            });
+            return Err(
+                VerifierProfileAdoptionRegistryWriteError::StoreRevisionNotSuccessor {
+                    before: store_revision_before,
+                    expected_after,
+                    observed_after: store_revision_after,
+                },
+            );
         }
 
         let transition = commit_evidence.transition();
@@ -123,8 +135,22 @@ impl VerifierProfileAdoptionRegistryWriteClaimV1 {
             subject.verifier_role_id(),
         )?;
         let predecessor_transition_digest = match transition.predecessor() {
-            VerifierProfileAdoptionPredecessorV1::Bootstrap => None,
-            VerifierProfileAdoptionPredecessorV1::Previous(digest) => Some(digest),
+            VerifierProfileAdoptionPredecessorV1::Bootstrap => {
+                if predecessor_commit_evidence_id.is_some() {
+                    return Err(
+                        VerifierProfileAdoptionRegistryWriteError::BootstrapHasPredecessorCommitEvidence,
+                    );
+                }
+                None
+            }
+            VerifierProfileAdoptionPredecessorV1::Previous(digest) => {
+                if predecessor_commit_evidence_id.is_none() {
+                    return Err(
+                        VerifierProfileAdoptionRegistryWriteError::MissingPredecessorCommitEvidence,
+                    );
+                }
+                Some(digest)
+            }
         };
         let candidate_transition_digest = transition.transition_digest()?;
         let candidate_generation = transition.generation();
@@ -136,6 +162,7 @@ impl VerifierProfileAdoptionRegistryWriteClaimV1 {
             slot_id,
             commit_evidence_id: commit_evidence.id(),
             predecessor_transition_digest,
+            predecessor_commit_evidence_id,
             candidate_transition_digest,
             candidate_generation,
             store_revision_before,
@@ -175,24 +202,38 @@ impl VerifierProfileAdoptionRegistryWriteClaimV1 {
         if self.transaction_challenge == [0; 32] {
             return Err(VerifierProfileAdoptionRegistryWriteError::ZeroTransactionChallenge);
         }
-        let expected_after = self
-            .store_revision_before
-            .checked_add(1)
-            .ok_or(VerifierProfileAdoptionRegistryWriteError::StoreRevisionExhausted {
+        let expected_after = self.store_revision_before.checked_add(1).ok_or(
+            VerifierProfileAdoptionRegistryWriteError::StoreRevisionExhausted {
                 current: self.store_revision_before,
-            })?;
+            },
+        )?;
         if self.store_revision_after != expected_after {
-            return Err(VerifierProfileAdoptionRegistryWriteError::StoreRevisionNotSuccessor {
-                before: self.store_revision_before,
-                expected_after,
-                observed_after: self.store_revision_after,
-            });
+            return Err(
+                VerifierProfileAdoptionRegistryWriteError::StoreRevisionNotSuccessor {
+                    before: self.store_revision_before,
+                    expected_after,
+                    observed_after: self.store_revision_after,
+                },
+            );
         }
-        if self.candidate_generation == 1 && self.predecessor_transition_digest.is_some() {
-            return Err(VerifierProfileAdoptionRegistryWriteError::GenerationOneHasPredecessor);
-        }
-        if self.candidate_generation > 1 && self.predecessor_transition_digest.is_none() {
-            return Err(VerifierProfileAdoptionRegistryWriteError::MissingPredecessorDigest);
+        if self.candidate_generation == 1 {
+            if self.predecessor_transition_digest.is_some() {
+                return Err(VerifierProfileAdoptionRegistryWriteError::GenerationOneHasPredecessor);
+            }
+            if self.predecessor_commit_evidence_id.is_some() {
+                return Err(
+                    VerifierProfileAdoptionRegistryWriteError::BootstrapHasPredecessorCommitEvidence,
+                );
+            }
+        } else {
+            if self.predecessor_transition_digest.is_none() {
+                return Err(VerifierProfileAdoptionRegistryWriteError::MissingPredecessorDigest);
+            }
+            if self.predecessor_commit_evidence_id.is_none() {
+                return Err(
+                    VerifierProfileAdoptionRegistryWriteError::MissingPredecessorCommitEvidence,
+                );
+            }
         }
         let expected = VerifierProfileAdoptionRegistryWriteClaimIdV1(self.hash_claim());
         if expected != self.claim_id {
@@ -253,6 +294,11 @@ impl VerifierProfileAdoptionRegistryWriteClaimV1 {
     pub fn predecessor_transition_digest(&self) -> Option<VerifierProfileAdoptionTransitionDigest> {
         self.predecessor_transition_digest
     }
+    pub fn predecessor_commit_evidence_id(
+        &self,
+    ) -> Option<VerifierProfileAdoptionCommitEvidenceIdV1> {
+        self.predecessor_commit_evidence_id
+    }
     pub fn candidate_transition_digest(&self) -> VerifierProfileAdoptionTransitionDigest {
         self.candidate_transition_digest
     }
@@ -296,6 +342,13 @@ impl VerifierProfileAdoptionRegistryWriteClaimV1 {
             Some(digest) => {
                 out.push(1);
                 out.extend_from_slice(digest.as_bytes());
+            }
+        }
+        match self.predecessor_commit_evidence_id {
+            None => out.push(0),
+            Some(id) => {
+                out.push(1);
+                out.extend_from_slice(id.as_bytes());
             }
         }
         out.extend_from_slice(self.candidate_transition_digest.as_bytes());
@@ -363,8 +416,12 @@ pub enum VerifierProfileAdoptionRegistryWriteError {
     },
     #[error("generation-1 registry write must not name a predecessor transition")]
     GenerationOneHasPredecessor,
+    #[error("bootstrap registry write must not name predecessor commit evidence")]
+    BootstrapHasPredecessorCommitEvidence,
     #[error("non-bootstrap registry write must name its exact predecessor transition digest")]
     MissingPredecessorDigest,
+    #[error("non-bootstrap registry write must name the exact predecessor commit-evidence record")]
+    MissingPredecessorCommitEvidence,
     #[error("stored verifier-adoption registry-write claim identity is not canonical")]
     ClaimIdentityMismatch,
     #[error("registry-write claim refers to a different commit-evidence record")]
@@ -484,6 +541,7 @@ mod tests {
             "continuity-registry-1",
             5,
             &evidence,
+            None,
             40,
             41,
             [0x77; 32],
@@ -500,11 +558,23 @@ mod tests {
         let a = commit_evidence(&profile(9, 7));
         let b = commit_evidence(&profile(10, 8));
         let a = VerifierProfileAdoptionRegistryWriteClaimV1::new(
-            "continuity-registry-1", 5, &a, 40, 41, [0x71; 32],
+            "continuity-registry-1",
+            5,
+            &a,
+            None,
+            40,
+            41,
+            [0x71; 32],
         )
         .unwrap();
         let b = VerifierProfileAdoptionRegistryWriteClaimV1::new(
-            "continuity-registry-1", 5, &b, 41, 42, [0x72; 32],
+            "continuity-registry-1",
+            5,
+            &b,
+            None,
+            41,
+            42,
+            [0x72; 32],
         )
         .unwrap();
         assert_eq!(a.slot_id(), b.slot_id());
@@ -512,18 +582,55 @@ mod tests {
     }
 
     #[test]
+    fn bootstrap_rejects_predecessor_commit_evidence() {
+        let evidence = commit_evidence(&profile(9, 7));
+        let err = VerifierProfileAdoptionRegistryWriteClaimV1::new(
+            "continuity-registry-1",
+            5,
+            &evidence,
+            Some(evidence.id()),
+            40,
+            41,
+            [0x71; 32],
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            VerifierProfileAdoptionRegistryWriteError::BootstrapHasPredecessorCommitEvidence
+        );
+    }
+
+    #[test]
     fn registry_epoch_and_transaction_challenge_change_claim_identity() {
         let evidence = commit_evidence(&profile(9, 7));
         let a = VerifierProfileAdoptionRegistryWriteClaimV1::new(
-            "continuity-registry-1", 5, &evidence, 40, 41, [0x71; 32],
+            "continuity-registry-1",
+            5,
+            &evidence,
+            None,
+            40,
+            41,
+            [0x71; 32],
         )
         .unwrap();
         let b = VerifierProfileAdoptionRegistryWriteClaimV1::new(
-            "continuity-registry-1", 6, &evidence, 40, 41, [0x71; 32],
+            "continuity-registry-1",
+            6,
+            &evidence,
+            None,
+            40,
+            41,
+            [0x71; 32],
         )
         .unwrap();
         let c = VerifierProfileAdoptionRegistryWriteClaimV1::new(
-            "continuity-registry-1", 5, &evidence, 40, 41, [0x72; 32],
+            "continuity-registry-1",
+            5,
+            &evidence,
+            None,
+            40,
+            41,
+            [0x72; 32],
         )
         .unwrap();
         assert_ne!(a.id(), b.id());
@@ -534,7 +641,13 @@ mod tests {
     fn store_revision_must_advance_exactly_once() {
         let evidence = commit_evidence(&profile(9, 7));
         let err = VerifierProfileAdoptionRegistryWriteClaimV1::new(
-            "continuity-registry-1", 5, &evidence, 40, 42, [0x71; 32],
+            "continuity-registry-1",
+            5,
+            &evidence,
+            None,
+            40,
+            42,
+            [0x71; 32],
         )
         .unwrap_err();
         assert_eq!(
@@ -551,11 +664,23 @@ mod tests {
     fn same_record_under_different_store_revision_has_different_claim_identity() {
         let evidence = commit_evidence(&profile(9, 7));
         let a = VerifierProfileAdoptionRegistryWriteClaimV1::new(
-            "continuity-registry-1", 5, &evidence, 40, 41, [0x71; 32],
+            "continuity-registry-1",
+            5,
+            &evidence,
+            None,
+            40,
+            41,
+            [0x71; 32],
         )
         .unwrap();
         let b = VerifierProfileAdoptionRegistryWriteClaimV1::new(
-            "continuity-registry-1", 5, &evidence, 41, 42, [0x71; 32],
+            "continuity-registry-1",
+            5,
+            &evidence,
+            None,
+            41,
+            42,
+            [0x71; 32],
         )
         .unwrap();
         assert_ne!(a.id(), b.id());
@@ -566,7 +691,13 @@ mod tests {
         let evidence = commit_evidence(&profile(9, 7));
         assert_eq!(
             VerifierProfileAdoptionRegistryWriteClaimV1::new(
-                "continuity-registry-1", 5, &evidence, 40, 41, [0; 32],
+                "continuity-registry-1",
+                5,
+                &evidence,
+                None,
+                40,
+                41,
+                [0; 32],
             )
             .unwrap_err(),
             VerifierProfileAdoptionRegistryWriteError::ZeroTransactionChallenge
