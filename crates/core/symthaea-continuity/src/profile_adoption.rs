@@ -30,8 +30,7 @@ pub const VERIFIER_PROFILE_ADOPTION_TRANSITION_SCHEMA_V1: &str =
     "symthaea-continuity-verifier-profile-adoption-transition-v1";
 
 const SUBJECT_DOMAIN: &[u8] = b"symthaea.continuity.verifier-profile-adoption.subject.v1\0";
-const TRANSITION_DOMAIN: &[u8] =
-    b"symthaea.continuity.verifier-profile-adoption.transition.v1\0";
+const TRANSITION_DOMAIN: &[u8] = b"symthaea.continuity.verifier-profile-adoption.transition.v1\0";
 
 /// Content identity of one canonical verifier-profile adoption subject.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -328,18 +327,42 @@ impl VerifierProfileAdoptionSubjectV1 {
         Ok(out)
     }
 
-    pub fn id(&self) -> VerifierProfileAdoptionSubjectId { self.subject_id }
-    pub fn adoption_id(&self) -> &str { &self.adoption_id }
-    pub fn authority_subject(&self) -> &str { &self.authority_subject }
-    pub fn authority_root_id(&self) -> &str { &self.authority_root_id }
-    pub fn authority_root_digest(&self) -> [u8; 32] { self.authority_root_digest }
-    pub fn verifier_role_id(&self) -> &str { &self.verifier_role_id }
-    pub fn verifier_profile_id(&self) -> VerifierProfileId { self.verifier_profile_id }
-    pub fn generation(&self) -> u64 { self.generation }
-    pub fn valid_from_unix_ms(&self) -> u64 { self.valid_from_unix_ms }
-    pub fn valid_until_unix_ms(&self) -> u64 { self.valid_until_unix_ms }
-    pub fn evidence_class_ceiling(&self) -> EvidenceClass { self.evidence_class_ceiling }
-    pub fn scope(&self) -> &VerifierAdoptionScopeV1 { &self.scope }
+    pub fn id(&self) -> VerifierProfileAdoptionSubjectId {
+        self.subject_id
+    }
+    pub fn adoption_id(&self) -> &str {
+        &self.adoption_id
+    }
+    pub fn authority_subject(&self) -> &str {
+        &self.authority_subject
+    }
+    pub fn authority_root_id(&self) -> &str {
+        &self.authority_root_id
+    }
+    pub fn authority_root_digest(&self) -> [u8; 32] {
+        self.authority_root_digest
+    }
+    pub fn verifier_role_id(&self) -> &str {
+        &self.verifier_role_id
+    }
+    pub fn verifier_profile_id(&self) -> VerifierProfileId {
+        self.verifier_profile_id
+    }
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+    pub fn valid_from_unix_ms(&self) -> u64 {
+        self.valid_from_unix_ms
+    }
+    pub fn valid_until_unix_ms(&self) -> u64 {
+        self.valid_until_unix_ms
+    }
+    pub fn evidence_class_ceiling(&self) -> EvidenceClass {
+        self.evidence_class_ceiling
+    }
+    pub fn scope(&self) -> &VerifierAdoptionScopeV1 {
+        &self.scope
+    }
 }
 
 /// Exact predecessor state for one logical verifier-role adoption lineage.
@@ -363,10 +386,14 @@ pub struct VerifierProfileAdoptionTransitionV1 {
 
 impl VerifierProfileAdoptionTransitionV1 {
     /// Build generation 1 under an already externally trusted adoption authority.
-    pub fn bootstrap(subject: VerifierProfileAdoptionSubjectV1) -> Result<Self, VerifierProfileAdoptionError> {
+    pub fn bootstrap(
+        subject: VerifierProfileAdoptionSubjectV1,
+    ) -> Result<Self, VerifierProfileAdoptionError> {
         subject.validate()?;
         if subject.generation() != 1 {
-            return Err(VerifierProfileAdoptionError::BootstrapGenerationMustBeOne { observed: subject.generation() });
+            return Err(VerifierProfileAdoptionError::BootstrapGenerationMustBeOne {
+                observed: subject.generation(),
+            });
         }
         Ok(Self {
             schema_version: VERIFIER_PROFILE_ADOPTION_TRANSITION_SCHEMA_V1.to_owned(),
@@ -387,10 +414,11 @@ impl VerifierProfileAdoptionTransitionV1 {
     ) -> Result<Self, VerifierProfileAdoptionError> {
         predecessor.validate()?;
         subject.validate()?;
-        let expected_generation = predecessor
-            .generation()
-            .checked_add(1)
-            .ok_or(VerifierProfileAdoptionError::GenerationExhausted { current: predecessor.generation() })?;
+        let expected_generation = predecessor.generation().checked_add(1).ok_or(
+            VerifierProfileAdoptionError::GenerationExhausted {
+                current: predecessor.generation(),
+            },
+        )?;
         if subject.generation() != expected_generation {
             return Err(VerifierProfileAdoptionError::GenerationNotSuccessor {
                 current: predecessor.generation(),
@@ -412,7 +440,9 @@ impl VerifierProfileAdoptionTransitionV1 {
         }
         Ok(Self {
             schema_version: VERIFIER_PROFILE_ADOPTION_TRANSITION_SCHEMA_V1.to_owned(),
-            predecessor: VerifierProfileAdoptionPredecessorV1::Previous(predecessor.transition_digest()?),
+            predecessor: VerifierProfileAdoptionPredecessorV1::Previous(
+                predecessor.transition_digest()?,
+            ),
             subject,
         })
     }
@@ -421,13 +451,21 @@ impl VerifierProfileAdoptionTransitionV1 {
     /// and does not compare against any persisted/current adoption head.
     pub fn validate(&self) -> Result<(), VerifierProfileAdoptionError> {
         if self.schema_version != VERIFIER_PROFILE_ADOPTION_TRANSITION_SCHEMA_V1 {
-            return Err(VerifierProfileAdoptionError::UnsupportedTransitionSchema(self.schema_version.clone()));
+            return Err(VerifierProfileAdoptionError::UnsupportedTransitionSchema(
+                self.schema_version.clone(),
+            ));
         }
         self.subject.validate()?;
         match (self.subject.generation(), self.predecessor) {
             (1, VerifierProfileAdoptionPredecessorV1::Bootstrap) => Ok(()),
-            (1, VerifierProfileAdoptionPredecessorV1::Previous(_)) => Err(VerifierProfileAdoptionError::GenerationOneHasPredecessor),
-            (_, VerifierProfileAdoptionPredecessorV1::Bootstrap) => Err(VerifierProfileAdoptionError::NonInitialGenerationUsesBootstrap { generation: self.subject.generation() }),
+            (1, VerifierProfileAdoptionPredecessorV1::Previous(_)) => {
+                Err(VerifierProfileAdoptionError::GenerationOneHasPredecessor)
+            }
+            (_, VerifierProfileAdoptionPredecessorV1::Bootstrap) => Err(
+                VerifierProfileAdoptionError::NonInitialGenerationUsesBootstrap {
+                    generation: self.subject.generation(),
+                },
+            ),
             (_, VerifierProfileAdoptionPredecessorV1::Previous(_)) => Ok(()),
         }
     }
@@ -452,13 +490,23 @@ impl VerifierProfileAdoptionTransitionV1 {
     }
 
     /// BLAKE3-256 identity of the exact canonical transition bytes.
-    pub fn transition_digest(&self) -> Result<VerifierProfileAdoptionTransitionDigest, VerifierProfileAdoptionError> {
-        Ok(VerifierProfileAdoptionTransitionDigest(*blake3::hash(&self.canonical_signing_bytes()?).as_bytes()))
+    pub fn transition_digest(
+        &self,
+    ) -> Result<VerifierProfileAdoptionTransitionDigest, VerifierProfileAdoptionError> {
+        Ok(VerifierProfileAdoptionTransitionDigest(
+            *blake3::hash(&self.canonical_signing_bytes()?).as_bytes(),
+        ))
     }
 
-    pub fn predecessor(&self) -> VerifierProfileAdoptionPredecessorV1 { self.predecessor }
-    pub fn subject(&self) -> &VerifierProfileAdoptionSubjectV1 { &self.subject }
-    pub fn generation(&self) -> u64 { self.subject.generation() }
+    pub fn predecessor(&self) -> VerifierProfileAdoptionPredecessorV1 {
+        self.predecessor
+    }
+    pub fn subject(&self) -> &VerifierProfileAdoptionSubjectV1 {
+        &self.subject
+    }
+    pub fn generation(&self) -> u64 {
+        self.subject.generation()
+    }
 }
 
 /// Fail-closed construction/lineage errors for verifier adoption claims.
@@ -483,7 +531,10 @@ pub enum VerifierProfileAdoptionError {
     #[error("adoption validity interval must satisfy valid_from < valid_until")]
     InvalidValidityInterval,
     #[error("requested evidence class {requested:?} exceeds verifier profile maximum {profile:?}")]
-    EvidenceClassExceedsProfile { profile: EvidenceClass, requested: EvidenceClass },
+    EvidenceClassExceedsProfile {
+        profile: EvidenceClass,
+        requested: EvidenceClass,
+    },
     #[error("exact requirement adoption scope must not be empty")]
     EmptyRequirementScope,
     #[error("exact requirement adoption scope must be sorted and unique")]
@@ -506,8 +557,14 @@ pub enum VerifierProfileAdoptionError {
     NonInitialGenerationUsesBootstrap { generation: u64 },
     #[error("verifier-profile adoption generation space exhausted at {current}")]
     GenerationExhausted { current: u64 },
-    #[error("verifier-profile adoption generation must be exact successor of {current}: expected {expected}, observed {observed}")]
-    GenerationNotSuccessor { current: u64, expected: u64, observed: u64 },
+    #[error(
+        "verifier-profile adoption generation must be exact successor of {current}: expected {expected}, observed {observed}"
+    )]
+    GenerationNotSuccessor {
+        current: u64,
+        expected: u64,
+        observed: u64,
+    },
     #[error("adoption authority subject changed across ordinary successor")]
     AuthoritySubjectChanged,
     #[error("adoption authority root id changed across ordinary successor")]
@@ -562,16 +619,30 @@ fn evidence_class_tag(class: EvidenceClass) -> u8 {
     }
 }
 
-fn checked_text(field: &'static str, value: String) -> Result<String, VerifierProfileAdoptionError> {
+fn checked_text(
+    field: &'static str,
+    value: String,
+) -> Result<String, VerifierProfileAdoptionError> {
     let trimmed = value.trim();
-    if trimmed.is_empty() { return Err(VerifierProfileAdoptionError::BlankText { field }); }
-    if trimmed.len() > 1024 { return Err(VerifierProfileAdoptionError::TextTooLong { field }); }
-    if trimmed.chars().any(char::is_control) { return Err(VerifierProfileAdoptionError::ControlCharacters { field }); }
+    if trimmed.is_empty() {
+        return Err(VerifierProfileAdoptionError::BlankText { field });
+    }
+    if trimmed.len() > 1024 {
+        return Err(VerifierProfileAdoptionError::TextTooLong { field });
+    }
+    if trimmed.chars().any(char::is_control) {
+        return Err(VerifierProfileAdoptionError::ControlCharacters { field });
+    }
     Ok(trimmed.to_owned())
 }
 
-fn put_len(out: &mut Vec<u8>, len: usize) { out.extend_from_slice(&(len as u64).to_le_bytes()); }
-fn put_str(out: &mut Vec<u8>, value: &str) { put_len(out, value.len()); out.extend_from_slice(value.as_bytes()); }
+fn put_len(out: &mut Vec<u8>, len: usize) {
+    out.extend_from_slice(&(len as u64).to_le_bytes());
+}
+fn put_str(out: &mut Vec<u8>, value: &str) {
+    put_len(out, value.len());
+    out.extend_from_slice(value.as_bytes());
+}
 
 #[cfg(test)]
 mod tests {
@@ -589,33 +660,70 @@ mod tests {
         VerifierProfileV1::new("hardware-verifier-v1", [root; 32], epoch, class).unwrap()
     }
 
-    fn subject(profile: &VerifierProfileV1, adoption_id: &str, generation: u64, authority_root: u8, ceiling: EvidenceClass) -> VerifierProfileAdoptionSubjectV1 {
+    fn subject(
+        profile: &VerifierProfileV1,
+        adoption_id: &str,
+        generation: u64,
+        authority_root: u8,
+        ceiling: EvidenceClass,
+    ) -> VerifierProfileAdoptionSubjectV1 {
         VerifierProfileAdoptionSubjectV1::new(
-            adoption_id, "organization:test", "adoption-root-1", [authority_root; 32],
-            profile, generation, 1_000, 2_000, ceiling,
+            adoption_id,
+            "organization:test",
+            "adoption-root-1",
+            [authority_root; 32],
+            profile,
+            generation,
+            1_000,
+            2_000,
+            ceiling,
             VerifierAdoptionScopeV1::AllContinuityVerification,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     fn contract_with_two_requirements() -> crate::ValidatedContinuityContractV1 {
         let mut requirements = Vec::new();
         for seed in [1u8, 2u8] {
             let observation = ObservationEnvelopeV1::new(
-                format!("machine-{seed}"), "workflow.dependency", "fixture", "1",
-                1_700_000_000_000 + seed as u64, ObservationCoverage::Complete,
-                EvidenceBasis::Tested, [seed; 32], vec![],
-            ).unwrap();
+                format!("machine-{seed}"),
+                "workflow.dependency",
+                "fixture",
+                "1",
+                1_700_000_000_000 + seed as u64,
+                ObservationCoverage::Complete,
+                EvidenceBasis::Tested,
+                [seed; 32],
+                vec![],
+            )
+            .unwrap();
             let dependency = DependencyClaimV1::new(
-                "role:research", "requires", format!("capability-{seed}"),
-                DependencyBasis::Observed, vec![observation.id()], vec![],
-            ).unwrap();
-            requirements.push(ContinuityRequirementV1::new(
-                dependency.id(), format!("capability-{seed}"), RequirementCriticality::Must,
-                EquivalencePredicate::BehavioralScenario { scenario_id: format!("scenario-{seed}") },
-                ApprovalBasis::ExplicitPolicy, [seed.wrapping_add(20); 32],
-            ).unwrap());
+                "role:research",
+                "requires",
+                format!("capability-{seed}"),
+                DependencyBasis::Observed,
+                vec![observation.id()],
+                vec![],
+            )
+            .unwrap();
+            requirements.push(
+                ContinuityRequirementV1::new(
+                    dependency.id(),
+                    format!("capability-{seed}"),
+                    RequirementCriticality::Must,
+                    EquivalencePredicate::BehavioralScenario {
+                        scenario_id: format!("scenario-{seed}"),
+                    },
+                    ApprovalBasis::ExplicitPolicy,
+                    [seed.wrapping_add(20); 32],
+                )
+                .unwrap(),
+            );
         }
-        ContinuityContractV1::new("research-fleet", [44; 32], requirements).unwrap().validate().unwrap()
+        ContinuityContractV1::new("research-fleet", [44; 32], requirements)
+            .unwrap()
+            .validate()
+            .unwrap()
     }
 
     #[test]
@@ -623,10 +731,18 @@ mod tests {
         let profile = profile(9, 7, EvidenceClass::HardwareVerified);
         assert_eq!(
             VerifierProfileAdoptionSubjectV1::new(
-                "adopt-1", "organization:test", "adoption-root-1", profile.root_digest(),
-                &profile, 1, 1_000, 2_000, EvidenceClass::HardwareVerified,
+                "adopt-1",
+                "organization:test",
+                "adoption-root-1",
+                profile.root_digest(),
+                &profile,
+                1,
+                1_000,
+                2_000,
+                EvidenceClass::HardwareVerified,
                 VerifierAdoptionScopeV1::AllContinuityVerification,
-            ).unwrap_err(),
+            )
+            .unwrap_err(),
             VerifierProfileAdoptionError::VerifierCannotSelfAdopt
         );
     }
@@ -636,8 +752,15 @@ mod tests {
         let profile = profile(9, 7, EvidenceClass::Observed);
         assert!(matches!(
             VerifierProfileAdoptionSubjectV1::new(
-                "adopt-1", "organization:test", "adoption-root-1", [4; 32], &profile,
-                1, 1_000, 2_000, EvidenceClass::HardwareVerified,
+                "adopt-1",
+                "organization:test",
+                "adoption-root-1",
+                [4; 32],
+                &profile,
+                1,
+                1_000,
+                2_000,
+                EvidenceClass::HardwareVerified,
                 VerifierAdoptionScopeV1::AllContinuityVerification,
             ),
             Err(VerifierProfileAdoptionError::EvidenceClassExceedsProfile { .. })
@@ -647,11 +770,27 @@ mod tests {
     #[test]
     fn bootstrap_is_generation_one_only() {
         let profile = profile(9, 7, EvidenceClass::HardwareVerified);
-        let first = VerifierProfileAdoptionTransitionV1::bootstrap(subject(&profile, "adopt-1", 1, 4, EvidenceClass::HardwareVerified)).unwrap();
+        let first = VerifierProfileAdoptionTransitionV1::bootstrap(subject(
+            &profile,
+            "adopt-1",
+            1,
+            4,
+            EvidenceClass::HardwareVerified,
+        ))
+        .unwrap();
         assert_eq!(first.generation(), 1);
-        assert_eq!(first.predecessor(), VerifierProfileAdoptionPredecessorV1::Bootstrap);
+        assert_eq!(
+            first.predecessor(),
+            VerifierProfileAdoptionPredecessorV1::Bootstrap
+        );
         assert!(matches!(
-            VerifierProfileAdoptionTransitionV1::bootstrap(subject(&profile, "adopt-2", 2, 4, EvidenceClass::HardwareVerified)),
+            VerifierProfileAdoptionTransitionV1::bootstrap(subject(
+                &profile,
+                "adopt-2",
+                2,
+                4,
+                EvidenceClass::HardwareVerified
+            )),
             Err(VerifierProfileAdoptionError::BootstrapGenerationMustBeOne { observed: 2 })
         ));
     }
@@ -659,41 +798,112 @@ mod tests {
     #[test]
     fn successor_binds_exact_predecessor() {
         let profile = profile(9, 7, EvidenceClass::HardwareVerified);
-        let first = VerifierProfileAdoptionTransitionV1::bootstrap(subject(&profile, "adopt-a", 1, 4, EvidenceClass::HardwareVerified)).unwrap();
-        let second = VerifierProfileAdoptionTransitionV1::successor(subject(&profile, "adopt-b", 2, 4, EvidenceClass::HardwareVerified), &first).unwrap();
-        assert_eq!(second.predecessor(), VerifierProfileAdoptionPredecessorV1::Previous(first.transition_digest().unwrap()));
+        let first = VerifierProfileAdoptionTransitionV1::bootstrap(subject(
+            &profile,
+            "adopt-a",
+            1,
+            4,
+            EvidenceClass::HardwareVerified,
+        ))
+        .unwrap();
+        let second = VerifierProfileAdoptionTransitionV1::successor(
+            subject(&profile, "adopt-b", 2, 4, EvidenceClass::HardwareVerified),
+            &first,
+        )
+        .unwrap();
+        assert_eq!(
+            second.predecessor(),
+            VerifierProfileAdoptionPredecessorV1::Previous(first.transition_digest().unwrap())
+        );
     }
 
     #[test]
     fn adoption_authority_can_rotate_exact_verifier_profile_under_same_role() {
         let old_profile = profile(9, 7, EvidenceClass::HardwareVerified);
         let new_profile = profile(10, 8, EvidenceClass::HardwareVerified);
-        let first = VerifierProfileAdoptionTransitionV1::bootstrap(subject(&old_profile, "adopt-a", 1, 4, EvidenceClass::HardwareVerified)).unwrap();
-        let second = VerifierProfileAdoptionTransitionV1::successor(subject(&new_profile, "adopt-b", 2, 4, EvidenceClass::DifferentiallyVerified), &first).unwrap();
-        assert_ne!(first.subject().verifier_profile_id(), second.subject().verifier_profile_id());
-        assert_eq!(first.subject().verifier_role_id(), second.subject().verifier_role_id());
-        assert_eq!(second.subject().evidence_class_ceiling(), EvidenceClass::DifferentiallyVerified);
+        let first = VerifierProfileAdoptionTransitionV1::bootstrap(subject(
+            &old_profile,
+            "adopt-a",
+            1,
+            4,
+            EvidenceClass::HardwareVerified,
+        ))
+        .unwrap();
+        let second = VerifierProfileAdoptionTransitionV1::successor(
+            subject(
+                &new_profile,
+                "adopt-b",
+                2,
+                4,
+                EvidenceClass::DifferentiallyVerified,
+            ),
+            &first,
+        )
+        .unwrap();
+        assert_ne!(
+            first.subject().verifier_profile_id(),
+            second.subject().verifier_profile_id()
+        );
+        assert_eq!(
+            first.subject().verifier_role_id(),
+            second.subject().verifier_role_id()
+        );
+        assert_eq!(
+            second.subject().evidence_class_ceiling(),
+            EvidenceClass::DifferentiallyVerified
+        );
     }
 
     #[test]
     fn adoption_authority_cannot_change_inside_ordinary_lineage() {
         let profile = profile(9, 7, EvidenceClass::HardwareVerified);
-        let first = VerifierProfileAdoptionTransitionV1::bootstrap(subject(&profile, "adopt-a", 1, 4, EvidenceClass::HardwareVerified)).unwrap();
+        let first = VerifierProfileAdoptionTransitionV1::bootstrap(subject(
+            &profile,
+            "adopt-a",
+            1,
+            4,
+            EvidenceClass::HardwareVerified,
+        ))
+        .unwrap();
         let candidate = subject(&profile, "adopt-b", 2, 5, EvidenceClass::HardwareVerified);
-        assert_eq!(VerifierProfileAdoptionTransitionV1::successor(candidate, &first).unwrap_err(), VerifierProfileAdoptionError::AuthorityRootChanged);
+        assert_eq!(
+            VerifierProfileAdoptionTransitionV1::successor(candidate, &first).unwrap_err(),
+            VerifierProfileAdoptionError::AuthorityRootChanged
+        );
     }
 
     #[test]
     fn conflicting_generation_one_heads_create_distinct_successor_lineages() {
         let profile = profile(9, 7, EvidenceClass::HardwareVerified);
-        let first_a = VerifierProfileAdoptionTransitionV1::bootstrap(subject(&profile, "adopt-a", 1, 4, EvidenceClass::HardwareVerified)).unwrap();
-        let first_b = VerifierProfileAdoptionTransitionV1::bootstrap(subject(&profile, "adopt-b", 1, 4, EvidenceClass::HardwareVerified)).unwrap();
-        assert_ne!(first_a.transition_digest().unwrap(), first_b.transition_digest().unwrap());
+        let first_a = VerifierProfileAdoptionTransitionV1::bootstrap(subject(
+            &profile,
+            "adopt-a",
+            1,
+            4,
+            EvidenceClass::HardwareVerified,
+        ))
+        .unwrap();
+        let first_b = VerifierProfileAdoptionTransitionV1::bootstrap(subject(
+            &profile,
+            "adopt-b",
+            1,
+            4,
+            EvidenceClass::HardwareVerified,
+        ))
+        .unwrap();
+        assert_ne!(
+            first_a.transition_digest().unwrap(),
+            first_b.transition_digest().unwrap()
+        );
         let next = subject(&profile, "adopt-c", 2, 4, EvidenceClass::HardwareVerified);
-        let second_a = VerifierProfileAdoptionTransitionV1::successor(next.clone(), &first_a).unwrap();
+        let second_a =
+            VerifierProfileAdoptionTransitionV1::successor(next.clone(), &first_a).unwrap();
         let second_b = VerifierProfileAdoptionTransitionV1::successor(next, &first_b).unwrap();
         assert_ne!(second_a.predecessor(), second_b.predecessor());
-        assert_ne!(second_a.canonical_signing_bytes().unwrap(), second_b.canonical_signing_bytes().unwrap());
+        assert_ne!(
+            second_a.canonical_signing_bytes().unwrap(),
+            second_b.canonical_signing_bytes().unwrap()
+        );
     }
 
     #[test]
@@ -701,15 +911,23 @@ mod tests {
         let contract = contract_with_two_requirements();
         let first = contract.requirements()[0].id();
         let second = contract.requirements()[1].id();
-        let scope = VerifierAdoptionScopeV1::requirements(contract.id(), vec![second, first, second]).unwrap();
+        let scope =
+            VerifierAdoptionScopeV1::requirements(contract.id(), vec![second, first, second])
+                .unwrap();
         match scope {
-            VerifierAdoptionScopeV1::Requirements { contract_id, requirement_ids } => {
+            VerifierAdoptionScopeV1::Requirements {
+                contract_id,
+                requirement_ids,
+            } => {
                 assert_eq!(contract_id, contract.id());
                 assert_eq!(requirement_ids, vec![first, second]);
             }
             _ => panic!("expected exact requirement scope"),
         }
-        assert_eq!(VerifierAdoptionScopeV1::requirements(contract.id(), vec![]).unwrap_err(), VerifierProfileAdoptionError::EmptyRequirementScope);
+        assert_eq!(
+            VerifierAdoptionScopeV1::requirements(contract.id(), vec![]).unwrap_err(),
+            VerifierProfileAdoptionError::EmptyRequirementScope
+        );
     }
 
     #[test]
@@ -718,12 +936,24 @@ mod tests {
         let first = contract.requirements()[0].id();
         let second = contract.requirements()[1].id();
         let profile = profile(9, 7, EvidenceClass::HardwareVerified);
-        let noncanonical = VerifierAdoptionScopeV1::Requirements { contract_id: contract.id(), requirement_ids: vec![second, first] };
+        let noncanonical = VerifierAdoptionScopeV1::Requirements {
+            contract_id: contract.id(),
+            requirement_ids: vec![second, first],
+        };
         assert_eq!(
             VerifierProfileAdoptionSubjectV1::new(
-                "adopt-1", "organization:test", "adoption-root-1", [4; 32], &profile,
-                1, 1_000, 2_000, EvidenceClass::HardwareVerified, noncanonical,
-            ).unwrap_err(),
+                "adopt-1",
+                "organization:test",
+                "adoption-root-1",
+                [4; 32],
+                &profile,
+                1,
+                1_000,
+                2_000,
+                EvidenceClass::HardwareVerified,
+                noncanonical,
+            )
+            .unwrap_err(),
             VerifierProfileAdoptionError::NonCanonicalRequirementScope
         );
     }

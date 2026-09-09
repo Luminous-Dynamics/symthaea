@@ -273,10 +273,8 @@ mod tests {
             [8; 32],
         );
         let bytes = canonical_verification_claim_bytes(&claim).unwrap();
-        let prefix = AUTH_BYTES_DOMAIN.len()
-            + 8
-            + CONTINUITY_VERIFICATION_CLAIM_AUTH_SCHEMA.len()
-            + 5 * 32;
+        let prefix =
+            AUTH_BYTES_DOMAIN.len() + 8 + CONTINUITY_VERIFICATION_CLAIM_AUTH_SCHEMA.len() + 5 * 32;
 
         assert_eq!(
             &bytes[prefix..prefix + 8],

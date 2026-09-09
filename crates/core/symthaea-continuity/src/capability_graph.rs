@@ -50,9 +50,7 @@ pub struct CapabilityGraphSnapshotV1 {
 
 impl CapabilityGraphSnapshotV1 {
     /// Construct a canonical, structurally closed graph snapshot.
-    pub fn new(
-        mut definitions: Vec<CapabilityDefinitionV1>,
-    ) -> Result<Self, CapabilityGraphError> {
+    pub fn new(mut definitions: Vec<CapabilityDefinitionV1>) -> Result<Self, CapabilityGraphError> {
         for definition in &definitions {
             definition.validate()?;
         }
@@ -92,7 +90,11 @@ impl CapabilityGraphSnapshotV1 {
             definition.validate()?;
         }
 
-        if self.definitions.windows(2).any(|pair| pair[0].id() >= pair[1].id()) {
+        if self
+            .definitions
+            .windows(2)
+            .any(|pair| pair[0].id() >= pair[1].id())
+        {
             if self
                 .definitions
                 .windows(2)
