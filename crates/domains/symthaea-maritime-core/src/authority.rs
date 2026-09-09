@@ -43,8 +43,20 @@ pub struct AuthorityLease {
 }
 
 impl AuthorityLease {
-    pub fn permits(&self, capability: MaritimeCapability, context: AuthorityContext) -> bool {
-        context.trusted_time_available
+    /// Evaluate a lease only for the platform it names.
+    ///
+    /// Shape validation is part of the authorization decision rather than an
+    /// optional caller precondition: malformed/missing evidence must never be able
+    /// to authorize merely because the time/epoch/capability tuple happens to match.
+    pub fn permits(
+        &self,
+        platform_id: &str,
+        capability: MaritimeCapability,
+        context: AuthorityContext,
+    ) -> bool {
+        self.validate().is_ok()
+            && platform_id == self.platform_id
+            && context.trusted_time_available
             && context.authority_epoch == self.authority_epoch
             && context.now_ms >= self.issued_at_ms
             && context.now_ms < self.expires_at_ms
@@ -55,6 +67,9 @@ impl AuthorityLease {
         if self.lease_id.trim().is_empty() || self.platform_id.trim().is_empty() {
             return Err("lease_id and platform_id must not be empty");
         }
+        if self.lease_id.trim() != self.lease_id || self.platform_id.trim() != self.platform_id {
+            return Err("lease_id and platform_id must not contain outer whitespace");
+        }
         if self.expires_at_ms <= self.issued_at_ms {
             return Err("authority lease must have a positive validity interval");
         }
@@ -63,6 +78,9 @@ impl AuthorityLease {
         }
         if self.evidence_binding.trim().is_empty() {
             return Err("evidence_binding must not be empty");
+        }
+        if self.evidence_binding.trim() != self.evidence_binding {
+            return Err("evidence_binding must not contain outer whitespace");
         }
         Ok(())
     }
@@ -80,9 +98,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn lease_is_epoch_time_and_capability_bounded() {
-        let lease = AuthorityLease {
+    fn lease() -> AuthorityLease {
+        AuthorityLease {
             lease_id: "lease-1".into(),
             platform_id: "usv-1".into(),
             authority_epoch: 9,
@@ -90,26 +107,63 @@ mod tests {
             expires_at_ms: 200,
             capabilities: BTreeSet::from([MaritimeCapability::Navigate]),
             evidence_binding: "sha256:example".into(),
-        };
-        assert!(lease.permits(MaritimeCapability::Navigate, context(150, 9)));
-        assert!(!lease.permits(MaritimeCapability::Navigate, context(200, 9)));
-        assert!(!lease.permits(MaritimeCapability::Navigate, context(150, 10)));
-        assert!(!lease.permits(MaritimeCapability::Dock, context(150, 9)));
+        }
+    }
+
+    #[test]
+    fn lease_is_platform_epoch_time_and_capability_bounded() {
+        let lease = lease();
+        assert!(lease.permits(
+            "usv-1",
+            MaritimeCapability::Navigate,
+            context(150, 9)
+        ));
+        assert!(!lease.permits(
+            "usv-2",
+            MaritimeCapability::Navigate,
+            context(150, 9)
+        ));
+        assert!(!lease.permits(
+            "usv-1",
+            MaritimeCapability::Navigate,
+            context(200, 9)
+        ));
+        assert!(!lease.permits(
+            "usv-1",
+            MaritimeCapability::Navigate,
+            context(150, 10)
+        ));
+        assert!(!lease.permits(
+            "usv-1",
+            MaritimeCapability::Dock,
+            context(150, 9)
+        ));
     }
 
     #[test]
     fn lease_fails_closed_without_trusted_time() {
-        let lease = AuthorityLease {
-            lease_id: "lease-1".into(),
-            platform_id: "usv-1".into(),
-            authority_epoch: 9,
-            issued_at_ms: 100,
-            expires_at_ms: 200,
-            capabilities: BTreeSet::from([MaritimeCapability::Navigate]),
-            evidence_binding: "sha256:example".into(),
-        };
+        let lease = lease();
         let mut ctx = context(150, 9);
         ctx.trusted_time_available = false;
-        assert!(!lease.permits(MaritimeCapability::Navigate, ctx));
+        assert!(!lease.permits("usv-1", MaritimeCapability::Navigate, ctx));
+    }
+
+    #[test]
+    fn malformed_or_unbound_evidence_cannot_authorize() {
+        let mut malformed = lease();
+        malformed.evidence_binding.clear();
+        assert!(!malformed.permits(
+            "usv-1",
+            MaritimeCapability::Navigate,
+            context(150, 9)
+        ));
+
+        let mut padded = lease();
+        padded.platform_id = " usv-1".into();
+        assert!(!padded.permits(
+            " usv-1",
+            MaritimeCapability::Navigate,
+            context(150, 9)
+        ));
     }
 }
