@@ -1,0 +1,181 @@
+name: Evidence Plane Shared Digest Migration
+
+on:
+  pull_request:
+    paths:
+      - 'Cargo.lock'
+      - 'crates/core/symthaea-evidence-plane/src/lib.rs'
+      - 'crates/domains/symthaea-fabrication-kernel/Cargo.toml'
+      - 'crates/domains/symthaea-fabrication-kernel/src/lib.rs'
+      - 'crates/domains/symthaea-fabrication-kernel/tests/crypto_digest_compatibility.rs'
+      - '.github/workflows/evidence-plane-shared-digest-migration.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact revision and parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Verify exact checkout and parent
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git rev-parse HEAD^)" = "${{ github.event.pull_request.base.sha }}"
+          test "${{ github.event.pull_request.base.sha }}" = "04b7d3182bdea0ec647b6c1ee4511901807415fb"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Freeze migration theorem and exact scope
+        shell: python
+        run: |
+          from copy import deepcopy
+          from pathlib import Path
+          import subprocess
+          import tomllib
+
+          evidence_lib = Path('crates/core/symthaea-evidence-plane/src/lib.rs').read_text()
+          fabrication_lib = Path('crates/domains/symthaea-fabrication-kernel/src/lib.rs').read_text()
+          fabrication_manifest = Path('crates/domains/symthaea-fabrication-kernel/Cargo.toml').read_text()
+
+          assert 'pub mod crypto_digest;' in evidence_lib
+          assert 'symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }' in fabrication_manifest
+          assert 'pub use symthaea_evidence_plane::crypto_digest::{' in fabrication_lib
+          for token in ['DigestParseError', 'Sha256', 'Sha256Digest', 'sha256']:
+              assert token in fabrication_lib, token
+          assert '\npub mod crypto_digest;\n' not in fabrication_lib
+
+          if '${{ github.event_name }}' == 'pull_request':
+              changed = set(subprocess.check_output(
+                  ['git', 'diff', '--name-only', 'HEAD^..HEAD'], text=True
+              ).splitlines())
+              expected = {
+                  '.github/workflows/evidence-plane-shared-digest-migration.yml',
+                  'Cargo.lock',
+                  'crates/core/symthaea-evidence-plane/src/lib.rs',
+                  'crates/domains/symthaea-fabrication-kernel/Cargo.toml',
+                  'crates/domains/symthaea-fabrication-kernel/src/lib.rs',
+                  'crates/domains/symthaea-fabrication-kernel/tests/crypto_digest_compatibility.rs',
+              }
+              assert changed == expected, sorted(changed)
+
+              preserved = [
+                  'crates/core/symthaea-evidence-plane/src/crypto_digest.rs',
+                  'crates/core/symthaea-evidence-plane/tests/crypto_digest_extraction.rs',
+                  'crates/domains/symthaea-fabrication-kernel/src/crypto_digest.rs',
+              ]
+              for path in preserved:
+                  subprocess.run(
+                      ['git', 'diff', '--exit-code', 'HEAD^..HEAD', '--', path],
+                      check=True,
+                  )
+
+              before = tomllib.loads(subprocess.check_output(
+                  ['git', 'show', 'HEAD^:Cargo.lock'], text=True
+              ))
+              after = tomllib.loads(Path('Cargo.lock').read_text())
+
+              def package(lock, name):
+                  matches = [p for p in lock['package'] if p.get('name') == name]
+                  assert len(matches) == 1, (name, matches)
+                  return matches[0]
+
+              old = package(before, 'symthaea-fabrication-kernel')
+              new = package(after, 'symthaea-fabrication-kernel')
+              expected_deps = sorted(old.get('dependencies', []) + ['symthaea-evidence-plane'])
+              assert sorted(new.get('dependencies', [])) == expected_deps, (old, new)
+
+              normalized = deepcopy(after)
+              target = package(normalized, 'symthaea-fabrication-kernel')
+              target['dependencies'] = [
+                  dep for dep in target.get('dependencies', [])
+                  if dep != 'symthaea-evidence-plane'
+              ]
+              assert normalized == before, 'Cargo.lock changed beyond the exact fabrication -> evidence-plane edge'
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-evidence-plane -p symthaea-fabrication-kernel -- --check
+
+      - name: Re-run qualified extraction parity
+        run: cargo test --locked -p symthaea-evidence-plane --test crypto_digest_extraction
+
+      - name: Evidence-plane regression
+        run: cargo test --locked -p symthaea-evidence-plane --lib
+
+      - name: Exact compatibility type identity
+        run: cargo test --locked -p symthaea-fabrication-kernel --test crypto_digest_compatibility
+
+      - name: Fabrication library regression
+        run: cargo test --locked -p symthaea-fabrication-kernel --lib
+
+      - name: Fabrication public-path regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-fabrication-kernel --test durable_gateway_pipeline
+          cargo test --locked -p symthaea-fabrication-kernel --test governed_release_pipeline
+          cargo test --locked -p symthaea-fabrication-kernel --test operational_release_pipeline
+          cargo test --locked -p symthaea-fabrication-kernel --test upgrade_operational_pipeline
+
+      - name: Changed-file Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --locked -p symthaea-evidence-plane --lib --no-deps \
+            --message-format=json > /tmp/evidence-shared-digest-clippy.json
+          cargo clippy --locked -p symthaea-fabrication-kernel \
+            --lib --test crypto_digest_compatibility --no-deps \
+            --message-format=json > /tmp/fabrication-shared-digest-clippy.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          owned = {
+              'crates/core/symthaea-evidence-plane/src/lib.rs',
+              'crates/domains/symthaea-fabrication-kernel/src/lib.rs',
+              'crates/domains/symthaea-fabrication-kernel/tests/crypto_digest_compatibility.rs',
+          }
+          failures = []
+          for path in [
+              Path('/tmp/evidence-shared-digest-clippy.json'),
+              Path('/tmp/fabrication-shared-digest-clippy.json'),
+          ]:
+              for raw in path.read_text().splitlines():
+                  try:
+                      event = json.loads(raw)
+                  except json.JSONDecodeError:
+                      continue
+                  if event.get('reason') != 'compiler-message':
+                      continue
+                  msg = event.get('message', {})
+                  if msg.get('level') != 'warning':
+                      continue
+                  primary = [s for s in msg.get('spans', []) if s.get('is_primary')]
+                  if any(s.get('file_name') in owned for s in primary):
+                      failures.append(msg.get('rendered') or msg.get('message', 'Clippy warning'))
+          if failures:
+              raise SystemExit('owned-file Clippy warnings:\n' + '\n'.join(failures))
+          PY
