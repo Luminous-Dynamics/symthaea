@@ -1,0 +1,160 @@
+name: Qualification Kernel V1
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qualification-kernel-v1.yml'
+      - 'patches/science/qualification-kernel-v1.patch'
+      - 'crates/core/symthaea-evidence-plane/src/lib.rs'
+      - 'crates/core/symthaea-evidence-plane/src/qualification.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/qualification-kernel-v1.patch
+
+jobs:
+  qualify:
+    name: Qualify profile-driven observations, disposition, and bounded authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates src || {
+            echo 'qualification branch must not materialize product source'
+            exit 1
+          }
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Prove current evidence plane lacks qualification authority vocabulary
+        run: |
+          test ! -e crates/core/symthaea-evidence-plane/src/qualification.rs
+          ! grep -F 'pub mod qualification;' crates/core/symthaea-evidence-plane/src/lib.rs
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet observation-interpretation-authority separation
+        run: |
+          FILE=crates/core/symthaea-evidence-plane/src/qualification.rs
+          grep -F 'There is deliberately no `Missing` variant.' "$FILE"
+          grep -F 'pub enum CheckRole' "$FILE"
+          grep -F 'pub enum QualificationDisposition' "$FILE"
+          grep -F 'pub enum QualificationAuthorityClaim' "$FILE"
+          grep -F 'pub struct MayReportQualified' "$FILE"
+          grep -F 'pub struct ValidatedQualification' "$FILE"
+          grep -F 'pub fn report_authority(&self) -> Option<MayReportQualified>' "$FILE"
+          grep -F 'MayReportQualified { _private: () }' "$FILE"
+          grep -F 'pub fn evaluate(' "$FILE"
+          grep -F 'pub fn validate(' "$FILE"
+          grep -F 'if scientific == 0' "$FILE"
+          grep -F 'pub profile: QualificationProfileV1' "$FILE"
+          grep -F 'profile_requirements(left)? == profile_requirements(right)?' "$FILE"
+          grep -F 'claimed_disposition: QualificationDisposition' "$FILE"
+          grep -F 'claimed_authority: QualificationAuthorityClaim' "$FILE"
+          grep -F 'Some(CheckOutcome::InfrastructureError) => interrupted = true' "$FILE"
+          grep -F 'Some(CheckOutcome::TimedOut | CheckOutcome::Skipped | CheckOutcome::Cancelled)' "$FILE"
+          ! grep -F 'pub claimed_disposition' "$FILE"
+          ! grep -F 'pub claimed_authority' "$FILE"
+          ! grep -F 'pub fn derive' "$FILE"
+          ! grep -F 'MaterializationAuthorized' "$FILE"
+
+      - name: Prove real-failure census shapes classify separately
+        run: |
+          mkdir -p crates/core/symthaea-evidence-plane/tests
+          cat > crates/core/symthaea-evidence-plane/tests/qualification_census.rs <<'RS'
+          use symthaea_evidence_plane::qualification::{
+              CheckOutcome, CheckRole, Observation, QualificationDisposition,
+              QualificationProfileV1, Requirement, evaluate,
+          };
+
+          fn profile() -> QualificationProfileV1 {
+              QualificationProfileV1 {
+                  id: "science-rust-census-v1".into(),
+                  version: 1,
+                  requirements: vec![
+                      Requirement { id: "premise".into(), role: CheckRole::Premise },
+                      Requirement { id: "theorem".into(), role: CheckRole::Scientific },
+                      Requirement { id: "hygiene".into(), role: CheckRole::Admissibility },
+                  ],
+              }
+          }
+
+          fn observation(id: &'static str, outcome: CheckOutcome) -> Observation {
+              Observation { id: id.into(), outcome }
+          }
+
+          #[test]
+          fn three_completed_red_shapes_are_hygiene_not_theorem_failure() {
+              for label in ["759", "773", "778"] {
+                  let observations = vec![
+                      observation("premise", CheckOutcome::Passed),
+                      observation("theorem", CheckOutcome::Passed),
+                      observation("hygiene", CheckOutcome::Failed),
+                  ];
+                  assert_eq!(
+                      evaluate(&profile(), &observations).unwrap(),
+                      QualificationDisposition::CandidateHygieneFailure,
+                      "PR #{label} census shape must preserve theorem success",
+                  );
+              }
+          }
+
+          #[test]
+          fn cancelled_and_timeout_shapes_are_incomplete_without_causal_attribution() {
+              for outcome in [CheckOutcome::Cancelled, CheckOutcome::TimedOut] {
+                  let observations = vec![
+                      observation("premise", CheckOutcome::Passed),
+                      observation("theorem", outcome),
+                  ];
+                  assert_eq!(
+                      evaluate(&profile(), &observations).unwrap(),
+                      QualificationDisposition::Incomplete,
+                  );
+              }
+          }
+          RS
+          cargo test --locked -p symthaea-evidence-plane --test qualification_census
+          rm crates/core/symthaea-evidence-plane/tests/qualification_census.rs
+
+      - name: Prove evaluator adversarial cases
+        run: |
+          cargo test --locked -p symthaea-evidence-plane qualification::tests -- --nocapture
+          cargo test --locked -p symthaea-evidence-plane
+
+      - name: Format
+        run: cargo fmt --check -p symthaea-evidence-plane
+
+      - name: Check
+        run: cargo check --locked -p symthaea-evidence-plane
+
+      - name: Clippy
+        run: cargo clippy --locked -p symthaea-evidence-plane --lib -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes a profile-driven evaluator that keeps execution observations separate from derived disposition; missing checks are derived rather than fabricated; at least one scientific requirement is mandatory; premise, scientific, and admissibility failures remain distinct; cancellation and unattributed timeout are incomplete while explicit infrastructure failure is distinct; duplicate/unknown/malformed observations fail closed; exact profile role semantics are structurally rebound during validation; serialized disposition/authority remain private untrusted claims; only successful validation can return the opaque MayReportQualified reporting token.'
+          echo 'PASS does not cryptographically identify the profile, candidate bytes, base commit, patch digest, workflow digest, runner/toolchain/environment identity, or external scientific truth. MayReportQualified is reporting authority only and MUST NOT authorize materialization. Exact artifact/execution identity and materialization authority remain future qualification stages.'
