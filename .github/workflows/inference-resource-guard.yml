@@ -1,0 +1,52 @@
+name: Inference Resource Guard
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_resource_guard.rs"
+      - "tests/inference_resource_guard.rs"
+      - "docs/architecture/INFERENCE_RESOURCE_GUARD_V1.md"
+      - ".github/workflows/inference-resource-guard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-resource-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-resource-guard:
+    name: Inference Resource Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: rustfmt --edition 2024 --check src/language/inference_resource_guard.rs tests/inference_resource_guard.rs
+
+      - name: Compile and run IF-7 resource regressions
+        run: cargo test --locked --test inference_resource_guard
+
+      - name: Focused resource-guard Clippy
+        run: cargo clippy --locked --test inference_resource_guard -- -D warnings -A dead-code
+
+      - name: Ratchet conservative authority boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'can never replenish it within an epoch' src/language/inference_resource_guard.rs
+          grep -F 'guard_instance_id' src/language/inference_resource_guard.rs
+          grep -F 'Provider observations can only decrease these ceilings' src/language/inference_resource_guard.rs
+          grep -F 'does not refund unused reserved tokens' src/language/inference_resource_guard.rs
+          grep -F 'Only `advance_quota_epoch()` may replenish' docs/architecture/INFERENCE_RESOURCE_GUARD_V1.md
+          grep -F 'no provider reset becoming quota authority' docs/architecture/INFERENCE_RESOURCE_GUARD_V1.md
