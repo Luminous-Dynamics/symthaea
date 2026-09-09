@@ -45,6 +45,11 @@ pub use phone_stream::{PhoneCaptureConfig, PhoneCaptureHandle};
 #[cfg(feature = "sensor-fusion")]
 pub mod sensor_fusion;
 
+// Cross-embodiment measurement only: requires both the physical-sensor and
+// humanoid semantic adapters. This module does not participate in live control.
+#[cfg(all(feature = "sensor-fusion", feature = "humanoid"))]
+pub mod sensorimotor_alignment;
+
 // SHA-256 integrity verification for model weight files
 pub mod model_integrity;
 
