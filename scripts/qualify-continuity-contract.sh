@@ -25,6 +25,8 @@ stage="preflight"
 source_state="unverified"
 format_patch_state="not-produced"
 format_source_state="not-produced"
+repair_probe_status="not-run"
+repair_probe_stage="not-run"
 
 sha256_file() {
     local path="$1"
@@ -90,6 +92,9 @@ write_receipt() {
         printf 'format_patch_state\t%s\n' "$format_patch_state"
         printf 'format_patch_sha256\t%s\n' "$(sha256_file "$format_patch_path")"
         printf 'format_source_state\t%s\n' "$format_source_state"
+        printf 'repair_probe_scope\tformatter-derived-non-qualifying\n'
+        printf 'repair_probe_status\t%s\n' "$repair_probe_status"
+        printf 'repair_probe_terminal_stage\t%s\n' "$repair_probe_stage"
         printf 'execution_provider\t%s\n' "$provider"
         printf 'runner_label\t%s\n' "${CONTINUITY_RUNNER_LABEL:-unknown}"
         printf 'runner_os\t%s\n' "${RUNNER_OS:-unknown}"
@@ -138,6 +143,8 @@ write_receipt() {
             echo "- source state: \`$source_state\`"
             echo "- format repair artifact: \`$format_patch_state\`"
             echo "- formatter source snapshot: \`$format_source_state\`"
+            echo "- formatter-repair diagnostic probe: \`$repair_probe_status\` at \`$repair_probe_stage\`"
+            echo '- repair probe is diagnostic only and cannot change exact-head FAIL/PASS status'
             echo '- scope: continuity software contracts only'
             echo '- full repository CI: independent'
             echo '- real-world availability/scientific/execution authority: none'
@@ -228,6 +235,37 @@ if ! cargo fmt -p symthaea-continuity -- --check; then
     echo "continuity-contract rustfmt_patch_sha256=$(sha256_file "$format_patch_path")"
     echo "continuity-contract rustfmt_source_dir=$format_source_dir"
     git diff --stat -- crates/core/symthaea-continuity >&2 || true
+
+    # Diagnostic-only probe. The exact committed head has already failed at
+    # formatting and remains FAIL regardless of these results. We intentionally
+    # probe the repository-pinned rustfmt repair so the next semantic/compiler
+    # defect can be surfaced without laundering repaired bytes into qualification.
+    repair_probe_status="FAIL"
+    repair_probe_stage="check_all_targets"
+    set +e
+    cargo check --locked -p symthaea-continuity --all-targets
+    probe_rc=$?
+    if [[ "$probe_rc" -eq 0 ]]; then
+        repair_probe_stage="clippy_all_targets"
+        cargo clippy --locked -p symthaea-continuity --all-targets -- -D warnings
+        probe_rc=$?
+    fi
+    if [[ "$probe_rc" -eq 0 ]]; then
+        repair_probe_stage="unit_and_integration_tests"
+        cargo test --locked -p symthaea-continuity
+        probe_rc=$?
+    fi
+    if [[ "$probe_rc" -eq 0 ]]; then
+        repair_probe_stage="doc_tests"
+        cargo test --locked -p symthaea-continuity --doc
+        probe_rc=$?
+    fi
+    if [[ "$probe_rc" -eq 0 ]]; then
+        repair_probe_status="PASS"
+        repair_probe_stage="complete"
+    fi
+    set -e
+    echo "continuity-contract repair_probe_status=$repair_probe_status repair_probe_stage=$repair_probe_stage"
     exit 1
 fi
 
