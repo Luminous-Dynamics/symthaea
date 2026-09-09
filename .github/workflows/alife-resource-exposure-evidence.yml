@@ -1,0 +1,179 @@
+name: ALife Causal Treatment Exposure
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/src/genesis_social_runner.rs"
+      - "crates/domains/symthaea-alife/src/resource_exposure.rs"
+      - "crates/domains/symthaea-alife/src/causal_replay_session.rs"
+      - "crates/domains/symthaea-alife/src/earth_forcing/**"
+      - "crates/domains/symthaea-alife/src/perturbation.rs"
+      - "crates/domains/symthaea-alife/tests/causal_resource_exposure.rs"
+      - ".github/workflows/alife-resource-exposure-evidence.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Exact consumed-resource theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/resource_exposure.rs
+          sha256sum crates/domains/symthaea-alife/src/population.rs
+          sha256sum crates/domains/symthaea-alife/src/perturbation.rs
+          sha256sum crates/domains/symthaea-alife/tests/causal_resource_exposure.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-resource-exposure-evidence
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Execute resource exposure unit regressions
+        run: 'cargo test --locked -p symthaea-alife resource_exposure::'
+
+      - name: Execute causal treatment integration target
+        run: cargo test --locked -p symthaea-alife --test causal_resource_exposure
+
+      - name: Execute session and fidelity prerequisites
+        run: |
+          cargo test --locked -p symthaea-alife causal_replay_session::
+          cargo test --locked -p symthaea-alife causal_replay_fidelity::
+
+      - name: Strict ALife Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze exactly-once Population resource seam
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('crates/domains/symthaea-alife/src/population.rs').read_text()
+          start = src.index('    pub fn step_social(')
+          end = src.index('    pub fn len(&self)', start)
+          body = src[start:end]
+          assert body.count('resource_for(n)') == 1, body.count('resource_for(n)')
+          assert body.index('let resource = resource_for(n);') < body.index('// Phase 1: pairing')
+          PY
+
+      - name: Freeze live exposure capture theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/resource_exposure.rs"
+          grep -q 'pub struct GenesisResourceExposureRunnerV1' "$src"
+          grep -q 'calls = calls.checked_add(1)' "$src"
+          grep -q 'if calls != 1' "$src"
+          grep -q 'resource.to_bits()' "$src"
+          grep -q 'ResourcePopulationMismatch' "$src"
+          grep -q 'self.completed_exposures.push' "$src"
+          grep -q 'qualified_runner_records_exact_scalar_returned_to_population' "$src"
+
+      - name: Freeze session treatment validation theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/resource_exposure.rs"
+          grep -q 'validate_resource_exposure_for_session_v1' "$src"
+          grep -q 'EarthForcedEnvironment::from_validated_snapshot_v1' "$src"
+          grep -q 'session.perturbation_schedule()' "$src"
+          grep -q 'schedule' "$src"
+          grep -q 'apply_resource(exposure.tick, baseline)' "$src"
+          grep -q 'exposure.population_before != batch.population_before()' "$src"
+          grep -q 'exposure.resource_bits != expected_resource.to_bits()' "$src"
+          grep -q 'EnvironmentEndpointMismatch' "$src"
+          test -f crates/domains/symthaea-alife/tests/causal_resource_exposure.rs
+          grep -q 'one_bit_resource_drift_is_rejected' crates/domains/symthaea-alife/tests/causal_resource_exposure.rs
+          grep -q 'exposure_population_count_must_match_natural_behavior_batch' crates/domains/symthaea-alife/tests/causal_resource_exposure.rs
+
+      - name: Require validated exposure capability to remain non-serializable
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('crates/domains/symthaea-alife/src/resource_exposure.rs').read_text()
+          marker = 'pub struct ValidatedGenesisTreatmentExposureV1'
+          idx = src.index(marker)
+          prefix = src[max(0, idx-180):idx]
+          assert 'Serialize' not in prefix and 'Deserialize' not in prefix, prefix
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/resource_exposure.rs"
+          ! grep -q 'origin_authenticity_established=true' "$src"
+          ! grep -q 'closed_treatment_execution_established=true' "$src"
+          ! grep -q 'live_counterfactual_replay_established=true' "$src"
+          ! grep -q 'causal_rescue_established=true' "$src"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-resource-exposure-evidence
+          {
+            echo "authority=genesis_resource_exposure_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "resource_exposure_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/resource_exposure.rs | cut -d' ' -f1)"
+            echo "population_resource_callback_exactly_once_candidate=true"
+            echo "consumed_resource_bits_recorded=true"
+            echo "exposure_tick_population_bound_to_behavior=true"
+            echo "earth_forcing_reconstructed_from_fork=true"
+            echo "perturbation_schedule_reapplied=true"
+            echo "one_bit_resource_drift_rejected=true"
+            echo "natural_environment_endpoint_bound=true"
+            echo "validated_exposure_capability_nonserializable=true"
+            echo "origin_authenticity_established=false"
+            echo "closed_treatment_execution_established=false"
+            echo "live_counterfactual_replay_established=false"
+            echo "statistical_inference_established=false"
+            echo "causal_rescue_established=false"
+          } > target/alife-resource-exposure-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-resource-exposure-evidence
+          path: target/alife-resource-exposure-evidence/qualification.txt
+          if-no-files-found: error
