@@ -1,0 +1,44 @@
+package luminous:symthaea-extension@1.0.0;
+
+/// Minimal identity exported by every public WebAssembly extension.
+record extension-identity {
+    /// Must match the signed package manifest extension ID.
+    id: string,
+    /// Must match the signed package manifest version.
+    version: string,
+    /// Host/guest ABI major version.
+    abi-major: u16,
+    /// Host/guest ABI minor version.
+    abi-minor: u16,
+    /// Digest of the exact package manifest the guest was built against.
+    manifest-digest: list<u8>,
+}
+
+enum health-state {
+    ready,
+    degraded,
+    unavailable,
+}
+
+record health-report {
+    state: health-state,
+    message: option<string>,
+}
+
+/// Control-plane interface only.
+///
+/// Capability-specific data-plane interfaces intentionally live in separate WIT
+/// packages/worlds so this ABI does not become a generic JSON/byte-message bus.
+interface control {
+    identity: func() -> extension-identity;
+    health: func() -> health-report;
+}
+
+/// Baseline world implemented by every sandboxed Symthaea extension.
+///
+/// It imports no WASI or host capabilities. Filesystem, network, clocks,
+/// randomness, sensors, actuators, and other authority must be linked through
+/// separate permission-scoped host interfaces.
+world extension-control-v1 {
+    export control;
+}
