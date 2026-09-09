@@ -16,27 +16,32 @@ mission policy.
 3. **Never average away an unsafe member.** Fleet assurance is per-platform and
    per-generation; one quarantined, stale or unsafe platform remains visible.
 4. **Authority is bounded.** Capabilities are explicit, epoch-bound, time-bound and
-   evidence-bound.
+   evidence-bound. Delegated authority requires trusted time at the point of use.
 5. **No weapon semantics in the substrate.** Maritime core exposes sensing,
    navigation, communications, cargo, inspection and maintenance capabilities.
    Target engagement and lethal-force decisions are intentionally outside its type
    vocabulary.
 6. **Bridges over duplication.** Existing AUV hydrodynamics, navigation, HAL rollout
-   assurance, Xenia secure sessions and Mycelix governance/evidence should be
-   integrated through narrow adapters rather than copied into this crate.
+   assurance, Xenia secure sessions and Mycelix governance/evidence are integrated
+   through narrow adapters rather than copied into this crate.
 
 ## Initial modules
 
 - `state`: shared platform identity, kinematics, energy and navigation quality.
-- `health`: component health and worst-case platform health aggregation.
+- `health`: component health and worst-case platform health aggregation; absent
+  observations fail closed to `Unknown`.
 - `degraded`: deterministic baseline operating envelopes under dependency loss.
 - `authority`: mission-neutral capability leases with epoch/time/evidence bounds.
 - `fleet`: per-member fleet admission and degraded-member reporting.
 
 ## Adapters
 
-- `symthaea-auv`: initial state adapter is implemented; health/assurance mapping is next.
-- `symthaea-hal`: fleet rollout/rollback assurance adapter is next.
+- `symthaea-auv`: state adapter implemented; AUV retains hydrodynamics, HDC/LTC,
+  chemical sensing and underwater navigation ownership.
+- `symthaea-hal`: runtime-health + fleet-admission evidence adapter implemented.
+  The adapter does **not** verify rollout signatures, trusted-time quorum, rollback
+  rehearsal or recovery artifacts; it consumes already-verified HAL facts and keeps
+  Missing/Stale/Mismatched states explicit and fail-closed.
 - Xenia: authenticated machine-session/evidence binding adapter is planned.
 - Mycelix: distributed identity, governance, provenance and logistics bridge is planned.
 
