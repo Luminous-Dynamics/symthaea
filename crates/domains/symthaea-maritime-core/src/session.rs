@@ -7,19 +7,25 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Opaque evidence produced after an external secure-session verifier succeeds.
+/// Immutable evidence produced after an external secure-session verifier succeeds.
+///
+/// Live revocation is deliberately **not** stored here: a session may be valid when
+/// authenticated and revoked one millisecond later. Current revocation state belongs in
+/// [`MachineSessionContext`] so point-of-use evaluation cannot accidentally trust a stale
+/// issuance-time boolean.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AuthenticatedMachineSession {
     pub session_id: String,
-    /// Opaque stable binding to the authenticated peer identity (for example a Xenia host
+    /// Opaque stable binding to the authenticated peer identity (for example a Xenia signing
     /// identity fingerprint). Maritime core does not interpret or recompute it.
     pub peer_identity_binding: String,
     pub authenticated_at_ms: u64,
     pub expires_at_ms: u64,
+    /// Provider-defined generation of the authority state that admitted this session.
+    /// Point-of-use evaluation requires an exact match with the current authority generation.
     pub authority_epoch: u64,
     /// Opaque binding to transcript/signature/verification evidence owned by the provider.
     pub evidence_binding: String,
-    pub revoked: bool,
 }
 
 impl AuthenticatedMachineSession {
@@ -40,11 +46,18 @@ impl AuthenticatedMachineSession {
     }
 }
 
+/// Current trust facts supplied at the point where session-derived authority is used.
+///
+/// This context is intentionally separate from immutable handshake evidence. Providers should
+/// recompute or refresh it from their authoritative time, enrollment and revocation state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MachineSessionContext {
     pub now_ms: u64,
     pub authority_epoch: u64,
     pub trusted_time_available: bool,
+    /// Current revocation result from the authority owner. This must not be an issuance-time
+    /// snapshot copied from [`AuthenticatedMachineSession`].
+    pub revoked: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,7 +73,7 @@ pub enum MachineSessionTrust {
 
 /// Evaluate only maritime-visible trust facts. This does not verify any signature, KEM,
 /// fingerprint, transcript or certificate; providers must do that before constructing the
-/// evidence record.
+/// immutable evidence record and must refresh the live context at point of use.
 pub fn evaluate_machine_session(
     session: &AuthenticatedMachineSession,
     context: MachineSessionContext,
@@ -71,7 +84,7 @@ pub fn evaluate_machine_session(
     if !context.trusted_time_available {
         return MachineSessionTrust::UntrustedTime;
     }
-    if session.revoked {
+    if context.revoked {
         return MachineSessionTrust::Revoked;
     }
     if session.authority_epoch != context.authority_epoch {
@@ -98,6 +111,14 @@ mod tests {
             expires_at_ms: 200,
             authority_epoch: 9,
             evidence_binding: "xenia-transcript:xyz".into(),
+        }
+    }
+
+    fn context(now_ms: u64) -> MachineSessionContext {
+        MachineSessionContext {
+            now_ms,
+            authority_epoch: 9,
+            trusted_time_available: true,
             revoked: false,
         }
     }
@@ -105,73 +126,56 @@ mod tests {
     #[test]
     fn valid_session_is_trusted_only_in_matching_time_and_epoch_context() {
         assert_eq!(
-            evaluate_machine_session(
-                &session(),
-                MachineSessionContext {
-                    now_ms: 150,
-                    authority_epoch: 9,
-                    trusted_time_available: true,
-                },
-            ),
+            evaluate_machine_session(&session(), context(150)),
             MachineSessionTrust::Trusted
         );
     }
 
     #[test]
     fn trusted_time_loss_fails_closed() {
+        let mut current = context(150);
+        current.trusted_time_available = false;
         assert_eq!(
-            evaluate_machine_session(
-                &session(),
-                MachineSessionContext {
-                    now_ms: 150,
-                    authority_epoch: 9,
-                    trusted_time_available: false,
-                },
-            ),
+            evaluate_machine_session(&session(), current),
             MachineSessionTrust::UntrustedTime
         );
     }
 
     #[test]
-    fn revocation_dominates_other_live_session_facts() {
-        let mut revoked = session();
-        revoked.revoked = true;
+    fn live_revocation_dominates_immutable_session_evidence() {
+        let issued = session();
         assert_eq!(
-            evaluate_machine_session(
-                &revoked,
-                MachineSessionContext {
-                    now_ms: 150,
-                    authority_epoch: 9,
-                    trusted_time_available: true,
-                },
-            ),
+            evaluate_machine_session(&issued, context(150)),
+            MachineSessionTrust::Trusted
+        );
+
+        let mut current = context(150);
+        current.revoked = true;
+        assert_eq!(
+            evaluate_machine_session(&issued, current),
             MachineSessionTrust::Revoked
         );
     }
 
     #[test]
     fn stale_epoch_and_expiry_are_rejected() {
+        let mut stale = context(150);
+        stale.authority_epoch = 10;
         assert_eq!(
-            evaluate_machine_session(
-                &session(),
-                MachineSessionContext {
-                    now_ms: 150,
-                    authority_epoch: 10,
-                    trusted_time_available: true,
-                },
-            ),
+            evaluate_machine_session(&session(), stale),
             MachineSessionTrust::EpochMismatch
         );
         assert_eq!(
-            evaluate_machine_session(
-                &session(),
-                MachineSessionContext {
-                    now_ms: 200,
-                    authority_epoch: 9,
-                    trusted_time_available: true,
-                },
-            ),
+            evaluate_machine_session(&session(), context(200)),
             MachineSessionTrust::Expired
+        );
+    }
+
+    #[test]
+    fn future_dated_session_is_rejected() {
+        assert_eq!(
+            evaluate_machine_session(&session(), context(99)),
+            MachineSessionTrust::NotYetValid
         );
     }
 }
