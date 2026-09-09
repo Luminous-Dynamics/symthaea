@@ -46,6 +46,8 @@ pub mod persistence;
 pub mod reasoning_context;
 #[cfg(feature = "self_schema")]
 pub mod self_schema;
+#[cfg(feature = "support")]
+pub mod support_adapter;
 
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
 pub use causal_bridge::CausalKnowledgeBridge;
@@ -59,3 +61,5 @@ pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
 pub use reasoning_context::{
     CausalChain, EpistemicState, GroundedFact, KnowledgeQueryResult, ReasoningContext,
 };
+#[cfg(feature = "support")]
+pub use support_adapter::GlobalKnowledgeSupportAdapterV1;
