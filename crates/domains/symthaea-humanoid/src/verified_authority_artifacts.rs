@@ -35,6 +35,7 @@ impl std::fmt::Debug for HumanoidVerifiedPhysicalAuthorityEvidence {
         f.debug_struct("HumanoidVerifiedPhysicalAuthorityEvidence")
             .field("verification_digest", &self.inner.verification_digest())
             .field("evidence_digest", &self.inner.evidence_digest())
+            .field("verifier_digest", &self.inner.verifier_digest())
             .field("scale", &self.inner.scale())
             .field("valid_until_s", &self.inner.valid_until_s())
             .finish()
@@ -77,6 +78,10 @@ impl HumanoidVerifiedPhysicalAuthorityEvidence {
         self.inner.verification_digest()
     }
 
+    pub const fn verifier_digest(&self) -> crate::evidence_digest::HumanoidEvidenceDigest {
+        self.inner.verifier_digest()
+    }
+
     pub const fn valid_until_s(&self) -> f64 {
         self.inner.valid_until_s()
     }
@@ -95,6 +100,7 @@ impl std::fmt::Debug for HumanoidVerifiedEpistemicAuthorityEvidence {
         f.debug_struct("HumanoidVerifiedEpistemicAuthorityEvidence")
             .field("verification_digest", &self.inner.verification_digest())
             .field("evidence_digest", &self.inner.evidence_digest())
+            .field("verifier_digest", &self.inner.verifier_digest())
             .field("scale", &self.inner.scale())
             .field("valid_until_s", &self.inner.valid_until_s())
             .finish()
@@ -135,6 +141,10 @@ impl HumanoidVerifiedEpistemicAuthorityEvidence {
 
     pub const fn verification_digest(&self) -> crate::evidence_digest::HumanoidEvidenceDigest {
         self.inner.verification_digest()
+    }
+
+    pub const fn verifier_digest(&self) -> crate::evidence_digest::HumanoidEvidenceDigest {
+        self.inner.verifier_digest()
     }
 
     pub const fn valid_until_s(&self) -> f64 {
