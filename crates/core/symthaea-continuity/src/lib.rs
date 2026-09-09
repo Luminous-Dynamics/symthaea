@@ -23,6 +23,7 @@ pub mod profile_adoption_registry_store;
 pub mod profile_adoption_registry_write;
 pub mod profile_adoption_root;
 pub mod profile_adoption_runtime;
+pub mod profile_adoption_store_authority;
 pub mod profile_adoption_time;
 pub mod verifier;
 mod witness;
@@ -94,6 +95,17 @@ pub use profile_adoption_root::{
 pub use profile_adoption_runtime::{
     PolicyCurrentVerifierRuntimeEnvelopeV1, VerifierProfileRuntimeAuthorityBaselineV1,
     VerifierProfileRuntimeAuthorityError, check_current_verifier_runtime_policy,
+};
+pub use profile_adoption_store_authority::{
+    VERIFIER_PROFILE_ADOPTION_STORE_AUTHORITY_BINDING_SCHEMA_V1,
+    StoreAuthorityQualifiedVerifierProfileAdoptionCasIdV1,
+    StoreAuthorityQualifiedVerifierProfileAdoptionCasV1,
+    TrustedVerifierProfileAdoptionRegistryCasError,
+    TrustedVerifierProfileAdoptionRegistryStoreV1,
+    VerifierProfileAdoptionStoreAuthorityBindingIdV1,
+    VerifierProfileAdoptionStoreAuthorityBindingV1,
+    VerifierProfileAdoptionStoreAuthorityError,
+    perform_trusted_verifier_profile_adoption_registry_cas,
 };
 pub use profile_adoption_time::{
     TimeBoundVerifierProfileAdoptionCommitPreconditionsV1,
