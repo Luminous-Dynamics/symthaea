@@ -60,7 +60,11 @@ pub mod reach_episode_evidence;
 mod reach_episode_promotion;
 pub mod reach_execution;
 pub mod reach_execution_evidence;
-pub mod reach_operational_promotion;
+pub mod reach_operational_authority;
+// Internal implementation detail: protocol-bound promotion is necessary, but the
+// public operational authority path must additionally bind upstream operator
+// approval to the exact policy and deployment scope.
+mod reach_operational_promotion;
 pub mod reach_outcome_evidence;
 pub mod reach_policy_identity;
 pub mod reach_qualification_campaign;
@@ -145,7 +149,7 @@ pub use qualification::*;
 pub use reach_episode_evidence::*;
 pub use reach_execution::*;
 pub use reach_execution_evidence::*;
-pub use reach_operational_promotion::*;
+pub use reach_operational_authority::*;
 pub use reach_outcome_evidence::*;
 pub use reach_policy_identity::*;
 pub use reach_qualification_campaign::*;
