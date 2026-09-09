@@ -22,13 +22,15 @@ use crate::cartesian_hand_reference::{
 use crate::contact::ContactFrame;
 use crate::dynamics::RigidBodyDynamicsProvider;
 use crate::execution::{
-    HumanoidAuthorityEnvelope, HumanoidExecutionPipeline, HumanoidExecutionResult,
-    HumanoidPreparedCommand,
+    HumanoidExecutionPipeline, HumanoidExecutionResult, HumanoidPreparedCommand,
 };
 use crate::floating_base::FloatingBaseDynamicsProvider;
 use crate::frozen_dynamics::FrozenHumanoidDynamicsEnvironment;
 use crate::full_dynamics::FullRigidBodyDynamicsProvider;
 use crate::morphology::HandSide;
+use crate::skill_authority_receipt::{
+    HumanoidSkillAuthorityReceipt, HumanoidSkillAuthorityReceiptValidationFailure,
+};
 use crate::skill_runtime::HumanoidSkillIntent;
 use crate::spatial_goal::HumanoidSpatiallyBoundSkillPermit;
 use crate::spatial_goal_identity::humanoid_spatial_goal_fingerprint;
@@ -52,6 +54,13 @@ pub enum HumanoidPermittedReachPreparationFailure {
     InvalidSpatialGoalIdentity,
     MissingFullDynamics,
     CartesianReference(HumanoidCartesianHandReferenceFailure),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HumanoidPermittedReachFinalizationFailure {
+    InvalidFinalizationTime,
+    FinalizationBeforePreparation,
+    AuthorityReceipt(HumanoidSkillAuthorityReceiptValidationFailure),
 }
 
 /// Exact snapshot identities frozen for one preparation cycle. Optional reduced
@@ -84,12 +93,30 @@ pub struct HumanoidPermittedReachPreparationReport {
     pub cartesian_reference: HumanoidCartesianHandReferenceReport,
 }
 
-/// Final actuator-eligible result after the prepared Reach command crosses typed
-/// goal authority and the pipeline's final safety projector.
+/// Audit snapshot of the move-only skill authority receipt consumed by finalization.
+///
+/// This is evidence only. It cannot recreate or refresh the consumed receipt.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HumanoidReachAuthorityReceiptAudit {
+    pub receipt_fingerprint: u64,
+    pub validation_epoch: u64,
+    pub issued_at_s: f64,
+    pub valid_until_s: f64,
+    pub requirement_subject_fingerprints: Vec<u64>,
+    pub operator_evidence_id: String,
+    pub qualification_evidence_id: String,
+    pub physical_evidence_id: String,
+    pub epistemic_evidence_id: String,
+    pub cognitive_evidence_id: String,
+}
+
+/// Final actuator-eligible result after the prepared Reach command crosses a
+/// fresh skill-bound authority receipt and the pipeline's final safety projector.
 #[derive(Debug, Clone)]
 pub struct HumanoidPermittedReachExecutionResult {
     pub execution: HumanoidExecutionResult,
     pub preparation: HumanoidPermittedReachPreparationReport,
+    pub authority_receipt: HumanoidReachAuthorityReceiptAudit,
 }
 
 /// One-shot Reach command that is still below the final authority/safety
@@ -101,7 +128,6 @@ pub struct HumanoidPermittedReachExecutionResult {
 /// for preparation.
 pub struct HumanoidPermittedReachPreparedCommand<'pipeline, 'permit> {
     pipeline: &'pipeline mut HumanoidExecutionPipeline,
-    #[allow(dead_code)]
     permit: HumanoidSpatiallyBoundSkillPermit<'permit>,
     prepared: HumanoidPreparedCommand,
     state: HumanoidState,
@@ -119,12 +145,44 @@ impl<'pipeline, 'permit> HumanoidPermittedReachPreparedCommand<'pipeline, 'permi
         self.prepared.hierarchy_report()
     }
 
-    /// Consume the one-shot prepared command and cross typed authority plus the
-    /// exact pipeline instance's final morphology-aware safety projection.
+    /// Consume the one-shot prepared command only after a fresh authority receipt
+    /// proves it is bound to this exact live permit/epoch/body/backend/subject set.
+    ///
+    /// The receipt is move-only and consumed together with the command. The
+    /// execution result retains only an audit snapshot; it cannot refresh or
+    /// replay authority.
     pub fn finalize(
         self,
-        authority: HumanoidAuthorityEnvelope,
-    ) -> HumanoidPermittedReachExecutionResult {
+        authority_receipt: HumanoidSkillAuthorityReceipt,
+        now_s: f64,
+    ) -> Result<HumanoidPermittedReachExecutionResult, HumanoidPermittedReachFinalizationFailure> {
+        if !now_s.is_finite() || now_s < 0.0 {
+            return Err(HumanoidPermittedReachFinalizationFailure::InvalidFinalizationTime);
+        }
+        if now_s < self.report.prepared_at_s {
+            return Err(HumanoidPermittedReachFinalizationFailure::FinalizationBeforePreparation);
+        }
+        authority_receipt
+            .validate_for_permit(self.permit.semantic(), now_s)
+            .map_err(HumanoidPermittedReachFinalizationFailure::AuthorityReceipt)?;
+
+        let source = authority_receipt.source_evidence();
+        let authority_audit = HumanoidReachAuthorityReceiptAudit {
+            receipt_fingerprint: authority_receipt.receipt_fingerprint(),
+            validation_epoch: authority_receipt.validation_epoch(),
+            issued_at_s: authority_receipt.issued_at_s(),
+            valid_until_s: authority_receipt.valid_until_s(),
+            requirement_subject_fingerprints: authority_receipt
+                .requirement_subject_fingerprints()
+                .to_vec(),
+            operator_evidence_id: source.operator.evidence_id.clone(),
+            qualification_evidence_id: source.qualification.evidence_id.clone(),
+            physical_evidence_id: source.physical.evidence_id.clone(),
+            epistemic_evidence_id: source.epistemic.evidence_id.clone(),
+            cognitive_evidence_id: source.cognitive.evidence_id.clone(),
+        };
+        let authority = authority_receipt.authority_envelope();
+
         let Self {
             pipeline,
             permit: _,
@@ -136,10 +194,11 @@ impl<'pipeline, 'permit> HumanoidPermittedReachPreparedCommand<'pipeline, 'permi
         } = self;
         let execution =
             pipeline.finalize_prepared(prepared, &state, authority, actuation_mode, dt);
-        HumanoidPermittedReachExecutionResult {
+        Ok(HumanoidPermittedReachExecutionResult {
             execution,
             preparation: report,
-        }
+            authority_receipt: authority_audit,
+        })
     }
 }
 
@@ -320,8 +379,6 @@ fn valid_reach_intent(intent: &HumanoidWholeBodyMotionIntent) -> bool {
                     return false;
                 }
             }
-            // Reach execution must not erase manipulation/contact semantics from
-            // a stronger skill just to make it runnable.
             HumanoidWholeBodyObjectiveIR::LocomotionVelocity { .. }
             | HumanoidWholeBodyObjectiveIR::ObjectContact { .. }
             | HumanoidWholeBodyObjectiveIR::HumanContact { .. }
