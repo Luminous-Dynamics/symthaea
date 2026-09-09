@@ -1,0 +1,189 @@
+name: ALife Birth Mutation Intervention
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/evolution_intervention.rs"
+      - "crates/domains/symthaea-alife/src/evolution_birth.rs"
+      - "crates/domains/symthaea-alife/src/evolution_rng.rs"
+      - "crates/domains/symthaea-alife/src/genome.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle.rs"
+      - "crates/domains/symthaea-alife/src/lib.rs"
+      - ".github/workflows/alife-birth-mutation-intervention.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Exact RNG-neutral birth intervention theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/evolution_intervention.rs
+          sha256sum crates/domains/symthaea-alife/src/evolution_birth.rs
+          sha256sum crates/domains/symthaea-alife/src/evolution_rng.rs
+          sha256sum crates/domains/symthaea-alife/src/genome.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-birth-mutation-intervention
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Test intervention contract
+        run: 'cargo test --locked -p symthaea-alife evolution_intervention::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict ALife Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze exact intervention subject theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/evolution_intervention.rs"
+
+          grep -q 'pub struct EvolutionBirthSubjectV1' "$src"
+          grep -q 'tick: u64' "$src"
+          grep -q 'reproductive_parent_index: u64' "$src"
+          grep -q 'reproductive_parent_id: AgentId' "$src"
+          grep -q 'reproductive_parent_genome: GenomeEvidenceV1' "$src"
+          grep -q 'genome_source_index: u64' "$src"
+          grep -q 'genome_source_id: AgentId' "$src"
+          grep -q 'genome_source_genome: GenomeEvidenceV1' "$src"
+          grep -q 'natural_offspring_genome: GenomeEvidenceV1' "$src"
+          grep -q 'validate_subject_match' "$src"
+          grep -q 'NaturalOffspringGenomeMismatch' "$src"
+          grep -q 'GenomeSourceGenomeMismatch' "$src"
+
+      - name: Freeze matched-randomness intervention theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/evolution_intervention.rs"
+
+          grep -q 'BirthMutationInterventionKindV1::Sham' "$src"
+          grep -q 'BirthMutationInterventionKindV1::RevertTraits' "$src"
+          grep -q 'copy_trait_from_source' "$src"
+          grep -q 'genome_source_genome' "$src"
+          grep -q 'validate_trait_set' "$src"
+          grep -q 'TraitsNotStrictlySorted' "$src"
+          grep -q 'TraitWasNotMutated' "$src"
+          grep -q 'intervention_consumes_no_additional_evolution_rng' "$src"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('crates/domains/symthaea-alife/src/evolution_intervention.rs').read_text()
+          production = text.split('#[cfg(test)]', 1)[0]
+          apply = production.split('pub fn apply(', 1)[1].split('impl BirthMutationInterventionReceiptV1', 1)[0]
+
+          # The intervention is deliberately downstream of natural birth planning: no RNG object,
+          # source-selection call, or mutation call may appear inside its application path.
+          forbidden = [
+              'EvolutionRngStreamsV1',
+              'prepare_evolution_birth_v1',
+              'select_genome_source_v1',
+              '.mutate(',
+              'mutation_state_mut',
+              'next_inheritance_source_unit',
+          ]
+          for token in forbidden:
+              if token in apply:
+                  raise SystemExit(f'intervention application started consuming/recomputing randomness: {token}')
+
+          if 'natural_plan: &EvolutionBirthPlanV1' not in apply:
+              raise SystemExit('intervention is no longer applied to an already-prepared natural plan')
+          if 'let mut plan = *natural_plan;' not in apply:
+              raise SystemExit('intervention no longer begins from the exact prepared natural plan')
+          PY
+
+      - name: Freeze full Genome v1 trait coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/evolution_intervention.rs"
+          for trait_name in SetPoint ForageEfficiency ActionTemperature PerceptualGrain; do
+            grep -q "GenomeTraitV1::$trait_name" "$src"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          genome = Path('crates/domains/symthaea-alife/src/genome.rs').read_text()
+          body = genome.split('pub struct Genome {', 1)[1].split('}', 1)[0]
+          fields = [line.strip().split(':', 1)[0].removeprefix('pub ').strip()
+                    for line in body.splitlines() if line.strip().startswith('pub ')]
+          expected = ['set_point', 'forage_efficiency', 'action_temperature', 'perceptual_grain']
+          if fields != expected:
+              raise SystemExit(f'Genome v1 field surface drifted; intervention contract requires audit: {fields}')
+          PY
+
+      - name: Freeze contract-only claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/evolution_intervention.rs"
+          ! grep -q 'impl Population' "$src"
+          ! grep -q 'impl GenesisEarthExecutionV1' "$src"
+          ! grep -q 'causal_rescue_established=true' "$src"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-birth-mutation-intervention-evidence
+          {
+            echo "authority=birth_mutation_intervention_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "source_sha256=$(sha256sum crates/domains/symthaea-alife/src/evolution_intervention.rs | cut -d' ' -f1)"
+            echo "exact_birth_subject_binding=true"
+            echo "selected_source_reversion=true"
+            echo "sham_control=true"
+            echo "canonical_trait_set=true"
+            echo "full_genome_v1_trait_coverage=true"
+            echo "zero_extra_rng_executed=true"
+            echo "live_intervention_execution=false"
+            echo "causal_rescue_established=false"
+          } > target/alife-birth-mutation-intervention-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-birth-mutation-intervention-evidence
+          path: target/alife-birth-mutation-intervention-evidence/qualification.txt
+          if-no-files-found: error
