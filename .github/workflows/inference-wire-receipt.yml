@@ -1,0 +1,52 @@
+name: Inference Wire Receipt
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_receipt.rs"
+      - "src/language/inference_executor.rs"
+      - "tests/inference_wire_receipt.rs"
+      - "docs/architecture/INFERENCE_WIRE_RECEIPT_V1.md"
+      - ".github/workflows/inference-wire-receipt.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-wire-receipt-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-wire-receipt:
+    name: Inference Wire Receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: rustfmt --edition 2024 --check src/language/inference_receipt.rs src/language/inference_executor.rs tests/inference_wire_receipt.rs
+
+      - name: Compile and run IF-6 wire receipt regressions
+        run: cargo test --locked --test inference_wire_receipt
+
+      - name: Focused wire-receipt Clippy
+        run: cargo clippy --locked --test inference_wire_receipt -- -D warnings -A dead-code
+
+      - name: Ratchet receipt privacy and authority boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'provider-response-id' src/language/inference_receipt.rs
+          grep -F 'Raw provider request/response ids are never stored' src/language/inference_receipt.rs
+          grep -F 'response_text_present' src/language/inference_executor.rs
+          grep -F 'does not render generated response text or transient raw provider identifiers' docs/architecture/INFERENCE_WIRE_RECEIPT_V1.md
+          grep -F 'Receipt evidence is not quota authority' docs/architecture/INFERENCE_WIRE_RECEIPT_V1.md
