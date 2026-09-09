@@ -66,6 +66,7 @@ pub mod gpio_estop;
 pub mod imu;
 pub mod ina219;
 pub mod interlock;
+pub mod maritime_adapter;
 pub mod mock;
 pub mod motor_safety;
 pub mod pca9685;
@@ -82,6 +83,10 @@ pub use gpio_estop::{EstopPoller, GpioEstop};
 pub use imu::{ComplementaryFilter, Mpu6050Decoder};
 pub use ina219::Ina219Decoder;
 pub use interlock::{SafetyConfig, SafetyInterlock};
+pub use maritime_adapter::{
+    HalAssuranceEvidenceState, HalFleetAdmissionFacts, maritime_health_from_hal,
+    maritime_member_from_hal,
+};
 pub use motor_safety::MotorSafetyLevel;
 pub use pca9685::Pca9685;
 pub use recording::{RecordingAdapter, ReplayAdapter, SensorRecording};
