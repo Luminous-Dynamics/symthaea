@@ -169,9 +169,9 @@ fn valid_id(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cartesian_hand_reference::HumanoidCartesianHandReferenceReport;
     use crate::morphology::HumanoidMorphology;
     use crate::reach_execution::{HumanoidFrozenDynamicsLineage, HumanoidPermittedReachPreparationReport};
-    use crate::cartesian_hand_reference::HumanoidCartesianHandReferenceReport;
 
     fn subject() -> HumanoidQualificationSubject {
         HumanoidQualificationSubject::new(
@@ -183,6 +183,7 @@ mod tests {
     }
 
     fn preparation() -> HumanoidPermittedReachPreparationReport {
+        let subject = subject();
         HumanoidPermittedReachPreparationReport {
             validation_epoch: 7,
             prepared_at_s: 1.5,
@@ -201,11 +202,20 @@ mod tests {
                 floating_sampled_at_s: None,
             },
             cartesian_reference: HumanoidCartesianHandReferenceReport {
-                position_error_norm_m: 0.25,
-                desired_cartesian_speed_mps: 0.2,
-                jacobian_confidence: 1.0,
-                maximum_normalized_correction_used: 0.1,
+                validation_epoch: 7,
+                subject_fingerprint: subject.fingerprint(),
+                hand: HandSide::Right,
+                goal_id: "cup-7".into(),
+                dynamics_model_id: "full-model".into(),
                 dynamics_age_s: 0.1,
+                state_age_s: 0.05,
+                jacobian_confidence: 1.0,
+                position_error_world_m: [0.2, -0.1, 0.1],
+                position_error_norm_m: 0.25,
+                desired_cartesian_velocity_world_mps: [0.1, -0.05, 0.05],
+                desired_cartesian_speed_mps: 0.2,
+                desired_joint_velocity_norm_rad_s: 0.15,
+                maximum_normalized_correction_used: 0.1,
             },
         }
     }
