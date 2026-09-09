@@ -129,11 +129,11 @@ impl HumanoidReachPerturbationSeedScheme {
     }
 
     pub const fn supports_trial_evidence(&self) -> bool {
-        matches!(Self::TrialSeed64 | Self::ExternalDeterministic64 { .. }, self)
+        matches!(self, Self::TrialSeed64 | Self::ExternalDeterministic64 { .. })
     }
 
     pub const fn supports_episode_evidence(&self) -> bool {
-        matches!(Self::EpisodeSeed64 | Self::ExternalDeterministic64 { .. }, self)
+        matches!(self, Self::EpisodeSeed64 | Self::ExternalDeterministic64 { .. })
     }
 
     fn hash_into(&self, hasher: &mut HumanoidEvidenceHasher) {
