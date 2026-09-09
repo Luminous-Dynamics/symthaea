@@ -1,6 +1,6 @@
 # One-shot exact-parent-gated successor repair for PR #1201.
-# This workflow deletes itself before committing. Its pre-push checks are
-# non-qualifying; only the normal read-only exact-head qualifier may produce PASS.
+# Pre-push validation is diagnostic only. Only the normal read-only v2
+# qualification workflow may establish PASS for the resulting exact commit.
 name: One-shot Continuity Successor Repair
 
 on:
@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 env:
-  EXPECTED_PARENT_SHA: 0afd3c2d6a22735e2bf855b1a40cc9377bc7d27c
+  EXPECTED_PARENT_SHA: ed704cac73284d2c42beea3c0e3caf56e18c8375
   TARGET_BRANCH: ci/continuity-verifier-grant-exact-head-v1
   WORKFLOW_PATH: .github/workflows/continuity-successor-repair-once.yml
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
@@ -67,39 +67,29 @@ jobs:
               text = p.read_text()
               count = text.count(old)
               if count != 1:
-                  raise SystemExit(f'{path}: expected one exact match, found {count}: {old[:120]!r}')
+                  raise SystemExit(
+                      f'{path}: expected exactly one match, found {count}: {old[:140]!r}'
+                  )
               p.write_text(text.replace(old, new, 1))
 
-          # Encode dormant authority/witness reachability as an explicit temporary
-          # architectural expectation rather than a crate-wide dead_code allow.
+          # Make intentional production-unreachability executable lint policy.
           replace_exact(
               'crates/core/symthaea-continuity/src/lib.rs',
-              '''pub mod auth_wire;
-          mod compose;
-          pub mod contract;
-          pub mod exact_policy;
-          pub mod observation;
-          pub mod profile_adoption;
-          pub mod profile_adoption_admission;
-          pub mod profile_adoption_commit;
-          pub mod profile_adoption_grant;
-          pub mod profile_adoption_grant_commit;
-          pub mod profile_adoption_root;
-          pub mod profile_adoption_time;
-          pub mod verifier;
-          mod witness;
-          ''',
-              '''pub mod auth_wire;
-          #[cfg_attr(
+              'mod compose;\n',
+              '''#[cfg_attr(
               not(test),
               expect(
                   dead_code,
-                  reason = "closed-world witness composition is intentionally unreachable until current-use verifier authority and authenticated committed-adoption proofs exist"
+                  reason = "closed-world witness composition remains unreachable until current-use verifier authority and authenticated committed-adoption proofs exist"
               )
           )]
           mod compose;
-          pub mod contract;
-          #[cfg_attr(
+          ''',
+          )
+          replace_exact(
+              'crates/core/symthaea-continuity/src/lib.rs',
+              'pub mod exact_policy;\n',
+              '''#[cfg_attr(
               not(test),
               expect(
                   dead_code,
@@ -107,49 +97,51 @@ jobs:
               )
           )]
           pub mod exact_policy;
-          pub mod observation;
-          pub mod profile_adoption;
-          pub mod profile_adoption_admission;
-          pub mod profile_adoption_commit;
-          pub mod profile_adoption_grant;
-          pub mod profile_adoption_grant_commit;
-          pub mod profile_adoption_root;
-          pub mod profile_adoption_time;
-          #[cfg_attr(
+          ''',
+          )
+          replace_exact(
+              'crates/core/symthaea-continuity/src/lib.rs',
+              'pub mod verifier;\n',
+              '''#[cfg_attr(
               not(test),
               expect(
                   dead_code,
-                  reason = "authority-checked and authenticated evidence constructors remain intentionally production-unreachable until current-use authority is proven"
+                  reason = "authority-checked and authenticated evidence constructors remain production-unreachable until current-use authority is proven"
               )
           )]
           #[cfg_attr(
               test,
               allow(
                   dead_code,
-                  reason = "verifier unit tests exercise the authority boundary without requiring every diagnostic accessor"
+                  reason = "verifier tests intentionally exercise only selected diagnostics at the dormant authority boundary"
               )
           )]
           pub mod verifier;
-          #[cfg_attr(
+          ''',
+          )
+          replace_exact(
+              'crates/core/symthaea-continuity/src/lib.rs',
+              'mod witness;\n',
+              '''#[cfg_attr(
               not(test),
               expect(
                   dead_code,
-                  reason = "the closed-world witness engine is retained behind crate-private composition until authenticated production evidence can reach it"
+                  reason = "the closed-world witness engine stays private until authenticated production evidence can reach it"
               )
           )]
           #[cfg_attr(
               test,
               allow(
                   dead_code,
-                  reason = "witness unit tests intentionally exercise selected state-machine surfaces while production composition remains private"
+                  reason = "witness tests intentionally exercise selected state-machine surfaces while production composition remains private"
               )
           )]
           mod witness;
           ''',
           )
 
-          # Replace the 9-parameter observation identity helper with one canonical
-          # view of exactly the fields committed by ObservationId.
+          # Bundle the exact fields committed by ObservationId into one canonical
+          # view so future schema changes cannot silently reorder/omit parallel args.
           replace_exact(
               'crates/core/symthaea-continuity/src/observation.rs',
               '''    observation_id: ObservationId,
@@ -277,8 +269,7 @@ jobs:
           ''',
           )
 
-          # Preserve the exact predecessor-root theorem while expressing it as one
-          # predicate instead of a Clippy-rejected nested conditional.
+          # Same predecessor-root theorem, expressed as one predicate.
           replace_exact(
               'crates/core/symthaea-continuity/src/profile_adoption_root.rs',
               '''        if let VerifierProfileAdoptionHeadV1::Current(identity) =
@@ -307,7 +298,8 @@ jobs:
           ''',
           )
 
-          # Strengthen v2's minimal-lock theorem to cover non-package metadata too.
+          # Strengthen lock classification from package-set-only to whole-lock
+          # metadata preservation plus exactly one local package admission.
           replace_exact(
               'scripts/qualify-continuity-contract-v2.sh',
               '''before_packages = collections.Counter(canon(p) for p in before.get('package', []))
@@ -352,75 +344,54 @@ jobs:
           ''',
           )
 
-          # Fetch dependencies as an explicit input phase, then make every compiler,
-          # lint and test phase offline. This separates network acquisition from
-          # software-contract execution.
+          # Resolve offline; fetch is a separately labelled network input phase;
+          # compiler/lint/test/doc execution then stays locked and offline.
           replace_exact(
               'scripts/qualify-continuity-contract-v2.sh',
-              '''    if [[ "$resolve_rc" -eq 0 && "$lock_repair_classification" == "minimal-workspace-member-admission" ]]; then
+              'if ! cargo metadata --locked --format-version 1 >/dev/null; then\n',
+              'if ! cargo metadata --locked --offline --format-version 1 >/dev/null; then\n',
+          )
+          replace_exact(
+              'scripts/qualify-continuity-contract-v2.sh',
+              '''        diagnostic_stage="check_all_targets_with_minimal_repaired_lock"
+              set +e
+              (
+                  cd "$worktree"
+                  cargo check --locked -p symthaea-continuity --all-targets
+              )
+              resolve_rc=$?
+          ''',
+              '''        diagnostic_stage="fetch_with_minimal_repaired_lock"
+              set +e
+              (
+                  cd "$worktree"
+                  cargo fetch --locked --manifest-path crates/core/symthaea-continuity/Cargo.toml
+              )
+              resolve_rc=$?
+              if [[ "$resolve_rc" -eq 0 ]]; then
                   diagnostic_stage="check_all_targets_with_minimal_repaired_lock"
-                  set +e
                   (
                       cd "$worktree"
-                      cargo check --locked -p symthaea-continuity --all-targets
+                      cargo check --locked --offline -p symthaea-continuity --all-targets
                   )
                   resolve_rc=$?
-                  if [[ "$resolve_rc" -eq 0 ]]; then
-                      diagnostic_stage="clippy_all_targets_with_minimal_repaired_lock"
-                      (
-                          cd "$worktree"
-                          cargo clippy --locked -p symthaea-continuity --all-targets -- -D warnings
-                      )
-                      resolve_rc=$?
-                  fi
-                  if [[ "$resolve_rc" -eq 0 ]]; then
-                      diagnostic_stage="unit_and_integration_tests_with_minimal_repaired_lock"
-                      (cd "$worktree" && cargo test --locked -p symthaea-continuity)
-                      resolve_rc=$?
-                  fi
-                  if [[ "$resolve_rc" -eq 0 ]]; then
-                      diagnostic_stage="doc_tests_with_minimal_repaired_lock"
-                      (cd "$worktree" && cargo test --locked -p symthaea-continuity --doc)
-                      resolve_rc=$?
-                  fi
-                  set -e
+              fi
           ''',
-              '''    if [[ "$resolve_rc" -eq 0 && "$lock_repair_classification" == "minimal-workspace-member-admission" ]]; then
-                  diagnostic_stage="fetch_with_minimal_repaired_lock"
-                  set +e
-                  (
-                      cd "$worktree"
-                      cargo fetch --locked --manifest-path crates/core/symthaea-continuity/Cargo.toml
-                  )
-                  resolve_rc=$?
-                  if [[ "$resolve_rc" -eq 0 ]]; then
-                      diagnostic_stage="check_all_targets_with_minimal_repaired_lock"
-                      (
-                          cd "$worktree"
-                          cargo check --locked --offline -p symthaea-continuity --all-targets
-                      )
-                      resolve_rc=$?
-                  fi
-                  if [[ "$resolve_rc" -eq 0 ]]; then
-                      diagnostic_stage="clippy_all_targets_with_minimal_repaired_lock"
-                      (
-                          cd "$worktree"
-                          cargo clippy --locked --offline -p symthaea-continuity --all-targets -- -D warnings
-                      )
-                      resolve_rc=$?
-                  fi
-                  if [[ "$resolve_rc" -eq 0 ]]; then
-                      diagnostic_stage="unit_and_integration_tests_with_minimal_repaired_lock"
-                      (cd "$worktree" && cargo test --locked --offline -p symthaea-continuity)
-                      resolve_rc=$?
-                  fi
-                  if [[ "$resolve_rc" -eq 0 ]]; then
-                      diagnostic_stage="doc_tests_with_minimal_repaired_lock"
-                      (cd "$worktree" && cargo test --locked --offline -p symthaea-continuity --doc)
-                      resolve_rc=$?
-                  fi
-                  set -e
-          ''',
+          )
+          replace_exact(
+              'scripts/qualify-continuity-contract-v2.sh',
+              'cargo clippy --locked -p symthaea-continuity --all-targets -- -D warnings',
+              'cargo clippy --locked --offline -p symthaea-continuity --all-targets -- -D warnings',
+          )
+          replace_exact(
+              'scripts/qualify-continuity-contract-v2.sh',
+              '(cd "$worktree" && cargo test --locked -p symthaea-continuity)',
+              '(cd "$worktree" && cargo test --locked --offline -p symthaea-continuity)',
+          )
+          replace_exact(
+              'scripts/qualify-continuity-contract-v2.sh',
+              '(cd "$worktree" && cargo test --locked -p symthaea-continuity --doc)',
+              '(cd "$worktree" && cargo test --locked --offline -p symthaea-continuity --doc)',
           )
           replace_exact(
               'scripts/qualify-continuity-contract-v2.sh',
@@ -428,7 +399,7 @@ jobs:
           cargo check --locked -p symthaea-continuity --all-targets
 
           stage="clippy_all_targets"
-          cargo clippy --locked -p symthaea-continuity --all-targets -- -D warnings
+          cargo clippy --locked --offline -p symthaea-continuity --all-targets -- -D warnings
 
           stage="unit_and_integration_tests"
           cargo test --locked -p symthaea-continuity
@@ -492,9 +463,9 @@ jobs:
           removed = list((before_packages - after_packages).elements())
           added = list((after_packages - before_packages).elements())
           if removed:
-              raise SystemExit(f'Cargo.lock existing package records changed/removed: {len(removed)}')
+              raise SystemExit(f'existing package records changed/removed: {len(removed)}')
           if len(added) != 1:
-              raise SystemExit(f'expected exactly one added package record, found {len(added)}')
+              raise SystemExit(f'expected one added package record, found {len(added)}')
           package = json.loads(added[0])
           expected = {
               'name': 'symthaea-continuity',
