@@ -1,0 +1,36 @@
+{
+  "schema": "symthaea.qualification-admission-subject-attempt-set.v1",
+  "admission_subject_id": "sha256:9c0769e927ffbc7fb2d0ec943d859f75a3ab32f73c30561db6e9c3881f2c50d0",
+  "attempt_observations": [
+    {
+      "observation_id": "sha256:fc9e4453ee0295552bc534b862f76102ce1aa1fb79100b1988b55fe1399bcd7f",
+      "admission_subject_id": "sha256:9c0769e927ffbc7fb2d0ec943d859f75a3ab32f73c30561db6e9c3881f2c50d0",
+      "provider": "github-actions",
+      "repository": "Luminous-Dynamics/symthaea",
+      "workflow_run_id": 34215218821,
+      "workflow_run_number": 3,
+      "job_id": 102025268120,
+      "requested_pr_head_sha": "7350ee0a5cab0ccaa48b6691e8d52875143b102b",
+      "requested_pr_base_sha": "fb513e0b1224e08b572cadb38ea56a710521a27c",
+      "checked_out_sha": "b98eb868f820aec8a61a46194c557d0ae723923f",
+      "terminal_disposition": "FormattingFailed",
+      "theorem_progress": [
+        {"name": "CargoLockFreshness", "disposition": "Passed"},
+        {"name": "ResourceNamespaceBijection", "disposition": "Passed"},
+        {"name": "ResourcePackageDiscovery", "disposition": "Passed"},
+        {"name": "Rustfmt", "disposition": "Failed"},
+        {"name": "CargoCheck", "disposition": "NotExecuted"},
+        {"name": "Clippy", "disposition": "NotExecuted"},
+        {"name": "Tests", "disposition": "NotExecuted"},
+        {"name": "DocTests", "disposition": "NotExecuted"}
+      ]
+    }
+  ],
+  "non_claims": [
+    "does not establish chronological ordering between attempts",
+    "does not establish identical checked-out bytes across attempts",
+    "does not include source-changing repair links",
+    "does not establish hosted qualification unless an included attempt is Passed"
+  ],
+  "set_id": "sha256:5324979291ac9f7f430f29ee72fda7d88f259994ed88ab8d36f6c4063b21a2fc"
+}
