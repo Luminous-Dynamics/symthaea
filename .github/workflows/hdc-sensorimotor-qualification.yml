@@ -5,6 +5,7 @@ on:
     paths:
       - 'crates/core/symthaea-core/src/hdc/sensorimotor_contingencies.rs'
       - 'crates/core/symthaea-core/src/hdc/sensorimotor_schema_v1.rs'
+      - 'crates/core/symthaea-core/src/hdc/sensorimotor_codebook_v1.rs'
       - 'src/perception/sensor_fusion.rs'
       - 'src/perception/sensorimotor_alignment.rs'
       - 'src/perception/mod.rs'
@@ -22,6 +23,33 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  sensorimotor-core:
+    name: Sensorimotor Core Equivalence
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-hdc-sensorimotor-core-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-hdc-sensorimotor-core-
+
+      - name: Run schema and prepared-codebook regressions
+        run: |
+          cargo test -p symthaea-core \
+            sensorimotor_ \
+            -- --test-threads=1
+
   imu-humanoid-alignment:
     name: IMU Humanoid Semantic Alignment
     runs-on: ubuntu-latest

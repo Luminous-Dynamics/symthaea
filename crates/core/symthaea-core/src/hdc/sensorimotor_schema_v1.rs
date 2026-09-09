@@ -244,11 +244,35 @@ impl SensorimotorObservationV1 {
     }
 }
 
+/// Versioned identity of the HDC representation geometry used for a physical
+/// sensorimotor fact. This is deliberately separate from the physical address
+/// digest so an optimized or future encoding kernel cannot silently change what
+/// the fact *means*.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SensorimotorHdcEncodingProfileV1 {
+    ThermometerPrefixBinaryV1,
+}
+
+impl SensorimotorHdcEncodingProfileV1 {
+    pub const fn schema_id(self) -> &'static str {
+        match self {
+            Self::ThermometerPrefixBinaryV1 => {
+                "symthaea.sensorimotor.hdc.thermometer-prefix-binary.v1"
+            }
+        }
+    }
+}
+
 /// Deterministic role/filler encoder for the v1 sensorimotor schema.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SensorimotorHdcEncoderV1;
 
 impl SensorimotorHdcEncoderV1 {
+    pub const fn profile(&self) -> SensorimotorHdcEncodingProfileV1 {
+        SensorimotorHdcEncodingProfileV1::ThermometerPrefixBinaryV1
+    }
+
     /// Encode one observation. Missing observations intentionally produce no
     /// measurement vector rather than being collapsed to numeric zero.
     pub fn encode_observation(
@@ -274,22 +298,11 @@ impl SensorimotorHdcEncoderV1 {
     ) -> Result<ContinuousHV, &'static str> {
         measurement.validate()?;
         let address_digest = measurement.address.semantic_digest()?;
-        let role = BinaryHV::random(seed64(&address_digest));
-
-        let contract = &measurement.address.value_contract;
-        let clamped = measurement.value.clamp(contract.min, contract.max);
-        let normalized = (clamped - contract.min) / (contract.max - contract.min);
-        let bin = ((normalized * f64::from(contract.bins - 1)).round() as u16)
-            .min(contract.bins - 1);
+        let role = sensorimotor_role_hv_v1(&address_digest);
+        let bin = sensorimotor_value_bin_v1(&measurement.address.value_contract, measurement.value);
 
         let levels: Vec<BinaryHV> = (0..=bin)
-            .map(|level| {
-                let mut hasher = blake3::Hasher::new();
-                hasher.update(SENSORIMOTOR_VALUE_DOMAIN_V1);
-                hasher.update(&address_digest);
-                hasher.update(&level.to_le_bytes());
-                BinaryHV::random(seed64(hasher.finalize().as_bytes()))
-            })
+            .map(|level| sensorimotor_value_level_hv_v1(&address_digest, level))
             .collect();
         let value = BinaryHV::bundle(&levels);
         Ok(role.bind(&value).to_continuous())
@@ -315,7 +328,31 @@ impl SensorimotorHdcEncoderV1 {
     }
 }
 
-fn seed64(digest: &[u8; 32]) -> u64 {
+pub(crate) fn sensorimotor_role_hv_v1(address_digest: &[u8; 32]) -> BinaryHV {
+    BinaryHV::random(sensorimotor_seed64_v1(address_digest))
+}
+
+pub(crate) fn sensorimotor_value_level_hv_v1(
+    address_digest: &[u8; 32],
+    level: u16,
+) -> BinaryHV {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(SENSORIMOTOR_VALUE_DOMAIN_V1);
+    hasher.update(address_digest);
+    hasher.update(&level.to_le_bytes());
+    BinaryHV::random(sensorimotor_seed64_v1(hasher.finalize().as_bytes()))
+}
+
+pub(crate) fn sensorimotor_value_bin_v1(
+    contract: &SensorimotorValueContractV1,
+    value: f64,
+) -> u16 {
+    let clamped = value.clamp(contract.min, contract.max);
+    let normalized = (clamped - contract.min) / (contract.max - contract.min);
+    ((normalized * f64::from(contract.bins - 1)).round() as u16).min(contract.bins - 1)
+}
+
+fn sensorimotor_seed64_v1(digest: &[u8; 32]) -> u64 {
     u64::from_le_bytes(digest[..8].try_into().expect("8-byte digest prefix"))
 }
 
@@ -436,6 +473,10 @@ fn unit_matches_quantity(quantity: &SensorimotorQuantityV1, unit: &SensorimotorU
         Q::Custom(_) => true,
     }
 }
+
+#[path = "sensorimotor_codebook_v1.rs"]
+mod codebook_v1;
+pub use codebook_v1::*;
 
 #[cfg(test)]
 mod sensorimotor_schema_tests {
