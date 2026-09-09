@@ -12,6 +12,9 @@ default = []
 # Keep the Phase-1 log clustering stack out of ordinary support builds. Enable
 # only where parsed LogEvent -> SystemObservationV1 ingestion is required.
 logparse-adapter = ["dep:symthaea-logparse", "dep:blake3"]
+# Provider-neutral external metric/trace/event normalization. No OpenTelemetry
+# SDK dependency is required; collectors adapt their data into the V1 record type.
+telemetry-adapter = ["dep:blake3"]
 
 [dependencies]
 serde = { workspace = true }
