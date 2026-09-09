@@ -11,6 +11,7 @@
 pub mod auth_wire;
 mod compose;
 pub mod contract;
+pub mod distributed;
 pub mod exact_policy;
 pub mod observation;
 pub mod profile_adoption;
@@ -29,6 +30,11 @@ pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
     ContinuityRequirementV1, ContractError, EquivalencePredicate, RequirementCriticality,
     ValidatedContinuityContractV1,
+};
+pub use distributed::{
+    DISTRIBUTED_CHANGE_BUDGET_SCHEMA_V1, DistributedChangeBudgetError, DistributedChangeBudgetId,
+    DistributedChangeBudgetV1, MutualExclusionSetV1, RecoveryPathClassV1,
+    ValidatedDistributedChangeBudgetV1,
 };
 pub use exact_policy::{
     ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1,
