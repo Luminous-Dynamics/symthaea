@@ -1,0 +1,254 @@
+name: Matter Reference Capsule Environment Bootstrap Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'research/matter-reference-capsule/verify_environment.py'
+      - '.github/workflows/matter-reference-capsule-bootstrap.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: matter-reference-capsule-bootstrap-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_PARENT_SHA: 53e32afe7aba5ae3426d2c66a75a2be466dc1bc6
+  QUALIFICATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  INSTALL_NIX_ACTION_SHA: 13d8dd58da0234aa297dedd986986ccb8e7f3e24
+  EXPECTED_NIX_VERSION: 'nix (Nix) 2.35.2'
+  EXPECTED_NIXPKGS_REV: 9ae611a455b90cf061d8f332b977e387bda8e1ca
+  EXPECTED_UV_LOCK_SHA256: 1ecb6c8a0752476c9731d0d44a4113c4ed1fabfee6e339724ee4534926bda646
+  EXPECTED_UV_CONSUMER_VERSION: 'uv 0.11.19'
+
+jobs:
+  qualify-prepared-environment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact revision and parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Verify exact head, parent, and environment-only scope
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "${{ github.event.pull_request.base.sha }}" = "$QUALIFICATION_PARENT_SHA"
+          test "$(git rev-parse HEAD^)" = "$QUALIFICATION_PARENT_SHA"
+
+          mapfile -t files < <(git diff --name-only HEAD^..HEAD | sort)
+          expected=(
+            '.github/workflows/matter-reference-capsule-bootstrap.yml'
+            'research/matter-reference-capsule/verify_environment.py'
+          )
+          test "${#files[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do
+            test "${files[$i]}" = "${expected[$i]}"
+          done
+
+          ! git diff --name-only HEAD^..HEAD | grep -Eq '(^|/)uv\.lock$|flake\.lock$|si-001-protocol\.json$|freeze_si_pseudo\.py$|bootstrap\.sh$|shell\.nix$'
+          git diff --check HEAD^..HEAD
+
+      - name: Static authority and consumer-identity audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          verifier='research/matter-reference-capsule/verify_environment.py'
+          python3 -m py_compile "$verifier"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('research/matter-reference-capsule/verify_environment.py').read_text()
+          forbidden = [
+              'from aiida.engine',
+              'import aiida.engine',
+              'CalculationFactory',
+              'ProcessBuilder',
+              'run_get_node',
+              'submit(',
+              'freeze_si_pseudo',
+              'UpfData',
+              'PseudoPotentialFamily',
+          ]
+          for token in forbidden:
+              assert token not in text, f'forbidden scientific/process authority in environment verifier: {token}'
+
+          required = [
+              'EXPECTED_LOCK_GENERATOR = {"python": "3.13.15", "uv": "uv 0.10.0"}',
+              'EXPECTED_UV_CONSUMER_VERSION = "uv 0.11.19"',
+              'EXPECTED_PYTHON_VERSION = "3.13.13"',
+              '"aiida-core": "2.9.2"',
+              '"aiida-pseudo": "1.9.0"',
+              '"aiida-quantumespresso": "5.0.0"',
+              '"lock", "--check"',
+              'uv_lock_check_read_only',
+              'orchestration_only_not_scientific_solver',
+          ]
+          for token in required:
+              assert token in text, f'missing consumer/provenance ratchet: {token}'
+
+          workflow = Path('.github/workflows/matter-reference-capsule-bootstrap.yml').read_text()
+          forbidden_workflow = [
+              'contents:' + ' write',
+              'freeze_si_pseudo' + '.py ',
+              'validate_si_001_protocol' + '.py',
+              'pw' + '.x <',
+              'ph' + '.x <',
+          ]
+          for token in forbidden_workflow:
+              assert token not in workflow, f'forbidden execution/write authority in environment workflow: {token}'
+          assert 'ubuntu-24.04' in workflow
+          assert '13d8dd58da0234aa297dedd986986ccb8e7f3e24' in workflow
+          assert "EXPECTED_UV_CONSUMER_VERSION: 'uv 0.11.19'" in workflow
+          PY
+
+      - name: Verify committed lock and root nixpkgs identity before Nix installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum research/matter-reference-capsule/uv.lock | awk '{print $1}')" = "$EXPECTED_UV_LOCK_SHA256"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          lock = json.loads(Path('flake.lock').read_text())
+          root = lock['nodes'][lock['root']]
+          node = root['inputs']['nixpkgs']
+          locked = lock['nodes'][node]['locked']
+          assert locked['rev'] == os.environ['EXPECTED_NIXPKGS_REV']
+          assert locked['type'] == 'github'
+          assert locked['owner'] == 'NixOS'
+          assert locked['repo'] == 'nixpkgs'
+          print(f"root nixpkgs node={node} rev={locked['rev']} narHash={locked['narHash']}")
+          PY
+
+      - name: Install pinned Nix 2.35.2
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # signed v31 target
+        with:
+          enable_kvm: false
+          github_access_token: ${{ github.token }}
+
+      - name: Verify Nix runtime identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(nix --version)" = "$EXPECTED_NIX_VERSION"
+          nix config show experimental-features | grep -q 'nix-command'
+
+      - name: Prepare and independently qualify frozen execution environment
+        shell: bash
+        env:
+          SYMTHAEA_MATTER_CAPSULE_STATE: ${{ runner.temp }}/symthaea-matter-si-001
+        run: |
+          set -euo pipefail
+          capsule="$PWD/research/matter-reference-capsule"
+          test ! -e "$SYMTHAEA_MATTER_CAPSULE_STATE"
+
+          nix-shell "$capsule/shell.nix" --run '
+            set -euo pipefail
+            test "$SYMTHAEA_MATTER_CAPSULE_SHELL" = 1
+            test "$(nix --version)" = "$EXPECTED_NIX_VERSION"
+            test "$(uv --version)" = "$EXPECTED_UV_CONSUMER_VERSION"
+            test "$(sha256sum research/matter-reference-capsule/uv.lock | awk '\''{print $1}'\'')" = "$EXPECTED_UV_LOCK_SHA256"
+
+            export SYMTHAEA_SHELL_DRIVER_PATH="$(readlink -f "$BASH")"
+            export SYMTHAEA_SHELL_DRIVER_VERSION="$BASH_VERSION"
+            test -f "$SYMTHAEA_SHELL_DRIVER_PATH"
+
+            bash research/matter-reference-capsule/bootstrap.sh symthaea-matter-si-001 matter-capsule@localhost.invalid
+
+            export AIIDA_PATH="$SYMTHAEA_MATTER_CAPSULE_STATE/aiida"
+            export UV_OFFLINE=1
+            research/matter-reference-capsule/.venv/bin/python \
+              research/matter-reference-capsule/verify_environment.py \
+              --repo-root "$PWD" \
+              --profile symthaea-matter-si-001 \
+              --state-root "$SYMTHAEA_MATTER_CAPSULE_STATE" \
+              --subject-head "$QUALIFICATION_HEAD_SHA" \
+              --output "$SYMTHAEA_MATTER_CAPSULE_STATE/environment-qualification.json"
+          '
+
+          test -f "$SYMTHAEA_MATTER_CAPSULE_STATE/environment-manifest.json"
+          test -f "$SYMTHAEA_MATTER_CAPSULE_STATE/environment-qualification.json"
+
+          (
+            cd "$SYMTHAEA_MATTER_CAPSULE_STATE"
+            sha256sum environment-manifest.json environment-qualification.json > environment-receipts.sha256
+          )
+
+      - name: Verify retained authority and provenance boundary
+        shell: bash
+        env:
+          SYMTHAEA_MATTER_CAPSULE_STATE: ${{ runner.temp }}/symthaea-matter-si-001
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path(os.environ['SYMTHAEA_MATTER_CAPSULE_STATE'])
+          prepared = json.loads((root / 'environment-manifest.json').read_text())
+          qualified = json.loads((root / 'environment-qualification.json').read_text())
+          assert prepared['authority'] == 'ExecutionEnvironmentPreparedOnly'
+          assert qualified['authority'] == 'ExecutionEnvironmentPreparedQualifiedV1'
+          assert qualified['subject_head'] == os.environ['QUALIFICATION_HEAD_SHA']
+          assert qualified['source']['lock_generator'] == {'python': '3.13.15', 'uv': 'uv 0.10.0'}
+
+          consumer = qualified['runtime']['lock_consumer']
+          assert consumer['uv']['version'] == 'uv 0.11.19'
+          assert consumer['python']['version'] == '3.13.13'
+          assert consumer['python_distributions'] == {
+              'aiida-core': '2.9.2',
+              'aiida-pseudo': '1.9.0',
+              'aiida-quantumespresso': '5.0.0',
+          }
+          assert consumer['uv_lock_check_read_only'] is True
+          assert consumer['uv_lock_sha256_after_check'] == os.environ['EXPECTED_UV_LOCK_SHA256']
+          assert qualified['runtime']['shell_driver']['authority_role'] == 'orchestration_only_not_scientific_solver'
+
+          assert qualified['aiida']['process_node_count'] == 0
+          assert qualified['aiida']['calcjob_node_count'] == 0
+          assert qualified['scientific_execution'] == {
+              'process_node_created': False,
+              'pseudopotential_installed': False,
+              'pseudopotential_selected': False,
+              'qe_calculation_executed': False,
+              'scientific_result_observed': False,
+              'sssp_download_executed': False,
+          }
+          assert qualified['next_required_transition'] == 'environment-bound-prospective-si-pseudopotential-freeze'
+          PY
+          (cd "$SYMTHAEA_MATTER_CAPSULE_STATE" && sha256sum -c environment-receipts.sha256)
+
+      - name: Upload prepared-environment qualification receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: matter-reference-environment-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/symthaea-matter-si-001/environment-manifest.json
+            ${{ runner.temp }}/symthaea-matter-si-001/environment-qualification.json
+            ${{ runner.temp }}/symthaea-matter-si-001/environment-receipts.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Preserve scientific authority boundary
+        shell: bash
+        run: |
+          {
+            echo '### Matter Reference Capsule environment status'
+            echo ''
+            echo 'The committed Python lock was instantiated inside the root-lock-derived Nix shell, and a fresh isolated AiiDA profile was prepared and independently qualified.'
+            echo 'The receipt distinguishes the hosted lock generator from the frozen Nix consumer and retains exact uv/Python/AiiDA/QE runtime identities.'
+            echo '**Authority: ExecutionEnvironmentPreparedQualifiedV1.**'
+            echo ''
+            echo 'The qualification requires zero ProcessNodes and zero CalcJobNodes. No pseudopotential was selected or installed and no Quantum ESPRESSO scientific calculation was executed.'
+            echo 'Next transition: environment-bound prospective Si pseudopotential freeze.'
+          } >> "$GITHUB_STEP_SUMMARY"
