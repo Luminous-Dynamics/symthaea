@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::distributed_state::DistributedStateContextId;
-use crate::execution_capability::{ExecutionAttemptId, ExecutionAttemptIntentV1};
+use crate::execution_capability::{
+    ExecutionAttemptId, ExecutionAttemptIntentV1, ExecutionCapabilityError,
+};
 use crate::scope::ContinuitySubjectId;
 use crate::verifier::{VerificationAdmissionError, VerifierProfileId, VerifierProfileV1};
 use crate::witness::TargetRealizationId;
