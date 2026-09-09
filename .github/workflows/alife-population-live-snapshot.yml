@@ -1,0 +1,195 @@
+name: ALife Population Live Snapshot
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-fep/**"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/agent_id.rs"
+      - "crates/domains/symthaea-alife/src/evolution_rng.rs"
+      - "crates/domains/symthaea-alife/src/genesis_evidence_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/genesis_rolling_evidence.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle_recorder.rs"
+      - "crates/domains/symthaea-alife/src/organism_seed.rs"
+      - "crates/domains/symthaea-alife/src/organism_snapshot.rs"
+      - "crates/domains/symthaea-alife/src/organism_snapshot/**"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/src/population/**"
+      - "crates/domains/symthaea-alife/src/population_config_snapshot.rs"
+      - "crates/domains/symthaea-alife/src/population_snapshot.rs"
+      - ".github/workflows/alife-population-live-snapshot.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Evidence-bound Population restore theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/population.rs
+          sha256sum crates/domains/symthaea-alife/src/population/live_snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/population_snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/organism_snapshot/live_snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/lifecycle_recorder.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-population-live-snapshot
+
+      - name: Check ALife/FEP formatting
+        run: cargo fmt -p symthaea-fep -p symthaea-alife -- --check
+
+      - name: Check ALife/FEP targets
+        run: cargo check --locked -p symthaea-fep -p symthaea-alife --all-targets
+
+      - name: Test bit-exact boundary restore
+        run: cargo test --locked -p symthaea-alife serialized_validated_population_restore_is_bit_exact_at_boundary
+
+      - name: Test uncheckpointed social advance rejection
+        run: cargo test --locked -p symthaea-alife snapshot_refuses_uncheckpointed_social_clock_advance
+
+      - name: Test pending behavior rejection
+        run: cargo test --locked -p symthaea-alife raw_population_with_pending_flat_rows_cannot_snapshot
+
+      - name: Test pending lifecycle rejection
+        run: cargo test --locked -p symthaea-alife pending_cull_lifecycle_transition_cannot_be_omitted
+
+      - name: Test raw population revalidation boundary
+        run: cargo test --locked -p symthaea-alife persisted_population_still_requires_validation_after_deserialization
+
+      - name: Test independent evidence revalidation
+        run: cargo test --locked -p symthaea-alife evidence_round_trip_does_not_weaken_population_restore_boundary
+
+      - name: Test population snapshot contract
+        run: 'cargo test --locked -p symthaea-alife population_snapshot::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze live Population authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          hot="crates/domains/symthaea-alife/src/population.rs"
+          bridge="crates/domains/symthaea-alife/src/population/live_snapshot.rs"
+
+          grep -q 'mod live_snapshot;' "$hot"
+          grep -q 'pub use live_snapshot::PopulationLiveSnapshotErrorV1;' "$hot"
+          grep -q 'pub fn snapshot_v1_at_evidence_boundary' "$bridge"
+          grep -q 'pub fn from_validated_snapshot_v1' "$bridge"
+          grep -q 'if !self.event_log.is_empty()' "$bridge"
+          grep -q 'if !self.lifecycle_recorder.events().is_empty()' "$bridge"
+          grep -q 'self.current_tick != expected_tick' "$bridge"
+          grep -q 'self.lifecycle_recorder.current_epoch() != lifecycle.continuation_epoch()' "$bridge"
+          grep -q 'self.lifecycle_recorder.next_sequence() != lifecycle.next_sequence()' "$bridge"
+          grep -q 'PopulationSnapshotV1::new' "$bridge"
+          grep -q 'self.organisms.iter().map(Organism::snapshot_v1)' "$bridge"
+          grep -q 'validate_for_genesis_social(evidence)' "$bridge"
+          grep -q 'OrganismSeedAllocatorV1::from_snapshot_for_lifecycle' "$bridge"
+          grep -q 'EvolutionRngStreamsV1::from_snapshot' "$bridge"
+          grep -q 'AgentIdAllocator::from_snapshot_for_lifecycle' "$bridge"
+          grep -q 'LifecycleRecorderV1::from_validated_checkpoint' "$bridge"
+          grep -q 'map(Organism::from_validated_snapshot_v1)' "$bridge"
+          grep -q 'event_log: Vec::new()' "$bridge"
+          grep -q 'restored.snapshot_v1_at_evidence_boundary(evidence)' "$bridge"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          bridge = Path('crates/domains/symthaea-alife/src/population/live_snapshot.rs').read_text()
+          snap = bridge.split('pub fn snapshot_v1_at_evidence_boundary', 1)[1].split('pub fn from_validated_snapshot_v1', 1)[0]
+          restore = bridge.split('pub fn from_validated_snapshot_v1', 1)[1].split('#[cfg(test)]', 1)[0]
+
+          if 'EncounterScheduler' in snap or 'EarthForcedEnvironment' in snap or 'EnvironmentSnapshot' in snap:
+              raise SystemExit('Population snapshot absorbed external scheduler/environment state')
+          if 'EncounterScheduler' in restore or 'EarthForcedEnvironment' in restore or 'EnvironmentSnapshot' in restore:
+              raise SystemExit('Population restore absorbed external scheduler/environment state')
+          if '.sort(' in snap or '.sort_by(' in snap or '.sort_by_key(' in snap:
+              raise SystemExit('live Population snapshot started canonicalizing causal organism Vec order')
+          if 'Population::new(' in restore or 'Self::new(' in restore:
+              raise SystemExit('restore fell back to fresh Population constructor authority')
+          required_restore = [
+              'snapshot.organisms()', 'snapshot.config().config()',
+              'snapshot.total_births()', 'snapshot.total_deaths()', 'snapshot.current_tick()'
+          ]
+          for token in required_restore:
+              if token not in restore:
+                  raise SystemExit(f'live Population restore omitted validated surface: {token}')
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          bridge="crates/domains/symthaea-alife/src/population/live_snapshot.rs"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$bridge"
+          ! grep -q 'from_validated_resume' "$bridge"
+          ! grep -q 'EncounterSchedulerSnapshotV1' "$bridge"
+          ! grep -q 'EnvironmentSnapshotV1' "$bridge"
+          ! grep -q 'EarthForcedEnvironmentSnapshotV1' "$bridge"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-population-live-snapshot-evidence
+          {
+            echo "authority=population_live_snapshot_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "bridge_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/population/live_snapshot.rs | cut -d' ' -f1)"
+            echo "quiescent_evidence_boundary_required=true"
+            echo "behavior_clock_bound=true"
+            echo "lifecycle_epoch_bound=true"
+            echo "lifecycle_sequence_bound=true"
+            echo "nested_organism_restore_bound=true"
+            echo "identity_allocator_lifecycle_bound=true"
+            echo "seed_allocator_lifecycle_bound=true"
+            echo "evolution_rng_validated_restore=true"
+            echo "exact_boundary_roundtrip_candidate=true"
+            echo "restored_runner_complete=false"
+            echo "scheduler_state_bound=false"
+            echo "environment_state_bound=false"
+            echo "population_execution_resume_established=false"
+          } > target/alife-population-live-snapshot-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-population-live-snapshot-evidence
+          path: target/alife-population-live-snapshot-evidence/qualification.txt
+          if-no-files-found: error
