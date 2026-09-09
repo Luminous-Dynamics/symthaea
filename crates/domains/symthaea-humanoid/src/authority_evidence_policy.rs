@@ -193,7 +193,6 @@ impl HumanoidPolicyBoundPhysicalAuthorityEvidence {
         self.inner.artifact_digest()
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn unsigned_claim(
         &self,
         issuer_id: impl Into<String>,
@@ -223,10 +222,11 @@ impl HumanoidPolicyBoundPhysicalAuthorityEvidence {
             verifier,
             now_s,
         )?;
+        let verifier_digest = inner.verifier_digest();
         Ok(HumanoidPolicyVerifiedPhysicalAuthorityEvidence {
             subject: self.subject.clone(),
             evidence_policy_digest: self.policy_digest,
-            verifier_digest: verifier.verifier_digest(),
+            verifier_digest,
             inner,
         })
     }
@@ -248,7 +248,6 @@ impl HumanoidPolicyBoundEpistemicAuthorityEvidence {
         self.inner.artifact_digest()
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn unsigned_claim(
         &self,
         issuer_id: impl Into<String>,
@@ -278,10 +277,11 @@ impl HumanoidPolicyBoundEpistemicAuthorityEvidence {
             verifier,
             now_s,
         )?;
+        let verifier_digest = inner.verifier_digest();
         Ok(HumanoidPolicyVerifiedEpistemicAuthorityEvidence {
             subject: self.subject.clone(),
             evidence_policy_digest: self.policy_digest,
-            verifier_digest: verifier.verifier_digest(),
+            verifier_digest,
             inner,
         })
     }
@@ -321,6 +321,7 @@ impl HumanoidPolicyVerifiedPhysicalAuthorityEvidence {
         &self.subject == subject
             && !self.evidence_policy_digest.is_zero()
             && !self.verifier_digest.is_zero()
+            && self.verifier_digest == self.inner.verifier_digest()
             && self.inner.validate_for(subject, now_s)
     }
 
@@ -363,6 +364,7 @@ impl HumanoidPolicyVerifiedEpistemicAuthorityEvidence {
         &self.subject == subject
             && !self.evidence_policy_digest.is_zero()
             && !self.verifier_digest.is_zero()
+            && self.verifier_digest == self.inner.verifier_digest()
             && self.inner.validate_for(subject, now_s)
     }
 
