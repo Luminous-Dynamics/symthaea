@@ -1,0 +1,54 @@
+name: Inference Provider Registry
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_provider_registry.rs"
+      - "tests/inference_provider_registry.rs"
+      - "tests/inference_provider_manifest_rejection.rs"
+      - "docs/architecture/INFERENCE_PROVIDER_REGISTRY_V1.md"
+      - ".github/workflows/inference-provider-registry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-provider-registry-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-provider-registry:
+    name: Inference Provider Registry
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: rustfmt --edition 2024 --check src/language/inference_provider_registry.rs tests/inference_provider_registry.rs tests/inference_provider_manifest_rejection.rs
+
+      - name: Compile and run IF-10 provider-registry regressions
+        run: cargo test --locked --test inference_provider_registry --test inference_provider_manifest_rejection
+
+      - name: Focused provider-registry Clippy
+        run: cargo clippy --locked --test inference_provider_registry --test inference_provider_manifest_rejection -- -D warnings -A dead-code
+
+      - name: Ratchet source/freshness boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'Public pricing documentation alone cannot' src/language/inference_provider_registry.rs
+          grep -F 'SignedDeploymentManifest' src/language/inference_provider_registry.rs
+          grep -F 'cannot become executable authority until a verifier' src/language/inference_provider_registry.rs
+          grep -F 'ProfileEpochNotAdvanced' src/language/inference_provider_registry.rs
+          grep -F 'PreviewModelForbidden' src/language/inference_provider_registry.rs
+          grep -F 'source locators can contain account-scoped identifiers' docs/architecture/INFERENCE_PROVIDER_REGISTRY_V1.md
+          grep -F 'no provider-profile digest bound into IF-2/IF-4 execution permits yet' docs/architecture/INFERENCE_PROVIDER_REGISTRY_V1.md
