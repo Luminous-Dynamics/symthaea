@@ -1,0 +1,159 @@
+name: ALife Matched Stochastic Replay
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/counterfactual_randomness.rs"
+      - "crates/domains/symthaea-alife/src/observed_stochastic_tape.rs"
+      - "crates/domains/symthaea-alife/src/matched_stochastic_replay.rs"
+      - ".github/workflows/alife-matched-stochastic-replay.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Observed-first matched randomness theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/matched_stochastic_replay.rs
+          sha256sum crates/domains/symthaea-alife/src/observed_stochastic_tape.rs
+          sha256sum crates/domains/symthaea-alife/src/counterfactual_randomness.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-matched-stochastic-replay
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Execute matched replay regressions
+        run: 'cargo test --locked -p symthaea-alife matched_stochastic_replay::'
+
+      - name: Execute prerequisite stochastic contracts
+        run: |
+          cargo test --locked -p symthaea-alife observed_stochastic_tape::
+          cargo test --locked -p symthaea-alife counterfactual_randomness::
+
+      - name: Strict ALife Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze observed-first scalar semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/matched_stochastic_replay.rs"
+
+          grep -q 'pub struct MatchedStochasticReplayV1' "$src"
+          grep -q 'MatchedRandomOriginV1::ObservedTape' "$src"
+          grep -q 'MatchedRandomOriginV1::CounterfactualFallback' "$src"
+          grep -q 'if let Some(value) = self.tape.unit_for(observed_key)' "$src"
+          grep -q 'if let Some(value) = self.tape.nonzero_u64_for(observed_key)' "$src"
+          grep -q 'draw_unit_f64' "$src"
+          grep -q 'draw_nonzero_u64' "$src"
+          grep -q 'inheritance_candidate_priority' "$src"
+          grep -q 'min_by_key' "$src"
+
+      - name: Freeze scheduler merge theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/matched_stochastic_replay.rs"
+
+          grep -q 'observed_rank_priority' "$src"
+          grep -q 'CounterfactualDrawKeyV1::scheduler_priority' "$src"
+          grep -q 'decorated.sort_by_key' "$src"
+          grep -q 'exact_scheduler_order_is_reproduced_when_the_historical_cohort_is_present' "$src"
+          grep -q 'scheduler_subset_preserves_the_exact_relative_order_of_shared_identities' "$src"
+          grep -q 'novel_scheduler_identity_is_deterministically_interleaved_without_reordering_shared_ids' "$src"
+          grep -q 'merge must not depend on input iteration order' "$src"
+
+      - name: Freeze fail-closed future mutation addressing
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/matched_stochastic_replay.rs"
+          grep -q 'FallbackMutationBirthOrdinalUnsupported' "$src"
+          grep -q 'if birth_ordinal != 0' "$src"
+          grep -q 'mutation_fallback_fails_closed_for_future_multi_birth_ordinal_until_field_address_expands' "$src"
+
+      - name: Require production paths to remain unwired in this tranche
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -q 'MatchedStochasticReplayV1' crates/domains/symthaea-alife/src/population.rs
+          ! grep -q 'MatchedStochasticReplayV1' crates/domains/symthaea-alife/src/encounter.rs
+          ! grep -q 'MatchedStochasticReplayV1' crates/domains/symthaea-alife/src/organism.rs
+          ! grep -q 'MatchedStochasticReplayV1' crates/core/symthaea-fep/src/agent.rs
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/matched_stochastic_replay.rs"
+          ! grep -q 'live_replay_established=true' "$src"
+          ! grep -q 'scheduler_statistical_adequacy_established=true' "$src"
+          ! grep -q 'causal_rescue_established=true' "$src"
+          ! grep -q 'origin_authenticity_established=true' "$src"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-matched-stochastic-replay-evidence
+          {
+            echo "authority=matched_stochastic_replay_contract_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "replay_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/matched_stochastic_replay.rs | cut -d' ' -f1)"
+            echo "observed_scalar_precedence=true"
+            echo "stateless_novel_fallback=true"
+            echo "exact_scheduler_sham_order_candidate=true"
+            echo "shared_scheduler_relative_order_preserved=true"
+            echo "fallback_inheritance_identity_order_independent=true"
+            echo "future_multi_birth_mutation_fallback_fail_closed=true"
+            echo "live_replay_established=false"
+            echo "scheduler_statistical_adequacy_established=false"
+            echo "origin_authenticity_established=false"
+            echo "causal_rescue_established=false"
+          } > target/alife-matched-stochastic-replay-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-matched-stochastic-replay-evidence
+          path: target/alife-matched-stochastic-replay-evidence/qualification.txt
+          if-no-files-found: error
