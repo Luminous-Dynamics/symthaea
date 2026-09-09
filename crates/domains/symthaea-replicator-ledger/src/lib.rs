@@ -11,10 +11,11 @@
 //! - concurrent/stale decisions cannot double-spend the same ledger snapshot;
 //! - descendant creation consumes both subject-subtree and lineage-tree budgets;
 //! - ancestor grant ceilings remain binding on later descendants;
+//! - capability ceilings attenuate across descendant creation and cannot widen;
 //! - descendant lineages cannot widen capabilities, budgets, or lower risk class;
 //! - quarantine/revocation propagates down subject and lineage ancestry;
-//! - a later grant generation may supersede an earlier subject scope, but stale
-//!   generations can never regain authority;
+//! - a later grant generation may supersede an earlier subject budget scope, but
+//!   stale or same-generation-mutated authority can never regain authority;
 //! - runtime safety evidence is rechecked at commit time.
 
 #![forbid(unsafe_code)]
@@ -90,8 +91,9 @@ pub struct LedgerAuthorityContext {
 
 /// Opaque authorization token produced only by the bound evaluator below.
 ///
-/// Private fields prevent callers from constructing a token with a risk class
-/// or budget ceiling that was not part of the successful RSK evaluation.
+/// Private fields prevent callers from constructing a token with a risk class,
+/// capability set, evidence binding, or budget ceiling that was not part of a
+/// successful RSK evaluation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BoundedReplicationAuthorization {
     authorized: AuthorizedReplication,
@@ -171,6 +173,12 @@ enum NegativeState { Clear, Quarantined, Revoked }
 struct AuthorityScope {
     grant_id: GrantId,
     generation: u64,
+    lineage: LineageId,
+    risk_class: RiskClass,
+    effective_capabilities: CapabilitySet,
+    expires_at_unix_secs: u64,
+    safety_case_digest: EvidenceDigest,
+    containment_envelope_digest: EvidenceDigest,
     max_direct_children: u64,
     max_total_descendants: u64,
     max_lineage_depth: u32,
@@ -181,6 +189,12 @@ impl AuthorityScope {
         Self {
             grant_id: a.grant_id(),
             generation: a.grant_generation(),
+            lineage: a.lineage(),
+            risk_class: a.risk_class(),
+            effective_capabilities: a.effective_capabilities(),
+            expires_at_unix_secs: a.expires_at_unix_secs(),
+            safety_case_digest: a.safety_case_digest(),
+            containment_envelope_digest: a.containment_envelope_digest(),
             max_direct_children: a.max_direct_children,
             max_total_descendants: a.max_total_descendants,
             max_lineage_depth: a.max_lineage_depth,
@@ -193,6 +207,7 @@ impl AuthorityScope {
 struct SubjectRecord {
     parent: Option<SubjectId>,
     lineage: LineageId,
+    capability_ceiling: CapabilitySet,
     depth: u32,
     direct_children: u64,
     subtree_descendants: u64,
@@ -214,6 +229,9 @@ struct LineageRecord {
 pub struct SubjectLedgerSnapshot {
     pub parent: Option<SubjectId>,
     pub lineage: LineageId,
+    /// Maximum capability set any future explicit grant may activate for this
+    /// subject. This is a ceiling, not authority.
+    pub capability_ceiling: CapabilitySet,
     pub depth: u32,
     pub direct_children: u64,
     pub subtree_descendants: u64,
@@ -252,6 +270,7 @@ pub enum LedgerEventKind {
         parent: SubjectId,
         child: SubjectId,
         lineage: LineageId,
+        child_capability_ceiling: CapabilitySet,
         grant_id: GrantId,
         grant_generation: u64,
         resource_units: u64,
@@ -304,6 +323,7 @@ pub enum LedgerError {
     AuthorityExpired,
     AuthorityRiskMismatch,
     EmptyAuthorityCapabilities,
+    AuthorityCapabilitiesExceedSubjectCeiling,
     AuthorityCapabilitiesExceedHardCeiling,
     AuthorityBudgetExceedsHardCeiling,
     RuntimeMonitorUnhealthy,
@@ -347,6 +367,7 @@ impl ReplicationLedger {
         subjects.insert(root_subject, SubjectRecord {
             parent: None,
             lineage: root_lineage,
+            capability_ceiling: root_policy.capability_ceiling,
             depth: 0,
             direct_children: 0,
             subtree_descendants: 0,
@@ -398,6 +419,7 @@ impl ReplicationLedger {
         Ok(SubjectLedgerSnapshot {
             parent: record.parent,
             lineage: record.lineage,
+            capability_ceiling: record.capability_ceiling,
             depth: record.depth,
             direct_children: record.direct_children,
             subtree_descendants: record.subtree_descendants,
@@ -434,8 +456,6 @@ impl ReplicationLedger {
         let parent_record = self.subjects.get(&parent).ok_or(LedgerError::UnknownSubject(parent))?;
         let output_record = self.lineages.get(&output_lineage)
             .ok_or(LedgerError::UnknownLineage(output_lineage))?;
-        let parent_lineage_record = self.lineages.get(&parent_record.lineage)
-            .ok_or(LedgerError::UnknownLineage(parent_record.lineage))?;
 
         let subject_ancestry = self.subject_ancestry(parent)?;
         let lineage_ancestry = self.lineage_ancestry(output_lineage)?;
@@ -462,7 +482,7 @@ impl ReplicationLedger {
         Ok(LedgerAuthorityContext {
             cursor: self.cursor,
             risk_class: output_record.policy.risk_class,
-            parent_capability_ceiling: parent_lineage_record.policy.capability_ceiling
+            parent_capability_ceiling: parent_record.capability_ceiling
                 .intersect(output_record.policy.capability_ceiling),
             quarantined,
             revoked,
@@ -636,6 +656,9 @@ impl ReplicationLedger {
         if authorization.effective_capabilities().is_empty() {
             return Err(LedgerError::EmptyAuthorityCapabilities);
         }
+        if !authorization.effective_capabilities().is_subset_of(parent_record.capability_ceiling) {
+            return Err(LedgerError::AuthorityCapabilitiesExceedSubjectCeiling);
+        }
         if !authorization.effective_capabilities().is_subset_of(parent_lineage_record.policy.capability_ceiling)
             || !authorization.effective_capabilities().is_subset_of(output_record.policy.capability_ceiling)
         {
@@ -725,6 +748,7 @@ impl ReplicationLedger {
             parent,
             child,
             lineage: output_lineage,
+            child_capability_ceiling: authorization.effective_capabilities(),
             grant_id: authorization.grant_id(),
             grant_generation: authorization.grant_generation(),
             resource_units,
@@ -745,6 +769,7 @@ impl ReplicationLedger {
         self.subjects.insert(child, SubjectRecord {
             parent: Some(parent),
             lineage: output_lineage,
+            capability_ceiling: authorization.effective_capabilities(),
             depth: child_depth,
             direct_children: 0,
             subtree_descendants: 0,
@@ -1009,7 +1034,23 @@ mod tests {
         assert_eq!(lineage.subtree_resource_units, 10);
         let child = l.subject_snapshot(sid(2)).unwrap();
         assert_eq!(child.depth, 1);
+        assert_eq!(child.capability_ceiling, A);
         assert_eq!(child.authority_generation, None);
+    }
+
+    #[test]
+    fn descendant_capability_ceiling_is_attenuating() {
+        let mut l = ledger();
+        let auth = authorize(&l, sid(1), lid(1), 1, 1);
+        l.commit_descendant(mid(1), &auth, sid(2), 1, 100, &runtime()).unwrap();
+        let context = l.authority_context(sid(2), lid(1), 1).unwrap();
+        assert_eq!(context.parent_capability_ceiling, A);
+        let mut req = request(sid(2), lid(1), context, 1, 1);
+        req.requested_capabilities = AB;
+        let mut g = grant(sid(2), lid(1), 1);
+        g.allowed_capabilities = AB;
+        let denied = evaluate_bound_replication_authority(context.cursor, &req, Some(&g));
+        assert!(denied.denial_reasons().contains(&DenialReason::RequestedCapabilitiesExceedParent));
     }
 
     #[test]
@@ -1074,22 +1115,21 @@ mod tests {
     }
 
     #[test]
-    fn subject_revocation_propagates_to_descendant_subtree() {
+    fn subject_revocation_propagates_to_descendant_authority_context() {
         let mut l = ledger();
         let a = authorize(&l, sid(1), lid(1), 1, 1);
         l.commit_descendant(mid(1), &a, sid(2), 1, 100, &runtime()).unwrap();
         l.revoke_subject(l.cursor(), mid(2), sid(1)).unwrap();
         let ctx = l.authority_context(sid(2), lid(1), 1).unwrap();
         assert!(ctx.revoked);
-        let child_auth = authorize(&l, sid(2), lid(1), 1, 1);
-        assert!(matches!(
-            l.commit_descendant(mid(3), &child_auth, sid(3), 1, 100, &runtime()),
-            Err(LedgerError::SubjectRevoked(s)) if s == sid(1)
-        ));
+        let req = request(sid(2), lid(1), ctx, 1, 1);
+        let g = grant(sid(2), lid(1), 1);
+        let denied = evaluate_bound_replication_authority(ctx.cursor, &req, Some(&g));
+        assert!(denied.denial_reasons().contains(&DenialReason::Revoked));
     }
 
     #[test]
-    fn stale_generation_and_same_generation_budget_mutation_fail_closed() {
+    fn stale_generation_and_same_generation_authority_mutation_fail_closed() {
         let mut l = ledger();
         let a1 = authorize(&l, sid(1), lid(1), 1, 1);
         l.commit_descendant(mid(1), &a1, sid(2), 1, 100, &runtime()).unwrap();
@@ -1168,8 +1208,9 @@ mod tests {
         l.commit_descendant(mid(3), &a2, sid(3), 1, 100, &runtime()).unwrap();
 
         // A newer, externally evaluated root-line grant widens only the root
-        // subject scope back up to the root hard ceiling. It does not widen the
-        // branch lineage's immutable population ceiling.
+        // subject budget scope back up to the root hard ceiling. The root's
+        // capability ceiling remains unchanged, and the branch lineage's hard
+        // population ceiling remains two.
         let a3 = authorize(&l, sid(1), lid(1), 2, 1);
         l.commit_descendant(mid(4), &a3, sid(4), 1, 100, &runtime()).unwrap();
 
