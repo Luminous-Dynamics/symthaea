@@ -56,7 +56,12 @@ pub mod plugin;
 pub mod qp_certification;
 pub mod qualification;
 pub mod reach_authority_commitment;
-pub mod reach_cryptographic_authority;
+pub mod reach_authority_committed_evidence;
+pub mod reach_authority_committed_promotion;
+// Internal implementation detail: protocol/corpus SHA-256 identity is necessary,
+// but public operational promotion must additionally bind finalized authority
+// commitments for every contributing trial and episode step.
+mod reach_cryptographic_authority;
 pub mod reach_episode_evidence;
 // Internal implementation detail: episode-complete evidence is necessary, but
 // operational promotion must additionally bind the exact qualification protocols.
@@ -152,7 +157,8 @@ pub use physical_health::*;
 pub use qp_certification::*;
 pub use qualification::*;
 pub use reach_authority_commitment::*;
-pub use reach_cryptographic_authority::*;
+pub use reach_authority_committed_evidence::*;
+pub use reach_authority_committed_promotion::*;
 pub use reach_episode_evidence::*;
 pub use reach_execution::*;
 pub use reach_execution_evidence::*;
