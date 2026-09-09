@@ -1,0 +1,352 @@
+diff --git a/crates/core/symthaea-evidence-plane/src/lib.rs b/crates/core/symthaea-evidence-plane/src/lib.rs
+--- a/crates/core/symthaea-evidence-plane/src/lib.rs
++++ b/crates/core/symthaea-evidence-plane/src/lib.rs
+@@ -45,6 +45,7 @@
+ //! and `SYMTHAEA_COGNITIVE_ARCHITECTURE_AUDIT_ADDENDUM_2026-07-28.md` (§0.1)
+ //! at the monorepo root for the audit trail behind this crate.
+ 
++pub mod qualification;
+ pub mod seed_plan;
+ pub mod task_validator;
+ 
+diff --git a/crates/core/symthaea-evidence-plane/src/qualification.rs b/crates/core/symthaea-evidence-plane/src/qualification.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/core/symthaea-evidence-plane/src/qualification.rs
+@@ -0,0 +1,336 @@
++// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
++// SPDX-License-Identifier: AGPL-3.0-or-later
++// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
++//! Qualification observations, deterministic interpretation, and bounded reporting authority.
++//!
++//! Observation != interpretation != authority. Missing checks are derived from the profile,
++//! never fabricated as observations. V1 does not bind candidate/base/patch, workflow, runner,
++//! toolchain, or environment identity and therefore cannot authorize materialization.
++
++use std::collections::{BTreeMap, BTreeSet};
++
++use serde::{Deserialize, Serialize};
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum CheckRole {
++    Premise,
++    Scientific,
++    Admissibility,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct Requirement {
++    pub id: String,
++    pub role: CheckRole,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct QualificationProfileV1 {
++    pub id: String,
++    pub version: u32,
++    pub requirements: Vec<Requirement>,
++}
++
++/// Raw outcome for a check that ran or was explicitly terminated.
++/// There is deliberately no `Missing` variant.
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum CheckOutcome {
++    Passed,
++    Failed,
++    Skipped,
++    Cancelled,
++    TimedOut,
++    InfrastructureError,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct Observation {
++    pub id: String,
++    pub outcome: CheckOutcome,
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum QualificationDisposition {
++    Qualified,
++    PremiseNotReproduced,
++    CandidateRejected,
++    CandidateHygieneFailure,
++    Incomplete,
++    InfrastructureInterrupted,
++}
++
++/// Reporting authority only. This is not materialization authority.
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++pub enum QualificationAuthority {
++    None,
++    MayReportQualified,
++}
++
++impl QualificationAuthority {
++    pub fn derive(disposition: QualificationDisposition) -> Self {
++        if disposition == QualificationDisposition::Qualified {
++            Self::MayReportQualified
++        } else {
++            Self::None
++        }
++    }
++}
++
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub enum QualificationError {
++    InvalidProfile,
++    DuplicateRequirement(String),
++    DuplicateObservation(String),
++    UnknownObservation(String),
++    ProfileMismatch,
++    DispositionMismatch,
++    AuthorityMismatch,
++}
++
++fn validated<'a>(
++    profile: &QualificationProfileV1,
++    observations: &'a [Observation],
++) -> Result<BTreeMap<&'a str, CheckOutcome>, QualificationError> {
++    if profile.id.trim().is_empty() || profile.version == 0 || profile.requirements.is_empty() {
++        return Err(QualificationError::InvalidProfile);
++    }
++    let mut required = BTreeSet::new();
++    for requirement in &profile.requirements {
++        if requirement.id.trim().is_empty() {
++            return Err(QualificationError::InvalidProfile);
++        }
++        if !required.insert(requirement.id.as_str()) {
++            return Err(QualificationError::DuplicateRequirement(requirement.id.clone()));
++        }
++    }
++    let mut observed = BTreeMap::new();
++    for observation in observations {
++        if !required.contains(observation.id.as_str()) {
++            return Err(QualificationError::UnknownObservation(observation.id.clone()));
++        }
++        if observed.insert(observation.id.as_str(), observation.outcome).is_some() {
++            return Err(QualificationError::DuplicateObservation(observation.id.clone()));
++        }
++    }
++    Ok(observed)
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++enum Stage {
++    Passed,
++    Failed,
++    Incomplete,
++    Interrupted,
++}
++
++fn stage(
++    role: CheckRole,
++    profile: &QualificationProfileV1,
++    observations: &BTreeMap<&str, CheckOutcome>,
++) -> Stage {
++    let mut incomplete = false;
++    let mut interrupted = false;
++    for requirement in profile.requirements.iter().filter(|r| r.role == role) {
++        match observations.get(requirement.id.as_str()).copied() {
++            Some(CheckOutcome::Passed) => {}
++            Some(CheckOutcome::Failed) => return Stage::Failed,
++            Some(CheckOutcome::TimedOut | CheckOutcome::InfrastructureError) => interrupted = true,
++            Some(CheckOutcome::Skipped | CheckOutcome::Cancelled) | None => incomplete = true,
++        }
++    }
++    if interrupted {
++        Stage::Interrupted
++    } else if incomplete {
++        Stage::Incomplete
++    } else {
++        Stage::Passed
++    }
++}
++
++/// Evaluate premise -> scientific -> admissibility in causal order. A conclusive
++/// failure is not overwritten by downstream checks that never ran.
++pub fn evaluate(
++    profile: &QualificationProfileV1,
++    observations: &[Observation],
++) -> Result<QualificationDisposition, QualificationError> {
++    let observations = validated(profile, observations)?;
++    match stage(CheckRole::Premise, profile, &observations) {
++        Stage::Failed => return Ok(QualificationDisposition::PremiseNotReproduced),
++        Stage::Incomplete => return Ok(QualificationDisposition::Incomplete),
++        Stage::Interrupted => return Ok(QualificationDisposition::InfrastructureInterrupted),
++        Stage::Passed => {}
++    }
++    match stage(CheckRole::Scientific, profile, &observations) {
++        Stage::Failed => return Ok(QualificationDisposition::CandidateRejected),
++        Stage::Incomplete => return Ok(QualificationDisposition::Incomplete),
++        Stage::Interrupted => return Ok(QualificationDisposition::InfrastructureInterrupted),
++        Stage::Passed => {}
++    }
++    Ok(match stage(CheckRole::Admissibility, profile, &observations) {
++        Stage::Failed => QualificationDisposition::CandidateHygieneFailure,
++        Stage::Incomplete => QualificationDisposition::Incomplete,
++        Stage::Interrupted => QualificationDisposition::InfrastructureInterrupted,
++        Stage::Passed => QualificationDisposition::Qualified,
++    })
++}
++
++/// Serializable receipt. Cached interpretation and authority are untrusted until `validate`.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++pub struct QualificationReceiptV1 {
++    pub profile_id: String,
++    pub profile_version: u32,
++    pub observations: Vec<Observation>,
++    pub disposition: QualificationDisposition,
++    pub authority: QualificationAuthority,
++}
++
++impl QualificationReceiptV1 {
++    pub fn new(
++        profile: &QualificationProfileV1,
++        observations: Vec<Observation>,
++    ) -> Result<Self, QualificationError> {
++        let disposition = evaluate(profile, &observations)?;
++        Ok(Self {
++            profile_id: profile.id.clone(),
++            profile_version: profile.version,
++            observations,
++            disposition,
++            authority: QualificationAuthority::derive(disposition),
++        })
++    }
++
++    pub fn validate(&self, profile: &QualificationProfileV1) -> Result<(), QualificationError> {
++        if self.profile_id != profile.id || self.profile_version != profile.version {
++            return Err(QualificationError::ProfileMismatch);
++        }
++        let disposition = evaluate(profile, &self.observations)?;
++        if self.disposition != disposition {
++            return Err(QualificationError::DispositionMismatch);
++        }
++        if self.authority != QualificationAuthority::derive(disposition) {
++            return Err(QualificationError::AuthorityMismatch);
++        }
++        Ok(())
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn p() -> QualificationProfileV1 {
++        QualificationProfileV1 {
++            id: "science-rust-v1".into(),
++            version: 1,
++            requirements: vec![
++                Requirement { id: "premise".into(), role: CheckRole::Premise },
++                Requirement { id: "theorem".into(), role: CheckRole::Scientific },
++                Requirement { id: "ratchet".into(), role: CheckRole::Scientific },
++                Requirement { id: "hygiene".into(), role: CheckRole::Admissibility },
++            ],
++        }
++    }
++    fn o(id: &str, outcome: CheckOutcome) -> Observation {
++        Observation {
++            id: id.into(),
++            outcome,
++        }
++    }
++    fn pass() -> Vec<Observation> {
++        ["premise", "theorem", "ratchet", "hygiene"]
++            .into_iter()
++            .map(|id| o(id, CheckOutcome::Passed))
++            .collect()
++    }
++
++    #[test]
++    fn green_authorizes_only_reporting() {
++        let r = QualificationReceiptV1::new(&p(), pass()).unwrap();
++        assert_eq!(r.disposition, QualificationDisposition::Qualified);
++        assert_eq!(r.authority, QualificationAuthority::MayReportQualified);
++        r.validate(&p()).unwrap();
++    }
++
++    #[test]
++    fn theorem_pass_hygiene_fail_preserves_theorem_success() {
++        let mut x = pass();
++        x[3].outcome = CheckOutcome::Failed;
++        assert_eq!(evaluate(&p(), &x).unwrap(), QualificationDisposition::CandidateHygieneFailure);
++    }
++
++    #[test]
++    fn conclusive_upstream_failures_outrank_downstream_absence() {
++        assert_eq!(
++            evaluate(&p(), &[o("premise", CheckOutcome::Failed)]).unwrap(),
++            QualificationDisposition::PremiseNotReproduced
++        );
++        let x = [
++            o("premise", CheckOutcome::Passed),
++            o("theorem", CheckOutcome::Failed),
++            o("ratchet", CheckOutcome::Passed),
++        ];
++        assert_eq!(evaluate(&p(), &x).unwrap(), QualificationDisposition::CandidateRejected);
++    }
++
++    #[test]
++    fn missing_and_cancelled_are_incomplete_but_explicit_infra_is_distinct() {
++        let mut x = pass();
++        x.pop();
++        assert_eq!(evaluate(&p(), &x).unwrap(), QualificationDisposition::Incomplete);
++        let mut x = pass();
++        x[1].outcome = CheckOutcome::Cancelled;
++        assert_eq!(evaluate(&p(), &x).unwrap(), QualificationDisposition::Incomplete);
++        let mut x = pass();
++        x[1].outcome = CheckOutcome::InfrastructureError;
++        assert_eq!(
++            evaluate(&p(), &x).unwrap(),
++            QualificationDisposition::InfrastructureInterrupted
++        );
++    }
++
++    #[test]
++    fn malformed_evidence_fails_closed() {
++        let mut x = pass();
++        x.push(o("hygiene", CheckOutcome::Passed));
++        assert!(matches!(
++            evaluate(&p(), &x),
++            Err(QualificationError::DuplicateObservation(_))
++        ));
++        assert!(matches!(
++            evaluate(&p(), &[o("future", CheckOutcome::Passed)]),
++            Err(QualificationError::UnknownObservation(_))
++        ));
++        let empty = QualificationProfileV1 {
++            id: "x".into(),
++            version: 1,
++            requirements: vec![],
++        };
++        assert_eq!(evaluate(&empty, &[]), Err(QualificationError::InvalidProfile));
++    }
++
++    #[test]
++    fn tampered_cached_claims_fail_closed() {
++        let mut r = QualificationReceiptV1::new(&p(), pass()).unwrap();
++        r.disposition = QualificationDisposition::CandidateRejected;
++        assert_eq!(
++            r.validate(&p()),
++            Err(QualificationError::DispositionMismatch)
++        );
++        let mut x = pass();
++        x[3].outcome = CheckOutcome::Failed;
++        let mut r = QualificationReceiptV1::new(&p(), x).unwrap();
++        r.authority = QualificationAuthority::MayReportQualified;
++        assert_eq!(
++            r.validate(&p()),
++            Err(QualificationError::AuthorityMismatch)
++        );
++    }
++
++    #[test]
++    fn serde_round_trip_still_requires_validation() {
++        let r = QualificationReceiptV1::new(&p(), pass()).unwrap();
++        let json = serde_json::to_string(&r).unwrap();
++        let decoded: QualificationReceiptV1 = serde_json::from_str(&json).unwrap();
++        decoded.validate(&p()).unwrap();
++    }
++}
