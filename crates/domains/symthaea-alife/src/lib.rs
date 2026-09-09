@@ -25,6 +25,7 @@
 
 pub mod agent_id;
 pub mod coalition;
+pub mod counterfactual_randomness;
 pub mod earth_forcing;
 pub mod encounter;
 pub mod encounter_snapshot;
@@ -72,6 +73,9 @@ pub use agent_id::{
     AgentId, AgentIdAllocator, AgentIdAllocatorRestoreErrorV1, AgentIdAllocatorSnapshotV1,
 };
 pub use coalition::{Coalition, detect_coalitions, detect_paying_coalitions};
+pub use counterfactual_randomness::{
+    CounterfactualDrawKeyV1, CounterfactualRandomDomainV1, CounterfactualRandomFieldV1,
+};
 pub use earth_forcing::EarthForcedEnvironment;
 pub use encounter::{EncounterScheduler, PairingMode};
 pub use encounter_snapshot::{
