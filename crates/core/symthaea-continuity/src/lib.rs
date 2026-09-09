@@ -11,6 +11,7 @@
 pub mod auth_wire;
 pub mod capability;
 pub mod capability_activation;
+pub mod capability_counterfactual;
 pub mod capability_graph;
 mod compose;
 pub mod contract;
@@ -35,6 +36,13 @@ pub use capability_activation::{
     CapabilityActivationClosureV1, CapabilityActivationError, CapabilityActivationRoundV1,
     UnsatisfiedCapabilityRequirementV1, ValidatedCapabilityActivationAssumptionsV1,
     derive_capability_activation_closure,
+};
+pub use capability_counterfactual::{
+    CAPABILITY_COUNTERFACTUAL_CONFIG_SCHEMA_V1, CapabilityCounterfactualConfigId,
+    CapabilityCounterfactualConfigV1, CapabilityCounterfactualError,
+    CapabilityCounterfactualFrontierV1, CapabilityCounterfactualOptionV1,
+    CapabilityCounterfactualTargetV1, ValidatedCapabilityCounterfactualConfigV1,
+    derive_capability_counterfactual_frontier,
 };
 pub use capability_graph::{
     CAPABILITY_GRAPH_SNAPSHOT_SCHEMA_V1, CapabilityGraphError, CapabilityGraphSnapshotId,
