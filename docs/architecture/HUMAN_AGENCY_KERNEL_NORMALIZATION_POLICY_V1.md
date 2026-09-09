@@ -14,15 +14,33 @@ ContentBoundPolicy != PrecommittedPolicy
 PresenceRequirement != FieldSelection
 ContainerPresence != ContainerType
 ObservedShape != ExpectedShape
+PolicyPathSyntax != PolicyPathSemantics
 ```
 
 ## Policy identity
 
 The policy content is bound by a domain-separated SHA-256 digest over canonical JSON excluding the digest field. The symbolic `profile_ref` remains a compatibility/human-facing name; `policy_id + policy_digest` is the content identity.
 
+HAK-013 also binds the selector grammar itself:
+
+```text
+selector_grammar = {
+  id: "hak.selector-path",
+  version: 1
+}
+```
+
+A content-bound path string is not enough if two interpreters can assign different semantics to that string.
+
+```text
+PolicyPathBytes != PolicyPathSemantics
+```
+
+A future normalization execution receipt must therefore use the grammar identity required by the policy rather than selecting a grammar after collection.
+
 ## Typed path semantics
 
-HAK-013 now separates three path categories:
+HAK-013 separates three path categories:
 
 ```text
 required_containers
@@ -66,7 +84,7 @@ Thus `steps=[]` can be retained faithfully without turning `steps` into permissi
 
 Exact overlap across container/required/optional categories is forbidden. A typed container path may intentionally be a prefix of selected descendants.
 
-The exact selector grammar and execution semantics are intentionally deferred to #1035; HAK-013 defines policy intent, not proof that the collector executed it.
+The selector grammar is now content-bound, but actual selector execution remains deferred to #1035:
 
 ```text
 NormalizationPolicyDefined != NormalizationPolicyExecutedByCollector
@@ -93,7 +111,7 @@ RawResponseRetained != ProviderAuthenticated
 
 ## Adversarial qualification contract
 
-The focused HAK-013 suite now covers policy/profile identity separation, digest tampering, duplicate resource profiles, selected-path overlap, typed-container/selected-path overlap, invalid container types, missing typed-container semantics, duplicate selected paths, omission-semantics loss, retrospective binding upgrades, unsupported precommit claims, historical completeness/replayability inflation, profile mismatch, and binding digest tampering.
+The focused HAK-013 suite covers policy/profile identity separation, policy digest tampering, selector-grammar substitution, duplicate resource profiles, selected-path overlap, typed-container/selected-path overlap, invalid container types, missing typed-container semantics, duplicate selected paths, omission-semantics loss, retrospective binding upgrades, unsupported precommit claims, historical completeness/replayability inflation, profile mismatch, and binding digest tampering.
 
 It also positively checks that typed container prefixes may coexist with explicit descendant selectors.
 
@@ -101,7 +119,7 @@ The E5-target qualification plan and HAK-010 obligation-to-step policy precommit
 
 ## Non-claims
 
-HAK-013 does not execute provider selectors, authenticate GitHub, prove selector grammar semantics, retain historical raw bytes that were never captured, prove historical omitted-field completeness, infer historical precommit timing, establish semantic truth, or grant runtime authority.
+HAK-013 does not execute provider selectors, authenticate GitHub, retain historical raw bytes that were never captured, prove historical omitted-field completeness, infer historical precommit timing, establish semantic truth, or grant runtime authority.
 
 ## Next boundary
 
@@ -115,4 +133,4 @@ RawProviderResponse
 -> ProviderSourceObservation
 ```
 
-That layer must prove both expected container types and selected-field semantics were actually enforced.
+That layer must prove both expected container types and selected-field semantics were actually enforced under `hak.selector-path` v1.
