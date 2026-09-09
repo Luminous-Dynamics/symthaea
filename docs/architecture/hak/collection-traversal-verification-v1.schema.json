@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hak.collection-traversal-verification.v1",
+  "title": "HAK Retained Traversal Verification v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "canonicalization_profile",
+    "digest_domain",
+    "verification_scope",
+    "verification_status",
+    "provider_authentication",
+    "temporal_snapshot_verification",
+    "continuation_source_verification",
+    "raw_response_content_verification",
+    "entity_projection_verification",
+    "transcript_digest",
+    "transcript",
+    "hak017_binding",
+    "dedup_execution",
+    "pages_verified",
+    "traversal_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "hak.collection-traversal-verification.v1"},
+    "canonicalization_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "artifact_ref", "raw_sha256"],
+      "properties": {
+        "profile_id": {"const": "hak.canonical-json.v1"},
+        "artifact_ref": {"const": "git:Luminous-Dynamics/symthaea@cf440ce4f813bb30a6b1948e5caac96feda10610:docs/architecture/hak/canonical-json-v1.profile.json"},
+        "raw_sha256": {"const": "sha256:f76152db3cce567bb4d24ca46b5ed94d95db698daa8882a6fcdb38828d40e830"}
+      }
+    },
+    "digest_domain": {"const": "hak.collection-traversal-verification.v1"},
+    "verification_scope": {"const": "RetainedTranscriptOnly"},
+    "verification_status": {"const": "VerifiedAgainstRetainedTranscript"},
+    "provider_authentication": {"const": "NotEstablished"},
+    "temporal_snapshot_verification": {"const": "NotEstablished"},
+    "continuation_source_verification": {"const": "NotEstablished"},
+    "raw_response_content_verification": {"const": "NotEstablished"},
+    "entity_projection_verification": {"const": "NotEstablished"},
+    "transcript_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "transcript": {"$ref": "#/$defs/transcript"},
+    "hak017_binding": {"$ref": "#/$defs/hak017Binding"},
+    "dedup_execution": {"$ref": "#/$defs/dedupExecution"},
+    "pages_verified": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "traversal_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "transcript": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "resource_kind", "collection_ref", "query_scope_ref", "scope_ref", "pagination_model", "pagination_contract_ref", "temporal", "pages"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "resource_kind": {"type": "string", "minLength": 1},
+        "collection_ref": {"type": "string", "minLength": 1},
+        "query_scope_ref": {"type": "string", "minLength": 1},
+        "scope_ref": {"type": "string", "minLength": 1},
+        "pagination_model": {"enum": ["LinkHeader", "PageNumber", "Cursor", "NonPaginated"]},
+        "pagination_contract_ref": {"type": "string", "minLength": 1},
+        "temporal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["declared_semantics", "evidence_refs"],
+          "properties": {
+            "declared_semantics": {"enum": ["BestEffortLiveTraversal", "DeclaredProviderSnapshotBound", "DeclaredQueryVersionBound", "DeclaredStableByProviderContract", "Unknown"]},
+            "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+          }
+        },
+        "pages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/page"}}
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "page_id", "request_ref", "continuation_in", "response_ref", "raw_response_digest", "continuation_out", "observed_after_or_at", "observed_before_or_at", "entity_ids"],
+      "properties": {
+        "ordinal": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+        "page_id": {"type": "string", "minLength": 1},
+        "request_ref": {"type": "string", "minLength": 1},
+        "continuation_in": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "response_ref": {"type": "string", "minLength": 1},
+        "raw_response_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "continuation_out": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "observed_after_or_at": {"type": "string", "minLength": 2},
+        "observed_before_or_at": {"type": "string", "minLength": 2},
+        "entity_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "hak017Binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collection_digest", "provider", "resource_kind", "collection_ref", "query_scope_ref", "scope_ref", "pagination_model", "pagination_contract_ref"],
+      "properties": {
+        "collection_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "provider": {"type": "string", "minLength": 1},
+        "resource_kind": {"type": "string", "minLength": 1},
+        "collection_ref": {"type": "string", "minLength": 1},
+        "query_scope_ref": {"type": "string", "minLength": 1},
+        "scope_ref": {"type": "string", "minLength": 1},
+        "pagination_model": {"enum": ["LinkHeader", "PageNumber", "Cursor", "NonPaginated"]},
+        "pagination_contract_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "dedupExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "identity_ref", "rule_ref", "input_count", "unique_count", "duplicate_count", "retained_unique_ids", "receipt_digest"],
+      "properties": {
+        "schema_version": {"const": "hak.dedup-execution.v1"},
+        "identity_ref": {"const": "hak.entity-id.literal-string.v1"},
+        "rule_ref": {"const": "hak.dedup.stable-first-occurrence.v1"},
+        "input_count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "unique_count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "duplicate_count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "retained_unique_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}
