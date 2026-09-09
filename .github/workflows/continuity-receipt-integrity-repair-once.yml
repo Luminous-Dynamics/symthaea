@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 env:
-  EXPECTED_PARENT_SHA: f40b4c1bee0ee54fed08aa5dab9be9fda38a12d1
+  EXPECTED_PARENT_SHA: 0fda54a20e7496bad36c8c761252d6686799a401
   TARGET_BRANCH: ci/continuity-verifier-grant-exact-head-v1
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
 
@@ -80,11 +80,11 @@ jobs:
                   '    if ! git diff --quiet -- Cargo.lock; then',
               ),
               (
-                  "            echo \"- offline lock-repair diagnostic probe: `\$lock_probe_status` at `\$lock_probe_stage`\"\n"
+                  "            echo \"- offline lock-repair diagnostic probe: `$lock_probe_status` at `$lock_probe_stage`\"\n"
                   "            echo '- repair probes are diagnostic only and cannot change exact-head FAIL/PASS status'",
-                  "            echo \"- offline lock-repair diagnostic probe: `\$lock_probe_status` at `\$lock_probe_stage`\"\n"
-                  "            echo \"- committed Cargo.lock SHA-256: `\$committed_cargo_lock_sha256`\"\n"
-                  "            echo \"- derived lock snapshot SHA-256: `\$lock_repair_snapshot_sha256`\"\n"
+                  "            echo \"- offline lock-repair diagnostic probe: `$lock_probe_status` at `$lock_probe_stage`\"\n"
+                  "            echo \"- committed Cargo.lock SHA-256: `$committed_cargo_lock_sha256`\"\n"
+                  "            echo \"- derived lock snapshot SHA-256: `$lock_repair_snapshot_sha256`\"\n"
                   "            echo '- repair probes are diagnostic only and cannot change exact-head FAIL/PASS status'",
               ),
           ]
