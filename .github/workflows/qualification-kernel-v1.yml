@@ -63,15 +63,23 @@ jobs:
           grep -F 'There is deliberately no `Missing` variant.' "$FILE"
           grep -F 'pub enum CheckRole' "$FILE"
           grep -F 'pub enum QualificationDisposition' "$FILE"
-          grep -F 'pub enum QualificationAuthority' "$FILE"
-          grep -F 'MayReportQualified' "$FILE"
+          grep -F 'pub enum QualificationAuthorityClaim' "$FILE"
+          grep -F 'pub struct MayReportQualified' "$FILE"
+          grep -F 'pub struct ValidatedQualification' "$FILE"
+          grep -F 'pub fn report_authority(&self) -> Option<MayReportQualified>' "$FILE"
+          grep -F 'MayReportQualified { _private: () }' "$FILE"
           grep -F 'pub fn evaluate(' "$FILE"
           grep -F 'pub fn validate(' "$FILE"
           grep -F 'if scientific == 0' "$FILE"
           grep -F 'pub profile: QualificationProfileV1' "$FILE"
           grep -F 'profile_requirements(left)? == profile_requirements(right)?' "$FILE"
+          grep -F 'claimed_disposition: QualificationDisposition' "$FILE"
+          grep -F 'claimed_authority: QualificationAuthorityClaim' "$FILE"
           grep -F 'Some(CheckOutcome::InfrastructureError) => interrupted = true' "$FILE"
           grep -F 'Some(CheckOutcome::TimedOut | CheckOutcome::Skipped | CheckOutcome::Cancelled)' "$FILE"
+          ! grep -F 'pub claimed_disposition' "$FILE"
+          ! grep -F 'pub claimed_authority' "$FILE"
+          ! grep -F 'pub fn derive' "$FILE"
           ! grep -F 'MaterializationAuthorized' "$FILE"
 
       - name: Prove real-failure census shapes classify separately
@@ -148,5 +156,5 @@ jobs:
 
       - name: Evidence boundary
         run: |
-          echo 'PASS establishes a profile-driven evaluator that keeps execution observations separate from derived disposition; missing checks are derived rather than fabricated; at least one scientific requirement is mandatory; premise, scientific, and admissibility failures remain distinct; cancellation and unattributed timeout are incomplete while explicit infrastructure failure is distinct; duplicate/unknown/malformed observations fail closed; exact profile role semantics are structurally rebound during validation; serialized disposition and bounded reporting authority are verifier-recomputed.'
+          echo 'PASS establishes a profile-driven evaluator that keeps execution observations separate from derived disposition; missing checks are derived rather than fabricated; at least one scientific requirement is mandatory; premise, scientific, and admissibility failures remain distinct; cancellation and unattributed timeout are incomplete while explicit infrastructure failure is distinct; duplicate/unknown/malformed observations fail closed; exact profile role semantics are structurally rebound during validation; serialized disposition/authority remain private untrusted claims; only successful validation can return the opaque MayReportQualified reporting token.'
           echo 'PASS does not cryptographically identify the profile, candidate bytes, base commit, patch digest, workflow digest, runner/toolchain/environment identity, or external scientific truth. MayReportQualified is reporting authority only and MUST NOT authorize materialization. Exact artifact/execution identity and materialization authority remain future qualification stages.'
