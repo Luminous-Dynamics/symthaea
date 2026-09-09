@@ -1,0 +1,25 @@
+{
+  "schema": "symthaea.qualification-attempt-registration.v1",
+  "provider": "github-actions",
+  "repository": "Luminous-Dynamics/symthaea",
+  "admission_id": "sha256:f1614461697124283ec569210d639bf8bb851fe26ce71d21cfd5350a4d08ec94",
+  "admission_subject_id": "sha256:26ad6a1b78407e158b2f8f3e9b168338985d7b854685241f5952a0e1a85c872e",
+  "requested_subject_sha": "60f45c5efcca01c8f46d4509831223a197d4e215",
+  "provider_run": {
+    "workflow_name": "Resource Stack Qualification",
+    "run_id": 34339379626,
+    "run_number": 4,
+    "job_id": 102426290712,
+    "pull_request": 1058
+  },
+  "observed_state": "ProviderQueued",
+  "execution_started": false,
+  "observed_at": "2026-09-09T12:12:00Z",
+  "non_claims": [
+    "does not establish execution start",
+    "does not establish hosted qualification",
+    "does not establish a terminal attempt disposition",
+    "does not establish the actual checked-out commit"
+  ],
+  "registration_id": "sha256:cf14aed2a72395152f0c2f7ecb7a4d850deeb7c8af05c3948697ad448fee8c31"
+}
