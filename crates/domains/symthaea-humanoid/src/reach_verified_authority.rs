@@ -1,11 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Final public Reach authority facade using v2 verified source decisions.
+//! Final public Reach authority facade using verified source decisions.
 //!
 //! The lower manifest-aware layer proves behavioral qualification and exact
-//! perturbation/protocol identity. This facade requires operator, physical,
-//! epistemic and cognitive authority to originate from the strong transport-neutral
-//! verifier boundary in `verified_authority_source`.
+//! perturbation/protocol identity. Operator and cognitive authority must originate
+//! from the strong transport-neutral verifier boundary. Physical and epistemic
+//! authority are stricter still: their signed claims must match canonical runtime
+//! evidence artifacts before they can reach this motor boundary.
 
 use crate::execution_authority_scope::HumanoidScopedSkillAuthorityReceipt;
 use crate::qualification::HumanoidQualificationSubject;
@@ -14,6 +15,9 @@ use crate::reach_manifest_authority::{
     issue_humanoid_reach_manifest_authority_receipt,
 };
 use crate::skill_permit::HumanoidSkillExecutionPermit;
+use crate::verified_authority_artifacts::{
+    HumanoidVerifiedEpistemicAuthorityEvidence, HumanoidVerifiedPhysicalAuthorityEvidence,
+};
 use crate::verified_authority_source::{
     HumanoidVerifiedAuthorityKind, HumanoidVerifiedAuthoritySource,
 };
@@ -112,8 +116,8 @@ impl HumanoidReachVerifiedAuthorityApproval {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HumanoidReachVerifiedAuthorityIssueFailure {
-    InvalidPhysicalSource,
-    InvalidEpistemicSource,
+    InvalidPhysicalEvidence,
+    InvalidEpistemicEvidence,
     InvalidCognitiveSource,
     SourceValidityTooShort,
     Lower(HumanoidReachManifestAuthorityIssueFailure),
@@ -121,9 +125,10 @@ pub enum HumanoidReachVerifiedAuthorityIssueFailure {
 
 /// Preferred final motor-authority issuer.
 ///
-/// The four externally-originating authority dimensions accepted by this function
-/// are all opaque verifier results. Qualification remains internally derived from
-/// the manifest-aware Reach operational artifact.
+/// Physical and epistemic sources are required to be verifier-approved canonical
+/// runtime artifacts. Operator and cognitive sources are still generic verifier
+/// results; qualification is internally derived from the manifest-aware Reach
+/// operational artifact.
 #[allow(clippy::too_many_arguments)]
 pub fn issue_humanoid_reach_verified_authority_receipt(
     subject: &HumanoidQualificationSubject,
@@ -131,18 +136,18 @@ pub fn issue_humanoid_reach_verified_authority_receipt(
     qualification: &HumanoidReachManifestOperationalArtifact,
     policy: &HumanoidReachManifestOperationalPolicy,
     operator_approval: &HumanoidReachVerifiedAuthorityApproval,
-    physical: &HumanoidVerifiedAuthoritySource,
-    epistemic: &HumanoidVerifiedAuthoritySource,
+    physical: &HumanoidVerifiedPhysicalAuthorityEvidence,
+    epistemic: &HumanoidVerifiedEpistemicAuthorityEvidence,
     cognitive: &HumanoidVerifiedAuthoritySource,
     now_s: f64,
     now_unix_millis: u64,
     requested_valid_until_s: f64,
 ) -> Result<HumanoidScopedSkillAuthorityReceipt, HumanoidReachVerifiedAuthorityIssueFailure> {
-    if !physical.validate_for(subject, HumanoidVerifiedAuthorityKind::Physical, now_s) {
-        return Err(HumanoidReachVerifiedAuthorityIssueFailure::InvalidPhysicalSource);
+    if !physical.validate_for(subject, now_s) {
+        return Err(HumanoidReachVerifiedAuthorityIssueFailure::InvalidPhysicalEvidence);
     }
-    if !epistemic.validate_for(subject, HumanoidVerifiedAuthorityKind::Epistemic, now_s) {
-        return Err(HumanoidReachVerifiedAuthorityIssueFailure::InvalidEpistemicSource);
+    if !epistemic.validate_for(subject, now_s) {
+        return Err(HumanoidReachVerifiedAuthorityIssueFailure::InvalidEpistemicEvidence);
     }
     if !cognitive.validate_for(subject, HumanoidVerifiedAuthorityKind::Cognitive, now_s) {
         return Err(HumanoidReachVerifiedAuthorityIssueFailure::InvalidCognitiveSource);
