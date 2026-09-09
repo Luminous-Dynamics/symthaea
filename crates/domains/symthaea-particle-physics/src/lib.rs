@@ -15,6 +15,8 @@
 //!   glueball/hadron spectroscopy with observation/interpretation separation
 //! - **Exotic spectroscopy**: unified mixed-state ontology, append-only evidence
 //!   graph, candidate/model discriminators, and a QCD↔spectroscopy semantic bridge
+//! - **Epistemic export**: versioned Symthaea→Mycelix DKG transport preserving
+//!   immutable evidence, provenance, support/challenge and supersession edges
 //!
 //! ## Natural Units
 //!
@@ -36,6 +38,7 @@ pub mod general_relativity;
 pub mod hadron_spectroscopy;
 pub mod lattice_qcd;
 pub mod model_comparison;
+pub mod mycelix_epistemic_bridge;
 pub mod qcd_spectroscopy_bridge;
 pub mod relativistic_qm;
 pub mod renormalization;
@@ -66,6 +69,11 @@ pub use hadron_spectroscopy::{
 pub use model_comparison::{
     CandidateModel, DiscriminatingObservable, ExpectedSignature, ModelExpectation,
     ObservablePrediction, discriminating_observables, rank_discriminators,
+};
+pub use mycelix_epistemic_bridge::{
+    MYCELIX_SPECTROSCOPY_DKG_PROTOCOL, MYCELIX_SPECTROSCOPY_DKG_SCHEMA_VERSION,
+    MycelixDkgBundle, MycelixDkgEdge, MycelixDkgNode, MycelixNodeKind, MycelixProvenance,
+    MycelixRelation, export_to_mycelix,
 };
 pub use qcd_spectroscopy_bridge::{
     BridgeAuthority, QcdMechanism, QcdSpectroscopyLink, glueball_links, hybrid_links,
