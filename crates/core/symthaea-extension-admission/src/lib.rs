@@ -6,7 +6,7 @@
 //! Discovery, technical compatibility, signature validity, signer authorization,
 //! capability admission, and point-of-use activation are different facts. This
 //! crate models only the host-owned admission decision and its live
-//! revocation/generation check. It performs no cryptography and grants no
+//! policy/trust-currentness check. It performs no cryptography and grants no
 //! authority by itself.
 //!
 //! The important boundary is:
@@ -18,7 +18,8 @@
 //!
 //! `AdmissionRecord` is immutable issuance evidence. `ActiveAdmission` is a
 //! non-serializable point-of-use value created only after the record is checked
-//! against the current manifest and live admission context.
+//! against the current manifest, admission-policy generation, trust generation,
+//! and live revocation state.
 
 #![deny(unsafe_code)]
 
@@ -85,9 +86,9 @@ pub enum TrustLevel {
 /// Immutable host admission decision.
 ///
 /// The record binds the exact manifest bytes, exact executable/package payload,
-/// and exact admission policy that produced the decision. Signature evidence is
-/// deliberately external; `signer` records the already-resolved identity, not a
-/// claim that this crate verified it.
+/// exact admission policy, and trust-snapshot generation that produced the
+/// decision. Signature evidence is deliberately external; `signer` records the
+/// already-resolved identity, not a claim that this crate verified it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdmissionRecord {
     extension: ExtensionId,
@@ -101,6 +102,7 @@ pub struct AdmissionRecord {
     granted_capabilities: Vec<CapabilityId>,
     granted_permissions: PermissionSet,
     generation: u64,
+    trust_generation: u64,
 }
 
 impl AdmissionRecord {
@@ -117,6 +119,7 @@ impl AdmissionRecord {
         mut granted_capabilities: Vec<CapabilityId>,
         granted_permissions: PermissionSet,
         generation: u64,
+        trust_generation: u64,
     ) -> Result<Self, AdmissionProblem> {
         let extension_version = extension_version.into();
         if extension_version.trim().is_empty() {
@@ -127,6 +130,9 @@ impl AdmissionRecord {
         }
         if generation == 0 {
             return Err(AdmissionProblem::ZeroGeneration);
+        }
+        if trust_generation == 0 {
+            return Err(AdmissionProblem::ZeroTrustGeneration);
         }
         if granted_capabilities.is_empty() {
             return Err(AdmissionProblem::EmptyCapabilityGrant);
@@ -151,6 +157,7 @@ impl AdmissionRecord {
             granted_capabilities,
             granted_permissions,
             generation,
+            trust_generation,
         };
         record.validate()?;
         Ok(record)
@@ -166,6 +173,9 @@ impl AdmissionRecord {
         }
         if self.generation == 0 {
             return Err(AdmissionProblem::ZeroGeneration);
+        }
+        if self.trust_generation == 0 {
+            return Err(AdmissionProblem::ZeroTrustGeneration);
         }
         validate_principal(self.issuer.as_str())?;
         if let Some(signer) = &self.signer {
@@ -221,8 +231,8 @@ impl AdmissionRecord {
         Ok(())
     }
 
-    /// Revalidate immutable issuance against live revocation/generation state and
-    /// return a non-serializable point-of-use admission.
+    /// Revalidate immutable issuance against live policy/trust generations and
+    /// revocation state, returning a non-serializable point-of-use admission.
     ///
     /// The validated manifest is retained inside the active value. This prevents
     /// an admission activated against manifest A from being replayed against a
@@ -240,6 +250,12 @@ impl AdmissionRecord {
             return Err(AdmissionProblem::GenerationMismatch {
                 admitted: self.generation,
                 current: context.current_generation,
+            });
+        }
+        if context.current_trust_generation != self.trust_generation {
+            return Err(AdmissionProblem::TrustGenerationMismatch {
+                admitted: self.trust_generation,
+                current: context.current_trust_generation,
             });
         }
         Ok(ActiveAdmission {
@@ -291,19 +307,25 @@ impl AdmissionRecord {
     pub fn generation(&self) -> u64 {
         self.generation
     }
+
+    pub fn trust_generation(&self) -> u64 {
+        self.trust_generation
+    }
 }
 
 /// Live host facts checked at the instant an admission is used.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AdmissionContext {
     pub current_generation: u64,
+    pub current_trust_generation: u64,
     pub revoked: bool,
 }
 
 impl AdmissionContext {
-    pub const fn active(current_generation: u64) -> Self {
+    pub const fn active(current_generation: u64, current_trust_generation: u64) -> Self {
         Self {
             current_generation,
+            current_trust_generation,
             revoked: false,
         }
     }
@@ -313,7 +335,8 @@ impl AdmissionContext {
 /// in-process manifest.
 ///
 /// This type intentionally does not implement `Clone` or serde. Obtain a fresh
-/// value at point of use after checking current revocation/generation state.
+/// value at point of use after checking current policy/trust generations and
+/// revocation state.
 #[derive(Debug, PartialEq, Eq)]
 pub struct ActiveAdmission {
     record: AdmissionRecord,
@@ -331,6 +354,10 @@ impl ActiveAdmission {
 
     pub fn generation(&self) -> u64 {
         self.record.generation()
+    }
+
+    pub fn trust_generation(&self) -> u64 {
+        self.record.trust_generation()
     }
 
     pub fn manifest_sha256(&self) -> Sha256Digest {
@@ -368,6 +395,7 @@ pub enum AdmissionProblem {
     EmptyVersion,
     NonCanonicalVersion,
     ZeroGeneration,
+    ZeroTrustGeneration,
     InvalidPrincipal,
     EmptyCapabilityGrant,
     DuplicateCapabilityGrant,
@@ -378,6 +406,7 @@ pub enum AdmissionProblem {
     PermissionExceedsManifest,
     Revoked,
     GenerationMismatch { admitted: u64, current: u64 },
+    TrustGenerationMismatch { admitted: u64, current: u64 },
 }
 
 fn validate_principal(value: &str) -> Result<(), AdmissionProblem> {
@@ -494,18 +523,20 @@ mod tests {
                 ..PermissionSet::default()
             },
             7,
+            13,
         )
         .unwrap()
     }
 
     #[test]
-    fn active_admission_requires_current_generation_and_exact_manifest() {
+    fn active_admission_requires_current_policy_trust_and_exact_manifest() {
         let manifest = manifest();
         let record = record();
         let active = record
-            .activate(&manifest, AdmissionContext::active(7))
+            .activate(&manifest, AdmissionContext::active(7, 13))
             .unwrap();
         assert_eq!(active.extension(), &manifest.id);
+        assert_eq!(active.trust_generation(), 13);
         assert!(active.matches_manifest(&manifest));
         assert!(active.allows_capability(&CapabilityId::new(
             "engineering.simulation.circuit"
@@ -519,7 +550,7 @@ mod tests {
     fn active_admission_rejects_same_id_version_manifest_substitution() {
         let manifest = manifest();
         let active = record()
-            .activate(&manifest, AdmissionContext::active(7))
+            .activate(&manifest, AdmissionContext::active(7, 13))
             .unwrap();
         let mut substituted = manifest.clone();
         substituted.description = "changed after activation".into();
@@ -536,6 +567,7 @@ mod tests {
                 &manifest,
                 AdmissionContext {
                     current_generation: 7,
+                    current_trust_generation: 13,
                     revoked: true,
                 }
             ),
@@ -545,12 +577,23 @@ mod tests {
     }
 
     #[test]
-    fn generation_replacement_invalidates_old_admission() {
+    fn policy_generation_replacement_invalidates_old_admission() {
         assert_eq!(
-            record().activate(&manifest(), AdmissionContext::active(8)),
+            record().activate(&manifest(), AdmissionContext::active(8, 13)),
             Err(AdmissionProblem::GenerationMismatch {
                 admitted: 7,
                 current: 8,
+            })
+        );
+    }
+
+    #[test]
+    fn trust_generation_replacement_invalidates_old_admission() {
+        assert_eq!(
+            record().activate(&manifest(), AdmissionContext::active(7, 14)),
+            Err(AdmissionProblem::TrustGenerationMismatch {
+                admitted: 13,
+                current: 14,
             })
         );
     }
