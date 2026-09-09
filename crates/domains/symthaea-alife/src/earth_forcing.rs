@@ -34,6 +34,10 @@
 
 use symthaea_earth_system::IceAlbedoModel;
 
+use crate::environment_snapshot::{
+    EarthForcedEnvironmentSnapshotV1, ValidatedEarthForcedEnvironmentSnapshotV1,
+};
+
 /// Effective mixed-layer ocean heat capacity for a ~70 m reservoir — the standard 0-D/1-D
 /// energy-balance choice for a model that must reproduce a real seasonal cycle timescale
 /// (Hartmann, *Global Physical Climatology*, 2nd ed., §2.7). `C = ρ·c_p·depth`.
@@ -95,11 +99,47 @@ impl EarthForcedEnvironment {
         self
     }
 
+    /// Capture the complete state needed for exact future climate-resource continuation.
+    pub fn snapshot_v1(&self) -> EarthForcedEnvironmentSnapshotV1 {
+        EarthForcedEnvironmentSnapshotV1::from_live_parts(
+            self.model,
+            self.temperature,
+            self.seasonal_amplitude,
+            self.seasonal_period_ticks,
+            self.dt_seconds,
+            self.secular_drift_per_tick,
+            self.tick,
+        )
+    }
+
+    /// Restore only from a snapshot that has already passed the v1 environment validator.
+    pub fn from_validated_snapshot_v1(
+        snapshot: &ValidatedEarthForcedEnvironmentSnapshotV1,
+    ) -> Self {
+        Self {
+            model: snapshot.model(),
+            temperature: snapshot.temperature(),
+            seasonal_amplitude: snapshot.seasonal_amplitude(),
+            seasonal_period_ticks: snapshot.seasonal_period_ticks(),
+            dt_seconds: snapshot.dt_seconds(),
+            secular_drift_per_tick: snapshot.secular_drift_per_tick(),
+            tick: snapshot.tick(),
+        }
+    }
+
     /// Advance one tick: the underlying solar constant first drifts by
     /// `secular_drift_per_tick` (permanent, unlike the seasonal term), then a real forward-Euler
     /// step of `C·dT/dt = N(T)` runs under that new baseline plus the seasonal modulation,
     /// returning the resulting `[0, 1]` resource proxy.
+    ///
+    /// Tick exhaustion is preflighted before climate state is mutated, so a caught overflow panic
+    /// cannot leave a half-advanced environment that a caller might accidentally reuse.
     pub fn step(&mut self) -> f64 {
+        let next_tick = self
+            .tick
+            .checked_add(1)
+            .expect("EarthForcedEnvironment tick space exhausted before climate mutation");
+
         self.model.solar_constant += self.secular_drift_per_tick;
 
         let phase = std::f64::consts::TAU * (self.tick as f64) / self.seasonal_period_ticks;
@@ -110,7 +150,7 @@ impl EarthForcedEnvironment {
         let net_radiation = forced_model.net_radiation(self.temperature);
         let delta_temperature = net_radiation * self.dt_seconds / MIXED_LAYER_HEAT_CAPACITY;
         self.temperature += delta_temperature;
-        self.tick += 1;
+        self.tick = next_tick;
 
         self.resource_proxy()
     }
