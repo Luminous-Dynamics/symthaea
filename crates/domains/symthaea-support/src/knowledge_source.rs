@@ -130,7 +130,7 @@ pub fn merge_knowledge_hits_v1(
             hit.validate()?;
             let replace = match by_source.get(&hit.source_id) {
                 None => true,
-                Some(existing) => rank_key(&hit) > rank_key(existing),
+                Some(existing) => prefer_new_hit(&hit, existing),
             };
             if replace {
                 by_source.insert(hit.source_id.clone(), hit);
@@ -138,24 +138,27 @@ pub fn merge_knowledge_hits_v1(
         }
     }
     let mut merged: Vec<_> = by_source.into_values().collect();
-    merged.sort_by(|a, b| {
-        b.similarity
-            .partial_cmp(&a.similarity)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| {
-                b.confidence
-                    .unwrap_or(-1.0)
-                    .partial_cmp(&a.confidence.unwrap_or(-1.0))
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .then_with(|| a.source_id.cmp(&b.source_id))
-    });
+    merged.sort_by(compare_hits);
     merged.truncate(limit);
     Ok(merged)
 }
 
-fn rank_key(hit: &SupportKnowledgeHitV1) -> (u32, u32) {
-    (hit.similarity.to_bits(), hit.confidence.unwrap_or(-1.0).to_bits())
+fn prefer_new_hit(candidate: &SupportKnowledgeHitV1, existing: &SupportKnowledgeHitV1) -> bool {
+    compare_hits(candidate, existing) == std::cmp::Ordering::Less
+}
+
+/// Ordering suitable for `sort_by`: strongest hit sorts first.
+fn compare_hits(a: &SupportKnowledgeHitV1, b: &SupportKnowledgeHitV1) -> std::cmp::Ordering {
+    b.similarity
+        .partial_cmp(&a.similarity)
+        .unwrap_or(std::cmp::Ordering::Equal)
+        .then_with(|| {
+            b.confidence
+                .unwrap_or(-1.0)
+                .partial_cmp(&a.confidence.unwrap_or(-1.0))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .then_with(|| a.source_id.cmp(&b.source_id))
 }
 
 fn validate_unit(value: f32, label: &'static str) -> Result<(), KnowledgeSourceErrorV1> {
@@ -234,6 +237,15 @@ mod tests {
         ).unwrap();
         let ids: Vec<&str> = merged.iter().map(|item| item.source_id.as_str()).collect();
         assert_eq!(ids, vec!["b", "a", "c"]);
+    }
+
+    #[test]
+    fn established_confidence_beats_unknown_on_similarity_tie() {
+        let merged = merge_knowledge_hits_v1(
+            [vec![hit("a", 0.8, None)], vec![hit("a", 0.8, Some(0.2))]],
+            1,
+        ).unwrap();
+        assert_eq!(merged[0].confidence, Some(0.2));
     }
 
     #[test]
