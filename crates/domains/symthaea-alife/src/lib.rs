@@ -38,6 +38,7 @@ pub mod evolutionary_history;
 pub mod exact_sign_test;
 pub mod genesis_evidence_checkpoint;
 pub mod genesis_event_batch;
+pub mod genesis_execution;
 pub mod genesis_rolling_evidence;
 pub mod genesis_social_runner;
 pub mod genesis_tick;
@@ -107,6 +108,11 @@ pub use genesis_evidence_checkpoint::{
 pub use genesis_event_batch::{
     GenesisTickBatchErrorV1, GenesisTickBatchV1, GenesisTickChunkSummaryV1,
     ValidatedGenesisTickBatchV1, validate_genesis_tick_chunk,
+};
+pub use genesis_execution::{
+    GenesisEarthExecutionCapsuleErrorV1, GenesisEarthExecutionCapsuleV1,
+    GenesisEarthExecutionCheckpointV1, GenesisEarthExecutionErrorV1, GenesisEarthExecutionV1,
+    GenesisExecutionProtocolV1, ValidatedGenesisEarthExecutionCapsuleV1,
 };
 pub use genesis_rolling_evidence::{
     GenesisRollingEvidenceCheckpointV1, GenesisRollingEvidenceErrorV1,
