@@ -4,9 +4,10 @@
 //! Public-side schema and loader for reproducible IT golden incidents.
 //!
 //! Solver-visible scenario material is deliberately separated from oracle/ground-
-//! truth material. The production support crate embeds only the public seed corpus;
-//! oracle fixtures are included only in this module's tests. A future benchmark
-//! harness should preserve the same process/file boundary.
+//! truth material. This crate embeds only the public seed corpus. Real root-cause,
+//! action-outcome, remediation and verification oracles must be supplied by a
+//! separate benchmark artifact/private harness input and must never be committed
+//! beside solver-visible fixtures.
 
 use crate::it_qualification::{
     AdversarialConditionV1, ItCompetencyLevelV1, ItDomainV1, ItQualificationCaseV1,
@@ -108,6 +109,11 @@ impl GoldenIncidentCaseV1 {
                 "golden incident requires diagnostic actions".into(),
             ));
         }
+        if self.high_stakes && self.threshold.max_unsafe_action_rate != 0.0 {
+            return Err(GoldenIncidentErrorV1::InvalidField(
+                "high-stakes golden incidents require zero tolerated unsafe-action rate".into(),
+            ));
+        }
 
         let mut evidence_ids = BTreeSet::new();
         for evidence in &self.initial_evidence {
@@ -199,8 +205,8 @@ impl GoldenIncidentCorpusV1 {
     }
 }
 
-/// Built-in solver-visible seed corpus. Oracle/action-outcome data is not embedded
-/// in this non-test function.
+/// Built-in solver-visible seed corpus. Oracle/action-outcome data is intentionally
+/// absent from the repository and must be supplied separately by a benchmark harness.
 pub fn seed_golden_incidents_v1() -> Result<GoldenIncidentCorpusV1, GoldenIncidentErrorV1> {
     let corpus: GoldenIncidentCorpusV1 = serde_json::from_str(include_str!(
         "../data/it_golden_incidents_public_v1.json"
@@ -261,33 +267,6 @@ fn require_nonempty(value: &str, field: &'static str) -> Result<(), GoldenIncide
 mod tests {
     use super::*;
     use crate::it_qualification::ItQualificationMatrixV1;
-    use std::collections::{BTreeMap, BTreeSet};
-
-    #[derive(Debug, Deserialize)]
-    struct OracleCorpusV1 {
-        schema_version: String,
-        oracles: Vec<OracleCaseV1>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct OracleCaseV1 {
-        id: String,
-        revision: u32,
-        root_cause: String,
-        causal_chain: Vec<String>,
-        action_outcomes: BTreeMap<String, Vec<String>>,
-        required_findings: Vec<String>,
-        acceptable_remediations: Vec<String>,
-        prohibited_remediations: Vec<String>,
-        verification: Vec<String>,
-    }
-
-    fn seed_oracles() -> OracleCorpusV1 {
-        serde_json::from_str(include_str!(
-            "../data/oracle/it_golden_incidents_oracle_v1.json"
-        ))
-        .unwrap()
-    }
 
     #[test]
     fn public_seed_corpus_is_valid_and_registers_into_qualification_matrix() {
@@ -295,68 +274,40 @@ mod tests {
         assert!(corpus.cases.len() >= 4);
         let mut matrix = ItQualificationMatrixV1::new();
         for incident in &corpus.cases {
-            matrix.register_case(incident.qualification_case().unwrap()).unwrap();
+            matrix
+                .register_case(incident.qualification_case().unwrap())
+                .unwrap();
         }
         assert_eq!(matrix.cases().count(), corpus.cases.len());
     }
 
     #[test]
-    fn oracle_keys_match_public_keys_and_only_reference_offered_actions() {
-        let public = seed_golden_incidents_v1().unwrap();
-        let oracle = seed_oracles();
-        assert_eq!(oracle.schema_version, GOLDEN_INCIDENT_SCHEMA_V1);
-
-        let public_by_key: BTreeMap<_, _> = public
-            .cases
-            .iter()
-            .map(|case| ((case.id.as_str(), case.revision), case))
-            .collect();
-        let oracle_keys: BTreeSet<_> = oracle
-            .oracles
-            .iter()
-            .map(|case| (case.id.as_str(), case.revision))
-            .collect();
-        let public_keys: BTreeSet<_> = public_by_key.keys().copied().collect();
-        assert_eq!(oracle_keys, public_keys);
-
-        for oracle_case in &oracle.oracles {
-            let public_case = public_by_key[&(oracle_case.id.as_str(), oracle_case.revision)];
-            let action_ids: BTreeSet<_> = public_case
-                .diagnostic_actions
-                .iter()
-                .map(|action| action.id.as_str())
-                .collect();
-            assert!(oracle_case
-                .action_outcomes
-                .keys()
-                .all(|action| action_ids.contains(action.as_str())));
+    fn public_fixture_schema_contains_no_oracle_fields() {
+        let value: serde_json::Value = serde_json::from_str(include_str!(
+            "../data/it_golden_incidents_public_v1.json"
+        ))
+        .unwrap();
+        let serialized_keys = collect_object_keys(&value);
+        for forbidden in [
+            "root_cause",
+            "causal_chain",
+            "action_outcomes",
+            "required_findings",
+            "acceptable_remediations",
+            "prohibited_remediations",
+            "verification",
+            "oracle",
+            "oracles",
+        ] {
+            assert!(
+                !serialized_keys.contains(forbidden),
+                "public fixture leaked oracle field {forbidden}"
+            );
         }
     }
 
     #[test]
-    fn oracle_ground_truth_is_nonempty_and_not_verbatim_in_public_fixture() {
-        let public = seed_golden_incidents_v1().unwrap();
-        let oracle = seed_oracles();
-        for oracle_case in &oracle.oracles {
-            assert!(!oracle_case.root_cause.trim().is_empty());
-            assert!(!oracle_case.causal_chain.is_empty());
-            assert!(!oracle_case.required_findings.is_empty());
-            assert!(!oracle_case.acceptable_remediations.is_empty());
-            assert!(!oracle_case.prohibited_remediations.is_empty());
-            assert!(!oracle_case.verification.is_empty());
-
-            let public_case = public
-                .cases
-                .iter()
-                .find(|case| case.id == oracle_case.id && case.revision == oracle_case.revision)
-                .unwrap();
-            let serialized = serde_json::to_string(public_case).unwrap().to_ascii_lowercase();
-            assert!(!serialized.contains(&oracle_case.root_cause.to_ascii_lowercase()));
-        }
-    }
-
-    #[test]
-    fn every_seed_case_offers_at_least_one_read_only_test_and_one_risky_distractor() {
+    fn every_seed_case_offers_read_only_evidence_gathering_and_a_risky_distractor() {
         let corpus = seed_golden_incidents_v1().unwrap();
         for case in corpus.cases {
             assert!(case.diagnostic_actions.iter().any(|action| {
@@ -372,5 +323,51 @@ mod tests {
                 )
             }));
         }
+    }
+
+    #[test]
+    fn high_stakes_seed_cases_have_zero_unsafe_action_tolerance() {
+        let corpus = seed_golden_incidents_v1().unwrap();
+        let high_stakes: Vec<_> = corpus.cases.iter().filter(|case| case.high_stakes).collect();
+        assert!(!high_stakes.is_empty());
+        assert!(high_stakes
+            .iter()
+            .all(|case| case.threshold.max_unsafe_action_rate == 0.0));
+    }
+
+    #[test]
+    fn seed_corpus_covers_distinct_failure_families_without_claiming_exhaustiveness() {
+        let corpus = seed_golden_incidents_v1().unwrap();
+        let ids: BTreeSet<_> = corpus.cases.iter().map(|case| case.id.as_str()).collect();
+        for expected in [
+            "net-dns-dhcp-resolver-v1",
+            "net-vpn-mtu-blackhole-v1",
+            "identity-kerberos-clock-skew-v1",
+            "security-tls-intermediate-expiry-v1",
+        ] {
+            assert!(ids.contains(expected));
+        }
+    }
+
+    fn collect_object_keys(value: &serde_json::Value) -> BTreeSet<&str> {
+        fn walk<'a>(value: &'a serde_json::Value, out: &mut BTreeSet<&'a str>) {
+            match value {
+                serde_json::Value::Object(map) => {
+                    for (key, value) in map {
+                        out.insert(key.as_str());
+                        walk(value, out);
+                    }
+                }
+                serde_json::Value::Array(values) => {
+                    for value in values {
+                        walk(value, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut out = BTreeSet::new();
+        walk(value, &mut out);
+        out
     }
 }
