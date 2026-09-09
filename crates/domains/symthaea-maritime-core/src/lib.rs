@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Shared, non-weaponized maritime autonomy primitives.
+//! Shared, mission-neutral maritime autonomy primitives.
 //!
 //! This crate intentionally stops below mission-specific applications. It defines
 //! platform state, health, authority, degraded-operation and fleet-assurance
@@ -11,6 +11,7 @@ pub mod authority;
 pub mod degraded;
 pub mod fleet;
 pub mod health;
+pub mod prelude;
 pub mod state;
 
 pub use authority::*;
