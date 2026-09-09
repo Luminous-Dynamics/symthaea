@@ -8,6 +8,8 @@
 
 /// Niche-preserving, confidence-qualified Pareto comparison without scalar fitness.
 pub mod archive;
+/// Content-addressed binding from evidence-plane runs into generativity evidence.
+pub mod evidence_binding;
 /// Evidence-bearing, non-authoritative evaluation of future capacity and optionality.
 pub mod generativity;
 /// Typed outcomes that keep surprise reduction distinct from broader discovery value.
