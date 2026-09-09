@@ -3,8 +3,9 @@
 //! Computing-continuity kernel.
 //!
 //! This crate deliberately separates observed facts from dependency claims,
-//! continuity requirements, verification evidence, and execution authority.
-//! None of these values grants migration authority by itself.
+//! continuity requirements, verification evidence, counterfactual analysis,
+//! and execution authority. None of these values grants migration authority by
+//! itself.
 
 #![deny(unsafe_code)]
 
