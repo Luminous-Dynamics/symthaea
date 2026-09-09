@@ -21,14 +21,16 @@ pub struct FleetAssuranceReport {
 }
 
 impl FleetAssuranceReport {
-    /// Admission is intentionally all-members, not an aggregate score.
+    /// Admission is intentionally all-members, not an aggregate score. Missing or
+    /// unknown health evidence cannot satisfy a full-admission claim.
     pub fn all_members_admitted(&self) -> bool {
         !self.members.is_empty()
             && self.members.values().all(|member| {
                 member.admitted
                     && !member.quarantined
                     && member.generation == self.expected_generation
-                    && member.health.worst_severity() < HealthSeverity::Unsafe
+                    && member.envelope == OperatingEnvelope::Normal
+                    && member.health.is_fully_observed_nominal()
             })
     }
 
@@ -40,7 +42,7 @@ impl FleetAssuranceReport {
                     || !member.admitted
                     || member.generation != self.expected_generation
                     || member.envelope != OperatingEnvelope::Normal
-                    || member.health.worst_severity() >= HealthSeverity::Degraded
+                    || member.health.worst_severity() >= HealthSeverity::Unknown
             })
             .collect()
     }
@@ -80,6 +82,19 @@ mod tests {
             fleet_id: "fleet".into(),
             expected_generation: 4,
             members,
+        };
+        assert!(!report.all_members_admitted());
+        assert_eq!(report.degraded_members().len(), 1);
+    }
+
+    #[test]
+    fn missing_member_health_blocks_full_admission() {
+        let mut m = member("a", HealthSeverity::Healthy);
+        m.health.components.clear();
+        let report = FleetAssuranceReport {
+            fleet_id: "fleet".into(),
+            expected_generation: 4,
+            members: BTreeMap::from([("a".into(), m)]),
         };
         assert!(!report.all_members_admitted());
         assert_eq!(report.degraded_members().len(), 1);
