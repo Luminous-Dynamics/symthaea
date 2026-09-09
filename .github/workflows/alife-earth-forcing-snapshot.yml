@@ -1,0 +1,139 @@
+name: ALife Earth Forcing Snapshot
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-earth-system/**"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/earth_forcing.rs"
+      - "crates/domains/symthaea-alife/src/earth_forcing/**"
+      - ".github/workflows/alife-earth-forcing-snapshot.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Bit-exact Earth forcing restore theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/earth_forcing.rs
+          sha256sum crates/domains/symthaea-alife/src/earth_forcing/snapshot.rs
+          sha256sum crates/domains/symthaea-earth-system/src/ice_albedo.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-earth-forcing-snapshot
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-earth-system -p symthaea-alife -- --check
+
+      - name: Check targets
+        run: cargo check --locked -p symthaea-earth-system -p symthaea-alife --all-targets
+
+      - name: Test exact causal field round trip
+        run: cargo test --locked -p symthaea-alife serialized_restore_preserves_every_causal_field_bit_exactly
+
+      - name: Test long restored environment future
+        run: cargo test --locked -p symthaea-alife restored_environment_has_identical_long_future
+
+      - name: Test invalid climate model rejection
+        run: cargo test --locked -p symthaea-alife invalid_earth_model_cannot_become_restore_authority
+
+      - name: Test nonfinite integration rejection
+        run: cargo test --locked -p symthaea-alife nonfinite_integrator_state_fails_closed
+
+      - name: Test period/timestep rejection
+        run: cargo test --locked -p symthaea-alife nonpositive_period_or_timestep_fails_closed
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze Earth forcing causal surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          hot="crates/domains/symthaea-alife/src/earth_forcing.rs"
+          snap="crates/domains/symthaea-alife/src/earth_forcing/snapshot.rs"
+
+          grep -q 'mod snapshot;' "$hot"
+          grep -q 'pub fn snapshot_v1' "$snap"
+          grep -q 'pub fn from_validated_snapshot_v1' "$snap"
+          grep -q 'model.validate()' "$snap"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('crates/domains/symthaea-alife/src/earth_forcing/snapshot.rs').read_text()
+          required = [
+              'model_solar_constant_bits', 'model_emissivity_bits',
+              'model_albedo_ice_bits', 'model_albedo_warm_bits',
+              'model_t_ice_bits', 'model_t_warm_bits',
+              'temperature_bits', 'seasonal_amplitude_bits',
+              'seasonal_period_ticks_bits', 'dt_seconds_bits',
+              'secular_drift_per_tick_bits', 'tick: u64'
+          ]
+          for token in required:
+              if token not in text:
+                  raise SystemExit(f'Earth forcing snapshot omitted causal field: {token}')
+          if 'EarthForcedEnvironment::earth_like' in text.split('pub fn from_validated_snapshot_v1', 1)[1].split('impl EarthForcedEnvironmentSnapshotV1', 1)[0]:
+              raise SystemExit('Earth restore fell back to fresh constructor defaults')
+          PY
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-earth-forcing-snapshot-evidence
+          {
+            echo "authority=earth_forcing_snapshot_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "snapshot_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/earth_forcing/snapshot.rs | cut -d' ' -f1)"
+            echo "complete_environment_causal_surface=true"
+            echo "ice_albedo_domain_validation_reused=true"
+            echo "private_environment_tick_preserved=true"
+            echo "long_future_bit_exact_candidate=true"
+            echo "population_bound=false"
+            echo "scheduler_bound=false"
+            echo "execution_capsule_established=false"
+            echo "cryptographic_provenance=false"
+          } > target/alife-earth-forcing-snapshot-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-earth-forcing-snapshot-evidence
+          path: target/alife-earth-forcing-snapshot-evidence/qualification.txt
+          if-no-files-found: error
