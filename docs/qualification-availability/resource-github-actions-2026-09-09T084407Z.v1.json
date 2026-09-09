@@ -1,0 +1,36 @@
+{
+  "schema": "symthaea.qualification-availability-observation.v1",
+  "provider": "github-actions",
+  "repository": "Luminous-Dynamics/symthaea",
+  "observed_at": "2026-09-09T08:44:07Z",
+  "queued_run_count": 1092,
+  "pending_run_count": 10,
+  "in_progress_run_count": 0,
+  "retrieval_cap_reached": true,
+  "oldest_retrievable_queued": {
+    "ordinal_within_provider_cap": 1000,
+    "run_id": 34212533622,
+    "created_at": "2026-09-08T09:53:57Z",
+    "age_seconds_lower_bound": 82210
+  },
+  "qualification_subject": {
+    "admission_id": "sha256:e937bd324855f2c8a8e97c286f180674d43776c61af23ee373d4ebcc20e15f0b",
+    "subject_sha": "7350ee0a5cab0ccaa48b6691e8d52875143b102b"
+  },
+  "observed_existing_run": {
+    "run_id": 34215218821,
+    "status": "pending",
+    "created_at": "2026-09-08T10:23:47Z",
+    "wait_seconds": 80420,
+    "predates_admission_request": true
+  },
+  "non_claims": [
+    "does not establish a source failure",
+    "does not establish hosted qualification",
+    "does not prove the true oldest queued run time",
+    "does not select a CI provider for future attempts",
+    "does not state that GitHub Actions is permanently unavailable",
+    "does not state that the observed existing run was launched by the admission request"
+  ],
+  "observation_id": "sha256:d385a544425e19370ea00f29e949eb116b3280525010e8535be98ac974fc1c99"
+}
