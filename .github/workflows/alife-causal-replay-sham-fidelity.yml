@@ -1,0 +1,173 @@
+name: ALife Causal Rescue Sham Fidelity
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/causal_replay_estimand.rs"
+      - "crates/domains/symthaea-alife/src/causal_replay_fidelity.rs"
+      - "crates/domains/symthaea-alife/src/causal_replay_session.rs"
+      - "crates/domains/symthaea-alife/src/genesis_execution.rs"
+      - "crates/domains/symthaea-alife/src/population_snapshot.rs"
+      - "crates/domains/symthaea-alife/src/encounter_snapshot.rs"
+      - "crates/domains/symthaea-alife/src/earth_forcing/**"
+      - ".github/workflows/alife-causal-replay-sham-fidelity.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Exact natural-endpoint sham theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/causal_replay_fidelity.rs
+          sha256sum crates/domains/symthaea-alife/src/causal_replay_estimand.rs
+          sha256sum crates/domains/symthaea-alife/src/causal_replay_session.rs
+          sha256sum crates/domains/symthaea-alife/src/genesis_execution.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-causal-replay-sham-fidelity
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Execute sham fidelity regressions
+        run: 'cargo test --locked -p symthaea-alife causal_replay_fidelity::'
+
+      - name: Execute estimand and session prerequisites
+        run: |
+          cargo test --locked -p symthaea-alife causal_replay_estimand::
+          cargo test --locked -p symthaea-alife causal_replay_session::
+
+      - name: Strict ALife Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze complete endpoint fingerprint theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_fidelity.rs"
+          grep -q 'genesis-earth-endpoint-fingerprint-v1' "$src"
+          grep -q 'Population::from_validated_snapshot_v1' "$src"
+          grep -q 'snapshot_v1_at_evidence_boundary' "$src"
+          grep -q 'EncounterScheduler::from_validated_snapshot_v1' "$src"
+          grep -q 'EarthForcedEnvironment::from_validated_snapshot_v1' "$src"
+          grep -q 'GenesisEvidenceCheckpointV1::new' "$src"
+          grep -q 'hash_component(&mut hasher, "population"' "$src"
+          grep -q 'hash_component(&mut hasher, "scheduler"' "$src"
+          grep -q 'hash_component(&mut hasher, "environment"' "$src"
+          grep -q 'hash_component(&mut hasher, "evidence"' "$src"
+
+      - name: Freeze exact sham equality and effect gating
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_fidelity.rs"
+          grep -q 'EndpointFingerprintMismatch' "$src"
+          grep -q 'one_bit_environment_drift_fails_exact_sham_fidelity' "$src"
+          grep -q 'CausalRescueShamFidelityReceiptV1' "$src"
+          grep -q 'compute_fidelity_qualified_primary_effect_v1' "$src"
+          grep -q 'FidelityReceiptSpecMismatch' "$src"
+          grep -q 'primary_effect_requires_fidelity_from_the_same_experiment' "$src"
+
+      - name: Require fidelity receipt to remain non-serializable authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('crates/domains/symthaea-alife/src/causal_replay_fidelity.rs').read_text()
+          marker = 'pub struct CausalRescueShamFidelityReceiptV1'
+          idx = src.index(marker)
+          prefix = src[max(0, idx-180):idx]
+          assert 'Serialize' not in prefix and 'Deserialize' not in prefix, prefix
+          PY
+
+      - name: Require production hash dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="crates/domains/symthaea-alife/Cargo.toml"
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('crates/domains/symthaea-alife/Cargo.toml').read_text()
+          deps = text.split('[dependencies]', 1)[1]
+          assert 'serde_json = { workspace = true }' in deps
+          assert 'sha2 = { workspace = true }' in deps
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_fidelity.rs"
+          ! grep -q 'origin_authenticity_established=true' "$src"
+          ! grep -q 'treatment_exposure_established=true' "$src"
+          ! grep -q 'live_replay_established=true' "$src"
+          ! grep -q 'causal_rescue_established=true' "$src"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-causal-replay-sham-fidelity-evidence
+          {
+            echo "authority=causal_rescue_sham_fidelity_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "fidelity_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/causal_replay_fidelity.rs | cut -d' ' -f1)"
+            echo "full_endpoint_semantic_fingerprint_candidate=true"
+            echo "population_bound=true"
+            echo "scheduler_bound=true"
+            echo "earth_forcing_bound=true"
+            echo "behavior_lifecycle_evidence_bound=true"
+            echo "one_bit_environment_drift_rejected=true"
+            echo "sham_fidelity_receipt_nonserializable=true"
+            echo "primary_effect_requires_same_experiment_fidelity=true"
+            echo "origin_authenticity_established=false"
+            echo "treatment_exposure_established=false"
+            echo "live_replay_established=false"
+            echo "statistical_inference_established=false"
+            echo "causal_rescue_established=false"
+          } > target/alife-causal-replay-sham-fidelity-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-causal-replay-sham-fidelity-evidence
+          path: target/alife-causal-replay-sham-fidelity-evidence/qualification.txt
+          if-no-files-found: error
