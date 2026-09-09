@@ -13,4 +13,12 @@ categories = ["simulation", "science"]
 
 [dependencies]
 symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-extension-core = { path = "../../core/symthaea-extension-core", optional = true }
+symthaea-sim-extension-routing = { path = "../symthaea-sim-extension-routing", optional = true }
 
+[features]
+default = []
+extension-routing = [
+    "dep:symthaea-extension-core",
+    "dep:symthaea-sim-extension-routing",
+]
