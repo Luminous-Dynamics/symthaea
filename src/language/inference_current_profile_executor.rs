@@ -6,9 +6,11 @@
 //! freshness timestamp at execution. Construction resolves the current profile,
 //! derives the private HTTP executor from that profile, and shares one exact Arc
 //! clock between profile freshness checks and the underlying inference executor.
+//! The v3 profile theorem is owned here; lower credential/HTTP layers only receive
+//! an exact preverified binding.
 
 #[cfg(not(test))]
-use super::inference_binding::QuotaStateBinding;
+use super::inference_binding::{CredentialStateBinding, QuotaStateBinding};
 #[cfg(not(test))]
 use super::inference_contract::{InferencePolicy, InferenceRequest, ModelIdentity};
 #[cfg(not(test))]
@@ -16,7 +18,7 @@ use super::inference_credential::{
     CredentialBoundOpenAiExecutor, InferenceCredentialExecutorError, InferenceCredentialLease,
 };
 #[cfg(not(test))]
-use super::inference_execution_envelope::InferenceGenerationControls;
+use super::inference_execution_envelope::{EndpointStateBinding, InferenceGenerationControls};
 #[cfg(not(test))]
 use super::inference_executor::{
     InferenceExecutionFailure, InferenceExecutionOutcome, InferenceExecutorFatalError,
@@ -30,12 +32,14 @@ use super::inference_profile_execution::{
     ProviderProfileResolver, admit_and_bind_profile_execution,
 };
 #[cfg(not(test))]
-use super::inference_provider_registry::{ProviderProfileKey, ProviderQualificationPolicy};
+use super::inference_provider_registry::{
+    ProviderProfileKey, ProviderQualificationPolicy, QualifiedProviderCandidate,
+};
 #[cfg(not(test))]
 use super::inference_receipt::{InferenceFailureClass, InferenceReceipt};
 
 #[cfg(test)]
-use crate::inference_binding::QuotaStateBinding;
+use crate::inference_binding::{CredentialStateBinding, QuotaStateBinding};
 #[cfg(test)]
 use crate::inference_contract::{InferencePolicy, InferenceRequest, ModelIdentity};
 #[cfg(test)]
@@ -43,7 +47,7 @@ use crate::inference_credential::{
     CredentialBoundOpenAiExecutor, InferenceCredentialExecutorError, InferenceCredentialLease,
 };
 #[cfg(test)]
-use crate::inference_execution_envelope::InferenceGenerationControls;
+use crate::inference_execution_envelope::{EndpointStateBinding, InferenceGenerationControls};
 #[cfg(test)]
 use crate::inference_executor::{
     InferenceExecutionFailure, InferenceExecutionOutcome, InferenceExecutorFatalError,
@@ -57,7 +61,9 @@ use crate::inference_profile_execution::{
     ProviderProfileResolver, admit_and_bind_profile_execution,
 };
 #[cfg(test)]
-use crate::inference_provider_registry::{ProviderProfileKey, ProviderQualificationPolicy};
+use crate::inference_provider_registry::{
+    ProviderProfileKey, ProviderQualificationPolicy, QualifiedProviderCandidate,
+};
 #[cfg(test)]
 use crate::inference_receipt::{InferenceFailureClass, InferenceReceipt};
 
@@ -65,19 +71,12 @@ use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Allow one shared clock object to be cloned by Arc without creating another
-/// freshness/receipt time source.
 impl<T: InferenceTickSource + ?Sized> InferenceTickSource for Arc<T> {
     fn now_tick(&self) -> u64 {
         (**self).now_tick()
     }
 }
 
-/// Current-profile execution wrapper.
-///
-/// The underlying credential-bound HTTP executor is built internally from the
-/// currently qualified profile. The same Arc clock is retained for future profile
-/// qualification and cloned into the inner executor for receipt/execution timing.
 pub struct CurrentProfileCredentialExecutor<C: ?Sized, R> {
     executor: CredentialBoundOpenAiExecutor<Arc<C>>,
     resolver: R,
@@ -101,11 +100,6 @@ impl<C: InferenceTickSource + ?Sized, R> fmt::Debug for CurrentProfileCredential
 impl<C: InferenceTickSource + ?Sized, R: ProviderProfileResolver>
     CurrentProfileCredentialExecutor<C, R>
 {
-    /// Construct the safe executor from the current qualified profile.
-    ///
-    /// Provider id, wire model and endpoint are derived from registry truth rather
-    /// than supplied independently by the caller. The credential lease remains the
-    /// IF-9 secret/identity capability and is moved into the private transport.
     #[allow(clippy::too_many_arguments)]
     pub fn from_current_profile(
         resolver: R,
@@ -154,13 +148,37 @@ impl<C: InferenceTickSource + ?Sized, R: ProviderProfileResolver>
         &self.profile_key
     }
 
-    pub fn inner(&self) -> &CredentialBoundOpenAiExecutor<Arc<C>> {
+    /// Read-only endpoint metadata for diagnostics/tests. No lower executor handle
+    /// is exposed publicly, preventing callers from bypassing current-profile checks.
+    pub fn endpoint_binding(&self) -> &EndpointStateBinding {
+        self.executor.endpoint_binding()
+    }
+
+    /// Non-secret credential identity used in authority bindings.
+    pub fn credential_binding(&self) -> &CredentialStateBinding {
+        self.executor.credential_binding()
+    }
+
+    /// Crate-internal access for stricter child wrappers only. External callers
+    /// cannot obtain the lower credential/transport executor.
+    pub(crate) fn inner(&self) -> &CredentialBoundOpenAiExecutor<Arc<C>> {
         &self.executor
     }
 
-    /// Resolve the current profile using the wrapper-owned trusted clock and
-    /// produce the exact v3 binding used for permit issuance. This does not mint a
-    /// permit or execute anything.
+    pub(crate) fn trusted_now_tick(&self) -> u64 {
+        self.clock.now_tick()
+    }
+
+    pub(crate) fn resolve_current_profile(
+        &self,
+    ) -> Result<QualifiedProviderCandidate, ProviderProfileResolveError> {
+        self.resolver.resolve_current(
+            &self.profile_key,
+            self.clock.now_tick(),
+            self.qualification_policy,
+        )
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn bind_current(
         &self,
@@ -187,9 +205,6 @@ impl<C: InferenceTickSource + ?Sized, R: ProviderProfileResolver>
         .map_err(CurrentProfileBindingError::Profile)
     }
 
-    /// Resolve the currently installed profile again adjacent to execution using
-    /// the same trusted clock object used by the inner executor. A lookup or
-    /// qualification failure consumes `prepared` into a local failure receipt.
     #[allow(clippy::too_many_arguments)]
     pub async fn execute_current(
         &self,
@@ -205,10 +220,23 @@ impl<C: InferenceTickSource + ?Sized, R: ProviderProfileResolver>
             .resolve_current(&self.profile_key, now_tick, self.qualification_policy)
         {
             Ok(profile) => profile,
-            Err(_) => return profile_resolution_failure(prepared, now_tick),
+            Err(_) => return profile_verification_failure(prepared, now_tick),
+        };
+        let rebound = match admit_and_bind_profile_execution(
+            policy,
+            request,
+            &profile,
+            self.executor.credential_binding(),
+            quota,
+            self.executor.endpoint_binding(),
+            controls,
+            now_tick,
+        ) {
+            Ok(bound) => bound,
+            Err(_) => return profile_verification_failure(prepared, now_tick),
         };
         self.executor
-            .execute_profile_bound(prepared, policy, request, &profile, quota, controls)
+            .execute_preverified_binding(prepared, *rebound.binding(), request, controls)
             .await
     }
 
@@ -228,15 +256,26 @@ impl<C: InferenceTickSource + ?Sized, R: ProviderProfileResolver>
             .resolve_current(&self.profile_key, now_tick, self.qualification_policy)
         {
             Ok(profile) => profile,
-            Err(_) => return profile_resolution_failure(prepared, now_tick),
+            Err(_) => return profile_verification_failure(prepared, now_tick),
+        };
+        let rebound = match admit_and_bind_profile_execution(
+            policy,
+            request,
+            &profile,
+            self.executor.credential_binding(),
+            quota,
+            self.executor.endpoint_binding(),
+            controls,
+            now_tick,
+        ) {
+            Ok(bound) => bound,
+            Err(_) => return profile_verification_failure(prepared, now_tick),
         };
         self.executor
-            .execute_streaming_profile_bound(
+            .execute_streaming_preverified_binding(
                 prepared,
-                policy,
+                *rebound.binding(),
                 request,
-                &profile,
-                quota,
                 controls,
                 on_token,
             )
@@ -244,7 +283,7 @@ impl<C: InferenceTickSource + ?Sized, R: ProviderProfileResolver>
     }
 }
 
-fn profile_resolution_failure(
+fn profile_verification_failure(
     prepared: PreparedInferenceExecution,
     completed_at_tick: u64,
 ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {

@@ -3,9 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Permit-gated OpenAI-compatible executor.
 //!
-//! Legacy execution re-derives the complete v2 binding immediately before I/O.
-//! IF-11 adds an additive v3 profile-bound path that re-derives the qualified
-//! deployment/profile binding immediately before the same private transport call.
+//! The raw executor understands the IF-4/v2 semantic execution envelope plus a
+//! crate-internal exact-binding dispatch seam. Higher authority layers (current
+//! provider profile, resource scope, future manifests) re-derive their stronger
+//! bindings above this file and pass only the final exact binding downward.
 
 #[cfg(not(test))]
 use super::inference_binding::{CredentialStateBinding, QuotaStateBinding};
@@ -17,11 +18,7 @@ use super::inference_execution_envelope::{
     InferenceGenerationControls, admit_and_bind_execution,
 };
 #[cfg(not(test))]
-use super::inference_permit::PreparedInferenceExecution;
-#[cfg(not(test))]
-use super::inference_profile_execution::admit_and_bind_profile_execution;
-#[cfg(not(test))]
-use super::inference_provider_registry::QualifiedProviderCandidate;
+use super::inference_permit::{InferenceExecutionBinding, PreparedInferenceExecution};
 #[cfg(not(test))]
 use super::inference_receipt::{
     InferenceFailureClass, InferenceRateLimitEvidence, InferenceReceipt, InferenceReceiptError,
@@ -44,11 +41,7 @@ use crate::inference_execution_envelope::{
     InferenceGenerationControls, admit_and_bind_execution,
 };
 #[cfg(test)]
-use crate::inference_permit::PreparedInferenceExecution;
-#[cfg(test)]
-use crate::inference_profile_execution::admit_and_bind_profile_execution;
-#[cfg(test)]
-use crate::inference_provider_registry::QualifiedProviderCandidate;
+use crate::inference_permit::{InferenceExecutionBinding, PreparedInferenceExecution};
 #[cfg(test)]
 use crate::inference_receipt::{
     InferenceFailureClass, InferenceRateLimitEvidence, InferenceReceipt, InferenceReceiptError,
@@ -64,7 +57,6 @@ use crate::openai_compatible_transport::{
 use std::fmt;
 use std::time::Duration;
 
-/// Qualified monotonic/trusted tick source supplied by the embedding runtime.
 pub trait InferenceTickSource: Send + Sync {
     fn now_tick(&self) -> u64;
 }
@@ -73,6 +65,7 @@ pub trait InferenceTickSource: Send + Sync {
 pub enum InferenceExecutionFailure {
     BindingRejected,
     ProviderProfileRejected,
+    ResourceScopeRejected,
     BoundStateChanged,
     UnsupportedTools,
     UnsupportedStructuredOutput,
@@ -84,8 +77,6 @@ pub enum InferenceExecutionFailure {
     EmptyResponse,
 }
 
-/// Terminal execution result. Operational failures still carry a receipt.
-/// Custom Debug deliberately omits generated text and raw provider identifiers.
 pub struct InferenceExecutionOutcome {
     pub response_text: Option<String>,
     pub receipt: InferenceReceipt,
@@ -104,7 +95,6 @@ impl fmt::Debug for InferenceExecutionOutcome {
     }
 }
 
-/// OpenAI-compatible executor whose underlying transport cannot be accessed directly.
 pub struct OpenAiInferenceExecutor<C> {
     transport: OpenAiCompatibleTransport,
     endpoint: EndpointStateBinding,
@@ -138,7 +128,6 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
         };
         let timeout_millis = u64::try_from(timeout.as_millis())
             .map_err(|_| InferenceExecutorConfigError::TimeoutTooLarge)?;
-
         let config = OpenAiCompatibleConfig::new(provider_id, base_url, wire_model, credential)?
             .with_timeout(timeout)?;
         let endpoint = EndpointStateBinding::openai_compatible(
@@ -161,7 +150,6 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
         &self.endpoint
     }
 
-    /// Legacy v2 execution path retained for stack compatibility.
     #[allow(clippy::too_many_arguments)]
     pub async fn execute(
         &self,
@@ -182,42 +170,6 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
         }
         let wire_request = match self.verify_and_derive(
             &prepared, policy, request, candidate, credential, quota, controls,
-        ) {
-            Ok(request) => request,
-            Err(failure) => {
-                return self.failure_outcome(
-                    prepared,
-                    failure,
-                    InferenceFailureClass::VerificationRejected,
-                );
-            }
-        };
-        self.dispatch_non_streaming(prepared, wire_request).await
-    }
-
-    /// IF-11 v3 path. The exact qualified deployment/profile is rebound immediately
-    /// before I/O and compared with the prepared one-use execution authority.
-    #[allow(clippy::too_many_arguments)]
-    pub async fn execute_profile_bound(
-        &self,
-        prepared: PreparedInferenceExecution,
-        policy: &InferencePolicy,
-        request: &InferenceRequest,
-        profile: &QualifiedProviderCandidate,
-        credential: &CredentialStateBinding,
-        quota: &QuotaStateBinding,
-        controls: InferenceGenerationControls,
-    ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {
-        if controls.streaming() {
-            return self.failure_outcome(
-                prepared,
-                InferenceExecutionFailure::WrongStreamingEntryPoint,
-                InferenceFailureClass::VerificationRejected,
-            );
-        }
-        let now_tick = self.clock.now_tick();
-        let wire_request = match self.verify_profile_and_derive(
-            &prepared, policy, request, profile, credential, quota, controls, now_tick,
         ) {
             Ok(request) => request,
             Err(failure) => {
@@ -265,15 +217,46 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
         self.dispatch_streaming(prepared, wire_request, on_token).await
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub async fn execute_streaming_profile_bound(
+    /// Crate-internal seam for a stricter child layer that has already re-derived
+    /// its complete execution binding. The exact expected binding is compared here
+    /// immediately before wire request derivation and private transport dispatch.
+    pub(crate) async fn execute_preverified_binding(
         &self,
         prepared: PreparedInferenceExecution,
-        policy: &InferencePolicy,
+        expected_binding: InferenceExecutionBinding,
         request: &InferenceRequest,
-        profile: &QualifiedProviderCandidate,
-        credential: &CredentialStateBinding,
-        quota: &QuotaStateBinding,
+        controls: InferenceGenerationControls,
+    ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {
+        if controls.streaming() {
+            return self.failure_outcome(
+                prepared,
+                InferenceExecutionFailure::WrongStreamingEntryPoint,
+                InferenceFailureClass::VerificationRejected,
+            );
+        }
+        let wire_request = match self.verify_exact_binding_and_derive(
+            &prepared,
+            expected_binding,
+            request,
+            controls,
+        ) {
+            Ok(request) => request,
+            Err(failure) => {
+                return self.failure_outcome(
+                    prepared,
+                    failure,
+                    InferenceFailureClass::VerificationRejected,
+                );
+            }
+        };
+        self.dispatch_non_streaming(prepared, wire_request).await
+    }
+
+    pub(crate) async fn execute_streaming_preverified_binding(
+        &self,
+        prepared: PreparedInferenceExecution,
+        expected_binding: InferenceExecutionBinding,
+        request: &InferenceRequest,
         controls: InferenceGenerationControls,
         on_token: &mut (dyn for<'a> FnMut(&'a str) + Send),
     ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {
@@ -284,9 +267,11 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
                 InferenceFailureClass::VerificationRejected,
             );
         }
-        let now_tick = self.clock.now_tick();
-        let wire_request = match self.verify_profile_and_derive(
-            &prepared, policy, request, profile, credential, quota, controls, now_tick,
+        let wire_request = match self.verify_exact_binding_and_derive(
+            &prepared,
+            expected_binding,
+            request,
+            controls,
         ) {
             Ok(request) => request,
             Err(failure) => {
@@ -328,31 +313,15 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
         self.derive_wire_request(request, controls)
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn verify_profile_and_derive(
+    fn verify_exact_binding_and_derive(
         &self,
         prepared: &PreparedInferenceExecution,
-        policy: &InferencePolicy,
+        expected_binding: InferenceExecutionBinding,
         request: &InferenceRequest,
-        profile: &QualifiedProviderCandidate,
-        credential: &CredentialStateBinding,
-        quota: &QuotaStateBinding,
         controls: InferenceGenerationControls,
-        now_tick: u64,
     ) -> Result<TransportGenerationRequest, InferenceExecutionFailure> {
         self.validate_supported_wire_contract(request)?;
-        let rebound = admit_and_bind_profile_execution(
-            policy,
-            request,
-            profile,
-            credential,
-            quota,
-            &self.endpoint,
-            controls,
-            now_tick,
-        )
-        .map_err(|_| InferenceExecutionFailure::ProviderProfileRejected)?;
-        if rebound.binding() != prepared.binding() {
+        if &expected_binding != prepared.binding() {
             return Err(InferenceExecutionFailure::BoundStateChanged);
         }
         self.derive_wire_request(request, controls)

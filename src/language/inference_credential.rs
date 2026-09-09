@@ -3,7 +3,8 @@
 //! Credential-bound inference executor.
 //!
 //! A credential lease carries both the secret material used on the wire and the
-//! exact non-secret credential identity/epoch used in inference bindings.
+//! exact non-secret credential identity/epoch used in inference bindings. Higher
+//! authority layers derive stronger execution bindings above this file.
 
 #[cfg(not(test))]
 use super::inference_binding::{CredentialStateBinding, InferenceBindingError, QuotaStateBinding};
@@ -17,9 +18,7 @@ use super::inference_executor::{
     InferenceTickSource, OpenAiInferenceExecutor,
 };
 #[cfg(not(test))]
-use super::inference_permit::PreparedInferenceExecution;
-#[cfg(not(test))]
-use super::inference_provider_registry::QualifiedProviderCandidate;
+use super::inference_permit::{InferenceExecutionBinding, PreparedInferenceExecution};
 #[cfg(not(test))]
 use super::openai_compatible_transport::{BearerCredential, TransportConfigError, TransportCredential};
 
@@ -35,9 +34,7 @@ use crate::inference_executor::{
     InferenceTickSource, OpenAiInferenceExecutor,
 };
 #[cfg(test)]
-use crate::inference_permit::PreparedInferenceExecution;
-#[cfg(test)]
-use crate::inference_provider_registry::QualifiedProviderCandidate;
+use crate::inference_permit::{InferenceExecutionBinding, PreparedInferenceExecution};
 #[cfg(test)]
 use crate::openai_compatible_transport::{BearerCredential, TransportConfigError, TransportCredential};
 
@@ -85,7 +82,6 @@ impl InferenceCredentialHandle {
     }
 }
 
-/// Non-clone credential capability. Secret material is deliberately absent from Debug.
 pub struct InferenceCredentialLease {
     binding: CredentialStateBinding,
     mode: InferenceCredentialMode,
@@ -162,7 +158,6 @@ pub fn resolve_credential<R: InferenceCredentialResolver>(
     Ok(lease)
 }
 
-/// Safe wrapper: callers cannot supply a different credential binding at execution.
 pub struct CredentialBoundOpenAiExecutor<C> {
     inner: OpenAiInferenceExecutor<C>,
     binding: CredentialStateBinding,
@@ -232,28 +227,18 @@ impl<C: InferenceTickSource> CredentialBoundOpenAiExecutor<C> {
             .await
     }
 
-    /// Additive IF-11 path. Credential identity remains inseparable from the secret
-    /// while the exact provider profile is rebound by the private executor.
-    #[allow(clippy::too_many_arguments)]
-    pub async fn execute_profile_bound(
+    /// Crate-private exact-binding forwarding for stricter child authority layers.
+    /// The credential secret remains inseparable from this executor while the child
+    /// layer owns all semantics used to derive `expected_binding`.
+    pub(crate) async fn execute_preverified_binding(
         &self,
         prepared: PreparedInferenceExecution,
-        policy: &InferencePolicy,
+        expected_binding: InferenceExecutionBinding,
         request: &InferenceRequest,
-        profile: &QualifiedProviderCandidate,
-        quota: &QuotaStateBinding,
         controls: InferenceGenerationControls,
     ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {
         self.inner
-            .execute_profile_bound(
-                prepared,
-                policy,
-                request,
-                profile,
-                &self.binding,
-                quota,
-                controls,
-            )
+            .execute_preverified_binding(prepared, expected_binding, request, controls)
             .await
     }
 
@@ -282,25 +267,19 @@ impl<C: InferenceTickSource> CredentialBoundOpenAiExecutor<C> {
             .await
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub async fn execute_streaming_profile_bound(
+    pub(crate) async fn execute_streaming_preverified_binding(
         &self,
         prepared: PreparedInferenceExecution,
-        policy: &InferencePolicy,
+        expected_binding: InferenceExecutionBinding,
         request: &InferenceRequest,
-        profile: &QualifiedProviderCandidate,
-        quota: &QuotaStateBinding,
         controls: InferenceGenerationControls,
         on_token: &mut (dyn for<'a> FnMut(&'a str) + Send),
     ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {
         self.inner
-            .execute_streaming_profile_bound(
+            .execute_streaming_preverified_binding(
                 prepared,
-                policy,
+                expected_binding,
                 request,
-                profile,
-                &self.binding,
-                quota,
                 controls,
                 on_token,
             )
