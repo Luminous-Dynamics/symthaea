@@ -67,6 +67,11 @@ jobs:
           grep -F 'MayReportQualified' "$FILE"
           grep -F 'pub fn evaluate(' "$FILE"
           grep -F 'pub fn validate(' "$FILE"
+          grep -F 'if scientific == 0' "$FILE"
+          grep -F 'pub profile: QualificationProfileV1' "$FILE"
+          grep -F 'profile_requirements(left)? == profile_requirements(right)?' "$FILE"
+          grep -F 'Some(CheckOutcome::InfrastructureError) => interrupted = true' "$FILE"
+          grep -F 'Some(CheckOutcome::TimedOut | CheckOutcome::Skipped | CheckOutcome::Cancelled)' "$FILE"
           ! grep -F 'MaterializationAuthorized' "$FILE"
 
       - name: Prove real-failure census shapes classify separately
@@ -111,15 +116,17 @@ jobs:
           }
 
           #[test]
-          fn cancelled_shape_is_incomplete_not_candidate_rejection() {
-              let observations = vec![
-                  observation("premise", CheckOutcome::Passed),
-                  observation("theorem", CheckOutcome::Cancelled),
-              ];
-              assert_eq!(
-                  evaluate(&profile(), &observations).unwrap(),
-                  QualificationDisposition::Incomplete,
-              );
+          fn cancelled_and_timeout_shapes_are_incomplete_without_causal_attribution() {
+              for outcome in [CheckOutcome::Cancelled, CheckOutcome::TimedOut] {
+                  let observations = vec![
+                      observation("premise", CheckOutcome::Passed),
+                      observation("theorem", outcome),
+                  ];
+                  assert_eq!(
+                      evaluate(&profile(), &observations).unwrap(),
+                      QualificationDisposition::Incomplete,
+                  );
+              }
           }
           RS
           cargo test --locked -p symthaea-evidence-plane --test qualification_census
@@ -141,5 +148,5 @@ jobs:
 
       - name: Evidence boundary
         run: |
-          echo 'PASS establishes a profile-driven evaluator that keeps execution observations separate from derived disposition; missing checks are derived rather than fabricated; premise, scientific, and admissibility failures remain distinct; cancellation is incomplete unless infrastructure failure is explicitly observed; duplicate/unknown observations fail closed; serialized disposition and bounded reporting authority are verifier-recomputed.'
-          echo 'PASS does not bind candidate bytes, base commit, patch digest, workflow digest, runner/toolchain/environment identity, or external scientific truth. MayReportQualified is reporting authority only and MUST NOT authorize materialization. Exact artifact identity and materialization authority remain future qualification stages.'
+          echo 'PASS establishes a profile-driven evaluator that keeps execution observations separate from derived disposition; missing checks are derived rather than fabricated; at least one scientific requirement is mandatory; premise, scientific, and admissibility failures remain distinct; cancellation and unattributed timeout are incomplete while explicit infrastructure failure is distinct; duplicate/unknown/malformed observations fail closed; exact profile role semantics are structurally rebound during validation; serialized disposition and bounded reporting authority are verifier-recomputed.'
+          echo 'PASS does not cryptographically identify the profile, candidate bytes, base commit, patch digest, workflow digest, runner/toolchain/environment identity, or external scientific truth. MayReportQualified is reporting authority only and MUST NOT authorize materialization. Exact artifact/execution identity and materialization authority remain future qualification stages.'
