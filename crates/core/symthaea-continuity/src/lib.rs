@@ -9,8 +9,22 @@
 #![deny(unsafe_code)]
 
 pub mod auth_wire;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production witness composition stays sealed until authenticated current verifier authority exists"
+    )
+)]
 mod compose;
 pub mod contract;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "production exact-policy admission stays sealed until authenticated current verifier authority exists"
+    )
+)]
 pub mod exact_policy;
 pub mod observation;
 pub mod profile_adoption;
@@ -20,7 +34,15 @@ pub mod profile_adoption_grant;
 pub mod profile_adoption_grant_commit;
 pub mod profile_adoption_root;
 pub mod profile_adoption_time;
+#[expect(
+    dead_code,
+    reason = "private authority-checked and authenticated verifier evidence is intentionally unmintable in production"
+)]
 pub mod verifier;
+#[expect(
+    dead_code,
+    reason = "closed-world witness internals remain private until verifier-owned authenticated evidence can reach composition"
+)]
 mod witness;
 
 pub use auth_wire::{
@@ -61,13 +83,12 @@ pub use profile_adoption_grant::{
     bind_root_bound_adoption_to_authority_grant,
 };
 pub use profile_adoption_grant_commit::{
-    GrantBoundVerifierProfileAdoptionCommitPreconditionsV1,
-    VerifierProfileAdoptionGrantCommitError,
+    GrantBoundVerifierProfileAdoptionCommitPreconditionsV1, VerifierProfileAdoptionGrantCommitError,
 };
 pub use profile_adoption_root::{
     RootBoundPolicyCheckedVerifierProfileAdoptionV1,
-    VerifierProfileAdoptionAuthorityRootSnapshotId,
-    VerifierProfileAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionRootBindingError,
+    VerifierProfileAdoptionAuthorityRootSnapshotId, VerifierProfileAdoptionAuthorityRootSnapshotV1,
+    VerifierProfileAdoptionRootBindingError,
 };
 pub use profile_adoption_time::{
     TimeBoundVerifierProfileAdoptionCommitPreconditionsV1,

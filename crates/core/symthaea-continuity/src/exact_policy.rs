@@ -183,20 +183,41 @@ mod tests {
 
     fn contract() -> ValidatedContinuityContractV1 {
         let observation = ObservationEnvelopeV1::new(
-            "machine-1", "workflow.dependency", "fixture", "1", 1_700_000_000_000,
-            ObservationCoverage::Complete, EvidenceBasis::Tested, [1; 32], vec![],
-        ).unwrap();
+            "machine-1",
+            "workflow.dependency",
+            "fixture",
+            "1",
+            1_700_000_000_000,
+            ObservationCoverage::Complete,
+            EvidenceBasis::Tested,
+            [1; 32],
+            vec![],
+        )
+        .unwrap();
         let dependency = DependencyClaimV1::new(
-            "role:research", "requires", "capability:cuda", DependencyBasis::Observed,
-            vec![observation.id()], vec![],
-        ).unwrap();
+            "role:research",
+            "requires",
+            "capability:cuda",
+            DependencyBasis::Observed,
+            vec![observation.id()],
+            vec![],
+        )
+        .unwrap();
         let requirement = ContinuityRequirementV1::new(
-            dependency.id(), "cuda-workflow", RequirementCriticality::Must,
-            EquivalencePredicate::BehavioralScenario { scenario_id: "cuda-fixture-v1".into() },
-            ApprovalBasis::ExplicitPolicy, [2; 32],
-        ).unwrap();
+            dependency.id(),
+            "cuda-workflow",
+            RequirementCriticality::Must,
+            EquivalencePredicate::BehavioralScenario {
+                scenario_id: "cuda-fixture-v1".into(),
+            },
+            ApprovalBasis::ExplicitPolicy,
+            [2; 32],
+        )
+        .unwrap();
         ContinuityContractV1::new("research-fleet", [3; 32], vec![requirement])
-            .unwrap().validate().unwrap()
+            .unwrap()
+            .validate()
+            .unwrap()
     }
 
     fn profile(root: u8, epoch: u64, class: EvidenceClass) -> VerifierProfileV1 {
@@ -205,7 +226,8 @@ mod tests {
 
     fn entries(contract: &ValidatedContinuityContractV1) -> Vec<VerificationPolicyEntryV1> {
         vec![VerificationPolicyEntryV1::new(
-            contract.requirements()[0].id(), EvidenceClass::Simulated,
+            contract.requirements()[0].id(),
+            EvidenceClass::Simulated,
         )]
     }
 
@@ -234,7 +256,9 @@ mod tests {
                 ExactVerificationPolicyV1::new(&candidate, entries(&contract)).unwrap();
             assert_ne!(base_policy.id(), candidate_policy.id());
             assert_eq!(
-                base_policy.validate_against_profile(&candidate).unwrap_err(),
+                base_policy
+                    .validate_against_profile(&candidate)
+                    .unwrap_err(),
                 ExactVerificationPolicyError::VerifierProfileIdentityMismatch
             );
         }
@@ -249,13 +273,26 @@ mod tests {
         let policy = ExactVerificationPolicyV1::new(&trusted, entries(&contract)).unwrap();
         let challenge = [5; 32];
         let claim = VerificationEvidenceClaimV1::new(
-            contract.id(), target, contract.requirements()[0].id(), substituted.id(), challenge,
-            1_700_000_000_111, VerificationOutcomeV1::Satisfied, [8; 32],
-        ).unwrap();
+            contract.id(),
+            target,
+            contract.requirements()[0].id(),
+            substituted.id(),
+            challenge,
+            1_700_000_000_111,
+            VerificationOutcomeV1::Satisfied,
+            [8; 32],
+        )
+        .unwrap();
         assert_eq!(
             policy_check_exact_verification_evidence(
-                &contract, target, &policy, &substituted, challenge, claim,
-            ).unwrap_err(),
+                &contract,
+                target,
+                &policy,
+                &substituted,
+                challenge,
+                claim,
+            )
+            .unwrap_err(),
             ExactVerificationPolicyError::VerifierProfileIdentityMismatch
         );
     }

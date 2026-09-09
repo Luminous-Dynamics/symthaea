@@ -234,10 +234,12 @@ fn validate_entire_interval(
 ) -> Result<(), VerifierProfileAdoptionTimeError> {
     let uncertainty_ms = clock.uncertainty_ms();
     if uncertainty_ms > max_uncertainty_ms {
-        return Err(VerifierProfileAdoptionTimeError::ClockUncertaintyExceedsPolicy {
-            observed_ms: uncertainty_ms,
-            maximum_ms: max_uncertainty_ms,
-        });
+        return Err(
+            VerifierProfileAdoptionTimeError::ClockUncertaintyExceedsPolicy {
+                observed_ms: uncertainty_ms,
+                maximum_ms: max_uncertainty_ms,
+            },
+        );
     }
 
     let valid_from = preconditions.valid_from_unix_ms();
@@ -315,36 +317,45 @@ pub enum VerifierProfileAdoptionTimeError {
     ControlCharacters { field: &'static str },
     #[error("verifier-adoption clock epoch must be greater than zero")]
     ZeroClockEpoch,
-    #[error("invalid verifier-adoption clock interval: earliest {earliest_unix_ms} > latest {latest_unix_ms}")]
+    #[error(
+        "invalid verifier-adoption clock interval: earliest {earliest_unix_ms} > latest {latest_unix_ms}"
+    )]
     InvalidClockInterval {
         earliest_unix_ms: u64,
         latest_unix_ms: u64,
     },
     #[error("stored verifier-adoption clock observation identity is not canonical")]
     ClockObservationIdentityMismatch,
-    #[error("verifier-adoption clock lineage changed: expected {expected_source_id}@{expected_epoch}, observed {observed_source_id}@{observed_epoch}")]
+    #[error(
+        "verifier-adoption clock lineage changed: expected {expected_source_id}@{expected_epoch}, observed {observed_source_id}@{observed_epoch}"
+    )]
     ClockLineageChanged {
         expected_source_id: String,
         expected_epoch: u64,
         observed_source_id: String,
         observed_epoch: u64,
     },
-    #[error("verifier-adoption clock uncertainty {observed_ms}ms exceeds policy maximum {maximum_ms}ms")]
-    ClockUncertaintyExceedsPolicy {
-        observed_ms: u64,
-        maximum_ms: u64,
-    },
-    #[error("verifier adoption is definitely not yet valid: latest possible time {latest_unix_ms} < valid-from {valid_from_unix_ms}")]
+    #[error(
+        "verifier-adoption clock uncertainty {observed_ms}ms exceeds policy maximum {maximum_ms}ms"
+    )]
+    ClockUncertaintyExceedsPolicy { observed_ms: u64, maximum_ms: u64 },
+    #[error(
+        "verifier adoption is definitely not yet valid: latest possible time {latest_unix_ms} < valid-from {valid_from_unix_ms}"
+    )]
     DefinitelyNotYetValid {
         latest_unix_ms: u64,
         valid_from_unix_ms: u64,
     },
-    #[error("verifier adoption is definitely expired: earliest possible time {earliest_unix_ms} >= valid-until {valid_until_unix_ms}")]
+    #[error(
+        "verifier adoption is definitely expired: earliest possible time {earliest_unix_ms} >= valid-until {valid_until_unix_ms}"
+    )]
     DefinitelyExpired {
         earliest_unix_ms: u64,
         valid_until_unix_ms: u64,
     },
-    #[error("verifier-adoption clock uncertainty [{earliest_unix_ms}, {latest_unix_ms}] crosses validity [{valid_from_unix_ms}, {valid_until_unix_ms})")]
+    #[error(
+        "verifier-adoption clock uncertainty [{earliest_unix_ms}, {latest_unix_ms}] crosses validity [{valid_from_unix_ms}, {valid_until_unix_ms})"
+    )]
     UncertaintyCrossesValidityBoundary {
         earliest_unix_ms: u64,
         latest_unix_ms: u64,
@@ -357,10 +368,10 @@ pub enum VerifierProfileAdoptionTimeError {
 mod tests {
     use super::*;
     use crate::{
-        EvidenceClass, RootBoundPolicyCheckedVerifierProfileAdoptionV1,
-        VerifierAdoptionScopeV1, VerifierProfileAdoptionAdmissionPolicyV1,
-        VerifierProfileAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionHeadV1,
-        VerifierProfileAdoptionSubjectV1, VerifierProfileAdoptionTransitionV1, VerifierProfileV1,
+        EvidenceClass, RootBoundPolicyCheckedVerifierProfileAdoptionV1, VerifierAdoptionScopeV1,
+        VerifierProfileAdoptionAdmissionPolicyV1, VerifierProfileAdoptionAuthorityRootSnapshotV1,
+        VerifierProfileAdoptionHeadV1, VerifierProfileAdoptionSubjectV1,
+        VerifierProfileAdoptionTransitionV1, VerifierProfileV1,
     };
 
     fn profile() -> VerifierProfileV1 {
@@ -409,7 +420,8 @@ mod tests {
         .unwrap()
         .check(1_500, &transition, &profile, None)
         .unwrap();
-        let bound = RootBoundPolicyCheckedVerifierProfileAdoptionV1::bind(checked, root(9)).unwrap();
+        let bound =
+            RootBoundPolicyCheckedVerifierProfileAdoptionV1::bind(checked, root(9)).unwrap();
         VerifierProfileAdoptionCommitPreconditionsV1::from_root_bound(bound).unwrap()
     }
 
@@ -505,10 +517,12 @@ mod tests {
                 &clock("secure-rtc-v1", 7, 1_300, 1_700),
                 250,
             ),
-            Err(VerifierProfileAdoptionTimeError::ClockUncertaintyExceedsPolicy {
-                observed_ms: 400,
-                maximum_ms: 250,
-            })
+            Err(
+                VerifierProfileAdoptionTimeError::ClockUncertaintyExceedsPolicy {
+                    observed_ms: 400,
+                    maximum_ms: 250,
+                }
+            )
         ));
 
         let bounded = time_bound();
@@ -518,10 +532,12 @@ mod tests {
                 &root(9),
                 bounded.inner().expected_predecessor_head(),
             ),
-            Err(VerifierProfileAdoptionTimeError::ClockUncertaintyExceedsPolicy {
-                observed_ms: 400,
-                maximum_ms: 250,
-            })
+            Err(
+                VerifierProfileAdoptionTimeError::ClockUncertaintyExceedsPolicy {
+                    observed_ms: 400,
+                    maximum_ms: 250,
+                }
+            )
         ));
     }
 
@@ -604,10 +620,17 @@ mod tests {
         assert_eq!(bounded.max_uncertainty_ms(), 250);
         assert_eq!(
             bounded.inner().canonical_transition_bytes(),
-            bounded.inner().transition().canonical_signing_bytes().unwrap()
+            bounded
+                .inner()
+                .transition()
+                .canonical_signing_bytes()
+                .unwrap()
         );
         assert_eq!(
-            bounded.inner().expected_root_snapshot().provisioning_epoch(),
+            bounded
+                .inner()
+                .expected_root_snapshot()
+                .provisioning_epoch(),
             9
         );
     }

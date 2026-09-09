@@ -13,9 +13,7 @@ use crate::observation::DependencyClaimId;
 const REQUIREMENT_DOMAIN: &[u8] = b"symthaea.continuity.requirement.v1\0";
 const CONTRACT_DOMAIN: &[u8] = b"symthaea.continuity.contract.v1\0";
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ContinuityRequirementId([u8; 32]);
 
 impl ContinuityRequirementId {
@@ -24,9 +22,7 @@ impl ContinuityRequirementId {
     }
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ContinuityContractId([u8; 32]);
 
 impl ContinuityContractId {
@@ -267,7 +263,10 @@ impl ContinuityContractV1 {
             requirement.validate_structure()?;
         }
         requirements.sort_by_key(ContinuityRequirementV1::id);
-        if requirements.windows(2).any(|pair| pair[0].id() == pair[1].id()) {
+        if requirements
+            .windows(2)
+            .any(|pair| pair[0].id() == pair[1].id())
+        {
             return Err(ContractError::DuplicateRequirement);
         }
         let contract_id = ContinuityContractId(hash_contract(
@@ -317,7 +316,10 @@ impl ContinuityContractV1 {
             }
         }
         canonical.sort_by_key(ContinuityRequirementV1::id);
-        if canonical.windows(2).any(|pair| pair[0].id() == pair[1].id()) {
+        if canonical
+            .windows(2)
+            .any(|pair| pair[0].id() == pair[1].id())
+        {
             return Err(ContractError::DuplicateRequirement);
         }
         if canonical != self.requirements {
@@ -331,7 +333,9 @@ impl ContinuityContractV1 {
         if self.contract_id != expected {
             return Err(ContractError::ContractIdentityMismatch);
         }
-        Ok(ValidatedContinuityContractV1 { inner: self.clone() })
+        Ok(ValidatedContinuityContractV1 {
+            inner: self.clone(),
+        })
     }
 }
 
@@ -539,12 +543,9 @@ mod tests {
     fn requirement_input_order_does_not_change_contract_identity() {
         let first = approved_requirement(3);
         let second = approved_requirement(4);
-        let left = ContinuityContractV1::new(
-            "fleet-a",
-            [7; 32],
-            vec![first.clone(), second.clone()],
-        )
-        .unwrap();
+        let left =
+            ContinuityContractV1::new("fleet-a", [7; 32], vec![first.clone(), second.clone()])
+                .unwrap();
         let right = ContinuityContractV1::new("fleet-a", [7; 32], vec![second, first]).unwrap();
         assert_eq!(left.id(), right.id());
         left.validate().unwrap();
@@ -580,8 +581,8 @@ mod tests {
     #[test]
     fn source_snapshot_changes_contract_identity() {
         let requirement = approved_requirement(6);
-        let left = ContinuityContractV1::new("fleet-a", [1; 32], vec![requirement.clone()])
-            .unwrap();
+        let left =
+            ContinuityContractV1::new("fleet-a", [1; 32], vec![requirement.clone()]).unwrap();
         let right = ContinuityContractV1::new("fleet-a", [2; 32], vec![requirement]).unwrap();
         assert_ne!(left.id(), right.id());
     }
@@ -589,11 +590,8 @@ mod tests {
     #[test]
     fn duplicate_requirements_fail_closed() {
         let requirement = approved_requirement(7);
-        let result = ContinuityContractV1::new(
-            "fleet-a",
-            [3; 32],
-            vec![requirement.clone(), requirement],
-        );
+        let result =
+            ContinuityContractV1::new("fleet-a", [3; 32], vec![requirement.clone(), requirement]);
         assert_eq!(result.unwrap_err(), ContractError::DuplicateRequirement);
     }
 }

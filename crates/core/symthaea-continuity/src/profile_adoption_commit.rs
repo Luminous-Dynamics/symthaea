@@ -129,7 +129,8 @@ impl VerifierProfileAdoptionCommitPreconditionsV1 {
             return Ok(VerifierProfileAdoptionCommitStateV1::AlreadyCommitted);
         }
 
-        self.root_bound.require_current_authority_root(current_root)?;
+        self.root_bound
+            .require_current_authority_root(current_root)?;
 
         if current_head != self.expected_predecessor_head() {
             return Err(VerifierProfileAdoptionCommitError::AdoptionHeadChanged);
@@ -159,12 +160,16 @@ pub enum VerifierProfileAdoptionCommitError {
     CandidateHeadNotCurrent,
     #[error("persisted verifier-adoption head changed before commit")]
     AdoptionHeadChanged,
-    #[error("verifier-profile adoption is not yet valid at commit: now {now_unix_ms}, valid from {valid_from_unix_ms}")]
+    #[error(
+        "verifier-profile adoption is not yet valid at commit: now {now_unix_ms}, valid from {valid_from_unix_ms}"
+    )]
     NotYetValid {
         now_unix_ms: u64,
         valid_from_unix_ms: u64,
     },
-    #[error("verifier-profile adoption expired before commit: now {now_unix_ms}, valid until {valid_until_unix_ms}")]
+    #[error(
+        "verifier-profile adoption expired before commit: now {now_unix_ms}, valid until {valid_until_unix_ms}"
+    )]
     Expired {
         now_unix_ms: u64,
         valid_until_unix_ms: u64,
@@ -175,11 +180,10 @@ pub enum VerifierProfileAdoptionCommitError {
 mod tests {
     use super::*;
     use crate::{
-        EvidenceClass, PolicyCheckedVerifierProfileAdoptionV1,
-        VerifierAdoptionScopeV1, VerifierProfileAdoptionAdmissionPolicyV1,
-        VerifierProfileAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionHeadV1,
-        VerifierProfileAdoptionSubjectV1, VerifierProfileAdoptionTransitionV1,
-        VerifierProfileV1,
+        EvidenceClass, PolicyCheckedVerifierProfileAdoptionV1, VerifierAdoptionScopeV1,
+        VerifierProfileAdoptionAdmissionPolicyV1, VerifierProfileAdoptionAuthorityRootSnapshotV1,
+        VerifierProfileAdoptionHeadV1, VerifierProfileAdoptionSubjectV1,
+        VerifierProfileAdoptionTransitionV1, VerifierProfileV1,
     };
 
     fn profile(root: u8, epoch: u64) -> VerifierProfileV1 {
@@ -212,7 +216,10 @@ mod tests {
         .unwrap()
     }
 
-    fn bootstrap(profile: &VerifierProfileV1, adoption_id: &str) -> VerifierProfileAdoptionTransitionV1 {
+    fn bootstrap(
+        profile: &VerifierProfileV1,
+        adoption_id: &str,
+    ) -> VerifierProfileAdoptionTransitionV1 {
         VerifierProfileAdoptionTransitionV1::bootstrap(subject(profile, adoption_id, 1)).unwrap()
     }
 
@@ -242,11 +249,9 @@ mod tests {
     }
 
     fn preconditions() -> VerifierProfileAdoptionCommitPreconditionsV1 {
-        let bound = RootBoundPolicyCheckedVerifierProfileAdoptionV1::bind(
-            checked_bootstrap(),
-            root(9),
-        )
-        .unwrap();
+        let bound =
+            RootBoundPolicyCheckedVerifierProfileAdoptionV1::bind(checked_bootstrap(), root(9))
+                .unwrap();
         VerifierProfileAdoptionCommitPreconditionsV1::from_root_bound(bound).unwrap()
     }
 
@@ -380,7 +385,10 @@ mod tests {
         let preconditions = preconditions();
         assert_eq!(
             preconditions.canonical_transition_bytes(),
-            preconditions.transition().canonical_signing_bytes().unwrap()
+            preconditions
+                .transition()
+                .canonical_signing_bytes()
+                .unwrap()
         );
         assert_eq!(
             preconditions.transition_digest(),

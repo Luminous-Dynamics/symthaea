@@ -27,9 +27,7 @@ const OBLIGATION_DOMAIN: &[u8] = b"symthaea.continuity.verification-obligation.v
 const MANIFEST_DOMAIN: &[u8] = b"symthaea.continuity.witness-manifest.v1\0";
 const WITNESS_DOMAIN: &[u8] = b"symthaea.continuity.witness-evaluation.v1\0";
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct TargetRealizationId([u8; 32]);
 
 impl TargetRealizationId {
@@ -45,9 +43,7 @@ impl TargetRealizationId {
     }
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerificationPolicyId([u8; 32]);
 
 impl VerificationPolicyId {
@@ -56,9 +52,7 @@ impl VerificationPolicyId {
     }
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerificationObligationId([u8; 32]);
 
 impl VerificationObligationId {
@@ -67,9 +61,7 @@ impl VerificationObligationId {
     }
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct WitnessManifestId([u8; 32]);
 
 impl WitnessManifestId {
@@ -78,9 +70,7 @@ impl WitnessManifestId {
     }
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct WitnessId([u8; 32]);
 
 impl WitnessId {
@@ -263,8 +253,11 @@ impl WitnessManifestV1 {
         policy.validate()?;
         let contract_ids: Vec<ContinuityRequirementId> =
             contract.requirements().iter().map(|r| r.id()).collect();
-        let policy_ids: Vec<ContinuityRequirementId> =
-            policy.entries().iter().map(|entry| entry.requirement_id()).collect();
+        let policy_ids: Vec<ContinuityRequirementId> = policy
+            .entries()
+            .iter()
+            .map(|entry| entry.requirement_id())
+            .collect();
         if contract_ids != policy_ids {
             return Err(WitnessError::PolicyContractMismatch);
         }
@@ -375,7 +368,9 @@ pub enum ObligationDispositionV1 {
 impl ObligationDispositionV1 {
     fn evidence_digest(&self) -> [u8; 32] {
         match self {
-            Self::Satisfied { evidence_digest, .. }
+            Self::Satisfied {
+                evidence_digest, ..
+            }
             | Self::Failed { evidence_digest }
             | Self::Inconclusive { evidence_digest }
             | Self::InfrastructureFailure { evidence_digest }
@@ -454,13 +449,13 @@ impl WitnessLedgerV1 {
         let mut blocking_failures = 0usize;
         let mut nonblocking_issues = 0usize;
         for obligation in &self.manifest.obligations {
-            let disposition = self
-                .dispositions
-                .get(&obligation.id())
-                .ok_or(WitnessError::IncompleteWitness {
-                    expected: self.manifest.obligations.len(),
-                    observed: self.dispositions.len(),
-                })?;
+            let disposition =
+                self.dispositions
+                    .get(&obligation.id())
+                    .ok_or(WitnessError::IncompleteWitness {
+                        expected: self.manifest.obligations.len(),
+                        observed: self.dispositions.len(),
+                    })?;
             let satisfied = matches!(
                 disposition.evidence_class(),
                 Some(class) if class >= obligation.minimum_evidence_class()
@@ -515,9 +510,7 @@ impl WitnessEvaluationV1 {
         self.nonblocking_issues
     }
 
-    pub fn dispositions(
-        &self,
-    ) -> &BTreeMap<VerificationObligationId, ObligationDispositionV1> {
+    pub fn dispositions(&self) -> &BTreeMap<VerificationObligationId, ObligationDispositionV1> {
         &self.dispositions
     }
 
@@ -606,10 +599,7 @@ fn checked_text(field: &'static str, value: String) -> Result<String, WitnessErr
     Ok(trimmed.to_string())
 }
 
-fn hash_policy(
-    verifier_profile_id: &str,
-    entries: &[VerificationPolicyEntryV1],
-) -> [u8; 32] {
+fn hash_policy(verifier_profile_id: &str, entries: &[VerificationPolicyEntryV1]) -> [u8; 32] {
     let mut bytes = Vec::new();
     put_str(&mut bytes, verifier_profile_id);
     put_len(&mut bytes, entries.len());

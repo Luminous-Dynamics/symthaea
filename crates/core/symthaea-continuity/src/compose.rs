@@ -55,10 +55,16 @@ pub(crate) enum ComposeError {
     CrossContractEvidence,
     #[error("authenticated evidence belongs to a different target realization")]
     CrossTargetEvidence,
-    #[error("authenticated evidence references requirement outside the validated contract: {requirement:?}")]
-    UnknownRequirementEvidence { requirement: ContinuityRequirementId },
+    #[error(
+        "authenticated evidence references requirement outside the validated contract: {requirement:?}"
+    )]
+    UnknownRequirementEvidence {
+        requirement: ContinuityRequirementId,
+    },
     #[error("requirement received more than one authenticated evidence item: {requirement:?}")]
-    DuplicateRequirementEvidence { requirement: ContinuityRequirementId },
+    DuplicateRequirementEvidence {
+        requirement: ContinuityRequirementId,
+    },
 }
 
 #[cfg(test)]
@@ -78,7 +84,7 @@ mod tests {
     };
     use crate::profile_adoption_root::VerifierProfileAdoptionAuthorityRootSnapshotV1;
     use crate::verifier::{
-        AuthorityCheckedVerificationEvidenceV1, AuthenticatedVerificationEvidenceV1,
+        AuthenticatedVerificationEvidenceV1, AuthorityCheckedVerificationEvidenceV1,
         VerificationEvidenceClaimV1, VerificationOutcomeV1, VerifierProfileV1,
         policy_check_verification_evidence,
     };
@@ -86,32 +92,67 @@ mod tests {
 
     fn contract(seed: u8) -> ValidatedContinuityContractV1 {
         let observation = ObservationEnvelopeV1::new(
-            format!("machine-{seed}"), "workflow.dependency", "fixture", "1",
-            1_700_000_000_000 + seed as u64, ObservationCoverage::Complete,
-            EvidenceBasis::Tested, [seed; 32], vec![],
-        ).unwrap();
+            format!("machine-{seed}"),
+            "workflow.dependency",
+            "fixture",
+            "1",
+            1_700_000_000_000 + seed as u64,
+            ObservationCoverage::Complete,
+            EvidenceBasis::Tested,
+            [seed; 32],
+            vec![],
+        )
+        .unwrap();
         let dependency = DependencyClaimV1::new(
-            "role:test", "requires", format!("capability-{seed}"), DependencyBasis::Declared,
-            vec![observation.id()], vec![],
-        ).unwrap();
+            "role:test",
+            "requires",
+            format!("capability-{seed}"),
+            DependencyBasis::Declared,
+            vec![observation.id()],
+            vec![],
+        )
+        .unwrap();
         let requirement = ContinuityRequirementV1::new(
-            dependency.id(), format!("test-workflow-{seed}"), RequirementCriticality::Must,
-            EquivalencePredicate::BehavioralScenario { scenario_id: format!("scenario-{seed}") },
-            ApprovalBasis::ExplicitPolicy, [seed.wrapping_add(20); 32],
-        ).unwrap();
-        ContinuityContractV1::new(format!("test-fleet-{seed}"), [seed.wrapping_add(40); 32], vec![requirement])
-            .unwrap().validate().unwrap()
+            dependency.id(),
+            format!("test-workflow-{seed}"),
+            RequirementCriticality::Must,
+            EquivalencePredicate::BehavioralScenario {
+                scenario_id: format!("scenario-{seed}"),
+            },
+            ApprovalBasis::ExplicitPolicy,
+            [seed.wrapping_add(20); 32],
+        )
+        .unwrap();
+        ContinuityContractV1::new(
+            format!("test-fleet-{seed}"),
+            [seed.wrapping_add(40); 32],
+            vec![requirement],
+        )
+        .unwrap()
+        .validate()
+        .unwrap()
     }
 
     fn profile() -> VerifierProfileV1 {
-        VerifierProfileV1::new("fixture-verifier", [8; 32], 1, EvidenceClass::HardwareVerified).unwrap()
+        VerifierProfileV1::new(
+            "fixture-verifier",
+            [8; 32],
+            1,
+            EvidenceClass::HardwareVerified,
+        )
+        .unwrap()
     }
 
     fn policy(contract: &ValidatedContinuityContractV1) -> VerificationPolicyV1 {
         VerificationPolicyV1::new(
             "fixture-verifier",
-            contract.requirements().iter().map(|r| VerificationPolicyEntryV1::new(r.id(), EvidenceClass::Simulated)).collect(),
-        ).unwrap()
+            contract
+                .requirements()
+                .iter()
+                .map(|r| VerificationPolicyEntryV1::new(r.id(), EvidenceClass::Simulated))
+                .collect(),
+        )
+        .unwrap()
     }
 
     fn authenticated(
@@ -123,17 +164,20 @@ mod tests {
     ) -> AuthenticatedVerificationEvidenceV1 {
         let policy = policy(contract);
         let claim = VerificationEvidenceClaimV1::new(
-            contract.id(), target, contract.requirements()[0].id(), profile.id(), challenge,
-            1_700_000_000_100, VerificationOutcomeV1::Satisfied, evidence_digest,
-        ).unwrap();
-        let profile_checked = policy_check_verification_evidence(
-            contract,
+            contract.id(),
             target,
-            &policy,
-            profile,
+            contract.requirements()[0].id(),
+            profile.id(),
             challenge,
-            claim,
-        ).unwrap();
+            1_700_000_000_100,
+            VerificationOutcomeV1::Satisfied,
+            evidence_digest,
+        )
+        .unwrap();
+        let profile_checked = policy_check_verification_evidence(
+            contract, target, &policy, profile, challenge, claim,
+        )
+        .unwrap();
 
         let adoption = VerifierProfileAdoptionTransitionV1::bootstrap(
             VerifierProfileAdoptionSubjectV1::new(
@@ -147,21 +191,26 @@ mod tests {
                 1_800_000_000_000,
                 EvidenceClass::HardwareVerified,
                 VerifierAdoptionScopeV1::AllContinuityVerification,
-            ).unwrap(),
-        ).unwrap();
+            )
+            .unwrap(),
+        )
+        .unwrap();
         let root_snapshot = VerifierProfileAdoptionAuthorityRootSnapshotV1::new(
             "organization:test",
             "adoption-root-1",
             [0x55; 32],
             9,
-        ).unwrap();
+        )
+        .unwrap();
         let authority_checked = AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
             profile_checked,
             &adoption,
             &root_snapshot,
-        ).unwrap();
+        )
+        .unwrap();
 
-        AuthenticatedVerificationEvidenceV1::authenticate_for_test(authority_checked, [9; 32]).unwrap()
+        AuthenticatedVerificationEvidenceV1::authenticate_for_test(authority_checked, [9; 32])
+            .unwrap()
     }
 
     #[test]
@@ -170,9 +219,12 @@ mod tests {
         let target = TargetRealizationId::from_digest([4; 32]).unwrap();
         let profile = profile();
         let qualified = compose_qualified_witness(
-            &contract, target, &policy(&contract),
+            &contract,
+            target,
+            &policy(&contract),
             vec![authenticated(&contract, target, &profile, [5; 32], [6; 32])],
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(qualified.contract_id(), contract.id());
         assert_eq!(qualified.target_realization_id(), target);
     }
@@ -183,7 +235,9 @@ mod tests {
         let target = TargetRealizationId::from_digest([4; 32]).unwrap();
         assert!(matches!(
             compose_qualified_witness(&contract, target, &policy(&contract), vec![]),
-            Err(ComposeError::Witness(WitnessError::IncompleteWitness { .. }))
+            Err(ComposeError::Witness(
+                WitnessError::IncompleteWitness { .. }
+            ))
         ));
     }
 
@@ -208,7 +262,8 @@ mod tests {
         let profile = profile();
         let evidence = authenticated(&contract, target_a, &profile, [6; 32], [7; 32]);
         assert_eq!(
-            compose_qualified_witness(&contract, target_b, &policy(&contract), vec![evidence]).unwrap_err(),
+            compose_qualified_witness(&contract, target_b, &policy(&contract), vec![evidence])
+                .unwrap_err(),
             ComposeError::CrossTargetEvidence,
         );
     }
@@ -221,7 +276,8 @@ mod tests {
         let profile = profile();
         let evidence = authenticated(&contract_a, target, &profile, [6; 32], [7; 32]);
         assert_eq!(
-            compose_qualified_witness(&contract_b, target, &policy(&contract_b), vec![evidence]).unwrap_err(),
+            compose_qualified_witness(&contract_b, target, &policy(&contract_b), vec![evidence])
+                .unwrap_err(),
             ComposeError::CrossContractEvidence,
         );
     }

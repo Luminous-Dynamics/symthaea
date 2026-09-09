@@ -113,13 +113,21 @@ pub enum VerifierProfileAdoptionGrantCommitError {
     Time(#[from] VerifierProfileAdoptionTimeError),
     #[error("grant-bound adoption and trusted-time commit capsule reference different transitions")]
     TransitionMismatch,
-    #[error("grant-bound adoption and trusted-time commit capsule reference different root snapshots")]
+    #[error(
+        "grant-bound adoption and trusted-time commit capsule reference different root snapshots"
+    )]
     AuthorityRootMismatch,
-    #[error("grant-bound adoption and trusted-time commit capsule reference different predecessor heads")]
+    #[error(
+        "grant-bound adoption and trusted-time commit capsule reference different predecessor heads"
+    )]
     PredecessorHeadMismatch,
-    #[error("grant-bound adoption and trusted-time commit capsule reference different candidate heads")]
+    #[error(
+        "grant-bound adoption and trusted-time commit capsule reference different candidate heads"
+    )]
     CandidateHeadMismatch,
-    #[error("grant-bound adoption and trusted-time commit capsule reference different verifier profiles")]
+    #[error(
+        "grant-bound adoption and trusted-time commit capsule reference different verifier profiles"
+    )]
     VerifierProfileMismatch,
     #[error("local verifier-adoption grant changed before commit")]
     AuthorityGrantChanged,
@@ -131,10 +139,9 @@ mod tests {
     use crate::{
         EvidenceClass, RootBoundPolicyCheckedVerifierProfileAdoptionV1,
         VerifierAdoptionAuthorityGrantV1, VerifierAdoptionScopeV1,
-        VerifierProfileAdoptionAdmissionPolicyV1,
-        VerifierProfileAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionCommitPreconditionsV1,
-        VerifierProfileAdoptionHeadV1, VerifierProfileAdoptionSubjectV1,
-        VerifierProfileAdoptionTransitionV1, VerifierProfileV1,
+        VerifierProfileAdoptionAdmissionPolicyV1, VerifierProfileAdoptionAuthorityRootSnapshotV1,
+        VerifierProfileAdoptionCommitPreconditionsV1, VerifierProfileAdoptionHeadV1,
+        VerifierProfileAdoptionSubjectV1, VerifierProfileAdoptionTransitionV1, VerifierProfileV1,
         bind_root_bound_adoption_to_authority_grant,
     };
 
@@ -207,13 +214,8 @@ mod tests {
     }
 
     fn clock(epoch: u64, earliest: u64, latest: u64) -> VerifierProfileAdoptionClockObservationV1 {
-        VerifierProfileAdoptionClockObservationV1::new(
-            "trusted-clock-1",
-            epoch,
-            earliest,
-            latest,
-        )
-        .unwrap()
+        VerifierProfileAdoptionClockObservationV1::new("trusted-clock-1", epoch, earliest, latest)
+            .unwrap()
     }
 
     fn fixture() -> (
@@ -224,29 +226,19 @@ mod tests {
     ) {
         let root = root(9);
         let root_bound = root_bound(&root, "adopt-1");
-        let commit = VerifierProfileAdoptionCommitPreconditionsV1::from_root_bound(
-            root_bound.clone(),
-        )
-        .unwrap();
+        let commit =
+            VerifierProfileAdoptionCommitPreconditionsV1::from_root_bound(root_bound.clone())
+                .unwrap();
         let checked_clock = clock(4, 1_490, 1_510);
-        let time_bound = TimeBoundVerifierProfileAdoptionCommitPreconditionsV1::new(
-            commit,
-            &checked_clock,
-            50,
-        )
-        .unwrap();
+        let time_bound =
+            TimeBoundVerifierProfileAdoptionCommitPreconditionsV1::new(commit, &checked_clock, 50)
+                .unwrap();
         let grant = grant(root.clone(), 3, EvidenceClass::HardwareVerified);
-        let grant_bound = bind_root_bound_adoption_to_authority_grant(
-            root_bound,
-            &grant,
-            None,
-        )
-        .unwrap();
-        let combined = GrantBoundVerifierProfileAdoptionCommitPreconditionsV1::new(
-            grant_bound,
-            time_bound,
-        )
-        .unwrap();
+        let grant_bound =
+            bind_root_bound_adoption_to_authority_grant(root_bound, &grant, None).unwrap();
+        let combined =
+            GrantBoundVerifierProfileAdoptionCommitPreconditionsV1::new(grant_bound, time_bound)
+                .unwrap();
         (combined, root, grant, checked_clock)
     }
 
@@ -259,7 +251,10 @@ mod tests {
                     &current_clock,
                     &root,
                     &grant,
-                    combined.grant_bound().root_bound().expected_predecessor_head(),
+                    combined
+                        .grant_bound()
+                        .root_bound()
+                        .expected_predecessor_head(),
                 )
                 .unwrap(),
             VerifierProfileAdoptionCommitStateV1::ReadyToCommit
@@ -276,7 +271,10 @@ mod tests {
                     &current_clock,
                     &root,
                     &changed,
-                    combined.grant_bound().root_bound().expected_predecessor_head(),
+                    combined
+                        .grant_bound()
+                        .root_bound()
+                        .expected_predecessor_head(),
                 )
                 .unwrap_err(),
             VerifierProfileAdoptionGrantCommitError::AuthorityGrantChanged
@@ -293,7 +291,10 @@ mod tests {
                     &current_clock,
                     &root,
                     &changed,
-                    combined.grant_bound().root_bound().expected_predecessor_head(),
+                    combined
+                        .grant_bound()
+                        .root_bound()
+                        .expected_predecessor_head(),
                 )
                 .unwrap_err(),
             VerifierProfileAdoptionGrantCommitError::AuthorityGrantChanged
@@ -309,7 +310,10 @@ mod tests {
                 &changed_clock,
                 &root,
                 &grant,
-                combined.grant_bound().root_bound().expected_predecessor_head(),
+                combined
+                    .grant_bound()
+                    .root_bound()
+                    .expected_predecessor_head(),
             ),
             Err(VerifierProfileAdoptionGrantCommitError::Time(
                 VerifierProfileAdoptionTimeError::ClockLineageChanged { .. }

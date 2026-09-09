@@ -18,13 +18,11 @@ use thiserror::Error;
 use crate::contract::{ContinuityRequirementId, ValidatedContinuityContractV1};
 use crate::profile_adoption::VerifierAdoptionScopeV1;
 use crate::profile_adoption_root::{
-    RootBoundPolicyCheckedVerifierProfileAdoptionV1,
-    VerifierProfileAdoptionAuthorityRootSnapshotV1,
+    RootBoundPolicyCheckedVerifierProfileAdoptionV1, VerifierProfileAdoptionAuthorityRootSnapshotV1,
 };
 use crate::witness::EvidenceClass;
 
-const GRANT_DOMAIN: &[u8] =
-    b"symthaea.continuity.verifier-adoption-authority-grant.canonical.v1\0";
+const GRANT_DOMAIN: &[u8] = b"symthaea.continuity.verifier-adoption-authority-grant.canonical.v1\0";
 
 /// Content identity of one exact locally provisioned grant capability.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -138,7 +136,10 @@ impl GrantBoundRootBoundVerifierProfileAdoptionV1 {
     pub fn effective_evidence_class(&self) -> EvidenceClass {
         // The adoption subject was already validated against the verifier profile,
         // and binding below proves the subject ceiling is <= local grant ceiling.
-        self.root_bound.transition().subject().evidence_class_ceiling()
+        self.root_bound
+            .transition()
+            .subject()
+            .evidence_class_ceiling()
     }
 
     pub fn effective_scope(&self) -> &VerifierAdoptionScopeV1 {
@@ -223,8 +224,10 @@ fn ground_scopes_in_contract(
     allowed: &VerifierAdoptionScopeV1,
     scope_contract: Option<&ValidatedContinuityContractV1>,
 ) -> Result<(), VerifierAdoptionAuthorityGrantError> {
-    if matches!(candidate, VerifierAdoptionScopeV1::AllContinuityVerification)
-        && matches!(allowed, VerifierAdoptionScopeV1::AllContinuityVerification)
+    if matches!(
+        candidate,
+        VerifierAdoptionScopeV1::AllContinuityVerification
+    ) && matches!(allowed, VerifierAdoptionScopeV1::AllContinuityVerification)
     {
         return Ok(());
     }
@@ -385,7 +388,9 @@ pub enum VerifierAdoptionAuthorityGrantError {
     AuthorityRootSnapshotMismatch,
     #[error("authority grant belongs to a different logical verifier role")]
     VerifierRoleMismatch,
-    #[error("requested evidence class {requested:?} exceeds local authority-grant maximum {maximum:?}")]
+    #[error(
+        "requested evidence class {requested:?} exceeds local authority-grant maximum {maximum:?}"
+    )]
     EvidenceClassExceedsAuthorityGrant {
         maximum: EvidenceClass,
         requested: EvidenceClass,
@@ -395,9 +400,15 @@ pub enum VerifierAdoptionAuthorityGrantError {
     #[error("verifier authority scope references a different continuity contract")]
     ScopeContractMismatch,
     #[error("authority grant references requirement outside the exact contract: {requirement:?}")]
-    UnknownAuthorityGrantRequirement { requirement: ContinuityRequirementId },
-    #[error("adoption candidate references requirement outside the exact contract: {requirement:?}")]
-    UnknownCandidateRequirement { requirement: ContinuityRequirementId },
+    UnknownAuthorityGrantRequirement {
+        requirement: ContinuityRequirementId,
+    },
+    #[error(
+        "adoption candidate references requirement outside the exact contract: {requirement:?}"
+    )]
+    UnknownCandidateRequirement {
+        requirement: ContinuityRequirementId,
+    },
     #[error("requirement-scoped authority grant must not be empty")]
     EmptyRequirementScope,
     #[error("requirement-scoped authority grant must be strictly sorted and unique")]
@@ -625,11 +636,8 @@ mod tests {
         let requirement = contract.requirements()[0].id();
         let root = root(4);
         let profile = profile();
-        let candidate_scope = VerifierAdoptionScopeV1::requirements(
-            contract.id(),
-            vec![requirement],
-        )
-        .unwrap();
+        let candidate_scope =
+            VerifierAdoptionScopeV1::requirements(contract.id(), vec![requirement]).unwrap();
         let subject = VerifierProfileAdoptionSubjectV1::new(
             "adopt-1",
             root.authority_subject(),
@@ -669,12 +677,9 @@ mod tests {
         )
         .unwrap();
 
-        let bound = bind_root_bound_adoption_to_authority_grant(
-            root_bound,
-            &grant,
-            Some(&contract),
-        )
-        .unwrap();
+        let bound =
+            bind_root_bound_adoption_to_authority_grant(root_bound, &grant, Some(&contract))
+                .unwrap();
         assert_eq!(bound.effective_scope(), &candidate_scope);
     }
 }
