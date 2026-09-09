@@ -1,0 +1,121 @@
+{
+  "schema": "symthaea.integration-train.v1",
+  "base_subject": "e2076ccc24f9b411722cb9655bc9e9135691ae23",
+  "ordered_tranches": [
+    {
+      "commit_sha": "82666107dc13fbea18c06b335edbc529bf8fe1d6",
+      "predecessor_sha": "e2076ccc24f9b411722cb9655bc9e9135691ae23",
+      "theorem_id": "resources.r3.shadow-benchmark.v1",
+      "claim": "Shadow evaluation freezes selector decisions before outcome evidence and requires complete feasible-candidate outcome coverage.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-shadow-benchmark/Cargo.toml",
+        "crates/domains/symthaea-resource-shadow-benchmark/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:803"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 803
+    },
+    {
+      "commit_sha": "a68393cd502db52758e8a4c99ef740b5d1ff9ace",
+      "predecessor_sha": "82666107dc13fbea18c06b335edbc529bf8fe1d6",
+      "theorem_id": "resources.r3.shadow-campaign.v1",
+      "claim": "Shadow campaigns preregister scenarios and preserve exactly one append-only disposition for every scenario before finalization.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-shadow-campaign/Cargo.toml",
+        "crates/domains/symthaea-resource-shadow-campaign/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:810"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 810
+    },
+    {
+      "commit_sha": "a4c703d45c4b92067ef2eefa6515d58f2e53ecb3",
+      "predecessor_sha": "a68393cd502db52758e8a4c99ef740b5d1ff9ace",
+      "theorem_id": "resources.r3.execution-profile.v1",
+      "claim": "A campaign is bound to an exact execution selection root without promoting that selection into realized execution evidence.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-campaign-execution-profile/Cargo.toml",
+        "crates/domains/symthaea-resource-campaign-execution-profile/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:817"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 817
+    },
+    {
+      "commit_sha": "600b9e01acba27c87da1ef97fcfce669281efebf",
+      "predecessor_sha": "a4c703d45c4b92067ef2eefa6515d58f2e53ecb3",
+      "theorem_id": "resources.r3.execution-receipt.v1",
+      "claim": "A complete execution receipt claim can be structurally matched to one exact execution selection profile without claiming independent verification.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-campaign-execution-receipt/Cargo.toml",
+        "crates/domains/symthaea-resource-campaign-execution-receipt/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:819"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 819
+    },
+    {
+      "commit_sha": "fb513e0b1224e08b572cadb38ea56a710521a27c",
+      "predecessor_sha": "600b9e01acba27c87da1ef97fcfce669281efebf",
+      "theorem_id": "resources.r3.execution-verifier.v1",
+      "claim": "Captured execution preimages independently reconstruct receipt commitments and must exactly match the profile-matched receipt.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-campaign-execution-verifier/Cargo.toml",
+        "crates/domains/symthaea-resource-campaign-execution-verifier/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:830"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 830
+    },
+    {
+      "commit_sha": "7350ee0a5cab0ccaa48b6691e8d52875143b102b",
+      "predecessor_sha": "fb513e0b1224e08b572cadb38ea56a710521a27c",
+      "theorem_id": "resources.r3.stack-qualification-workflow.v1",
+      "claim": "The cumulative resource stack has a focused workflow specifying lock-freshness, namespace, formatting, compile, lint, test, and doc-test qualification checks.",
+      "changed_files": [
+        ".github/workflows/resource-stack-qualification.yml"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:833"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 833
+    }
+  ],
+  "cumulative_tip_sha": "7350ee0a5cab0ccaa48b6691e8d52875143b102b",
+  "train_id": "sha256:9d9fa660c788b3b7f24e43822196c1ca3e046ac2fc299149b019c7d4f729ede4"
+}
