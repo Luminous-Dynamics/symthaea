@@ -57,7 +57,10 @@ pub mod qp_certification;
 pub mod qualification;
 pub mod reach_authority_commitment;
 pub mod reach_authority_committed_evidence;
-pub mod reach_authority_committed_promotion;
+// Internal implementation detail: authority-committed stages are necessary, but
+// public operational promotion additionally requires collision-resistant evidence
+// diversity for spatial goals and authority decisions.
+mod reach_authority_committed_promotion;
 // Internal implementation detail: protocol/corpus SHA-256 identity is necessary,
 // but public operational promotion must additionally bind finalized authority
 // commitments for every contributing trial and episode step.
@@ -82,6 +85,7 @@ pub mod reach_qualification_lineage;
 // but it is not sufficient to expose an operational Reach capability on its own.
 mod reach_qualification_promotion;
 pub mod reach_spatial_goal_commitment;
+pub mod reach_strong_diversity_promotion;
 pub mod recovery;
 pub mod recovery_benchmark;
 pub mod recovery_certification;
@@ -159,7 +163,6 @@ pub use qp_certification::*;
 pub use qualification::*;
 pub use reach_authority_commitment::*;
 pub use reach_authority_committed_evidence::*;
-pub use reach_authority_committed_promotion::*;
 pub use reach_episode_evidence::*;
 pub use reach_execution::*;
 pub use reach_execution_evidence::*;
@@ -168,6 +171,7 @@ pub use reach_policy_identity::*;
 pub use reach_qualification_campaign::*;
 pub use reach_qualification_lineage::*;
 pub use reach_spatial_goal_commitment::*;
+pub use reach_strong_diversity_promotion::*;
 pub use recovery_certification::*;
 pub use release_pipeline::*;
 pub use reproducible_oracle_build::*;
