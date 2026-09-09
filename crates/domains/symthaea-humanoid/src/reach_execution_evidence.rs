@@ -44,7 +44,8 @@ pub struct HumanoidReachCommandEvidence {
     pub floating_sampled_at_s: Option<f64>,
     pub full_dynamics_age_s: f64,
 
-    // Existing hierarchy / solver evidence.
+    // Existing hierarchy / solver evidence. Non-finite fail-closed sentinels are
+    // intentionally preserved here; policy assessment rejects them explicitly.
     pub whole_body_feasible: bool,
     pub whole_body_objective_residual: f64,
     pub whole_body_joint_utilization: f64,
@@ -114,45 +115,41 @@ pub fn bind_humanoid_reach_command_evidence(
     {
         return Err(HumanoidReachCommandEvidenceBindFailure::GoalIdentityMismatch);
     }
-    if result.preparation.dynamics.full_model_id != cartesian.dynamics_model_id
-        || result.preparation.dynamics.full_sampled_at_s > f64::MAX
-    {
+    if result.preparation.dynamics.full_model_id != cartesian.dynamics_model_id {
         return Err(HumanoidReachCommandEvidenceBindFailure::FullDynamicsIdentityMismatch);
     }
     if result.execution.command.num_actuators() != subject.morphology.num_actuators() {
         return Err(HumanoidReachCommandEvidenceBindFailure::FinalCommandMorphologyMismatch);
     }
 
-    let hierarchy = &result.execution.report.hierarchy;
-    let safety = &result.execution.report.safety;
-    let finite = [
+    // These values establish identity/reference lineage and must always be
+    // ordinary finite numbers. Solver residuals are intentionally excluded here
+    // because +inf/NaN may be the existing controller's fail-closed evidence.
+    let required_finite = [
         cartesian.position_error_norm_m,
         cartesian.desired_cartesian_speed_mps,
         cartesian.jacobian_confidence,
         cartesian.dynamics_age_s,
-        hierarchy.whole_body_objective_residual,
-        hierarchy.whole_body_joint_utilization,
-        hierarchy.inverse_dynamics_max_violation,
-        hierarchy.contact_dynamics_residual_nm,
-        hierarchy.contact_acceleration_residual,
-        hierarchy.contact_friction_utilization,
-        hierarchy.floating_base_dynamics_residual,
+        cartesian.maximum_normalized_correction_used as f64,
         result.execution.report.authority_scale as f64,
         result.execution.command.control_effort() as f64,
         result.preparation.dynamics.full_sampled_at_s,
     ]
     .into_iter()
     .all(f64::is_finite);
-    if !finite
+    if !required_finite
         || cartesian.position_error_norm_m < 0.0
         || cartesian.desired_cartesian_speed_mps < 0.0
         || !(0.0..=1.0).contains(&cartesian.jacobian_confidence)
         || cartesian.dynamics_age_s < 0.0
+        || !(0.0..=1.0).contains(&cartesian.maximum_normalized_correction_used)
         || !(0.0..=1.0).contains(&result.execution.report.authority_scale)
     {
         return Err(HumanoidReachCommandEvidenceBindFailure::InvalidReceiptNumericEvidence);
     }
 
+    let hierarchy = &result.execution.report.hierarchy;
+    let safety = &result.execution.report.safety;
     Ok(HumanoidReachCommandEvidence {
         schema_version: HUMANOID_REACH_COMMAND_EVIDENCE_SCHEMA_VERSION,
         subject: subject.clone(),
@@ -258,6 +255,7 @@ impl HumanoidReachCommandEvidencePolicy {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HumanoidReachCommandEvidenceFailureKind {
     InvalidPolicy,
+    InvalidEvidenceSchema,
     SubjectMismatch,
     DynamicsTooOld,
     JacobianConfidenceTooLow,
@@ -303,6 +301,9 @@ pub fn assess_humanoid_reach_command_evidence(
     if !policy.validate_for(subject) {
         failures.push(HumanoidReachCommandEvidenceFailureKind::InvalidPolicy);
     }
+    if evidence.schema_version != HUMANOID_REACH_COMMAND_EVIDENCE_SCHEMA_VERSION {
+        failures.push(HumanoidReachCommandEvidenceFailureKind::InvalidEvidenceSchema);
+    }
     let fingerprint = subject.fingerprint();
     if fingerprint == 0
         || evidence.subject_fingerprint != fingerprint
@@ -311,25 +312,37 @@ pub fn assess_humanoid_reach_command_evidence(
     {
         failures.push(HumanoidReachCommandEvidenceFailureKind::SubjectMismatch);
     }
-    if evidence.full_dynamics_age_s > policy.maximum_full_dynamics_age_s {
+    if !evidence.full_dynamics_age_s.is_finite()
+        || evidence.full_dynamics_age_s > policy.maximum_full_dynamics_age_s
+    {
         failures.push(HumanoidReachCommandEvidenceFailureKind::DynamicsTooOld);
     }
-    if evidence.jacobian_confidence < policy.minimum_jacobian_confidence {
+    if !evidence.jacobian_confidence.is_finite()
+        || evidence.jacobian_confidence < policy.minimum_jacobian_confidence
+    {
         failures.push(HumanoidReachCommandEvidenceFailureKind::JacobianConfidenceTooLow);
     }
-    if evidence.authority_scale < policy.minimum_goal_authority_scale {
+    if !evidence.authority_scale.is_finite()
+        || evidence.authority_scale < policy.minimum_goal_authority_scale
+    {
         failures.push(HumanoidReachCommandEvidenceFailureKind::GoalAuthorityTooLow);
     }
     if !evidence.whole_body_feasible {
         failures.push(HumanoidReachCommandEvidenceFailureKind::WholeBodyInfeasible);
     }
-    if evidence.whole_body_objective_residual > policy.maximum_whole_body_objective_residual {
+    if !evidence.whole_body_objective_residual.is_finite()
+        || evidence.whole_body_objective_residual > policy.maximum_whole_body_objective_residual
+    {
         failures.push(HumanoidReachCommandEvidenceFailureKind::WholeBodyResidualTooLarge);
     }
-    if evidence.whole_body_joint_utilization > policy.maximum_joint_utilization {
+    if !evidence.whole_body_joint_utilization.is_finite()
+        || evidence.whole_body_joint_utilization > policy.maximum_joint_utilization
+    {
         failures.push(HumanoidReachCommandEvidenceFailureKind::JointUtilizationTooHigh);
     }
-    if evidence.inverse_dynamics_max_violation > policy.maximum_inverse_dynamics_violation {
+    if !evidence.inverse_dynamics_max_violation.is_finite()
+        || evidence.inverse_dynamics_max_violation > policy.maximum_inverse_dynamics_violation
+    {
         failures.push(HumanoidReachCommandEvidenceFailureKind::InverseDynamicsViolationTooLarge);
     }
     if evidence.inverse_dynamics_fallback && !policy.allow_inverse_dynamics_fallback {
@@ -338,13 +351,19 @@ pub fn assess_humanoid_reach_command_evidence(
     if !evidence.contact_dynamics_converged {
         failures.push(HumanoidReachCommandEvidenceFailureKind::ContactDynamicsNotConverged);
     }
-    if evidence.contact_dynamics_residual_nm > policy.maximum_contact_dynamics_residual_nm {
+    if !evidence.contact_dynamics_residual_nm.is_finite()
+        || evidence.contact_dynamics_residual_nm > policy.maximum_contact_dynamics_residual_nm
+    {
         failures.push(HumanoidReachCommandEvidenceFailureKind::ContactDynamicsResidualTooLarge);
     }
-    if evidence.contact_acceleration_residual > policy.maximum_contact_acceleration_residual {
+    if !evidence.contact_acceleration_residual.is_finite()
+        || evidence.contact_acceleration_residual > policy.maximum_contact_acceleration_residual
+    {
         failures.push(HumanoidReachCommandEvidenceFailureKind::ContactAccelerationResidualTooLarge);
     }
-    if evidence.contact_friction_utilization > policy.maximum_contact_friction_utilization {
+    if !evidence.contact_friction_utilization.is_finite()
+        || evidence.contact_friction_utilization > policy.maximum_contact_friction_utilization
+    {
         failures.push(HumanoidReachCommandEvidenceFailureKind::ContactFrictionUtilizationTooHigh);
     }
     if evidence.contact_dynamics_fallback && !policy.allow_contact_dynamics_fallback {
@@ -360,7 +379,10 @@ pub fn assess_humanoid_reach_command_evidence(
         if !evidence.floating_base_dynamics_converged {
             failures.push(HumanoidReachCommandEvidenceFailureKind::FloatingBaseNotConverged);
         }
-        if evidence.floating_base_dynamics_residual > policy.maximum_floating_base_dynamics_residual {
+        if !evidence.floating_base_dynamics_residual.is_finite()
+            || evidence.floating_base_dynamics_residual
+                > policy.maximum_floating_base_dynamics_residual
+        {
             failures.push(HumanoidReachCommandEvidenceFailureKind::FloatingBaseResidualTooLarge);
         }
         if evidence.floating_base_dynamics_fallback && !policy.allow_floating_base_fallback {
@@ -502,5 +524,15 @@ mod tests {
         assert!(assessment
             .failures
             .contains(&HumanoidReachCommandEvidenceFailureKind::InverseDynamicsFallbackForbidden));
+    }
+
+    #[test]
+    fn fail_closed_infinite_solver_residual_is_preserved_then_rejected() {
+        let mut evidence = evidence();
+        evidence.floating_base_dynamics_residual = f64::INFINITY;
+        let assessment = assess_humanoid_reach_command_evidence(&subject(), &policy(), &evidence);
+        assert!(assessment
+            .failures
+            .contains(&HumanoidReachCommandEvidenceFailureKind::FloatingBaseResidualTooLarge));
     }
 }
