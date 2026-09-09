@@ -4,14 +4,19 @@
 //! Fail-closed control-plane host for public Symthaea WebAssembly Components.
 //!
 //! A successful [`ControlPlaneHost::inspect`] means only that a component is
-//! technically compatible with the admitted manifest bytes and can execute its
-//! zero-authority control interface within the configured resource envelope.
-//! It does **not** mean that the component or signer is trusted, admitted for a
-//! capability, or authorized to perform an action.
+//! technically compatible with the presented manifest bytes and can execute its
+//! zero-authority control interface within the configured **guest execution**
+//! envelope. It does **not** mean that the component or signer is trusted,
+//! admitted for a capability, or authorized to perform an action.
 //!
 //! The initial host intentionally links no WASI or Symthaea host imports. Any
 //! component requiring ambient filesystem, network, clock, randomness, sensor,
 //! actuator, or other host authority therefore fails before instantiation.
+//!
+//! JIT compilation occurs before a [`Store`] exists; store limits, fuel, and
+//! epoch deadlines therefore bound guest execution, not compiler CPU/memory/time.
+//! Arbitrary-public-package promotion requires a separately supervised compiler
+//! worker rather than pretending these controls contain compilation.
 
 #![deny(unsafe_code)]
 
@@ -30,6 +35,12 @@ use wasmtime::{Config, Engine, Store, StoreLimits, StoreLimitsBuilder};
 /// Canonical exported control interface for ABI v1.
 pub const CONTROL_INTERFACE_V1: &str = "luminous:symthaea-extension/control@1.0.0";
 pub const CONTROL_ABI_V1: AbiVersion = AbiVersion { major: 1, minor: 0 };
+
+/// Stable identity for the Wasm proposal/codegen profile used by this host.
+///
+/// Changing any accepted/rejected language feature or determinism setting must
+/// mint a new profile identity rather than silently widening v1.
+pub const CONTROL_WASM_PROFILE_V1: &str = "symthaea.extension.control-wasm-profile.v1";
 
 /// Host-side ceiling independent of extension-requested resource budgets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,6 +112,7 @@ pub struct ControlInspection {
     pub health: GuestHealthReport,
     pub manifest_sha256: [u8; 32],
     pub component_sha256: [u8; 32],
+    pub wasm_profile: &'static str,
 }
 
 #[derive(Debug, Error)]
@@ -173,6 +185,10 @@ impl ControlPlaneHost {
         self.policy
     }
 
+    pub const fn wasm_profile(&self) -> &'static str {
+        CONTROL_WASM_PROFILE_V1
+    }
+
     /// Compile and run only the extension-control-v1 interface with zero host
     /// imports. Success is technical compatibility, not signer authorization.
     pub fn inspect(
@@ -196,14 +212,7 @@ impl ControlPlaneHost {
 
         let manifest_sha256 = sha256(manifest_bytes);
         let component_sha256 = sha256(component_bytes);
-
-        let mut config = Config::new();
-        config
-            .wasm_component_model(true)
-            .consume_fuel(true)
-            .epoch_interruption(true);
-        let engine = Engine::new(&config)
-            .map_err(|error| ControlHostError::ComponentCompile(error.to_string()))?;
+        let engine = control_engine()?;
         let component = Component::new(&engine, component_bytes)
             .map_err(|error| ControlHostError::ComponentCompile(error.to_string()))?;
 
@@ -291,6 +300,7 @@ impl ControlPlaneHost {
             health,
             manifest_sha256,
             component_sha256,
+            wasm_profile: CONTROL_WASM_PROFILE_V1,
         })
     }
 
@@ -383,6 +393,28 @@ impl ControlPlaneHost {
     }
 }
 
+/// Create the exact v1 engine profile.
+///
+/// Standard SIMD remains available for useful high-performance extensions, but
+/// relaxed SIMD is rejected because its specified results may vary by host.
+/// Experimental/expanded memory and control-flow proposals are unnecessary for
+/// the tiny control plane and stay out of the accepted baseline.
+fn control_engine() -> Result<Engine, ControlHostError> {
+    let mut config = Config::new();
+    config
+        .wasm_component_model(true)
+        .wasm_relaxed_simd(false)
+        .relaxed_simd_deterministic(true)
+        .wasm_memory64(false)
+        .wasm_multi_memory(false)
+        .wasm_tail_call(false)
+        .wasm_stack_switching(false)
+        .cranelift_nan_canonicalization(true)
+        .consume_fuel(true)
+        .epoch_interruption(true);
+    Engine::new(&config).map_err(|error| ControlHostError::ComponentCompile(error.to_string()))
+}
+
 struct HostState {
     limits: StoreLimits,
 }
@@ -404,9 +436,7 @@ fn is_zero_authority(permissions: &PermissionSet) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_extension_core::{
-        ExtensionId, ExtensionKind, PermissionSet, ResourceBudget,
-    };
+    use symthaea_extension_core::{ExtensionId, ExtensionKind, PermissionSet, ResourceBudget};
 
     fn manifest() -> ExtensionManifest {
         ExtensionManifest {
@@ -426,6 +456,13 @@ mod tests {
 
     fn bytes(manifest: &ExtensionManifest) -> Vec<u8> {
         serde_json::to_vec(manifest).unwrap()
+    }
+
+    #[test]
+    fn control_wasm_profile_is_versioned_and_engine_builds() {
+        let host = ControlPlaneHost::default();
+        assert_eq!(host.wasm_profile(), CONTROL_WASM_PROFILE_V1);
+        control_engine().unwrap();
     }
 
     #[test]
