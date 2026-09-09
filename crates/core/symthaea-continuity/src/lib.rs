@@ -15,6 +15,7 @@ pub mod exact_policy;
 pub mod observation;
 pub mod profile_adoption;
 pub mod profile_adoption_admission;
+pub mod profile_adoption_commit;
 pub mod verifier;
 mod witness;
 
@@ -45,6 +46,10 @@ pub use profile_adoption_admission::{
     PolicyCheckedVerifierProfileAdoptionV1, VerifierProfileAdoptionAdmissionError,
     VerifierProfileAdoptionAdmissionPolicyV1, VerifierProfileAdoptionHeadIdentityV1,
     VerifierProfileAdoptionHeadV1,
+};
+pub use profile_adoption_commit::{
+    VerifierAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionCommitError,
+    VerifierProfileAdoptionCommitPreconditionsV1, VerifierProfileAdoptionCommitStateV1,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
