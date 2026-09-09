@@ -22,13 +22,14 @@ use crate::cartesian_hand_reference::{
 use crate::contact::ContactFrame;
 use crate::dynamics::RigidBodyDynamicsProvider;
 use crate::execution::{HumanoidExecutionPipeline, HumanoidExecutionResult, HumanoidPreparedCommand};
+use crate::execution_authority_scope::{
+    HumanoidExecutionAuthorityScopeValidationFailure, HumanoidExecutionPurpose,
+    HumanoidQualificationAuthorityBasis, HumanoidScopedSkillAuthorityReceipt,
+};
 use crate::floating_base::FloatingBaseDynamicsProvider;
 use crate::frozen_dynamics::FrozenHumanoidDynamicsEnvironment;
 use crate::full_dynamics::FullRigidBodyDynamicsProvider;
 use crate::morphology::HandSide;
-use crate::skill_authority_receipt::{
-    HumanoidSkillAuthorityReceipt, HumanoidSkillAuthorityReceiptValidationFailure,
-};
 use crate::skill_runtime::HumanoidSkillIntent;
 use crate::spatial_goal::HumanoidSpatiallyBoundSkillPermit;
 use crate::spatial_goal_identity::humanoid_spatial_goal_fingerprint;
@@ -58,7 +59,7 @@ pub enum HumanoidPermittedReachPreparationFailure {
 pub enum HumanoidPermittedReachFinalizationFailure {
     InvalidFinalizationTime,
     FinalizationBeforePreparation,
-    AuthorityReceipt(HumanoidSkillAuthorityReceiptValidationFailure),
+    AuthorityScope(HumanoidExecutionAuthorityScopeValidationFailure),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -79,9 +80,7 @@ pub struct HumanoidPermittedReachPreparationReport {
     pub spatial_goal_fingerprint: u64,
     pub hand: HandSide,
     pub target_world_m: [f64; 3],
-    /// Exact root-frame target used by workspace admission for this epoch.
     pub target_root_m: [f64; 3],
-    /// Squared normalized radius inside the qualified workspace ellipsoid.
     pub workspace_utilization_sq: f64,
     pub dynamics: HumanoidFrozenDynamicsLineage,
     pub cartesian_reference: HumanoidCartesianHandReferenceReport,
@@ -90,6 +89,10 @@ pub struct HumanoidPermittedReachPreparationReport {
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidReachAuthorityReceiptAudit {
     pub receipt_fingerprint: u64,
+    pub scope_fingerprint: u64,
+    pub scope_id: String,
+    pub execution_purpose: HumanoidExecutionPurpose,
+    pub qualification_basis: HumanoidQualificationAuthorityBasis,
     pub validation_epoch: u64,
     pub issued_at_s: f64,
     pub valid_until_s: f64,
@@ -133,9 +136,12 @@ impl<'pipeline, 'permit> HumanoidPermittedReachPreparedCommand<'pipeline, 'permi
         self.prepared.hierarchy_report()
     }
 
+    /// Consume the prepared command only after purpose-scoped authority proves it
+    /// is bound to the same live permit and the correct qualification/operational
+    /// context. A trial-protocol receipt cannot masquerade as operational authority.
     pub fn finalize(
         self,
-        authority_receipt: HumanoidSkillAuthorityReceipt,
+        authority_receipt: HumanoidScopedSkillAuthorityReceipt,
         now_s: f64,
     ) -> Result<HumanoidPermittedReachExecutionResult, HumanoidPermittedReachFinalizationFailure> {
         if !now_s.is_finite() || now_s < 0.0 {
@@ -146,11 +152,15 @@ impl<'pipeline, 'permit> HumanoidPermittedReachPreparedCommand<'pipeline, 'permi
         }
         authority_receipt
             .validate_for_permit(self.permit.semantic(), now_s)
-            .map_err(HumanoidPermittedReachFinalizationFailure::AuthorityReceipt)?;
+            .map_err(HumanoidPermittedReachFinalizationFailure::AuthorityScope)?;
 
         let source = authority_receipt.source_evidence();
         let authority_audit = HumanoidReachAuthorityReceiptAudit {
             receipt_fingerprint: authority_receipt.receipt_fingerprint(),
+            scope_fingerprint: authority_receipt.scope_fingerprint(),
+            scope_id: authority_receipt.scope_id().to_string(),
+            execution_purpose: authority_receipt.purpose(),
+            qualification_basis: authority_receipt.qualification_basis(),
             validation_epoch: authority_receipt.validation_epoch(),
             issued_at_s: authority_receipt.issued_at_s(),
             valid_until_s: authority_receipt.valid_until_s(),
