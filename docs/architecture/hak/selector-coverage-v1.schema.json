@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hak.selector-coverage.v1",
+  "title": "HAK Selector Coverage v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "canonicalization_profile",
+    "digest_domain",
+    "source_receipt",
+    "resource_kind",
+    "policy",
+    "coverage_semantics",
+    "optional_results",
+    "coverage_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "hak.selector-coverage.v1"},
+    "canonicalization_profile": {"const": "hak.canonical-json.v1"},
+    "digest_domain": {"const": "hak.selector-coverage.v1"},
+    "source_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "receipt_digest", "execution_status"],
+      "properties": {
+        "schema_version": {"const": "hak.normalization-execution-receipt.v1"},
+        "receipt_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "execution_status": {"enum": ["Succeeded", "Partial", "Failed"]}
+      }
+    },
+    "resource_kind": {"type": "string", "minLength": 1},
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "policy_digest"],
+      "properties": {
+        "policy_id": {"type": "string", "minLength": 1},
+        "policy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "coverage_semantics": {
+      "const": {
+        "model": "HAKSelectorPathTerminalContextV1",
+        "nonfailed_conservation": "applicable == matches + missing",
+        "empty_wildcard_semantics": "zero applicable contexts -> NotApplicable",
+        "historical_receipt_status_preserved": true
+      }
+    },
+    "optional_results": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/coverageResult"}
+    },
+    "coverage_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "coverageResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "source_status", "coverage_state", "applicable", "matches", "missing"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "source_status": {"enum": ["Present", "Absent", "Failed"]},
+        "coverage_state": {"enum": ["Present", "PartiallyPresent", "Absent", "NotApplicable", "Failed"]},
+        "applicable": {
+          "anyOf": [
+            {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+            {"type": "null"}
+          ]
+        },
+        "matches": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "missing": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"coverage_state": {"const": "Present"}}},
+          "then": {
+            "properties": {
+              "source_status": {"const": "Present"},
+              "applicable": {"type": "integer", "minimum": 1},
+              "matches": {"type": "integer", "minimum": 1},
+              "missing": {"const": 0}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"coverage_state": {"const": "PartiallyPresent"}}},
+          "then": {
+            "properties": {
+              "source_status": {"const": "Present"},
+              "applicable": {"type": "integer", "minimum": 2},
+              "matches": {"type": "integer", "minimum": 1},
+              "missing": {"type": "integer", "minimum": 1}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"coverage_state": {"const": "Absent"}}},
+          "then": {
+            "properties": {
+              "source_status": {"const": "Absent"},
+              "applicable": {"type": "integer", "minimum": 1},
+              "matches": {"const": 0},
+              "missing": {"type": "integer", "minimum": 1}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"coverage_state": {"const": "NotApplicable"}}},
+          "then": {
+            "properties": {
+              "source_status": {"const": "Absent"},
+              "applicable": {"const": 0},
+              "matches": {"const": 0},
+              "missing": {"const": 0}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"coverage_state": {"const": "Failed"}}},
+          "then": {
+            "properties": {
+              "source_status": {"const": "Failed"},
+              "applicable": {"type": "null"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}
