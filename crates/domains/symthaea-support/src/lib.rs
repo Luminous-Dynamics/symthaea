@@ -23,6 +23,8 @@ pub mod standards_registry;
 pub mod system_state;
 pub mod technology;
 pub mod telemetry;
+#[cfg(feature = "telemetry-adapter")]
+pub mod telemetry_adapter;
 pub mod triage;
 pub mod types;
 
@@ -62,4 +64,10 @@ pub use system_state::{
 pub use technology::{
     ApplicabilityAssessmentV1, ApplicabilityScopeV1, ApplicabilityStatusV1, StringSelectorV1,
     TechnologyIdentityError, TechnologyIdentityV1,
+};
+#[cfg(feature = "telemetry-adapter")]
+pub use telemetry_adapter::{
+    ExternalTelemetryRecordV1, TelemetryAdapterErrorV1, TelemetryObservationAdapterConfigV1,
+    TelemetryObservationAdapterV1, TelemetryRetentionPolicyV1, TelemetrySchemaIdentityV1,
+    TelemetrySchemaStabilityV1, TelemetrySignalKindV1,
 };
