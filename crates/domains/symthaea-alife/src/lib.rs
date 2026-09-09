@@ -33,6 +33,7 @@ pub mod events;
 pub mod evolvability;
 pub mod evolvability_comparison;
 pub mod evolution_birth;
+pub mod evolution_intervention;
 pub mod evolution_rng;
 pub mod evolutionary_history;
 pub mod exact_sign_test;
@@ -88,6 +89,12 @@ pub use evolvability_comparison::{
 };
 pub use evolution_birth::{
     EvolutionBirthPlanErrorV1, EvolutionBirthPlanV1, prepare_evolution_birth_v1,
+};
+pub use evolution_intervention::{
+    AppliedBirthMutationInterventionV1, BirthMutationInterventionErrorV1,
+    BirthMutationInterventionKindV1, BirthMutationInterventionReceiptV1,
+    BirthMutationInterventionV1, EvolutionBirthSubjectV1, GenomeTraitV1,
+    changed_traits_for_plan_v1,
 };
 pub use evolution_rng::{
     EvolutionRngRestoreErrorV1, EvolutionRngSnapshotV1, EvolutionRngStreamsV1,
