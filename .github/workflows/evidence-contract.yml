@@ -11,6 +11,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/evidence-contract.yml'
+      - 'scripts/qualify-evidence-contract.sh'
       - 'crates/core/symthaea-evidence-plane/**'
       - 'crates/domains/symthaea-psych-bench/**'
       - 'crates/core/symthaea-core/**'
@@ -49,34 +50,6 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Assert exact-head identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          expected='${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}'
-          actual="$(git rev-parse HEAD)"
-          test "$actual" = "$expected" || {
-            echo "qualified head mismatch: expected=$expected actual=$actual" >&2
-            exit 1
-          }
-          {
-            echo '## Evidence Contract Qualification'
-            echo
-            echo "- qualified SHA: \`$actual\`"
-            echo '- scope: software-contract qualification only'
-            echo '- full repository CI: independent'
-            echo '- empirical/scientific claim authority: none'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Refuse baseline-generation mode
-        shell: bash
-        run: |
-          set -euo pipefail
-          if env | grep -q '^UPDATE_SNAPSHOT='; then
-            echo 'UPDATE_SNAPSHOT is present; comparison/qualification must remain read-only.' >&2
-            exit 1
-          fi
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
@@ -85,19 +58,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libasound2-dev
 
-      - name: Record selected toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustc -Vv
-          cargo -V
-          cargo metadata --locked --no-deps --format-version 1 >/dev/null
-
-      - name: Evidence-plane contracts
-        run: cargo test --locked -p symthaea-evidence-plane
-
-      - name: Psych-bench contracts
-        run: cargo test --locked -p symthaea-psych-bench
-
-      - name: Backend Butlin conformance
-        run: cargo test --locked -p symthaea-psych-bench --features symthaea-backend --lib -- butlin
+      - name: Qualify evidence contracts
+        env:
+          QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: bash scripts/qualify-evidence-contract.sh
