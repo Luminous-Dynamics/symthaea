@@ -1,0 +1,51 @@
+name: Inference Permit
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_permit.rs"
+      - "tests/inference_permit.rs"
+      - "docs/architecture/INFERENCE_PERMIT_V1.md"
+      - ".github/workflows/inference-permit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-permit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-permit:
+    name: Inference Permit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: rustfmt --edition 2024 --check src/language/inference_permit.rs tests/inference_permit.rs
+
+      - name: Compile and run IF-2 permit regressions
+        run: cargo test --locked --test inference_permit
+
+      - name: Focused permit Clippy
+        run: cargo clippy --locked --test inference_permit -- -D warnings -A dead-code
+
+      - name: Ratchet ownership and TOCTOU boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'Intentionally not Clone, Copy, Serialize, or Deserialize' src/language/inference_permit.rs
+          grep -F 'active' src/language/inference_permit.rs
+          grep -F 'remove(&permit.nonce)' src/language/inference_permit.rs
+          grep -F 'half-open monotonic interval' docs/architecture/INFERENCE_PERMIT_V1.md
+          grep -F 'no durable permit store' docs/architecture/INFERENCE_PERMIT_V1.md
