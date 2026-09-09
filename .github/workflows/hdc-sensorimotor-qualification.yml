@@ -8,6 +8,7 @@ on:
       - 'crates/core/symthaea-core/src/hdc/sensorimotor_codebook_v1.rs'
       - 'src/perception/sensor_fusion.rs'
       - 'src/perception/sensorimotor_alignment.rs'
+      - 'src/perception/sensorimotor_alignment_timing.rs'
       - 'src/perception/mod.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_state.rs'
       - 'crates/domains/symthaea-humanoid/src/lib.rs'
