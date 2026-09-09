@@ -11,6 +11,7 @@
 pub mod auth_wire;
 pub mod capability;
 pub mod capability_graph;
+pub mod capability_topology;
 mod compose;
 pub mod contract;
 pub mod exact_policy;
@@ -31,6 +32,10 @@ pub use capability::{
 pub use capability_graph::{
     CAPABILITY_GRAPH_SNAPSHOT_SCHEMA_V1, CapabilityGraphError, CapabilityGraphSnapshotId,
     CapabilityGraphSnapshotV1, ValidatedCapabilityGraphV1,
+};
+pub use capability_topology::{
+    CapabilityComponentIndex, CapabilityComponentV1, CapabilityCondensationEdgeV1,
+    CapabilityTopologyError, CapabilityTopologyV1, analyze_capability_topology,
 };
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
