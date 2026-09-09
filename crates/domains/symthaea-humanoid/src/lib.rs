@@ -60,7 +60,9 @@ pub mod reach_outcome_evidence;
 pub mod reach_policy_identity;
 pub mod reach_qualification_campaign;
 pub mod reach_qualification_lineage;
-pub mod reach_qualification_promotion;
+// Step-level Reach evidence may issue internal stage artifacts, but cannot expose
+// operational capability on its own. Episode-complete promotion is layered above.
+mod reach_qualification_promotion;
 pub mod recovery;
 pub mod recovery_benchmark;
 pub mod recovery_certification;
@@ -141,7 +143,6 @@ pub use reach_outcome_evidence::*;
 pub use reach_policy_identity::*;
 pub use reach_qualification_campaign::*;
 pub use reach_qualification_lineage::*;
-pub use reach_qualification_promotion::*;
 pub use recovery_certification::*;
 pub use release_pipeline::*;
 pub use reproducible_oracle_build::*;
