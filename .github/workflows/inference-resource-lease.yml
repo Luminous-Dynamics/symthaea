@@ -1,0 +1,101 @@
+name: Inference Resource Lease
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_resource_lease.rs"
+      - "src/language/inference_leased_executor.rs"
+      - "tests/inference_resource_lease.rs"
+      - "docs/architecture/INFERENCE_RESOURCE_LEASE_V1.md"
+      - ".github/workflows/inference-resource-lease.yml"
+      - "scripts/check-inference-test-targets.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-resource-lease-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-resource-lease:
+    name: Inference Resource Lease
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Materialize workflow-proven test registrations
+        run: python3 scripts/check-inference-test-targets.py --fix
+
+      - name: Verify registration closure
+        run: python3 scripts/check-inference-test-targets.py
+
+      - name: Check focused formatting
+        run: >-
+          rustfmt --edition 2024 --check
+          src/language/inference_resource_lease.rs
+          src/language/inference_leased_executor.rs
+          tests/inference_resource_lease.rs
+
+      - name: Compile and run IF-15 resource lease regressions
+        run: cargo test --locked --test inference_resource_lease
+
+      - name: Preserve IF-7 resource guard theorem
+        run: cargo test --locked --test inference_resource_guard
+
+      - name: Preserve IF-12 resource scope theorem
+        run: cargo test --locked --test inference_resource_scope
+
+      - name: Preserve IF-13 resource execution theorem
+        run: cargo test --locked --test inference_resource_execution
+
+      - name: Preserve IF-14 terminal HTTP status evidence
+        run: cargo test --locked --test inference_http_status_evidence
+
+      - name: Focused resource lease Clippy
+        run: >-
+          cargo clippy --locked --test inference_resource_lease --
+          -D warnings -A dead-code -A unused-imports
+
+      - name: Ratchet leased authority boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          grep -F 'symthaea.inference.resource-lease-binding.v5' src/language/inference_resource_lease.rs
+          grep -F 'symthaea.inference.execution-resource-lease.v1' src/language/inference_resource_lease.rs
+          grep -F 'pub fn prepare_leased_current' src/language/inference_leased_executor.rs
+          grep -F 'pub fn cancel_prepared_leased_current' src/language/inference_leased_executor.rs
+          grep -F 'PreparedLeasedInferenceExecution' src/language/inference_leased_executor.rs
+          grep -F 'validate_lease_owner' src/language/inference_leased_executor.rs
+          grep -F 'settle_rate_limited' src/language/inference_resource_lease.rs
+          grep -F 'settle_auth_rejected' src/language/inference_resource_lease.rs
+          grep -F 'provider_http_status' src/language/inference_resource_lease.rs
+
+          if grep -Fq 'pub fn bind_and_lease_current' src/language/inference_leased_executor.rs; then
+            echo 'public API must not expose a naked active lease before permit preparation' >&2
+            exit 1
+          fi
+
+          if grep -Fq 'pub async fn execute_leased_current' src/language/inference_leased_executor.rs; then
+            echo 'public API must accept the joined prepared leased capability instead' >&2
+            exit 1
+          fi
+
+          if grep -Fq 'pub async fn execute_streaming_leased_current' src/language/inference_leased_executor.rs; then
+            echo 'public streaming API must accept the joined prepared leased capability instead' >&2
+            exit 1
+          fi
+
+          grep -F 'accidentally dropped process-local prepared capabilities' docs/architecture/INFERENCE_RESOURCE_LEASE_V1.md
+          grep -F 'global uniqueness enforcement for caller-supplied authority ids' docs/architecture/INFERENCE_RESOURCE_LEASE_V1.md
+          grep -F 'deployment-aware routing' docs/architecture/INFERENCE_RESOURCE_LEASE_V1.md
