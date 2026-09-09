@@ -8,6 +8,8 @@
 
 /// Niche-preserving, confidence-qualified Pareto comparison without scalar fitness.
 pub mod archive;
+/// Evidence-aware Pareto admission that keeps support separate from reported confidence.
+pub mod evidence_admission;
 /// Content-addressed binding from evidence-plane runs into generativity evidence.
 pub mod evidence_binding;
 /// Evidence-bearing, non-authoritative evaluation of future capacity and optionality.
