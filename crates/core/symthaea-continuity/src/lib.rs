@@ -9,6 +9,7 @@
 #![deny(unsafe_code)]
 
 pub mod auth_wire;
+pub mod capability;
 mod compose;
 pub mod contract;
 pub mod exact_policy;
@@ -21,6 +22,10 @@ pub use auth_wire::{
     CONTINUITY_VERIFICATION_CLAIM_AUTH_SCHEMA, CONTINUITY_VERIFICATION_CLAIM_HASH_ALGORITHM,
     CONTINUITY_VERIFICATION_XENIA_PURPOSE, canonical_verification_claim_bytes,
     canonical_verification_claim_digest,
+};
+pub use capability::{
+    CAPABILITY_DEFINITION_SCHEMA_V1, CapabilityDefinitionId, CapabilityDefinitionV1,
+    CapabilityError, CapabilityId, CapabilityRequirementV1,
 };
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
