@@ -1,0 +1,81 @@
+name: HAK Canonical JSON
+
+on:
+  pull_request:
+    branches:
+      - architecture/hak-normalization-execution-v1
+    paths:
+      - 'scripts/hak_canonical_json.py'
+      - 'tests/python/test_hak_canonical_json.py'
+      - 'tools/hak_canonical_json_rust.rs'
+      - 'tools/hak_canonical_profile_contract_rust.rs'
+      - 'docs/architecture/HUMAN_AGENCY_KERNEL_CANONICAL_JSON_V1.md'
+      - 'docs/architecture/hak/canonical-json-v1.profile.json'
+      - 'docs/architecture/hak/golden/hak-canonical-json-v1.vectors.json'
+      - 'docs/architecture/hak/plans/hak015-canonical-json-e5-v1.plan.json'
+      - 'docs/architecture/hak/policies/hak015-canonical-json-binding-policy-v1.json'
+      - '.github/workflows/hak-canonical-json.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  canonical-json:
+    name: HAK Canonical JSON
+    runs-on: ubuntu-latest
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    steps:
+      - name: Resolve exact subject
+        id: subject
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.subject.outputs.sha }}
+          persist-credentials: false
+
+      - name: Assert exact-head checkout
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ steps.subject.outputs.sha }}"
+          echo "HAK-015 exact subject: $(git rev-parse HEAD)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile HAK-015 Python reference
+        run: |
+          python -m py_compile scripts/hak_canonical_json.py
+          python -m json.tool docs/architecture/hak/canonical-json-v1.profile.json >/dev/null
+          python -m json.tool docs/architecture/hak/golden/hak-canonical-json-v1.vectors.json >/dev/null
+
+      - name: Run HAK-015 Python golden vectors
+        run: python tests/python/test_hak_canonical_json.py
+
+      - name: Run HAK-015 Rust golden vectors
+        run: |
+          rustc --version
+          rustc --edition=2021 --test tools/hak_canonical_json_rust.rs -o /tmp/hak-canonical-json-rust
+          /tmp/hak-canonical-json-rust
+          rustc --edition=2021 tools/hak_canonical_profile_contract_rust.rs -o /tmp/hak-canonical-profile-rust
+          /tmp/hak-canonical-profile-rust
+
+      - name: Lint HAK-015 qualification plan
+        run: python scripts/hak_evidence_lint.py docs/architecture/hak/plans/hak015-canonical-json-e5-v1.plan.json
+
+      - name: Lint HAK-015 check-binding policy
+        run: |
+          python scripts/hak_check_binding_lint.py \
+            --plan docs/architecture/hak/plans/hak015-canonical-json-e5-v1.plan.json \
+            --policy docs/architecture/hak/policies/hak015-canonical-json-binding-policy-v1.json

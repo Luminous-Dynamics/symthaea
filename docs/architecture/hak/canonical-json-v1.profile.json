@@ -1,0 +1,39 @@
+{
+  "schema_version": "hak.canonical-json-profile.v1",
+  "profile_id": "hak.canonical-json.v1",
+  "base_standard": {
+    "name": "RFC 8785",
+    "relationship": "CompatibleSubset"
+  },
+  "input_contract": {
+    "encoding": "UTF-8",
+    "duplicate_object_names": "Reject",
+    "unicode_strings": "UnicodeScalarValuesOnly",
+    "numbers": {
+      "profile": "SafeIntegerOnly",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991,
+      "floating_point_allowed": false,
+      "negative_zero_canonicalizes_to": 0
+    }
+  },
+  "serialization": {
+    "object_key_order": "RFC8785Utf16CodeUnits",
+    "object_sorting_recursive": true,
+    "array_order": "PreserveExactly",
+    "whitespace": "None",
+    "string_escaping": "RFC8785Compatible",
+    "unicode_normalization": "None",
+    "output_encoding": "UTF-8"
+  },
+  "digest_contract": {
+    "algorithm": "SHA-256",
+    "preimage": "UTF8(profile_id) || 0x00 || UTF8(domain) || 0x00 || canonical_bytes",
+    "domain_must_be_nonempty": true,
+    "domain_must_not_contain_nul": true
+  },
+  "migration": {
+    "reinterpret_existing_digests": false,
+    "historical_python_sort_keys_digests_remain_historical": true
+  }
+}

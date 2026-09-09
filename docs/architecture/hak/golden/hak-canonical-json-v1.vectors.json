@@ -1,0 +1,71 @@
+{
+  "profile_id": "hak.canonical-json.v1",
+  "positive": [
+    {
+      "id": "ascii-order",
+      "raw_json": "{\"b\":2,\"a\":1}",
+      "canonical_utf8": "{\"a\":1,\"b\":2}",
+      "digest_domain": "hak.golden.v1",
+      "hak_sha256": "sha256:49631e9e176170d965654977f33a95235fb2dc57856eccf8d9cd9c4e122ba619"
+    },
+    {
+      "id": "nested",
+      "raw_json": "{\"z\":[{\"b\":2,\"a\":1},3],\"a\":true}",
+      "canonical_utf8": "{\"a\":true,\"z\":[{\"a\":1,\"b\":2},3]}",
+      "digest_domain": "hak.golden.v1",
+      "hak_sha256": "sha256:d803112c449a401cd280e1c9d42dd1e90a76a48d68fc4d0c885aeaf2c5b5c6a2"
+    },
+    {
+      "id": "unicode-sort",
+      "raw_json": "{\"€\":\"Euro Sign\",\"\\r\":\"Carriage Return\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\",\"1\":\"One\",\"😀\":\"Emoji: Grinning Face\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\"}",
+      "canonical_utf8": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}",
+      "digest_domain": "hak.golden.v1",
+      "hak_sha256": "sha256:fdb3eb875e7e450d1224d5b88ece108c9b190d1b0f58a7edf861eaa5f593afe4"
+    },
+    {
+      "id": "string-escapes",
+      "raw_json": "{\"s\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}",
+      "canonical_utf8": "{\"s\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}",
+      "digest_domain": "hak.golden.v1",
+      "hak_sha256": "sha256:eebb055e8e2c5f31b4f3f0f6f9620bf70846191ba7c9a397c3689feba0ca6d1a"
+    },
+    {
+      "id": "unicode-no-normalization",
+      "raw_json": "{\"é\":1,\"é\":2}",
+      "canonical_utf8": "{\"é\":2,\"é\":1}",
+      "digest_domain": "hak.golden.v1",
+      "hak_sha256": "sha256:26b0aacecf6a9b83b1da4322cd31e2c23c358b867aa026f929be67b83ca28dd9"
+    },
+    {
+      "id": "safe-integers",
+      "raw_json": "{\"zero\":0,\"min\":-9007199254740991,\"max\":9007199254740991}",
+      "canonical_utf8": "{\"max\":9007199254740991,\"min\":-9007199254740991,\"zero\":0}",
+      "digest_domain": "hak.golden.v1",
+      "hak_sha256": "sha256:9574edbabf38defff84fdf1e80ff965319fa5058c77394bee62aeec26d87cd1f"
+    },
+    {
+      "id": "negative-zero",
+      "raw_json": "{\"x\":-0}",
+      "canonical_utf8": "{\"x\":0}",
+      "digest_domain": "hak.golden.v1",
+      "hak_sha256": "sha256:0e3336283cd27ea7a6bfe30e057fdc988f098efbb7dcc4acfb0a65f92dea5e44"
+    },
+    {
+      "id": "array-order",
+      "raw_json": "[\"z\",\"a\",{\"b\":1,\"a\":2}]",
+      "canonical_utf8": "[\"z\",\"a\",{\"a\":2,\"b\":1}]",
+      "digest_domain": "hak.golden.v1",
+      "hak_sha256": "sha256:6e2a4879e0a71fc54e5c4d28901c32f2c5a1de1e80580e4d5d79dff3384ce244"
+    }
+  ],
+  "negative": [
+    {"id":"duplicate-key","raw_json":"{\"a\":1,\"a\":2}","error_kind":"DuplicateKey"},
+    {"id":"float","raw_json":"{\"x\":1.5}","error_kind":"UnsupportedNumber"},
+    {"id":"exponent","raw_json":"{\"x\":1e3}","error_kind":"UnsupportedNumber"},
+    {"id":"unsafe-positive","raw_json":"{\"x\":9007199254740992}","error_kind":"UnsafeInteger"},
+    {"id":"unsafe-negative","raw_json":"{\"x\":-9007199254740992}","error_kind":"UnsafeInteger"},
+    {"id":"nan","raw_json":"{\"x\":NaN}","error_kind":"UnsupportedNumber"},
+    {"id":"infinity","raw_json":"{\"x\":Infinity}","error_kind":"UnsupportedNumber"},
+    {"id":"lone-surrogate","raw_json":"{\"x\":\"\\ud800\"}","error_kind":"InvalidUnicode"}
+  ]
+}
