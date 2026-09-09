@@ -42,6 +42,7 @@ pub mod oracle_generator_certification;
 pub mod osqp_backend;
 pub mod plugin;
 pub mod predictive_baseline;
+pub mod predictor_context;
 pub mod qp_certification;
 pub mod recovery;
 pub mod recovery_benchmark;
@@ -96,6 +97,7 @@ pub use oracle_generator_certification::*;
 #[cfg(feature = "osqp-backend")]
 pub use osqp_backend::*;
 pub use predictive_baseline::*;
+pub use predictor_context::*;
 pub use qp_certification::*;
 pub use recovery_certification::*;
 pub use release_pipeline::*;
