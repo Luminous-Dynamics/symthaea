@@ -1,0 +1,69 @@
+name: Inference HTTP Status Evidence
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_receipt.rs"
+      - "src/language/inference_executor.rs"
+      - "tests/inference_http_status_evidence.rs"
+      - "docs/architecture/INFERENCE_HTTP_STATUS_EVIDENCE_V1.md"
+      - ".github/workflows/inference-http-status-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-http-status-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-http-status-evidence:
+    name: Inference HTTP Status Evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: >-
+          rustfmt --edition 2024 --check
+          src/language/inference_receipt.rs
+          src/language/inference_executor.rs
+          tests/inference_http_status_evidence.rs
+
+      - name: Compile and run status plus inherited wire regressions
+        run: >-
+          cargo test --locked
+          --test inference_http_status_evidence
+          --test inference_executor
+          --test inference_wire_receipt
+
+      - name: Focused HTTP status Clippy
+        run: cargo clippy --locked --test inference_http_status_evidence -- -D warnings -A dead-code
+
+      - name: Ratchet status/privacy boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'provider_http_status: Option<u16>' src/language/inference_receipt.rs
+          grep -F 'pub const fn provider_http_status(&self) -> Option<u16>' src/language/inference_receipt.rs
+          grep -F 'with_provider_http_status' src/language/inference_executor.rs
+          grep -F 'TransportError::HttpStatus(status)' src/language/inference_executor.rs
+          grep -F 'PRIVATE_PROMPT_ECHO_MUST_NOT_SURVIVE' tests/inference_http_status_evidence.rs
+          grep -F 'automatically settle or mutate `InferenceResourceGuard`' docs/architecture/INFERENCE_HTTP_STATUS_EVIDENCE_V1.md
+          if grep -q 'response_body' src/language/inference_receipt.rs; then
+            echo 'receipt layer must not retain provider response bodies' >&2
+            exit 1
+          fi
+          if grep -q 'pub fn with_provider_http_status' src/language/inference_receipt.rs; then
+            echo 'ordinary callers must not mint provider HTTP status evidence' >&2
+            exit 1
+          fi
