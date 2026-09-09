@@ -6,7 +6,7 @@
 //! command or operational authority is introduced. It records one exact hand's
 //! contact with one exact object state, derives normal/tangential wrench and
 //! relative-motion metrics, applies an explicit freshness/contact policy, and
-//! emits a SHA-256 assessment artifact.
+//! emits an immutable SHA-256 assessment artifact.
 //!
 //! It deliberately does not command finger torque, infer an unknown friction
 //! coefficient, or claim retention from geometry alone.
@@ -20,23 +20,16 @@ use crate::types::{ActuationMode, HumanoidTask};
 pub const HUMANOID_GRASP_CONTACT_OBSERVATION_SCHEMA_VERSION: u32 = 1;
 pub const HUMANOID_GRASP_CONTACT_POLICY_SCHEMA_VERSION: u32 = 1;
 pub const HUMANOID_GRASP_CONTACT_ASSESSMENT_SCHEMA_VERSION: u32 = 1;
-const NORMAL_UNIT_TOLERANCE: f64 = 1.0e-6;
+const NORMAL_VECTOR_EPSILON: f64 = 1.0e-9;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum HumanoidManipulationContactSource {
-    /// No trustworthy manipulation-contact evidence exists.
     Unavailable,
-    /// Contact inferred from geometry only. Never qualifies as measured contact.
     KinematicEstimate,
-    /// Contact inferred from vision only. Never qualifies as measured contact.
     VisionEstimate,
-    /// Rigid-body solver wrench at the canonical hand site.
     SolverWrench,
-    /// Physical wrist/hand force-torque sensor.
     ForceTorqueSensor,
-    /// Distributed tactile-array contact estimate.
     TactileArray,
-    /// Fused measured contact whose producer preserves source provenance.
     FusedMeasured,
 }
 
@@ -47,8 +40,7 @@ impl HumanoidManipulationContactSource {
             Self::KinematicEstimate => 1,
             Self::VisionEstimate => 2,
             Self::SolverWrench => 3,
-            Self::ForceTorqueSensor => 4,
-            Self::TactileArray => 4,
+            Self::ForceTorqueSensor | Self::TactileArray => 4,
             Self::FusedMeasured => 5,
         }
     }
@@ -81,7 +73,6 @@ pub enum HumanoidGraspContactObservationFailure {
     InvalidDigest,
 }
 
-/// Immutable observation of one hand contacting one exact object state.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidGraspContactObservation {
     schema_version: u32,
@@ -179,47 +170,42 @@ impl HumanoidGraspContactObservation {
             observation_digest: HumanoidEvidenceDigest::ZERO,
         };
         value.observation_digest = digest_observation(&value);
-        if value.observation_digest.is_zero() {
+        if value.observation_digest.is_zero() || !value.validate_for(subject) {
             return Err(HumanoidGraspContactObservationFailure::InvalidDigest);
         }
         Ok(value)
     }
 
-    pub fn object_id(&self) -> &str {
-        &self.object_id
+    pub fn validate_for(&self, subject: &HumanoidQualificationSubject) -> bool {
+        self.schema_version == HUMANOID_GRASP_CONTACT_OBSERVATION_SCHEMA_VERSION
+            && digest_subject(subject) == Some(self.subject_digest)
+            && valid_id(&self.object_id)
+            && !self.object_state_digest.is_zero()
+            && self.site == expected_hand_site(self.hand)
+            && self.timestamp_s.is_finite()
+            && self.timestamp_s >= 0.0
+            && finite_vec3(self.contact_point_world_m)
+            && finite_vec3(self.outward_normal_world_unit)
+            && (norm3(self.outward_normal_world_unit) - 1.0).abs() <= 1.0e-9
+            && finite_vec3(self.force_world_n)
+            && finite_vec3(self.torque_world_nm)
+            && finite_vec3(self.hand_relative_to_object_velocity_world_mps)
+            && self.confidence.is_finite()
+            && (0.0..=1.0).contains(&self.confidence)
+            && !(self.source == HumanoidManipulationContactSource::Unavailable && self.in_contact)
+            && !self.observation_digest.is_zero()
+            && self.observation_digest == digest_observation(self)
     }
 
-    pub const fn object_state_digest(&self) -> HumanoidEvidenceDigest {
-        self.object_state_digest
-    }
-
-    pub const fn hand(&self) -> HandSide {
-        self.hand
-    }
-
-    pub const fn site(&self) -> HumanoidContactSite {
-        self.site
-    }
-
-    pub const fn source(&self) -> HumanoidManipulationContactSource {
-        self.source
-    }
-
-    pub const fn in_contact(&self) -> bool {
-        self.in_contact
-    }
-
-    pub const fn timestamp_s(&self) -> f64 {
-        self.timestamp_s
-    }
-
-    pub const fn confidence(&self) -> f64 {
-        self.confidence
-    }
-
-    pub const fn observation_digest(&self) -> HumanoidEvidenceDigest {
-        self.observation_digest
-    }
+    pub fn object_id(&self) -> &str { &self.object_id }
+    pub const fn object_state_digest(&self) -> HumanoidEvidenceDigest { self.object_state_digest }
+    pub const fn hand(&self) -> HandSide { self.hand }
+    pub const fn site(&self) -> HumanoidContactSite { self.site }
+    pub const fn source(&self) -> HumanoidManipulationContactSource { self.source }
+    pub const fn in_contact(&self) -> bool { self.in_contact }
+    pub const fn timestamp_s(&self) -> f64 { self.timestamp_s }
+    pub const fn confidence(&self) -> f64 { self.confidence }
+    pub const fn observation_digest(&self) -> HumanoidEvidenceDigest { self.observation_digest }
 
     pub fn age_s(&self, now_s: f64) -> f64 {
         if !now_s.is_finite() || now_s < self.timestamp_s {
@@ -228,19 +214,18 @@ impl HumanoidGraspContactObservation {
         now_s - self.timestamp_s
     }
 
-    /// Signed force along the object's outward surface normal. Positive means the
-    /// hand is pushing into the object (opposite outward normal).
+    /// Positive means the hand is pushing into the object, opposite the object's
+    /// outward surface normal.
     pub fn normal_force_n(&self) -> f64 {
         -dot3(self.force_world_n, self.outward_normal_world_unit)
     }
 
     pub fn tangential_force_n(&self) -> f64 {
         let signed_outward = dot3(self.force_world_n, self.outward_normal_world_unit);
-        let tangent = sub3(
+        norm3(sub3(
             self.force_world_n,
             scale3(self.outward_normal_world_unit, signed_outward),
-        );
-        norm3(tangent)
+        ))
     }
 
     pub fn separation_speed_mps(&self) -> f64 {
@@ -264,28 +249,27 @@ impl HumanoidGraspContactObservation {
             self.hand_relative_to_object_velocity_world_mps,
             self.outward_normal_world_unit,
         );
-        let tangent = sub3(
+        norm3(sub3(
             self.hand_relative_to_object_velocity_world_mps,
             scale3(self.outward_normal_world_unit, normal_speed),
-        );
-        norm3(tangent)
+        ))
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidGraspContactPolicy {
-    pub schema_version: u32,
-    pub subject_digest: HumanoidEvidenceDigest,
-    pub hand: HandSide,
-    pub maximum_contact_age_s: f64,
-    pub minimum_confidence: f64,
-    pub minimum_source_quality_rank: u8,
-    pub require_measured_source: bool,
-    pub minimum_normal_force_n: f64,
-    pub maximum_normal_force_n: f64,
-    pub maximum_tangential_speed_mps: f64,
-    pub maximum_separation_speed_mps: f64,
-    pub maximum_closing_speed_mps: f64,
+    schema_version: u32,
+    subject_digest: HumanoidEvidenceDigest,
+    hand: HandSide,
+    maximum_contact_age_s: f64,
+    minimum_confidence: f64,
+    minimum_source_quality_rank: u8,
+    require_measured_source: bool,
+    minimum_normal_force_n: f64,
+    maximum_normal_force_n: f64,
+    maximum_tangential_speed_mps: f64,
+    maximum_separation_speed_mps: f64,
+    maximum_closing_speed_mps: f64,
     policy_digest: HumanoidEvidenceDigest,
 }
 
@@ -340,17 +324,37 @@ impl HumanoidGraspContactPolicy {
             policy_digest: HumanoidEvidenceDigest::ZERO,
         };
         value.policy_digest = digest_policy(&value);
-        (!value.policy_digest.is_zero()).then_some(value)
+        value.validate_for(subject).then_some(value)
     }
 
-    pub const fn policy_digest(&self) -> HumanoidEvidenceDigest {
-        self.policy_digest
+    pub fn validate_for(&self, subject: &HumanoidQualificationSubject) -> bool {
+        self.schema_version == HUMANOID_GRASP_CONTACT_POLICY_SCHEMA_VERSION
+            && digest_subject(subject) == Some(self.subject_digest)
+            && self.maximum_contact_age_s.is_finite()
+            && self.maximum_contact_age_s > 0.0
+            && self.minimum_confidence.is_finite()
+            && (0.0..=1.0).contains(&self.minimum_confidence)
+            && self.minimum_source_quality_rank <= HumanoidManipulationContactSource::FusedMeasured.quality_rank()
+            && self.minimum_normal_force_n.is_finite()
+            && self.minimum_normal_force_n >= 0.0
+            && self.maximum_normal_force_n.is_finite()
+            && self.maximum_normal_force_n > self.minimum_normal_force_n
+            && self.maximum_tangential_speed_mps.is_finite()
+            && self.maximum_tangential_speed_mps >= 0.0
+            && self.maximum_separation_speed_mps.is_finite()
+            && self.maximum_separation_speed_mps >= 0.0
+            && self.maximum_closing_speed_mps.is_finite()
+            && self.maximum_closing_speed_mps >= 0.0
+            && !self.policy_digest.is_zero()
+            && self.policy_digest == digest_policy(self)
     }
+
+    pub const fn hand(&self) -> HandSide { self.hand }
+    pub const fn policy_digest(&self) -> HumanoidEvidenceDigest { self.policy_digest }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HumanoidGraspContactFailureKind {
-    SubjectMismatch,
     HandMismatch,
     NoContact,
     Stale,
@@ -364,26 +368,69 @@ pub enum HumanoidGraspContactFailureKind {
     ClosingTooFast,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HumanoidGraspContactAssessmentFailure {
+    InvalidTime,
+    InvalidObservation,
+    InvalidPolicy,
+    InvalidDigest,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidGraspContactAssessment {
-    pub schema_version: u32,
-    pub object_id: String,
-    pub object_state_digest: HumanoidEvidenceDigest,
-    pub hand: HandSide,
-    pub observation_digest: HumanoidEvidenceDigest,
-    pub policy_digest: HumanoidEvidenceDigest,
-    pub age_s: f64,
-    pub normal_force_n: f64,
-    pub tangential_force_n: f64,
-    pub tangential_speed_mps: f64,
-    pub separation_speed_mps: f64,
-    pub closing_speed_mps: f64,
-    pub confidence: f64,
-    pub source: HumanoidManipulationContactSource,
-    pub failures: Vec<HumanoidGraspContactFailureKind>,
-    pub accepted: bool,
-    pub assessed_at_s: f64,
-    pub assessment_digest: HumanoidEvidenceDigest,
+    schema_version: u32,
+    subject_digest: HumanoidEvidenceDigest,
+    object_id: String,
+    object_state_digest: HumanoidEvidenceDigest,
+    hand: HandSide,
+    observation_digest: HumanoidEvidenceDigest,
+    policy_digest: HumanoidEvidenceDigest,
+    age_s: f64,
+    normal_force_n: f64,
+    tangential_force_n: f64,
+    tangential_speed_mps: f64,
+    separation_speed_mps: f64,
+    closing_speed_mps: f64,
+    confidence: f64,
+    source: HumanoidManipulationContactSource,
+    failures: Vec<HumanoidGraspContactFailureKind>,
+    accepted: bool,
+    assessed_at_s: f64,
+    assessment_digest: HumanoidEvidenceDigest,
+}
+
+impl HumanoidGraspContactAssessment {
+    pub fn object_id(&self) -> &str { &self.object_id }
+    pub const fn object_state_digest(&self) -> HumanoidEvidenceDigest { self.object_state_digest }
+    pub const fn hand(&self) -> HandSide { self.hand }
+    pub const fn observation_digest(&self) -> HumanoidEvidenceDigest { self.observation_digest }
+    pub const fn policy_digest(&self) -> HumanoidEvidenceDigest { self.policy_digest }
+    pub const fn normal_force_n(&self) -> f64 { self.normal_force_n }
+    pub const fn tangential_force_n(&self) -> f64 { self.tangential_force_n }
+    pub const fn tangential_speed_mps(&self) -> f64 { self.tangential_speed_mps }
+    pub fn failures(&self) -> &[HumanoidGraspContactFailureKind] { &self.failures }
+    pub const fn accepted(&self) -> bool { self.accepted }
+    pub const fn assessment_digest(&self) -> HumanoidEvidenceDigest { self.assessment_digest }
+
+    pub fn validate(
+        &self,
+        subject: &HumanoidQualificationSubject,
+        observation: &HumanoidGraspContactObservation,
+        policy: &HumanoidGraspContactPolicy,
+    ) -> bool {
+        self.schema_version == HUMANOID_GRASP_CONTACT_ASSESSMENT_SCHEMA_VERSION
+            && digest_subject(subject) == Some(self.subject_digest)
+            && observation.validate_for(subject)
+            && policy.validate_for(subject)
+            && self.object_id == observation.object_id
+            && self.object_state_digest == observation.object_state_digest
+            && self.hand == observation.hand
+            && self.observation_digest == observation.observation_digest
+            && self.policy_digest == policy.policy_digest
+            && self.accepted == self.failures.is_empty()
+            && !self.assessment_digest.is_zero()
+            && self.assessment_digest == digest_assessment(self)
+    }
 }
 
 pub fn assess_humanoid_grasp_contact(
@@ -391,7 +438,17 @@ pub fn assess_humanoid_grasp_contact(
     observation: &HumanoidGraspContactObservation,
     policy: &HumanoidGraspContactPolicy,
     now_s: f64,
-) -> HumanoidGraspContactAssessment {
+) -> Result<HumanoidGraspContactAssessment, HumanoidGraspContactAssessmentFailure> {
+    if !now_s.is_finite() || now_s < 0.0 {
+        return Err(HumanoidGraspContactAssessmentFailure::InvalidTime);
+    }
+    if !observation.validate_for(subject) {
+        return Err(HumanoidGraspContactAssessmentFailure::InvalidObservation);
+    }
+    if !policy.validate_for(subject) {
+        return Err(HumanoidGraspContactAssessmentFailure::InvalidPolicy);
+    }
+
     let age_s = observation.age_s(now_s);
     let normal_force_n = observation.normal_force_n();
     let tangential_force_n = observation.tangential_force_n();
@@ -400,12 +457,6 @@ pub fn assess_humanoid_grasp_contact(
     let closing_speed_mps = observation.closing_speed_mps();
     let mut failures = Vec::new();
 
-    if digest_subject(subject) != Some(policy.subject_digest)
-        || digest_subject(subject) != Some(observation.subject_digest)
-        || subject.task != HumanoidTask::Grasp
-    {
-        failures.push(HumanoidGraspContactFailureKind::SubjectMismatch);
-    }
     if observation.hand != policy.hand || observation.site != expected_hand_site(policy.hand) {
         failures.push(HumanoidGraspContactFailureKind::HandMismatch);
     }
@@ -440,9 +491,10 @@ pub fn assess_humanoid_grasp_contact(
         failures.push(HumanoidGraspContactFailureKind::ClosingTooFast);
     }
 
-    let accepted = failures.is_empty();
     let mut assessment = HumanoidGraspContactAssessment {
         schema_version: HUMANOID_GRASP_CONTACT_ASSESSMENT_SCHEMA_VERSION,
+        subject_digest: digest_subject(subject)
+            .ok_or(HumanoidGraspContactAssessmentFailure::InvalidObservation)?,
         object_id: observation.object_id.clone(),
         object_state_digest: observation.object_state_digest,
         hand: observation.hand,
@@ -456,13 +508,16 @@ pub fn assess_humanoid_grasp_contact(
         closing_speed_mps,
         confidence: observation.confidence,
         source: observation.source,
+        accepted: failures.is_empty(),
         failures,
-        accepted,
         assessed_at_s: now_s,
         assessment_digest: HumanoidEvidenceDigest::ZERO,
     };
     assessment.assessment_digest = digest_assessment(&assessment);
-    assessment
+    if !assessment.validate(subject, observation, policy) {
+        return Err(HumanoidGraspContactAssessmentFailure::InvalidDigest);
+    }
+    Ok(assessment)
 }
 
 fn expected_hand_site(hand: HandSide) -> HumanoidContactSite {
@@ -525,6 +580,7 @@ fn digest_policy(value: &HumanoidGraspContactPolicy) -> HumanoidEvidenceDigest {
 fn digest_assessment(value: &HumanoidGraspContactAssessment) -> HumanoidEvidenceDigest {
     let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-contact-assessment.v1");
     h.u32(value.schema_version)
+        .digest(value.subject_digest)
         .string(&value.object_id)
         .digest(value.object_state_digest)
         .u64(hand_id(value.hand))
@@ -547,56 +603,32 @@ fn digest_assessment(value: &HumanoidGraspContactAssessment) -> HumanoidEvidence
 }
 
 fn hash_vec3(h: &mut HumanoidEvidenceHasher, value: [f64; 3]) {
-    for component in value {
-        h.f64(component);
-    }
+    for component in value { h.f64(component); }
 }
 
-fn finite_vec3(value: [f64; 3]) -> bool {
-    value.into_iter().all(f64::is_finite)
-}
+fn finite_vec3(value: [f64; 3]) -> bool { value.into_iter().all(f64::is_finite) }
 
 fn normalize_vec3(value: [f64; 3]) -> Option<[f64; 3]> {
-    if !finite_vec3(value) {
-        return None;
-    }
+    if !finite_vec3(value) { return None; }
     let norm = norm3(value);
-    if !norm.is_finite() || norm <= NORMAL_UNIT_TOLERANCE {
-        return None;
-    }
+    if !norm.is_finite() || norm <= NORMAL_VECTOR_EPSILON { return None; }
     Some([value[0] / norm, value[1] / norm, value[2] / norm])
 }
 
-fn dot3(a: [f64; 3], b: [f64; 3]) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn sub3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-fn scale3(value: [f64; 3], scale: f64) -> [f64; 3] {
-    [value[0] * scale, value[1] * scale, value[2] * scale]
-}
-
-fn norm3(value: [f64; 3]) -> f64 {
-    dot3(value, value).sqrt()
-}
+fn dot3(a: [f64; 3], b: [f64; 3]) -> f64 { a[0] * b[0] + a[1] * b[1] + a[2] * b[2] }
+fn sub3(a: [f64; 3], b: [f64; 3]) -> [f64; 3] { [a[0] - b[0], a[1] - b[1], a[2] - b[2]] }
+fn scale3(value: [f64; 3], scale: f64) -> [f64; 3] { [value[0] * scale, value[1] * scale, value[2] * scale] }
+fn norm3(value: [f64; 3]) -> f64 { dot3(value, value).sqrt() }
 
 fn valid_id(value: &str) -> bool {
     !value.trim().is_empty()
         && value == value.trim()
         && value.len() <= 256
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_graphic() && !byte.is_ascii_whitespace())
+        && value.bytes().all(|byte| byte.is_ascii_graphic() && !byte.is_ascii_whitespace())
 }
 
 fn hand_id(hand: HandSide) -> u64 {
-    match hand {
-        HandSide::Right => 1,
-        HandSide::Left => 2,
-    }
+    match hand { HandSide::Right => 1, HandSide::Left => 2 }
 }
 
 fn contact_source_id(source: HumanoidManipulationContactSource) -> u64 {
@@ -613,18 +645,17 @@ fn contact_source_id(source: HumanoidManipulationContactSource) -> u64 {
 
 fn failure_id(failure: HumanoidGraspContactFailureKind) -> u64 {
     match failure {
-        HumanoidGraspContactFailureKind::SubjectMismatch => 1,
-        HumanoidGraspContactFailureKind::HandMismatch => 2,
-        HumanoidGraspContactFailureKind::NoContact => 3,
-        HumanoidGraspContactFailureKind::Stale => 4,
-        HumanoidGraspContactFailureKind::ConfidenceTooLow => 5,
-        HumanoidGraspContactFailureKind::SourceQualityTooLow => 6,
-        HumanoidGraspContactFailureKind::SourceNotMeasured => 7,
-        HumanoidGraspContactFailureKind::NormalForceTooLow => 8,
-        HumanoidGraspContactFailureKind::NormalForceTooHigh => 9,
-        HumanoidGraspContactFailureKind::TangentialSlipTooFast => 10,
-        HumanoidGraspContactFailureKind::SeparationTooFast => 11,
-        HumanoidGraspContactFailureKind::ClosingTooFast => 12,
+        HumanoidGraspContactFailureKind::HandMismatch => 1,
+        HumanoidGraspContactFailureKind::NoContact => 2,
+        HumanoidGraspContactFailureKind::Stale => 3,
+        HumanoidGraspContactFailureKind::ConfidenceTooLow => 4,
+        HumanoidGraspContactFailureKind::SourceQualityTooLow => 5,
+        HumanoidGraspContactFailureKind::SourceNotMeasured => 6,
+        HumanoidGraspContactFailureKind::NormalForceTooLow => 7,
+        HumanoidGraspContactFailureKind::NormalForceTooHigh => 8,
+        HumanoidGraspContactFailureKind::TangentialSlipTooFast => 9,
+        HumanoidGraspContactFailureKind::SeparationTooFast => 10,
+        HumanoidGraspContactFailureKind::ClosingTooFast => 11,
     }
 }
 
@@ -663,154 +694,92 @@ mod tests {
 
     fn policy() -> HumanoidGraspContactPolicy {
         HumanoidGraspContactPolicy::new(
-            &subject(),
-            HandSide::Right,
-            0.05,
-            0.8,
+            &subject(), HandSide::Right, 0.05, 0.8,
             HumanoidManipulationContactSource::SolverWrench.quality_rank(),
-            true,
-            2.0,
-            50.0,
-            0.01,
-            0.005,
-            0.02,
-        )
-        .unwrap()
+            true, 2.0, 50.0, 0.01, 0.005, 0.02,
+        ).unwrap()
     }
 
-    fn observation(
-        relative_velocity: [f64; 3],
-        timestamp_s: f64,
-    ) -> HumanoidGraspContactObservation {
+    fn observation(relative_velocity: [f64; 3], timestamp_s: f64) -> HumanoidGraspContactObservation {
         HumanoidGraspContactObservation::new(
-            &subject(),
-            "object-17",
-            HumanoidEvidenceDigest::from_bytes([7; 32]),
-            HandSide::Right,
-            HumanoidContactSite::RightHand,
-            true,
-            [0.4, -0.2, 1.1],
-            [1.0, 0.0, 0.0],
-            [-12.0, 0.5, 0.0],
-            [0.0, 0.0, 0.0],
-            relative_velocity,
-            0.95,
-            HumanoidManipulationContactSource::SolverWrench,
-            timestamp_s,
-        )
-        .unwrap()
+            &subject(), "object-17", HumanoidEvidenceDigest::from_bytes([7; 32]),
+            HandSide::Right, HumanoidContactSite::RightHand, true,
+            [0.4, -0.2, 1.1], [1.0, 0.0, 0.0], [-12.0, 0.5, 0.0], [0.0; 3],
+            relative_velocity, 0.95, HumanoidManipulationContactSource::SolverWrench, timestamp_s,
+        ).unwrap()
     }
 
     #[test]
     fn stable_measured_contact_is_accepted() {
-        let assessment = assess_humanoid_grasp_contact(
-            &subject(),
-            &observation([0.0, 0.002, 0.0], 1.0),
-            &policy(),
-            1.01,
-        );
-        assert!(assessment.accepted, "{:?}", assessment.failures);
-        assert!(assessment.normal_force_n >= 2.0);
-        assert!(assessment.assessment_digest != HumanoidEvidenceDigest::ZERO);
+        let o = observation([0.0, 0.002, 0.0], 1.0);
+        let p = policy();
+        let assessment = assess_humanoid_grasp_contact(&subject(), &o, &p, 1.01).unwrap();
+        assert!(assessment.accepted(), "{:?}", assessment.failures());
+        assert!(assessment.normal_force_n() >= 2.0);
+        assert!(assessment.validate(&subject(), &o, &p));
     }
 
     #[test]
     fn tangential_slip_is_rejected() {
-        let assessment = assess_humanoid_grasp_contact(
-            &subject(),
-            &observation([0.0, 0.03, 0.0], 1.0),
-            &policy(),
-            1.01,
-        );
-        assert!(!assessment.accepted);
-        assert!(assessment
-            .failures
-            .contains(&HumanoidGraspContactFailureKind::TangentialSlipTooFast));
+        let o = observation([0.0, 0.03, 0.0], 1.0);
+        let p = policy();
+        let assessment = assess_humanoid_grasp_contact(&subject(), &o, &p, 1.01).unwrap();
+        assert!(!assessment.accepted());
+        assert!(assessment.failures().contains(&HumanoidGraspContactFailureKind::TangentialSlipTooFast));
     }
 
     #[test]
     fn stale_contact_is_rejected() {
-        let assessment = assess_humanoid_grasp_contact(
-            &subject(),
-            &observation([0.0, 0.0, 0.0], 1.0),
-            &policy(),
-            1.20,
+        let o = observation([0.0; 3], 1.0);
+        let p = policy();
+        let assessment = assess_humanoid_grasp_contact(&subject(), &o, &p, 1.20).unwrap();
+        assert!(assessment.failures().contains(&HumanoidGraspContactFailureKind::Stale));
+    }
+
+    #[test]
+    fn invalid_assessment_time_is_rejected() {
+        let o = observation([0.0; 3], 1.0);
+        let p = policy();
+        assert_eq!(
+            assess_humanoid_grasp_contact(&subject(), &o, &p, f64::NAN),
+            Err(HumanoidGraspContactAssessmentFailure::InvalidTime)
         );
-        assert!(assessment
-            .failures
-            .contains(&HumanoidGraspContactFailureKind::Stale));
     }
 
     #[test]
     fn wrong_hand_site_fails_observation_construction() {
         let result = HumanoidGraspContactObservation::new(
-            &subject(),
-            "object-17",
-            HumanoidEvidenceDigest::from_bytes([7; 32]),
-            HandSide::Right,
-            HumanoidContactSite::LeftHand,
-            true,
-            [0.0; 3],
-            [1.0, 0.0, 0.0],
-            [-5.0, 0.0, 0.0],
-            [0.0; 3],
-            [0.0; 3],
-            1.0,
-            HumanoidManipulationContactSource::SolverWrench,
-            1.0,
+            &subject(), "object-17", HumanoidEvidenceDigest::from_bytes([7; 32]),
+            HandSide::Right, HumanoidContactSite::LeftHand, true,
+            [0.0; 3], [1.0, 0.0, 0.0], [-5.0, 0.0, 0.0], [0.0; 3], [0.0; 3],
+            1.0, HumanoidManipulationContactSource::SolverWrench, 1.0,
         );
-        assert_eq!(
-            result,
-            Err(HumanoidGraspContactObservationFailure::InvalidHandSite)
-        );
+        assert_eq!(result, Err(HumanoidGraspContactObservationFailure::InvalidHandSite));
     }
 
     #[test]
     fn object_state_changes_observation_identity() {
         let a = observation([0.0; 3], 1.0);
         let b = HumanoidGraspContactObservation::new(
-            &subject(),
-            "object-17",
-            HumanoidEvidenceDigest::from_bytes([8; 32]),
-            HandSide::Right,
-            HumanoidContactSite::RightHand,
-            true,
-            [0.4, -0.2, 1.1],
-            [1.0, 0.0, 0.0],
-            [-12.0, 0.5, 0.0],
-            [0.0; 3],
-            [0.0; 3],
-            0.95,
-            HumanoidManipulationContactSource::SolverWrench,
-            1.0,
-        )
-        .unwrap();
+            &subject(), "object-17", HumanoidEvidenceDigest::from_bytes([8; 32]),
+            HandSide::Right, HumanoidContactSite::RightHand, true,
+            [0.4, -0.2, 1.1], [1.0, 0.0, 0.0], [-12.0, 0.5, 0.0], [0.0; 3], [0.0; 3],
+            0.95, HumanoidManipulationContactSource::SolverWrench, 1.0,
+        ).unwrap();
         assert_ne!(a.observation_digest(), b.observation_digest());
     }
 
     #[test]
     fn kinematic_contact_cannot_satisfy_measured_policy() {
         let kinematic = HumanoidGraspContactObservation::new(
-            &subject(),
-            "object-17",
-            HumanoidEvidenceDigest::from_bytes([7; 32]),
-            HandSide::Right,
-            HumanoidContactSite::RightHand,
-            true,
-            [0.4, -0.2, 1.1],
-            [1.0, 0.0, 0.0],
-            [-12.0, 0.0, 0.0],
-            [0.0; 3],
-            [0.0; 3],
-            1.0,
-            HumanoidManipulationContactSource::KinematicEstimate,
-            1.0,
-        )
-        .unwrap();
-        let assessment = assess_humanoid_grasp_contact(&subject(), &kinematic, &policy(), 1.01);
-        assert!(!assessment.accepted);
-        assert!(assessment
-            .failures
-            .contains(&HumanoidGraspContactFailureKind::SourceNotMeasured));
+            &subject(), "object-17", HumanoidEvidenceDigest::from_bytes([7; 32]),
+            HandSide::Right, HumanoidContactSite::RightHand, true,
+            [0.4, -0.2, 1.1], [1.0, 0.0, 0.0], [-12.0, 0.0, 0.0], [0.0; 3], [0.0; 3],
+            1.0, HumanoidManipulationContactSource::KinematicEstimate, 1.0,
+        ).unwrap();
+        let p = policy();
+        let assessment = assess_humanoid_grasp_contact(&subject(), &kinematic, &p, 1.01).unwrap();
+        assert!(!assessment.accepted());
+        assert!(assessment.failures().contains(&HumanoidGraspContactFailureKind::SourceNotMeasured));
     }
 }
