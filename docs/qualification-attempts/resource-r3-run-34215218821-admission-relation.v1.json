@@ -1,0 +1,17 @@
+{
+  "schema": "symthaea.qualification-attempt-admission-relation.v1",
+  "observation_id": "sha256:07c428a25fab005330c5c9a4ecf9424bae98014c130b36e94b79da3abdcfcb94",
+  "admission_request_id": "sha256:e937bd324855f2c8a8e97c286f180674d43776c61af23ee373d4ebcc20e15f0b",
+  "admission_subject_id": "sha256:9c0769e927ffbc7fb2d0ec943d859f75a3ab32f73c30561db6e9c3881f2c50d0",
+  "relation": "AttemptPredatesAdmissionRequest",
+  "evidence_refs": [
+    "github-actions:run:34215218821",
+    "qualification-availability:sha256:d385a544425e19370ea00f29e949eb116b3280525010e8535be98ac974fc1c99"
+  ],
+  "non_claims": [
+    "does not establish admission launched the attempt",
+    "does not establish hosted qualification",
+    "does not establish wall-clock authenticity beyond referenced provider evidence"
+  ],
+  "relation_id": "sha256:aaeb48ad3f619e51d900d25316acfb7f066a394b5d937323643d05b5dd5cd232"
+}
