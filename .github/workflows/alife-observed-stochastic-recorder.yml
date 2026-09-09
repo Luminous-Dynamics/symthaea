@@ -1,0 +1,133 @@
+name: ALife Observed Stochastic Recorder
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/observed_stochastic_recorder.rs"
+      - "crates/domains/symthaea-alife/src/observed_stochastic_tape.rs"
+      - ".github/workflows/alife-observed-stochastic-recorder.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Typed recorder construction theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-observed-stochastic-recorder
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Execute recorder regressions
+        run: 'cargo test --locked -p symthaea-alife observed_stochastic_recorder::'
+
+      - name: Execute canonical tape regressions
+        run: 'cargo test --locked -p symthaea-alife observed_stochastic_tape::'
+
+      - name: Strict ALife Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze typed-only construction surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/observed_stochastic_recorder.rs"
+          grep -q 'record_inheritance_source_sample' "$src"
+          grep -q 'record_mutation_occurrence' "$src"
+          grep -q 'record_mutation_perturbation' "$src"
+          grep -q 'record_offspring_construction_seed' "$src"
+          grep -q 'record_agent_action_sample' "$src"
+          grep -q 'record_scheduler_order' "$src"
+          ! grep -q 'pub fn record(' "$src"
+          ! grep -q 'pub fn insert(' "$src"
+
+      - name: Freeze canonicalization and duplicate protection
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/observed_stochastic_recorder.rs"
+          grep -q 'BTreeMap<ObservedStochasticKeyV1' "$src"
+          grep -q 'DuplicateScalar' "$src"
+          grep -q 'DuplicateSchedulerOrder' "$src"
+          grep -q 'scalar_draws.contains_key' "$src"
+          grep -q 'scheduler_orders.contains_key' "$src"
+          grep -q '.validate()' "$src"
+          grep -q 'canonical_tape_validator_remains_final_authority' "$src"
+
+      - name: Require live owners to remain unwired in this tranche
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -q 'ObservedStochasticRecorderV1' crates/domains/symthaea-alife/src/population.rs
+          ! grep -q 'ObservedStochasticRecorderV1' crates/domains/symthaea-alife/src/encounter.rs
+          ! grep -q 'ObservedStochasticRecorderV1' crates/domains/symthaea-alife/src/genome.rs
+          ! grep -q 'ObservedStochasticRecorderV1' crates/domains/symthaea-alife/src/inheritance_source.rs
+          ! grep -q 'ObservedStochasticRecorderV1' crates/core/symthaea-fep/src/agent.rs
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/observed_stochastic_recorder.rs"
+          ! grep -q 'stochastic_tape_completeness=true' "$src"
+          ! grep -q 'live_owner_wiring=true' "$src"
+          ! grep -q 'causal_replay_ready=true' "$src"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-observed-stochastic-recorder-evidence
+          {
+            echo "authority=observed_stochastic_recorder_contract_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "recorder_sha256=$(sha256sum crates/domains/symthaea-alife/src/observed_stochastic_recorder.rs | cut -d' ' -f1)"
+            echo "typed_construction_surface=true"
+            echo "canonical_order_owned=true"
+            echo "duplicate_semantic_addresses_fail_closed=true"
+            echo "canonical_tape_revalidation_required=true"
+            echo "live_owner_wiring=false"
+            echo "stochastic_tape_completeness=false"
+            echo "causal_replay_ready=false"
+          } > target/alife-observed-stochastic-recorder-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-observed-stochastic-recorder-evidence
+          path: target/alife-observed-stochastic-recorder-evidence/qualification.txt
+          if-no-files-found: error
