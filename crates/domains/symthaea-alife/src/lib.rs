@@ -24,6 +24,7 @@
 //! Neither claim is about consciousness or Φ — see the plan doc's Non-goals.
 
 pub mod agent_id;
+pub mod causal_replay_session;
 pub mod coalition;
 pub mod counterfactual_randomness;
 pub mod earth_forcing;
@@ -73,6 +74,11 @@ pub mod types;
 
 pub use agent_id::{
     AgentId, AgentIdAllocator, AgentIdAllocatorRestoreErrorV1, AgentIdAllocatorSnapshotV1,
+};
+pub use causal_replay_session::{
+    CausalRescueOutcomeProtocolV1, CausalRescueReplaySessionErrorV1,
+    CausalRescueReplaySessionV1, ResourcePerturbationSnapshotV1,
+    ValidatedCausalRescueReplaySessionV1,
 };
 pub use coalition::{Coalition, detect_coalitions, detect_paying_coalitions};
 pub use counterfactual_randomness::{
