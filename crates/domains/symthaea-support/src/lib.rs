@@ -13,6 +13,7 @@ pub mod diagnostic_beliefs;
 pub mod diagnostics;
 pub mod federation;
 pub mod knowledge;
+pub mod knowledge_source;
 #[cfg(feature = "logparse-adapter")]
 pub mod logparse_adapter;
 pub mod predictive;
@@ -32,6 +33,11 @@ pub use diagnostic_beliefs::{
     rank_tests_by_information_gain, CausalHypothesisV1, DiagnosticBeliefError,
     DiagnosticOutcomeId, DiagnosticTestId, DiagnosticTestModelV1, ExpectedInformationGainV1,
     HypothesisDistributionV1, HypothesisId, HypothesisStatusV1,
+};
+pub use knowledge_source::{
+    merge_knowledge_hits_v1, KnowledgeOriginV1, KnowledgeQueryPurposeV1,
+    KnowledgeShareabilityV1, KnowledgeSourceErrorV1, SupportKnowledgeHitV1,
+    SupportKnowledgeQueryV1, SupportKnowledgeSourceV1,
 };
 #[cfg(feature = "logparse-adapter")]
 pub use logparse_adapter::{
