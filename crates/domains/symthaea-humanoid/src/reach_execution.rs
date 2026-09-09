@@ -28,8 +28,10 @@ use crate::execution::{
 use crate::floating_base::FloatingBaseDynamicsProvider;
 use crate::frozen_dynamics::FrozenHumanoidDynamicsEnvironment;
 use crate::full_dynamics::FullRigidBodyDynamicsProvider;
+use crate::morphology::HandSide;
 use crate::skill_runtime::HumanoidSkillIntent;
 use crate::spatial_goal::HumanoidSpatiallyBoundSkillPermit;
+use crate::spatial_goal_identity::humanoid_spatial_goal_fingerprint;
 use crate::terrain::TerrainProbe;
 use crate::types::{
     ActuationMode, HumanoidCommand, HumanoidPdGains, HumanoidState, HumanoidTask,
@@ -44,8 +46,10 @@ pub enum HumanoidPermittedReachPreparationFailure {
     PipelineMorphologyMismatch,
     PermitIntentActuationMismatch,
     InvalidControlPeriod,
+    InvalidPreparationTime,
     InvalidPdGains,
     InvalidReachIntent,
+    InvalidSpatialGoalIdentity,
     MissingFullDynamics,
     CartesianReference(HumanoidCartesianHandReferenceFailure),
 }
@@ -64,10 +68,18 @@ pub struct HumanoidFrozenDynamicsLineage {
 }
 
 /// Non-authoritative evidence emitted when one Reach command has been prepared.
+///
+/// The exact spatial observation is intentionally carried through finalization so
+/// a later outcome evaluator can prove it is measuring the same target that was
+/// admitted by the live permit rather than merely a reused string goal id.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidPermittedReachPreparationReport {
     pub validation_epoch: u64,
+    pub prepared_at_s: f64,
     pub goal_id: String,
+    pub spatial_goal_fingerprint: u64,
+    pub hand: HandSide,
+    pub target_world_m: [f64; 3],
     pub dynamics: HumanoidFrozenDynamicsLineage,
     pub cartesian_reference: HumanoidCartesianHandReferenceReport,
 }
@@ -178,11 +190,19 @@ where
     if !dt.is_finite() || dt <= 0.0 {
         return Err(HumanoidPermittedReachPreparationFailure::InvalidControlPeriod);
     }
+    if !now_s.is_finite() || now_s < 0.0 {
+        return Err(HumanoidPermittedReachPreparationFailure::InvalidPreparationTime);
+    }
     if !valid_pd_gains(pd_gains, pipeline.morphology().num_actuators()) {
         return Err(HumanoidPermittedReachPreparationFailure::InvalidPdGains);
     }
     if !valid_reach_intent(intent) {
         return Err(HumanoidPermittedReachPreparationFailure::InvalidReachIntent);
+    }
+
+    let spatial_goal_fingerprint = humanoid_spatial_goal_fingerprint(permit.goal());
+    if spatial_goal_fingerprint == 0 {
+        return Err(HumanoidPermittedReachPreparationFailure::InvalidSpatialGoalIdentity);
     }
 
     let frozen = FrozenHumanoidDynamicsEnvironment::capture(environment, state, contacts);
@@ -241,7 +261,11 @@ where
     };
     let report = HumanoidPermittedReachPreparationReport {
         validation_epoch: permit.semantic().epoch(),
+        prepared_at_s: now_s,
         goal_id: permit.goal().goal_id.clone(),
+        spatial_goal_fingerprint,
+        hand: permit.goal().hand,
+        target_world_m: permit.goal().target_world_m,
         dynamics: dynamics_lineage,
         cartesian_reference: cartesian.report,
     };
