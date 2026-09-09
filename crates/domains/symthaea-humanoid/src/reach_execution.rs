@@ -21,9 +21,7 @@ use crate::cartesian_hand_reference::{
 };
 use crate::contact::ContactFrame;
 use crate::dynamics::RigidBodyDynamicsProvider;
-use crate::execution::{
-    HumanoidExecutionPipeline, HumanoidExecutionResult, HumanoidPreparedCommand,
-};
+use crate::execution::{HumanoidExecutionPipeline, HumanoidExecutionResult, HumanoidPreparedCommand};
 use crate::floating_base::FloatingBaseDynamicsProvider;
 use crate::frozen_dynamics::FrozenHumanoidDynamicsEnvironment;
 use crate::full_dynamics::FullRigidBodyDynamicsProvider;
@@ -63,9 +61,6 @@ pub enum HumanoidPermittedReachFinalizationFailure {
     AuthorityReceipt(HumanoidSkillAuthorityReceiptValidationFailure),
 }
 
-/// Exact snapshot identities frozen for one preparation cycle. Optional reduced
-/// and floating-base contracts remain explicit rather than being promoted to
-/// evidence when the backend did not provide them.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidFrozenDynamicsLineage {
     pub rigid_model_id: Option<String>,
@@ -76,11 +71,6 @@ pub struct HumanoidFrozenDynamicsLineage {
     pub floating_sampled_at_s: Option<f64>,
 }
 
-/// Non-authoritative evidence emitted when one Reach command has been prepared.
-///
-/// The exact spatial observation is intentionally carried through finalization so
-/// a later outcome evaluator can prove it is measuring the same target that was
-/// admitted by the live permit rather than merely a reused string goal id.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidPermittedReachPreparationReport {
     pub validation_epoch: u64,
@@ -89,29 +79,34 @@ pub struct HumanoidPermittedReachPreparationReport {
     pub spatial_goal_fingerprint: u64,
     pub hand: HandSide,
     pub target_world_m: [f64; 3],
+    /// Exact root-frame target used by workspace admission for this epoch.
+    pub target_root_m: [f64; 3],
+    /// Squared normalized radius inside the qualified workspace ellipsoid.
+    pub workspace_utilization_sq: f64,
     pub dynamics: HumanoidFrozenDynamicsLineage,
     pub cartesian_reference: HumanoidCartesianHandReferenceReport,
 }
 
-/// Audit snapshot of the move-only skill authority receipt consumed by finalization.
-///
-/// This is evidence only. It cannot recreate or refresh the consumed receipt.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidReachAuthorityReceiptAudit {
     pub receipt_fingerprint: u64,
     pub validation_epoch: u64,
     pub issued_at_s: f64,
     pub valid_until_s: f64,
+    pub finalized_at_s: f64,
     pub requirement_subject_fingerprints: Vec<u64>,
     pub operator_evidence_id: String,
     pub qualification_evidence_id: String,
     pub physical_evidence_id: String,
     pub epistemic_evidence_id: String,
     pub cognitive_evidence_id: String,
+    pub operator_scale: f32,
+    pub qualification_scale: f32,
+    pub physical_scale: f32,
+    pub epistemic_scale: f32,
+    pub cognitive_scale: f32,
 }
 
-/// Final actuator-eligible result after the prepared Reach command crosses a
-/// fresh skill-bound authority receipt and the pipeline's final safety projector.
 #[derive(Debug, Clone)]
 pub struct HumanoidPermittedReachExecutionResult {
     pub execution: HumanoidExecutionResult,
@@ -119,13 +114,6 @@ pub struct HumanoidPermittedReachExecutionResult {
     pub authority_receipt: HumanoidReachAuthorityReceiptAudit,
 }
 
-/// One-shot Reach command that is still below the final authority/safety
-/// boundary.
-///
-/// This type is deliberately not Clone or Serialize. Holding the spatial permit
-/// keeps the originating validation cycle borrowed, while holding the mutable
-/// pipeline borrow pins the command to the exact safety-projector history used
-/// for preparation.
 pub struct HumanoidPermittedReachPreparedCommand<'pipeline, 'permit> {
     pipeline: &'pipeline mut HumanoidExecutionPipeline,
     permit: HumanoidSpatiallyBoundSkillPermit<'permit>,
@@ -145,12 +133,6 @@ impl<'pipeline, 'permit> HumanoidPermittedReachPreparedCommand<'pipeline, 'permi
         self.prepared.hierarchy_report()
     }
 
-    /// Consume the one-shot prepared command only after a fresh authority receipt
-    /// proves it is bound to this exact live permit/epoch/body/backend/subject set.
-    ///
-    /// The receipt is move-only and consumed together with the command. The
-    /// execution result retains only an audit snapshot; it cannot refresh or
-    /// replay authority.
     pub fn finalize(
         self,
         authority_receipt: HumanoidSkillAuthorityReceipt,
@@ -172,6 +154,7 @@ impl<'pipeline, 'permit> HumanoidPermittedReachPreparedCommand<'pipeline, 'permi
             validation_epoch: authority_receipt.validation_epoch(),
             issued_at_s: authority_receipt.issued_at_s(),
             valid_until_s: authority_receipt.valid_until_s(),
+            finalized_at_s: now_s,
             requirement_subject_fingerprints: authority_receipt
                 .requirement_subject_fingerprints()
                 .to_vec(),
@@ -180,6 +163,11 @@ impl<'pipeline, 'permit> HumanoidPermittedReachPreparedCommand<'pipeline, 'permi
             physical_evidence_id: source.physical.evidence_id.clone(),
             epistemic_evidence_id: source.epistemic.evidence_id.clone(),
             cognitive_evidence_id: source.cognitive.evidence_id.clone(),
+            operator_scale: source.operator.scale,
+            qualification_scale: source.qualification.scale,
+            physical_scale: source.physical.scale,
+            epistemic_scale: source.epistemic.scale,
+            cognitive_scale: source.cognitive.scale,
         };
         let authority = authority_receipt.authority_envelope();
 
@@ -192,8 +180,7 @@ impl<'pipeline, 'permit> HumanoidPermittedReachPreparedCommand<'pipeline, 'permi
             dt,
             report,
         } = self;
-        let execution =
-            pipeline.finalize_prepared(prepared, &state, authority, actuation_mode, dt);
+        let execution = pipeline.finalize_prepared(prepared, &state, authority, actuation_mode, dt);
         Ok(HumanoidPermittedReachExecutionResult {
             execution,
             preparation: report,
@@ -202,22 +189,6 @@ impl<'pipeline, 'permit> HumanoidPermittedReachPreparedCommand<'pipeline, 'permi
     }
 }
 
-/// Prepare one permit-bound Reach command through the existing deterministic
-/// hierarchy.
-///
-/// The Cartesian hand correction is added to a standing reference *before* the
-/// hierarchy runs. Sparse inverse dynamics, floating-base dynamics, contact
-/// dynamics, centroidal correction, typed authority, final projection, and HAL
-/// therefore remain downstream of manipulation reference generation.
-///
-/// Every exposed body-dynamics contract is sampled exactly once into a frozen
-/// per-cycle adapter. Cartesian lowering and the existing hierarchy therefore
-/// consume the same full-dynamics snapshot rather than independently sampling a
-/// live backend at two different instants.
-///
-/// This path intentionally supports Reach only. Grasp/Carry/HumanContact remain
-/// rejected until their contact-force and retention semantics are implemented in
-/// the native whole-body solver.
 #[allow(clippy::too_many_arguments)]
 pub fn prepare_permitted_reach<'pipeline, 'permit, T>(
     pipeline: &'pipeline mut HumanoidExecutionPipeline,
@@ -263,6 +234,9 @@ where
     if spatial_goal_fingerprint == 0 {
         return Err(HumanoidPermittedReachPreparationFailure::InvalidSpatialGoalIdentity);
     }
+    if !permit.workspace_utilization_sq().is_finite() || permit.workspace_utilization_sq() < 0.0 {
+        return Err(HumanoidPermittedReachPreparationFailure::InvalidSpatialGoalIdentity);
+    }
 
     let frozen = FrozenHumanoidDynamicsEnvironment::capture(environment, state, contacts);
     let dynamics = frozen
@@ -291,9 +265,6 @@ where
         *value = (*value + *correction).clamp(-1.0, 1.0);
     }
 
-    // Reach reference is fully deterministic in this first execution path. No
-    // learned residual is injected here; learned proposals can be added later as
-    // separately bounded references without changing this authority boundary.
     let learned_residual = HumanoidCommand::zero_for(n);
     let prepared = pipeline.prepare_with_environment(
         HumanoidTask::Reach,
@@ -325,6 +296,8 @@ where
         spatial_goal_fingerprint,
         hand: permit.goal().hand,
         target_world_m: permit.goal().target_world_m,
+        target_root_m: permit.target_root_m(),
+        workspace_utilization_sq: permit.workspace_utilization_sq(),
         dynamics: dynamics_lineage,
         cartesian_reference: cartesian.report,
     };
@@ -343,14 +316,8 @@ where
 fn valid_pd_gains(gains: &HumanoidPdGains, actuators: usize) -> bool {
     gains.kp.len() == actuators
         && gains.kd.len() == actuators
-        && gains
-            .kp
-            .iter()
-            .all(|value| value.is_finite() && *value >= 0.0)
-        && gains
-            .kd
-            .iter()
-            .all(|value| value.is_finite() && *value >= 0.0)
+        && gains.kp.iter().all(|value| value.is_finite() && *value >= 0.0)
+        && gains.kd.iter().all(|value| value.is_finite() && *value >= 0.0)
 }
 
 fn valid_reach_intent(intent: &HumanoidWholeBodyMotionIntent) -> bool {
@@ -471,10 +438,7 @@ mod tests {
     #[test]
     fn pd_gain_cardinality_and_finiteness_are_checked() {
         let gains = HumanoidPdGains::for_morphology(HumanoidMorphology::Dmc21);
-        assert!(valid_pd_gains(
-            &gains,
-            HumanoidMorphology::Dmc21.num_actuators()
-        ));
+        assert!(valid_pd_gains(&gains, HumanoidMorphology::Dmc21.num_actuators()));
         assert!(!valid_pd_gains(
             &gains,
             HumanoidMorphology::Dexterous53.num_actuators()
