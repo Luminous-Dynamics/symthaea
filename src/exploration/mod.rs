@@ -12,6 +12,8 @@ pub mod archive;
 pub mod evidence_admission;
 /// Content-addressed binding from evidence-plane runs into generativity evidence.
 pub mod evidence_binding;
+/// Declared method/data lineage diversity over mechanically qualified evidence.
+pub mod evidence_independence;
 /// Evidence-bearing, non-authoritative evaluation of future capacity and optionality.
 pub mod generativity;
 /// Typed outcomes that keep surprise reduction distinct from broader discovery value.
