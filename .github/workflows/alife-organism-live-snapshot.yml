@@ -1,0 +1,148 @@
+name: ALife Organism Live Snapshot
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-fep/**"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/organism.rs"
+      - "crates/domains/symthaea-alife/src/organism_snapshot.rs"
+      - "crates/domains/symthaea-alife/src/organism_snapshot/live_snapshot.rs"
+      - ".github/workflows/alife-organism-live-snapshot.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Organism exact-resume theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/organism_snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/organism_snapshot/live_snapshot.rs
+          sha256sum crates/core/symthaea-fep/src/agent/live_snapshot.rs
+          sha256sum crates/core/symthaea-fep/src/markov_blanket/live_snapshot.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-organism-live-snapshot
+
+      - name: Check ALife formatting
+        run: cargo fmt -p symthaea-alife -p symthaea-fep -- --check
+
+      - name: Check ALife/FEP targets
+        run: cargo check --locked -p symthaea-fep -p symthaea-alife --all-targets
+
+      - name: Test exact asocial continuation
+        run: cargo test --locked -p symthaea-alife serialized_validated_restore_preserves_exact_asocial_future
+
+      - name: Test exact social continuation
+        run: cargo test --locked -p symthaea-alife serialized_validated_restore_preserves_social_ledger_and_future
+
+      - name: Test canonical ledger persistence
+        run: cargo test --locked -p symthaea-alife persistence_canonicalizes_ledger_without_mutating_live_map
+
+      - name: Test organism snapshot contract
+        run: 'cargo test --locked -p symthaea-alife organism_snapshot::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze organism restore theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          contract="crates/domains/symthaea-alife/src/organism_snapshot.rs"
+          bridge="crates/domains/symthaea-alife/src/organism_snapshot/live_snapshot.rs"
+
+          grep -q 'mod live_snapshot;' "$contract"
+          grep -q 'pub fn snapshot_v1(&self) -> OrganismSnapshotV1' "$bridge"
+          grep -q 'pub fn from_validated_snapshot_v1(snapshot: &ValidatedOrganismSnapshotV1)' "$bridge"
+          grep -q 'ActiveInferenceAgent::from_validated_snapshot_v1' "$bridge"
+          grep -q 'MarkovBoundaryOperator::from_validated_snapshot_v1' "$bridge"
+          grep -q 'ledger.sort_by_key' "$bridge"
+          grep -q 'serialized_validated_restore_preserves_exact_asocial_future' "$bridge"
+          grep -q 'serialized_validated_restore_preserves_social_ledger_and_future' "$bridge"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          bridge = Path('crates/domains/symthaea-alife/src/organism_snapshot/live_snapshot.rs').read_text()
+          snap = bridge.split('pub fn snapshot_v1', 1)[1].split('pub fn from_validated_snapshot_v1', 1)[0]
+          restore = bridge.split('pub fn from_validated_snapshot_v1', 1)[1].split('#[cfg(test)]', 1)[0]
+          required = ['id', 'agent', 'boundary', 'energy', 'cfg', 'last_resource_observed', 'ledger', 'lineage_id', 'generation']
+          for field in required:
+              if field not in snap:
+                  raise SystemExit(f'organism snapshot omits causal surface: {field}')
+              if field not in restore:
+                  raise SystemExit(f'organism restore omits causal surface: {field}')
+          if 'Organism::new(' in restore:
+              raise SystemExit('restore fell back to constructor defaults/fresh seed')
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          bridge="crates/domains/symthaea-alife/src/organism_snapshot/live_snapshot.rs"
+          ! grep -q 'PopulationSnapshotV1' "$bridge"
+          ! grep -q 'EncounterSchedulerSnapshotV1' "$bridge"
+          ! grep -q 'EnvironmentSnapshotV1' "$bridge"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$bridge"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-organism-live-snapshot-evidence
+          {
+            echo "authority=organism_live_snapshot_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "organism_bridge_sha256=$(sha256sum crates/domains/symthaea-alife/src/organism_snapshot/live_snapshot.rs | cut -d' ' -f1)"
+            echo "nested_fep_restore_bound=true"
+            echo "nested_markov_restore_bound=true"
+            echo "asocial_future_equivalence_candidate=true"
+            echo "social_ledger_future_equivalence_candidate=true"
+            echo "live_population_restore=false"
+            echo "population_execution_resume_established=false"
+          } > target/alife-organism-live-snapshot-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-organism-live-snapshot-evidence
+          path: target/alife-organism-live-snapshot-evidence/qualification.txt
+          if-no-files-found: error
