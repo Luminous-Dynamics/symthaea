@@ -4,10 +4,10 @@
 //!
 //! This module asks a deliberately narrow question:
 //!
-//! > Under one exact capability graph and one exact activation-assumption set,
-//! > which small sets of additional prerequisite capabilities, if treated as
-//! > available counterfactually, cause a currently blocked activatable target to
-//! > enter the deterministic activation closure?
+//! > Under one exact capability graph, one exact activation-assumption set, and
+//! > one exact target query, which small sets of additional prerequisite
+//! > capabilities, if treated as available counterfactually, cause each queried
+//! > blocked activatable target to enter deterministic activation closure?
 //!
 //! Counterfactual support is not evidence, feasibility, cost, safety, priority,
 //! recommendation, or authority. The target capability itself is never offered
@@ -26,15 +26,167 @@ use crate::{
     derive_capability_activation_closure,
 };
 
+/// Stable schema for deterministic counterfactual target scope.
+pub const CAPABILITY_COUNTERFACTUAL_QUERY_SCHEMA_V1: &str =
+    "symthaea-continuity-capability-counterfactual-query-v1";
 /// Stable schema for deterministic counterfactual search bounds.
 pub const CAPABILITY_COUNTERFACTUAL_CONFIG_SCHEMA_V1: &str =
     "symthaea-continuity-capability-counterfactual-config-v1";
 
+const QUERY_DOMAIN: &[u8] = b"symthaea.continuity.capability-counterfactual-query.v1\0";
 const CONFIG_DOMAIN: &[u8] = b"symthaea.continuity.capability-counterfactual-config.v1\0";
+const HARD_MAX_QUERY_TARGETS: usize = 256;
 const HARD_MAX_UNIVERSE_SIZE: u16 = 32;
 const HARD_MAX_SUPPORT_WIDTH: u16 = 6;
 const HARD_MAX_OPTIONS_PER_TARGET: u16 = 2_048;
 const HARD_MAX_TOTAL_SIMULATIONS: u32 = 100_000;
+
+/// Exact identity of one canonical target query.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct CapabilityCounterfactualQueryId([u8; 32]);
+
+impl CapabilityCounterfactualQueryId {
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+/// Exact target scope for one counterfactual analysis.
+///
+/// Query identity binds the exact graph snapshot, exact base activation
+/// assumptions, and canonical target set. It is not an authorization to analyze
+/// or act on those targets.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CapabilityCounterfactualQueryV1 {
+    schema_version: String,
+    source_snapshot_id: CapabilityGraphSnapshotId,
+    base_assumptions_id: CapabilityActivationAssumptionsId,
+    targets: Vec<CapabilityId>,
+    query_id: CapabilityCounterfactualQueryId,
+}
+
+impl CapabilityCounterfactualQueryV1 {
+    pub fn new(
+        graph: &ValidatedCapabilityGraphV1,
+        assumptions: &ValidatedCapabilityActivationAssumptionsV1,
+        mut targets: Vec<CapabilityId>,
+    ) -> Result<Self, CapabilityCounterfactualError> {
+        if assumptions.source_snapshot_id() != graph.id() {
+            return Err(CapabilityCounterfactualError::QuerySourceSnapshotMismatch {
+                declared: assumptions.source_snapshot_id(),
+                actual: graph.id(),
+            });
+        }
+        targets.sort_unstable();
+        targets.dedup();
+        validate_query_targets(graph, &targets)?;
+
+        let source_snapshot_id = graph.id();
+        let base_assumptions_id = assumptions.id();
+        let query_id = CapabilityCounterfactualQueryId(hash_query(
+            source_snapshot_id,
+            base_assumptions_id,
+            &targets,
+        ));
+        Ok(Self {
+            schema_version: CAPABILITY_COUNTERFACTUAL_QUERY_SCHEMA_V1.to_owned(),
+            source_snapshot_id,
+            base_assumptions_id,
+            targets,
+            query_id,
+        })
+    }
+
+    pub fn id(&self) -> CapabilityCounterfactualQueryId {
+        self.query_id
+    }
+
+    pub fn source_snapshot_id(&self) -> CapabilityGraphSnapshotId {
+        self.source_snapshot_id
+    }
+
+    pub fn base_assumptions_id(&self) -> CapabilityActivationAssumptionsId {
+        self.base_assumptions_id
+    }
+
+    pub fn targets(&self) -> &[CapabilityId] {
+        &self.targets
+    }
+
+    pub fn validate(
+        &self,
+        graph: &ValidatedCapabilityGraphV1,
+        assumptions: &ValidatedCapabilityActivationAssumptionsV1,
+    ) -> Result<ValidatedCapabilityCounterfactualQueryV1, CapabilityCounterfactualError> {
+        if self.schema_version != CAPABILITY_COUNTERFACTUAL_QUERY_SCHEMA_V1 {
+            return Err(CapabilityCounterfactualError::UnsupportedQuerySchema(
+                self.schema_version.clone(),
+            ));
+        }
+        if self.source_snapshot_id != graph.id() {
+            return Err(CapabilityCounterfactualError::QuerySourceSnapshotMismatch {
+                declared: self.source_snapshot_id,
+                actual: graph.id(),
+            });
+        }
+        if self.base_assumptions_id != assumptions.id() {
+            return Err(CapabilityCounterfactualError::QueryAssumptionsMismatch {
+                declared: self.base_assumptions_id,
+                actual: assumptions.id(),
+            });
+        }
+        if assumptions.source_snapshot_id() != graph.id() {
+            return Err(CapabilityCounterfactualError::QuerySourceSnapshotMismatch {
+                declared: assumptions.source_snapshot_id(),
+                actual: graph.id(),
+            });
+        }
+        if !strictly_sorted(&self.targets) {
+            return Err(CapabilityCounterfactualError::NonCanonicalQueryTargets);
+        }
+        validate_query_targets(graph, &self.targets)?;
+
+        let expected = CapabilityCounterfactualQueryId(hash_query(
+            self.source_snapshot_id,
+            self.base_assumptions_id,
+            &self.targets,
+        ));
+        if expected != self.query_id {
+            return Err(CapabilityCounterfactualError::QueryIdentityMismatch);
+        }
+        Ok(ValidatedCapabilityCounterfactualQueryV1 {
+            inner: self.clone(),
+        })
+    }
+}
+
+/// Non-Serde validated target query.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidatedCapabilityCounterfactualQueryV1 {
+    inner: CapabilityCounterfactualQueryV1,
+}
+
+impl ValidatedCapabilityCounterfactualQueryV1 {
+    pub fn id(&self) -> CapabilityCounterfactualQueryId {
+        self.inner.id()
+    }
+
+    pub fn source_snapshot_id(&self) -> CapabilityGraphSnapshotId {
+        self.inner.source_snapshot_id()
+    }
+
+    pub fn base_assumptions_id(&self) -> CapabilityActivationAssumptionsId {
+        self.inner.base_assumptions_id()
+    }
+
+    pub fn targets(&self) -> &[CapabilityId] {
+        self.inner.targets()
+    }
+
+    pub fn as_raw(&self) -> &CapabilityCounterfactualQueryV1 {
+        &self.inner
+    }
+}
 
 /// Exact identity of one canonical bounded-search configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -207,7 +359,7 @@ impl CapabilityCounterfactualOptionV1 {
     }
 }
 
-/// Counterfactual search result for one blocked activatable target.
+/// Counterfactual search result for one queried blocked activatable target.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapabilityCounterfactualTargetV1 {
     target_capability_id: CapabilityId,
@@ -244,6 +396,7 @@ impl CapabilityCounterfactualTargetV1 {
 pub struct CapabilityCounterfactualFrontierV1 {
     source_snapshot_id: CapabilityGraphSnapshotId,
     base_assumptions_id: CapabilityActivationAssumptionsId,
+    query_id: CapabilityCounterfactualQueryId,
     config_id: CapabilityCounterfactualConfigId,
     base_available_after_closure: Vec<CapabilityId>,
     targets: Vec<CapabilityCounterfactualTargetV1>,
@@ -257,6 +410,10 @@ impl CapabilityCounterfactualFrontierV1 {
 
     pub fn base_assumptions_id(&self) -> CapabilityActivationAssumptionsId {
         self.base_assumptions_id
+    }
+
+    pub fn query_id(&self) -> CapabilityCounterfactualQueryId {
+        self.query_id
     }
 
     pub fn config_id(&self) -> CapabilityCounterfactualConfigId {
@@ -278,6 +435,28 @@ impl CapabilityCounterfactualFrontierV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum CapabilityCounterfactualError {
+    #[error("unsupported capability counterfactual query schema: {0}")]
+    UnsupportedQuerySchema(String),
+    #[error("counterfactual query declares graph {declared:?} but analysis uses {actual:?}")]
+    QuerySourceSnapshotMismatch {
+        declared: CapabilityGraphSnapshotId,
+        actual: CapabilityGraphSnapshotId,
+    },
+    #[error("counterfactual query declares assumptions {declared:?} but analysis uses {actual:?}")]
+    QueryAssumptionsMismatch {
+        declared: CapabilityActivationAssumptionsId,
+        actual: CapabilityActivationAssumptionsId,
+    },
+    #[error("counterfactual query must name 1..={HARD_MAX_QUERY_TARGETS} targets")]
+    InvalidQueryTargets,
+    #[error("counterfactual query targets must be in strict canonical identity order")]
+    NonCanonicalQueryTargets,
+    #[error("counterfactual query references capability absent from graph: {0:?}")]
+    UnknownQueryTarget(CapabilityId),
+    #[error("counterfactual query identity does not match canonical fields")]
+    QueryIdentityMismatch,
+    #[error("queried capability is not blocked under the exact base activation closure: {0:?}")]
+    TargetNotBlocked(CapabilityId),
     #[error("unsupported capability counterfactual config schema: {0}")]
     UnsupportedConfigSchema(String),
     #[error("counterfactual config identity does not match canonical fields")]
@@ -312,14 +491,15 @@ pub enum CapabilityCounterfactualError {
     InconsistentCounterfactual(CapabilityId),
 }
 
-/// Derive bounded inclusion-minimal counterfactual support sets.
+/// Derive bounded inclusion-minimal counterfactual support sets for an exact
+/// canonical target query.
 ///
-/// The search universe for each blocked activatable target is its complete
-/// transitive structural prerequisite cone, excluding the target and anything
-/// already available after the base activation closure. Every subset through the
-/// configured width is considered. A subset is successful only if feeding it
-/// back as an explicit additional-availability assumption into CC-03B causes the
-/// target to enter closure.
+/// The search universe for each queried blocked activatable target is its
+/// complete transitive structural prerequisite cone, excluding the target and
+/// anything already available after the base activation closure. Every subset
+/// through the configured width is considered. A subset is successful only if
+/// feeding it back as an explicit additional-availability assumption into
+/// CC-03B causes the target to enter closure.
 ///
 /// This is counterfactual model analysis only. It does not claim that any
 /// support capability can be realized, restored, purchased, operated safely, or
@@ -327,16 +507,38 @@ pub enum CapabilityCounterfactualError {
 pub fn derive_capability_counterfactual_frontier(
     graph: &ValidatedCapabilityGraphV1,
     assumptions: &ValidatedCapabilityActivationAssumptionsV1,
+    query: &ValidatedCapabilityCounterfactualQueryV1,
     config: &ValidatedCapabilityCounterfactualConfigV1,
 ) -> Result<CapabilityCounterfactualFrontierV1, CapabilityCounterfactualError> {
+    if query.source_snapshot_id() != graph.id() {
+        return Err(CapabilityCounterfactualError::QuerySourceSnapshotMismatch {
+            declared: query.source_snapshot_id(),
+            actual: graph.id(),
+        });
+    }
+    if query.base_assumptions_id() != assumptions.id() {
+        return Err(CapabilityCounterfactualError::QueryAssumptionsMismatch {
+            declared: query.base_assumptions_id(),
+            actual: assumptions.id(),
+        });
+    }
+
     let base_closure = derive_capability_activation_closure(graph, assumptions)?;
     let base_available_after_closure = base_closure.available_after_closure().to_vec();
     let base_available: BTreeSet<_> = base_available_after_closure.iter().copied().collect();
+    let blocked_targets: BTreeSet<_> = base_closure
+        .blocked_activatable()
+        .iter()
+        .map(|blocked| blocked.capability_id())
+        .collect();
     let mut simulations_evaluated = 0_u64;
-    let mut targets = Vec::with_capacity(base_closure.blocked_activatable().len());
+    let mut targets = Vec::with_capacity(query.targets().len());
 
-    for blocked in base_closure.blocked_activatable() {
-        let target = blocked.capability_id();
+    for &target in query.targets() {
+        if !blocked_targets.contains(&target) {
+            return Err(CapabilityCounterfactualError::TargetNotBlocked(target));
+        }
+
         let mut dependency_universe = collect_dependency_cone(graph, target)?;
         dependency_universe.retain(|capability_id| !base_available.contains(capability_id));
 
@@ -441,6 +643,7 @@ pub fn derive_capability_counterfactual_frontier(
     Ok(CapabilityCounterfactualFrontierV1 {
         source_snapshot_id: graph.id(),
         base_assumptions_id: assumptions.id(),
+        query_id: query.id(),
         config_id: config.id(),
         base_available_after_closure,
         targets,
@@ -544,6 +747,25 @@ fn binomial(n: usize, k: usize) -> u128 {
     value
 }
 
+fn validate_query_targets(
+    graph: &ValidatedCapabilityGraphV1,
+    targets: &[CapabilityId],
+) -> Result<(), CapabilityCounterfactualError> {
+    if targets.is_empty() || targets.len() > HARD_MAX_QUERY_TARGETS {
+        return Err(CapabilityCounterfactualError::InvalidQueryTargets);
+    }
+    for &target in targets {
+        if graph.definition(target).is_none() {
+            return Err(CapabilityCounterfactualError::UnknownQueryTarget(target));
+        }
+    }
+    Ok(())
+}
+
+fn strictly_sorted(capability_ids: &[CapabilityId]) -> bool {
+    capability_ids.windows(2).all(|pair| pair[0] < pair[1])
+}
+
 fn validate_limits(
     max_universe_size: u16,
     max_support_width: u16,
@@ -566,6 +788,26 @@ fn validate_limits(
         return Err(CapabilityCounterfactualError::InvalidSimulationLimit);
     }
     Ok(())
+}
+
+fn hash_query(
+    source_snapshot_id: CapabilityGraphSnapshotId,
+    base_assumptions_id: CapabilityActivationAssumptionsId,
+    targets: &[CapabilityId],
+) -> [u8; 32] {
+    let mut bytes = Vec::with_capacity(128 + targets.len() * 32);
+    put_str(&mut bytes, CAPABILITY_COUNTERFACTUAL_QUERY_SCHEMA_V1);
+    bytes.extend_from_slice(source_snapshot_id.as_bytes());
+    bytes.extend_from_slice(base_assumptions_id.as_bytes());
+    bytes.extend_from_slice(&(targets.len() as u64).to_le_bytes());
+    for target in targets {
+        bytes.extend_from_slice(target.as_bytes());
+    }
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(QUERY_DOMAIN);
+    hasher.update(&bytes);
+    *hasher.finalize().as_bytes()
 }
 
 fn hash_config(
@@ -621,6 +863,17 @@ mod tests {
             .unwrap()
     }
 
+    fn query(
+        graph: &ValidatedCapabilityGraphV1,
+        assumptions: &ValidatedCapabilityActivationAssumptionsV1,
+        targets: Vec<CapabilityId>,
+    ) -> ValidatedCapabilityCounterfactualQueryV1 {
+        CapabilityCounterfactualQueryV1::new(graph, assumptions, targets)
+            .unwrap()
+            .validate(graph, assumptions)
+            .unwrap()
+    }
+
     fn config(
         universe: u16,
         width: u16,
@@ -654,10 +907,12 @@ mod tests {
         expected_support.sort_unstable();
         let graph = graph(vec![target, a, b]);
         let assumptions = assumptions(&graph, vec![], vec![target_id]);
+        let query = query(&graph, &assumptions, vec![target_id]);
 
         let frontier = derive_capability_counterfactual_frontier(
             &graph,
             &assumptions,
+            &query,
             &config(8, 3, 16, 100),
         )
         .unwrap();
@@ -688,10 +943,12 @@ mod tests {
         let b_id = b.id();
         let graph = graph(vec![target, a, b]);
         let assumptions = assumptions(&graph, vec![], vec![target_id]);
+        let query = query(&graph, &assumptions, vec![target_id]);
 
         let frontier = derive_capability_counterfactual_frontier(
             &graph,
             &assumptions,
+            &query,
             &config(8, 2, 16, 100),
         )
         .unwrap();
@@ -725,10 +982,12 @@ mod tests {
         let target_id = target.id();
         let graph = graph(vec![target, a, b]);
         let assumptions = assumptions(&graph, vec![], vec![a_id, target_id]);
+        let query = query(&graph, &assumptions, vec![target_id]);
 
         let frontier = derive_capability_counterfactual_frontier(
             &graph,
             &assumptions,
+            &query,
             &config(8, 2, 16, 100),
         )
         .unwrap();
@@ -761,20 +1020,19 @@ mod tests {
         .unwrap();
         let graph = graph(vec![a, b]);
         let assumptions = assumptions(&graph, vec![], vec![a_id, b_id]);
+        let query = query(&graph, &assumptions, vec![a_id]);
 
         let frontier = derive_capability_counterfactual_frontier(
             &graph,
             &assumptions,
+            &query,
             &config(8, 2, 16, 100),
         )
         .unwrap();
-        let a_target = frontier
-            .targets()
-            .iter()
-            .find(|target| target.target_capability_id() == a_id)
-            .unwrap();
-        assert_eq!(a_target.options().len(), 1);
-        assert_eq!(a_target.options()[0].assumed_support(), &[b_id]);
+        assert_eq!(frontier.targets().len(), 1);
+        assert_eq!(frontier.targets()[0].target_capability_id(), a_id);
+        assert_eq!(frontier.targets()[0].options().len(), 1);
+        assert_eq!(frontier.targets()[0].options()[0].assumed_support(), &[b_id]);
     }
 
     #[test]
@@ -788,10 +1046,12 @@ mod tests {
         .unwrap();
         let graph = graph(vec![target]);
         let assumptions = assumptions(&graph, vec![], vec![target_id]);
+        let query = query(&graph, &assumptions, vec![target_id]);
 
         let frontier = derive_capability_counterfactual_frontier(
             &graph,
             &assumptions,
+            &query,
             &config(4, 2, 8, 20),
         )
         .unwrap();
@@ -820,11 +1080,13 @@ mod tests {
         let target_id = target.id();
         let graph = graph(vec![target, a, b, c]);
         let assumptions = assumptions(&graph, vec![], vec![target_id]);
+        let query = query(&graph, &assumptions, vec![target_id]);
 
         assert!(matches!(
             derive_capability_counterfactual_frontier(
                 &graph,
                 &assumptions,
+                &query,
                 &config(2, 2, 16, 100),
             ),
             Err(CapabilityCounterfactualError::UniverseLimitExceeded { .. })
@@ -853,11 +1115,13 @@ mod tests {
         definitions.extend(leaves);
         let graph = graph(definitions);
         let assumptions = assumptions(&graph, vec![], vec![target_id]);
+        let query = query(&graph, &assumptions, vec![target_id]);
 
         assert!(matches!(
             derive_capability_counterfactual_frontier(
                 &graph,
                 &assumptions,
+                &query,
                 &config(8, 2, 16, 5),
             ),
             Err(CapabilityCounterfactualError::SimulationLimitExceeded { .. })
@@ -885,15 +1149,101 @@ mod tests {
         let target_id = target.id();
         let graph = graph(vec![target, a, b, c]);
         let assumptions = assumptions(&graph, vec![], vec![target_id]);
+        let query = query(&graph, &assumptions, vec![target_id]);
 
         assert!(matches!(
             derive_capability_counterfactual_frontier(
                 &graph,
                 &assumptions,
+                &query,
                 &config(8, 1, 2, 100),
             ),
             Err(CapabilityCounterfactualError::OptionLimitExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn query_scope_does_not_inherit_unrelated_large_target_failure() {
+        let small_dependency = leaf("small-dependency");
+        let small_target = CapabilityDefinitionV1::new(
+            "org.example",
+            "small-target",
+            Some(CapabilityRequirementV1::leaf(small_dependency.id())),
+        )
+        .unwrap();
+        let small_target_id = small_target.id();
+
+        let large_leaves: Vec<_> = ["l1", "l2", "l3", "l4"]
+            .into_iter()
+            .map(leaf)
+            .collect();
+        let large_target = CapabilityDefinitionV1::new(
+            "org.example",
+            "large-target",
+            Some(
+                CapabilityRequirementV1::all_of(
+                    large_leaves
+                        .iter()
+                        .map(|definition| CapabilityRequirementV1::leaf(definition.id()))
+                        .collect(),
+                )
+                .unwrap(),
+            ),
+        )
+        .unwrap();
+        let large_target_id = large_target.id();
+
+        let mut definitions = vec![small_target, small_dependency, large_target];
+        definitions.extend(large_leaves);
+        let graph = graph(definitions);
+        let assumptions = assumptions(
+            &graph,
+            vec![],
+            vec![small_target_id, large_target_id],
+        );
+        let query = query(&graph, &assumptions, vec![small_target_id]);
+
+        let frontier = derive_capability_counterfactual_frontier(
+            &graph,
+            &assumptions,
+            &query,
+            &config(2, 2, 16, 100),
+        )
+        .expect("unqueried large target must not poison scoped analysis");
+        assert_eq!(frontier.targets().len(), 1);
+        assert_eq!(frontier.targets()[0].target_capability_id(), small_target_id);
+    }
+
+    #[test]
+    fn query_rejects_target_that_is_not_blocked_under_base_closure() {
+        let target = leaf("target");
+        let target_id = target.id();
+        let graph = graph(vec![target]);
+        let assumptions = assumptions(&graph, vec![target_id], vec![]);
+        let query = query(&graph, &assumptions, vec![target_id]);
+
+        assert_eq!(
+            derive_capability_counterfactual_frontier(
+                &graph,
+                &assumptions,
+                &query,
+                &config(4, 2, 8, 20),
+            ),
+            Err(CapabilityCounterfactualError::TargetNotBlocked(target_id))
+        );
+    }
+
+    #[test]
+    fn query_identity_commits_exact_target_scope() {
+        let a = leaf("a");
+        let b = leaf("b");
+        let a_id = a.id();
+        let b_id = b.id();
+        let graph = graph(vec![a, b]);
+        let assumptions = assumptions(&graph, vec![], vec![a_id, b_id]);
+        let left = CapabilityCounterfactualQueryV1::new(&graph, &assumptions, vec![a_id]).unwrap();
+        let right = CapabilityCounterfactualQueryV1::new(&graph, &assumptions, vec![b_id]).unwrap();
+        assert_ne!(left.id(), right.id());
     }
 
     #[test]
