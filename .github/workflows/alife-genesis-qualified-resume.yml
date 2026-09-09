@@ -1,0 +1,186 @@
+name: ALife Genesis Qualified Resume
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-fep/**"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/genesis_evidence_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/genesis_rolling_evidence.rs"
+      - "crates/domains/symthaea-alife/src/genesis_rolling_evidence/**"
+      - "crates/domains/symthaea-alife/src/genesis_social_runner.rs"
+      - "crates/domains/symthaea-alife/src/genesis_social_runner/**"
+      - "crates/domains/symthaea-alife/src/genesis_tick.rs"
+      - "crates/domains/symthaea-alife/src/genesis_tick/**"
+      - "crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/population.rs"
+      - "crates/domains/symthaea-alife/src/population/**"
+      - "crates/domains/symthaea-alife/src/population_snapshot.rs"
+      - ".github/workflows/alife-genesis-qualified-resume.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Qualified checkpoint-resume-checkpoint theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/genesis_social_runner.rs
+          sha256sum crates/domains/symthaea-alife/src/genesis_social_runner/resume.rs
+          sha256sum crates/domains/symthaea-alife/src/genesis_rolling_evidence.rs
+          sha256sum crates/domains/symthaea-alife/src/genesis_rolling_evidence/resume.rs
+          sha256sum crates/domains/symthaea-alife/src/genesis_tick/evidence_restore.rs
+          sha256sum crates/domains/symthaea-alife/src/population/live_snapshot.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-genesis-qualified-resume
+
+      - name: Check ALife/FEP formatting
+        run: cargo fmt -p symthaea-fep -p symthaea-alife -- --check
+
+      - name: Check ALife/FEP targets
+        run: cargo check --locked -p symthaea-fep -p symthaea-alife --all-targets
+
+      - name: Test social runner boundary reconstruction
+        run: cargo test --locked -p symthaea-alife validated_resume_recreates_population_and_tick_boundary_without_pending_batches
+
+      - name: Test rolling runner retained checkpoint boundary
+        run: cargo test --locked -p symthaea-alife resumed_rolling_runner_retains_exact_checkpoint_boundary
+
+      - name: Test checkpoint restore checkpoint continuity
+        run: cargo test --locked -p symthaea-alife checkpoint_restore_checkpoint_forms_one_contiguous_evidence_lineage
+
+      - name: Test resumed cull lifecycle continuation
+        run: cargo test --locked -p symthaea-alife cull_after_resume_extends_retained_lifecycle_without_advancing_behavior_clock
+
+      - name: Test population restore prerequisite
+        run: cargo test --locked -p symthaea-alife serialized_validated_population_restore_is_bit_exact_at_boundary
+
+      - name: Test evidence-bound tick prerequisite
+        run: cargo test --locked -p symthaea-alife validated_evidence_recreates_exact_next_behavior_tick
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze qualified resume authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          social="crates/domains/symthaea-alife/src/genesis_social_runner/resume.rs"
+          rolling="crates/domains/symthaea-alife/src/genesis_rolling_evidence/resume.rs"
+          tick="crates/domains/symthaea-alife/src/genesis_tick/evidence_restore.rs"
+
+          grep -q 'pub fn from_validated_resume' "$social"
+          grep -q 'Population::from_validated_snapshot_v1' "$social"
+          grep -q 'GenesisTickCursorV1::from_validated_evidence' "$social"
+          grep -q 'completed_batches: Vec::new()' "$social"
+          grep -q 'qualified: true' "$social"
+
+          grep -q 'pub fn from_validated_resume' "$rolling"
+          grep -q 'GenesisSocialRunnerV1::from_validated_resume' "$rolling"
+          grep -q 'lifecycle: Some(evidence.lifecycle().clone())' "$rolling"
+          grep -q 'behavior_next_tick: evidence.behavior_next_tick()' "$rolling"
+          grep -q 'qualified: true' "$rolling"
+
+          grep -q 'pub fn from_validated_evidence' "$tick"
+          grep -q 'next_tick: evidence.behavior_next_tick()' "$tick"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          social = Path('crates/domains/symthaea-alife/src/genesis_social_runner/resume.rs').read_text()
+          rolling = Path('crates/domains/symthaea-alife/src/genesis_rolling_evidence/resume.rs').read_text()
+
+          forbidden = [
+              'Population::new(', 'GenesisTickCursorV1::new()',
+              'EncounterSchedulerSnapshotV1', 'EnvironmentSnapshotV1',
+              'EarthForcedEnvironmentSnapshotV1', 'PopulationExecutionCapsuleV1'
+          ]
+          for token in forbidden:
+              if token in social or token in rolling:
+                  raise SystemExit(f'qualified resume crossed current claim boundary: {token}')
+
+          required = [
+              'ValidatedPopulationSnapshotV1',
+              'ValidatedGenesisEvidenceCheckpointV1'
+          ]
+          for token in required:
+              if token not in social or token not in rolling:
+                  raise SystemExit(f'qualified resume lost validated authority input: {token}')
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          social="crates/domains/symthaea-alife/src/genesis_social_runner/resume.rs"
+          rolling="crates/domains/symthaea-alife/src/genesis_rolling_evidence/resume.rs"
+          ! grep -q 'scheduler_state_bound=true' "$social" "$rolling"
+          ! grep -q 'environment_state_bound=true' "$social" "$rolling"
+          ! grep -q 'trajectory_equivalence' "$social" "$rolling"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$social" "$rolling"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-genesis-qualified-resume-evidence
+          {
+            echo "authority=genesis_qualified_resume_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "social_resume_sha256=$(sha256sum crates/domains/symthaea-alife/src/genesis_social_runner/resume.rs | cut -d' ' -f1)"
+            echo "rolling_resume_sha256=$(sha256sum crates/domains/symthaea-alife/src/genesis_rolling_evidence/resume.rs | cut -d' ' -f1)"
+            echo "validated_population_required=true"
+            echo "validated_genesis_evidence_required=true"
+            echo "behavior_tick_authority_restored=true"
+            echo "lifecycle_prefix_retained=true"
+            echo "pending_behavior_batches_empty_on_resume=true"
+            echo "checkpoint_restore_checkpoint_continuity_candidate=true"
+            echo "resumed_cull_continuity_candidate=true"
+            echo "scheduler_state_bound=false"
+            echo "environment_state_bound=false"
+            echo "trajectory_equivalence_established=false"
+            echo "full_execution_capsule_established=false"
+          } > target/alife-genesis-qualified-resume-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-genesis-qualified-resume-evidence
+          path: target/alife-genesis-qualified-resume-evidence/qualification.txt
+          if-no-files-found: error
