@@ -62,6 +62,7 @@
 
 pub mod calibration;
 pub mod error;
+pub mod exact_interlock;
 pub mod gpio_estop;
 pub mod imu;
 pub mod ina219;
@@ -78,6 +79,7 @@ pub mod servo;
 
 pub use calibration::{CalibrationProfile, JointCalibration};
 pub use error::{HalError, HalResult};
+pub use exact_interlock::ExactCommandSafetyInterlock;
 pub use gpio_estop::{EstopPoller, GpioEstop};
 pub use imu::{ComplementaryFilter, Mpu6050Decoder};
 pub use ina219::Ina219Decoder;
