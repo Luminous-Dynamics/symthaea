@@ -19,6 +19,7 @@ pub mod profile_adoption_commit;
 pub mod profile_adoption_commit_evidence;
 pub mod profile_adoption_grant;
 pub mod profile_adoption_grant_commit;
+pub mod profile_adoption_registry_write;
 pub mod profile_adoption_root;
 pub mod profile_adoption_runtime;
 pub mod profile_adoption_time;
@@ -71,6 +72,11 @@ pub use profile_adoption_grant::{
 pub use profile_adoption_grant_commit::{
     GrantBoundVerifierProfileAdoptionCommitPreconditionsV1,
     VerifierProfileAdoptionGrantCommitError,
+};
+pub use profile_adoption_registry_write::{
+    VERIFIER_PROFILE_ADOPTION_REGISTRY_WRITE_CLAIM_SCHEMA_V1,
+    VerifierProfileAdoptionRegistrySlotIdV1, VerifierProfileAdoptionRegistryWriteClaimIdV1,
+    VerifierProfileAdoptionRegistryWriteClaimV1, VerifierProfileAdoptionRegistryWriteError,
 };
 pub use profile_adoption_root::{
     RootBoundPolicyCheckedVerifierProfileAdoptionV1,
