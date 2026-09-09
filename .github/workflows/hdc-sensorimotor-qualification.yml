@@ -1,0 +1,64 @@
+name: HDC Sensorimotor Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-core/src/hdc/sensorimotor_contingencies.rs'
+      - 'crates/core/symthaea-core/src/hdc/sensorimotor_schema_v1.rs'
+      - 'src/perception/sensor_fusion.rs'
+      - 'src/perception/sensorimotor_alignment.rs'
+      - 'src/perception/mod.rs'
+      - 'crates/domains/symthaea-humanoid/src/semantic_state.rs'
+      - 'crates/domains/symthaea-humanoid/src/lib.rs'
+      - '.github/workflows/hdc-sensorimotor-qualification.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: hdc-sensorimotor-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  imu-humanoid-alignment:
+    name: IMU Humanoid Semantic Alignment
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-hdc-sensorimotor-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-hdc-sensorimotor-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev \
+            protobuf-compiler \
+            libclang-dev \
+            libespeak-ng-dev \
+            cmake
+
+      - name: Run actual adapter alignment regressions
+        run: |
+          cargo test -p symthaea --lib \
+            --features 'sensor-imu,humanoid' \
+            sensorimotor_alignment \
+            -- --test-threads=1
