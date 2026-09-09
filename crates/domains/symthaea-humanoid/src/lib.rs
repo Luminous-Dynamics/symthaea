@@ -6,6 +6,7 @@ pub mod backend_action_evidence;
 pub mod centroidal;
 pub mod contact;
 pub mod contact_inverse_dynamics;
+pub mod continuous_predictor;
 pub mod control;
 pub mod control_budget;
 pub mod control_release;
@@ -66,6 +67,7 @@ pub use actuation::*;
 pub use backend_action_evidence::*;
 pub use centroidal::*;
 pub use contact_inverse_dynamics::*;
+pub use continuous_predictor::*;
 pub use control_budget::*;
 pub use control_release::*;
 pub use controller::*;
@@ -111,6 +113,11 @@ pub use transition_evidence::*;
 pub use types::*;
 pub use vision_terrain::*;
 pub use whole_body::*;
+
+// The predicted-value enum contains only copyable scalar/reason payloads. Making
+// that semantic explicit avoids moving from borrowed prediction records during
+// deterministic digest validation.
+impl Copy for HumanoidPredictedValueV1 {}
 
 pub use crate::control::GaitControlProfile;
 pub use control::{
