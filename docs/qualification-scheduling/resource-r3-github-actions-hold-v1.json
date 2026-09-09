@@ -1,0 +1,27 @@
+{
+  "schema": "symthaea.qualification-scheduling-decision.v1",
+  "subject_id": "sha256:9c0769e927ffbc7fb2d0ec943d859f75a3ab32f73c30561db6e9c3881f2c50d0",
+  "admission_request_ids": [
+    "sha256:e937bd324855f2c8a8e97c286f180674d43776c61af23ee373d4ebcc20e15f0b"
+  ],
+  "availability_observation_id": "sha256:d385a544425e19370ea00f29e949eb116b3280525010e8535be98ac974fc1c99",
+  "provider_scope": "github-actions",
+  "decision": "DoNotDuplicatePendingAttempt",
+  "existing_attempt": {
+    "workflow_run_id": 34215218821,
+    "subject_sha": "7350ee0a5cab0ccaa48b6691e8d52875143b102b",
+    "status": "pending"
+  },
+  "reason_codes": [
+    "existing_exact_subject_attempt_pending",
+    "provider_backlog_observed"
+  ],
+  "non_claims": [
+    "does not cancel the existing attempt",
+    "does not establish a source failure",
+    "does not establish hosted qualification",
+    "does not prevent provider-neutral fallback",
+    "does not state future scheduling priority"
+  ],
+  "decision_id": "sha256:22198de5c5456d9e63c43fa7c1cb8b8a263407b594f2189f7063d44913b24e2e"
+}
