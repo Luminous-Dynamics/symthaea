@@ -293,6 +293,7 @@ mod tests {
         ResourceBudget, RuntimeKind,
     };
     use symthaea_extension_router::{ProviderState, TrustLevel};
+    use symthaea_sim_bridge::EngineeringDomain;
 
     #[derive(Debug)]
     struct MockBackend {
@@ -319,6 +320,7 @@ mod tests {
         descriptor: SimulationProviderDescriptor,
         create_count: Arc<AtomicUsize>,
         backend_name: &'static str,
+        backend_solvers: Option<Vec<SolverKind>>,
     }
 
     impl SimulationBackendFactory for CountingFactory {
@@ -330,7 +332,10 @@ mod tests {
             self.create_count.fetch_add(1, AtomicOrdering::SeqCst);
             Ok(Box::new(MockBackend {
                 name: self.backend_name,
-                solvers: self.descriptor.supported_solvers.clone(),
+                solvers: self
+                    .backend_solvers
+                    .clone()
+                    .unwrap_or_else(|| self.descriptor.supported_solvers.clone()),
             }))
         }
     }
@@ -360,6 +365,19 @@ mod tests {
         }
     }
 
+    fn factory(
+        descriptor: SimulationProviderDescriptor,
+        create_count: Arc<AtomicUsize>,
+        backend_name: &'static str,
+    ) -> CountingFactory {
+        CountingFactory {
+            descriptor,
+            create_count,
+            backend_name,
+            backend_solvers: None,
+        }
+    }
+
     fn observation(
         id: &str,
         evidence_grade: u8,
@@ -379,13 +397,14 @@ mod tests {
     #[test]
     fn registration_does_not_instantiate_backend() {
         let count = Arc::new(AtomicUsize::new(0));
-        let factory = CountingFactory {
-            descriptor: descriptor("org.example.fea", "mock-fea", SolverKind::FiniteElement),
-            create_count: count.clone(),
-            backend_name: "mock-fea",
-        };
         let mut registry = LazySimulationRegistry::new();
-        registry.register(factory).unwrap();
+        registry
+            .register(factory(
+                descriptor("org.example.fea", "mock-fea", SolverKind::FiniteElement),
+                count.clone(),
+                "mock-fea",
+            ))
+            .unwrap();
         assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
     }
 
@@ -397,18 +416,18 @@ mod tests {
         let mut registry = LazySimulationRegistry::new();
 
         registry
-            .register(CountingFactory {
-                descriptor: descriptor("org.example.low", "low", solver),
-                create_count: low_count.clone(),
-                backend_name: "low",
-            })
+            .register(factory(
+                descriptor("org.example.low", "low", solver),
+                low_count.clone(),
+                "low",
+            ))
             .unwrap();
         registry
-            .register(CountingFactory {
-                descriptor: descriptor("org.example.high", "high", solver),
-                create_count: high_count.clone(),
-                backend_name: "high",
-            })
+            .register(factory(
+                descriptor("org.example.high", "high", solver),
+                high_count.clone(),
+                "high",
+            ))
             .unwrap();
         registry
             .set_observation(observation("org.example.low", 2, 8_000))
@@ -441,11 +460,11 @@ mod tests {
         let count = Arc::new(AtomicUsize::new(0));
         let mut registry = LazySimulationRegistry::new();
         registry
-            .register(CountingFactory {
-                descriptor: descriptor("org.example.circuit", "declared", solver),
-                create_count: count,
-                backend_name: "actual",
-            })
+            .register(factory(
+                descriptor("org.example.circuit", "declared", solver),
+                count,
+                "actual",
+            ))
             .unwrap();
         registry
             .set_observation(observation("org.example.circuit", 5, 10_000))
@@ -463,6 +482,41 @@ mod tests {
             )
             .unwrap_err();
         assert!(matches!(err, LazySimulationError::BackendNameMismatch { .. }));
+    }
+
+    #[test]
+    fn instantiated_backend_solver_claim_must_match_descriptor() {
+        let solver = SolverKind::FiniteElement;
+        let count = Arc::new(AtomicUsize::new(0));
+        let descriptor = descriptor("org.example.structure", "structure", solver);
+        let mut registry = LazySimulationRegistry::new();
+        registry
+            .register(CountingFactory {
+                descriptor,
+                create_count: count,
+                backend_name: "structure",
+                backend_solvers: Some(vec![SolverKind::Circuit]),
+            })
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.structure", 5, 10_000))
+            .unwrap();
+
+        let request = SimulationRequest::new("run-3", EngineeringDomain::Civil, solver, "test");
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            LazySimulationError::BackendSolverMismatch { .. }
+        ));
     }
 
     #[test]
