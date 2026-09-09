@@ -1,6 +1,6 @@
 # Symthaea Maritime Core
 
-`sythaea-maritime-core` is a small, mission-neutral substrate for maritime autonomy.
+`symthaea-maritime-core` is a small, mission-neutral substrate for maritime autonomy.
 It is intended to be shared by AUVs, USVs, research vessels, logistics craft,
 remote sensors and larger maritime platforms without importing application-specific
 mission policy.
@@ -33,12 +33,12 @@ mission policy.
 - `authority`: mission-neutral capability leases with epoch/time/evidence bounds.
 - `fleet`: per-member fleet admission and degraded-member reporting.
 
-## Intended next adapters
+## Adapters
 
-- `symthaea-auv` → maritime state/health adapter.
-- `symthaea-hal` → fleet rollout/rollback assurance adapter.
-- Xenia → authenticated machine-session/evidence binding adapter.
-- Mycelix → distributed identity, governance, provenance and logistics bridge.
+- `symthaea-auv`: initial state adapter is implemented; health/assurance mapping is next.
+- `symthaea-hal`: fleet rollout/rollback assurance adapter is next.
+- Xenia: authenticated machine-session/evidence binding adapter is planned.
+- Mycelix: distributed identity, governance, provenance and logistics bridge is planned.
 
 This crate is not a physical safety controller, collision-avoidance implementation,
 or regulatory compliance claim. Hardware and operational validation remain required
