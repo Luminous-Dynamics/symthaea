@@ -130,6 +130,22 @@ impl TimestampV1 {
     pub fn validate(&self) -> Result<(), EvidenceValidationError> {
         self.clock_domain.validate()
     }
+
+    /// Return elapsed nanoseconds since an earlier timestamp in the same clock domain.
+    ///
+    /// Cross-domain subtraction is rejected rather than silently assuming clock
+    /// synchronization. A timestamp that moves backward in the same domain is also
+    /// rejected rather than wrapping into a plausible duration.
+    pub fn elapsed_since(&self, earlier: &Self) -> Result<u64, EvidenceValidationError> {
+        self.validate()?;
+        earlier.validate()?;
+        if self.clock_domain != earlier.clock_domain {
+            return Err(EvidenceValidationError::ClockDomainMismatch);
+        }
+        self.nanoseconds
+            .checked_sub(earlier.nanoseconds)
+            .ok_or(EvidenceValidationError::NonMonotonicTimestamp)
+    }
 }
 
 /// Shared metadata attached to normalized embodiment evidence.
@@ -201,7 +217,7 @@ impl EvidenceMetadataV1 {
         Ok(value)
     }
 
-    /// Validate source, availability, clock, and identifier invariants.
+    /// Validate source, availability, clock, validity-window, and identifier invariants.
     pub fn validate(&self) -> Result<(), EvidenceValidationError> {
         if self.schema_version != EMBODIMENT_EVIDENCE_SCHEMA_V1 {
             return Err(EvidenceValidationError::UnsupportedSchemaVersion {
@@ -214,6 +230,9 @@ impl EvidenceMetadataV1 {
         }
         if self.valid_for_ns == Some(0) {
             return Err(EvidenceValidationError::ZeroValidityWindow);
+        }
+        if self.valid_for_ns.is_some() && self.observed_at.is_none() {
+            return Err(EvidenceValidationError::ValidityWindowRequiresTimestamp);
         }
         validate_optional_identifier(&self.provenance_id, "provenance_id")?;
         validate_optional_identifier(&self.profile_id, "profile_id")?;
@@ -238,6 +257,35 @@ impl EvidenceMetadataV1 {
         }
 
         Ok(())
+    }
+
+    /// Evaluate producer-declared availability at `now` when a validity window exists.
+    ///
+    /// This method never compares timestamps from different clock domains. If no
+    /// validity window is declared, the producer's current availability classification
+    /// is returned unchanged. Consumers may still impose stricter local freshness
+    /// policies above this primitive.
+    pub fn effective_availability_at(
+        &self,
+        now: &TimestampV1,
+    ) -> Result<EvidenceAvailability, EvidenceValidationError> {
+        self.validate()?;
+        if self.availability != EvidenceAvailability::Available {
+            return Ok(self.availability);
+        }
+        let Some(valid_for_ns) = self.valid_for_ns else {
+            return Ok(EvidenceAvailability::Available);
+        };
+        let observed_at = self
+            .observed_at
+            .as_ref()
+            .ok_or(EvidenceValidationError::ValidityWindowRequiresTimestamp)?;
+        let age_ns = now.elapsed_since(observed_at)?;
+        if age_ns >= valid_for_ns {
+            Ok(EvidenceAvailability::Stale)
+        } else {
+            Ok(EvidenceAvailability::Available)
+        }
     }
 }
 
@@ -376,7 +424,7 @@ impl NormalizedVectorEvidenceV1 {
         Ok(evidence)
     }
 
-    /// Validate semantic cardinality, availability, non-emptiness, and value range.
+    /// Validate semantic cardinality, profile identity, availability, and value range.
     pub fn validate(&self) -> Result<(), EvidenceValidationError> {
         self.metadata.validate()?;
         if self.kind.cardinality() != EvidenceCardinality::Vector {
@@ -393,6 +441,9 @@ impl NormalizedVectorEvidenceV1 {
                 }
             }
             EvidenceAvailability::Available | EvidenceAvailability::Stale => {
+                if self.metadata.profile_id.is_none() {
+                    return Err(EvidenceValidationError::ProfileRequiredForVector);
+                }
                 let values = self
                     .values
                     .as_ref()
@@ -466,6 +517,10 @@ pub enum EvidenceValidationError {
     },
     /// Clock-domain identifier is empty, padded, or contains control characters.
     InvalidClockDomain,
+    /// Timestamp arithmetic attempted across unrelated clock domains.
+    ClockDomainMismatch,
+    /// A later timestamp was numerically earlier in the same clock domain.
+    NonMonotonicTimestamp,
     /// Optional identifier is present but invalid.
     InvalidIdentifier(&'static str),
     /// Available/stale evidence omitted its source class.
@@ -476,6 +531,8 @@ pub enum EvidenceValidationError {
     RuntimeTimestampRequired(EvidenceSourceClass),
     /// Stale evidence used a non-runtime assumption source.
     StaleRequiresRuntimeSource,
+    /// A validity window was declared without a source timestamp.
+    ValidityWindowRequiresTimestamp,
     /// A validity window of zero nanoseconds is meaningless.
     ZeroValidityWindow,
     /// Available/stale evidence omitted its value payload.
@@ -484,6 +541,8 @@ pub enum EvidenceValidationError {
     ValueForbiddenForUnavailable,
     /// Available/stale vector evidence was empty.
     EmptyVector,
+    /// Available/stale vector evidence omitted the profile defining vector positions.
+    ProfileRequiredForVector,
     /// Scalar/vector representation does not match the semantic kind.
     CardinalityMismatch {
         /// Semantic kind being represented.
@@ -512,6 +571,8 @@ impl std::fmt::Display for EvidenceValidationError {
                 write!(f, "unsupported embodiment evidence schema version {found}")
             }
             Self::InvalidClockDomain => write!(f, "invalid clock-domain identifier"),
+            Self::ClockDomainMismatch => write!(f, "cannot compare different clock domains"),
+            Self::NonMonotonicTimestamp => write!(f, "timestamp moved backward within one clock domain"),
             Self::InvalidIdentifier(field) => write!(f, "invalid {field} identifier"),
             Self::SourceRequired => write!(f, "available/stale evidence requires a source class"),
             Self::SourceForbiddenForUnavailable => {
@@ -523,12 +584,19 @@ impl std::fmt::Display for EvidenceValidationError {
             Self::StaleRequiresRuntimeSource => {
                 write!(f, "stale evidence requires a timestamped runtime source")
             }
+            Self::ValidityWindowRequiresTimestamp => {
+                write!(f, "validity window requires an explicit source timestamp")
+            }
             Self::ZeroValidityWindow => write!(f, "validity window must be greater than zero"),
             Self::ValueRequired => write!(f, "available/stale evidence requires a value"),
             Self::ValueForbiddenForUnavailable => {
                 write!(f, "unavailable evidence must not carry a value")
             }
             Self::EmptyVector => write!(f, "available/stale vector evidence must not be empty"),
+            Self::ProfileRequiredForVector => write!(
+                f,
+                "available/stale vector evidence requires a profile defining vector positions"
+            ),
             Self::CardinalityMismatch { kind, expected } => {
                 write!(f, "evidence kind {kind:?} does not have {expected:?} cardinality")
             }
@@ -558,6 +626,10 @@ mod tests {
 
     fn host_time(ns: u64) -> TimestampV1 {
         TimestampV1::new(ClockDomainId::new("host.monotonic").unwrap(), ns)
+    }
+
+    fn sim_time(ns: u64) -> TimestampV1 {
+        TimestampV1::new(ClockDomainId::new("sim.model").unwrap(), ns)
     }
 
     #[test]
@@ -654,11 +726,12 @@ mod tests {
 
     #[test]
     fn actuator_health_is_vector_valued_and_non_empty_when_available() {
-        let metadata = EvidenceMetadataV1::available(
+        let mut metadata = EvidenceMetadataV1::available(
             EvidenceSourceClass::Measured,
             Some(host_time(200)),
         )
         .unwrap();
+        metadata.profile_id = Some("actuator-map.v1".into());
         assert!(NormalizedVectorEvidenceV1::new(
             EmbodimentEvidenceKind::ActuatorHealth,
             Some(vec![1.0, 0.75, 0.5]),
@@ -672,6 +745,23 @@ mod tests {
                 metadata
             ),
             Err(EvidenceValidationError::EmptyVector)
+        );
+    }
+
+    #[test]
+    fn actuator_health_requires_profile_identity() {
+        let metadata = EvidenceMetadataV1::available(
+            EvidenceSourceClass::Measured,
+            Some(host_time(200)),
+        )
+        .unwrap();
+        assert_eq!(
+            NormalizedVectorEvidenceV1::new(
+                EmbodimentEvidenceKind::ActuatorHealth,
+                Some(vec![1.0]),
+                metadata
+            ),
+            Err(EvidenceValidationError::ProfileRequiredForVector)
         );
     }
 
@@ -731,6 +821,47 @@ mod tests {
         assert_eq!(
             metadata.validate(),
             Err(EvidenceValidationError::InvalidIdentifier("profile_id"))
+        );
+    }
+
+    #[test]
+    fn validity_window_requires_timestamp() {
+        let mut metadata = EvidenceMetadataV1::available(
+            EvidenceSourceClass::CompatibilityAssumption,
+            None,
+        )
+        .unwrap();
+        metadata.valid_for_ns = Some(10);
+        assert_eq!(
+            metadata.validate(),
+            Err(EvidenceValidationError::ValidityWindowRequiresTimestamp)
+        );
+    }
+
+    #[test]
+    fn freshness_uses_only_same_monotonic_clock_domain() {
+        let mut metadata = EvidenceMetadataV1::available(
+            EvidenceSourceClass::Measured,
+            Some(host_time(100)),
+        )
+        .unwrap();
+        metadata.valid_for_ns = Some(50);
+
+        assert_eq!(
+            metadata.effective_availability_at(&host_time(149)).unwrap(),
+            EvidenceAvailability::Available
+        );
+        assert_eq!(
+            metadata.effective_availability_at(&host_time(150)).unwrap(),
+            EvidenceAvailability::Stale
+        );
+        assert_eq!(
+            metadata.effective_availability_at(&sim_time(150)),
+            Err(EvidenceValidationError::ClockDomainMismatch)
+        );
+        assert_eq!(
+            metadata.effective_availability_at(&host_time(99)),
+            Err(EvidenceValidationError::NonMonotonicTimestamp)
         );
     }
 
