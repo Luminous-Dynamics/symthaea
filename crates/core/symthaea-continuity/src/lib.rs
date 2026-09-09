@@ -27,6 +27,7 @@ pub mod scope;
 pub mod subject_contract;
 pub mod subject_witness;
 pub mod transition_authority;
+pub mod trusted_commit_epoch;
 pub mod verifier;
 mod witness;
 
@@ -117,6 +118,17 @@ pub use transition_authority::{
     TransitionAuthorityProfileId, TransitionAuthorityProfileV1,
     ValidatedTransitionAuthorityPolicyV1, canonical_transition_authority_claim_bytes,
     canonical_transition_authority_claim_digest,
+};
+pub use trusted_commit_epoch::{
+    TRUSTED_COMMIT_CLOCK_PROFILE_SCHEMA_V1, TRUSTED_COMMIT_EPOCH_CLAIM_SCHEMA_V1,
+    TRUSTED_COMMIT_EPOCH_POLICY_SCHEMA_V1, TRUSTED_COMMIT_EPOCH_XENIA_PURPOSE,
+    AuthenticatedTrustedCommitEpochId, QualifiedTrustedCommitEpochId,
+    QualifiedTrustedCommitEpochV1, TrustedCommitClockProfileId, TrustedCommitClockProfileV1,
+    TrustedCommitEligibilityId, TrustedCommitEligibilityV1, TrustedCommitEpochClaimId,
+    TrustedCommitEpochClaimV1, TrustedCommitEpochError, TrustedCommitEpochPolicyId,
+    TrustedCommitEpochPolicyV1, ValidatedTrustedCommitEpochPolicyV1,
+    canonical_trusted_commit_epoch_claim_bytes, canonical_trusted_commit_epoch_claim_digest,
+    validate_trusted_commit_epoch_progression,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
