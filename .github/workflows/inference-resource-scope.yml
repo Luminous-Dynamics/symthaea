@@ -1,0 +1,57 @@
+name: Inference Resource Scope
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_resource_scope.rs"
+      - "tests/inference_resource_scope.rs"
+      - "docs/architecture/INFERENCE_RESOURCE_SCOPE_V1.md"
+      - ".github/workflows/inference-resource-scope.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-resource-scope-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-resource-scope:
+    name: Inference Resource Scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: >-
+          rustfmt --edition 2024 --check
+          src/language/inference_resource_scope.rs
+          tests/inference_resource_scope.rs
+
+      - name: Compile and run IF-12 resource-scope regressions
+        run: cargo test --locked --test inference_resource_scope
+
+      - name: Focused resource-scope Clippy
+        run: cargo clippy --locked --test inference_resource_scope -- -D warnings -A dead-code
+
+      - name: Ratchet local resource-scope authority boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'symthaea.inference.resource-scope-proof.v1' src/language/inference_resource_scope.rs
+          grep -F 'Similar-looking strings do not prove' src/language/inference_resource_scope.rs
+          grep -F 'latest_credential_epoch' src/language/inference_resource_scope.rs
+          grep -F 'latest_quota_epoch' src/language/inference_resource_scope.rs
+          grep -F 'profile.profile_digest()' src/language/inference_resource_scope.rs
+          grep -F 'registry_id' src/language/inference_resource_scope.rs
+          grep -F 'matching-looking identifier strings do not create authority' docs/architecture/INFERENCE_RESOURCE_SCOPE_V1.md
+          grep -F 'binding the resource-scope proof into IF-11/v3 execution permits' docs/architecture/INFERENCE_RESOURCE_SCOPE_V1.md
