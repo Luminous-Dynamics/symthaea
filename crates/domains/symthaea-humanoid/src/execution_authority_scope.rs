@@ -4,13 +4,14 @@
 //!
 //! Capability qualification has an unavoidable bootstrap boundary: the trials
 //! used to qualify a capability cannot require that same capability to have
-//! already passed operational qualification. This module makes that distinction
-//! explicit instead of weakening the qualification source.
+//! already passed operational qualification. Qualification executions therefore
+//! use a `TrialProtocol` basis, while operational execution requires a
+//! `QualifiedCapability` basis produced only by a verified promotion path.
 //!
-//! Qualification executions use a `TrialProtocol` basis and are bound to an
-//! explicit simulation/HIL/physical qualification purpose. Operational execution
-//! requires a `QualifiedCapability` basis. The scoped receipt is move-only and
-//! cannot be converted between purposes after issuance.
+//! Public callers may directly scope controlled qualification trials. They cannot
+//! label an arbitrary receipt as operational. The operational constructor is
+//! crate-internal so capability-specific promotion code must first verify the
+//! corresponding qualification artifact.
 
 use crate::execution::HumanoidAuthorityEnvelope;
 use crate::skill_authority_receipt::{
@@ -48,13 +49,22 @@ impl HumanoidExecutionPurpose {
             Self::Operational => HumanoidQualificationAuthorityBasis::QualifiedCapability,
         }
     }
+
+    pub const fn is_qualification(self) -> bool {
+        matches!(
+            self,
+            Self::SimulationQualification | Self::HilQualification | Self::PhysicalQualification
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HumanoidExecutionAuthorityScopeIssueFailure {
     InvalidScopeId,
-    QualificationBasisMismatch,
+    QualificationPurposeRequired,
+    OperationalScopeRequiresVerifiedPromotion,
     InvalidInnerReceipt,
+    Inner(HumanoidSkillAuthorityReceiptValidationFailure),
     InvalidScopeFingerprint,
 }
 
@@ -158,20 +168,68 @@ impl HumanoidScopedSkillAuthorityReceipt {
     }
 }
 
-/// Bind an already-issued skill authority receipt to one immutable execution
-/// purpose. No source scales are changed by this operation.
-pub fn scope_humanoid_skill_authority_receipt(
+/// Public bootstrap path for controlled qualification runs.
+///
+/// This function cannot issue Operational authority and always uses the
+/// `TrialProtocol` basis. The inner receipt must already match the exact live
+/// permit at issuance time; Reach finalization revalidates it again before use.
+pub fn scope_humanoid_qualification_trial_authority_receipt(
+    inner: HumanoidSkillAuthorityReceipt,
+    permit: &HumanoidSkillExecutionPermit<'_>,
+    purpose: HumanoidExecutionPurpose,
+    protocol_scope_id: impl Into<String>,
+    now_s: f64,
+) -> Result<HumanoidScopedSkillAuthorityReceipt, HumanoidExecutionAuthorityScopeIssueFailure> {
+    if !purpose.is_qualification() {
+        return Err(HumanoidExecutionAuthorityScopeIssueFailure::QualificationPurposeRequired);
+    }
+    inner
+        .validate_for_permit(permit, now_s)
+        .map_err(HumanoidExecutionAuthorityScopeIssueFailure::Inner)?;
+    scope_checked(
+        inner,
+        purpose,
+        HumanoidQualificationAuthorityBasis::TrialProtocol,
+        protocol_scope_id.into(),
+    )
+}
+
+/// Crate-internal operational constructor.
+///
+/// Capability-specific promotion code may call this only after verifying the
+/// evidence artifact that justifies `QualifiedCapability`. Keeping this out of
+/// the public API prevents external callers from self-labeling an arbitrary
+/// authority receipt as production-qualified.
+pub(crate) fn scope_verified_operational_authority_receipt(
+    inner: HumanoidSkillAuthorityReceipt,
+    permit: &HumanoidSkillExecutionPermit<'_>,
+    operational_scope_id: impl Into<String>,
+    now_s: f64,
+) -> Result<HumanoidScopedSkillAuthorityReceipt, HumanoidExecutionAuthorityScopeIssueFailure> {
+    inner
+        .validate_for_permit(permit, now_s)
+        .map_err(HumanoidExecutionAuthorityScopeIssueFailure::Inner)?;
+    scope_checked(
+        inner,
+        HumanoidExecutionPurpose::Operational,
+        HumanoidQualificationAuthorityBasis::QualifiedCapability,
+        operational_scope_id.into(),
+    )
+}
+
+fn scope_checked(
     inner: HumanoidSkillAuthorityReceipt,
     purpose: HumanoidExecutionPurpose,
     qualification_basis: HumanoidQualificationAuthorityBasis,
-    scope_id: impl Into<String>,
+    scope_id: String,
 ) -> Result<HumanoidScopedSkillAuthorityReceipt, HumanoidExecutionAuthorityScopeIssueFailure> {
-    let scope_id = scope_id.into();
     if !valid_id(&scope_id) {
         return Err(HumanoidExecutionAuthorityScopeIssueFailure::InvalidScopeId);
     }
     if qualification_basis != purpose.required_qualification_basis() {
-        return Err(HumanoidExecutionAuthorityScopeIssueFailure::QualificationBasisMismatch);
+        return Err(
+            HumanoidExecutionAuthorityScopeIssueFailure::OperationalScopeRequiresVerifiedPromotion,
+        );
     }
     if inner.receipt_fingerprint() == 0
         || inner.validation_epoch() == 0
@@ -288,6 +346,7 @@ mod tests {
             HumanoidExecutionPurpose::Operational.required_qualification_basis(),
             HumanoidQualificationAuthorityBasis::QualifiedCapability
         );
+        assert!(!HumanoidExecutionPurpose::Operational.is_qualification());
     }
 
     #[test]
