@@ -1,0 +1,97 @@
+name: Inference Resource Execution
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_resource_execution.rs"
+      - "src/language/inference_current_profile_executor.rs"
+      - "src/language/inference_executor.rs"
+      - "src/language/inference_credential.rs"
+      - "tests/inference_resource_execution.rs"
+      - "tests/inference_resource_scope.rs"
+      - "tests/inference_provider_profile_binding.rs"
+      - "tests/inference_executor.rs"
+      - "tests/inference_credential.rs"
+      - "tests/inference_wire_receipt.rs"
+      - "docs/architecture/INFERENCE_RESOURCE_EXECUTION_V1.md"
+      - ".github/workflows/inference-resource-execution.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-resource-execution-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-resource-execution:
+    name: Inference Resource Execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: >-
+          rustfmt --edition 2024 --check
+          src/language/inference_resource_execution.rs
+          src/language/inference_current_profile_executor.rs
+          src/language/inference_executor.rs
+          src/language/inference_credential.rs
+          tests/inference_resource_execution.rs
+
+      - name: Compile and run resource execution plus lower-layer regressions
+        run: >-
+          cargo test --locked
+          --test inference_executor
+          --test inference_wire_receipt
+          --test inference_credential
+          --test inference_provider_profile_binding
+          --test inference_resource_scope
+          --test inference_resource_execution
+
+      - name: Focused resource-execution Clippy
+        run: cargo clippy --locked --test inference_resource_execution -- -D warnings -A dead-code
+
+      - name: Ratchet v4 authority boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'symthaea.inference.resource-execution-binding.v4' src/language/inference_resource_execution.rs
+          grep -F 'verify_current_scope' src/language/inference_resource_execution.rs
+          grep -F 'ResourceScopeRejected' src/language/inference_executor.rs
+          grep -F 'pub(crate) async fn execute_preverified_binding' src/language/inference_executor.rs
+          grep -F 'pub(crate) async fn execute_preverified_binding' src/language/inference_credential.rs
+          grep -F '.execute_preverified_binding(' src/language/inference_current_profile_executor.rs
+          grep -F '.execute_preverified_binding(' src/language/inference_resource_execution.rs
+          grep -F 'pub(crate) fn inner' src/language/inference_current_profile_executor.rs
+          if grep -Fq 'pub fn inner' src/language/inference_current_profile_executor.rs; then
+            echo 'lower current-profile executor must not be publicly exposed' >&2
+            exit 1
+          fi
+          if grep -Fq 'inference_provider_registry' src/language/inference_executor.rs; then
+            echo 'raw executor must remain provider-profile agnostic' >&2
+            exit 1
+          fi
+          if grep -Fq 'inference_profile_execution' src/language/inference_executor.rs; then
+            echo 'raw executor must not own v3 profile semantics' >&2
+            exit 1
+          fi
+          if grep -Fq 'inference_provider_registry' src/language/inference_credential.rs; then
+            echo 'credential executor must remain provider-profile agnostic' >&2
+            exit 1
+          fi
+          if sed -n '/pub async fn execute_current(/,/^    }/p' src/language/inference_resource_execution.rs | grep -q 'VerifiedInferenceResourceScope'; then
+            echo 'public v4 execution must not accept caller-supplied scope proof' >&2
+            exit 1
+          fi
+          grep -F 'atomic lease that freezes resource-scope registry authority' docs/architecture/INFERENCE_RESOURCE_EXECUTION_V1.md
+          grep -F 'integration of IF-7 reservation capability' docs/architecture/INFERENCE_RESOURCE_EXECUTION_V1.md
