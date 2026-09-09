@@ -15,6 +15,7 @@ pub mod exact_policy;
 pub mod observation;
 pub mod profile_adoption;
 pub mod profile_adoption_admission;
+pub mod profile_adoption_authority;
 pub mod profile_adoption_commit;
 pub mod verifier;
 mod witness;
@@ -46,6 +47,11 @@ pub use profile_adoption_admission::{
     PolicyCheckedVerifierProfileAdoptionV1, VerifierProfileAdoptionAdmissionError,
     VerifierProfileAdoptionAdmissionPolicyV1, VerifierProfileAdoptionHeadIdentityV1,
     VerifierProfileAdoptionHeadV1,
+};
+pub use profile_adoption_authority::{
+    AuthorityGrantedVerifierProfileAdoptionV1, VerifierAdoptionAuthorityGrantError,
+    VerifierAdoptionAuthorityGrantIdV1, VerifierAdoptionAuthorityGrantV1,
+    bind_policy_checked_adoption_to_authority_grant,
 };
 pub use profile_adoption_commit::{
     VerifierAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionCommitError,
