@@ -12,8 +12,10 @@ pub mod auth_wire;
 mod compose;
 pub mod contract;
 pub mod distributed;
+pub mod distributed_currentness;
 pub mod distributed_evidence;
 mod distributed_evidence_error_bridge;
+pub mod distributed_qualification;
 pub mod distributed_state;
 pub mod exact_policy;
 pub mod failure_domain;
@@ -40,12 +42,21 @@ pub use distributed::{
     DistributedChangeBudgetV1, MutualExclusionSetV1, RecoveryPathClassV1,
     ValidatedDistributedChangeBudgetV1,
 };
+pub use distributed_currentness::{
+    DISTRIBUTED_CURRENTNESS_POLICY_SCHEMA_V1, DistributedCurrentnessPolicyError,
+    DistributedCurrentnessPolicyId, DistributedCurrentnessPolicyV1,
+    ValidatedDistributedCurrentnessPolicyV1,
+};
 pub use distributed_evidence::{
     FAILURE_DOMAIN_STATE_CLAIM_SCHEMA_V1, RECOVERY_PATH_STATE_CLAIM_SCHEMA_V1,
     AuthenticatedFailureDomainStateEvidenceId, AuthenticatedRecoveryPathStateEvidenceId,
     DistributedEvidenceError, FailureDomainObservationOutcomeV1, FailureDomainStateClaimId,
     FailureDomainStateClaimV1, RecoveryPathObservationOutcomeV1, RecoveryPathStateClaimId,
     RecoveryPathStateClaimV1,
+};
+pub use distributed_qualification::{
+    DistributedCurrentStateDigest, DistributedQualificationError, DistributedVerifierSnapshotV1,
+    QualifiedDistributedTransitionWitnessId, QualifiedDistributedTransitionWitnessV1,
 };
 pub use distributed_state::{
     DISTRIBUTED_STATE_CONTEXT_SCHEMA_V1, PARTICIPANT_STATE_CLAIM_SCHEMA_V1,
