@@ -13,6 +13,7 @@ mod compose;
 pub mod contract;
 pub mod distributed;
 pub mod distributed_evidence;
+mod distributed_evidence_error_bridge;
 pub mod distributed_state;
 pub mod exact_policy;
 pub mod failure_domain;
