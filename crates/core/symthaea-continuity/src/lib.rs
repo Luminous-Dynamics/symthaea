@@ -17,6 +17,7 @@ pub mod profile_adoption;
 pub mod profile_adoption_admission;
 pub mod profile_adoption_authority;
 pub mod profile_adoption_commit;
+pub mod profile_adoption_currentness;
 pub mod profile_adoption_registry_commit;
 pub mod verifier;
 mod witness;
@@ -57,6 +58,13 @@ pub use profile_adoption_authority::{
 pub use profile_adoption_commit::{
     VerifierAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionCommitError,
     VerifierProfileAdoptionCommitPreconditionsV1, VerifierProfileAdoptionCommitStateV1,
+};
+pub use profile_adoption_currentness::{
+    VERIFIER_PROFILE_ADOPTION_REGISTRY_RECORD_SCHEMA_V1,
+    PolicyCurrentVerifierProfileAdoptionV1, VerifierAdoptionAuthorityGrantRecordV1,
+    VerifierAdoptionAuthorityRootRecordV1, VerifierProfileAdoptionCurrentnessError,
+    VerifierProfileAdoptionRegistryRecordIdV1, VerifierProfileAdoptionRegistryRecordV1,
+    check_persisted_adoption_currentness,
 };
 pub use profile_adoption_registry_commit::{
     VerifierProfileAdoptionRegistryCommitError,
