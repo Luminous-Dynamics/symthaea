@@ -77,6 +77,10 @@ impl HumanoidVerifiedPhysicalAuthorityEvidence {
         self.inner.verification_digest()
     }
 
+    pub const fn valid_until_s(&self) -> f64 {
+        self.inner.valid_until_s()
+    }
+
     pub(crate) fn source_snapshot(&self) -> crate::skill_authority_receipt::HumanoidAuthoritySourceSnapshot {
         self.inner.source_snapshot()
     }
@@ -131,6 +135,10 @@ impl HumanoidVerifiedEpistemicAuthorityEvidence {
 
     pub const fn verification_digest(&self) -> crate::evidence_digest::HumanoidEvidenceDigest {
         self.inner.verification_digest()
+    }
+
+    pub const fn valid_until_s(&self) -> f64 {
+        self.inner.valid_until_s()
     }
 
     pub(crate) fn source_snapshot(&self) -> crate::skill_authority_receipt::HumanoidAuthoritySourceSnapshot {
