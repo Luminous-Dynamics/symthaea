@@ -1,0 +1,554 @@
+# One-shot exact-parent-gated successor repair for PR #1201.
+# This workflow deletes itself before committing. Its pre-push checks are
+# non-qualifying; only the normal read-only exact-head qualifier may produce PASS.
+name: One-shot Continuity Successor Repair
+
+on:
+  push:
+    branches:
+      - ci/continuity-verifier-grant-exact-head-v1
+    paths:
+      - '.github/workflows/continuity-successor-repair-once.yml'
+
+permissions:
+  contents: write
+
+env:
+  EXPECTED_PARENT_SHA: 0afd3c2d6a22735e2bf855b1a40cc9377bc7d27c
+  TARGET_BRANCH: ci/continuity-verifier-grant-exact-head-v1
+  WORKFLOW_PATH: .github/workflows/continuity-successor-repair-once.yml
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+
+jobs:
+  repair:
+    name: Build minimal exact-head successor
+    if: github.actor == 'Tristan-Stoltz-ERC'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact trigger head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Verify one-shot boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_SHA"
+          test "$(git diff --name-only HEAD^ HEAD)" = "$WORKFLOW_PATH"
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" "$WORKFLOW_PATH")" -eq 1
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Apply bounded source and qualifier hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one exact match, found {count}: {old[:120]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          # Encode dormant authority/witness reachability as an explicit temporary
+          # architectural expectation rather than a crate-wide dead_code allow.
+          replace_exact(
+              'crates/core/symthaea-continuity/src/lib.rs',
+              '''pub mod auth_wire;
+          mod compose;
+          pub mod contract;
+          pub mod exact_policy;
+          pub mod observation;
+          pub mod profile_adoption;
+          pub mod profile_adoption_admission;
+          pub mod profile_adoption_commit;
+          pub mod profile_adoption_grant;
+          pub mod profile_adoption_grant_commit;
+          pub mod profile_adoption_root;
+          pub mod profile_adoption_time;
+          pub mod verifier;
+          mod witness;
+          ''',
+              '''pub mod auth_wire;
+          #[cfg_attr(
+              not(test),
+              expect(
+                  dead_code,
+                  reason = "closed-world witness composition is intentionally unreachable until current-use verifier authority and authenticated committed-adoption proofs exist"
+              )
+          )]
+          mod compose;
+          pub mod contract;
+          #[cfg_attr(
+              not(test),
+              expect(
+                  dead_code,
+                  reason = "exact-policy evidence admission is reserved for the future currently-authorized verifier bridge"
+              )
+          )]
+          pub mod exact_policy;
+          pub mod observation;
+          pub mod profile_adoption;
+          pub mod profile_adoption_admission;
+          pub mod profile_adoption_commit;
+          pub mod profile_adoption_grant;
+          pub mod profile_adoption_grant_commit;
+          pub mod profile_adoption_root;
+          pub mod profile_adoption_time;
+          #[cfg_attr(
+              not(test),
+              expect(
+                  dead_code,
+                  reason = "authority-checked and authenticated evidence constructors remain intentionally production-unreachable until current-use authority is proven"
+              )
+          )]
+          #[cfg_attr(
+              test,
+              allow(
+                  dead_code,
+                  reason = "verifier unit tests exercise the authority boundary without requiring every diagnostic accessor"
+              )
+          )]
+          pub mod verifier;
+          #[cfg_attr(
+              not(test),
+              expect(
+                  dead_code,
+                  reason = "the closed-world witness engine is retained behind crate-private composition until authenticated production evidence can reach it"
+              )
+          )]
+          #[cfg_attr(
+              test,
+              allow(
+                  dead_code,
+                  reason = "witness unit tests intentionally exercise selected state-machine surfaces while production composition remains private"
+              )
+          )]
+          mod witness;
+          ''',
+          )
+
+          # Replace the 9-parameter observation identity helper with one canonical
+          # view of exactly the fields committed by ObservationId.
+          replace_exact(
+              'crates/core/symthaea-continuity/src/observation.rs',
+              '''    observation_id: ObservationId,
+          }
+
+          impl ObservationEnvelopeV1 {
+          ''',
+              '''    observation_id: ObservationId,
+          }
+
+          struct ObservationIdentityFields<'a> {
+              subject: &'a str,
+              observation_kind: &'a str,
+              provider_id: &'a str,
+              provider_version: &'a str,
+              captured_at_unix_ms: u64,
+              coverage: ObservationCoverage,
+              basis: EvidenceBasis,
+              evidence_digest: [u8; 32],
+              limitations: &'a [String],
+          }
+
+          impl<'a> From<&'a ObservationEnvelopeV1> for ObservationIdentityFields<'a> {
+              fn from(observation: &'a ObservationEnvelopeV1) -> Self {
+                  Self {
+                      subject: &observation.subject,
+                      observation_kind: &observation.observation_kind,
+                      provider_id: &observation.provider_id,
+                      provider_version: &observation.provider_version,
+                      captured_at_unix_ms: observation.captured_at_unix_ms,
+                      coverage: observation.coverage,
+                      basis: observation.basis,
+                      evidence_digest: observation.evidence_digest,
+                      limitations: &observation.limitations,
+                  }
+              }
+          }
+
+          impl ObservationEnvelopeV1 {
+          ''',
+          )
+          replace_exact(
+              'crates/core/symthaea-continuity/src/observation.rs',
+              '''        let observation_id = ObservationId(hash_observation(
+              &subject,
+              &observation_kind,
+              &provider_id,
+              &provider_version,
+              captured_at_unix_ms,
+              coverage,
+              basis,
+              evidence_digest,
+              &limitations,
+          ));
+          ''',
+              '''        let observation_id = ObservationId(hash_observation(&ObservationIdentityFields {
+              subject: &subject,
+              observation_kind: &observation_kind,
+              provider_id: &provider_id,
+              provider_version: &provider_version,
+              captured_at_unix_ms,
+              coverage,
+              basis,
+              evidence_digest,
+              limitations: &limitations,
+          }));
+          ''',
+          )
+          replace_exact(
+              'crates/core/symthaea-continuity/src/observation.rs',
+              '''        let expected = ObservationId(hash_observation(
+              &self.subject,
+              &self.observation_kind,
+              &self.provider_id,
+              &self.provider_version,
+              self.captured_at_unix_ms,
+              self.coverage,
+              self.basis,
+              self.evidence_digest,
+              &self.limitations,
+          ));
+          ''',
+              '''        let expected = ObservationId(hash_observation(&ObservationIdentityFields::from(self)));
+          ''',
+          )
+          replace_exact(
+              'crates/core/symthaea-continuity/src/observation.rs',
+              '''fn hash_observation(
+              subject: &str,
+              observation_kind: &str,
+              provider_id: &str,
+              provider_version: &str,
+              captured_at_unix_ms: u64,
+              coverage: ObservationCoverage,
+              basis: EvidenceBasis,
+              evidence_digest: [u8; 32],
+              limitations: &[String],
+          ) -> [u8; 32] {
+              let mut bytes = Vec::new();
+              put_str(&mut bytes, subject);
+              put_str(&mut bytes, observation_kind);
+              put_str(&mut bytes, provider_id);
+              put_str(&mut bytes, provider_version);
+              bytes.extend_from_slice(&captured_at_unix_ms.to_le_bytes());
+              bytes.push(coverage.tag());
+              bytes.push(basis.tag());
+              bytes.extend_from_slice(&evidence_digest);
+              put_strings(&mut bytes, limitations);
+              domain_hash(OBSERVATION_DOMAIN, &bytes)
+          }
+          ''',
+              '''fn hash_observation(fields: &ObservationIdentityFields<'_>) -> [u8; 32] {
+              let mut bytes = Vec::new();
+              put_str(&mut bytes, fields.subject);
+              put_str(&mut bytes, fields.observation_kind);
+              put_str(&mut bytes, fields.provider_id);
+              put_str(&mut bytes, fields.provider_version);
+              bytes.extend_from_slice(&fields.captured_at_unix_ms.to_le_bytes());
+              bytes.push(fields.coverage.tag());
+              bytes.push(fields.basis.tag());
+              bytes.extend_from_slice(&fields.evidence_digest);
+              put_strings(&mut bytes, fields.limitations);
+              domain_hash(OBSERVATION_DOMAIN, &bytes)
+          }
+          ''',
+          )
+
+          # Preserve the exact predecessor-root theorem while expressing it as one
+          # predicate instead of a Clippy-rejected nested conditional.
+          replace_exact(
+              'crates/core/symthaea-continuity/src/profile_adoption_root.rs',
+              '''        if let VerifierProfileAdoptionHeadV1::Current(identity) =
+              checked.expected_predecessor_head()
+          {
+              if identity.authority_subject() != authority_root_snapshot.authority_subject()
+                  || identity.authority_root_id() != authority_root_snapshot.authority_root_id()
+                  || identity.authority_root_digest()
+                      != authority_root_snapshot.authority_root_digest()
+              {
+                  return Err(
+                      VerifierProfileAdoptionRootBindingError::PredecessorRootSnapshotMismatch,
+                  );
+              }
+          }
+          ''',
+              '''        if let VerifierProfileAdoptionHeadV1::Current(identity) =
+              checked.expected_predecessor_head()
+              && (identity.authority_subject() != authority_root_snapshot.authority_subject()
+                  || identity.authority_root_id() != authority_root_snapshot.authority_root_id()
+                  || identity.authority_root_digest()
+                      != authority_root_snapshot.authority_root_digest())
+          {
+              return Err(VerifierProfileAdoptionRootBindingError::PredecessorRootSnapshotMismatch);
+          }
+          ''',
+          )
+
+          # Strengthen v2's minimal-lock theorem to cover non-package metadata too.
+          replace_exact(
+              'scripts/qualify-continuity-contract-v2.sh',
+              '''before_packages = collections.Counter(canon(p) for p in before.get('package', []))
+          after_packages = collections.Counter(canon(p) for p in after.get('package', []))
+          added = list((after_packages - before_packages).elements())
+          removed = list((before_packages - after_packages).elements())
+
+          classification = 'broad-workspace-reresolution'
+          if not removed and len(added) == 1:
+              package = json.loads(added[0])
+              expected = {
+                  'name': 'symthaea-continuity',
+                  'version': '0.1.0',
+                  'dependencies': ['blake3', 'serde', 'thiserror 1.0.69'],
+              }
+              if package == expected:
+                  classification = 'minimal-workspace-member-admission'
+          elif not removed and not added:
+              classification = 'no-package-set-change'
+          ''',
+              '''before_packages = collections.Counter(canon(p) for p in before.get('package', []))
+          after_packages = collections.Counter(canon(p) for p in after.get('package', []))
+          added = list((after_packages - before_packages).elements())
+          removed = list((before_packages - after_packages).elements())
+          before_non_packages = {k: v for k, v in before.items() if k != 'package'}
+          after_non_packages = {k: v for k, v in after.items() if k != 'package'}
+
+          classification = 'non-package-metadata-changed'
+          if canon(before_non_packages) == canon(after_non_packages):
+              classification = 'broad-workspace-reresolution'
+              if not removed and len(added) == 1:
+                  package = json.loads(added[0])
+                  expected = {
+                      'name': 'symthaea-continuity',
+                      'version': '0.1.0',
+                      'dependencies': ['blake3', 'serde', 'thiserror 1.0.69'],
+                  }
+                  if package == expected:
+                      classification = 'minimal-workspace-member-admission'
+              elif not removed and not added:
+                  classification = 'no-package-set-change'
+          ''',
+          )
+
+          # Fetch dependencies as an explicit input phase, then make every compiler,
+          # lint and test phase offline. This separates network acquisition from
+          # software-contract execution.
+          replace_exact(
+              'scripts/qualify-continuity-contract-v2.sh',
+              '''    if [[ "$resolve_rc" -eq 0 && "$lock_repair_classification" == "minimal-workspace-member-admission" ]]; then
+                  diagnostic_stage="check_all_targets_with_minimal_repaired_lock"
+                  set +e
+                  (
+                      cd "$worktree"
+                      cargo check --locked -p symthaea-continuity --all-targets
+                  )
+                  resolve_rc=$?
+                  if [[ "$resolve_rc" -eq 0 ]]; then
+                      diagnostic_stage="clippy_all_targets_with_minimal_repaired_lock"
+                      (
+                          cd "$worktree"
+                          cargo clippy --locked -p symthaea-continuity --all-targets -- -D warnings
+                      )
+                      resolve_rc=$?
+                  fi
+                  if [[ "$resolve_rc" -eq 0 ]]; then
+                      diagnostic_stage="unit_and_integration_tests_with_minimal_repaired_lock"
+                      (cd "$worktree" && cargo test --locked -p symthaea-continuity)
+                      resolve_rc=$?
+                  fi
+                  if [[ "$resolve_rc" -eq 0 ]]; then
+                      diagnostic_stage="doc_tests_with_minimal_repaired_lock"
+                      (cd "$worktree" && cargo test --locked -p symthaea-continuity --doc)
+                      resolve_rc=$?
+                  fi
+                  set -e
+          ''',
+              '''    if [[ "$resolve_rc" -eq 0 && "$lock_repair_classification" == "minimal-workspace-member-admission" ]]; then
+                  diagnostic_stage="fetch_with_minimal_repaired_lock"
+                  set +e
+                  (
+                      cd "$worktree"
+                      cargo fetch --locked --manifest-path crates/core/symthaea-continuity/Cargo.toml
+                  )
+                  resolve_rc=$?
+                  if [[ "$resolve_rc" -eq 0 ]]; then
+                      diagnostic_stage="check_all_targets_with_minimal_repaired_lock"
+                      (
+                          cd "$worktree"
+                          cargo check --locked --offline -p symthaea-continuity --all-targets
+                      )
+                      resolve_rc=$?
+                  fi
+                  if [[ "$resolve_rc" -eq 0 ]]; then
+                      diagnostic_stage="clippy_all_targets_with_minimal_repaired_lock"
+                      (
+                          cd "$worktree"
+                          cargo clippy --locked --offline -p symthaea-continuity --all-targets -- -D warnings
+                      )
+                      resolve_rc=$?
+                  fi
+                  if [[ "$resolve_rc" -eq 0 ]]; then
+                      diagnostic_stage="unit_and_integration_tests_with_minimal_repaired_lock"
+                      (cd "$worktree" && cargo test --locked --offline -p symthaea-continuity)
+                      resolve_rc=$?
+                  fi
+                  if [[ "$resolve_rc" -eq 0 ]]; then
+                      diagnostic_stage="doc_tests_with_minimal_repaired_lock"
+                      (cd "$worktree" && cargo test --locked --offline -p symthaea-continuity --doc)
+                      resolve_rc=$?
+                  fi
+                  set -e
+          ''',
+          )
+          replace_exact(
+              'scripts/qualify-continuity-contract-v2.sh',
+              '''stage="check_all_targets"
+          cargo check --locked -p symthaea-continuity --all-targets
+
+          stage="clippy_all_targets"
+          cargo clippy --locked -p symthaea-continuity --all-targets -- -D warnings
+
+          stage="unit_and_integration_tests"
+          cargo test --locked -p symthaea-continuity
+
+          stage="doc_tests"
+          cargo test --locked -p symthaea-continuity --doc
+          ''',
+              '''stage="cargo_fetch_locked"
+          cargo fetch --locked --manifest-path crates/core/symthaea-continuity/Cargo.toml
+
+          stage="check_all_targets"
+          cargo check --locked --offline -p symthaea-continuity --all-targets
+
+          stage="clippy_all_targets"
+          cargo clippy --locked --offline -p symthaea-continuity --all-targets -- -D warnings
+
+          stage="unit_and_integration_tests"
+          cargo test --locked --offline -p symthaea-continuity
+
+          stage="doc_tests"
+          cargo test --locked --offline -p symthaea-continuity --doc
+          ''',
+          )
+          PY
+
+          bash -n scripts/qualify-continuity-contract-v2.sh
+          cargo fmt -p symthaea-continuity
+          cargo fmt -p symthaea-continuity -- --check
+          git diff --check
+
+      - name: Derive and prove minimal Cargo.lock admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="${RUNNER_TEMP}/Cargo.lock.before"
+          cp Cargo.lock "$before"
+          cargo metadata --offline --format-version 1 >/dev/null
+          test -n "$(git diff -- Cargo.lock)"
+
+          python3 - "$before" Cargo.lock <<'PY'
+          import collections
+          import json
+          import sys
+          import tomllib
+
+          with open(sys.argv[1], 'rb') as fh:
+              before = tomllib.load(fh)
+          with open(sys.argv[2], 'rb') as fh:
+              after = tomllib.load(fh)
+
+          def canon(value):
+              return json.dumps(value, sort_keys=True, separators=(',', ':'))
+
+          before_non_packages = {k: v for k, v in before.items() if k != 'package'}
+          after_non_packages = {k: v for k, v in after.items() if k != 'package'}
+          if canon(before_non_packages) != canon(after_non_packages):
+              raise SystemExit('Cargo.lock non-package metadata changed')
+
+          before_packages = collections.Counter(canon(p) for p in before.get('package', []))
+          after_packages = collections.Counter(canon(p) for p in after.get('package', []))
+          removed = list((before_packages - after_packages).elements())
+          added = list((after_packages - before_packages).elements())
+          if removed:
+              raise SystemExit(f'Cargo.lock existing package records changed/removed: {len(removed)}')
+          if len(added) != 1:
+              raise SystemExit(f'expected exactly one added package record, found {len(added)}')
+          package = json.loads(added[0])
+          expected = {
+              'name': 'symthaea-continuity',
+              'version': '0.1.0',
+              'dependencies': ['blake3', 'serde', 'thiserror 1.0.69'],
+          }
+          if package != expected:
+              raise SystemExit(f'unexpected added package record: {package!r}')
+          print('minimal-workspace-member-admission: PASS')
+          PY
+
+          git diff --stat -- Cargo.lock
+          git diff --check
+
+      - name: Non-qualifying successor validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --offline --format-version 1 >/dev/null
+          cargo fetch --locked --manifest-path crates/core/symthaea-continuity/Cargo.toml
+          cargo check --locked --offline -p symthaea-continuity --all-targets
+          cargo clippy --locked --offline -p symthaea-continuity --all-targets -- -D warnings
+          cargo test --locked --offline -p symthaea-continuity
+          cargo test --locked --offline -p symthaea-continuity --doc
+          cargo fmt -p symthaea-continuity -- --check
+          bash -n scripts/qualify-continuity-contract-v2.sh
+          git diff --check
+
+      - name: Commit only the bounded successor
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm "$WORKFLOW_PATH"
+
+          actual="$(git diff --name-only | sort)"
+          expected="$(printf '%s\n' \
+            Cargo.lock \
+            "$WORKFLOW_PATH" \
+            crates/core/symthaea-continuity/src/lib.rs \
+            crates/core/symthaea-continuity/src/observation.rs \
+            crates/core/symthaea-continuity/src/profile_adoption_root.rs \
+            scripts/qualify-continuity-contract-v2.sh | sort)"
+          if [[ "$actual" != "$expected" ]]; then
+            echo 'unexpected successor file set' >&2
+            echo '--- expected' >&2
+            printf '%s\n' "$expected" >&2
+            echo '--- actual' >&2
+            printf '%s\n' "$actual" >&2
+            exit 1
+          fi
+
+          git config user.name 'Luminous Continuity Successor Repair'
+          git config user.email 'continuity-successor-repair@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'ci(continuity): admit minimal lock and encode authority boundary'
+          git push origin "HEAD:$TARGET_BRANCH"
