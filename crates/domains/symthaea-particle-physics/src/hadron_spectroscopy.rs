@@ -7,6 +7,9 @@
 //! interpretations of internal composition. That distinction is essential for
 //! frontier QCD states such as glueball candidates, hybrids, multiquarks, and
 //! hadronic molecules.
+//!
+//! The core rule is deliberately strict:
+//! **observation is data; composition is interpretation.**
 
 use serde::{Deserialize, Serialize};
 
@@ -100,7 +103,10 @@ pub enum HadronicComposition {
 }
 
 /// A directly observed resonance, independent of its internal interpretation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+///
+/// `Serialize` is intentional here; these built-in fixtures use static labels.
+/// External ingestion can map owned source records into this canonical form.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ObservedResonance {
     pub name: &'static str,
     pub jpc: Option<Jpc>,
@@ -112,13 +118,13 @@ pub struct ObservedResonance {
 }
 
 /// A hypothesis linking an observed resonance to an internal composition.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CompositionInterpretation {
     pub resonance: &'static str,
     pub composition: HadronicComposition,
     pub status: InterpretationStatus,
-    /// Human-readable provenance key; intended to resolve into the evidence
-    /// graph rather than serve as a free-floating confidence scalar.
+    /// Provenance key intended to resolve into the evidence graph rather than
+    /// serve as a free-floating confidence scalar.
     pub evidence_key: &'static str,
 }
 
@@ -131,11 +137,12 @@ pub struct GlueballLevel {
     pub approximation: QcdApproximation,
 }
 
-/// Baseline pure-gauge/quenched glueball spectrum.
+/// Baseline pure-gauge glueball spectrum.
 ///
-/// These values are intentionally represented as theory predictions, not as
-/// discovered particles. Physical resonances can mix strongly with quarkonia
-/// once dynamical quarks are included.
+/// These approximate values are represented as theory predictions, not as
+/// discovered particles. Physical resonances can mix with quarkonia once
+/// dynamical quarks are included; callers must not equate spectrum proximity
+/// with particle identity.
 pub const BASELINE_GLUEBALL_LEVELS: [GlueballLevel; 3] = [
     GlueballLevel {
         jpc: Jpc::SCALAR,
@@ -154,11 +161,21 @@ pub const BASELINE_GLUEBALL_LEVELS: [GlueballLevel; 3] = [
     },
 ];
 
+/// 2026 Yang-Mills lattice prediction for the scalar-glueball mass radius.
+///
+/// Source: Abbott et al., Phys. Rev. Lett. 136, 041901 (2026),
+/// DOI 10.1103/67xg-qxhz. This is a theory prediction at a single lattice
+/// spacing, not an experimental radius measurement.
+pub const SCALAR_GLUEBALL_MASS_RADIUS_FM: Measurement = Measurement::symmetric(0.263, 0.031);
+
 /// BESIII-era X(2370) resonance fixture.
 ///
 /// The resonance and J^PC assignment are kept separate from its proposed
 /// glueball-dominant composition. This prevents a future reinterpretation from
 /// mutating the underlying experimental observation.
+///
+/// Combined 2026 BESIII values: m = 2359 +13/-14 MeV/c^2,
+/// Gamma = 170 +44/-29 MeV.
 pub const X2370: ObservedResonance = ObservedResonance {
     name: "X(2370)",
     jpc: Some(Jpc::PSEUDOSCALAR),
@@ -167,7 +184,7 @@ pub const X2370: ObservedResonance = ObservedResonance {
     status: ObservationStatus::Established,
 };
 
-/// Current leading interpretation represented conservatively.
+/// BESIII's 2026 glueball-dominant interpretation represented conservatively.
 pub const X2370_GLUEBALL_INTERPRETATION: CompositionInterpretation = CompositionInterpretation {
     resonance: "X(2370)",
     composition: HadronicComposition::Glueball,
@@ -175,14 +192,29 @@ pub const X2370_GLUEBALL_INTERPRETATION: CompositionInterpretation = Composition
     evidence_key: "besiii::x2370::pseudoscalar_glueball_dominant",
 };
 
-/// Competing molecular interpretation retained explicitly so the model can
-/// reason over disagreement rather than collapse it into a boolean flag.
+/// A retained molecular-family alternative. This does not assert equal support;
+/// it exists so downstream epistemic reasoning can represent live model
+/// alternatives rather than collapsing identity into a boolean.
 pub const X2370_MOLECULAR_INTERPRETATION: CompositionInterpretation = CompositionInterpretation {
     resonance: "X(2370)",
     composition: HadronicComposition::HadronicMolecule,
     status: InterpretationStatus::Proposed,
-    evidence_key: "theory::x2370::sigma_antisigma_molecule",
+    evidence_key: "theory::x2370::hadronic_molecule_family",
 };
+
+/// Does a resonance share the quantum-number channel of a predicted glueball?
+pub fn glueball_channel_matches(resonance: &ObservedResonance, level: &GlueballLevel) -> bool {
+    resonance.jpc == Some(level.jpc)
+}
+
+/// Distance between a resonance mass and a glueball-level central prediction.
+///
+/// Returns MeV/c^2. This is a descriptive diagnostic only; it is deliberately
+/// not converted into an identity/confidence score because theory and
+/// experimental uncertainties are not interchangeable.
+pub fn glueball_mass_gap_mev(resonance: &ObservedResonance, level: &GlueballLevel) -> f64 {
+    (resonance.mass_mev.value - level.mass_gev.value * 1000.0).abs()
+}
 
 #[cfg(test)]
 mod tests {
@@ -203,10 +235,26 @@ mod tests {
 
     #[test]
     fn pseudoscalar_glueball_channel_matches_x2370_quantum_numbers() {
-        assert_eq!(X2370.jpc, Some(Jpc::PSEUDOSCALAR));
-        assert!(BASELINE_GLUEBALL_LEVELS
+        let pseudoscalar = BASELINE_GLUEBALL_LEVELS
             .iter()
-            .any(|level| level.jpc == Jpc::PSEUDOSCALAR));
+            .find(|level| level.jpc == Jpc::PSEUDOSCALAR)
+            .expect("pseudoscalar glueball baseline");
+        assert!(glueball_channel_matches(&X2370, pseudoscalar));
+    }
+
+    #[test]
+    fn mass_proximity_is_diagnostic_not_identity() {
+        let pseudoscalar = BASELINE_GLUEBALL_LEVELS
+            .iter()
+            .find(|level| level.jpc == Jpc::PSEUDOSCALAR)
+            .expect("pseudoscalar glueball baseline");
+        let gap = glueball_mass_gap_mev(&X2370, pseudoscalar);
+        assert!(gap > 0.0);
+        assert_eq!(X2370.status, ObservationStatus::Established);
+        assert_ne!(
+            X2370_GLUEBALL_INTERPRETATION.status,
+            InterpretationStatus::Consensus
+        );
     }
 
     #[test]
@@ -218,5 +266,11 @@ mod tests {
                 QcdApproximation::PureYangMills | QcdApproximation::QuenchedQcd
             ));
         }
+    }
+
+    #[test]
+    fn scalar_radius_is_positive_and_compact() {
+        assert!(SCALAR_GLUEBALL_MASS_RADIUS_FM.value > 0.0);
+        assert!(SCALAR_GLUEBALL_MASS_RADIUS_FM.value < 0.5);
     }
 }
