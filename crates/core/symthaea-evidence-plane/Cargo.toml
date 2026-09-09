@@ -6,6 +6,7 @@ license = "AGPL-3.0-or-later"
 description = "Shared evidence contract (declared mechanism vs. measured counters, hard-failing integrity check, canonical config hashing) for Symthaea's research/ablation harnesses -- extracted from examples/hdc_ltc_coupling_ablation.rs, second consumer is symthaea-psych-bench's Butlin AE-2 runner. See SYMTHAEA_COGNITIVE_CORE_RECONCILIATION_PLAN_2026-07-28.md Phase 1."
 
 [dependencies]
+blake3 = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
