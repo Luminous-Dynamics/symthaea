@@ -19,10 +19,12 @@ head_tree="$(git rev-parse 'HEAD^{tree}')"
 expected_sha="${QUALIFIED_SHA:-$actual_sha}"
 receipt_path="${CONTINUITY_CONTRACT_RECEIPT:-${TMPDIR:-/tmp}/symthaea-continuity-contract-qualification-v1.tsv}"
 format_patch_path="${CONTINUITY_FORMAT_PATCH:-${TMPDIR:-/tmp}/symthaea-continuity-rustfmt.patch}"
+format_source_dir="${CONTINUITY_FORMAT_SOURCE_DIR:-${TMPDIR:-/tmp}/symthaea-continuity-rustfmt-source}"
 status="FAIL"
 stage="preflight"
 source_state="unverified"
 format_patch_state="not-produced"
+format_source_state="not-produced"
 
 sha256_file() {
     local path="$1"
@@ -87,6 +89,7 @@ write_receipt() {
         printf 'source_state\t%s\n' "$source_state"
         printf 'format_patch_state\t%s\n' "$format_patch_state"
         printf 'format_patch_sha256\t%s\n' "$(sha256_file "$format_patch_path")"
+        printf 'format_source_state\t%s\n' "$format_source_state"
         printf 'execution_provider\t%s\n' "$provider"
         printf 'runner_label\t%s\n' "${CONTINUITY_RUNNER_LABEL:-unknown}"
         printf 'runner_os\t%s\n' "${RUNNER_OS:-unknown}"
@@ -134,6 +137,7 @@ write_receipt() {
             echo "- terminal stage: \`$failure_stage\`"
             echo "- source state: \`$source_state\`"
             echo "- format repair artifact: \`$format_patch_state\`"
+            echo "- formatter source snapshot: \`$format_source_state\`"
             echo '- scope: continuity software contracts only'
             echo '- full repository CI: independent'
             echo '- real-world availability/scientific/execution authority: none'
@@ -195,6 +199,7 @@ fi
 source_state="clean-exact-checkout"
 
 rm -f "$format_patch_path"
+rm -rf "$format_source_dir"
 
 echo "continuity-contract qualified_sha=$actual_sha"
 echo "continuity-contract committed_tree=$head_tree"
@@ -214,10 +219,14 @@ if ! cargo fmt -p symthaea-continuity -- --check; then
         exit 1
     fi
     git diff --binary -- crates/core/symthaea-continuity > "$format_patch_path"
+    mkdir -p "$format_source_dir"
+    cp -a crates/core/symthaea-continuity/src/. "$format_source_dir"/
     format_patch_state="generated-from-exact-head"
+    format_source_state="generated-from-exact-head"
     source_state="formatter-derived-diff-from-exact-head"
     echo "continuity-contract rustfmt_patch=$format_patch_path"
     echo "continuity-contract rustfmt_patch_sha256=$(sha256_file "$format_patch_path")"
+    echo "continuity-contract rustfmt_source_dir=$format_source_dir"
     git diff --stat -- crates/core/symthaea-continuity >&2 || true
     exit 1
 fi
