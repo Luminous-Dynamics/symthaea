@@ -1,0 +1,27 @@
+{
+  "schema": "symthaea.qualification-admission-request.v1",
+  "program_id": "resources.planning-research.v1",
+  "catalog_id": "sha256:9d18b6a535c102a6bcff168dd14686f5906917475da0b561b2e545bfbc400964",
+  "catalog_branch": "evidence/resource-train-catalog-v1",
+  "catalog_path": "docs/integration-trains/resource-train-catalog.v1.json",
+  "target_train": {
+    "name": "R3",
+    "train_id": "sha256:9d9fa660c788b3b7f24e43822196c1ca3e046ac2fc299149b019c7d4f729ede4",
+    "subject_sha": "7350ee0a5cab0ccaa48b6691e8d52875143b102b"
+  },
+  "qualification_profile": "resources.stack-qualification.v1",
+  "reason": "promote the exact cumulative resource research tip to heavyweight qualification",
+  "evidence_refs": [
+    "issue:986",
+    "issue:987",
+    "pr:833"
+  ],
+  "non_claims": [
+    "does not authorize merge",
+    "does not establish execution authority",
+    "does not establish hosted qualification",
+    "does not select a CI provider",
+    "does not state a qualification outcome"
+  ],
+  "admission_id": "sha256:e937bd324855f2c8a8e97c286f180674d43776c61af23ee373d4ebcc20e15f0b"
+}
