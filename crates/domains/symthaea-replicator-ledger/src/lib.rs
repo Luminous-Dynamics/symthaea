@@ -909,6 +909,11 @@ mod tests {
     ) -> ReplicationAuthorityRequest {
         let mut budget = context.budget;
         budget.requested_resource_units = requested_resource_units;
+        let independent_approvals = if context.risk_class.requires_high_consequence_quorum() {
+            2
+        } else {
+            1
+        };
         ReplicationAuthorityRequest {
             subject,
             lineage,
@@ -933,7 +938,7 @@ mod tests {
             },
             budget,
             quorum: QuorumEvidence {
-                independent_approvals: 1,
+                independent_approvals,
                 required_independent_approvals: 1,
             },
         }
@@ -960,7 +965,14 @@ mod tests {
     ) -> BoundedReplicationAuthorization {
         let context = ledger.authority_context(subject, lineage, resource_units).unwrap();
         let request = request(subject, lineage, context, generation, resource_units);
-        let grant = grant(subject, lineage, generation);
+        let parent_lineage = ledger.subject_snapshot(subject).unwrap().lineage;
+        let parent_policy = ledger.lineage_snapshot(parent_lineage).unwrap().policy;
+        let output_policy = ledger.lineage_snapshot(lineage).unwrap().policy;
+        let mut grant = grant(subject, lineage, generation);
+        grant.max_direct_children = parent_policy.max_direct_children_per_subject;
+        grant.max_total_descendants = output_policy.max_total_descendants;
+        grant.max_lineage_depth = output_policy.max_lineage_depth;
+        grant.max_resource_units = output_policy.max_resource_units;
         let BoundReplicationDecision::Allow(auth) =
             evaluate_bound_replication_authority(context.cursor, &request, Some(&grant))
         else { panic!("expected bound allow") };
@@ -1069,8 +1081,9 @@ mod tests {
         l.revoke_subject(l.cursor(), mid(2), sid(1)).unwrap();
         let ctx = l.authority_context(sid(2), lid(1), 1).unwrap();
         assert!(ctx.revoked);
+        let child_auth = authorize(&l, sid(2), lid(1), 1, 1);
         assert!(matches!(
-            l.commit_descendant(mid(3), &authorize(&l, sid(2), lid(1), 1, 1), sid(3), 1, 100, &runtime()),
+            l.commit_descendant(mid(3), &child_auth, sid(3), 1, 100, &runtime()),
             Err(LedgerError::SubjectRevoked(s)) if s == sid(1)
         ));
     }
@@ -1115,7 +1128,7 @@ mod tests {
             Err(LedgerError::GrantRevoked { .. })
         ));
 
-        let child = authorize(&l, sid(2), lid(1), 1, 1);
+        let child = authorize(&l, sid(2), lid(1), 2, 1);
         assert_eq!(
             l.commit_descendant(mid(4), &child, sid(3), 1, 100, &runtime()),
             Err(LedgerError::AncestorGrantRevoked(sid(1)))
@@ -1141,38 +1154,29 @@ mod tests {
     }
 
     #[test]
-    fn hard_lineage_ceiling_cannot_be_bypassed_by_branching() {
+    fn shared_lineage_ceiling_applies_across_sibling_subject_subtrees() {
         let mut l = ledger();
-        let mut root = root_policy();
-        root.max_total_descendants = 2;
-        l = ReplicationLedger::new(LedgerEpochId::new([8; 32]), sid(1), lid(1), root);
-        let mut branch = root;
+        let mut branch = root_policy();
         branch.risk_class = RiskClass::R4;
         branch.capability_ceiling = A;
+        branch.max_total_descendants = 2;
         l.register_lineage_branch(l.cursor(), mid(1), lid(2), lid(1), branch).unwrap();
 
-        let a1 = authorize(&l, sid(1), lid(1), 1, 1);
+        let a1 = authorize(&l, sid(1), lid(2), 1, 1);
         l.commit_descendant(mid(2), &a1, sid(2), 1, 100, &runtime()).unwrap();
-
-        let c = l.authority_context(sid(1), lid(2), 1).unwrap();
-        let mut req = request(sid(1), lid(2), c, 2, 1);
-        req.quorum.independent_approvals = 2;
-        let mut g = grant(sid(1), lid(2), 2);
-        g.max_total_descendants = 2;
-        let BoundReplicationDecision::Allow(a2) =
-            evaluate_bound_replication_authority(c.cursor, &req, Some(&g)) else { panic!() };
+        let a2 = authorize(&l, sid(1), lid(2), 1, 1);
         l.commit_descendant(mid(3), &a2, sid(3), 1, 100, &runtime()).unwrap();
 
-        let c = l.authority_context(sid(1), lid(2), 1).unwrap();
-        let mut req = request(sid(1), lid(2), c, 3, 1);
-        req.quorum.independent_approvals = 2;
-        let mut g = grant(sid(1), lid(2), 3);
-        g.max_total_descendants = 2;
-        let BoundReplicationDecision::Allow(a3) =
-            evaluate_bound_replication_authority(c.cursor, &req, Some(&g)) else { panic!() };
+        // A newer, externally evaluated root-line grant widens only the root
+        // subject scope back up to the root hard ceiling. It does not widen the
+        // branch lineage's immutable population ceiling.
+        let a3 = authorize(&l, sid(1), lid(1), 2, 1);
+        l.commit_descendant(mid(4), &a3, sid(4), 1, 100, &runtime()).unwrap();
+
+        let a4 = authorize(&l, sid(2), lid(2), 1, 1);
         assert_eq!(
-            l.commit_descendant(mid(4), &a3, sid(4), 1, 100, &runtime()),
-            Err(LedgerError::LineageDescendantBudgetExhausted(lid(1)))
+            l.commit_descendant(mid(5), &a4, sid(5), 1, 100, &runtime()),
+            Err(LedgerError::LineageDescendantBudgetExhausted(lid(2)))
         );
     }
 }
