@@ -38,16 +38,6 @@ sha256_file() {
     fi
 }
 
-command_value() {
-    local command_name="$1"
-    shift
-    if command -v "$command_name" >/dev/null 2>&1; then
-        "$command_name" "$@" 2>/dev/null || true
-    else
-        printf 'unavailable'
-    fi
-}
-
 write_receipt() {
     local exit_code="$1"
     local final_status="$status"
@@ -98,6 +88,8 @@ write_receipt() {
         printf 'full_repository_ci\tindependent\n'
         printf 'baseline_generation\tforbidden\n'
         printf 'environment_authority\tobserved-not-capsule-qualified\n'
+        printf 'receipt_attestation\tnone\n'
+        printf 'provider_metadata_basis\tambient-runtime\n'
         printf 'qualified_sha\t%s\n' "$actual_sha"
         printf 'expected_sha\t%s\n' "$expected_sha"
         printf 'committed_tree\t%s\n' "$head_tree"
@@ -122,6 +114,10 @@ write_receipt() {
         printf 'qualifier_script_sha256\t%s\n' "$(sha256_file scripts/qualify-evidence-contract.sh)"
         printf 'workflow_sha256\t%s\n' "$(sha256_file .github/workflows/evidence-contract.yml)"
         printf 'authority_integration_targets\t%s\n' "$target_list"
+        printf 'github_event_name\t%s\n' "${GITHUB_EVENT_NAME:-not-applicable}"
+        printf 'github_repository\t%s\n' "${GITHUB_REPOSITORY:-not-applicable}"
+        printf 'github_workflow_ref\t%s\n' "${GITHUB_WORKFLOW_REF:-not-applicable}"
+        printf 'github_job\t%s\n' "${GITHUB_JOB:-not-applicable}"
         printf 'github_run_id\t%s\n' "${GITHUB_RUN_ID:-not-applicable}"
         printf 'github_run_attempt\t%s\n' "${GITHUB_RUN_ATTEMPT:-not-applicable}"
     } > "$receipt_path"
@@ -140,6 +136,7 @@ write_receipt() {
             echo '- scope: software-contract qualification only'
             echo '- full repository CI: independent'
             echo '- empirical/scientific claim authority: none'
+            echo '- receipt attestation: none (run/artifact context is the external witness)'
         } >> "$GITHUB_STEP_SUMMARY"
     fi
 }
