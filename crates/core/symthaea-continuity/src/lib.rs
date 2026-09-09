@@ -12,6 +12,7 @@
 pub mod auth_wire;
 pub mod capability;
 pub mod capability_activation;
+pub mod capability_analysis_receipt;
 pub mod capability_counterfactual;
 pub mod capability_graph;
 mod compose;
@@ -37,6 +38,12 @@ pub use capability_activation::{
     CapabilityActivationClosureV1, CapabilityActivationError, CapabilityActivationRoundV1,
     UnsatisfiedCapabilityRequirementV1, ValidatedCapabilityActivationAssumptionsV1,
     derive_capability_activation_closure,
+};
+pub use capability_analysis_receipt::{
+    CAPABILITY_ACTIVATION_CLOSURE_RECEIPT_SCHEMA_V1,
+    CAPABILITY_COUNTERFACTUAL_FRONTIER_RECEIPT_SCHEMA_V1, CapabilityActivationClosureReceiptId,
+    CapabilityActivationClosureReceiptV1, CapabilityAnalysisReceiptError,
+    CapabilityCounterfactualFrontierReceiptId, CapabilityCounterfactualFrontierReceiptV1,
 };
 pub use capability_counterfactual::{
     CAPABILITY_COUNTERFACTUAL_CONFIG_SCHEMA_V1, CAPABILITY_COUNTERFACTUAL_QUERY_SCHEMA_V1,
