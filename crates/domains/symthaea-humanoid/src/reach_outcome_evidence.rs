@@ -91,20 +91,27 @@ pub fn bind_humanoid_reach_outcome_evidence(
     }
     if result.preparation.spatial_goal_fingerprint == 0
         || result.preparation.goal_id.trim().is_empty()
-        || !result.preparation.target_world_m.iter().all(|value| value.is_finite())
+        || !result
+            .preparation
+            .target_world_m
+            .iter()
+            .all(|value| value.is_finite())
     {
         return Err(HumanoidReachOutcomeBindFailure::InvalidSpatialGoalIdentity);
     }
     if !result.preparation.prepared_at_s.is_finite() || result.preparation.prepared_at_s < 0.0 {
         return Err(HumanoidReachOutcomeBindFailure::InvalidPreparationTime);
     }
-    if post_state.validate_for(subject.morphology).is_err() || !post_state.timestamp.is_finite() {
+    if post_state.validate_for(subject.morphology).is_err()
+        || !post_state.timestamp.is_finite()
+        || post_state.timestamp < 0.0
+    {
         return Err(HumanoidReachOutcomeBindFailure::InvalidPostState);
     }
     if post_state.timestamp < result.preparation.prepared_at_s {
         return Err(HumanoidReachOutcomeBindFailure::ObservationBeforePreparation);
     }
-    if !received_at_s.is_finite() || received_at_s < 0.0 || received_at_s < post_state.timestamp {
+    if !received_at_s.is_finite() || received_at_s < 0.0 {
         return Err(HumanoidReachOutcomeBindFailure::InvalidReceivedTime);
     }
     if post_state.timestamp > received_at_s {
@@ -207,6 +214,8 @@ impl HumanoidReachOutcomeEvidencePolicy {
 pub enum HumanoidReachOutcomeFailureKind {
     InvalidPolicy,
     InvalidEvidenceSchema,
+    InvalidEvidenceIdentity,
+    InvalidEvidenceNumericConsistency,
     SubjectMismatch,
     ObservationTooOld,
     ObservationTooLate,
@@ -240,6 +249,13 @@ pub fn assess_humanoid_reach_outcome_evidence(
     if evidence.schema_version != HUMANOID_REACH_OUTCOME_EVIDENCE_SCHEMA_VERSION {
         failures.push(HumanoidReachOutcomeFailureKind::InvalidEvidenceSchema);
     }
+    if evidence.validation_epoch == 0
+        || evidence.goal_id.trim().is_empty()
+        || evidence.goal_id != evidence.goal_id.trim()
+        || evidence.spatial_goal_fingerprint == 0
+    {
+        failures.push(HumanoidReachOutcomeFailureKind::InvalidEvidenceIdentity);
+    }
     let fingerprint = subject.fingerprint();
     if fingerprint == 0
         || evidence.subject_fingerprint != fingerprint
@@ -247,22 +263,34 @@ pub fn assess_humanoid_reach_outcome_evidence(
     {
         failures.push(HumanoidReachOutcomeFailureKind::SubjectMismatch);
     }
-    if evidence.observation_age_s > policy.maximum_observation_age_s {
+    if !outcome_arithmetic_is_consistent(evidence) {
+        failures.push(HumanoidReachOutcomeFailureKind::InvalidEvidenceNumericConsistency);
+    }
+    if !evidence.observation_age_s.is_finite()
+        || evidence.observation_age_s > policy.maximum_observation_age_s
+    {
         failures.push(HumanoidReachOutcomeFailureKind::ObservationTooOld);
     }
-    if evidence.elapsed_since_preparation_s > policy.maximum_elapsed_since_preparation_s {
+    if !evidence.elapsed_since_preparation_s.is_finite()
+        || evidence.elapsed_since_preparation_s > policy.maximum_elapsed_since_preparation_s
+    {
         failures.push(HumanoidReachOutcomeFailureKind::ObservationTooLate);
     }
-    if evidence.post_command_error_m > policy.maximum_post_command_error_m {
+    if !evidence.post_command_error_m.is_finite()
+        || evidence.post_command_error_m > policy.maximum_post_command_error_m
+    {
         failures.push(HumanoidReachOutcomeFailureKind::FinalErrorTooLarge);
     }
 
-    let already_inside = evidence.pre_command_error_m <= policy.maximum_post_command_error_m;
+    let already_inside = evidence.pre_command_error_m.is_finite()
+        && evidence.pre_command_error_m <= policy.maximum_post_command_error_m;
     if !(policy.allow_already_within_tolerance && already_inside) {
-        if evidence.progress_m < policy.minimum_progress_m {
+        if !evidence.progress_m.is_finite() || evidence.progress_m < policy.minimum_progress_m {
             failures.push(HumanoidReachOutcomeFailureKind::ProgressTooSmall);
         }
-        if evidence.fractional_progress < policy.minimum_fractional_progress {
+        if !evidence.fractional_progress.is_finite()
+            || evidence.fractional_progress < policy.minimum_fractional_progress
+        {
             failures.push(HumanoidReachOutcomeFailureKind::FractionalProgressTooSmall);
         }
     }
@@ -323,6 +351,58 @@ pub fn assess_humanoid_reach_step(
         outcome,
         step_accepted,
     })
+}
+
+fn outcome_arithmetic_is_consistent(evidence: &HumanoidReachOutcomeEvidence) -> bool {
+    let all_finite = evidence.target_world_m.iter().all(|value| value.is_finite())
+        && evidence.hand_world_m.iter().all(|value| value.is_finite())
+        && [
+            evidence.prepared_at_s,
+            evidence.observed_at_s,
+            evidence.received_at_s,
+            evidence.observation_age_s,
+            evidence.elapsed_since_preparation_s,
+            evidence.pre_command_error_m,
+            evidence.post_command_error_m,
+            evidence.progress_m,
+            evidence.fractional_progress,
+        ]
+        .into_iter()
+        .all(f64::is_finite);
+    if !all_finite
+        || evidence.prepared_at_s < 0.0
+        || evidence.observed_at_s < evidence.prepared_at_s
+        || evidence.received_at_s < evidence.observed_at_s
+        || evidence.observation_age_s < 0.0
+        || evidence.elapsed_since_preparation_s < 0.0
+        || evidence.pre_command_error_m < 0.0
+        || evidence.post_command_error_m < 0.0
+    {
+        return false;
+    }
+
+    let derived_age = evidence.received_at_s - evidence.observed_at_s;
+    let derived_elapsed = evidence.observed_at_s - evidence.prepared_at_s;
+    let derived_post_error = norm3(sub3(evidence.target_world_m, evidence.hand_world_m));
+    let derived_progress = evidence.pre_command_error_m - evidence.post_command_error_m;
+    let derived_fraction = if evidence.pre_command_error_m > 1.0e-12 {
+        evidence.progress_m / evidence.pre_command_error_m
+    } else if evidence.post_command_error_m <= 1.0e-12 {
+        1.0
+    } else {
+        return false;
+    };
+
+    approximately_equal(evidence.observation_age_s, derived_age)
+        && approximately_equal(evidence.elapsed_since_preparation_s, derived_elapsed)
+        && approximately_equal(evidence.post_command_error_m, derived_post_error)
+        && approximately_equal(evidence.progress_m, derived_progress)
+        && approximately_equal(evidence.fractional_progress, derived_fraction)
+}
+
+fn approximately_equal(a: f64, b: f64) -> bool {
+    let scale = 1.0 + a.abs().max(b.abs());
+    (a - b).abs() <= 1.0e-10 * scale
 }
 
 fn hand_world_position(state: &HumanoidState, hand: HandSide) -> Option<[f64; 3]> {
@@ -407,10 +487,17 @@ mod tests {
         evidence.post_command_error_m = 0.10;
         evidence.progress_m = -0.02;
         evidence.fractional_progress = -0.25;
+        // Keep the public receipt internally self-consistent so this test isolates
+        // the policy failure rather than the arithmetic guard.
+        evidence.hand_world_m = [0.30, -0.2, 1.0];
         let assessment =
             assess_humanoid_reach_outcome_evidence(&subject(), &outcome_policy(), &evidence);
         assert!(!assessment.outcome_accepted);
-        assert!(assessment.failures.contains(&HumanoidReachOutcomeFailureKind::ProgressTooSmall));
+        assert!(
+            assessment
+                .failures
+                .contains(&HumanoidReachOutcomeFailureKind::ProgressTooSmall)
+        );
     }
 
     #[test]
@@ -420,8 +507,25 @@ mod tests {
         evidence.post_command_error_m = 0.02;
         evidence.progress_m = 0.0;
         evidence.fractional_progress = 0.0;
+        evidence.hand_world_m = [0.38, -0.2, 1.0];
         let assessment =
             assess_humanoid_reach_outcome_evidence(&subject(), &outcome_policy(), &evidence);
         assert!(assessment.outcome_accepted);
+    }
+
+    #[test]
+    fn hand_crafted_favorable_progress_with_wrong_geometry_fails_closed() {
+        let mut evidence = evidence();
+        evidence.post_command_error_m = 0.001;
+        evidence.progress_m = 0.079;
+        evidence.fractional_progress = 0.9875;
+        // Keep the actual measured hand where it was: the claimed error no longer
+        // matches target geometry.
+        let assessment =
+            assess_humanoid_reach_outcome_evidence(&subject(), &outcome_policy(), &evidence);
+        assert!(!assessment.outcome_accepted);
+        assert!(assessment.failures.contains(
+            &HumanoidReachOutcomeFailureKind::InvalidEvidenceNumericConsistency
+        ));
     }
 }
