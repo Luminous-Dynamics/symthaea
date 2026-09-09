@@ -1,0 +1,203 @@
+name: Scientific Disposition Replay Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-scientific-replay/**"
+      - ".github/workflows/scientific-disposition-replay.yml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  replay-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision and parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Verify exact checkout and parent
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git rev-parse HEAD^)" = "${{ github.event.pull_request.base.sha }}"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Scope and capability audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("crates/core/symthaea-scientific-replay/src/lib.rs")
+          text = path.read_text()
+
+          marker = "pub struct ReplayVerifiedDispositionEvaluationV1"
+          idx = text.index(marker)
+          prefix_lines = text[:idx].splitlines()[-8:]
+          prefix = "\n".join(prefix_lines)
+          assert "Serialize" not in prefix, prefix
+          assert "Deserialize" not in prefix, prefix
+
+          body_start = text.index("{", idx) + 1
+          body_end = text.index("}\n\nimpl ReplayVerifiedDispositionEvaluationV1", body_start)
+          body = text[body_start:body_end]
+          assert not re.search(r"(?m)^\s*pub\s+\w+\s*:", body), body
+          assert "assessment_id" not in body, "caller assessment id leaked into positive witness"
+          assert "impl ReplayVerifiedDispositionEvaluationV1 {\n    pub fn new" not in text
+          assert "pub fn assessment_id" not in text
+
+          predicate_marker = "pub enum PredicateValueV1"
+          predicate_idx = text.index(predicate_marker)
+          predicate_prefix = "\n".join(text[:predicate_idx].splitlines()[-4:])
+          assert "PartialOrd" not in predicate_prefix, predicate_prefix
+          assert not re.search(r"\bOrd\b", predicate_prefix), predicate_prefix
+          assert "no epistemic semantics" in predicate_prefix, predicate_prefix
+
+          # The full SCI replay/currentness capabilities are intentionally not
+          # implemented in this lower evaluation-replay tranche.
+          assert "pub struct ReplayVerifiedScientificDispositionV1" not in text
+          assert "pub struct CurrentWithinScientificViewDispositionV1" not in text
+          assert "pub struct QualifiedScientificViewStateV1" not in text
+
+          required_context_fields = [
+              "evidence_view_id",
+              "evidence_view_snapshot_id",
+              "source_lifecycle_generation_id",
+              "external_argument_generation_id",
+              "dependency_graph_generation_id",
+              "target_compatibility_generation_id",
+              "triangulation_generation_id",
+              "reason_topology_snapshot_id",
+              "predicate_derivation_profile_id",
+              "predicate_derivation_artifact_id",
+              "predicate_derivation_execution_lineage_id",
+              "information_cutoff_id",
+          ]
+          assert "pub struct DispositionEvaluationContextV1" in text
+          assert "pub context: DispositionEvaluationContextV1" in text
+          assert "EvaluationContextMismatch" in text
+          for field in required_context_fields:
+              assert f"pub {field}: String" in text, f"missing evaluation context field: {field}"
+
+          assert "pub artifact_id: String" in text, "policy artifact identity must be retained"
+          assert "reason_topology_snapshot_id" in text
+
+          forbidden = [
+              "SystemTime",
+              "std::env",
+              "std::fs",
+              "TcpStream",
+              "UdpSocket",
+              "reqwest",
+              "tokio",
+              "thread_rng",
+              "rand::",
+          ]
+          for token in forbidden:
+              assert token not in text, f"ambient authority token present: {token}"
+
+          legacy_authority = [
+              "HypothesisStatus",
+              "ScientificMethodEngine",
+              "evidence_count",
+              "rank_hypotheses",
+              "find_contradictions",
+          ]
+          code_without_module_docs = "\n".join(
+              line for line in text.splitlines() if not line.startswith("//!" )
+          )
+          for token in legacy_authority:
+              assert token not in code_without_module_docs, (
+                  f"legacy scientific_method authority leaked into replay crate: {token}"
+              )
+          PY
+
+          base_sha="${{ github.event.pull_request.base.sha || '' }}"
+          if [[ -n "$base_sha" ]]; then
+            test "$(git rev-parse HEAD^)" = "$base_sha"
+
+            python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import tomllib
+
+          current = tomllib.loads(Path("Cargo.lock").read_text())
+          parent = tomllib.loads(
+              subprocess.check_output(["git", "show", "HEAD^:Cargo.lock"], text=True)
+          )
+          expected = {
+              "name": "symthaea-scientific-replay",
+              "version": "0.1.0",
+              "dependencies": ["serde", "serde_json"],
+          }
+
+          def replay_entries(lock):
+              return [
+                  package
+                  for package in lock["package"]
+                  if package.get("name") == "symthaea-scientific-replay"
+              ]
+
+          current_entries = replay_entries(current)
+          parent_entries = replay_entries(parent)
+          assert current_entries == [expected], current_entries
+
+          if parent_entries == []:
+              # Introduction mode: this PR owns exactly one lock transition.
+              changed = subprocess.check_output(
+                  ["git", "diff", "--name-only", "HEAD^..HEAD", "--", "Cargo.lock"],
+                  text=True,
+              ).strip()
+              assert changed == "Cargo.lock", changed
+
+              current_without_replay = dict(current)
+              current_without_replay["package"] = [
+                  package
+                  for package in current["package"]
+                  if package.get("name") != "symthaea-scientific-replay"
+              ]
+              assert current_without_replay == parent, (
+                  "Cargo.lock changed beyond the exact new scientific-replay workspace package"
+              )
+          else:
+              # Descendant mode: the lower replay package already exists in the
+              # parent. Preserve its exact lock identity without claiming
+              # authority over unrelated lock evolution owned by the child PR.
+              assert parent_entries == [expected], parent_entries
+          PY
+          else
+            echo "workflow_dispatch: PR-relative replay lock audit not applicable"
+          fi
+
+      - name: Formatting
+        run: cargo fmt -p symthaea-scientific-replay -- --check
+
+      - name: Check
+        run: cargo check --locked -p symthaea-scientific-replay --all-targets
+
+      - name: Tests
+        run: cargo test --locked -p symthaea-scientific-replay
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-scientific-replay --all-targets --no-deps -- -D warnings
