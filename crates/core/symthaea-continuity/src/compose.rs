@@ -72,9 +72,15 @@ mod tests {
         DependencyBasis, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
         ObservationEnvelopeV1,
     };
+    use crate::profile_adoption::{
+        VerifierAdoptionScopeV1, VerifierProfileAdoptionSubjectV1,
+        VerifierProfileAdoptionTransitionV1,
+    };
+    use crate::profile_adoption_root::VerifierProfileAdoptionAuthorityRootSnapshotV1;
     use crate::verifier::{
-        policy_check_verification_evidence, AuthenticatedVerificationEvidenceV1,
+        AuthorityCheckedVerificationEvidenceV1, AuthenticatedVerificationEvidenceV1,
         VerificationEvidenceClaimV1, VerificationOutcomeV1, VerifierProfileV1,
+        policy_check_verification_evidence,
     };
     use crate::witness::{EvidenceClass, VerificationPolicyEntryV1};
 
@@ -120,8 +126,42 @@ mod tests {
             contract.id(), target, contract.requirements()[0].id(), profile.id(), challenge,
             1_700_000_000_100, VerificationOutcomeV1::Satisfied, evidence_digest,
         ).unwrap();
-        let checked = policy_check_verification_evidence(contract, target, &policy, profile, challenge, claim).unwrap();
-        AuthenticatedVerificationEvidenceV1::authenticate_for_test(checked, [9; 32]).unwrap()
+        let profile_checked = policy_check_verification_evidence(
+            contract,
+            target,
+            &policy,
+            profile,
+            challenge,
+            claim,
+        ).unwrap();
+
+        let adoption = VerifierProfileAdoptionTransitionV1::bootstrap(
+            VerifierProfileAdoptionSubjectV1::new(
+                "fixture-adoption",
+                "organization:test",
+                "adoption-root-1",
+                [0x55; 32],
+                profile,
+                1,
+                1_600_000_000_000,
+                1_800_000_000_000,
+                EvidenceClass::HardwareVerified,
+                VerifierAdoptionScopeV1::AllContinuityVerification,
+            ).unwrap(),
+        ).unwrap();
+        let root_snapshot = VerifierProfileAdoptionAuthorityRootSnapshotV1::new(
+            "organization:test",
+            "adoption-root-1",
+            [0x55; 32],
+            9,
+        ).unwrap();
+        let authority_checked = AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
+            profile_checked,
+            &adoption,
+            &root_snapshot,
+        ).unwrap();
+
+        AuthenticatedVerificationEvidenceV1::authenticate_for_test(authority_checked, [9; 32]).unwrap()
     }
 
     #[test]

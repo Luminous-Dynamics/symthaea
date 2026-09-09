@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Verifier-owned continuity evidence admission.
 //!
-//! `RawEvidence != PolicyCheckedEvidence != AuthenticatedEvidence != QualifiedWitness`.
+//! `RawEvidence != ProfilePolicyCheckedEvidence != AuthorityCheckedEvidence != AuthenticatedEvidence != QualifiedWitness`.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -10,13 +10,16 @@ use thiserror::Error;
 use crate::contract::{
     ContinuityContractId, ContinuityRequirementId, ValidatedContinuityContractV1,
 };
+use crate::profile_adoption::{VerifierAdoptionScopeV1, VerifierProfileAdoptionTransitionDigest};
+use crate::profile_adoption_root::VerifierProfileAdoptionAuthorityRootSnapshotId;
 use crate::witness::{
     EvidenceClass, ObligationDispositionV1, TargetRealizationId, VerificationPolicyV1,
 };
 
 const PROFILE_DOMAIN: &[u8] = b"symthaea.continuity.verifier-profile.v1\0";
 const CLAIM_DOMAIN: &[u8] = b"symthaea.continuity.verification-claim.v1\0";
-const AUTH_DOMAIN: &[u8] = b"symthaea.continuity.authenticated-verification-evidence.v1\0";
+const AUTH_DOMAIN: &[u8] =
+    b"symthaea.continuity.authenticated-verification-evidence.authority-bound.v1\0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerifierProfileId([u8; 32]);
@@ -37,7 +40,10 @@ impl AuthenticatedVerificationEvidenceId {
 }
 
 /// Provisioned verifier identity and the strongest evidence class it may issue.
-/// The class is profile-owned; raw transport claims cannot select it.
+///
+/// This is capability/configuration, not organizational authority. A profile may
+/// support `HardwareVerified` while an adopted authority grant restricts it to a
+/// weaker class or narrower scope.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerifierProfileV1 {
     profile_name: String,
@@ -159,13 +165,14 @@ impl VerificationEvidenceClaimV1 {
     }
 }
 
+/// Exact profile/policy/context admission. This is deliberately weaker than
+/// organizational authority admission and proves no signature.
 #[derive(Debug, Clone)]
-pub(crate) struct PolicyCheckedVerificationEvidenceV1 {
+pub(crate) struct ProfilePolicyCheckedVerificationEvidenceV1 {
     claim: VerificationEvidenceClaimV1,
     profile: VerifierProfileV1,
 }
 
-/// Exact context admission. This proves no signature.
 pub(crate) fn policy_check_verification_evidence(
     contract: &ValidatedContinuityContractV1,
     target: TargetRealizationId,
@@ -173,7 +180,7 @@ pub(crate) fn policy_check_verification_evidence(
     profile: &VerifierProfileV1,
     expected_challenge: [u8; 32],
     claim: VerificationEvidenceClaimV1,
-) -> Result<PolicyCheckedVerificationEvidenceV1, VerificationAdmissionError> {
+) -> Result<ProfilePolicyCheckedVerificationEvidenceV1, VerificationAdmissionError> {
     profile.validate()?;
     claim.validate()?;
     if expected_challenge == [0; 32] { return Err(VerificationAdmissionError::ZeroTransactionChallenge); }
@@ -192,32 +199,135 @@ pub(crate) fn policy_check_verification_evidence(
     if !policy.entries().iter().any(|e| e.requirement_id() == claim.requirement_id()) {
         return Err(VerificationAdmissionError::RequirementOutsideVerificationPolicy);
     }
-    Ok(PolicyCheckedVerificationEvidenceV1 { claim, profile: profile.clone() })
+    Ok(ProfilePolicyCheckedVerificationEvidenceV1 { claim, profile: profile.clone() })
 }
 
-/// Authenticated evidence has no production constructor yet. A future crypto/Xenia
-/// adapter must authenticate the exact checked claim under the captured root.
+/// Profile-policy evidence after a separate current verifier-authority theorem has
+/// restricted it to the actually granted evidence class and adoption lineage.
+///
+/// There is intentionally no production constructor yet. A future
+/// `AuthorizedVerifierProfile` path must be the only production source and must
+/// prove adoption scope/currentness before creating this value.
+#[derive(Debug, Clone)]
+pub(crate) struct AuthorityCheckedVerificationEvidenceV1 {
+    profile_checked: ProfilePolicyCheckedVerificationEvidenceV1,
+    effective_evidence_class: EvidenceClass,
+    adoption_transition_digest: VerifierProfileAdoptionTransitionDigest,
+    authority_root_snapshot_id: VerifierProfileAdoptionAuthorityRootSnapshotId,
+}
+
+impl AuthorityCheckedVerificationEvidenceV1 {
+    pub(crate) fn effective_evidence_class(&self) -> EvidenceClass {
+        self.effective_evidence_class
+    }
+
+    pub(crate) fn adoption_transition_digest(&self) -> VerifierProfileAdoptionTransitionDigest {
+        self.adoption_transition_digest
+    }
+
+    pub(crate) fn authority_root_snapshot_id(&self) -> VerifierProfileAdoptionAuthorityRootSnapshotId {
+        self.authority_root_snapshot_id
+    }
+
+    /// Test-only model of the future `AuthorizedVerifierProfile` restriction step.
+    ///
+    /// All authority facts are derived from one exact adoption transition and one
+    /// exact local root snapshot rather than passed as independently selectable
+    /// ceiling/scope/identity fields.
+    #[cfg(test)]
+    pub(crate) fn authorize_for_test(
+        profile_checked: ProfilePolicyCheckedVerificationEvidenceV1,
+        adoption: &crate::profile_adoption::VerifierProfileAdoptionTransitionV1,
+        authority_root: &crate::profile_adoption_root::VerifierProfileAdoptionAuthorityRootSnapshotV1,
+    ) -> Result<Self, VerificationAdmissionError> {
+        let subject = adoption.subject();
+        if subject.verifier_profile_id() != profile_checked.profile.id()
+            || subject.verifier_role_id() != profile_checked.profile.profile_name()
+        {
+            return Err(VerificationAdmissionError::AuthorityVerifierProfileMismatch);
+        }
+        if subject.authority_subject() != authority_root.authority_subject()
+            || subject.authority_root_id() != authority_root.authority_root_id()
+            || subject.authority_root_digest() != authority_root.authority_root_digest()
+        {
+            return Err(VerificationAdmissionError::AuthorityRootSnapshotMismatch);
+        }
+        if subject.evidence_class_ceiling() > profile_checked.profile.evidence_class() {
+            return Err(VerificationAdmissionError::AuthorityEvidenceClassExceedsProfile {
+                profile: profile_checked.profile.evidence_class(),
+                authorized: subject.evidence_class_ceiling(),
+            });
+        }
+        if !scope_allows_claim(subject.scope(), &profile_checked.claim) {
+            return Err(VerificationAdmissionError::RequirementOutsideAdoptionScope);
+        }
+        let observed_at = profile_checked.claim.observed_at_unix_ms();
+        if observed_at < subject.valid_from_unix_ms() || observed_at >= subject.valid_until_unix_ms() {
+            return Err(VerificationAdmissionError::EvidenceObservationOutsideAdoptionValidity {
+                observed_at_unix_ms: observed_at,
+                valid_from_unix_ms: subject.valid_from_unix_ms(),
+                valid_until_unix_ms: subject.valid_until_unix_ms(),
+            });
+        }
+        let adoption_transition_digest = adoption
+            .transition_digest()
+            .expect("test authority transition must remain canonical");
+        Ok(Self {
+            profile_checked,
+            effective_evidence_class: subject.evidence_class_ceiling(),
+            adoption_transition_digest,
+            authority_root_snapshot_id: authority_root.id(),
+        })
+    }
+}
+
+/// Authenticated evidence can only contain authority-checked evidence.
+///
+/// A future crypto/Xenia adapter must authenticate the exact claim under the
+/// authorized verifier root, but it must not be able to skip the organizational
+/// adoption-authority layer and authenticate a bare profile-policy result directly.
 #[derive(Debug, Clone)]
 pub(crate) struct AuthenticatedVerificationEvidenceV1 {
-    checked: PolicyCheckedVerificationEvidenceV1,
+    checked: AuthorityCheckedVerificationEvidenceV1,
     authentication_evidence_digest: [u8; 32],
     evidence_id: AuthenticatedVerificationEvidenceId,
 }
 
 impl AuthenticatedVerificationEvidenceV1 {
-    pub(crate) fn contract_id(&self) -> ContinuityContractId { self.checked.claim.contract_id() }
-    pub(crate) fn target_realization_id(&self) -> TargetRealizationId { self.checked.claim.target_realization_id() }
-    pub(crate) fn requirement_id(&self) -> ContinuityRequirementId { self.checked.claim.requirement_id() }
-    pub(crate) fn profile_id(&self) -> VerifierProfileId { self.checked.profile.id() }
-    pub(crate) fn root_epoch(&self) -> u64 { self.checked.profile.root_epoch() }
-    pub(crate) fn observed_at_unix_ms(&self) -> u64 { self.checked.claim.observed_at_unix_ms() }
+    pub(crate) fn contract_id(&self) -> ContinuityContractId {
+        self.checked.profile_checked.claim.contract_id()
+    }
+    pub(crate) fn target_realization_id(&self) -> TargetRealizationId {
+        self.checked.profile_checked.claim.target_realization_id()
+    }
+    pub(crate) fn requirement_id(&self) -> ContinuityRequirementId {
+        self.checked.profile_checked.claim.requirement_id()
+    }
+    pub(crate) fn profile_id(&self) -> VerifierProfileId {
+        self.checked.profile_checked.profile.id()
+    }
+    pub(crate) fn root_epoch(&self) -> u64 {
+        self.checked.profile_checked.profile.root_epoch()
+    }
+    pub(crate) fn observed_at_unix_ms(&self) -> u64 {
+        self.checked.profile_checked.claim.observed_at_unix_ms()
+    }
+    pub(crate) fn effective_evidence_class(&self) -> EvidenceClass {
+        self.checked.effective_evidence_class()
+    }
+    pub(crate) fn adoption_transition_digest(&self) -> VerifierProfileAdoptionTransitionDigest {
+        self.checked.adoption_transition_digest()
+    }
+    pub(crate) fn authority_root_snapshot_id(&self) -> VerifierProfileAdoptionAuthorityRootSnapshotId {
+        self.checked.authority_root_snapshot_id()
+    }
     pub(crate) fn id(&self) -> AuthenticatedVerificationEvidenceId { self.evidence_id }
     pub(crate) fn disposition(&self) -> ObligationDispositionV1 {
         let evidence_digest = *self.evidence_id.as_bytes();
-        match self.checked.claim.outcome() {
+        match self.checked.profile_checked.claim.outcome() {
             VerificationOutcomeV1::Satisfied => ObligationDispositionV1::Satisfied {
                 evidence_digest,
-                evidence_class: self.checked.profile.evidence_class(),
+                evidence_class: self.checked.effective_evidence_class(),
             },
             VerificationOutcomeV1::Failed => ObligationDispositionV1::Failed { evidence_digest },
             VerificationOutcomeV1::Inconclusive => ObligationDispositionV1::Inconclusive { evidence_digest },
@@ -228,16 +338,37 @@ impl AuthenticatedVerificationEvidenceV1 {
 
     #[cfg(test)]
     pub(crate) fn authenticate_for_test(
-        checked: PolicyCheckedVerificationEvidenceV1,
+        checked: AuthorityCheckedVerificationEvidenceV1,
         authentication_evidence_digest: [u8; 32],
     ) -> Result<Self, VerificationAdmissionError> {
         if authentication_evidence_digest == [0; 32] {
             return Err(VerificationAdmissionError::ZeroAuthenticationEvidenceDigest);
         }
         let evidence_id = AuthenticatedVerificationEvidenceId(hash_authenticated(
-            checked.claim.id(), checked.profile.id(), authentication_evidence_digest,
+            checked.profile_checked.claim.id(),
+            checked.profile_checked.profile.id(),
+            checked.effective_evidence_class,
+            checked.adoption_transition_digest,
+            checked.authority_root_snapshot_id,
+            authentication_evidence_digest,
         ));
         Ok(Self { checked, authentication_evidence_digest, evidence_id })
+    }
+}
+
+fn scope_allows_claim(scope: &VerifierAdoptionScopeV1, claim: &VerificationEvidenceClaimV1) -> bool {
+    match scope {
+        VerifierAdoptionScopeV1::AllContinuityVerification => true,
+        VerifierAdoptionScopeV1::Contract { contract_id } => *contract_id == claim.contract_id(),
+        VerifierAdoptionScopeV1::Requirements {
+            contract_id,
+            requirement_ids,
+        } => {
+            *contract_id == claim.contract_id()
+                && requirement_ids
+                    .iter()
+                    .any(|requirement_id| *requirement_id == claim.requirement_id())
+        }
     }
 }
 
@@ -277,6 +408,23 @@ pub enum VerificationAdmissionError {
     UnknownRequirement,
     #[error("raw claim references a requirement outside the verification policy")]
     RequirementOutsideVerificationPolicy,
+    #[error("adoption authority binds a different exact verifier profile")]
+    AuthorityVerifierProfileMismatch,
+    #[error("adoption authority root snapshot does not match the adoption transition")]
+    AuthorityRootSnapshotMismatch,
+    #[error("authorized evidence class {authorized:?} exceeds verifier profile maximum {profile:?}")]
+    AuthorityEvidenceClassExceedsProfile {
+        profile: EvidenceClass,
+        authorized: EvidenceClass,
+    },
+    #[error("verification claim requirement is outside the verifier adoption authority scope")]
+    RequirementOutsideAdoptionScope,
+    #[error("verification evidence observation {observed_at_unix_ms} is outside verifier adoption validity [{valid_from_unix_ms}, {valid_until_unix_ms})")]
+    EvidenceObservationOutsideAdoptionValidity {
+        observed_at_unix_ms: u64,
+        valid_from_unix_ms: u64,
+        valid_until_unix_ms: u64,
+    },
     #[error("authentication evidence digest must be non-zero")]
     ZeroAuthenticationEvidenceDigest,
 }
@@ -324,11 +472,17 @@ fn hash_claim(
 fn hash_authenticated(
     claim_id: VerificationEvidenceClaimId,
     profile_id: VerifierProfileId,
+    effective_evidence_class: EvidenceClass,
+    adoption_transition_digest: VerifierProfileAdoptionTransitionDigest,
+    authority_root_snapshot_id: VerifierProfileAdoptionAuthorityRootSnapshotId,
     auth_digest: [u8; 32],
 ) -> [u8; 32] {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(claim_id.as_bytes());
     bytes.extend_from_slice(profile_id.as_bytes());
+    bytes.push(evidence_class_tag(effective_evidence_class));
+    bytes.extend_from_slice(adoption_transition_digest.as_bytes());
+    bytes.extend_from_slice(authority_root_snapshot_id.as_bytes());
     bytes.extend_from_slice(&auth_digest);
     domain_hash(AUTH_DOMAIN, &bytes)
 }
@@ -367,24 +521,37 @@ mod tests {
         DependencyBasis, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
         ObservationEnvelopeV1,
     };
+    use crate::profile_adoption::{
+        VerifierProfileAdoptionSubjectV1, VerifierProfileAdoptionTransitionV1,
+    };
+    use crate::profile_adoption_root::VerifierProfileAdoptionAuthorityRootSnapshotV1;
     use crate::witness::VerificationPolicyEntryV1;
 
-    fn contract() -> ValidatedContinuityContractV1 {
+    const AUTH_VALID_FROM: u64 = 1_600_000_000_000;
+    const AUTH_VALID_UNTIL: u64 = 1_800_000_000_000;
+
+    fn contract_with_seed(seed: u8) -> ValidatedContinuityContractV1 {
         let obs = ObservationEnvelopeV1::new(
-            "machine-1", "workflow.dependency", "fixture", "1", 1_700_000_000_000,
-            ObservationCoverage::Complete, EvidenceBasis::Tested, [1; 32], vec![],
+            format!("machine-{seed}"), "workflow.dependency", "fixture", "1",
+            1_700_000_000_000 + seed as u64, ObservationCoverage::Complete,
+            EvidenceBasis::Tested, [seed; 32], vec![],
         ).unwrap();
         let dep = DependencyClaimV1::new(
-            "role:research", "requires", "capability:cuda", DependencyBasis::Observed,
+            "role:research", "requires", format!("capability-{seed}"), DependencyBasis::Observed,
             vec![obs.id()], vec![],
         ).unwrap();
         let req = ContinuityRequirementV1::new(
-            dep.id(), "cuda-workflow", RequirementCriticality::Must,
-            EquivalencePredicate::BehavioralScenario { scenario_id: "cuda-fixture-v1".into() },
-            ApprovalBasis::ExplicitPolicy, [2; 32],
+            dep.id(), format!("cuda-workflow-{seed}"), RequirementCriticality::Must,
+            EquivalencePredicate::BehavioralScenario { scenario_id: format!("cuda-fixture-{seed}") },
+            ApprovalBasis::ExplicitPolicy, [seed.wrapping_add(20); 32],
         ).unwrap();
-        ContinuityContractV1::new("research-fleet", [3; 32], vec![req]).unwrap().validate().unwrap()
+        ContinuityContractV1::new(
+            format!("research-fleet-{seed}"),
+            [seed.wrapping_add(40); 32],
+            vec![req],
+        ).unwrap().validate().unwrap()
     }
+    fn contract() -> ValidatedContinuityContractV1 { contract_with_seed(1) }
     fn profile() -> VerifierProfileV1 {
         VerifierProfileV1::new("hardware-verifier-v1", [9; 32], 7, EvidenceClass::HardwareVerified).unwrap()
     }
@@ -394,11 +561,81 @@ mod tests {
             vec![VerificationPolicyEntryV1::new(contract.requirements()[0].id(), EvidenceClass::Simulated)],
         ).unwrap()
     }
-    fn claim(contract: &ValidatedContinuityContractV1, target: TargetRealizationId, profile: &VerifierProfileV1, challenge: [u8; 32]) -> VerificationEvidenceClaimV1 {
+    fn claim_at(
+        contract: &ValidatedContinuityContractV1,
+        target: TargetRealizationId,
+        profile: &VerifierProfileV1,
+        challenge: [u8; 32],
+        observed_at_unix_ms: u64,
+    ) -> VerificationEvidenceClaimV1 {
         VerificationEvidenceClaimV1::new(
             contract.id(), target, contract.requirements()[0].id(), profile.id(), challenge,
-            1_700_000_000_111, VerificationOutcomeV1::Satisfied, [8; 32],
+            observed_at_unix_ms, VerificationOutcomeV1::Satisfied, [8; 32],
         ).unwrap()
+    }
+    fn claim(contract: &ValidatedContinuityContractV1, target: TargetRealizationId, profile: &VerifierProfileV1, challenge: [u8; 32]) -> VerificationEvidenceClaimV1 {
+        claim_at(contract, target, profile, challenge, 1_700_000_000_111)
+    }
+    fn profile_checked_from_claim(
+        contract: &ValidatedContinuityContractV1,
+        target: TargetRealizationId,
+        profile: &VerifierProfileV1,
+        challenge: [u8; 32],
+        claim: VerificationEvidenceClaimV1,
+    ) -> ProfilePolicyCheckedVerificationEvidenceV1 {
+        policy_check_verification_evidence(
+            contract,
+            target,
+            &policy(contract),
+            profile,
+            challenge,
+            claim,
+        ).unwrap()
+    }
+    fn profile_checked(
+        contract: &ValidatedContinuityContractV1,
+        target: TargetRealizationId,
+        profile: &VerifierProfileV1,
+        challenge: [u8; 32],
+    ) -> ProfilePolicyCheckedVerificationEvidenceV1 {
+        profile_checked_from_claim(
+            contract,
+            target,
+            profile,
+            challenge,
+            claim(contract, target, profile, challenge),
+        )
+    }
+    fn authority_context(
+        profile: &VerifierProfileV1,
+        adoption_id: &str,
+        scope: VerifierAdoptionScopeV1,
+        ceiling: EvidenceClass,
+        root_epoch: u64,
+    ) -> (
+        VerifierProfileAdoptionTransitionV1,
+        VerifierProfileAdoptionAuthorityRootSnapshotV1,
+    ) {
+        let subject = VerifierProfileAdoptionSubjectV1::new(
+            adoption_id,
+            "organization:test",
+            "adoption-root-1",
+            [0x55; 32],
+            profile,
+            1,
+            AUTH_VALID_FROM,
+            AUTH_VALID_UNTIL,
+            ceiling,
+            scope,
+        ).unwrap();
+        let transition = VerifierProfileAdoptionTransitionV1::bootstrap(subject).unwrap();
+        let root = VerifierProfileAdoptionAuthorityRootSnapshotV1::new(
+            "organization:test",
+            "adoption-root-1",
+            [0x55; 32],
+            root_epoch,
+        ).unwrap();
+        (transition, root)
     }
 
     #[test]
@@ -433,5 +670,163 @@ mod tests {
         let a = profile();
         let b = VerifierProfileV1::new("hardware-verifier-v1", [9; 32], 8, EvidenceClass::HardwareVerified).unwrap();
         assert_ne!(a.id(), b.id());
+    }
+
+    #[test]
+    fn adopted_ceiling_not_profile_max_drives_authenticated_disposition() {
+        let contract = contract();
+        let target = TargetRealizationId::from_digest([4; 32]).unwrap();
+        let profile = profile();
+        let checked = profile_checked(&contract, target, &profile, [5; 32]);
+        let (adoption, root) = authority_context(
+            &profile,
+            "adopt-restricted",
+            VerifierAdoptionScopeV1::AllContinuityVerification,
+            EvidenceClass::DifferentiallyVerified,
+            9,
+        );
+        let authority_checked = AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
+            checked,
+            &adoption,
+            &root,
+        ).unwrap();
+        let authenticated = AuthenticatedVerificationEvidenceV1::authenticate_for_test(
+            authority_checked,
+            [0x77; 32],
+        ).unwrap();
+
+        assert_eq!(authenticated.effective_evidence_class(), EvidenceClass::DifferentiallyVerified);
+        assert!(matches!(
+            authenticated.disposition(),
+            ObligationDispositionV1::Satisfied {
+                evidence_class: EvidenceClass::DifferentiallyVerified,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn adoption_profile_must_match_profile_policy_result() {
+        let contract = contract();
+        let target = TargetRealizationId::from_digest([4; 32]).unwrap();
+        let profile_a = profile();
+        let profile_b = VerifierProfileV1::new(
+            "hardware-verifier-v1",
+            [0x0a; 32],
+            8,
+            EvidenceClass::HardwareVerified,
+        ).unwrap();
+        let checked = profile_checked(&contract, target, &profile_a, [5; 32]);
+        let (adoption, root) = authority_context(
+            &profile_b,
+            "adopt-other-profile",
+            VerifierAdoptionScopeV1::AllContinuityVerification,
+            EvidenceClass::HardwareVerified,
+            9,
+        );
+        assert_eq!(
+            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
+                checked,
+                &adoption,
+                &root,
+            ).unwrap_err(),
+            VerificationAdmissionError::AuthorityVerifierProfileMismatch
+        );
+    }
+
+    #[test]
+    fn adoption_scope_is_a_second_gate_after_profile_policy() {
+        let contract = contract();
+        let foreign = contract_with_seed(2);
+        let target = TargetRealizationId::from_digest([4; 32]).unwrap();
+        let profile = profile();
+        let checked = profile_checked(&contract, target, &profile, [5; 32]);
+        let (adoption, root) = authority_context(
+            &profile,
+            "adopt-foreign-scope",
+            VerifierAdoptionScopeV1::Contract { contract_id: foreign.id() },
+            EvidenceClass::HardwareVerified,
+            9,
+        );
+        assert_eq!(
+            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
+                checked,
+                &adoption,
+                &root,
+            ).unwrap_err(),
+            VerificationAdmissionError::RequirementOutsideAdoptionScope
+        );
+    }
+
+    #[test]
+    fn evidence_observation_must_fall_inside_adoption_validity() {
+        let contract = contract();
+        let target = TargetRealizationId::from_digest([4; 32]).unwrap();
+        let profile = profile();
+        let early = claim_at(
+            &contract,
+            target,
+            &profile,
+            [5; 32],
+            AUTH_VALID_FROM - 1,
+        );
+        let checked = profile_checked_from_claim(&contract, target, &profile, [5; 32], early);
+        let (adoption, root) = authority_context(
+            &profile,
+            "adopt-time-bound",
+            VerifierAdoptionScopeV1::AllContinuityVerification,
+            EvidenceClass::HardwareVerified,
+            9,
+        );
+        assert_eq!(
+            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
+                checked,
+                &adoption,
+                &root,
+            ).unwrap_err(),
+            VerificationAdmissionError::EvidenceObservationOutsideAdoptionValidity {
+                observed_at_unix_ms: AUTH_VALID_FROM - 1,
+                valid_from_unix_ms: AUTH_VALID_FROM,
+                valid_until_unix_ms: AUTH_VALID_UNTIL,
+            }
+        );
+    }
+
+    #[test]
+    fn authenticated_identity_commits_to_authority_grant_context() {
+        let contract = contract();
+        let target = TargetRealizationId::from_digest([4; 32]).unwrap();
+        let profile = profile();
+        let checked = profile_checked(&contract, target, &profile, [5; 32]);
+        let (adoption_a, root_a) = authority_context(
+            &profile,
+            "adopt-a",
+            VerifierAdoptionScopeV1::AllContinuityVerification,
+            EvidenceClass::DifferentiallyVerified,
+            9,
+        );
+        let (adoption_b, root_b) = authority_context(
+            &profile,
+            "adopt-b",
+            VerifierAdoptionScopeV1::AllContinuityVerification,
+            EvidenceClass::DifferentiallyVerified,
+            10,
+        );
+        let a = AuthenticatedVerificationEvidenceV1::authenticate_for_test(
+            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
+                checked.clone(), &adoption_a, &root_a,
+            ).unwrap(),
+            [0x77; 32],
+        ).unwrap();
+        let b = AuthenticatedVerificationEvidenceV1::authenticate_for_test(
+            AuthorityCheckedVerificationEvidenceV1::authorize_for_test(
+                checked, &adoption_b, &root_b,
+            ).unwrap(),
+            [0x77; 32],
+        ).unwrap();
+
+        assert_ne!(a.id(), b.id());
+        assert_ne!(a.adoption_transition_digest(), b.adoption_transition_digest());
+        assert_ne!(a.authority_root_snapshot_id(), b.authority_root_snapshot_id());
     }
 }
