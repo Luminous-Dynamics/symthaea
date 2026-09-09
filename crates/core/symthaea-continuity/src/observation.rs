@@ -123,17 +123,17 @@ impl ObservationEnvelopeV1 {
             return Err(ObservationError::ZeroEvidenceDigest);
         }
         let limitations = checked_limitations(limitations)?;
-        let observation_id = ObservationId(hash_observation(
-            &subject,
-            &observation_kind,
-            &provider_id,
-            &provider_version,
+        let observation_id = ObservationId(hash_observation(&ObservationIdentityFields {
+            subject: &subject,
+            observation_kind: &observation_kind,
+            provider_id: &provider_id,
+            provider_version: &provider_version,
             captured_at_unix_ms,
             coverage,
             basis,
             evidence_digest,
-            &limitations,
-        ));
+            limitations: &limitations,
+        }));
         Ok(Self {
             subject,
             observation_kind,
@@ -203,17 +203,17 @@ impl ObservationEnvelopeV1 {
         if canonical_limitations != self.limitations {
             return Err(ObservationError::NonCanonicalLimitations);
         }
-        let expected = ObservationId(hash_observation(
-            &self.subject,
-            &self.observation_kind,
-            &self.provider_id,
-            &self.provider_version,
-            self.captured_at_unix_ms,
-            self.coverage,
-            self.basis,
-            self.evidence_digest,
-            &self.limitations,
-        ));
+        let expected = ObservationId(hash_observation(&ObservationIdentityFields {
+            subject: &self.subject,
+            observation_kind: &self.observation_kind,
+            provider_id: &self.provider_id,
+            provider_version: &self.provider_version,
+            captured_at_unix_ms: self.captured_at_unix_ms,
+            coverage: self.coverage,
+            basis: self.basis,
+            evidence_digest: self.evidence_digest,
+            limitations: &self.limitations,
+        }));
         if self.observation_id != expected {
             return Err(ObservationError::IdentityMismatch);
         }
@@ -407,27 +407,29 @@ fn checked_limitations(limitations: Vec<String>) -> Result<Vec<String>, Observat
     Ok(out)
 }
 
-fn hash_observation(
-    subject: &str,
-    observation_kind: &str,
-    provider_id: &str,
-    provider_version: &str,
+struct ObservationIdentityFields<'a> {
+    subject: &'a str,
+    observation_kind: &'a str,
+    provider_id: &'a str,
+    provider_version: &'a str,
     captured_at_unix_ms: u64,
     coverage: ObservationCoverage,
     basis: EvidenceBasis,
     evidence_digest: [u8; 32],
-    limitations: &[String],
-) -> [u8; 32] {
+    limitations: &'a [String],
+}
+
+fn hash_observation(fields: &ObservationIdentityFields<'_>) -> [u8; 32] {
     let mut bytes = Vec::new();
-    put_str(&mut bytes, subject);
-    put_str(&mut bytes, observation_kind);
-    put_str(&mut bytes, provider_id);
-    put_str(&mut bytes, provider_version);
-    bytes.extend_from_slice(&captured_at_unix_ms.to_le_bytes());
-    bytes.push(coverage.tag());
-    bytes.push(basis.tag());
-    bytes.extend_from_slice(&evidence_digest);
-    put_strings(&mut bytes, limitations);
+    put_str(&mut bytes, fields.subject);
+    put_str(&mut bytes, fields.observation_kind);
+    put_str(&mut bytes, fields.provider_id);
+    put_str(&mut bytes, fields.provider_version);
+    bytes.extend_from_slice(&fields.captured_at_unix_ms.to_le_bytes());
+    bytes.push(fields.coverage.tag());
+    bytes.push(fields.basis.tag());
+    bytes.extend_from_slice(&fields.evidence_digest);
+    put_strings(&mut bytes, fields.limitations);
     domain_hash(OBSERVATION_DOMAIN, &bytes)
 }
 

@@ -142,16 +142,14 @@ impl RootBoundPolicyCheckedVerifierProfileAdoptionV1 {
 
         if let VerifierProfileAdoptionHeadV1::Current(identity) =
             checked.expected_predecessor_head()
-        {
-            if identity.authority_subject() != authority_root_snapshot.authority_subject()
+            && (identity.authority_subject() != authority_root_snapshot.authority_subject()
                 || identity.authority_root_id() != authority_root_snapshot.authority_root_id()
                 || identity.authority_root_digest()
-                    != authority_root_snapshot.authority_root_digest()
-            {
-                return Err(
-                    VerifierProfileAdoptionRootBindingError::PredecessorRootSnapshotMismatch,
-                );
-            }
+                    != authority_root_snapshot.authority_root_digest())
+        {
+            return Err(
+                VerifierProfileAdoptionRootBindingError::PredecessorRootSnapshotMismatch,
+            );
         }
 
         let transition_digest = checked.transition().transition_digest()?;
