@@ -16,6 +16,7 @@ mod design_space;
 mod economics;
 mod electron_nuclear_coupling;
 mod geometry;
+mod gluonic_hadrons;
 mod hadrons;
 mod high_entropy_alloys;
 mod inverse_search;
@@ -128,6 +129,7 @@ mod physics_validation_r7;
 #[cfg(test)]
 mod demo;
 
+pub use gluonic_hadrons::*;
 pub use hadrons::*;
 pub use periodic_table::*;
 pub use standard_model::*;
