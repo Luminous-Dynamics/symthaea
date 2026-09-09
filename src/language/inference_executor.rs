@@ -1,10 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! IF-4 permit-gated OpenAI-compatible executor.
+//! IF-4/IF-6 permit-gated OpenAI-compatible executor.
 //!
 //! The raw transport is private. Callers must transfer a `PreparedInferenceExecution`
 //! and the executor re-derives the complete v2 binding immediately before I/O.
+//!
+//! IF-6 consumes IF-5 observed transport results and projects only privacy-minimized
+//! wire evidence into receipts.
 
 #[cfg(not(test))]
 use super::inference_binding::{CredentialStateBinding, QuotaStateBinding};
@@ -19,12 +22,14 @@ use super::inference_execution_envelope::{
 use super::inference_permit::PreparedInferenceExecution;
 #[cfg(not(test))]
 use super::inference_receipt::{
-    InferenceFailureClass, InferenceReceipt, InferenceReceiptError,
+    InferenceFailureClass, InferenceRateLimitEvidence, InferenceReceipt, InferenceReceiptError,
+    InferenceTokenUsageEvidence, InferenceWireEvidence,
 };
 #[cfg(not(test))]
 use super::openai_compatible_transport::{
-    OpenAiCompatibleConfig, OpenAiCompatibleTransport, TransportConfigError, TransportCredential,
-    TransportError, TransportGenerationRequest,
+    OpenAiCompatibleConfig, OpenAiCompatibleTransport, ObservedTransportFailure,
+    ObservedTransportGeneration, TransportConfigError, TransportCredential, TransportError,
+    TransportGenerationRequest, TransportWireObservation,
 };
 
 #[cfg(test)]
@@ -39,11 +44,15 @@ use crate::inference_execution_envelope::{
 #[cfg(test)]
 use crate::inference_permit::PreparedInferenceExecution;
 #[cfg(test)]
-use crate::inference_receipt::{InferenceFailureClass, InferenceReceipt, InferenceReceiptError};
+use crate::inference_receipt::{
+    InferenceFailureClass, InferenceRateLimitEvidence, InferenceReceipt, InferenceReceiptError,
+    InferenceTokenUsageEvidence, InferenceWireEvidence,
+};
 #[cfg(test)]
 use crate::openai_compatible_transport::{
-    OpenAiCompatibleConfig, OpenAiCompatibleTransport, TransportConfigError, TransportCredential,
-    TransportError, TransportGenerationRequest,
+    OpenAiCompatibleConfig, OpenAiCompatibleTransport, ObservedTransportFailure,
+    ObservedTransportGeneration, TransportConfigError, TransportCredential, TransportError,
+    TransportGenerationRequest, TransportWireObservation,
 };
 
 use std::fmt;
@@ -69,11 +78,25 @@ pub enum InferenceExecutionFailure {
 }
 
 /// Terminal execution result. Operational failures still carry a receipt.
-#[derive(Debug)]
+///
+/// Custom `Debug` deliberately does not render `response_text` or raw provider
+/// request/response identifiers from the immediate wire observation.
 pub struct InferenceExecutionOutcome {
     pub response_text: Option<String>,
     pub receipt: InferenceReceipt,
     pub failure: Option<InferenceExecutionFailure>,
+    pub wire_observation: Option<TransportWireObservation>,
+}
+
+impl fmt::Debug for InferenceExecutionOutcome {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InferenceExecutionOutcome")
+            .field("response_text_present", &self.response_text.is_some())
+            .field("receipt", &self.receipt)
+            .field("failure", &self.failure)
+            .field("wire_observation_present", &self.wire_observation.is_some())
+            .finish()
+    }
 }
 
 /// OpenAI-compatible executor whose underlying transport cannot be accessed directly.
@@ -111,13 +134,8 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
         let timeout_millis = u64::try_from(timeout.as_millis())
             .map_err(|_| InferenceExecutorConfigError::TimeoutTooLarge)?;
 
-        let config = OpenAiCompatibleConfig::new(
-            provider_id,
-            base_url,
-            wire_model,
-            credential,
-        )?
-        .with_timeout(timeout)?;
+        let config = OpenAiCompatibleConfig::new(provider_id, base_url, wire_model, credential)?
+            .with_timeout(timeout)?;
 
         // Build endpoint evidence from the already-normalized transport config.
         let endpoint = EndpointStateBinding::openai_compatible(
@@ -179,24 +197,9 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
             }
         };
 
-        match self.transport.generate(&wire_request).await {
-            Ok(response) => {
-                let completed_at_tick = self.clock.now_tick();
-                let receipt = InferenceReceipt::success(
-                    prepared,
-                    &response.text,
-                    completed_at_tick,
-                )?;
-                Ok(InferenceExecutionOutcome {
-                    response_text: Some(response.text),
-                    receipt,
-                    failure: None,
-                })
-            }
-            Err(error) => {
-                let (failure, receipt_class) = classify_transport_error(&error);
-                self.failure_outcome(prepared, failure, receipt_class)
-            }
+        match self.transport.generate_observed(&wire_request).await {
+            Ok(observed) => self.success_outcome(prepared, observed),
+            Err(failure) => self.transport_failure_outcome(prepared, failure),
         }
     }
 
@@ -241,26 +244,11 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
 
         match self
             .transport
-            .generate_streaming(&wire_request, on_token)
+            .generate_streaming_observed(&wire_request, on_token)
             .await
         {
-            Ok(response) => {
-                let completed_at_tick = self.clock.now_tick();
-                let receipt = InferenceReceipt::success(
-                    prepared,
-                    &response.text,
-                    completed_at_tick,
-                )?;
-                Ok(InferenceExecutionOutcome {
-                    response_text: Some(response.text),
-                    receipt,
-                    failure: None,
-                })
-            }
-            Err(error) => {
-                let (failure, receipt_class) = classify_transport_error(&error);
-                self.failure_outcome(prepared, failure, receipt_class)
-            }
+            Ok(observed) => self.success_outcome(prepared, observed),
+            Err(failure) => self.transport_failure_outcome(prepared, failure),
         }
     }
 
@@ -306,6 +294,49 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
         })
     }
 
+    fn success_outcome(
+        &self,
+        prepared: PreparedInferenceExecution,
+        observed: ObservedTransportGeneration,
+    ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {
+        let completed_at_tick = self.clock.now_tick();
+        let wire_evidence = receipt_wire_evidence(&observed.observation)?;
+        let receipt = InferenceReceipt::success_observed(
+            prepared,
+            &observed.response.text,
+            completed_at_tick,
+            wire_evidence,
+        )?;
+        Ok(InferenceExecutionOutcome {
+            response_text: Some(observed.response.text),
+            receipt,
+            failure: None,
+            wire_observation: Some(observed.observation),
+        })
+    }
+
+    fn transport_failure_outcome(
+        &self,
+        prepared: PreparedInferenceExecution,
+        observed_failure: ObservedTransportFailure,
+    ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {
+        let (failure, receipt_class) = classify_transport_error(&observed_failure.error);
+        let completed_at_tick = self.clock.now_tick();
+        let wire_evidence = receipt_wire_evidence(&observed_failure.observation)?;
+        let receipt = InferenceReceipt::failure_observed(
+            prepared,
+            receipt_class,
+            completed_at_tick,
+            wire_evidence,
+        )?;
+        Ok(InferenceExecutionOutcome {
+            response_text: None,
+            receipt,
+            failure: Some(failure),
+            wire_observation: Some(observed_failure.observation),
+        })
+    }
+
     fn failure_outcome(
         &self,
         prepared: PreparedInferenceExecution,
@@ -318,8 +349,42 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
             response_text: None,
             receipt,
             failure: Some(failure),
+            wire_observation: None,
         })
     }
+}
+
+fn receipt_wire_evidence(
+    observation: &TransportWireObservation,
+) -> Result<InferenceWireEvidence, InferenceReceiptError> {
+    let usage = observation.usage.map(|usage| InferenceTokenUsageEvidence {
+        prompt_tokens: usage.prompt_tokens,
+        completion_tokens: usage.completion_tokens,
+        total_tokens: usage.total_tokens,
+    });
+    let limits = observation.rate_limits;
+    let rate_limits = InferenceRateLimitEvidence {
+        retry_after_millis: limits.retry_after_millis,
+        request_limit: limits.request_limit,
+        request_remaining: limits.request_remaining,
+        request_reset_after_millis: limits.request_reset_after_millis,
+        token_limit: limits.token_limit,
+        token_remaining: limits.token_remaining,
+        token_reset_after_millis: limits.token_reset_after_millis,
+    };
+
+    InferenceWireEvidence::new(
+        observation.response_id.as_deref(),
+        observation.request_id_header.as_deref(),
+        observation.provider_model.as_deref(),
+        observation.system_fingerprint.as_deref(),
+        observation.finish_reason.as_deref(),
+        usage,
+        rate_limits,
+        observation.latency_millis,
+        observation.metadata_conflict,
+        observation.metadata_rejected,
+    )
 }
 
 fn classify_transport_error(
