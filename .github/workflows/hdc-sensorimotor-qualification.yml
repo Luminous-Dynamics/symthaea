@@ -12,6 +12,7 @@ on:
       - 'src/perception/mod.rs'
       - 'crates/domains/symthaea-humanoid/src/actuation.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_action.rs'
+      - 'crates/domains/symthaea-humanoid/src/semantic_action_causality.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_state.rs'
       - 'crates/domains/symthaea-humanoid/src/lib.rs'
       - '.github/workflows/hdc-sensorimotor-qualification.yml'
@@ -101,4 +102,10 @@ jobs:
             -- --test-threads=1
           cargo test -p symthaea-humanoid \
             clipping \
+            -- --test-threads=1
+
+      - name: Run backend action causality probe
+        run: |
+          cargo test -p symthaea-humanoid \
+            semantic_action_causality \
             -- --test-threads=1
