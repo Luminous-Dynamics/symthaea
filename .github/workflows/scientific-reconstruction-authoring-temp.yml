@@ -1,0 +1,112 @@
+name: Scientific Reconstruction Authoring Temp
+
+on:
+  push:
+    branches:
+      - ci/scientific-reconstruction-authoring-temp
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout construction subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Apply narrow source fixes and format
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          module = Path('crates/core/symthaea-scientific-replay/src/qualified_reconstruction.rs')
+          text = module.read_text()
+
+          old = '''    node_contributions: BTreeMap<String, Option<String>>,
+'''
+          assert old in text
+          text = text.replace(old, '', 1)
+
+          old = '''    for candidate in view.candidates.values() {
+        if node_contributions.get(&candidate.reason_id)
+            != Some(&Some(candidate.contribution_id.clone()))
+        {
+            return Err(ReconstructionErrorV1::CandidateReasonMismatch {
+                contribution_id: candidate.contribution_id.clone(),
+                reason_id: candidate.reason_id.clone(),
+            });
+        }
+    }
+'''
+          new = '''    for candidate in view.candidates.values() {
+        match node_contributions.get(&candidate.reason_id) {
+            Some(Some(contribution_id)) if contribution_id == &candidate.contribution_id => {}
+            _ => {
+                return Err(ReconstructionErrorV1::CandidateReasonMismatch {
+                    contribution_id: candidate.contribution_id.clone(),
+                    reason_id: candidate.reason_id.clone(),
+                });
+            }
+        }
+    }
+'''
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          old = '''        node_contributions,
+        canonical_nodes,
+'''
+          new = '''        canonical_nodes,
+'''
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          old = '''                if dependencies.as_slice() != [source_predicate_id.as_str()] {
+'''
+          new = '''                if dependencies.len() != 1 || dependencies[0] != *source_predicate_id {
+'''
+          assert old in text
+          text = text.replace(old, new, 1)
+          module.write_text(text)
+
+          lib = Path('crates/core/symthaea-scientific-replay/src/lib.rs')
+          lib_text = lib.read_text()
+          marker = '#![forbid(unsafe_code)]\n'
+          assert marker in lib_text
+          assert 'pub mod qualified_reconstruction;' not in lib_text
+          lib_text = lib_text.replace(
+              marker,
+              marker + '\n/// Owner-qualified SCI-014A reconstruction and full historical replay.\npub mod qualified_reconstruction;\n',
+              1,
+          )
+          lib.write_text(lib_text)
+          PY
+
+          cargo fmt -p symthaea-scientific-replay
+
+          changed="$(git diff --name-only)"
+          test "$changed" = $'crates/core/symthaea-scientific-replay/src/lib.rs\ncrates/core/symthaea-scientific-replay/src/qualified_reconstruction.rs'
+
+      - name: Commit normalized construction candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Symthaea CI Authoring Candidate'
+          git config user.email 'actions@users.noreply.github.com'
+          git add crates/core/symthaea-scientific-replay/src/lib.rs crates/core/symthaea-scientific-replay/src/qualified_reconstruction.rs
+          git commit -m 'style(science): normalize qualified reconstruction candidate'
+          git push origin HEAD:ci/scientific-reconstruction-authoring-temp
