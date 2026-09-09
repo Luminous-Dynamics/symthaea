@@ -1,0 +1,149 @@
+name: ALife Causal Rescue Estimand
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/causal_replay_estimand.rs"
+      - "crates/domains/symthaea-alife/src/causal_replay_session.rs"
+      - "crates/domains/symthaea-alife/src/evolvability.rs"
+      - ".github/workflows/alife-causal-replay-estimand.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Primary mutation-rescue estimand theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/causal_replay_estimand.rs
+          sha256sum crates/domains/symthaea-alife/src/causal_replay_session.rs
+          sha256sum crates/domains/symthaea-alife/src/evolvability.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-causal-replay-estimand
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Execute estimand regressions
+        run: 'cargo test --locked -p symthaea-alife causal_replay_estimand::'
+
+      - name: Execute session and recovery prerequisites
+        run: |
+          cargo test --locked -p symthaea-alife causal_replay_session::
+          cargo test --locked -p symthaea-alife evolvability::
+
+      - name: Strict ALife Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze primary metric and contrast
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_estimand.rs"
+          grep -q 'NormalizedPopulationDeficitArea' "$src"
+          grep -q 'RevertMinusSham' "$src"
+          grep -q 'revert_normalized_deficit_area - sham_normalized_deficit_area' "$src"
+          grep -q 'positive means the reversion worsened normalized population deficit area' "$src"
+
+      - name: Freeze exact sham fidelity prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_estimand.rs"
+          grep -q 'ExactNaturalExecutionCapsule' "$src"
+          grep -q 'sham branch must reproduce the observed natural execution capsule exactly' "$src"
+
+      - name: Freeze metric domain and effect evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_estimand.rs"
+          grep -q 'NonFiniteMetric' "$src"
+          grep -q 'NegativeMetric' "$src"
+          grep -q 'NonFiniteEffect' "$src"
+          grep -q 'CausalRescueEffectV1' "$src"
+          grep -q 'effect_bits' "$src"
+
+      - name: Freeze experiment spec composition
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_estimand.rs"
+          grep -q 'pub struct CausalRescueExperimentSpecV1' "$src"
+          grep -q 'CausalRescueEstimandV1::canonical()' "$src"
+          grep -q '\.session' "$src"
+          grep -q '\.validate()' "$src"
+          grep -q 'NonCanonicalEstimand' "$src"
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_estimand.rs"
+          ! grep -q 'live_replay_established=true' "$src"
+          ! grep -q 'sham_fidelity_established=true' "$src"
+          ! grep -q 'statistical_inference_established=true' "$src"
+          ! grep -q 'causal_rescue_established=true' "$src"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-causal-replay-estimand-evidence
+          {
+            echo "authority=causal_rescue_estimand_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "estimand_sha256=$(sha256sum crates/domains/symthaea-alife/src/causal_replay_estimand.rs | cut -d' ' -f1)"
+            echo "primary_metric=normalized_population_deficit_area"
+            echo "primary_contrast=revert_minus_sham"
+            echo "positive_effect_means_reversion_worse=true"
+            echo "sham_fidelity_requirement=exact_natural_execution_capsule"
+            echo "live_replay_established=false"
+            echo "sham_fidelity_established=false"
+            echo "statistical_inference_established=false"
+            echo "causal_rescue_established=false"
+          } > target/alife-causal-replay-estimand-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-causal-replay-estimand-evidence
+          path: target/alife-causal-replay-estimand-evidence/qualification.txt
+          if-no-files-found: error
