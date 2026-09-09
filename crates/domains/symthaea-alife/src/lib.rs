@@ -29,6 +29,7 @@ pub mod earth_forcing;
 pub mod encounter;
 pub mod encounter_snapshot;
 pub mod environment;
+pub mod environment_snapshot;
 pub mod events;
 pub mod evolvability;
 pub mod evolvability_comparison;
@@ -78,6 +79,11 @@ pub use encounter_snapshot::{
     ValidatedEncounterSchedulerSnapshotV1,
 };
 pub use environment::Environment;
+pub use environment_snapshot::{
+    EarthForcedEnvironmentSnapshotErrorV1, EarthForcedEnvironmentSnapshotV1,
+    EnvironmentSnapshotErrorV1, EnvironmentSnapshotV1, IceAlbedoModelSnapshotV1,
+    ValidatedEarthForcedEnvironmentSnapshotV1, ValidatedEnvironmentSnapshotV1,
+};
 pub use events::GenesisEvent;
 pub use evolvability::{
     EvolvabilityError, RecoveryMetrics, analyze_recovery, analyze_recovery_through,
