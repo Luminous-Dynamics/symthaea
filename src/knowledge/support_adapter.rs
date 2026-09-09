@@ -17,9 +17,10 @@
 //! global knowledge confidence/currentness merely because support searched it.
 
 use super::{KnowledgeEncoder, KnowledgeManager};
+use symthaea_support::types::SupportCategory;
 use symthaea_support::{
-    KnowledgeOriginV1, KnowledgeShareabilityV1, KnowledgeSourceErrorV1, SupportCategory,
-    SupportKnowledgeHitV1, SupportKnowledgeQueryV1, SupportKnowledgeSourceV1,
+    KnowledgeOriginV1, KnowledgeShareabilityV1, KnowledgeSourceErrorV1, SupportKnowledgeHitV1,
+    SupportKnowledgeQueryV1, SupportKnowledgeSourceV1,
 };
 
 /// Read-only view of Symthaea's global semantic graph for IT support retrieval.
@@ -178,6 +179,9 @@ mod tests {
     #[test]
     fn unknown_global_domain_does_not_satisfy_category_constraint() {
         assert_eq!(map_support_category("geopolitics"), None);
-        assert_eq!(map_support_category("networking"), Some(SupportCategory::Network));
+        assert_eq!(
+            map_support_category("networking"),
+            Some(SupportCategory::Network)
+        );
     }
 }
