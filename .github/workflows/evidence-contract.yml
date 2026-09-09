@@ -35,23 +35,51 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
 
 jobs:
   evidence-contract:
     name: Exact-head evidence contracts
-    runs-on: ubuntu-latest
+    # Match the already-audited focused Spore qualification convention: pin
+    # the OS generation rather than the moving ubuntu-latest alias. The hosted
+    # image still evolves; the qualifier records the observed runtime/toolchain.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
       - name: Checkout exact qualified head
-        uses: actions/checkout@v4
+        # actions/checkout v4 release-line commit already audited by #406/#438.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Verify pinned checkout reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/evidence-contract.yml)" -eq 1
+          if grep -Eq 'uses: actions/checkout@v[0-9]+' .github/workflows/evidence-contract.yml; then
+            echo 'mutable actions/checkout major-version tag found in evidence qualification workflow' >&2
+            exit 1
+          fi
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+          rustc --version
+          cargo --version
 
       - name: Install focused system dependencies
         run: |
