@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "platform_id": "auv-01",
+  "generation": 7,
+  "sequence": 42,
+  "observed_at_us": 1700000000000042,
+  "kind": "health_observation",
+  "payload_json": "{\"severity\":\"healthy\",\"envelope\":\"normal\"}",
+  "evidence_binding": "xenia-handshake-transcript-v1:blake3-256:2222222222222222222222222222222222222222222222222222222222222222",
+  "position_evidence_refs": [
+    "mycelix-position:measurement:fixture-001"
+  ],
+  "previous_event_digest": null
+}
