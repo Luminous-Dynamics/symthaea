@@ -26,7 +26,7 @@ jobs:
           toolchain: 1.96.0
           components: rustfmt
 
-      - name: Apply narrow source fixes and format
+      - name: Apply authority fixes and format
         shell: bash
         run: |
           set -euo pipefail
@@ -35,6 +35,29 @@ jobs:
 
           module = Path('crates/core/symthaea-scientific-replay/src/qualified_reconstruction.rs')
           text = module.read_text()
+
+          # Synthetic fixtures prove the reconstruction protocol shape. They do
+          # not mint the production-reserved scientific replay capabilities.
+          text = text.replace(
+              'QualifiedScientificReconstructionV1',
+              'QualifiedScientificReconstructionFixtureV1',
+          )
+          text = text.replace(
+              'ReplayVerifiedScientificDispositionV1',
+              'ReplayVerifiedScientificDispositionFixtureV1',
+          )
+          text = text.replace(
+              'verify_replay_scientific_disposition_v1',
+              'verify_replay_scientific_disposition_fixture_v1',
+          )
+          text = text.replace(
+              'PredicateDerivationReceiptV1',
+              'PredicateDerivationReceiptFixtureV1',
+          )
+          text = text.replace(
+              'ScientificReconstructionMaterialV1',
+              'ScientificReconstructionFixtureMaterialV1',
+          )
 
           old = '    node_contributions: BTreeMap<String, Option<String>>,\n'
           assert old in text
@@ -51,9 +74,31 @@ jobs:
           text = text.replace(old, new, 1)
 
           old = '                if dependencies.as_slice() != [source_predicate_id.as_str()] {\n'
-          new = '                if dependencies.len() != 1 || dependencies[0] != *source_predicate_id {\n'
+          new = '                if dependencies.len() != 1 || dependencies.first() != Some(source_predicate_id) {\n'
           assert old in text
           text = text.replace(old, new, 1)
+
+          old = "fn build_policy(\n    fixture: &DispositionPolicyFixtureV1,\n) -> Result<DispositionPolicyV1, ReconstructionErrorV1> {\n"
+          new = "fn build_policy(\n    fixture: &DispositionPolicyFixtureV1,\n    scientific_use_id: &str,\n) -> Result<DispositionPolicyV1, ReconstructionErrorV1> {\n"
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          old = '    let mut parts = vec![canonical.profile_id.clone(), canonical.fallback_output.clone()];\n'
+          new = '    let mut parts = vec![\n        scientific_use_id.to_string(),\n        canonical.profile_id.clone(),\n        canonical.fallback_output.clone(),\n    ];\n'
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          old = '    let policy = build_policy(&fixture.policy)?;\n'
+          new = '    let policy = build_policy(&fixture.policy, &scientific_use_id)?;\n'
+          assert old in text
+          text = text.replace(old, new, 1)
+
+          # Make the authority ceiling explicit in source, not merely prose.
+          marker = 'pub const PREDICATE_DERIVATION_FIXTURE_PROFILE_V1: &str =\n    "symthaea.science.predicate-derivation.fixture.v1";\n'
+          assert marker in text
+          ceiling = marker + '\n// Reserved production capability names are intentionally absent from this\n// synthetic tranche. Real qualified upstream capabilities must own them later.\n'
+          text = text.replace(marker, ceiling, 1)
+
           module.write_text(text)
 
           lib = Path('crates/core/symthaea-scientific-replay/src/lib.rs')
@@ -63,7 +108,7 @@ jobs:
           assert 'pub mod qualified_reconstruction;' not in lib_text
           lib_text = lib_text.replace(
               marker,
-              marker + '\n/// Owner-qualified SCI-014A reconstruction and full historical replay.\npub mod qualified_reconstruction;\n',
+              marker + '\n/// SCI-014A synthetic reconstruction protocol qualification.\npub mod qualified_reconstruction;\n',
               1,
           )
           lib.write_text(lib_text)
