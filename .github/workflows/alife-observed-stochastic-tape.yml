@@ -1,0 +1,179 @@
+name: ALife Observed Stochastic Tape
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-fep/src/agent.rs"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/encounter.rs"
+      - "crates/domains/symthaea-alife/src/genome.rs"
+      - "crates/domains/symthaea-alife/src/inheritance_source.rs"
+      - "crates/domains/symthaea-alife/src/observed_stochastic_tape.rs"
+      - ".github/workflows/alife-observed-stochastic-tape.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Canonical observed stochastic evidence contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/observed_stochastic_tape.rs
+          sha256sum crates/domains/symthaea-alife/src/encounter.rs
+          sha256sum crates/domains/symthaea-alife/src/inheritance_source.rs
+          sha256sum crates/domains/symthaea-alife/src/genome.rs
+          sha256sum crates/core/symthaea-fep/src/agent.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-observed-stochastic-tape
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-fep -p symthaea-alife -- --check
+
+      - name: Check relevant targets
+        run: cargo check --locked -p symthaea-fep -p symthaea-alife --all-targets
+
+      - name: Execute tape contract tests
+        run: 'cargo test --locked -p symthaea-alife observed_stochastic_tape::'
+
+      - name: Strict ALife Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze tape authority semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          tape="crates/domains/symthaea-alife/src/observed_stochastic_tape.rs"
+
+          grep -q 'pub struct ObservedStochasticTapeSubjectV1' "$tape"
+          grep -q 'start_behavior_next_tick' "$tape"
+          grep -q 'start_lifecycle_next_sequence' "$tape"
+          grep -q 'end_behavior_next_tick' "$tape"
+          grep -q 'InheritanceSourceSample' "$tape"
+          grep -q 'MutationOccurrence' "$tape"
+          grep -q 'MutationPerturbation' "$tape"
+          grep -q 'OffspringConstructionSeed' "$tape"
+          grep -q 'AgentActionSample' "$tape"
+          grep -q 'RandomPopulation' "$tape"
+          grep -q 'FixedPartnerEligible' "$tape"
+          grep -q 'ScalarOrderNotCanonical' "$tape"
+          grep -q 'SchedulerOrderNotCanonical' "$tape"
+          grep -q 'SchedulerMembershipMismatch' "$tape"
+          grep -q 'project_shared_order' "$tape"
+          grep -q 'does not authenticate where the bytes came from' "$tape"
+
+      - name: Freeze current stochastic owner assumptions
+        shell: bash
+        run: |
+          set -euo pipefail
+          agent="crates/core/symthaea-fep/src/agent.rs"
+          encounter="crates/domains/symthaea-alife/src/encounter.rs"
+          inheritance="crates/domains/symthaea-alife/src/inheritance_source.rs"
+          genome="crates/domains/symthaea-alife/src/genome.rs"
+
+          # FEP action selection currently consumes one xorshift64 unit variate after computing
+          # the softmax probabilities. The tape records that variate, not the chosen action.
+          grep -q 'pub fn select_action(&mut self)' "$agent"
+          grep -q 'let u = (self.rng_state as f64) / (u64::MAX as f64)' "$agent"
+          grep -q 'if u < cumulative' "$agent"
+
+          # RandomPeer currently consumes one inheritance-source unit sample over population order.
+          grep -q 'let r = rng.next_inheritance_source_unit()' "$inheritance"
+          grep -q 'r \* organisms.len() as f64' "$inheritance"
+
+          # Genome-v1 mutation consumes an occurrence draw for each trait and a perturbation draw
+          # only when that trait mutates. Recording action/outcome alone would be insufficient.
+          grep -q 'if next_unit(rng_state) < mutation_rate' "$genome"
+          grep -q 'let perturbation = (next_unit(rng_state) - 0.5)' "$genome"
+
+          # Scheduler natural evidence is order evidence because the current owner is Fisher-Yates.
+          grep -q 'fn shuffle(&mut self, items: &mut \[AgentId\])' "$encounter"
+          grep -q 'for i in (1..items.len()).rev()' "$encounter"
+          grep -q 'items.swap(i, j)' "$encounter"
+
+      - name: Freeze Genome-v1 stochastic address coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          tape="crates/domains/symthaea-alife/src/observed_stochastic_tape.rs"
+          for trait in SetPoint ForageEfficiency ActionTemperature PerceptualGrain; do
+            grep -q "GenomeTraitV1::$trait" "$tape"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('crates/domains/symthaea-alife/src/genome.rs').read_text()
+          body = src.split('pub struct Genome {', 1)[1].split('}', 1)[0]
+          fields = [line for line in body.splitlines() if line.strip().startswith('pub ')]
+          if len(fields) != 4:
+              raise SystemExit(f'Genome-v1 field count changed ({len(fields)}); observed stochastic tape requires explicit audit')
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          tape="crates/domains/symthaea-alife/src/observed_stochastic_tape.rs"
+          ! grep -q 'live_recording_established=true' "$tape"
+          ! grep -q 'live_replay_established=true' "$tape"
+          ! grep -q 'origin_authenticity_established=true' "$tape"
+          ! grep -q 'causal_rescue_established=true' "$tape"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-observed-stochastic-tape-evidence
+          {
+            echo "authority=observed_stochastic_tape_contract_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "tape_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/observed_stochastic_tape.rs | cut -d' ' -f1)"
+            echo "canonical_scalar_evidence=true"
+            echo "exact_scheduler_order_evidence=true"
+            echo "behavior_interval_bound=true"
+            echo "lifecycle_start_anchor_bound=true"
+            echo "current_owner_semantics_checked=true"
+            echo "live_recording_established=false"
+            echo "live_replay_established=false"
+            echo "novel_identity_merge_policy_established=false"
+            echo "origin_authenticity_established=false"
+            echo "causal_rescue_established=false"
+          } > target/alife-observed-stochastic-tape-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-observed-stochastic-tape-evidence
+          path: target/alife-observed-stochastic-tape-evidence/qualification.txt
+          if-no-files-found: error
