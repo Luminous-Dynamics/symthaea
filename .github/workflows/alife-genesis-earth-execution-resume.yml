@@ -1,0 +1,206 @@
+name: ALife Genesis Earth Execution Resume
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-fep/**"
+      - "crates/domains/symthaea-earth-system/**"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/**"
+      - "crates/domains/symthaea-alife/tests/genesis_earth_execution_resume.rs"
+      - ".github/workflows/alife-genesis-earth-execution-resume.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Exact Earth-forced Genesis continuation theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/genesis_execution.rs
+          sha256sum crates/domains/symthaea-alife/tests/genesis_earth_execution_resume.rs
+          sha256sum crates/domains/symthaea-alife/src/earth_forcing/snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/encounter.rs
+          sha256sum crates/domains/symthaea-alife/src/encounter_snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/population/live_snapshot.rs
+          sha256sum crates/domains/symthaea-alife/src/genesis_rolling_evidence/resume.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-genesis-earth-execution-resume
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-fep -p symthaea-earth-system -p symthaea-alife -- --check
+
+      - name: Check all relevant targets
+        run: cargo check --locked -p symthaea-fep -p symthaea-earth-system -p symthaea-alife --all-targets
+
+      - name: Test execution capsule unit theorem
+        run: 'cargo test --locked -p symthaea-alife genesis_execution::'
+
+      - name: Test evolutionary whole-world resume theorem
+        run: cargo test --locked -p symthaea-alife --test genesis_earth_execution_resume
+
+      - name: Test scheduler live snapshot continuation
+        run: 'cargo test --locked -p symthaea-alife encounter::tests::'
+
+      - name: Test complete ALife package
+        run: cargo test --locked -p symthaea-alife
+
+      - name: Strict ALife Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze composed causal authority theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/genesis_execution.rs"
+          evo="crates/domains/symthaea-alife/tests/genesis_earth_execution_resume.rs"
+          pop="crates/domains/symthaea-alife/src/population.rs"
+
+          grep -q 'pub struct GenesisEarthExecutionCapsuleV1' "$src"
+          grep -q 'population: PopulationSnapshotV1' "$src"
+          grep -q 'scheduler: EncounterSchedulerSnapshotV1' "$src"
+          grep -q 'environment: EarthForcedEnvironmentSnapshotV1' "$src"
+          grep -q 'evidence: GenesisEvidenceCheckpointV1' "$src"
+          grep -q 'EarthForcedSocialV1' "$src"
+          grep -q 'environment.tick() != evidence.behavior_next_tick()' "$src"
+          grep -q 'validate_scheduler_against_lifecycle' "$src"
+          grep -q 'records.contains_key(&entry.agent_id())' "$src"
+          grep -q 'records.contains_key(&entry.partner_id())' "$src"
+          grep -q 'alive.contains(&agent_id)' "$src"
+          grep -q 'map.get(&partner_id).copied() != Some(agent_id)' "$src"
+
+          grep -q 'GenesisRollingEvidenceRunnerV1::from_validated_resume' "$src"
+          grep -q 'EncounterScheduler::from_validated_snapshot_v1' "$src"
+          grep -q 'EarthForcedEnvironment::from_validated_snapshot_v1' "$src"
+          grep -q 'runner.step_social(|_| environment.step(), scheduler)' "$src"
+          grep -q 'checkpoint_evidence()' "$src"
+          grep -q 'snapshot_v1_at_evidence_boundary' "$src"
+          grep -q 'scheduler: self.scheduler.snapshot_v1()' "$src"
+          grep -q 'environment: self.environment.snapshot_v1()' "$src"
+
+          # Earth forcing must advance once per world/social tick, not once per organism.
+          python3 - <<'PY'
+          from pathlib import Path
+          pop = Path('crates/domains/symthaea-alife/src/population.rs').read_text()
+          step = pop.split('pub fn step_social(', 1)[1].split('pub fn len(', 1)[0]
+          if step.count('resource_for(n)') != 1:
+              raise SystemExit('step_social no longer samples its resource driver exactly once per social tick')
+          PY
+
+          grep -q 'InheritanceMode::RandomPeer' "$evo"
+          grep -q 'mutation_rate: 0.61' "$evo"
+          grep -q 'cull_weakest' "$evo"
+          grep -q 'assert_eq!(split.population().len(), 16)' "$evo"
+          grep -q 'assert_eq!(restored.population().len(), 15)' "$evo"
+          grep -q 'assert_eq!(restored.population().len(), 60)' "$evo"
+
+      - name: Freeze exact split-run equality theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/genesis_execution.rs"
+          evo="crates/domains/symthaea-alife/tests/genesis_earth_execution_resume.rs"
+
+          grep -q 'serde_json::to_string(first_uninterrupted.persisted())' "$src"
+          grep -q 'serde_json::to_string(first_split.persisted())' "$src"
+          grep -q 'GenesisEarthExecutionV1::from_validated_capsule' "$src"
+          grep -q 'serde_json::to_string(final_uninterrupted.persisted())' "$src"
+          grep -q 'serde_json::to_string(final_restored.persisted())' "$src"
+          grep -q 'evolutionary_random_peer_world_is_bit_exact_across_cull_boundary_resume' "$evo"
+          grep -q 'serde_json::to_string(baseline_final.persisted())' "$evo"
+          grep -q 'serde_json::to_string(restored_final.persisted())' "$evo"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('crates/domains/symthaea-alife/src/genesis_execution.rs').read_text()
+          evo = Path('crates/domains/symthaea-alife/tests/genesis_earth_execution_resume.rs').read_text()
+          required = [
+              'random_scheduler_full_execution_is_exact_across_serialized_resume',
+              'fixed_partner_full_execution_with_stale_history_is_exact_across_serialized_resume',
+              'environment_clock_is_bound_to_behavior_clock',
+              'scheduler_cannot_reference_identity_absent_from_lifecycle_history',
+          ]
+          for token in required:
+              if token not in src:
+                  raise SystemExit(f'missing capsule theorem regression: {token}')
+          if 'InheritanceMode::RandomPeer' not in evo or 'mutation_rate: 0.61' not in evo:
+              raise SystemExit('evolutionary resume test no longer exercises RandomPeer mutation')
+          if 'to_string' not in evo or 'from_str' not in evo:
+              raise SystemExit('evolutionary resume test no longer crosses serialized persistence boundary')
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/genesis_execution.rs"
+          ! grep -q 'cryptographic_provenance_established=true' "$src"
+          ! grep -q 'open_ended_evolution_established=true' "$src"
+          ! grep -q 'arbitrary_environment_resume=true' "$src"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-genesis-earth-execution-resume-evidence
+          {
+            echo "authority=genesis_earth_execution_resume_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "capsule_source_sha256=$(sha256sum crates/domains/symthaea-alife/src/genesis_execution.rs | cut -d' ' -f1)"
+            echo "evolutionary_resume_test_sha256=$(sha256sum crates/domains/symthaea-alife/tests/genesis_earth_execution_resume.rs | cut -d' ' -f1)"
+            echo "population_state_bound=true"
+            echo "scheduler_state_bound=true"
+            echo "earth_environment_state_bound=true"
+            echo "behavior_lifecycle_evidence_bound=true"
+            echo "environment_clock_crosschecked=true"
+            echo "scheduler_lifecycle_crosschecked=true"
+            echo "serialized_split_run_executed=true"
+            echo "random_scheduler_executed=true"
+            echo "fixed_partner_scheduler_executed=true"
+            echo "random_peer_mutation_executed=true"
+            echo "birth_cull_resume_executed=true"
+            echo "profile_exact_resume_qualified=true"
+            echo "cryptographic_provenance_established=false"
+            echo "arbitrary_environment_resume_established=false"
+            echo "open_ended_evolution_established=false"
+          } > target/alife-genesis-earth-execution-resume-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-genesis-earth-execution-resume-evidence
+          path: target/alife-genesis-earth-execution-resume-evidence/qualification.txt
+          if-no-files-found: error
