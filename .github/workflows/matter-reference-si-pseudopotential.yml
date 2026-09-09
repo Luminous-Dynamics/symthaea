@@ -1,4 +1,4 @@
-name: Matter Reference Si Pseudopotential Freeze
+name: Matter Reference Environment-Bound Si Pseudopotential Freeze
 
 on:
   pull_request:
@@ -7,31 +7,44 @@ on:
       - '.github/workflows/matter-reference-si-pseudopotential.yml'
   workflow_dispatch:
 
+concurrency:
+  group: matter-reference-env-bound-pseudo-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
+env:
+  ENVIRONMENT_PARENT_SHA: 7b9ec63a5166bb168c02a4375fcb2fd7c9a22cd2
+  COMMITTED_LOCK_PARENT_SHA: 53e32afe7aba5ae3426d2c66a75a2be466dc1bc6
+  INSTALL_NIX_ACTION_SHA: 13d8dd58da0234aa297dedd986986ccb8e7f3e24
+  EXPECTED_NIX_VERSION: 'nix (Nix) 2.35.2'
+  EXPECTED_NIXPKGS_REV: 9ae611a455b90cf061d8f332b977e387bda8e1ca
+  EXPECTED_UV_LOCK_SHA256: 1ecb6c8a0752476c9731d0d44a4113c4ed1fabfee6e339724ee4534926bda646
+  EXPECTED_UV_CONSUMER_VERSION: 'uv 0.11.19'
+
 jobs:
-  qualify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  qualify-environment-bound-pseudo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
-      - name: Checkout exact head
-        uses: actions/checkout@v4
+      - name: Checkout exact revision and parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
 
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Enforce exact parent and two-file scope
+      - name: Verify exact parent and pseudopotential-only scope
+        if: github.event_name == 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
-          parent='d98e19344008b2719def10d12eb3d2298aa1f8b5'
-          test "$(git merge-base HEAD "$parent")" = "$parent"
-          mapfile -t files < <(git diff --name-only "$parent"...HEAD | sort)
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "${{ github.event.pull_request.base.sha }}" = "$ENVIRONMENT_PARENT_SHA"
+          test "$(git rev-parse HEAD^)" = "$ENVIRONMENT_PARENT_SHA"
+
+          mapfile -t files < <(git diff --name-only HEAD^..HEAD | sort)
           expected=(
             '.github/workflows/matter-reference-si-pseudopotential.yml'
             'research/matter-reference-capsule/freeze_si_pseudo.py'
@@ -40,57 +53,255 @@ jobs:
           for i in "${!expected[@]}"; do
             test "${files[$i]}" = "${expected[$i]}"
           done
-          git diff --check "$parent"...HEAD
 
-      - name: Syntax and dependency-free self-test
-        run: |
-          set -euo pipefail
-          python -m py_compile research/matter-reference-capsule/freeze_si_pseudo.py
-          python research/matter-reference-capsule/freeze_si_pseudo.py self-test
+          ! git diff --name-only HEAD^..HEAD | grep -Eq '(^|/)uv\.lock$|flake\.lock$|si-001-protocol\.json$|verify_environment\.py$|bootstrap\.sh$|shell\.nix$'
+          git diff --check HEAD^..HEAD
 
-      - name: Ratchet exact SSSP acquisition semantics
+      - name: Static authority, archive-safety, and composition audit
         shell: bash
         run: |
           set -euo pipefail
           f='research/matter-reference-capsule/freeze_si_pseudo.py'
-          grep -Fq 'FAMILY_VERSION = "1.3"' "$f"
-          grep -Fq 'FAMILY_FUNCTIONAL = "PBE"' "$f"
-          grep -Fq 'FAMILY_PROTOCOL = "precision"' "$f"
-          grep -Fq 'BUNDLE_FILENAME = "SSSP_1.3_PBE_precision.aiida_pseudo"' "$f"
-          grep -Fq '"--download-only"' "$f"
-          grep -Fq '"--from-download"' "$f"
-          grep -Fq 'EXPECTED_INNER_NAMES = {"archive.tar.gz", "metadata.json", "configuration.json"}' "$f"
-          if grep -Eq '(^|[^A-Za-z])(requests|urllib)([^A-Za-z]|$)|https?://' "$f"; then
-            echo 'Direct network implementation is forbidden; acquisition must go through the official aiida-pseudo CLI.' >&2
-            exit 1
-          fi
+          python3 -m py_compile "$f"
+          python3 "$f" self-test
 
-      - name: Ratchet prospective freeze and content identity
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('research/matter-reference-capsule/freeze_si_pseudo.py').read_text()
+          workflow = Path('.github/workflows/matter-reference-si-pseudopotential.yml').read_text()
+
+          required = [
+              'FAMILY_VERSION = "1.3"',
+              'FAMILY_FUNCTIONAL = "PBE"',
+              'FAMILY_PROTOCOL = "precision"',
+              'EXPECTED_ENVIRONMENT_HEAD = "7b9ec63a5166bb168c02a4375fcb2fd7c9a22cd2"',
+              'ENVIRONMENT_AUTHORITY = "ExecutionEnvironmentPreparedQualifiedV1"',
+              'AUTHORITY_FREEZE = "PreExecutionPseudopotentialFrozen"',
+              '"--download-only"',
+              '"--from-download"',
+              'resolved_patch_version',
+              'metadata_canonical_sha256',
+              'metadata_md5_map_sha256',
+              'metadata_cutoffs_sha256',
+              'manifest_sha256',
+              'duplicate JSON object key refused',
+              'link/device inner archive member refused',
+              'inner archive exceeds uncompressed-size limit',
+              'family_elements != expected_elements',
+              'family.get_cutoff_stringencies() != ("normal",)',
+              'environment_receipt_sha256',
+              'process_count_before',
+              'calcjob_count_before',
+              'process_count_after',
+              'calcjob_count_after',
+              'qe_calculation_executed',
+              'si-001-frozen-scientific-execution',
+          ]
+          for token in required:
+              assert token in text, f'missing pseudopotential/composition ratchet: {token}'
+
+          forbidden_source = ['import requests', 'from requests', 'import urllib', 'from urllib', 'http://', 'https://']
+          for token in forbidden_source:
+              assert token not in text, f'direct network implementation forbidden in freeze adapter: {token}'
+
+          forbidden_solver = ['pw' + '.x', 'ph' + '.x', 'q2r' + '.x', 'matdyn' + '.x', 'run_get_node', 'submit(']
+          for token in forbidden_solver:
+              assert token not in text, f'scientific solver/process authority forbidden in freeze adapter: {token}'
+
+          assert 'runs-on: ubuntu-24.04' in workflow
+          assert '13d8dd58da0234aa297dedd986986ccb8e7f3e24' in workflow
+          assert 'contents:' + ' write' not in workflow
+          PY
+
+      - name: Verify committed lock and root nixpkgs identity before Nix installation
         shell: bash
         run: |
           set -euo pipefail
-          f='research/matter-reference-capsule/freeze_si_pseudo.py'
-          grep -Fq 'uv_lock_sha256' "$f"
-          grep -Fq 'QueryBuilder().append(orm.ProcessNode).count()' "$f"
-          grep -Fq 'process_count_before != 0' "$f"
-          grep -Fq 'process_count_after != 0' "$f"
-          grep -Fq 'family.get_pseudo(element=ELEMENT)' "$f"
-          grep -Fq 'with pseudo.open(mode="rb") as handle:' "$f"
-          grep -Fq 'hashlib.md5(upf_bytes, usedforsecurity=False).hexdigest()' "$f"
-          grep -Fq 'upf_sha256 = _sha256_bytes(upf_bytes)' "$f"
-          grep -Fq 'upf_path = out / "Si.upf"' "$f"
-          grep -Fq 'recommended_cutoffs_reference_only' "$f"
-          grep -Fq 'AUTHORITY_FREEZE = "PreExecutionPseudopotentialFrozen"' "$f"
+          test "$(sha256sum research/matter-reference-capsule/uv.lock | awk '{print $1}')" = "$EXPECTED_UV_LOCK_SHA256"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          lock = json.loads(Path('flake.lock').read_text())
+          root = lock['nodes'][lock['root']]
+          node = root['inputs']['nixpkgs']
+          locked = lock['nodes'][node]['locked']
+          assert locked['rev'] == os.environ['EXPECTED_NIXPKGS_REV']
+          assert locked['type'] == 'github'
+          assert locked['owner'] == 'NixOS'
+          assert locked['repo'] == 'nixpkgs'
+          print(f"root nixpkgs node={node} rev={locked['rev']} narHash={locked['narHash']}")
+          PY
 
-      - name: Ratchet non-promotion boundary
+      - name: Install pinned Nix 2.35.2
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # signed v31 target
+        with:
+          enable_kvm: false
+          github_access_token: ${{ github.token }}
+
+      - name: Verify Nix runtime identity
         shell: bash
         run: |
           set -euo pipefail
-          f='research/matter-reference-capsule/freeze_si_pseudo.py'
-          grep -Fq 'does not execute QE' "$f"
-          grep -Fq 'production settings require independent convergence' "$f"
-          grep -Fq 'not experimental validation' "$f"
-          if grep -Eq 'pw\.x|ph\.x|q2r\.x|matdyn\.x|run_get_node|submit\(' "$f"; then
-            echo 'Pseudopotential freeze must not execute scientific solver jobs.' >&2
-            exit 1
-          fi
+          test "$(nix --version)" = "$EXPECTED_NIX_VERSION"
+          nix config show experimental-features | grep -q 'nix-command'
+
+      - name: Requalify environment and freeze exact Si pseudopotential prospectively
+        shell: bash
+        env:
+          SYMTHAEA_MATTER_CAPSULE_STATE: ${{ runner.temp }}/symthaea-matter-si-001
+        run: |
+          set -euo pipefail
+          capsule="$PWD/research/matter-reference-capsule"
+          state="$SYMTHAEA_MATTER_CAPSULE_STATE"
+          test ! -e "$state"
+
+          nix-shell "$capsule/shell.nix" --run '
+            set -euo pipefail
+            test "$SYMTHAEA_MATTER_CAPSULE_SHELL" = 1
+            test "$(nix --version)" = "$EXPECTED_NIX_VERSION"
+            test "$(uv --version)" = "$EXPECTED_UV_CONSUMER_VERSION"
+            test "$(sha256sum research/matter-reference-capsule/uv.lock | awk '\''{print $1}'\'')" = "$EXPECTED_UV_LOCK_SHA256"
+
+            export SYMTHAEA_SHELL_DRIVER_PATH="$(readlink -f "$BASH")"
+            export SYMTHAEA_SHELL_DRIVER_VERSION="$BASH_VERSION"
+            test -f "$SYMTHAEA_SHELL_DRIVER_PATH"
+
+            bash research/matter-reference-capsule/bootstrap.sh symthaea-matter-si-001 matter-capsule@localhost.invalid
+            export AIIDA_PATH="$SYMTHAEA_MATTER_CAPSULE_STATE/aiida"
+
+            export UV_OFFLINE=1
+            research/matter-reference-capsule/.venv/bin/python \
+              research/matter-reference-capsule/verify_environment.py \
+              --repo-root "$PWD" \
+              --profile symthaea-matter-si-001 \
+              --state-root "$SYMTHAEA_MATTER_CAPSULE_STATE" \
+              --subject-head "$ENVIRONMENT_PARENT_SHA" \
+              --output "$SYMTHAEA_MATTER_CAPSULE_STATE/environment-qualification.json"
+
+            research/matter-reference-capsule/.venv/bin/python \
+              research/matter-reference-capsule/freeze_si_pseudo.py \
+              download \
+              --output "$SYMTHAEA_MATTER_CAPSULE_STATE/pseudo-download"
+
+            research/matter-reference-capsule/.venv/bin/python \
+              research/matter-reference-capsule/freeze_si_pseudo.py \
+              install-freeze \
+              --profile symthaea-matter-si-001 \
+              --environment-receipt "$SYMTHAEA_MATTER_CAPSULE_STATE/environment-qualification.json" \
+              --bundle "$SYMTHAEA_MATTER_CAPSULE_STATE/pseudo-download/SSSP_1.3_PBE_precision.aiida_pseudo" \
+              --download-receipt "$SYMTHAEA_MATTER_CAPSULE_STATE/pseudo-download/download-receipt.json" \
+              --output "$SYMTHAEA_MATTER_CAPSULE_STATE/pseudo-freeze"
+          '
+
+          test -f "$state/environment-manifest.json"
+          test -f "$state/environment-qualification.json"
+          test -f "$state/pseudo-download/SSSP_1.3_PBE_precision.aiida_pseudo"
+          test -f "$state/pseudo-download/download-receipt.json"
+          test -f "$state/pseudo-freeze/Si.upf"
+          test -f "$state/pseudo-freeze/freeze-receipt.json"
+
+          (
+            cd "$state"
+            sha256sum \
+              environment-manifest.json \
+              environment-qualification.json \
+              pseudo-download/SSSP_1.3_PBE_precision.aiida_pseudo \
+              pseudo-download/download-receipt.json \
+              pseudo-freeze/Si.upf \
+              pseudo-freeze/freeze-receipt.json \
+              > transition-receipts.sha256
+          )
+
+      - name: Verify retained composed authority boundary
+        shell: bash
+        env:
+          SYMTHAEA_MATTER_CAPSULE_STATE: ${{ runner.temp }}/symthaea-matter-si-001
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ['SYMTHAEA_MATTER_CAPSULE_STATE'])
+          environment_path = root / 'environment-qualification.json'
+          download_path = root / 'pseudo-download/download-receipt.json'
+          freeze_path = root / 'pseudo-freeze/freeze-receipt.json'
+          si_path = root / 'pseudo-freeze/Si.upf'
+
+          environment = json.loads(environment_path.read_text())
+          download = json.loads(download_path.read_text())
+          freeze = json.loads(freeze_path.read_text())
+
+          def sha256(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          assert environment['authority'] == 'ExecutionEnvironmentPreparedQualifiedV1'
+          assert environment['subject_head'] == os.environ['ENVIRONMENT_PARENT_SHA']
+          assert environment['parent_head'] == os.environ['COMMITTED_LOCK_PARENT_SHA']
+          assert environment['aiida']['process_node_count'] == 0
+          assert environment['aiida']['calcjob_node_count'] == 0
+
+          assert download['authority'] == 'PseudoBundleDownloadedOnly'
+          assert download['requested_minor_version'] == '1.3'
+          assert isinstance(download['resolved_patch_version'], str) and download['resolved_patch_version'].startswith('1.3')
+          assert download['bundle_evidence']['metadata_element_count'] > 1
+          assert download['bundle_evidence']['inner_archive']['file_count'] == download['bundle_evidence']['metadata_element_count']
+
+          assert freeze['authority'] == 'PreExecutionPseudopotentialFrozen'
+          assert freeze['predecessor_environment']['receipt_sha256'] == sha256(environment_path)
+          assert freeze['predecessor_environment']['subject_head'] == os.environ['ENVIRONMENT_PARENT_SHA']
+          assert freeze['predecessor_environment']['uv_lock_sha256'] == os.environ['EXPECTED_UV_LOCK_SHA256']
+          assert freeze['source_bundle']['resolved_patch_version'] == download['resolved_patch_version']
+          assert freeze['family']['element_count'] == freeze['source_bundle']['metadata_element_count']
+          assert freeze['family']['installed_md5_map_sha256'] == freeze['source_bundle']['metadata_md5_map_sha256']
+          assert freeze['family']['installed_cutoffs_sha256'] == freeze['source_bundle']['metadata_cutoffs_sha256']
+          assert freeze['pseudo']['sha256'] == sha256(si_path)
+          assert freeze['process_graph'] == {
+              'process_nodes_before_install': 0,
+              'calcjob_nodes_before_install': 0,
+              'process_nodes_after_install': 0,
+              'calcjob_nodes_after_install': 0,
+          }
+          assert freeze['scientific_execution'] == {
+              'sssp_download_executed': True,
+              'pseudopotential_installed': True,
+              'pseudopotential_selected': True,
+              'qe_calculation_executed': False,
+              'process_node_created': False,
+              'scientific_result_observed': False,
+          }
+          assert freeze['next_required_transition'] == 'si-001-frozen-scientific-execution'
+          PY
+          (cd "$SYMTHAEA_MATTER_CAPSULE_STATE" && sha256sum -c transition-receipts.sha256)
+
+      - name: Upload composed pre-execution evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: matter-reference-si-pseudo-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/symthaea-matter-si-001/environment-manifest.json
+            ${{ runner.temp }}/symthaea-matter-si-001/environment-qualification.json
+            ${{ runner.temp }}/symthaea-matter-si-001/pseudo-download/SSSP_1.3_PBE_precision.aiida_pseudo
+            ${{ runner.temp }}/symthaea-matter-si-001/pseudo-download/download-receipt.json
+            ${{ runner.temp }}/symthaea-matter-si-001/pseudo-freeze/Si.upf
+            ${{ runner.temp }}/symthaea-matter-si-001/pseudo-freeze/freeze-receipt.json
+            ${{ runner.temp }}/symthaea-matter-si-001/transition-receipts.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Preserve scientific authority boundary
+        shell: bash
+        run: |
+          {
+            echo '### Matter Reference Capsule Si pseudopotential status'
+            echo ''
+            echo 'The exact qualified environment lineage was re-established, the official SSSP 1.3/PBE/precision bundle was content-addressed, and the complete installed SSSP family was checked against official metadata before freezing literal Si UPF bytes.'
+            echo '**Authority: PreExecutionPseudopotentialFrozen.**'
+            echo ''
+            echo 'This transition may download/install/select pseudopotentials, but it requires zero ProcessNodes and zero CalcJobNodes before and after installation and does not execute Quantum ESPRESSO.'
+            echo 'SSSP recommended cutoffs remain reference metadata only; independent numerical convergence is still required.'
+            echo 'Next transition: frozen Si-001 scientific execution.'
+          } >> "$GITHUB_STEP_SUMMARY"
