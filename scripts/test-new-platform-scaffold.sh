@@ -58,14 +58,21 @@ grep -Fq 'prediction_error: LEGACY_NO_PREDICTION_SENTINEL' "$crate/src/embodimen
 grep -Fq 'observation_confidence: LEGACY_NO_OBSERVATION_CONFIDENCE' "$crate/src/embodiment.rs"
 ! grep -Fq 'grounding_from_prediction_error' "$crate/src/embodiment.rs"
 
-# Typed safety telemetry and restrictive pre-step/reset state.
+# #1284: placeholder plant/model time is independent of legacy bridge/controller dt.
+grep -Fq 'simulation_dt: config.physics_dt()' "$crate/src/embodiment.rs"
+grep -Fq 'self.simulator.step(&command, self.simulation_dt);' "$crate/src/embodiment.rs"
+! grep -Fq 'self.simulator.step(&command, dt as f64);' "$crate/src/embodiment.rs"
+
+# Typed safety telemetry, restrictive pre-step/reset state, and non-placeholder local identity.
 grep -Fq 'safety_level: self.current_safety' "$crate/src/embodiment.rs"
 grep -Fq 'current_safety: MotorSafetyLevel::Red' "$crate/src/embodiment.rs"
+grep -Fq 'genesis.timeline_id()' "$crate/src/embodiment.rs"
 
 # The current plugin registry workflow replaces the pre-2026 constructor match arm.
 grep -Fq 'src/cognitive_loop/platform_registry.rs' <<<"$output"
 ! grep -Fq 'constructor.rs' <<<"$output"
 grep -Fq 'No workspace-members edit is needed' <<<"$output"
+grep -Fq 'with 7 source files' <<<"$output"
 
 # Invalid inputs fail without leaving a generated body behind.
 if ./scripts/new-platform.sh Bad_Name 3 7 >/dev/null 2>&1; then
