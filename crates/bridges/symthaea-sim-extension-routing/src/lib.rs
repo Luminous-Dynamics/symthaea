@@ -5,12 +5,14 @@
 //!
 //! This bridge preserves `symthaea-sim-bridge` as the numerical contract while
 //! moving provider discovery/routing ahead of backend instantiation. Expensive
-//! solver adapters therefore remain dormant until selected.
+//! solver adapters remain dormant until selected, and authority is supplied as
+//! fresh point-of-use [`ActiveAdmission`] values rather than cached booleans.
 
 #![deny(unsafe_code)]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
+use symthaea_extension_admission::ActiveAdmission;
 use symthaea_extension_core::{CapabilityId, ExtensionId, ExtensionManifest};
 use symthaea_extension_registry::{ExtensionRegistry, RegistryError};
 use symthaea_extension_router::{
@@ -117,6 +119,7 @@ pub enum LazySimulationError {
     Registry(RegistryError),
     DuplicateFactory(ExtensionId),
     ObservationForUnknownProvider(ExtensionId),
+    AdmissionForUnknownProvider(ExtensionId),
     Route(RoutingError),
     SelectedFactoryMissing(ExtensionId),
     BackendConstruction {
@@ -136,6 +139,9 @@ pub enum LazySimulationError {
 }
 
 /// Lazy simulation catalog. Factories are registered, not live backends.
+///
+/// Active admissions are intentionally **not stored** here. Callers must supply
+/// them for each invocation after current generation/revocation checks.
 #[derive(Default)]
 pub struct LazySimulationRegistry {
     catalog: ExtensionRegistry,
@@ -178,8 +184,8 @@ impl LazySimulationRegistry {
         Ok(())
     }
 
-    /// Update host-observed readiness/evidence/reliability for an admitted
-    /// provider. Observation is runtime state, not extension-controlled metadata.
+    /// Update host-observed readiness/evidence/reliability. Observation is
+    /// runtime quality state, never admission/authorization metadata.
     pub fn set_observation(
         &mut self,
         observation: ProviderObservation,
@@ -200,22 +206,39 @@ impl LazySimulationRegistry {
 
     /// Route, lazily instantiate only the winner, then delegate execution and
     /// result/evidence validation to the existing `SimulationRegistry` contract.
+    ///
+    /// `admissions` must be freshly activated by the caller for this point of
+    /// use; this registry never caches them across revocation/generation checks.
     pub fn run(
         &self,
         request: &SimulationRequest,
         constraints: RoutingConstraints,
+        admissions: &[ActiveAdmission],
     ) -> Result<(SimulationResult, RoutingDecision), LazySimulationError> {
         request
             .validate()
             .map_err(LazySimulationError::Simulation)?;
+
+        for admission in admissions {
+            if !self.catalog.contains(admission.extension()) {
+                return Err(LazySimulationError::AdmissionForUnknownProvider(
+                    admission.extension().clone(),
+                ));
+            }
+        }
 
         let routing_request = RoutingRequest {
             capability: solver_capability(request.solver),
             constraints,
         };
         let observations: Vec<_> = self.observations.values().cloned().collect();
-        let decision = ExtensionRouter::route(&self.catalog, &routing_request, &observations)
-            .map_err(LazySimulationError::Route)?;
+        let decision = ExtensionRouter::route(
+            &self.catalog,
+            &routing_request,
+            admissions,
+            &observations,
+        )
+        .map_err(LazySimulationError::Route)?;
 
         let factory = self
             .factories
@@ -288,11 +311,14 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
     use std::sync::Arc;
+    use symthaea_extension_admission::{
+        AdmissionContext, AdmissionRecord, PrincipalId, Sha256Digest, TrustLevel,
+    };
     use symthaea_extension_core::{
         AbiVersion, CapabilityDescriptor, EffectClass, ExtensionKind, PermissionSet,
         ResourceBudget, RuntimeKind,
     };
-    use symthaea_extension_router::{ProviderState, TrustLevel};
+    use symthaea_extension_router::ProviderState;
     use symthaea_sim_bridge::EngineeringDomain;
 
     #[derive(Debug)]
@@ -340,6 +366,10 @@ mod tests {
         }
     }
 
+    fn digest(byte: u8) -> Sha256Digest {
+        Sha256Digest::new([byte; 32])
+    }
+
     fn descriptor(id: &str, backend_name: &str, solver: SolverKind) -> SimulationProviderDescriptor {
         let capability = solver_capability(solver);
         SimulationProviderDescriptor {
@@ -385,13 +415,41 @@ mod tests {
     ) -> ProviderObservation {
         ProviderObservation {
             extension: ExtensionId::new(id),
-            admitted: true,
             state: ProviderState::Ready,
-            trust: TrustLevel::Trusted,
             evidence_grade,
             reliability_bps,
             estimated_latency_ms: Some(10),
         }
+    }
+
+    fn active_admission(
+        registry: &LazySimulationRegistry,
+        id: &str,
+        generation: u64,
+        seed: u8,
+    ) -> ActiveAdmission {
+        let extension = ExtensionId::new(id);
+        let manifest = registry.catalog().get(&extension).unwrap();
+        AdmissionRecord::issue(
+            extension,
+            manifest.version.clone(),
+            digest(seed),
+            digest(seed.wrapping_add(1)),
+            digest(seed.wrapping_add(2)),
+            PrincipalId::new("local:test-authority").unwrap(),
+            Some(PrincipalId::new("did:example:test-publisher").unwrap()),
+            TrustLevel::Trusted,
+            manifest
+                .provides
+                .iter()
+                .map(|capability| capability.id.clone())
+                .collect(),
+            PermissionSet::default(),
+            generation,
+        )
+        .unwrap()
+        .activate(manifest, AdmissionContext::active(generation))
+        .unwrap()
     }
 
     #[test]
@@ -435,6 +493,10 @@ mod tests {
         registry
             .set_observation(observation("org.example.high", 4, 9_900))
             .unwrap();
+        let admissions = vec![
+            active_admission(&registry, "org.example.low", 1, 10),
+            active_admission(&registry, "org.example.high", 1, 20),
+        ];
 
         let request = SimulationRequest::new("run-1", EngineeringDomain::Mechanical, solver, "test");
         let (result, decision) = registry
@@ -445,6 +507,7 @@ mod tests {
                     minimum_trust: TrustLevel::Trusted,
                     ..RoutingConstraints::default()
                 },
+                &admissions,
             )
             .unwrap();
 
@@ -452,6 +515,38 @@ mod tests {
         assert_eq!(result.evidence.backend.as_deref(), Some("high"));
         assert_eq!(low_count.load(AtomicOrdering::SeqCst), 0);
         assert_eq!(high_count.load(AtomicOrdering::SeqCst), 1);
+    }
+
+    #[test]
+    fn missing_admission_prevents_backend_instantiation() {
+        let solver = SolverKind::Circuit;
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut registry = LazySimulationRegistry::new();
+        registry
+            .register(factory(
+                descriptor("org.example.circuit", "circuit", solver),
+                count.clone(),
+                "circuit",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.circuit", 5, 10_000))
+            .unwrap();
+
+        let request = SimulationRequest::new("run-no-auth", EngineeringDomain::Electrical, solver, "test");
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &[],
+            )
+            .unwrap_err();
+        assert!(matches!(err, LazySimulationError::Route(_)));
+        assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
     }
 
     #[test]
@@ -469,6 +564,7 @@ mod tests {
         registry
             .set_observation(observation("org.example.circuit", 5, 10_000))
             .unwrap();
+        let admissions = vec![active_admission(&registry, "org.example.circuit", 1, 30)];
 
         let request = SimulationRequest::new("run-2", EngineeringDomain::Electrical, solver, "test");
         let err = registry
@@ -479,6 +575,7 @@ mod tests {
                     minimum_trust: TrustLevel::Trusted,
                     ..RoutingConstraints::default()
                 },
+                &admissions,
             )
             .unwrap_err();
         assert!(matches!(err, LazySimulationError::BackendNameMismatch { .. }));
@@ -501,6 +598,7 @@ mod tests {
         registry
             .set_observation(observation("org.example.structure", 5, 10_000))
             .unwrap();
+        let admissions = vec![active_admission(&registry, "org.example.structure", 1, 40)];
 
         let request = SimulationRequest::new("run-3", EngineeringDomain::Civil, solver, "test");
         let err = registry
@@ -511,6 +609,7 @@ mod tests {
                     minimum_trust: TrustLevel::Trusted,
                     ..RoutingConstraints::default()
                 },
+                &admissions,
             )
             .unwrap_err();
         assert!(matches!(
