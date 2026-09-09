@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hak.provider-response-envelope.v1",
+  "title": "HAK Provider Response Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "canonicalization_profile", "digest_domain", "provider", "resource_kind", "request", "response", "observation_bounds", "retention", "provider_authentication", "envelope_digest"],
+  "properties": {
+    "schema_version": {"const": "hak.provider-response-envelope.v1"},
+    "canonicalization_profile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile_id", "artifact_ref", "raw_sha256"],
+      "properties": {
+        "profile_id": {"const": "hak.canonical-json.v1"},
+        "artifact_ref": {"const": "git:Luminous-Dynamics/symthaea@cf440ce4f813bb30a6b1948e5caac96feda10610:docs/architecture/hak/canonical-json-v1.profile.json"},
+        "raw_sha256": {"const": "sha256:f76152db3cce567bb4d24ca46b5ed94d95db698daa8882a6fcdb38828d40e830"}
+      }
+    },
+    "digest_domain": {"const": "hak.provider-response-envelope.v1"},
+    "provider": {"const": "github-rest"},
+    "resource_kind": {"type": "string", "minLength": 1},
+    "request": {
+      "type": "object", "additionalProperties": false,
+      "required": ["request_ref", "method", "url"],
+      "properties": {
+        "request_ref": {"type": "string", "minLength": 1},
+        "method": {"const": "GET"},
+        "url": {"type": "string", "pattern": "^https://[^\\s]+$"}
+      }
+    },
+    "response": {
+      "type": "object", "additionalProperties": false,
+      "required": ["response_ref", "status", "headers", "headers_digest", "body_base64", "body_length", "body_raw_sha256"],
+      "properties": {
+        "response_ref": {"type": "string", "minLength": 1},
+        "status": {"type": "integer", "minimum": 100, "maximum": 599},
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["name", "value"],
+            "properties": {
+              "name": {"type": "string", "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"},
+              "value": {"type": "string", "pattern": "^[^\\r\\n]*$"}
+            }
+          }
+        },
+        "headers_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "body_base64": {"type": "string", "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"},
+        "body_length": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "body_raw_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "observation_bounds": {
+      "type": "object", "additionalProperties": false,
+      "required": ["request_not_before", "response_not_after"],
+      "properties": {
+        "request_not_before": {"type": "string", "minLength": 1},
+        "response_not_after": {"type": "string", "minLength": 1}
+      }
+    },
+    "retention": {
+      "const": {
+        "body_bytes_retained": true,
+        "header_representation": "RetainedFieldValuesV1",
+        "raw_http_wire_representation": "NotRetained"
+      }
+    },
+    "provider_authentication": {"const": "NotEstablished"},
+    "envelope_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
