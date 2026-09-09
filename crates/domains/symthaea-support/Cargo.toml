@@ -11,17 +11,15 @@ license = "AGPL-3.0-or-later"
 default = []
 # Keep the Phase-1 log clustering stack out of ordinary support builds. Enable
 # only where parsed LogEvent -> SystemObservationV1 ingestion is required.
-logparse-adapter = ["dep:symthaea-logparse", "dep:blake3"]
-# Provider-neutral external metric/trace/event normalization. No OpenTelemetry
-# SDK dependency is required; collectors adapt their data into the V1 record type.
-telemetry-adapter = ["dep:blake3"]
+logparse-adapter = ["dep:symthaea-logparse"]
 
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }
 libc = "0.2"
-blake3 = { workspace = true, optional = true }
+# Used by evidence identities in provider-neutral telemetry and optional log adapters.
+blake3 = { workspace = true }
 symthaea-logparse = { path = "../../core/symthaea-logparse", optional = true }
 
 [dev-dependencies]
