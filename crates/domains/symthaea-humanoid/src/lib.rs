@@ -4,6 +4,11 @@
 pub mod actuation;
 pub mod actuation_capability;
 pub mod actuator_controllability;
+// Internal compatibility layer. Public motor authority uses the v2 verified
+// source boundary below, which binds scheme identity and the full verification
+// decision into the runtime evidence identity.
+mod authority_source_attestation;
+pub mod verified_authority_source;
 pub mod capability_envelope;
 pub mod capability_request;
 pub mod cartesian_hand_reference;
@@ -55,6 +60,10 @@ pub mod physical_health;
 pub mod plugin;
 pub mod qp_certification;
 pub mod qualification;
+// Internal v1 attested facade. The public operational path is
+// `reach_verified_authority`, which accepts only v2 verifier decisions.
+mod reach_attested_authority;
+pub mod reach_verified_authority;
 pub mod reach_authority_commitment;
 pub mod reach_authority_committed_evidence;
 // Internal implementation detail: authority-committed stages are necessary, but
@@ -71,9 +80,9 @@ pub mod reach_episode_evidence;
 mod reach_episode_promotion;
 pub mod reach_execution;
 pub mod reach_execution_evidence;
-// Final public authority facade: exact perturbation manifests, manifest-aware
-// operator approval, and strongest-artifact motor receipt issuance.
-pub mod reach_manifest_authority;
+// Internal implementation detail: manifest-aware motor authority is necessary,
+// but the exported path additionally requires authenticated source verification.
+mod reach_manifest_authority;
 // Internal implementation detail: manifest-bound qualification/promotion is
 // necessary, but the actual motor receipt must record the strongest identities.
 mod reach_manifest_bound_promotion;
@@ -127,6 +136,7 @@ pub mod whole_body_lowering;
 pub use actuation::*;
 pub use actuation_capability::*;
 pub use actuator_controllability::*;
+pub use verified_authority_source::*;
 pub use capability_envelope::*;
 pub use capability_request::*;
 pub use cartesian_hand_reference::*;
@@ -170,12 +180,12 @@ pub use payload_capability::*;
 pub use physical_health::*;
 pub use qp_certification::*;
 pub use qualification::*;
+pub use reach_verified_authority::*;
 pub use reach_authority_commitment::*;
 pub use reach_authority_committed_evidence::*;
 pub use reach_episode_evidence::*;
 pub use reach_execution::*;
 pub use reach_execution_evidence::*;
-pub use reach_manifest_authority::*;
 pub use reach_outcome_evidence::*;
 pub use reach_perturbation_manifest::*;
 pub use reach_policy_identity::*;
