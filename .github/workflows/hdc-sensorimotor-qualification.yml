@@ -13,6 +13,7 @@ on:
       - 'crates/domains/symthaea-humanoid/Cargo.toml'
       - 'crates/domains/symthaea-humanoid/src/actuation.rs'
       - 'crates/domains/symthaea-humanoid/src/backend_action_evidence.rs'
+      - 'crates/domains/symthaea-humanoid/src/predictive_baseline.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_action.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_action_causality.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_state.rs'
@@ -123,4 +124,10 @@ jobs:
         run: |
           cargo test -p symthaea-humanoid \
             transition_evidence \
+            -- --test-threads=1
+
+      - name: Run predictive baseline regressions
+        run: |
+          cargo test -p symthaea-humanoid \
+            predictive_baseline \
             -- --test-threads=1
