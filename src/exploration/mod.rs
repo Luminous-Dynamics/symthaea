@@ -8,6 +8,8 @@
 
 /// Evidence-bearing, non-authoritative evaluation of future capacity and optionality.
 pub mod generativity;
+/// Typed outcomes that keep surprise reduction distinct from broader discovery value.
+pub mod outcome;
 
 pub use symthaea_exploration::*;
 
