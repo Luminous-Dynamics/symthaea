@@ -20,6 +20,7 @@ mod distributed_evidence_error_bridge;
 pub mod distributed_qualification;
 pub mod distributed_state;
 pub mod exact_policy;
+pub mod execution_capability;
 pub mod failure_domain;
 pub mod observation;
 pub mod profile_adoption;
@@ -82,6 +83,14 @@ pub use distributed_state::{
 };
 pub use exact_policy::{
     ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1,
+};
+pub use execution_capability::{
+    EXECUTION_ATTEMPT_INTENT_SCHEMA_V1, EXECUTION_ATTEMPT_RECEIPT_SCHEMA_V1,
+    EXECUTION_BACKEND_PROFILE_SCHEMA_V1, ExecutionAttemptId, ExecutionAttemptIntentV1,
+    ExecutionAttemptOutcomeV1, ExecutionAttemptReceiptId, ExecutionAttemptReceiptV1,
+    ExecutionBackendId, ExecutionBackendProfileV1, ExecutionCapabilityError,
+    ExecutionEpochAnchorModeV1, ExecutionSessionId, ExecutionSessionV1,
+    OneUseExecutionCapabilityId, OneUseExecutionCapabilityV1, PreparedExecutionAttemptV1,
 };
 pub use failure_domain::{
     FAILURE_DOMAIN_POLICY_SCHEMA_V1, FailureDomainGroupV1, FailureDomainKindV1,
