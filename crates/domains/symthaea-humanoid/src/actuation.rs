@@ -23,6 +23,9 @@ pub struct ActuationAdaptation {
     pub command: HumanoidCommand,
     pub source_mode: ActuationMode,
     pub target_mode: ActuationMode,
+    /// Number of joints whose command changed because a command-boundary clamp
+    /// was applied while producing `command`. A joint is counted at most once,
+    /// even if both normalized input and physical target limits clamp it.
     pub clipped_joints: usize,
 }
 
@@ -74,24 +77,33 @@ impl ActuationAdapter {
 
         match target_mode {
             ActuationMode::NormalizedTorque => {
-                output.extend(intent.torques.iter().map(|value| value.clamp(-1.0, 1.0)));
+                for value in intent.torques.iter().copied() {
+                    let clamped = value.clamp(-1.0, 1.0);
+                    if clamped != value {
+                        clipped_joints += 1;
+                    }
+                    output.push(clamped);
+                }
             }
             ActuationMode::TorqueNewtonMetres => {
-                output.extend(
-                    intent
-                        .torques
-                        .iter()
-                        .zip(torque_scales.iter())
-                        .map(|(value, scale)| value.clamp(-1.0, 1.0) * *scale as f32),
-                );
+                for (value, scale) in intent.torques.iter().copied().zip(torque_scales.iter()) {
+                    let clamped = value.clamp(-1.0, 1.0);
+                    if clamped != value {
+                        clipped_joints += 1;
+                    }
+                    output.push(clamped * *scale as f32);
+                }
             }
             ActuationMode::PositionTargetRadians | ActuationMode::NormalizedPosition => {
                 for i in 0..n {
                     let [low, high] = limits[i];
+                    let normalized_intent = intent.torques[i].clamp(-1.0, 1.0);
+                    let input_clipped = normalized_intent != intent.torques[i];
                     let requested = state.joint_angles[i]
-                        + intent.torques[i].clamp(-1.0, 1.0) as f64 * self.max_position_step_rad;
+                        + normalized_intent as f64 * self.max_position_step_rad;
                     let target = requested.clamp(low, high);
-                    if target != requested {
+                    let target_clipped = target != requested;
+                    if input_clipped || target_clipped {
                         clipped_joints += 1;
                     }
 
@@ -137,6 +149,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(adapted.command.torques, intent.torques);
+        assert_eq!(adapted.clipped_joints, 0);
     }
 
     #[test]
@@ -171,5 +184,65 @@ mod tests {
             )
             .unwrap();
         assert!((adapted.command.torques[0] - 50.0).abs() < 1.0e-6);
+        assert_eq!(adapted.clipped_joints, 0);
+    }
+
+    #[test]
+    fn torque_modes_report_clipping_instead_of_hiding_it() {
+        let adapter = ActuationAdapter::default();
+        let state = HumanoidState::standing();
+        // Construct directly because `from_raw` intentionally clamps at the
+        // command boundary and would erase the evidence this regression needs.
+        let intent = HumanoidCommand {
+            torques: vec![1.25; HumanoidMorphology::Dmc21.num_actuators()],
+        };
+
+        let normalized = adapter
+            .adapt_normalized_torque_intent(
+                &intent,
+                &state,
+                HumanoidMorphology::Dmc21,
+                ActuationMode::NormalizedTorque,
+            )
+            .unwrap();
+        assert_eq!(normalized.clipped_joints, HumanoidMorphology::Dmc21.num_actuators());
+        assert!(normalized.command.torques.iter().all(|value| *value == 1.0));
+
+        let physical = adapter
+            .adapt_normalized_torque_intent(
+                &intent,
+                &state,
+                HumanoidMorphology::Dmc21,
+                ActuationMode::TorqueNewtonMetres,
+            )
+            .unwrap();
+        assert_eq!(physical.clipped_joints, HumanoidMorphology::Dmc21.num_actuators());
+        assert!((physical.command.torques[0] - 100.0).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn position_modes_count_normalized_input_clipping_even_without_joint_limit_hit() {
+        let adapter = ActuationAdapter::default();
+        let state = HumanoidState::standing();
+        let mut torques = vec![0.0; HumanoidMorphology::Dmc21.num_actuators()];
+        // Abdomen-y has enough positive range that +0.20 rad remains inside its
+        // physical joint limits, so the only clip here is the 1.25 -> 1.0 input.
+        torques[0] = 1.25;
+        let intent = HumanoidCommand { torques };
+
+        for mode in [
+            ActuationMode::PositionTargetRadians,
+            ActuationMode::NormalizedPosition,
+        ] {
+            let adapted = adapter
+                .adapt_normalized_torque_intent(
+                    &intent,
+                    &state,
+                    HumanoidMorphology::Dmc21,
+                    mode,
+                )
+                .unwrap();
+            assert_eq!(adapted.clipped_joints, 1);
+        }
     }
 }

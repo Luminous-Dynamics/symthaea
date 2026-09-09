@@ -10,6 +10,8 @@ on:
       - 'src/perception/sensorimotor_alignment.rs'
       - 'src/perception/sensorimotor_alignment_timing.rs'
       - 'src/perception/mod.rs'
+      - 'crates/domains/symthaea-humanoid/src/actuation.rs'
+      - 'crates/domains/symthaea-humanoid/src/semantic_action.rs'
       - 'crates/domains/symthaea-humanoid/src/semantic_state.rs'
       - 'crates/domains/symthaea-humanoid/src/lib.rs'
       - '.github/workflows/hdc-sensorimotor-qualification.yml'
@@ -90,4 +92,13 @@ jobs:
           cargo test -p symthaea --lib \
             --features 'sensor-imu,humanoid' \
             sensorimotor_alignment \
+            -- --test-threads=1
+
+      - name: Run humanoid physical action regressions
+        run: |
+          cargo test -p symthaea-humanoid \
+            semantic_action \
+            -- --test-threads=1
+          cargo test -p symthaea-humanoid \
+            clipping \
             -- --test-threads=1
