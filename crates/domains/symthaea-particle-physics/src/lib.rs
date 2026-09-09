@@ -47,10 +47,11 @@ pub use decay_widths::{
     w_boson_channels, w_total_width, z_total_width,
 };
 pub use hadron_spectroscopy::{
-    BASELINE_GLUEBALL_LEVELS, CompositionInterpretation, GlueballLevel, HadronicComposition,
-    InterpretationStatus, Jpc, Measurement, ObservationStatus, ObservedResonance, QcdApproximation,
-    SCALAR_GLUEBALL_MASS_RADIUS_FM, X2370, X2370_GLUEBALL_INTERPRETATION,
-    X2370_MOLECULAR_INTERPRETATION, glueball_channel_matches, glueball_mass_gap_mev,
+    BASELINE_GLUEBALL_LEVELS, CompositionInterpretation, EvidenceEffect, EvidenceKind,
+    EvidenceRecord, GlueballLevel, HadronicComposition, InterpretationStatus, Jpc, Measurement,
+    ObservationStatus, ObservedResonance, QcdApproximation, SCALAR_GLUEBALL_MASS_RADIUS_FM,
+    X2370, X2370_EVIDENCE, X2370_GLUEBALL_INTERPRETATION, X2370_MOLECULAR_INTERPRETATION,
+    glueball_channel_matches, glueball_mass_gap_mev, x2370_evidence,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
