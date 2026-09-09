@@ -12,7 +12,7 @@
 //! human-contact and payload objectives remain unsupported here until a lower
 //! controller explicitly implements them.
 
-use crate::skill_runtime::HumanoidLocomotionMode;
+use crate::skill_runtime::{HumanoidLocomotionMode, HumanoidSkillIntent};
 use crate::types::HumanoidTask;
 use crate::whole_body_intent::{
     HumanoidWholeBodyMotionIntent, HumanoidWholeBodyObjectiveIR,
@@ -86,8 +86,11 @@ pub struct HumanoidCurrentControllerSeed {
 #[derive(Debug, Clone, PartialEq)]
 pub enum HumanoidWholeBodyLoweringError {
     InvalidIntentLineage,
+    UnexpectedSpatialLineage,
+    MissingUprightObjective,
     DuplicateUprightObjective,
     DuplicateLocomotionObjective,
+    InvalidLocomotionDemand,
     UnsupportedObjective(HumanoidWholeBodyObjectiveKind),
     NonzeroTurnRateUnsupported { requested_rad_s: f64 },
     SourceSkillMismatch,
@@ -110,6 +113,9 @@ pub fn lower_whole_body_intent_for_current_controller(
             .any(|fingerprint| *fingerprint == 0)
     {
         return Err(HumanoidWholeBodyLoweringError::InvalidIntentLineage);
+    }
+    if intent.spatial_goal_id.is_some() {
+        return Err(HumanoidWholeBodyLoweringError::UnexpectedSpatialLineage);
     }
 
     let coverage = current_humanoid_lowering_coverage();
@@ -142,6 +148,12 @@ pub fn lower_whole_body_intent_for_current_controller(
                 if locomotion.is_some() {
                     return Err(HumanoidWholeBodyLoweringError::DuplicateLocomotionObjective);
                 }
+                if !horizontal_speed_mps.is_finite()
+                    || *horizontal_speed_mps < 0.0
+                    || !turn_rate_rad_s.is_finite()
+                {
+                    return Err(HumanoidWholeBodyLoweringError::InvalidLocomotionDemand);
+                }
                 if !coverage.turn_rate && turn_rate_rad_s.abs() > 1e-12 {
                     return Err(HumanoidWholeBodyLoweringError::NonzeroTurnRateUnsupported {
                         requested_rad_s: *turn_rate_rad_s,
@@ -172,18 +184,31 @@ pub fn lower_whole_body_intent_for_current_controller(
         }
     }
 
+    if upright_count != 1 {
+        return Err(HumanoidWholeBodyLoweringError::MissingUprightObjective);
+    }
+
     let (task, target_speed_mps) = match (intent.source_skill, locomotion) {
-        (crate::skill_runtime::HumanoidSkillIntent::Stand, None) => (HumanoidTask::Stand, 0.0),
+        (HumanoidSkillIntent::Stand, None) => (HumanoidTask::Stand, 0.0),
         (
-            crate::skill_runtime::HumanoidSkillIntent::Locomote { mode, .. },
-            Some((lowered_mode, speed, _)),
-        ) if mode == lowered_mode => (
-            match mode {
-                HumanoidLocomotionMode::Walk => HumanoidTask::Walk,
-                HumanoidLocomotionMode::Run => HumanoidTask::Run,
+            HumanoidSkillIntent::Locomote {
+                mode,
+                horizontal_speed_mps,
+                turn_rate_rad_s,
             },
-            speed,
-        ),
+            Some((lowered_mode, lowered_speed, lowered_turn)),
+        ) if mode == lowered_mode
+            && horizontal_speed_mps.to_bits() == lowered_speed.to_bits()
+            && turn_rate_rad_s.to_bits() == lowered_turn.to_bits() =>
+        {
+            (
+                match mode {
+                    HumanoidLocomotionMode::Walk => HumanoidTask::Walk,
+                    HumanoidLocomotionMode::Run => HumanoidTask::Run,
+                },
+                lowered_speed,
+            )
+        }
         _ => return Err(HumanoidWholeBodyLoweringError::SourceSkillMismatch),
     };
 
@@ -198,8 +223,7 @@ pub fn lower_whole_body_intent_for_current_controller(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::morphology::HumanoidMorphology;
-    use crate::skill_runtime::{HumanoidSkillIntent, HumanoidLocomotionMode};
+    use crate::morphology::{HandSide, HumanoidMorphology};
     use crate::types::ActuationMode;
     use crate::whole_body_intent::{
         HumanoidContactObjectiveMode, HumanoidWholeBodyInvariantIR,
@@ -281,6 +305,38 @@ mod tests {
     }
 
     #[test]
+    fn source_skill_and_objective_must_match_exactly() {
+        let intent = base_intent(
+            HumanoidSkillIntent::Locomote {
+                mode: HumanoidLocomotionMode::Walk,
+                horizontal_speed_mps: 0.4,
+                turn_rate_rad_s: 0.0,
+            },
+            vec![
+                HumanoidWholeBodyObjectiveIR::UprightPosture,
+                HumanoidWholeBodyObjectiveIR::LocomotionVelocity {
+                    mode: HumanoidLocomotionMode::Walk,
+                    horizontal_speed_mps: 0.5,
+                    turn_rate_rad_s: 0.0,
+                },
+            ],
+        );
+        assert_eq!(
+            lower_whole_body_intent_for_current_controller(&intent),
+            Err(HumanoidWholeBodyLoweringError::SourceSkillMismatch)
+        );
+    }
+
+    #[test]
+    fn missing_upright_objective_fails_closed() {
+        let intent = base_intent(HumanoidSkillIntent::Stand, vec![]);
+        assert_eq!(
+            lower_whole_body_intent_for_current_controller(&intent),
+            Err(HumanoidWholeBodyLoweringError::MissingUprightObjective)
+        );
+    }
+
+    #[test]
     fn carry_cannot_be_lowered_by_erasing_manipulation() {
         let intent = base_intent(
             HumanoidSkillIntent::Carry {
@@ -299,12 +355,12 @@ mod tests {
                     turn_rate_rad_s: 0.0,
                 },
                 HumanoidWholeBodyObjectiveIR::EndEffectorTarget {
-                    hand: crate::morphology::HandSide::Right,
+                    hand: HandSide::Right,
                     target_root_m: [0.3, -0.2, 0.2],
                     maximum_speed_mps: 0.1,
                 },
                 HumanoidWholeBodyObjectiveIR::ObjectContact {
-                    hand: crate::morphology::HandSide::Right,
+                    hand: HandSide::Right,
                     mode: HumanoidContactObjectiveMode::Maintain,
                     requested_contact_force_n: 8.0,
                     resulting_total_payload_kg: 2.0,
