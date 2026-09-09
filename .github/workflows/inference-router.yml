@@ -1,0 +1,52 @@
+name: Inference Router
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_router.rs"
+      - "tests/inference_router.rs"
+      - "docs/architecture/INFERENCE_ROUTER_V1.md"
+      - ".github/workflows/inference-router.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-router-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-router:
+    name: Inference Router
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: rustfmt --edition 2024 --check src/language/inference_router.rs tests/inference_router.rs
+
+      - name: Compile and run IF-8 router regressions
+        run: cargo test --locked --test inference_router
+
+      - name: Focused router Clippy
+        run: cargo clippy --locked --test inference_router -- -D warnings -A dead-code
+
+      - name: Ratchet hard-gate and determinism boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'hard eligibility gates' src/language/inference_router.rs
+          grep -F 'A routing plan is not execution authority' src/language/inference_router.rs
+          grep -F 'No input-order tie break exists' src/language/inference_router.rs
+          grep -F 'No score, quality observation, latency estimate, or learned success statistic can' docs/architecture/INFERENCE_ROUTER_V1.md
+          grep -F 'A stale plan cannot spend exhausted quota' docs/architecture/INFERENCE_ROUTER_V1.md
+          grep -F 'no current `LLMBackend` factory/routing change' docs/architecture/INFERENCE_ROUTER_V1.md
