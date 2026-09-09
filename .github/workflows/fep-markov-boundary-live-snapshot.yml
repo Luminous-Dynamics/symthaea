@@ -1,0 +1,149 @@
+name: FEP Markov Boundary Live Snapshot
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-fep/Cargo.toml"
+      - "crates/core/symthaea-fep/src/markov_blanket.rs"
+      - "crates/core/symthaea-fep/src/markov_blanket/live_snapshot.rs"
+      - "crates/core/symthaea-fep/src/markov_boundary_snapshot.rs"
+      - ".github/workflows/fep-markov-boundary-live-snapshot.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: MarkovBoundaryOperator exact-resume theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/core/symthaea-fep/src/markov_blanket.rs
+          sha256sum crates/core/symthaea-fep/src/markov_blanket/live_snapshot.rs
+          sha256sum crates/core/symthaea-fep/src/markov_boundary_snapshot.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: fep-markov-boundary-live-snapshot
+
+      - name: Check FEP formatting
+        run: cargo fmt -p symthaea-fep -- --check
+
+      - name: Check FEP targets
+        run: cargo check --locked -p symthaea-fep --all-targets
+
+      - name: Test wrapped-history continuation
+        run: cargo test --locked -p symthaea-fep serialized_validated_restore_preserves_wrapped_history_future
+
+      - name: Test topology-adjusted EMA continuation
+        run: cargo test --locked -p symthaea-fep topology_adjusted_ema_history_divergence_survives_restore
+
+      - name: Test snapshot validator
+        run: 'cargo test --locked -p symthaea-fep markov_boundary_snapshot::'
+
+      - name: Test complete FEP package
+        run: cargo test --locked -p symthaea-fep
+
+      - name: Strict package-local Clippy
+        run: cargo clippy --locked -p symthaea-fep --all-targets --no-deps -- -D warnings
+
+      - name: Freeze live-boundary restore theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          live="crates/core/symthaea-fep/src/markov_blanket.rs"
+          bridge="crates/core/symthaea-fep/src/markov_blanket/live_snapshot.rs"
+          contract="crates/core/symthaea-fep/src/markov_boundary_snapshot.rs"
+
+          grep -q 'mod live_snapshot;' "$live"
+          grep -q 'pub fn snapshot_v1(&self) -> MarkovBoundarySnapshotV1' "$bridge"
+          grep -q 'pub fn from_validated_snapshot_v1(snapshot: &ValidatedMarkovBoundarySnapshotV1)' "$bridge"
+          grep -q 'serialized_validated_restore_preserves_wrapped_history_future' "$bridge"
+          grep -q 'topology_adjusted_ema_history_divergence_survives_restore' "$bridge"
+          grep -q 'MARKOV_BOUNDARY_HISTORY_CAP_V1: usize = 64' "$contract"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          live = Path('crates/core/symthaea-fep/src/markov_blanket.rs').read_text()
+          if live.count('mod live_snapshot;') != 1:
+              raise SystemExit('Markov live-snapshot child-module seam drifted')
+
+          bridge = Path('crates/core/symthaea-fep/src/markov_blanket/live_snapshot.rs').read_text()
+          snapshot = bridge.split('pub fn snapshot_v1', 1)[1].split('pub fn from_validated_snapshot_v1', 1)[0]
+          restore = bridge.split('pub fn from_validated_snapshot_v1', 1)[1].split('#[cfg(test)]', 1)[0]
+          required = [
+              'partition', 'permeability', 'permeability_ema', 'alpha',
+              'history', 'history_idx', 'history_count'
+          ]
+          for field in required:
+              if f'{field}:' not in snapshot:
+                  raise SystemExit(f'Markov snapshot omits causal field {field}')
+              if f'{field}:' not in restore:
+                  raise SystemExit(f'Markov restore omits causal field {field}')
+
+          if 'ValidatedMarkovBoundarySnapshotV1' not in bridge.split('pub fn from_validated_snapshot_v1', 1)[1].split('{', 1)[0]:
+              raise SystemExit('validated capability no longer gates live Markov restore')
+          PY
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          bridge="crates/core/symthaea-fep/src/markov_blanket/live_snapshot.rs"
+          ! grep -q 'OrganismSnapshotV1' "$bridge"
+          ! grep -q 'PopulationSnapshotV1' "$bridge"
+          ! grep -q 'PopulationExecutionCapsuleV1' "$bridge"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/fep-markov-boundary-live-snapshot-evidence
+          {
+            echo "authority=markov_boundary_live_snapshot_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "bridge_source_sha256=$(sha256sum crates/core/symthaea-fep/src/markov_blanket/live_snapshot.rs | cut -d' ' -f1)"
+            echo "snapshot_source_sha256=$(sha256sum crates/core/symthaea-fep/src/markov_boundary_snapshot.rs | cut -d' ' -f1)"
+            echo "wrapped_history_continuation_tested=true"
+            echo "topology_ema_history_divergence_preserved=true"
+            echo "validated_restore_capability_required=true"
+            echo "organism_live_restore=false"
+            echo "population_execution_resume_established=false"
+          } > target/fep-markov-boundary-live-snapshot-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: fep-markov-boundary-live-snapshot-evidence
+          path: target/fep-markov-boundary-live-snapshot-evidence/qualification.txt
+          if-no-files-found: error
