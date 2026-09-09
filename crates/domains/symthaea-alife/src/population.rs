@@ -24,6 +24,9 @@ use crate::lifecycle_recorder::LifecycleRecorderV1;
 use crate::organism::{Action, Organism, OrganismConfig};
 use crate::organism_seed::OrganismSeedAllocatorV1;
 
+mod live_snapshot;
+pub use live_snapshot::PopulationLiveSnapshotErrorV1;
+
 /// How an offspring's genome is chosen at reproduction, per `ALIFE_PLAN_2026-07-08.md` Phase 4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InheritanceMode {
