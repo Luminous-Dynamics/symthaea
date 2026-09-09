@@ -20,6 +20,7 @@ use crate::reach_qualification_lineage::{
     HumanoidReachLineageBoundTrial, HumanoidReachLineageTrialBindFailure,
     HumanoidReachPerturbationProfileBinding, bind_lineage_humanoid_reach_qualification_trial,
 };
+use crate::reach_spatial_goal_commitment::HumanoidReachSpatialGoalCommitment;
 use crate::types::HumanoidState;
 
 pub const HUMANOID_REACH_AUTHORITY_COMMITTED_EVIDENCE_SCHEMA_VERSION: u32 = 1;
@@ -28,6 +29,7 @@ pub const HUMANOID_REACH_AUTHORITY_COMMITTED_EVIDENCE_SCHEMA_VERSION: u32 = 1;
 pub struct HumanoidReachAuthorityCommittedTrial {
     pub(crate) inner: HumanoidReachLineageBoundTrial,
     authority: HumanoidReachAuthorityCommitment,
+    spatial: HumanoidReachSpatialGoalCommitment,
     binding_digest: HumanoidEvidenceDigest,
 }
 
@@ -46,6 +48,8 @@ impl HumanoidReachAuthorityCommittedTrial {
     ) -> Result<Self, HumanoidReachAuthorityCommittedTrialBindFailure> {
         let authority = HumanoidReachAuthorityCommitment::from_finalized_execution(subject, result)
             .ok_or(HumanoidReachAuthorityCommittedTrialBindFailure::InvalidAuthorityCommitment)?;
+        let spatial = HumanoidReachSpatialGoalCommitment::from_preparation(subject, &result.preparation)
+            .ok_or(HumanoidReachAuthorityCommittedTrialBindFailure::InvalidSpatialGoalCommitment)?;
         let inner = bind_lineage_humanoid_reach_qualification_trial(
             subject, scenario, perturbation, trial_id, trial_seed, result, step,
             command_policy, outcome_policy,
@@ -55,14 +59,15 @@ impl HumanoidReachAuthorityCommittedTrial {
             || inner.trial.authority_scope_fingerprint != result.authority_receipt.scope_fingerprint
             || inner.trial.authority_scope_id.as_str()
                 != result.authority_receipt.scope_id.as_str()
+            || inner.trial.spatial_goal_fingerprint != result.preparation.spatial_goal_fingerprint
         {
             return Err(HumanoidReachAuthorityCommittedTrialBindFailure::AuthorityLineageMismatch);
         }
-        let binding_digest = digest_trial(&inner, authority);
+        let binding_digest = digest_trial(&inner, authority, spatial);
         if binding_digest.is_zero() {
             return Err(HumanoidReachAuthorityCommittedTrialBindFailure::InvalidBindingDigest);
         }
-        Ok(Self { inner, authority, binding_digest })
+        Ok(Self { inner, authority, spatial, binding_digest })
     }
 
     pub const fn authority_receipt_digest(&self) -> HumanoidEvidenceDigest {
@@ -77,6 +82,10 @@ impl HumanoidReachAuthorityCommittedTrial {
         self.authority.finalization_digest()
     }
 
+    pub const fn spatial_goal_digest(&self) -> HumanoidEvidenceDigest {
+        self.spatial.goal_digest()
+    }
+
     pub const fn binding_digest(&self) -> HumanoidEvidenceDigest {
         self.binding_digest
     }
@@ -84,14 +93,16 @@ impl HumanoidReachAuthorityCommittedTrial {
     pub(crate) fn validate(&self) -> bool {
         self.inner.validate()
             && !self.authority.finalization_digest().is_zero()
+            && !self.spatial.goal_digest().is_zero()
             && !self.binding_digest.is_zero()
-            && self.binding_digest == digest_trial(&self.inner, self.authority)
+            && self.binding_digest == digest_trial(&self.inner, self.authority, self.spatial)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HumanoidReachAuthorityCommittedTrialBindFailure {
     InvalidAuthorityCommitment,
+    InvalidSpatialGoalCommitment,
     Lower(HumanoidReachLineageTrialBindFailure),
     AuthorityLineageMismatch,
     InvalidBindingDigest,
@@ -101,6 +112,7 @@ pub enum HumanoidReachAuthorityCommittedTrialBindFailure {
 pub struct HumanoidReachAuthorityCommittedEpisodeStep {
     pub(crate) inner: HumanoidReachEpisodeStepEvidence,
     authority: HumanoidReachAuthorityCommitment,
+    spatial: HumanoidReachSpatialGoalCommitment,
     binding_digest: HumanoidEvidenceDigest,
 }
 
@@ -117,6 +129,8 @@ impl HumanoidReachAuthorityCommittedEpisodeStep {
     ) -> Result<Self, HumanoidReachAuthorityCommittedEpisodeStepBindFailure> {
         let authority = HumanoidReachAuthorityCommitment::from_finalized_execution(subject, result)
             .ok_or(HumanoidReachAuthorityCommittedEpisodeStepBindFailure::InvalidAuthorityCommitment)?;
+        let spatial = HumanoidReachSpatialGoalCommitment::from_preparation(subject, &result.preparation)
+            .ok_or(HumanoidReachAuthorityCommittedEpisodeStepBindFailure::InvalidSpatialGoalCommitment)?;
         let inner = bind_humanoid_reach_episode_step(
             subject, command_policy, outcome_policy, command_evidence, result, post_state, received_at_s,
         )
@@ -124,18 +138,23 @@ impl HumanoidReachAuthorityCommittedEpisodeStep {
         if inner.authority_receipt_fingerprint != result.authority_receipt.receipt_fingerprint
             || inner.authority_scope_fingerprint != result.authority_receipt.scope_fingerprint
             || inner.authority_scope_id.as_str() != result.authority_receipt.scope_id.as_str()
+            || inner.spatial_goal_fingerprint != result.preparation.spatial_goal_fingerprint
         {
             return Err(HumanoidReachAuthorityCommittedEpisodeStepBindFailure::AuthorityLineageMismatch);
         }
-        let binding_digest = digest_episode_step(&inner, authority);
+        let binding_digest = digest_episode_step(&inner, authority, spatial);
         if binding_digest.is_zero() {
             return Err(HumanoidReachAuthorityCommittedEpisodeStepBindFailure::InvalidBindingDigest);
         }
-        Ok(Self { inner, authority, binding_digest })
+        Ok(Self { inner, authority, spatial, binding_digest })
     }
 
     pub const fn authority_finalization_digest(&self) -> HumanoidEvidenceDigest {
         self.authority.finalization_digest()
+    }
+
+    pub const fn spatial_goal_digest(&self) -> HumanoidEvidenceDigest {
+        self.spatial.goal_digest()
     }
 
     pub const fn binding_digest(&self) -> HumanoidEvidenceDigest {
@@ -145,14 +164,16 @@ impl HumanoidReachAuthorityCommittedEpisodeStep {
     pub(crate) fn validate(&self) -> bool {
         self.inner.validate()
             && !self.authority.finalization_digest().is_zero()
+            && !self.spatial.goal_digest().is_zero()
             && !self.binding_digest.is_zero()
-            && self.binding_digest == digest_episode_step(&self.inner, self.authority)
+            && self.binding_digest == digest_episode_step(&self.inner, self.authority, self.spatial)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HumanoidReachAuthorityCommittedEpisodeStepBindFailure {
     InvalidAuthorityCommitment,
+    InvalidSpatialGoalCommitment,
     Lower(HumanoidReachEpisodeStepBindFailure),
     AuthorityLineageMismatch,
     InvalidBindingDigest,
@@ -209,6 +230,7 @@ impl HumanoidReachAuthorityCommittedEpisodeCase {
 fn digest_trial(
     bound: &HumanoidReachLineageBoundTrial,
     authority: HumanoidReachAuthorityCommitment,
+    spatial: HumanoidReachSpatialGoalCommitment,
 ) -> HumanoidEvidenceDigest {
     let t = &bound.trial;
     let mut h = HumanoidEvidenceHasher::new("reach.authority-committed-trial.v1");
@@ -223,6 +245,7 @@ fn digest_trial(
         .bool(t.step_accepted).u64(bound.command_policy_fingerprint)
         .u64(bound.outcome_policy_fingerprint)
         .u64(bound.perturbation_configuration_fingerprint)
+        .digest(spatial.goal_digest())
         .digest(authority.receipt_digest()).digest(authority.scope_digest())
         .digest(authority.finalization_digest());
     h.finish()
@@ -231,6 +254,7 @@ fn digest_trial(
 fn digest_episode_step(
     step: &HumanoidReachEpisodeStepEvidence,
     authority: HumanoidReachAuthorityCommitment,
+    spatial: HumanoidReachSpatialGoalCommitment,
 ) -> HumanoidEvidenceDigest {
     let mut h = HumanoidEvidenceHasher::new("reach.authority-committed-episode-step.v1");
     h.u32(HUMANOID_REACH_AUTHORITY_COMMITTED_EVIDENCE_SCHEMA_VERSION)
@@ -242,6 +266,7 @@ fn digest_episode_step(
         .string(&step.command_policy_id).string(&step.outcome_policy_id)
         .string(&step.authority_scope_id).u64(purpose_id(step.execution_purpose))
         .u64(basis_id(step.qualification_basis)).bool(step.step_accepted)
+        .digest(spatial.goal_digest())
         .digest(authority.receipt_digest()).digest(authority.scope_digest())
         .digest(authority.finalization_digest());
     h.finish()
