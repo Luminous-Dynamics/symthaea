@@ -352,7 +352,9 @@ mod tests {
 
     fn hierarchy() -> ResourceHierarchy {
         let mut hierarchy = ResourceHierarchy::default();
-        hierarchy.insert_root(node("region", NodeScale::Region)).unwrap();
+        hierarchy
+            .insert_root(node("region", NodeScale::Region))
+            .unwrap();
         hierarchy
             .insert_child("region", node("site-a", NodeScale::Site))
             .unwrap();
