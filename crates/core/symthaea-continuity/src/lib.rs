@@ -25,6 +25,7 @@ pub mod execution_journal;
 pub mod execution_result;
 pub mod failure_domain;
 pub mod observation;
+pub mod post_execution_observation;
 pub mod profile_adoption;
 pub mod scope;
 pub mod subject_contract;
@@ -110,6 +111,13 @@ pub use failure_domain::{
 pub use observation::{
     DependencyBasis, DependencyClaimId, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
     ObservationEnvelopeV1, ObservationError, ObservationId,
+};
+pub use post_execution_observation::{
+    POST_EXECUTION_OBSERVATION_CLAIM_SCHEMA_V1, AuthenticatedPostExecutionObservationId,
+    PostExecutionObservationClaimId, PostExecutionObservationClaimV1,
+    PostExecutionObservationError, PostExecutionObservationPolicyId,
+    PostExecutionObservationPolicyV1, PostExecutionObservedStateV1,
+    QualifiedPostExecutionObservationId, QualifiedPostExecutionObservationV1,
 };
 pub use profile_adoption::{
     VERIFIER_PROFILE_ADOPTION_SUBJECT_SCHEMA_V1, VERIFIER_PROFILE_ADOPTION_TRANSITION_SCHEMA_V1,
