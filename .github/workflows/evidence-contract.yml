@@ -36,6 +36,8 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+  EVIDENCE_RUNNER_LABEL: ubuntu-24.04
 
 jobs:
   evidence-contract:
@@ -55,13 +57,14 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Verify pinned checkout reference
+      - name: Verify pinned workflow actions
         shell: bash
         run: |
           set -euo pipefail
           test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/evidence-contract.yml)" -eq 1
-          if grep -Eq 'uses: actions/checkout@v[0-9]+' .github/workflows/evidence-contract.yml; then
-            echo 'mutable actions/checkout major-version tag found in evidence qualification workflow' >&2
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/evidence-contract.yml)" -eq 1
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/evidence-contract.yml; then
+            echo 'mutable major-version GitHub Action tag found in evidence qualification workflow' >&2
             exit 1
           fi
 
@@ -89,4 +92,14 @@ jobs:
       - name: Qualify evidence contracts
         env:
           QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          EVIDENCE_CONTRACT_RECEIPT: ${{ runner.temp }}/evidence-contract-qualification-v1.tsv
         run: bash scripts/qualify-evidence-contract.sh
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: evidence-contract-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/evidence-contract-qualification-v1.tsv
+          if-no-files-found: warn
+          retention-days: 14
