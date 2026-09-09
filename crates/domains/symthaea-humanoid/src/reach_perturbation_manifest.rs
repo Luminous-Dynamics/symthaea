@@ -13,7 +13,7 @@ use std::collections::BTreeSet;
 use crate::evidence_digest::{HumanoidEvidenceDigest, HumanoidEvidenceHasher};
 use crate::qualification::HumanoidQualificationSubject;
 use crate::reach_qualification_lineage::HumanoidReachPerturbationProfileBinding;
-use crate::types::HumanoidTask;
+use crate::types::{ActuationMode, HumanoidTask};
 
 pub const HUMANOID_REACH_PERTURBATION_MANIFEST_SCHEMA_VERSION: u32 = 1;
 
@@ -39,10 +39,18 @@ impl HumanoidReachPerturbationValue {
                 minimum.is_finite() && maximum.is_finite() && maximum >= minimum
             }
             Self::F64Set(values) => {
-                !values.is_empty() && values.iter().all(|value| value.is_finite())
+                if values.is_empty() || values.iter().any(|value| !value.is_finite()) {
+                    return false;
+                }
+                let mut seen = BTreeSet::new();
+                values.iter().all(|value| seen.insert(value.to_bits()))
             }
             Self::TextSet(values) => {
-                !values.is_empty() && values.iter().all(|value| valid_id(value))
+                if values.is_empty() || values.iter().any(|value| !valid_id(value)) {
+                    return false;
+                }
+                let mut seen = BTreeSet::new();
+                values.iter().all(|value| seen.insert(value.as_str()))
             }
             Self::Digest(value) => !value.is_zero(),
         }
@@ -66,14 +74,18 @@ impl HumanoidReachPerturbationValue {
                 hasher.u64(5).f64(*minimum).f64(*maximum);
             }
             Self::F64Set(values) => {
-                hasher.u64(6).usize(values.len());
-                for value in values {
-                    hasher.f64(*value);
+                let mut ordered = values.iter().map(|value| value.to_bits()).collect::<Vec<_>>();
+                ordered.sort_unstable();
+                hasher.u64(6).usize(ordered.len());
+                for bits in ordered {
+                    hasher.f64(f64::from_bits(bits));
                 }
             }
             Self::TextSet(values) => {
-                hasher.u64(7).usize(values.len());
-                for value in values {
+                let mut ordered = values.iter().map(String::as_str).collect::<Vec<_>>();
+                ordered.sort_unstable();
+                hasher.u64(7).usize(ordered.len());
+                for value in ordered {
                     hasher.string(value);
                 }
             }
@@ -116,6 +128,14 @@ impl HumanoidReachPerturbationSeedScheme {
         }
     }
 
+    pub const fn supports_trial_evidence(&self) -> bool {
+        matches!(Self::TrialSeed64 | Self::ExternalDeterministic64 { .. }, self)
+    }
+
+    pub const fn supports_episode_evidence(&self) -> bool {
+        matches!(Self::EpisodeSeed64 | Self::ExternalDeterministic64 { .. }, self)
+    }
+
     fn hash_into(&self, hasher: &mut HumanoidEvidenceHasher) {
         match self {
             Self::TrialSeed64 => {
@@ -132,16 +152,22 @@ impl HumanoidReachPerturbationSeedScheme {
 }
 
 /// Complete perturbation/randomization identity for one Reach scenario profile.
+///
+/// `producer_artifact_digest` commits the exact randomizer/fault-injector build.
+/// `environment_artifact_digest` commits the simulator/HIL/world/model bundle to
+/// which the randomizer was applied. Version strings remain useful metadata but
+/// are never treated as artifact identity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidReachPerturbationManifest {
     schema_version: u32,
     profile_id: String,
     producer_id: String,
     producer_version: String,
+    producer_artifact_digest: HumanoidEvidenceDigest,
     environment_id: String,
     environment_version: String,
-    backend_profile_id: String,
-    subject_fingerprint: u64,
+    environment_artifact_digest: HumanoidEvidenceDigest,
+    subject_digest: HumanoidEvidenceDigest,
     seed_scheme: HumanoidReachPerturbationSeedScheme,
     entries: Vec<HumanoidReachPerturbationEntry>,
     manifest_digest: HumanoidEvidenceDigest,
@@ -154,23 +180,24 @@ impl HumanoidReachPerturbationManifest {
         profile_id: impl Into<String>,
         producer_id: impl Into<String>,
         producer_version: impl Into<String>,
+        producer_artifact_digest: HumanoidEvidenceDigest,
         environment_id: impl Into<String>,
         environment_version: impl Into<String>,
+        environment_artifact_digest: HumanoidEvidenceDigest,
         seed_scheme: HumanoidReachPerturbationSeedScheme,
         entries: Vec<HumanoidReachPerturbationEntry>,
     ) -> Option<Self> {
-        if !subject.validate() || subject.task != HumanoidTask::Reach {
-            return None;
-        }
+        let subject_digest = digest_subject(subject)?;
         let mut manifest = Self {
             schema_version: HUMANOID_REACH_PERTURBATION_MANIFEST_SCHEMA_VERSION,
             profile_id: profile_id.into(),
             producer_id: producer_id.into(),
             producer_version: producer_version.into(),
+            producer_artifact_digest,
             environment_id: environment_id.into(),
             environment_version: environment_version.into(),
-            backend_profile_id: subject.backend_profile_id.clone(),
-            subject_fingerprint: subject.fingerprint(),
+            environment_artifact_digest,
+            subject_digest,
             seed_scheme,
             entries,
             manifest_digest: HumanoidEvidenceDigest::ZERO,
@@ -188,6 +215,14 @@ impl HumanoidReachPerturbationManifest {
 
     pub const fn manifest_digest(&self) -> HumanoidEvidenceDigest {
         self.manifest_digest
+    }
+
+    pub const fn producer_artifact_digest(&self) -> HumanoidEvidenceDigest {
+        self.producer_artifact_digest
+    }
+
+    pub const fn environment_artifact_digest(&self) -> HumanoidEvidenceDigest {
+        self.environment_artifact_digest
     }
 
     pub fn seed_scheme(&self) -> &HumanoidReachPerturbationSeedScheme {
@@ -215,16 +250,14 @@ impl HumanoidReachPerturbationManifest {
 
     fn validate_shape(&self, subject: &HumanoidQualificationSubject) -> bool {
         if self.schema_version != HUMANOID_REACH_PERTURBATION_MANIFEST_SCHEMA_VERSION
-            || !subject.validate()
-            || subject.task != HumanoidTask::Reach
+            || digest_subject(subject) != Some(self.subject_digest)
             || !valid_id(&self.profile_id)
             || !valid_id(&self.producer_id)
             || !valid_id(&self.producer_version)
+            || self.producer_artifact_digest.is_zero()
             || !valid_id(&self.environment_id)
             || !valid_id(&self.environment_version)
-            || self.backend_profile_id != subject.backend_profile_id
-            || self.subject_fingerprint == 0
-            || self.subject_fingerprint != subject.fingerprint()
+            || self.environment_artifact_digest.is_zero()
             || !self.seed_scheme.validate()
             || self.entries.is_empty()
             || self.entries.iter().any(|entry| !entry.validate())
@@ -236,6 +269,19 @@ impl HumanoidReachPerturbationManifest {
     }
 }
 
+fn digest_subject(subject: &HumanoidQualificationSubject) -> Option<HumanoidEvidenceDigest> {
+    if !subject.validate() || subject.task != HumanoidTask::Reach {
+        return None;
+    }
+    let mut h = HumanoidEvidenceHasher::new("reach.perturbation-subject.v1");
+    h.u32(subject.schema_version)
+        .string(subject.morphology.schema_id())
+        .u64(task_id(subject.task))
+        .u64(actuation_mode_id(subject.actuation_mode))
+        .string(&subject.backend_profile_id);
+    Some(h.finish())
+}
+
 fn digest_manifest(manifest: &HumanoidReachPerturbationManifest) -> HumanoidEvidenceDigest {
     let mut entries = manifest.entries.iter().collect::<Vec<_>>();
     entries.sort_by(|left, right| left.path.cmp(&right.path));
@@ -245,10 +291,11 @@ fn digest_manifest(manifest: &HumanoidReachPerturbationManifest) -> HumanoidEvid
         .string(&manifest.profile_id)
         .string(&manifest.producer_id)
         .string(&manifest.producer_version)
+        .digest(manifest.producer_artifact_digest)
         .string(&manifest.environment_id)
         .string(&manifest.environment_version)
-        .string(&manifest.backend_profile_id)
-        .u64(manifest.subject_fingerprint);
+        .digest(manifest.environment_artifact_digest)
+        .digest(manifest.subject_digest);
     manifest.seed_scheme.hash_into(&mut h);
     h.usize(entries.len());
     for entry in entries {
@@ -267,6 +314,25 @@ fn legacy_u64(digest: HumanoidEvidenceDigest) -> u64 {
         value = 1;
     }
     value
+}
+
+fn task_id(task: HumanoidTask) -> u64 {
+    match task {
+        HumanoidTask::Stand => 1,
+        HumanoidTask::Walk => 2,
+        HumanoidTask::Run => 3,
+        HumanoidTask::Reach => 4,
+        HumanoidTask::Grasp => 5,
+    }
+}
+
+fn actuation_mode_id(mode: ActuationMode) -> u64 {
+    match mode {
+        ActuationMode::NormalizedTorque => 1,
+        ActuationMode::TorqueNewtonMetres => 2,
+        ActuationMode::NormalizedPosition => 3,
+        ActuationMode::PositionTargetRadians => 4,
+    }
 }
 
 fn valid_id(value: &str) -> bool {
@@ -289,7 +355,6 @@ fn valid_path(value: &str) -> bool {
 mod tests {
     use super::*;
     use crate::morphology::HumanoidMorphology;
-    use crate::types::ActuationMode;
 
     fn subject() -> HumanoidQualificationSubject {
         HumanoidQualificationSubject::new(
@@ -306,8 +371,10 @@ mod tests {
             "nominal-plus-noise-v1",
             "humanoid-qualification-runner",
             "1.0.0",
-            "mujoco",
+            HumanoidEvidenceDigest::from_bytes([9; 32]),
+            "mujoco-world-bundle",
             "3.8.0",
+            HumanoidEvidenceDigest::from_bytes([10; 32]),
             HumanoidReachPerturbationSeedScheme::TrialSeed64,
             entries,
         )
@@ -334,6 +401,25 @@ mod tests {
     }
 
     #[test]
+    fn set_order_does_not_change_manifest_digest() {
+        let a = manifest(vec![HumanoidReachPerturbationEntry {
+            path: "fault.mode".into(),
+            value: HumanoidReachPerturbationValue::TextSet(vec![
+                "encoder-delay".into(),
+                "torque-derate".into(),
+            ]),
+        }]);
+        let b = manifest(vec![HumanoidReachPerturbationEntry {
+            path: "fault.mode".into(),
+            value: HumanoidReachPerturbationValue::TextSet(vec![
+                "torque-derate".into(),
+                "encoder-delay".into(),
+            ]),
+        }]);
+        assert_eq!(a.manifest_digest(), b.manifest_digest());
+    }
+
+    #[test]
     fn parameter_change_changes_manifest_digest() {
         let a = manifest(vec![HumanoidReachPerturbationEntry {
             path: "dynamics.mass_scale".into(),
@@ -349,6 +435,32 @@ mod tests {
                 maximum: 1.2,
             },
         }]);
+        assert_ne!(a.manifest_digest(), b.manifest_digest());
+    }
+
+    #[test]
+    fn artifact_change_changes_manifest_digest() {
+        let entries = vec![HumanoidReachPerturbationEntry {
+            path: "environment.gravity_scale".into(),
+            value: HumanoidReachPerturbationValue::F64Range {
+                minimum: 0.99,
+                maximum: 1.01,
+            },
+        }];
+        let a = manifest(entries.clone());
+        let b = HumanoidReachPerturbationManifest::new(
+            &subject(),
+            "nominal-plus-noise-v1",
+            "humanoid-qualification-runner",
+            "1.0.0",
+            HumanoidEvidenceDigest::from_bytes([11; 32]),
+            "mujoco-world-bundle",
+            "3.8.0",
+            HumanoidEvidenceDigest::from_bytes([10; 32]),
+            HumanoidReachPerturbationSeedScheme::TrialSeed64,
+            entries,
+        )
+        .unwrap();
         assert_ne!(a.manifest_digest(), b.manifest_digest());
     }
 
