@@ -13,7 +13,7 @@ diff --git a/crates/core/symthaea-evidence-plane/src/qualification.rs b/crates/c
 new file mode 100644
 --- /dev/null
 +++ b/crates/core/symthaea-evidence-plane/src/qualification.rs
-@@ -0,0 +1,467 @@
+@@ -0,0 +1,521 @@
 +// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 +// SPDX-License-Identifier: AGPL-3.0-or-later
 +// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -76,19 +76,55 @@ new file mode 100644
 +    InfrastructureInterrupted,
 +}
 +
-+/// Reporting authority only. This is not materialization authority.
++/// Serialized authority is only a cached claim. It is never a capability.
 +#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-+pub enum QualificationAuthority {
++pub enum QualificationAuthorityClaim {
 +    None,
 +    MayReportQualified,
 +}
 +
-+impl QualificationAuthority {
-+    pub fn derive(disposition: QualificationDisposition) -> Self {
++impl QualificationAuthorityClaim {
++    fn derive(disposition: QualificationDisposition) -> Self {
 +        if disposition == QualificationDisposition::Qualified {
 +            Self::MayReportQualified
 +        } else {
 +            Self::None
++        }
++    }
++}
++
++/// Opaque bounded capability returned only by successful receipt validation.
++///
++/// This authorizes reporting the receipt as qualified under the supplied profile.
++/// It does not authorize materialization or any external action.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub struct MayReportQualified {
++    _private: (),
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub struct ValidatedQualification {
++    disposition: QualificationDisposition,
++    report_authority: Option<MayReportQualified>,
++}
++
++impl ValidatedQualification {
++    pub fn disposition(&self) -> QualificationDisposition {
++        self.disposition
++    }
++
++    pub fn report_authority(&self) -> Option<MayReportQualified> {
++        self.report_authority
++    }
++
++    fn from_disposition(disposition: QualificationDisposition) -> Self {
++        Self {
++            disposition,
++            report_authority: if disposition == QualificationDisposition::Qualified {
++                Some(MayReportQualified { _private: () })
++            } else {
++                None
++            },
 +        }
 +    }
 +}
@@ -251,8 +287,10 @@ new file mode 100644
 +pub struct QualificationReceiptV1 {
 +    pub profile: QualificationProfileV1,
 +    pub observations: Vec<Observation>,
-+    pub disposition: QualificationDisposition,
-+    pub authority: QualificationAuthority,
++    // Serialized interpretation is a claim, not authority. Keep it private so
++    // programmatic consumers cannot accidentally trust it without validation.
++    claimed_disposition: QualificationDisposition,
++    claimed_authority: QualificationAuthorityClaim,
 +}
 +
 +impl QualificationReceiptV1 {
@@ -264,23 +302,26 @@ new file mode 100644
 +        Ok(Self {
 +            profile: profile.clone(),
 +            observations,
-+            disposition,
-+            authority: QualificationAuthority::derive(disposition),
++            claimed_disposition: disposition,
++            claimed_authority: QualificationAuthorityClaim::derive(disposition),
 +        })
 +    }
 +
-+    pub fn validate(&self, profile: &QualificationProfileV1) -> Result<(), QualificationError> {
++    pub fn validate(
++        &self,
++        profile: &QualificationProfileV1,
++    ) -> Result<ValidatedQualification, QualificationError> {
 +        if !profiles_match(&self.profile, profile)? {
 +            return Err(QualificationError::ProfileMismatch);
 +        }
 +        let disposition = evaluate(profile, &self.observations)?;
-+        if self.disposition != disposition {
++        if self.claimed_disposition != disposition {
 +            return Err(QualificationError::DispositionMismatch);
 +        }
-+        if self.authority != QualificationAuthority::derive(disposition) {
++        if self.claimed_authority != QualificationAuthorityClaim::derive(disposition) {
 +            return Err(QualificationError::AuthorityMismatch);
 +        }
-+        Ok(())
++        Ok(ValidatedQualification::from_disposition(disposition))
 +    }
 +}
 +
@@ -328,11 +369,24 @@ new file mode 100644
 +    }
 +
 +    #[test]
-+    fn green_authorizes_only_reporting() {
++    fn green_mints_only_validated_reporting_authority() {
 +        let r = QualificationReceiptV1::new(&p(), pass()).unwrap();
-+        assert_eq!(r.disposition, QualificationDisposition::Qualified);
-+        assert_eq!(r.authority, QualificationAuthority::MayReportQualified);
-+        r.validate(&p()).unwrap();
++        let validated = r.validate(&p()).unwrap();
++        assert_eq!(
++            validated.disposition(),
++            QualificationDisposition::Qualified
++        );
++        assert!(validated.report_authority().is_some());
++
++        let mut x = pass();
++        x[3].outcome = CheckOutcome::Failed;
++        let r = QualificationReceiptV1::new(&p(), x).unwrap();
++        let validated = r.validate(&p()).unwrap();
++        assert_eq!(
++            validated.disposition(),
++            QualificationDisposition::CandidateHygieneFailure
++        );
++        assert!(validated.report_authority().is_none());
 +    }
 +
 +    #[test]
@@ -457,7 +511,7 @@ new file mode 100644
 +    #[test]
 +    fn tampered_cached_claims_fail_closed() {
 +        let mut r = QualificationReceiptV1::new(&p(), pass()).unwrap();
-+        r.disposition = QualificationDisposition::CandidateRejected;
++        r.claimed_disposition = QualificationDisposition::CandidateRejected;
 +        assert_eq!(
 +            r.validate(&p()),
 +            Err(QualificationError::DispositionMismatch)
@@ -466,7 +520,7 @@ new file mode 100644
 +        let mut x = pass();
 +        x[3].outcome = CheckOutcome::Failed;
 +        let mut r = QualificationReceiptV1::new(&p(), x).unwrap();
-+        r.authority = QualificationAuthority::MayReportQualified;
++        r.claimed_authority = QualificationAuthorityClaim::MayReportQualified;
 +        assert_eq!(
 +            r.validate(&p()),
 +            Err(QualificationError::AuthorityMismatch)
