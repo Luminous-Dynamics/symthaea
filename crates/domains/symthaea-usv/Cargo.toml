@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-usv"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+description = "Mission-neutral uncrewed surface vessel state and collision-risk boundary for Symthaea"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde = { workspace = true }
+symthaea-maritime-core = { path = "../symthaea-maritime-core" }
