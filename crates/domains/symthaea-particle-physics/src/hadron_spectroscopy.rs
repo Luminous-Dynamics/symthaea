@@ -102,6 +102,38 @@ pub enum HadronicComposition {
     Unknown,
 }
 
+/// Source class for a piece of spectroscopy evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EvidenceKind {
+    ExperimentalObservation,
+    ExperimentalUpperLimit,
+    LatticePrediction,
+    PhenomenologicalModel,
+}
+
+/// How a record bears on an interpretation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EvidenceEffect {
+    Supports,
+    Constrains,
+    Challenges,
+    Context,
+}
+
+/// Minimal immutable provenance record for a spectroscopy claim.
+///
+/// Static strings keep built-in fixtures const-friendly. A future ingestion
+/// layer can own arbitrary external strings and normalize them into stable keys.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EvidenceRecord {
+    pub key: &'static str,
+    pub kind: EvidenceKind,
+    pub effect: EvidenceEffect,
+    pub source: &'static str,
+    pub persistent_id: &'static str,
+    pub year: u16,
+}
+
 /// A directly observed resonance, independent of its internal interpretation.
 ///
 /// `Serialize` is intentional here; these built-in fixtures use static labels.
@@ -184,6 +216,44 @@ pub const X2370: ObservedResonance = ObservedResonance {
     status: ObservationStatus::Established,
 };
 
+/// Evidence records supporting the canonical X(2370) observation and the
+/// glueball-dominant interpretation. The records do not themselves compute a
+/// confidence score; that belongs to the epistemic layer.
+pub const X2370_EVIDENCE: [EvidenceRecord; 4] = [
+    EvidenceRecord {
+        key: "besiii::x2370::jpc_0minusplus",
+        kind: EvidenceKind::ExperimentalObservation,
+        effect: EvidenceEffect::Supports,
+        source: "BESIII Collaboration",
+        persistent_id: "arXiv:2312.05324",
+        year: 2024,
+    },
+    EvidenceRecord {
+        key: "besiii::x2370::mass_width_decay_modes",
+        kind: EvidenceKind::ExperimentalObservation,
+        effect: EvidenceEffect::Supports,
+        source: "BESIII Collaboration",
+        persistent_id: "arXiv:2605.26495",
+        year: 2026,
+    },
+    EvidenceRecord {
+        key: "besiii::x2370::kstar_k_suppression",
+        kind: EvidenceKind::ExperimentalUpperLimit,
+        effect: EvidenceEffect::Supports,
+        source: "BESIII Collaboration",
+        persistent_id: "arXiv:2607.20366",
+        year: 2026,
+    },
+    EvidenceRecord {
+        key: "lattice::scalar_glueball::mass_radius",
+        kind: EvidenceKind::LatticePrediction,
+        effect: EvidenceEffect::Context,
+        source: "Abbott et al.",
+        persistent_id: "doi:10.1103/67xg-qxhz",
+        year: 2026,
+    },
+];
+
 /// BESIII's 2026 glueball-dominant interpretation represented conservatively.
 pub const X2370_GLUEBALL_INTERPRETATION: CompositionInterpretation = CompositionInterpretation {
     resonance: "X(2370)",
@@ -214,6 +284,11 @@ pub fn glueball_channel_matches(resonance: &ObservedResonance, level: &GlueballL
 /// experimental uncertainties are not interchangeable.
 pub fn glueball_mass_gap_mev(resonance: &ObservedResonance, level: &GlueballLevel) -> f64 {
     (resonance.mass_mev.value - level.mass_gev.value * 1000.0).abs()
+}
+
+/// Resolve a built-in evidence key.
+pub fn x2370_evidence(key: &str) -> Option<&'static EvidenceRecord> {
+    X2370_EVIDENCE.iter().find(|record| record.key == key)
 }
 
 #[cfg(test)]
@@ -255,6 +330,19 @@ mod tests {
             X2370_GLUEBALL_INTERPRETATION.status,
             InterpretationStatus::Consensus
         );
+    }
+
+    #[test]
+    fn evidence_records_are_traceable() {
+        let mass_width = x2370_evidence("besiii::x2370::mass_width_decay_modes")
+            .expect("mass/width evidence");
+        assert_eq!(mass_width.persistent_id, "arXiv:2605.26495");
+        assert_eq!(mass_width.kind, EvidenceKind::ExperimentalObservation);
+
+        let suppression = x2370_evidence("besiii::x2370::kstar_k_suppression")
+            .expect("K* K suppression evidence");
+        assert_eq!(suppression.persistent_id, "arXiv:2607.20366");
+        assert_eq!(suppression.effect, EvidenceEffect::Supports);
     }
 
     #[test]
