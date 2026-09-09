@@ -1,0 +1,178 @@
+name: ALife Causal Rescue Replay Session
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-alife/Cargo.toml"
+      - "crates/domains/symthaea-alife/src/causal_replay_session.rs"
+      - "crates/domains/symthaea-alife/src/genesis_execution.rs"
+      - "crates/domains/symthaea-alife/src/genesis_evidence_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/lifecycle_checkpoint.rs"
+      - "crates/domains/symthaea-alife/src/evolution_intervention.rs"
+      - "crates/domains/symthaea-alife/src/observed_stochastic_tape.rs"
+      - "crates/domains/symthaea-alife/src/matched_stochastic_replay.rs"
+      - "crates/domains/symthaea-alife/src/perturbation.rs"
+      - ".github/workflows/alife-causal-replay-session.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  qualify:
+    name: Evidence-bound mutation rescue session theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Record source identities
+        run: |
+          echo "git_sha=$(git rev-parse HEAD)"
+          sha256sum Cargo.lock
+          sha256sum crates/domains/symthaea-alife/src/causal_replay_session.rs
+          sha256sum crates/domains/symthaea-alife/src/genesis_execution.rs
+          sha256sum crates/domains/symthaea-alife/src/observed_stochastic_tape.rs
+          sha256sum crates/domains/symthaea-alife/src/evolution_intervention.rs
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: alife-causal-replay-session
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-alife -- --check
+
+      - name: Check ALife targets
+        run: cargo check --locked -p symthaea-alife --all-targets
+
+      - name: Execute causal replay session regressions
+        run: 'cargo test --locked -p symthaea-alife causal_replay_session::'
+
+      - name: Execute causal replay prerequisites
+        run: |
+          cargo test --locked -p symthaea-alife genesis_execution::
+          cargo test --locked -p symthaea-alife observed_stochastic_tape::
+          cargo test --locked -p symthaea-alife matched_stochastic_replay::
+          cargo test --locked -p symthaea-alife evolution_intervention::
+
+      - name: Strict ALife Clippy
+        run: cargo clippy --locked -p symthaea-alife --all-targets --no-deps -- -D warnings
+
+      - name: Freeze exact fork to natural endpoint binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_session.rs"
+
+          grep -q 'pub struct CausalRescueReplaySessionV1' "$src"
+          grep -q 'validate_lifecycle_extension' "$src"
+          grep -q 'LifecyclePrefixMismatch' "$src"
+          grep -q 'TapeStartBehaviorMismatch' "$src"
+          grep -q 'TapeStartLifecycleMismatch' "$src"
+          grep -q 'TapeEndBehaviorMismatch' "$src"
+          grep -q 'natural_prefix\[..fork_prefix.len()\] != fork_prefix\[..\]' "$src"
+
+      - name: Freeze observed natural birth intervention binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_session.rs"
+
+          grep -q 'InterventionTickMismatch' "$src"
+          grep -q 'InterventionParentNotAliveAtFork' "$src"
+          grep -q 'InterventionSourceNotAliveAtFork' "$src"
+          grep -q 'ObservedNaturalBirthMissing' "$src"
+          grep -q 'ObservedNaturalBirthAmbiguous' "$src"
+          grep -q 'ObservedNaturalBirthAlreadyPresentAtFork' "$src"
+          grep -q 'InterventionTraitNotObservedMutated' "$src"
+          grep -q 'record.born_tick == subject.tick()' "$src"
+          grep -q 'record.genome == natural_genome' "$src"
+
+      - name: Freeze stress and outcome protocol binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_session.rs"
+
+          grep -q 'ResourcePerturbationSnapshotV1' "$src"
+          grep -q 'PerturbationOrderNotCanonical' "$src"
+          grep -q 'ResourcePerturbation::new' "$src"
+          grep -q 'ZeroBaselineLookback' "$src"
+          grep -q 'InvalidRecoveryFraction' "$src"
+          grep -q 'EvaluationEndsBeforeFocalPerturbation' "$src"
+          grep -q 'EvaluationOutsideNaturalEndpoint' "$src"
+
+      - name: Require real natural-run fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_session.rs"
+          grep -q 'GenesisEarthExecutionV1::new' "$src"
+          grep -q 'checkpoint_execution' "$src"
+          grep -q 'mutation_rate: 1.0' "$src"
+          grep -q 'revert_all_changed_for_plan' "$src"
+          grep -q 'session_binds_real_natural_birth_and_exact_lifecycle_extension' "$src"
+
+      - name: Freeze claim boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="crates/domains/symthaea-alife/src/causal_replay_session.rs"
+          ! grep -q 'live_replay_established=true' "$src"
+          ! grep -q 'stochastic_tape_completeness_established=true' "$src"
+          ! grep -q 'origin_authenticity_established=true' "$src"
+          ! grep -q 'causal_rescue_established=true' "$src"
+
+      - name: Write qualification metadata
+        run: |
+          mkdir -p target/alife-causal-replay-session-evidence
+          {
+            echo "authority=causal_rescue_replay_session_contract_v1"
+            echo "git_sha=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "session_sha256=$(sha256sum crates/domains/symthaea-alife/src/causal_replay_session.rs | cut -d' ' -f1)"
+            echo "fork_capsule_revalidated=true"
+            echo "natural_endpoint_revalidated=true"
+            echo "lifecycle_prefix_extension_required=true"
+            echo "tape_behavior_and_start_lifecycle_bound=true"
+            echo "intervention_at_fork_required=true"
+            echo "observed_natural_birth_unique_binding=true"
+            echo "reverted_traits_observed_mutated=true"
+            echo "stress_schedule_bit_preserving=true"
+            echo "outcome_window_bound=true"
+            echo "live_replay_established=false"
+            echo "stochastic_tape_completeness_established=false"
+            echo "primary_estimand_explicitly_bound=false"
+            echo "origin_authenticity_established=false"
+            echo "causal_rescue_established=false"
+          } > target/alife-causal-replay-session-evidence/qualification.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: alife-causal-replay-session-evidence
+          path: target/alife-causal-replay-session-evidence/qualification.txt
+          if-no-files-found: error
