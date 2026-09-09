@@ -1,0 +1,160 @@
+{
+  "schema": "symthaea.integration-train.v1",
+  "base_subject": "99ae477f46b17a04df390abf33b0b308c3220781",
+  "ordered_tranches": [
+    {
+      "commit_sha": "723a035fc0f0e60e067e676443e812e0b649fab7",
+      "predecessor_sha": "99ae477f46b17a04df390abf33b0b308c3220781",
+      "theorem_id": "resources.r2.objective-metric.v1",
+      "claim": "Objective scalars are comparable only under one exact metric identity including unit and statistic.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-objective-metric/Cargo.toml",
+        "crates/domains/symthaea-resource-objective-metric/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:779"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 779
+    },
+    {
+      "commit_sha": "1373a924759f1b2e619305081401e4274840d7d9",
+      "predecessor_sha": "723a035fc0f0e60e067e676443e812e0b649fab7",
+      "theorem_id": "resources.r2.objective-evidence.v1",
+      "claim": "Objective evidence binds one scalar claim to an exact metric and an exact feasible candidate.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-objective-evidence/Cargo.toml",
+        "crates/domains/symthaea-resource-objective-evidence/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:764"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 764
+    },
+    {
+      "commit_sha": "5df053cc9b154f45e0b8a0be46540a59245b85ac",
+      "predecessor_sha": "1373a924759f1b2e619305081401e4274840d7d9",
+      "theorem_id": "resources.r2.objective-qualification.v1",
+      "claim": "Objective evidence qualifies only under exact metric semantics and explicit fail-closed conflict policy.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-objective-qualification/Cargo.toml",
+        "crates/domains/symthaea-resource-objective-qualification/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:767"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 767
+    },
+    {
+      "commit_sha": "c24bb27314f069de94f503cf72803f28a98b3ed6",
+      "predecessor_sha": "5df053cc9b154f45e0b8a0be46540a59245b85ac",
+      "theorem_id": "resources.r2.pareto.v1",
+      "claim": "Pareto ranking consumes the complete feasible subset under one exact qualified metric schema.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-pareto/Cargo.toml",
+        "crates/domains/symthaea-resource-pareto/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:772"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 772
+    },
+    {
+      "commit_sha": "8234363a1c08a988e29bcdd8ca08e13821e7d9b1",
+      "predecessor_sha": "c24bb27314f069de94f503cf72803f28a98b3ed6",
+      "theorem_id": "resources.r2.recommendation.v1",
+      "claim": "A planner recommendation may only name an exact member of the retained feasible subset or explicitly abstain.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-recommendation/Cargo.toml",
+        "crates/domains/symthaea-resource-recommendation/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:755"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 755
+    },
+    {
+      "commit_sha": "f7f91479a300c7b798e00ad9e15fce258ebe687e",
+      "predecessor_sha": "8234363a1c08a988e29bcdd8ca08e13821e7d9b1",
+      "theorem_id": "resources.r2.selectors.v1",
+      "claim": "Deterministic baseline and Pareto control selectors share the same closed-set recommendation gate.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-selectors/Cargo.toml",
+        "crates/domains/symthaea-resource-selectors/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:789"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 789
+    },
+    {
+      "commit_sha": "02017a277647cf79c4d393b5161c02ea632ac2c8",
+      "predecessor_sha": "f7f91479a300c7b798e00ad9e15fce258ebe687e",
+      "theorem_id": "resources.r2.normalization.v1",
+      "claim": "Qualified objective scalars enter a dimensionless range only through explicit metric, direction, band, and out-of-range semantics.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-objective-normalization/Cargo.toml",
+        "crates/domains/symthaea-resource-objective-normalization/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:794"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 794
+    },
+    {
+      "commit_sha": "e2076ccc24f9b411722cb9655bc9e9135691ae23",
+      "predecessor_sha": "02017a277647cf79c4d393b5161c02ea632ac2c8",
+      "theorem_id": "resources.r2.hdc-shadow.v1",
+      "claim": "The HDC shadow selector ranks only the complete closed feasible subset under the exact qualified and normalized objective schema.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-hdc-shadow/Cargo.toml",
+        "crates/domains/symthaea-resource-hdc-shadow/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:798"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 798
+    }
+  ],
+  "cumulative_tip_sha": "e2076ccc24f9b411722cb9655bc9e9135691ae23",
+  "train_id": "sha256:cc3a3716d7a29fb83c243cb9a719712d89a854c3474a6b7b739933e262494e79"
+}
