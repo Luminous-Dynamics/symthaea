@@ -14,6 +14,9 @@ categories = ["science", "algorithms", "simulation"]
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-authority-time = { path = "../../bridges/symthaea-authority-time" }
+symthaea-xenia-authority = { path = "../../bridges/symthaea-xenia-authority" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
