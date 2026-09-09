@@ -697,3 +697,5 @@ mod tests {
         );
     }
 }
+
+mod live_snapshot;
