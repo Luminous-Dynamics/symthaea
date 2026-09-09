@@ -16,6 +16,8 @@ pub mod evidence_ancestry;
 pub mod evidence_binding;
 /// Declared method/data lineage diversity over mechanically qualified evidence.
 pub mod evidence_independence;
+/// Canonical semantic capsule for authenticating generativity provenance inputs.
+pub mod evidence_provenance;
 /// Evidence-bearing, non-authoritative evaluation of future capacity and optionality.
 pub mod generativity;
 /// Typed outcomes that keep surprise reduction distinct from broader discovery value.
