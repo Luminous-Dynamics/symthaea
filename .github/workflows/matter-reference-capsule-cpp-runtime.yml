@@ -1,0 +1,183 @@
+name: Matter Reference Capsule C++ Runtime Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'research/matter-reference-capsule/shell.nix'
+      - 'research/matter-reference-capsule/verify_native_runtime.py'
+      - '.github/workflows/matter-reference-capsule-cpp-runtime.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: matter-reference-cpp-runtime-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_PARENT_SHA: 53e32afe7aba5ae3426d2c66a75a2be466dc1bc6
+  INSTALL_NIX_ACTION_SHA: 13d8dd58da0234aa297dedd986986ccb8e7f3e24
+  EXPECTED_NIX_VERSION: 'nix (Nix) 2.35.2'
+  EXPECTED_NIXPKGS_REV: 9ae611a455b90cf061d8f332b977e387bda8e1ca
+  EXPECTED_UV_LOCK_SHA256: 1ecb6c8a0752476c9731d0d44a4113c4ed1fabfee6e339724ee4534926bda646
+
+jobs:
+  qualify-native-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Enforce exact parent and three-file runtime-only scope
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "${{ github.event.pull_request.base.sha }}" = "$QUALIFICATION_PARENT_SHA"
+          test "$(git rev-parse HEAD^)" = "$QUALIFICATION_PARENT_SHA"
+          mapfile -t files < <(git diff --name-only HEAD^..HEAD | sort)
+          expected=(
+            '.github/workflows/matter-reference-capsule-cpp-runtime.yml'
+            'research/matter-reference-capsule/shell.nix'
+            'research/matter-reference-capsule/verify_native_runtime.py'
+          )
+          test "${#files[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do
+            test "${files[$i]}" = "${expected[$i]}"
+          done
+          git diff --check HEAD^..HEAD
+
+      - name: Static runtime and authority audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          shell_file='research/matter-reference-capsule/shell.nix'
+          verifier='research/matter-reference-capsule/verify_native_runtime.py'
+          workflow='.github/workflows/matter-reference-capsule-cpp-runtime.yml'
+          python3 -m py_compile "$verifier"
+          grep -Fq 'cppRuntime = pkgs.stdenv.cc.cc.lib;' "$shell_file"
+          grep -Fq 'cppLibraryPath = pkgs.lib.makeLibraryPath [ cppRuntime ];' "$shell_file"
+          grep -Fq 'export SYMTHAEA_CPP_RUNTIME_STORE=' "$shell_file"
+          grep -Fq 'export LD_LIBRARY_PATH="${cppLibraryPath}"' "$shell_file"
+          ! grep -Eq '(/usr/lib|/lib/x86_64|LD_LIBRARY_PATH=.*\$LD_LIBRARY_PATH)' "$shell_file"
+          grep -Fq 'LockedPythonNativeRuntimeQualifiedV1' "$verifier"
+          grep -Fq 'parse_ldd_libstdcxx' "$verifier"
+          grep -Fq 'ctypes.CDLL("libstdc++.so.6")' "$verifier"
+          grep -Fq 'libstdcxx_resolved_inside_declared_runtime' "$verifier"
+          python3 - <<'PY'
+          from pathlib import Path
+          verifier = Path('research/matter-reference-capsule/verify_native_runtime.py').read_text()
+          workflow = Path('.github/workflows/matter-reference-capsule-cpp-runtime.yml').read_text()
+          forbidden_verifier = [
+              'from ' + 'aiida',
+              'import ' + 'aiida',
+              'ver' + 'di',
+              'aiida-' + 'pseudo',
+              'pw' + '.x',
+              'ph' + '.x',
+              'q2r' + '.x',
+              'matdyn' + '.x',
+          ]
+          forbidden_workflow = [
+              'ver' + 'di ',
+              'aiida-' + 'pseudo ',
+              'freeze_si_' + 'pseudo.py ',
+              'pw' + '.x <',
+              'ph' + '.x <',
+              'contents:' + ' write',
+          ]
+          for token in forbidden_verifier:
+              assert token not in verifier, f'forbidden authority in native runtime verifier: {token}'
+          for token in forbidden_workflow:
+              assert token not in workflow, f'forbidden authority in native runtime workflow: {token}'
+          PY
+
+      - name: Verify frozen inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum research/matter-reference-capsule/uv.lock | awk '{print $1}')" = "$EXPECTED_UV_LOCK_SHA256"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          lock = json.loads(Path('flake.lock').read_text())
+          root = lock['nodes'][lock['root']]
+          node = root['inputs']['nixpkgs']
+          locked = lock['nodes'][node]['locked']
+          assert locked['rev'] == os.environ['EXPECTED_NIXPKGS_REV']
+          print(f"nixpkgs node={node} rev={locked['rev']} narHash={locked['narHash']}")
+          PY
+
+      - name: Install pinned Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # signed v31 target
+        with:
+          enable_kvm: false
+          github_access_token: ${{ github.token }}
+
+      - name: Prove locked pyzmq resolves declared Nix libstdc++
+        shell: bash
+        env:
+          SUBJECT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          OUTPUT_DIR: ${{ runner.temp }}/matter-cpp-runtime
+        run: |
+          set -euo pipefail
+          test "$(nix --version)" = "$EXPECTED_NIX_VERSION"
+          mkdir -p "$OUTPUT_DIR"
+
+          nix-shell research/matter-reference-capsule/shell.nix --run '
+            set -euo pipefail
+            test "$SYMTHAEA_MATTER_CAPSULE_SHELL" = 1
+            case "$SYMTHAEA_CPP_RUNTIME_STORE" in /nix/store/*) ;; *) exit 2 ;; esac
+            test "$LD_LIBRARY_PATH" = "$SYMTHAEA_CPP_RUNTIME_STORE/lib"
+            test -e "$SYMTHAEA_CPP_RUNTIME_STORE/lib/libstdc++.so.6"
+            export UV_PROJECT_ENVIRONMENT="$PWD/research/matter-reference-capsule/.venv"
+            uv sync --project research/matter-reference-capsule --frozen --no-dev --python "$SYMTHAEA_PYTHON"
+            research/matter-reference-capsule/.venv/bin/python \
+              research/matter-reference-capsule/verify_native_runtime.py \
+              --repo-root "$PWD" \
+              --subject-head "$SUBJECT_HEAD" \
+              --output "$OUTPUT_DIR/cpp-runtime-qualification.json"
+          '
+
+          test -f "$OUTPUT_DIR/cpp-runtime-qualification.json"
+          sha256sum "$OUTPUT_DIR/cpp-runtime-qualification.json" > "$OUTPUT_DIR/cpp-runtime-qualification.sha256"
+
+      - name: Verify authority boundary
+        shell: bash
+        env:
+          OUTPUT_DIR: ${{ runner.temp }}/matter-cpp-runtime
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['OUTPUT_DIR'])
+          q = json.loads((root / 'cpp-runtime-qualification.json').read_text())
+          assert q['authority'] == 'LockedPythonNativeRuntimeQualifiedV1'
+          assert q['scientific_execution'] is False
+          assert q['aiida_profile_created'] is False
+          assert q['pseudopotential_installed'] is False
+          assert q['qe_calculation_executed'] is False
+          assert q['pyzmq']['version'] == '27.2.0'
+          assert q['pyzmq']['libstdcxx_resolved_inside_declared_runtime'] is True
+          assert q['cpp_runtime']['store_output'].startswith('/nix/store/')
+          assert q['cpp_runtime']['libstdcxx_path'].startswith(q['cpp_runtime']['store_output'] + '/')
+          PY
+          (cd "$OUTPUT_DIR" && sha256sum -c cpp-runtime-qualification.sha256)
+
+      - name: Upload runtime qualification
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: matter-cpp-runtime-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/matter-cpp-runtime/cpp-runtime-qualification.json
+            ${{ runner.temp }}/matter-cpp-runtime/cpp-runtime-qualification.sha256
+          if-no-files-found: error
+          retention-days: 30
