@@ -16,6 +16,9 @@
 
 #![forbid(unsafe_code)]
 
+/// SCI-014A synthetic reconstruction protocol qualification.
+pub mod qualified_reconstruction;
+
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;

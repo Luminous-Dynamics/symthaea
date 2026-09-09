@@ -16,13 +16,14 @@
 //! - every policy predicate must have exactly one owner-derived receipt;
 //! - negative-by-absence predicates consume an already-closed evidence view;
 //! - only a qualified reconstruction may be composed with persisted lower
-//!   evaluation data to mint `ReplayVerifiedScientificDispositionV1`;
+//!   evaluation data to mint `ReplayVerifiedScientificDispositionFixtureV1`;
 //! - full replay is historical evidence, never currentness or action authority.
 
 use super::{
     DispositionEvaluationContextV1, DispositionEvaluationInputsV1, DispositionPolicyV1,
     DispositionRuleV1, PersistedDispositionEvaluationRecordV1, PredicateFactV1, PredicateValueV1,
-    ReplayErrorV1, ReplayVerifiedDispositionEvaluationV1, verify_persisted_disposition_evaluation_v1,
+    ReplayErrorV1, ReplayVerifiedDispositionEvaluationV1,
+    verify_persisted_disposition_evaluation_v1,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
@@ -32,6 +33,9 @@ pub const SCIENTIFIC_RECONSTRUCTION_FIXTURE_PROFILE_V1: &str =
     "symthaea.science.qualified-reconstruction.fixture.v1";
 pub const PREDICATE_DERIVATION_FIXTURE_PROFILE_V1: &str =
     "symthaea.science.predicate-derivation.fixture.v1";
+
+// Reserved production capability names are intentionally absent from this
+// synthetic tranche. Real qualified upstream capabilities must own them later.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContributionRoleV1 {
@@ -194,7 +198,7 @@ pub struct ScientificReconstructionFixtureV1 {
 /// Ordinary proof material. Possessing or deserializing an equivalent record
 /// would not recreate the private qualified reconstruction capability.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PredicateDerivationReceiptV1 {
+pub struct PredicateDerivationReceiptFixtureV1 {
     pub predicate_id: String,
     pub predicate_spec_material_id: String,
     pub direct_predicate_dependency_ids: Vec<String>,
@@ -208,7 +212,7 @@ pub struct PredicateDerivationReceiptV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ScientificReconstructionMaterialV1 {
+pub struct ScientificReconstructionFixtureMaterialV1 {
     pub reconstruction_profile_id: String,
     pub proposition_id: String,
     pub scientific_use_id: String,
@@ -218,7 +222,7 @@ pub struct ScientificReconstructionMaterialV1 {
     pub closed_evidence_view_receipt_id: String,
     pub predicate_dependency_graph_material_id: String,
     pub reason_topology_ids: Vec<String>,
-    pub predicate_receipts: Vec<PredicateDerivationReceiptV1>,
+    pub predicate_receipts: Vec<PredicateDerivationReceiptFixtureV1>,
     pub owner_reconstruction_execution_lineage_id: String,
 }
 
@@ -227,23 +231,23 @@ pub struct ScientificReconstructionMaterialV1 {
 /// Private fields and absence of Serde construction keep ordinary fixture or
 /// persisted data from recreating this capability.
 #[derive(Debug, PartialEq, Eq)]
-pub struct QualifiedScientificReconstructionV1 {
+pub struct QualifiedScientificReconstructionFixtureV1 {
     reconstruction_material_id: String,
-    material: ScientificReconstructionMaterialV1,
+    material: ScientificReconstructionFixtureMaterialV1,
     policy: DispositionPolicyV1,
     predicate_facts: Vec<PredicateFactV1>,
 }
 
-impl QualifiedScientificReconstructionV1 {
+impl QualifiedScientificReconstructionFixtureV1 {
     pub fn material_id(&self) -> &str {
         &self.reconstruction_material_id
     }
 
-    pub fn material(&self) -> &ScientificReconstructionMaterialV1 {
+    pub fn material(&self) -> &ScientificReconstructionFixtureMaterialV1 {
         &self.material
     }
 
-    pub fn predicate_receipts(&self) -> &[PredicateDerivationReceiptV1] {
+    pub fn predicate_receipts(&self) -> &[PredicateDerivationReceiptFixtureV1] {
         &self.material.predicate_receipts
     }
 }
@@ -252,13 +256,13 @@ impl QualifiedScientificReconstructionV1 {
 /// state. This is not currentness, truth, consensus, recommendation, or action
 /// authority.
 #[derive(Debug, PartialEq, Eq)]
-pub struct ReplayVerifiedScientificDispositionV1 {
-    reconstruction: QualifiedScientificReconstructionV1,
+pub struct ReplayVerifiedScientificDispositionFixtureV1 {
+    reconstruction: QualifiedScientificReconstructionFixtureV1,
     evaluation: ReplayVerifiedDispositionEvaluationV1,
 }
 
-impl ReplayVerifiedScientificDispositionV1 {
-    pub fn reconstruction(&self) -> &QualifiedScientificReconstructionV1 {
+impl ReplayVerifiedScientificDispositionFixtureV1 {
+    pub fn reconstruction(&self) -> &QualifiedScientificReconstructionFixtureV1 {
         &self.reconstruction
     }
 
@@ -273,29 +277,80 @@ impl ReplayVerifiedScientificDispositionV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReconstructionErrorV1 {
-    EmptyField { field: &'static str },
-    DuplicateCandidate { contribution_id: String },
-    DuplicateAccounting { contribution_id: String },
+    EmptyField {
+        field: &'static str,
+    },
+    DuplicateCandidate {
+        contribution_id: String,
+    },
+    DuplicateAccounting {
+        contribution_id: String,
+    },
     CandidateAccountingMismatch,
-    InvalidAccountingReason { contribution_id: String },
-    AliasTargetMissing { contribution_id: String, target_id: String },
-    AliasSelfReference { contribution_id: String },
-    AliasChain { contribution_id: String, target_id: String },
-    DuplicateReasonNode { reason_id: String },
-    UnknownReasonContribution { reason_id: String, contribution_id: String },
-    CandidateReasonMismatch { contribution_id: String, reason_id: String },
-    DuplicateReasonEdge { edge_id: String },
-    UnknownReasonEndpoint { reason_id: String },
-    DuplicateStateAtom { field: &'static str, key: String },
-    DuplicatePredicateSpec { predicate_id: String },
-    DuplicatePredicateDependency { predicate_id: String, dependency_id: String },
-    DuplicatePredicateReason { predicate_id: String, reason_id: String },
-    UnknownPredicateDependency { predicate_id: String, dependency_id: String },
+    InvalidAccountingReason {
+        contribution_id: String,
+    },
+    AliasTargetMissing {
+        contribution_id: String,
+        target_id: String,
+    },
+    AliasSelfReference {
+        contribution_id: String,
+    },
+    AliasChain {
+        contribution_id: String,
+        target_id: String,
+    },
+    DuplicateReasonNode {
+        reason_id: String,
+    },
+    UnknownReasonContribution {
+        reason_id: String,
+        contribution_id: String,
+    },
+    CandidateReasonMismatch {
+        contribution_id: String,
+        reason_id: String,
+    },
+    DuplicateReasonEdge {
+        edge_id: String,
+    },
+    UnknownReasonEndpoint {
+        reason_id: String,
+    },
+    DuplicateStateAtom {
+        field: &'static str,
+        key: String,
+    },
+    DuplicatePredicateSpec {
+        predicate_id: String,
+    },
+    DuplicatePredicateDependency {
+        predicate_id: String,
+        dependency_id: String,
+    },
+    DuplicatePredicateReason {
+        predicate_id: String,
+        reason_id: String,
+    },
+    UnknownPredicateDependency {
+        predicate_id: String,
+        dependency_id: String,
+    },
     PredicateDependencyCycle,
-    OperatorDependencyMismatch { predicate_id: String },
-    UnknownPredicateReason { predicate_id: String, reason_id: String },
-    MissingPolicyPredicateCoverage { predicate_id: String },
-    ExtraPredicateSpec { predicate_id: String },
+    OperatorDependencyMismatch {
+        predicate_id: String,
+    },
+    UnknownPredicateReason {
+        predicate_id: String,
+        reason_id: String,
+    },
+    MissingPolicyPredicateCoverage {
+        predicate_id: String,
+    },
+    ExtraPredicateSpec {
+        predicate_id: String,
+    },
     LowerReplay(ReplayErrorV1),
 }
 
@@ -313,7 +368,10 @@ impl fmt::Display for ReconstructionErrorV1 {
                 write!(f, "candidate and accounting identity sets differ")
             }
             Self::InvalidAccountingReason { contribution_id } => {
-                write!(f, "invalid accounting reason for contribution: {contribution_id}")
+                write!(
+                    f,
+                    "invalid accounting reason for contribution: {contribution_id}"
+                )
             }
             Self::AliasTargetMissing {
                 contribution_id,
@@ -371,7 +429,10 @@ impl fmt::Display for ReconstructionErrorV1 {
             Self::DuplicatePredicateReason {
                 predicate_id,
                 reason_id,
-            } => write!(f, "duplicate reason {reason_id} for predicate {predicate_id}"),
+            } => write!(
+                f,
+                "duplicate reason {reason_id} for predicate {predicate_id}"
+            ),
             Self::UnknownPredicateDependency {
                 predicate_id,
                 dependency_id,
@@ -383,7 +444,10 @@ impl fmt::Display for ReconstructionErrorV1 {
                 write!(f, "predicate derivation dependency graph contains a cycle")
             }
             Self::OperatorDependencyMismatch { predicate_id } => {
-                write!(f, "operator/dependency contract mismatch for {predicate_id}")
+                write!(
+                    f,
+                    "operator/dependency contract mismatch for {predicate_id}"
+                )
             }
             Self::UnknownPredicateReason {
                 predicate_id,
@@ -393,7 +457,10 @@ impl fmt::Display for ReconstructionErrorV1 {
                 "predicate {predicate_id} refers to unknown reason {reason_id}"
             ),
             Self::MissingPolicyPredicateCoverage { predicate_id } => {
-                write!(f, "missing derivation receipt path for policy predicate {predicate_id}")
+                write!(
+                    f,
+                    "missing derivation receipt path for policy predicate {predicate_id}"
+                )
             }
             Self::ExtraPredicateSpec { predicate_id } => write!(
                 f,
@@ -425,7 +492,6 @@ struct QualifiedClosedEvidenceViewFixtureV1 {
 struct QualifiedReasonTopologyFixtureV1 {
     snapshot_id: String,
     node_ids: BTreeSet<String>,
-    node_contributions: BTreeMap<String, Option<String>>,
     canonical_nodes: Vec<ReasonNodeFixtureV1>,
     canonical_edges: Vec<ReasonEdgeFixtureV1>,
 }
@@ -544,7 +610,9 @@ fn proposition_id(
     ))
 }
 
-fn scientific_use_id(use_fixture: &ScientificUseFixtureV1) -> Result<String, ReconstructionErrorV1> {
+fn scientific_use_id(
+    use_fixture: &ScientificUseFixtureV1,
+) -> Result<String, ReconstructionErrorV1> {
     require_non_empty(&use_fixture.purpose, "scientific_use_purpose")?;
     Ok(exact_material_id(
         "scientific-use",
@@ -781,13 +849,14 @@ fn qualify_reason_topology(
         .collect();
 
     for candidate in view.candidates.values() {
-        if node_contributions.get(&candidate.reason_id)
-            != Some(&Some(candidate.contribution_id.clone()))
-        {
-            return Err(ReconstructionErrorV1::CandidateReasonMismatch {
-                contribution_id: candidate.contribution_id.clone(),
-                reason_id: candidate.reason_id.clone(),
-            });
+        match node_contributions.get(&candidate.reason_id) {
+            Some(Some(contribution_id)) if contribution_id == &candidate.contribution_id => {}
+            _ => {
+                return Err(ReconstructionErrorV1::CandidateReasonMismatch {
+                    contribution_id: candidate.contribution_id.clone(),
+                    reason_id: candidate.reason_id.clone(),
+                });
+            }
         }
     }
 
@@ -806,7 +875,6 @@ fn qualify_reason_topology(
     Ok(QualifiedReasonTopologyFixtureV1 {
         snapshot_id,
         node_ids,
-        node_contributions,
         canonical_nodes,
         canonical_edges,
     })
@@ -852,6 +920,7 @@ fn reason_subgraph_material_id(
 
 fn build_policy(
     fixture: &DispositionPolicyFixtureV1,
+    scientific_use_id: &str,
 ) -> Result<DispositionPolicyV1, ReconstructionErrorV1> {
     let provisional = DispositionPolicyV1 {
         profile_id: fixture.profile_id.clone(),
@@ -861,7 +930,11 @@ fn build_policy(
     };
     let mut canonical = super::canonical_policy(&provisional)?;
 
-    let mut parts = vec![canonical.profile_id.clone(), canonical.fallback_output.clone()];
+    let mut parts = vec![
+        scientific_use_id.to_string(),
+        canonical.profile_id.clone(),
+        canonical.fallback_output.clone(),
+    ];
     for rule in &canonical.rules {
         parts.push(rule.rule_id.clone());
         parts.push(rule.priority.to_string());
@@ -931,7 +1004,7 @@ fn canonical_predicate_specs(
                 source_predicate_id,
             } => {
                 require_non_empty(source_predicate_id, "mirror_source_predicate_id")?;
-                if dependencies.as_slice() != [source_predicate_id.as_str()] {
+                if dependencies.len() != 1 || dependencies.first() != Some(source_predicate_id) {
                     return Err(ReconstructionErrorV1::OperatorDependencyMismatch {
                         predicate_id: spec.predicate_id.clone(),
                     });
@@ -996,8 +1069,7 @@ fn validate_policy_coverage(
 fn predicate_topological_order(
     specs: &BTreeMap<String, PredicateDerivationSpecFixtureV1>,
 ) -> Result<Vec<String>, ReconstructionErrorV1> {
-    let mut indegree: BTreeMap<String, usize> =
-        specs.keys().cloned().map(|id| (id, 0)).collect();
+    let mut indegree: BTreeMap<String, usize> = specs.keys().cloned().map(|id| (id, 0)).collect();
     let mut dependents: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
     for (predicate_id, spec) in specs {
@@ -1128,7 +1200,7 @@ fn evaluate_predicate_specs(
     view: &QualifiedClosedEvidenceViewFixtureV1,
     derivation_artifact_id: &str,
     execution_lineage_id: &str,
-) -> Result<Vec<PredicateDerivationReceiptV1>, ReconstructionErrorV1> {
+) -> Result<Vec<PredicateDerivationReceiptFixtureV1>, ReconstructionErrorV1> {
     let mut results = BTreeMap::new();
     let mut receipts = BTreeMap::new();
 
@@ -1169,7 +1241,7 @@ fn evaluate_predicate_specs(
         results.insert(predicate_id.clone(), result);
         receipts.insert(
             predicate_id.clone(),
-            PredicateDerivationReceiptV1 {
+            PredicateDerivationReceiptFixtureV1 {
                 predicate_id: predicate_id.clone(),
                 predicate_spec_material_id: predicate_spec_material_id(spec),
                 direct_predicate_dependency_ids: spec.direct_predicate_dependency_ids.clone(),
@@ -1187,7 +1259,7 @@ fn evaluate_predicate_specs(
     Ok(receipts.into_values().collect())
 }
 
-fn receipt_material_id(receipt: &PredicateDerivationReceiptV1) -> String {
+fn receipt_material_id(receipt: &PredicateDerivationReceiptFixtureV1) -> String {
     let mut parts = vec![
         receipt.predicate_id.clone(),
         receipt.predicate_spec_material_id.clone(),
@@ -1204,7 +1276,7 @@ fn receipt_material_id(receipt: &PredicateDerivationReceiptV1) -> String {
     exact_material_id("predicate-derivation-receipt", parts)
 }
 
-fn reconstruction_material_id(material: &ScientificReconstructionMaterialV1) -> String {
+fn reconstruction_material_id(material: &ScientificReconstructionFixtureMaterialV1) -> String {
     let mut parts = vec![
         material.reconstruction_profile_id.clone(),
         material.proposition_id.clone(),
@@ -1244,7 +1316,7 @@ fn reconstruction_material_id(material: &ScientificReconstructionMaterialV1) -> 
 /// the fixture material and retained behind a private capability boundary.
 pub fn qualify_fixture_scientific_reconstruction_v1(
     fixture: &ScientificReconstructionFixtureV1,
-) -> Result<QualifiedScientificReconstructionV1, ReconstructionErrorV1> {
+) -> Result<QualifiedScientificReconstructionFixtureV1, ReconstructionErrorV1> {
     let proposition_id = proposition_id(&fixture.proposition)?;
     let scientific_use_id = scientific_use_id(&fixture.scientific_use)?;
     let information_cutoff_id = information_cutoff_id(&fixture.information_cutoff)?;
@@ -1284,7 +1356,7 @@ pub fn qualify_fixture_scientific_reconstruction_v1(
         "triangulation",
     )?;
 
-    let policy = build_policy(&fixture.policy)?;
+    let policy = build_policy(&fixture.policy, &scientific_use_id)?;
     let specs = canonical_predicate_specs(&fixture.predicate_specs)?;
     validate_policy_coverage(&policy, &specs)?;
 
@@ -1336,7 +1408,7 @@ pub fn qualify_fixture_scientific_reconstruction_v1(
         .collect();
     let reason_topology_ids: Vec<_> = topology.node_ids.iter().cloned().collect();
 
-    let material = ScientificReconstructionMaterialV1 {
+    let material = ScientificReconstructionFixtureMaterialV1 {
         reconstruction_profile_id: SCIENTIFIC_RECONSTRUCTION_FIXTURE_PROFILE_V1.to_string(),
         proposition_id,
         scientific_use_id,
@@ -1351,7 +1423,7 @@ pub fn qualify_fixture_scientific_reconstruction_v1(
     };
     let reconstruction_material_id = reconstruction_material_id(&material);
 
-    Ok(QualifiedScientificReconstructionV1 {
+    Ok(QualifiedScientificReconstructionFixtureV1 {
         reconstruction_material_id,
         material,
         policy,
@@ -1363,10 +1435,10 @@ pub fn qualify_fixture_scientific_reconstruction_v1(
 ///
 /// No API accepts an already-created lower replay witness plus caller strings;
 /// the lower witness is created internally from reconstruction-owned material.
-pub fn verify_replay_scientific_disposition_v1(
+pub fn verify_replay_scientific_disposition_fixture_v1(
     record: &PersistedDispositionEvaluationRecordV1,
-    reconstruction: QualifiedScientificReconstructionV1,
-) -> Result<ReplayVerifiedScientificDispositionV1, ReconstructionErrorV1> {
+    reconstruction: QualifiedScientificReconstructionFixtureV1,
+) -> Result<ReplayVerifiedScientificDispositionFixtureV1, ReconstructionErrorV1> {
     let inputs = DispositionEvaluationInputsV1 {
         proposition_id: reconstruction.material.proposition_id.clone(),
         scientific_use_id: reconstruction.material.scientific_use_id.clone(),
@@ -1374,13 +1446,10 @@ pub fn verify_replay_scientific_disposition_v1(
         reason_topology_ids: reconstruction.material.reason_topology_ids.clone(),
         predicates: reconstruction.predicate_facts.clone(),
     };
-    let evaluation = verify_persisted_disposition_evaluation_v1(
-        record,
-        &inputs,
-        &reconstruction.policy,
-    )?;
+    let evaluation =
+        verify_persisted_disposition_evaluation_v1(record, &inputs, &reconstruction.policy)?;
 
-    Ok(ReplayVerifiedScientificDispositionV1 {
+    Ok(ReplayVerifiedScientificDispositionFixtureV1 {
         reconstruction,
         evaluation,
     })
@@ -1582,7 +1651,7 @@ mod tests {
     }
 
     fn lower_inputs(
-        reconstruction: &QualifiedScientificReconstructionV1,
+        reconstruction: &QualifiedScientificReconstructionFixtureV1,
     ) -> DispositionEvaluationInputsV1 {
         DispositionEvaluationInputsV1 {
             proposition_id: reconstruction.material.proposition_id.clone(),
@@ -1594,7 +1663,7 @@ mod tests {
     }
 
     fn persisted_record(
-        reconstruction: &QualifiedScientificReconstructionV1,
+        reconstruction: &QualifiedScientificReconstructionFixtureV1,
     ) -> PersistedDispositionEvaluationRecordV1 {
         build_persisted_evaluation_record_v1(
             "assessment:fixture",
@@ -1608,11 +1677,18 @@ mod tests {
     fn full_replay_requires_owner_reconstruction_then_lower_replay() {
         let reconstruction = qualify_fixture_scientific_reconstruction_v1(&base_fixture()).unwrap();
         let record = persisted_record(&reconstruction);
-        let verified = verify_replay_scientific_disposition_v1(&record, reconstruction).unwrap();
+        let verified =
+            verify_replay_scientific_disposition_fixture_v1(&record, reconstruction).unwrap();
 
-        assert_eq!(verified.primary_disposition(), "SupportedWithinFixtureScope");
         assert_eq!(
-            verified.reconstruction().material().reconstruction_profile_id,
+            verified.primary_disposition(),
+            "SupportedWithinFixtureScope"
+        );
+        assert_eq!(
+            verified
+                .reconstruction()
+                .material()
+                .reconstruction_profile_id,
             SCIENTIFIC_RECONSTRUCTION_FIXTURE_PROFILE_V1
         );
     }
@@ -1646,7 +1722,8 @@ mod tests {
         assert_eq!(opposition.result, PredicateValueV1::Unknown);
 
         let record = persisted_record(&reconstruction);
-        let verified = verify_replay_scientific_disposition_v1(&record, reconstruction).unwrap();
+        let verified =
+            verify_replay_scientific_disposition_fixture_v1(&record, reconstruction).unwrap();
         assert_eq!(verified.primary_disposition(), "Underdetermined");
     }
 
@@ -1751,12 +1828,14 @@ mod tests {
     #[test]
     fn hidden_auxiliary_predicate_is_rejected_in_fixture_v1() {
         let mut fixture = base_fixture();
-        fixture.predicate_specs.push(PredicateDerivationSpecFixtureV1 {
-            predicate_id: "hidden-helper".into(),
-            direct_predicate_dependency_ids: vec![],
-            reason_ids: vec!["reason:closure".into()],
-            operator: PredicateOperatorFixtureV1::AllCandidatesAccountedFor,
-        });
+        fixture
+            .predicate_specs
+            .push(PredicateDerivationSpecFixtureV1 {
+                predicate_id: "hidden-helper".into(),
+                direct_predicate_dependency_ids: vec![],
+                reason_ids: vec!["reason:closure".into()],
+                operator: PredicateOperatorFixtureV1::AllCandidatesAccountedFor,
+            });
         assert_eq!(
             qualify_fixture_scientific_reconstruction_v1(&fixture),
             Err(ReconstructionErrorV1::ExtraPredicateSpec {
@@ -1811,17 +1890,15 @@ mod tests {
         let record = persisted_record(&first);
 
         let mut changed_fixture = base_fixture();
-        changed_fixture.predicate_specs[0].reason_ids = vec![
-            "reason:closure".into(),
-            "reason:support".into(),
-        ];
+        changed_fixture.predicate_specs[0].reason_ids =
+            vec!["reason:closure".into(), "reason:support".into()];
         let changed = qualify_fixture_scientific_reconstruction_v1(&changed_fixture).unwrap();
         assert_ne!(
             first.material().context.predicate_derivation_artifact_id,
             changed.material().context.predicate_derivation_artifact_id
         );
         assert_eq!(
-            verify_replay_scientific_disposition_v1(&record, changed),
+            verify_replay_scientific_disposition_fixture_v1(&record, changed),
             Err(ReconstructionErrorV1::LowerReplay(
                 ReplayErrorV1::EvaluationContextMismatch
             ))
@@ -1837,7 +1914,7 @@ mod tests {
         changed_fixture.evidence_view.scope_id = "different-scope".into();
         let changed = qualify_fixture_scientific_reconstruction_v1(&changed_fixture).unwrap();
         assert_eq!(
-            verify_replay_scientific_disposition_v1(&record, changed),
+            verify_replay_scientific_disposition_fixture_v1(&record, changed),
             Err(ReconstructionErrorV1::LowerReplay(
                 ReplayErrorV1::EvaluationContextMismatch
             ))
