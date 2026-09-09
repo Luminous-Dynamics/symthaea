@@ -72,6 +72,7 @@ pub mod predator_prey;
 pub mod repeat_shock;
 pub mod repeat_shock_did;
 pub mod repeat_shock_relative;
+pub mod resource_exposure;
 pub mod types;
 
 pub use agent_id::{
@@ -220,5 +221,9 @@ pub use repeat_shock_did::{
 pub use repeat_shock_relative::{
     RepeatedShockRelativeErrorV1, RepeatedShockRelativeV1, RepeatedShockRelativeVerdictV1,
     compare_repeated_shock_relative,
+};
+pub use resource_exposure::{
+    GenesisResourceExposureErrorV1, GenesisResourceExposureRunnerV1, GenesisResourceExposureV1,
+    ValidatedGenesisTreatmentExposureV1, validate_resource_exposure_for_session_v1,
 };
 pub use types::BoundaryModulators;
