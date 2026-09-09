@@ -18,9 +18,11 @@ actual_sha="$(git rev-parse HEAD)"
 head_tree="$(git rev-parse 'HEAD^{tree}')"
 expected_sha="${QUALIFIED_SHA:-$actual_sha}"
 receipt_path="${CONTINUITY_CONTRACT_RECEIPT:-${TMPDIR:-/tmp}/symthaea-continuity-contract-qualification-v1.tsv}"
+format_patch_path="${CONTINUITY_FORMAT_PATCH:-${TMPDIR:-/tmp}/symthaea-continuity-rustfmt.patch}"
 status="FAIL"
 stage="preflight"
 source_state="unverified"
+format_patch_state="not-produced"
 
 sha256_file() {
     local path="$1"
@@ -83,6 +85,8 @@ write_receipt() {
         printf 'expected_sha\t%s\n' "$expected_sha"
         printf 'committed_tree\t%s\n' "$head_tree"
         printf 'source_state\t%s\n' "$source_state"
+        printf 'format_patch_state\t%s\n' "$format_patch_state"
+        printf 'format_patch_sha256\t%s\n' "$(sha256_file "$format_patch_path")"
         printf 'execution_provider\t%s\n' "$provider"
         printf 'runner_label\t%s\n' "${CONTINUITY_RUNNER_LABEL:-unknown}"
         printf 'runner_os\t%s\n' "${RUNNER_OS:-unknown}"
@@ -129,6 +133,7 @@ write_receipt() {
             echo "- committed tree: \`$head_tree\`"
             echo "- terminal stage: \`$failure_stage\`"
             echo "- source state: \`$source_state\`"
+            echo "- format repair artifact: \`$format_patch_state\`"
             echo '- scope: continuity software contracts only'
             echo '- full repository CI: independent'
             echo '- real-world availability/scientific/execution authority: none'
@@ -189,6 +194,8 @@ if [[ -n "$untracked" ]]; then
 fi
 source_state="clean-exact-checkout"
 
+rm -f "$format_patch_path"
+
 echo "continuity-contract qualified_sha=$actual_sha"
 echo "continuity-contract committed_tree=$head_tree"
 rustc -Vv
@@ -198,7 +205,22 @@ stage="cargo_metadata"
 cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
 stage="format"
-cargo fmt -p symthaea-continuity -- --check
+if ! cargo fmt -p symthaea-continuity -- --check; then
+    mkdir -p "$(dirname "$format_patch_path")"
+    cargo fmt -p symthaea-continuity
+    if git diff --quiet -- crates/core/symthaea-continuity; then
+        source_state="format-check-failed-without-repair-diff"
+        echo 'error: rustfmt check failed but formatter produced no continuity diff' >&2
+        exit 1
+    fi
+    git diff --binary -- crates/core/symthaea-continuity > "$format_patch_path"
+    format_patch_state="generated-from-exact-head"
+    source_state="formatter-derived-diff-from-exact-head"
+    echo "continuity-contract rustfmt_patch=$format_patch_path"
+    echo "continuity-contract rustfmt_patch_sha256=$(sha256_file "$format_patch_path")"
+    git diff --stat -- crates/core/symthaea-continuity >&2 || true
+    exit 1
+fi
 
 stage="check_all_targets"
 cargo check --locked -p symthaea-continuity --all-targets
