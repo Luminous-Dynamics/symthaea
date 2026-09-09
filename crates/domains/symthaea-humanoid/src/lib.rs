@@ -65,6 +65,7 @@ pub mod skill_permit;
 pub mod skill_runtime;
 pub mod sparse_qp_backend;
 pub mod spatial_goal;
+mod spatial_goal_debug;
 pub mod state_estimation;
 pub mod state_uncertainty;
 pub mod terrain;
