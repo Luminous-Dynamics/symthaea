@@ -1,0 +1,53 @@
+name: Inference Executor
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_execution_envelope.rs"
+      - "src/language/inference_executor.rs"
+      - "tests/inference_executor.rs"
+      - "docs/architecture/INFERENCE_EXECUTOR_V1.md"
+      - ".github/workflows/inference-executor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-executor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-executor:
+    name: Inference Executor
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: rustfmt --edition 2024 --check src/language/inference_execution_envelope.rs src/language/inference_executor.rs tests/inference_executor.rs
+
+      - name: Compile and run IF-4 regressions
+        run: cargo test --locked --test inference_executor
+
+      - name: Focused IF-4 Clippy
+        run: cargo clippy --locked --test inference_executor -- -D warnings -A dead-code
+
+      - name: Ratchet authority/provenance boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'execution-binding.v2' src/language/inference_execution_envelope.rs
+          grep -F 'The raw transport is private' src/language/inference_executor.rs
+          grep -F 're-derives the complete v2 binding immediately before I/O' src/language/inference_executor.rs
+          grep -F 'does not accept an arbitrary `TransportGenerationRequest`' docs/architecture/INFERENCE_EXECUTOR_V1.md
+          grep -F 'Tool and structured-output requests fail closed' docs/architecture/INFERENCE_EXECUTOR_V1.md
+          grep -F 'no replacement of the current `LLMBackend` factory' docs/architecture/INFERENCE_EXECUTOR_V1.md
