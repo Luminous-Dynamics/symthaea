@@ -1,0 +1,15 @@
+{
+  "schema": "symthaea.resource-qualification-attempt-set.v2",
+  "qualification_profile": "resources.stack-qualification.v1",
+  "admission_subject_id": "sha256:9c0769e927ffbc7fb2d0ec943d859f75a3ab32f73c30561db6e9c3881f2c50d0",
+  "observation_ids": [
+    "sha256:07c428a25fab005330c5c9a4ecf9424bae98014c130b36e94b79da3abdcfcb94"
+  ],
+  "non_claims": [
+    "does not establish chronological ordering between attempts",
+    "does not establish identical checked-out bytes across attempts",
+    "does not include source-changing repair links",
+    "does not establish qualification unless an included observation is Passed"
+  ],
+  "set_id": "sha256:b9404951605b43ef02227fab101ffcece6731b5e0d294eb2f63433c16b45cc5c"
+}
