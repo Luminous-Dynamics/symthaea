@@ -10,7 +10,7 @@
 //! This module integrates with the existing BinaryHV hypervector infrastructure
 //! for efficient contingency encoding and lookup.
 
-use super::binary_hv::BinaryHV;
+use super::{binary_hv::BinaryHV, ContinuousHV, HDC_DIMENSION};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
@@ -1025,6 +1025,14 @@ impl ContingencyConsciousnessContribution {
         self.surprise
     }
 }
+
+// ============================================================================
+// UNIVERSAL ROLE-BOUND PHYSICAL SEMANTICS (R3.1)
+// ============================================================================
+
+#[path = "sensorimotor_schema_v1.rs"]
+pub mod schema_v1;
+pub use schema_v1::*;
 
 // ============================================================================
 // TESTS
