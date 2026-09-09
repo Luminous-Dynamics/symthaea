@@ -185,10 +185,14 @@ pub enum HumanoidReachManifestAuthorityIssueFailure {
 /// Mint the actual purpose-scoped motor authority receipt from the strongest Reach
 /// evidence identities.
 ///
-/// `now_s` and `now_unix_millis` must describe the same issuance instant in their
-/// respective clocks. `requested_valid_until_s` is mapped forward by elapsed time
-/// into Unix milliseconds; the strongest qualification artifact must remain valid
-/// at that mapped future instant or issuance fails closed.
+/// `now_s` and `now_unix_millis` are an explicit caller-supplied clock correlation:
+/// they must describe the same issuance instant. The humanoid domain does not own
+/// a trusted wall-clock/monotonic synchronization service, so this function does
+/// not claim to authenticate that correlation. `requested_valid_until_s` is mapped
+/// forward by elapsed time into Unix milliseconds; the strongest qualification
+/// artifact must remain valid at that mapped future instant or issuance fails
+/// closed. A future clock-attestation service can bind the correlation without
+/// changing this capability API.
 #[allow(clippy::too_many_arguments)]
 pub fn issue_humanoid_reach_manifest_authority_receipt(
     subject: &HumanoidQualificationSubject,
