@@ -15,8 +15,10 @@ pub mod exact_policy;
 pub mod observation;
 pub mod profile_adoption;
 pub mod profile_adoption_admission;
+pub mod profile_adoption_authority;
 pub mod profile_adoption_commit;
 pub mod profile_adoption_root;
+pub mod profile_adoption_runtime;
 pub mod profile_adoption_time;
 pub mod verifier;
 mod witness;
@@ -49,6 +51,11 @@ pub use profile_adoption_admission::{
     VerifierProfileAdoptionAdmissionPolicyV1, VerifierProfileAdoptionHeadIdentityV1,
     VerifierProfileAdoptionHeadV1,
 };
+pub use profile_adoption_authority::{
+    AuthorityGrantedVerifierProfileAdoptionV1, VerifierAdoptionAuthorityGrantError,
+    VerifierAdoptionAuthorityGrantIdV1, VerifierAdoptionAuthorityGrantV1,
+    bind_policy_checked_adoption_to_authority_grant,
+};
 pub use profile_adoption_commit::{
     VerifierProfileAdoptionCommitError, VerifierProfileAdoptionCommitPreconditionsV1,
     VerifierProfileAdoptionCommitStateV1,
@@ -57,6 +64,10 @@ pub use profile_adoption_root::{
     RootBoundPolicyCheckedVerifierProfileAdoptionV1,
     VerifierProfileAdoptionAuthorityRootSnapshotId,
     VerifierProfileAdoptionAuthorityRootSnapshotV1, VerifierProfileAdoptionRootBindingError,
+};
+pub use profile_adoption_runtime::{
+    PolicyCurrentVerifierRuntimeEnvelopeV1, VerifierProfileRuntimeAuthorityError,
+    check_current_verifier_runtime_policy,
 };
 pub use profile_adoption_time::{
     TimeBoundVerifierProfileAdoptionCommitPreconditionsV1,
