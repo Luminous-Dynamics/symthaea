@@ -95,6 +95,25 @@ jobs:
           EVIDENCE_CONTRACT_RECEIPT: ${{ runner.temp }}/evidence-contract-qualification-v1.tsv
         run: bash scripts/qualify-evidence-contract.sh
 
+      - name: Publish receipt digest
+        if: always()
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/evidence-contract-qualification-v1.tsv
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RECEIPT" ]]; then
+            echo 'No qualification receipt was produced; execution did not reach the receipt-bearing verifier.'
+            exit 0
+          fi
+          digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
+          echo "evidence-contract receipt_sha256=$digest"
+          {
+            echo
+            echo "- receipt SHA-256: \`$digest\`"
+            echo '- receipt bytes are not independently signed; this digest is witnessed by the workflow log.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload qualification receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
