@@ -107,6 +107,12 @@ def _canonical_json_sha256(value: Any) -> str:
     return _sha256_bytes(_json_bytes(value))
 
 
+def _require_subject_head(value: str) -> str:
+    if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+        raise FreezeError(f"invalid exact subject head: {value!r}")
+    return value
+
+
 def _reject_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
@@ -378,12 +384,19 @@ def _download_evidence(parsed: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validate_download_receipt(
-    receipt: dict[str, Any], bundle: Path, *, uv_lock_sha256: str, versions: dict[str, str]
+    receipt: dict[str, Any],
+    bundle: Path,
+    *,
+    subject_head: str,
+    uv_lock_sha256: str,
+    versions: dict[str, str],
 ) -> dict[str, Any]:
     if receipt.get("schema_version") != DOWNLOAD_SCHEMA:
         raise FreezeError("unsupported or malformed pseudopotential download receipt")
     if receipt.get("authority") != AUTHORITY_DOWNLOAD:
         raise FreezeError("download receipt authority mismatch")
+    if receipt.get("subject_head") != subject_head:
+        raise FreezeError("download receipt subject head mismatch")
     if receipt.get("family_label") != FAMILY_LABEL or receipt.get("element") != ELEMENT:
         raise FreezeError("download receipt family/element does not match Capsule 001 contract")
     if receipt.get("uv_lock_sha256") != uv_lock_sha256:
@@ -478,6 +491,7 @@ def _parse_patch_version(output: str) -> str:
 
 
 def _download(args: argparse.Namespace) -> None:
+    subject_head = _require_subject_head(args.subject_head)
     uv_lock_sha256 = _require_capsule_environment()
     versions = _distribution_versions()
     out = Path(args.output).resolve()
@@ -503,6 +517,8 @@ def _download(args: argparse.Namespace) -> None:
     parsed = _parse_bundle(bundle)
     receipt = {
         "schema_version": DOWNLOAD_SCHEMA,
+        "authority": AUTHORITY_DOWNLOAD,
+        "subject_head": subject_head,
         "created_utc": _utc_iso(created),
         "created_utc_yyyymmdd": _yyyymmdd(created),
         "family_label": FAMILY_LABEL,
@@ -515,7 +531,6 @@ def _download(args: argparse.Namespace) -> None:
         "bundle_evidence": _download_evidence(parsed),
         "uv_lock_sha256": uv_lock_sha256,
         "python_distributions": versions,
-        "authority": AUTHORITY_DOWNLOAD,
         "limitations": [
             "network acquisition is content-addressed but does not itself qualify an AiiDA environment or install a family",
             "SSSP latest patch resolution is time-dependent; the resolved patch version and exact bundle bytes are retained",
@@ -540,6 +555,7 @@ def _normalize_cutoffs(value: dict[str, Any]) -> dict[str, dict[str, float]]:
 
 
 def _install_freeze(args: argparse.Namespace) -> None:
+    subject_head = _require_subject_head(args.subject_head)
     uv_lock_sha256 = _require_capsule_environment()
     versions = _distribution_versions()
     bundle = Path(args.bundle).resolve()
@@ -552,6 +568,7 @@ def _install_freeze(args: argparse.Namespace) -> None:
     parsed = _validate_download_receipt(
         download_receipt,
         bundle,
+        subject_head=subject_head,
         uv_lock_sha256=uv_lock_sha256,
         versions=versions,
     )
@@ -667,6 +684,8 @@ def _install_freeze(args: argparse.Namespace) -> None:
     created = _utc_now()
     freeze = {
         "schema_version": FREEZE_SCHEMA,
+        "authority": AUTHORITY_FREEZE,
+        "subject_head": subject_head,
         "created_utc": _utc_iso(created),
         "created_utc_yyyymmdd": _yyyymmdd(created),
         "predecessor_environment": {
@@ -735,7 +754,6 @@ def _install_freeze(args: argparse.Namespace) -> None:
             "process_node_created": False,
             "scientific_result_observed": False,
         },
-        "authority": AUTHORITY_FREEZE,
         "next_required_transition": "si-001-frozen-scientific-execution",
         "limitations": [
             "this receipt freezes a complete SSSP family and literal Si input before any AiiDA process; it does not execute QE",
@@ -823,9 +841,11 @@ def _self_test() -> None:
         assert parsed["silicon_metadata"]["cutoff_wfc_ry"] == 42.0
         assert set(parsed["member_sha256"]) == EXPECTED_INNER_NAMES
 
+        fixture_head = "b" * 40
         download_receipt = {
             "schema_version": DOWNLOAD_SCHEMA,
             "authority": AUTHORITY_DOWNLOAD,
+            "subject_head": fixture_head,
             "family_label": FAMILY_LABEL,
             "element": ELEMENT,
             "bundle_sha256": _sha256_file(bundle),
@@ -836,6 +856,7 @@ def _self_test() -> None:
         _validate_download_receipt(
             download_receipt,
             bundle,
+            subject_head=fixture_head,
             uv_lock_sha256="a" * 64,
             versions={"fixture": "1"},
         )
@@ -893,12 +914,14 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     download = sub.add_parser("download", help="download and content-address the exact SSSP bundle")
+    download.add_argument("--subject-head", required=True)
     download.add_argument("--output", required=True)
 
     freeze = sub.add_parser(
         "install-freeze",
         help="bind qualified environment + exact SSSP bundle and freeze Si before any process",
     )
+    freeze.add_argument("--subject-head", required=True)
     freeze.add_argument("--profile", required=True)
     freeze.add_argument("--environment-receipt", required=True)
     freeze.add_argument("--bundle", required=True)
