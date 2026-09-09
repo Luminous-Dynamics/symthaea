@@ -54,14 +54,15 @@ pub mod physical_health;
 pub mod plugin;
 pub mod qp_certification;
 pub mod qualification;
+pub mod reach_episode_evidence;
 pub mod reach_execution;
 pub mod reach_execution_evidence;
 pub mod reach_outcome_evidence;
 pub mod reach_policy_identity;
 pub mod reach_qualification_campaign;
 pub mod reach_qualification_lineage;
-// Step-level Reach evidence may issue internal stage artifacts, but cannot expose
-// operational capability on its own. Episode-complete promotion is layered above.
+// Step-level Reach promotion remains internal until episode-complete promotion
+// proves the full behavioral capability rather than only controller-step quality.
 mod reach_qualification_promotion;
 pub mod recovery;
 pub mod recovery_benchmark;
@@ -137,6 +138,7 @@ pub use payload_capability::*;
 pub use physical_health::*;
 pub use qp_certification::*;
 pub use qualification::*;
+pub use reach_episode_evidence::*;
 pub use reach_execution::*;
 pub use reach_execution_evidence::*;
 pub use reach_outcome_evidence::*;
