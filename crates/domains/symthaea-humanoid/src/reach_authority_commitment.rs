@@ -11,7 +11,8 @@
 //! it commits the exact Reach subject, authority-source identities/scales, permit
 //! epoch/time window, execution purpose/basis, deployment scope and finalization
 //! instant with domain-separated SHA-256. The old fingerprints remain secondary
-//! corruption checks; promotion-grade code should bind these digests instead.
+//! corruption checks; they are validated but deliberately excluded from the
+//! cryptographic identity.
 
 use crate::evidence_digest::{HumanoidEvidenceDigest, HumanoidEvidenceHasher};
 use crate::execution_authority_scope::{
@@ -236,9 +237,6 @@ fn digest_receipt_audit(
         }
         h.string(id).f32(scale);
     }
-    // Secondary compatibility checksum. Collision resistance comes from the
-    // complete canonical contents above, not from this legacy value.
-    h.u64(audit.receipt_fingerprint);
     Some(h.finish())
 }
 
@@ -258,8 +256,7 @@ fn digest_scope_audit(
         .digest(receipt_digest)
         .u64(purpose_id(audit.execution_purpose))
         .u64(basis_id(audit.qualification_basis))
-        .string(&audit.scope_id)
-        .u64(audit.scope_fingerprint);
+        .string(&audit.scope_id);
     Some(h.finish())
 }
 
@@ -333,33 +330,17 @@ mod tests {
     use super::*;
     use crate::morphology::HumanoidMorphology;
 
-    #[test]
-    fn subject_digest_changes_with_backend_identity() {
-        let a = HumanoidQualificationSubject::new(
+    fn subject() -> HumanoidQualificationSubject {
+        HumanoidQualificationSubject::new(
             HumanoidMorphology::Dexterous53,
             HumanoidTask::Reach,
             ActuationMode::NormalizedTorque,
             "backend-a",
-        );
-        let b = HumanoidQualificationSubject::new(
-            HumanoidMorphology::Dexterous53,
-            HumanoidTask::Reach,
-            ActuationMode::NormalizedTorque,
-            "backend-b",
-        );
-        assert_ne!(digest_subject(&a), digest_subject(&b));
+        )
     }
 
-    #[test]
-    fn scope_digest_is_domain_separated_from_receipt_digest() {
-        let subject = HumanoidQualificationSubject::new(
-            HumanoidMorphology::Dexterous53,
-            HumanoidTask::Reach,
-            ActuationMode::NormalizedTorque,
-            "backend-a",
-        );
-        let subject_digest = digest_subject(&subject).unwrap();
-        let audit = HumanoidReachAuthorityReceiptAudit {
+    fn audit(subject: &HumanoidQualificationSubject) -> HumanoidReachAuthorityReceiptAudit {
+        HumanoidReachAuthorityReceiptAudit {
             receipt_fingerprint: 11,
             scope_fingerprint: 12,
             scope_id: "sim-reach-v1".into(),
@@ -380,9 +361,45 @@ mod tests {
             physical_scale: 0.9,
             epistemic_scale: 0.8,
             cognitive_scale: 0.7,
-        };
+        }
+    }
+
+    #[test]
+    fn subject_digest_changes_with_backend_identity() {
+        let a = subject();
+        let b = HumanoidQualificationSubject::new(
+            HumanoidMorphology::Dexterous53,
+            HumanoidTask::Reach,
+            ActuationMode::NormalizedTorque,
+            "backend-b",
+        );
+        assert_ne!(digest_subject(&a), digest_subject(&b));
+    }
+
+    #[test]
+    fn scope_digest_is_domain_separated_from_receipt_digest() {
+        let subject = subject();
+        let subject_digest = digest_subject(&subject).unwrap();
+        let audit = audit(&subject);
         let receipt = digest_receipt_audit(subject_digest, &audit).unwrap();
         let scope = digest_scope_audit(receipt, &audit).unwrap();
         assert_ne!(receipt, scope);
+    }
+
+    #[test]
+    fn legacy_checksums_do_not_change_cryptographic_identity() {
+        let subject = subject();
+        let subject_digest = digest_subject(&subject).unwrap();
+        let a = audit(&subject);
+        let mut b = a.clone();
+        b.receipt_fingerprint = 0xaaaa;
+        b.scope_fingerprint = 0xbbbb;
+        let receipt_a = digest_receipt_audit(subject_digest, &a).unwrap();
+        let receipt_b = digest_receipt_audit(subject_digest, &b).unwrap();
+        assert_eq!(receipt_a, receipt_b);
+        assert_eq!(
+            digest_scope_audit(receipt_a, &a).unwrap(),
+            digest_scope_audit(receipt_b, &b).unwrap()
+        );
     }
 }
