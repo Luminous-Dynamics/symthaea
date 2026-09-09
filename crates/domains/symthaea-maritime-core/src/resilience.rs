@@ -60,6 +60,19 @@ impl ResidualUtilitySnapshot {
             + self.recoverability.diagnostic_units()
             + self.operator_support.diagnostic_units()
     }
+
+    /// True when any independent utility axis becomes more available.
+    ///
+    /// This intentionally does not use the aggregate diagnostic units: an improvement
+    /// on one axis must not be hidden by an equal degradation on another axis during an
+    /// accumulating-failure experiment.
+    fn any_axis_improved_over(&self, previous: &Self) -> bool {
+        self.safe_navigation > previous.safe_navigation
+            || self.observation > previous.observation
+            || self.communications > previous.communications
+            || self.recoverability > previous.recoverability
+            || self.operator_support > previous.operator_support
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -109,7 +122,7 @@ impl ProgressiveFailureTrace {
             if current.envelope < previous.envelope {
                 return Err(ProgressiveFailureViolation::EnvelopeExpanded { step });
             }
-            if current.diagnostic_retained_units() > previous.diagnostic_retained_units() {
+            if current.any_axis_improved_over(previous) {
                 return Err(ProgressiveFailureViolation::UtilityImproved { step });
             }
             if current.energy_remaining_fraction > previous.energy_remaining_fraction {
@@ -301,6 +314,54 @@ mod tests {
         assert!(matches!(
             trace.validate_accumulating_failures(),
             Err(ProgressiveFailureViolation::EnvelopeExpanded { step: 1 })
+        ));
+    }
+
+    #[test]
+    fn aggregate_tradeoff_cannot_hide_one_axis_improving() {
+        use UtilityAvailability::{Available, Degraded};
+
+        // Aggregate diagnostic units are equal (8 -> 8), but navigation improves
+        // while observation degrades. Accumulating failures must reject that hidden
+        // capability expansion rather than treating the axes as fungible.
+        let trace = ProgressiveFailureTrace {
+            observations: vec![
+                FailureObservation {
+                    label: "before".into(),
+                    utility: snapshot(
+                        OperatingEnvelope::ReducedCapability,
+                        Degraded,
+                        Available,
+                        Available,
+                        Available,
+                        Available,
+                        0.8,
+                        false,
+                    ),
+                },
+                FailureObservation {
+                    label: "after".into(),
+                    utility: snapshot(
+                        OperatingEnvelope::ReducedCapability,
+                        Available,
+                        Degraded,
+                        Available,
+                        Available,
+                        Available,
+                        0.79,
+                        false,
+                    ),
+                },
+            ],
+        };
+
+        assert_eq!(
+            trace.observations[0].utility.diagnostic_retained_units(),
+            trace.observations[1].utility.diagnostic_retained_units()
+        );
+        assert!(matches!(
+            trace.validate_accumulating_failures(),
+            Err(ProgressiveFailureViolation::UtilityImproved { step: 1 })
         ));
     }
 }
