@@ -170,7 +170,7 @@ new file mode 100644
 +
 +/// Opaque witness that two independently supplied, valid identity envelopes
 +/// matched exactly. It carries no scientific or materialization authority.
-+#[derive(Debug, Clone)]
++#[derive(Debug, Clone, PartialEq, Eq)]
 +pub struct VerifiedArtifactIdentity {
 +    identity: QualificationArtifactIdentityV1,
 +}
@@ -245,7 +245,7 @@ new file mode 100644
 +        if !unique.insert(path.as_str()) {
 +            return Err(ArtifactIdentityError::InvalidChangedPaths);
 +        }
-+        previous = Some(path);
++        previous = Some(path.as_str());
 +    }
 +    Ok(())
 +}
