@@ -1,0 +1,27 @@
+{
+  "schema": "symthaea.integration-train.v1",
+  "base_subject": "99ae477f46b17a04df390abf33b0b308c3220781",
+  "ordered_tranches": [
+    {
+      "commit_sha": "ce3d20a42a278c46f7fe10e43d2d51b26ddeffbb",
+      "predecessor_sha": "99ae477f46b17a04df390abf33b0b308c3220781",
+      "theorem_id": "resources.b1.bundle-feasibility.v1",
+      "claim": "A bounded multi-allocation bundle is feasible only when all members coexist in one shared prospective capacity state and each satisfies full-interval quality.",
+      "changed_files": [
+        "crates/domains/symthaea-resource-bundle-feasibility/Cargo.toml",
+        "crates/domains/symthaea-resource-bundle-feasibility/src/lib.rs"
+      ],
+      "evidence_refs": [
+        "issue:987",
+        "pr:760"
+      ],
+      "non_claims": [
+        "does not establish execution authority",
+        "hosted qualification not established"
+      ],
+      "origin_pr": 760
+    }
+  ],
+  "cumulative_tip_sha": "ce3d20a42a278c46f7fe10e43d2d51b26ddeffbb",
+  "train_id": "sha256:8c0abc71bdf2d0dd500bb20c591306f59569b4a9898be049da061bd839e56147"
+}
