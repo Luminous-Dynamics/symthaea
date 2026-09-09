@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Exact verifier-profile binding for continuity verification policy.
 //!
-//! The original witness-layer policy stores a human-readable verifier profile name.
-//! That is useful for diagnostics, but a name is not a trust root. This module wraps
-//! that internal policy with the exact `VerifierProfileId`, which commits the verifier
-//! root digest, root epoch, evidence class, and profile name.
+//! A human-readable verifier name is diagnostic metadata, not a trust root. The
+//! public policy surface in this module binds the witness-layer policy to the exact
+//! `VerifierProfileId`, which commits the verifier root digest, root epoch, evidence
+//! class, and profile name.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -15,9 +15,7 @@ use crate::verifier::{
     VerificationEvidenceClaimV1, VerifierProfileId, VerifierProfileV1,
     policy_check_verification_evidence,
 };
-use crate::witness::{
-    VerificationPolicyEntryV1, VerificationPolicyV1, WitnessError,
-};
+use crate::witness::{VerificationPolicyEntryV1, VerificationPolicyV1, WitnessError};
 use crate::{TargetRealizationId, ValidatedContinuityContractV1};
 
 const EXACT_POLICY_DOMAIN: &[u8] = b"symthaea.continuity.exact-verification-policy.v1\0";
@@ -33,12 +31,13 @@ impl ExactVerificationPolicyId {
     }
 }
 
-/// Public verification policy bound to one exact verifier-profile identity.
+/// Constructor-only policy bound to one exact verifier-profile identity.
 ///
-/// The inner name-based witness policy remains an implementation detail. External
-/// callers cannot obtain it through the public API and therefore cannot accidentally
-/// treat a reused profile name as equivalent to the exact root/epoch/class snapshot.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// This type intentionally implements neither `Serialize` nor `Deserialize`.
+/// Transport/config bytes therefore cannot manufacture the trust-bearing wrapper;
+/// callers reconstruct it from a validated `VerifierProfileV1` plus explicit
+/// requirement evidence floors.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExactVerificationPolicyV1 {
     verifier_profile_id: VerifierProfileId,
     verifier_profile_name: String,
@@ -88,7 +87,7 @@ impl ExactVerificationPolicyV1 {
         self.inner.entries()
     }
 
-    /// Revalidate deserialized/configured state against the exact provisioned profile.
+    /// Require the currently provisioned profile to be the exact profile pinned here.
     pub fn validate_against_profile(
         &self,
         profile: &VerifierProfileV1,
@@ -118,11 +117,10 @@ impl ExactVerificationPolicyV1 {
     }
 }
 
-/// Exact-context policy admission used by future authentication/composition adapters.
+/// Exact-context admission used by future authentication/composition adapters.
 ///
-/// The profile identity is checked before delegating to the existing lower-level
-/// admission logic. Therefore a profile with the same display name but a different
-/// root, epoch, or evidence class cannot enter through this path.
+/// A same-name profile with a different root, epoch, or evidence class is rejected
+/// before the lower-level name-based witness policy is consulted.
 pub(crate) fn policy_check_exact_verification_evidence(
     contract: &ValidatedContinuityContractV1,
     target: TargetRealizationId,
@@ -145,22 +143,16 @@ pub(crate) fn policy_check_exact_verification_evidence(
 /// Exact verifier-policy failures.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ExactVerificationPolicyError {
-    /// The underlying witness policy was invalid.
     #[error(transparent)]
     Witness(#[from] WitnessError),
-    /// The verifier profile itself was malformed or internally inconsistent.
     #[error(transparent)]
     Admission(#[from] VerificationAdmissionError),
-    /// The exact verifier profile differs from the one pinned by this policy.
     #[error("verification policy pins a different exact verifier profile identity")]
     VerifierProfileIdentityMismatch,
-    /// The diagnostic profile name differs from the pinned profile's current name.
     #[error("verification policy verifier profile name mismatch")]
     VerifierProfileNameMismatch,
-    /// The internal witness policy name differs from the exact wrapper name.
     #[error("internal verification policy profile name mismatch")]
     InnerProfileNameMismatch,
-    /// Stored exact policy identity does not match its canonical fields.
     #[error("stored exact verification policy identity does not match canonical fields")]
     PolicyIdentityMismatch,
 }
@@ -189,41 +181,20 @@ mod tests {
 
     fn contract() -> ValidatedContinuityContractV1 {
         let observation = ObservationEnvelopeV1::new(
-            "machine-1",
-            "workflow.dependency",
-            "fixture",
-            "1",
-            1_700_000_000_000,
-            ObservationCoverage::Complete,
-            EvidenceBasis::Tested,
-            [1; 32],
-            vec![],
-        )
-        .unwrap();
+            "machine-1", "workflow.dependency", "fixture", "1", 1_700_000_000_000,
+            ObservationCoverage::Complete, EvidenceBasis::Tested, [1; 32], vec![],
+        ).unwrap();
         let dependency = DependencyClaimV1::new(
-            "role:research",
-            "requires",
-            "capability:cuda",
-            DependencyBasis::Observed,
-            vec![observation.id()],
-            vec![],
-        )
-        .unwrap();
+            "role:research", "requires", "capability:cuda", DependencyBasis::Observed,
+            vec![observation.id()], vec![],
+        ).unwrap();
         let requirement = ContinuityRequirementV1::new(
-            dependency.id(),
-            "cuda-workflow",
-            RequirementCriticality::Must,
-            EquivalencePredicate::BehavioralScenario {
-                scenario_id: "cuda-fixture-v1".into(),
-            },
-            ApprovalBasis::ExplicitPolicy,
-            [2; 32],
-        )
-        .unwrap();
+            dependency.id(), "cuda-workflow", RequirementCriticality::Must,
+            EquivalencePredicate::BehavioralScenario { scenario_id: "cuda-fixture-v1".into() },
+            ApprovalBasis::ExplicitPolicy, [2; 32],
+        ).unwrap();
         ContinuityContractV1::new("research-fleet", [3; 32], vec![requirement])
-            .unwrap()
-            .validate()
-            .unwrap()
+            .unwrap().validate().unwrap()
     }
 
     fn profile(root: u8, epoch: u64, class: EvidenceClass) -> VerifierProfileV1 {
@@ -232,13 +203,12 @@ mod tests {
 
     fn entries(contract: &ValidatedContinuityContractV1) -> Vec<VerificationPolicyEntryV1> {
         vec![VerificationPolicyEntryV1::new(
-            contract.requirements()[0].id(),
-            EvidenceClass::Simulated,
+            contract.requirements()[0].id(), EvidenceClass::Simulated,
         )]
     }
 
     #[test]
-    fn exact_policy_is_deterministic_for_same_profile() {
+    fn same_exact_profile_is_deterministic() {
         let contract = contract();
         let profile = profile(9, 7, EvidenceClass::HardwareVerified);
         let a = ExactVerificationPolicyV1::new(&profile, entries(&contract)).unwrap();
@@ -248,36 +218,28 @@ mod tests {
     }
 
     #[test]
-    fn same_name_different_root_changes_policy_identity_and_is_rejected() {
-        let contract = contract();
-        let trusted = profile(9, 7, EvidenceClass::HardwareVerified);
-        let substituted = profile(10, 7, EvidenceClass::HardwareVerified);
-        let policy = ExactVerificationPolicyV1::new(&trusted, entries(&contract)).unwrap();
-        let substituted_policy =
-            ExactVerificationPolicyV1::new(&substituted, entries(&contract)).unwrap();
-        assert_ne!(policy.id(), substituted_policy.id());
-        assert_eq!(
-            policy.validate_against_profile(&substituted).unwrap_err(),
-            ExactVerificationPolicyError::VerifierProfileIdentityMismatch
-        );
-    }
-
-    #[test]
-    fn same_name_different_epoch_or_class_changes_exact_policy_identity() {
+    fn same_name_different_root_epoch_or_class_changes_policy_identity() {
         let contract = contract();
         let base = profile(9, 7, EvidenceClass::HardwareVerified);
-        let rotated = profile(9, 8, EvidenceClass::HardwareVerified);
-        let weaker = profile(9, 7, EvidenceClass::Observed);
+        let changed = [
+            profile(10, 7, EvidenceClass::HardwareVerified),
+            profile(9, 8, EvidenceClass::HardwareVerified),
+            profile(9, 7, EvidenceClass::Observed),
+        ];
         let base_policy = ExactVerificationPolicyV1::new(&base, entries(&contract)).unwrap();
-        let rotated_policy =
-            ExactVerificationPolicyV1::new(&rotated, entries(&contract)).unwrap();
-        let weaker_policy = ExactVerificationPolicyV1::new(&weaker, entries(&contract)).unwrap();
-        assert_ne!(base_policy.id(), rotated_policy.id());
-        assert_ne!(base_policy.id(), weaker_policy.id());
+        for candidate in changed {
+            let candidate_policy =
+                ExactVerificationPolicyV1::new(&candidate, entries(&contract)).unwrap();
+            assert_ne!(base_policy.id(), candidate_policy.id());
+            assert_eq!(
+                base_policy.validate_against_profile(&candidate).unwrap_err(),
+                ExactVerificationPolicyError::VerifierProfileIdentityMismatch
+            );
+        }
     }
 
     #[test]
-    fn exact_policy_check_rejects_same_name_root_substitution_before_admission() {
+    fn same_name_root_substitution_fails_before_claim_admission() {
         let contract = contract();
         let target = TargetRealizationId::from_digest([4; 32]).unwrap();
         let trusted = profile(9, 7, EvidenceClass::HardwareVerified);
@@ -285,26 +247,13 @@ mod tests {
         let policy = ExactVerificationPolicyV1::new(&trusted, entries(&contract)).unwrap();
         let challenge = [5; 32];
         let claim = VerificationEvidenceClaimV1::new(
-            contract.id(),
-            target,
-            contract.requirements()[0].id(),
-            substituted.id(),
-            challenge,
-            1_700_000_000_111,
-            VerificationOutcomeV1::Satisfied,
-            [8; 32],
-        )
-        .unwrap();
+            contract.id(), target, contract.requirements()[0].id(), substituted.id(), challenge,
+            1_700_000_000_111, VerificationOutcomeV1::Satisfied, [8; 32],
+        ).unwrap();
         assert_eq!(
             policy_check_exact_verification_evidence(
-                &contract,
-                target,
-                &policy,
-                &substituted,
-                challenge,
-                claim,
-            )
-            .unwrap_err(),
+                &contract, target, &policy, &substituted, challenge, claim,
+            ).unwrap_err(),
             ExactVerificationPolicyError::VerifierProfileIdentityMismatch
         );
     }
