@@ -38,10 +38,12 @@ pub use capability_activation::{
     derive_capability_activation_closure,
 };
 pub use capability_counterfactual::{
-    CAPABILITY_COUNTERFACTUAL_CONFIG_SCHEMA_V1, CapabilityCounterfactualConfigId,
-    CapabilityCounterfactualConfigV1, CapabilityCounterfactualError,
-    CapabilityCounterfactualFrontierV1, CapabilityCounterfactualOptionV1,
-    CapabilityCounterfactualTargetV1, ValidatedCapabilityCounterfactualConfigV1,
+    CAPABILITY_COUNTERFACTUAL_CONFIG_SCHEMA_V1, CAPABILITY_COUNTERFACTUAL_QUERY_SCHEMA_V1,
+    CapabilityCounterfactualConfigId, CapabilityCounterfactualConfigV1,
+    CapabilityCounterfactualError, CapabilityCounterfactualFrontierV1,
+    CapabilityCounterfactualOptionV1, CapabilityCounterfactualQueryId,
+    CapabilityCounterfactualQueryV1, CapabilityCounterfactualTargetV1,
+    ValidatedCapabilityCounterfactualConfigV1, ValidatedCapabilityCounterfactualQueryV1,
     derive_capability_counterfactual_frontier,
 };
 pub use capability_graph::{
