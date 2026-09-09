@@ -1,0 +1,53 @@
+name: Inference Binding Receipt
+
+on:
+  pull_request:
+    paths:
+      - "src/language/inference_binding.rs"
+      - "src/language/inference_receipt.rs"
+      - "tests/inference_binding_receipt.rs"
+      - "docs/architecture/INFERENCE_BINDING_RECEIPT_V1.md"
+      - ".github/workflows/inference-binding-receipt.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-binding-receipt-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inference-binding-receipt:
+    name: Inference Binding Receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Check focused formatting
+        run: rustfmt --edition 2024 --check src/language/inference_binding.rs src/language/inference_receipt.rs tests/inference_binding_receipt.rs
+
+      - name: Compile and run IF-3 regressions
+        run: cargo test --locked --test inference_binding_receipt
+
+      - name: Focused IF-3 Clippy
+        run: cargo clippy --locked --test inference_binding_receipt -- -D warnings -A dead-code
+
+      - name: Ratchet canonical/privacy boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'NOT hashes of Rust memory layout, Debug text' src/language/inference_binding.rs
+          grep -F 'Supported purposes are semantically a set' src/language/inference_binding.rs
+          grep -F 'contains no bearer token or secret key material' src/language/inference_binding.rs
+          grep -F 'Raw response text is hashed and immediately discarded' src/language/inference_receipt.rs
+          grep -F 'Receipts are evidence, not authority' docs/architecture/INFERENCE_BINDING_RECEIPT_V1.md
+          grep -F 'no transport execution wrapper yet' docs/architecture/INFERENCE_BINDING_RECEIPT_V1.md
