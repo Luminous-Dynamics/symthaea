@@ -48,7 +48,8 @@ impl Sha256Digest {
 ///
 /// This is intentionally opaque. Xenia/Mycelix/local trust infrastructure may
 /// supply stronger semantics without this crate duplicating their identity
-/// systems.
+/// systems. Text is canonical: leading/trailing whitespace is rejected rather
+/// than silently normalized.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct PrincipalId(String);
@@ -121,6 +122,9 @@ impl AdmissionRecord {
         if extension_version.trim().is_empty() {
             return Err(AdmissionProblem::EmptyVersion);
         }
+        if extension_version != extension_version.trim() {
+            return Err(AdmissionProblem::NonCanonicalVersion);
+        }
         if generation == 0 {
             return Err(AdmissionProblem::ZeroGeneration);
         }
@@ -156,6 +160,9 @@ impl AdmissionRecord {
     pub fn validate(&self) -> Result<(), AdmissionProblem> {
         if self.extension_version.trim().is_empty() {
             return Err(AdmissionProblem::EmptyVersion);
+        }
+        if self.extension_version != self.extension_version.trim() {
+            return Err(AdmissionProblem::NonCanonicalVersion);
         }
         if self.generation == 0 {
             return Err(AdmissionProblem::ZeroGeneration);
@@ -216,6 +223,10 @@ impl AdmissionRecord {
 
     /// Revalidate immutable issuance against live revocation/generation state and
     /// return a non-serializable point-of-use admission.
+    ///
+    /// The validated manifest is retained inside the active value. This prevents
+    /// an admission activated against manifest A from being replayed against a
+    /// different in-process manifest B that happens to reuse the same ID/version.
     pub fn activate(
         &self,
         manifest: &ExtensionManifest,
@@ -233,6 +244,7 @@ impl AdmissionRecord {
         }
         Ok(ActiveAdmission {
             record: self.clone(),
+            manifest: manifest.clone(),
         })
     }
 
@@ -297,13 +309,15 @@ impl AdmissionContext {
     }
 }
 
-/// Non-serializable proof that one admission record is current for one manifest.
+/// Non-serializable proof that one admission record is current for one exact
+/// in-process manifest.
 ///
-/// Obtain a fresh value at point of use. Long-lived caching across revocation
-/// checks is intentionally outside this contract.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// This type intentionally does not implement `Clone` or serde. Obtain a fresh
+/// value at point of use after checking current revocation/generation state.
+#[derive(Debug, PartialEq, Eq)]
 pub struct ActiveAdmission {
     record: AdmissionRecord,
+    manifest: ExtensionManifest,
 }
 
 impl ActiveAdmission {
@@ -331,6 +345,11 @@ impl ActiveAdmission {
         self.record.policy_sha256()
     }
 
+    /// Exact structural manifest match proven during activation.
+    pub fn matches_manifest(&self, manifest: &ExtensionManifest) -> bool {
+        &self.manifest == manifest
+    }
+
     pub fn allows_capability(&self, capability: &CapabilityId) -> bool {
         self.record
             .granted_capabilities()
@@ -347,6 +366,7 @@ impl ActiveAdmission {
 pub enum AdmissionProblem {
     InvalidManifest,
     EmptyVersion,
+    NonCanonicalVersion,
     ZeroGeneration,
     InvalidPrincipal,
     EmptyCapabilityGrant,
@@ -362,6 +382,7 @@ pub enum AdmissionProblem {
 
 fn validate_principal(value: &str) -> Result<(), AdmissionProblem> {
     if value.trim().is_empty()
+        || value != value.trim()
         || value.len() > 256
         || value.chars().any(|character| character.is_control())
     {
@@ -396,6 +417,9 @@ fn filesystem_is_subset(
     granted: &FilesystemPermission,
     requested: &FilesystemPermission,
 ) -> bool {
+    // Paths are exact opaque grants here; this crate deliberately performs no
+    // parent-directory or symlink interpretation. A concrete host is responsible
+    // for mapping a granted path to its sandbox/runtime semantics.
     match (granted, requested) {
         (FilesystemPermission::None, _) => true,
         (FilesystemPermission::ReadOnly(granted), FilesystemPermission::ReadOnly(requested))
@@ -475,19 +499,31 @@ mod tests {
     }
 
     #[test]
-    fn active_admission_requires_current_generation() {
+    fn active_admission_requires_current_generation_and_exact_manifest() {
         let manifest = manifest();
         let record = record();
         let active = record
             .activate(&manifest, AdmissionContext::active(7))
             .unwrap();
         assert_eq!(active.extension(), &manifest.id);
+        assert!(active.matches_manifest(&manifest));
         assert!(active.allows_capability(&CapabilityId::new(
             "engineering.simulation.circuit"
         )));
         assert!(!active.allows_capability(&CapabilityId::new(
             "engineering.simulation.process"
         )));
+    }
+
+    #[test]
+    fn active_admission_rejects_same_id_version_manifest_substitution() {
+        let manifest = manifest();
+        let active = record()
+            .activate(&manifest, AdmissionContext::active(7))
+            .unwrap();
+        let mut substituted = manifest.clone();
+        substituted.description = "changed after activation".into();
+        assert!(!active.matches_manifest(&substituted));
     }
 
     #[test]
@@ -536,6 +572,14 @@ mod tests {
         assert_eq!(
             record.validate_against_manifest(&manifest()),
             Err(AdmissionProblem::PermissionExceedsManifest)
+        );
+    }
+
+    #[test]
+    fn principal_identity_must_be_canonical() {
+        assert_eq!(
+            PrincipalId::new(" did:example:publisher "),
+            Err(AdmissionProblem::InvalidPrincipal)
         );
     }
 
