@@ -1,0 +1,193 @@
+name: Evidence Plane Crypto Digest Extraction
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-evidence-plane/src/crypto_digest.rs'
+      - 'crates/core/symthaea-evidence-plane/tests/crypto_digest_extraction.rs'
+      - 'crates/domains/symthaea-fabrication-kernel/src/crypto_digest.rs'
+      - '.github/workflows/evidence-plane-crypto-digest-extraction.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision and parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Verify exact checkout and parent
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git rev-parse HEAD^)" = "${{ github.event.pull_request.base.sha }}"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Freeze extraction theorem and scope
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          import subprocess
+
+          candidate = Path('crates/core/symthaea-evidence-plane/src/crypto_digest.rs').read_text()
+          harness = Path('crates/core/symthaea-evidence-plane/tests/crypto_digest_extraction.rs').read_text()
+          workflow = Path('.github/workflows/evidence-plane-crypto-digest-extraction.yml').read_text()
+
+          required_candidate = [
+              'pub struct Sha256Digest(pub [u8; 32]);',
+              'pub struct Sha256 {',
+              'pub fn sha256(data: &[u8]) -> Sha256Digest',
+              'const INITIAL_STATE: [u32; 8]',
+              'const ROUND_CONSTANTS: [u32; 64]',
+              'fn compress(state: &mut [u32; 8], block: &[u8; 64])',
+              'standard_vectors_match',
+              'incremental_updates_match_one_shot',
+              'chunk_boundaries_around_padding_match_one_shot',
+          ]
+          for needle in required_candidate:
+              if needle not in candidate:
+                  raise SystemExit(f'missing neutral digest invariant: {needle}')
+
+          required_harness = [
+              '#[path = "../src/crypto_digest.rs"]',
+              '#[path = "../../../domains/symthaea-fabrication-kernel/src/crypto_digest.rs"]',
+              'fn neutral_candidate_matches_existing_fabrication_digest()',
+              'candidate::sha256(&bytes).to_hex()',
+              'fabrication::sha256(&bytes).to_hex()',
+              'nist_style_known_answers_match',
+              'padding_boundaries_match_one_shot',
+          ]
+          for needle in required_harness:
+              if needle not in harness:
+                  raise SystemExit(f'missing extraction qualification invariant: {needle}')
+
+          required_workflow = [
+              'name: Changed-file Clippy',
+              "'crates/core/symthaea-evidence-plane/src/crypto_digest.rs'",
+              "'crates/core/symthaea-evidence-plane/tests/crypto_digest_extraction.rs'",
+              "msg.get('level') != 'warning'",
+              "span.get('is_primary')",
+          ]
+          for needle in required_workflow:
+              if needle not in workflow:
+                  raise SystemExit(f'missing scoped Clippy invariant: {needle}')
+
+          # Reject actual external crypto namespace use. Token boundaries are
+          # deliberate: a raw substring check for `ring::` also matches the
+          # tail of ordinary Rust `String::...` and caused the superseded v1
+          # qualification run to fail before any SHA-256 test executed.
+          external_namespace = re.compile(
+              r'(?<![A-Za-z0-9_])(?:sha2|ring|openssl|blake3)::'
+          )
+          match = external_namespace.search(candidate)
+          if match:
+              raise SystemExit(
+                  'neutral digest extraction acquired external implementation: '
+                  + match.group(0)
+              )
+
+          if '${{ github.event_name }}' == 'pull_request':
+              base = '${{ github.event.pull_request.base.sha }}'
+              if subprocess.check_output(
+                  ['git', 'rev-parse', 'HEAD^'], text=True
+              ).strip() != base:
+                  raise SystemExit('digest extraction exact parent mismatch')
+              changed = set(subprocess.check_output(
+                  ['git', 'diff', '--name-only', 'HEAD^..HEAD'], text=True
+              ).splitlines())
+              allowed = {
+                  '.github/workflows/evidence-plane-crypto-digest-extraction.yml',
+                  'crates/core/symthaea-evidence-plane/src/crypto_digest.rs',
+                  'crates/core/symthaea-evidence-plane/tests/crypto_digest_extraction.rs',
+              }
+              if changed != allowed:
+                  raise SystemExit(
+                      f'unexpected digest extraction scope: {sorted(changed)}'
+                  )
+
+              forbidden_changes = {
+                  'crates/core/symthaea-evidence-plane/Cargo.toml',
+                  'crates/core/symthaea-evidence-plane/src/lib.rs',
+                  'crates/domains/symthaea-fabrication-kernel/Cargo.toml',
+                  'crates/domains/symthaea-fabrication-kernel/src/crypto_digest.rs',
+                  'Cargo.lock',
+              }
+              touched = changed & forbidden_changes
+              if touched:
+                  raise SystemExit(
+                      'extraction spike changed consumer/public dependency surface: '
+                      + str(sorted(touched))
+                  )
+          else:
+              print('workflow_dispatch: PR-relative scope audit not applicable')
+
+      - name: Locked workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-evidence-plane -- --check
+
+      - name: Focused extraction qualification
+        run: cargo test --locked -p symthaea-evidence-plane --test crypto_digest_extraction
+
+      - name: Existing evidence-plane tests
+        run: cargo test --locked -p symthaea-evidence-plane --lib
+
+      - name: Changed-file Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --locked -p symthaea-evidence-plane \
+            --test crypto_digest_extraction --message-format=json \
+            > /tmp/crypto-digest-clippy.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          owned = {
+              'crates/core/symthaea-evidence-plane/src/crypto_digest.rs',
+              'crates/core/symthaea-evidence-plane/tests/crypto_digest_extraction.rs',
+          }
+          failures = []
+          for raw in Path('/tmp/crypto-digest-clippy.json').read_text().splitlines():
+              try:
+                  event = json.loads(raw)
+              except json.JSONDecodeError:
+                  continue
+              if event.get('reason') != 'compiler-message':
+                  continue
+              msg = event.get('message', {})
+              if msg.get('level') != 'warning':
+                  continue
+              primary = [
+                  span for span in msg.get('spans', []) if span.get('is_primary')
+              ]
+              if any(span.get('file_name') in owned for span in primary):
+                  failures.append(msg.get('rendered') or msg.get('message', 'Clippy warning'))
+
+          if failures:
+              raise SystemExit(
+                  'owned-file Clippy warnings:\n' + '\n'.join(failures)
+              )
+          PY
