@@ -11,4 +11,8 @@ symthaea-extension-core = { path = "../../core/symthaea-extension-core" }
 serde_json.workspace = true
 sha2 = "0.10"
 thiserror.workspace = true
-wasmtime = { version = "44.0.1", features = ["component-model"] }
+# Public extension inspection needs synchronous execution, runtime compilation,
+# and the Component Model. Disable Wasmtime's broad default feature set so this
+# bridge does not silently pull async, cache, GC, threads, profiling, coredumps,
+# WAT parsing, pooling, or other unrelated embedding surfaces into the host.
+wasmtime = { version = "44.0.1", default-features = false, features = ["std", "runtime", "cranelift", "component-model"] }
