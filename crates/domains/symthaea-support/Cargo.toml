@@ -7,11 +7,20 @@ authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>
 description = "IT support intelligence for Symthaea: triage, diagnostics, knowledge, privacy, actions, prediction"
 license = "AGPL-3.0-or-later"
 
+[features]
+default = []
+# Keep the Phase-1 log clustering stack out of ordinary support builds. Enable
+# only where parsed LogEvent -> SystemObservationV1 ingestion is required.
+logparse-adapter = ["dep:symthaea-logparse", "dep:blake3"]
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }
 libc = "0.2"
+blake3 = { workspace = true, optional = true }
+symthaea-logparse = { path = "../../core/symthaea-logparse", optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+chrono = { workspace = true }
