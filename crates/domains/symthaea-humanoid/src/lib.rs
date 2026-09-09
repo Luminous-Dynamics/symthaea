@@ -24,6 +24,7 @@ pub mod embodiment;
 pub mod encoder;
 pub mod equality_qp;
 pub mod evaluation;
+pub mod evidence_digest;
 pub mod evolution;
 pub mod execution;
 pub mod execution_authority_scope;
@@ -54,16 +55,18 @@ pub mod physical_health;
 pub mod plugin;
 pub mod qp_certification;
 pub mod qualification;
+pub mod reach_cryptographic_authority;
 pub mod reach_episode_evidence;
 // Internal implementation detail: episode-complete evidence is necessary, but
 // operational promotion must additionally bind the exact qualification protocols.
 mod reach_episode_promotion;
 pub mod reach_execution;
 pub mod reach_execution_evidence;
-pub mod reach_operational_authority;
+// Internal implementation detail: operator/policy binding remains as deterministic
+// defense-in-depth; the public authority path requires SHA-256 commitments too.
+mod reach_operational_authority;
 // Internal implementation detail: protocol-bound promotion is necessary, but the
-// public operational authority path must additionally bind upstream operator
-// approval to the exact policy and deployment scope.
+// public operational authority path requires cryptographic protocol/corpus identity.
 mod reach_operational_promotion;
 pub mod reach_outcome_evidence;
 pub mod reach_policy_identity;
@@ -121,6 +124,7 @@ pub use embodied_certification::*;
 pub use encoder::*;
 pub use equality_qp::*;
 pub use evaluation::*;
+pub use evidence_digest::*;
 pub use execution::*;
 pub use execution_authority_scope::*;
 pub use external_solver_certification::*;
@@ -146,10 +150,10 @@ pub use payload_capability::*;
 pub use physical_health::*;
 pub use qp_certification::*;
 pub use qualification::*;
+pub use reach_cryptographic_authority::*;
 pub use reach_episode_evidence::*;
 pub use reach_execution::*;
 pub use reach_execution_evidence::*;
-pub use reach_operational_authority::*;
 pub use reach_outcome_evidence::*;
 pub use reach_policy_identity::*;
 pub use reach_qualification_campaign::*;
