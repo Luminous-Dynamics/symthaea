@@ -4,8 +4,8 @@
 pub use crate::{
     AuthenticatedMachineSession, AuthorityContext, AuthorityLease, ComponentHealth,
     DependencyState, FailureObservation, FleetAssuranceReport, FleetMemberReport,
-    HealthSeverity, MachineSessionContext, MachineSessionTrust, MaritimeCapability,
-    MaritimePlatformKind, MaritimeState, NavigationQuality, OperatingEnvelope, PlatformHealth,
-    ProgressiveFailureTrace, ProgressiveFailureViolation, ResidualUtilitySnapshot,
-    UtilityAvailability, baseline_envelope, evaluate_machine_session,
+    HealthSeverity, MachineSessionContext, MachineSessionPolicy, MachineSessionTrust,
+    MaritimeCapability, MaritimePlatformKind, MaritimeState, NavigationQuality, OperatingEnvelope,
+    PlatformHealth, ProgressiveFailureTrace, ProgressiveFailureViolation,
+    ResidualUtilitySnapshot, UtilityAvailability, baseline_envelope, evaluate_machine_session,
 };
