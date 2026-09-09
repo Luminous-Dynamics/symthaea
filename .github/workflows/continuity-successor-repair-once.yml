@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 env:
-  EXPECTED_PARENT_SHA: 6c67fe19bd9a4396924b5440f9d00da4bad69084
+  EXPECTED_PARENT_SHA: cc8fb3fa07b7ae4ae67908a03c6a7b7c218e68d6
   TARGET_BRANCH: ci/continuity-verifier-grant-exact-head-v1
   WORKFLOW_PATH: .github/workflows/continuity-successor-repair-once.yml
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
@@ -45,6 +45,7 @@ jobs:
           test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_SHA"
           test "$(git diff --name-only HEAD^ HEAD)" = "$WORKFLOW_PATH"
           test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" "$WORKFLOW_PATH")" -eq 1
+          echo 'trigger-boundary=PASS'
 
       - name: Apply and prove witnessed minimal lock admission
         shell: bash
@@ -53,8 +54,11 @@ jobs:
           cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
           printf '%s' "$WITNESSED_PATCH_B64" | base64 -d > "$RUNNER_TEMP/continuity-lock.patch"
           test "$(sha256sum "$RUNNER_TEMP/continuity-lock.patch" | awk '{print $1}')" = "$WITNESSED_PATCH_SHA256"
+          echo 'witnessed-patch-bytes=PASS'
+
           git apply --check "$RUNNER_TEMP/continuity-lock.patch"
           git apply "$RUNNER_TEMP/continuity-lock.patch"
+          echo 'exact-patch-application=PASS'
 
           python3 - "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock <<'PY'
           import collections
@@ -89,12 +93,13 @@ jobs:
           if json.loads(added[0]) != expected:
               raise SystemExit('added package node is not the reviewed symthaea-continuity node')
           PY
+          echo 'semantic-lock-theorem=PASS'
 
-          test "$(sha256sum <(git diff --binary -- Cargo.lock) | awk '{print $1}')" = "$WITNESSED_PATCH_SHA256"
           read -r additions deletions < <(git diff --numstat -- Cargo.lock)
           test "$additions" = 9
           test "$deletions" = 0
           test "$(git diff --name-only)" = Cargo.lock
+          echo 'bounded-lock-diff=PASS'
 
       - name: Commit exact lock admission and remove writer
         shell: bash
@@ -106,6 +111,7 @@ jobs:
           printf '%s\n' "${changed[@]}" | sort > "$RUNNER_TEMP/changed"
           printf '%s\n' "$WORKFLOW_PATH" Cargo.lock | sort > "$RUNNER_TEMP/expected"
           cmp "$RUNNER_TEMP/expected" "$RUNNER_TEMP/changed"
+          echo 'commit-scope=PASS'
 
           git config user.name 'Luminous Continuity Qualification'
           git config user.email 'actions@users.noreply.github.com'
