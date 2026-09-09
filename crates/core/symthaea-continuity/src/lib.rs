@@ -14,6 +14,7 @@ pub mod contract;
 pub mod exact_policy;
 pub mod observation;
 pub mod profile_adoption;
+pub mod scope;
 pub mod verifier;
 mod witness;
 
@@ -39,6 +40,10 @@ pub use profile_adoption::{
     VerifierAdoptionScopeV1, VerifierProfileAdoptionError, VerifierProfileAdoptionPredecessorV1,
     VerifierProfileAdoptionSubjectId, VerifierProfileAdoptionSubjectV1,
     VerifierProfileAdoptionTransitionDigest, VerifierProfileAdoptionTransitionV1,
+};
+pub use scope::{
+    CONTINUITY_SUBJECT_SCHEMA_V1, ContinuityScopeV1, ContinuitySubjectError,
+    ContinuitySubjectId, ContinuitySubjectV1,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
