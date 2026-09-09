@@ -11,6 +11,7 @@
 pub mod auth_wire;
 mod compose;
 pub mod commit_currentness;
+pub mod commit_eligibility;
 pub mod contract;
 pub mod distributed;
 pub mod distributed_currentness;
@@ -41,6 +42,9 @@ pub use commit_currentness::{
     LocalCommitObservationOutcomeV1, LocalCommitStateClaimId, LocalCommitStateClaimV1,
     QualifiedLocalCommitCurrentnessId, QualifiedLocalCommitCurrentnessV1,
     ValidatedLocalCommitCurrentnessPolicyV1,
+};
+pub use commit_eligibility::{
+    CommitEligibilityError, CommitEligibleTransitionId, CommitEligibleTransitionV1,
 };
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
