@@ -1,0 +1,32 @@
+{
+  "schema": "symthaea.qualification-subject-repair.v1",
+  "program_id": "resources.planning-research.v1",
+  "from_subject": {
+    "subject_id": "sha256:9c0769e927ffbc7fb2d0ec943d859f75a3ab32f73c30561db6e9c3881f2c50d0",
+    "source_sha": "7350ee0a5cab0ccaa48b6691e8d52875143b102b",
+    "terminal_attempt_observation_id": "sha256:fc9e4453ee0295552bc534b862f76102ce1aa1fb79100b1988b55fe1399bcd7f",
+    "terminal_disposition": "FormattingFailed"
+  },
+  "repair": {
+    "commit_sha": "60f45c5efcca01c8f46d4509831223a197d4e215",
+    "origin_pr": 1058,
+    "train_id": "sha256:5d88a1a7ae3ddcbe83230783a850c6071274f57ade03c1191a55aec6598fe673",
+    "changed_files": [
+      "crates/domains/symthaea-resource-accounting/src/lib.rs"
+    ],
+    "reason_code": "rustfmt_required_change"
+  },
+  "to_subject": {
+    "subject_id": "sha256:26ad6a1b78407e158b2f8f3e9b168338985d7b854685241f5952a0e1a85c872e",
+    "source_sha": "60f45c5efcca01c8f46d4509831223a197d4e215",
+    "catalog_id": "sha256:d1e649465956ffd2ecd0198aa8d20e80ac4b3ff5e8ebd432a6135ac87f7d825d",
+    "train_id": "sha256:5d88a1a7ae3ddcbe83230783a850c6071274f57ade03c1191a55aec6598fe673"
+  },
+  "non_claims": [
+    "does not establish the repaired subject passes qualification",
+    "does not merge the old and new qualification subjects",
+    "does not rewrite the failed attempt",
+    "does not state that run 4 has executed"
+  ],
+  "repair_link_id": "sha256:bf0eec22f11a91a1a9d252eea81fb5067658c59d1c67606d465dac1eb40227a0"
+}
