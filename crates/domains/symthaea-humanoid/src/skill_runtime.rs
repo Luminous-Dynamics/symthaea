@@ -207,6 +207,8 @@ pub enum HumanoidSkillRequirementRole {
 pub enum HumanoidSkillPrecondition {
     GoalExecutionAuthority,
     QualifiedSubject(HumanoidTask),
+    /// A load must already be retained before the skill starts. Grasp establishes
+    /// retention as a postcondition; Carry requires it as a precondition.
     LoadRetentionEvidence,
     HumanProximityEvidence,
     HumanContactConsent,
@@ -217,6 +219,9 @@ pub enum HumanoidSkillInvariant {
     CapabilityEnvelopeRespected,
     QualificationSubjectStable,
     ProtectiveBehaviorMayPreemptGoal,
+    /// Retention must remain continuously true for a skill that begins with an
+    /// already-retained load, such as Carry. Acquisition-phase Grasp does not
+    /// advertise this invariant before retention exists.
     LoadRetentionMaintained,
     HumanContactConsentMaintained,
 }
@@ -352,10 +357,9 @@ pub fn compile_humanoid_skill_contract(
                 subject,
                 request,
             );
-            if resulting_total_payload_kg > 0.0 {
-                preconditions.push(HumanoidSkillPrecondition::LoadRetentionEvidence);
-                invariants.push(HumanoidSkillInvariant::LoadRetentionMaintained);
-            }
+            // Grasp establishes retention. Requiring/advertising retained-load
+            // evidence here would make acquisition circular and contradict the
+            // executive's explicit LoadRetentionEstablished postcondition.
             recovery = HumanoidSkillRecoveryPolicy::SecureLoadThenReplan;
         }
         HumanoidSkillIntent::Carry {
@@ -589,6 +593,47 @@ mod tests {
         .into_iter()
         .map(|task| envelope_for(task, HumanInteractionEvidence::no_human_present()))
         .collect()
+    }
+
+    #[test]
+    fn grasp_establishes_retention_instead_of_requiring_it_before_start() {
+        let contract = compile_humanoid_skill_contract(
+            HumanoidSkillIntent::Grasp {
+                end_effector_speed_mps: 0.1,
+                object_contact_force_n: 20.0,
+                resulting_total_payload_kg: 4.0,
+            },
+            &qualifications(),
+        )
+        .unwrap();
+        assert!(!contract
+            .preconditions
+            .contains(&HumanoidSkillPrecondition::LoadRetentionEvidence));
+        assert!(!contract
+            .invariants
+            .contains(&HumanoidSkillInvariant::LoadRetentionMaintained));
+    }
+
+    #[test]
+    fn carry_requires_and_maintains_preexisting_retention() {
+        let contract = compile_humanoid_skill_contract(
+            HumanoidSkillIntent::Carry {
+                mode: HumanoidLocomotionMode::Walk,
+                horizontal_speed_mps: 0.5,
+                turn_rate_rad_s: 0.2,
+                manipulation_speed_mps: 0.1,
+                retention_force_n: 20.0,
+                resulting_total_payload_kg: 4.0,
+            },
+            &qualifications(),
+        )
+        .unwrap();
+        assert!(contract
+            .preconditions
+            .contains(&HumanoidSkillPrecondition::LoadRetentionEvidence));
+        assert!(contract
+            .invariants
+            .contains(&HumanoidSkillInvariant::LoadRetentionMaintained));
     }
 
     #[test]

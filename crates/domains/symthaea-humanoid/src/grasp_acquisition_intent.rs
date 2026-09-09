@@ -8,6 +8,12 @@
 //! the live spatial permit, Grasp subject, contact/retention policies and every
 //! Grasp objective still describe the same episode.
 //!
+//! Requested contact force and realized measured contact are deliberately not
+//! conflated here. The guarded semantic capability request has already admitted
+//! the requested force; canonical contact evidence later assesses the realized
+//! physical wrench. Acquisition binds the exact contact-policy identity without
+//! duplicating its measured-force acceptance interval.
+//!
 //! The resulting value is planning/evidence state only. It is not motor authority
 //! and cannot be lowered directly to actuator commands.
 
@@ -27,7 +33,7 @@ use crate::whole_body_intent::{
 };
 
 pub const HUMANOID_GRASP_OBJECT_BINDING_SCHEMA_VERSION: u32 = 1;
-pub const HUMANOID_GRASP_ACQUISITION_POLICY_SCHEMA_VERSION: u32 = 1;
+pub const HUMANOID_GRASP_ACQUISITION_POLICY_SCHEMA_VERSION: u32 = 2;
 pub const HUMANOID_GRASP_ACQUISITION_INTENT_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,7 +160,12 @@ impl HumanoidGraspObjectBindingEvidence {
 }
 
 /// Admission policy for turning a fresh object-bound Grasp IR into acquisition
-/// planning state. These are plan limits, not actuator or product-safety limits.
+/// planning state. These are planning limits, not actuator/product-safety limits.
+///
+/// Contact-force limits are intentionally absent. The requested force is already
+/// part of the admitted semantic capability request and must match the exact
+/// whole-body IR. Realized physical contact force is independently judged by the
+/// bound `HumanoidGraspContactPolicy` once measured evidence exists.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidGraspAcquisitionPolicy {
     schema_version: u32,
@@ -165,14 +176,11 @@ pub struct HumanoidGraspAcquisitionPolicy {
     maximum_object_binding_age_s: f64,
     minimum_object_confidence: f64,
     maximum_end_effector_speed_mps: f64,
-    minimum_requested_contact_force_n: f64,
-    maximum_requested_contact_force_n: f64,
     maximum_resulting_payload_kg: f64,
     policy_digest: HumanoidEvidenceDigest,
 }
 
 impl HumanoidGraspAcquisitionPolicy {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         subject: &HumanoidQualificationSubject,
         contact_policy: &HumanoidGraspContactPolicy,
@@ -180,8 +188,6 @@ impl HumanoidGraspAcquisitionPolicy {
         maximum_object_binding_age_s: f64,
         minimum_object_confidence: f64,
         maximum_end_effector_speed_mps: f64,
-        minimum_requested_contact_force_n: f64,
-        maximum_requested_contact_force_n: f64,
         maximum_resulting_payload_kg: f64,
     ) -> Option<Self> {
         if !subject.validate()
@@ -194,10 +200,6 @@ impl HumanoidGraspAcquisitionPolicy {
             || !(0.0..=1.0).contains(&minimum_object_confidence)
             || !maximum_end_effector_speed_mps.is_finite()
             || maximum_end_effector_speed_mps <= 0.0
-            || !minimum_requested_contact_force_n.is_finite()
-            || minimum_requested_contact_force_n < 0.0
-            || !maximum_requested_contact_force_n.is_finite()
-            || maximum_requested_contact_force_n < minimum_requested_contact_force_n
             || !maximum_resulting_payload_kg.is_finite()
             || maximum_resulting_payload_kg < 0.0
         {
@@ -213,8 +215,6 @@ impl HumanoidGraspAcquisitionPolicy {
             maximum_object_binding_age_s,
             minimum_object_confidence,
             maximum_end_effector_speed_mps,
-            minimum_requested_contact_force_n,
-            maximum_requested_contact_force_n,
             maximum_resulting_payload_kg,
             policy_digest: HumanoidEvidenceDigest::ZERO,
         };
@@ -243,10 +243,6 @@ impl HumanoidGraspAcquisitionPolicy {
             && (0.0..=1.0).contains(&self.minimum_object_confidence)
             && self.maximum_end_effector_speed_mps.is_finite()
             && self.maximum_end_effector_speed_mps > 0.0
-            && self.minimum_requested_contact_force_n.is_finite()
-            && self.minimum_requested_contact_force_n >= 0.0
-            && self.maximum_requested_contact_force_n.is_finite()
-            && self.maximum_requested_contact_force_n >= self.minimum_requested_contact_force_n
             && self.maximum_resulting_payload_kg.is_finite()
             && self.maximum_resulting_payload_kg >= 0.0
             && !self.policy_digest.is_zero()
@@ -274,7 +270,6 @@ pub enum HumanoidGraspAcquisitionFailure {
     IntentObjectiveShapeMismatch,
     MissingRequiredInvariant,
     RequestedSpeedTooHigh,
-    RequestedContactForceOutOfPolicy,
     RequestedPayloadTooHigh,
     InvalidDigest,
 }
@@ -451,16 +446,12 @@ pub fn compile_humanoid_grasp_acquisition_intent(
     if requested_end_effector_speed_mps > acquisition_policy.maximum_end_effector_speed_mps {
         return Err(HumanoidGraspAcquisitionFailure::RequestedSpeedTooHigh);
     }
-    if requested_contact_force_n < acquisition_policy.minimum_requested_contact_force_n
-        || requested_contact_force_n > acquisition_policy.maximum_requested_contact_force_n
-    {
-        return Err(HumanoidGraspAcquisitionFailure::RequestedContactForceOutOfPolicy);
-    }
     if resulting_total_payload_kg > acquisition_policy.maximum_resulting_payload_kg {
         return Err(HumanoidGraspAcquisitionFailure::RequestedPayloadTooHigh);
     }
 
-    let valid_until_s = object_binding.observed_at_s() + acquisition_policy.maximum_object_binding_age_s;
+    let valid_until_s =
+        object_binding.observed_at_s() + acquisition_policy.maximum_object_binding_age_s;
     if !valid_until_s.is_finite() || valid_until_s < now_s {
         return Err(HumanoidGraspAcquisitionFailure::ObjectBindingStale);
     }
@@ -576,7 +567,7 @@ fn digest_object_binding(value: &HumanoidGraspObjectBindingEvidence) -> Humanoid
 }
 
 fn digest_acquisition_policy(value: &HumanoidGraspAcquisitionPolicy) -> HumanoidEvidenceDigest {
-    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-acquisition-policy.v1");
+    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-acquisition-policy.v2");
     h.u32(value.schema_version)
         .digest(value.subject_digest)
         .u64(hand_id(value.hand))
@@ -585,8 +576,6 @@ fn digest_acquisition_policy(value: &HumanoidGraspAcquisitionPolicy) -> Humanoid
         .f64(value.maximum_object_binding_age_s)
         .f64(value.minimum_object_confidence)
         .f64(value.maximum_end_effector_speed_mps)
-        .f64(value.minimum_requested_contact_force_n)
-        .f64(value.maximum_requested_contact_force_n)
         .f64(value.maximum_resulting_payload_kg);
     h.finish()
 }
@@ -693,9 +682,7 @@ mod tests {
         HumanoidSkillActuationEvidenceEntry, HumanoidSkillActuationPolicyEntry,
     };
     use crate::skill_permit::{HumanoidPermitSkillExecutive, HumanoidSkillValidationCycle};
-    use crate::skill_runtime::{
-        HumanoidSkillQualificationSet, compile_humanoid_skill_contract,
-    };
+    use crate::skill_runtime::{HumanoidSkillQualificationSet, compile_humanoid_skill_contract};
     use crate::spatial_goal::{
         HumanoidReachWorkspaceProfile, HumanoidSpatialGoalAdmissionConfig,
         bind_humanoid_spatial_goal,
@@ -881,17 +868,38 @@ mod tests {
         retention: &HumanoidGraspRetentionPolicy,
     ) -> HumanoidGraspAcquisitionPolicy {
         HumanoidGraspAcquisitionPolicy::new(
-            &subject(),
-            contact,
-            retention,
-            0.2,
-            0.8,
-            0.2,
-            2.0,
-            15.0,
-            1.0,
+            &subject(), contact, retention, 0.2, 0.8, 0.2, 1.0,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn acquisition_policy_binds_canonical_contact_policy_identity() {
+        let contact_a = contact_policy();
+        let retention_a = retention_policy(&contact_a);
+        let acquisition_a = acquisition_policy(&contact_a, &retention_a);
+
+        let contact_b = HumanoidGraspContactPolicy::new(
+            &subject(),
+            HandSide::Right,
+            0.05,
+            0.8,
+            HumanoidManipulationContactSource::SolverWrench.quality_rank(),
+            true,
+            3.0,
+            45.0,
+            15.0,
+            2.0,
+            0.02,
+            0.01,
+            0.02,
+        )
+        .unwrap();
+        let retention_b = retention_policy(&contact_b);
+        let acquisition_b = acquisition_policy(&contact_b, &retention_b);
+
+        assert_ne!(contact_a.policy_digest(), contact_b.policy_digest());
+        assert_ne!(acquisition_a.policy_digest(), acquisition_b.policy_digest());
     }
 
     #[test]
