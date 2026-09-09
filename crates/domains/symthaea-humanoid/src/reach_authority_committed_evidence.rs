@@ -149,6 +149,14 @@ impl HumanoidReachAuthorityCommittedEpisodeStep {
         Ok(Self { inner, authority, spatial, binding_digest })
     }
 
+    pub const fn authority_receipt_digest(&self) -> HumanoidEvidenceDigest {
+        self.authority.receipt_digest()
+    }
+
+    pub const fn authority_scope_digest(&self) -> HumanoidEvidenceDigest {
+        self.authority.scope_digest()
+    }
+
     pub const fn authority_finalization_digest(&self) -> HumanoidEvidenceDigest {
         self.authority.finalization_digest()
     }
@@ -215,6 +223,10 @@ impl HumanoidReachAuthorityCommittedEpisodeCase {
 
     pub const fn case_digest(&self) -> HumanoidEvidenceDigest {
         self.case_digest
+    }
+
+    pub(crate) fn steps(&self) -> &[HumanoidReachAuthorityCommittedEpisodeStep] {
+        &self.steps
     }
 
     pub(crate) fn validate(&self) -> bool {
