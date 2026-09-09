@@ -16,6 +16,7 @@ pub mod observation;
 pub mod profile_adoption;
 pub mod profile_adoption_admission;
 pub mod profile_adoption_commit;
+pub mod profile_adoption_grant;
 pub mod profile_adoption_root;
 pub mod profile_adoption_time;
 pub mod verifier;
@@ -52,6 +53,11 @@ pub use profile_adoption_admission::{
 pub use profile_adoption_commit::{
     VerifierProfileAdoptionCommitError, VerifierProfileAdoptionCommitPreconditionsV1,
     VerifierProfileAdoptionCommitStateV1,
+};
+pub use profile_adoption_grant::{
+    GrantBoundRootBoundVerifierProfileAdoptionV1, VerifierAdoptionAuthorityGrantError,
+    VerifierAdoptionAuthorityGrantIdV1, VerifierAdoptionAuthorityGrantV1,
+    bind_root_bound_adoption_to_authority_grant,
 };
 pub use profile_adoption_root::{
     RootBoundPolicyCheckedVerifierProfileAdoptionV1,
