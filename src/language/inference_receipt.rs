@@ -8,7 +8,8 @@
 //!
 //! IF-6 may additionally retain a privacy-minimized projection of provider wire
 //! observations. Raw provider request/response ids are digested before entering
-//! the receipt.
+//! the receipt. Later settlement layers may also inspect the terminal HTTP status
+//! of a failed provider request; provider response bodies remain excluded.
 
 #[cfg(not(test))]
 use super::inference_binding::{InferenceBindingError, digest_response_text};
@@ -73,7 +74,9 @@ pub struct InferenceRateLimitEvidence {
 ///
 /// Raw provider request/response ids are never stored. Their domain-separated
 /// BLAKE3 digests are sufficient for later equality/correlation checks against an
-/// explicitly supplied external provider record.
+/// explicitly supplied external provider record. `provider_http_status` is only a
+/// numeric terminal status observed for a failed HTTP request; no remote body is
+/// retained with it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InferenceWireEvidence {
     provider_response_id_digest: Option<BindingDigest>,
@@ -86,6 +89,7 @@ pub struct InferenceWireEvidence {
     latency_millis: u64,
     metadata_conflict: bool,
     metadata_rejected: bool,
+    provider_http_status: Option<u16>,
 }
 
 impl InferenceWireEvidence {
@@ -117,7 +121,15 @@ impl InferenceWireEvidence {
             latency_millis,
             metadata_conflict,
             metadata_rejected,
+            provider_http_status: None,
         })
+    }
+
+    /// Attach the terminal HTTP status observed by the transport. Kept crate-only
+    /// so ordinary callers cannot manufacture settlement evidence on a receipt.
+    pub(crate) fn with_provider_http_status(mut self, status: Option<u16>) -> Self {
+        self.provider_http_status = status;
+        self
     }
 
     pub fn provider_response_id_digest(&self) -> Option<&BindingDigest> {
@@ -158,6 +170,10 @@ impl InferenceWireEvidence {
 
     pub const fn metadata_rejected(&self) -> bool {
         self.metadata_rejected
+    }
+
+    pub const fn provider_http_status(&self) -> Option<u16> {
+        self.provider_http_status
     }
 }
 

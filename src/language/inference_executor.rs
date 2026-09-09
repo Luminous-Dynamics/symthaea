@@ -408,9 +408,14 @@ impl<C: InferenceTickSource> OpenAiInferenceExecutor<C> {
         prepared: PreparedInferenceExecution,
         observed_failure: ObservedTransportFailure,
     ) -> Result<InferenceExecutionOutcome, InferenceExecutorFatalError> {
+        let provider_http_status = match &observed_failure.error {
+            TransportError::HttpStatus(status) => Some(*status),
+            _ => None,
+        };
         let (failure, receipt_class) = classify_transport_error(&observed_failure.error);
         let completed_at_tick = self.clock.now_tick();
-        let wire_evidence = receipt_wire_evidence(&observed_failure.observation)?;
+        let wire_evidence = receipt_wire_evidence(&observed_failure.observation)?
+            .with_provider_http_status(provider_http_status);
         let receipt = InferenceReceipt::failure_observed(
             prepared,
             receipt_class,
