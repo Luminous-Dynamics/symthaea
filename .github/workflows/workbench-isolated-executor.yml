@@ -1,0 +1,163 @@
+name: Workbench Isolated Executor
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/workbench_isolated_executor.py'
+      - 'scripts/test_workbench_isolated_executor.py'
+      - 'docs/neuroscience/WORKBENCH_ISOLATED_EXECUTOR_V1.md'
+      - '.github/workflows/workbench-isolated-executor.yml'
+      - 'scripts/verify_workbench_invocation_isolation_profile.py'
+      - 'data/neuroscience/workbench_invocation_isolation_profile_v1.json'
+      - 'data/neuroscience/workbench_execution_capsule_profile_v1.json'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QUALIFICATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  qualify:
+    name: Qualify isolated executor mechanism
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_SHA"
+          printf 'qualified_head=%s\n' "$QUALIFICATION_SHA"
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntax
+        run: |
+          python -m py_compile \
+            scripts/workbench_isolated_executor.py \
+            scripts/test_workbench_isolated_executor.py
+
+      - name: Validate exact parent profiles
+        run: |
+          python scripts/verify_workbench_invocation_isolation_profile.py \
+            --profile data/neuroscience/workbench_invocation_isolation_profile_v1.json \
+            --parent-profile data/neuroscience/workbench_execution_capsule_profile_v1.json
+
+      - name: Behavioral executor contracts
+        run: PYTHONPATH=scripts python -m unittest -v scripts/test_workbench_isolated_executor.py
+
+      - name: Smoke executor through real profile verifier
+        run: |
+          PYTHONPATH=scripts python - <<'PY'
+          import tempfile
+          from pathlib import Path
+          import workbench_isolated_executor as executor
+
+          root = Path.cwd()
+          profile = root / 'data/neuroscience/workbench_invocation_isolation_profile_v1.json'
+          parent = root / 'data/neuroscience/workbench_execution_capsule_profile_v1.json'
+          with tempfile.TemporaryDirectory() as td:
+              temp = Path(td)
+              scratch = temp / 'scratch'
+              scratch.mkdir()
+              fake = temp / 'fake-workbench'
+              fake.write_text("#!/bin/sh\nprintf 'smoke-out\\n'\nprintf 'smoke-err\\n' >&2\n")
+              fake.chmod(0o700)
+              expected = executor.digest_regular_file(fake, 'smoke executable')
+              observation = executor.observe_isolated_execution(
+                  fake,
+                  [],
+                  expected,
+                  profile,
+                  parent,
+                  scratch,
+                  'smoke',
+              )
+              executor.require_success(observation)
+              assert observation['stdout'] == b'smoke-out\n'
+              assert observation['stderr'] == b'smoke-err\n'
+              assert observation['isolation']['cleanup_confirmed'] is True
+              assert not any(observation['authority'].values())
+              assert not any(scratch.iterdir())
+          PY
+
+      - name: Process surface ratchet
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path('scripts/workbench_isolated_executor.py')
+          tree = ast.parse(path.read_text())
+          forbidden_imports = {'socket', 'urllib', 'http', 'requests', 'aiohttp', 'ftplib'}
+          imports = set()
+          subprocess_runs = []
+          forbidden_calls = []
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  imports.update(alias.name.split('.')[0] for alias in node.names)
+              elif isinstance(node, ast.ImportFrom) and node.module:
+                  imports.add(node.module.split('.')[0])
+              elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+                  owner, attr = node.func.value.id, node.func.attr
+                  if owner == 'subprocess' and attr == 'run':
+                      subprocess_runs.append(node)
+                  if (owner, attr) in {('subprocess', 'Popen'), ('os', 'system'), ('os', 'popen')}:
+                      forbidden_calls.append((owner, attr))
+          assert not (imports & forbidden_imports), imports & forbidden_imports
+          assert forbidden_calls == [], forbidden_calls
+          assert len(subprocess_runs) == 1, len(subprocess_runs)
+          call = subprocess_runs[0]
+          kw = {item.arg: item.value for item in call.keywords if item.arg}
+          for name, expected in {'shell': False, 'close_fds': True, 'check': False}.items():
+              value = kw[name]
+              assert isinstance(value, ast.Constant) and value.value is expected, name
+          assert isinstance(kw['pass_fds'], ast.Tuple) and len(kw['pass_fds'].elts) == 0
+          for name, attr in {'stdin': 'DEVNULL', 'stdout': 'PIPE', 'stderr': 'PIPE'}.items():
+              value = kw[name]
+              assert isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name)
+              assert value.value.id == 'subprocess' and value.attr == attr, name
+          assert 'cwd' in kw and 'env' in kw
+          PY
+
+      - name: Authority and lifecycle ratchet
+        run: |
+          PYTHONPATH=scripts python - <<'PY'
+          import workbench_isolated_executor as m
+          expected = {
+              'executor_mechanism_qualified',
+              'real_workbench_invocation_verified',
+              'same_host_repeatability_established',
+              'path_equivalence_established',
+              'cross_cpu_equivalence_established',
+              'workbench_execution_qualified',
+              'scientific_execution_qualified',
+              'transform_executed',
+              'atlas_correctness_established',
+              'fmq010_established',
+              'neural_alignment_established',
+              'consciousness_evidence',
+          }
+          assert set(m.AUTHORITY) == expected
+          assert not any(m.AUTHORITY.values())
+          assert len(m.ROOT_ROLES) == 10
+          assert len(set(m.ROOT_ROLES)) == 10
+          PY
+          grep -Fq 'SingleThreadedExecutorQualification' docs/neuroscience/WORKBENCH_ISOLATED_EXECUTOR_V1.md
+          grep -Fq 'QualifiedExecutorMechanism != QualifiedScientificExecution' docs/neuroscience/WORKBENCH_ISOLATED_EXECUTOR_V1.md
+          grep -Fq 'GeneratorImplementationRoot' docs/neuroscience/WORKBENCH_ISOLATED_EXECUTOR_V1.md
