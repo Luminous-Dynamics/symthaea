@@ -6,6 +6,8 @@
 //! Re-exports from the `symthaea-exploration` sub-crate plus experimental
 //! measurement-only evaluation contracts that are not yet part of action selection.
 
+/// Niche-preserving, confidence-qualified Pareto comparison without scalar fitness.
+pub mod archive;
 /// Evidence-bearing, non-authoritative evaluation of future capacity and optionality.
 pub mod generativity;
 /// Typed outcomes that keep surprise reduction distinct from broader discovery value.
