@@ -55,9 +55,12 @@ pub mod plugin;
 pub mod qp_certification;
 pub mod qualification;
 pub mod reach_episode_evidence;
-pub mod reach_episode_promotion;
+// Internal implementation detail: episode-complete evidence is necessary, but
+// operational promotion must additionally bind the exact qualification protocols.
+mod reach_episode_promotion;
 pub mod reach_execution;
 pub mod reach_execution_evidence;
+pub mod reach_operational_promotion;
 pub mod reach_outcome_evidence;
 pub mod reach_policy_identity;
 pub mod reach_qualification_campaign;
@@ -140,9 +143,9 @@ pub use physical_health::*;
 pub use qp_certification::*;
 pub use qualification::*;
 pub use reach_episode_evidence::*;
-pub use reach_episode_promotion::*;
 pub use reach_execution::*;
 pub use reach_execution_evidence::*;
+pub use reach_operational_promotion::*;
 pub use reach_outcome_evidence::*;
 pub use reach_policy_identity::*;
 pub use reach_qualification_campaign::*;
