@@ -13,6 +13,10 @@
 //!   structure constants, Casimir operators
 //! - **Non-perturbative QCD**: confinement, lattice-QCD observables,
 //!   glueball/hadron spectroscopy with observation/interpretation separation
+//! - **Exotic spectroscopy**: unified mixed-state ontology, append-only evidence
+//!   graph, candidate/model discriminators, and a QCD↔spectroscopy semantic bridge
+//! - **Epistemic export**: versioned Symthaea→Mycelix DKG transport preserving
+//!   immutable evidence, provenance, support/challenge and supersession edges
 //!
 //! ## Natural Units
 //!
@@ -28,12 +32,17 @@
 pub mod constants;
 pub mod cross_sections;
 pub mod decay_widths;
+pub mod exotic_hadrons;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod hadron_spectroscopy;
 pub mod lattice_qcd;
+pub mod model_comparison;
+pub mod mycelix_epistemic_bridge;
+pub mod qcd_spectroscopy_bridge;
 pub mod relativistic_qm;
 pub mod renormalization;
+pub mod spectroscopy_evidence;
 pub mod symmetry_groups;
 
 // Re-export key items
@@ -46,6 +55,10 @@ pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
 };
+pub use exotic_hadrons::{
+    CompositionError, CompositionModel, HadronBasisState, MixtureComponent,
+    quarkonium_glueball_mixture,
+};
 pub use hadron_spectroscopy::{
     BASELINE_GLUEBALL_LEVELS, CompositionInterpretation, EvidenceEffect, EvidenceKind,
     EvidenceRecord, GlueballLevel, HadronicComposition, InterpretationStatus, Jpc, Measurement,
@@ -53,9 +66,26 @@ pub use hadron_spectroscopy::{
     X2370, X2370_EVIDENCE, X2370_GLUEBALL_INTERPRETATION, X2370_MOLECULAR_INTERPRETATION,
     glueball_channel_matches, glueball_mass_gap_mev, x2370_evidence,
 };
+pub use model_comparison::{
+    CandidateModel, DiscriminatingObservable, ExpectedSignature, ModelExpectation,
+    ObservablePrediction, discriminating_observables, rank_discriminators,
+};
+pub use mycelix_epistemic_bridge::{
+    MYCELIX_SPECTROSCOPY_DKG_PROTOCOL, MYCELIX_SPECTROSCOPY_DKG_SCHEMA_VERSION,
+    MycelixDkgBundle, MycelixDkgEdge, MycelixDkgNode, MycelixNodeKind, MycelixProvenance,
+    MycelixRelation, export_to_mycelix,
+};
+pub use qcd_spectroscopy_bridge::{
+    BridgeAuthority, QcdMechanism, QcdSpectroscopyLink, glueball_links, hybrid_links,
+    requires_quantitative_qcd,
+};
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
     qcd_beta, qed_beta,
+};
+pub use spectroscopy_evidence::{
+    EvidenceEdge, EvidenceGraphError, EvidenceNodeKind, EvidenceRelation, GraphNodeRef,
+    ScientificClaim, SpectroscopyEvidence, SpectroscopyEvidenceGraph,
 };
 pub use symmetry_groups::{
     Complex, gell_mann_matrix, gell_mann_trace_product, pauli_matrices, su2_casimir,
