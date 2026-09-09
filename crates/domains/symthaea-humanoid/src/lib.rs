@@ -71,6 +71,12 @@ pub mod reach_episode_evidence;
 mod reach_episode_promotion;
 pub mod reach_execution;
 pub mod reach_execution_evidence;
+// Final public authority facade: exact perturbation manifests, manifest-aware
+// operator approval, and strongest-artifact motor receipt issuance.
+pub mod reach_manifest_authority;
+// Internal implementation detail: manifest-bound qualification/promotion is
+// necessary, but the actual motor receipt must record the strongest identities.
+mod reach_manifest_bound_promotion;
 // Internal implementation detail: operator/policy binding remains as deterministic
 // defense-in-depth; the public authority path requires SHA-256 commitments too.
 mod reach_operational_authority;
@@ -78,6 +84,7 @@ mod reach_operational_authority;
 // public operational authority path requires cryptographic protocol/corpus identity.
 mod reach_operational_promotion;
 pub mod reach_outcome_evidence;
+pub mod reach_perturbation_manifest;
 pub mod reach_policy_identity;
 pub mod reach_qualification_campaign;
 pub mod reach_qualification_lineage;
@@ -85,7 +92,9 @@ pub mod reach_qualification_lineage;
 // but it is not sufficient to expose an operational Reach capability on its own.
 mod reach_qualification_promotion;
 pub mod reach_spatial_goal_commitment;
-pub mod reach_strong_diversity_promotion;
+// Internal implementation detail: SHA-256 diversity is mandatory and is consumed
+// by the manifest-bound promotion layer rather than exposed as an alternate path.
+mod reach_strong_diversity_promotion;
 pub mod recovery;
 pub mod recovery_benchmark;
 pub mod recovery_certification;
@@ -166,12 +175,13 @@ pub use reach_authority_committed_evidence::*;
 pub use reach_episode_evidence::*;
 pub use reach_execution::*;
 pub use reach_execution_evidence::*;
+pub use reach_manifest_authority::*;
 pub use reach_outcome_evidence::*;
+pub use reach_perturbation_manifest::*;
 pub use reach_policy_identity::*;
 pub use reach_qualification_campaign::*;
 pub use reach_qualification_lineage::*;
 pub use reach_spatial_goal_commitment::*;
-pub use reach_strong_diversity_promotion::*;
 pub use recovery_certification::*;
 pub use release_pipeline::*;
 pub use reproducible_oracle_build::*;
