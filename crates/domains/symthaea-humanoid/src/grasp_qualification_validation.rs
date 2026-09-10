@@ -36,6 +36,8 @@ pub fn validate_complete_measured_grasp_qualification(
     measurement_policy: &HumanoidGraspMeasurementCoveragePolicy,
     measured_trial: &HumanoidMeasuredGraspControllerQualificationTrial,
 ) -> bool {
+    let required_purpose = controller_policy.required_execution_purpose();
+
     subject.validate()
         && subject.task == HumanoidTask::Grasp
         && candidate.validate()
@@ -43,6 +45,10 @@ pub fn validate_complete_measured_grasp_qualification(
         && contact_policy.validate_for(subject)
         && retention_policy.validate_for(subject, contact_policy)
         && measurement_chain.validate()
+        // Promotion/import must independently prove the measurement environment
+        // corresponds to the exact campaign purpose; constructor history is not
+        // accepted as evidence of this relation.
+        && measurement_chain.kind().admits(required_purpose)
         && measurement_policy.validate_for(
             subject,
             candidate,
@@ -52,6 +58,7 @@ pub fn validate_complete_measured_grasp_qualification(
             measurement_chain,
         )
         && measured_trial.trial().validate_for(subject, controller_policy)
+        && measured_trial.trial().execution_purpose() == required_purpose
         && measured_trial.measurement().validate_for(
             measured_trial.trial(),
             measurement_policy,
