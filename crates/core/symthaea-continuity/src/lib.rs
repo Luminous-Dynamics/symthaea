@@ -20,6 +20,7 @@ pub mod distributed_currentness;
 pub mod distributed_evidence;
 mod distributed_evidence_error_bridge;
 mod distributed_health_common;
+mod distributed_health_v1_error_bridge;
 pub mod distributed_qualification;
 pub mod distributed_state;
 pub mod exact_distributed_health;
@@ -96,6 +97,7 @@ pub use distributed_evidence::{
     FailureDomainStateClaimV1, RecoveryPathObservationOutcomeV1, RecoveryPathStateClaimId,
     RecoveryPathStateClaimV1,
 };
+pub use distributed_health_common::DistributedHealthEvaluationError;
 pub use distributed_qualification::{
     DistributedCurrentStateDigest, DistributedQualificationError, DistributedVerifierSnapshotV1,
     QualifiedDistributedTransitionWitnessId, QualifiedDistributedTransitionWitnessV1,
