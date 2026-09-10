@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shared closed-world distributed-health evaluator.
 //!
-//! This module owns the policy/evidence evaluation that is common to the original
+//! This module owns the policy/evidence evaluation common to the original
 //! post-transition V1 proof and the generic healthy-local-snapshot V2 proof. It does
-//! not define either proof identity. Callers retain their own domain-separated hash
-//! contracts so extracting this evaluator does not silently rewrite V1 identities.
+//! not define either proof identity. The error vocabulary is deliberately neutral:
+//! the evaluated local subject may be a new target, a crash-reconciled source, or a
+//! future independently admitted baseline.
 
 use std::collections::{BTreeMap, BTreeSet};
+
+use thiserror::Error;
 
 use crate::distributed::RecoveryPathClassV1;
 use crate::distributed_currentness::ValidatedDistributedCurrentnessPolicyV1;
@@ -22,7 +25,6 @@ use crate::distributed_state::{
     ValidatedDistributedStateContextV1,
 };
 use crate::failure_domain::{FailureDomainPolicyId, ValidatedFailureDomainPolicyV1};
-use crate::post_transition_distributed_health::PostTransitionDistributedHealthError;
 use crate::scope::ContinuitySubjectId;
 use crate::verifier::VerifierProfileId;
 
@@ -48,14 +50,14 @@ pub(crate) fn evaluate_distributed_health(
     failure_domain_evidence: &[AuthenticatedFailureDomainStateEvidenceV1],
     recovery_evidence: &[AuthenticatedRecoveryPathStateEvidenceV1],
     evaluated_at_unix_ms: u64,
-) -> Result<EvaluatedDistributedHealthV1, PostTransitionDistributedHealthError> {
+) -> Result<EvaluatedDistributedHealthV1, DistributedHealthEvaluationError> {
     if evaluated_at_unix_ms == 0 {
-        return Err(PostTransitionDistributedHealthError::ZeroEvaluationTime);
+        return Err(DistributedHealthEvaluationError::ZeroEvaluationTime);
     }
     if currentness.budget_id() != context.budget_id()
         || currentness.budget_generation() != context.budget_generation()
     {
-        return Err(PostTransitionDistributedHealthError::CurrentnessContextMismatch);
+        return Err(DistributedHealthEvaluationError::CurrentnessContextMismatch);
     }
 
     let failure_policy_by_id =
@@ -86,7 +88,7 @@ pub(crate) fn evaluate_distributed_health(
             .binary_search(&evidence.participant_subject_id())
             .is_err()
         {
-            return Err(PostTransitionDistributedHealthError::ParticipantOutsideBudget {
+            return Err(DistributedHealthEvaluationError::ParticipantOutsideBudget {
                 participant: evidence.participant_subject_id(),
             });
         }
@@ -94,12 +96,12 @@ pub(crate) fn evaluate_distributed_health(
             .insert(evidence.participant_subject_id(), evidence.state())
             .is_some()
         {
-            return Err(PostTransitionDistributedHealthError::DuplicateParticipantEvidence {
+            return Err(DistributedHealthEvaluationError::DuplicateParticipantEvidence {
                 participant: evidence.participant_subject_id(),
             });
         }
         if evidence.state() == ParticipantOperationalStateV1::Unknown {
-            return Err(PostTransitionDistributedHealthError::UnknownParticipantState {
+            return Err(DistributedHealthEvaluationError::UnknownParticipantState {
                 participant: evidence.participant_subject_id(),
             });
         }
@@ -110,21 +112,21 @@ pub(crate) fn evaluate_distributed_health(
 
     let expected_participants = context.budget().participant_subject_ids();
     if states.len() != expected_participants.len() {
-        return Err(PostTransitionDistributedHealthError::IncompleteParticipantEvidence {
+        return Err(DistributedHealthEvaluationError::IncompleteParticipantEvidence {
             expected: expected_participants.len(),
             observed: states.len(),
         });
     }
     for participant in expected_participants {
         if !states.contains_key(participant) {
-            return Err(PostTransitionDistributedHealthError::MissingParticipantEvidence {
+            return Err(DistributedHealthEvaluationError::MissingParticipantEvidence {
                 participant: *participant,
             });
         }
     }
 
     if states.get(&local_subject_id) != Some(&ParticipantOperationalStateV1::Healthy) {
-        return Err(PostTransitionDistributedHealthError::TransitionedSubjectNotHealthy {
+        return Err(DistributedHealthEvaluationError::LocalSubjectNotHealthy {
             participant: local_subject_id,
         });
     }
@@ -142,14 +144,14 @@ pub(crate) fn evaluate_distributed_health(
         .collect();
     let unavailable_count = unavailable.len() as u32;
     if unavailable_count > context.budget().max_concurrent_unavailable() {
-        return Err(PostTransitionDistributedHealthError::AvailabilityBudgetExceeded {
+        return Err(DistributedHealthEvaluationError::AvailabilityBudgetExceeded {
             unavailable: unavailable_count,
             allowed: context.budget().max_concurrent_unavailable(),
         });
     }
     let healthy_count = expected_participants.len() as u32 - unavailable_count;
     if healthy_count < context.budget().minimum_healthy() {
-        return Err(PostTransitionDistributedHealthError::MinimumHealthyViolated {
+        return Err(DistributedHealthEvaluationError::MinimumHealthyViolated {
             observed: healthy_count,
             required: context.budget().minimum_healthy(),
         });
@@ -161,7 +163,7 @@ pub(crate) fn evaluate_distributed_health(
             .filter(|member| unavailable.contains(member))
             .count();
         if unavailable_members > 1 {
-            return Err(PostTransitionDistributedHealthError::MutualExclusionViolated);
+            return Err(DistributedHealthEvaluationError::MutualExclusionViolated);
         }
     }
 
@@ -182,7 +184,7 @@ pub(crate) fn evaluate_distributed_health(
             currentness.max_future_skew_ms(),
         )?;
         if !failure_policy_by_id.contains_key(&evidence.policy_id()) {
-            return Err(PostTransitionDistributedHealthError::UnexpectedFailureDomainEvidence {
+            return Err(DistributedHealthEvaluationError::UnexpectedFailureDomainEvidence {
                 policy_id: evidence.policy_id(),
             });
         }
@@ -190,7 +192,7 @@ pub(crate) fn evaluate_distributed_health(
             .insert(evidence.policy_id(), evidence.outcome())
             .is_some()
         {
-            return Err(PostTransitionDistributedHealthError::DuplicateFailureDomainEvidence {
+            return Err(DistributedHealthEvaluationError::DuplicateFailureDomainEvidence {
                 policy_id: evidence.policy_id(),
             });
         }
@@ -200,7 +202,7 @@ pub(crate) fn evaluate_distributed_health(
     }
 
     if failure_outcomes.len() != currentness.required_failure_domain_policy_ids().len() {
-        return Err(PostTransitionDistributedHealthError::IncompleteFailureDomainEvidence {
+        return Err(DistributedHealthEvaluationError::IncompleteFailureDomainEvidence {
             expected: currentness.required_failure_domain_policy_ids().len(),
             observed: failure_outcomes.len(),
         });
@@ -209,12 +211,12 @@ pub(crate) fn evaluate_distributed_health(
     let mut healthy_domains = Vec::new();
     for policy_id in currentness.required_failure_domain_policy_ids() {
         let outcome = failure_outcomes.get(policy_id).copied().ok_or(
-            PostTransitionDistributedHealthError::MissingFailureDomainEvidence {
+            DistributedHealthEvaluationError::MissingFailureDomainEvidence {
                 policy_id: *policy_id,
             },
         )?;
         if outcome != FailureDomainObservationOutcomeV1::MatchesPolicy {
-            return Err(PostTransitionDistributedHealthError::FailureDomainNotCurrent {
+            return Err(DistributedHealthEvaluationError::FailureDomainNotCurrent {
                 policy_id: *policy_id,
             });
         }
@@ -232,7 +234,7 @@ pub(crate) fn evaluate_distributed_health(
             })
             .count() as u32;
         if count < policy.minimum_healthy_domains() {
-            return Err(PostTransitionDistributedHealthError::FailureDomainFloorViolated {
+            return Err(DistributedHealthEvaluationError::FailureDomainFloorViolated {
                 policy_id: *policy_id,
                 observed: count,
                 required: policy.minimum_healthy_domains(),
@@ -264,15 +266,15 @@ pub(crate) fn evaluate_distributed_health(
             .binary_search(evidence.recovery_path_class())
             .is_err()
         {
-            return Err(PostTransitionDistributedHealthError::RecoveryClassOutsideBudget);
+            return Err(DistributedHealthEvaluationError::RecoveryClassOutsideBudget);
         }
         if !seen_recovery_classes.insert(evidence.recovery_path_class().clone()) {
-            return Err(PostTransitionDistributedHealthError::DuplicateRecoveryEvidence);
+            return Err(DistributedHealthEvaluationError::DuplicateRecoveryEvidence);
         }
         if evidence.outcome() == RecoveryPathObservationOutcomeV1::Available {
             let identity = evidence
                 .recovery_path_identity_digest()
-                .ok_or(PostTransitionDistributedHealthError::AvailableRecoveryMissingIdentity)?;
+                .ok_or(DistributedHealthEvaluationError::AvailableRecoveryMissingIdentity)?;
             recovery_by_class.insert(evidence.recovery_path_class().clone(), identity);
         }
         observation_times.push(evidence.observed_at_unix_ms());
@@ -281,7 +283,7 @@ pub(crate) fn evaluate_distributed_health(
     }
 
     if recovery_by_class.is_empty() {
-        return Err(PostTransitionDistributedHealthError::NoAvailableRecoveryPath);
+        return Err(DistributedHealthEvaluationError::NoAvailableRecoveryPath);
     }
     validate_cross_evidence_skew(
         &observation_times,
@@ -313,7 +315,7 @@ fn validate_failure_policies<'a>(
     policies: &'a [ValidatedFailureDomainPolicyV1],
 ) -> Result<
     BTreeMap<FailureDomainPolicyId, &'a ValidatedFailureDomainPolicyV1>,
-    PostTransitionDistributedHealthError,
+    DistributedHealthEvaluationError,
 > {
     let mut by_id = BTreeMap::new();
     for policy in policies {
@@ -321,7 +323,7 @@ fn validate_failure_policies<'a>(
             || policy.budget_generation() != context.budget_generation()
             || policy.aggregate_subject_id() != context.aggregate_subject_id()
         {
-            return Err(PostTransitionDistributedHealthError::FailureDomainPolicyContextMismatch {
+            return Err(DistributedHealthEvaluationError::FailureDomainPolicyContextMismatch {
                 policy_id: policy.id(),
             });
         }
@@ -330,18 +332,18 @@ fn validate_failure_policies<'a>(
             .binary_search(&policy.id())
             .is_err()
         {
-            return Err(PostTransitionDistributedHealthError::UnexpectedFailureDomainPolicy {
+            return Err(DistributedHealthEvaluationError::UnexpectedFailureDomainPolicy {
                 policy_id: policy.id(),
             });
         }
         if by_id.insert(policy.id(), policy).is_some() {
-            return Err(PostTransitionDistributedHealthError::DuplicateFailureDomainPolicy {
+            return Err(DistributedHealthEvaluationError::DuplicateFailureDomainPolicy {
                 policy_id: policy.id(),
             });
         }
     }
     if by_id.len() != currentness.required_failure_domain_policy_ids().len() {
-        return Err(PostTransitionDistributedHealthError::IncompleteFailureDomainPolicies {
+        return Err(DistributedHealthEvaluationError::IncompleteFailureDomainPolicies {
             expected: currentness.required_failure_domain_policy_ids().len(),
             observed: by_id.len(),
         });
@@ -353,9 +355,9 @@ fn require_context(
     role: &'static str,
     observed: DistributedStateContextId,
     expected: DistributedStateContextId,
-) -> Result<(), PostTransitionDistributedHealthError> {
+) -> Result<(), DistributedHealthEvaluationError> {
     if observed != expected {
-        return Err(PostTransitionDistributedHealthError::EvidenceContextMismatch { role });
+        return Err(DistributedHealthEvaluationError::EvidenceContextMismatch { role });
     }
     Ok(())
 }
@@ -364,9 +366,9 @@ fn require_profile(
     role: &'static str,
     profile_id: VerifierProfileId,
     allowed: &[VerifierProfileId],
-) -> Result<(), PostTransitionDistributedHealthError> {
+) -> Result<(), DistributedHealthEvaluationError> {
     if allowed.binary_search(&profile_id).is_err() {
-        return Err(PostTransitionDistributedHealthError::UnapprovedVerifierProfile {
+        return Err(DistributedHealthEvaluationError::UnapprovedVerifierProfile {
             role,
             profile_id,
         });
@@ -380,11 +382,11 @@ fn check_freshness(
     evaluated_at_unix_ms: u64,
     maximum_age_ms: u64,
     maximum_future_skew_ms: u64,
-) -> Result<(), PostTransitionDistributedHealthError> {
+) -> Result<(), DistributedHealthEvaluationError> {
     if observed_at_unix_ms > evaluated_at_unix_ms {
         let skew = observed_at_unix_ms - evaluated_at_unix_ms;
         if skew > maximum_future_skew_ms {
-            return Err(PostTransitionDistributedHealthError::EvidenceFromFuture {
+            return Err(DistributedHealthEvaluationError::EvidenceFromFuture {
                 role,
                 skew_ms: skew,
                 allowed_ms: maximum_future_skew_ms,
@@ -394,7 +396,7 @@ fn check_freshness(
     }
     let age = evaluated_at_unix_ms - observed_at_unix_ms;
     if age > maximum_age_ms {
-        return Err(PostTransitionDistributedHealthError::StaleEvidence {
+        return Err(DistributedHealthEvaluationError::StaleEvidence {
             role,
             age_ms: age,
             allowed_ms: maximum_age_ms,
@@ -406,17 +408,99 @@ fn check_freshness(
 fn validate_cross_evidence_skew(
     times: &[u64],
     maximum_skew_ms: u64,
-) -> Result<(), PostTransitionDistributedHealthError> {
+) -> Result<(), DistributedHealthEvaluationError> {
     let Some(minimum) = times.iter().min().copied() else {
-        return Err(PostTransitionDistributedHealthError::NoCurrentnessEvidence);
+        return Err(DistributedHealthEvaluationError::NoCurrentnessEvidence);
     };
     let maximum = times.iter().max().copied().unwrap_or(minimum);
     let skew = maximum - minimum;
     if skew > maximum_skew_ms {
-        return Err(PostTransitionDistributedHealthError::CrossEvidenceSkewExceeded {
+        return Err(DistributedHealthEvaluationError::CrossEvidenceSkewExceeded {
             observed_ms: skew,
             allowed_ms: maximum_skew_ms,
         });
     }
     Ok(())
+}
+
+/// Protocol-neutral errors produced by the shared distributed-health evaluator.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum DistributedHealthEvaluationError {
+    #[error("distributed-health evaluation time must be non-zero")]
+    ZeroEvaluationTime,
+    #[error("distributed currentness policy is bound to a different budget/generation")]
+    CurrentnessContextMismatch,
+    #[error("failure-domain policy {policy_id:?} belongs to a different distributed context")]
+    FailureDomainPolicyContextMismatch { policy_id: FailureDomainPolicyId },
+    #[error("unexpected failure-domain policy {policy_id:?}")]
+    UnexpectedFailureDomainPolicy { policy_id: FailureDomainPolicyId },
+    #[error("duplicate failure-domain policy {policy_id:?}")]
+    DuplicateFailureDomainPolicy { policy_id: FailureDomainPolicyId },
+    #[error("failure-domain policy set incomplete: expected {expected}, observed {observed}")]
+    IncompleteFailureDomainPolicies { expected: usize, observed: usize },
+    #[error("authenticated {role} evidence belongs to a different distributed context")]
+    EvidenceContextMismatch { role: &'static str },
+    #[error("{role} verifier profile {profile_id:?} is not approved by currentness policy")]
+    UnapprovedVerifierProfile {
+        role: &'static str,
+        profile_id: VerifierProfileId,
+    },
+    #[error("participant evidence references subject outside budget: {participant:?}")]
+    ParticipantOutsideBudget { participant: ContinuitySubjectId },
+    #[error("duplicate participant evidence for {participant:?}")]
+    DuplicateParticipantEvidence { participant: ContinuitySubjectId },
+    #[error("participant evidence incomplete: expected {expected}, observed {observed}")]
+    IncompleteParticipantEvidence { expected: usize, observed: usize },
+    #[error("missing participant evidence for {participant:?}")]
+    MissingParticipantEvidence { participant: ContinuitySubjectId },
+    #[error("participant state is UNKNOWN: {participant:?}")]
+    UnknownParticipantState { participant: ContinuitySubjectId },
+    #[error("exact local subject is not currently healthy in participant evidence: {participant:?}")]
+    LocalSubjectNotHealthy { participant: ContinuitySubjectId },
+    #[error("current unavailable count {unavailable} exceeds distributed budget {allowed}")]
+    AvailabilityBudgetExceeded { unavailable: u32, allowed: u32 },
+    #[error("current healthy count {observed} is below required minimum {required}")]
+    MinimumHealthyViolated { observed: u32, required: u32 },
+    #[error("current unavailable set violates a protected mutual-exclusion set")]
+    MutualExclusionViolated,
+    #[error("unexpected failure-domain evidence for policy {policy_id:?}")]
+    UnexpectedFailureDomainEvidence { policy_id: FailureDomainPolicyId },
+    #[error("duplicate failure-domain evidence for policy {policy_id:?}")]
+    DuplicateFailureDomainEvidence { policy_id: FailureDomainPolicyId },
+    #[error("failure-domain evidence incomplete: expected {expected}, observed {observed}")]
+    IncompleteFailureDomainEvidence { expected: usize, observed: usize },
+    #[error("missing failure-domain evidence for policy {policy_id:?}")]
+    MissingFailureDomainEvidence { policy_id: FailureDomainPolicyId },
+    #[error("failure-domain policy {policy_id:?} is not currently observed to match")]
+    FailureDomainNotCurrent { policy_id: FailureDomainPolicyId },
+    #[error("failure-domain policy {policy_id:?} has {observed} healthy domains below required {required}")]
+    FailureDomainFloorViolated {
+        policy_id: FailureDomainPolicyId,
+        observed: u32,
+        required: u32,
+    },
+    #[error("recovery evidence names a class outside the distributed budget")]
+    RecoveryClassOutsideBudget,
+    #[error("duplicate recovery evidence for the same recovery class")]
+    DuplicateRecoveryEvidence,
+    #[error("available recovery evidence is missing its exact path identity")]
+    AvailableRecoveryMissingIdentity,
+    #[error("no authenticated current independent recovery path is available")]
+    NoAvailableRecoveryPath,
+    #[error("authenticated {role} evidence is stale: age {age_ms} ms > {allowed_ms} ms")]
+    StaleEvidence {
+        role: &'static str,
+        age_ms: u64,
+        allowed_ms: u64,
+    },
+    #[error("authenticated {role} evidence is too far in the future: skew {skew_ms} ms > {allowed_ms} ms")]
+    EvidenceFromFuture {
+        role: &'static str,
+        skew_ms: u64,
+        allowed_ms: u64,
+    },
+    #[error("distributed currentness evidence set is empty")]
+    NoCurrentnessEvidence,
+    #[error("cross-evidence observation skew {observed_ms} ms exceeds allowed {allowed_ms} ms")]
+    CrossEvidenceSkewExceeded { observed_ms: u64, allowed_ms: u64 },
 }
