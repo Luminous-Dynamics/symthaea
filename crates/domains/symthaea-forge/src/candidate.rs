@@ -8,9 +8,7 @@
 //! exact `DiscoveryRun`.
 
 use crate::certificate::{CertificateError, ForgeCandidate};
-use crate::trace::{
-    validate_forge_trace_observations, ForgeTraceError, ForgeTraceEvent,
-};
+use crate::trace::{validate_forge_trace_observations, ForgeTraceError, ForgeTraceEvent};
 use symthaea_algorithms::discovery::{
     CandidateArtifact, CandidateArtifactKind, CandidateProposal, DiscoveryError, DiscoveryRun,
 };
@@ -47,12 +45,6 @@ pub enum ForgeProposalError {
     GenerationOverflow,
 }
 
-/// Convert one exact Forge survivor into a generic candidate proposal.
-///
-/// The baseline implementation is retained as the lineage parent. Forge's accepted mutation
-/// history becomes the ordered transformation trace. Intermediate generation winners are already
-/// cryptographically linked inside the Forge certificate by parent->child artifact identities, so
-/// they do not need to be fabricated as standalone registry implementations here.
 pub fn proposal_from_forge(
     run: &DiscoveryRun,
     algorithm: &AlgorithmRecord,
@@ -96,11 +88,7 @@ pub fn proposal_from_forge(
         vec![baseline_implementation.id.clone()],
         certificate.transformation_ids(),
     )?;
-    let artifact = CandidateArtifact::new(
-        CandidateArtifactKind::Other,
-        artifact_id,
-        source_ref,
-    )?;
+    let artifact = CandidateArtifact::new(CandidateArtifactKind::Other, artifact_id, source_ref)?;
 
     Ok(CandidateProposal::new_at_generation(
         run,
@@ -111,14 +99,6 @@ pub fn proposal_from_forge(
     )?)
 }
 
-/// Replay Forge's generator-local observation stream into a semantic, hash-chained ledger.
-///
-/// Forge trace events are intentionally not trusted as a ledger by themselves. First the Forge
-/// lifecycle validator proves every generated occurrence has exactly one terminal outcome and every
-/// `observation_id` resolves to an exact retained object. Then `DiscoveryLedger` rechecks run
-/// identity, generation/candidate budgets, event shape, ordering and terminal seal while
-/// reconstructing the semantic hash chain. Finally the observation store proves complete coverage
-/// for the resulting semantic ledger.
 pub fn ledger_from_forge_trace(
     run: &DiscoveryRun,
     trace: &[ForgeTraceEvent],
@@ -145,6 +125,7 @@ mod tests {
     use crate::certificate::{
         full_source_artifact_id, ForgeCertificate, GateEvidence, MutationRecord,
     };
+    use crate::trace::ForgeAttemptId;
     use symthaea_algorithms::discovery::{DiscoveryPolicy, SearchBudget};
     use symthaea_algorithms::ledger::DiscoveryEventKind;
     use symthaea_algorithms::observation::ObservationObject;
@@ -246,6 +227,15 @@ mod tests {
         (run, algorithm, baseline, candidate)
     }
 
+    fn attempt(candidate: &ForgeCandidate) -> ForgeAttemptId {
+        ForgeAttemptId::derive(
+            &candidate.certificate().baseline_artifact_id,
+            7,
+            0,
+            1,
+        )
+    }
+
     #[test]
     fn proposal_binds_baseline_candidate_and_ordered_transformations() {
         let (run, algorithm, baseline, candidate) = fixture();
@@ -301,17 +291,20 @@ mod tests {
     fn forge_trace_replays_only_with_complete_observation_store() {
         let (run, _, _, candidate) = fixture();
         let artifact = candidate.artifact_id().clone();
+        let attempt_id = attempt(&candidate);
         let generated = ObservationObject::utf8("forge.generated.v1", "generated").unwrap();
         let rejected = ObservationObject::utf8("forge.rejected.v1", "counterexample").unwrap();
         let completed = ObservationObject::utf8("forge.completed.v1", "complete").unwrap();
         let trace = vec![
             ForgeTraceEvent::candidate(
+                attempt_id.clone(),
                 1,
                 DiscoveryEventKind::CandidateGenerated,
                 artifact.clone(),
                 generated.id().clone(),
             ),
             ForgeTraceEvent::candidate(
+                attempt_id,
                 1,
                 DiscoveryEventKind::RejectedCorrectness,
                 artifact,
@@ -319,7 +312,8 @@ mod tests {
             ),
             ForgeTraceEvent::completed(completed.id().clone()),
         ];
-        let observations = ObservationStore::from_objects(vec![generated, rejected, completed]).unwrap();
+        let observations =
+            ObservationStore::from_objects(vec![generated, rejected, completed]).unwrap();
         let ledger = ledger_from_forge_trace(&run, &trace, &observations).unwrap();
         assert!(ledger.is_sealed());
         assert_eq!(ledger.len(), trace.len());
@@ -329,16 +323,19 @@ mod tests {
     #[test]
     fn missing_observation_blocks_semantic_replay() {
         let (run, _, _, candidate) = fixture();
+        let attempt_id = attempt(&candidate);
         let generated = ObservationObject::utf8("forge.generated.v1", "generated").unwrap();
         let completed = ObservationObject::utf8("forge.completed.v1", "complete").unwrap();
         let trace = vec![
             ForgeTraceEvent::candidate(
+                attempt_id.clone(),
                 1,
                 DiscoveryEventKind::CandidateGenerated,
                 candidate.artifact_id().clone(),
                 generated.id().clone(),
             ),
             ForgeTraceEvent::candidate(
+                attempt_id,
                 1,
                 DiscoveryEventKind::RejectedCorrectness,
                 candidate.artifact_id().clone(),
@@ -358,6 +355,7 @@ mod tests {
         let (run, _, _, candidate) = fixture();
         let generated = ObservationObject::utf8("forge.generated.v1", "generated").unwrap();
         let trace = vec![ForgeTraceEvent::candidate(
+            attempt(&candidate),
             1,
             DiscoveryEventKind::CandidateGenerated,
             candidate.artifact_id().clone(),
