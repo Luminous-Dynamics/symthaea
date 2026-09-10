@@ -112,11 +112,17 @@ class EnforcementLineageTests(unittest.TestCase):
         self.assertEqual(derive()["lineage_id"], derive()["lineage_id"])
 
     def test_v2_selector_is_independent(self):
-        with self.assertRaisesRegex(lineage.EnforcementLineageError, "V2 evidence bytes"):
+        with self.assertRaisesRegex(
+            lineage.EnforcementLineageError,
+            "enforcement_v2: bytes do not match independently selected identity",
+        ):
             derive(expected_v2_evidence_id="sha256:" + "0" * 64)
 
     def test_v3_selector_is_independent(self):
-        with self.assertRaisesRegex(lineage.EnforcementLineageError, "V3 evidence bytes"):
+        with self.assertRaisesRegex(
+            lineage.EnforcementLineageError,
+            "enforcement_v3: bytes do not match independently selected identity",
+        ):
             derive(expected_v3_evidence_id="sha256:" + "0" * 64)
 
     def test_v3_cannot_repoint_to_alternate_v2_even_when_rehashed(self):
