@@ -45,12 +45,17 @@ pub enum HistoricalSessionHandoffError {
     ObservationAfterSession,
     /// Provider history did not claim completeness through the observation.
     HistoryNotCovered,
-    /// Provider-history binding was empty, padded, or contained control characters.
+    /// Provider session-admission proof binding was malformed.
+    InvalidSessionAdmissionBinding,
+    /// Provider-history binding was malformed.
     InvalidHistoryBinding,
 }
 
 /// Non-serializable proof that an external authority provider historically qualified one exact
 /// immutable machine session through one exact observation instant.
+///
+/// Maritime core remains provider-neutral: it retains opaque bindings to both the provider's exact
+/// session-admission proof and exact authority-history proof without reproducing their cryptography.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HistoricallyQualifiedMachineSessionV1 {
     provider_schema: String,
@@ -61,6 +66,7 @@ pub struct HistoricallyQualifiedMachineSessionV1 {
     session_authenticated_at_ms: u64,
     session_expires_at_ms: u64,
     observation_at_ms: u64,
+    provider_session_admission_binding: String,
     provider_history_binding: String,
     history_head_sequence: u64,
     history_observed_through_ms: u64,
@@ -69,9 +75,9 @@ pub struct HistoricallyQualifiedMachineSessionV1 {
 impl HistoricallyQualifiedMachineSessionV1 {
     /// Cross a provider's already-verified historical authority result into maritime core.
     ///
-    /// Production callers must supply the exact provider-owned session/transcript evidence binding
-    /// carried by the historical result. Historical authority for another proof of the same
-    /// principal or timestamps is not interchangeable with this immutable session.
+    /// Production callers must supply the exact provider-owned session/transcript evidence binding,
+    /// opaque session-admission proof binding, and opaque history-head binding carried by the
+    /// verified provider result. These bindings are audit identity, not live authority tokens.
     #[allow(clippy::too_many_arguments)]
     pub fn from_verified_provider_result(
         session: &AuthenticatedMachineSession,
@@ -84,6 +90,7 @@ impl HistoricallyQualifiedMachineSessionV1 {
         session_authenticated_at_ms: u64,
         session_expires_at_ms: u64,
         observation_at_ms: u64,
+        provider_session_admission_binding: impl Into<String>,
         provider_history_binding: impl Into<String>,
         history_head_sequence: u64,
         history_observed_through_ms: u64,
@@ -107,6 +114,7 @@ impl HistoricallyQualifiedMachineSessionV1 {
         let session_id = session_id.into();
         let peer_identity_binding = peer_identity_binding.into();
         let session_evidence_binding = session_evidence_binding.into();
+        let provider_session_admission_binding = provider_session_admission_binding.into();
         let provider_history_binding = provider_history_binding.into();
 
         if provider_schema != session.schema() {
@@ -141,6 +149,9 @@ impl HistoricallyQualifiedMachineSessionV1 {
         if history_observed_through_ms < observation_at_ms {
             return Err(HistoricalSessionHandoffError::HistoryNotCovered);
         }
+        if !canonical_text(&provider_session_admission_binding) {
+            return Err(HistoricalSessionHandoffError::InvalidSessionAdmissionBinding);
+        }
         if !canonical_text(&provider_history_binding) {
             return Err(HistoricalSessionHandoffError::InvalidHistoryBinding);
         }
@@ -154,6 +165,7 @@ impl HistoricallyQualifiedMachineSessionV1 {
             session_authenticated_at_ms,
             session_expires_at_ms,
             observation_at_ms,
+            provider_session_admission_binding,
             provider_history_binding,
             history_head_sequence,
             history_observed_through_ms,
@@ -161,7 +173,7 @@ impl HistoricallyQualifiedMachineSessionV1 {
     }
 
     /// Test-only compatibility helper for internal observation fixtures. Production adapters cannot
-    /// use this shortcut; it copies the evidence binding from the already-constructed test session.
+    /// use this shortcut; it supplies a local fixture-only admission binding.
     #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_verified_provider(
@@ -188,6 +200,7 @@ impl HistoricallyQualifiedMachineSessionV1 {
             session_authenticated_at_ms,
             session_expires_at_ms,
             observation_at_ms,
+            "test-provider-session-admission-binding",
             provider_history_binding,
             0,
             history_observed_through_ms,
@@ -195,27 +208,64 @@ impl HistoricallyQualifiedMachineSessionV1 {
     }
 
     /// Session-evidence provider schema whose history was qualified.
-    pub fn provider_schema(&self) -> &str { &self.provider_schema }
+    pub fn provider_schema(&self) -> &str {
+        &self.provider_schema
+    }
+
     /// Non-secret provider session identifier qualified by history.
-    pub fn session_id(&self) -> &str { &self.session_id }
+    pub fn session_id(&self) -> &str {
+        &self.session_id
+    }
+
     /// Provider-owned binding to the exact authenticated machine principal.
-    pub fn peer_identity_binding(&self) -> &str { &self.peer_identity_binding }
+    pub fn peer_identity_binding(&self) -> &str {
+        &self.peer_identity_binding
+    }
+
     /// Provider-owned binding to the exact authenticated session/transcript evidence.
-    pub fn session_evidence_binding(&self) -> &str { &self.session_evidence_binding }
+    pub fn session_evidence_binding(&self) -> &str {
+        &self.session_evidence_binding
+    }
+
     /// Exact authority generation historically qualified by the provider.
-    pub const fn authority_epoch(&self) -> u64 { self.authority_epoch }
+    pub const fn authority_epoch(&self) -> u64 {
+        self.authority_epoch
+    }
+
     /// Exact session-admission instant historically qualified by the provider.
-    pub const fn session_authenticated_at_ms(&self) -> u64 { self.session_authenticated_at_ms }
+    pub const fn session_authenticated_at_ms(&self) -> u64 {
+        self.session_authenticated_at_ms
+    }
+
     /// Exact exclusive session-expiry instant historically qualified by the provider.
-    pub const fn session_expires_at_ms(&self) -> u64 { self.session_expires_at_ms }
+    pub const fn session_expires_at_ms(&self) -> u64 {
+        self.session_expires_at_ms
+    }
+
     /// Observation instant historically qualified by the provider.
-    pub const fn observation_at_ms(&self) -> u64 { self.observation_at_ms }
+    pub const fn observation_at_ms(&self) -> u64 {
+        self.observation_at_ms
+    }
+
+    /// Opaque binding to the exact provider-owned session-admission proof.
+    pub fn provider_session_admission_binding(&self) -> &str {
+        &self.provider_session_admission_binding
+    }
+
     /// Opaque binding to provider-owned verified history evidence.
-    pub fn provider_history_binding(&self) -> &str { &self.provider_history_binding }
+    pub fn provider_history_binding(&self) -> &str {
+        &self.provider_history_binding
+    }
+
     /// Monotonic provider history-head sequence that supported this qualification.
-    pub const fn history_head_sequence(&self) -> u64 { self.history_head_sequence }
+    pub const fn history_head_sequence(&self) -> u64 {
+        self.history_head_sequence
+    }
+
     /// Provider history's completeness horizon for this qualification.
-    pub const fn history_observed_through_ms(&self) -> u64 { self.history_observed_through_ms }
+    pub const fn history_observed_through_ms(&self) -> u64 {
+        self.history_observed_through_ms
+    }
 
     /// Whether this historical result names the exact immutable session and observation instant.
     pub fn matches_session_observation(
@@ -241,15 +291,27 @@ mod tests {
     const SCHEMA: &str = "xenia-verified-machine-session-evidence-v1";
     const PRINCIPAL: &str = "xenia-signing-identity-v1:blake3-256:abc";
     const SESSION_EVIDENCE: &str = "xenia-handshake-transcript-v1:blake3-256:def";
+    const ADMISSION: &str = "xenia-machine-session-admission-v1:blake3-256:abc";
+    const HISTORY: &str = "xenia-machine-authority-history-head-v1:blake3-256:def";
 
     fn session() -> AuthenticatedMachineSession {
         AuthenticatedMachineSession::from_verified_provider(
-            SCHEMA, "session-1", PRINCIPAL, 1_000, 2_000, 9, SESSION_EVIDENCE,
-        ).unwrap()
+            SCHEMA,
+            "session-1",
+            PRINCIPAL,
+            1_000,
+            2_000,
+            9,
+            SESSION_EVIDENCE,
+        )
+        .unwrap()
     }
 
     fn policy() -> MachineSessionPolicy<'static> {
-        MachineSessionPolicy { accepted_schemas: &[SCHEMA], max_validity_ms: 1_000 }
+        MachineSessionPolicy {
+            accepted_schemas: &[SCHEMA],
+            max_validity_ms: 1_000,
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -262,21 +324,43 @@ mod tests {
         authenticated_at_ms: u64,
         expires_at_ms: u64,
         observation_at_ms: u64,
+        admission_binding: &str,
         history_binding: &str,
         history_head_sequence: u64,
         observed_through_ms: u64,
     ) -> Result<HistoricallyQualifiedMachineSessionV1, HistoricalSessionHandoffError> {
         HistoricallyQualifiedMachineSessionV1::from_verified_provider_result(
-            &session(), policy(), provider_schema, session_id, principal, session_evidence, epoch,
-            authenticated_at_ms, expires_at_ms, observation_at_ms, history_binding,
-            history_head_sequence, observed_through_ms,
+            &session(),
+            policy(),
+            provider_schema,
+            session_id,
+            principal,
+            session_evidence,
+            epoch,
+            authenticated_at_ms,
+            expires_at_ms,
+            observation_at_ms,
+            admission_binding,
+            history_binding,
+            history_head_sequence,
+            observed_through_ms,
         )
     }
 
     fn qualify() -> Result<HistoricallyQualifiedMachineSessionV1, HistoricalSessionHandoffError> {
         handoff(
-            SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 1_500,
-            "xenia-machine-authority-history-head-v1:abc", 7, 1_600,
+            SCHEMA,
+            "session-1",
+            PRINCIPAL,
+            SESSION_EVIDENCE,
+            9,
+            1_000,
+            2_000,
+            1_500,
+            ADMISSION,
+            HISTORY,
+            7,
+            1_600,
         )
     }
 
@@ -285,25 +369,34 @@ mod tests {
         let qualified = qualify().unwrap();
         assert!(qualified.matches_session_observation(&session(), 1_500));
         assert_eq!(qualified.session_evidence_binding(), SESSION_EVIDENCE);
+        assert_eq!(qualified.provider_session_admission_binding(), ADMISSION);
+        assert_eq!(qualified.provider_history_binding(), HISTORY);
         assert_eq!(qualified.history_head_sequence(), 7);
         assert_eq!(qualified.history_observed_through_ms(), 1_600);
     }
 
     #[test]
     fn historical_handoff_cannot_bypass_local_schema_or_lifetime_policy() {
-        let unsupported = MachineSessionPolicy { accepted_schemas: &["other-provider-v1"], max_validity_ms: 1_000 };
+        let unsupported = MachineSessionPolicy {
+            accepted_schemas: &["other-provider-v1"],
+            max_validity_ms: 1_000,
+        };
         assert_eq!(
             HistoricallyQualifiedMachineSessionV1::from_verified_provider_result(
                 &session(), unsupported, SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9,
-                1_000, 2_000, 1_500, "history:abc", 0, 1_600,
+                1_000, 2_000, 1_500, ADMISSION, HISTORY, 0, 1_600,
             ),
             Err(HistoricalSessionHandoffError::UnsupportedProviderSchema)
         );
-        let too_short = MachineSessionPolicy { accepted_schemas: &[SCHEMA], max_validity_ms: 999 };
+
+        let too_short = MachineSessionPolicy {
+            accepted_schemas: &[SCHEMA],
+            max_validity_ms: 999,
+        };
         assert_eq!(
             HistoricallyQualifiedMachineSessionV1::from_verified_provider_result(
                 &session(), too_short, SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9,
-                1_000, 2_000, 1_500, "history:abc", 0, 1_600,
+                1_000, 2_000, 1_500, ADMISSION, HISTORY, 0, 1_600,
             ),
             Err(HistoricalSessionHandoffError::SessionValidityTooLong)
         );
@@ -311,16 +404,41 @@ mod tests {
 
     #[test]
     fn mismatched_identity_session_evidence_epoch_interval_or_observation_fail_closed() {
-        assert_eq!(handoff(SCHEMA, "session-1", "other-principal", SESSION_EVIDENCE, 9, 1_000, 2_000, 1_500, "history:abc", 0, 1_600), Err(HistoricalSessionHandoffError::IdentityMismatch));
-        assert_eq!(handoff(SCHEMA, "session-1", PRINCIPAL, "other-evidence", 9, 1_000, 2_000, 1_500, "history:abc", 0, 1_600), Err(HistoricalSessionHandoffError::SessionEvidenceMismatch));
-        assert_eq!(handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 10, 1_000, 2_000, 1_500, "history:abc", 0, 1_600), Err(HistoricalSessionHandoffError::AuthorityEpochMismatch));
-        assert_eq!(handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_001, 1_500, "history:abc", 0, 1_600), Err(HistoricalSessionHandoffError::SessionIntervalMismatch));
-        assert_eq!(handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 2_000, "history:abc", 0, 2_000), Err(HistoricalSessionHandoffError::ObservationAfterSession));
+        assert_eq!(
+            handoff(SCHEMA, "session-1", "other-principal", SESSION_EVIDENCE, 9, 1_000, 2_000, 1_500, ADMISSION, HISTORY, 0, 1_600),
+            Err(HistoricalSessionHandoffError::IdentityMismatch)
+        );
+        assert_eq!(
+            handoff(SCHEMA, "session-1", PRINCIPAL, "other-evidence", 9, 1_000, 2_000, 1_500, ADMISSION, HISTORY, 0, 1_600),
+            Err(HistoricalSessionHandoffError::SessionEvidenceMismatch)
+        );
+        assert_eq!(
+            handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 10, 1_000, 2_000, 1_500, ADMISSION, HISTORY, 0, 1_600),
+            Err(HistoricalSessionHandoffError::AuthorityEpochMismatch)
+        );
+        assert_eq!(
+            handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_001, 1_500, ADMISSION, HISTORY, 0, 1_600),
+            Err(HistoricalSessionHandoffError::SessionIntervalMismatch)
+        );
+        assert_eq!(
+            handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 2_000, ADMISSION, HISTORY, 0, 2_000),
+            Err(HistoricalSessionHandoffError::ObservationAfterSession)
+        );
     }
 
     #[test]
-    fn incomplete_history_or_bad_binding_fail_closed() {
-        assert_eq!(handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 1_500, "history:abc", 0, 1_499), Err(HistoricalSessionHandoffError::HistoryNotCovered));
-        assert_eq!(handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 1_500, " history:abc", 0, 1_600), Err(HistoricalSessionHandoffError::InvalidHistoryBinding));
+    fn malformed_provider_proof_bindings_fail_closed() {
+        assert_eq!(
+            handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 1_500, " admission", HISTORY, 0, 1_600),
+            Err(HistoricalSessionHandoffError::InvalidSessionAdmissionBinding)
+        );
+        assert_eq!(
+            handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 1_500, ADMISSION, " history", 0, 1_600),
+            Err(HistoricalSessionHandoffError::InvalidHistoryBinding)
+        );
+        assert_eq!(
+            handoff(SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 1_500, ADMISSION, HISTORY, 0, 1_499),
+            Err(HistoricalSessionHandoffError::HistoryNotCovered)
+        );
     }
 }
