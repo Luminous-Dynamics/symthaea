@@ -1,7 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Human-exoskeleton coupled impedance dynamics simulator.
-use crate::types::*;
+use crate::{
+    power::{PowerBus, PowerBusConfig},
+    types::*,
+};
 
 const G: f64 = 9.81;
 
@@ -14,6 +17,7 @@ pub trait ExoskeletonPhysicsSimulator {
 pub struct SimpleExoskeletonSimulator {
     state: ExoskeletonState,
     config: ExoskeletonConfig,
+    power_bus: PowerBus,
     inertias: [f64; NUM_JOINTS],
     joint_damping: [f64; NUM_JOINTS],
     segment_masses: [f64; NUM_JOINTS],
@@ -33,6 +37,14 @@ pub struct SimpleExoskeletonSimulator {
 
 impl SimpleExoskeletonSimulator {
     pub fn new() -> Self {
+        Self::with_power_config(PowerBusConfig::default())
+    }
+
+    /// Construct the reference simulator with an explicit aggregate power model.
+    ///
+    /// This is primarily useful for deterministic energy-budget experiments and
+    /// does not imply that the default or supplied values describe certified hardware.
+    pub fn with_power_config(power_config: PowerBusConfig) -> Self {
         let config = ExoskeletonConfig::default();
         let total = config.human_mass + config.exo_mass;
         Self {
@@ -56,6 +68,7 @@ impl SimpleExoskeletonSimulator {
             ],
             segment_lengths: [0.45, 0.43, 0.08, 0.45, 0.43, 0.08],
             config,
+            power_bus: PowerBus::new(power_config),
             rng_state: 42,
             gait_phase: 0.0,
             gait_frequency: 1.0,
@@ -67,6 +80,10 @@ impl SimpleExoskeletonSimulator {
 
     pub fn set_walking(&mut self, w: bool) {
         self.walking = w;
+    }
+
+    pub fn power_bus(&self) -> &PowerBus {
+        &self.power_bus
     }
 
     /// Disturbance-observer estimate of the human's joint torques (N·m).
@@ -138,11 +155,28 @@ impl ExoskeletonPhysicsSimulator for SimpleExoskeletonSimulator {
         // the exo applies toward the neutral posture (Tier 2.6, 2026-07).
         let k_imp = (cmd.stiffness_gain as f64).clamp(0.0, 1.0) * self.config.max_joint_stiffness;
         let d_imp = (cmd.damping_gain as f64).clamp(0.0, 1.0) * self.config.max_joint_damping;
+
+        // Compute desired exoskeleton torque before mutating dynamics so the
+        // finite electrical source can bound powered assistance coherently.
+        let mut desired_exo = [0.0; NUM_JOINTS];
         for i in 0..NUM_JOINTS {
             let exo_cmd = cmd.joint_torques[i] as f64 * self.config.max_torques[i];
             let impedance = -k_imp * (self.state.joint_angles[i] - self.neutral_pose[i])
                 - d_imp * self.state.joint_velocities[i];
-            let exo = exo_cmd + impedance;
+            desired_exo[i] = exo_cmd + impedance;
+        }
+        let requested_mechanical_power_w = desired_exo
+            .iter()
+            .zip(self.state.joint_velocities.iter())
+            .map(|(torque, velocity)| (torque * velocity).abs())
+            .sum();
+        let allocation = self
+            .power_bus
+            .allocate(requested_mechanical_power_w, 0.0, dt);
+        let powered_scale = allocation.actuator_scale;
+
+        for i in 0..NUM_JOINTS {
+            let exo = desired_exo[i] * powered_scale;
             self.state.human_torques[i] = human[i];
             self.state.exo_torques[i] = exo;
             let gravity = self.gravity_torque(i);
@@ -183,13 +217,14 @@ impl ExoskeletonPhysicsSimulator for SimpleExoskeletonSimulator {
                 self.gait_phase -= std::f64::consts::TAU;
             }
         }
-        self.state.battery_soc = (self.state.battery_soc - 0.00001 * dt).max(0.0);
+        self.state.battery_soc = self.power_bus.state_of_charge();
     }
     fn state(&self) -> &ExoskeletonState {
         &self.state
     }
     fn reset(&mut self) {
         self.state = ExoskeletonState::standing();
+        self.power_bus.reset_full();
         self.gait_phase = 0.0;
         self.rng_state = 42;
         self.intent_estimate = [0.0; NUM_JOINTS];
@@ -304,6 +339,40 @@ mod tests {
             rate > 0.9,
             "intent estimate must track human torque sign: {rate:.3} agreement"
         );
+    }
+
+    #[test]
+    fn battery_draw_is_coupled_to_power_bus() {
+        let mut sim = SimpleExoskeletonSimulator::new();
+        let start = sim.power_bus().remaining_energy_j();
+        for _ in 0..100 {
+            sim.step(&ExoskeletonCommand::zero(), 0.005);
+        }
+        assert!(sim.power_bus().remaining_energy_j() < start);
+        assert_eq!(sim.state().battery_soc, sim.power_bus().state_of_charge());
+    }
+
+    #[test]
+    fn depleted_bus_removes_powered_assistance_without_removing_human_torque() {
+        let power = PowerBusConfig {
+            capacity_j: 0.001,
+            idle_power_w: 100.0,
+            control_power_w: 0.0,
+            actuator_efficiency: 1.0,
+            max_continuous_power_w: 100.0,
+        };
+        let mut sim = SimpleExoskeletonSimulator::with_power_config(power);
+        sim.set_walking(false);
+        let cmd = ExoskeletonCommand {
+            joint_torques: [1.0; NUM_ACTUATORS],
+            stiffness_gain: 1.0,
+            damping_gain: 1.0,
+        };
+        sim.step(&cmd, 0.005);
+        assert_eq!(sim.power_bus().state_of_charge(), 0.0);
+        sim.step(&cmd, 0.005);
+        assert!(sim.state().exo_torques.iter().all(|torque| *torque == 0.0));
+        assert!(sim.state().human_torques.iter().any(|torque| *torque != 0.0));
     }
 
     mod proptest_physics {
