@@ -2,8 +2,10 @@
 //! Convenience imports for maritime platform adapters.
 
 pub use crate::{
-    AuthorityContext, AuthorityLease, ComponentHealth, DependencyState, DockingObservation,
-    DockingPhase, FailureObservation, FleetAssuranceReport, FleetMemberReport, HealthSeverity,
+    AuthorityContext, AuthorityLease, BayBoundary, BayBoundaryDecision, BayBoundaryGateContext,
+    BayBoundaryRefusal, BayMediumState, BayOccupancy, BayPressureQualification, BoundaryPosition,
+    ComponentHealth, DependencyState, DockingObservation, DockingPhase, FailureObservation,
+    FleetAssuranceReport, FleetMemberReport, HealthSeverity, MaritimeBayObservation,
     MaritimeCapability, MaritimeOperatingMode, MaritimePlatformKind, MaritimeResourceEnvelope,
     MaritimeResourceRequest, MaritimeServiceContract, MaritimeServiceKind, MaritimeState,
     NavigationQuality, OperatingEnvelope, OperatingModeContext, OperatingModeDecision,
@@ -12,5 +14,6 @@ pub use crate::{
     ReleaseRefusal, ResidualUtilitySnapshot, ResourceAllocationProjection, ResourceDecision,
     ResourceGateContext, ResourcePriority, ResourceRefusal, ServiceGateContext,
     ServiceStartDecision, ServiceStartRefusal, UtilityAvailability, baseline_envelope,
-    evaluate_operating_mode, evaluate_release, evaluate_resource_request, evaluate_service_start,
+    evaluate_bay_boundary_open, evaluate_operating_mode, evaluate_release, evaluate_resource_request,
+    evaluate_service_start,
 };
