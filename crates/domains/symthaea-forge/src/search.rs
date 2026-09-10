@@ -136,7 +136,7 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
             };
             let candidate_source = render_file(&file);
 
-            let staged = sandbox.stage(&config.target_file)?;
+            let mut staged = sandbox.stage(&config.target_file)?;
             staged.write(&candidate_source)?;
             let gates = run_correctness_gates(&target());
             let all_passed = gates.iter().all(|gate| gate.passed);
