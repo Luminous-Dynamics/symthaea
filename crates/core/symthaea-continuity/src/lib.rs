@@ -24,6 +24,7 @@ pub mod execution_capability;
 pub mod execution_journal;
 pub mod execution_result;
 pub mod failure_domain;
+pub mod known_good;
 pub mod observation;
 pub mod post_execution_health;
 pub mod post_execution_observation;
@@ -109,6 +110,11 @@ pub use failure_domain::{
     FAILURE_DOMAIN_POLICY_SCHEMA_V1, FailureDomainGroupV1, FailureDomainKindV1,
     FailureDomainPolicyError, FailureDomainPolicyId, FailureDomainPolicyV1,
     ValidatedFailureDomainPolicyV1,
+};
+pub use known_good::{
+    KNOWN_GOOD_CHECKPOINT_RECORD_SCHEMA_V1, KnownGoodCheckpointError,
+    KnownGoodCheckpointId, KnownGoodCheckpointRecordV1, KnownGoodRecoveryPathV1,
+    QualifiedKnownGoodCheckpointV1,
 };
 pub use observation::{
     DependencyBasis, DependencyClaimId, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
