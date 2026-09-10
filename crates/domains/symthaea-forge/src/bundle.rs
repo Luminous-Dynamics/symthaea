@@ -14,6 +14,7 @@ use thiserror::Error;
 
 pub const MANIFEST_FILE: &str = "bundle-manifest.json";
 pub const TRACE_FILE: &str = "search-trace.json";
+pub const OBSERVATIONS_FILE: &str = "observations.json";
 pub const CANDIDATE_FILE: &str = "candidate.rs";
 pub const CERTIFICATE_FILE: &str = "certificate.json";
 pub const REPORT_FILE: &str = "report.md";
@@ -51,8 +52,14 @@ impl ForgeBundleOutcome {
 
     pub fn required_files(self) -> &'static [&'static str] {
         match self {
-            Self::Winner => &[TRACE_FILE, CANDIDATE_FILE, CERTIFICATE_FILE, REPORT_FILE],
-            Self::NoWinner => &[TRACE_FILE],
+            Self::Winner => &[
+                TRACE_FILE,
+                OBSERVATIONS_FILE,
+                CANDIDATE_FILE,
+                CERTIFICATE_FILE,
+                REPORT_FILE,
+            ],
+            Self::NoWinner => &[TRACE_FILE, OBSERVATIONS_FILE],
         }
     }
 }
@@ -74,7 +81,8 @@ impl ForgeBundleFile {
             path: path.display().to_string(),
             detail: error.to_string(),
         })?;
-        let byte_len = u64::try_from(bytes.len()).map_err(|_| BundleError::FileMismatch(name.into()))?;
+        let byte_len = u64::try_from(bytes.len())
+            .map_err(|_| BundleError::FileMismatch(name.into()))?;
         let content_id = ContentId::derive(
             "symthaea.forge-output-file.v1",
             [name.as_bytes(), bytes.as_slice()],
@@ -191,12 +199,12 @@ mod tests {
     }
 
     #[test]
-    fn no_winner_manifest_requires_only_trace() {
+    fn no_winner_manifest_requires_trace_and_observations() {
         let root = temp_dir("no-winner");
         fs::write(root.join(TRACE_FILE), b"[]").unwrap();
+        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
         let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::NoWinner).unwrap();
-        assert_eq!(manifest.files.len(), 1);
-        assert_eq!(manifest.files[0].name, TRACE_FILE);
+        assert_eq!(manifest.files.len(), 2);
         assert!(manifest.validate_at(&root).is_ok());
         let _ = fs::remove_dir_all(root);
     }
@@ -206,6 +214,7 @@ mod tests {
         let root = temp_dir("winner");
         for (name, bytes) in [
             (TRACE_FILE, b"[]".as_slice()),
+            (OBSERVATIONS_FILE, b"[]".as_slice()),
             (CANDIDATE_FILE, b"fn f() {}".as_slice()),
             (CERTIFICATE_FILE, b"{}".as_slice()),
             (REPORT_FILE, b"report".as_slice()),
@@ -213,7 +222,7 @@ mod tests {
             fs::write(root.join(name), bytes).unwrap();
         }
         let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::Winner).unwrap();
-        assert_eq!(manifest.files.len(), 4);
+        assert_eq!(manifest.files.len(), 5);
         assert!(manifest.validate_at(&root).is_ok());
         let _ = fs::remove_dir_all(root);
     }
@@ -222,6 +231,7 @@ mod tests {
     fn post_manifest_file_change_is_detected() {
         let root = temp_dir("mutation");
         fs::write(root.join(TRACE_FILE), b"before").unwrap();
+        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
         let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::NoWinner).unwrap();
         fs::write(root.join(TRACE_FILE), b"after").unwrap();
         assert!(matches!(
