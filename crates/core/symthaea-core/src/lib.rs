@@ -78,6 +78,8 @@ pub mod embodiment_evidence;
 pub mod embodiment_evidence_provider;
 /// Transport-delivery evidence kept distinct from physical execution evidence.
 pub mod embodiment_transport;
+/// Correlated timestamped transport traces with explicit clock-domain semantics.
+pub mod embodiment_transport_trace;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
