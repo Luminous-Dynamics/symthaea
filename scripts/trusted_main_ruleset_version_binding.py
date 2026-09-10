@@ -77,44 +77,17 @@ def _sha256(value: Any, *, where: str) -> str:
     return value
 
 
-def _positive_int(value: Any, *, where: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise RulesetVersionBindingError(f"{where}: positive integer required")
-    return value
-
-
 def _validate_enforcement(value: Any, *, expected_id: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise RulesetVersionBindingError("enforcement_v3: object required")
-    required = {
-        "schema", "repository", "repository_id", "target_ref", "root_sha", "ruleset_id",
-        "policy_id", "structural_verification_id", "effective_rules_verification_id",
-        "root_subject_id", "trusted_enforcement_selection_id", "selected_rule_suite_ids",
-        "selected_rule_suite_observation_ids", "selected_actor_id", "v2_evidence_id",
-        "disposition", "bypass_assurance", "evidence_selection_basis", "evidence_authority",
-        "chronology_authority", "current_admission", "receipt_attestation",
-        "scientific_authority", "evidence_id",
-    }
-    if set(value) != required or value.get("schema") != enforcement_v3.SCHEMA:
-        raise RulesetVersionBindingError("enforcement_v3: closed supported theorem schema required")
-    if value["disposition"] != "EnforcementBehaviorallyCorroborated":
-        raise RulesetVersionBindingError("enforcement_v3: positive behavioral disposition required")
+    try:
+        result = enforcement_v3.validate_enforcement_evidence_v3(value)
+    except enforcement_v3.EnforcementEvidenceV3Error as exc:
+        raise RulesetVersionBindingError(f"enforcement_v3: revalidation failed: {exc}") from exc
     expected = _sha256(expected_id, where="expected_enforcement_evidence_id")
-    observed = _sha256(value["evidence_id"], where="enforcement_v3.evidence_id")
-    payload = dict(value)
-    del payload["evidence_id"]
-    if enforcement_v3._content_id(enforcement_v3.DOMAIN, payload) != observed:
-        raise RulesetVersionBindingError("enforcement_v3: content identity mismatch")
-    if observed != expected:
-        raise RulesetVersionBindingError("enforcement_v3: bytes do not match independently selected identity")
-    for field in ("selected_rule_suite_ids", "selected_rule_suite_observation_ids"):
-        mapping = value[field]
-        if not isinstance(mapping, dict) or set(mapping) != set(OPERATIONS):
-            raise RulesetVersionBindingError(f"enforcement_v3.{field}: exact operation set required")
-    for operation in OPERATIONS:
-        _positive_int(value["selected_rule_suite_ids"][operation], where=f"selected_rule_suite_ids.{operation}")
-        _sha256(value["selected_rule_suite_observation_ids"][operation], where=f"selected_rule_suite_observation_ids.{operation}")
-    return value
+    if result["evidence_id"] != expected:
+        raise RulesetVersionBindingError(
+            "enforcement_v3: bytes do not match independently selected identity"
+        )
+    return result
 
 
 def _reverify_version_state(value: Any, policy: Any, *, expected_id: str) -> dict[str, Any]:
@@ -175,7 +148,9 @@ def _validate_observations(value: Any, enforcement: dict[str, Any]) -> dict[str,
         if observation["ruleset_id"] != enforcement["ruleset_id"]:
             raise RulesetVersionBindingError(f"{operation}: ruleset ID mismatch")
         try:
-            instant = provider_time.parse_github_utc_instant(observation["pushed_at"], where=f"{operation}.pushed_at")
+            instant = provider_time.parse_github_utc_instant(
+                observation["pushed_at"], where=f"{operation}.pushed_at"
+            )
         except provider_time.ProviderTimeError as exc:
             raise RulesetVersionBindingError(str(exc)) from exc
         normalized[operation] = {
@@ -199,15 +174,21 @@ def derive_version_binding(
 ) -> dict[str, Any]:
     normalized_policy = p0.normalize_policy(policy)
     policy_id = p0.policy_id(normalized_policy)
-    enforcement = _validate_enforcement(enforcement_evidence_v3, expected_id=expected_enforcement_evidence_id)
-    version_state = _reverify_version_state(selected_version_state, policy, expected_id=expected_version_state_id)
+    enforcement = _validate_enforcement(
+        enforcement_evidence_v3, expected_id=expected_enforcement_evidence_id
+    )
+    version_state = _reverify_version_state(
+        selected_version_state, policy, expected_id=expected_version_state_id
+    )
     try:
         verified_history = history.validate_verified_history(history_verification)
     except history.RulesetHistoryError as exc:
         raise RulesetVersionBindingError(f"history_verification: {exc}") from exc
     expected_history = _sha256(expected_history_id, where="expected_history_id")
     if verified_history["history_id"] != expected_history:
-        raise RulesetVersionBindingError("history_verification: bytes do not match independently selected identity")
+        raise RulesetVersionBindingError(
+            "history_verification: bytes do not match independently selected identity"
+        )
 
     for label, artifact in (
         ("enforcement_v3", enforcement),
@@ -216,28 +197,56 @@ def derive_version_binding(
     ):
         if artifact["policy_id"] != policy_id:
             raise RulesetVersionBindingError(f"{label}: policy identity mismatch")
-        if artifact["repository"] != normalized_policy["repository"] or artifact["repository_id"] != normalized_policy["repository_id"]:
+        if (
+            artifact["repository"] != normalized_policy["repository"]
+            or artifact["repository_id"] != normalized_policy["repository_id"]
+        ):
             raise RulesetVersionBindingError(f"{label}: repository identity mismatch")
         if artifact["target_ref"] != normalized_policy["target_ref"]:
             raise RulesetVersionBindingError(f"{label}: target ref mismatch")
-    if not (enforcement["ruleset_id"] == version_state["ruleset_id"] == verified_history["ruleset_id"]):
+    if not (
+        enforcement["ruleset_id"]
+        == version_state["ruleset_id"]
+        == verified_history["ruleset_id"]
+    ):
         raise RulesetVersionBindingError("ruleset identity mismatch across composed artifacts")
+
+    expected_bypass_assurance = (
+        "no-configured-p0-bypass-and-distinct-non-bypass-failures-observed"
+        if normalized_policy["allowed_bypass_actors"] == []
+        else "not-fully-established"
+    )
+    if enforcement["bypass_assurance"] != expected_bypass_assurance:
+        raise RulesetVersionBindingError(
+            "enforcement_v3: bypass assurance is inconsistent with selected P0 policy"
+        )
 
     observations = _validate_observations(selected_observations, enforcement)
     versions = verified_history["versions"]
-    matches = [i for i, entry in enumerate(versions) if entry["version_id"] == version_state["version_id"]]
+    matches = [
+        i for i, entry in enumerate(versions)
+        if entry["version_id"] == version_state["version_id"]
+    ]
     if len(matches) != 1:
         raise RulesetVersionBindingError("selected version_id is absent or non-unique in complete history")
     selected_index = matches[0]
     if selected_index == 0:
-        raise RulesetVersionBindingError("selected version has no predecessor boundary; closed interval not established")
+        raise RulesetVersionBindingError(
+            "selected version has no predecessor boundary; closed interval not established"
+        )
     if selected_index + 1 >= len(versions):
-        raise RulesetVersionBindingError("selected version has no successor boundary; closed interval not established")
+        raise RulesetVersionBindingError(
+            "selected version has no successor boundary; closed interval not established"
+        )
 
     selected_summary = versions[selected_index]
-    for field in ("provider_updated_at", "provider_unix_nanos", "provider_actor_id", "provider_actor_type"):
+    for field in (
+        "provider_updated_at", "provider_unix_nanos", "provider_actor_id", "provider_actor_type"
+    ):
         if selected_summary[field] != version_state[field]:
-            raise RulesetVersionBindingError(f"selected version history summary does not match exact version state: {field}")
+            raise RulesetVersionBindingError(
+                f"selected version history summary does not match exact version state: {field}"
+            )
     predecessor = versions[selected_index - 1]
     successor = versions[selected_index + 1]
 
@@ -246,7 +255,9 @@ def derive_version_binding(
         attempt_nanos = observations[operation]["provider_unix_nanos"]
         eligible = [entry for entry in versions if entry["provider_unix_nanos"] <= attempt_nanos]
         if not eligible:
-            raise RulesetVersionBindingError(f"{operation}: attempt predates first observed ruleset version")
+            raise RulesetVersionBindingError(
+                f"{operation}: attempt predates first observed ruleset version"
+            )
         resolved = eligible[-1]
         if resolved["version_id"] != version_state["version_id"]:
             raise RulesetVersionBindingError(
