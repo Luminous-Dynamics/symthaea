@@ -1,0 +1,75 @@
+# One-shot Rust 1.96 formatting repair for the exact capability provenance source.
+# It may modify only capability_analysis_provenance.rs, then deletes itself.
+
+name: Capability Provenance Rustfmt Once
+
+on:
+  push:
+    branches:
+      - ci/capability-algorithm-provenance-exact-head-v1
+    paths:
+      - .github/workflows/capability-provenance-rustfmt-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-once:
+    name: Format capability provenance source once
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ci/capability-algorithm-provenance-exact-head-v1
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install repository-pinned Rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Format exact provenance source and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          target='crates/core/symthaea-continuity/src/capability_analysis_provenance.rs'
+          before_sha="$(sha256sum "$target" | awk '{print $1}')"
+          rustfmt --edition 2024 "$target"
+          after_sha="$(sha256sum "$target" | awk '{print $1}')"
+          test "$before_sha" != "$after_sha"
+          rustfmt --edition 2024 --check "$target"
+
+          mapfile -t changed < <(git diff --name-only)
+          if [[ "${#changed[@]}" -ne 1 || "${changed[0]}" != "$target" ]]; then
+            echo "error: rustfmt changed unexpected tracked paths" >&2
+            printf '%s\n' "${changed[@]}" >&2
+            exit 1
+          fi
+
+          git add "$target"
+          rm .github/workflows/capability-provenance-rustfmt-once.yml
+          git add .github/workflows/capability-provenance-rustfmt-once.yml
+
+          mapfile -t staged < <(git diff --cached --name-only)
+          if [[ "${#staged[@]}" -ne 2 ]]; then
+            echo "error: unexpected staged path count" >&2
+            printf '%s\n' "${staged[@]}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${staged[@]}" | grep -Fxq "$target"
+          printf '%s\n' "${staged[@]}" | grep -Fxq .github/workflows/capability-provenance-rustfmt-once.yml
+          git diff --cached --check
+
+          git commit -m "style(continuity): format capability provenance source"
+          git push origin HEAD:ci/capability-algorithm-provenance-exact-head-v1
