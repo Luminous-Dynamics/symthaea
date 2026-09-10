@@ -1,15 +1,18 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Behavior-preserving bridge from the live Forge mutator to proposal-exposure evidence.
+//! Behavior-preserving proposal-evidence binding.
 //!
-//! The mutator owns proposal mechanics. This module does not resample or reconstruct a choice from
-//! RNG state; it validates and converts the exact [`crate::mutations::RecordedMutation`] emitted by
-//! that proposal into the typed [`crate::proposal_exposure::ForgeProposalExposure`] contract.
+//! The live mutator owns proposal mechanics. Generator-local raw records preserve that exact draw;
+//! this module is the only semantic bridge from those records into `ForgeProposalExposure`.
+//! Binding performs no RNG operations and never reapplies a mutation.
 
 use crate::mutations::{Mutator, RecordedMutation};
 use crate::proposal_exposure::{
     ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
     ForgeProposalExposureError, ForgeProposalPolicy, ForgeProposalSelection,
+};
+use crate::proposal_trace::{
+    ForgeRawProposalDecision, ForgeRawProposalError, ForgeRawProposalRecord,
 };
 use crate::trace::ForgeAttemptId;
 use symthaea_algorithms::discovery::{DiscoveryError, DiscoveryRun};
@@ -22,20 +25,16 @@ pub enum ForgeProposalRecordingError {
     Discovery(#[from] DiscoveryError),
     #[error(transparent)]
     Exposure(#[from] ForgeProposalExposureError),
+    #[error(transparent)]
+    Raw(#[from] ForgeRawProposalError),
     #[error("proposal policy generator does not match the semantic DiscoveryRun generator")]
     PolicyRunMismatch,
     #[error("Forge attempt does not belong to the semantic DiscoveryRun seed/generation budget")]
     AttemptRunMismatch,
-    #[error("recorded mutator opportunity order does not match the frozen proposal policy")]
+    #[error("raw proposal opportunity order does not match the frozen semantic policy")]
     OpportunityOrderMismatch,
-    #[error("recorded mutator opportunity count cannot be represented in the exposure contract")]
-    OpportunityCountOverflow,
-    #[error("recorded mutator total does not equal the checked opportunity sum")]
-    OpportunityTotalMismatch,
-    #[error("recorded mutator selection is inconsistent with its opportunity set")]
+    #[error("raw proposal selected registration slot does not match the frozen semantic policy")]
     SelectionMismatch,
-    #[error("recorded mutation operator does not equal the operator selected by the proposal draw")]
-    MutationOperatorMismatch,
 }
 
 /// Build the exact `UniformEligibleSiteV1` policy corresponding to this mutator's registered
@@ -51,11 +50,10 @@ pub fn proposal_policy_for_mutator(
     )?)
 }
 
-/// Convert one already-executed mutator draw into a typed proposal-exposure record.
+/// Convenience path for an in-memory live draw.
 ///
-/// This function performs no RNG operations and never reapplies a mutation. The exact live draw is
-/// accepted only if its ordered opportunities, total, selected pair and optional mutation operator
-/// agree with the supplied generator-scoped policy.
+/// The live draw is first frozen as a generator-local raw record; semantic binding then follows the
+/// same path used by persisted/reloaded evidence. There is intentionally one semantic converter.
 pub fn exposure_from_recorded_mutation(
     run: &DiscoveryRun,
     attempt_id: ForgeAttemptId,
@@ -63,91 +61,87 @@ pub fn exposure_from_recorded_mutation(
     policy: &ForgeProposalPolicy,
     recorded: &RecordedMutation,
 ) -> Result<ForgeProposalExposure, ForgeProposalRecordingError> {
+    let raw = ForgeRawProposalRecord::from_recorded(attempt_id, parent_artifact_id, recorded)?;
+    exposure_from_raw_record(run, policy, &raw)
+}
+
+/// Bind one self-validating generator-local proposal record to a semantic discovery run/policy.
+///
+/// A raw record may faithfully describe generator behavior that this v1 family policy cannot
+/// represent (for example duplicate operator-family registrations). Such evidence is retained but
+/// fails semantic qualification rather than being rewritten.
+pub fn exposure_from_raw_record(
+    run: &DiscoveryRun,
+    policy: &ForgeProposalPolicy,
+    raw: &ForgeRawProposalRecord,
+) -> Result<ForgeProposalExposure, ForgeProposalRecordingError> {
     run.validate()?;
     policy.validate()?;
+    raw.validate()?;
+
     if policy.generator_id() != &run.generator_id {
         return Err(ForgeProposalRecordingError::PolicyRunMismatch);
     }
-    if attempt_id.seed() != run.seed || attempt_id.generation() >= run.budget.max_generations {
+    let attempt = raw.attempt_id();
+    if attempt.seed() != run.seed || attempt.generation() >= run.budget.max_generations {
         return Err(ForgeProposalRecordingError::AttemptRunMismatch);
     }
-    if recorded.opportunities.len() != policy.families().len() {
+    if raw.opportunities().len() != policy.families().len() {
         return Err(ForgeProposalRecordingError::OpportunityOrderMismatch);
     }
 
-    let mut opportunities = Vec::with_capacity(recorded.opportunities.len());
-    let mut checked_total = 0u64;
-    for (recorded_opportunity, family) in recorded.opportunities.iter().zip(policy.families()) {
-        if recorded_opportunity.operator != family.operator() {
-            return Err(ForgeProposalRecordingError::OpportunityOrderMismatch);
-        }
-        let eligible_sites = u64::try_from(recorded_opportunity.eligible_sites)
-            .map_err(|_| ForgeProposalRecordingError::OpportunityCountOverflow)?;
-        checked_total = checked_total
-            .checked_add(eligible_sites)
-            .ok_or(ForgeProposalRecordingError::OpportunityCountOverflow)?;
-        opportunities.push(ForgeFamilyOpportunity::new(family.clone(), eligible_sites));
-    }
-
-    let recorded_total = u64::try_from(recorded.total_eligible_sites)
-        .map_err(|_| ForgeProposalRecordingError::OpportunityCountOverflow)?;
-    if checked_total != recorded_total {
-        return Err(ForgeProposalRecordingError::OpportunityTotalMismatch);
-    }
-
-    let decision = match &recorded.selection {
-        None => {
-            if recorded_total != 0 || recorded.mutation.is_some() {
-                return Err(ForgeProposalRecordingError::SelectionMismatch);
-            }
-            ForgeProposalDecision::NoEligibleSites
-        }
-        Some(selection) => {
-            if recorded_total == 0 {
-                return Err(ForgeProposalRecordingError::SelectionMismatch);
-            }
-            let recorded_opportunity = recorded
-                .opportunities
-                .get(selection.operator_index)
-                .ok_or(ForgeProposalRecordingError::SelectionMismatch)?;
-            if recorded_opportunity.operator != selection.operator {
-                return Err(ForgeProposalRecordingError::SelectionMismatch);
-            }
-            if recorded
-                .mutation
-                .as_ref()
-                .is_some_and(|mutation| mutation.operator != selection.operator)
+    let opportunities = raw
+        .opportunities()
+        .iter()
+        .zip(policy.families())
+        .enumerate()
+        .map(|(index, (raw_opportunity, family))| {
+            let expected_index = u64::try_from(index)
+                .map_err(|_| ForgeProposalRecordingError::OpportunityOrderMismatch)?;
+            if raw_opportunity.operator_index() != expected_index
+                || raw_opportunity.operator() != family.operator()
             {
-                return Err(ForgeProposalRecordingError::MutationOperatorMismatch);
+                return Err(ForgeProposalRecordingError::OpportunityOrderMismatch);
             }
+            Ok(ForgeFamilyOpportunity::new(
+                family.clone(),
+                raw_opportunity.eligible_sites(),
+            ))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let decision = match raw.decision() {
+        ForgeRawProposalDecision::NoEligibleSites => ForgeProposalDecision::NoEligibleSites,
+        ForgeRawProposalDecision::Selected { selection } => {
+            let index = usize::try_from(selection.operator_index())
+                .map_err(|_| ForgeProposalRecordingError::SelectionMismatch)?;
             let family = policy
                 .families()
-                .get(selection.operator_index)
-                .ok_or(ForgeProposalRecordingError::SelectionMismatch)?
-                .clone();
-            if family.operator() != selection.operator {
+                .get(index)
+                .ok_or(ForgeProposalRecordingError::SelectionMismatch)?;
+            if family.operator() != selection.operator() {
                 return Err(ForgeProposalRecordingError::SelectionMismatch);
             }
-            let site_index = u64::try_from(selection.site_index)
-                .map_err(|_| ForgeProposalRecordingError::OpportunityCountOverflow)?;
-            let global_pair_index = u64::try_from(selection.global_pair_index)
-                .map_err(|_| ForgeProposalRecordingError::OpportunityCountOverflow)?;
             ForgeProposalDecision::Selected(ForgeProposalSelection::new(
-                family,
-                site_index,
-                global_pair_index,
+                family.clone(),
+                selection.site_index(),
+                selection.global_pair_index(),
             ))
         }
     };
 
-    Ok(ForgeProposalExposure::new(
+    let exposure = ForgeProposalExposure::new(
         run.id.clone(),
-        attempt_id,
-        parent_artifact_id,
+        raw.attempt_id().clone(),
+        raw.parent_artifact_id().clone(),
         policy.clone(),
         opportunities,
         decision,
-    )?)
+    )?;
+    if exposure.total_eligible_sites() != raw.total_eligible_sites() {
+        return Err(ForgeProposalRecordingError::OpportunityOrderMismatch);
+    }
+    Ok(exposure)
 }
 
 #[cfg(test)]
@@ -192,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn live_recorded_draw_converts_without_resampling() {
+    fn live_and_raw_semantic_binding_are_identical() {
         let run = run();
         let mutator = Mutator::default();
         let policy = proposal_policy_for_mutator(&run, &mutator).unwrap();
@@ -202,36 +196,37 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(41);
         let recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
 
-        let exposure = exposure_from_recorded_mutation(
+        let direct = exposure_from_recorded_mutation(
             &run,
-            attempt,
-            baseline,
+            attempt.clone(),
+            baseline.clone(),
             &policy,
             &recorded,
         )
         .unwrap();
+        let raw = ForgeRawProposalRecord::from_recorded(attempt, baseline, &recorded).unwrap();
+        let rebound = exposure_from_raw_record(&run, &policy, &raw).unwrap();
+        assert_eq!(direct, rebound);
+    }
 
+    #[test]
+    fn persisted_raw_round_trip_preserves_semantic_exposure() {
+        let run = run();
+        let mutator = Mutator::default();
+        let policy = proposal_policy_for_mutator(&run, &mutator).unwrap();
+        let baseline = full_source_artifact_id("fn f(x: i32) -> bool { x < 5 }\n");
+        let attempt = ForgeAttemptId::derive(&baseline, run.seed, 0, 0);
+        let mut body = parse_body("fn f(x: i32, y: i32) -> bool { x < 5 && y + 2 > 9 }");
+        let mut rng = StdRng::seed_from_u64(53);
+        let recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
+        let raw = ForgeRawProposalRecord::from_recorded(attempt, baseline, &recorded).unwrap();
+        let bytes = serde_json::to_vec(&raw).unwrap();
+        let decoded: ForgeRawProposalRecord = serde_json::from_slice(&bytes).unwrap();
+        decoded.validate().unwrap();
         assert_eq!(
-            exposure.total_eligible_sites(),
-            u64::try_from(recorded.total_eligible_sites).unwrap()
+            exposure_from_raw_record(&run, &policy, &raw).unwrap(),
+            exposure_from_raw_record(&run, &policy, &decoded).unwrap()
         );
-        assert_eq!(exposure.opportunities().len(), recorded.opportunities.len());
-        match (exposure.decision(), recorded.selection.as_ref()) {
-            (ForgeProposalDecision::Selected(observed), Some(recorded_selection)) => {
-                assert_eq!(
-                    observed.family_id(),
-                    &policy.families()[recorded_selection.operator_index]
-                );
-                assert_eq!(observed.family_id().operator(), recorded_selection.operator);
-                assert_eq!(observed.site_index(), recorded_selection.site_index as u64);
-                assert_eq!(
-                    observed.global_pair_index(),
-                    recorded_selection.global_pair_index as u64
-                );
-            }
-            (ForgeProposalDecision::NoEligibleSites, None) => {}
-            _ => panic!("typed exposure must preserve the live mutator decision"),
-        }
     }
 
     #[test]
@@ -244,9 +239,6 @@ mod tests {
         let mut body = parse_body("fn f() -> i64 { 0 }");
         let mut rng = StdRng::seed_from_u64(7);
         let recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
-        assert!(recorded.selection.is_some());
-        assert!(recorded.mutation.is_none());
-
         let exposure = exposure_from_recorded_mutation(
             &run,
             attempt,
@@ -259,32 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn tampered_operator_slot_fails_closed() {
-        let run = run();
-        let mutator = Mutator::default();
-        let policy = proposal_policy_for_mutator(&run, &mutator).unwrap();
-        let baseline = full_source_artifact_id("fn f(x: i32) -> bool { x < 5 }\n");
-        let attempt = ForgeAttemptId::derive(&baseline, run.seed, 0, 0);
-        let mut body = parse_body("fn f(x: i32, y: i32) -> bool { x < 5 && y + 2 > 9 }");
-        let mut rng = StdRng::seed_from_u64(41);
-        let mut recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
-        let selection = recorded.selection.as_mut().unwrap();
-        selection.operator_index = (selection.operator_index + 1) % recorded.opportunities.len();
-
-        assert!(matches!(
-            exposure_from_recorded_mutation(
-                &run,
-                attempt,
-                baseline,
-                &policy,
-                &recorded,
-            ),
-            Err(ForgeProposalRecordingError::SelectionMismatch)
-        ));
-    }
-
-    #[test]
-    fn reordered_opportunities_fail_closed() {
+    fn reordered_raw_opportunities_fail_closed() {
         let run = run();
         let mutator = Mutator::default();
         let policy = proposal_policy_for_mutator(&run, &mutator).unwrap();
@@ -292,17 +259,17 @@ mod tests {
         let attempt = ForgeAttemptId::derive(&baseline, run.seed, 0, 0);
         let mut body = parse_body("fn f(x: i32) -> bool { x < 5 }");
         let mut rng = StdRng::seed_from_u64(3);
-        let mut recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
-        recorded.opportunities.swap(0, 1);
+        let recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
+        let raw = ForgeRawProposalRecord::from_recorded(attempt, baseline, &recorded).unwrap();
 
+        // A different policy order is semantically a different sampler interpretation.
+        let reversed = ForgeProposalPolicy::uniform_eligible_site(
+            run.generator_id.clone(),
+            mutator.operator_names().collect::<Vec<_>>().into_iter().rev(),
+        )
+        .unwrap();
         assert!(matches!(
-            exposure_from_recorded_mutation(
-                &run,
-                attempt,
-                baseline,
-                &policy,
-                &recorded,
-            ),
+            exposure_from_raw_record(&run, &reversed, &raw),
             Err(ForgeProposalRecordingError::OpportunityOrderMismatch)
         ));
     }
@@ -317,15 +284,8 @@ mod tests {
         let mut body = parse_body("fn f() -> &'static str { \"x\" }");
         let mut rng = StdRng::seed_from_u64(2);
         let recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
-
-        let exposure = exposure_from_recorded_mutation(
-            &run,
-            attempt,
-            baseline,
-            &policy,
-            &recorded,
-        )
-        .unwrap();
+        let raw = ForgeRawProposalRecord::from_recorded(attempt, baseline, &recorded).unwrap();
+        let exposure = exposure_from_raw_record(&run, &policy, &raw).unwrap();
         assert!(matches!(exposure.decision(), ForgeProposalDecision::NoEligibleSites));
         assert_eq!(exposure.total_eligible_sites(), 0);
     }
