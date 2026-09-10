@@ -4,9 +4,9 @@
 //!
 //! This crate intentionally stops below mission-specific applications. It defines
 //! platform state, health, authority, degraded-operation, fleet-assurance,
-//! operating-mode/limit evaluation, resident docking/service and progressive-failure
-//! recording contracts reusable by AUVs, USVs, research vessels, logistics craft
-//! and other maritime platforms.
+//! operating-mode/limit evaluation, resident docking/service, independent resource
+//! envelopes and progressive-failure recording contracts reusable by AUVs, USVs,
+//! research vessels, logistics craft and other maritime platforms.
 
 pub mod authority;
 pub mod degraded;
@@ -16,6 +16,7 @@ pub mod health;
 pub mod operating_mode;
 pub mod prelude;
 pub mod resilience;
+pub mod resources;
 pub mod state;
 
 pub use authority::*;
@@ -25,4 +26,5 @@ pub use fleet::*;
 pub use health::*;
 pub use operating_mode::*;
 pub use resilience::*;
+pub use resources::*;
 pub use state::*;
