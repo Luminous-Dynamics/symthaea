@@ -31,14 +31,23 @@ const MAX_POSITION_REFERENCE_BYTES: usize = 512;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MaritimeObservationKind {
+    /// Snapshot or change in the platform's mission-neutral operational state.
     StateObservation,
+    /// Snapshot or change in component/platform health.
     HealthObservation,
+    /// Transition in a non-weapon safety or assurance state.
     AssuranceTransition,
+    /// Transition in local authority or operating-envelope state.
     AuthorityTransition,
+    /// Observation whose primary content is an opaque positioning-evidence reference.
     PositionEvidenceReference,
+    /// Communications availability, degradation, recovery, or similar state.
     CommunicationsState,
+    /// Mission-neutral supply, inventory, transfer, or logistics event.
     LogisticsEvent,
+    /// Inspection, service, repair, or maintenance event.
     MaintenanceEvent,
+    /// Recovery, restart, reconciliation, or return-to-service event.
     RecoveryEvent,
 }
 
@@ -62,9 +71,13 @@ impl MaritimeObservationKind {
 /// Invalid local observation-source policy input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObservationSourcePolicyError {
+    /// Provider schema was empty, padded, oversized, or contained control characters.
     InvalidProviderSchema,
+    /// Peer identity binding was empty, padded, oversized, or contained control characters.
     InvalidPeerIdentityBinding,
+    /// Platform identifier was empty, padded, oversized, or contained control characters.
     InvalidPlatformId,
+    /// The exact same provider/principal/platform grant appeared more than once.
     DuplicateGrant,
 }
 
@@ -80,6 +93,7 @@ pub struct ObservationSourceGrantV1 {
 }
 
 impl ObservationSourceGrantV1 {
+    /// Construct one validated local provider/principal-to-platform authorization grant.
     pub fn new(
         provider_schema: impl Into<String>,
         peer_identity_binding: impl Into<String>,
@@ -115,6 +129,7 @@ pub struct ObservationSourcePolicyV1 {
 }
 
 impl ObservationSourcePolicyV1 {
+    /// Build a deterministic local source policy, rejecting duplicate exact grants.
     pub fn new(
         grants: impl IntoIterator<Item = ObservationSourceGrantV1>,
     ) -> Result<Self, ObservationSourcePolicyError> {
