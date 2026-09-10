@@ -4,6 +4,9 @@
 
 #![deny(unsafe_code)]
 
+#[cfg(feature = "extension-routing")]
+pub mod extension;
+
 use symthaea_sim_bridge::{
     CommandSolver, EngineeringDomain, SimulationBackend, SimulationError, SimulationRequest,
     SimulationResult, SolverKind,
