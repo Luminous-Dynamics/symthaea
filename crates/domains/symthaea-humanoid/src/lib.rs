@@ -22,6 +22,8 @@ pub mod grasp_controller_qualification;
 pub mod grasp_measurement_coverage;
 pub mod grasp_qualification_validation;
 pub mod qualification_evidence_attestation;
+#[cfg(test)]
+mod qualification_evidence_attestation_tests;
 pub mod capability_envelope;
 pub mod capability_request;
 pub mod cartesian_hand_reference;
