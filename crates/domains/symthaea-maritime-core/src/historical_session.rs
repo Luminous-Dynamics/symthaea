@@ -31,6 +31,8 @@ pub enum HistoricalSessionHandoffError {
     IdentityMismatch,
     /// Provider handoff named a different non-secret session identifier.
     SessionIdMismatch,
+    /// Provider handoff named different immutable provider/session evidence.
+    SessionEvidenceMismatch,
     /// Provider handoff qualified a different authority generation.
     AuthorityEpochMismatch,
     /// Provider handoff did not bind the exact immutable session interval.
@@ -52,18 +54,21 @@ pub enum HistoricalSessionHandoffError {
 ///
 /// Construction is an explicit provider-verification handoff. The provider adapter must first
 /// verify its native signed/history evidence. Maritime core then checks that the positive result
-/// exactly matches the existing provider session, local schema/lifetime policy, authority epoch,
-/// admitted-session interval, and observation time.
+/// exactly matches the existing provider session, including the provider-owned transcript/session
+/// evidence binding, local schema/lifetime policy, authority epoch, admitted-session interval, and
+/// observation time.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HistoricallyQualifiedMachineSessionV1 {
     provider_schema: String,
     session_id: String,
     peer_identity_binding: String,
+    session_evidence_binding: String,
     authority_epoch: u64,
     session_authenticated_at_ms: u64,
     session_expires_at_ms: u64,
     observation_at_ms: u64,
     provider_history_binding: String,
+    history_head_sequence: u64,
     history_observed_through_ms: u64,
 }
 
@@ -71,8 +76,8 @@ impl HistoricallyQualifiedMachineSessionV1 {
     /// Cross a provider's already-verified historical authority result into maritime core.
     ///
     /// The redundant session fields are intentional: a historical result for another session,
-    /// principal, provider, epoch, or validity interval must not be reusable merely because an
-    /// observation timestamp happens to fit the local session.
+    /// principal, provider, transcript/session proof, epoch, or validity interval must not be
+    /// reusable merely because an observation timestamp happens to fit the local session.
     #[allow(clippy::too_many_arguments)]
     pub fn from_verified_provider(
         session: &AuthenticatedMachineSession,
@@ -80,11 +85,13 @@ impl HistoricallyQualifiedMachineSessionV1 {
         provider_schema: impl Into<String>,
         session_id: impl Into<String>,
         peer_identity_binding: impl Into<String>,
+        session_evidence_binding: impl Into<String>,
         authority_epoch: u64,
         session_authenticated_at_ms: u64,
         session_expires_at_ms: u64,
         observation_at_ms: u64,
         provider_history_binding: impl Into<String>,
+        history_head_sequence: u64,
         history_observed_through_ms: u64,
     ) -> Result<Self, HistoricalSessionHandoffError> {
         if !session_policy
@@ -105,6 +112,7 @@ impl HistoricallyQualifiedMachineSessionV1 {
         let provider_schema = provider_schema.into();
         let session_id = session_id.into();
         let peer_identity_binding = peer_identity_binding.into();
+        let session_evidence_binding = session_evidence_binding.into();
         let provider_history_binding = provider_history_binding.into();
 
         if provider_schema != session.schema() {
@@ -115,6 +123,9 @@ impl HistoricallyQualifiedMachineSessionV1 {
         }
         if session_id != session.session_id() {
             return Err(HistoricalSessionHandoffError::SessionIdMismatch);
+        }
+        if session_evidence_binding != session.evidence_binding() {
+            return Err(HistoricalSessionHandoffError::SessionEvidenceMismatch);
         }
         if authority_epoch != session.authority_epoch() {
             return Err(HistoricalSessionHandoffError::AuthorityEpochMismatch);
@@ -144,11 +155,13 @@ impl HistoricallyQualifiedMachineSessionV1 {
             provider_schema,
             session_id,
             peer_identity_binding,
+            session_evidence_binding,
             authority_epoch,
             session_authenticated_at_ms,
             session_expires_at_ms,
             observation_at_ms,
             provider_history_binding,
+            history_head_sequence,
             history_observed_through_ms,
         })
     }
@@ -166,6 +179,11 @@ impl HistoricallyQualifiedMachineSessionV1 {
     /// Provider-owned binding to the exact authenticated machine principal.
     pub fn peer_identity_binding(&self) -> &str {
         &self.peer_identity_binding
+    }
+
+    /// Provider-owned binding to the exact authenticated session/transcript evidence.
+    pub fn session_evidence_binding(&self) -> &str {
+        &self.session_evidence_binding
     }
 
     /// Exact authority generation historically qualified by the provider.
@@ -193,6 +211,11 @@ impl HistoricallyQualifiedMachineSessionV1 {
         &self.provider_history_binding
     }
 
+    /// Monotonic provider history-head sequence that supported this qualification.
+    pub const fn history_head_sequence(&self) -> u64 {
+        self.history_head_sequence
+    }
+
     /// Provider history's completeness horizon for this qualification.
     pub const fn history_observed_through_ms(&self) -> u64 {
         self.history_observed_through_ms
@@ -207,6 +230,7 @@ impl HistoricallyQualifiedMachineSessionV1 {
         self.provider_schema == session.schema()
             && self.session_id == session.session_id()
             && self.peer_identity_binding == session.peer_identity_binding()
+            && self.session_evidence_binding == session.evidence_binding()
             && self.authority_epoch == session.authority_epoch()
             && self.session_authenticated_at_ms == session.authenticated_at_ms()
             && self.session_expires_at_ms == session.expires_at_ms()
@@ -220,6 +244,7 @@ mod tests {
 
     const SCHEMA: &str = "xenia-verified-machine-session-evidence-v1";
     const PRINCIPAL: &str = "xenia-signing-identity-v1:blake3-256:abc";
+    const SESSION_EVIDENCE: &str = "xenia-handshake-transcript-v1:blake3-256:def";
 
     fn session() -> AuthenticatedMachineSession {
         AuthenticatedMachineSession::from_verified_provider(
@@ -229,7 +254,7 @@ mod tests {
             1_000,
             2_000,
             9,
-            "xenia-handshake-transcript-v1:blake3-256:def",
+            SESSION_EVIDENCE,
         )
         .unwrap()
     }
@@ -241,18 +266,49 @@ mod tests {
         }
     }
 
-    fn qualify() -> Result<HistoricallyQualifiedMachineSessionV1, HistoricalSessionHandoffError> {
+    #[allow(clippy::too_many_arguments)]
+    fn handoff(
+        provider_schema: &str,
+        session_id: &str,
+        principal: &str,
+        session_evidence: &str,
+        epoch: u64,
+        authenticated_at_ms: u64,
+        expires_at_ms: u64,
+        observation_at_ms: u64,
+        history_binding: &str,
+        history_head_sequence: u64,
+        observed_through_ms: u64,
+    ) -> Result<HistoricallyQualifiedMachineSessionV1, HistoricalSessionHandoffError> {
         HistoricallyQualifiedMachineSessionV1::from_verified_provider(
             &session(),
             policy(),
+            provider_schema,
+            session_id,
+            principal,
+            session_evidence,
+            epoch,
+            authenticated_at_ms,
+            expires_at_ms,
+            observation_at_ms,
+            history_binding,
+            history_head_sequence,
+            observed_through_ms,
+        )
+    }
+
+    fn qualify() -> Result<HistoricallyQualifiedMachineSessionV1, HistoricalSessionHandoffError> {
+        handoff(
             SCHEMA,
             "session-1",
             PRINCIPAL,
+            SESSION_EVIDENCE,
             9,
             1_000,
             2_000,
             1_500,
             "xenia-machine-authority-history-head-v1:abc",
+            7,
             1_600,
         )
     }
@@ -261,8 +317,10 @@ mod tests {
     fn exact_historical_session_and_observation_are_accepted() {
         let qualified = qualify().unwrap();
         assert!(qualified.matches_session_observation(&session(), 1_500));
+        assert_eq!(qualified.session_evidence_binding(), SESSION_EVIDENCE);
         assert_eq!(qualified.authority_epoch(), 9);
         assert_eq!(qualified.session_expires_at_ms(), 2_000);
+        assert_eq!(qualified.history_head_sequence(), 7);
         assert_eq!(qualified.history_observed_through_ms(), 1_600);
     }
 
@@ -274,17 +332,8 @@ mod tests {
         };
         assert_eq!(
             HistoricallyQualifiedMachineSessionV1::from_verified_provider(
-                &session(),
-                unsupported,
-                SCHEMA,
-                "session-1",
-                PRINCIPAL,
-                9,
-                1_000,
-                2_000,
-                1_500,
-                "history:abc",
-                1_600,
+                &session(), unsupported, SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9,
+                1_000, 2_000, 1_500, "history:abc", 0, 1_600,
             ),
             Err(HistoricalSessionHandoffError::UnsupportedProviderSchema)
         );
@@ -295,62 +344,65 @@ mod tests {
         };
         assert_eq!(
             HistoricallyQualifiedMachineSessionV1::from_verified_provider(
-                &session(),
-                too_short,
-                SCHEMA,
-                "session-1",
-                PRINCIPAL,
-                9,
-                1_000,
-                2_000,
-                1_500,
-                "history:abc",
-                1_600,
+                &session(), too_short, SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9,
+                1_000, 2_000, 1_500, "history:abc", 0, 1_600,
             ),
             Err(HistoricalSessionHandoffError::SessionValidityTooLong)
         );
     }
 
     #[test]
-    fn mismatched_identity_epoch_interval_or_observation_fail_closed() {
-        let cases = [
-            HistoricallyQualifiedMachineSessionV1::from_verified_provider(
-                &session(), policy(), SCHEMA, "session-1", "other-principal", 9, 1_000, 2_000,
-                1_500, "history:abc", 1_600,
+    fn mismatched_identity_session_evidence_epoch_interval_or_observation_fail_closed() {
+        assert_eq!(
+            handoff(
+                SCHEMA, "session-1", "other-principal", SESSION_EVIDENCE, 9, 1_000, 2_000,
+                1_500, "history:abc", 0, 1_600,
             ),
-            HistoricallyQualifiedMachineSessionV1::from_verified_provider(
-                &session(), policy(), SCHEMA, "session-1", PRINCIPAL, 10, 1_000, 2_000, 1_500,
-                "history:abc", 1_600,
+            Err(HistoricalSessionHandoffError::IdentityMismatch)
+        );
+        assert_eq!(
+            handoff(
+                SCHEMA, "session-1", PRINCIPAL, "other-evidence", 9, 1_000, 2_000, 1_500,
+                "history:abc", 0, 1_600,
             ),
-            HistoricallyQualifiedMachineSessionV1::from_verified_provider(
-                &session(), policy(), SCHEMA, "session-1", PRINCIPAL, 9, 1_000, 2_001, 1_500,
-                "history:abc", 1_600,
+            Err(HistoricalSessionHandoffError::SessionEvidenceMismatch)
+        );
+        assert_eq!(
+            handoff(
+                SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 10, 1_000, 2_000, 1_500,
+                "history:abc", 0, 1_600,
             ),
-            HistoricallyQualifiedMachineSessionV1::from_verified_provider(
-                &session(), policy(), SCHEMA, "session-1", PRINCIPAL, 9, 1_000, 2_000, 2_000,
-                "history:abc", 2_000,
+            Err(HistoricalSessionHandoffError::AuthorityEpochMismatch)
+        );
+        assert_eq!(
+            handoff(
+                SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_001, 1_500,
+                "history:abc", 0, 1_600,
             ),
-        ];
-
-        assert_eq!(cases[0], Err(HistoricalSessionHandoffError::IdentityMismatch));
-        assert_eq!(cases[1], Err(HistoricalSessionHandoffError::AuthorityEpochMismatch));
-        assert_eq!(cases[2], Err(HistoricalSessionHandoffError::SessionIntervalMismatch));
-        assert_eq!(cases[3], Err(HistoricalSessionHandoffError::ObservationAfterSession));
+            Err(HistoricalSessionHandoffError::SessionIntervalMismatch)
+        );
+        assert_eq!(
+            handoff(
+                SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 2_000,
+                "history:abc", 0, 2_000,
+            ),
+            Err(HistoricalSessionHandoffError::ObservationAfterSession)
+        );
     }
 
     #[test]
     fn incomplete_history_or_bad_binding_fail_closed() {
         assert_eq!(
-            HistoricallyQualifiedMachineSessionV1::from_verified_provider(
-                &session(), policy(), SCHEMA, "session-1", PRINCIPAL, 9, 1_000, 2_000, 1_500,
-                "history:abc", 1_499,
+            handoff(
+                SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 1_500,
+                "history:abc", 0, 1_499,
             ),
             Err(HistoricalSessionHandoffError::HistoryNotCovered)
         );
         assert_eq!(
-            HistoricallyQualifiedMachineSessionV1::from_verified_provider(
-                &session(), policy(), SCHEMA, "session-1", PRINCIPAL, 9, 1_000, 2_000, 1_500,
-                " history:abc", 1_600,
+            handoff(
+                SCHEMA, "session-1", PRINCIPAL, SESSION_EVIDENCE, 9, 1_000, 2_000, 1_500,
+                " history:abc", 0, 1_600,
             ),
             Err(HistoricalSessionHandoffError::InvalidHistoryBinding)
         );
