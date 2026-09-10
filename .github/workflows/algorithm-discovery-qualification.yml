@@ -10,6 +10,7 @@ on:
       - 'crates/bridges/symthaea-algorithm-egraph-bridge/**'
       - 'crates/bridges/symthaea-algorithm-evidence-collector/**'
       - 'crates/bridges/symthaea-hdc-algorithm-evidence/**'
+      - 'crates/bridges/symthaea-forge-algorithm-evidence/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
   push:
     branches: [ main ]
@@ -21,6 +22,7 @@ on:
       - 'crates/bridges/symthaea-algorithm-egraph-bridge/**'
       - 'crates/bridges/symthaea-algorithm-evidence-collector/**'
       - 'crates/bridges/symthaea-hdc-algorithm-evidence/**'
+      - 'crates/bridges/symthaea-forge-algorithm-evidence/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
 
 permissions:
@@ -56,6 +58,9 @@ jobs:
       - name: Test capsule-bound HDC evidence bridge
         run: cargo test -p symthaea-hdc-algorithm-evidence -- --test-threads=1
 
+      - name: Test Forge collector identity bridge
+        run: cargo test -p symthaea-forge-algorithm-evidence -- --test-threads=1
+
       - name: Build HDC Criterion benchmark without measuring
         run: cargo bench -p symthaea-algorithm-lab --bench hdc_hamming_candidates --no-run
 
@@ -68,4 +73,5 @@ jobs:
           -p symthaea-algorithm-egraph-bridge
           -p symthaea-algorithm-evidence-collector
           -p symthaea-hdc-algorithm-evidence
+          -p symthaea-forge-algorithm-evidence
           --all-targets --all-features -- -D warnings
