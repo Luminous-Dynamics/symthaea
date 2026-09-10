@@ -9,7 +9,7 @@ on:
     paths:
       - '.github/workflows/continuity-subject-snapshot.yml'
       - 'scripts/qualify-continuity-subject-snapshot.sh'
-      - 'crates/core/symthaea-continuity/src/subject.rs'
+      - 'crates/core/symthaea-continuity/src/scope.rs'
       - 'crates/core/symthaea-continuity/src/subject_snapshot.rs'
       - 'crates/core/symthaea-continuity/src/lib.rs'
       - 'crates/core/symthaea-continuity/Cargo.toml'
