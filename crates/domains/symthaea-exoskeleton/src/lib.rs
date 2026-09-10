@@ -30,5 +30,6 @@ pub mod sensored_suite;
 pub mod simulator;
 #[cfg(feature = "symtropy")]
 pub mod symtropy_sim;
+pub mod thermal;
 pub mod training;
 pub mod types;
