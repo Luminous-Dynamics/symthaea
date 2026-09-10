@@ -1,30 +1,29 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Crash-safe in-place mutation staging.
+//! Crash-aware, exclusive in-place mutation staging.
 //!
-//! `symthaea-forge` must actually write a candidate mutation to disk for
-//! `cargo check`/`cargo test`/a benchmark binary to see it -- there is no
-//! cheap way to make `rustc` compile a file that only exists in memory.
-//! Rather than a full workspace copy (expensive, and this project's
-//! standing rule is "no git worktrees" -- see
-//! `memory/feedback_no_worktrees.md`), this module makes in-place mutation
-//! *safe* instead of avoiding it:
+//! Forge currently has to place a candidate on disk while Cargo compiles/tests it. This module
+//! keeps that exceptional mutation window narrow and fail-closed:
 //!
-//! 1. Before mutating, the original file is copied to `<file>.forge-orig`.
-//! 2. [`StagedMutation`] is an RAII guard: `Drop` restores the original
-//!    content from the backup and deletes it, unless [`StagedMutation::commit`]
-//!    was called first.
-//! 3. On construction, [`Sandbox::new`] scans for orphaned `.forge-orig`
-//!    files (evidence of a previous run that was killed mid-mutation --
-//!    this project's session has hit exactly that failure mode repeatedly,
-//!    see `memory/feedback_background_cargo_gets_killed_mystery.md`) and
-//!    self-heals by restoring them before any new work starts.
+//! 1. Every target and scan root is canonicalized beneath one project root.
+//! 2. A `<file>.forge-orig` backup is created with `create_new`, acting as an exclusive per-file
+//!    staging lease. A second Forge process cannot silently overwrite it.
+//! 3. Pre-existing backups are reported as recovery-required evidence. They are **not**
+//!    automatically restored because a backup may belong to another still-running Forge process.
+//! 4. The guard tracks the exact content Forge believes is on disk. If another writer changes the
+//!    target during evaluation, Forge refuses to overwrite that edit and retains the original
+//!    backup for explicit recovery.
+//! 5. [`StagedMutation::restore`] consumes the guard and reports restoration/removal failures.
+//!    `Drop` remains a best-effort panic fallback only.
+//! 6. There is deliberately no `commit()` capability: this sandbox cannot make a staged candidate
+//!    survive as the canonical source file.
 //!
-//! `Drop` cannot run after `SIGKILL`, so this is not a perfect guarantee --
-//! but combined with the startup self-heal, an interrupted run leaves the
-//! tree mutated for at most the lifetime of the next `Sandbox::new` call,
-//! never permanently.
+//! `SIGKILL` can still interrupt the mutation window. The resulting backup makes that state
+//! detectable on the next run, which must stop for explicit recovery rather than guessing that the
+//! backup is orphaned.
 
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 const BACKUP_SUFFIX: &str = ".forge-orig";
@@ -33,6 +32,10 @@ const BACKUP_SUFFIX: &str = ".forge-orig";
 pub enum SandboxError {
     #[error("{path:?} resolves outside the allowed project root {root:?}")]
     OutsideProjectRoot { path: PathBuf, root: PathBuf },
+    #[error("Forge staging/recovery backup already exists; explicit recovery is required: {0:?}")]
+    RecoveryRequired(PathBuf),
+    #[error("target changed outside Forge's staging lease: {0:?}")]
+    ConcurrentModification(PathBuf),
     #[error("io error on {path:?}: {source}")]
     Io {
         path: PathBuf,
@@ -41,73 +44,83 @@ pub enum SandboxError {
     },
 }
 
+#[derive(Debug)]
 pub struct Sandbox {
     project_root: PathBuf,
 }
 
 impl Sandbox {
-    /// `project_root` is canonicalized once and every staged file must
-    /// resolve inside it (blocks absolute-path and `..`-traversal escapes,
-    /// mirroring `self_optimization.rs`'s existing path guard).
-    ///
-    /// Also scans `search_roots` for orphaned `.forge-orig` backups left by
-    /// a previous interrupted run and restores them.
     pub fn new(
         project_root: impl AsRef<Path>,
         search_roots: &[PathBuf],
     ) -> Result<Self, SandboxError> {
-        let project_root = project_root
-            .as_ref()
+        let requested_root = project_root.as_ref();
+        let project_root = requested_root
             .canonicalize()
-            .map_err(|e| SandboxError::Io {
-                path: project_root.as_ref().to_path_buf(),
-                source: e,
+            .map_err(|source| SandboxError::Io {
+                path: requested_root.to_path_buf(),
+                source,
             })?;
         let sandbox = Self { project_root };
+
         for root in search_roots {
-            sandbox.heal_orphaned_backups(root)?;
+            if !root.exists() {
+                continue;
+            }
+            let canonical = sandbox.require_within_root(root)?;
+            sandbox.detect_existing_backups(&canonical)?;
         }
         Ok(sandbox)
     }
 
-    fn heal_orphaned_backups(&self, dir: &Path) -> Result<(), SandboxError> {
+    fn detect_existing_backups(&self, dir: &Path) -> Result<(), SandboxError> {
         if !dir.is_dir() {
             return Ok(());
         }
-        let entries = std::fs::read_dir(dir).map_err(|e| SandboxError::Io {
+        let entries = std::fs::read_dir(dir).map_err(|source| SandboxError::Io {
             path: dir.to_path_buf(),
-            source: e,
+            source,
         })?;
-        for entry in entries.flatten() {
+        for entry in entries {
+            let entry = entry.map_err(|source| SandboxError::Io {
+                path: dir.to_path_buf(),
+                source,
+            })?;
             let path = entry.path();
-            if path.is_dir() {
-                self.heal_orphaned_backups(&path)?;
+            let file_type = entry.file_type().map_err(|source| SandboxError::Io {
+                path: path.clone(),
+                source,
+            })?;
+            if file_type.is_symlink() {
+                if path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.ends_with(BACKUP_SUFFIX))
+                {
+                    return Err(SandboxError::RecoveryRequired(path));
+                }
                 continue;
             }
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if let Some(orig_name) = name.strip_suffix(BACKUP_SUFFIX) {
-                    let target = path.with_file_name(orig_name);
-                    tracing_or_eprintln(&format!(
-                        "forge: healing orphaned backup {path:?} -> restoring {target:?}"
-                    ));
-                    std::fs::copy(&path, &target).map_err(|e| SandboxError::Io {
-                        path: target.clone(),
-                        source: e,
-                    })?;
-                    std::fs::remove_file(&path).map_err(|e| SandboxError::Io {
-                        path: path.clone(),
-                        source: e,
-                    })?;
-                }
+            if file_type.is_dir() {
+                let canonical = self.require_within_root(&path)?;
+                self.detect_existing_backups(&canonical)?;
+                continue;
+            }
+            if path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(BACKUP_SUFFIX))
+            {
+                return Err(SandboxError::RecoveryRequired(path));
             }
         }
         Ok(())
     }
 
     fn require_within_root(&self, path: &Path) -> Result<PathBuf, SandboxError> {
-        let canonical = path.canonicalize().map_err(|e| SandboxError::Io {
+        let canonical = path.canonicalize().map_err(|source| SandboxError::Io {
             path: path.to_path_buf(),
-            source: e,
+            source,
         })?;
         if !canonical.starts_with(&self.project_root) {
             return Err(SandboxError::OutsideProjectRoot {
@@ -118,53 +131,70 @@ impl Sandbox {
         Ok(canonical)
     }
 
-    /// Back up `file_path`'s current content and return an RAII guard.
-    /// Restores automatically on drop unless [`StagedMutation::commit`] is
-    /// called.
+    /// Acquire an exclusive staging lease and preserve the exact original UTF-8 source.
     pub fn stage(&self, file_path: &Path) -> Result<StagedMutation, SandboxError> {
         let canonical = self.require_within_root(file_path)?;
-        let original = std::fs::read_to_string(&canonical).map_err(|e| SandboxError::Io {
+        let original = std::fs::read_to_string(&canonical).map_err(|source| SandboxError::Io {
             path: canonical.clone(),
-            source: e,
+            source,
         })?;
         let backup_path = backup_path_for(&canonical);
-        std::fs::write(&backup_path, &original).map_err(|e| SandboxError::Io {
-            path: backup_path.clone(),
-            source: e,
+
+        let mut backup = match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&backup_path)
+        {
+            Ok(file) => file,
+            Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => {
+                return Err(SandboxError::RecoveryRequired(backup_path));
+            }
+            Err(source) => {
+                return Err(SandboxError::Io {
+                    path: backup_path,
+                    source,
+                });
+            }
+        };
+        backup
+            .write_all(original.as_bytes())
+            .and_then(|_| backup.sync_all())
+            .map_err(|source| SandboxError::Io {
+                path: backup_path.clone(),
+                source,
+            })?;
+
+        let after_lease = std::fs::read_to_string(&canonical).map_err(|source| SandboxError::Io {
+            path: canonical.clone(),
+            source,
         })?;
+        if after_lease != original {
+            return Err(SandboxError::ConcurrentModification(canonical));
+        }
+
         Ok(StagedMutation {
             file_path: canonical,
             backup_path,
-            original,
-            committed: false,
+            original: original.clone(),
+            expected_current: original,
+            restored: false,
         })
     }
 }
 
 fn backup_path_for(file_path: &Path) -> PathBuf {
-    let mut s = file_path.as_os_str().to_owned();
-    s.push(BACKUP_SUFFIX);
-    PathBuf::from(s)
+    let mut name = file_path.as_os_str().to_owned();
+    name.push(BACKUP_SUFFIX);
+    PathBuf::from(name)
 }
 
-/// Try `tracing::warn!` if a subscriber is installed; always also print to
-/// stderr so the healing message is visible even in a bare `cargo run`.
-fn tracing_or_eprintln(msg: &str) {
-    tracing::warn!(target: "symthaea_forge::sandbox", "{msg}");
-    eprintln!("{msg}");
-}
-
-/// RAII guard over one staged mutation. Write the candidate content with
-/// [`Self::write`], run gates against it, then either [`Self::commit`] (to
-/// keep the mutation on disk -- used only for the *winning* candidate
-/// pending human review, never for a losing one) or let the guard drop to
-/// restore the original automatically.
 #[derive(Debug)]
 pub struct StagedMutation {
     file_path: PathBuf,
     backup_path: PathBuf,
     original: String,
-    committed: bool,
+    expected_current: String,
+    restored: bool,
 }
 
 impl StagedMutation {
@@ -176,45 +206,85 @@ impl StagedMutation {
         &self.original
     }
 
-    pub fn write(&self, new_content: &str) -> Result<(), SandboxError> {
-        std::fs::write(&self.file_path, new_content).map_err(|e| SandboxError::Io {
+    /// Replace the exact content currently owned by this lease with candidate content.
+    pub fn write(&mut self, new_content: &str) -> Result<(), SandboxError> {
+        if !self.backup_path.is_file() {
+            return Err(SandboxError::RecoveryRequired(self.backup_path.clone()));
+        }
+        self.require_expected_current()?;
+        std::fs::write(&self.file_path, new_content).map_err(|source| SandboxError::Io {
             path: self.file_path.clone(),
-            source: e,
-        })
-    }
-
-    /// Restore the original content immediately (idempotent; also happens
-    /// automatically on drop if this was never called).
-    pub fn restore(&self) -> Result<(), SandboxError> {
-        std::fs::write(&self.file_path, &self.original).map_err(|e| SandboxError::Io {
-            path: self.file_path.clone(),
-            source: e,
-        })
-    }
-
-    /// Keep the current on-disk content and remove the backup -- the
-    /// mutation survives this guard's drop. Only call this for a candidate
-    /// that has cleared every gate and is ready for human review.
-    ///
-    /// Marks `committed` and lets `self` drop normally at the end of this
-    /// call: `Drop::drop` always removes the backup file (for both the
-    /// committed and non-committed paths -- see below), it only skips the
-    /// restore-write when committed, so there is nothing left for this
-    /// method to do afterward. (An earlier version also removed the
-    /// backup file itself here, which raced with `Drop::drop` already
-    /// having removed it and panicked on `NotFound`.)
-    pub fn commit(mut self) -> Result<(), SandboxError> {
-        self.committed = true;
+            source,
+        })?;
+        self.expected_current.clear();
+        self.expected_current.push_str(new_content);
         Ok(())
+    }
+
+    /// Restore the original only if the target still contains the exact candidate bytes Forge
+    /// placed there. A concurrent external edit is preserved and the backup is retained.
+    pub fn restore(mut self) -> Result<(), SandboxError> {
+        self.require_expected_current()?;
+        std::fs::write(&self.file_path, &self.original).map_err(|source| SandboxError::Io {
+            path: self.file_path.clone(),
+            source,
+        })?;
+        std::fs::remove_file(&self.backup_path).map_err(|source| SandboxError::Io {
+            path: self.backup_path.clone(),
+            source,
+        })?;
+        self.restored = true;
+        Ok(())
+    }
+
+    fn require_expected_current(&self) -> Result<(), SandboxError> {
+        let current = std::fs::read_to_string(&self.file_path).map_err(|source| SandboxError::Io {
+            path: self.file_path.clone(),
+            source,
+        })?;
+        if current == self.expected_current {
+            Ok(())
+        } else {
+            Err(SandboxError::ConcurrentModification(self.file_path.clone()))
+        }
     }
 }
 
 impl Drop for StagedMutation {
     fn drop(&mut self) {
-        if !self.committed {
-            let _ = std::fs::write(&self.file_path, &self.original);
+        if self.restored {
+            return;
         }
-        let _ = std::fs::remove_file(&self.backup_path);
+        match std::fs::read_to_string(&self.file_path) {
+            Ok(current) if current == self.expected_current => {}
+            Ok(_) => {
+                eprintln!(
+                    "forge: target {:?} changed outside the staging lease; refusing emergency overwrite; original retained at {:?}",
+                    self.file_path, self.backup_path
+                );
+                return;
+            }
+            Err(error) => {
+                eprintln!(
+                    "forge: cannot inspect {:?} during emergency restore: {error}; original retained at {:?}",
+                    self.file_path, self.backup_path
+                );
+                return;
+            }
+        }
+        if let Err(error) = std::fs::write(&self.file_path, &self.original) {
+            eprintln!(
+                "forge: emergency restore failed for {:?}: {error}; original retained at {:?}",
+                self.file_path, self.backup_path
+            );
+            return;
+        }
+        if let Err(error) = std::fs::remove_file(&self.backup_path) {
+            eprintln!(
+                "forge: restored {:?} but failed to remove staging backup {:?}: {error}",
+                self.file_path, self.backup_path
+            );
+        }
     }
 }
 
@@ -233,88 +303,112 @@ mod tests {
     }
 
     #[test]
-    fn stage_write_and_drop_restores_original() {
+    fn stage_write_and_explicit_restore_restores_original() {
         let root = temp_project("restore");
-        let file = root.join("src").join("lib.rs");
+        let file = root.join("src/lib.rs");
         std::fs::write(&file, "const X: i32 = 1;\n").unwrap();
-
         let sandbox = Sandbox::new(&root, &[]).unwrap();
-        {
-            let staged = sandbox.stage(&file).unwrap();
-            staged.write("const X: i32 = 999;\n").unwrap();
-            assert_eq!(
-                std::fs::read_to_string(&file).unwrap(),
-                "const X: i32 = 999;\n"
-            );
-            // guard drops here without commit()
-        }
-        assert_eq!(
-            std::fs::read_to_string(&file).unwrap(),
-            "const X: i32 = 1;\n"
-        );
+        let mut staged = sandbox.stage(&file).unwrap();
+        staged.write("const X: i32 = 999;\n").unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "const X: i32 = 999;\n");
+        staged.restore().unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "const X: i32 = 1;\n");
         assert!(!backup_path_for(&file.canonicalize().unwrap()).exists());
-
         let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
-    fn commit_keeps_the_mutation_on_disk() {
-        let root = temp_project("commit");
-        let file = root.join("src").join("lib.rs");
+    fn drop_remains_best_effort_fallback() {
+        let root = temp_project("drop-restore");
+        let file = root.join("src/lib.rs");
         std::fs::write(&file, "const X: i32 = 1;\n").unwrap();
-
         let sandbox = Sandbox::new(&root, &[]).unwrap();
-        let staged = sandbox.stage(&file).unwrap();
-        staged.write("const X: i32 = 2;\n").unwrap();
-        staged.commit().unwrap();
-
-        assert_eq!(
-            std::fs::read_to_string(&file).unwrap(),
-            "const X: i32 = 2;\n"
-        );
-        assert!(!backup_path_for(&file.canonicalize().unwrap()).exists());
-
+        {
+            let mut staged = sandbox.stage(&file).unwrap();
+            staged.write("const X: i32 = 2;\n").unwrap();
+        }
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "const X: i32 = 1;\n");
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn second_stager_cannot_overwrite_live_backup() {
+        let root = temp_project("exclusive");
+        let file = root.join("src/lib.rs");
+        std::fs::write(&file, "const X: i32 = 1;\n").unwrap();
+        let first = Sandbox::new(&root, &[]).unwrap();
+        let guard = first.stage(&file).unwrap();
+        let second = Sandbox::new(&root, &[]).unwrap();
+        assert!(matches!(
+            second.stage(&file),
+            Err(SandboxError::RecoveryRequired(_))
+        ));
+        guard.restore().unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn existing_backup_stops_startup_instead_of_auto_healing() {
+        let root = temp_project("recovery-required");
+        let file = root.join("src/lib.rs");
+        std::fs::write(&file, "mutated\n").unwrap();
+        let canonical = file.canonicalize().unwrap();
+        std::fs::write(backup_path_for(&canonical), "original\n").unwrap();
+        let error = Sandbox::new(&root, &[root.join("src")]).unwrap_err();
+        assert!(matches!(error, SandboxError::RecoveryRequired(_)));
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "mutated\n");
+        assert_eq!(
+            std::fs::read_to_string(backup_path_for(&canonical)).unwrap(),
+            "original\n"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn search_root_outside_project_is_rejected_before_scanning() {
+        let root = temp_project("root");
+        let outside = temp_project("outside-scan");
+        assert!(matches!(
+            Sandbox::new(&root, &[outside.clone()]),
+            Err(SandboxError::OutsideProjectRoot { .. })
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&outside);
     }
 
     #[test]
     fn path_outside_project_root_is_rejected() {
         let root = temp_project("outside-root");
         let outside_dir = temp_project("outside-target");
-        let outside_file = outside_dir.join("src").join("lib.rs");
+        let outside_file = outside_dir.join("src/lib.rs");
         std::fs::write(&outside_file, "// not part of the project\n").unwrap();
-
         let sandbox = Sandbox::new(&root, &[]).unwrap();
-        let err = sandbox.stage(&outside_file).unwrap_err();
-        assert!(matches!(err, SandboxError::OutsideProjectRoot { .. }));
-
+        assert!(matches!(
+            sandbox.stage(&outside_file),
+            Err(SandboxError::OutsideProjectRoot { .. })
+        ));
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_dir_all(&outside_dir);
     }
 
     #[test]
-    fn orphaned_backup_is_healed_on_construction() {
-        let root = temp_project("heal");
-        let file = root.join("src").join("lib.rs");
+    fn concurrent_edit_is_preserved_and_backup_retained() {
+        let root = temp_project("concurrent-write");
+        let file = root.join("src/lib.rs");
         std::fs::write(&file, "const X: i32 = 1;\n").unwrap();
-        // Simulate a previous run that mutated the file and was killed
-        // before its StagedMutation guard could drop: write the mutated
-        // content to the real file, and the original to a `.forge-orig`
-        // backup next to it (exactly what `stage()` + `write()` leaves
-        // behind mid-flight).
-        let canonical_file = file.canonicalize().unwrap();
-        std::fs::write(&canonical_file, "const X: i32 = 999999;\n").unwrap();
-        std::fs::write(backup_path_for(&canonical_file), "const X: i32 = 1;\n").unwrap();
-
-        // Constructing a new Sandbox over this directory should notice and
-        // restore the orphaned backup before any new work starts.
-        let _sandbox = Sandbox::new(&root, &[root.clone()]).unwrap();
+        let sandbox = Sandbox::new(&root, &[]).unwrap();
+        let mut staged = sandbox.stage(&file).unwrap();
+        staged.write("candidate\n").unwrap();
+        std::fs::write(&file, "external edit\n").unwrap();
+        assert!(matches!(
+            staged.restore(),
+            Err(SandboxError::ConcurrentModification(_))
+        ));
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "external edit\n");
         assert_eq!(
-            std::fs::read_to_string(&file).unwrap(),
+            std::fs::read_to_string(backup_path_for(&file.canonicalize().unwrap())).unwrap(),
             "const X: i32 = 1;\n"
         );
-        assert!(!backup_path_for(&canonical_file).exists());
-
         let _ = std::fs::remove_dir_all(&root);
     }
 }

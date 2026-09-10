@@ -1,37 +1,30 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! `symthaea-forge`: a mutate -> verify -> benchmark -> select search loop
-//! over a single target function's AST.
+//! `symthaea-forge`: a bounded mutate -> verify -> measure -> select search loop over one target
+//! function's Rust AST.
 //!
-//! This is Tier 2.1 of `DISCOVERY_AND_SELF_IMPROVEMENT_PLAN_2026-07-06.md`
-//! -- the one item in that plan requiring genuinely new construction, not
-//! a seam-fix. It answers the question "can Symthaea discover a better
-//! *algorithm*, not just tune numeric constants?" with a real, if
-//! deliberately scoped, yes: [`mutations`] applies AST-level structural
-//! mutations (comparison-operator swaps, arithmetic-operator swaps, and
-//! literal perturbation) via `syn`, not text/regex matching; [`fitness`]
-//! enforces correctness (compile, then existing tests) strictly
-//! pass/fail before a candidate is ever benchmarked; [`sandbox`] makes
-//! the necessary in-place staging crash-safe; [`search`] ties it together
-//! into a population/generations loop; and [`certificate`] records every
-//! winning candidate's full evidence for human review -- nothing here
-//! ever auto-applies a mutation to the real source tree.
+//! [`mutations`] applies local structural AST mutations via `syn`; [`fitness`] gates compilation
+//! and tests before any configured benchmark; [`sandbox`] provides an exclusive, fail-closed
+//! temporary staging lease because Cargo must see candidate source on disk; [`search`] restores the
+//! canonical source before retaining a candidate in memory; and [`certificate`] creates a
+//! human-reviewable report of the search survivor.
 //!
-//! # What this deliberately does NOT do
+//! # Authority boundary
 //!
-//! - No autonomous promotion. The search's output is a certificate + a
-//!   proposed file written to an output directory, never an in-place edit
-//!   of the real source. A human (today: whoever runs `forge-run` and
-//!   reviews `report.md`) decides whether to apply it.
-//! - No general-purpose program synthesis. The mutation operator set is
-//!   small and specific (see [`mutations`]); this is a *local* search
-//!   around an existing, working implementation, not code generation from
-//!   a specification.
-//! - No claim that every search run finds an improvement. Most won't --
-//!   that is the expected, honest outcome for a well-written starting
-//!   function with a small mutation operator set and a modest population/
-//!   generation budget. The infrastructure being real does not imply every
-//!   run being fruitful.
+//! - No staged mutation can be committed through [`sandbox`]; the staging type has no `commit()`
+//!   operation and explicit restoration errors abort search.
+//! - Pre-existing `.forge-orig` state is never auto-restored because it might belong to another
+//!   live Forge process. Search stops for explicit recovery.
+//! - A configured benchmark failure is an evaluation failure, not correctness-only mode.
+//! - Persistent CLI output is certificate/report evidence only and must resolve outside the
+//!   canonical workspace. Existing output files are not overwritten.
+//! - Forge's single-run benchmark score is a search heuristic, not replicated evidence of
+//!   superiority and not a production-promotion decision.
+//! - No general-purpose program synthesis or autonomous production activation is provided here.
+//!
+//! The evidence-first `symthaea-algorithms` stack is the intended destination for typed candidate
+//! identity, ordered transformation lineage, reproducible evaluation receipts, repeatability,
+//! robust comparison, and any future separately reviewed promotion policy.
 
 pub mod certificate;
 pub mod fitness;

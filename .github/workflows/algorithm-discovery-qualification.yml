@@ -6,6 +6,7 @@ on:
       - 'crates/core/symthaea-algorithms/**'
       - 'crates/core/symthaea-eml-egraph/**'
       - 'crates/domains/symthaea-algorithm-lab/**'
+      - 'crates/domains/symthaea-forge/**'
       - 'crates/bridges/symthaea-algorithm-egraph-bridge/**'
       - 'crates/bridges/symthaea-algorithm-evidence-collector/**'
       - 'crates/bridges/symthaea-hdc-algorithm-evidence/**'
@@ -16,6 +17,7 @@ on:
       - 'crates/core/symthaea-algorithms/**'
       - 'crates/core/symthaea-eml-egraph/**'
       - 'crates/domains/symthaea-algorithm-lab/**'
+      - 'crates/domains/symthaea-forge/**'
       - 'crates/bridges/symthaea-algorithm-egraph-bridge/**'
       - 'crates/bridges/symthaea-algorithm-evidence-collector/**'
       - 'crates/bridges/symthaea-hdc-algorithm-evidence/**'
@@ -42,6 +44,9 @@ jobs:
       - name: Test HDC discovery laboratory
         run: cargo test -p symthaea-algorithm-lab --lib -- --test-threads=1
 
+      - name: Test Forge search safety
+        run: cargo test -p symthaea-forge --all-targets -- --test-threads=1
+
       - name: Test e-graph lineage bridge
         run: cargo test -p symthaea-algorithm-egraph-bridge -- --test-threads=1
 
@@ -59,6 +64,7 @@ jobs:
           cargo clippy
           -p symthaea-algorithms
           -p symthaea-algorithm-lab
+          -p symthaea-forge
           -p symthaea-algorithm-egraph-bridge
           -p symthaea-algorithm-evidence-collector
           -p symthaea-hdc-algorithm-evidence
