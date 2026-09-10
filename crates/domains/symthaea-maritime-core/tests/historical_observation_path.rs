@@ -10,6 +10,7 @@ use symthaea_maritime_core::{
 const SCHEMA: &str = "xenia-verified-machine-session-evidence-v1";
 const PRINCIPAL: &str = "xenia-signing-identity-v1:blake3-256:abc";
 const SESSION_EVIDENCE: &str = "xenia-handshake-transcript-v1:blake3-256:def";
+const ADMISSION: &str = "xenia-machine-session-admission-v1:blake3-256:abc";
 
 fn session() -> AuthenticatedMachineSession {
     AuthenticatedMachineSession::from_verified_provider(
@@ -70,6 +71,7 @@ fn delayed_historical_reconciliation_preserves_the_live_observation_id() {
         1_000,
         2_000,
         1_400,
+        ADMISSION,
         "xenia-machine-authority-history-head-v1:blake3-256:abc",
         7,
         1_600,
@@ -90,5 +92,6 @@ fn delayed_historical_reconciliation_preserves_the_live_observation_id() {
 
     assert_eq!(live, delayed);
     assert_eq!(historical.session_evidence_binding(), SESSION_EVIDENCE);
+    assert_eq!(historical.provider_session_admission_binding(), ADMISSION);
     assert_eq!(historical.history_head_sequence(), 7);
 }
