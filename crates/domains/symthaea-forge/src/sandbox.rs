@@ -10,9 +10,12 @@
 //!    staging lease. A second Forge process cannot silently overwrite it.
 //! 3. Pre-existing backups are reported as recovery-required evidence. They are **not**
 //!    automatically restored because a backup may belong to another still-running Forge process.
-//! 4. [`StagedMutation::restore`] consumes the guard and reports restoration/removal failures.
-//!    `Drop` remains a best-effort crash/panic fallback only.
-//! 5. There is deliberately no `commit()` capability: this sandbox cannot make a staged candidate
+//! 4. The guard tracks the exact content Forge believes is on disk. If another writer changes the
+//!    target during evaluation, Forge refuses to overwrite that edit and retains the original
+//!    backup for explicit recovery.
+//! 5. [`StagedMutation::restore`] consumes the guard and reports restoration/removal failures.
+//!    `Drop` remains a best-effort panic fallback only.
+//! 6. There is deliberately no `commit()` capability: this sandbox cannot make a staged candidate
 //!    survive as the canonical source file.
 //!
 //! `SIGKILL` can still interrupt the mutation window. The resulting backup makes that state
@@ -31,7 +34,7 @@ pub enum SandboxError {
     OutsideProjectRoot { path: PathBuf, root: PathBuf },
     #[error("Forge staging/recovery backup already exists; explicit recovery is required: {0:?}")]
     RecoveryRequired(PathBuf),
-    #[error("target changed while Forge was acquiring its staging lease: {0:?}")]
+    #[error("target changed outside Forge's staging lease: {0:?}")]
     ConcurrentModification(PathBuf),
     #[error("io error on {path:?}: {source}")]
     Io {
@@ -47,10 +50,6 @@ pub struct Sandbox {
 }
 
 impl Sandbox {
-    /// Create a sandbox rooted at one exact canonical project directory.
-    ///
-    /// `search_roots` are inspected only for stale/live staging markers. Every existing root must
-    /// itself canonicalize beneath `project_root`; directory symlinks are never traversed.
     pub fn new(
         project_root: impl AsRef<Path>,
         search_roots: &[PathBuf],
@@ -165,8 +164,6 @@ impl Sandbox {
                 source,
             })?;
 
-        // Detect a non-Forge writer racing the lease acquisition window before any candidate bytes
-        // are written. Keep the backup on error so explicit recovery has the known original.
         let after_lease = std::fs::read_to_string(&canonical).map_err(|source| SandboxError::Io {
             path: canonical.clone(),
             source,
@@ -178,7 +175,8 @@ impl Sandbox {
         Ok(StagedMutation {
             file_path: canonical,
             backup_path,
-            original,
+            original: original.clone(),
+            expected_current: original,
             restored: false,
         })
     }
@@ -190,12 +188,12 @@ fn backup_path_for(file_path: &Path) -> PathBuf {
     PathBuf::from(name)
 }
 
-/// Exclusive guard over one temporary source mutation.
 #[derive(Debug)]
 pub struct StagedMutation {
     file_path: PathBuf,
     backup_path: PathBuf,
     original: String,
+    expected_current: String,
     restored: bool,
 }
 
@@ -208,30 +206,25 @@ impl StagedMutation {
         &self.original
     }
 
-    /// Write candidate content only while the staging lease still exists and the canonical file
-    /// still contains the original bytes observed when the lease was acquired.
-    pub fn write(&self, new_content: &str) -> Result<(), SandboxError> {
+    /// Replace the exact content currently owned by this lease with candidate content.
+    pub fn write(&mut self, new_content: &str) -> Result<(), SandboxError> {
         if !self.backup_path.is_file() {
             return Err(SandboxError::RecoveryRequired(self.backup_path.clone()));
         }
-        let current = std::fs::read_to_string(&self.file_path).map_err(|source| SandboxError::Io {
-            path: self.file_path.clone(),
-            source,
-        })?;
-        if current != self.original {
-            return Err(SandboxError::ConcurrentModification(self.file_path.clone()));
-        }
+        self.require_expected_current()?;
         std::fs::write(&self.file_path, new_content).map_err(|source| SandboxError::Io {
             path: self.file_path.clone(),
             source,
-        })
+        })?;
+        self.expected_current.clear();
+        self.expected_current.push_str(new_content);
+        Ok(())
     }
 
-    /// Restore the exact original source and release the staging lease.
-    ///
-    /// Search code should call this explicitly so restoration failures propagate. `Drop` is only
-    /// an emergency fallback for early-return/panic paths.
+    /// Restore the original only if the target still contains the exact candidate bytes Forge
+    /// placed there. A concurrent external edit is preserved and the backup is retained.
     pub fn restore(mut self) -> Result<(), SandboxError> {
+        self.require_expected_current()?;
         std::fs::write(&self.file_path, &self.original).map_err(|source| SandboxError::Io {
             path: self.file_path.clone(),
             source,
@@ -243,6 +236,18 @@ impl StagedMutation {
         self.restored = true;
         Ok(())
     }
+
+    fn require_expected_current(&self) -> Result<(), SandboxError> {
+        let current = std::fs::read_to_string(&self.file_path).map_err(|source| SandboxError::Io {
+            path: self.file_path.clone(),
+            source,
+        })?;
+        if current == self.expected_current {
+            Ok(())
+        } else {
+            Err(SandboxError::ConcurrentModification(self.file_path.clone()))
+        }
+    }
 }
 
 impl Drop for StagedMutation {
@@ -250,9 +255,26 @@ impl Drop for StagedMutation {
         if self.restored {
             return;
         }
+        match std::fs::read_to_string(&self.file_path) {
+            Ok(current) if current == self.expected_current => {}
+            Ok(_) => {
+                eprintln!(
+                    "forge: target {:?} changed outside the staging lease; refusing emergency overwrite; original retained at {:?}",
+                    self.file_path, self.backup_path
+                );
+                return;
+            }
+            Err(error) => {
+                eprintln!(
+                    "forge: cannot inspect {:?} during emergency restore: {error}; original retained at {:?}",
+                    self.file_path, self.backup_path
+                );
+                return;
+            }
+        }
         if let Err(error) = std::fs::write(&self.file_path, &self.original) {
             eprintln!(
-                "forge: emergency restore failed for {:?}: {error}; backup retained at {:?}",
+                "forge: emergency restore failed for {:?}: {error}; original retained at {:?}",
                 self.file_path, self.backup_path
             );
             return;
@@ -286,7 +308,7 @@ mod tests {
         let file = root.join("src/lib.rs");
         std::fs::write(&file, "const X: i32 = 1;\n").unwrap();
         let sandbox = Sandbox::new(&root, &[]).unwrap();
-        let staged = sandbox.stage(&file).unwrap();
+        let mut staged = sandbox.stage(&file).unwrap();
         staged.write("const X: i32 = 999;\n").unwrap();
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "const X: i32 = 999;\n");
         staged.restore().unwrap();
@@ -302,7 +324,7 @@ mod tests {
         std::fs::write(&file, "const X: i32 = 1;\n").unwrap();
         let sandbox = Sandbox::new(&root, &[]).unwrap();
         {
-            let staged = sandbox.stage(&file).unwrap();
+            let mut staged = sandbox.stage(&file).unwrap();
             staged.write("const X: i32 = 2;\n").unwrap();
         }
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "const X: i32 = 1;\n");
@@ -370,19 +392,23 @@ mod tests {
     }
 
     #[test]
-    fn write_detects_non_forge_modification_after_lease() {
+    fn concurrent_edit_is_preserved_and_backup_retained() {
         let root = temp_project("concurrent-write");
         let file = root.join("src/lib.rs");
         std::fs::write(&file, "const X: i32 = 1;\n").unwrap();
         let sandbox = Sandbox::new(&root, &[]).unwrap();
-        let staged = sandbox.stage(&file).unwrap();
+        let mut staged = sandbox.stage(&file).unwrap();
+        staged.write("candidate\n").unwrap();
         std::fs::write(&file, "external edit\n").unwrap();
         assert!(matches!(
-            staged.write("candidate\n"),
+            staged.restore(),
             Err(SandboxError::ConcurrentModification(_))
         ));
-        drop(staged);
-        assert_eq!(std::fs::read_to_string(&file).unwrap(), "const X: i32 = 1;\n");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "external edit\n");
+        assert_eq!(
+            std::fs::read_to_string(backup_path_for(&file.canonicalize().unwrap())).unwrap(),
+            "const X: i32 = 1;\n"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 }
