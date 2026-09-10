@@ -1,0 +1,132 @@
+# One-shot lock reconciliation for the test-only serde_json dependency added by
+# the capability provenance transport regression child. The helper may modify
+# only Cargo.lock, proves the parsed package delta is exactly the expected local
+# dependency edge, verifies --locked compilation, then self-deletes.
+
+name: Capability Provenance Transport Lock Once
+
+on:
+  push:
+    branches:
+      - architecture/capability-analysis-algorithm-provenance-hardening-v1
+    paths:
+      - .github/workflows/capability-provenance-transport-lock-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile-once:
+    name: Reconcile transport-test lock state once
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: architecture/capability-analysis-algorithm-provenance-hardening-v1
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Reconcile exact local package dependency and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          cp Cargo.lock /tmp/Cargo.lock.before
+
+          # This is deliberately the only unlocked Cargo operation. The parsed
+          # invariant below rejects every lock mutation except adding serde_json
+          # to the existing local symthaea-continuity package dependency list.
+          cargo check -p symthaea-continuity --all-targets
+
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          before = tomllib.loads(Path('/tmp/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+
+          if before.get('version') != after.get('version'):
+              raise SystemExit('Cargo.lock version changed')
+          if {k: v for k, v in before.items() if k != 'package'} != {k: v for k, v in after.items() if k != 'package'}:
+              raise SystemExit('non-package Cargo.lock metadata changed')
+
+          def key(pkg):
+              return (pkg.get('name'), pkg.get('version'), pkg.get('source'))
+
+          before_pkgs = before.get('package', [])
+          after_pkgs = after.get('package', [])
+          if len(before_pkgs) != len(after_pkgs):
+              raise SystemExit(f'package count changed: {len(before_pkgs)} -> {len(after_pkgs)}')
+
+          before_map = {key(pkg): pkg for pkg in before_pkgs}
+          after_map = {key(pkg): pkg for pkg in after_pkgs}
+          if len(before_map) != len(before_pkgs) or len(after_map) != len(after_pkgs):
+              raise SystemExit('package identity key is not unique')
+          if before_map.keys() != after_map.keys():
+              raise SystemExit('package identity set changed')
+
+          target = ('symthaea-continuity', '0.1.0', None)
+          if target not in before_map:
+              raise SystemExit('expected local symthaea-continuity lock package is absent')
+
+          changed = []
+          for package_key in before_map:
+              if before_map[package_key] != after_map[package_key]:
+                  changed.append(package_key)
+          if changed != [target]:
+              raise SystemExit(f'unexpected parsed package changes: {changed}')
+
+          left = dict(before_map[target])
+          right = dict(after_map[target])
+          before_deps = list(left.pop('dependencies', []))
+          after_deps = list(right.pop('dependencies', []))
+          if left != right:
+              raise SystemExit('target package changed outside dependencies')
+          if 'serde_json' in before_deps:
+              raise SystemExit('serde_json was unexpectedly already present in target lock dependencies')
+          if sorted(after_deps) != sorted(before_deps + ['serde_json']):
+              raise SystemExit(f'unexpected target dependency delta: {before_deps} -> {after_deps}')
+          if len(after_deps) != len(set(after_deps)):
+              raise SystemExit('target dependency list contains duplicates')
+          PY
+
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo check --locked -p symthaea-continuity --all-targets
+
+          mapfile -t changed < <(git diff --name-only)
+          if [[ "${#changed[@]}" -ne 1 || "${changed[0]}" != 'Cargo.lock' ]]; then
+            echo 'error: lock reconciliation changed unexpected tracked paths' >&2
+            printf '%s\n' "${changed[@]}" >&2
+            exit 1
+          fi
+
+          git add Cargo.lock
+          rm .github/workflows/capability-provenance-transport-lock-once.yml
+          git add .github/workflows/capability-provenance-transport-lock-once.yml
+
+          mapfile -t staged < <(git diff --cached --name-only)
+          if [[ "${#staged[@]}" -ne 2 ]]; then
+            echo 'error: unexpected staged path count' >&2
+            printf '%s\n' "${staged[@]}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${staged[@]}" | grep -Fxq Cargo.lock
+          printf '%s\n' "${staged[@]}" | grep -Fxq .github/workflows/capability-provenance-transport-lock-once.yml
+          git diff --cached --check
+
+          git commit -m "chore(continuity): reconcile provenance transport lock state"
+          git push origin HEAD:architecture/capability-analysis-algorithm-provenance-hardening-v1
