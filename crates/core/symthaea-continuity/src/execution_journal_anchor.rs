@@ -408,6 +408,9 @@ impl QualifiedExecutionJournalAnchorV1 {
     pub fn profile_id(&self) -> ExecutionJournalAnchorProfileId { self.profile_id }
     pub fn root_epoch(&self) -> u64 { self.root_epoch }
     pub fn anchor_sequence(&self) -> u64 { self.anchor_sequence }
+    pub fn predecessor_anchor_id(&self) -> Option<QualifiedExecutionJournalAnchorId> {
+        self.predecessor_anchor_id
+    }
     pub fn subject_id(&self) -> ContinuitySubjectId { self.subject_id }
     pub fn journal_digest(&self) -> ExecutionJournalDigest { self.journal_digest }
     pub fn journal_entry_count(&self) -> u64 { self.journal_entry_count }
