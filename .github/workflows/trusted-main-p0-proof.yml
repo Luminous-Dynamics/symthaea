@@ -1,0 +1,132 @@
+# Ephemeral branch-local execution harness for the trusted-main P0 proof tranche.
+# MUST NOT be merged. The trigger commit is the recipe; SUBJECT_SHA is the proof subject.
+
+name: Trusted Main P0 Proof (Ephemeral)
+
+on:
+  push:
+    branches:
+      - tools/trusted-main-protection-p0
+    paths:
+      - '.github/workflows/trusted-main-p0-proof.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trusted-main-p0-proof-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUBJECT_SHA: 22efbbd1ee4b8d797bc13ae97ecb7b51faf10cfe
+  SUBJECT_TREE: 7e8402b3352e295e80d552343b1a1c69ed8ad7d7
+
+jobs:
+  proof:
+    name: Exact-subject P0 proof suite
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact recipe commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind recipe identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow='.github/workflows/trusted-main-p0-proof.yml'
+          actual_head="$(git rev-parse HEAD)"
+          checkout_count="$(grep -Ec '^[[:space:]]+uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262[[:space:]]*$' "$workflow" || true)"
+          upload_count="$(grep -Ec '^[[:space:]]+uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02[[:space:]]*$' "$workflow" || true)"
+          test "$actual_head" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = 'refs/heads/tools/trusted-main-protection-p0'
+          test "$checkout_count" -eq 1
+          test "$upload_count" -eq 1
+          if grep -Eq '^[[:space:]]+uses: actions/(checkout|upload-artifact)@v[0-9]+[[:space:]]*$' "$workflow"; then
+            echo 'mutable major-version action reference found in proof recipe' >&2
+            exit 1
+          fi
+          echo "RECIPE_SHA=$actual_head" >> "$GITHUB_ENV"
+          echo "RECIPE_TREE=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_ENV"
+          echo "RECIPE_WORKFLOW_SHA256=$(sha256sum "$workflow" | awk '{print $1}')" >> "$GITHUB_ENV"
+
+      - name: Checkout frozen proof subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "$SUBJECT_SHA^{commit}"
+          git checkout --detach "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$SUBJECT_TREE"
+          test ! -e .github/workflows/trusted-main-p0-proof.yml
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          echo 'subject_preflight=clean-exact-detached-checkout'
+
+      - name: Execute trusted-main proof regressions
+        id: proofs
+        shell: bash
+        run: |
+          set -u
+          python3 -m unittest discover -s tests/python -p 'test_trusted_main_*.py' -v
+          test_rc=$?
+          postflight_rc=0
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA" || postflight_rc=1
+          test "$(git rev-parse 'HEAD^{tree}')" = "$SUBJECT_TREE" || postflight_rc=1
+          test -z "$(git status --porcelain=v1 --untracked-files=all)" || postflight_rc=1
+          if [[ "$test_rc" -ne 0 || "$postflight_rc" -ne 0 ]]; then exit 1; fi
+          echo 'subject_postflight=clean-exact-detached-checkout'
+
+      - name: Write proof receipt
+        if: always()
+        shell: bash
+        env:
+          PROOF_OUTCOME: ${{ steps.proofs.outcome }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/trusted-main-p0-proof-v3.tsv"
+          status=FAIL
+          if [[ "$PROOF_OUTCOME" == success ]]; then status=PASS; fi
+          recipe_sha="${RECIPE_SHA:-$GITHUB_SHA}"
+          recipe_tree="${RECIPE_TREE:-unavailable}"
+          recipe_workflow_sha256="${RECIPE_WORKFLOW_SHA256:-unavailable}"
+          if [[ "$recipe_tree" == unavailable ]] && git cat-file -e "$GITHUB_SHA^{commit}" 2>/dev/null; then recipe_tree="$(git show -s --format=%T "$GITHUB_SHA")"; fi
+          {
+            printf 'schema\tsymthaea-trusted-main-p0-proof-attempt-v3\n'
+            printf 'status\t%s\n' "$status"
+            printf 'scope\tsoftware-contract-only\n'
+            printf 'server_p0_authority\tnone\n'
+            printf 'scientific_authority\tnone\n'
+            printf 'current_admission\tnot-evaluated\n'
+            printf 'receipt_attestation\tnone\n'
+            printf 'subject_sha\t%s\n' "$SUBJECT_SHA"
+            printf 'subject_tree\t%s\n' "$SUBJECT_TREE"
+            printf 'recipe_sha\t%s\n' "$recipe_sha"
+            printf 'recipe_tree\t%s\n' "$recipe_tree"
+            printf 'recipe_workflow_sha256\t%s\n' "$recipe_workflow_sha256"
+            printf 'github_run_id\t%s\n' "$GITHUB_RUN_ID"
+            printf 'github_run_attempt\t%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'runner_os\t%s\n' "$RUNNER_OS"
+            printf 'runner_arch\t%s\n' "$RUNNER_ARCH"
+            printf 'image_os\t%s\n' "${ImageOS:-unknown}"
+            printf 'image_version\t%s\n' "${ImageVersion:-unknown}"
+            printf 'kernel_release\t%s\n' "$(uname -r)"
+            printf 'python_version\t%s\n' "$(python3 --version 2>&1)"
+            printf 'test_discovery\ttests/python:test_trusted_main_*.py\n'
+          } > "$receipt"
+          digest="$(sha256sum "$receipt" | awk '{print $1}')"
+          echo "trusted-main-p0 proof_receipt_sha256=$digest"
+          cat "$receipt"
+
+      - name: Upload proof receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: trusted-main-p0-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/trusted-main-p0-proof-v3.tsv
+          if-no-files-found: error
+          retention-days: 14
