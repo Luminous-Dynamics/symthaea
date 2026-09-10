@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-algorithm-egraph-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Evidence-preserving bridge from Symthaea EML e-graph proofs to algorithm lineage"
+
+[dependencies]
+egg = "0.10"
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-eml-egraph = { path = "../../core/symthaea-eml-egraph" }
+thiserror = { workspace = true }
