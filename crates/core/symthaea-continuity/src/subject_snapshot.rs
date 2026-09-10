@@ -226,13 +226,13 @@ fn validate_parent_closure(
 ) -> Result<(), ContinuitySubjectSnapshotError> {
     let known: BTreeSet<_> = subjects.iter().map(ContinuitySubjectV1::id).collect();
     for subject in subjects {
-        if let Some(parent) = subject.parent_subject_id() {
-            if !known.contains(&parent) {
-                return Err(ContinuitySubjectSnapshotError::MissingParent {
-                    child: subject.id(),
-                    parent,
-                });
-            }
+        if let Some(parent) = subject.parent_subject_id()
+            && !known.contains(&parent)
+        {
+            return Err(ContinuitySubjectSnapshotError::MissingParent {
+                child: subject.id(),
+                parent,
+            });
         }
     }
     Ok(())
