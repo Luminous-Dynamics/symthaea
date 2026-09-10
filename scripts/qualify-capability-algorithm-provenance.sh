@@ -24,6 +24,7 @@ source_state="unverified"
 strict_clippy_exit="not-run"
 legacy_lint_diagnostic_count="not-run"
 legacy_lint_allowlist="dead_code@compose.rs,exact_policy.rs,verifier.rs,witness.rs;clippy::too_many_arguments@observation.rs"
+format_scope="crates/core/symthaea-continuity/src/capability_analysis_provenance.rs"
 activation_semantics="symthaea-continuity-capability-activation-monotone-fixed-point-v1"
 counterfactual_semantics="symthaea-continuity-capability-counterfactual-bounded-support-frontier-v1"
 
@@ -73,6 +74,7 @@ write_receipt() {
         printf 'exit_code\t%s\n' "$exit_code"
         printf 'terminal_stage\t%s\n' "$terminal_stage"
         printf 'scope\tcapability-algorithm-provenance-software-contract-only\n'
+        printf 'format_scope\t%s\n' "$format_scope"
         printf 'runtime_semantic_provenance\tseparate-from-ci-source-attestation\n'
         printf 'real_world_availability_authority\tnone\n'
         printf 'scientific_authority\tnone\n'
@@ -142,6 +144,7 @@ write_receipt() {
             echo "- committed tree: \`$head_tree\`"
             echo "- terminal stage: \`$terminal_stage\`"
             echo "- source state: \`$source_state\`"
+            echo "- format scope: \`$format_scope\`"
             echo "- activation semantics: \`$activation_semantics\`"
             echo "- counterfactual semantics: \`$counterfactual_semantics\`"
             echo "- strict Clippy exit: \`$strict_clippy_exit\`"
@@ -206,8 +209,12 @@ grep -Fq "$counterfactual_semantics" crates/core/symthaea-continuity/src/capabil
 stage="cargo_metadata"
 cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
+# Formatting is deliberately scoped to the new theorem source. Package-wide
+# rustfmt would import unrelated historical style drift into this focused proof.
+# Locked all-target compilation and tests below still exercise crate exports and
+# integration with the rest of symthaea-continuity.
 stage="format"
-cargo fmt -p symthaea-continuity -- --check
+rustfmt --edition 2024 --check "$format_scope"
 
 stage="check_all_targets"
 cargo check --locked -p symthaea-continuity --all-targets
