@@ -1,0 +1,65 @@
+# One-shot mechanical formatter for the exact typed-subject qualification scope.
+# This workflow must delete itself in the same commit that records rustfmt output.
+
+name: Continuity Subject Rustfmt Once
+
+on:
+  push:
+    branches:
+      - 'ci/continuity-subject-snapshot-exact-head-v1'
+
+permissions:
+  contents: write
+
+jobs:
+  format-once:
+    name: Apply pinned subject rustfmt once
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ci/continuity-subject-snapshot-exact-head-v1
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Format exact subject sources and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          scope='crates/core/symthaea-continuity/src/scope.rs'
+          snapshot='crates/core/symthaea-continuity/src/subject_snapshot.rs'
+          rustfmt --edition 2024 "$scope" "$snapshot"
+
+          mapfile -t changed < <(git diff --name-only)
+          if [[ "${#changed[@]}" -eq 0 ]]; then
+            echo 'error: pinned rustfmt produced no subject-source changes' >&2
+            exit 1
+          fi
+          for path in "${changed[@]}"; do
+            case "$path" in
+              "$scope"|"$snapshot") ;;
+              *) echo "error: rustfmt changed unexpected path: $path" >&2; exit 1 ;;
+            esac
+          done
+
+          git add "$scope" "$snapshot"
+          rm .github/workflows/continuity-subject-format-once.yml
+          git add .github/workflows/continuity-subject-format-once.yml
+          git diff --cached --check
+          git commit -m "style(continuity): apply pinned subject rustfmt"
+          git push origin HEAD:ci/continuity-subject-snapshot-exact-head-v1
