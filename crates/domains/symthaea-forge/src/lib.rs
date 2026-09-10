@@ -19,8 +19,9 @@
 //! constrains cross-run aggregation, [`family_learning`] introduces generator-scoped operator
 //! families, [`family_context_learning`] permits family aggregation only across distinct exact-
 //! context runs, [`sequence_learning`] reconstructs accepted family history at generation
-//! boundaries, and [`sequence_stats`] aggregates bounded-history conditional outcomes only across
-//! exact-context repeated-search cohorts.
+//! boundaries, [`sequence_stats`] aggregates bounded-history conditional outcomes only across
+//! exact-context repeated-search cohorts, and [`corpus_split`] freezes outcome-independent
+//! train/validation/holdout membership before future model fitting.
 //!
 //! # Authority boundary
 //!
@@ -31,20 +32,25 @@
 //!   state only for later generations.
 //! - History order is explicit and content-addressed; first-order and higher-order statistics do not
 //!   silently mix.
+//! - Corpus role ranking depends only on a frozen salt and semantic `DiscoveryRun` identity, never
+//!   on outcome-bearing batch/cohort identity.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
 //!   benchmark is a candidate evaluation rejection.
 //! - Persistent output must resolve outside the canonical workspace and is create-new only.
 //! - Forge's local benchmark remains a search heuristic, not replicated superiority evidence.
-//! - Learning tables, sequences, and conditional statistics are descriptive search memory only.
-//! - No promotion, merge, activation, search-policy mutation, or runtime authority is provided here.
+//! - Learning tables, sequences, conditional statistics, and corpus partitions are descriptive
+//!   research records only.
+//! - No promotion, merge, activation, model fitting, search-policy mutation, or runtime authority is
+//!   provided here.
 
 pub mod bundle;
 pub mod bundle_verify;
 pub mod candidate;
 pub mod certificate;
 pub mod context_learning;
+pub mod corpus_split;
 pub mod family_context_learning;
 pub mod family_learning;
 pub mod fitness;
@@ -72,6 +78,10 @@ pub use certificate::{CertificateError, ForgeCandidate, ForgeCertificate};
 pub use context_learning::{
     ContextBoundForgeBatch, ContextualTransformationStats, ExactContextForgeCohort,
     ExactContextTransformationTable, ForgeContextLearningError,
+};
+pub use corpus_split::{
+    ForgeCorpusAssignment, ForgeCorpusRole, ForgeCorpusSplitError, ForgeCorpusSplitSpec,
+    ForgeSequenceCorpusSplit,
 };
 pub use family_context_learning::{
     ContextBoundForgeFamilyBatch, ContextualForgeFamilyStats, ExactContextForgeFamilyCohort,
