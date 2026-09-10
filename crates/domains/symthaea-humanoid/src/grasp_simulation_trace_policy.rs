@@ -16,6 +16,7 @@ use crate::grasp_simulation_trace_attestation::{
 };
 
 pub const HUMANOID_GRASP_SIMULATION_TRACE_TRUST_POLICY_SCHEMA_VERSION: u32 = 1;
+pub const HUMANOID_POLICY_VERIFIED_GRASP_SIMULATION_TRACE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HumanoidGraspSimulationTraceTrustPolicy {
@@ -121,9 +122,16 @@ pub enum HumanoidGraspSimulationTracePolicyVerificationFailure {
 
 /// Opaque trace provenance that passed both cryptographic verification and the
 /// exact precommitted campaign trust policy.
+///
+/// The exact signed claim is retained so future import/serialization validation
+/// can re-run producer/key/scheme/revocation/lifetime admission rather than merely
+/// trusting that this wrapper must once have been constructed through the binder.
 pub struct HumanoidPolicyVerifiedGraspSimulationTrace {
+    schema_version: u32,
     evidence_policy_digest: HumanoidEvidenceDigest,
+    claim: HumanoidGraspSimulationTraceClaim,
     inner: HumanoidVerifiedGraspSimulationTrace,
+    binding_digest: HumanoidEvidenceDigest,
 }
 
 impl std::fmt::Debug for HumanoidPolicyVerifiedGraspSimulationTrace {
@@ -131,8 +139,11 @@ impl std::fmt::Debug for HumanoidPolicyVerifiedGraspSimulationTrace {
         f.debug_struct("HumanoidPolicyVerifiedGraspSimulationTrace")
             .field("evidence_policy_digest", &self.evidence_policy_digest)
             .field("trace_digest", &self.inner.trace_digest())
+            .field("statement_digest", &self.claim.statement_digest())
+            .field("producer_id", &self.claim.producer_id())
             .field("verifier_digest", &self.inner.verifier_digest())
             .field("verification_digest", &self.inner.verification_digest())
+            .field("binding_digest", &self.binding_digest)
             .finish()
     }
 }
@@ -154,8 +165,16 @@ impl HumanoidPolicyVerifiedGraspSimulationTrace {
         self.inner.verification_digest()
     }
 
+    pub const fn binding_digest(&self) -> HumanoidEvidenceDigest {
+        self.binding_digest
+    }
+
     pub const fn valid_until_unix_millis(&self) -> u64 {
         self.inner.valid_until_unix_millis()
+    }
+
+    pub fn claim(&self) -> &HumanoidGraspSimulationTraceClaim {
+        &self.claim
     }
 
     pub fn validate_for(
@@ -164,10 +183,22 @@ impl HumanoidPolicyVerifiedGraspSimulationTrace {
         policy: &HumanoidGraspSimulationTraceTrustPolicy,
         now_unix_millis: u64,
     ) -> bool {
-        policy.validate()
+        self.schema_version == HUMANOID_POLICY_VERIFIED_GRASP_SIMULATION_TRACE_SCHEMA_VERSION
+            && policy.validate()
             && self.evidence_policy_digest == policy.policy_digest()
+            && self.claim.validate()
+            && policy.admits_claim(&self.claim)
+            && now_unix_millis > 0
+            && now_unix_millis >= self.claim.attested_at_unix_millis()
+            && now_unix_millis <= self.claim.valid_until_unix_millis()
+            && self.claim.trace_digest() == trace.trace_digest()
+            && self.claim.trace_digest() == self.inner.trace_digest()
+            && self.claim.producer_id() == self.inner.producer_id()
+            && self.claim.producer_artifact_digest() == self.inner.producer_artifact_digest()
             && self.inner.verifier_digest() == policy.verifier_digest()
             && self.inner.validate_for(trace, now_unix_millis)
+            && !self.binding_digest.is_zero()
+            && self.binding_digest == digest_policy_bound_verification(self)
     }
 }
 
@@ -199,10 +230,14 @@ pub fn verify_policy_bound_humanoid_grasp_simulation_trace(
         return Err(HumanoidGraspSimulationTracePolicyVerificationFailure::VerifierPolicyMismatch);
     }
 
-    let value = HumanoidPolicyVerifiedGraspSimulationTrace {
+    let mut value = HumanoidPolicyVerifiedGraspSimulationTrace {
+        schema_version: HUMANOID_POLICY_VERIFIED_GRASP_SIMULATION_TRACE_SCHEMA_VERSION,
         evidence_policy_digest: policy.policy_digest(),
+        claim: claim.clone(),
         inner,
+        binding_digest: HumanoidEvidenceDigest::ZERO,
     };
+    value.binding_digest = digest_policy_bound_verification(&value);
     value
         .validate_for(trace, policy, now_unix_millis)
         .then_some(value)
@@ -220,6 +255,17 @@ fn digest_policy(value: &HumanoidGraspSimulationTraceTrustPolicy) -> HumanoidEvi
         .u64(value.minimum_revocation_epoch)
         .u64(value.maximum_claim_lifetime_millis)
         .digest(value.verifier_digest);
+    h.finish()
+}
+
+fn digest_policy_bound_verification(
+    value: &HumanoidPolicyVerifiedGraspSimulationTrace,
+) -> HumanoidEvidenceDigest {
+    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-simulation-trace-policy-binding.v1");
+    h.u32(value.schema_version)
+        .digest(value.evidence_policy_digest)
+        .digest(value.claim.statement_digest())
+        .digest(value.inner.verification_digest());
     h.finish()
 }
 
