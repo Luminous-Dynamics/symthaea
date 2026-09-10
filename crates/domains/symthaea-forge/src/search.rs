@@ -6,8 +6,16 @@
 //! source on disk. Every candidate is explicitly restored before search decisions continue; the
 //! RAII drop path is only a panic/early-return fallback. A configured benchmark that fails is a
 //! rejected evaluation, never an alias for correctness-only mode.
+//!
+//! Search survivors retain the exact full-file source bytes that were staged and checked. Their
+//! certificates content-address those bytes and every accepted parent->child mutation. This makes
+//! Forge a useful candidate generator for `symthaea-algorithms` without upgrading its local search
+//! heuristic into evidence-grade performance or promotion authority.
 
-use crate::certificate::{BenchmarkEvidence, ForgeCertificate, gate_result_to_evidence};
+use crate::certificate::{
+    BenchmarkEvidence, ForgeCandidate, ForgeCertificate, MutationRecord, full_source_artifact_id,
+    gate_result_to_evidence,
+};
 use crate::fitness::{EvaluationTarget, run_benchmark, run_correctness_gates};
 use crate::mutations::{Mutator, find_function_body_mut};
 use crate::sandbox::Sandbox;
@@ -52,9 +60,9 @@ impl SearchStats {
 pub struct SearchOutcome {
     pub stats: SearchStats,
     pub baseline_benchmark_score: Option<f64>,
-    /// Best search candidate under the configured heuristic. This remains a human-review proposal,
-    /// not evidence of replicated superiority or production eligibility.
-    pub best: Option<ForgeCertificate>,
+    /// Best search candidate under the configured heuristic. The object contains the exact full
+    /// source bytes plus a self-validating certificate; it is still only a proposal.
+    pub best: Option<ForgeCandidate>,
 }
 
 fn build_eval_target<'a>(config: &'a ForgeConfig, features: &'a [&'a str]) -> EvaluationTarget<'a> {
@@ -83,7 +91,9 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
     let sandbox = Sandbox::new(&config.workspace_root, &[target_dir])?;
 
     let original_source = std::fs::read_to_string(&config.target_file)?;
+    let baseline_artifact_id = full_source_artifact_id(&original_source);
     let mut current_best_source = original_source.clone();
+    let mut current_best_artifact_id = baseline_artifact_id.clone();
     let feature_refs: Vec<&str> = config.features.iter().map(String::as_str).collect();
     let target = || build_eval_target(config, &feature_refs);
 
@@ -106,12 +116,12 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
     let mutator = Mutator::default();
     let mut rng = StdRng::seed_from_u64(config.seed);
     let mut stats = SearchStats::default();
-    let mut best: Option<ForgeCertificate> = None;
+    let mut best: Option<ForgeCandidate> = None;
     let mut current_best_score = baseline_score;
-    let mut mutation_history: Vec<crate::certificate::MutationRecord> = Vec::new();
+    let mut mutation_history: Vec<MutationRecord> = Vec::new();
 
     for generation in 0..config.generations {
-        let mut generation_winner: Option<(String, ForgeCertificate)> = None;
+        let mut generation_winner: Option<ForgeCandidate> = None;
 
         for _ in 0..config.population {
             stats.candidates_attempted += 1;
@@ -135,6 +145,7 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 continue;
             };
             let candidate_source = render_file(&file);
+            let candidate_artifact_id = full_source_artifact_id(&candidate_source);
 
             let mut staged = sandbox.stage(&config.target_file)?;
             staged.write(&candidate_source)?;
@@ -150,7 +161,6 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 } else {
                     stats.candidates_failed_test += 1;
                 }
-                // Restoration is part of the search theorem, not a best-effort side effect.
                 staged.restore()?;
                 continue;
             }
@@ -168,8 +178,8 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 }
             };
 
-            // The real source must be restored before any candidate is retained in memory or a
-            // certificate is constructed. Search state and source-tree state remain separate.
+            // Source restoration is part of candidate validity. Nothing is retained until this
+            // succeeds, and the certificate still names the exact bytes that were just evaluated.
             staged.restore()?;
 
             let benchmark_evidence = match (&bench, current_best_score) {
@@ -189,17 +199,14 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                     })
                 }
                 (None, None) => None,
-                // `run_benchmark` can return None only when no benchmark was configured. A mixed
-                // state here means the baseline/candidate evaluation contract changed mid-run.
                 _ => anyhow::bail!("Forge benchmark configuration changed during one search run"),
             };
 
             let improved = match (&bench, current_best_score) {
                 (Some(candidate), Some(parent_score)) => candidate.score < parent_score,
-                (None, None) => true, // explicit correctness-only search mode
+                (None, None) => true,
                 _ => false,
             };
-
             if !improved {
                 continue;
             }
@@ -209,31 +216,38 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 .unwrap_or_default();
             let after_source = extract_function_source(&candidate_source, &config.target_function)
                 .unwrap_or_default();
-            let mut candidate_history = mutation_history.clone();
-            candidate_history.push(crate::certificate::MutationRecord {
+            let accepted_mutation = MutationRecord::new(
                 generation,
-                operator: mutation.operator.to_string(),
-                detail: mutation.detail.clone(),
-            });
-            let cert = ForgeCertificate {
+                mutation.operator,
+                mutation.detail.clone(),
+                current_best_artifact_id.clone(),
+                candidate_artifact_id.clone(),
+            );
+            let mut candidate_history = mutation_history.clone();
+            candidate_history.push(accepted_mutation.clone());
+            let certificate = ForgeCertificate {
                 generated_at_unix_ms: now_millis(),
                 target_file: config.target_file.clone(),
                 target_function: config.target_function.clone(),
                 package: config.package.clone(),
                 git_sha: current_git_sha(&config.workspace_root),
                 generation,
-                mutation_operator: mutation.operator.to_string(),
-                mutation_detail: mutation.detail.clone(),
+                baseline_artifact_id: baseline_artifact_id.clone(),
+                candidate_artifact_id,
+                mutation_operator: accepted_mutation.operator.clone(),
+                mutation_detail: accepted_mutation.detail.clone(),
                 mutation_history: candidate_history,
                 gates: gates.iter().map(gate_result_to_evidence).collect(),
                 benchmark: benchmark_evidence,
                 before_source,
                 after_source,
             };
+            let candidate = ForgeCandidate::new(certificate, candidate_source)?;
 
-            let should_replace_generation_winner = match (&generation_winner, &cert.benchmark) {
+            let should_replace_generation_winner = match (&generation_winner, candidate.certificate().benchmark.as_ref()) {
                 (None, _) => true,
-                (Some((_, previous)), Some(candidate_benchmark)) => previous
+                (Some(previous), Some(candidate_benchmark)) => previous
+                    .certificate()
                     .benchmark
                     .as_ref()
                     .is_some_and(|previous_benchmark| {
@@ -244,17 +258,19 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 (Some(_), None) => false,
             };
             if should_replace_generation_winner {
-                generation_winner = Some((candidate_source, cert));
+                generation_winner = Some(candidate);
             }
         }
 
-        if let Some((source, cert)) = generation_winner {
-            if let Some(benchmark) = &cert.benchmark {
+        if let Some(candidate) = generation_winner {
+            candidate.validate()?;
+            if let Some(benchmark) = &candidate.certificate().benchmark {
                 current_best_score = Some(benchmark.candidate_score);
             }
-            current_best_source = source;
-            mutation_history = cert.mutation_history.clone();
-            best = Some(cert);
+            current_best_source = candidate.full_source().to_string();
+            current_best_artifact_id = candidate.artifact_id().clone();
+            mutation_history = candidate.certificate().mutation_history.clone();
+            best = Some(candidate);
         }
     }
 
