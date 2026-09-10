@@ -20,8 +20,9 @@
 //! families, [`family_context_learning`] permits family aggregation only across distinct exact-
 //! context runs, [`sequence_learning`] reconstructs accepted family history at generation
 //! boundaries, [`sequence_stats`] aggregates bounded-history conditional outcomes only across
-//! exact-context repeated-search cohorts, and [`corpus_split`] freezes outcome-independent
-//! train/validation/holdout membership before future model fitting.
+//! exact-context repeated-search cohorts, [`corpus_split`] freezes outcome-independent
+//! train/validation/holdout membership, and [`proposal_exposure`] defines the complete opportunity
+//! evidence required before those observational outcomes may inform future policy learning.
 //!
 //! # Authority boundary
 //!
@@ -34,16 +35,18 @@
 //!   silently mix.
 //! - Corpus role ranking depends only on a frozen salt and semantic `DiscoveryRun` identity, never
 //!   on outcome-bearing batch/cohort identity.
+//! - Proposal exposure records exact eligible-site counts and selected pair; raw family success is
+//!   not eligible for policy learning without complete exposure qualification.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
 //!   benchmark is a candidate evaluation rejection.
 //! - Persistent output must resolve outside the canonical workspace and is create-new only.
 //! - Forge's local benchmark remains a search heuristic, not replicated superiority evidence.
-//! - Learning tables, sequences, conditional statistics, and corpus partitions are descriptive
-//!   research records only.
-//! - No promotion, merge, activation, model fitting, search-policy mutation, or runtime authority is
-//!   provided here.
+//! - Learning tables, sequences, conditional statistics, corpus partitions, and exposure receipts
+//!   are descriptive research records only.
+//! - No promotion, merge, activation, model fitting, inverse-propensity estimator, search-policy
+//!   mutation, or runtime authority is provided here.
 
 pub mod bundle;
 pub mod bundle_verify;
@@ -57,6 +60,7 @@ pub mod fitness;
 pub mod learning;
 pub mod mutations;
 pub mod observations;
+pub mod proposal_exposure;
 pub mod sandbox;
 pub mod search;
 pub mod sequence_learning;
@@ -96,6 +100,11 @@ pub use learning::{
     ForgeLearningError, ForgeTrialBatch, TransformationOutcomeStats, TransformationOutcomeTable,
 };
 pub use observations::ForgeObservationError;
+pub use proposal_exposure::{
+    ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
+    ForgeProposalExposureArchive, ForgeProposalExposureError, ForgeProposalLearningQualification,
+    ForgeProposalPolicy, ForgeProposalRule, ForgeProposalSelection,
+};
 pub use search::{
     run_search, run_search_recorded, ForgeConfig, SearchFailure, SearchOutcome, SearchRecord,
     SearchStats,
