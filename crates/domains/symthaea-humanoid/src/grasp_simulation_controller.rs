@@ -30,6 +30,8 @@ pub const HUMANOID_GRASP_SIMULATION_CONTROLLER_POLICY_SCHEMA_VERSION: u32 = 1;
 pub const HUMANOID_GRASP_SIMULATION_SESSION_SCHEMA_VERSION: u32 = 1;
 pub const HUMANOID_GRASP_SIMULATION_PROPOSAL_SCHEMA_VERSION: u32 = 1;
 
+pub mod causal_trace;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidGraspSimulationControllerPolicy {
     schema_version: u32,
