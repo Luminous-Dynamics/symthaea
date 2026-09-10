@@ -7,6 +7,8 @@ on:
       - 'crates/domains/symthaea-replicator-ledger/**'
       - 'docs/architecture/replicator-safety/**'
       - '.github/workflows/rsk-safety.yml'
+      - 'scripts/check-class-a-changes.sh'
+      - 'docs/compliance/GOVERNANCE_CHARTER.md'
   push:
     branches: [main]
     paths:
@@ -14,6 +16,8 @@ on:
       - 'crates/domains/symthaea-replicator-ledger/**'
       - 'docs/architecture/replicator-safety/**'
       - '.github/workflows/rsk-safety.yml'
+      - 'scripts/check-class-a-changes.sh'
+      - 'docs/compliance/GOVERNANCE_CHARTER.md'
   workflow_dispatch:
 
 permissions:
@@ -28,6 +32,38 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  rsk-governance:
+    name: RSK Class A ADR gate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require an ADR for RSK safety-boundary changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="origin/${GITHUB_BASE_REF}"
+          changed_files="$(git diff --name-only "${base}"...HEAD)"
+
+          class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-ledger/|\.github/workflows/rsk-safety\.yml$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
+
+          if ! printf '%s\n' "${changed_files}" | grep -Eq "${class_a_pattern}"; then
+            echo "No RSK Class A implementation/governance surface changed."
+            exit 0
+          fi
+
+          echo "RSK Class A surface changed; verifying ADR evidence."
+          if ! printf '%s\n' "${changed_files}" | grep -Eq '^docs/compliance/adr/ADR-[0-9]+.*\.md$'; then
+            echo "ERROR: RSK Class A changes require a changed ADR under docs/compliance/adr/."
+            exit 1
+          fi
+
+          echo "Changed ADR found. RSK Class A governance prerequisite satisfied."
+
   rsk-core:
     name: RSK constitutional + ledger checks
     runs-on: ubuntu-latest
