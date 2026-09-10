@@ -269,6 +269,10 @@ impl HumanoidGraspControllerQualificationPolicy {
         &self.campaign_id
     }
 
+    pub const fn required_execution_purpose(&self) -> HumanoidExecutionPurpose {
+        self.required_execution_purpose
+    }
+
     pub const fn policy_digest(&self) -> HumanoidEvidenceDigest {
         self.policy_digest
     }
@@ -474,6 +478,10 @@ impl HumanoidGraspControllerQualificationTrial {
 
     pub const fn retention_lost_after_success(&self) -> bool {
         self.retention_lost_after_success
+    }
+
+    pub const fn execution_purpose(&self) -> HumanoidExecutionPurpose {
+        self.execution_purpose
     }
 
     pub const fn trial_digest(&self) -> HumanoidEvidenceDigest {

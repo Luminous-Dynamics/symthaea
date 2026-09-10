@@ -19,6 +19,11 @@ pub mod grasp_contact_evidence;
 pub mod grasp_retention_evidence;
 pub mod grasp_acquisition_intent;
 pub mod grasp_controller_qualification;
+pub mod grasp_measurement_coverage;
+pub mod grasp_qualification_validation;
+pub mod qualification_evidence_attestation;
+#[cfg(test)]
+mod qualification_evidence_attestation_tests;
 pub mod capability_envelope;
 pub mod capability_request;
 pub mod cartesian_hand_reference;
@@ -160,6 +165,9 @@ pub use grasp_contact_evidence::*;
 pub use grasp_retention_evidence::*;
 pub use grasp_acquisition_intent::*;
 pub use grasp_controller_qualification::*;
+pub use grasp_measurement_coverage::*;
+pub use grasp_qualification_validation::*;
+pub use qualification_evidence_attestation::*;
 pub use capability_envelope::*;
 pub use capability_request::*;
 pub use cartesian_hand_reference::*;
@@ -244,6 +252,12 @@ pub use vision_terrain::*;
 pub use whole_body::*;
 pub use whole_body_intent::*;
 pub use whole_body_lowering::*;
+
+impl PartialEq for HumanoidMeasuredGraspControllerQualificationTrial {
+    fn eq(&self, other: &Self) -> bool {
+        self.bundle_digest() == other.bundle_digest()
+    }
+}
 
 pub use crate::control::GaitControlProfile;
 pub use control::{
