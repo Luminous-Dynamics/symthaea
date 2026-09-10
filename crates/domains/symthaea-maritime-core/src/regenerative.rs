@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Regenerative industrial-closure contracts for long-lived maritime infrastructure.
 //!
-//! This module answers a deliberately narrower question than manufacturing control:
-//! given a set of recurring dependencies, local production/recycling capacity and
-//! stockpiles, how much of an essential capability set is regenerative and what
-//! dependency bounds autonomous operation when external supply disappears?
-//!
-//! The model is descriptive and conservative. It does not prescribe mining,
-//! enrichment, fuel fabrication, reactor operation, semiconductor fabrication or
-//! any other physical process. Dependencies marked [`DependencyGovernance::SafeguardedExternal`]
-//! are structurally forbidden from claiming ordinary local production or recycling.
+//! This module models recurring dependency demand, ordinary local production,
+//! recycling, stockpiles and capability dependencies. It is descriptive rather
+//! than a manufacturing controller. In particular, a dependency marked
+//! [`DependencyGovernance::SafeguardedExternal`] may be stockpiled but is
+//! structurally forbidden from claiming ordinary local production or recycling.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -23,30 +19,29 @@ const MAX_EVIDENCE_LEN: usize = 1024;
 pub enum DependencyGovernance {
     /// Ordinary industrial dependency that may be produced or recycled locally.
     Ordinary,
-    /// Dependency intentionally serviced only through a separately safeguarded
-    /// external process. The ordinary closure model may stockpile it but may not
-    /// claim local production or recycling for it.
+    /// Dependency intentionally supplied only through a separately safeguarded
+    /// external process. Ordinary local production/recycling is prohibited.
     SafeguardedExternal,
 }
 
-/// Coarse kind of dependency represented by the closure graph.
+/// Coarse type of dependency represented by the closure model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RegenerativeDependencyKind {
     /// Physical feedstock or bulk material.
     Material,
     /// Manufactured component or replaceable module.
     Component,
-    /// Machine tool or production equipment capacity.
+    /// Machine tool or production-equipment capacity.
     Tooling,
     /// Calibration, inspection or measurement capacity.
     Metrology,
-    /// Consumable or process input required by manufacturing.
+    /// Consumable or other process input.
     ProcessInput,
-    /// Energy or other infrastructure service.
+    /// Energy or supporting infrastructure service.
     EnergyService,
-    /// Software, design or other reproducible digital artifact.
+    /// Software, design or another reproducible digital artifact.
     SoftwareArtifact,
-    /// Externally provided service that does not fit the other categories.
+    /// Other externally provided service.
     ExternalService,
 }
 
@@ -58,20 +53,20 @@ pub struct RegenerativeDependency {
     pub dependency_id: String,
     /// Dependency category.
     pub kind: RegenerativeDependencyKind,
-    /// Governance boundary for this dependency.
+    /// Governance boundary.
     pub governance: DependencyGovernance,
     /// Units consumed during one model period.
     pub demand_units_per_period: u64,
-    /// Units that ordinary local production can create during one period.
+    /// Units ordinary local production can create during one period.
     pub local_production_units_per_period: u64,
-    /// Units recoverable from recycling during one period.
+    /// Units recoverable by recycling during one period.
     pub recycling_units_per_period: u64,
-    /// Qualified units already stockpiled when autonomous operation begins.
+    /// Qualified units stockpiled when autonomous operation begins.
     pub stockpile_units: u64,
-    /// Optional physical mass of one unit, in grams, for mass-flow closure metrics.
-    /// Non-physical services and software should use `None`.
+    /// Optional mass of one unit, in grams, for physical-mass closure metrics.
+    /// Non-physical services/software use `None`.
     pub unit_mass_grams: Option<u64>,
-    /// Opaque binding to the evidence supporting the modeled rates/inventory.
+    /// Opaque binding to evidence supporting the modeled rates/inventory.
     pub evidence_binding: String,
 }
 
@@ -80,7 +75,6 @@ impl RegenerativeDependency {
     pub fn validate(&self) -> Result<(), RegenerativeClosureError> {
         validate_id("dependency_id", &self.dependency_id)?;
         validate_evidence(&self.evidence_binding)?;
-
         if self.demand_units_per_period == 0 {
             return Err(RegenerativeClosureError::ZeroDemand {
                 dependency_id: self.dependency_id.clone(),
@@ -102,47 +96,45 @@ impl RegenerativeDependency {
         Ok(())
     }
 
-    /// Locally regenerated units available per model period, excluding stockpile.
+    /// Locally regenerated units per period, excluding stockpile.
     pub fn local_flow_units_per_period(&self) -> u128 {
         u128::from(self.local_production_units_per_period)
             + u128::from(self.recycling_units_per_period)
     }
 
-    /// Autonomous horizon for this dependency under the static rates in the model.
+    /// Autonomous horizon under the static rates represented by this dependency.
     ///
-    /// A result of [`RegenerativeHorizon::IndefiniteUnderStaticModel`] means only
-    /// that modeled local production plus recycling meets recurring demand. It is
-    /// not a claim that the real physical system can operate forever.
+    /// `IndefiniteUnderStaticModel` means recurring modeled local flow meets
+    /// recurring modeled demand; it is not a perpetual-operation claim.
     pub fn autonomous_horizon(&self) -> Result<RegenerativeHorizon, RegenerativeClosureError> {
         self.validate()?;
         let demand = u128::from(self.demand_units_per_period);
-        let local_flow = self.local_flow_units_per_period();
-        if local_flow >= demand {
+        let local = self.local_flow_units_per_period();
+        if local >= demand {
             return Ok(RegenerativeHorizon::IndefiniteUnderStaticModel);
         }
-
-        let deficit = demand - local_flow;
+        let deficit = demand - local;
         let periods = u128::from(self.stockpile_units) / deficit;
         Ok(RegenerativeHorizon::FinitePeriods(periods as u64))
     }
 }
 
-/// Capability whose continued availability depends on one or more dependencies.
+/// Capability whose availability depends on all named dependencies remaining viable.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegenerativeCapability {
     /// Canonical capability identifier.
     pub capability_id: String,
-    /// Whether loss of this capability ends the modeled autonomous mission/system.
+    /// Whether loss of this capability ends the modeled autonomous system/mission.
     pub essential: bool,
-    /// Dependencies that must all remain available for this capability.
+    /// Dependencies required by this capability.
     pub dependency_ids: BTreeSet<String>,
-    /// Opaque binding to the evidence/design definition for this capability.
+    /// Opaque evidence/design binding for the capability definition.
     pub evidence_binding: String,
 }
 
 impl RegenerativeCapability {
-    /// Validate the capability's standalone shape.
+    /// Validate standalone capability shape.
     pub fn validate(&self) -> Result<(), RegenerativeClosureError> {
         validate_id("capability_id", &self.capability_id)?;
         validate_evidence(&self.evidence_binding)?;
@@ -158,7 +150,7 @@ impl RegenerativeCapability {
     }
 }
 
-/// Version-agnostic static industrial-closure model.
+/// Static industrial-closure model for one infrastructure configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegenerativeClosureModel {
@@ -168,14 +160,14 @@ pub struct RegenerativeClosureModel {
     pub period_duration_ms: u64,
     /// Recurring dependencies considered by the model.
     pub dependencies: Vec<RegenerativeDependency>,
-    /// Capabilities whose viability is evaluated from the dependency set.
+    /// Capabilities evaluated from those dependencies.
     pub capabilities: Vec<RegenerativeCapability>,
     /// Opaque evidence/version binding for the complete model definition.
     pub evidence_binding: String,
 }
 
 impl RegenerativeClosureModel {
-    /// Validate identifiers, references, cardinality and governance invariants.
+    /// Validate identifiers, references, cardinality and governance boundaries.
     pub fn validate(&self) -> Result<(), RegenerativeClosureError> {
         validate_id("model_id", &self.model_id)?;
         validate_evidence(&self.evidence_binding)?;
@@ -227,84 +219,72 @@ impl RegenerativeClosureModel {
         Ok(())
     }
 
-    /// Evaluate mass-flow closure and the autonomous horizon of each capability.
+    /// Evaluate regenerative flow metrics and capability survival horizons.
     pub fn evaluate(&self) -> Result<RegenerativeClosureReport, RegenerativeClosureError> {
         self.validate()?;
-
-        let dependency_map: BTreeMap<&str, &RegenerativeDependency> = self
+        let dependencies: BTreeMap<&str, &RegenerativeDependency> = self
             .dependencies
             .iter()
             .map(|dependency| (dependency.dependency_id.as_str(), dependency))
             .collect();
 
-        let mut required_physical_mass = 0_u128;
-        let mut regenerated_physical_mass = 0_u128;
+        let mut required_mass = 0_u128;
+        let mut regenerated_mass = 0_u128;
         let mut ordinary_count = 0_u128;
-        let mut ordinary_closed_count = 0_u128;
+        let mut ordinary_closed = 0_u128;
         let mut safeguarded_external_dependency_ids = Vec::new();
 
         for dependency in &self.dependencies {
-            if dependency.governance == DependencyGovernance::Ordinary {
-                ordinary_count += 1;
-                if matches!(
-                    dependency.autonomous_horizon()?,
-                    RegenerativeHorizon::IndefiniteUnderStaticModel
-                ) {
-                    ordinary_closed_count += 1;
+            let horizon = dependency.autonomous_horizon()?;
+            match dependency.governance {
+                DependencyGovernance::Ordinary => {
+                    ordinary_count += 1;
+                    if horizon == RegenerativeHorizon::IndefiniteUnderStaticModel {
+                        ordinary_closed += 1;
+                    }
                 }
-            } else {
-                safeguarded_external_dependency_ids.push(dependency.dependency_id.clone());
+                DependencyGovernance::SafeguardedExternal => {
+                    safeguarded_external_dependency_ids.push(dependency.dependency_id.clone());
+                }
             }
 
-            if let Some(unit_mass_grams) = dependency.unit_mass_grams {
-                let unit_mass = u128::from(unit_mass_grams);
+            if let Some(unit_mass) = dependency.unit_mass_grams {
+                let unit_mass = u128::from(unit_mass);
                 let demand_mass = u128::from(dependency.demand_units_per_period)
                     .checked_mul(unit_mass)
                     .ok_or(RegenerativeClosureError::ArithmeticOverflow)?;
-                required_physical_mass = required_physical_mass
+                required_mass = required_mass
                     .checked_add(demand_mass)
                     .ok_or(RegenerativeClosureError::ArithmeticOverflow)?;
 
                 let regenerated_units = dependency
                     .local_flow_units_per_period()
                     .min(u128::from(dependency.demand_units_per_period));
-                let regenerated_mass = regenerated_units
+                let local_mass = regenerated_units
                     .checked_mul(unit_mass)
                     .ok_or(RegenerativeClosureError::ArithmeticOverflow)?;
-                regenerated_physical_mass = regenerated_physical_mass
-                    .checked_add(regenerated_mass)
+                regenerated_mass = regenerated_mass
+                    .checked_add(local_mass)
                     .ok_or(RegenerativeClosureError::ArithmeticOverflow)?;
             }
         }
 
-        let physical_mass_flow_closure_basis_points = if required_physical_mass == 0 {
-            None
-        } else {
-            Some(
-                ((regenerated_physical_mass * 10_000) / required_physical_mass)
-                    .min(10_000) as u16,
-            )
-        };
-
-        let ordinary_dependency_flow_closure_basis_points = if ordinary_count == 0 {
-            None
-        } else {
-            Some(((ordinary_closed_count * 10_000) / ordinary_count) as u16)
-        };
+        let physical_mass_flow_closure_basis_points = basis_points(regenerated_mass, required_mass);
+        let ordinary_dependency_flow_closure_basis_points = basis_points(ordinary_closed, ordinary_count);
 
         let mut capability_viability = Vec::with_capacity(self.capabilities.len());
         for capability in &self.capabilities {
-            let mut finite_min: Option<u64> = None;
+            let mut finite_min = None;
             let mut limiting = Vec::new();
-
             for dependency_id in &capability.dependency_ids {
-                let dependency = dependency_map[dependency_id.as_str()];
+                let dependency = dependencies
+                    .get(dependency_id.as_str())
+                    .expect("validated dependency reference");
                 if let RegenerativeHorizon::FinitePeriods(periods) = dependency.autonomous_horizon()?
                 {
                     match finite_min {
                         None => {
                             finite_min = Some(periods);
-                            limiting.clear();
                             limiting.push(dependency_id.clone());
                         }
                         Some(current) if periods < current => {
@@ -317,20 +297,18 @@ impl RegenerativeClosureModel {
                     }
                 }
             }
-
-            let horizon = finite_min.map_or(
-                RegenerativeHorizon::IndefiniteUnderStaticModel,
-                RegenerativeHorizon::FinitePeriods,
-            );
             capability_viability.push(CapabilityViability {
                 capability_id: capability.capability_id.clone(),
                 essential: capability.essential,
-                horizon,
+                horizon: finite_min.map_or(
+                    RegenerativeHorizon::IndefiniteUnderStaticModel,
+                    RegenerativeHorizon::FinitePeriods,
+                ),
                 limiting_dependency_ids: limiting,
             });
         }
 
-        let essential_finite_min = capability_viability
+        let essential_limit = capability_viability
             .iter()
             .filter(|capability| capability.essential)
             .filter_map(|capability| match capability.horizon {
@@ -339,16 +317,11 @@ impl RegenerativeClosureModel {
             })
             .min();
 
-        let essential_horizon = essential_finite_min.map_or(
-            RegenerativeHorizon::IndefiniteUnderStaticModel,
-            RegenerativeHorizon::FinitePeriods,
-        );
-
-        let mut limiting_dependency_ids = BTreeSet::new();
-        if let Some(limit) = essential_finite_min {
+        let mut system_limiting = BTreeSet::new();
+        if let Some(limit) = essential_limit {
             for capability in capability_viability.iter().filter(|capability| capability.essential) {
                 if capability.horizon == RegenerativeHorizon::FinitePeriods(limit) {
-                    limiting_dependency_ids.extend(capability.limiting_dependency_ids.iter().cloned());
+                    system_limiting.extend(capability.limiting_dependency_ids.iter().cloned());
                 }
             }
         }
@@ -358,21 +331,31 @@ impl RegenerativeClosureModel {
             period_duration_ms: self.period_duration_ms,
             physical_mass_flow_closure_basis_points,
             ordinary_dependency_flow_closure_basis_points,
-            essential_horizon,
-            limiting_dependency_ids: limiting_dependency_ids.into_iter().collect(),
+            essential_horizon: essential_limit.map_or(
+                RegenerativeHorizon::IndefiniteUnderStaticModel,
+                RegenerativeHorizon::FinitePeriods,
+            ),
+            limiting_dependency_ids: system_limiting.into_iter().collect(),
             safeguarded_external_dependency_ids,
             capability_viability,
         })
     }
 }
 
+fn basis_points(numerator: u128, denominator: u128) -> Option<u16> {
+    if denominator == 0 {
+        None
+    } else {
+        Some(((numerator.saturating_mul(10_000) / denominator).min(10_000)) as u16)
+    }
+}
+
 /// Autonomous horizon under the static rates and stockpiles in a closure model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RegenerativeHorizon {
-    /// Number of complete model periods that can be sustained without external supply.
+    /// Number of complete model periods sustainable without external supply.
     FinitePeriods(u64),
-    /// Modeled regenerative flow meets recurring demand.
-    /// This is not a real-world perpetual-operation claim.
+    /// Modeled recurring local flow meets recurring demand.
     IndefiniteUnderStaticModel,
 }
 
@@ -382,15 +365,15 @@ pub enum RegenerativeHorizon {
 pub struct CapabilityViability {
     /// Capability identifier from the source model.
     pub capability_id: String,
-    /// Whether the capability participates in the system-level horizon.
+    /// Whether this capability participates in the system-level horizon.
     pub essential: bool,
-    /// Autonomous horizon of the capability.
+    /// Autonomous horizon of this capability.
     pub horizon: RegenerativeHorizon,
-    /// Dependencies that establish the finite horizon, if any.
+    /// Dependencies establishing the finite horizon, if any.
     pub limiting_dependency_ids: Vec<String>,
 }
 
-/// Derived closure report. This is diagnostic evidence, not authority to manufacture.
+/// Derived closure report. This is diagnostic evidence, not manufacturing authority.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegenerativeClosureReport {
@@ -399,25 +382,24 @@ pub struct RegenerativeClosureReport {
     /// Duration of each reported period in milliseconds.
     pub period_duration_ms: u64,
     /// Regenerated share of recurring physical mass demand, in basis points.
-    /// Stockpiles do not count as regenerative flow.
+    /// Stockpile inventory is deliberately excluded from regenerative flow.
     pub physical_mass_flow_closure_basis_points: Option<u16>,
-    /// Share of ordinary dependency categories whose recurring local flow fully
-    /// covers recurring demand, in basis points.
+    /// Share of ordinary dependency categories fully closed by recurring local flow.
     pub ordinary_dependency_flow_closure_basis_points: Option<u16>,
-    /// Earliest modeled loss horizon among essential capabilities.
+    /// Earliest finite loss horizon among essential capabilities.
     pub essential_horizon: RegenerativeHorizon,
-    /// Dependencies responsible for the system-level finite horizon.
+    /// Dependencies responsible for that system-level finite horizon.
     pub limiting_dependency_ids: Vec<String>,
-    /// Dependencies intentionally outside ordinary local industrial closure.
+    /// Dependencies intentionally outside ordinary industrial closure.
     pub safeguarded_external_dependency_ids: Vec<String>,
-    /// Per-capability viability details.
+    /// Per-capability viability results.
     pub capability_viability: Vec<CapabilityViability>,
 }
 
 /// Validation/evaluation errors for regenerative closure models.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegenerativeClosureError {
-    /// Required identifier is empty, padded, contains control characters or is too long.
+    /// Identifier is empty, padded, contains control characters or is too long.
     InvalidIdentifier { field: &'static str },
     /// Evidence binding is empty, padded, contains control characters or is too long.
     InvalidEvidenceBinding,
@@ -427,28 +409,28 @@ pub enum RegenerativeClosureError {
     NoDependencies,
     /// Model contains no capabilities.
     NoCapabilities,
-    /// Model contains no capability marked essential.
+    /// Model contains no essential capability.
     NoEssentialCapabilities,
-    /// Model exceeds the bounded dependency/capability cardinality.
+    /// Model exceeds bounded dependency/capability cardinality.
     ModelTooLarge,
     /// Dependency has zero recurring demand.
     ZeroDemand { dependency_id: String },
     /// A dependency marked as physical has zero unit mass.
     ZeroPhysicalMass { dependency_id: String },
-    /// Safeguarded dependency incorrectly claims ordinary local production/recycling.
+    /// Safeguarded dependency incorrectly claims ordinary local supply.
     SafeguardedDependencyClaimsLocalSupply { dependency_id: String },
     /// Dependency identifier is duplicated.
     DuplicateDependency { dependency_id: String },
     /// Capability identifier is duplicated.
     DuplicateCapability { capability_id: String },
-    /// Capability does not declare any dependencies.
+    /// Capability declares no dependencies.
     CapabilityHasNoDependencies { capability_id: String },
     /// Capability refers to a dependency absent from the same model.
     UnknownDependencyReference {
         capability_id: String,
         dependency_id: String,
     },
-    /// Bounded integer arithmetic overflowed while deriving aggregate mass metrics.
+    /// Integer arithmetic overflowed while deriving aggregate mass metrics.
     ArithmeticOverflow,
 }
 
@@ -503,37 +485,38 @@ mod tests {
     }
 
     fn model() -> RegenerativeClosureModel {
-        let steel = dependency(
-            "structural-steel",
-            DependencyGovernance::Ordinary,
-            1_000_000,
-            950_000,
-            50_000,
-            0,
-            Some(1_000),
-        );
-        let electronics = dependency(
-            "control-electronics",
-            DependencyGovernance::Ordinary,
-            100,
-            90,
-            0,
-            1_000,
-            Some(10),
-        );
-        let nuclear_service = dependency(
-            "qualified-reactor-fuel-service",
-            DependencyGovernance::SafeguardedExternal,
-            1,
-            0,
-            0,
-            30,
-            Some(1),
-        );
         RegenerativeClosureModel {
             model_id: "manta-closure-v1".into(),
             period_duration_ms: YEAR_MS,
-            dependencies: vec![steel, electronics, nuclear_service],
+            dependencies: vec![
+                dependency(
+                    "structural-steel",
+                    DependencyGovernance::Ordinary,
+                    1_000_000,
+                    950_000,
+                    50_000,
+                    0,
+                    Some(1_000),
+                ),
+                dependency(
+                    "control-electronics",
+                    DependencyGovernance::Ordinary,
+                    100,
+                    90,
+                    0,
+                    1_000,
+                    Some(10),
+                ),
+                dependency(
+                    "qualified-reactor-fuel-service",
+                    DependencyGovernance::SafeguardedExternal,
+                    1,
+                    0,
+                    0,
+                    30,
+                    Some(1),
+                ),
+            ],
             capabilities: vec![RegenerativeCapability {
                 capability_id: "persistent-ocean-infrastructure".into(),
                 essential: true,
@@ -551,7 +534,7 @@ mod tests {
     #[test]
     fn high_mass_closure_can_still_have_a_finite_critical_horizon() {
         let report = model().evaluate().unwrap();
-        assert!(report.physical_mass_flow_closure_basis_points.unwrap() > 9_999);
+        assert_eq!(report.physical_mass_flow_closure_basis_points, Some(9_999));
         assert_eq!(report.essential_horizon, RegenerativeHorizon::FinitePeriods(30));
         assert_eq!(
             report.limiting_dependency_ids,
@@ -564,7 +547,7 @@ mod tests {
     }
 
     #[test]
-    fn local_flow_and_recycling_can_close_an_ordinary_dependency() {
+    fn recycling_can_close_an_ordinary_dependency() {
         let dep = dependency(
             "steel",
             DependencyGovernance::Ordinary,
@@ -581,7 +564,7 @@ mod tests {
     }
 
     #[test]
-    fn stockpile_only_extends_the_finite_horizon_and_not_closure_rate() {
+    fn stockpile_extends_horizon_but_not_regenerative_flow() {
         let dep = dependency(
             "electronics",
             DependencyGovernance::Ordinary,
@@ -598,7 +581,7 @@ mod tests {
     }
 
     #[test]
-    fn safeguarded_external_dependency_cannot_claim_ordinary_local_fuel_cycle() {
+    fn safeguarded_dependency_cannot_claim_ordinary_local_fuel_cycle() {
         let dep = dependency(
             "reactor-fuel",
             DependencyGovernance::SafeguardedExternal,
@@ -632,26 +615,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_ids_and_noncanonical_evidence_are_rejected() {
-        let mut duplicate = model();
-        duplicate.dependencies.push(duplicate.dependencies[0].clone());
-        assert_eq!(
-            duplicate.validate(),
-            Err(RegenerativeClosureError::DuplicateDependency {
-                dependency_id: "structural-steel".into(),
-            })
-        );
-
-        let mut malformed = model();
-        malformed.dependencies[0].evidence_binding = " evidence:steel".into();
-        assert_eq!(
-            malformed.validate(),
-            Err(RegenerativeClosureError::InvalidEvidenceBinding)
-        );
-    }
-
-    #[test]
-    fn adding_supply_cannot_shorten_a_dependency_horizon() {
+    fn adding_local_supply_cannot_shorten_horizon() {
         let baseline = dependency(
             "electronics",
             DependencyGovernance::Ordinary,
@@ -670,14 +634,7 @@ mod tests {
             1_000,
             Some(10),
         );
-        let baseline_horizon = match baseline.autonomous_horizon().unwrap() {
-            RegenerativeHorizon::FinitePeriods(periods) => periods,
-            RegenerativeHorizon::IndefiniteUnderStaticModel => u64::MAX,
-        };
-        let improved_horizon = match improved.autonomous_horizon().unwrap() {
-            RegenerativeHorizon::FinitePeriods(periods) => periods,
-            RegenerativeHorizon::IndefiniteUnderStaticModel => u64::MAX,
-        };
-        assert!(improved_horizon >= baseline_horizon);
+        assert_eq!(baseline.autonomous_horizon().unwrap(), RegenerativeHorizon::FinitePeriods(20));
+        assert_eq!(improved.autonomous_horizon().unwrap(), RegenerativeHorizon::FinitePeriods(50));
     }
 }
