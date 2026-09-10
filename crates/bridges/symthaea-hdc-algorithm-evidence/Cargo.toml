@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-hdc-algorithm-evidence"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Capsule-bound evidence bridge for Symthaea HDC algorithm discovery"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-algorithm-lab = { path = "../../domains/symthaea-algorithm-lab" }
+symthaea-algorithm-evidence-collector = { path = "../symthaea-algorithm-evidence-collector" }
+thiserror = { workspace = true }
