@@ -1,6 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Symthaea Core
 //!
 //! The mathematical and structural foundation for the Holographic Liquid Brain.
@@ -80,6 +79,8 @@ pub mod embodiment_provider;
 pub mod embodiment_provider_timing;
 /// Evidence-derived provider readiness assessments for bound embodiments.
 pub mod embodiment_readiness;
+/// Time-addressed provider-readiness assessments that preserve assessment time into lifecycle evidence.
+pub mod embodiment_readiness_timing;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
