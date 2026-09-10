@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-forge-overlay-evidence"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Declared candidate-overlay provenance gate for Forge algorithm evaluation"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge = { path = "../../domains/symthaea-forge" }
+symthaea-algorithm-evidence-collector = { path = "../symthaea-algorithm-evidence-collector" }
+symthaea-forge-algorithm-evidence = { path = "../symthaea-forge-algorithm-evidence" }
+thiserror = { workspace = true }
