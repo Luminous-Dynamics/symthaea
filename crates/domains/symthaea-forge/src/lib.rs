@@ -29,8 +29,10 @@
 //! [`proposal_trace`] retains the live draw as generator-local content-addressed evidence,
 //! [`proposal_coverage`] proves that raw proposal evidence exactly covers the search trace,
 //! [`proposal_qualification`] composes those layers while also binding no-op-only runs to the exact
-//! semantic baseline implementation, and [`proposal_dataset`] freezes one exact row per
-//! `(attempt, policy family)` before any estimator or learned policy exists.
+//! semantic baseline implementation, [`proposal_dataset`] freezes one exact row per
+//! `(attempt, policy family)` before any estimator or learned policy exists, and
+//! [`proposal_corpus`] binds those tables to the frozen corpus split while exposing separate
+//! training/validation datasets and an identity-only holdout seal.
 //!
 //! # Authority boundary
 //!
@@ -54,6 +56,9 @@
 //! - No-op-only proposal histories still have to bind the exact declared baseline artifact.
 //! - Proposal observation tables retain zero-opportunity and unselected families; absence is never
 //!   silently converted into failure or success evidence.
+//! - Training and validation proposal tables are exposed through different role-checked types.
+//! - Holdout is identity-only in v1; this crate provides no convenience API that exposes holdout
+//!   observation rows before a future frozen-model evaluation boundary exists.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
@@ -78,6 +83,7 @@ pub mod fitness;
 pub mod learning;
 pub mod mutations;
 pub mod observations;
+pub mod proposal_corpus;
 pub mod proposal_coverage;
 pub mod proposal_dataset;
 pub mod proposal_exposure;
@@ -127,6 +133,11 @@ pub use learning::{
     ForgeLearningError, ForgeTrialBatch, TransformationOutcomeStats, TransformationOutcomeTable,
 };
 pub use observations::ForgeObservationError;
+pub use proposal_corpus::{
+    ForgeProposalCorpusError, ForgeProposalCorpusManifest, ForgeProposalCorpusMember,
+    ForgeProposalHoldoutMember, ForgeProposalHoldoutSeal, ForgeProposalTrainingSet,
+    ForgeProposalValidationSet,
+};
 pub use proposal_coverage::{validate_forge_raw_proposal_coverage, ForgeProposalCoverageError};
 pub use proposal_dataset::{
     ForgeProposalDatasetError, ForgeProposalObservationRow, ForgeProposalObservationTable,
