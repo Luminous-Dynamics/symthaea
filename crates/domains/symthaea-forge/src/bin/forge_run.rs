@@ -15,20 +15,21 @@
 //!
 //! Candidate staging is temporary and restored by the library. Persistent output is required to
 //! resolve outside the canonical workspace and existing evidence files are never overwritten.
-//! `search-trace.json` is emitted even when no winner exists, so negative search outcomes survive.
-//! A surviving candidate is written as exact full-file source bytes and immediately re-hashed.
-//! `bundle-manifest.json` is written last; without a valid manifest, a partial directory is not a
-//! completed Forge result.
+//! `search-trace.json` and `observations.json` are emitted even when no winner exists, so negative
+//! search outcomes remain reconstructable. A surviving candidate is written as exact full-file
+//! source bytes and immediately re-hashed. `bundle-manifest.json` is written last; without a valid
+//! manifest, a partial directory is not a completed Forge result.
 
 use std::ffi::OsString;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
+use symthaea_algorithms::observation::{ObservationObject, ObservationStore};
 use symthaea_forge::certificate::full_source_artifact_id;
 use symthaea_forge::{
-    read_completed_manifest, run_search, validate_forge_trace, ForgeBundleManifest,
-    ForgeBundleOutcome, ForgeConfig, CANDIDATE_FILE, CERTIFICATE_FILE, MANIFEST_FILE, REPORT_FILE,
-    TRACE_FILE,
+    read_completed_manifest, run_search, validate_forge_trace_observations, ForgeBundleManifest,
+    ForgeBundleOutcome, ForgeConfig, ForgeTraceEvent, CANDIDATE_FILE, CERTIFICATE_FILE,
+    MANIFEST_FILE, OBSERVATIONS_FILE, REPORT_FILE, TRACE_FILE,
 };
 
 struct Args {
@@ -127,7 +128,8 @@ fn main() -> anyhow::Result<()> {
     };
 
     let outcome = run_search(&config)?;
-    validate_forge_trace(&outcome.trace)?;
+    validate_forge_trace_observations(&outcome.trace, &outcome.observations)?;
+    let expected_observation_snapshot = outcome.observations.snapshot_id()?;
     let bundle_outcome = if outcome.best.is_some() {
         ForgeBundleOutcome::Winner
     } else {
@@ -135,18 +137,41 @@ fn main() -> anyhow::Result<()> {
     };
 
     let trace_path = out_dir.join(TRACE_FILE);
+    let observations_path = out_dir.join(OBSERVATIONS_FILE);
     let candidate_path = out_dir.join(CANDIDATE_FILE);
     let cert_path = out_dir.join(CERTIFICATE_FILE);
     let report_path = out_dir.join(REPORT_FILE);
     let manifest_path = out_dir.join(MANIFEST_FILE);
     ensure_absent(&[
         &trace_path,
+        &observations_path,
         &candidate_path,
         &cert_path,
         &report_path,
         &manifest_path,
     ])?;
+
     write_new(&trace_path, &serde_json::to_vec_pretty(&outcome.trace)?)?;
+    let observation_objects: Vec<ObservationObject> = outcome.observations.objects().cloned().collect();
+    write_new(
+        &observations_path,
+        &serde_json::to_vec_pretty(&observation_objects)?,
+    )?;
+
+    // Rehydrate both persisted files before allowing winner artifacts or the terminal manifest.
+    // This proves persistence did not sever event -> observation references.
+    let persisted_trace: Vec<ForgeTraceEvent> =
+        serde_json::from_slice(&std::fs::read(&trace_path)?)?;
+    if persisted_trace != outcome.trace {
+        anyhow::bail!("persisted Forge search trace changed during immediate read-back");
+    }
+    let persisted_objects: Vec<ObservationObject> =
+        serde_json::from_slice(&std::fs::read(&observations_path)?)?;
+    let persisted_store = ObservationStore::from_objects(persisted_objects)?;
+    validate_forge_trace_observations(&persisted_trace, &persisted_store)?;
+    if persisted_store.snapshot_id()? != expected_observation_snapshot {
+        anyhow::bail!("persisted Forge observation store changed during immediate read-back");
+    }
 
     println!(
         "candidates: {} attempted, {} no-eligible-mutation, {} failed compile, {} failed test, {} failed benchmark, {} passed correctness, {} satisfied search-selection rule",
@@ -156,7 +181,7 @@ fn main() -> anyhow::Result<()> {
         outcome.stats.candidates_failed_test,
         outcome.stats.candidates_failed_benchmark,
         outcome.stats.candidates_passed_correctness,
-        outcome.stats.candidates_improved_benchmark,
+        outcome.stats.candidates_selected_by_search,
     );
     if let Some(baseline) = outcome.baseline_benchmark_score {
         println!("baseline benchmark score: {baseline:.2}");
@@ -182,17 +207,19 @@ fn main() -> anyhow::Result<()> {
             write_new(&report_path, render_report(cert).as_bytes())?;
             println!("\n{}", cert.summary());
             println!(
-                "\nHONEST FRAMING: this is a proposed search candidate, not an applied change or replicated performance result. Exact source: {}. Certificate: {}. Report: {}. Negative/neutral trace: {}.",
+                "\nHONEST FRAMING: this is a proposed search candidate, not an applied change or replicated performance result. Exact source: {}. Certificate: {}. Report: {}. Trace: {}. Reconstructable observations: {}.",
                 candidate_path.display(),
                 cert_path.display(),
                 report_path.display(),
                 trace_path.display(),
+                observations_path.display(),
             );
         }
         None => {
             println!(
-                "\nNo mutation in this bounded run both passed every configured correctness gate and satisfied the search-selection rule. This is a legitimate negative result; the full negative/neutral search trace was retained at {}.",
+                "\nNo mutation in this bounded run both passed every configured correctness gate and satisfied the search-selection rule. This is a legitimate negative result; its trace and reconstructable observations were retained at {} and {}.",
                 trace_path.display(),
+                observations_path.display(),
             );
         }
     }
@@ -340,7 +367,7 @@ fn render_report(cert: &symthaea_forge::ForgeCertificate) -> String {
         })
         .collect();
     format!(
-        "# symthaea-forge candidate report\n\nGenerated: {generated} ms since epoch\nTarget: `{file}::{func}` (package `{package}`)\nGit SHA at search time: `{sha}`\nGeneration found: {generation}\nBaseline full-file artifact: `{baseline_artifact}`\nCandidate full-file artifact: `{candidate_artifact}`\nMutation: **{op}** — {detail}\n\n## Ordered artifact lineage\n{lineage}\n## Gates\n{gates}\n## Benchmark/search heuristic\n{bench}\n## Before\n```rust\n{before}\n```\n\n## After\n```rust\n{after}\n```\n\n## Authority boundary\n`candidate.rs` is the exact full-file survivor identified above. `search-trace.json` retains negative and neutral search outcomes independently of whether a winner exists. `bundle-manifest.json` is the terminal completion marker and must validate before this directory is treated as a complete Forge result. This report is a human-review proposal. It does not establish replicated performance, production eligibility, or permission to modify runtime code. The candidate should be independently re-hashed and re-evaluated through the algorithm evidence pipeline before any separate promotion review.\n",
+        "# symthaea-forge candidate report\n\nGenerated: {generated} ms since epoch\nTarget: `{file}::{func}` (package `{package}`)\nGit SHA at search time: `{sha}`\nGeneration found: {generation}\nBaseline full-file artifact: `{baseline_artifact}`\nCandidate full-file artifact: `{candidate_artifact}`\nMutation: **{op}** — {detail}\n\n## Ordered artifact lineage\n{lineage}\n## Gates\n{gates}\n## Benchmark/search heuristic\n{bench}\n## Before\n```rust\n{before}\n```\n\n## After\n```rust\n{after}\n```\n\n## Authority boundary\n`candidate.rs` is the exact full-file survivor identified above. `search-trace.json` records the event history and `observations.json` retains the exact bounded payloads referenced by every event. `bundle-manifest.json` is the terminal completion marker and must validate before this directory is treated as a complete Forge result. This report is a human-review proposal. It does not establish replicated performance, production eligibility, or permission to modify runtime code. The candidate should be independently re-hashed and re-evaluated through the algorithm evidence pipeline before any separate promotion review.\n",
         generated = cert.generated_at_unix_ms,
         file = cert.target_file.display(),
         func = cert.target_function,

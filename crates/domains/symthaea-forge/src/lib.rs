@@ -13,8 +13,9 @@
 //! supply the semantic `ProblemSpec`/`AlgorithmRecord` context and a baseline implementation, then
 //! converts the exact Forge survivor into a generic `CandidateProposal`. It also replays Forge's
 //! generator-local [`trace`] into a semantic hash-chained discovery ledger only when the exact
-//! `DiscoveryRun` is supplied externally. [`bundle`] makes persistent CLI output complete only when
-//! a final content-addressed manifest validates the exact files on disk.
+//! `DiscoveryRun` and complete observation archive are supplied externally. [`bundle`] makes
+//! persistent CLI output complete only when a final content-addressed manifest validates the exact
+//! files on disk.
 //!
 //! # Authority boundary
 //!
@@ -34,15 +35,19 @@ pub mod candidate;
 pub mod certificate;
 pub mod fitness;
 pub mod mutations;
+pub mod observations;
 pub mod sandbox;
 pub mod search;
 pub mod trace;
 
 pub use bundle::{
     read_completed_manifest, BundleError, ForgeBundleManifest, ForgeBundleOutcome, CANDIDATE_FILE,
-    CERTIFICATE_FILE, MANIFEST_FILE, REPORT_FILE, TRACE_FILE,
+    CERTIFICATE_FILE, MANIFEST_FILE, OBSERVATIONS_FILE, REPORT_FILE, TRACE_FILE,
 };
 pub use candidate::{ledger_from_forge_trace, proposal_from_forge, ForgeProposalError};
 pub use certificate::{CertificateError, ForgeCandidate, ForgeCertificate};
+pub use observations::ForgeObservationError;
 pub use search::{run_search, ForgeConfig, SearchOutcome};
-pub use trace::{validate_forge_trace, ForgeTraceError, ForgeTraceEvent};
+pub use trace::{
+    validate_forge_trace, validate_forge_trace_observations, ForgeTraceError, ForgeTraceEvent,
+};

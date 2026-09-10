@@ -8,25 +8,25 @@
 //! rejected evaluation, never an alias for correctness-only mode.
 //!
 //! Search survivors retain the exact full-file source bytes that were staged and checked. The
-//! search also emits a generator-local trace of negative/neutral outcomes. That trace can later be
-//! bound to a semantic `DiscoveryRun` without making Forge itself an authority over problem meaning.
+//! search also emits a generator-local trace of negative/neutral outcomes plus a bounded
+//! content-addressed observation store. That trace can later be bound to a semantic `DiscoveryRun`
+//! without making Forge itself an authority over problem meaning.
 
 use crate::certificate::{
     full_source_artifact_id, gate_result_to_evidence, BenchmarkEvidence, ForgeCandidate,
     ForgeCertificate, MutationRecord,
 };
-use crate::fitness::{
-    run_benchmark, run_correctness_gates, BenchmarkResult, EvaluationTarget, GateResult,
-};
+use crate::fitness::{run_benchmark, run_correctness_gates, EvaluationTarget};
 use crate::mutations::{find_function_body_mut, Mutator};
+use crate::observations as forge_observations;
 use crate::sandbox::Sandbox;
-use crate::trace::{forge_observation_id, ForgeTraceEvent};
+use crate::trace::{validate_forge_trace_observations, ForgeTraceEvent};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use std::fmt::Display;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use symthaea_algorithms::ledger::DiscoveryEventKind;
+use symthaea_algorithms::observation::{ObservationObject, ObservationStore};
 use symthaea_algorithms::ContentId;
 
 #[derive(Debug, Clone)]
@@ -53,7 +53,9 @@ pub struct SearchStats {
     /// finite result. These are rejected, not retained as structure-only candidates.
     pub candidates_failed_benchmark: usize,
     pub candidates_passed_correctness: usize,
-    pub candidates_improved_benchmark: usize,
+    /// Candidates selected by Forge's local search rule. In correctness-only mode this means the
+    /// first deterministic passing survivor, not a performance improvement.
+    pub candidates_selected_by_search: usize,
 }
 
 impl SearchStats {
@@ -68,10 +70,11 @@ pub struct SearchOutcome {
     /// Best search candidate under the configured heuristic. The object contains the exact full
     /// source bytes plus a self-validating certificate; it is still only a proposal.
     pub best: Option<ForgeCandidate>,
-    /// Ordered generator-local observations, including negative results and one terminal
-    /// `SearchCompleted` event. These become a semantic hash chain only through the adapter in
-    /// `candidate`, where the exact `DiscoveryRun` is known.
+    /// Ordered generator-local events, including negative results and one terminal
+    /// `SearchCompleted` event.
     pub trace: Vec<ForgeTraceEvent>,
+    /// Canonical bounded payloads referenced by every event's `observation_id`.
+    pub observations: ObservationStore,
 }
 
 fn build_eval_target<'a>(config: &'a ForgeConfig, features: &'a [&'a str]) -> EvaluationTarget<'a> {
@@ -82,6 +85,15 @@ fn build_eval_target<'a>(config: &'a ForgeConfig, features: &'a [&'a str]) -> Ev
         features,
         bench_example: config.bench_example.as_deref(),
     }
+}
+
+fn retain_observation(
+    store: &mut ObservationStore,
+    observation: ObservationObject,
+) -> anyhow::Result<ContentId> {
+    let id = observation.id().clone();
+    store.insert(observation)?;
+    Ok(id)
 }
 
 pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
@@ -129,6 +141,7 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
     let mut current_best_score = baseline_score;
     let mut mutation_history: Vec<MutationRecord> = Vec::new();
     let mut trace = Vec::new();
+    let mut observation_store = ObservationStore::new();
 
     for generation in 0..config.generations {
         let generation_u64 = u64::try_from(generation)
@@ -142,13 +155,14 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 Ok(file) => file,
                 Err(_) => {
                     stats.candidates_no_eligible_mutation += 1;
-                    trace.push(ForgeTraceEvent::no_candidate(
-                        generation_u64,
-                        no_candidate_observation_id(
+                    let observation_id = retain_observation(
+                        &mut observation_store,
+                        forge_observations::no_candidate(
                             "current-best-not-syn-parseable",
                             &current_best_artifact_id,
-                        ),
-                    ));
+                        )?,
+                    )?;
+                    trace.push(ForgeTraceEvent::no_candidate(generation_u64, observation_id));
                     continue;
                 }
             };
@@ -161,26 +175,28 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
             };
             let Some(mutation) = mutator.mutate_one(body, &mut rng) else {
                 stats.candidates_no_eligible_mutation += 1;
-                trace.push(ForgeTraceEvent::no_candidate(
-                    generation_u64,
-                    no_candidate_observation_id(
+                let observation_id = retain_observation(
+                    &mut observation_store,
+                    forge_observations::no_candidate(
                         "no-eligible-ast-mutation",
                         &current_best_artifact_id,
-                    ),
-                ));
+                    )?,
+                )?;
+                trace.push(ForgeTraceEvent::no_candidate(generation_u64, observation_id));
                 continue;
             };
             let candidate_source = render_file(&file);
             let candidate_artifact_id = full_source_artifact_id(&candidate_source);
             if candidate_artifact_id == current_best_artifact_id {
                 stats.candidates_no_eligible_mutation += 1;
-                trace.push(ForgeTraceEvent::no_candidate(
-                    generation_u64,
-                    no_candidate_observation_id(
+                let observation_id = retain_observation(
+                    &mut observation_store,
+                    forge_observations::no_candidate(
                         "mutation-rendered-identical-source",
                         &current_best_artifact_id,
-                    ),
-                ));
+                    )?,
+                )?;
+                trace.push(ForgeTraceEvent::no_candidate(generation_u64, observation_id));
                 continue;
             }
 
@@ -191,11 +207,15 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 current_best_artifact_id.clone(),
                 candidate_artifact_id.clone(),
             );
+            let generated_observation = retain_observation(
+                &mut observation_store,
+                forge_observations::candidate_generated(&attempted_mutation)?,
+            )?;
             trace.push(ForgeTraceEvent::candidate(
                 generation_u64,
                 DiscoveryEventKind::CandidateGenerated,
                 candidate_artifact_id.clone(),
-                attempted_mutation.transformation_id.as_content_id().clone(),
+                generated_observation,
             ));
 
             let mut staged = sandbox.stage(&config.target_file)?;
@@ -214,11 +234,15 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                     stats.candidates_failed_test += 1;
                     DiscoveryEventKind::RejectedCorrectness
                 };
+                let observation_id = retain_observation(
+                    &mut observation_store,
+                    forge_observations::gates(&attempted_mutation, &gates)?,
+                )?;
                 trace.push(ForgeTraceEvent::candidate(
                     generation_u64,
                     kind,
                     candidate_artifact_id,
-                    gate_observation_id(&attempted_mutation, &gates),
+                    observation_id,
                 ));
                 staged.restore()?;
                 continue;
@@ -229,11 +253,19 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 Ok(benchmark) => benchmark,
                 Err(error) => {
                     stats.candidates_failed_benchmark += 1;
+                    let error_text = error.to_string();
+                    let observation_id = retain_observation(
+                        &mut observation_store,
+                        forge_observations::benchmark_failure(
+                            &attempted_mutation,
+                            &error_text,
+                        )?,
+                    )?;
                     trace.push(ForgeTraceEvent::candidate(
                         generation_u64,
                         DiscoveryEventKind::RejectedEvaluation,
                         candidate_artifact_id,
-                        benchmark_failure_observation_id(&attempted_mutation, &error),
+                        observation_id,
                     ));
                     staged.restore()?;
                     eprintln!(
@@ -267,27 +299,31 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 _ => anyhow::bail!("Forge benchmark configuration changed during one search run"),
             };
 
-            let improved = match (&bench, current_best_score) {
+            let selected_against_parent = match (&bench, current_best_score) {
                 (Some(candidate), Some(parent_score)) => candidate.score < parent_score,
                 (None, None) => true,
                 _ => false,
             };
-            if !improved {
-                trace.push(ForgeTraceEvent::candidate(
-                    generation_u64,
-                    DiscoveryEventKind::ValidNotSelected,
-                    candidate_artifact_id,
-                    selection_observation_id(
+            if !selected_against_parent {
+                let observation_id = retain_observation(
+                    &mut observation_store,
+                    forge_observations::selection(
                         &attempted_mutation,
                         bench.as_ref(),
                         current_best_score,
                         "not-better-than-parent",
-                    ),
+                    )?,
+                )?;
+                trace.push(ForgeTraceEvent::candidate(
+                    generation_u64,
+                    DiscoveryEventKind::ValidNotSelected,
+                    candidate_artifact_id,
+                    observation_id,
                 ));
                 continue;
             }
 
-            stats.candidates_improved_benchmark += 1;
+            stats.candidates_selected_by_search += 1;
             let before_source = extract_function_source(&original_source, &config.target_function)
                 .unwrap_or_default();
             let after_source = extract_function_source(&candidate_source, &config.target_function)
@@ -331,36 +367,51 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
             };
             if should_replace_generation_winner {
                 if let Some(previous) = generation_winner.replace(candidate) {
+                    let observation_id = retain_observation(
+                        &mut observation_store,
+                        forge_observations::candidate_decision(
+                            &previous,
+                            "superseded-within-generation",
+                        )?,
+                    )?;
                     trace.push(ForgeTraceEvent::candidate(
                         generation_u64,
                         DiscoveryEventKind::ValidNotSelected,
                         previous.artifact_id().clone(),
-                        candidate_decision_observation_id(
-                            &previous,
-                            "superseded-within-generation",
-                        ),
+                        observation_id,
                     ));
                 }
             } else {
+                let observation_id = retain_observation(
+                    &mut observation_store,
+                    forge_observations::candidate_decision(
+                        &candidate,
+                        "generation-winner-remained-better",
+                    )?,
+                )?;
                 trace.push(ForgeTraceEvent::candidate(
                     generation_u64,
                     DiscoveryEventKind::ValidNotSelected,
                     candidate.artifact_id().clone(),
-                    candidate_decision_observation_id(
-                        &candidate,
-                        "generation-winner-remained-better",
-                    ),
+                    observation_id,
                 ));
             }
         }
 
         if let Some(candidate) = generation_winner {
             candidate.validate()?;
+            let observation_id = retain_observation(
+                &mut observation_store,
+                forge_observations::candidate_decision(
+                    &candidate,
+                    "selected-for-next-generation",
+                )?,
+            )?;
             trace.push(ForgeTraceEvent::candidate(
                 generation_u64,
                 DiscoveryEventKind::SelectedForContinuation,
                 candidate.artifact_id().clone(),
-                candidate_decision_observation_id(&candidate, "selected-for-next-generation"),
+                observation_id,
             ));
             if let Some(benchmark) = &candidate.certificate().benchmark {
                 current_best_score = Some(benchmark.candidate_score);
@@ -372,148 +423,31 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
         }
     }
 
-    trace.push(ForgeTraceEvent::completed(search_summary_observation_id(
-        &stats,
-        baseline_score,
-        best.as_ref(),
-    )));
+    let summary_observation = retain_observation(
+        &mut observation_store,
+        forge_observations::search_summary(
+            stats.candidates_attempted,
+            stats.candidates_no_eligible_mutation,
+            stats.candidates_failed_compile,
+            stats.candidates_failed_test,
+            stats.candidates_failed_benchmark,
+            stats.candidates_passed_correctness,
+            stats.candidates_selected_by_search,
+            baseline_score,
+            best.as_ref(),
+        )?,
+    )?;
+    trace.push(ForgeTraceEvent::completed(summary_observation));
+
+    validate_forge_trace_observations(&trace, &observation_store)?;
 
     Ok(SearchOutcome {
         stats,
         baseline_benchmark_score: baseline_score,
         best,
         trace,
+        observations: observation_store,
     })
-}
-
-fn no_candidate_observation_id(reason: &str, parent: &ContentId) -> ContentId {
-    forge_observation_id(
-        "symthaea.forge-no-candidate-observation.v1",
-        [reason.as_bytes(), parent.as_str().as_bytes()],
-    )
-}
-
-fn gate_observation_id(mutation: &MutationRecord, gates: &[GateResult]) -> ContentId {
-    let mut owned = vec![
-        mutation.transformation_id.as_content_id().as_str().as_bytes().to_vec(),
-        (gates.len() as u64).to_be_bytes().to_vec(),
-    ];
-    for gate in gates {
-        owned.push(gate.gate.label().as_bytes().to_vec());
-        owned.push(if gate.passed { b"pass".to_vec() } else { b"fail".to_vec() });
-        owned.push(gate.output_tail.as_bytes().to_vec());
-    }
-    forge_observation_id(
-        "symthaea.forge-gate-observation.v1",
-        owned.iter().map(Vec::as_slice),
-    )
-}
-
-fn benchmark_failure_observation_id(
-    mutation: &MutationRecord,
-    error: &impl Display,
-) -> ContentId {
-    let error = error.to_string();
-    forge_observation_id(
-        "symthaea.forge-benchmark-failure-observation.v1",
-        [
-            mutation.transformation_id.as_content_id().as_str().as_bytes(),
-            error.as_bytes(),
-        ],
-    )
-}
-
-fn selection_observation_id(
-    mutation: &MutationRecord,
-    benchmark: Option<&BenchmarkResult>,
-    parent_score: Option<f64>,
-    decision: &str,
-) -> ContentId {
-    let parent_bits = parent_score.map(f64::to_bits).unwrap_or(u64::MAX).to_be_bytes();
-    let candidate_bits = benchmark
-        .map(|result| result.score.to_bits())
-        .unwrap_or(u64::MAX)
-        .to_be_bytes();
-    let metric = benchmark.map(|result| result.metric_name.as_str()).unwrap_or("");
-    forge_observation_id(
-        "symthaea.forge-selection-observation.v1",
-        [
-            mutation.transformation_id.as_content_id().as_str().as_bytes(),
-            decision.as_bytes(),
-            metric.as_bytes(),
-            parent_bits.as_slice(),
-            candidate_bits.as_slice(),
-        ],
-    )
-}
-
-fn candidate_decision_observation_id(candidate: &ForgeCandidate, decision: &str) -> ContentId {
-    let certificate = candidate.certificate();
-    let metric = certificate
-        .benchmark
-        .as_ref()
-        .map(|benchmark| benchmark.metric_name.as_str())
-        .unwrap_or("");
-    let score = certificate
-        .benchmark
-        .as_ref()
-        .map(|benchmark| benchmark.candidate_score.to_bits())
-        .unwrap_or(u64::MAX)
-        .to_be_bytes();
-    let transformation = certificate
-        .mutation_history
-        .last()
-        .expect("validated Forge candidate has a mutation")
-        .transformation_id
-        .as_content_id();
-    forge_observation_id(
-        "symthaea.forge-candidate-decision-observation.v1",
-        [
-            candidate.artifact_id().as_str().as_bytes(),
-            transformation.as_str().as_bytes(),
-            decision.as_bytes(),
-            metric.as_bytes(),
-            score.as_slice(),
-        ],
-    )
-}
-
-fn search_summary_observation_id(
-    stats: &SearchStats,
-    baseline_score: Option<f64>,
-    best: Option<&ForgeCandidate>,
-) -> ContentId {
-    let baseline = baseline_score
-        .map(f64::to_bits)
-        .unwrap_or(u64::MAX)
-        .to_be_bytes();
-    let counts = [
-        stats.candidates_attempted as u128,
-        stats.candidates_no_eligible_mutation as u128,
-        stats.candidates_failed_compile as u128,
-        stats.candidates_failed_test as u128,
-        stats.candidates_failed_benchmark as u128,
-        stats.candidates_passed_correctness as u128,
-        stats.candidates_improved_benchmark as u128,
-    ];
-    let count_bytes: Vec<Vec<u8>> = counts
-        .into_iter()
-        .map(|count| count.to_be_bytes().to_vec())
-        .collect();
-    let best_id = best.map(ForgeCandidate::artifact_id);
-    let mut owned = vec![baseline.to_vec()];
-    owned.extend(count_bytes);
-    owned.push(
-        best_id
-            .map(ContentId::as_str)
-            .unwrap_or("")
-            .as_bytes()
-            .to_vec(),
-    );
-    forge_observation_id(
-        "symthaea.forge-search-summary-observation.v1",
-        owned.iter().map(Vec::as_slice),
-    )
 }
 
 fn render_file(file: &syn::File) -> String {
@@ -569,6 +503,7 @@ fn current_git_sha(workspace_root: &std::path::Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fitness::GateResult;
 
     #[test]
     fn extract_function_source_finds_a_free_function() {
@@ -609,9 +544,9 @@ mod tests {
             output_tail: "error A".into(),
             duration: std::time::Duration::from_millis(1),
         };
-        let a = gate_observation_id(&mutation, &[gate.clone()]);
+        let a = forge_observations::gates(&mutation, &[gate.clone()]).unwrap();
         gate.output_tail = "error B".into();
-        let b = gate_observation_id(&mutation, &[gate]);
-        assert_ne!(a, b);
+        let b = forge_observations::gates(&mutation, &[gate]).unwrap();
+        assert_ne!(a.id(), b.id());
     }
 }

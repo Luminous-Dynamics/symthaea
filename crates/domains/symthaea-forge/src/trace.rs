@@ -13,6 +13,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use symthaea_algorithms::ledger::DiscoveryEventKind;
+use symthaea_algorithms::observation::ObservationStore;
 use symthaea_algorithms::ContentId;
 use thiserror::Error;
 
@@ -30,6 +31,10 @@ pub enum ForgeTraceError {
     MissingCompletion,
     #[error("CandidateArchived is not emitted by Forge's local search trace")]
     UnsupportedArchivedEvent,
+    #[error("Forge trace references an observation absent from the supplied store: {0}")]
+    MissingObservation(String),
+    #[error("Forge observation store failed self-validation: {0}")]
+    InvalidObservationStore(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -148,16 +153,31 @@ pub fn validate_forge_trace(trace: &[ForgeTraceEvent]) -> Result<(), ForgeTraceE
     }
 }
 
-pub fn forge_observation_id<'a>(
-    domain: &str,
-    parts: impl IntoIterator<Item = &'a [u8]>,
-) -> ContentId {
-    ContentId::derive(domain, parts)
+/// Prove that every observation reference in a locally valid Forge trace resolves to one exact
+/// canonical object. Extra objects are permitted because a store may cover more than one trace or
+/// snapshot.
+pub fn validate_forge_trace_observations(
+    trace: &[ForgeTraceEvent],
+    observations: &ObservationStore,
+) -> Result<(), ForgeTraceError> {
+    validate_forge_trace(trace)?;
+    observations
+        .validate()
+        .map_err(|error| ForgeTraceError::InvalidObservationStore(error.to_string()))?;
+    for event in trace {
+        if !observations.contains(&event.observation_id) {
+            return Err(ForgeTraceError::MissingObservation(
+                event.observation_id.as_str().to_string(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_algorithms::observation::ObservationObject;
 
     fn cid(domain: &str, value: &str) -> ContentId {
         ContentId::derive(domain, [value.as_bytes()])
@@ -263,5 +283,19 @@ mod tests {
             validate_forge_trace(&trace).unwrap_err(),
             ForgeTraceError::EventAfterCompletion
         );
+    }
+
+    #[test]
+    fn observation_coverage_is_required() {
+        let object = ObservationObject::utf8("forge.test.v1", "complete").unwrap();
+        let trace = vec![ForgeTraceEvent::completed(object.id().clone())];
+        let full = ObservationStore::from_objects(vec![object]).unwrap();
+        assert!(validate_forge_trace_observations(&trace, &full).is_ok());
+
+        let empty = ObservationStore::new();
+        assert!(matches!(
+            validate_forge_trace_observations(&trace, &empty),
+            Err(ForgeTraceError::MissingObservation(_))
+        ));
     }
 }
