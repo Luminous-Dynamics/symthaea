@@ -92,16 +92,16 @@ pub struct LegacyCompatibilityEvidenceAdapter<'a> {
     actuator_profile_id: String,
 }
 
-impl<'a> LegacyCompatibilityEvidenceAdapter<'a> {
+impl LegacyCompatibilityEvidenceAdapter<'_> {
     /// Create a compatibility adapter.
     ///
     /// `actuator_profile_id` identifies the positional meaning of the legacy
     /// actuator-health vector. It must be explicit because an unlabelled vector
     /// cannot establish which physical actuator each element describes.
     pub fn new(
-        bridge: &'a dyn EmbodimentBridge,
+        bridge: &dyn EmbodimentBridge,
         actuator_profile_id: impl Into<String>,
-    ) -> Result<Self, EvidenceValidationError> {
+    ) -> Result<LegacyCompatibilityEvidenceAdapter<'_>, EvidenceValidationError> {
         let actuator_profile_id = actuator_profile_id.into();
         let trimmed = actuator_profile_id.trim();
         if trimmed.is_empty()
@@ -112,7 +112,7 @@ impl<'a> LegacyCompatibilityEvidenceAdapter<'a> {
                 "actuator_profile_id",
             ));
         }
-        Ok(Self {
+        Ok(LegacyCompatibilityEvidenceAdapter {
             bridge,
             actuator_profile_id,
         })
