@@ -10,7 +10,6 @@ use crate::candidate::{ledger_from_forge_trace, ForgeProposalError};
 use crate::trace::ForgeTraceEvent;
 use crate::trials::{
     extract_transformation_trials, ForgeTrialError, ForgeTrialOutcome, ForgeTrialSet,
-    TransformationTrial,
 };
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -181,7 +180,10 @@ impl TransformationOutcomeStats {
         trials: impl IntoIterator<Item = ForgeTrialOutcome>,
     ) -> Result<Self, ForgeLearningError> {
         let mut row = Self {
-            id: ContentId::derive("symthaea.forge-transformation-outcome-row.uninitialized", [b"v1".as_slice()]),
+            id: ContentId::derive(
+                "symthaea.forge-transformation-outcome-row.uninitialized",
+                [b"v1".as_slice()],
+            ),
             transformation_id,
             trials: 0,
             rejected_compilation: 0,
@@ -542,9 +544,7 @@ mod tests {
         let observations = ObservationStore::from_objects(vec![generated, rejected, summary]).unwrap();
         let batch = ForgeTrialBatch::from_trace(&run, &baseline, &trace, &observations).unwrap();
         let table = TransformationOutcomeTable::from_batch(&batch).unwrap();
-        let row = table.get(mutation.transformation_id.as_ref()).unwrap_or_else(|| {
-            table.rows().first().expect("one transformation row")
-        });
+        let row = table.get(&mutation.transformation_id).expect("one transformation row");
         assert_eq!(row.trials(), 1);
         assert_eq!(row.rejected_correctness(), 1);
         assert_eq!(row.interrupted(), 0);
