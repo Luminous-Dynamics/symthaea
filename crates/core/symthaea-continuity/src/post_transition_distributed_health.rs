@@ -196,11 +196,8 @@ pub(crate) fn compose_post_transition_distributed_health(
         return Err(PostTransitionDistributedHealthError::CurrentnessContextMismatch);
     }
 
-    let failure_policy_by_id = validate_failure_policies(
-        context,
-        currentness,
-        failure_domain_policies,
-    )?;
+    let failure_policy_by_id =
+        validate_failure_policies(context, currentness, failure_domain_policies)?;
 
     let mut observation_times = Vec::new();
     let mut verifier_snapshots = BTreeSet::new();
@@ -388,7 +385,9 @@ pub(crate) fn compose_post_transition_distributed_health(
         healthy_domains.push((*policy_id, count));
     }
 
-    let mut recovery_by_class = BTreeMap::<RecoveryPathClassV1, QualifiedRecoveryPathSnapshotV1>::new();
+    let mut recovery_by_class =
+        BTreeMap::<RecoveryPathClassV1, QualifiedRecoveryPathSnapshotV1>::new();
+    let mut seen_recovery_classes = BTreeSet::<RecoveryPathClassV1>::new();
     let mut recovery_evidence_ids = Vec::new();
     for evidence in recovery_evidence {
         require_context("recovery", evidence.context_id(), context.id())?;
@@ -412,7 +411,7 @@ pub(crate) fn compose_post_transition_distributed_health(
         {
             return Err(PostTransitionDistributedHealthError::RecoveryClassOutsideBudget);
         }
-        if recovery_by_class.contains_key(evidence.recovery_path_class()) {
+        if !seen_recovery_classes.insert(evidence.recovery_path_class().clone()) {
             return Err(PostTransitionDistributedHealthError::DuplicateRecoveryEvidence);
         }
         if evidence.outcome() == RecoveryPathObservationOutcomeV1::Available {
@@ -496,8 +495,10 @@ fn validate_failure_policies<'a>(
     context: &ValidatedDistributedStateContextV1,
     currentness: &ValidatedDistributedCurrentnessPolicyV1,
     policies: &'a [ValidatedFailureDomainPolicyV1],
-) -> Result<BTreeMap<FailureDomainPolicyId, &'a ValidatedFailureDomainPolicyV1>, PostTransitionDistributedHealthError>
-{
+) -> Result<
+    BTreeMap<FailureDomainPolicyId, &'a ValidatedFailureDomainPolicyV1>,
+    PostTransitionDistributedHealthError,
+> {
     let mut by_id = BTreeMap::new();
     for policy in policies {
         if policy.budget_id() != context.budget_id()
@@ -758,10 +759,7 @@ fn hash_qualified(
     *hasher.finalize().as_bytes()
 }
 
-fn hash_ids<'a>(
-    hasher: &mut blake3::Hasher,
-    ids: impl Iterator<Item = &'a [u8; 32]>,
-) {
+fn hash_ids<'a>(hasher: &mut blake3::Hasher, ids: impl Iterator<Item = &'a [u8; 32]>) {
     let ids = ids.collect::<Vec<_>>();
     hasher.update(&(ids.len() as u64).to_le_bytes());
     for id in ids {
