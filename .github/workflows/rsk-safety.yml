@@ -100,6 +100,30 @@ jobs:
 
           echo "Generic Class A detector retains all required RSK/governance paths."
 
+      - name: Keep RSK reference crates non-publishable until admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifests=(
+            crates/domains/symthaea-replicator-safety/Cargo.toml
+            crates/domains/symthaea-replicator-ledger/Cargo.toml
+          )
+
+          for manifest in "${manifests[@]}"; do
+            if ! grep -Eq '^publish[[:space:]]*=[[:space:]]*false[[:space:]]*$' "${manifest}"; then
+              echo "ERROR: ${manifest} is publishable while RSK production admission remains denied."
+              exit 1
+            fi
+          done
+
+          if ! grep -Fq 'Production admission status: DENIED / NOT YET ELIGIBLE.' \
+            docs/architecture/replicator-safety/RSK_PRODUCTION_ADMISSION_GATES_V0_1.md; then
+            echo "ERROR: production-admission status marker is missing or changed."
+            exit 1
+          fi
+
+          echo "RSK reference crates remain non-publishable and admission remains explicitly denied."
+
   rsk-core:
     name: RSK constitutional + ledger checks
     runs-on: ubuntu-latest
