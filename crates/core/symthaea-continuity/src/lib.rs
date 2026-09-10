@@ -9,6 +9,7 @@
 #![deny(unsafe_code)]
 
 pub mod active_lkg;
+pub mod active_lkg_currentness;
 pub mod auth_wire;
 mod compose;
 pub mod commit_currentness;
@@ -52,8 +53,14 @@ mod witness;
 
 pub use active_lkg::{
     ACTIVE_KNOWN_GOOD_SELECTION_RECORD_SCHEMA_V1, ActiveKnownGoodSelectionError,
-    ActiveKnownGoodSelectionId, ActiveKnownGoodSelectionRecordV1,
-    ActiveKnownGoodSelectionV1,
+    ActiveKnownGoodSelectionId, ActiveKnownGoodSelectionRecordV1, ActiveKnownGoodSelectionV1,
+};
+pub use active_lkg_currentness::{
+    ACTIVE_LKG_CURRENTNESS_AUTH_PURPOSE, ACTIVE_LKG_CURRENTNESS_CLAIM_SCHEMA_V1,
+    ActiveLkgCurrentnessClaimId, ActiveLkgCurrentnessClaimV1, ActiveLkgCurrentnessError,
+    AuthenticatedActiveLkgCurrentnessId, QualifiedActiveLkgCurrentnessId,
+    QualifiedActiveLkgCurrentnessV1, canonical_active_lkg_currentness_claim_bytes,
+    canonical_active_lkg_currentness_claim_digest,
 };
 pub use auth_wire::{
     CONTINUITY_VERIFICATION_CLAIM_AUTH_SCHEMA, CONTINUITY_VERIFICATION_CLAIM_HASH_ALGORITHM,
@@ -68,9 +75,7 @@ pub use commit_currentness::{
     QualifiedLocalCommitCurrentnessId, QualifiedLocalCommitCurrentnessV1,
     ValidatedLocalCommitCurrentnessPolicyV1,
 };
-pub use commit_eligibility::{
-    CommitEligibilityError, CommitEligibleTransitionId, CommitEligibleTransitionV1,
-};
+pub use commit_eligibility::{CommitEligibilityError, CommitEligibleTransitionId, CommitEligibleTransitionV1};
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
     ContinuityRequirementV1, ContractError, EquivalencePredicate, RequirementCriticality,
@@ -110,10 +115,9 @@ pub use distributed_qualification::{
 };
 pub use distributed_state::{
     DISTRIBUTED_STATE_CONTEXT_SCHEMA_V1, PARTICIPANT_STATE_CLAIM_SCHEMA_V1,
-    AuthenticatedParticipantStateEvidenceId, DistributedStateContextId,
-    DistributedStateContextV1, DistributedStateError, ParticipantOperationalStateV1,
-    ParticipantSetDigest, ParticipantStateClaimId, ParticipantStateClaimV1,
-    ValidatedDistributedStateContextV1,
+    AuthenticatedParticipantStateEvidenceId, DistributedStateContextId, DistributedStateContextV1,
+    DistributedStateError, ParticipantOperationalStateV1, ParticipantSetDigest,
+    ParticipantStateClaimId, ParticipantStateClaimV1, ValidatedDistributedStateContextV1,
 };
 pub use exact_distributed_health::{
     ExactDistributedHealthError, ExactDistributedRecoveryPathV2, ExactDistributedStateDigestV2,
@@ -128,9 +132,7 @@ pub use exact_local_health::{
     QualifiedHealthyLocalSnapshotId, QualifiedHealthyLocalSnapshotV1,
     canonical_crash_source_health_claim_bytes, canonical_crash_source_health_claim_digest,
 };
-pub use exact_policy::{
-    ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1,
-};
+pub use exact_policy::{ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1};
 pub use execution_capability::{
     EXECUTION_ATTEMPT_INTENT_SCHEMA_V1, EXECUTION_ATTEMPT_RECEIPT_SCHEMA_V1,
     EXECUTION_BACKEND_PROFILE_SCHEMA_V1, ExecutionAttemptId, ExecutionAttemptIntentV1,
@@ -153,22 +155,17 @@ pub use execution_journal_anchor::{
     ExecutionJournalAnchorClaimId, ExecutionJournalAnchorClaimV1, ExecutionJournalAnchorError,
     ExecutionJournalAnchorProfileId, ExecutionJournalAnchorProfileV1,
     QualifiedExecutionJournalAnchorId, QualifiedExecutionJournalAnchorV1,
-    canonical_execution_journal_anchor_claim_bytes,
-    canonical_execution_journal_anchor_claim_digest,
+    canonical_execution_journal_anchor_claim_bytes, canonical_execution_journal_anchor_claim_digest,
 };
-pub use execution_result::{
-    CanonicalExecutionAttemptResultId, CanonicalExecutionAttemptResultV1,
-    ExecutionResultBindingError,
-};
+pub use execution_result::{CanonicalExecutionAttemptResultId, CanonicalExecutionAttemptResultV1, ExecutionResultBindingError};
 pub use failure_domain::{
     FAILURE_DOMAIN_POLICY_SCHEMA_V1, FailureDomainGroupV1, FailureDomainKindV1,
     FailureDomainPolicyError, FailureDomainPolicyId, FailureDomainPolicyV1,
     ValidatedFailureDomainPolicyV1,
 };
 pub use known_good::{
-    KNOWN_GOOD_CHECKPOINT_RECORD_SCHEMA_V1, KnownGoodCheckpointError,
-    KnownGoodCheckpointId, KnownGoodCheckpointRecordV1, KnownGoodRecoveryPathV1,
-    QualifiedKnownGoodCheckpointV1,
+    KNOWN_GOOD_CHECKPOINT_RECORD_SCHEMA_V1, KnownGoodCheckpointError, KnownGoodCheckpointId,
+    KnownGoodCheckpointRecordV1, KnownGoodRecoveryPathV1, QualifiedKnownGoodCheckpointV1,
 };
 pub use observation::{
     DependencyBasis, DependencyClaimId, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
@@ -178,9 +175,8 @@ pub use post_execution_health::{
     POST_EXECUTION_HEALTH_AUTH_PURPOSE, POST_EXECUTION_HEALTH_CLAIM_SCHEMA_V1,
     AuthenticatedPostExecutionHealthId, PostExecutionHealthClaimId, PostExecutionHealthClaimV1,
     PostExecutionHealthError, PostExecutionHealthOutcomeV1, PostExecutionHealthPolicyId,
-    PostExecutionHealthPolicyV1, QualifiedPostExecutionHealthId,
-    QualifiedPostExecutionHealthV1, canonical_post_execution_health_claim_bytes,
-    canonical_post_execution_health_claim_digest,
+    PostExecutionHealthPolicyV1, QualifiedPostExecutionHealthId, QualifiedPostExecutionHealthV1,
+    canonical_post_execution_health_claim_bytes, canonical_post_execution_health_claim_digest,
 };
 pub use post_execution_observation::{
     POST_EXECUTION_OBSERVATION_CLAIM_SCHEMA_V1, AuthenticatedPostExecutionObservationId,
@@ -200,33 +196,21 @@ pub use profile_adoption::{
     VerifierProfileAdoptionSubjectId, VerifierProfileAdoptionSubjectV1,
     VerifierProfileAdoptionTransitionDigest, VerifierProfileAdoptionTransitionV1,
 };
-pub use promotion_eligibility::{
-    LkgPromotionEligibilityId, LkgPromotionEligibilityV1, LkgPromotionError,
-};
+pub use promotion_eligibility::{LkgPromotionEligibilityId, LkgPromotionEligibilityV1, LkgPromotionError};
 pub use recovery_qualification::{
     QualifiedRecoveryToActiveKnownGoodId, QualifiedRecoveryToActiveKnownGoodV1,
     RecoveryQualificationError,
 };
-pub use scope::{
-    CONTINUITY_SUBJECT_SCHEMA_V1, ContinuityScopeV1, ContinuitySubjectError,
-    ContinuitySubjectId, ContinuitySubjectV1,
-};
-pub use subject_contract::{
-    SubjectBoundContinuityContractId, SubjectBoundContinuityContractV1,
-    SubjectContractBindingError,
-};
-pub use subject_witness::{
-    SubjectBoundQualifiedContinuityWitnessId, SubjectBoundQualifiedContinuityWitnessV1,
-    SubjectWitnessBindingError,
-};
+pub use scope::{CONTINUITY_SUBJECT_SCHEMA_V1, ContinuityScopeV1, ContinuitySubjectError, ContinuitySubjectId, ContinuitySubjectV1};
+pub use subject_contract::{SubjectBoundContinuityContractId, SubjectBoundContinuityContractV1, SubjectContractBindingError};
+pub use subject_witness::{SubjectBoundQualifiedContinuityWitnessId, SubjectBoundQualifiedContinuityWitnessV1, SubjectWitnessBindingError};
 pub use transition_authority::{
     TRANSITION_AUTHORITY_CLAIM_SCHEMA_V1, TRANSITION_AUTHORITY_POLICY_SCHEMA_V1,
     TRANSITION_AUTHORITY_PROFILE_SCHEMA_V1, TRANSITION_AUTHORITY_XENIA_PURPOSE,
     AuthenticatedTransitionAuthorityId, TransitionAuthorityClaimId, TransitionAuthorityClaimV1,
     TransitionAuthorityError, TransitionAuthorityPolicyId, TransitionAuthorityPolicyV1,
-    TransitionAuthorityProfileId, TransitionAuthorityProfileV1,
-    ValidatedTransitionAuthorityPolicyV1, canonical_transition_authority_claim_bytes,
-    canonical_transition_authority_claim_digest,
+    TransitionAuthorityProfileId, TransitionAuthorityProfileV1, ValidatedTransitionAuthorityPolicyV1,
+    canonical_transition_authority_claim_bytes, canonical_transition_authority_claim_digest,
 };
 pub use transition_lineage::{
     KNOWN_GOOD_EXECUTION_INTENT_SCHEMA_V1, KNOWN_GOOD_TRANSITION_LINEAGE_SCHEMA_V1,
@@ -237,13 +221,12 @@ pub use transition_lineage::{
 pub use trusted_commit_epoch::{
     TRUSTED_COMMIT_CLOCK_PROFILE_SCHEMA_V1, TRUSTED_COMMIT_EPOCH_CLAIM_SCHEMA_V1,
     TRUSTED_COMMIT_EPOCH_POLICY_SCHEMA_V1, TRUSTED_COMMIT_EPOCH_XENIA_PURPOSE,
-    AuthenticatedTrustedCommitEpochId, QualifiedTrustedCommitEpochId,
-    QualifiedTrustedCommitEpochV1, TrustedCommitClockProfileId, TrustedCommitClockProfileV1,
-    TrustedCommitEligibilityId, TrustedCommitEligibilityV1, TrustedCommitEpochClaimId,
-    TrustedCommitEpochClaimV1, TrustedCommitEpochError, TrustedCommitEpochPolicyId,
-    TrustedCommitEpochPolicyV1, ValidatedTrustedCommitEpochPolicyV1,
-    canonical_trusted_commit_epoch_claim_bytes, canonical_trusted_commit_epoch_claim_digest,
-    validate_trusted_commit_epoch_progression,
+    AuthenticatedTrustedCommitEpochId, QualifiedTrustedCommitEpochId, QualifiedTrustedCommitEpochV1,
+    TrustedCommitClockProfileId, TrustedCommitClockProfileV1, TrustedCommitEligibilityId,
+    TrustedCommitEligibilityV1, TrustedCommitEpochClaimId, TrustedCommitEpochClaimV1,
+    TrustedCommitEpochError, TrustedCommitEpochPolicyId, TrustedCommitEpochPolicyV1,
+    ValidatedTrustedCommitEpochPolicyV1, canonical_trusted_commit_epoch_claim_bytes,
+    canonical_trusted_commit_epoch_claim_digest, validate_trusted_commit_epoch_progression,
 };
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
@@ -251,6 +234,5 @@ pub use verifier::{
 };
 pub use witness::{
     EvidenceClass, ObligationDispositionV1, QualifiedContinuityWitnessV1, TargetRealizationId,
-    VerificationObligationId, VerificationPolicyEntryV1, WitnessError, WitnessId,
-    WitnessManifestId,
+    VerificationObligationId, VerificationPolicyEntryV1, WitnessError, WitnessId, WitnessManifestId,
 };
