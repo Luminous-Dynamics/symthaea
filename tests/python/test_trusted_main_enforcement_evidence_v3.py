@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import copy
 import sys
 import unittest
 from pathlib import Path
@@ -71,6 +72,29 @@ def derive(**overrides):
     return v3.derive_enforcement_evidence_v3(**values)
 
 
+def rehash_evidence(value: dict) -> dict:
+    changed = copy.deepcopy(value)
+    payload = dict(changed)
+    payload.pop("evidence_id", None)
+    changed["evidence_id"] = v3._content_id(v3.DOMAIN, payload)
+    return changed
+
+
+def rederive_selection(value: dict) -> dict:
+    changed = copy.deepcopy(value)
+    payload = {
+        "schema": v3.SELECTION_SCHEMA,
+        "structural_verification_id": changed["structural_verification_id"],
+        "effective_rules_verification_id": changed["effective_rules_verification_id"],
+        "root_subject_id": changed["root_subject_id"],
+        "rule_suite_ids": changed["selected_rule_suite_ids"],
+        "rule_suite_observation_ids": changed["selected_rule_suite_observation_ids"],
+        "actor_id": changed["selected_actor_id"],
+    }
+    changed["trusted_enforcement_selection_id"] = v3._content_id(v3.SELECTION_DOMAIN, payload)
+    return rehash_evidence(changed)
+
+
 class EnforcementEvidenceV3Tests(unittest.TestCase):
     def test_independently_selected_exact_attempts_are_positive(self):
         result = derive()
@@ -91,6 +115,7 @@ class EnforcementEvidenceV3Tests(unittest.TestCase):
         self.assertRegex(result["trusted_enforcement_selection_id"], r"^sha256:[0-9a-f]{64}$")
         for identity in result["selected_rule_suite_observation_ids"].values():
             self.assertRegex(identity, r"^sha256:[0-9a-f]{64}$")
+        self.assertEqual(v3.validate_enforcement_evidence_v3(result), result)
 
     def test_foreign_structural_schema_rejects_before_v2_positive_path(self):
         s = fx.structural()
@@ -198,6 +223,69 @@ class EnforcementEvidenceV3Tests(unittest.TestCase):
             second["trusted_enforcement_selection_id"],
         )
         self.assertNotEqual(first["evidence_id"], second["evidence_id"])
+
+    def test_rehashed_chronology_authority_inflation_rejects(self):
+        changed = derive()
+        changed["chronology_authority"] = "externally-anchored"
+        changed = rehash_evidence(changed)
+        with self.assertRaisesRegex(v3.EnforcementEvidenceV3Error, "chronology_authority"):
+            v3.validate_enforcement_evidence_v3(changed)
+
+    def test_rehashed_receipt_attestation_inflation_rejects(self):
+        changed = derive()
+        changed["receipt_attestation"] = "cryptographically-attested"
+        changed = rehash_evidence(changed)
+        with self.assertRaisesRegex(v3.EnforcementEvidenceV3Error, "receipt_attestation"):
+            v3.validate_enforcement_evidence_v3(changed)
+
+    def test_rehashed_current_admission_inflation_rejects(self):
+        changed = derive()
+        changed["current_admission"] = "admitted"
+        changed = rehash_evidence(changed)
+        with self.assertRaisesRegex(v3.EnforcementEvidenceV3Error, "current_admission"):
+            v3.validate_enforcement_evidence_v3(changed)
+
+    def test_rehashed_scientific_authority_inflation_rejects(self):
+        changed = derive()
+        changed["scientific_authority"] = "qualified"
+        changed = rehash_evidence(changed)
+        with self.assertRaisesRegex(v3.EnforcementEvidenceV3Error, "scientific_authority"):
+            v3.validate_enforcement_evidence_v3(changed)
+
+    def test_rehashed_selection_basis_drift_rejects(self):
+        changed = derive()
+        changed["evidence_selection_basis"] = "caller-selected"
+        changed = rehash_evidence(changed)
+        with self.assertRaisesRegex(v3.EnforcementEvidenceV3Error, "evidence_selection_basis"):
+            v3.validate_enforcement_evidence_v3(changed)
+
+    def test_outer_rehash_cannot_hide_selection_identity_tamper(self):
+        changed = derive()
+        changed["trusted_enforcement_selection_id"] = "sha256:" + "0" * 64
+        changed = rehash_evidence(changed)
+        with self.assertRaisesRegex(v3.EnforcementEvidenceV3Error, "trusted selection identity mismatch"):
+            v3.validate_enforcement_evidence_v3(changed)
+
+    def test_rederived_selection_cannot_make_duplicate_suite_ids_valid(self):
+        changed = derive()
+        changed["selected_rule_suite_ids"]["force_push"] = 101
+        changed = rederive_selection(changed)
+        with self.assertRaisesRegex(v3.EnforcementEvidenceV3Error, "IDs must be distinct"):
+            v3.validate_enforcement_evidence_v3(changed)
+
+    def test_bool_cannot_substitute_for_selected_actor_id(self):
+        changed = derive()
+        changed["selected_actor_id"] = True
+        changed = rederive_selection(changed)
+        with self.assertRaisesRegex(v3.EnforcementEvidenceV3Error, "selected_actor_id.*positive integer"):
+            v3.validate_enforcement_evidence_v3(changed)
+
+    def test_unknown_bypass_assurance_cannot_be_rehashed_into_acceptance(self):
+        changed = derive()
+        changed["bypass_assurance"] = "all-bypass-impossible"
+        changed = rehash_evidence(changed)
+        with self.assertRaisesRegex(v3.EnforcementEvidenceV3Error, "bypass_assurance"):
+            v3.validate_enforcement_evidence_v3(changed)
 
 
 if __name__ == "__main__":
