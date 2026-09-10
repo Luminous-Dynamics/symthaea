@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Semantic verification for persisted Forge bundles.
 //!
-//! [`bundle`](crate::bundle) proves exact file integrity and canonical file sets. This module adds
-//! cross-file propositions: trace terminal must agree with manifest outcome, every observation must
-//! resolve, summary/abort counters must agree with the event history, and any persisted survivor
-//! must be the exact last `SelectedForContinuation` artifact.
+//! [`crate::bundle`] proves exact persisted-file integrity. This module proves cross-file meaning:
+//! manifest outcome agrees with trace terminal, every observation resolves, terminal summaries
+//! agree with the event history, and any survivor is the exact last continuation selected by Forge.
 
 use crate::bundle::{
     read_completed_manifest, BundleError, ForgeBundleManifest, ForgeBundleOutcome, ABORT_FILE,
@@ -16,6 +15,7 @@ use crate::search::{SearchFailure, SearchStats};
 use crate::trace::{validate_forge_trace_observations, ForgeTraceEvent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use symthaea_algorithms::ledger::DiscoveryEventKind;
@@ -25,7 +25,7 @@ use thiserror::Error;
 
 const COMPLETED_SCHEMA: &str = "symthaea.forge.search-summary.v1";
 const ABORTED_SCHEMA: &str = "symthaea.forge.search-aborted.v1";
-const MAX_ABORT_DETAIL_BYTES: usize = 4_020;
+const MAX_ABORT_DETAIL_BYTES: usize = 8 * 1024;
 
 #[derive(Debug, Error)]
 pub enum BundleSemanticError {
@@ -53,6 +53,8 @@ pub enum BundleSemanticError {
     TerminalObservationSchemaMismatch,
     #[error("terminal observation payload disagrees with the persisted trace or bundle")]
     TerminalObservationMismatch,
+    #[error("aborted bundle has inconsistent search counters")]
+    AbortStatsMismatch,
     #[error("aborted bundle is missing or has invalid abort metadata")]
     InvalidAbortRecord,
 }
@@ -95,7 +97,10 @@ pub struct ForgeAbortRecord {
 impl ForgeAbortRecord {
     pub fn from_failure(failure: &SearchFailure) -> Self {
         let stats = ForgeAbortStats::from(&failure.stats);
-        let best_artifact_id = failure.best.as_ref().map(|candidate| candidate.artifact_id().clone());
+        let best_artifact_id = failure
+            .best
+            .as_ref()
+            .map(|candidate| candidate.artifact_id().clone());
         let baseline_score_bits = failure.baseline_benchmark_score.map(f64::to_bits);
         let id = derive_abort_record_id(
             &failure.phase,
@@ -200,8 +205,8 @@ fn derive_abort_record_id(
     parts.extend(counts.into_iter().map(|count| count.to_be_bytes().to_vec()));
     parts.push(
         baseline_score_bits
-            .map(u64::to_be_bytes)
-            .unwrap_or(u64::MAX.to_be_bytes())
+            .unwrap_or(u64::MAX)
+            .to_be_bytes()
             .to_vec(),
     );
     parts.push(
@@ -250,12 +255,7 @@ pub fn read_completed_bundle(root: &Path) -> Result<VerifiedForgeBundle, BundleS
         }
     })?;
 
-    let last_selected = trace
-        .iter()
-        .rev()
-        .find(|event| event.kind == DiscoveryEventKind::SelectedForContinuation)
-        .and_then(|event| event.candidate_artifact_id.as_ref());
-    let derived_stats = derive_stats(&trace);
+    let facts = TraceFacts::from_trace(&trace);
     let survivor = read_survivor_if_present(root)?;
 
     let abort = match manifest.outcome {
@@ -269,10 +269,14 @@ pub fn read_completed_bundle(root: &Path) -> Result<VerifiedForgeBundle, BundleS
             let survivor = survivor
                 .as_ref()
                 .ok_or(BundleSemanticError::SurvivorSelectionMismatch)?;
-            if last_selected != Some(survivor.artifact_id()) {
+            if facts.last_selected.as_ref() != Some(survivor.artifact_id()) {
                 return Err(BundleSemanticError::SurvivorSelectionMismatch);
             }
-            validate_completed_payload(&terminal_payload, &derived_stats, Some(survivor.artifact_id()))?;
+            validate_completed_payload(
+                &terminal_payload,
+                &facts.completed_stats(),
+                Some(survivor.artifact_id()),
+            )?;
             None
         }
         ForgeBundleOutcome::NoWinner => {
@@ -282,10 +286,10 @@ pub fn read_completed_bundle(root: &Path) -> Result<VerifiedForgeBundle, BundleS
             if terminal_object.schema() != COMPLETED_SCHEMA {
                 return Err(BundleSemanticError::TerminalObservationSchemaMismatch);
             }
-            if survivor.is_some() || last_selected.is_some() {
+            if survivor.is_some() || facts.last_selected.is_some() {
                 return Err(BundleSemanticError::NoWinnerHasSelection);
             }
-            validate_completed_payload(&terminal_payload, &derived_stats, None)?;
+            validate_completed_payload(&terminal_payload, &facts.completed_stats(), None)?;
             None
         }
         ForgeBundleOutcome::Aborted => {
@@ -297,10 +301,15 @@ pub fn read_completed_bundle(root: &Path) -> Result<VerifiedForgeBundle, BundleS
             }
             let abort: ForgeAbortRecord = read_json(root, ABORT_FILE)?;
             abort.validate()?;
-            if abort.stats != derived_stats || abort.observation_payload() != terminal_payload {
+            facts.validate_abort_stats(abort.stats())?;
+            if abort.observation_payload() != terminal_payload {
                 return Err(BundleSemanticError::TerminalObservationMismatch);
             }
-            match (abort.best_artifact_id(), survivor.as_ref(), last_selected) {
+            match (
+                abort.best_artifact_id(),
+                survivor.as_ref(),
+                facts.last_selected.as_ref(),
+            ) {
                 (None, None, None) => {}
                 (Some(expected), Some(candidate), Some(selected))
                     if expected == candidate.artifact_id() && expected == selected => {}
@@ -353,8 +362,7 @@ fn reject_unmanifested_reserved_files(
     root: &Path,
     manifest: &ForgeBundleManifest,
 ) -> Result<(), BundleSemanticError> {
-    let manifested: std::collections::BTreeSet<&str> =
-        manifest.files.iter().map(|file| file.name.as_str()).collect();
+    let manifested: BTreeSet<&str> = manifest.files.iter().map(|file| file.name.as_str()).collect();
     for name in [
         TRACE_FILE,
         OBSERVATIONS_FILE,
@@ -375,36 +383,94 @@ fn reject_unmanifested_reserved_files(
     Ok(())
 }
 
-fn derive_stats(trace: &[ForgeTraceEvent]) -> ForgeAbortStats {
-    let mut generated = 0usize;
-    let mut no_op = 0usize;
-    let mut compile = 0usize;
-    let mut correctness = 0usize;
-    let mut evaluation = 0usize;
-    let mut selected = 0usize;
-    let mut valid_not_selected = 0usize;
-    for event in trace {
-        match event.kind {
-            DiscoveryEventKind::CandidateGenerated => generated += 1,
-            DiscoveryEventKind::GeneratorNoOp => no_op += 1,
-            DiscoveryEventKind::RejectedCompilation => compile += 1,
-            DiscoveryEventKind::RejectedCorrectness => correctness += 1,
-            DiscoveryEventKind::RejectedEvaluation => evaluation += 1,
-            DiscoveryEventKind::ValidNotSelected => valid_not_selected += 1,
-            DiscoveryEventKind::SelectedForContinuation => selected += 1,
-            DiscoveryEventKind::CandidateArchived
-            | DiscoveryEventKind::SearchCompleted
-            | DiscoveryEventKind::SearchAborted => {}
+#[derive(Debug)]
+struct TraceFacts {
+    generated: usize,
+    no_op: usize,
+    compile: usize,
+    correctness: usize,
+    evaluation: usize,
+    valid_not_selected: usize,
+    selected: usize,
+    last_selected: Option<ContentId>,
+}
+
+impl TraceFacts {
+    fn from_trace(trace: &[ForgeTraceEvent]) -> Self {
+        let mut facts = Self {
+            generated: 0,
+            no_op: 0,
+            compile: 0,
+            correctness: 0,
+            evaluation: 0,
+            valid_not_selected: 0,
+            selected: 0,
+            last_selected: None,
+        };
+        for event in trace {
+            match event.kind {
+                DiscoveryEventKind::CandidateGenerated => facts.generated += 1,
+                DiscoveryEventKind::GeneratorNoOp => facts.no_op += 1,
+                DiscoveryEventKind::RejectedCompilation => facts.compile += 1,
+                DiscoveryEventKind::RejectedCorrectness => facts.correctness += 1,
+                DiscoveryEventKind::RejectedEvaluation => facts.evaluation += 1,
+                DiscoveryEventKind::ValidNotSelected => facts.valid_not_selected += 1,
+                DiscoveryEventKind::SelectedForContinuation => {
+                    facts.selected += 1;
+                    facts.last_selected = event.candidate_artifact_id.clone();
+                }
+                DiscoveryEventKind::CandidateArchived
+                | DiscoveryEventKind::SearchCompleted
+                | DiscoveryEventKind::SearchAborted => {}
+            }
+        }
+        facts
+    }
+
+    fn completed_stats(&self) -> ForgeAbortStats {
+        ForgeAbortStats {
+            candidates_attempted: self.generated + self.no_op,
+            candidates_no_eligible_mutation: self.no_op,
+            candidates_failed_compile: self.compile,
+            candidates_failed_test: self.correctness,
+            candidates_failed_benchmark: self.evaluation,
+            candidates_passed_correctness: self.evaluation
+                + self.valid_not_selected
+                + self.selected,
+            candidates_selected_by_search: self.selected,
         }
     }
-    ForgeAbortStats {
-        candidates_attempted: generated + no_op,
-        candidates_no_eligible_mutation: no_op,
-        candidates_failed_compile: compile,
-        candidates_failed_test: correctness,
-        candidates_failed_benchmark: evaluation,
-        candidates_passed_correctness: evaluation + valid_not_selected + selected,
-        candidates_selected_by_search: selected,
+
+    /// An aborted single-threaded search may have an in-flight loop attempt with no event yet, and
+    /// may have generated candidates whose correctness/selection lifecycle was interrupted. Exact
+    /// terminal rejection/selection counters remain derivable; progress counters are bounded.
+    fn validate_abort_stats(&self, stats: &ForgeAbortStats) -> Result<(), BundleSemanticError> {
+        if stats.candidates_no_eligible_mutation != self.no_op
+            || stats.candidates_failed_compile != self.compile
+            || stats.candidates_failed_test != self.correctness
+            || stats.candidates_failed_benchmark != self.evaluation
+            || stats.candidates_selected_by_search != self.selected
+        {
+            return Err(BundleSemanticError::AbortStatsMismatch);
+        }
+
+        let classified_attempts = self.generated + self.no_op;
+        if stats.candidates_attempted < classified_attempts
+            || stats.candidates_attempted > classified_attempts.saturating_add(1)
+        {
+            return Err(BundleSemanticError::AbortStatsMismatch);
+        }
+
+        let definitely_passed = self.evaluation + self.valid_not_selected + self.selected;
+        let max_possible_passed = self
+            .generated
+            .saturating_sub(self.compile.saturating_add(self.correctness));
+        if stats.candidates_passed_correctness < definitely_passed
+            || stats.candidates_passed_correctness > max_possible_passed
+        {
+            return Err(BundleSemanticError::AbortStatsMismatch);
+        }
+        Ok(())
     }
 }
 
@@ -450,28 +516,56 @@ fn validate_completed_payload(
 mod tests {
     use super::*;
 
+    fn artifact(name: &str) -> ContentId {
+        ContentId::derive("artifact", [name.as_bytes()])
+    }
+
+    fn observation(name: &str) -> ContentId {
+        ContentId::derive("obs", [name.as_bytes()])
+    }
+
     #[test]
-    fn derived_stats_count_only_actual_continuations_as_selected() {
-        let artifact = ContentId::derive("artifact", [b"a".as_slice()]);
-        let obs = |name: &str| ContentId::derive("obs", [name.as_bytes()]);
+    fn completed_stats_count_only_actual_continuations_as_selected() {
+        let artifact = artifact("a");
         let trace = vec![
             ForgeTraceEvent::candidate(
                 0,
                 DiscoveryEventKind::CandidateGenerated,
                 artifact.clone(),
-                obs("generated"),
+                observation("generated"),
             ),
             ForgeTraceEvent::candidate(
                 0,
                 DiscoveryEventKind::ValidNotSelected,
                 artifact,
-                obs("not-selected"),
+                observation("not-selected"),
             ),
-            ForgeTraceEvent::completed(obs("complete")),
+            ForgeTraceEvent::completed(observation("complete")),
         ];
-        let stats = derive_stats(&trace);
+        let stats = TraceFacts::from_trace(&trace).completed_stats();
         assert_eq!(stats.candidates_attempted, 1);
         assert_eq!(stats.candidates_passed_correctness, 1);
         assert_eq!(stats.candidates_selected_by_search, 0);
+    }
+
+    #[test]
+    fn aborted_stats_allow_interrupted_generated_candidate() {
+        let trace = vec![ForgeTraceEvent::candidate(
+            0,
+            DiscoveryEventKind::CandidateGenerated,
+            artifact("a"),
+            observation("generated"),
+        )];
+        let facts = TraceFacts::from_trace(&trace);
+        let stats = ForgeAbortStats {
+            candidates_attempted: 1,
+            candidates_no_eligible_mutation: 0,
+            candidates_failed_compile: 0,
+            candidates_failed_test: 0,
+            candidates_failed_benchmark: 0,
+            candidates_passed_correctness: 1,
+            candidates_selected_by_search: 0,
+        };
+        assert!(facts.validate_abort_stats(&stats).is_ok());
     }
 }
