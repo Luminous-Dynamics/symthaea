@@ -16,23 +16,25 @@
 //! => declared candidate overlay
 //! ```
 //!
-//! Only then may this bridge construct an evaluation context equivalent to the collector's clean
-//! context formula. Candidate/overlay identities are deliberately excluded from that context so
-//! different implementations evaluated under the same baseline, command, machine, toolchain and
-//! input profile remain comparable. Candidate identity stays in `ImplementationRecord`.
+//! Candidate/overlay identities are deliberately excluded from the resulting comparison context,
+//! so two implementations evaluated under the same baseline, command, machine, toolchain and input
+//! profile remain comparable. Candidate identity stays in `ImplementationRecord`.
+//!
+//! Context construction re-observes the live Git/worktree/file state. A proof that was valid
+//! earlier cannot be reused after the candidate file or repository state changes.
 //!
 //! This is provenance admission, not execution, correctness, performance, replication, promotion,
 //! or runtime authority.
 
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use symthaea_algorithm_evidence_collector::ExperimentCapsule;
-use symthaea_algorithms::evaluation::{EvaluationContext, EvaluationError};
 use symthaea_algorithms::discovery::{CandidateProposal, DiscoveryError, DiscoveryRun};
+use symthaea_algorithms::evaluation::{EvaluationContext, EvaluationError};
 use symthaea_algorithms::ContentId;
 use symthaea_forge::{CertificateError, ForgeCandidate};
 use symthaea_forge_algorithm_evidence::{
-    ForgeCollectorBinding, ForgeCollectorBindingError, bind_forge_candidate_to_capsule,
+    bind_forge_candidate_to_capsule, ForgeCollectorBinding, ForgeCollectorBindingError,
 };
 use thiserror::Error;
 
@@ -70,7 +72,7 @@ pub enum OverlayError {
     CandidateSymlink,
     #[error("candidate file resolves outside the repository root")]
     CandidateEscapesRepository,
-    #[error("candidate file bytes differ from the exact Forge survivor")]
+    #[error("candidate file bytes differ from the collector-bound candidate bytes")]
     CandidateBytesMismatch,
     #[error("overlay evidence does not belong to the supplied capsule")]
     CapsuleBindingMismatch,
@@ -86,6 +88,7 @@ pub struct DeclaredForgeOverlay {
     binding_id: ContentId,
     capsule_id: ContentId,
     worktree_status_id: ContentId,
+    collector_file_id: ContentId,
     relative_path: String,
     baseline_revision: String,
 }
@@ -107,18 +110,23 @@ impl DeclaredForgeOverlay {
         &self.worktree_status_id
     }
 
+    pub fn collector_file_id(&self) -> &ContentId {
+        &self.collector_file_id
+    }
+
     pub fn relative_path(&self) -> &str {
         &self.relative_path
     }
 
-    /// Construct a comparison context for this declared overlay.
+    /// Construct a comparison context only after re-validating the exact live overlay.
     ///
-    /// This intentionally mirrors the collector's v1 context formula except for its clean-worktree
-    /// rejection. The overlay identity itself is not folded into the context; otherwise each
-    /// candidate would become incomparable merely because its source bytes differ.
+    /// This mirrors the collector's v1 context formula except for its clean-worktree rejection.
+    /// The overlay identity itself is not folded into the context; otherwise each candidate would
+    /// become incomparable merely because its source bytes differ.
     #[allow(clippy::too_many_arguments)]
-    pub fn evaluation_context(
+    pub fn evaluation_context_from_live_overlay(
         &self,
+        repository_root: &Path,
         capsule: &ExperimentCapsule,
         base_evaluator_id: ContentId,
         oracle_id: ContentId,
@@ -136,6 +144,15 @@ impl DeclaredForgeOverlay {
         {
             return Err(OverlayError::CapsuleBindingMismatch);
         }
+
+        validate_live_overlay_state(
+            repository_root,
+            &self.baseline_revision,
+            capsule,
+            &self.relative_path,
+            &self.collector_file_id,
+        )?;
+
         let command = capsule
             .commands
             .get(command_index)
@@ -189,9 +206,84 @@ fn run_git(root: &Path, args: &[&str]) -> Result<String, OverlayError> {
         ));
     }
     let stdout = String::from_utf8(output.stdout).map_err(|_| OverlayError::NonUtf8GitOutput)?;
-    // Match the collector v1 command normalization exactly. The v1 overlay theorem below accepts
-    // one status line only, so trimming the outer whitespace cannot hide an additional entry.
+    // Match collector v1 command normalization exactly. The overlay theorem accepts one status
+    // line only, so trimming outer whitespace cannot hide a second entry.
     Ok(stdout.trim().to_string())
+}
+
+fn canonical_repository_root(repository_root: &Path) -> Result<PathBuf, OverlayError> {
+    let root = repository_root
+        .canonicalize()
+        .map_err(|error| OverlayError::InvalidRepositoryRoot(error.to_string()))?;
+    if !root.is_dir() {
+        return Err(OverlayError::InvalidRepositoryRoot(
+            root.display().to_string(),
+        ));
+    }
+    let reported_root = run_git(&root, &["rev-parse", "--show-toplevel"])?;
+    let git_root = PathBuf::from(reported_root)
+        .canonicalize()
+        .map_err(|error| OverlayError::InvalidRepositoryRoot(error.to_string()))?;
+    if git_root != root {
+        return Err(OverlayError::NotRepositoryTopLevel);
+    }
+    Ok(root)
+}
+
+fn collector_source_file_id(relative_path: &str, bytes: &[u8]) -> ContentId {
+    ContentId::derive(
+        "symthaea.algorithm-source-file.v1",
+        [relative_path.as_bytes(), bytes],
+    )
+}
+
+fn validate_live_overlay_state(
+    repository_root: &Path,
+    baseline_revision: &str,
+    capsule: &ExperimentCapsule,
+    relative_path: &str,
+    collector_file_id: &ContentId,
+) -> Result<(), OverlayError> {
+    validate_relative_path(relative_path)?;
+    let root = canonical_repository_root(repository_root)?;
+
+    let live_head = run_git(&root, &["rev-parse", "--verify", "HEAD"])?;
+    if live_head != baseline_revision || live_head != capsule.repository.revision {
+        return Err(OverlayError::HeadRevisionMismatch);
+    }
+
+    let status = run_git(
+        &root,
+        &["status", "--porcelain=v1", "--untracked-files=all"],
+    )?;
+    let status_id = ContentId::derive("symthaea.git-worktree-status.v1", [status.as_bytes()]);
+    if status_id != capsule.repository.worktree_status_id {
+        return Err(OverlayError::WorktreeStatusMismatch);
+    }
+    if status.lines().count() != 1 || status != format!("M {relative_path}") {
+        // Raw porcelain for one unstaged modification begins with ` M`; collector v1 trims the
+        // outer leading space. Staged, untracked, renamed, deleted, or multi-file states differ.
+        return Err(OverlayError::UnexpectedWorktreeStatus);
+    }
+
+    let requested = root.join(relative_path);
+    let metadata = std::fs::symlink_metadata(&requested)
+        .map_err(|error| OverlayError::InvalidRepositoryRoot(error.to_string()))?;
+    if metadata.file_type().is_symlink() {
+        return Err(OverlayError::CandidateSymlink);
+    }
+    let canonical_candidate = requested
+        .canonicalize()
+        .map_err(|error| OverlayError::InvalidRepositoryRoot(error.to_string()))?;
+    if !canonical_candidate.starts_with(&root) {
+        return Err(OverlayError::CandidateEscapesRepository);
+    }
+    let live_bytes = std::fs::read(&canonical_candidate)
+        .map_err(|error| OverlayError::InvalidRepositoryRoot(error.to_string()))?;
+    if collector_source_file_id(relative_path, &live_bytes) != *collector_file_id {
+        return Err(OverlayError::CandidateBytesMismatch);
+    }
+    Ok(())
 }
 
 /// Observe and admit exactly one Forge candidate as the complete Git-visible worktree delta.
@@ -215,58 +307,6 @@ pub fn observe_declared_forge_overlay(
         return Err(OverlayError::CapsuleUnexpectedlyClean);
     }
 
-    let root = repository_root
-        .canonicalize()
-        .map_err(|error| OverlayError::InvalidRepositoryRoot(error.to_string()))?;
-    if !root.is_dir() {
-        return Err(OverlayError::InvalidRepositoryRoot(
-            root.display().to_string(),
-        ));
-    }
-    let git_root = Path::new(&run_git(&root, &["rev-parse", "--show-toplevel"])? )
-        .canonicalize()
-        .map_err(|error| OverlayError::InvalidRepositoryRoot(error.to_string()))?;
-    if git_root != root {
-        return Err(OverlayError::NotRepositoryTopLevel);
-    }
-
-    let live_head = run_git(&root, &["rev-parse", "--verify", "HEAD"])?;
-    if live_head != run.baseline_revision || live_head != capsule.repository.revision {
-        return Err(OverlayError::HeadRevisionMismatch);
-    }
-
-    let status = run_git(
-        &root,
-        &["status", "--porcelain=v1", "--untracked-files=all"],
-    )?;
-    let status_id = ContentId::derive("symthaea.git-worktree-status.v1", [status.as_bytes()]);
-    if status_id != capsule.repository.worktree_status_id {
-        return Err(OverlayError::WorktreeStatusMismatch);
-    }
-    if status.lines().count() != 1 || status != format!("M {expected_relative_path}") {
-        // Collector v1 trims the leading space from a single raw ` M path` porcelain line. A
-        // staged `M  path`, untracked `?? path`, rename, deletion, or any multi-file state fails.
-        return Err(OverlayError::UnexpectedWorktreeStatus);
-    }
-
-    let requested = root.join(expected_relative_path);
-    let metadata = std::fs::symlink_metadata(&requested)
-        .map_err(|error| OverlayError::InvalidRepositoryRoot(error.to_string()))?;
-    if metadata.file_type().is_symlink() {
-        return Err(OverlayError::CandidateSymlink);
-    }
-    let canonical_candidate = requested
-        .canonicalize()
-        .map_err(|error| OverlayError::InvalidRepositoryRoot(error.to_string()))?;
-    if !canonical_candidate.starts_with(&root) {
-        return Err(OverlayError::CandidateEscapesRepository);
-    }
-    let live_source = std::fs::read_to_string(&canonical_candidate)
-        .map_err(|error| OverlayError::InvalidRepositoryRoot(error.to_string()))?;
-    if live_source != candidate.full_source() {
-        return Err(OverlayError::CandidateBytesMismatch);
-    }
-
     let binding = bind_forge_candidate_to_capsule(
         run,
         proposal,
@@ -275,23 +315,34 @@ pub fn observe_declared_forge_overlay(
         candidate_group_label,
         expected_relative_path,
     )?;
+
+    validate_live_overlay_state(
+        repository_root,
+        &run.baseline_revision,
+        capsule,
+        expected_relative_path,
+        binding.collector_file_id(),
+    )?;
+
     let id = ContentId::derive(
-        "symthaea.declared-forge-overlay.v1",
+        "symthaea.declared-forge-overlay.v2",
         [
             binding.id().as_str().as_bytes(),
             capsule.id.as_str().as_bytes(),
-            status_id.as_str().as_bytes(),
+            capsule.repository.worktree_status_id.as_str().as_bytes(),
+            binding.collector_file_id().as_str().as_bytes(),
             expected_relative_path.as_bytes(),
-            live_head.as_bytes(),
+            run.baseline_revision.as_bytes(),
         ],
     );
     let overlay = DeclaredForgeOverlay {
         id,
         binding_id: binding.id().clone(),
         capsule_id: capsule.id.clone(),
-        worktree_status_id: status_id,
+        worktree_status_id: capsule.repository.worktree_status_id.clone(),
+        collector_file_id: binding.collector_file_id().clone(),
         relative_path: expected_relative_path.to_string(),
-        baseline_revision: live_head,
+        baseline_revision: run.baseline_revision.clone(),
     };
     Ok((binding, overlay))
 }
@@ -299,12 +350,10 @@ pub fn observe_declared_forge_overlay(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
     use std::fs;
-    use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
     use symthaea_algorithm_evidence_collector::{
-        ArtifactGroupSpec, CollectorPolicy, CommandSpec, collect_experiment_capsule,
+        collect_experiment_capsule, ArtifactGroupSpec, CollectorPolicy, CommandSpec,
     };
     use symthaea_algorithms::discovery::{DiscoveryPolicy, SearchBudget};
     use symthaea_algorithms::{
@@ -312,9 +361,9 @@ mod tests {
         ImplementationRecord, ProblemSpec, SemanticGuarantee,
     };
     use symthaea_forge::certificate::{
-        ForgeCertificate, GateEvidence, MutationRecord, full_source_artifact_id,
+        full_source_artifact_id, ForgeCertificate, GateEvidence, MutationRecord,
     };
-    use symthaea_forge::{ForgeCandidate, proposal_from_forge};
+    use symthaea_forge::{proposal_from_forge, ForgeCandidate};
 
     fn temp_repo() -> PathBuf {
         let nonce = SystemTime::now()
@@ -335,14 +384,24 @@ mod tests {
             .current_dir(root)
             .output()
             .unwrap();
-        assert!(output.status.success(), "git {:?}: {}", args, String::from_utf8_lossy(&output.stderr));
-        String::from_utf8(output.stdout).unwrap().trim().to_string()
+        assert!(
+            output.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .trim()
+            .to_string()
     }
 
     fn init_repo(root: &Path, baseline_source: &str) -> String {
         fs::write(root.join("src/target.rs"), baseline_source).unwrap();
         git(root, &["init", "-q"]);
-        git(root, &["config", "user.email", "forge-overlay-test@example.invalid"]);
+        git(
+            root,
+            &["config", "user.email", "forge-overlay-test@example.invalid"],
+        );
         git(root, &["config", "user.name", "Forge Overlay Test"]);
         git(root, &["add", "src/target.rs"]);
         git(root, &["commit", "-q", "-m", "baseline"]);
@@ -456,6 +515,14 @@ mod tests {
         .unwrap()
     }
 
+    fn context_inputs() -> (ContentId, ContentId, ContentId) {
+        (
+            ContentId::derive("evaluator", [b"criterion".as_slice()]),
+            ContentId::derive("oracle", [b"reference".as_slice()]),
+            ContentId::derive("inputs", [b"fixed".as_slice()]),
+        )
+    }
+
     #[test]
     fn two_exact_overlays_share_context_but_keep_distinct_candidate_identity() {
         let root = temp_repo();
@@ -482,12 +549,14 @@ mod tests {
             "src/target.rs",
         )
         .unwrap();
+        let (evaluator, oracle, inputs) = context_inputs();
         let context_a = overlay_a
-            .evaluation_context(
+            .evaluation_context_from_live_overlay(
+                &root,
                 &capsule_a,
-                ContentId::derive("evaluator", [b"criterion".as_slice()]),
-                ContentId::derive("oracle", [b"reference".as_slice()]),
-                ContentId::derive("inputs", [b"fixed".as_slice()]),
+                evaluator.clone(),
+                oracle.clone(),
+                inputs.clone(),
                 0,
                 vec![1, 2, 3],
             )
@@ -516,11 +585,12 @@ mod tests {
         )
         .unwrap();
         let context_b = overlay_b
-            .evaluation_context(
+            .evaluation_context_from_live_overlay(
+                &root,
                 &capsule_b,
-                ContentId::derive("evaluator", [b"criterion".as_slice()]),
-                ContentId::derive("oracle", [b"reference".as_slice()]),
-                ContentId::derive("inputs", [b"fixed".as_slice()]),
+                evaluator,
+                oracle,
+                inputs,
                 0,
                 vec![1, 2, 3],
             )
@@ -539,7 +609,7 @@ mod tests {
     fn unrelated_dirty_file_blocks_overlay_admission() {
         let root = temp_repo();
         let baseline_source = "fn target() -> i32 { 1 }\n";
-        let revision = init_repo(&root, baseline_source);
+        init_repo(&root, baseline_source);
         fs::write(root.join("other.txt"), "baseline\n").unwrap();
         git(&root, &["add", "other.txt"]);
         git(&root, &["commit", "-q", "-m", "add other"]);
@@ -567,6 +637,51 @@ mod tests {
             ),
             Err(OverlayError::UnexpectedWorktreeStatus)
         ));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn context_revalidation_rejects_post_observation_mutation() {
+        let root = temp_repo();
+        let baseline_source = "fn target() -> i32 { 1 }\n";
+        let revision = init_repo(&root, baseline_source);
+        let (run, algorithm, baseline) = semantic_context(&revision, baseline_source);
+        let candidate = forge_candidate(
+            &revision,
+            0,
+            baseline_source,
+            "fn target() -> i32 { 2 }\n",
+        );
+        fs::write(root.join("src/target.rs"), candidate.full_source()).unwrap();
+        let capsule = collect_dirty_capsule(&root);
+        let proposal = proposal_from_forge(&run, &algorithm, &baseline, &candidate).unwrap();
+        let (_, overlay) = observe_declared_forge_overlay(
+            &root,
+            &run,
+            &proposal,
+            &candidate,
+            &capsule,
+            "forge-candidate",
+            "src/target.rs",
+        )
+        .unwrap();
+
+        fs::write(root.join("src/target.rs"), "fn target() -> i32 { 99 }\n").unwrap();
+        let (evaluator, oracle, inputs) = context_inputs();
+        assert!(matches!(
+            overlay.evaluation_context_from_live_overlay(
+                &root,
+                &capsule,
+                evaluator,
+                oracle,
+                inputs,
+                0,
+                vec![1],
+            ),
+            Err(OverlayError::CandidateBytesMismatch)
+        ));
+
+        fs::write(root.join("src/target.rs"), baseline_source).unwrap();
         let _ = fs::remove_dir_all(root);
     }
 
