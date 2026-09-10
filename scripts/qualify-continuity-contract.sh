@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # Focused exact-head software-contract qualification for symthaea-continuity.
-# Re-triggered after the pinned Rust 1.96 mechanical formatting repair.
+# Re-triggered after the exact-head Rust 1.96 lockfile reconciliation.
 #
 # This lane proves only that one exact committed source tree satisfies the
 # focused continuity crate's formatting/compiler/lint/test contracts. It does
