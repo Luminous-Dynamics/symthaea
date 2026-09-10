@@ -6,7 +6,10 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/core/symthaea-extension-core/**"
+      - "crates/core/symthaea-extension-admission/**"
+      - "crates/core/symthaea-extension-admission-policy/**"
       - "crates/bridges/symthaea-extension-host/**"
+      - "crates/bridges/symthaea-extension-admission-bridge/**"
       - ".github/workflows/extension-host.yml"
   workflow_dispatch:
 
@@ -68,14 +71,20 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Check host
-        run: cargo check --locked -p symthaea-extension-host --all-targets
+      - name: Check host and admission bridge
+        run: |
+          cargo check --locked -p symthaea-extension-host --all-targets
+          cargo check --locked -p symthaea-extension-admission-bridge --all-targets
 
-      - name: Test host
-        run: cargo test --locked -p symthaea-extension-host
+      - name: Test host and admission bridge
+        run: |
+          cargo test --locked -p symthaea-extension-host
+          cargo test --locked -p symthaea-extension-admission-bridge
 
-      - name: Clippy host
-        run: cargo clippy --locked -p symthaea-extension-host --all-targets -- -D warnings
+      - name: Clippy host and admission bridge
+        run: |
+          cargo clippy --locked -p symthaea-extension-host --all-targets -- -D warnings
+          cargo clippy --locked -p symthaea-extension-admission-bridge --all-targets -- -D warnings
 
       - name: Require committed lockfile
         run: git diff --exit-code -- Cargo.lock
