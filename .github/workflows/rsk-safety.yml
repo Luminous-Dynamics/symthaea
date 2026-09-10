@@ -1,0 +1,71 @@
+name: RSK Safety Kernel
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-replicator-safety/**'
+      - 'crates/domains/symthaea-replicator-ledger/**'
+      - 'docs/architecture/replicator-safety/**'
+      - '.github/workflows/rsk-safety.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/domains/symthaea-replicator-safety/**'
+      - 'crates/domains/symthaea-replicator-ledger/**'
+      - 'docs/architecture/replicator-safety/**'
+      - '.github/workflows/rsk-safety.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rsk-safety-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rsk-core:
+    name: RSK constitutional + ledger checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-rsk-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-rsk-
+
+      - name: Format only the RSK crates
+        run: cargo fmt --check -p symthaea-replicator-safety -p symthaea-replicator-ledger
+
+      - name: Compile the RSK crates and all test targets
+        run: |
+          cargo check -p symthaea-replicator-safety --all-targets
+          cargo check -p symthaea-replicator-ledger --all-targets
+
+      - name: Run the constitutional authority tests
+        run: cargo test -p symthaea-replicator-safety --all-targets
+
+      - name: Run lineage, budget, replay-resistance, and adversarial tests
+        run: cargo test -p symthaea-replicator-ledger --all-targets
+
+      - name: Clippy the complete RSK target surface
+        run: |
+          cargo clippy -p symthaea-replicator-safety --all-targets -- -D warnings
+          cargo clippy -p symthaea-replicator-ledger --all-targets -- -D warnings
