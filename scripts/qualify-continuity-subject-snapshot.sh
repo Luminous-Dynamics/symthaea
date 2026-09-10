@@ -20,6 +20,10 @@ status="FAIL"
 stage="preflight"
 source_state="unverified"
 
+scope_source="crates/core/symthaea-continuity/src/scope.rs"
+snapshot_source="crates/core/symthaea-continuity/src/subject_snapshot.rs"
+format_scope="$scope_source;$snapshot_source"
+
 sha256_file() {
     local path="$1"
     if [[ -f "$path" ]]; then
@@ -38,6 +42,7 @@ write_receipt() {
     local rustc_commit="unavailable"
     local rustc_host="unavailable"
     local cargo_version="unavailable"
+    local rustfmt_version="unavailable"
     local tmp_path="${receipt_path}.tmp.$$"
 
     set +e
@@ -56,6 +61,9 @@ write_receipt() {
     if command -v cargo >/dev/null 2>&1; then
         cargo_version="$(cargo -V 2>/dev/null || printf 'unavailable')"
     fi
+    if command -v rustfmt >/dev/null 2>&1; then
+        rustfmt_version="$(rustfmt -V 2>/dev/null || printf 'unavailable')"
+    fi
 
     mkdir -p "$(dirname "$receipt_path")" || return 1
     {
@@ -64,6 +72,8 @@ write_receipt() {
         printf 'exit_code\t%s\n' "$exit_code"
         printf 'terminal_stage\t%s\n' "$terminal_stage"
         printf 'scope\ttyped-subject-snapshot-software-contract-only\n'
+        printf 'format_scope\t%s\n' "$format_scope"
+        printf 'format_edition\t2024\n'
         printf 'physical_existence_authority\tnone\n'
         printf 'availability_authority\tnone\n'
         printf 'ownership_authority\tnone\n'
@@ -86,11 +96,12 @@ write_receipt() {
         printf 'rustc_commit_hash\t%s\n' "$rustc_commit"
         printf 'rustc_host\t%s\n' "$rustc_host"
         printf 'cargo_version\t%s\n' "$cargo_version"
+        printf 'rustfmt_version\t%s\n' "$rustfmt_version"
         printf 'cargo_lock_sha256\t%s\n' "$(sha256_file Cargo.lock)"
         printf 'workspace_manifest_sha256\t%s\n' "$(sha256_file Cargo.toml)"
         printf 'continuity_manifest_sha256\t%s\n' "$(sha256_file crates/core/symthaea-continuity/Cargo.toml)"
-        printf 'subject_scope_source_sha256\t%s\n' "$(sha256_file crates/core/symthaea-continuity/src/scope.rs)"
-        printf 'subject_snapshot_source_sha256\t%s\n' "$(sha256_file crates/core/symthaea-continuity/src/subject_snapshot.rs)"
+        printf 'subject_scope_source_sha256\t%s\n' "$(sha256_file "$scope_source")"
+        printf 'subject_snapshot_source_sha256\t%s\n' "$(sha256_file "$snapshot_source")"
         printf 'rust_toolchain_sha256\t%s\n' "$(sha256_file rust-toolchain.toml)"
         printf 'qualifier_script_sha256\t%s\n' "$(sha256_file scripts/qualify-continuity-subject-snapshot.sh)"
         printf 'workflow_sha256\t%s\n' "$(sha256_file .github/workflows/continuity-subject-snapshot.yml)"
@@ -109,6 +120,7 @@ write_receipt() {
             echo "- committed tree: \`$head_tree\`"
             echo "- terminal stage: \`$terminal_stage\`"
             echo "- source state: \`$source_state\`"
+            echo "- format scope: \`$format_scope\` (Edition 2024)"
             echo '- scope: typed subject/snapshot software contracts only'
             echo '- full repository CI: independent'
             echo '- physical existence/availability/ownership/policy/recovery/execution authority: none'
@@ -140,10 +152,16 @@ fi
 stage="preflight_sources_present"
 for path in \
     crates/core/symthaea-continuity/Cargo.toml \
-    crates/core/symthaea-continuity/src/scope.rs \
-    crates/core/symthaea-continuity/src/subject_snapshot.rs; do
+    "$scope_source" \
+    "$snapshot_source"; do
     [[ -f "$path" ]] || { echo "error: required source absent: $path" >&2; exit 1; }
 done
+
+stage="preflight_manifest_contract"
+grep -Eq '^edition[[:space:]]*=[[:space:]]*"2024"[[:space:]]*$' crates/core/symthaea-continuity/Cargo.toml || {
+    echo 'error: focused formatter contract expects symthaea-continuity Edition 2024' >&2
+    exit 1
+}
 
 stage="preflight_clean_tree"
 if ! git diff --quiet --ignore-submodules -- || ! git diff --cached --quiet --ignore-submodules --; then
@@ -161,8 +179,11 @@ source_state="clean-exact-checkout"
 stage="cargo_metadata"
 cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
-stage="format"
-cargo fmt -p symthaea-continuity -- --check
+# Deliberately format only the sources named by this theorem. Package-wide
+# `cargo fmt -p` would make unrelated staged continuity modules part of this
+# qualification boundary and can therefore create false failures.
+stage="format_subject_sources"
+rustfmt --edition 2024 --check "$scope_source" "$snapshot_source"
 
 stage="check_all_targets"
 cargo check --locked -p symthaea-continuity --all-targets
