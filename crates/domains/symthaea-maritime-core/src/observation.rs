@@ -2,16 +2,17 @@
 //! Deterministic association between mission-neutral observations and trusted machine sessions.
 //!
 //! This module does not introduce a new authentication scheme. Xenia (or another configured
-//! provider) remains responsible for cryptographic session verification and live authority.
-//! Maritime core only mints a deterministic observation binding after the provider-neutral
-//! session contract evaluates `Trusted` **and** local source policy authorizes that exact provider
-//! principal to speak for the named platform. The resulting BLAKE3 value is an association/
-//! integrity identifier suitable for an opaque downstream evidence field; it is not a signature
-//! or a standalone proof of authentication.
+//! provider) remains responsible for cryptographic session verification and live or historical
+//! machine authority. Maritime core mints a deterministic observation binding only after either
+//! the live provider-neutral session contract evaluates `Trusted`, or an exact non-serializable
+//! historical provider qualification matches the same immutable session and observation. Local
+//! source policy must separately authorize that provider principal to speak for the named platform.
+//! The resulting BLAKE3 value is an association/integrity identifier suitable for an opaque
+//! downstream evidence field; it is not a signature or a standalone proof of authentication.
 
 use crate::{
-    AuthenticatedMachineSession, MachineSessionContext, MachineSessionPolicy, MachineSessionTrust,
-    evaluate_machine_session,
+    AuthenticatedMachineSession, HistoricallyQualifiedMachineSessionV1, MachineSessionContext,
+    MachineSessionPolicy, MachineSessionTrust, evaluate_machine_session,
 };
 use serde::{Deserialize, Serialize};
 
@@ -155,8 +156,10 @@ impl ObservationSourcePolicyV1 {
 /// Why a session-bound observation could not be minted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObservationBindingError {
-    /// The provider-neutral session gate did not evaluate to `Trusted`.
+    /// The provider-neutral live session gate did not evaluate to `Trusted`.
     SessionNotTrusted(MachineSessionTrust),
+    /// A historical provider result did not name this exact session and observation instant.
+    HistoricalQualificationMismatch,
     /// `platform_id` was empty, padded, oversized or contained control characters.
     InvalidPlatformId,
     /// The authenticated provider principal is not locally authorized for this platform subject.
@@ -180,12 +183,12 @@ pub enum ObservationBindingError {
 }
 
 /// In-process proof that maritime core associated one exact observation with a session that was
-/// trusted and locally authorized for the platform subject when this value was minted.
+/// locally authorized for the platform subject and had a valid live or historical authority proof.
 ///
 /// Fields are private and this type deliberately has no serde surface. Persisting or transporting
-/// the returned binding does not preserve live revocation or local source-policy state and must not
-/// be treated as a signature. Downstream systems claiming authenticated provenance must verify
-/// provider-owned evidence through that provider.
+/// the returned binding does not preserve live revocation, historical proof, or local source-policy
+/// state and must not be treated as a signature. Downstream systems claiming authenticated
+/// provenance must verify provider-owned evidence through that provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionBoundObservationV1 {
     binding: String,
@@ -219,11 +222,10 @@ impl SessionBoundObservationV1 {
 /// Bind exact observation bytes to an authenticated session only after current authority and
 /// platform-subject authorization both succeed.
 ///
-/// The algorithm commits to the provider schema, session identifier, peer identity, provider-owned
-/// evidence binding, session admission interval/epoch, platform, observation time/class, exact JSON
-/// payload bytes, and ordered position-evidence references. Mycelix may carry the returned value as
-/// an opaque `evidence_binding` while independently owning sequence/predecessor continuity and final
-/// serialized bridge-size validation.
+/// Live authority is checked at point of use. The stable association algorithm itself is shared
+/// with [`bind_observation_to_historically_qualified_session`], so delayed verification of the
+/// exact same session and bytes resolves to the same evidence identifier rather than a second
+/// proof-path-dependent ID.
 pub fn bind_observation_to_trusted_session(
     session: &AuthenticatedMachineSession,
     context: &MachineSessionContext,
@@ -240,7 +242,112 @@ pub fn bind_observation_to_trusted_session(
         return Err(ObservationBindingError::SessionNotTrusted(trust));
     }
 
-    let platform_id = platform_id.into();
+    let platform_id = validate_observation_material(
+        session,
+        source_policy,
+        platform_id.into(),
+        observed_at_us,
+        payload_json,
+        position_evidence_refs,
+    )?;
+
+    let observed_at_ms = observed_at_us / 1_000;
+    if observed_at_ms > context.now_ms() {
+        return Err(ObservationBindingError::ObservationAfterAuthorityCheck);
+    }
+
+    Ok(compute_session_bound_observation(
+        session,
+        platform_id,
+        observed_at_us,
+        kind,
+        payload_json,
+        position_evidence_refs,
+    ))
+}
+
+/// Bind exact observation bytes after a provider has historically qualified this exact immutable
+/// session and observation interval.
+///
+/// Historical proof is **not** converted into live authority. This path first re-applies the
+/// deployment's current provider-schema/session-lifetime policy, then requires the positive
+/// historical handoff to match the exact session and millisecond observation instant. Platform
+/// source authorization and all payload/reference/session-window validation are identical to the
+/// live path. The provider-history binding remains on the historical qualification for audit and is
+/// deliberately not mixed into the association digest, so live and delayed verification of the
+/// same session+bytes produce one stable observation identifier.
+pub fn bind_observation_to_historically_qualified_session(
+    session: &AuthenticatedMachineSession,
+    historical: &HistoricallyQualifiedMachineSessionV1,
+    session_policy: MachineSessionPolicy<'_>,
+    source_policy: &ObservationSourcePolicyV1,
+    platform_id: impl Into<String>,
+    observed_at_us: u64,
+    kind: MaritimeObservationKind,
+    payload_json: &str,
+    position_evidence_refs: &[String],
+) -> Result<SessionBoundObservationV1, ObservationBindingError> {
+    let static_trust = evaluate_static_session_policy(session, session_policy);
+    if static_trust != MachineSessionTrust::Trusted {
+        return Err(ObservationBindingError::SessionNotTrusted(static_trust));
+    }
+
+    let observed_at_ms = observed_at_us / 1_000;
+    if !historical.matches_session_observation(session, observed_at_ms) {
+        return Err(ObservationBindingError::HistoricalQualificationMismatch);
+    }
+
+    let platform_id = validate_observation_material(
+        session,
+        source_policy,
+        platform_id.into(),
+        observed_at_us,
+        payload_json,
+        position_evidence_refs,
+    )?;
+
+    Ok(compute_session_bound_observation(
+        session,
+        platform_id,
+        observed_at_us,
+        kind,
+        payload_json,
+        position_evidence_refs,
+    ))
+}
+
+fn evaluate_static_session_policy(
+    session: &AuthenticatedMachineSession,
+    policy: MachineSessionPolicy<'_>,
+) -> MachineSessionTrust {
+    if session.validate_shape().is_err() {
+        return MachineSessionTrust::Malformed;
+    }
+    if !policy
+        .accepted_schemas
+        .iter()
+        .any(|accepted| *accepted == session.schema())
+    {
+        return MachineSessionTrust::UnsupportedSchema;
+    }
+    if session
+        .expires_at_ms()
+        .checked_sub(session.authenticated_at_ms())
+        .is_none_or(|validity| validity > policy.max_validity_ms)
+    {
+        return MachineSessionTrust::ValidityTooLong;
+    }
+    MachineSessionTrust::Trusted
+}
+
+fn validate_observation_material(
+    session: &AuthenticatedMachineSession,
+    source_policy: &ObservationSourcePolicyV1,
+    platform_id: String,
+    observed_at_us: u64,
+    payload_json: &str,
+    position_evidence_refs: &[String],
+) -> Result<String, ObservationBindingError> {
     if !canonical_text(&platform_id, MAX_PLATFORM_ID_BYTES) {
         return Err(ObservationBindingError::InvalidPlatformId);
     }
@@ -270,8 +377,6 @@ pub fn bind_observation_to_trusted_session(
         return Err(ObservationBindingError::NonCanonicalPositionReferences);
     }
 
-    // Session/context time is millisecond precision while maritime evidence uses microseconds.
-    // Compare on the provider's millisecond clock to avoid pretending sub-millisecond authority.
     let observed_at_ms = observed_at_us / 1_000;
     if observed_at_ms < session.authenticated_at_ms() {
         return Err(ObservationBindingError::ObservationBeforeSession);
@@ -279,10 +384,17 @@ pub fn bind_observation_to_trusted_session(
     if observed_at_ms >= session.expires_at_ms() {
         return Err(ObservationBindingError::ObservationAfterSession);
     }
-    if observed_at_ms > context.now_ms() {
-        return Err(ObservationBindingError::ObservationAfterAuthorityCheck);
-    }
+    Ok(platform_id)
+}
 
+fn compute_session_bound_observation(
+    session: &AuthenticatedMachineSession,
+    platform_id: String,
+    observed_at_us: u64,
+    kind: MaritimeObservationKind,
+    payload_json: &str,
+    position_evidence_refs: &[String],
+) -> SessionBoundObservationV1 {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-maritime-session-bound-observation-v1\0");
     hash_bytes(&mut hasher, session.schema().as_bytes());
@@ -300,7 +412,7 @@ pub fn bind_observation_to_trusted_session(
         hash_bytes(&mut hasher, reference.as_bytes());
     }
 
-    Ok(SessionBoundObservationV1 {
+    SessionBoundObservationV1 {
         binding: format!(
             "{SESSION_BOUND_OBSERVATION_PREFIX_V1}{}",
             hasher.finalize().to_hex()
@@ -308,7 +420,7 @@ pub fn bind_observation_to_trusted_session(
         platform_id,
         observed_at_us,
         kind,
-    })
+    }
 }
 
 fn canonical_text(value: &str, max_bytes: usize) -> bool {
@@ -371,6 +483,23 @@ mod tests {
         .unwrap()
     }
 
+    fn historical(observation_at_ms: u64) -> HistoricallyQualifiedMachineSessionV1 {
+        HistoricallyQualifiedMachineSessionV1::from_verified_provider(
+            &session(),
+            session_policy(),
+            SCHEMA,
+            "session-1",
+            IDENTITY,
+            9,
+            1_000,
+            2_000,
+            observation_at_ms,
+            "history-head:abc",
+            observation_at_ms,
+        )
+        .unwrap()
+    }
+
     fn bind(payload: &str) -> Result<SessionBoundObservationV1, ObservationBindingError> {
         bind_observation_to_trusted_session(
             &session(),
@@ -417,6 +546,66 @@ mod tests {
         assert_eq!(
             first.evidence_binding().len(),
             SESSION_BOUND_OBSERVATION_PREFIX_V1.len() + 64
+        );
+    }
+
+    #[test]
+    fn live_and_historical_proof_paths_produce_the_same_association() {
+        let live = bind(r#"{"severity":"healthy"}"#).unwrap();
+        let delayed = bind_observation_to_historically_qualified_session(
+            &session(),
+            &historical(1_400),
+            session_policy(),
+            &source_policy(),
+            "auv-01",
+            1_400_000,
+            MaritimeObservationKind::HealthObservation,
+            r#"{"severity":"healthy"}"#,
+            &["mycelix-position:measurement:001".into()],
+        )
+        .unwrap();
+        assert_eq!(live, delayed);
+    }
+
+    #[test]
+    fn historical_path_rechecks_current_local_session_policy() {
+        let strict_policy = MachineSessionPolicy {
+            accepted_schemas: &[SCHEMA],
+            max_validity_ms: 999,
+        };
+        assert_eq!(
+            bind_observation_to_historically_qualified_session(
+                &session(),
+                &historical(1_400),
+                strict_policy,
+                &source_policy(),
+                "auv-01",
+                1_400_000,
+                MaritimeObservationKind::HealthObservation,
+                "{}",
+                &[],
+            ),
+            Err(ObservationBindingError::SessionNotTrusted(
+                MachineSessionTrust::ValidityTooLong
+            ))
+        );
+    }
+
+    #[test]
+    fn historical_proof_cannot_be_reused_for_another_observation_time() {
+        assert_eq!(
+            bind_observation_to_historically_qualified_session(
+                &session(),
+                &historical(1_400),
+                session_policy(),
+                &source_policy(),
+                "auv-01",
+                1_401_000,
+                MaritimeObservationKind::HealthObservation,
+                "{}",
+                &[],
+            ),
+            Err(ObservationBindingError::HistoricalQualificationMismatch)
         );
     }
 
