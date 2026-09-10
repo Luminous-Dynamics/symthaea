@@ -28,7 +28,10 @@ use crate::morphology::HandSide;
 use crate::qualification::HumanoidQualificationSubject;
 use crate::types::{ActuationMode, HumanoidTask};
 
-pub const HUMANOID_GRASP_CONTROLLER_QUALIFICATION_SCHEMA_VERSION: u32 = 1;
+/// v2 makes qualification trials independently self-auditing against the exact
+/// subject and scenario-policy metadata. v1 trial digests must not be interpreted
+/// under these stronger semantics.
+pub const HUMANOID_GRASP_CONTROLLER_QUALIFICATION_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidGraspControllerCandidate {
@@ -78,6 +81,11 @@ impl HumanoidGraspControllerCandidate {
     }
 }
 
+/// One precommitted qualification cell.
+///
+/// Profile IDs are human/operator-facing selectors. Their SHA-256 digests bind
+/// the exact class/fault/perturbation configurations so an unchanged ID cannot be
+/// reused for different test semantics.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidGraspControllerScenarioCell {
     pub scenario_id: String,
@@ -85,16 +93,22 @@ pub struct HumanoidGraspControllerScenarioCell {
     pub minimum_workspace_utilization_sq: f64,
     pub maximum_workspace_utilization_sq: f64,
     pub object_fixture_class_id: String,
+    pub object_fixture_class_digest: HumanoidEvidenceDigest,
     pub perturbation_profile_id: String,
+    pub perturbation_profile_digest: HumanoidEvidenceDigest,
     pub sensor_fault_profile_id: String,
+    pub sensor_fault_profile_digest: HumanoidEvidenceDigest,
 }
 
 impl HumanoidGraspControllerScenarioCell {
     pub fn validate(&self) -> bool {
         valid_id(&self.scenario_id)
             && valid_id(&self.object_fixture_class_id)
+            && !self.object_fixture_class_digest.is_zero()
             && valid_id(&self.perturbation_profile_id)
+            && !self.perturbation_profile_digest.is_zero()
             && valid_id(&self.sensor_fault_profile_id)
+            && !self.sensor_fault_profile_digest.is_zero()
             && self.minimum_workspace_utilization_sq.is_finite()
             && self.maximum_workspace_utilization_sq.is_finite()
             && self.minimum_workspace_utilization_sq >= 0.0
@@ -107,8 +121,11 @@ impl HumanoidGraspControllerScenarioCell {
             && context.workspace_utilization_sq >= self.minimum_workspace_utilization_sq
             && context.workspace_utilization_sq <= self.maximum_workspace_utilization_sq
             && context.object_fixture_class_id == self.object_fixture_class_id
+            && context.object_fixture_class_digest == self.object_fixture_class_digest
             && context.perturbation_profile_id == self.perturbation_profile_id
+            && context.perturbation_profile_digest == self.perturbation_profile_digest
             && context.sensor_fault_profile_id == self.sensor_fault_profile_id
+            && context.sensor_fault_profile_digest == self.sensor_fault_profile_digest
     }
 }
 
@@ -192,26 +209,20 @@ impl HumanoidGraspControllerQualificationPolicy {
             .then_some(value)
     }
 
-    pub fn validate_for(
-        &self,
-        subject: &HumanoidQualificationSubject,
-        candidate: &HumanoidGraspControllerCandidate,
-        contact_policy: &HumanoidGraspContactPolicy,
-        retention_policy: &HumanoidGraspRetentionPolicy,
-    ) -> bool {
+    fn structural_validate_for_subject(&self, subject: &HumanoidQualificationSubject) -> bool {
         if self.schema_version != HUMANOID_GRASP_CONTROLLER_QUALIFICATION_SCHEMA_VERSION
             || digest_subject(subject) != Some(self.subject_digest)
             || subject.task != HumanoidTask::Grasp
-            || !candidate.validate()
-            || self.candidate_digest != candidate.candidate_digest()
-            || !contact_policy.validate_for(subject)
-            || self.contact_policy_digest != contact_policy.policy_digest()
-            || !retention_policy.validate_for(subject, contact_policy)
-            || self.retention_policy_digest != retention_policy.policy_digest()
             || !valid_id(&self.campaign_id)
+            || self.candidate_digest.is_zero()
+            || self.contact_policy_digest.is_zero()
+            || self.retention_policy_digest.is_zero()
             || !is_qualification_purpose(self.required_execution_purpose)
             || self.required_scenarios.is_empty()
-            || self.required_scenarios.iter().any(|requirement| !requirement.validate())
+            || self
+                .required_scenarios
+                .iter()
+                .any(|requirement| !requirement.validate())
             || self.policy_digest.is_zero()
             || self.policy_digest != digest_policy(self)
         {
@@ -221,6 +232,28 @@ impl HumanoidGraspControllerQualificationPolicy {
         self.required_scenarios
             .iter()
             .all(|requirement| ids.insert(requirement.cell.scenario_id.clone()))
+    }
+
+    pub fn validate_for(
+        &self,
+        subject: &HumanoidQualificationSubject,
+        candidate: &HumanoidGraspControllerCandidate,
+        contact_policy: &HumanoidGraspContactPolicy,
+        retention_policy: &HumanoidGraspRetentionPolicy,
+    ) -> bool {
+        self.structural_validate_for_subject(subject)
+            && candidate.validate()
+            && self.candidate_digest == candidate.candidate_digest()
+            && contact_policy.validate_for(subject)
+            && self.contact_policy_digest == contact_policy.policy_digest()
+            && retention_policy.validate_for(subject, contact_policy)
+            && self.retention_policy_digest == retention_policy.policy_digest()
+            // One canonical contact policy is hand-specific. Mixed-hand campaigns
+            // therefore require separate qualification policies/campaigns today.
+            && self
+                .required_scenarios
+                .iter()
+                .all(|requirement| requirement.cell.hand == contact_policy.hand())
     }
 
     fn scenario(
@@ -251,6 +284,7 @@ pub struct HumanoidGraspControllerTrialContext {
     pub workspace_utilization_sq: f64,
     pub object_fixture_id: String,
     pub object_fixture_class_id: String,
+    pub object_fixture_class_digest: HumanoidEvidenceDigest,
     pub object_fixture_digest: HumanoidEvidenceDigest,
     pub environment_digest: HumanoidEvidenceDigest,
     pub perturbation_profile_id: String,
@@ -262,7 +296,9 @@ pub struct HumanoidGraspControllerTrialContext {
 
 impl HumanoidGraspControllerTrialContext {
     pub fn validate_for(&self, subject: &HumanoidQualificationSubject) -> bool {
-        valid_id(&self.trial_id)
+        subject.validate()
+            && subject.task == HumanoidTask::Grasp
+            && valid_id(&self.trial_id)
             && valid_id(&self.scenario_id)
             && is_qualification_purpose(self.execution_purpose)
             && self.backend_profile_id == subject.backend_profile_id
@@ -270,6 +306,7 @@ impl HumanoidGraspControllerTrialContext {
             && (0.0..=1.0).contains(&self.workspace_utilization_sq)
             && valid_id(&self.object_fixture_id)
             && valid_id(&self.object_fixture_class_id)
+            && !self.object_fixture_class_digest.is_zero()
             && !self.object_fixture_digest.is_zero()
             && !self.environment_digest.is_zero()
             && valid_id(&self.perturbation_profile_id)
@@ -305,6 +342,7 @@ pub struct HumanoidGraspControllerQualificationTrial {
     contact_policy_digest: HumanoidEvidenceDigest,
     retention_policy_digest: HumanoidEvidenceDigest,
     scenario_id: String,
+    scenario_requirement_digest: HumanoidEvidenceDigest,
     trial_id: String,
     trial_seed: u64,
     execution_purpose: HumanoidExecutionPurpose,
@@ -313,9 +351,13 @@ pub struct HumanoidGraspControllerQualificationTrial {
     workspace_utilization_sq: f64,
     object_id: String,
     object_fixture_id: String,
+    object_fixture_class_id: String,
+    object_fixture_class_digest: HumanoidEvidenceDigest,
     object_fixture_digest: HumanoidEvidenceDigest,
     environment_digest: HumanoidEvidenceDigest,
+    perturbation_profile_id: String,
     perturbation_profile_digest: HumanoidEvidenceDigest,
+    sensor_fault_profile_id: String,
     sensor_fault_profile_digest: HumanoidEvidenceDigest,
     observation_digests: Vec<HumanoidEvidenceDigest>,
     assessment_digests: Vec<HumanoidEvidenceDigest>,
@@ -337,28 +379,57 @@ pub struct HumanoidGraspControllerQualificationTrial {
 }
 
 impl HumanoidGraspControllerQualificationTrial {
-    pub fn validate_for(&self, policy: &HumanoidGraspControllerQualificationPolicy) -> bool {
+    /// Promotion-grade self-validation against the exact qualification subject
+    /// and exact selected campaign cell.
+    ///
+    /// Recomputing `trial_digest` after tampering is insufficient: subject,
+    /// backend, hand, workspace cell, fixture class and perturbation/fault profile
+    /// identities must still match the precommitted policy.
+    pub fn validate_for(
+        &self,
+        subject: &HumanoidQualificationSubject,
+        policy: &HumanoidGraspControllerQualificationPolicy,
+    ) -> bool {
+        let Some(subject_digest) = digest_subject(subject) else {
+            return false;
+        };
+        if !policy.structural_validate_for_subject(subject) {
+            return false;
+        }
+        let Some(requirement) = policy.scenario(&self.scenario_id) else {
+            return false;
+        };
+
         self.schema_version == HUMANOID_GRASP_CONTROLLER_QUALIFICATION_SCHEMA_VERSION
-            && !self.campaign_policy_digest.is_zero()
             && self.campaign_policy_digest == policy.policy_digest()
-            && !self.subject_digest.is_zero()
-            && !self.candidate_digest.is_zero()
+            && !self.campaign_policy_digest.is_zero()
+            && self.subject_digest == subject_digest
+            && self.subject_digest == policy.subject_digest
             && self.candidate_digest == policy.candidate_digest
+            && !self.candidate_digest.is_zero()
             && self.contact_policy_digest == policy.contact_policy_digest
             && self.retention_policy_digest == policy.retention_policy_digest
+            && self.scenario_requirement_digest == digest_scenario_requirement(requirement)
+            && !self.scenario_requirement_digest.is_zero()
             && valid_id(&self.scenario_id)
-            && policy.scenario(&self.scenario_id).is_some()
+            && self.scenario_id == requirement.cell.scenario_id
             && valid_id(&self.trial_id)
             && self.execution_purpose == policy.required_execution_purpose
-            && valid_id(&self.backend_profile_id)
+            && self.backend_profile_id == subject.backend_profile_id
+            && self.hand == requirement.cell.hand
             && self.workspace_utilization_sq.is_finite()
-            && (0.0..=1.0).contains(&self.workspace_utilization_sq)
+            && self.workspace_utilization_sq >= requirement.cell.minimum_workspace_utilization_sq
+            && self.workspace_utilization_sq <= requirement.cell.maximum_workspace_utilization_sq
             && valid_id(&self.object_id)
             && valid_id(&self.object_fixture_id)
+            && self.object_fixture_class_id == requirement.cell.object_fixture_class_id
+            && self.object_fixture_class_digest == requirement.cell.object_fixture_class_digest
             && !self.object_fixture_digest.is_zero()
             && !self.environment_digest.is_zero()
-            && !self.perturbation_profile_digest.is_zero()
-            && !self.sensor_fault_profile_digest.is_zero()
+            && self.perturbation_profile_id == requirement.cell.perturbation_profile_id
+            && self.perturbation_profile_digest == requirement.cell.perturbation_profile_digest
+            && self.sensor_fault_profile_id == requirement.cell.sensor_fault_profile_id
+            && self.sensor_fault_profile_digest == requirement.cell.sensor_fault_profile_digest
             && self.sample_count > 0
             && self.observation_digests.len() == self.sample_count
             && self.assessment_digests.len() == self.sample_count
@@ -430,7 +501,9 @@ pub fn bind_humanoid_grasp_controller_qualification_trial(
     if !policy.validate_for(subject, candidate, contact_policy, retention_policy) {
         return Err(HumanoidGraspControllerTrialBindFailure::InvalidPolicy);
     }
-    if !context.validate_for(subject) || context.execution_purpose != policy.required_execution_purpose {
+    if !context.validate_for(subject)
+        || context.execution_purpose != policy.required_execution_purpose
+    {
         return Err(HumanoidGraspControllerTrialBindFailure::InvalidContext);
     }
     let Some(requirement) = policy.scenario(&context.scenario_id) else {
@@ -473,7 +546,9 @@ pub fn bind_humanoid_grasp_controller_qualification_trial(
         assessment_digests.push(assessment.assessment_digest());
         samples.push(
             HumanoidGraspRetentionSample::bind(subject, observation, assessment, contact_policy)
-                .map_err(|_| HumanoidGraspControllerTrialBindFailure::RetentionSampleBindingFailed)?,
+                .map_err(|_| {
+                    HumanoidGraspControllerTrialBindFailure::RetentionSampleBindingFailed
+                })?,
         );
     }
 
@@ -504,6 +579,7 @@ pub fn bind_humanoid_grasp_controller_qualification_trial(
         contact_policy_digest: contact_policy.policy_digest(),
         retention_policy_digest: retention_policy.policy_digest(),
         scenario_id: context.scenario_id.clone(),
+        scenario_requirement_digest: digest_scenario_requirement(requirement),
         trial_id: context.trial_id.clone(),
         trial_seed: context.trial_seed,
         execution_purpose: context.execution_purpose,
@@ -512,9 +588,13 @@ pub fn bind_humanoid_grasp_controller_qualification_trial(
         workspace_utilization_sq: context.workspace_utilization_sq,
         object_id: observations[0].object_id().to_string(),
         object_fixture_id: context.object_fixture_id.clone(),
+        object_fixture_class_id: context.object_fixture_class_id.clone(),
+        object_fixture_class_digest: context.object_fixture_class_digest,
         object_fixture_digest: context.object_fixture_digest,
         environment_digest: context.environment_digest,
+        perturbation_profile_id: context.perturbation_profile_id.clone(),
         perturbation_profile_digest: context.perturbation_profile_digest,
+        sensor_fault_profile_id: context.sensor_fault_profile_id.clone(),
         sensor_fault_profile_digest: context.sensor_fault_profile_digest,
         observation_digests,
         assessment_digests,
@@ -535,7 +615,7 @@ pub fn bind_humanoid_grasp_controller_qualification_trial(
         trial_digest: HumanoidEvidenceDigest::ZERO,
     };
     trial.trial_digest = digest_trial(&trial);
-    if !trial.validate_for(policy) {
+    if !trial.validate_for(subject, policy) {
         return Err(HumanoidGraspControllerTrialBindFailure::InvalidDigest);
     }
     Ok(trial)
@@ -611,7 +691,7 @@ pub fn assess_humanoid_grasp_controller_qualification_campaign(
 
     let mut seen_trial_ids = BTreeSet::new();
     for trial in trials {
-        if !trial.validate_for(policy) {
+        if !trial.validate_for(subject, policy) {
             failures.push(HumanoidGraspControllerCampaignFailureKind::InvalidTrial);
             continue;
         }
@@ -627,15 +707,24 @@ pub fn assess_humanoid_grasp_controller_qualification_campaign(
             .filter(|trial| trial.scenario_id == requirement.cell.scenario_id)
             .collect::<Vec<_>>();
         let total_trials = cell_trials.len();
-        let accepted_trials = cell_trials.iter().filter(|trial| trial.trial_accepted).count();
+        let accepted_trials = cell_trials
+            .iter()
+            .filter(|trial| trial.trial_accepted)
+            .count();
         let failure_rate = rate(total_trials - accepted_trials, total_trials, 1.0);
         let false_retention_rate = rate(
-            cell_trials.iter().filter(|trial| trial.false_retention).count(),
+            cell_trials
+                .iter()
+                .filter(|trial| trial.false_retention)
+                .count(),
             total_trials,
             1.0,
         );
         let false_negative_rate = rate(
-            cell_trials.iter().filter(|trial| trial.false_negative).count(),
+            cell_trials
+                .iter()
+                .filter(|trial| trial.false_negative)
+                .count(),
             total_trials,
             1.0,
         );
@@ -689,10 +778,12 @@ pub fn assess_humanoid_grasp_controller_qualification_campaign(
             );
         }
         if retention_loss_rate > requirement.maximum_retention_loss_rate {
-            scenario_failures.push(HumanoidGraspControllerScenarioFailureKind::RetentionLossRateTooHigh);
+            scenario_failures
+                .push(HumanoidGraspControllerScenarioFailureKind::RetentionLossRateTooHigh);
         }
         if continuity_break_trial_rate > requirement.maximum_continuity_break_trial_rate {
-            scenario_failures.push(HumanoidGraspControllerScenarioFailureKind::ContinuityBreakRateTooHigh);
+            scenario_failures
+                .push(HumanoidGraspControllerScenarioFailureKind::ContinuityBreakRateTooHigh);
         }
         if distinct_object_fixtures < requirement.minimum_distinct_object_fixtures {
             scenario_failures.push(
@@ -735,7 +826,10 @@ pub fn assess_humanoid_grasp_controller_qualification_campaign(
         policy_digest: policy.policy_digest(),
         campaign_digest,
         total_trials: trials.len(),
-        total_accepted_trials: trials.iter().filter(|trial| trial.trial_accepted).count(),
+        total_accepted_trials: trials
+            .iter()
+            .filter(|trial| trial.trial_accepted)
+            .count(),
         scenarios: scenario_assessments,
         campaign_accepted: failures.is_empty() && !campaign_digest.is_zero(),
         failures,
@@ -750,8 +844,37 @@ fn digest_candidate(value: &HumanoidGraspControllerCandidate) -> HumanoidEvidenc
     h.finish()
 }
 
+fn digest_scenario_requirement(
+    value: &HumanoidGraspControllerScenarioRequirement,
+) -> HumanoidEvidenceDigest {
+    if !value.validate() {
+        return HumanoidEvidenceDigest::ZERO;
+    }
+    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-controller-scenario-requirement.v2");
+    h.string(&value.cell.scenario_id)
+        .u64(hand_id(value.cell.hand))
+        .f64(value.cell.minimum_workspace_utilization_sq)
+        .f64(value.cell.maximum_workspace_utilization_sq)
+        .string(&value.cell.object_fixture_class_id)
+        .digest(value.cell.object_fixture_class_digest)
+        .string(&value.cell.perturbation_profile_id)
+        .digest(value.cell.perturbation_profile_digest)
+        .string(&value.cell.sensor_fault_profile_id)
+        .digest(value.cell.sensor_fault_profile_digest)
+        .usize(value.minimum_trials)
+        .f64(value.maximum_trial_failure_rate)
+        .f64(value.maximum_false_retention_rate)
+        .f64(value.maximum_false_negative_rate)
+        .f64(value.maximum_retention_loss_rate)
+        .f64(value.maximum_continuity_break_trial_rate)
+        .usize(value.minimum_distinct_object_fixtures)
+        .usize(value.minimum_distinct_environment_digests)
+        .bool(value.require_unique_trial_seeds);
+    h.finish()
+}
+
 fn digest_policy(value: &HumanoidGraspControllerQualificationPolicy) -> HumanoidEvidenceDigest {
-    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-controller-qualification-policy.v1");
+    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-controller-qualification-policy.v2");
     h.u32(value.schema_version)
         .string(&value.campaign_id)
         .digest(value.subject_digest)
@@ -761,28 +884,13 @@ fn digest_policy(value: &HumanoidGraspControllerQualificationPolicy) -> Humanoid
         .u64(purpose_id(value.required_execution_purpose))
         .usize(value.required_scenarios.len());
     for requirement in &value.required_scenarios {
-        h.string(&requirement.cell.scenario_id)
-            .u64(hand_id(requirement.cell.hand))
-            .f64(requirement.cell.minimum_workspace_utilization_sq)
-            .f64(requirement.cell.maximum_workspace_utilization_sq)
-            .string(&requirement.cell.object_fixture_class_id)
-            .string(&requirement.cell.perturbation_profile_id)
-            .string(&requirement.cell.sensor_fault_profile_id)
-            .usize(requirement.minimum_trials)
-            .f64(requirement.maximum_trial_failure_rate)
-            .f64(requirement.maximum_false_retention_rate)
-            .f64(requirement.maximum_false_negative_rate)
-            .f64(requirement.maximum_retention_loss_rate)
-            .f64(requirement.maximum_continuity_break_trial_rate)
-            .usize(requirement.minimum_distinct_object_fixtures)
-            .usize(requirement.minimum_distinct_environment_digests)
-            .bool(requirement.require_unique_trial_seeds);
+        h.digest(digest_scenario_requirement(requirement));
     }
     h.finish()
 }
 
 fn digest_trial(value: &HumanoidGraspControllerQualificationTrial) -> HumanoidEvidenceDigest {
-    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-controller-qualification-trial.v1");
+    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-controller-qualification-trial.v2");
     h.u32(value.schema_version)
         .digest(value.campaign_policy_digest)
         .digest(value.subject_digest)
@@ -790,6 +898,7 @@ fn digest_trial(value: &HumanoidGraspControllerQualificationTrial) -> HumanoidEv
         .digest(value.contact_policy_digest)
         .digest(value.retention_policy_digest)
         .string(&value.scenario_id)
+        .digest(value.scenario_requirement_digest)
         .string(&value.trial_id)
         .u64(value.trial_seed)
         .u64(purpose_id(value.execution_purpose))
@@ -798,9 +907,13 @@ fn digest_trial(value: &HumanoidGraspControllerQualificationTrial) -> HumanoidEv
         .f64(value.workspace_utilization_sq)
         .string(&value.object_id)
         .string(&value.object_fixture_id)
+        .string(&value.object_fixture_class_id)
+        .digest(value.object_fixture_class_digest)
         .digest(value.object_fixture_digest)
         .digest(value.environment_digest)
+        .string(&value.perturbation_profile_id)
         .digest(value.perturbation_profile_digest)
+        .string(&value.sensor_fault_profile_id)
         .digest(value.sensor_fault_profile_digest)
         .usize(value.observation_digests.len());
     for digest in &value.observation_digests {
@@ -841,7 +954,7 @@ fn digest_campaign(
             .then(left.trial_id.cmp(&right.trial_id))
             .then(left.trial_seed.cmp(&right.trial_seed))
     });
-    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-controller-qualification-campaign.v1");
+    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-controller-qualification-campaign.v2");
     h.digest(policy.policy_digest()).usize(sorted.len());
     for trial in sorted {
         h.digest(trial.trial_digest);
@@ -986,8 +1099,11 @@ mod tests {
                 minimum_workspace_utilization_sq: min_u,
                 maximum_workspace_utilization_sq: max_u,
                 object_fixture_class_id: "rigid-small-v1".into(),
+                object_fixture_class_digest: HumanoidEvidenceDigest::from_bytes([7; 32]),
                 perturbation_profile_id: "nominal-v1".into(),
+                perturbation_profile_digest: HumanoidEvidenceDigest::from_bytes([5; 32]),
                 sensor_fault_profile_id: "sensors-nominal-v1".into(),
+                sensor_fault_profile_digest: HumanoidEvidenceDigest::from_bytes([6; 32]),
             },
             minimum_trials: 1,
             maximum_trial_failure_rate: 0.0,
@@ -1018,7 +1134,11 @@ mod tests {
         )
     }
 
-    fn context(scenario_id: &str, workspace_utilization_sq: f64, reported: bool) -> HumanoidGraspControllerTrialContext {
+    fn context(
+        scenario_id: &str,
+        workspace_utilization_sq: f64,
+        reported: bool,
+    ) -> HumanoidGraspControllerTrialContext {
         HumanoidGraspControllerTrialContext {
             trial_id: format!("trial-{scenario_id}"),
             trial_seed: 7,
@@ -1028,6 +1148,7 @@ mod tests {
             workspace_utilization_sq,
             object_fixture_id: "fixture-a".into(),
             object_fixture_class_id: "rigid-small-v1".into(),
+            object_fixture_class_digest: HumanoidEvidenceDigest::from_bytes([7; 32]),
             object_fixture_digest: HumanoidEvidenceDigest::from_bytes([3; 32]),
             environment_digest: HumanoidEvidenceDigest::from_bytes([4; 32]),
             perturbation_profile_id: "nominal-v1".into(),
@@ -1042,7 +1163,10 @@ mod tests {
         force_n: f64,
         in_contact: bool,
         times: &[f64],
-    ) -> (Vec<HumanoidGraspContactObservation>, Vec<HumanoidGraspContactAssessment>) {
+    ) -> (
+        Vec<HumanoidGraspContactObservation>,
+        Vec<HumanoidGraspContactAssessment>,
+    ) {
         let contact = contact_policy();
         let mut observations = Vec::new();
         let mut assessments = Vec::new();
@@ -1056,7 +1180,11 @@ mod tests {
                 in_contact,
                 [0.2, 0.0, 1.0],
                 [1.0, 0.0, 0.0],
-                if in_contact { [-force_n, 0.1, 0.0] } else { [0.0; 3] },
+                if in_contact {
+                    [-force_n, 0.1, 0.0]
+                } else {
+                    [0.0; 3]
+                },
                 [0.0; 3],
                 [0.0; 3],
                 0.95,
@@ -1068,13 +1196,9 @@ mod tests {
                 time,
             )
             .unwrap();
-            let assessment = assess_humanoid_grasp_contact(
-                &subject(),
-                &observation,
-                &contact,
-                time + 0.001,
-            )
-            .unwrap();
+            let assessment =
+                assess_humanoid_grasp_contact(&subject(), &observation, &contact, time + 0.001)
+                    .unwrap();
             observations.push(observation);
             assessments.push(assessment);
         }
@@ -1102,17 +1226,10 @@ mod tests {
         .unwrap()
     }
 
-    #[test]
-    fn operational_purpose_cannot_be_a_qualification_campaign() {
-        assert!(policy_with(
-            vec![scenario("center", 0.0, 0.5)],
-            HumanoidExecutionPurpose::Operational,
-        )
-        .is_none());
-    }
-
-    #[test]
-    fn measured_continuous_retention_and_matching_controller_claim_passes_trial() {
+    fn accepted_trial() -> (
+        HumanoidGraspControllerQualificationPolicy,
+        HumanoidGraspControllerQualificationTrial,
+    ) {
         let contact = contact_policy();
         let retention = retention_policy(&contact);
         let policy = HumanoidGraspControllerQualificationPolicy::new(
@@ -1125,8 +1242,32 @@ mod tests {
             vec![scenario("center", 0.0, 0.5)],
         )
         .unwrap();
-        let (observations, assessments) = evidence(10.0, true, &[1.00, 1.02, 1.04, 1.06, 1.09]);
-        let trial = bind_trial(&policy, &context("center", 0.25, true), &observations, &assessments);
+        let (observations, assessments) =
+            evidence(10.0, true, &[1.00, 1.02, 1.04, 1.06, 1.09]);
+        let trial = bind_trial(
+            &policy,
+            &context("center", 0.25, true),
+            &observations,
+            &assessments,
+        );
+        (policy, trial)
+    }
+
+    #[test]
+    fn operational_purpose_cannot_be_a_qualification_campaign() {
+        assert!(
+            policy_with(
+                vec![scenario("center", 0.0, 0.5)],
+                HumanoidExecutionPurpose::Operational,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn measured_continuous_retention_and_matching_controller_claim_passes_trial() {
+        let (policy, trial) = accepted_trial();
+        assert!(trial.validate_for(&subject(), &policy));
         assert!(trial.trial_accepted());
         assert!(!trial.false_retention());
         assert!(!trial.false_negative());
@@ -1147,8 +1288,14 @@ mod tests {
             vec![scenario("center", 0.0, 0.5)],
         )
         .unwrap();
-        let (observations, assessments) = evidence(0.0, false, &[1.00, 1.02, 1.04, 1.06, 1.09]);
-        let trial = bind_trial(&policy, &context("center", 0.25, true), &observations, &assessments);
+        let (observations, assessments) =
+            evidence(0.0, false, &[1.00, 1.02, 1.04, 1.06, 1.09]);
+        let trial = bind_trial(
+            &policy,
+            &context("center", 0.25, true),
+            &observations,
+            &assessments,
+        );
         assert!(!trial.trial_accepted());
         assert!(trial.false_retention());
     }
@@ -1174,7 +1321,12 @@ mod tests {
         observations.extend(good_observations);
         assessments.extend(good_assessments);
 
-        let trial = bind_trial(&policy, &context("center", 0.25, true), &observations, &assessments);
+        let trial = bind_trial(
+            &policy,
+            &context("center", 0.25, true),
+            &observations,
+            &assessments,
+        );
         assert!(!trial.trial_accepted());
         assert_eq!(trial.in_contact_policy_violation_samples(), 1);
     }
@@ -1196,7 +1348,8 @@ mod tests {
             ],
         )
         .unwrap();
-        let (observations, assessments) = evidence(10.0, true, &[1.00, 1.02, 1.04, 1.06, 1.09]);
+        let (observations, assessments) =
+            evidence(10.0, true, &[1.00, 1.02, 1.04, 1.06, 1.09]);
         let center = bind_trial(
             &policy,
             &context("center", 0.25, true),
@@ -1217,8 +1370,61 @@ mod tests {
             .iter()
             .find(|scenario| scenario.scenario_id == "boundary")
             .unwrap();
-        assert!(boundary
-            .failures
-            .contains(&HumanoidGraspControllerScenarioFailureKind::MissingTrials));
+        assert!(
+            boundary
+                .failures
+                .contains(&HumanoidGraspControllerScenarioFailureKind::MissingTrials)
+        );
+    }
+
+    #[test]
+    fn exact_subject_substitution_is_rejected() {
+        let (policy, trial) = accepted_trial();
+        let substituted = HumanoidQualificationSubject::new(
+            HumanoidMorphology::Dexterous53,
+            HumanoidTask::Grasp,
+            ActuationMode::PositionTargetRadians,
+            "grasp-controller-qualification-test-backend",
+        );
+        assert!(!trial.validate_for(&substituted, &policy));
+        assert!(trial.validate_for(&subject(), &policy));
+    }
+
+    #[test]
+    fn backend_substitution_is_rejected_even_after_recomputing_trial_digest() {
+        let (policy, mut trial) = accepted_trial();
+        trial.backend_profile_id = "other-backend".into();
+        trial.trial_digest = digest_trial(&trial);
+        assert!(!trial.validate_for(&subject(), &policy));
+    }
+
+    #[test]
+    fn scenario_metadata_substitution_is_rejected_even_after_recomputing_trial_digest() {
+        let (policy, mut trial) = accepted_trial();
+        trial.object_fixture_class_id = "other-fixture-class".into();
+        trial.object_fixture_class_digest = HumanoidEvidenceDigest::from_bytes([8; 32]);
+        trial.trial_digest = digest_trial(&trial);
+        assert!(!trial.validate_for(&subject(), &policy));
+    }
+
+    #[test]
+    fn perturbation_configuration_substitution_is_rejected_even_after_recomputing_trial_digest() {
+        let (policy, mut trial) = accepted_trial();
+        trial.perturbation_profile_digest = HumanoidEvidenceDigest::from_bytes([9; 32]);
+        trial.trial_digest = digest_trial(&trial);
+        assert!(!trial.validate_for(&subject(), &policy));
+    }
+
+    #[test]
+    fn mixed_hand_campaign_is_rejected_for_one_hand_contact_policy() {
+        let mut left = scenario("left", 0.0, 0.5);
+        left.cell.hand = HandSide::Left;
+        assert!(
+            policy_with(
+                vec![scenario("right", 0.0, 0.5), left],
+                HumanoidExecutionPurpose::SimulationQualification,
+            )
+            .is_none()
+        );
     }
 }
