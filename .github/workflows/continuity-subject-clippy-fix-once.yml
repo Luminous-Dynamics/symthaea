@@ -46,37 +46,39 @@ jobs:
           target='crates/core/symthaea-continuity/src/subject_snapshot.rs'
           python3 - <<'PY'
           from pathlib import Path
-
           path = Path('crates/core/symthaea-continuity/src/subject_snapshot.rs')
-          text = path.read_text()
-          old = '''        if let Some(parent) = subject.parent_subject_id() {
-            if !known.contains(&parent) {
-                return Err(ContinuitySubjectSnapshotError::MissingParent {
-                    child: subject.id(),
-                    parent,
-                });
-            }
-        }
-'''
-          new = '''        if let Some(parent) = subject.parent_subject_id()
-            && !known.contains(&parent)
-        {
-            return Err(ContinuitySubjectSnapshotError::MissingParent {
-                child: subject.id(),
-                parent,
-            });
-        }
-'''
-          if text.count(old) != 1:
-              raise SystemExit('expected exactly one subject parent-closure nested-if shape')
-          path.write_text(text.replace(old, new))
+          lines = path.read_text().splitlines()
+          expected = [
+              '        if let Some(parent) = subject.parent_subject_id() {',
+              '            if !known.contains(&parent) {',
+              '                return Err(ContinuitySubjectSnapshotError::MissingParent {',
+              '                    child: subject.id(),',
+              '                    parent,',
+              '                });',
+              '            }',
+              '        }',
+          ]
+          replacement = [
+              '        if let Some(parent) = subject.parent_subject_id()',
+              '            && !known.contains(&parent)',
+              '        {',
+              '            return Err(ContinuitySubjectSnapshotError::MissingParent {',
+              '                child: subject.id(),',
+              '                parent,',
+              '            });',
+              '        }',
+          ]
+          matches = [i for i in range(len(lines) - len(expected) + 1) if lines[i:i + len(expected)] == expected]
+          if len(matches) != 1:
+              raise SystemExit(f'expected exactly one subject parent-closure nested-if shape, got {len(matches)}')
+          i = matches[0]
+          lines[i:i + len(expected)] = replacement
+          path.write_text('\n'.join(lines) + '\n')
           PY
 
           rustfmt --edition 2024 "$target"
           rustfmt --edition 2024 --check "$target"
 
-          # Prove the repaired source itself no longer emits the discovered
-          # collapsible_if diagnostic while not granting a package-wide lint waiver.
           set +e
           cargo clippy --locked -p symthaea-continuity --all-targets --message-format=json -- -D warnings > /tmp/subject-clippy.jsonl 2>&1
           clippy_exit=$?
@@ -84,7 +86,6 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
-
           unexpected_local = []
           for raw in Path('/tmp/subject-clippy.jsonl').read_text(errors='replace').splitlines():
               try:
@@ -103,8 +104,6 @@ jobs:
           if unexpected_local:
               raise SystemExit(f'subject-local strict Clippy diagnostics remain: {unexpected_local}')
           PY
-          # Strict package Clippy is expected to remain non-zero while the known
-          # bounded legacy baseline exists; the qualification script inventories it.
           test "$clippy_exit" -ne 0
 
           mapfile -t changed < <(git diff --name-only)
