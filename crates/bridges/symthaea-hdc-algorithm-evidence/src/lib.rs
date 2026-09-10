@@ -180,10 +180,10 @@ pub fn proposal_from_capsule(
     )?;
     Ok(CandidateProposal::new_at_generation(
         run,
+        generation,
         implementation,
         lineage,
         artifact,
-        generation,
     )?)
 }
 
