@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-extension-registry"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Deterministic capability registry for Symthaea extensions"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-extension-core = { path = "../symthaea-extension-core" }
