@@ -70,6 +70,8 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Causal physical-action stage primitives for Embodiment-v2 migration.
+pub mod embodiment_action;
 /// Evidence primitives for explicit embodiment availability, source, time, and metric semantics.
 pub mod embodiment_evidence;
 /// Additive evidence-provider seam for legacy and Embodiment-v2 migration.
