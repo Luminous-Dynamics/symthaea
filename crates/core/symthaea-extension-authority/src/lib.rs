@@ -12,6 +12,10 @@
 //! hashed, named, or reconstructed from manifest/principal strings. A caller may
 //! create a different authority instance, but admissions minted by that instance
 //! are rejected by consumers bound to another [`AuthorityScope`].
+//!
+//! Checked access to the inner `ActiveAdmission` is closure-scoped. Public callers
+//! cannot obtain a raw active-admission borrow and carry it beyond the currentness
+//! check that authorized one operation.
 
 #![deny(unsafe_code)]
 
@@ -19,7 +23,7 @@ use std::sync::Arc;
 use symthaea_extension_admission::{
     ActiveAdmission, AdmissionCurrentnessSource, AdmissionProblem, AdmissionRecord,
 };
-use symthaea_extension_core::ExtensionManifest;
+use symthaea_extension_core::{ExtensionId, ExtensionManifest};
 use thiserror::Error;
 
 #[derive(Debug)]
@@ -73,8 +77,9 @@ impl Default for AdmissionAuthority {
 
 /// Cloneable verification-only scope for one [`AdmissionAuthority`].
 ///
-/// This handle can verify and recheck admissions from its authority instance but
-/// cannot mint new [`ScopedAdmission`] values.
+/// This handle can verify and use admissions from its authority instance but
+/// cannot mint new [`ScopedAdmission`] values. Checked active authority is only
+/// made available inside [`AuthorityScope::with_rechecked`].
 #[derive(Debug, Clone)]
 pub struct AuthorityScope {
     seal: Arc<AuthoritySeal>,
@@ -87,34 +92,34 @@ impl AuthorityScope {
         Arc::ptr_eq(&self.seal, &admission.seal)
     }
 
-    /// Borrow the underlying live admission only after scope identity is proven.
-    pub fn admission<'a>(
+    /// Verify authority-instance identity and live currentness, then run exactly
+    /// one operation with the checked admission.
+    ///
+    /// The higher-ranked callback prevents the borrow supplied to `operation`
+    /// from escaping as the return value. Consumers therefore cannot turn this
+    /// API into a long-lived bearer reference after the currentness check.
+    pub fn with_rechecked<R, F>(
         &self,
-        admission: &'a ScopedAdmission,
-    ) -> Result<&'a ActiveAdmission, AuthorityScopeError> {
-        if !self.accepts(admission) {
-            return Err(AuthorityScopeError::ForeignAuthority);
-        }
-        Ok(&admission.admission)
-    }
-
-    /// Verify authority-instance identity and then re-resolve live currentness at
-    /// the actual use site.
-    pub fn recheck<'a>(
-        &self,
-        admission: &'a ScopedAdmission,
+        admission: &ScopedAdmission,
         currentness: &dyn AdmissionCurrentnessSource,
-    ) -> Result<&'a ActiveAdmission, ScopedAdmissionError> {
-        let admission = self.admission(admission)?;
-        admission.recheck_currentness(currentness)?;
-        Ok(admission)
+        operation: F,
+    ) -> Result<R, ScopedAdmissionError>
+    where
+        F: for<'a> FnOnce(&'a ActiveAdmission) -> R,
+    {
+        if !self.accepts(admission) {
+            return Err(AuthorityScopeError::ForeignAuthority.into());
+        }
+        admission.admission.recheck_currentness(currentness)?;
+        Ok(operation(&admission.admission))
     }
 }
 
 /// Non-serializable active admission bound to one process-local authority.
 ///
-/// The underlying `ActiveAdmission` is deliberately not exposed directly; a
-/// consumer must present the matching [`AuthorityScope`] to borrow it.
+/// The underlying `ActiveAdmission` is deliberately never returned by the public
+/// API. A consumer must present the matching [`AuthorityScope`] and perform its
+/// use inside a fresh currentness-checked callback.
 #[derive(Debug)]
 pub struct ScopedAdmission {
     admission: ActiveAdmission,
@@ -123,7 +128,7 @@ pub struct ScopedAdmission {
 
 impl ScopedAdmission {
     /// Convenience identity accessor that does not grant use authority.
-    pub fn extension(&self) -> &symthaea_extension_core::ExtensionId {
+    pub fn extension(&self) -> &ExtensionId {
         self.admission.extension()
     }
 }
@@ -155,8 +160,8 @@ mod tests {
         AdmissionContext, AdmissionSubject, PrincipalId, Sha256Digest, TrustLevel,
     };
     use symthaea_extension_core::{
-        AbiVersion, CapabilityDescriptor, CapabilityId, EffectClass, ExtensionId, ExtensionKind,
-        PermissionSet, ResourceBudget, RuntimeKind,
+        AbiVersion, CapabilityDescriptor, CapabilityId, EffectClass, ExtensionKind, PermissionSet,
+        ResourceBudget, RuntimeKind,
     };
 
     #[derive(Debug, Clone, Copy)]
@@ -218,10 +223,14 @@ mod tests {
 
         assert!(host.scope().accepts(&scoped));
         assert!(!foreign.scope().accepts(&scoped));
-        assert_eq!(
-            foreign.scope().admission(&scoped),
-            Err(AuthorityScopeError::ForeignAuthority)
-        );
+        assert!(matches!(
+            foreign
+                .scope()
+                .with_rechecked(&scoped, &current(), |_| ()),
+            Err(ScopedAdmissionError::Scope(
+                AuthorityScopeError::ForeignAuthority
+            ))
+        ));
     }
 
     #[test]
@@ -231,11 +240,21 @@ mod tests {
         let host_scoped = host.activate(&record(), &manifest(), &current()).unwrap();
         let impostor_scoped = impostor.activate(&record(), &manifest(), &current()).unwrap();
 
-        assert!(host.scope().admission(&host_scoped).is_ok());
         assert_eq!(
-            host.scope().admission(&impostor_scoped),
-            Err(AuthorityScopeError::ForeignAuthority)
+            host.scope()
+                .with_rechecked(&host_scoped, &current(), |admission| {
+                    admission.extension().clone()
+                })
+                .unwrap(),
+            ExtensionId::new("org.example.scoped")
         );
+        assert!(matches!(
+            host.scope()
+                .with_rechecked(&impostor_scoped, &current(), |_| ()),
+            Err(ScopedAdmissionError::Scope(
+                AuthorityScopeError::ForeignAuthority
+            ))
+        ));
     }
 
     #[test]
@@ -249,15 +268,15 @@ mod tests {
     }
 
     #[test]
-    fn scope_recheck_invalidates_revoked_token_at_use_time() {
+    fn checked_use_invalidates_revoked_token_at_use_time() {
         let host = AdmissionAuthority::new();
         let scope = host.scope();
         let scoped = host.activate(&record(), &manifest(), &current()).unwrap();
         let revoked = Currentness(Some(AdmissionContext::revoked(7, 11)));
 
-        assert!(scope.recheck(&scoped, &current()).is_ok());
+        assert!(scope.with_rechecked(&scoped, &current(), |_| ()).is_ok());
         assert_eq!(
-            scope.recheck(&scoped, &revoked),
+            scope.with_rechecked(&scoped, &revoked, |_| ()),
             Err(ScopedAdmissionError::Currentness(AdmissionProblem::Revoked))
         );
     }
@@ -271,5 +290,6 @@ mod tests {
 
         assert!(scope.accepts(&scoped));
         assert!(clone.accepts(&scoped));
+        assert!(clone.with_rechecked(&scoped, &current(), |_| ()).is_ok());
     }
 }
