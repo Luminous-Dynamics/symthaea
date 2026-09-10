@@ -10,7 +10,5 @@ homepage = "https://luminousdynamics.org"
 
 [dependencies]
 serde = { workspace = true }
-
-[dev-dependencies]
 serde_json = { workspace = true }
 blake3 = { workspace = true }
