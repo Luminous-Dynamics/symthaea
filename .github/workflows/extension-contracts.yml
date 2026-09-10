@@ -1,0 +1,117 @@
+name: Extension Contracts
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-extension-*/**"
+      - "crates/bridges/symthaea-sim-extension-routing/**"
+      - "crates/bridges/symthaea-ngspice-bridge/**"
+      - ".github/workflows/extension-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  extension-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-extension-contracts-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-extension-contracts-
+
+      # New workspace members can require local package entries in Cargo.lock even
+      # when they introduce no new third-party version. Let Cargo compute the
+      # minimal lock reconciliation from the existing lock, capture it, then use
+      # --locked for every actual validation command below.
+      - name: Reconcile candidate lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > extension-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the extension workspace graph."
+          else
+            echo "Cargo.lock requires the following generated update:"
+            cat extension-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-cargo-lock-patch
+          path: extension-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check extension contract crates
+        run: |
+          cargo check --locked \
+            -p symthaea-extension-core \
+            -p symthaea-extension-registry \
+            -p symthaea-extension-router \
+            -p symthaea-extension-admission \
+            -p symthaea-extension-admission-policy \
+            -p symthaea-sim-extension-routing
+
+      - name: Test extension contract crates
+        run: |
+          cargo test --locked \
+            -p symthaea-extension-core \
+            -p symthaea-extension-registry \
+            -p symthaea-extension-router \
+            -p symthaea-extension-admission \
+            -p symthaea-extension-admission-policy \
+            -p symthaea-sim-extension-routing
+
+      - name: Check concrete ngspice provider
+        run: |
+          cargo check --locked -p symthaea-ngspice-bridge --features extension-routing
+          cargo test --locked -p symthaea-ngspice-bridge --features extension-routing
+
+      - name: Clippy extension contracts
+        run: |
+          cargo clippy --locked \
+            -p symthaea-extension-core \
+            -p symthaea-extension-registry \
+            -p symthaea-extension-router \
+            -p symthaea-extension-admission \
+            -p symthaea-extension-admission-policy \
+            -p symthaea-sim-extension-routing \
+            --all-targets -- -D warnings
+          cargo clippy --locked -p symthaea-ngspice-bridge \
+            --features extension-routing --all-targets -- -D warnings
+
+      # Keep the lane red until the generated lock reconciliation is committed,
+      # but only after compiler/test feedback has already been collected.
+      - name: Require committed lockfile
+        run: git diff --exit-code -- Cargo.lock
