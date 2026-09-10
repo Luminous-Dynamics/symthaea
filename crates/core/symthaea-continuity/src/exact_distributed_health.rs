@@ -18,7 +18,9 @@ use crate::distributed_evidence::{
     AuthenticatedFailureDomainStateEvidenceId, AuthenticatedFailureDomainStateEvidenceV1,
     AuthenticatedRecoveryPathStateEvidenceId, AuthenticatedRecoveryPathStateEvidenceV1,
 };
-use crate::distributed_health_common::evaluate_distributed_health;
+use crate::distributed_health_common::{
+    DistributedHealthEvaluationError, evaluate_distributed_health,
+};
 use crate::distributed_state::{
     AuthenticatedParticipantStateEvidenceId, AuthenticatedParticipantStateEvidenceV1,
     DistributedStateContextId, ParticipantSetDigest, ValidatedDistributedStateContextV1,
@@ -28,7 +30,6 @@ use crate::exact_local_health::{
     QualifiedHealthyLocalSnapshotV1,
 };
 use crate::failure_domain::{FailureDomainPolicyId, ValidatedFailureDomainPolicyV1};
-use crate::post_transition_distributed_health::PostTransitionDistributedHealthError;
 use crate::scope::ContinuitySubjectId;
 use crate::verifier::VerifierProfileId;
 use crate::witness::TargetRealizationId;
@@ -229,7 +230,7 @@ pub(crate) fn compose_exact_distributed_health_v2(
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ExactDistributedHealthError {
     #[error(transparent)]
-    DistributedEvaluation(#[from] PostTransitionDistributedHealthError),
+    DistributedEvaluation(#[from] DistributedHealthEvaluationError),
     #[error("exact distributed-health evaluation time must be non-zero")]
     ZeroEvaluationTime,
     #[error("healthy local snapshot belongs to another distributed context")]
