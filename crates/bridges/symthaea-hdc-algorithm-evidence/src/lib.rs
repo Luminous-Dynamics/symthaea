@@ -2,31 +2,40 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Capsule-bound evidence for the first HDC algorithm-discovery laboratory.
 //!
-//! This bridge fixes a subtle comparability boundary:
+//! This bridge enforces the distinction:
 //!
 //! ```text
-//! input-corpus identity != candidate correctness identity != candidate artifact identity
+//! discovery run
+//! != candidate artifact
+//! != input corpus
+//! != correctness evidence
+//! != evaluation context
+//! != performance receipt
 //! ```
 //!
 //! Two candidates evaluated over the same exact corpus, evaluator command, machine, toolchain,
-//! and dependency locks must share one [`EvaluationContext`] so Pareto comparison is meaningful.
-//! Their implementation and correctness identities must still remain distinct.
+//! dependency locks, and frozen repository baseline must share one [`EvaluationContext`] so a
+//! Pareto comparison is meaningful. Their implementation and correctness identities must remain
+//! distinct.
 //!
-//! The bridge creates evidence records only. It cannot execute benchmarks, edit source, use Git,
+//! This crate creates evidence records only. It cannot execute benchmarks, edit source, use Git,
 //! promote a candidate, or grant runtime authority.
 
-use symthaea_algorithm_evidence_collector::{
-    CollectorError, CommandSpec, ExperimentCapsule,
-};
+use symthaea_algorithm_evidence_collector::{CollectorError, CommandSpec, ExperimentCapsule};
 use symthaea_algorithm_lab::{
     HammingCandidate, HammingCorrectnessEvidence, HdcLabError, hamming_algorithm, hamming_problem,
     implementation_record,
+};
+use symthaea_algorithms::discovery::{
+    CandidateArtifact, CandidateArtifactKind, CandidateProposal, DiscoveryError, DiscoveryRun,
 };
 use symthaea_algorithms::evaluation::{
     CorrectnessVerdict, EvaluationContext, EvaluationError, EvaluationReceipt, ObjectiveDirection,
     ObjectiveMeasurement,
 };
-use symthaea_algorithms::{ContentId, ImplementationRecord, RegistryError};
+use symthaea_algorithms::{
+    AlgorithmLineage, ContentId, ImplementationId, ImplementationRecord, RegistryError,
+};
 use thiserror::Error;
 
 pub const HDC_HAMMING_CORPUS_SCHEMA: &str = "symthaea-hdc-hamming-corpus-v1";
@@ -42,30 +51,33 @@ pub enum HdcEvidenceBridgeError {
     #[error(transparent)]
     Collector(#[from] CollectorError),
     #[error(transparent)]
+    Discovery(#[from] DiscoveryError),
+    #[error(transparent)]
     Evaluation(#[from] EvaluationError),
+    #[error("discovery run is not for the exact HDC Hamming problem")]
+    RunProblemMismatch,
+    #[error("capsule repository revision differs from the discovery run baseline revision")]
+    BaselineRevisionMismatch,
     #[error("candidate artifact group `{0}` is missing from the experiment capsule")]
     MissingCandidateArtifactGroup(String),
-    #[error("implementation artifact identity does not match the collected candidate artifact")]
+    #[error("candidate artifact identity does not match the collected artifact group")]
     CandidateArtifactMismatch,
-    #[error("implementation source reference does not match the correctness candidate")]
+    #[error("candidate implementation does not match the correctness candidate")]
     CandidateImplementationMismatch,
     #[error("correctness evidence is not a passing exact result")]
     CorrectnessNotPassed,
-    #[error("selected capsule command is not the canonical HDC Hamming benchmark command")]
-    BenchmarkCommandMismatch,
-    #[error("bound correctness evidence does not match the supplied implementation")]
-    CorrectnessImplementationMismatch,
+    #[error("bound correctness evidence does not match the supplied run/proposal")]
+    CorrectnessBindingMismatch,
     #[error("bound correctness evidence input corpus does not match the evaluation context")]
     InputProfileMismatch,
-    #[error("capsule repository revision differs from the discovery run baseline revision")]
-    BaselineRevisionMismatch,
+    #[error("selected capsule command is not the canonical HDC Hamming benchmark command")]
+    BenchmarkCommandMismatch,
 }
 
-/// Canonical corpus identity for the exact HDC correctness workload.
+/// Candidate-independent identity of the exact correctness workload.
 ///
-/// Candidate identity is deliberately absent. The corpus is the semantic problem plus the fixed
-/// edge-case protocol and canonical seed set, so multiple candidates can be evaluated in one
-/// comparable context.
+/// This commits the semantic problem, fixed edge cases, deterministic pair-generation rule,
+/// operand-order coverage, and canonical seed set. Candidate identity is deliberately absent.
 pub fn hamming_input_profile_id(seeds: &[u64]) -> Result<ContentId, HdcEvidenceBridgeError> {
     let problem = hamming_problem()?;
     let mut seeds = seeds.to_vec();
@@ -103,8 +115,9 @@ pub fn hamming_evaluator_id() -> ContentId {
     )
 }
 
-/// Exact benchmark invocation this bridge is willing to bind into a rankable HDC context.
-/// Recording this command is provenance only; this crate does not execute it.
+/// Exact benchmark invocation admitted by this bridge.
+///
+/// Recording it is provenance only. This crate never executes the command.
 pub fn canonical_hamming_benchmark_command() -> Result<CommandSpec, CollectorError> {
     CommandSpec::new(
         "cargo",
@@ -118,30 +131,69 @@ pub fn canonical_hamming_benchmark_command() -> Result<CommandSpec, CollectorErr
     )
 }
 
-/// Build an implementation identity directly from a collector-produced artifact group.
-pub fn implementation_from_capsule(
+fn validate_run_capsule(
+    run: &DiscoveryRun,
     capsule: &ExperimentCapsule,
-    candidate: HammingCandidate,
-    candidate_artifact_group: &str,
-) -> Result<ImplementationRecord, HdcEvidenceBridgeError> {
+) -> Result<(), HdcEvidenceBridgeError> {
+    run.validate()?;
     capsule.validate()?;
-    let artifact_id = capsule
+    let problem = hamming_problem()?;
+    if run.problem_id != problem.id {
+        return Err(HdcEvidenceBridgeError::RunProblemMismatch);
+    }
+    if capsule.repository.revision != run.baseline_revision {
+        return Err(HdcEvidenceBridgeError::BaselineRevisionMismatch);
+    }
+    Ok(())
+}
+
+fn artifact_id(
+    capsule: &ExperimentCapsule,
+    candidate_artifact_group: &str,
+) -> Result<ContentId, HdcEvidenceBridgeError> {
+    capsule
         .artifact_group_id(candidate_artifact_group)
         .cloned()
         .ok_or_else(|| {
             HdcEvidenceBridgeError::MissingCandidateArtifactGroup(
                 candidate_artifact_group.to_string(),
             )
-        })?;
-    Ok(implementation_record(candidate, artifact_id)?)
+        })
 }
 
-/// Opaque correctness binding connecting an exact candidate implementation/artifact to the
-/// candidate-independent input corpus on which the laboratory checked it.
+/// Build a generation-bound proposal directly from collector-produced candidate bytes.
+pub fn proposal_from_capsule(
+    run: &DiscoveryRun,
+    capsule: &ExperimentCapsule,
+    candidate: HammingCandidate,
+    candidate_artifact_group: &str,
+    generation: u64,
+) -> Result<CandidateProposal, HdcEvidenceBridgeError> {
+    validate_run_capsule(run, capsule)?;
+    let artifact_id = artifact_id(capsule, candidate_artifact_group)?;
+    let implementation = implementation_record(candidate, artifact_id.clone())?;
+    let lineage = AlgorithmLineage::new(implementation.id.clone(), vec![], vec![])?;
+    let artifact = CandidateArtifact::new(
+        CandidateArtifactKind::SourceTree,
+        artifact_id,
+        format!("capsule://artifact-group/{candidate_artifact_group}"),
+    )?;
+    Ok(CandidateProposal::new_at_generation(
+        run,
+        implementation,
+        lineage,
+        artifact,
+        generation,
+    )?)
+}
+
+/// Opaque correctness binding connecting one exact discovery proposal to the candidate-independent
+/// input corpus on which the HDC laboratory checked it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapsuleBoundHammingCorrectness {
     id: ContentId,
-    implementation_id: symthaea_algorithms::ImplementationId,
+    run_id: ContentId,
+    implementation_id: ImplementationId,
     candidate: HammingCandidate,
     candidate_artifact_id: ContentId,
     raw_correctness_id: ContentId,
@@ -154,7 +206,11 @@ impl CapsuleBoundHammingCorrectness {
         &self.id
     }
 
-    pub fn implementation_id(&self) -> &symthaea_algorithms::ImplementationId {
+    pub fn run_id(&self) -> &ContentId {
+        &self.run_id
+    }
+
+    pub fn implementation_id(&self) -> &ImplementationId {
         &self.implementation_id
     }
 
@@ -181,11 +237,11 @@ impl CapsuleBoundHammingCorrectness {
         if canonical_seeds != self.seeds {
             return Err(HdcEvidenceBridgeError::InputProfileMismatch);
         }
-        let input_profile_id = hamming_input_profile_id(&self.seeds)?;
-        if input_profile_id != self.input_profile_id {
+        if hamming_input_profile_id(&self.seeds)? != self.input_profile_id {
             return Err(HdcEvidenceBridgeError::InputProfileMismatch);
         }
         let expected = derive_bound_correctness_id(
+            &self.run_id,
             &self.implementation_id,
             self.candidate,
             &self.candidate_artifact_id,
@@ -193,22 +249,24 @@ impl CapsuleBoundHammingCorrectness {
             &self.input_profile_id,
         );
         if expected != self.id {
-            return Err(HdcEvidenceBridgeError::CorrectnessImplementationMismatch);
+            return Err(HdcEvidenceBridgeError::CorrectnessBindingMismatch);
         }
         Ok(())
     }
 }
 
 fn derive_bound_correctness_id(
-    implementation_id: &symthaea_algorithms::ImplementationId,
+    run_id: &ContentId,
+    implementation_id: &ImplementationId,
     candidate: HammingCandidate,
     candidate_artifact_id: &ContentId,
     raw_correctness_id: &ContentId,
     input_profile_id: &ContentId,
 ) -> ContentId {
     ContentId::derive(
-        "symthaea.hdc-hamming-capsule-correctness.v1",
+        "symthaea.hdc-hamming-capsule-correctness.v2",
         [
+            run_id.as_str().as_bytes(),
             implementation_id.as_content_id().as_str().as_bytes(),
             candidate.name().as_bytes(),
             candidate_artifact_id.as_str().as_bytes(),
@@ -218,14 +276,16 @@ fn derive_bound_correctness_id(
     )
 }
 
-/// Bind laboratory correctness to the exact implementation bytes collected in the capsule.
+/// Bind raw laboratory correctness to the exact run, proposal, and collected candidate artifact.
 pub fn bind_correctness(
+    run: &DiscoveryRun,
     capsule: &ExperimentCapsule,
     candidate_artifact_group: &str,
-    implementation: &ImplementationRecord,
+    proposal: &CandidateProposal,
     correctness: &HammingCorrectnessEvidence,
 ) -> Result<CapsuleBoundHammingCorrectness, HdcEvidenceBridgeError> {
-    capsule.validate()?;
+    validate_run_capsule(run, capsule)?;
+    proposal.validate_for(run)?;
     correctness.validate()?;
     if !correctness.passed() || correctness.verdict() != CorrectnessVerdict::Passed {
         return Err(HdcEvidenceBridgeError::CorrectnessNotPassed);
@@ -233,41 +293,39 @@ pub fn bind_correctness(
 
     let problem = hamming_problem()?;
     let algorithm = hamming_algorithm(&problem)?;
-    implementation.validate_for(&algorithm)?;
+    proposal.implementation.validate_for(&algorithm)?;
 
     let expected_source_ref = format!(
         "symthaea-algorithm-lab::{}",
         correctness.candidate().name()
     );
-    if implementation.source_ref != expected_source_ref {
+    if proposal.implementation.source_ref != expected_source_ref {
         return Err(HdcEvidenceBridgeError::CandidateImplementationMismatch);
     }
 
-    let capsule_artifact = capsule
-        .artifact_group_id(candidate_artifact_group)
-        .ok_or_else(|| {
-            HdcEvidenceBridgeError::MissingCandidateArtifactGroup(
-                candidate_artifact_group.to_string(),
-            )
-        })?;
-    if &implementation.artifact_id != capsule_artifact {
+    let capsule_artifact_id = artifact_id(capsule, candidate_artifact_group)?;
+    if proposal.implementation.artifact_id != capsule_artifact_id
+        || proposal.artifact.content_id != capsule_artifact_id
+    {
         return Err(HdcEvidenceBridgeError::CandidateArtifactMismatch);
     }
 
     let input_profile_id = hamming_input_profile_id(correctness.seeds())?;
     let candidate = correctness.candidate();
     let id = derive_bound_correctness_id(
-        &implementation.id,
+        &run.id,
+        &proposal.implementation.id,
         candidate,
-        &implementation.artifact_id,
+        &capsule_artifact_id,
         correctness.id(),
         &input_profile_id,
     );
     let bound = CapsuleBoundHammingCorrectness {
         id,
-        implementation_id: implementation.id.clone(),
+        run_id: run.id.clone(),
+        implementation_id: proposal.implementation.id.clone(),
         candidate,
-        candidate_artifact_id: implementation.artifact_id.clone(),
+        candidate_artifact_id: capsule_artifact_id,
         raw_correctness_id: correctness.id().clone(),
         input_profile_id,
         seeds: correctness.seeds().to_vec(),
@@ -276,68 +334,71 @@ pub fn bind_correctness(
     Ok(bound)
 }
 
-/// Create the exact comparison context without folding candidate bytes or candidate-specific
-/// correctness evidence into the context identity.
+/// Create a rankable comparison context without candidate bytes or candidate-specific correctness
+/// evidence contaminating the context identity.
 pub fn hamming_evaluation_context(
+    run: &DiscoveryRun,
     capsule: &ExperimentCapsule,
-    bound_correctness: &CapsuleBoundHammingCorrectness,
+    bound: &CapsuleBoundHammingCorrectness,
     command_index: usize,
 ) -> Result<EvaluationContext, HdcEvidenceBridgeError> {
-    bound_correctness.validate()?;
+    validate_run_capsule(run, capsule)?;
+    bound.validate()?;
+    if bound.run_id != run.id {
+        return Err(HdcEvidenceBridgeError::CorrectnessBindingMismatch);
+    }
+
     let command = capsule
         .commands
         .get(command_index)
         .ok_or(CollectorError::CommandIndexOutOfRange(command_index))?;
-    let canonical = canonical_hamming_benchmark_command()?;
-    if command != &canonical {
+    if command != &canonical_hamming_benchmark_command()? {
         return Err(HdcEvidenceBridgeError::BenchmarkCommandMismatch);
     }
 
     Ok(capsule.evaluation_context(
         hamming_evaluator_id(),
         hamming_oracle_id(),
-        bound_correctness.input_profile_id.clone(),
+        bound.input_profile_id.clone(),
         command_index,
-        bound_correctness.seeds.clone(),
+        bound.seeds.clone(),
     )?)
 }
 
 /// Mint one historical latency receipt from an externally observed Criterion measurement.
 ///
-/// This function does not run Criterion. `measurement_run_id` must identify the actual external
-/// measurement run so append-only repeatability evidence can distinguish reruns.
+/// This function never runs Criterion. The measurement-run ID identifies the external execution
+/// so append-only repeatability evidence can distinguish reruns.
 pub fn latency_receipt_from_capsule(
+    run: &DiscoveryRun,
     capsule: &ExperimentCapsule,
-    implementation: &ImplementationRecord,
-    bound_correctness: &CapsuleBoundHammingCorrectness,
+    proposal: &CandidateProposal,
+    bound: &CapsuleBoundHammingCorrectness,
     command_index: usize,
     latency_ns_per_op: f64,
     measurement_run_id: impl Into<String>,
 ) -> Result<EvaluationReceipt, HdcEvidenceBridgeError> {
-    implementation.validate()?;
-    bound_correctness.validate()?;
-    if implementation.id != bound_correctness.implementation_id
-        || implementation.artifact_id != bound_correctness.candidate_artifact_id
+    validate_run_capsule(run, capsule)?;
+    proposal.validate_for(run)?;
+    bound.validate()?;
+    if bound.run_id != run.id
+        || proposal.implementation.id != bound.implementation_id
+        || proposal.implementation.artifact_id != bound.candidate_artifact_id
     {
-        return Err(HdcEvidenceBridgeError::CorrectnessImplementationMismatch);
+        return Err(HdcEvidenceBridgeError::CorrectnessBindingMismatch);
     }
 
-    let problem = hamming_problem()?;
-    if implementation.problem_id != problem.id {
-        return Err(HdcEvidenceBridgeError::CorrectnessImplementationMismatch);
-    }
-
-    let context = hamming_evaluation_context(capsule, bound_correctness, command_index)?;
-    if context.input_profile_id != bound_correctness.input_profile_id {
+    let context = hamming_evaluation_context(run, capsule, bound, command_index)?;
+    if context.input_profile_id != bound.input_profile_id {
         return Err(HdcEvidenceBridgeError::InputProfileMismatch);
     }
 
     Ok(EvaluationReceipt::new(
-        problem.id,
-        implementation.id.clone(),
+        run.problem_id.clone(),
+        proposal.implementation.id.clone(),
         context,
         CorrectnessVerdict::Passed,
-        bound_correctness.id.clone(),
+        bound.id.clone(),
         vec![ObjectiveMeasurement::new(
             "latency",
             ObjectiveDirection::Minimize,
@@ -359,8 +420,10 @@ mod tests {
         ArtifactGroupSpec, CapturedEnvironment, MachineProfile, RepositoryState, ToolchainProfile,
         collect_artifact_group,
     };
-    use symthaea_algorithm_lab::verify_candidate;
+    use symthaea_algorithm_lab::{pilot_run, verify_candidate};
     use symthaea_algorithms::pareto::ParetoCohort;
+
+    const REVISION: &str = "0123456789abcdef";
 
     fn cid(domain: &str, value: &str) -> ContentId {
         ContentId::derive(domain, [value.as_bytes()])
@@ -389,7 +452,7 @@ mod tests {
         .unwrap();
         let capsule = ExperimentCapsule::new(
             RepositoryState::new(
-                "0123456789abcdef",
+                REVISION,
                 true,
                 cid("status", "clean"),
                 Some(cid("cargo-lock", "same-lock")),
@@ -423,55 +486,76 @@ mod tests {
     }
 
     #[test]
-    fn same_corpus_is_candidate_independent() {
-        let a = hamming_input_profile_id(&[7, 3, 7]).unwrap();
-        let b = hamming_input_profile_id(&[3, 7]).unwrap();
-        assert_eq!(a, b);
+    fn input_corpus_identity_is_canonical_and_candidate_independent() {
+        assert_eq!(
+            hamming_input_profile_id(&[7, 3, 7]).unwrap(),
+            hamming_input_profile_id(&[3, 7]).unwrap()
+        );
     }
 
     #[test]
-    fn different_candidate_artifacts_share_comparison_context() {
+    fn different_artifacts_share_context_but_not_correctness_or_implementation_identity() {
+        let run = pilot_run(REVISION, 42).unwrap();
         let capsule_a = capsule_with_candidate_bytes("a", b"byte popcount candidate");
         let capsule_b = capsule_with_candidate_bytes("b", b"u64 popcount candidate");
-        assert_ne!(
-            capsule_a.artifact_group_id("candidate-source"),
-            capsule_b.artifact_group_id("candidate-source")
-        );
         assert_ne!(capsule_a.id, capsule_b.id);
         assert_eq!(
             capsule_a.comparison_environment_id(),
             capsule_b.comparison_environment_id()
         );
 
-        let impl_a = implementation_from_capsule(
+        let proposal_a = proposal_from_capsule(
+            &run,
             &capsule_a,
             HammingCandidate::BytePopcount,
             "candidate-source",
+            0,
         )
         .unwrap();
-        let impl_b = implementation_from_capsule(
+        let proposal_b = proposal_from_capsule(
+            &run,
             &capsule_b,
             HammingCandidate::U64Popcount,
             "candidate-source",
+            0,
         )
         .unwrap();
-        assert_ne!(impl_a.id, impl_b.id);
-        assert_ne!(impl_a.artifact_id, impl_b.artifact_id);
+        assert_ne!(proposal_a.implementation.id, proposal_b.implementation.id);
+        assert_ne!(
+            proposal_a.implementation.artifact_id,
+            proposal_b.implementation.artifact_id
+        );
 
-        let raw_a = verify_candidate(HammingCandidate::BytePopcount, &[1, 2, 3, 5, 8]);
-        let raw_b = verify_candidate(HammingCandidate::U64Popcount, &[1, 2, 3, 5, 8]);
-        let bound_a = bind_correctness(&capsule_a, "candidate-source", &impl_a, &raw_a).unwrap();
-        let bound_b = bind_correctness(&capsule_b, "candidate-source", &impl_b, &raw_b).unwrap();
+        let seeds = [1, 2, 3, 5, 8];
+        let raw_a = verify_candidate(HammingCandidate::BytePopcount, &seeds);
+        let raw_b = verify_candidate(HammingCandidate::U64Popcount, &seeds);
+        let bound_a = bind_correctness(
+            &run,
+            &capsule_a,
+            "candidate-source",
+            &proposal_a,
+            &raw_a,
+        )
+        .unwrap();
+        let bound_b = bind_correctness(
+            &run,
+            &capsule_b,
+            "candidate-source",
+            &proposal_b,
+            &raw_b,
+        )
+        .unwrap();
         assert_ne!(bound_a.id(), bound_b.id());
         assert_eq!(bound_a.input_profile_id(), bound_b.input_profile_id());
 
-        let context_a = hamming_evaluation_context(&capsule_a, &bound_a, 0).unwrap();
-        let context_b = hamming_evaluation_context(&capsule_b, &bound_b, 0).unwrap();
+        let context_a = hamming_evaluation_context(&run, &capsule_a, &bound_a, 0).unwrap();
+        let context_b = hamming_evaluation_context(&run, &capsule_b, &bound_b, 0).unwrap();
         assert_eq!(context_a, context_b);
 
         let receipt_a = latency_receipt_from_capsule(
+            &run,
             &capsule_a,
-            &impl_a,
+            &proposal_a,
             &bound_a,
             0,
             11.0,
@@ -479,78 +563,115 @@ mod tests {
         )
         .unwrap();
         let receipt_b = latency_receipt_from_capsule(
+            &run,
             &capsule_b,
-            &impl_b,
+            &proposal_b,
             &bound_b,
             0,
             9.0,
             "measurement-b",
         )
         .unwrap();
-
-        let cohort = ParetoCohort::new(vec![receipt_a, receipt_b]).unwrap();
-        assert_eq!(cohort.frontier().len(), 1);
-        assert_eq!(cohort.frontier()[0].implementation_id, impl_b.id);
+        let receipts = vec![receipt_a, receipt_b];
+        let cohort = ParetoCohort::new(&receipts).unwrap();
+        let frontier = cohort.frontier();
+        assert_eq!(frontier.len(), 1);
+        assert_eq!(&frontier[0].implementation_id, &proposal_b.implementation.id);
     }
 
     #[test]
     fn candidate_cannot_borrow_another_candidates_correctness() {
+        let run = pilot_run(REVISION, 42).unwrap();
         let capsule = capsule_with_candidate_bytes("borrow", b"shared source artifact");
-        let implementation = implementation_from_capsule(
+        let proposal = proposal_from_capsule(
+            &run,
             &capsule,
             HammingCandidate::U64Popcount,
             "candidate-source",
+            0,
         )
         .unwrap();
         let raw = verify_candidate(HammingCandidate::BytePopcount, &[1, 2, 3]);
         assert!(matches!(
-            bind_correctness(&capsule, "candidate-source", &implementation, &raw),
+            bind_correctness(&run, &capsule, "candidate-source", &proposal, &raw),
             Err(HdcEvidenceBridgeError::CandidateImplementationMismatch)
         ));
     }
 
     #[test]
-    fn changed_artifact_requires_new_implementation_and_correctness_binding() {
+    fn changed_artifact_invalidates_old_proposal_binding() {
+        let run = pilot_run(REVISION, 42).unwrap();
         let old_capsule = capsule_with_candidate_bytes("old", b"candidate v1");
         let new_capsule = capsule_with_candidate_bytes("new", b"candidate v2");
-        let old_impl = implementation_from_capsule(
+        let old_proposal = proposal_from_capsule(
+            &run,
             &old_capsule,
             HammingCandidate::BytePopcount,
             "candidate-source",
+            0,
         )
         .unwrap();
         let raw = verify_candidate(HammingCandidate::BytePopcount, &[1, 2, 3]);
         assert!(matches!(
-            bind_correctness(&new_capsule, "candidate-source", &old_impl, &raw),
+            bind_correctness(
+                &run,
+                &new_capsule,
+                "candidate-source",
+                &old_proposal,
+                &raw
+            ),
             Err(HdcEvidenceBridgeError::CandidateArtifactMismatch)
         ));
     }
 
     #[test]
+    fn capsule_revision_must_equal_frozen_discovery_baseline() {
+        let run = pilot_run("different-revision", 42).unwrap();
+        let capsule = capsule_with_candidate_bytes("revision", b"candidate");
+        assert!(matches!(
+            proposal_from_capsule(
+                &run,
+                &capsule,
+                HammingCandidate::BytePopcount,
+                "candidate-source",
+                0
+            ),
+            Err(HdcEvidenceBridgeError::BaselineRevisionMismatch)
+        ));
+    }
+
+    #[test]
     fn wrong_benchmark_command_fails_closed() {
-        let mut capsule = capsule_with_candidate_bytes("command", b"candidate");
-        capsule.commands = vec![CommandSpec::new("cargo", vec!["test".into()]).unwrap()];
-        // Re-seal to make command substitution structurally canonical; semantic admission still
-        // belongs to this HDC-specific bridge.
-        capsule = ExperimentCapsule::new(
-            capsule.repository,
-            capsule.machine,
-            capsule.toolchain,
-            capsule.environment,
-            capsule.artifact_groups,
-            capsule.commands,
+        let run = pilot_run(REVISION, 42).unwrap();
+        let original = capsule_with_candidate_bytes("command", b"candidate");
+        let capsule = ExperimentCapsule::new(
+            original.repository,
+            original.machine,
+            original.toolchain,
+            original.environment,
+            original.artifact_groups,
+            vec![CommandSpec::new("cargo", vec!["test".into()]).unwrap()],
         )
         .unwrap();
-        let implementation = implementation_from_capsule(
+        let proposal = proposal_from_capsule(
+            &run,
             &capsule,
             HammingCandidate::BytePopcount,
             "candidate-source",
+            0,
         )
         .unwrap();
         let raw = verify_candidate(HammingCandidate::BytePopcount, &[1]);
-        let bound = bind_correctness(&capsule, "candidate-source", &implementation, &raw).unwrap();
+        let bound = bind_correctness(
+            &run,
+            &capsule,
+            "candidate-source",
+            &proposal,
+            &raw,
+        )
+        .unwrap();
         assert!(matches!(
-            hamming_evaluation_context(&capsule, &bound, 0),
+            hamming_evaluation_context(&run, &capsule, &bound, 0),
             Err(HdcEvidenceBridgeError::BenchmarkCommandMismatch)
         ));
     }
