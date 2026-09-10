@@ -14,6 +14,7 @@
 //! infer friction or compensate unsafe shear/torque/slip by blindly squeezing harder.
 
 use crate::evidence_digest::{HumanoidEvidenceDigest, HumanoidEvidenceHasher};
+use crate::execution_authority_scope::HumanoidExecutionPurpose;
 use crate::grasp_acquisition_intent::HumanoidGraspAcquisitionIntent;
 use crate::grasp_contact_evidence::{
     HumanoidGraspContactAssessment, HumanoidGraspContactFailureKind,
@@ -174,7 +175,9 @@ impl HumanoidGraspSimulationControllerCandidate {
         subject: &HumanoidQualificationSubject,
         contact_policy: &HumanoidGraspContactPolicy,
     ) -> bool {
-        self.policy.validate_for(subject, contact_policy) && self.candidate.validate()
+        self.policy.validate_for(subject, contact_policy)
+            && self.candidate.validate()
+            && self.candidate.controller_id() == self.policy.controller_id
     }
 
     pub fn qualification_candidate(&self) -> &HumanoidGraspControllerCandidate {
@@ -223,6 +226,7 @@ pub enum HumanoidGraspSimulationProposalKind {
 pub enum HumanoidGraspSimulationControllerFailure {
     InvalidSubject,
     InvalidCandidate,
+    WrongExecutionPurpose,
     InvalidTime,
     AcquisitionExpired,
     HandMismatch,
@@ -242,6 +246,7 @@ pub struct HumanoidGraspSimulationControllerProposal {
     schema_version: u32,
     subject_digest: HumanoidEvidenceDigest,
     session_digest: HumanoidEvidenceDigest,
+    execution_purpose: HumanoidExecutionPurpose,
     sequence: u64,
     previous_proposal_digest: Option<HumanoidEvidenceDigest>,
     acquisition_intent_digest: HumanoidEvidenceDigest,
@@ -261,6 +266,10 @@ impl HumanoidGraspSimulationControllerProposal {
         self.sequence
     }
 
+    pub const fn execution_purpose(&self) -> HumanoidExecutionPurpose {
+        self.execution_purpose
+    }
+
     pub const fn proposal_digest(&self) -> HumanoidEvidenceDigest {
         self.proposal_digest
     }
@@ -273,6 +282,7 @@ impl HumanoidGraspSimulationControllerProposal {
         self.schema_version == HUMANOID_GRASP_SIMULATION_PROPOSAL_SCHEMA_VERSION
             && !self.subject_digest.is_zero()
             && !self.session_digest.is_zero()
+            && self.execution_purpose == HumanoidExecutionPurpose::SimulationQualification
             && self.sequence > 0
             && self
                 .previous_proposal_digest
@@ -300,6 +310,7 @@ pub struct HumanoidGraspSimulationControllerSession {
     acquisition_intent_digest: HumanoidEvidenceDigest,
     candidate_digest: HumanoidEvidenceDigest,
     controller_policy_digest: HumanoidEvidenceDigest,
+    execution_purpose: HumanoidExecutionPurpose,
     object_id: String,
     hand: HandSide,
     target_root_m: [f64; 3],
@@ -316,6 +327,7 @@ impl std::fmt::Debug for HumanoidGraspSimulationControllerSession {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HumanoidGraspSimulationControllerSession")
             .field("candidate_digest", &self.candidate_digest)
+            .field("execution_purpose", &self.execution_purpose)
             .field("object_id", &self.object_id)
             .field("hand", &self.hand)
             .field("steps", &self.steps)
@@ -331,10 +343,14 @@ impl HumanoidGraspSimulationControllerSession {
         acquisition: &HumanoidGraspAcquisitionIntent,
         candidate: &HumanoidGraspSimulationControllerCandidate,
         contact_policy: &HumanoidGraspContactPolicy,
+        execution_purpose: HumanoidExecutionPurpose,
         now_s: f64,
     ) -> Result<Self, HumanoidGraspSimulationControllerFailure> {
         let subject_digest = digest_subject(subject)
             .ok_or(HumanoidGraspSimulationControllerFailure::InvalidSubject)?;
+        if execution_purpose != HumanoidExecutionPurpose::SimulationQualification {
+            return Err(HumanoidGraspSimulationControllerFailure::WrongExecutionPurpose);
+        }
         if !candidate.validate_for(subject, contact_policy) {
             return Err(HumanoidGraspSimulationControllerFailure::InvalidCandidate);
         }
@@ -354,6 +370,7 @@ impl HumanoidGraspSimulationControllerSession {
             acquisition_intent_digest: acquisition.intent_digest(),
             candidate_digest: candidate.candidate_digest(),
             controller_policy_digest: candidate.policy.policy_digest,
+            execution_purpose,
             object_id: acquisition.object_id().to_string(),
             hand: acquisition.hand(),
             target_root_m: acquisition.target_root_m(),
@@ -385,6 +402,9 @@ impl HumanoidGraspSimulationControllerSession {
     ) -> Result<HumanoidGraspSimulationControllerProposal, HumanoidGraspSimulationControllerFailure> {
         if self.terminal {
             return Err(HumanoidGraspSimulationControllerFailure::SessionTerminal);
+        }
+        if self.execution_purpose != HumanoidExecutionPurpose::SimulationQualification {
+            return Err(HumanoidGraspSimulationControllerFailure::WrongExecutionPurpose);
         }
         if digest_subject(subject) != Some(self.subject_digest)
             || !candidate.validate_for(subject, contact_policy)
@@ -431,7 +451,9 @@ impl HumanoidGraspSimulationControllerSession {
                     if !assessment.validate(subject, observation, contact_policy) {
                         return Err(HumanoidGraspSimulationControllerFailure::InvalidAssessment);
                     }
-                    if observation.object_id() != self.object_id || assessment.object_id() != self.object_id {
+                    if observation.object_id() != self.object_id
+                        || assessment.object_id() != self.object_id
+                    {
                         return Err(HumanoidGraspSimulationControllerFailure::ObjectMismatch);
                     }
                     if observation.hand() != self.hand || assessment.hand() != self.hand {
@@ -487,6 +509,7 @@ impl HumanoidGraspSimulationControllerSession {
             schema_version: HUMANOID_GRASP_SIMULATION_PROPOSAL_SCHEMA_VERSION,
             subject_digest: self.subject_digest,
             session_digest: self.session_digest,
+            execution_purpose: self.execution_purpose,
             sequence,
             previous_proposal_digest: self.last_proposal_digest,
             acquisition_intent_digest: self.acquisition_intent_digest,
@@ -530,7 +553,7 @@ fn valid_proposal_kind(kind: &HumanoidGraspSimulationProposalKind) -> bool {
             target_root_m,
             admitted_speed_fraction,
         } => {
-            target_root_m.into_iter().all(f64::is_finite)
+            target_root_m.iter().copied().all(f64::is_finite)
                 && admitted_speed_fraction.is_finite()
                 && *admitted_speed_fraction > 0.0
                 && *admitted_speed_fraction <= 1.0
@@ -570,6 +593,7 @@ fn digest_session(value: &HumanoidGraspSimulationControllerSession) -> HumanoidE
         .digest(value.acquisition_intent_digest)
         .digest(value.candidate_digest)
         .digest(value.controller_policy_digest)
+        .u64(purpose_id(value.execution_purpose))
         .string(&value.object_id)
         .u64(hand_id(value.hand));
     for component in value.target_root_m {
@@ -585,6 +609,7 @@ fn digest_proposal(value: &HumanoidGraspSimulationControllerProposal) -> Humanoi
     h.u32(value.schema_version)
         .digest(value.subject_digest)
         .digest(value.session_digest)
+        .u64(purpose_id(value.execution_purpose))
         .u64(value.sequence)
         .bool(value.previous_proposal_digest.is_some());
     if let Some(digest) = value.previous_proposal_digest {
@@ -650,6 +675,15 @@ fn digest_subject(subject: &HumanoidQualificationSubject) -> Option<HumanoidEvid
         .u64(actuation_mode_id(subject.actuation_mode))
         .string(&subject.backend_profile_id);
     Some(h.finish())
+}
+
+fn purpose_id(purpose: HumanoidExecutionPurpose) -> u64 {
+    match purpose {
+        HumanoidExecutionPurpose::SimulationQualification => 1,
+        HumanoidExecutionPurpose::HilQualification => 2,
+        HumanoidExecutionPurpose::PhysicalQualification => 3,
+        HumanoidExecutionPurpose::Operational => 4,
+    }
 }
 
 fn valid_id(value: &str) -> bool {
@@ -778,10 +812,20 @@ mod tests {
         let contact = contact_policy();
         let low = observation(1.0);
         let good = observation(10.0);
-        let low_assessment = assess_humanoid_grasp_contact(&subject(), &low, &contact, 1.001).unwrap();
-        let good_assessment = assess_humanoid_grasp_contact(&subject(), &good, &contact, 1.001).unwrap();
+        let low_assessment =
+            assess_humanoid_grasp_contact(&subject(), &low, &contact, 1.001).unwrap();
+        let good_assessment =
+            assess_humanoid_grasp_contact(&subject(), &good, &contact, 1.001).unwrap();
         assert!(!low_assessment.accepted());
         assert!(isolated_low_normal_force(low_assessment.failures()));
         assert!(good_assessment.accepted());
+    }
+
+    #[test]
+    fn simulation_controller_purpose_is_not_operational() {
+        assert_ne!(
+            HumanoidExecutionPurpose::SimulationQualification,
+            HumanoidExecutionPurpose::Operational
+        );
     }
 }
