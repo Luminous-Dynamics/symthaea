@@ -22,6 +22,7 @@ pub mod distributed_qualification;
 pub mod distributed_state;
 pub mod exact_policy;
 pub mod execution_capability;
+pub mod execution_coordinator;
 pub mod execution_journal;
 pub mod execution_journal_anchor;
 pub mod execution_result;
@@ -107,6 +108,10 @@ pub use execution_capability::{
     ExecutionBackendId, ExecutionBackendProfileV1, ExecutionCapabilityError,
     ExecutionEpochAnchorModeV1, ExecutionSessionId, ExecutionSessionV1,
     OneUseExecutionCapabilityId, OneUseExecutionCapabilityV1, PreparedExecutionAttemptV1,
+};
+pub use execution_coordinator::{
+    KnownGoodExecutionCoordinatorError, PendingAnchoredKnownGoodExecutionV1,
+    ReadyKnownGoodExecutionAttemptV1, prepare_known_good_execution,
 };
 pub use execution_journal::{
     ExecutionJournalDigest, ExecutionJournalError, JournalAttemptDispositionV1,
