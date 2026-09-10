@@ -40,6 +40,7 @@ impl MaritimeEvidenceKindV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct MycelixMaritimeEvidenceV1 {
     schema_version: u8,
     platform_id: String,
@@ -124,6 +125,18 @@ fn mycelix_v1_root_fixture_matches_cross_repo_wire_contract() {
     );
     assert!(envelope.previous_event_digest.is_none());
     assert_eq!(envelope.content_digest(), ROOT_DIGEST);
+}
+
+#[test]
+fn mycelix_v1_unknown_fields_fail_closed_cross_repo() {
+    let mut value: serde_json::Value = serde_json::from_str(ROOT_FIXTURE).unwrap();
+    value
+        .as_object_mut()
+        .unwrap()
+        .insert("authority_override".into(), serde_json::Value::Bool(true));
+    let encoded = serde_json::to_string(&value).unwrap();
+
+    assert!(serde_json::from_str::<MycelixMaritimeEvidenceV1>(&encoded).is_err());
 }
 
 #[test]
