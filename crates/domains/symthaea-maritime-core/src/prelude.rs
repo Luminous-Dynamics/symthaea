@@ -4,7 +4,9 @@
 pub use crate::{
     AuthorityContext, AuthorityLease, ComponentHealth, DependencyState, FailureObservation,
     FleetAssuranceReport, FleetMemberReport, HealthSeverity, MaritimeCapability,
-    MaritimePlatformKind, MaritimeState, NavigationQuality, OperatingEnvelope, PlatformHealth,
-    ProgressiveFailureTrace, ProgressiveFailureViolation, ResidualUtilitySnapshot,
-    UtilityAvailability, baseline_envelope,
+    MaritimeOperatingMode, MaritimePlatformKind, MaritimeState, NavigationQuality,
+    OperatingEnvelope, OperatingModeContext, OperatingModeDecision, OperatingModeRefusal,
+    OperationalLimitAssessment, OperationalLimitStatus, PlatformHealth, ProgressiveFailureTrace,
+    ProgressiveFailureViolation, ResidualUtilitySnapshot, UtilityAvailability, baseline_envelope,
+    evaluate_operating_mode,
 };
