@@ -6,7 +6,6 @@
 # subject/snapshot lineage. This establishes software properties only; it does
 # not establish physical existence, current availability, ownership, policy,
 # recovery sufficiency, or execution authority.
-# Re-triggered after the pinned Rust 1.96 subject-source formatting commit.
 
 set -euo pipefail
 
@@ -20,6 +19,9 @@ receipt_path="${SUBJECT_SNAPSHOT_RECEIPT:-${TMPDIR:-/tmp}/continuity-subject-sna
 status="FAIL"
 stage="preflight"
 source_state="unverified"
+strict_clippy_exit="not-run"
+legacy_lint_diagnostic_count="not-run"
+legacy_lint_allowlist="dead_code@compose.rs,exact_policy.rs,verifier.rs,witness.rs;clippy::too_many_arguments@observation.rs"
 
 scope_source="crates/core/symthaea-continuity/src/scope.rs"
 snapshot_source="crates/core/symthaea-continuity/src/subject_snapshot.rs"
@@ -75,6 +77,10 @@ write_receipt() {
         printf 'scope\ttyped-subject-snapshot-software-contract-only\n'
         printf 'format_scope\t%s\n' "$format_scope"
         printf 'format_edition\t2024\n'
+        printf 'clippy_policy\tstrict-inventory-plus-explicit-legacy-baseline\n'
+        printf 'strict_clippy_exit\t%s\n' "$strict_clippy_exit"
+        printf 'legacy_lint_allowlist\t%s\n' "$legacy_lint_allowlist"
+        printf 'legacy_lint_diagnostic_count\t%s\n' "$legacy_lint_diagnostic_count"
         printf 'physical_existence_authority\tnone\n'
         printf 'availability_authority\tnone\n'
         printf 'ownership_authority\tnone\n'
@@ -122,6 +128,8 @@ write_receipt() {
             echo "- terminal stage: \`$terminal_stage\`"
             echo "- source state: \`$source_state\`"
             echo "- format scope: \`$format_scope\` (Edition 2024)"
+            echo "- strict Clippy exit: \`$strict_clippy_exit\`"
+            echo "- accepted legacy lint diagnostics: \`$legacy_lint_diagnostic_count\`"
             echo '- scope: typed subject/snapshot software contracts only'
             echo '- full repository CI: independent'
             echo '- physical existence/availability/ownership/policy/recovery/execution authority: none'
@@ -181,7 +189,7 @@ stage="cargo_metadata"
 cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
 # Deliberately format only the sources named by this theorem. Package-wide
-# `cargo fmt -p` would make unrelated staged continuity modules part of this
+# `cargo fmt -p` would make unrelated continuity modules part of this
 # qualification boundary and can therefore create false failures.
 stage="format_subject_sources"
 rustfmt --edition 2024 --check "$scope_source" "$snapshot_source"
@@ -189,8 +197,67 @@ rustfmt --edition 2024 --check "$scope_source" "$snapshot_source"
 stage="check_all_targets"
 cargo check --locked -p symthaea-continuity --all-targets
 
-stage="clippy_all_targets"
-cargo clippy --locked -p symthaea-continuity --all-targets -- -D warnings
+# First run Clippy with the strictest policy and parse its diagnostics. Only the
+# independently bounded legacy baseline already qualified by the continuity
+# contract lane may be accepted. Any lint from scope.rs or subject_snapshot.rs,
+# or any new lint elsewhere, fails this stage rather than being globally hidden.
+stage="clippy_strict_inventory"
+strict_clippy_json="${TMPDIR:-/tmp}/symthaea-subject-snapshot-clippy-${actual_sha}.jsonl"
+set +e
+cargo clippy --locked -p symthaea-continuity --all-targets --message-format=json -- -D warnings >"$strict_clippy_json" 2>&1
+strict_clippy_exit=$?
+set -e
+
+if [[ "$strict_clippy_exit" -eq 0 ]]; then
+    legacy_lint_diagnostic_count="0"
+else
+    legacy_lint_diagnostic_count="$(python3 - "$strict_clippy_json" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+allowed_dead_code_files = {"compose.rs", "exact_policy.rs", "verifier.rs", "witness.rs"}
+allowed_pairs = {("clippy::too_many_arguments", "observation.rs")}
+count = 0
+unexpected = []
+for raw in path.read_text(errors="replace").splitlines():
+    try:
+        event = json.loads(raw)
+    except json.JSONDecodeError:
+        continue
+    if event.get("reason") != "compiler-message":
+        continue
+    message = event.get("message") or {}
+    if message.get("level") != "error":
+        continue
+    code = (message.get("code") or {}).get("code")
+    primary = next((span for span in message.get("spans", []) if span.get("is_primary")), None)
+    file_name = pathlib.PurePosixPath((primary or {}).get("file_name", "")).name
+    rendered = (message.get("message") or "").replace("\n", " ")
+    count += 1
+    allowed = code == "dead_code" and file_name in allowed_dead_code_files
+    allowed = allowed or (code, file_name) in allowed_pairs
+    if not allowed:
+        unexpected.append((code or "<none>", file_name or "<none>", rendered))
+if count == 0:
+    print("error: strict Clippy failed without parseable error diagnostics", file=sys.stderr)
+    sys.exit(2)
+if unexpected:
+    print("error: strict Clippy produced diagnostics outside explicit legacy baseline", file=sys.stderr)
+    for code, file_name, rendered in unexpected:
+        print(f"  {code}@{file_name}: {rendered}", file=sys.stderr)
+    sys.exit(3)
+print(count)
+PY
+)"
+fi
+
+stage="clippy_all_targets_with_legacy_baseline"
+cargo clippy --locked -p symthaea-continuity --all-targets -- \
+    -A dead_code \
+    -A clippy::too_many_arguments \
+    -D warnings
 
 stage="subject_snapshot_regressions"
 cargo test --locked -p symthaea-continuity subject_snapshot -- --nocapture
