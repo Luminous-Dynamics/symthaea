@@ -1,3 +1,4 @@
+# Retry after isolated capability-graph compiler fix.
 name: Continuity Lockfile Once
 
 on:
