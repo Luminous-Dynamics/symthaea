@@ -31,6 +31,7 @@ pub mod post_execution_health;
 pub mod post_execution_observation;
 pub mod post_transition_distributed_health;
 pub mod profile_adoption;
+pub mod recovery_qualification;
 pub mod scope;
 pub mod subject_contract;
 pub mod subject_witness;
@@ -150,6 +151,10 @@ pub use profile_adoption::{
     VerifierAdoptionScopeV1, VerifierProfileAdoptionError, VerifierProfileAdoptionPredecessorV1,
     VerifierProfileAdoptionSubjectId, VerifierProfileAdoptionSubjectV1,
     VerifierProfileAdoptionTransitionDigest, VerifierProfileAdoptionTransitionV1,
+};
+pub use recovery_qualification::{
+    QualifiedRecoveryToActiveKnownGoodId, QualifiedRecoveryToActiveKnownGoodV1,
+    RecoveryQualificationError,
 };
 pub use scope::{
     CONTINUITY_SUBJECT_SCHEMA_V1, ContinuityScopeV1, ContinuitySubjectError,
