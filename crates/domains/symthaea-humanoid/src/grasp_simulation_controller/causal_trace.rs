@@ -4,19 +4,19 @@
 //!
 //! This module does **not** translate a semantic proposal into `HumanoidCommand`,
 //! call `HumanoidPhysicsSimulator::step`, or expose any physical/hardware path.
-//! Instead it defines a two-phase evidence protocol around a separately reviewed
-//! simulation adapter:
+//! It defines a two-phase evidence protocol around a separately reviewed simulation
+//! adapter: precommit the exact proposal/harness/pre-state, then bind the exact
+//! post-state and same-frame canonical contact observation.
 //!
-//! 1. precommit the exact controller proposal, controller session, simulator /
-//!    adapter / extractor identities, and exact pre-step humanoid/object state;
-//! 2. after the adapter executes the simulation transition, bind the exact
-//!    post-state and canonical contact observation to that precommitment.
+//! Complete traces consume the controller session when sealed. That matters: a
+//! hash-contiguous prefix is not complete evidence if the same session can later
+//! emit omitted proposals. Session consumption makes closure type-level final for
+//! that session value. A terminal `Abort` proposal is recorded as a final decision
+//! but is never treated as a plant step.
 //!
-//! A complete trace then proves hash-chain continuity across proposal decisions,
-//! humanoid states, object states, simulator time, and the canonical observations
-//! later consumed by controller qualification. This is structural causal lineage,
-//! not authenticated proof that an external simulator process actually executed;
-//! producer attestation remains a separate evidence-provenance concern.
+//! This is structural causal lineage, not authenticated proof that an external
+//! simulator process actually executed; producer/executor attestation remains a
+//! separate evidence-provenance concern.
 
 use super::{
     HumanoidGraspSimulationControllerCandidate, HumanoidGraspSimulationControllerProposal,
@@ -33,7 +33,7 @@ use crate::types::{ActuationMode, HumanoidState, HumanoidTask};
 pub const HUMANOID_GRASP_SIMULATION_HARNESS_SCHEMA_VERSION: u32 = 1;
 pub const HUMANOID_GRASP_SIMULATION_STEP_COMMITMENT_SCHEMA_VERSION: u32 = 1;
 pub const HUMANOID_GRASP_SIMULATION_STEP_RESULT_SCHEMA_VERSION: u32 = 1;
-pub const HUMANOID_GRASP_SIMULATION_CAUSAL_TRACE_SCHEMA_VERSION: u32 = 1;
+pub const HUMANOID_GRASP_SIMULATION_CAUSAL_TRACE_SCHEMA_VERSION: u32 = 2;
 const MAX_INTEGRATION_SUBSTEPS: usize = 1_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,12 +42,17 @@ pub enum HumanoidGraspSimulationDeterminismMode {
     SeededStochastic,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HumanoidGraspSimulationTraceClosureKind {
+    QualificationWindowClosed,
+    ControllerAborted,
+}
+
 /// Exact identity of the simulation environment that turns one semantic proposal
 /// into one simulation transition and extracts the canonical contact observation.
 ///
-/// The proposal adapter is intentionally identified here but not implemented here.
-/// This keeps proposal -> simulator-command lowering reviewable as its own future
-/// boundary rather than smuggling it into the controller domain.
+/// The proposal adapter is identified here but intentionally not implemented here.
+/// Proposal -> simulator-command lowering remains its own review boundary.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidGraspSimulationHarnessIdentity {
     schema_version: u32,
@@ -156,6 +161,9 @@ pub enum HumanoidGraspSimulationCausalFailure {
     EmptyTrace,
     TraceDoesNotStartAtFirstProposal,
     TraceDiscontinuity,
+    MissingTerminalAbortProposal,
+    UnexpectedTerminalProposal,
+    SessionClosureMismatch,
     InvalidDigest,
 }
 
@@ -231,8 +239,7 @@ impl HumanoidGraspSimulationStepCommitment {
 /// Precommit one exact proposal against one exact simulation state.
 ///
 /// `pre_state.timestamp` must exactly equal the controller decision time. This
-/// deliberately rejects ambiguous traces where a proposal is generated against
-/// one simulator frame but later paired with a different pre-step frame.
+/// rejects ambiguous traces where a proposal is paired with another pre-step frame.
 #[allow(clippy::too_many_arguments)]
 pub fn prepare_humanoid_grasp_simulation_step(
     subject: &HumanoidQualificationSubject,
@@ -341,7 +348,6 @@ pub fn prepare_humanoid_grasp_simulation_step(
         .ok_or(HumanoidGraspSimulationCausalFailure::InvalidDigest)
 }
 
-/// Immutable result of one precommitted simulation transition.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidGraspSimulationStepResult {
     schema_version: u32,
@@ -504,11 +510,7 @@ pub fn bind_humanoid_grasp_simulation_step_result(
         .ok_or(HumanoidGraspSimulationCausalFailure::InvalidResult)
 }
 
-/// Complete closed-loop simulation lineage for one Grasp controller session.
-///
-/// The trace is deliberately strict: it starts at proposal 1 / step 0 and admits
-/// no missing proposal transitions. This prevents a qualification harness from
-/// omitting a failed intermediate step while retaining later successful evidence.
+/// Complete, sealed closed-loop simulation lineage for one controller session.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HumanoidGraspSimulationCausalTrace {
     schema_version: u32,
@@ -521,78 +523,114 @@ pub struct HumanoidGraspSimulationCausalTrace {
     object_id: String,
     hand: HandSide,
     episode_seed: u64,
+    closed_session_steps: usize,
+    closure_kind: HumanoidGraspSimulationTraceClosureKind,
+    terminal_proposal_digest: Option<HumanoidEvidenceDigest>,
     steps: Vec<HumanoidGraspSimulationStepResult>,
     trace_digest: HumanoidEvidenceDigest,
 }
 
-impl HumanoidGraspSimulationCausalTrace {
-    pub fn from_results(
-        results: Vec<HumanoidGraspSimulationStepResult>,
-    ) -> Result<Self, HumanoidGraspSimulationCausalFailure> {
-        let Some(first) = results.first() else {
-            return Err(HumanoidGraspSimulationCausalFailure::EmptyTrace);
-        };
-        if !first.validate_internal() {
-            return Err(HumanoidGraspSimulationCausalFailure::InvalidResult);
-        }
-        if first.step_index != 0
-            || first.proposal_sequence != 1
-            || first.previous_proposal_digest.is_some()
-        {
-            return Err(HumanoidGraspSimulationCausalFailure::TraceDoesNotStartAtFirstProposal);
-        }
-
-        for result in &results {
-            if !result.validate_internal()
-                || result.subject_digest != first.subject_digest
-                || result.execution_purpose != HumanoidExecutionPurpose::SimulationQualification
-                || result.session_digest != first.session_digest
-                || result.acquisition_intent_digest != first.acquisition_intent_digest
-                || result.candidate_digest != first.candidate_digest
-                || result.harness_digest != first.harness_digest
-                || result.object_id != first.object_id
-                || result.hand != first.hand
-                || result.episode_seed != first.episode_seed
-            {
-                return Err(HumanoidGraspSimulationCausalFailure::TraceDiscontinuity);
-            }
-        }
-
-        for pair in results.windows(2) {
-            let previous = &pair[0];
-            let next = &pair[1];
-            if next.step_index != previous.step_index.saturating_add(1)
-                || next.proposal_sequence != previous.proposal_sequence.saturating_add(1)
-                || next.previous_proposal_digest != Some(previous.proposal_digest)
-                || next.pre_state_digest != previous.post_state_digest
-                || next.pre_object_state_digest != previous.post_object_state_digest
-                || next.pre_state_timestamp_s.to_bits() != previous.post_state_timestamp_s.to_bits()
-            {
-                return Err(HumanoidGraspSimulationCausalFailure::TraceDiscontinuity);
-            }
-        }
-
-        let mut value = Self {
-            schema_version: HUMANOID_GRASP_SIMULATION_CAUSAL_TRACE_SCHEMA_VERSION,
-            subject_digest: first.subject_digest,
-            execution_purpose: HumanoidExecutionPurpose::SimulationQualification,
-            session_digest: first.session_digest,
-            acquisition_intent_digest: first.acquisition_intent_digest,
-            candidate_digest: first.candidate_digest,
-            harness_digest: first.harness_digest,
-            object_id: first.object_id.clone(),
-            hand: first.hand,
-            episode_seed: first.episode_seed,
-            steps: results,
-            trace_digest: HumanoidEvidenceDigest::ZERO,
-        };
-        value.trace_digest = digest_causal_trace(&value);
-        value
-            .validate()
-            .then_some(value)
-            .ok_or(HumanoidGraspSimulationCausalFailure::InvalidDigest)
+/// Consume the controller session and seal the complete transition trace.
+///
+/// A non-terminal session must have exactly one plant result for every proposal.
+/// A terminal session must supply its final `Abort` proposal separately; that
+/// proposal must follow the final plant transition but is not itself executed.
+pub fn seal_humanoid_grasp_simulation_causal_trace(
+    session: HumanoidGraspSimulationControllerSession,
+    terminal_abort: Option<HumanoidGraspSimulationControllerProposal>,
+    results: Vec<HumanoidGraspSimulationStepResult>,
+) -> Result<HumanoidGraspSimulationCausalTrace, HumanoidGraspSimulationCausalFailure> {
+    if results.is_empty() {
+        return Err(HumanoidGraspSimulationCausalFailure::EmptyTrace);
+    }
+    if !valid_result_chain(&results) {
+        return Err(HumanoidGraspSimulationCausalFailure::TraceDiscontinuity);
+    }
+    let first = &results[0];
+    let last = results.last().expect("nonempty checked");
+    if first.step_index != 0
+        || first.proposal_sequence != 1
+        || first.previous_proposal_digest.is_some()
+    {
+        return Err(HumanoidGraspSimulationCausalFailure::TraceDoesNotStartAtFirstProposal);
+    }
+    if session.execution_purpose != HumanoidExecutionPurpose::SimulationQualification
+        || session.subject_digest != first.subject_digest
+        || session.session_digest != first.session_digest
+        || session.acquisition_intent_digest != first.acquisition_intent_digest
+        || session.candidate_digest != first.candidate_digest
+        || session.object_id != first.object_id
+        || session.hand != first.hand
+    {
+        return Err(HumanoidGraspSimulationCausalFailure::SessionClosureMismatch);
     }
 
+    let (closure_kind, terminal_proposal_digest) = if session.terminal {
+        let Some(abort) = terminal_abort else {
+            return Err(HumanoidGraspSimulationCausalFailure::MissingTerminalAbortProposal);
+        };
+        if !abort.validate()
+            || !matches!(&abort.kind, HumanoidGraspSimulationProposalKind::Abort { .. })
+            || abort.execution_purpose != HumanoidExecutionPurpose::SimulationQualification
+            || abort.subject_digest != session.subject_digest
+            || abort.session_digest != session.session_digest
+            || abort.acquisition_intent_digest != session.acquisition_intent_digest
+            || abort.candidate_digest != session.candidate_digest
+            || abort.object_id != session.object_id
+            || abort.hand != session.hand
+            || session.last_proposal_digest != Some(abort.proposal_digest)
+            || session.steps != results.len().saturating_add(1)
+            || abort.sequence != session.steps as u64
+            || abort.previous_proposal_digest != Some(last.proposal_digest)
+            || abort.sequence != last.proposal_sequence.saturating_add(1)
+        {
+            return Err(HumanoidGraspSimulationCausalFailure::SessionClosureMismatch);
+        }
+        (
+            HumanoidGraspSimulationTraceClosureKind::ControllerAborted,
+            Some(abort.proposal_digest),
+        )
+    } else {
+        if terminal_abort.is_some() {
+            return Err(HumanoidGraspSimulationCausalFailure::UnexpectedTerminalProposal);
+        }
+        if session.steps != results.len()
+            || session.last_proposal_digest != Some(last.proposal_digest)
+            || session.steps as u64 != last.proposal_sequence
+        {
+            return Err(HumanoidGraspSimulationCausalFailure::SessionClosureMismatch);
+        }
+        (
+            HumanoidGraspSimulationTraceClosureKind::QualificationWindowClosed,
+            None,
+        )
+    };
+
+    let mut value = HumanoidGraspSimulationCausalTrace {
+        schema_version: HUMANOID_GRASP_SIMULATION_CAUSAL_TRACE_SCHEMA_VERSION,
+        subject_digest: first.subject_digest,
+        execution_purpose: HumanoidExecutionPurpose::SimulationQualification,
+        session_digest: first.session_digest,
+        acquisition_intent_digest: first.acquisition_intent_digest,
+        candidate_digest: first.candidate_digest,
+        harness_digest: first.harness_digest,
+        object_id: first.object_id.clone(),
+        hand: first.hand,
+        episode_seed: first.episode_seed,
+        closed_session_steps: session.steps,
+        closure_kind,
+        terminal_proposal_digest,
+        steps: results,
+        trace_digest: HumanoidEvidenceDigest::ZERO,
+    };
+    value.trace_digest = digest_causal_trace(&value);
+    value
+        .validate()
+        .then_some(value)
+        .ok_or(HumanoidGraspSimulationCausalFailure::InvalidDigest)
+}
+
+impl HumanoidGraspSimulationCausalTrace {
     pub fn validate(&self) -> bool {
         if self.schema_version != HUMANOID_GRASP_SIMULATION_CAUSAL_TRACE_SCHEMA_VERSION
             || self.execution_purpose != HumanoidExecutionPurpose::SimulationQualification
@@ -604,6 +642,7 @@ impl HumanoidGraspSimulationCausalTrace {
             || !valid_id(&self.object_id)
             || self.steps.is_empty()
             || self.trace_digest.is_zero()
+            || !valid_result_chain(&self.steps)
         {
             return false;
         }
@@ -611,39 +650,51 @@ impl HumanoidGraspSimulationCausalTrace {
         if first.step_index != 0
             || first.proposal_sequence != 1
             || first.previous_proposal_digest.is_some()
+            || self.steps.iter().any(|result| {
+                result.subject_digest != self.subject_digest
+                    || result.session_digest != self.session_digest
+                    || result.acquisition_intent_digest != self.acquisition_intent_digest
+                    || result.candidate_digest != self.candidate_digest
+                    || result.harness_digest != self.harness_digest
+                    || result.object_id != self.object_id
+                    || result.hand != self.hand
+                    || result.episode_seed != self.episode_seed
+            })
         {
             return false;
         }
-        if self.steps.iter().any(|result| {
-            !result.validate_internal()
-                || result.subject_digest != self.subject_digest
-                || result.session_digest != self.session_digest
-                || result.acquisition_intent_digest != self.acquisition_intent_digest
-                || result.candidate_digest != self.candidate_digest
-                || result.harness_digest != self.harness_digest
-                || result.object_id != self.object_id
-                || result.hand != self.hand
-                || result.episode_seed != self.episode_seed
-        }) {
-            return false;
-        }
-        if self.steps.windows(2).any(|pair| {
-            let previous = &pair[0];
-            let next = &pair[1];
-            next.step_index != previous.step_index.saturating_add(1)
-                || next.proposal_sequence != previous.proposal_sequence.saturating_add(1)
-                || next.previous_proposal_digest != Some(previous.proposal_digest)
-                || next.pre_state_digest != previous.post_state_digest
-                || next.pre_object_state_digest != previous.post_object_state_digest
-                || next.pre_state_timestamp_s.to_bits() != previous.post_state_timestamp_s.to_bits()
-        }) {
-            return false;
+        match self.closure_kind {
+            HumanoidGraspSimulationTraceClosureKind::QualificationWindowClosed => {
+                if self.terminal_proposal_digest.is_some()
+                    || self.closed_session_steps != self.steps.len()
+                {
+                    return false;
+                }
+            }
+            HumanoidGraspSimulationTraceClosureKind::ControllerAborted => {
+                if self
+                    .terminal_proposal_digest
+                    .map(|digest| digest.is_zero())
+                    .unwrap_or(true)
+                    || self.closed_session_steps != self.steps.len().saturating_add(1)
+                {
+                    return false;
+                }
+            }
         }
         self.trace_digest == digest_causal_trace(self)
     }
 
     pub const fn trace_digest(&self) -> HumanoidEvidenceDigest {
         self.trace_digest
+    }
+
+    pub const fn closure_kind(&self) -> HumanoidGraspSimulationTraceClosureKind {
+        self.closure_kind
+    }
+
+    pub const fn terminal_proposal_digest(&self) -> Option<HumanoidEvidenceDigest> {
+        self.terminal_proposal_digest
     }
 
     pub fn steps(&self) -> &[HumanoidGraspSimulationStepResult] {
@@ -653,6 +704,36 @@ impl HumanoidGraspSimulationCausalTrace {
     pub fn observation_digests(&self) -> Vec<HumanoidEvidenceDigest> {
         self.steps.iter().map(|step| step.observation_digest).collect()
     }
+}
+
+fn valid_result_chain(results: &[HumanoidGraspSimulationStepResult]) -> bool {
+    if results.is_empty() || results.iter().any(|result| !result.validate_internal()) {
+        return false;
+    }
+    let first = &results[0];
+    if results.iter().any(|result| {
+        result.subject_digest != first.subject_digest
+            || result.execution_purpose != HumanoidExecutionPurpose::SimulationQualification
+            || result.session_digest != first.session_digest
+            || result.acquisition_intent_digest != first.acquisition_intent_digest
+            || result.candidate_digest != first.candidate_digest
+            || result.harness_digest != first.harness_digest
+            || result.object_id != first.object_id
+            || result.hand != first.hand
+            || result.episode_seed != first.episode_seed
+    }) {
+        return false;
+    }
+    !results.windows(2).any(|pair| {
+        let previous = &pair[0];
+        let next = &pair[1];
+        next.step_index != previous.step_index.saturating_add(1)
+            || next.proposal_sequence != previous.proposal_sequence.saturating_add(1)
+            || next.previous_proposal_digest != Some(previous.proposal_digest)
+            || next.pre_state_digest != previous.post_state_digest
+            || next.pre_object_state_digest != previous.post_object_state_digest
+            || next.pre_state_timestamp_s.to_bits() != previous.post_state_timestamp_s.to_bits()
+    })
 }
 
 /// Canonical privileged simulation-state identity for causal Grasp evidence.
@@ -763,7 +844,7 @@ fn digest_step_result(value: &HumanoidGraspSimulationStepResult) -> HumanoidEvid
 }
 
 fn digest_causal_trace(value: &HumanoidGraspSimulationCausalTrace) -> HumanoidEvidenceDigest {
-    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-simulation-causal-trace.v1");
+    let mut h = HumanoidEvidenceHasher::new("humanoid.grasp-simulation-causal-trace.v2");
     h.u32(value.schema_version)
         .digest(value.subject_digest)
         .u64(execution_purpose_id(value.execution_purpose))
@@ -774,7 +855,13 @@ fn digest_causal_trace(value: &HumanoidGraspSimulationCausalTrace) -> HumanoidEv
         .string(&value.object_id)
         .u64(hand_id(value.hand))
         .u64(value.episode_seed)
-        .usize(value.steps.len());
+        .usize(value.closed_session_steps)
+        .u64(closure_kind_id(value.closure_kind))
+        .bool(value.terminal_proposal_digest.is_some());
+    if let Some(digest) = value.terminal_proposal_digest {
+        h.digest(digest);
+    }
+    h.usize(value.steps.len());
     for step in &value.steps {
         h.digest(step.result_digest);
     }
@@ -801,6 +888,13 @@ fn determinism_mode_id(mode: HumanoidGraspSimulationDeterminismMode) -> u64 {
     match mode {
         HumanoidGraspSimulationDeterminismMode::DeterministicReplay => 1,
         HumanoidGraspSimulationDeterminismMode::SeededStochastic => 2,
+    }
+}
+
+fn closure_kind_id(kind: HumanoidGraspSimulationTraceClosureKind) -> u64 {
+    match kind {
+        HumanoidGraspSimulationTraceClosureKind::QualificationWindowClosed => 1,
+        HumanoidGraspSimulationTraceClosureKind::ControllerAborted => 2,
     }
 }
 
@@ -869,6 +963,37 @@ mod tests {
         state
     }
 
+    fn synthetic_session(
+        steps: usize,
+        last_proposal_digest: Option<HumanoidEvidenceDigest>,
+        terminal: bool,
+    ) -> HumanoidGraspSimulationControllerSession {
+        let mut session = HumanoidGraspSimulationControllerSession {
+            schema_version: super::super::HUMANOID_GRASP_SIMULATION_SESSION_SCHEMA_VERSION,
+            subject_digest: super::super::digest_subject(&subject()).unwrap(),
+            acquisition_intent_digest: HumanoidEvidenceDigest::from_bytes([11; 32]),
+            candidate_digest: HumanoidEvidenceDigest::from_bytes([12; 32]),
+            controller_policy_digest: HumanoidEvidenceDigest::from_bytes([13; 32]),
+            execution_purpose: HumanoidExecutionPurpose::SimulationQualification,
+            object_id: "object-a".into(),
+            hand: HandSide::Right,
+            target_root_m: [0.2, 0.0, 1.0],
+            acquisition_valid_until_s: 10.0,
+            started_at_s: 1.0,
+            last_step_at_s: 1.0,
+            steps,
+            last_proposal_digest,
+            terminal,
+            session_digest: HumanoidEvidenceDigest::ZERO,
+        };
+        session.session_digest = super::super::digest_session(&session);
+        session
+    }
+
+    fn session_digest() -> HumanoidEvidenceDigest {
+        synthetic_session(0, None, false).session_digest
+    }
+
     fn synthetic_commitment(
         step_index: u64,
         proposal_digest: HumanoidEvidenceDigest,
@@ -880,7 +1005,7 @@ mod tests {
             schema_version: HUMANOID_GRASP_SIMULATION_STEP_COMMITMENT_SCHEMA_VERSION,
             subject_digest: super::super::digest_subject(&subject()).unwrap(),
             execution_purpose: HumanoidExecutionPurpose::SimulationQualification,
-            session_digest: HumanoidEvidenceDigest::from_bytes([10; 32]),
+            session_digest: session_digest(),
             acquisition_intent_digest: HumanoidEvidenceDigest::from_bytes([11; 32]),
             candidate_digest: HumanoidEvidenceDigest::from_bytes([12; 32]),
             proposal_digest,
@@ -923,6 +1048,57 @@ mod tests {
             timestamp,
         )
         .unwrap()
+    }
+
+    fn synthetic_abort(
+        sequence: u64,
+        previous: HumanoidEvidenceDigest,
+    ) -> HumanoidGraspSimulationControllerProposal {
+        let session = synthetic_session(0, None, false);
+        let mut proposal = HumanoidGraspSimulationControllerProposal {
+            schema_version: super::super::HUMANOID_GRASP_SIMULATION_PROPOSAL_SCHEMA_VERSION,
+            subject_digest: session.subject_digest,
+            session_digest: session.session_digest,
+            execution_purpose: HumanoidExecutionPurpose::SimulationQualification,
+            sequence,
+            previous_proposal_digest: Some(previous),
+            acquisition_intent_digest: session.acquisition_intent_digest,
+            candidate_digest: session.candidate_digest,
+            object_id: session.object_id,
+            hand: session.hand,
+            feedback_observation_digest: Some(HumanoidEvidenceDigest::from_bytes([60; 32])),
+            feedback_assessment_digest: Some(HumanoidEvidenceDigest::from_bytes([61; 32])),
+            feedback_object_state_digest: Some(HumanoidEvidenceDigest::from_bytes([62; 32])),
+            generated_at_s: 1.02,
+            kind: HumanoidGraspSimulationProposalKind::Abort {
+                reason: super::super::HumanoidGraspSimulationAbortReason::UnsafeMeasuredContact,
+            },
+            proposal_digest: HumanoidEvidenceDigest::ZERO,
+        };
+        proposal.proposal_digest = super::super::digest_proposal(&proposal);
+        assert!(proposal.validate());
+        proposal
+    }
+
+    fn one_result() -> (HumanoidGraspSimulationStepResult, HumanoidEvidenceDigest) {
+        let pre = state(1.0, 0.0);
+        let post = state(1.01, 0.01);
+        let object0 = HumanoidEvidenceDigest::from_bytes([20; 32]);
+        let object1 = HumanoidEvidenceDigest::from_bytes([21; 32]);
+        let proposal0 = HumanoidEvidenceDigest::from_bytes([30; 32]);
+        let commitment = synthetic_commitment(0, proposal0, None, &pre, object0);
+        let result = bind_humanoid_grasp_simulation_step_result(
+            &subject(),
+            &harness(),
+            &commitment,
+            &pre,
+            &post,
+            object1,
+            &observation(1.01, object1),
+            1,
+        )
+        .unwrap();
+        (result, proposal0)
     }
 
     #[test]
@@ -990,6 +1166,16 @@ mod tests {
     }
 
     #[test]
+    fn sealed_trace_rejects_tail_omission() {
+        let (result, proposal0) = one_result();
+        let session = synthetic_session(2, Some(proposal0), false);
+        assert_eq!(
+            seal_humanoid_grasp_simulation_causal_trace(session, None, vec![result]),
+            Err(HumanoidGraspSimulationCausalFailure::SessionClosureMismatch)
+        );
+    }
+
+    #[test]
     fn complete_trace_rejects_state_chain_discontinuity_even_with_rehashed_result() {
         let pre0 = state(1.0, 0.0);
         let post0 = state(1.01, 0.01);
@@ -998,14 +1184,8 @@ mod tests {
         let proposal0 = HumanoidEvidenceDigest::from_bytes([30; 32]);
         let commitment0 = synthetic_commitment(0, proposal0, None, &pre0, object0);
         let result0 = bind_humanoid_grasp_simulation_step_result(
-            &subject(),
-            &harness(),
-            &commitment0,
-            &pre0,
-            &post0,
-            object1,
-            &observation(1.01, object1),
-            2,
+            &subject(), &harness(), &commitment0, &pre0, &post0, object1,
+            &observation(1.01, object1), 2,
         )
         .unwrap();
 
@@ -1014,50 +1194,52 @@ mod tests {
         let proposal1 = HumanoidEvidenceDigest::from_bytes([31; 32]);
         let commitment1 = synthetic_commitment(1, proposal1, Some(proposal0), &post0, object1);
         let mut result1 = bind_humanoid_grasp_simulation_step_result(
-            &subject(),
-            &harness(),
-            &commitment1,
-            &post0,
-            &post1,
-            object2,
-            &observation(1.02, object2),
-            2,
+            &subject(), &harness(), &commitment1, &post0, &post1, object2,
+            &observation(1.02, object2), 2,
         )
         .unwrap();
-
         result1.pre_state_digest = HumanoidEvidenceDigest::from_bytes([99; 32]);
         result1.result_digest = digest_step_result(&result1);
         assert!(result1.validate_internal());
+        let session = synthetic_session(2, Some(proposal1), false);
         assert_eq!(
-            HumanoidGraspSimulationCausalTrace::from_results(vec![result0, result1]),
+            seal_humanoid_grasp_simulation_causal_trace(session, None, vec![result0, result1]),
             Err(HumanoidGraspSimulationCausalFailure::TraceDiscontinuity)
         );
     }
 
     #[test]
-    fn complete_trace_binds_observation_sequence() {
-        let pre0 = state(1.0, 0.0);
-        let post0 = state(1.01, 0.01);
-        let object0 = HumanoidEvidenceDigest::from_bytes([20; 32]);
-        let object1 = HumanoidEvidenceDigest::from_bytes([21; 32]);
-        let proposal0 = HumanoidEvidenceDigest::from_bytes([30; 32]);
-        let commitment0 = synthetic_commitment(0, proposal0, None, &pre0, object0);
-        let result0 = bind_humanoid_grasp_simulation_step_result(
-            &subject(),
-            &harness(),
-            &commitment0,
-            &pre0,
-            &post0,
-            object1,
-            &observation(1.01, object1),
-            1,
-        )
-        .unwrap();
-
-        let trace = HumanoidGraspSimulationCausalTrace::from_results(vec![result0]).unwrap();
+    fn nonterminal_session_is_consumed_into_closed_trace() {
+        let (result, proposal0) = one_result();
+        let session = synthetic_session(1, Some(proposal0), false);
+        let trace = seal_humanoid_grasp_simulation_causal_trace(session, None, vec![result]).unwrap();
         assert!(trace.validate());
+        assert_eq!(
+            trace.closure_kind(),
+            HumanoidGraspSimulationTraceClosureKind::QualificationWindowClosed
+        );
         assert_eq!(trace.steps().len(), 1);
         assert_eq!(trace.observation_digests().len(), 1);
-        assert!(!trace.trace_digest().is_zero());
+    }
+
+    #[test]
+    fn abort_is_sealed_as_terminal_decision_not_plant_step() {
+        let (result, proposal0) = one_result();
+        let abort = synthetic_abort(2, proposal0);
+        let abort_digest = abort.proposal_digest;
+        let session = synthetic_session(2, Some(abort_digest), true);
+        let trace = seal_humanoid_grasp_simulation_causal_trace(
+            session,
+            Some(abort),
+            vec![result],
+        )
+        .unwrap();
+        assert!(trace.validate());
+        assert_eq!(
+            trace.closure_kind(),
+            HumanoidGraspSimulationTraceClosureKind::ControllerAborted
+        );
+        assert_eq!(trace.terminal_proposal_digest(), Some(abort_digest));
+        assert_eq!(trace.steps().len(), 1);
     }
 }
