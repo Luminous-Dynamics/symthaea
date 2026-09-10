@@ -266,9 +266,7 @@ impl CapabilityCounterfactualProvenanceV1 {
             );
         }
         if self.algorithm_id != capability_counterfactual_algorithm_id_v1() {
-            return Err(
-                CapabilityAnalysisProvenanceError::CounterfactualAlgorithmIdentityMismatch,
-            );
+            return Err(CapabilityAnalysisProvenanceError::CounterfactualAlgorithmIdentityMismatch);
         }
         let expected_receipt_id =
             CapabilityCounterfactualFrontierReceiptV1::from_frontier(frontier).id();
@@ -378,14 +376,11 @@ mod tests {
             .unwrap()
             .validate()
             .unwrap();
-        let assumptions = CapabilityActivationAssumptionsV1::new(
-            &graph,
-            vec![dependency.id()],
-            vec![target_id],
-        )
-        .unwrap()
-        .validate(&graph)
-        .unwrap();
+        let assumptions =
+            CapabilityActivationAssumptionsV1::new(&graph, vec![dependency.id()], vec![target_id])
+                .unwrap()
+                .validate(&graph)
+                .unwrap();
         derive_capability_activation_closure(&graph, &assumptions).unwrap()
     }
 
@@ -455,13 +450,9 @@ mod tests {
             .unwrap()
             .validate()
             .unwrap();
-        let frontier = derive_capability_counterfactual_frontier(
-            &graph,
-            &assumptions,
-            &query,
-            &config,
-        )
-        .unwrap();
+        let frontier =
+            derive_capability_counterfactual_frontier(&graph, &assumptions, &query, &config)
+                .unwrap();
 
         let provenance = CapabilityCounterfactualProvenanceV1::from_frontier(&frontier);
         assert_eq!(
