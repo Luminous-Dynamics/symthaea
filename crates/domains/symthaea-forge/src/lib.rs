@@ -18,8 +18,9 @@
 //! rewrite instances, [`learning`] provides exact-instance audit summaries, [`context_learning`]
 //! constrains cross-run aggregation, [`family_learning`] introduces generator-scoped operator
 //! families, [`family_context_learning`] permits family aggregation only across distinct exact-
-//! context runs, and [`sequence_learning`] reconstructs accepted family history at generation
-//! boundaries without confusing sibling attempt order with state-transition order.
+//! context runs, [`sequence_learning`] reconstructs accepted family history at generation
+//! boundaries, and [`sequence_stats`] aggregates bounded-history conditional outcomes only across
+//! exact-context repeated-search cohorts.
 //!
 //! # Authority boundary
 //!
@@ -28,14 +29,16 @@
 //! - Concrete transformation identity and reusable transformation-family identity are separate.
 //! - Sequence memory conditions siblings on the state entering their generation; a winner changes
 //!   state only for later generations.
+//! - History order is explicit and content-addressed; first-order and higher-order statistics do not
+//!   silently mix.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
 //!   benchmark is a candidate evaluation rejection.
 //! - Persistent output must resolve outside the canonical workspace and is create-new only.
 //! - Forge's local benchmark remains a search heuristic, not replicated superiority evidence.
-//! - Learning tables and sequences are descriptive search-memory records, not promotion evidence.
-//! - No promotion, merge, activation, or runtime authority is provided here.
+//! - Learning tables, sequences, and conditional statistics are descriptive search memory only.
+//! - No promotion, merge, activation, search-policy mutation, or runtime authority is provided here.
 
 pub mod bundle;
 pub mod bundle_verify;
@@ -51,6 +54,7 @@ pub mod observations;
 pub mod sandbox;
 pub mod search;
 pub mod sequence_learning;
+pub mod sequence_stats;
 pub mod trace;
 pub mod trial_semantics;
 pub mod trials;
@@ -89,6 +93,11 @@ pub use search::{
 pub use sequence_learning::{
     ForgeAcceptedFamilyStep, ForgeConditionedFamilyTrial, ForgeFamilyHistory,
     ForgeSearchFamilySequence, ForgeSequenceLearningError,
+};
+pub use sequence_stats::{
+    ContextBoundForgeSequenceBatch, ContextualFamilyTransitionStats,
+    ExactContextConditionalFamilyTable, ExactContextForgeSequenceCohort,
+    ForgeConditionalFamilyKey, ForgeHistoryOrder, ForgeSequenceStatsError,
 };
 pub use trace::{
     validate_forge_trace, validate_forge_trace_observations, ForgeAttemptId, ForgeTraceError,
