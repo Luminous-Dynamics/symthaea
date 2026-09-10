@@ -5,7 +5,10 @@ pub use crate::{
     AuthenticatedMachineSession, AuthorityContext, AuthorityLease, ComponentHealth,
     DependencyState, FailureObservation, FleetAssuranceReport, FleetMemberReport,
     HealthSeverity, MachineSessionContext, MachineSessionPolicy, MachineSessionTrust,
-    MaritimeCapability, MaritimePlatformKind, MaritimeState, NavigationQuality, OperatingEnvelope,
-    PlatformHealth, ProgressiveFailureTrace, ProgressiveFailureViolation,
-    ResidualUtilitySnapshot, UtilityAvailability, baseline_envelope, evaluate_machine_session,
+    MaritimeCapability, MaritimeObservationKind, MaritimePlatformKind, MaritimeState,
+    NavigationQuality, ObservationBindingError, ObservationSourceGrantV1,
+    ObservationSourcePolicyError, ObservationSourcePolicyV1, OperatingEnvelope, PlatformHealth,
+    ProgressiveFailureTrace, ProgressiveFailureViolation, ResidualUtilitySnapshot,
+    SESSION_BOUND_OBSERVATION_PREFIX_V1, SessionBoundObservationV1, UtilityAvailability,
+    baseline_envelope, bind_observation_to_trusted_session, evaluate_machine_session,
 };
