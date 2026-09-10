@@ -13,9 +13,9 @@ use symthaea_replicator_ledger::{
     RuntimeSafetyWitness, evaluate_bound_replication_authority,
 };
 use symthaea_replicator_safety::{
-    CapabilitySet, ContainmentStatus, EvidenceDigest, GrantId, GrantIssuerClass, LineageId,
-    MonitoringStatus, QuorumEvidence, ReplicationAuthorityRequest, ReplicationGrant, RiskClass,
-    SafetyCaseStatus, SubjectId,
+    CapabilitySet, ContainmentStatus, DenialReason, EvidenceDigest, GrantId, GrantIssuerClass,
+    LineageId, MonitoringStatus, QuorumEvidence, ReplicationAuthorityRequest, ReplicationGrant,
+    RiskClass, SafetyCaseStatus, SubjectId,
 };
 
 const A: CapabilitySet = CapabilitySet::from_bits(0b0001);
@@ -241,7 +241,7 @@ fn descendant_capability_ceiling_cannot_be_reexpanded_by_a_fresh_grant() {
     assert!(!decision.is_allowed());
     assert!(decision
         .denial_reasons()
-        .contains(&symthaea_replicator_safety::DenialReason::RequestedCapabilitiesExceedParent));
+        .contains(&DenialReason::RequestedCapabilitiesExceedParent));
 }
 
 #[test]
@@ -269,8 +269,9 @@ fn ancestor_population_budget_remains_binding_on_grandchildren() {
 }
 
 #[test]
-fn ancestor_lineage_quarantine_blocks_descendant_branch_authority() {
+fn ancestor_lineage_quarantine_becomes_a_constitutional_denial() {
     let mut ledger = ledger();
+    let root = sid(1);
     let root_lineage = lid(1);
     let child_lineage = lid(2);
 
@@ -292,8 +293,16 @@ fn ancestor_lineage_quarantine_blocks_descendant_branch_authority() {
         .quarantine_lineage(cursor, mid(41), root_lineage)
         .expect("root lineage quarantine should commit");
 
-    let context = ledger.authority_context(sid(1), child_lineage, 1);
-    assert!(context.is_err(), "ancestor lineage quarantine must fail closed for descendant branches");
+    let context = ledger
+        .authority_context(root, child_lineage, 1)
+        .expect("context construction should preserve negative facts for audit");
+    assert!(context.quarantined);
+
+    let branch_grant = grant(root, child_lineage, 42, 1, A, 4, 50);
+    let request = request(root, child_lineage, context, 1, A, 1);
+    let decision = evaluate_bound_replication_authority(context.cursor, &request, Some(&branch_grant));
+    assert!(!decision.is_allowed());
+    assert!(decision.denial_reasons().contains(&DenialReason::Quarantined));
 }
 
 #[test]
