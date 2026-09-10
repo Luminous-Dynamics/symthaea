@@ -89,7 +89,7 @@ write_receipt() {
         printf 'cargo_lock_sha256\t%s\n' "$(sha256_file Cargo.lock)"
         printf 'workspace_manifest_sha256\t%s\n' "$(sha256_file Cargo.toml)"
         printf 'continuity_manifest_sha256\t%s\n' "$(sha256_file crates/core/symthaea-continuity/Cargo.toml)"
-        printf 'subject_source_sha256\t%s\n' "$(sha256_file crates/core/symthaea-continuity/src/subject.rs)"
+        printf 'subject_scope_source_sha256\t%s\n' "$(sha256_file crates/core/symthaea-continuity/src/scope.rs)"
         printf 'subject_snapshot_source_sha256\t%s\n' "$(sha256_file crates/core/symthaea-continuity/src/subject_snapshot.rs)"
         printf 'rust_toolchain_sha256\t%s\n' "$(sha256_file rust-toolchain.toml)"
         printf 'qualifier_script_sha256\t%s\n' "$(sha256_file scripts/qualify-continuity-subject-snapshot.sh)"
@@ -140,7 +140,7 @@ fi
 stage="preflight_sources_present"
 for path in \
     crates/core/symthaea-continuity/Cargo.toml \
-    crates/core/symthaea-continuity/src/subject.rs \
+    crates/core/symthaea-continuity/src/scope.rs \
     crates/core/symthaea-continuity/src/subject_snapshot.rs; do
     [[ -f "$path" ]] || { echo "error: required source absent: $path" >&2; exit 1; }
 done
@@ -172,7 +172,7 @@ cargo clippy --locked -p symthaea-continuity --all-targets -- -D warnings
 
 stage="subject_snapshot_regressions"
 cargo test --locked -p symthaea-continuity subject_snapshot -- --nocapture
-cargo test --locked -p symthaea-continuity parent_structure_fails_closed_without_closure_precondition -- --exact --nocapture
+cargo test --locked -p symthaea-continuity --lib 'subject_snapshot::tests::parent_structure_fails_closed_without_closure_precondition' -- --exact --nocapture
 
 stage="package_tests"
 cargo test --locked -p symthaea-continuity
