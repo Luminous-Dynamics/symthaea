@@ -11,9 +11,10 @@
 //!
 //! [`candidate`] is the authority-free bridge into `symthaea-algorithms`: it requires the caller to
 //! supply the semantic `ProblemSpec`/`AlgorithmRecord` context and a baseline implementation, then
-//! converts the exact Forge survivor into a generic `CandidateProposal`. Forge itself therefore
-//! remains a candidate generator rather than a source of semantic truth, replicated performance,
-//! or production authority.
+//! converts the exact Forge survivor into a generic `CandidateProposal`. It also replays Forge's
+//! generator-local [`trace`] into a semantic hash-chained discovery ledger only when the exact
+//! `DiscoveryRun` is supplied externally. [`bundle`] makes persistent CLI output complete only when
+//! a final content-addressed manifest validates the exact files on disk.
 //!
 //! # Authority boundary
 //!
@@ -28,13 +29,20 @@
 //!   superiority and not a production-promotion decision.
 //! - No general-purpose program synthesis or autonomous production activation is provided here.
 
+pub mod bundle;
 pub mod candidate;
 pub mod certificate;
 pub mod fitness;
 pub mod mutations;
 pub mod sandbox;
 pub mod search;
+pub mod trace;
 
-pub use candidate::{ForgeProposalError, proposal_from_forge};
+pub use bundle::{
+    read_completed_manifest, BundleError, ForgeBundleManifest, ForgeBundleOutcome, CANDIDATE_FILE,
+    CERTIFICATE_FILE, MANIFEST_FILE, REPORT_FILE, TRACE_FILE,
+};
+pub use candidate::{ledger_from_forge_trace, proposal_from_forge, ForgeProposalError};
 pub use certificate::{CertificateError, ForgeCandidate, ForgeCertificate};
-pub use search::{ForgeConfig, SearchOutcome, run_search};
+pub use search::{run_search, ForgeConfig, SearchOutcome};
+pub use trace::{validate_forge_trace, ForgeTraceError, ForgeTraceEvent};

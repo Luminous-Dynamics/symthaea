@@ -13,17 +13,23 @@
 //!     --out /tmp/forge-out/entropy-histogram
 //! ```
 //!
-//! Candidate staging is temporary and restored by the library. Persistent proposal output is
-//! required to resolve outside the canonical workspace and existing evidence files are never
-//! overwritten. A surviving candidate is written as exact full-file source bytes and immediately
-//! re-hashed against the certificate before the report is considered complete.
+//! Candidate staging is temporary and restored by the library. Persistent output is required to
+//! resolve outside the canonical workspace and existing evidence files are never overwritten.
+//! `search-trace.json` is emitted even when no winner exists, so negative search outcomes survive.
+//! A surviving candidate is written as exact full-file source bytes and immediately re-hashed.
+//! `bundle-manifest.json` is written last; without a valid manifest, a partial directory is not a
+//! completed Forge result.
 
 use std::ffi::OsString;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use symthaea_forge::certificate::full_source_artifact_id;
-use symthaea_forge::{ForgeConfig, run_search};
+use symthaea_forge::{
+    read_completed_manifest, run_search, validate_forge_trace, ForgeBundleManifest,
+    ForgeBundleOutcome, ForgeConfig, CANDIDATE_FILE, CERTIFICATE_FILE, MANIFEST_FILE, REPORT_FILE,
+    TRACE_FILE,
+};
 
 struct Args {
     target_file: PathBuf,
@@ -121,9 +127,29 @@ fn main() -> anyhow::Result<()> {
     };
 
     let outcome = run_search(&config)?;
+    validate_forge_trace(&outcome.trace)?;
+    let bundle_outcome = if outcome.best.is_some() {
+        ForgeBundleOutcome::Winner
+    } else {
+        ForgeBundleOutcome::NoWinner
+    };
+
+    let trace_path = out_dir.join(TRACE_FILE);
+    let candidate_path = out_dir.join(CANDIDATE_FILE);
+    let cert_path = out_dir.join(CERTIFICATE_FILE);
+    let report_path = out_dir.join(REPORT_FILE);
+    let manifest_path = out_dir.join(MANIFEST_FILE);
+    ensure_absent(&[
+        &trace_path,
+        &candidate_path,
+        &cert_path,
+        &report_path,
+        &manifest_path,
+    ])?;
+    write_new(&trace_path, &serde_json::to_vec_pretty(&outcome.trace)?)?;
 
     println!(
-        "candidates: {} attempted, {} no-eligible-mutation, {} failed compile, {} failed test, {} failed benchmark, {} passed correctness, {} improved search score",
+        "candidates: {} attempted, {} no-eligible-mutation, {} failed compile, {} failed test, {} failed benchmark, {} passed correctness, {} satisfied search-selection rule",
         outcome.stats.candidates_attempted,
         outcome.stats.candidates_no_eligible_mutation,
         outcome.stats.candidates_failed_compile,
@@ -140,10 +166,6 @@ fn main() -> anyhow::Result<()> {
         Some(candidate) => {
             candidate.validate()?;
             let cert = candidate.certificate();
-            let candidate_path = out_dir.join("candidate.rs");
-            let cert_path = out_dir.join("certificate.json");
-            let report_path = out_dir.join("report.md");
-            ensure_absent(&[&candidate_path, &cert_path, &report_path])?;
 
             write_new(&candidate_path, candidate.full_source().as_bytes())?;
             let persisted_source = std::fs::read_to_string(&candidate_path)?;
@@ -160,18 +182,34 @@ fn main() -> anyhow::Result<()> {
             write_new(&report_path, render_report(cert).as_bytes())?;
             println!("\n{}", cert.summary());
             println!(
-                "\nHONEST FRAMING: this is a proposed search candidate, not an applied change or replicated performance result. Exact source: {}. Certificate: {}. Report: {}. A later evidence collector can independently hash candidate.rs before any evaluation-grade receipt is minted.",
+                "\nHONEST FRAMING: this is a proposed search candidate, not an applied change or replicated performance result. Exact source: {}. Certificate: {}. Report: {}. Negative/neutral trace: {}.",
                 candidate_path.display(),
                 cert_path.display(),
                 report_path.display(),
+                trace_path.display(),
             );
         }
         None => {
             println!(
-                "\nNo mutation in this bounded run both passed every configured correctness gate and satisfied the search-selection rule. This is a legitimate negative result; do not weaken gates to manufacture a winner."
+                "\nNo mutation in this bounded run both passed every configured correctness gate and satisfied the search-selection rule. This is a legitimate negative result; the full negative/neutral search trace was retained at {}.",
+                trace_path.display(),
             );
         }
     }
+
+    // The manifest is the terminal commit marker for persistent output. If any earlier write or
+    // validation fails, it is never created and the directory remains an explicitly partial bundle.
+    let manifest = ForgeBundleManifest::observe(&out_dir, bundle_outcome)?;
+    write_new(&manifest_path, manifest.to_json_pretty()?.as_bytes())?;
+    let verified = read_completed_manifest(&out_dir)?;
+    if verified.id != manifest.id {
+        anyhow::bail!("Forge bundle manifest changed during immediate read-back validation");
+    }
+    println!(
+        "completed Forge evidence bundle: {} (manifest {})",
+        manifest_path.display(),
+        manifest.id
+    );
 
     Ok(())
 }
@@ -302,7 +340,7 @@ fn render_report(cert: &symthaea_forge::ForgeCertificate) -> String {
         })
         .collect();
     format!(
-        "# symthaea-forge candidate report\n\nGenerated: {generated} ms since epoch\nTarget: `{file}::{func}` (package `{package}`)\nGit SHA at search time: `{sha}`\nGeneration found: {generation}\nBaseline full-file artifact: `{baseline_artifact}`\nCandidate full-file artifact: `{candidate_artifact}`\nMutation: **{op}** — {detail}\n\n## Ordered artifact lineage\n{lineage}\n## Gates\n{gates}\n## Benchmark/search heuristic\n{bench}\n## Before\n```rust\n{before}\n```\n\n## After\n```rust\n{after}\n```\n\n## Authority boundary\n`candidate.rs` is the exact full-file survivor identified above. This report is a human-review proposal. It does not establish replicated performance, production eligibility, or permission to modify runtime code. The candidate should be independently re-hashed and re-evaluated through the algorithm evidence pipeline before any separate promotion review.\n",
+        "# symthaea-forge candidate report\n\nGenerated: {generated} ms since epoch\nTarget: `{file}::{func}` (package `{package}`)\nGit SHA at search time: `{sha}`\nGeneration found: {generation}\nBaseline full-file artifact: `{baseline_artifact}`\nCandidate full-file artifact: `{candidate_artifact}`\nMutation: **{op}** — {detail}\n\n## Ordered artifact lineage\n{lineage}\n## Gates\n{gates}\n## Benchmark/search heuristic\n{bench}\n## Before\n```rust\n{before}\n```\n\n## After\n```rust\n{after}\n```\n\n## Authority boundary\n`candidate.rs` is the exact full-file survivor identified above. `search-trace.json` retains negative and neutral search outcomes independently of whether a winner exists. `bundle-manifest.json` is the terminal completion marker and must validate before this directory is treated as a complete Forge result. This report is a human-review proposal. It does not establish replicated performance, production eligibility, or permission to modify runtime code. The candidate should be independently re-hashed and re-evaluated through the algorithm evidence pipeline before any separate promotion review.\n",
         generated = cert.generated_at_unix_ms,
         file = cert.target_file.display(),
         func = cert.target_function,
@@ -354,10 +392,10 @@ mod tests {
         ));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
-        let candidate = root.join("candidate.rs");
-        let cert = root.join("certificate.json");
-        std::fs::write(&cert, "existing").unwrap();
-        assert!(ensure_absent(&[&candidate, &cert]).is_err());
+        let candidate = root.join(CANDIDATE_FILE);
+        let manifest = root.join(MANIFEST_FILE);
+        std::fs::write(&manifest, "existing").unwrap();
+        assert!(ensure_absent(&[&candidate, &manifest]).is_err());
         assert!(!candidate.exists());
         let _ = std::fs::remove_dir_all(root);
     }
