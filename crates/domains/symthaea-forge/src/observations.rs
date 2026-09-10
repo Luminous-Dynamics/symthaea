@@ -5,7 +5,7 @@
 //! These objects make `observation_id` reconstructable without turning a Forge-local observation
 //! into correctness, performance, replication, promotion, or runtime authority.
 
-use crate::certificate::{ForgeCandidate, MutationRecord};
+use crate::certificate::{CertificateError, ForgeCandidate, MutationRecord};
 use crate::fitness::{BenchmarkResult, GateResult};
 use serde::Serialize;
 use symthaea_algorithms::observation::{ObservationEncoding, ObservationError, ObservationObject};
@@ -13,6 +13,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ForgeObservationError {
+    #[error(transparent)]
+    Certificate(#[from] CertificateError),
     #[error(transparent)]
     Object(#[from] ObservationError),
     #[error("Forge observation JSON serialization failed: {0}")]
