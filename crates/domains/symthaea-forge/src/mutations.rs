@@ -30,9 +30,10 @@ pub struct MutationOpportunity {
     pub eligible_sites: usize,
 }
 
-/// Exact selected `(operator, site)` pair under the current uniform-site sampler.
+/// Exact selected `(operator slot, site)` pair under the current uniform-site sampler.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MutationSelection {
+    pub operator_index: usize,
     pub operator: &'static str,
     pub site_index: usize,
     pub global_pair_index: usize,
@@ -512,9 +513,15 @@ impl Mutator {
 
         let global_pair_index = rng.gen_range(0..total_eligible_sites);
         let mut local_index = global_pair_index;
-        for (operator, opportunity) in self.operators.iter().zip(opportunities.iter()) {
+        for (operator_index, (operator, opportunity)) in self
+            .operators
+            .iter()
+            .zip(opportunities.iter())
+            .enumerate()
+        {
             if local_index < opportunity.eligible_sites {
                 let selection = MutationSelection {
+                    operator_index,
                     operator: operator.name(),
                     site_index: local_index,
                     global_pair_index,
@@ -573,8 +580,8 @@ pub fn find_function_body_mut<'f>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     fn parse_fn_body(src: &str) -> syn::Block {
         let file: syn::File = syn::parse_str(src).expect("test fixture must parse");
@@ -662,16 +669,32 @@ mod tests {
                 .sum::<usize>()
         );
         let selection = recorded.selection.as_ref().unwrap();
-        let mut offset = 0usize;
-        for opportunity in &recorded.opportunities {
-            if opportunity.operator == selection.operator {
-                assert!(selection.site_index < opportunity.eligible_sites);
-                assert_eq!(selection.global_pair_index, offset + selection.site_index);
-                return;
-            }
-            offset += opportunity.eligible_sites;
-        }
-        panic!("selected operator must exist in the recorded opportunity set");
+        let opportunity = &recorded.opportunities[selection.operator_index];
+        assert_eq!(opportunity.operator, selection.operator);
+        assert!(selection.site_index < opportunity.eligible_sites);
+        let offset = recorded.opportunities[..selection.operator_index]
+            .iter()
+            .map(|opportunity| opportunity.eligible_sites)
+            .sum::<usize>();
+        assert_eq!(selection.global_pair_index, offset + selection.site_index);
+    }
+
+    #[test]
+    fn duplicate_operator_names_still_have_distinct_registration_slots() {
+        let mut body = parse_fn_body("fn f(x: i32) -> bool { x < 5 }");
+        let mutator = Mutator::new(vec![
+            Box::new(ComparisonOperatorSwap),
+            Box::new(ComparisonOperatorSwap),
+        ]);
+        let mut rng = StdRng::seed_from_u64(13);
+        let recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
+        assert_eq!(recorded.opportunities.len(), 2);
+        let selection = recorded.selection.unwrap();
+        assert!(selection.operator_index < 2);
+        assert_eq!(
+            recorded.opportunities[selection.operator_index].operator,
+            selection.operator
+        );
     }
 
     #[test]
