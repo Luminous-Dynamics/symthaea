@@ -74,6 +74,8 @@ pub mod embodiment;
 pub mod embodiment_evidence;
 /// Additive evidence-provider seam for legacy and Embodiment-v2 migration.
 pub mod embodiment_evidence_provider;
+/// Explicit physical transition timing receipts for Embodiment-v2 migration.
+pub mod embodiment_timing;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
