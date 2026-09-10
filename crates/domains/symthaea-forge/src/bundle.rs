@@ -3,8 +3,9 @@
 //! Completion manifest for persistent Forge output bundles.
 //!
 //! A directory containing some Forge files is not, by itself, a completed result. The manifest is
-//! written last by the CLI and content-addresses the exact required files for either a winner or a
-//! no-winner outcome. Consumers should require and validate it before treating a bundle as complete.
+//! written last and content-addresses the exact canonical file set for a winner, no-winner, or
+//! aborted search. An aborted run may preserve a previously valid survivor, but partial survivor
+//! triplets are rejected.
 
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -15,15 +16,27 @@ use thiserror::Error;
 pub const MANIFEST_FILE: &str = "bundle-manifest.json";
 pub const TRACE_FILE: &str = "search-trace.json";
 pub const OBSERVATIONS_FILE: &str = "observations.json";
+pub const ABORT_FILE: &str = "abort.json";
 pub const CANDIDATE_FILE: &str = "candidate.rs";
 pub const CERTIFICATE_FILE: &str = "certificate.json";
 pub const REPORT_FILE: &str = "report.md";
+
+const WINNER_FILES: &[&str] = &[
+    TRACE_FILE,
+    OBSERVATIONS_FILE,
+    CANDIDATE_FILE,
+    CERTIFICATE_FILE,
+    REPORT_FILE,
+];
+const NO_WINNER_FILES: &[&str] = &[TRACE_FILE, OBSERVATIONS_FILE];
+const ABORT_BASE_FILES: &[&str] = &[TRACE_FILE, OBSERVATIONS_FILE, ABORT_FILE];
+const SURVIVOR_FILES: &[&str] = &[CANDIDATE_FILE, CERTIFICATE_FILE, REPORT_FILE];
 
 #[derive(Debug, Error)]
 pub enum BundleError {
     #[error("Forge bundle path is not a regular file: {0}")]
     MissingFile(String),
-    #[error("Forge bundle file name is not one of the canonical names for this outcome")]
+    #[error("Forge bundle file set is not canonical for this outcome")]
     UnexpectedFileSet,
     #[error("Forge bundle file changed after manifest creation: {0}")]
     FileMismatch(String),
@@ -40,6 +53,7 @@ pub enum BundleError {
 pub enum ForgeBundleOutcome {
     Winner,
     NoWinner,
+    Aborted,
 }
 
 impl ForgeBundleOutcome {
@@ -47,19 +61,7 @@ impl ForgeBundleOutcome {
         match self {
             Self::Winner => b"winner",
             Self::NoWinner => b"no-winner",
-        }
-    }
-
-    pub fn required_files(self) -> &'static [&'static str] {
-        match self {
-            Self::Winner => &[
-                TRACE_FILE,
-                OBSERVATIONS_FILE,
-                CANDIDATE_FILE,
-                CERTIFICATE_FILE,
-                REPORT_FILE,
-            ],
-            Self::NoWinner => &[TRACE_FILE, OBSERVATIONS_FILE],
+            Self::Aborted => b"aborted",
         }
     }
 }
@@ -105,8 +107,8 @@ pub struct ForgeBundleManifest {
 impl ForgeBundleManifest {
     /// Observe the already-written result files and construct the terminal completion manifest.
     pub fn observe(root: &Path, outcome: ForgeBundleOutcome) -> Result<Self, BundleError> {
-        let mut files = outcome
-            .required_files()
+        let names = canonical_file_names_at(root, outcome)?;
+        let mut files = names
             .iter()
             .map(|name| ForgeBundleFile::observe(root, name))
             .collect::<Result<Vec<_>, _>>()?;
@@ -116,10 +118,15 @@ impl ForgeBundleManifest {
     }
 
     pub fn validate(&self) -> Result<(), BundleError> {
-        let mut expected_names: Vec<&str> = self.outcome.required_files().to_vec();
-        expected_names.sort_unstable();
         let observed_names: Vec<&str> = self.files.iter().map(|file| file.name.as_str()).collect();
-        if observed_names != expected_names {
+        if !is_canonical_name_set(self.outcome, &observed_names) {
+            return Err(BundleError::UnexpectedFileSet);
+        }
+        if self
+            .files
+            .windows(2)
+            .any(|pair| pair[0].name >= pair[1].name)
+        {
             return Err(BundleError::UnexpectedFileSet);
         }
         if derive_manifest_id(self.outcome, &self.files) != self.id {
@@ -128,7 +135,7 @@ impl ForgeBundleManifest {
         Ok(())
     }
 
-    /// Re-read every required file and prove the persisted bundle still matches this manifest.
+    /// Re-read every manifested file and prove the persisted bundle still matches this manifest.
     pub fn validate_at(&self, root: &Path) -> Result<(), BundleError> {
         self.validate()?;
         let observed = Self::observe(root, self.outcome)?;
@@ -140,7 +147,7 @@ impl ForgeBundleManifest {
                 .iter()
                 .zip(observed.files.iter())
                 .find_map(|(expected, actual)| (expected != actual).then(|| expected.name.clone()))
-                .unwrap_or_else(|| "unknown".to_string());
+                .unwrap_or_else(|| "file-set".to_string());
             Err(BundleError::FileMismatch(changed))
         }
     }
@@ -148,6 +155,56 @@ impl ForgeBundleManifest {
     pub fn to_json_pretty(&self) -> Result<String, BundleError> {
         serde_json::to_string_pretty(self)
             .map_err(|error| BundleError::Serialization(error.to_string()))
+    }
+}
+
+fn canonical_file_names_at(
+    root: &Path,
+    outcome: ForgeBundleOutcome,
+) -> Result<Vec<&'static str>, BundleError> {
+    match outcome {
+        ForgeBundleOutcome::Winner => Ok(WINNER_FILES.to_vec()),
+        ForgeBundleOutcome::NoWinner => Ok(NO_WINNER_FILES.to_vec()),
+        ForgeBundleOutcome::Aborted => {
+            let survivor_presence: Vec<bool> = SURVIVOR_FILES
+                .iter()
+                .map(|name| root.join(name).is_file())
+                .collect();
+            let all_survivor = survivor_presence.iter().all(|present| *present);
+            let no_survivor = survivor_presence.iter().all(|present| !*present);
+            if !all_survivor && !no_survivor {
+                return Err(BundleError::UnexpectedFileSet);
+            }
+            let mut files = ABORT_BASE_FILES.to_vec();
+            if all_survivor {
+                files.extend_from_slice(SURVIVOR_FILES);
+            }
+            Ok(files)
+        }
+    }
+}
+
+fn is_canonical_name_set(outcome: ForgeBundleOutcome, names: &[&str]) -> bool {
+    let mut observed = names.to_vec();
+    observed.sort_unstable();
+    observed.dedup();
+    if observed.len() != names.len() {
+        return false;
+    }
+
+    let matches = |expected: &[&str]| {
+        let mut expected = expected.to_vec();
+        expected.sort_unstable();
+        observed == expected
+    };
+    match outcome {
+        ForgeBundleOutcome::Winner => matches(WINNER_FILES),
+        ForgeBundleOutcome::NoWinner => matches(NO_WINNER_FILES),
+        ForgeBundleOutcome::Aborted => {
+            let mut with_survivor = ABORT_BASE_FILES.to_vec();
+            with_survivor.extend_from_slice(SURVIVOR_FILES);
+            matches(ABORT_BASE_FILES) || matches(&with_survivor)
+        }
     }
 }
 
@@ -167,7 +224,6 @@ fn derive_manifest_id(outcome: ForgeBundleOutcome, files: &[ForgeBundleFile]) ->
     )
 }
 
-/// Read and validate a completed Forge bundle from disk.
 pub fn read_completed_manifest(root: &Path) -> Result<ForgeBundleManifest, BundleError> {
     let path: PathBuf = root.join(MANIFEST_FILE);
     let bytes = fs::read(&path).map_err(|error| BundleError::Io {
@@ -198,6 +254,12 @@ mod tests {
         root
     }
 
+    fn write_survivor_triplet(root: &Path) {
+        fs::write(root.join(CANDIDATE_FILE), b"fn f() {}").unwrap();
+        fs::write(root.join(CERTIFICATE_FILE), b"{}").unwrap();
+        fs::write(root.join(REPORT_FILE), b"report").unwrap();
+    }
+
     #[test]
     fn no_winner_manifest_requires_trace_and_observations() {
         let root = temp_dir("no-winner");
@@ -212,18 +274,51 @@ mod tests {
     #[test]
     fn winner_manifest_binds_all_required_files() {
         let root = temp_dir("winner");
-        for (name, bytes) in [
-            (TRACE_FILE, b"[]".as_slice()),
-            (OBSERVATIONS_FILE, b"[]".as_slice()),
-            (CANDIDATE_FILE, b"fn f() {}".as_slice()),
-            (CERTIFICATE_FILE, b"{}".as_slice()),
-            (REPORT_FILE, b"report".as_slice()),
-        ] {
-            fs::write(root.join(name), bytes).unwrap();
-        }
+        fs::write(root.join(TRACE_FILE), b"[]").unwrap();
+        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
+        write_survivor_triplet(&root);
         let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::Winner).unwrap();
         assert_eq!(manifest.files.len(), 5);
         assert!(manifest.validate_at(&root).is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn aborted_manifest_without_survivor_is_canonical() {
+        let root = temp_dir("aborted");
+        fs::write(root.join(TRACE_FILE), b"[]").unwrap();
+        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
+        fs::write(root.join(ABORT_FILE), b"{}").unwrap();
+        let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::Aborted).unwrap();
+        assert_eq!(manifest.files.len(), 3);
+        assert!(manifest.validate_at(&root).is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn aborted_manifest_may_preserve_complete_survivor_triplet() {
+        let root = temp_dir("aborted-survivor");
+        fs::write(root.join(TRACE_FILE), b"[]").unwrap();
+        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
+        fs::write(root.join(ABORT_FILE), b"{}").unwrap();
+        write_survivor_triplet(&root);
+        let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::Aborted).unwrap();
+        assert_eq!(manifest.files.len(), 6);
+        assert!(manifest.validate_at(&root).is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn aborted_manifest_rejects_partial_survivor_triplet() {
+        let root = temp_dir("aborted-partial");
+        fs::write(root.join(TRACE_FILE), b"[]").unwrap();
+        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
+        fs::write(root.join(ABORT_FILE), b"{}").unwrap();
+        fs::write(root.join(CANDIDATE_FILE), b"fn f() {}").unwrap();
+        assert!(matches!(
+            ForgeBundleManifest::observe(&root, ForgeBundleOutcome::Aborted),
+            Err(BundleError::UnexpectedFileSet)
+        ));
         let _ = fs::remove_dir_all(root);
     }
 
