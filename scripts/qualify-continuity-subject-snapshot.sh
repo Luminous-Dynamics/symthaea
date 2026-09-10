@@ -6,6 +6,7 @@
 # subject/snapshot lineage. This establishes software properties only; it does
 # not establish physical existence, current availability, ownership, policy,
 # recovery sufficiency, or execution authority.
+# Re-triggered after the pinned Rust 1.96 subject-source formatting commit.
 
 set -euo pipefail
 
