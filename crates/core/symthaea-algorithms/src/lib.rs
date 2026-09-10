@@ -6,6 +6,7 @@
 //! This crate is descriptive, not authorizing:
 //! `Problem != Algorithm != Implementation != Evaluation != Evidence != Promotion != Authority`.
 
+pub mod discovery;
 pub mod evaluation;
 pub mod pareto;
 mod registry;
