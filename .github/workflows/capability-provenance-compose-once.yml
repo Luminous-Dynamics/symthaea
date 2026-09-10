@@ -69,7 +69,11 @@ jobs:
           path.write_text(text)
           PY
 
-          cargo generate-lockfile
+          # Reuse the already-proven #1181 mechanism: ordinary package-scoped
+          # cargo check performs the minimum lock reconciliation needed for the
+          # newly introduced workspace package. Do not regenerate the workspace
+          # lockfile wholesale.
+          cargo check -p symthaea-continuity --all-targets
 
           # Parsed lock theorem: all old package records are preserved exactly
           # and the only new package record is symthaea-continuity.
@@ -103,6 +107,8 @@ jobs:
           print('lock reconciliation: exactly one symthaea-continuity package added')
           PY
 
+          # Once reconciled, prove the same package builds with lock mutation
+          # forbidden before committing anything.
           cargo check --locked -p symthaea-continuity --all-targets
 
           mapfile -t changed < <(git diff --name-only)
