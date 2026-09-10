@@ -7,6 +7,10 @@ use symthaea_maritime_core::{
 };
 
 const XENIA_SCHEMA_V1: &str = "xenia-verified-machine-session-evidence-v1";
+const XENIA_IDENTITY_BINDING: &str =
+    "xenia-signing-identity-v1:blake3-256:12fb7634b7b55b14b996d5b984e4ce93f5db26e0aac9d5d177f2622dbeda412e";
+const XENIA_TRANSCRIPT_BINDING: &str =
+    "xenia-handshake-transcript-v1:blake3-256:2222222222222222222222222222222222222222222222222222222222222222";
 const EVIDENCE_FIXTURE: &str =
     include_str!("../fixtures/xenia-verified-machine-session-evidence-v1.json");
 
@@ -39,6 +43,7 @@ fn policy() -> MachineSessionPolicy<'static> {
 fn project_fixture_after_provider_verification() -> AuthenticatedMachineSession {
     let wire: XeniaSessionFixtureV1 = serde_json::from_str(EVIDENCE_FIXTURE).unwrap();
     assert_eq!(wire.schema, XENIA_SCHEMA_V1);
+    assert_eq!(wire.peer_identity_binding, XENIA_IDENTITY_BINDING);
     assert!(wire
         .negotiated_context_binding
         .as_deref()
@@ -56,6 +61,23 @@ fn project_fixture_after_provider_verification() -> AuthenticatedMachineSession 
     .unwrap()
 }
 
+fn context_for(
+    session: &AuthenticatedMachineSession,
+    now_ms: u64,
+    authority_epoch: u64,
+    trusted_time_available: bool,
+    revoked: bool,
+) -> MachineSessionContext {
+    MachineSessionContext::from_authority_provider(
+        session.peer_identity_binding(),
+        now_ms,
+        authority_epoch,
+        trusted_time_available,
+        revoked,
+    )
+    .unwrap()
+}
+
 #[test]
 fn xenia_v1_session_evidence_projects_into_provider_neutral_contract() {
     let session = project_fixture_after_provider_verification();
@@ -65,9 +87,7 @@ fn xenia_v1_session_evidence_projects_into_provider_neutral_contract() {
     assert_eq!(session.authenticated_at_ms(), 1_700_000_000_000);
     assert_eq!(session.expires_at_ms(), 1_700_000_060_000);
     assert_eq!(session.authority_epoch(), 9);
-    assert!(session
-        .peer_identity_binding()
-        .starts_with("xenia-signing-identity-v1:blake3-256:"));
+    assert_eq!(session.peer_identity_binding(), XENIA_IDENTITY_BINDING);
     assert!(session
         .evidence_binding()
         .starts_with("xenia-handshake-transcript-v1:blake3-256:"));
@@ -78,79 +98,75 @@ fn xenia_v1_session_evidence_projects_into_provider_neutral_contract() {
 fn fresh_local_policy_and_authority_context_drive_fail_closed_evaluation() {
     let session = project_fixture_after_provider_verification();
 
-    // Intentionally constructed in-process. Current time, authority generation,
-    // revocation state and provider-schema acceptance are local policy facts,
-    // not replayable cross-repo wire artifacts.
-    let context = MachineSessionContext {
-        now_ms: 1_700_000_030_000,
-        authority_epoch: 9,
-        trusted_time_available: true,
-        revoked: false,
-    };
-
+    let context = context_for(&session, 1_700_000_030_000, 9, true, false);
     assert_eq!(
-        evaluate_machine_session(&session, context, policy()),
+        evaluate_machine_session(&session, &context, policy()),
         MachineSessionTrust::Trusted
     );
 
-    let mut revoked = context;
-    revoked.revoked = true;
+    let revoked = context_for(&session, 1_700_000_030_000, 9, true, true);
     assert_eq!(
-        evaluate_machine_session(&session, revoked, policy()),
+        evaluate_machine_session(&session, &revoked, policy()),
         MachineSessionTrust::Revoked
     );
 
-    let mut rotated_authority = context;
-    rotated_authority.authority_epoch = 10;
+    let rotated_authority = context_for(&session, 1_700_000_030_000, 10, true, false);
     assert_eq!(
-        evaluate_machine_session(&session, rotated_authority, policy()),
+        evaluate_machine_session(&session, &rotated_authority, policy()),
         MachineSessionTrust::EpochMismatch
     );
 
-    let mut time_untrusted = context;
-    time_untrusted.trusted_time_available = false;
+    let time_untrusted = context_for(&session, 1_700_000_030_000, 9, false, false);
     assert_eq!(
-        evaluate_machine_session(&session, time_untrusted, policy()),
+        evaluate_machine_session(&session, &time_untrusted, policy()),
         MachineSessionTrust::UntrustedTime
+    );
+
+    let wrong_identity = MachineSessionContext::from_authority_provider(
+        "xenia-signing-identity-v1:blake3-256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        1_700_000_030_000,
+        9,
+        true,
+        false,
+    )
+    .unwrap();
+    assert_eq!(
+        evaluate_machine_session(&session, &wrong_identity, policy()),
+        MachineSessionTrust::ContextIdentityMismatch
     );
 }
 
 #[test]
 fn future_xenia_schema_and_excessive_validity_require_explicit_review() {
-    let context = MachineSessionContext {
-        now_ms: 1_700_000_030_000,
-        authority_epoch: 9,
-        trusted_time_available: true,
-        revoked: false,
-    };
-
     let future = AuthenticatedMachineSession::from_verified_provider(
         "xenia-verified-machine-session-evidence-v2",
         "session-fixture-001",
-        "xenia-signing-identity-v1:blake3-256:5555555555555555555555555555555555555555555555555555555555555555",
+        XENIA_IDENTITY_BINDING,
         1_700_000_000_000,
         1_700_000_060_000,
         9,
-        "xenia-handshake-transcript-v1:blake3-256:2222222222222222222222222222222222222222222222222222222222222222",
+        XENIA_TRANSCRIPT_BINDING,
     )
     .unwrap();
+    let future_context = context_for(&future, 1_700_000_030_000, 9, true, false);
     assert_eq!(
-        evaluate_machine_session(&future, context, policy()),
+        evaluate_machine_session(&future, &future_context, policy()),
         MachineSessionTrust::UnsupportedSchema
     );
 
     let too_long = AuthenticatedMachineSession::from_verified_provider(
         XENIA_SCHEMA_V1,
         "session-fixture-001",
-        "xenia-signing-identity-v1:blake3-256:5555555555555555555555555555555555555555555555555555555555555555",
+        XENIA_IDENTITY_BINDING,
         1_700_000_000_000,
         1_700_000_060_001,
         9,
-        "xenia-handshake-transcript-v1:blake3-256:2222222222222222222222222222222222222222222222222222222222222222",
+        XENIA_TRANSCRIPT_BINDING,
     )
     .unwrap();
+    let too_long_context = context_for(&too_long, 1_700_000_030_000, 9, true, false);
     assert_eq!(
-        evaluate_machine_session(&too_long, context, policy()),
+        evaluate_machine_session(&too_long, &too_long_context, policy()),
         MachineSessionTrust::ValidityTooLong
     );
 }
