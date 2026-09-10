@@ -27,9 +27,10 @@
 //! those observational outcomes may inform future policy learning, [`proposal_recording`] binds
 //! either live or persisted raw proposal evidence through one semantic conversion path,
 //! [`proposal_trace`] retains the live draw as generator-local content-addressed evidence,
-//! [`proposal_coverage`] proves that raw proposal evidence exactly covers the search trace, and
+//! [`proposal_coverage`] proves that raw proposal evidence exactly covers the search trace,
 //! [`proposal_qualification`] composes those layers while also binding no-op-only runs to the exact
-//! semantic baseline implementation.
+//! semantic baseline implementation, and [`proposal_dataset`] freezes one exact row per
+//! `(attempt, policy family)` before any estimator or learned policy exists.
 //!
 //! # Authority boundary
 //!
@@ -51,14 +52,16 @@
 //! - Proposal-stage traces and raw proposal archives must provide one-to-one coverage both before
 //!   return from search and after persistent bundle rehydration.
 //! - No-op-only proposal histories still have to bind the exact declared baseline artifact.
+//! - Proposal observation tables retain zero-opportunity and unselected families; absence is never
+//!   silently converted into failure or success evidence.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
 //!   benchmark is a candidate evaluation rejection.
 //! - Persistent output must resolve outside the canonical workspace and is create-new only.
 //! - Forge's local benchmark remains a search heuristic, not replicated superiority evidence.
-//! - Learning tables, sequences, conditional statistics, corpus partitions, and exposure receipts
-//!   are descriptive research records only.
+//! - Learning tables, sequences, conditional statistics, corpus partitions, exposure receipts, and
+//!   proposal datasets are descriptive research records only.
 //! - No promotion, merge, activation, model fitting, inverse-propensity estimator, search-policy
 //!   mutation, or runtime authority is provided here.
 
@@ -76,6 +79,7 @@ pub mod learning;
 pub mod mutations;
 pub mod observations;
 pub mod proposal_coverage;
+pub mod proposal_dataset;
 pub mod proposal_exposure;
 pub mod proposal_qualification;
 pub mod proposal_recording;
@@ -124,6 +128,10 @@ pub use learning::{
 };
 pub use observations::ForgeObservationError;
 pub use proposal_coverage::{validate_forge_raw_proposal_coverage, ForgeProposalCoverageError};
+pub use proposal_dataset::{
+    ForgeProposalDatasetError, ForgeProposalObservationRow, ForgeProposalObservationTable,
+    ForgeProposalRowDecision, ForgeProposalRowOutcome,
+};
 pub use proposal_exposure::{
     ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
     ForgeProposalExposureArchive, ForgeProposalExposureError, ForgeProposalLearningQualification,
