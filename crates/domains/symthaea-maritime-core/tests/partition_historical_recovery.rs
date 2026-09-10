@@ -14,6 +14,7 @@ const PRINCIPAL: &str = "xenia-signing-identity-v1:blake3-256:fixture-principal"
 const PLATFORM: &str = "auv-01";
 const OLD_EVIDENCE: &str = "xenia-handshake-transcript-v1:blake3-256:old-session";
 const NEW_EVIDENCE: &str = "xenia-handshake-transcript-v1:blake3-256:new-session";
+const OLD_ADMISSION: &str = "xenia-machine-session-admission-v1:blake3-256:old-session";
 
 fn session(
     session_id: &str,
@@ -79,7 +80,6 @@ fn partition_reconnect_uses_history_for_the_past_and_new_admission_for_the_futur
     let source_policy = source_policy();
     let old_session = session("session-before-partition", 1_000, 2_000, 9, OLD_EVIDENCE);
 
-    // Before the partition, current provider authority permits an exact observation association.
     let live_before_partition = bind_observation_to_trusted_session(
         &old_session,
         &context(1_500, 9, false),
@@ -94,7 +94,6 @@ fn partition_reconnect_uses_history_for_the_past_and_new_admission_for_the_futur
     .unwrap();
     let stable_pre_partition_binding = live_before_partition.evidence_binding().to_owned();
 
-    // Network loss reduces the local envelope; it does not manufacture broader authority.
     assert_eq!(
         baseline_envelope(
             DependencyState {
@@ -109,7 +108,6 @@ fn partition_reconnect_uses_history_for_the_past_and_new_admission_for_the_futur
         OperatingEnvelope::ReducedCapability
     );
 
-    // Once reconnect reveals revocation, the old session cannot mint a new live association.
     assert_eq!(
         bind_observation_to_trusted_session(
             &old_session,
@@ -127,9 +125,6 @@ fn partition_reconnect_uses_history_for_the_past_and_new_admission_for_the_futur
         ))
     );
 
-    // Provider-owned history may still establish that the already-recorded 1.400 s observation
-    // was inside the exact old session and authority epoch. This historical proof carries the
-    // original session/transcript evidence binding and the exact retained history-head position.
     let historical = HistoricallyQualifiedMachineSessionV1::from_verified_provider_result(
         &old_session,
         session_policy(),
@@ -141,6 +136,7 @@ fn partition_reconnect_uses_history_for_the_past_and_new_admission_for_the_futur
         1_000,
         2_000,
         1_400,
+        OLD_ADMISSION,
         "xenia-machine-authority-history-head-v1:blake3-256:revoked-at-1600",
         1,
         1_700,
@@ -160,18 +156,18 @@ fn partition_reconnect_uses_history_for_the_past_and_new_admission_for_the_futur
     )
     .unwrap();
 
-    // Reconciliation is proof-path independent: Mycelix sees the same opaque association rather
-    // than a second ID merely because authority was re-established historically after reconnect.
     assert_eq!(recovered_after_reconnect, live_before_partition);
     assert_eq!(
         recovered_after_reconnect.evidence_binding(),
         stable_pre_partition_binding
     );
     assert_eq!(historical.session_evidence_binding(), OLD_EVIDENCE);
+    assert_eq!(
+        historical.provider_session_admission_binding(),
+        OLD_ADMISSION
+    );
     assert_eq!(historical.history_head_sequence(), 1);
 
-    // A newer authority generation does not revive the old session. Continuing current operation
-    // requires a fresh admission/session and therefore a distinct association for new bytes.
     assert_eq!(
         bind_observation_to_trusted_session(
             &old_session,
@@ -224,6 +220,7 @@ fn historical_recovery_cannot_rebind_different_bytes_or_time() {
         1_000,
         2_000,
         1_400,
+        OLD_ADMISSION,
         "xenia-machine-authority-history-head-v1:blake3-256:revoked-at-1600",
         1,
         1_700,
