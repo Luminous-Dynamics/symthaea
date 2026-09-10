@@ -14,7 +14,8 @@
 //! The `space_exosuit` supervisory module deliberately adds an independent
 //! deterministic assist envelope for EVA research. Phi may influence proposed
 //! assistance elsewhere, but it is not an input to that certified-assist
-//! admission boundary.
+//! admission boundary. Rescue propulsion is likewise isolated behind its own
+//! deterministic authority, navigation-validity, delta-v, and no-fire gates.
 
 #![deny(unsafe_code)]
 
@@ -37,6 +38,9 @@ pub mod pressure_garment;
 pub mod radiation;
 pub mod reduced_gravity;
 pub mod reflex;
+pub mod rescue_benchmark;
+pub mod rescue_navigation;
+pub mod rescue_propulsion;
 pub mod resource_optimizer;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
