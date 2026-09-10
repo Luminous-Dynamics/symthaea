@@ -5,12 +5,14 @@
 //!
 //! This bridge preserves `symthaea-sim-bridge` as the numerical contract while
 //! moving provider discovery/routing ahead of backend instantiation. Expensive
-//! solver adapters therefore remain dormant until selected.
+//! solver adapters remain dormant until selected, and authority is supplied as
+//! fresh point-of-use [`ActiveAdmission`] values rather than cached booleans.
 
 #![deny(unsafe_code)]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
+use symthaea_extension_admission::ActiveAdmission;
 use symthaea_extension_core::{CapabilityId, ExtensionId, ExtensionManifest};
 use symthaea_extension_registry::{ExtensionRegistry, RegistryError};
 use symthaea_extension_router::{
@@ -22,7 +24,6 @@ use symthaea_sim_bridge::{
     SolverKind,
 };
 
-/// Stable semantic capability used to route one solver family.
 pub fn solver_capability(solver: SolverKind) -> CapabilityId {
     let suffix = match solver {
         SolverKind::FiniteElement => "finite_element",
@@ -37,14 +38,10 @@ pub fn solver_capability(solver: SolverKind) -> CapabilityId {
     CapabilityId::new(format!("engineering.simulation.{suffix}"))
 }
 
-/// Cheap metadata describing one lazily-instantiated simulation provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimulationProviderDescriptor {
-    /// Shared extension identity/capability/permission/resource declaration.
     pub manifest: ExtensionManifest,
-    /// Expected `SimulationBackend::name()` after factory instantiation.
     pub backend_name: String,
-    /// Solver families this provider advertises without instantiating the backend.
     pub supported_solvers: Vec<SolverKind>,
 }
 
@@ -68,11 +65,9 @@ impl SimulationProviderDescriptor {
         if self.supported_solvers.is_empty() {
             return Err(DescriptorProblem::EmptySolverSet);
         }
-
         let mut seen = BTreeSet::new();
         for solver in &self.supported_solvers {
-            let sort_key = solver_sort_key(*solver);
-            if !seen.insert(sort_key) {
+            if !seen.insert(solver_sort_key(*solver)) {
                 return Err(DescriptorProblem::DuplicateSolver(*solver));
             }
             let capability = solver_capability(*solver);
@@ -102,10 +97,7 @@ fn solver_sort_key(solver: SolverKind) -> u8 {
     }
 }
 
-/// Factory for an expensive or externally connected simulation backend.
-///
-/// `descriptor()` must be cheap and side-effect free. `create()` is called only
-/// after the extension router selects this provider for an invocation.
+/// Cheap factory boundary. `create()` is called only after routing selects it.
 pub trait SimulationBackendFactory: Debug + Send + Sync {
     fn descriptor(&self) -> &SimulationProviderDescriptor;
     fn create(&self) -> Result<Box<dyn SimulationBackend>, SimulationError>;
@@ -117,6 +109,7 @@ pub enum LazySimulationError {
     Registry(RegistryError),
     DuplicateFactory(ExtensionId),
     ObservationForUnknownProvider(ExtensionId),
+    AdmissionForUnknownProvider(ExtensionId),
     Route(RoutingError),
     SelectedFactoryMissing(ExtensionId),
     BackendConstruction {
@@ -135,7 +128,7 @@ pub enum LazySimulationError {
     Simulation(SimulationError),
 }
 
-/// Lazy simulation catalog. Factories are registered, not live backends.
+/// Factories and quality telemetry may be cached. Active authority is not.
 #[derive(Default)]
 pub struct LazySimulationRegistry {
     catalog: ExtensionRegistry,
@@ -157,16 +150,12 @@ impl LazySimulationRegistry {
         Self::default()
     }
 
-    /// Register provider metadata and its lazy factory without constructing a
-    /// solver backend.
     pub fn register(
         &mut self,
         factory: impl SimulationBackendFactory + 'static,
     ) -> Result<(), LazySimulationError> {
         let descriptor = factory.descriptor();
-        descriptor
-            .validate()
-            .map_err(LazySimulationError::Descriptor)?;
+        descriptor.validate().map_err(LazySimulationError::Descriptor)?;
         let id = descriptor.manifest.id.clone();
         if self.factories.contains_key(&id) {
             return Err(LazySimulationError::DuplicateFactory(id));
@@ -178,8 +167,6 @@ impl LazySimulationRegistry {
         Ok(())
     }
 
-    /// Update host-observed readiness/evidence/reliability for an admitted
-    /// provider. Observation is runtime state, not extension-controlled metadata.
     pub fn set_observation(
         &mut self,
         observation: ProviderObservation,
@@ -198,24 +185,38 @@ impl LazySimulationRegistry {
         &self.catalog
     }
 
-    /// Route, lazily instantiate only the winner, then delegate execution and
-    /// result/evidence validation to the existing `SimulationRegistry` contract.
+    /// Route, instantiate only the winner, then delegate result/provenance
+    /// validation to the existing `SimulationRegistry` contract.
+    ///
+    /// `admissions` must be freshly activated against current policy/trust
+    /// generations and revocation state. They are never cached here.
     pub fn run(
         &self,
         request: &SimulationRequest,
         constraints: RoutingConstraints,
+        admissions: &[ActiveAdmission],
     ) -> Result<(SimulationResult, RoutingDecision), LazySimulationError> {
-        request
-            .validate()
-            .map_err(LazySimulationError::Simulation)?;
+        request.validate().map_err(LazySimulationError::Simulation)?;
+        for admission in admissions {
+            if !self.catalog.contains(admission.extension()) {
+                return Err(LazySimulationError::AdmissionForUnknownProvider(
+                    admission.extension().clone(),
+                ));
+            }
+        }
 
         let routing_request = RoutingRequest {
             capability: solver_capability(request.solver),
             constraints,
         };
         let observations: Vec<_> = self.observations.values().cloned().collect();
-        let decision = ExtensionRouter::route(&self.catalog, &routing_request, &observations)
-            .map_err(LazySimulationError::Route)?;
+        let decision = ExtensionRouter::route(
+            &self.catalog,
+            &routing_request,
+            admissions,
+            &observations,
+        )
+        .map_err(LazySimulationError::Route)?;
 
         let factory = self
             .factories
@@ -243,8 +244,6 @@ impl LazySimulationRegistry {
             });
         }
 
-        // Preserve every request/result/provenance invariant in the existing
-        // bridge by dispatching through a single-backend legacy registry.
         let mut legacy = SimulationRegistry::new();
         legacy.register(BoxedBackend(backend));
         let result = legacy.run(request).map_err(LazySimulationError::Simulation)?;
@@ -252,8 +251,6 @@ impl LazySimulationRegistry {
     }
 }
 
-/// Thin delegation wrapper allowing an already-boxed dynamic backend to pass
-/// through `SimulationRegistry::register`, which accepts a concrete backend.
 struct BoxedBackend(Box<dyn SimulationBackend>);
 
 impl Debug for BoxedBackend {
@@ -288,11 +285,14 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
     use std::sync::Arc;
+    use symthaea_extension_admission::{
+        AdmissionContext, AdmissionRecord, PrincipalId, Sha256Digest, TrustLevel,
+    };
     use symthaea_extension_core::{
         AbiVersion, CapabilityDescriptor, EffectClass, ExtensionKind, PermissionSet,
         ResourceBudget, RuntimeKind,
     };
-    use symthaea_extension_router::{ProviderState, TrustLevel};
+    use symthaea_extension_router::ProviderState;
     use symthaea_sim_bridge::EngineeringDomain;
 
     #[derive(Debug)]
@@ -302,14 +302,8 @@ mod tests {
     }
 
     impl SimulationBackend for MockBackend {
-        fn name(&self) -> &'static str {
-            self.name
-        }
-
-        fn supported_solvers(&self) -> &[SolverKind] {
-            &self.solvers
-        }
-
+        fn name(&self) -> &'static str { self.name }
+        fn supported_solvers(&self) -> &[SolverKind] { &self.solvers }
         fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
             Ok(SimulationResult::dry_run(request.id.clone(), self.name, 0.8))
         }
@@ -318,30 +312,25 @@ mod tests {
     #[derive(Debug)]
     struct CountingFactory {
         descriptor: SimulationProviderDescriptor,
-        create_count: Arc<AtomicUsize>,
+        count: Arc<AtomicUsize>,
         backend_name: &'static str,
         backend_solvers: Option<Vec<SolverKind>>,
     }
 
     impl SimulationBackendFactory for CountingFactory {
-        fn descriptor(&self) -> &SimulationProviderDescriptor {
-            &self.descriptor
-        }
-
+        fn descriptor(&self) -> &SimulationProviderDescriptor { &self.descriptor }
         fn create(&self) -> Result<Box<dyn SimulationBackend>, SimulationError> {
-            self.create_count.fetch_add(1, AtomicOrdering::SeqCst);
+            self.count.fetch_add(1, AtomicOrdering::SeqCst);
             Ok(Box::new(MockBackend {
                 name: self.backend_name,
-                solvers: self
-                    .backend_solvers
-                    .clone()
-                    .unwrap_or_else(|| self.descriptor.supported_solvers.clone()),
+                solvers: self.backend_solvers.clone().unwrap_or_else(|| self.descriptor.supported_solvers.clone()),
             }))
         }
     }
 
-    fn descriptor(id: &str, backend_name: &str, solver: SolverKind) -> SimulationProviderDescriptor {
-        let capability = solver_capability(solver);
+    fn digest(byte: u8) -> Sha256Digest { Sha256Digest::new([byte; 32]) }
+
+    fn descriptor(id: &str, name: &str, solver: SolverKind) -> SimulationProviderDescriptor {
         SimulationProviderDescriptor {
             manifest: ExtensionManifest {
                 id: ExtensionId::new(id),
@@ -352,7 +341,7 @@ mod tests {
                 runtime: RuntimeKind::Native,
                 description: String::new(),
                 provides: vec![CapabilityDescriptor {
-                    id: capability,
+                    id: solver_capability(solver),
                     description: "test simulation provider".into(),
                     effect: EffectClass::Pure,
                 }],
@@ -360,173 +349,137 @@ mod tests {
                 permissions: PermissionSet::default(),
                 resources: ResourceBudget::default(),
             },
-            backend_name: backend_name.into(),
+            backend_name: name.into(),
             supported_solvers: vec![solver],
         }
     }
 
-    fn factory(
-        descriptor: SimulationProviderDescriptor,
-        create_count: Arc<AtomicUsize>,
-        backend_name: &'static str,
-    ) -> CountingFactory {
-        CountingFactory {
-            descriptor,
-            create_count,
-            backend_name,
-            backend_solvers: None,
-        }
+    fn factory(desc: SimulationProviderDescriptor, count: Arc<AtomicUsize>, name: &'static str) -> CountingFactory {
+        CountingFactory { descriptor: desc, count, backend_name: name, backend_solvers: None }
     }
 
-    fn observation(
-        id: &str,
-        evidence_grade: u8,
-        reliability_bps: u16,
-    ) -> ProviderObservation {
+    fn observation(id: &str, evidence: u8, reliability: u16) -> ProviderObservation {
         ProviderObservation {
             extension: ExtensionId::new(id),
-            admitted: true,
             state: ProviderState::Ready,
-            trust: TrustLevel::Trusted,
-            evidence_grade,
-            reliability_bps,
+            evidence_grade: evidence,
+            reliability_bps: reliability,
             estimated_latency_ms: Some(10),
         }
     }
 
+    fn active_admission(registry: &LazySimulationRegistry, id: &str, generation: u64, seed: u8) -> ActiveAdmission {
+        let extension = ExtensionId::new(id);
+        let manifest = registry.catalog().get(&extension).unwrap();
+        let trust_generation = 10_000 + u64::from(seed);
+        AdmissionRecord::issue(
+            extension,
+            manifest.version.clone(),
+            digest(seed),
+            digest(seed.wrapping_add(1)),
+            digest(seed.wrapping_add(2)),
+            PrincipalId::new("local:test-authority").unwrap(),
+            Some(PrincipalId::new("did:example:test-publisher").unwrap()),
+            TrustLevel::Trusted,
+            manifest.provides.iter().map(|capability| capability.id.clone()).collect(),
+            PermissionSet::default(),
+            generation,
+            trust_generation,
+        )
+        .unwrap()
+        .activate(manifest, AdmissionContext::active(generation, trust_generation))
+        .unwrap()
+    }
+
     #[test]
-    fn registration_does_not_instantiate_backend() {
+    fn registration_is_cold_and_only_winner_is_instantiated() {
+        let solver = SolverKind::ComputationalFluidDynamics;
+        let low = Arc::new(AtomicUsize::new(0));
+        let high = Arc::new(AtomicUsize::new(0));
+        let mut registry = LazySimulationRegistry::new();
+        registry.register(factory(descriptor("org.example.low", "low", solver), low.clone(), "low")).unwrap();
+        registry.register(factory(descriptor("org.example.high", "high", solver), high.clone(), "high")).unwrap();
+        assert_eq!(low.load(AtomicOrdering::SeqCst), 0);
+        assert_eq!(high.load(AtomicOrdering::SeqCst), 0);
+        registry.set_observation(observation("org.example.low", 2, 8_000)).unwrap();
+        registry.set_observation(observation("org.example.high", 4, 9_900)).unwrap();
+        let admissions = vec![
+            active_admission(&registry, "org.example.low", 1, 10),
+            active_admission(&registry, "org.example.high", 1, 20),
+        ];
+        let request = SimulationRequest::new("run-1", EngineeringDomain::Mechanical, solver, "test");
+        let (result, decision) = registry.run(
+            &request,
+            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
+            &admissions,
+        ).unwrap();
+        assert_eq!(decision.selected, ExtensionId::new("org.example.high"));
+        assert_eq!(result.evidence.backend.as_deref(), Some("high"));
+        assert_eq!(low.load(AtomicOrdering::SeqCst), 0);
+        assert_eq!(high.load(AtomicOrdering::SeqCst), 1);
+    }
+
+    #[test]
+    fn missing_admission_prevents_instantiation() {
+        let solver = SolverKind::Circuit;
         let count = Arc::new(AtomicUsize::new(0));
         let mut registry = LazySimulationRegistry::new();
-        registry
-            .register(factory(
-                descriptor("org.example.fea", "mock-fea", SolverKind::FiniteElement),
-                count.clone(),
-                "mock-fea",
-            ))
-            .unwrap();
+        registry.register(factory(descriptor("org.example.circuit", "circuit", solver), count.clone(), "circuit")).unwrap();
+        registry.set_observation(observation("org.example.circuit", 5, 10_000)).unwrap();
+        let request = SimulationRequest::new("no-auth", EngineeringDomain::Electrical, solver, "test");
+        assert!(registry.run(
+            &request,
+            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
+            &[],
+        ).is_err());
         assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
     }
 
     #[test]
-    fn only_selected_provider_is_instantiated() {
-        let solver = SolverKind::ComputationalFluidDynamics;
-        let low_count = Arc::new(AtomicUsize::new(0));
-        let high_count = Arc::new(AtomicUsize::new(0));
-        let mut registry = LazySimulationRegistry::new();
-
-        registry
-            .register(factory(
-                descriptor("org.example.low", "low", solver),
-                low_count.clone(),
-                "low",
-            ))
-            .unwrap();
-        registry
-            .register(factory(
-                descriptor("org.example.high", "high", solver),
-                high_count.clone(),
-                "high",
-            ))
-            .unwrap();
-        registry
-            .set_observation(observation("org.example.low", 2, 8_000))
-            .unwrap();
-        registry
-            .set_observation(observation("org.example.high", 4, 9_900))
-            .unwrap();
-
-        let request = SimulationRequest::new("run-1", EngineeringDomain::Mechanical, solver, "test");
-        let (result, decision) = registry
-            .run(
-                &request,
-                RoutingConstraints {
-                    maximum_effect: EffectClass::Pure,
-                    minimum_trust: TrustLevel::Trusted,
-                    ..RoutingConstraints::default()
-                },
-            )
-            .unwrap();
-
-        assert_eq!(decision.selected, ExtensionId::new("org.example.high"));
-        assert_eq!(result.evidence.backend.as_deref(), Some("high"));
-        assert_eq!(low_count.load(AtomicOrdering::SeqCst), 0);
-        assert_eq!(high_count.load(AtomicOrdering::SeqCst), 1);
-    }
-
-    #[test]
-    fn instantiated_backend_name_must_match_descriptor() {
+    fn backend_must_match_cheap_descriptor() {
         let solver = SolverKind::Circuit;
         let count = Arc::new(AtomicUsize::new(0));
         let mut registry = LazySimulationRegistry::new();
-        registry
-            .register(factory(
-                descriptor("org.example.circuit", "declared", solver),
-                count,
-                "actual",
-            ))
-            .unwrap();
-        registry
-            .set_observation(observation("org.example.circuit", 5, 10_000))
-            .unwrap();
-
+        registry.register(factory(descriptor("org.example.circuit", "declared", solver), count, "actual")).unwrap();
+        registry.set_observation(observation("org.example.circuit", 5, 10_000)).unwrap();
+        let admissions = vec![active_admission(&registry, "org.example.circuit", 1, 30)];
         let request = SimulationRequest::new("run-2", EngineeringDomain::Electrical, solver, "test");
-        let err = registry
-            .run(
-                &request,
-                RoutingConstraints {
-                    maximum_effect: EffectClass::Pure,
-                    minimum_trust: TrustLevel::Trusted,
-                    ..RoutingConstraints::default()
-                },
-            )
-            .unwrap_err();
+        let err = registry.run(
+            &request,
+            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
+            &admissions,
+        ).unwrap_err();
         assert!(matches!(err, LazySimulationError::BackendNameMismatch { .. }));
     }
 
     #[test]
-    fn instantiated_backend_solver_claim_must_match_descriptor() {
+    fn backend_solver_claim_must_match_descriptor() {
         let solver = SolverKind::FiniteElement;
         let count = Arc::new(AtomicUsize::new(0));
-        let descriptor = descriptor("org.example.structure", "structure", solver);
+        let desc = descriptor("org.example.structure", "structure", solver);
         let mut registry = LazySimulationRegistry::new();
-        registry
-            .register(CountingFactory {
-                descriptor,
-                create_count: count,
-                backend_name: "structure",
-                backend_solvers: Some(vec![SolverKind::Circuit]),
-            })
-            .unwrap();
-        registry
-            .set_observation(observation("org.example.structure", 5, 10_000))
-            .unwrap();
-
+        registry.register(CountingFactory {
+            descriptor: desc,
+            count,
+            backend_name: "structure",
+            backend_solvers: Some(vec![SolverKind::Circuit]),
+        }).unwrap();
+        registry.set_observation(observation("org.example.structure", 5, 10_000)).unwrap();
+        let admissions = vec![active_admission(&registry, "org.example.structure", 1, 40)];
         let request = SimulationRequest::new("run-3", EngineeringDomain::Civil, solver, "test");
-        let err = registry
-            .run(
-                &request,
-                RoutingConstraints {
-                    maximum_effect: EffectClass::Pure,
-                    minimum_trust: TrustLevel::Trusted,
-                    ..RoutingConstraints::default()
-                },
-            )
-            .unwrap_err();
-        assert!(matches!(
-            err,
-            LazySimulationError::BackendSolverMismatch { .. }
-        ));
+        let err = registry.run(
+            &request,
+            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
+            &admissions,
+        ).unwrap_err();
+        assert!(matches!(err, LazySimulationError::BackendSolverMismatch { .. }));
     }
 
     #[test]
     fn descriptor_must_advertise_capability_for_each_solver() {
         let solver = SolverKind::Process;
-        let mut descriptor = descriptor("org.example.process", "process", solver);
-        descriptor.manifest.provides.clear();
-        assert_eq!(
-            descriptor.validate(),
-            Err(DescriptorProblem::MissingSolverCapability(solver))
-        );
+        let mut desc = descriptor("org.example.process", "process", solver);
+        desc.manifest.provides.clear();
+        assert_eq!(desc.validate(), Err(DescriptorProblem::MissingSolverCapability(solver)));
     }
 }

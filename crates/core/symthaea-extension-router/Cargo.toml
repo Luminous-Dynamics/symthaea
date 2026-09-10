@@ -7,5 +7,6 @@ description = "Deterministic policy-aware capability routing for Symthaea extens
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [dependencies]
+symthaea-extension-admission = { path = "../symthaea-extension-admission" }
 symthaea-extension-core = { path = "../symthaea-extension-core" }
 symthaea-extension-registry = { path = "../symthaea-extension-registry" }
