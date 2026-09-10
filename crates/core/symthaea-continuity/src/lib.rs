@@ -23,6 +23,7 @@ pub mod distributed_state;
 pub mod exact_policy;
 pub mod execution_capability;
 pub mod execution_journal;
+pub mod execution_journal_anchor;
 pub mod execution_result;
 pub mod failure_domain;
 pub mod known_good;
@@ -110,6 +111,15 @@ pub use execution_capability::{
 pub use execution_journal::{
     ExecutionJournalDigest, ExecutionJournalError, JournalAttemptDispositionV1,
     JournalAttemptEntryV1, ReconstructedExecutionJournalV1,
+};
+pub use execution_journal_anchor::{
+    EXECUTION_JOURNAL_ANCHOR_AUTH_PURPOSE, EXECUTION_JOURNAL_ANCHOR_CLAIM_SCHEMA_V1,
+    EXECUTION_JOURNAL_ANCHOR_PROFILE_SCHEMA_V1, AuthenticatedExecutionJournalAnchorId,
+    ExecutionJournalAnchorClaimId, ExecutionJournalAnchorClaimV1, ExecutionJournalAnchorError,
+    ExecutionJournalAnchorProfileId, ExecutionJournalAnchorProfileV1,
+    QualifiedExecutionJournalAnchorId, QualifiedExecutionJournalAnchorV1,
+    canonical_execution_journal_anchor_claim_bytes,
+    canonical_execution_journal_anchor_claim_digest,
 };
 pub use execution_result::{
     CanonicalExecutionAttemptResultId, CanonicalExecutionAttemptResultV1,
