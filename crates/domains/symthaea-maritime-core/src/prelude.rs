@@ -11,5 +11,6 @@ pub use crate::{
     ObservationSourcePolicyV1, OperatingEnvelope, PlatformHealth, ProgressiveFailureTrace,
     ProgressiveFailureViolation, ResidualUtilitySnapshot, SESSION_BOUND_OBSERVATION_PREFIX_V1,
     SessionBoundObservationV1, UtilityAvailability, baseline_envelope,
-    bind_observation_to_trusted_session, evaluate_machine_session,
+    bind_observation_to_historically_qualified_session, bind_observation_to_trusted_session,
+    evaluate_machine_session,
 };
