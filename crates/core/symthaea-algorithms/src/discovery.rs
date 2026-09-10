@@ -1,7 +1,7 @@
 //! Zero-authority discovery protocol.
 //!
-//! This module describes search runs and candidate artifacts. It deliberately has no process,
-//! filesystem-mutation, Git, merge, activation, or promotion API.
+//! This module describes bounded search runs and candidate artifacts. It deliberately has no
+//! process, filesystem-mutation, Git, merge, activation, or promotion API.
 
 use crate::evaluation::{EvaluationError, EvaluationReceipt};
 use crate::{
@@ -36,6 +36,12 @@ pub enum DiscoveryError {
     DuplicateCandidate,
     #[error("evaluation receipt is already archived for this candidate")]
     DuplicateEvaluation,
+    #[error("candidate budget exhausted: maximum {maximum}")]
+    CandidateBudgetExceeded { maximum: u64 },
+    #[error("evaluation budget exhausted: maximum {maximum}")]
+    EvaluationBudgetExceeded { maximum: u64 },
+    #[error("candidate generation {generation} exceeds run generation budget {maximum}")]
+    GenerationBudgetExceeded { generation: u64, maximum: u64 },
     #[error("discovery run identity does not match its canonical fields")]
     IdentityMismatch,
     #[error("candidate source/artifact reference must not be empty")]
@@ -227,22 +233,43 @@ impl CandidateArtifact {
     }
 }
 
+/// One candidate proposed within exactly one bounded discovery run.
+///
+/// `generation` is zero-based. A run with `max_generations = 1` admits only generation zero.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CandidateProposal {
     pub run_id: ContentId,
+    pub generation: u64,
     pub implementation: ImplementationRecord,
     pub lineage: AlgorithmLineage,
     pub artifact: CandidateArtifact,
 }
 
 impl CandidateProposal {
+    /// Compatibility constructor for first-generation/enumerated candidates.
     pub fn new(
         run: &DiscoveryRun,
         implementation: ImplementationRecord,
         lineage: AlgorithmLineage,
         artifact: CandidateArtifact,
     ) -> Result<Self, DiscoveryError> {
+        Self::new_at_generation(run, 0, implementation, lineage, artifact)
+    }
+
+    pub fn new_at_generation(
+        run: &DiscoveryRun,
+        generation: u64,
+        implementation: ImplementationRecord,
+        lineage: AlgorithmLineage,
+        artifact: CandidateArtifact,
+    ) -> Result<Self, DiscoveryError> {
         run.validate()?;
+        if generation >= run.budget.max_generations {
+            return Err(DiscoveryError::GenerationBudgetExceeded {
+                generation,
+                maximum: run.budget.max_generations,
+            });
+        }
         implementation.validate()?;
         if implementation.problem_id != run.problem_id {
             return Err(DiscoveryError::ProblemMismatch);
@@ -255,10 +282,35 @@ impl CandidateProposal {
         }
         Ok(Self {
             run_id: run.id.clone(),
+            generation,
             implementation,
             lineage,
             artifact,
         })
+    }
+
+    pub fn validate_for(&self, run: &DiscoveryRun) -> Result<(), DiscoveryError> {
+        run.validate()?;
+        if self.run_id != run.id {
+            return Err(DiscoveryError::RunMismatch);
+        }
+        if self.generation >= run.budget.max_generations {
+            return Err(DiscoveryError::GenerationBudgetExceeded {
+                generation: self.generation,
+                maximum: run.budget.max_generations,
+            });
+        }
+        self.implementation.validate()?;
+        if self.implementation.problem_id != run.problem_id {
+            return Err(DiscoveryError::ProblemMismatch);
+        }
+        self.lineage
+            .validate_for(&self.implementation)
+            .map_err(|_| DiscoveryError::LineageMismatch)?;
+        if self.artifact.content_id != self.implementation.artifact_id {
+            return Err(DiscoveryError::ArtifactMismatch);
+        }
+        Ok(())
     }
 }
 
@@ -286,45 +338,37 @@ impl ArchivedCandidate {
     }
 }
 
-/// Archive scoped to exactly one discovery run.
+/// Archive scoped to exactly one discovery run and enforcing that run's declared budgets.
 ///
-/// Persistence is caller-owned. This type cannot write files, invoke Git, or mint production
-/// authority.
+/// Persistence is caller-owned. This type cannot write files, invoke Git, execute candidates, or
+/// mint production authority.
 #[derive(Debug)]
 pub struct CandidateArchive {
-    run_id: ContentId,
-    problem_id: ProblemId,
+    run: DiscoveryRun,
     candidates: BTreeMap<ImplementationId, ArchivedCandidate>,
+    evaluation_count: u64,
 }
 
 impl CandidateArchive {
     pub fn for_run(run: &DiscoveryRun) -> Result<Self, DiscoveryError> {
         run.validate()?;
         Ok(Self {
-            run_id: run.id.clone(),
-            problem_id: run.problem_id.clone(),
+            run: run.clone(),
             candidates: BTreeMap::new(),
+            evaluation_count: 0,
         })
     }
 
     pub fn insert(&mut self, proposal: CandidateProposal) -> Result<(), DiscoveryError> {
-        if proposal.run_id != self.run_id {
-            return Err(DiscoveryError::RunMismatch);
-        }
-        if proposal.implementation.problem_id != self.problem_id {
-            return Err(DiscoveryError::ProblemMismatch);
-        }
-        proposal.implementation.validate()?;
-        proposal
-            .lineage
-            .validate_for(&proposal.implementation)
-            .map_err(|_| DiscoveryError::LineageMismatch)?;
-        if proposal.artifact.content_id != proposal.implementation.artifact_id {
-            return Err(DiscoveryError::ArtifactMismatch);
-        }
+        proposal.validate_for(&self.run)?;
         let key = proposal.implementation.id.clone();
         if self.candidates.contains_key(&key) {
             return Err(DiscoveryError::DuplicateCandidate);
+        }
+        if self.candidates.len() as u64 >= self.run.budget.max_candidates {
+            return Err(DiscoveryError::CandidateBudgetExceeded {
+                maximum: self.run.budget.max_candidates,
+            });
         }
         self.candidates.insert(
             key,
@@ -346,19 +390,29 @@ impl CandidateArchive {
             return Err(DiscoveryError::EvaluationMismatch);
         };
         if receipt.implementation_id != candidate.proposal.implementation.id
-            || receipt.problem_id != self.problem_id
+            || receipt.problem_id != self.run.problem_id
         {
             return Err(DiscoveryError::EvaluationMismatch);
         }
         if candidate.evaluations.contains_key(&receipt.id) {
             return Err(DiscoveryError::DuplicateEvaluation);
         }
+        if self.evaluation_count >= self.run.budget.max_evaluations {
+            return Err(DiscoveryError::EvaluationBudgetExceeded {
+                maximum: self.run.budget.max_evaluations,
+            });
+        }
         candidate.evaluations.insert(receipt.id.clone(), receipt);
+        self.evaluation_count += 1;
         Ok(())
     }
 
+    pub fn run(&self) -> &DiscoveryRun {
+        &self.run
+    }
+
     pub fn run_id(&self) -> &ContentId {
-        &self.run_id
+        &self.run.id
     }
 
     pub fn get(&self, id: &ImplementationId) -> Option<&ArchivedCandidate> {
@@ -371,6 +425,10 @@ impl CandidateArchive {
 
     pub fn is_empty(&self) -> bool {
         self.candidates.is_empty()
+    }
+
+    pub fn evaluation_count(&self) -> u64 {
+        self.evaluation_count
     }
 
     pub fn evaluated(&self) -> impl Iterator<Item = &EvaluationReceipt> {
@@ -407,41 +465,54 @@ mod tests {
         .unwrap()
     }
 
-    fn run(problem: &ProblemSpec) -> DiscoveryRun {
+    fn run_with_budget(problem: &ProblemSpec, budget: SearchBudget) -> DiscoveryRun {
         DiscoveryRun::new(
             problem,
             DiscoveryPolicy::default(),
             cid("generator", "deterministic-sweep-v1"),
             "abc123",
-            SearchBudget::new(100, 10, 100).unwrap(),
+            budget,
             42,
         )
         .unwrap()
     }
 
-    fn proposal(run: &DiscoveryRun) -> CandidateProposal {
-        let artifact_id = cid("artifact", "candidate-1");
+    fn run(problem: &ProblemSpec) -> DiscoveryRun {
+        run_with_budget(problem, SearchBudget::new(100, 10, 100).unwrap())
+    }
+
+    fn proposal_named(
+        run: &DiscoveryRun,
+        generation: u64,
+        name: &str,
+    ) -> CandidateProposal {
+        let artifact_id = cid("artifact", name);
         let implementation = ImplementationRecord::new(
             run.problem_id.clone(),
             AlgorithmId(cid("algorithm", "family")),
-            "candidate://run/1",
+            format!("candidate://run/{name}"),
             artifact_id.clone(),
             None,
         )
         .unwrap();
         let lineage = AlgorithmLineage::new(implementation.id.clone(), vec![], vec![]).unwrap();
-        CandidateProposal::new(
+        CandidateProposal::new_at_generation(
             run,
+            generation,
             implementation,
             lineage,
             CandidateArtifact::new(
                 CandidateArtifactKind::UnifiedDiff,
                 artifact_id,
-                "archive://candidate-1.patch",
+                format!("archive://{name}.patch"),
             )
             .unwrap(),
         )
         .unwrap()
+    }
+
+    fn proposal(run: &DiscoveryRun) -> CandidateProposal {
+        proposal_named(run, 0, "candidate-1")
     }
 
     fn evaluation(proposal: &CandidateProposal, run_id: &str, latency: f64) -> EvaluationReceipt {
@@ -520,6 +591,52 @@ mod tests {
     }
 
     #[test]
+    fn generation_budget_is_enforced_at_proposal_construction() {
+        let problem = problem(DiscoveryRisk::Ordinary);
+        let run = run_with_budget(&problem, SearchBudget::new(10, 2, 10).unwrap());
+        let artifact_id = cid("artifact", "too-late");
+        let implementation = ImplementationRecord::new(
+            run.problem_id.clone(),
+            AlgorithmId(cid("algorithm", "family")),
+            "candidate://late",
+            artifact_id.clone(),
+            None,
+        )
+        .unwrap();
+        let lineage = AlgorithmLineage::new(implementation.id.clone(), vec![], vec![]).unwrap();
+        let artifact = CandidateArtifact::new(
+            CandidateArtifactKind::UnifiedDiff,
+            artifact_id,
+            "archive://late.patch",
+        )
+        .unwrap();
+        assert_eq!(
+            CandidateProposal::new_at_generation(&run, 2, implementation, lineage, artifact)
+                .unwrap_err(),
+            DiscoveryError::GenerationBudgetExceeded {
+                generation: 2,
+                maximum: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn archive_revalidates_generation_after_deserialization_style_mutation() {
+        let problem = problem(DiscoveryRisk::Ordinary);
+        let run = run_with_budget(&problem, SearchBudget::new(10, 1, 10).unwrap());
+        let mut candidate = proposal(&run);
+        candidate.generation = 1;
+        let mut archive = CandidateArchive::for_run(&run).unwrap();
+        assert_eq!(
+            archive.insert(candidate).unwrap_err(),
+            DiscoveryError::GenerationBudgetExceeded {
+                generation: 1,
+                maximum: 1,
+            }
+        );
+    }
+
+    #[test]
     fn candidate_artifact_must_match_implementation_artifact() {
         let problem = problem(DiscoveryRisk::Ordinary);
         let run = run(&problem);
@@ -541,6 +658,43 @@ mod tests {
         assert_eq!(
             CandidateProposal::new(&run, implementation, lineage, artifact).unwrap_err(),
             DiscoveryError::ArtifactMismatch
+        );
+    }
+
+    #[test]
+    fn candidate_budget_stops_n_plus_one() {
+        let problem = problem(DiscoveryRisk::Ordinary);
+        let run = run_with_budget(&problem, SearchBudget::new(2, 1, 10).unwrap());
+        let mut archive = CandidateArchive::for_run(&run).unwrap();
+        archive.insert(proposal_named(&run, 0, "a")).unwrap();
+        archive.insert(proposal_named(&run, 0, "b")).unwrap();
+        assert_eq!(
+            archive.insert(proposal_named(&run, 0, "c")).unwrap_err(),
+            DiscoveryError::CandidateBudgetExceeded { maximum: 2 }
+        );
+        assert_eq!(archive.len(), 2);
+    }
+
+    #[test]
+    fn evaluation_budget_is_global_across_candidates() {
+        let problem = problem(DiscoveryRisk::Ordinary);
+        let run = run_with_budget(&problem, SearchBudget::new(2, 1, 2).unwrap());
+        let a = proposal_named(&run, 0, "a");
+        let b = proposal_named(&run, 0, "b");
+        let a_id = a.implementation.id.clone();
+        let b_id = b.implementation.id.clone();
+        let a_eval_1 = evaluation(&a, "a-1", 10.0);
+        let a_eval_2 = evaluation(&a, "a-2", 11.0);
+        let b_eval = evaluation(&b, "b-1", 12.0);
+        let mut archive = CandidateArchive::for_run(&run).unwrap();
+        archive.insert(a).unwrap();
+        archive.insert(b).unwrap();
+        archive.attach_evaluation(&a_id, a_eval_1).unwrap();
+        archive.attach_evaluation(&a_id, a_eval_2).unwrap();
+        assert_eq!(archive.evaluation_count(), 2);
+        assert_eq!(
+            archive.attach_evaluation(&b_id, b_eval).unwrap_err(),
+            DiscoveryError::EvaluationBudgetExceeded { maximum: 2 }
         );
     }
 
