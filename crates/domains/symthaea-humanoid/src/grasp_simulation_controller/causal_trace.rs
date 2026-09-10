@@ -278,7 +278,9 @@ pub fn prepare_humanoid_grasp_simulation_step(
     {
         return Err(HumanoidGraspSimulationCausalFailure::ProposalCandidateMismatch);
     }
-    if proposal.object_id != acquisition.object_id() || session.object_id != acquisition.object_id() {
+    if proposal.object_id.as_str() != acquisition.object_id()
+        || session.object_id.as_str() != acquisition.object_id()
+    {
         return Err(HumanoidGraspSimulationCausalFailure::ProposalObjectMismatch);
     }
     if proposal.hand != acquisition.hand() || session.hand != acquisition.hand() {
@@ -289,7 +291,7 @@ pub fn prepare_humanoid_grasp_simulation_step(
     {
         return Err(HumanoidGraspSimulationCausalFailure::ProposalNotLatestSessionDecision);
     }
-    if matches!(proposal.kind, HumanoidGraspSimulationProposalKind::Abort { .. }) {
+    if matches!(&proposal.kind, HumanoidGraspSimulationProposalKind::Abort { .. }) {
         return Err(HumanoidGraspSimulationCausalFailure::TerminalProposalHasNoPlantStep);
     }
     if pre_state.validate_for(subject.morphology).is_err() {
@@ -462,7 +464,7 @@ pub fn bind_humanoid_grasp_simulation_step_result(
     if observation.object_state_digest() != post_object_state_digest {
         return Err(HumanoidGraspSimulationCausalFailure::ObservationObjectStateMismatch);
     }
-    if observation.object_id() != commitment.object_id {
+    if observation.object_id() != commitment.object_id.as_str() {
         return Err(HumanoidGraspSimulationCausalFailure::ObservationObjectMismatch);
     }
     if observation.hand() != commitment.hand {
