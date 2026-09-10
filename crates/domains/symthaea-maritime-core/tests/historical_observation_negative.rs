@@ -36,6 +36,7 @@ fn provider_historical_result_cannot_substitute_another_session_proof() {
             1_000,
             2_000,
             1_400,
+            "xenia-machine-session-admission-v1:blake3-256:abc",
             "xenia-machine-authority-history-head-v1:blake3-256:abc",
             7,
             1_600,
