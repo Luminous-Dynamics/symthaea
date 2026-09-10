@@ -99,7 +99,8 @@ pub struct RoutingConstraints {
     pub maximum_fuel: Option<u64>,
     /// Highest effect class permitted for this invocation.
     pub maximum_effect: EffectClass,
-    /// Empty means any runtime is acceptable.
+    /// Empty means any invocable runtime is acceptable. `DataOnly` is never
+    /// eligible for this invocation router, even when explicitly listed.
     pub allowed_runtimes: Vec<RuntimeKind>,
     /// Whether degraded providers may remain eligible.
     pub allow_degraded: bool,
@@ -165,6 +166,7 @@ pub enum RejectionReason {
     LatencyAboveMaximum,
     MemoryAboveMaximum,
     FuelAboveMaximum,
+    RuntimeNotInvocable,
     RuntimeNotAllowed,
     EffectNotAllowed,
 }
@@ -202,7 +204,11 @@ pub enum RoutingError {
     },
 }
 
-/// Stateless deterministic router.
+/// Stateless deterministic invocation router.
+///
+/// Declarative `DataOnly` extensions remain discoverable through
+/// `ExtensionRegistry`, but they are consumed by typed data loaders/query paths,
+/// not by this executable-provider router.
 #[derive(Debug, Default)]
 pub struct ExtensionRouter;
 
@@ -336,7 +342,13 @@ fn assess_candidate<'a>(
     {
         reasons.push(RejectionReason::FuelAboveMaximum);
     }
-    if !request.constraints.allowed_runtimes.is_empty()
+
+    // Data-only packages are catalog entries, not executable providers. An
+    // explicit runtime allowlist must never turn declarative content into an
+    // invocation target; a typed data loader/query path owns that boundary.
+    if manifest.runtime == RuntimeKind::DataOnly {
+        reasons.push(RejectionReason::RuntimeNotInvocable);
+    } else if !request.constraints.allowed_runtimes.is_empty()
         && !request
             .constraints
             .allowed_runtimes
@@ -584,6 +596,50 @@ mod tests {
         assert!(reasons.contains(&RejectionReason::EffectNotAllowed));
         assert!(reasons.contains(&RejectionReason::MemoryAboveMaximum));
         assert!(reasons.contains(&RejectionReason::FuelAboveMaximum));
+    }
+
+    #[test]
+    fn data_only_provider_is_discoverable_but_never_invocable() {
+        let capability = "knowledge.example.records";
+        let mut registry = ExtensionRegistry::new();
+        let mut data = manifest(
+            "org.example.knowledge-pack",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::DataOnly,
+            0,
+            0,
+        );
+        data.kind = ExtensionKind::KnowledgePack;
+        data.resources = ResourceBudget {
+            memory_bytes: 0,
+            fuel: 0,
+            max_wall_time_ms: 0,
+            max_output_bytes: 0,
+            max_concurrency: 0,
+        };
+        registry.register(data).unwrap();
+        assert!(registry.has_provider(&CapabilityId::new(capability)));
+
+        let observations = vec![observation(
+            "org.example.knowledge-pack",
+            TrustLevel::Privileged,
+            5,
+            10_000,
+            Some(0),
+        )];
+        let mut request = request(capability);
+        // Even an explicit caller allowlist cannot reinterpret declarative data
+        // as an executable provider.
+        request.constraints.allowed_runtimes = vec![RuntimeKind::DataOnly];
+
+        let err = ExtensionRouter::route(&registry, &request, &observations).unwrap_err();
+        let RoutingError::NoEligibleProvider { assessments, .. } = err else {
+            panic!("expected no eligible provider");
+        };
+        assert!(assessments[0]
+            .rejection_reasons
+            .contains(&RejectionReason::RuntimeNotInvocable));
     }
 
     #[test]
