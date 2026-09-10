@@ -25,8 +25,9 @@
 //! evidence required before those observational outcomes may inform future policy learning,
 //! [`proposal_recording`] binds either live or persisted raw proposal evidence through one semantic
 //! conversion path, [`proposal_trace`] retains the live draw as generator-local content-addressed
-//! evidence, and [`proposal_coverage`] proves that raw proposal evidence exactly covers the search
-//! trace before any semantic run/policy binding.
+//! evidence, [`proposal_coverage`] proves that raw proposal evidence exactly covers the search
+//! trace, and [`proposal_qualification`] composes those layers while also binding no-op-only runs to
+//! the exact semantic baseline implementation.
 //!
 //! # Authority boundary
 //!
@@ -46,6 +47,7 @@
 //! - Raw proposal archives record generator behavior faithfully even when a later semantic policy
 //!   refuses to qualify that behavior for learning.
 //! - Proposal-stage traces and raw proposal archives must provide one-to-one coverage.
+//! - No-op-only proposal histories still have to bind the exact declared baseline artifact.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
@@ -71,6 +73,7 @@ pub mod mutations;
 pub mod observations;
 pub mod proposal_coverage;
 pub mod proposal_exposure;
+pub mod proposal_qualification;
 pub mod proposal_recording;
 pub mod proposal_trace;
 pub mod sandbox;
@@ -117,6 +120,9 @@ pub use proposal_exposure::{
     ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
     ForgeProposalExposureArchive, ForgeProposalExposureError, ForgeProposalLearningQualification,
     ForgeProposalPolicy, ForgeProposalRule, ForgeProposalSelection,
+};
+pub use proposal_qualification::{
+    ForgeProposalQualificationError, ForgeQualifiedProposalEvidence,
 };
 pub use proposal_recording::{
     exposure_from_raw_record, exposure_from_recorded_mutation, proposal_policy_for_mutator,
