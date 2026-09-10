@@ -16,8 +16,9 @@
 //! [`bundle_verify`] proves the cross-file semantics of that bundle. [`trial_semantics`] validates
 //! event/schema/attempt/artifact/transformation consistency, [`trials`] preserves exact concrete
 //! rewrite instances, [`learning`] provides exact-instance audit summaries, [`context_learning`]
-//! constrains cross-run aggregation, and [`family_learning`] introduces the generator-scoped
-//! operator-family identity suitable for statistical search learning.
+//! constrains cross-run aggregation, [`family_learning`] introduces generator-scoped operator
+//! families, and [`family_context_learning`] permits family aggregation only across distinct runs
+//! sharing the exact semantic/evaluation context and generator implementation.
 //!
 //! # Authority boundary
 //!
@@ -38,6 +39,7 @@ pub mod bundle_verify;
 pub mod candidate;
 pub mod certificate;
 pub mod context_learning;
+pub mod family_context_learning;
 pub mod family_learning;
 pub mod fitness;
 pub mod learning;
@@ -62,6 +64,10 @@ pub use certificate::{CertificateError, ForgeCandidate, ForgeCertificate};
 pub use context_learning::{
     ContextBoundForgeBatch, ContextualTransformationStats, ExactContextForgeCohort,
     ExactContextTransformationTable, ForgeContextLearningError,
+};
+pub use family_context_learning::{
+    ContextBoundForgeFamilyBatch, ContextualForgeFamilyStats, ExactContextForgeFamilyCohort,
+    ExactContextForgeFamilyOutcomeTable, ForgeFamilyContextError,
 };
 pub use family_learning::{
     ForgeFamilyLearningError, ForgeFamilyOutcomeStats, ForgeFamilyOutcomeTable, ForgeFamilyTrial,
