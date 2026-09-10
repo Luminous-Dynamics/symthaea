@@ -1,0 +1,10 @@
+{
+  "platform_id": "auv-01",
+  "observed_at_us": 1700000030000000,
+  "kind": "health_observation",
+  "payload_json": "{\"severity\":\"healthy\"}",
+  "position_evidence_refs": [
+    "mycelix-position:measurement:001"
+  ],
+  "expected_binding": "symthaea-maritime-session-bound-observation-v1:blake3-256:c258e96264cee15f3e9fd95b36e049884a6a42e67ae968a36a5b9868fc2e52d0"
+}
