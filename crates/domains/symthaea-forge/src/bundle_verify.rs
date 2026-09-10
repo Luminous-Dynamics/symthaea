@@ -1,10 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Semantic verification for persisted Forge bundles.
-//!
-//! [`crate::bundle`] proves exact persisted-file integrity. This module proves cross-file meaning:
-//! manifest outcome agrees with trace terminal, every observation resolves, terminal summaries
-//! agree with the event history, and any survivor is the exact last continuation selected by Forge.
 
 use crate::bundle::{
     read_completed_manifest, BundleError, ForgeBundleManifest, ForgeBundleOutcome, ABORT_FILE,
@@ -441,9 +437,6 @@ impl TraceFacts {
         }
     }
 
-    /// An aborted single-threaded search may have an in-flight loop attempt with no event yet, and
-    /// may have generated candidates whose correctness/selection lifecycle was interrupted. Exact
-    /// terminal rejection/selection counters remain derivable; progress counters are bounded.
     fn validate_abort_stats(&self, stats: &ForgeAbortStats) -> Result<(), BundleSemanticError> {
         if stats.candidates_no_eligible_mutation != self.no_op
             || stats.candidates_failed_compile != self.compile
@@ -515,6 +508,7 @@ fn validate_completed_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::trace::ForgeAttemptId;
 
     fn artifact(name: &str) -> ContentId {
         ContentId::derive("artifact", [name.as_bytes()])
@@ -524,20 +518,27 @@ mod tests {
         ContentId::derive("obs", [name.as_bytes()])
     }
 
+    fn attempt(ordinal: u64) -> ForgeAttemptId {
+        ForgeAttemptId::derive(&artifact("baseline"), 7, ordinal, 0)
+    }
+
     #[test]
     fn completed_stats_count_only_actual_continuations_as_selected() {
-        let artifact = artifact("a");
+        let candidate = artifact("a");
+        let id = attempt(0);
         let trace = vec![
             ForgeTraceEvent::candidate(
+                id.clone(),
                 0,
                 DiscoveryEventKind::CandidateGenerated,
-                artifact.clone(),
+                candidate.clone(),
                 observation("generated"),
             ),
             ForgeTraceEvent::candidate(
+                id,
                 0,
                 DiscoveryEventKind::ValidNotSelected,
-                artifact,
+                candidate,
                 observation("not-selected"),
             ),
             ForgeTraceEvent::completed(observation("complete")),
@@ -551,6 +552,7 @@ mod tests {
     #[test]
     fn aborted_stats_allow_interrupted_generated_candidate() {
         let trace = vec![ForgeTraceEvent::candidate(
+            attempt(0),
             0,
             DiscoveryEventKind::CandidateGenerated,
             artifact("a"),
