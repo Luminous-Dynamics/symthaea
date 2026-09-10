@@ -174,10 +174,12 @@ pub struct ForgeProposalCorpusManifest {
 }
 
 impl ForgeProposalCorpusManifest {
+    /// Freeze the corpus assignment against already-built observation tables without taking
+    /// ownership of those potentially large tables. The manifest stores identities only.
     pub fn from_tables(
         cohort: &ExactContextForgeSequenceCohort,
         split: &ForgeSequenceCorpusSplit,
-        tables: Vec<ForgeProposalObservationTable>,
+        tables: &[ForgeProposalObservationTable],
     ) -> Result<Self, ForgeProposalCorpusError> {
         cohort.validate()?;
         split.validate_for(cohort)?;
@@ -194,7 +196,7 @@ impl ForgeProposalCorpusManifest {
         let context_id = family_batch.context_id().clone();
         let generator_id = family_batch.generator_id().clone();
 
-        let mut tables_by_run = BTreeMap::<String, ForgeProposalObservationTable>::new();
+        let mut tables_by_run = BTreeMap::<String, &ForgeProposalObservationTable>::new();
         let mut policy_id: Option<ContentId> = None;
         let mut families: Option<Vec<ForgeTransformationFamilyId>> = None;
         for table in tables {
@@ -236,10 +238,7 @@ impl ForgeProposalCorpusManifest {
             let table = tables_by_run
                 .remove(assignment.run_id().as_str())
                 .ok_or(ForgeProposalCorpusError::TableCoverageMismatch)?;
-            members.push(ForgeProposalCorpusMember::from_assignment(
-                assignment,
-                &table,
-            )?);
+            members.push(ForgeProposalCorpusMember::from_assignment(assignment, table)?);
         }
         if !tables_by_run.is_empty() {
             return Err(ForgeProposalCorpusError::TableCoverageMismatch);
@@ -370,10 +369,10 @@ impl ForgeProposalCorpusManifest {
             .ok_or(ForgeProposalCorpusError::EmptyCohort)?;
         let family_batch = first_batch.family_batch();
         if &self.problem_id != family_batch.problem_id()
-            || self.baseline_implementation_id
-                != *family_batch.baseline_implementation_id().as_content_id()
-            || self.context_id != *family_batch.context_id()
-            || self.generator_id != *family_batch.generator_id()
+            || &self.baseline_implementation_id
+                != family_batch.baseline_implementation_id().as_content_id()
+            || &self.context_id != family_batch.context_id()
+            || &self.generator_id != family_batch.generator_id()
         {
             return Err(ForgeProposalCorpusError::ManifestScopeMismatch);
         }
