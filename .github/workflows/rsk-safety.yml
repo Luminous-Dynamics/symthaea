@@ -42,12 +42,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Require an ADR for RSK safety-boundary changes
+      - name: Require an RSK Class A ADR for safety-boundary changes
         shell: bash
         run: |
           set -euo pipefail
-          base="origin/${GITHUB_BASE_REF}"
-          changed_files="$(git diff --name-only "${base}"...HEAD)"
+          base_sha='${{ github.event.pull_request.base.sha }}'
+          changed_files="$(git diff --name-only "${base_sha}"...HEAD)"
 
           class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-ledger/|\.github/workflows/rsk-safety\.yml$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
 
@@ -57,12 +57,48 @@ jobs:
           fi
 
           echo "RSK Class A surface changed; verifying ADR evidence."
-          if ! printf '%s\n' "${changed_files}" | grep -Eq '^docs/compliance/adr/ADR-[0-9]+.*\.md$'; then
+          adr_files="$(printf '%s\n' "${changed_files}" | grep -E '^docs/compliance/adr/ADR-[0-9]+.*\.md$' || true)"
+          if [ -z "${adr_files}" ]; then
             echo "ERROR: RSK Class A changes require a changed ADR under docs/compliance/adr/."
             exit 1
           fi
 
-          echo "Changed ADR found. RSK Class A governance prerequisite satisfied."
+          valid_adr=false
+          while IFS= read -r adr; do
+            [ -n "${adr}" ] || continue
+            if grep -Eq '(Replicator Safety Kernel|RSK)' "${adr}" \
+              && grep -Eq '^\*\*Change Class\*\*: A([[:space:]]|$)' "${adr}"; then
+              echo "RSK Class A ADR found: ${adr}"
+              valid_adr=true
+              break
+            fi
+          done <<< "${adr_files}"
+
+          if ! ${valid_adr}; then
+            echo "ERROR: changed ADRs do not identify RSK and declare Change Class A."
+            exit 1
+          fi
+
+      - name: Verify generic Class A detector retains RSK coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_paths=(
+            'crates/domains/symthaea-replicator-safety/'
+            'crates/domains/symthaea-replicator-ledger/'
+            '.github/workflows/rsk-safety.yml'
+            'scripts/check-class-a-changes.sh'
+            'docs/compliance/GOVERNANCE_CHARTER.md'
+          )
+
+          for path in "${required_paths[@]}"; do
+            if ! grep -Fq "\"${path}\"" scripts/check-class-a-changes.sh; then
+              echo "ERROR: generic Class A detector lost required RSK/governance path: ${path}"
+              exit 1
+            fi
+          done
+
+          echo "Generic Class A detector retains all required RSK/governance paths."
 
   rsk-core:
     name: RSK constitutional + ledger checks
