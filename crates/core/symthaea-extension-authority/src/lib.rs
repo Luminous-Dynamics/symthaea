@@ -242,7 +242,10 @@ mod tests {
     fn activation_still_fails_closed_when_currentness_is_unavailable() {
         let host = AdmissionAuthority::new();
         let result = host.activate(&record(), &manifest(), &Currentness(None));
-        assert_eq!(result, Err(AdmissionProblem::CurrentnessUnavailable));
+        assert!(matches!(
+            result,
+            Err(AdmissionProblem::CurrentnessUnavailable)
+        ));
     }
 
     #[test]
