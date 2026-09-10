@@ -1,0 +1,132 @@
+# One-shot semantic-preserving Clippy repair for the typed subject snapshot source.
+# It may change only subject_snapshot.rs, then deletes itself.
+
+name: Continuity Subject Clippy Fix Once
+
+on:
+  push:
+    branches:
+      - ci/continuity-subject-snapshot-exact-head-v1
+    paths:
+      - .github/workflows/continuity-subject-clippy-fix-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair-once:
+    name: Repair subject-local Clippy lint once
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ci/continuity-subject-snapshot-exact-head-v1
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Apply exact subject-local repair and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          target='crates/core/symthaea-continuity/src/subject_snapshot.rs'
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/core/symthaea-continuity/src/subject_snapshot.rs')
+          text = path.read_text()
+          old = '''        if let Some(parent) = subject.parent_subject_id() {
+            if !known.contains(&parent) {
+                return Err(ContinuitySubjectSnapshotError::MissingParent {
+                    child: subject.id(),
+                    parent,
+                });
+            }
+        }
+'''
+          new = '''        if let Some(parent) = subject.parent_subject_id()
+            && !known.contains(&parent)
+        {
+            return Err(ContinuitySubjectSnapshotError::MissingParent {
+                child: subject.id(),
+                parent,
+            });
+        }
+'''
+          if text.count(old) != 1:
+              raise SystemExit('expected exactly one subject parent-closure nested-if shape')
+          path.write_text(text.replace(old, new))
+          PY
+
+          rustfmt --edition 2024 "$target"
+          rustfmt --edition 2024 --check "$target"
+
+          # Prove the repaired source itself no longer emits the discovered
+          # collapsible_if diagnostic while not granting a package-wide lint waiver.
+          set +e
+          cargo clippy --locked -p symthaea-continuity --all-targets --message-format=json -- -D warnings > /tmp/subject-clippy.jsonl 2>&1
+          clippy_exit=$?
+          set -e
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          unexpected_local = []
+          for raw in Path('/tmp/subject-clippy.jsonl').read_text(errors='replace').splitlines():
+              try:
+                  event = json.loads(raw)
+              except json.JSONDecodeError:
+                  continue
+              if event.get('reason') != 'compiler-message':
+                  continue
+              message = event.get('message') or {}
+              if message.get('level') != 'error':
+                  continue
+              primary = next((s for s in message.get('spans', []) if s.get('is_primary')), None)
+              file_name = Path((primary or {}).get('file_name', '')).name
+              if file_name in {'subject_snapshot.rs', 'scope.rs'}:
+                  unexpected_local.append(((message.get('code') or {}).get('code'), message.get('message')))
+          if unexpected_local:
+              raise SystemExit(f'subject-local strict Clippy diagnostics remain: {unexpected_local}')
+          PY
+          # Strict package Clippy is expected to remain non-zero while the known
+          # bounded legacy baseline exists; the qualification script inventories it.
+          test "$clippy_exit" -ne 0
+
+          mapfile -t changed < <(git diff --name-only)
+          if [[ "${#changed[@]}" -ne 1 || "${changed[0]}" != "$target" ]]; then
+            echo "error: subject repair changed unexpected tracked paths" >&2
+            printf '%s\n' "${changed[@]}" >&2
+            exit 1
+          fi
+
+          git add "$target"
+          rm .github/workflows/continuity-subject-clippy-fix-once.yml
+          git add .github/workflows/continuity-subject-clippy-fix-once.yml
+
+          mapfile -t staged < <(git diff --cached --name-only)
+          if [[ "${#staged[@]}" -ne 2 ]]; then
+            echo "error: unexpected staged path count" >&2
+            printf '%s\n' "${staged[@]}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${staged[@]}" | grep -Fxq "$target"
+          printf '%s\n' "${staged[@]}" | grep -Fxq .github/workflows/continuity-subject-clippy-fix-once.yml
+          git diff --cached --check
+
+          git commit -m "refactor(continuity): collapse subject parent guard"
+          git push origin HEAD:ci/continuity-subject-snapshot-exact-head-v1
