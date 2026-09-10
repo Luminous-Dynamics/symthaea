@@ -18,12 +18,18 @@ use thiserror::Error;
 pub enum CertificateError {
     #[error("Forge certificate must contain at least one accepted mutation")]
     EmptyMutationHistory,
+    #[error("Forge survivor certificate must contain the canonical compile -> test gate sequence")]
+    InvalidGateSequence,
     #[error("Forge survivor certificate contains a failed correctness gate")]
     CorrectnessGateFailed,
     #[error("mutation history generation order is not strictly increasing")]
     NonIncreasingGeneration,
     #[error("mutation artifact chain is discontinuous")]
     ArtifactChainMismatch,
+    #[error("mutation must change the exact full-file artifact")]
+    NoArtifactChange,
+    #[error("mutation operator/detail must be non-empty single-line text")]
+    InvalidMutationText,
     #[error("certificate convenience fields do not match the final mutation")]
     FinalMutationMismatch,
     #[error("benchmark evidence is non-finite or arithmetically inconsistent")]
@@ -57,6 +63,7 @@ pub struct BenchmarkEvidence {
 impl BenchmarkEvidence {
     pub fn validate(&self) -> Result<(), CertificateError> {
         if self.metric_name.trim().is_empty()
+            || self.metric_name.chars().any(char::is_control)
             || !self.baseline_score.is_finite()
             || !self.candidate_score.is_finite()
             || !self.absolute_improvement.is_finite()
@@ -138,6 +145,18 @@ impl MutationRecord {
     }
 
     pub fn validate(&self) -> Result<(), CertificateError> {
+        if self.operator.trim().is_empty()
+            || self.detail.trim().is_empty()
+            || self.operator.trim() != self.operator
+            || self.detail.trim() != self.detail
+            || self.operator.chars().any(char::is_control)
+            || self.detail.chars().any(char::is_control)
+        {
+            return Err(CertificateError::InvalidMutationText);
+        }
+        if self.parent_artifact_id == self.candidate_artifact_id {
+            return Err(CertificateError::NoArtifactChange);
+        }
         let rebuilt = Self::new(
             self.generation,
             self.operator.clone(),
@@ -184,11 +203,18 @@ impl ForgeCertificate {
 
     /// Validate the certificate's self-contained structural claims.
     ///
-    /// This does not prove that Cargo commands actually ran or that the benchmark is repeatable;
-    /// those stronger claims belong to later capsule/evaluation evidence.
+    /// This proves that the serialized survivor still describes the exact gate sequence Forge uses,
+    /// but not that those Cargo commands actually executed. Command provenance and repeatability
+    /// remain responsibilities of the later experiment/evaluation evidence path.
     pub fn validate(&self) -> Result<(), CertificateError> {
         if self.mutation_history.is_empty() {
             return Err(CertificateError::EmptyMutationHistory);
+        }
+        if self.gates.len() != 2
+            || self.gates[0].gate != "compile"
+            || self.gates[1].gate != "test"
+        {
+            return Err(CertificateError::InvalidGateSequence);
         }
         if !self.all_gates_passed() {
             return Err(CertificateError::CorrectnessGateFailed);
@@ -397,11 +423,17 @@ mod tests {
     }
 
     #[test]
-    fn validation_requires_passing_gates() {
+    fn validation_requires_canonical_passing_gates() {
         assert!(sample_certificate(true).0.validate().is_ok());
         assert_eq!(
             sample_certificate(false).0.validate().unwrap_err(),
             CertificateError::CorrectnessGateFailed
+        );
+        let (mut cert, _) = sample_certificate(true);
+        cert.gates.swap(0, 1);
+        assert_eq!(
+            cert.validate().unwrap_err(),
+            CertificateError::InvalidGateSequence
         );
     }
 
@@ -411,6 +443,18 @@ mod tests {
         cert.mutation_history[0].candidate_artifact_id =
             full_source_artifact_id("fn entropy_histogram() -> f64 { 2.0 }\n");
         assert!(cert.validate().is_err());
+    }
+
+    #[test]
+    fn mutation_cannot_claim_an_unchanged_artifact() {
+        let (mut cert, _) = sample_certificate(true);
+        let same = cert.mutation_history[0].parent_artifact_id.clone();
+        cert.mutation_history[0].candidate_artifact_id = same.clone();
+        cert.candidate_artifact_id = same;
+        assert_eq!(
+            cert.validate().unwrap_err(),
+            CertificateError::NoArtifactChange
+        );
     }
 
     #[test]
