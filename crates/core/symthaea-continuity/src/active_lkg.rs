@@ -123,7 +123,13 @@ pub struct ActiveKnownGoodSelectionV1 {
 }
 
 impl ActiveKnownGoodSelectionV1 {
-    pub fn select(
+    /// Crate-owned selection constructor.
+    ///
+    /// Generation >1 selection is reached through promotion eligibility. Generation
+    /// 1 is reserved for a dedicated baseline-admission path. Keeping this crate-owned
+    /// prevents external callers from bypassing either theorem by directly selecting
+    /// an arbitrary qualified checkpoint.
+    pub(crate) fn select(
         checkpoint: &QualifiedKnownGoodCheckpointV1,
         predecessor: Option<&ActiveKnownGoodSelectionV1>,
         selected_at_unix_ms: u64,
