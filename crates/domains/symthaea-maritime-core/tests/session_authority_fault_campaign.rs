@@ -175,6 +175,44 @@ fn progressive_authority_failures_never_mint_a_new_observation_binding() {
 }
 
 #[test]
+fn authority_epoch_rotation_invalidates_old_session_without_rewriting_history() {
+    let before_rotation = context(
+        SCHEMA,
+        IDENTITY,
+        1_700_000_030_000,
+        EPOCH,
+        true,
+        false,
+    );
+    let old_binding = try_bind(&before_rotation).expect("old epoch must initially bind");
+
+    let after_rotation = context(
+        SCHEMA,
+        IDENTITY,
+        1_700_000_030_001,
+        EPOCH + 1,
+        true,
+        false,
+    );
+    assert_eq!(
+        evaluate_machine_session(&session(), &after_rotation, session_policy()),
+        MachineSessionTrust::EpochMismatch
+    );
+    assert_eq!(
+        try_bind(&after_rotation),
+        Err(ObservationBindingError::SessionNotTrusted(
+            MachineSessionTrust::EpochMismatch
+        ))
+    );
+
+    // Rotation invalidates future use of the immutable old session; it does not
+    // rewrite the historical association that was valid before rotation.
+    assert!(old_binding.ends_with(
+        "c258e96264cee15f3e9fd95b36e049884a6a42e67ae968a36a5b9868fc2e52d0"
+    ));
+}
+
+#[test]
 fn fresh_session_authority_does_not_override_platform_source_policy() {
     let trusted = context(
         SCHEMA,
