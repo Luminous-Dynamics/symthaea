@@ -1,11 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Authority-free adapters from Forge output into the generic algorithm-discovery protocol.
-//!
-//! Forge does not invent the semantic problem or algorithm family. Those are supplied by the
-//! caller as already-valid registry records. The proposal adapter binds the exact survivor to that
-//! meaning; the ledger adapter binds Forge's generator-local trace and observation archive to one
-//! exact `DiscoveryRun`.
 
 use crate::certificate::{CertificateError, ForgeCandidate};
 use crate::trace::{validate_forge_trace_observations, ForgeTraceError, ForgeTraceEvent};
@@ -128,7 +123,7 @@ mod tests {
     use crate::trace::ForgeAttemptId;
     use symthaea_algorithms::discovery::{DiscoveryPolicy, SearchBudget};
     use symthaea_algorithms::ledger::DiscoveryEventKind;
-    use symthaea_algorithms::observation::ObservationObject;
+    use symthaea_algorithms::observation::{ObservationEncoding, ObservationObject};
     use symthaea_algorithms::{
         AlgorithmProvenance, ContentId, DeterminismRequirement, DiscoveryRisk, ProblemSpec,
         SemanticGuarantee,
@@ -236,6 +231,19 @@ mod tests {
         )
     }
 
+    fn attempt_observation(attempt: &ForgeAttemptId, label: &str) -> ObservationObject {
+        ObservationObject::new(
+            "forge.test.attempt.v1",
+            ObservationEncoding::Json,
+            serde_json::to_vec(&serde_json::json!({
+                "attempt_id": attempt.as_content_id().as_str(),
+                "label": label
+            }))
+            .unwrap(),
+        )
+        .unwrap()
+    }
+
     #[test]
     fn proposal_binds_baseline_candidate_and_ordered_transformations() {
         let (run, algorithm, baseline, candidate) = fixture();
@@ -292,8 +300,8 @@ mod tests {
         let (run, _, _, candidate) = fixture();
         let artifact = candidate.artifact_id().clone();
         let attempt_id = attempt(&candidate);
-        let generated = ObservationObject::utf8("forge.generated.v1", "generated").unwrap();
-        let rejected = ObservationObject::utf8("forge.rejected.v1", "counterexample").unwrap();
+        let generated = attempt_observation(&attempt_id, "generated");
+        let rejected = attempt_observation(&attempt_id, "counterexample");
         let completed = ObservationObject::utf8("forge.completed.v1", "complete").unwrap();
         let trace = vec![
             ForgeTraceEvent::candidate(
@@ -324,7 +332,7 @@ mod tests {
     fn missing_observation_blocks_semantic_replay() {
         let (run, _, _, candidate) = fixture();
         let attempt_id = attempt(&candidate);
-        let generated = ObservationObject::utf8("forge.generated.v1", "generated").unwrap();
+        let generated = attempt_observation(&attempt_id, "generated");
         let completed = ObservationObject::utf8("forge.completed.v1", "complete").unwrap();
         let trace = vec![
             ForgeTraceEvent::candidate(
@@ -353,9 +361,10 @@ mod tests {
     #[test]
     fn unterminated_forge_trace_is_rejected_before_semantic_replay() {
         let (run, _, _, candidate) = fixture();
-        let generated = ObservationObject::utf8("forge.generated.v1", "generated").unwrap();
+        let attempt_id = attempt(&candidate);
+        let generated = attempt_observation(&attempt_id, "generated");
         let trace = vec![ForgeTraceEvent::candidate(
-            attempt(&candidate),
+            attempt_id,
             1,
             DiscoveryEventKind::CandidateGenerated,
             candidate.artifact_id().clone(),
