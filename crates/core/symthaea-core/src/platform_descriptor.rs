@@ -9,17 +9,13 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::embodiment::EmbodimentPlatform;
+use crate::embodiment::{EmbodimentPlatform, PlatformRegistry};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DescriptorEvidence {
-    /// Built-in qualitative preset; useful for routing, not qualification.
     PresetHeuristic,
-    /// Declared by a platform/plugin but not independently measured.
     Declared,
-    /// Backed by measured platform evidence.
     Measured,
-    /// Backed by a platform-specific qualification campaign.
     Qualified,
 }
 
@@ -36,6 +32,7 @@ pub enum MorphologyClass {
     Manipulator,
     Wearable,
     SurgicalManipulator,
+    Spacecraft,
     OrbitalServicer,
     ProcessMachine,
 }
@@ -58,6 +55,8 @@ pub enum MobilityClass {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OperatingEnvironment {
     TerrestrialSurface,
+    PlanetarySurface,
+    AirlessSurface,
     Aerial,
     Underwater,
     Subterranean,
@@ -196,7 +195,8 @@ impl CapabilityStrengths {
 /// actuator handle, token, capability grant, or authorization state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlatformDescriptor {
-    pub preset: EmbodimentPlatform,
+    /// Existing named preset, when this descriptor came from one.
+    pub preset: Option<EmbodimentPlatform>,
     pub name: String,
     pub morphology: MorphologyClass,
     pub mobility: Vec<MobilityClass>,
@@ -213,6 +213,86 @@ pub struct PlatformDescriptor {
 }
 
 impl PlatformDescriptor {
+    /// Start a descriptor for a body that does not need a named enum preset.
+    /// Conservative defaults are intentional: supervised autonomy, high safety
+    /// criticality, and zero capability strengths until explicitly declared.
+    pub fn composed(name: impl Into<String>, morphology: MorphologyClass) -> Self {
+        Self {
+            preset: None,
+            name: name.into(),
+            morphology,
+            mobility: Vec::new(),
+            environments: Vec::new(),
+            manipulation: Vec::new(),
+            sensors: Vec::new(),
+            energy: vec![EnergyClass::Unknown],
+            communications: Vec::new(),
+            roles: Vec::new(),
+            safety_criticality: SafetyCriticality::High,
+            autonomy: AutonomyClass::Supervised,
+            strengths: CapabilityStrengths::ZERO,
+            evidence: DescriptorEvidence::Declared,
+        }
+    }
+
+    pub fn with_role(mut self, role: MissionRole) -> Self {
+        push_unique(&mut self.roles, role);
+        self
+    }
+
+    pub fn with_environment(mut self, environment: OperatingEnvironment) -> Self {
+        push_unique(&mut self.environments, environment);
+        self
+    }
+
+    pub fn with_mobility(mut self, mobility: MobilityClass) -> Self {
+        push_unique(&mut self.mobility, mobility);
+        self
+    }
+
+    pub fn with_sensor(mut self, sensor: SensorCapability) -> Self {
+        push_unique(&mut self.sensors, sensor);
+        self
+    }
+
+    pub fn with_manipulation(mut self, capability: ManipulationCapability) -> Self {
+        push_unique(&mut self.manipulation, capability);
+        self
+    }
+
+    pub fn with_communication(mut self, capability: CommunicationCapability) -> Self {
+        push_unique(&mut self.communications, capability);
+        self
+    }
+
+    pub fn with_energy(mut self, energy: EnergyClass) -> Self {
+        if self.energy == [EnergyClass::Unknown] {
+            self.energy.clear();
+        }
+        push_unique(&mut self.energy, energy);
+        self
+    }
+
+    pub fn with_strengths(mut self, strengths: CapabilityStrengths) -> Self {
+        self.strengths = strengths;
+        self
+    }
+
+    pub fn with_autonomy(mut self, autonomy: AutonomyClass) -> Self {
+        self.autonomy = autonomy;
+        self
+    }
+
+    pub fn with_safety_criticality(mut self, criticality: SafetyCriticality) -> Self {
+        self.safety_criticality = criticality;
+        self
+    }
+
+    pub fn with_evidence(mut self, evidence: DescriptorEvidence) -> Self {
+        self.evidence = evidence;
+        self
+    }
+
     pub fn supports_role(&self, role: MissionRole) -> bool {
         self.roles.contains(&role)
     }
@@ -230,6 +310,56 @@ impl PlatformDescriptor {
     }
 }
 
+fn push_unique<T: PartialEq>(values: &mut Vec<T>, value: T) {
+    if !values.contains(&value) {
+        values.push(value);
+    }
+}
+
+/// Read-only capability discovery over the existing plugin registry.
+///
+/// This deliberately returns platform identities/descriptors only. It never
+/// constructs a bridge or creates runtime authority.
+pub trait PlatformRegistryDescriptorExt {
+    fn registered_descriptors(&self) -> Vec<PlatformDescriptor>;
+    fn platforms_supporting_role(&self, role: MissionRole) -> Vec<EmbodimentPlatform>;
+    fn platforms_supporting(
+        &self,
+        role: MissionRole,
+        environment: OperatingEnvironment,
+    ) -> Vec<EmbodimentPlatform>;
+}
+
+impl PlatformRegistryDescriptorExt for PlatformRegistry {
+    fn registered_descriptors(&self) -> Vec<PlatformDescriptor> {
+        self.registered_platforms()
+            .into_iter()
+            .map(EmbodimentPlatform::descriptor)
+            .collect()
+    }
+
+    fn platforms_supporting_role(&self, role: MissionRole) -> Vec<EmbodimentPlatform> {
+        self.registered_platforms()
+            .into_iter()
+            .filter(|platform| platform.descriptor().supports_role(role))
+            .collect()
+    }
+
+    fn platforms_supporting(
+        &self,
+        role: MissionRole,
+        environment: OperatingEnvironment,
+    ) -> Vec<EmbodimentPlatform> {
+        self.registered_platforms()
+            .into_iter()
+            .filter(|platform| {
+                let descriptor = platform.descriptor();
+                descriptor.supports_role(role) && descriptor.supports_environment(environment)
+            })
+            .collect()
+    }
+}
+
 impl EmbodimentPlatform {
     /// Return the canonical descriptive preset for this platform identity.
     ///
@@ -237,17 +367,16 @@ impl EmbodimentPlatform {
     /// for capability routing and discovery, but are not hardware qualification
     /// evidence and never grant actuator authority.
     pub fn descriptor(self) -> PlatformDescriptor {
-        use AutonomyClass::*;
-        use CommunicationCapability::*;
-        use DescriptorEvidence::PresetHeuristic;
-        use EnergyClass::*;
-        use ManipulationCapability::*;
-        use MissionRole::*;
-        use MobilityClass::*;
-        use MorphologyClass::*;
-        use OperatingEnvironment::*;
-        use SafetyCriticality::*;
-        use SensorCapability::*;
+        use AutonomyClass as A;
+        use CommunicationCapability as C;
+        use EnergyClass as En;
+        use ManipulationCapability as M;
+        use MissionRole as R;
+        use MobilityClass as Mob;
+        use MorphologyClass as Morph;
+        use OperatingEnvironment as Env;
+        use SafetyCriticality as S;
+        use SensorCapability as Se;
 
         let d = |name: &str,
                  morphology,
@@ -261,7 +390,7 @@ impl EmbodimentPlatform {
                  safety_criticality,
                  autonomy,
                  strengths| PlatformDescriptor {
-            preset: self,
+            preset: Some(self),
             name: name.into(),
             morphology,
             mobility,
@@ -274,160 +403,165 @@ impl EmbodimentPlatform {
             safety_criticality,
             autonomy,
             strengths,
-            evidence: PresetHeuristic,
+            evidence: DescriptorEvidence::PresetHeuristic,
         };
 
         match self {
             EmbodimentPlatform::None => d(
-                "none", None, vec![MobilityClass::None], vec![], vec![], vec![], vec![Unknown],
-                vec![], vec![], Low, Advisory, CapabilityStrengths::ZERO,
+                "none", Morph::None, vec![Mob::None], vec![], vec![], vec![], vec![En::Unknown],
+                vec![], vec![], S::Low, A::Advisory, CapabilityStrengths::ZERO,
             ),
             EmbodimentPlatform::Humanoid => d(
-                "humanoid", Humanoid, vec![Legged], vec![TerrestrialSurface, HabitatInterior],
-                vec![GeneralManipulation, ToolUse, MaterialHandling],
-                vec![Vision, Depth, Inertial, ForceTorque, Proprioception],
-                vec![Battery], vec![LocalWireless, Mesh],
-                vec![Mobility, Manipulation, Inspection, Logistics, Servicing],
-                LifeCritical, BoundedAutonomy,
+                "humanoid", Morph::Humanoid, vec![Mob::Legged], vec![Env::TerrestrialSurface, Env::HabitatInterior],
+                vec![M::GeneralManipulation, M::ToolUse, M::MaterialHandling],
+                vec![Se::Vision, Se::Depth, Se::Inertial, Se::ForceTorque, Se::Proprioception],
+                vec![En::Battery], vec![C::LocalWireless, C::Mesh],
+                vec![R::Mobility, R::Manipulation, R::Inspection, R::Logistics, R::Servicing],
+                S::LifeCritical, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.8, locomotion: 0.9, perception: 0.7, communication: 0.5 },
             ),
             EmbodimentPlatform::Quadrotor => d(
-                "quadrotor", Rotorcraft, vec![MobilityClass::Rotorcraft], vec![Aerial], vec![],
-                vec![Vision, Depth, Inertial, Position], vec![Battery], vec![LocalWireless, Mesh],
-                vec![Mobility, Inspection, Science], High, BoundedAutonomy,
+                "quadrotor", Morph::Rotorcraft, vec![Mob::Rotorcraft], vec![Env::Aerial], vec![],
+                vec![Se::Vision, Se::Depth, Se::Inertial, Se::Position], vec![En::Battery], vec![C::LocalWireless, C::Mesh],
+                vec![R::Mobility, R::Inspection, R::Science], S::High, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.0, locomotion: 0.9, perception: 0.8, communication: 0.7 },
             ),
             EmbodimentPlatform::Vehicle => d(
-                "vehicle", GroundVehicle, vec![Wheeled], vec![TerrestrialSurface], vec![],
-                vec![Vision, Depth, Inertial, Position], vec![Battery, Fuel, Hybrid], vec![LocalWireless, Mesh, LongRange],
-                vec![Mobility, Transport, Logistics], LifeCritical, BoundedAutonomy,
+                "vehicle", Morph::GroundVehicle, vec![Mob::Wheeled], vec![Env::TerrestrialSurface], vec![],
+                vec![Se::Vision, Se::Depth, Se::Inertial, Se::Position], vec![En::Battery, En::Fuel, En::Hybrid],
+                vec![C::LocalWireless, C::Mesh, C::LongRange], vec![R::Mobility, R::Transport, R::Logistics],
+                S::LifeCritical, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.0, locomotion: 1.0, perception: 0.6, communication: 0.8 },
             ),
             EmbodimentPlatform::Helicopter => d(
-                "helicopter", Rotorcraft, vec![MobilityClass::Rotorcraft], vec![Aerial], vec![],
-                vec![Vision, Inertial, Position], vec![Fuel, Hybrid], vec![LongRange],
-                vec![Mobility, Transport, Inspection], LifeCritical, Supervised,
+                "helicopter", Morph::Rotorcraft, vec![Mob::Rotorcraft], vec![Env::Aerial], vec![],
+                vec![Se::Vision, Se::Inertial, Se::Position], vec![En::Fuel, En::Hybrid], vec![C::LongRange],
+                vec![R::Mobility, R::Transport, R::Inspection], S::LifeCritical, A::Supervised,
                 CapabilityStrengths { manipulation: 0.0, locomotion: 0.95, perception: 0.7, communication: 0.6 },
             ),
             EmbodimentPlatform::Auv => d(
-                "auv", MarineVehicle, vec![Swimming, Buoyant], vec![Underwater],
-                vec![GeneralManipulation], vec![Sonar, Inertial, Position, Environmental],
-                vec![Battery], vec![StoreAndForward, LongRange],
-                vec![Mobility, Inspection, Science, Servicing], High, BoundedAutonomy,
+                "auv", Morph::MarineVehicle, vec![Mob::Swimming, Mob::Buoyant], vec![Env::Underwater],
+                vec![M::GeneralManipulation], vec![Se::Sonar, Se::Inertial, Se::Position, Se::Environmental],
+                vec![En::Battery], vec![C::StoreAndForward, C::LongRange],
+                vec![R::Mobility, R::Inspection, R::Science, R::Servicing], S::High, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.3, locomotion: 0.7, perception: 0.5, communication: 0.2 },
             ),
             EmbodimentPlatform::Manipulator => d(
-                "manipulator", Manipulator, vec![MobilityClass::None], vec![HabitatInterior, GeneralInfrastructure],
-                vec![GeneralManipulation, PrecisionManipulation, ToolUse, MaterialHandling],
-                vec![ForceTorque, Proprioception, Vision], vec![ExternalGrid], vec![DirectAttached, LocalWireless],
-                vec![Manipulation, Servicing, Logistics], High, BoundedAutonomy,
+                "manipulator", Morph::Manipulator, vec![Mob::None], vec![Env::HabitatInterior, Env::GeneralInfrastructure],
+                vec![M::GeneralManipulation, M::PrecisionManipulation, M::ToolUse, M::MaterialHandling],
+                vec![Se::ForceTorque, Se::Proprioception, Se::Vision], vec![En::ExternalGrid],
+                vec![C::DirectAttached, C::LocalWireless], vec![R::Manipulation, R::Servicing, R::Logistics],
+                S::High, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 1.0, locomotion: 0.0, perception: 0.6, communication: 0.4 },
             ),
             EmbodimentPlatform::Exoskeleton => d(
-                "exoskeleton", Wearable, vec![HumanCoupled], vec![TerrestrialSurface, HabitatInterior],
-                vec![HumanAssistance], vec![ForceTorque, Proprioception, Inertial], vec![HumanCoupled, Battery],
-                vec![DirectAttached, LocalWireless], vec![Mobility, Manipulation, Care], LifeCritical, HumanCoupled,
+                "exoskeleton", Morph::Wearable, vec![Mob::HumanCoupled], vec![Env::TerrestrialSurface, Env::HabitatInterior],
+                vec![M::HumanAssistance], vec![Se::ForceTorque, Se::Proprioception, Se::Inertial],
+                vec![En::HumanCoupled, En::Battery], vec![C::DirectAttached, C::LocalWireless],
+                vec![R::Mobility, R::Manipulation, R::Care], S::LifeCritical, A::HumanCoupled,
                 CapabilityStrengths { manipulation: 0.5, locomotion: 0.8, perception: 0.3, communication: 0.3 },
             ),
             EmbodimentPlatform::Surgical => d(
-                "surgical", SurgicalManipulator, vec![MobilityClass::None], vec![HabitatInterior],
-                vec![PrecisionManipulation, SurgicalInteraction], vec![Vision, Depth, ForceTorque, Biomedical],
-                vec![ExternalGrid], vec![DirectAttached], vec![Surgery, Care, Manipulation], LifeCritical, Supervised,
+                "surgical", Morph::SurgicalManipulator, vec![Mob::None], vec![Env::HabitatInterior],
+                vec![M::PrecisionManipulation, M::SurgicalInteraction], vec![Se::Vision, Se::Depth, Se::ForceTorque, Se::Biomedical],
+                vec![En::ExternalGrid], vec![C::DirectAttached], vec![R::Surgery, R::Care, R::Manipulation],
+                S::LifeCritical, A::Supervised,
                 CapabilityStrengths { manipulation: 1.0, locomotion: 0.0, perception: 0.9, communication: 0.5 },
             ),
             EmbodimentPlatform::Orbital => d(
-                "orbital-servicer", OrbitalServicer, vec![OrbitalFreeFlight], vec![OrbitalMicrogravity],
-                vec![GeneralManipulation, PrecisionManipulation, ServicingToolUse],
-                vec![Vision, Inertial, ForceTorque, OrbitalNavigation], vec![Battery, Solar],
-                vec![LongRange, StoreAndForward, Interplanetary], vec![Mobility, Manipulation, Servicing, Inspection],
-                High, BoundedAutonomy,
+                "orbital-servicer", Morph::OrbitalServicer, vec![Mob::OrbitalFreeFlight], vec![Env::OrbitalMicrogravity],
+                vec![M::GeneralManipulation, M::PrecisionManipulation, M::ToolUse],
+                vec![Se::Vision, Se::Inertial, Se::ForceTorque, Se::OrbitalNavigation], vec![En::Battery, En::Solar],
+                vec![C::LongRange, C::StoreAndForward, C::Interplanetary],
+                vec![R::Mobility, R::Manipulation, R::Servicing, R::Inspection], S::High, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.9, locomotion: 0.0, perception: 0.4, communication: 0.3 },
             ),
             EmbodimentPlatform::Quadruped => d(
-                "quadruped", Quadruped, vec![Legged], vec![TerrestrialSurface], vec![],
-                vec![Vision, Depth, Inertial, Proprioception], vec![Battery], vec![LocalWireless, Mesh],
-                vec![Mobility, Inspection, Logistics], High, BoundedAutonomy,
+                "quadruped", Morph::Quadruped, vec![Mob::Legged], vec![Env::TerrestrialSurface], vec![],
+                vec![Se::Vision, Se::Depth, Se::Inertial, Se::Proprioception], vec![En::Battery], vec![C::LocalWireless, C::Mesh],
+                vec![R::Mobility, R::Inspection, R::Logistics], S::High, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.0, locomotion: 0.85, perception: 0.7, communication: 0.5 },
             ),
             EmbodimentPlatform::Subterranean => d(
-                "subterranean", ProcessMachine, vec![Subterranean, Tracked], vec![OperatingEnvironment::Subterranean],
-                vec![Excavation, MaterialHandling, ToolUse], vec![Depth, Inertial, Environmental, ForceTorque],
-                vec![Battery, ExternalGrid], vec![Mesh, StoreAndForward], vec![Mobility, Mining, Construction, Inspection],
-                High, BoundedAutonomy,
+                "subterranean", Morph::ProcessMachine, vec![Mob::Subterranean, Mob::Tracked], vec![Env::Subterranean],
+                vec![M::Excavation, M::MaterialHandling, M::ToolUse], vec![Se::Depth, Se::Inertial, Se::Environmental, Se::ForceTorque],
+                vec![En::Battery, En::ExternalGrid], vec![C::Mesh, C::StoreAndForward],
+                vec![R::Mobility, R::Mining, R::Construction, R::Inspection], S::High, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.7, locomotion: 0.6, perception: 0.6, communication: 0.3 },
             ),
             EmbodimentPlatform::Infrastructure => d(
-                "infrastructure", FixedInstallation, vec![MobilityClass::None], vec![GeneralInfrastructure],
-                vec![ProcessControl], vec![Environmental, NetworkState], vec![ExternalGrid, Solar, Hybrid],
-                vec![DirectAttached, Mesh, LongRange], vec![HabitatOperations, Communications, Computing],
-                High, Cooperative,
+                "infrastructure", Morph::FixedInstallation, vec![Mob::None], vec![Env::GeneralInfrastructure],
+                vec![M::ProcessControl], vec![Se::Environmental, Se::NetworkState], vec![En::ExternalGrid, En::Solar, En::Hybrid],
+                vec![C::DirectAttached, C::Mesh, C::LongRange], vec![R::HabitatOperations, R::Communications, R::Computing],
+                S::High, A::Cooperative,
                 CapabilityStrengths { manipulation: 0.2, locomotion: 0.0, perception: 0.7, communication: 1.0 },
             ),
             EmbodimentPlatform::Scavenger => d(
-                "scavenger", ProcessMachine, vec![Wheeled, Tracked], vec![TerrestrialSurface, GeneralInfrastructure],
-                vec![MaterialHandling, ToolUse, GeneralManipulation], vec![Vision, Depth, ForceTorque], vec![Battery],
-                vec![Mesh, LocalWireless], vec![Recycling, Logistics, Servicing], High, BoundedAutonomy,
+                "scavenger", Morph::ProcessMachine, vec![Mob::Wheeled, Mob::Tracked], vec![Env::TerrestrialSurface, Env::GeneralInfrastructure],
+                vec![M::MaterialHandling, M::ToolUse, M::GeneralManipulation], vec![Se::Vision, Se::Depth, Se::ForceTorque],
+                vec![En::Battery], vec![C::Mesh, C::LocalWireless], vec![R::Recycling, R::Logistics, R::Servicing],
+                S::High, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.8, locomotion: 0.5, perception: 0.7, communication: 0.5 },
             ),
             EmbodimentPlatform::Agribot => d(
-                "agribot", GroundVehicle, vec![Wheeled], vec![Agricultural, TerrestrialSurface],
-                vec![GeneralManipulation, ToolUse, MaterialHandling], vec![Vision, Depth, Environmental, Position],
-                vec![Battery, Solar], vec![Mesh, LocalWireless], vec![Agriculture, Inspection, Logistics],
-                Moderate, BoundedAutonomy,
+                "agribot", Morph::GroundVehicle, vec![Mob::Wheeled], vec![Env::Agricultural, Env::TerrestrialSurface],
+                vec![M::GeneralManipulation, M::ToolUse, M::MaterialHandling],
+                vec![Se::Vision, Se::Depth, Se::Environmental, Se::Position], vec![En::Battery, En::Solar],
+                vec![C::Mesh, C::LocalWireless], vec![R::Agriculture, R::Inspection, R::Logistics],
+                S::Moderate, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.6, locomotion: 0.6, perception: 0.8, communication: 0.5 },
             ),
             EmbodimentPlatform::Biota => d(
-                "biota", GroundVehicle, vec![Wheeled], vec![AnimalProximate, TerrestrialSurface],
-                vec![], vec![Vision, Depth, Environmental], vec![Battery], vec![Mesh, LocalWireless],
-                vec![EcologicalStewardship, Inspection], High, BoundedAutonomy,
+                "biota", Morph::GroundVehicle, vec![Mob::Wheeled], vec![Env::AnimalProximate, Env::TerrestrialSurface],
+                vec![], vec![Se::Vision, Se::Depth, Se::Environmental], vec![En::Battery], vec![C::Mesh, C::LocalWireless],
+                vec![R::EcologicalStewardship, R::Inspection], S::High, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.1, locomotion: 0.5, perception: 0.9, communication: 0.5 },
             ),
             EmbodimentPlatform::Clime => d(
-                "clime", FixedInstallation, vec![MobilityClass::None], vec![HabitatInterior, GeneralInfrastructure],
-                vec![ProcessControl], vec![Environmental, NetworkState], vec![ExternalGrid], vec![DirectAttached, Mesh],
-                vec![HabitatOperations, Care], LifeCritical, Cooperative,
+                "clime", Morph::FixedInstallation, vec![Mob::None], vec![Env::HabitatInterior, Env::GeneralInfrastructure],
+                vec![M::ProcessControl], vec![Se::Environmental, Se::NetworkState], vec![En::ExternalGrid],
+                vec![C::DirectAttached, C::Mesh], vec![R::HabitatOperations, R::Care], S::LifeCritical, A::Cooperative,
                 CapabilityStrengths { manipulation: 0.3, locomotion: 0.0, perception: 0.9, communication: 0.6 },
             ),
             EmbodimentPlatform::CareProvider => d(
-                "care-provider", Virtual, vec![MobilityClass::Virtual], vec![Digital], vec![],
-                vec![NetworkState], vec![Virtual], vec![DirectAttached, LongRange], vec![Care, Computing],
-                High, VirtualAgent,
+                "care-provider", Morph::Virtual, vec![Mob::Virtual], vec![Env::Digital], vec![], vec![Se::NetworkState],
+                vec![En::Virtual], vec![C::DirectAttached, C::LongRange], vec![R::Care, R::Computing], S::High, A::VirtualAgent,
                 CapabilityStrengths { manipulation: 0.0, locomotion: 0.0, perception: 0.6, communication: 1.0 },
             ),
             EmbodimentPlatform::Browser => d(
-                "browser", Virtual, vec![MobilityClass::Virtual], vec![Digital], vec![], vec![NetworkState], vec![Virtual],
-                vec![DirectAttached, LongRange], vec![Inspection, Computing, Communications], Moderate, VirtualAgent,
+                "browser", Morph::Virtual, vec![Mob::Virtual], vec![Env::Digital], vec![], vec![Se::NetworkState],
+                vec![En::Virtual], vec![C::DirectAttached, C::LongRange], vec![R::Inspection, R::Computing, R::Communications],
+                S::Moderate, A::VirtualAgent,
                 CapabilityStrengths { manipulation: 0.0, locomotion: 0.0, perception: 0.8, communication: 1.0 },
             ),
             EmbodimentPlatform::Phone => d(
-                "phone", Virtual, vec![MobilityClass::Virtual], vec![Digital], vec![], vec![Vision, NetworkState], vec![Virtual],
-                vec![DirectAttached, LocalWireless, LongRange], vec![Inspection, Computing, Communications], Moderate, Supervised,
+                "phone", Morph::Virtual, vec![Mob::Virtual], vec![Env::Digital], vec![], vec![Se::Vision, Se::NetworkState],
+                vec![En::Virtual], vec![C::DirectAttached, C::LocalWireless, C::LongRange],
+                vec![R::Inspection, R::Computing, R::Communications], S::Moderate, A::Supervised,
                 CapabilityStrengths { manipulation: 0.1, locomotion: 0.0, perception: 0.8, communication: 1.0 },
             ),
             EmbodimentPlatform::Desktop => d(
-                "desktop", Virtual, vec![MobilityClass::Virtual], vec![Digital], vec![], vec![Vision, NetworkState], vec![Virtual],
-                vec![DirectAttached, LongRange], vec![Inspection, Computing, Communications], Moderate, Supervised,
+                "desktop", Morph::Virtual, vec![Mob::Virtual], vec![Env::Digital], vec![], vec![Se::Vision, Se::NetworkState],
+                vec![En::Virtual], vec![C::DirectAttached, C::LongRange],
+                vec![R::Inspection, R::Computing, R::Communications], S::Moderate, A::Supervised,
                 CapabilityStrengths { manipulation: 0.1, locomotion: 0.0, perception: 0.8, communication: 1.0 },
             ),
             EmbodimentPlatform::Detritivore => d(
-                "detritivore", ProcessMachine, vec![MobilityClass::None], vec![GeneralInfrastructure],
-                vec![MaterialHandling, ProcessControl], vec![ForceTorque, Environmental], vec![ExternalGrid],
-                vec![DirectAttached, Mesh], vec![Recycling, Servicing], High, BoundedAutonomy,
+                "detritivore", Morph::ProcessMachine, vec![Mob::None], vec![Env::GeneralInfrastructure],
+                vec![M::MaterialHandling, M::ProcessControl], vec![Se::ForceTorque, Se::Environmental],
+                vec![En::ExternalGrid], vec![C::DirectAttached, C::Mesh], vec![R::Recycling, R::Servicing],
+                S::High, A::BoundedAutonomy,
                 CapabilityStrengths { manipulation: 0.7, locomotion: 0.0, perception: 0.5, communication: 0.4 },
             ),
         }
     }
 }
 
-// Internal alias used only to keep the Orbital preset readable without adding
-// a separate public capability for every possible tool family.
-const ServicingToolUse: ManipulationCapability = ManipulationCapability::ToolUse;
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const ALL_PLATFORMS: [EmbodimentPlatform; 21] = [
+    const ALL_PLATFORMS: [EmbodimentPlatform; 22] = [
         EmbodimentPlatform::None,
         EmbodimentPlatform::Humanoid,
         EmbodimentPlatform::Quadrotor,
@@ -449,35 +583,50 @@ mod tests {
         EmbodimentPlatform::Browser,
         EmbodimentPlatform::Phone,
         EmbodimentPlatform::Desktop,
-        // Detritivore intentionally tested separately below because changing
-        // the stable enum roster should force this census to be reviewed.
+        EmbodimentPlatform::Detritivore,
     ];
 
     #[test]
     fn every_preset_descriptor_is_structurally_valid() {
         for platform in ALL_PLATFORMS {
             let descriptor = platform.descriptor();
-            assert_eq!(descriptor.preset, platform);
+            assert_eq!(descriptor.preset, Some(platform));
             assert!(descriptor.is_structurally_valid(), "invalid {platform:?}");
             assert_eq!(descriptor.evidence, DescriptorEvidence::PresetHeuristic);
         }
-        assert!(EmbodimentPlatform::Detritivore.descriptor().is_structurally_valid());
     }
 
     #[test]
-    fn capability_is_not_authority() {
+    fn composed_descriptor_needs_no_enum_variant() {
+        let rover = PlatformDescriptor::composed("lunar-hauler", MorphologyClass::GroundVehicle)
+            .with_environment(OperatingEnvironment::AirlessSurface)
+            .with_environment(OperatingEnvironment::PlanetarySurface)
+            .with_mobility(MobilityClass::Tracked)
+            .with_role(MissionRole::Logistics)
+            .with_role(MissionRole::Construction)
+            .with_sensor(SensorCapability::Inertial)
+            .with_sensor(SensorCapability::Depth)
+            .with_energy(EnergyClass::Battery);
+        assert_eq!(rover.preset, None);
+        assert!(rover.supports_role(MissionRole::Construction));
+        assert!(rover.supports_environment(OperatingEnvironment::AirlessSurface));
+        assert_eq!(rover.evidence, DescriptorEvidence::Declared);
+        assert!(rover.is_structurally_valid());
+    }
+
+    #[test]
+    fn capability_is_not_authority_or_qualification() {
         let descriptor = EmbodimentPlatform::Manipulator.descriptor();
         assert!(descriptor.supports_role(MissionRole::Manipulation));
-        // Compile-time/type-level boundary: the descriptor contains no command
-        // or authorization object. This regression test pins its evidence state
-        // as heuristic so discovery cannot masquerade as qualification.
         assert_eq!(descriptor.evidence, DescriptorEvidence::PresetHeuristic);
     }
 
     #[test]
-    fn deep_space_platform_advertises_store_and_forward() {
+    fn orbital_preset_advertises_store_and_forward() {
         let descriptor = EmbodimentPlatform::Orbital.descriptor();
         assert!(descriptor.supports_environment(OperatingEnvironment::OrbitalMicrogravity));
-        assert!(descriptor.communications.contains(&CommunicationCapability::StoreAndForward));
+        assert!(descriptor
+            .communications
+            .contains(&CommunicationCapability::StoreAndForward));
     }
 }
