@@ -1,0 +1,65 @@
+name: Continuity exact rustfmt repair promotion
+
+on:
+  push:
+    branches:
+      - ci/continuity-store-authority-exact-head-v1
+
+permissions:
+  contents: write
+
+jobs:
+  promote-exact-repair:
+    runs-on: ubuntu-24.04
+    env:
+      TARGET_BRANCH: architecture/continuity-verifier-adoption-trusted-store-v1
+      TARGET_SHA: a0a9ade2410f8f78c91608e652050b67dab68f19
+      EXPECTED_PATCH_SHA256: f680ac318824ac3e40f7e3a504c7aea26355814b1b70673298a419adca897fff
+    steps:
+      - name: Checkout exact feature head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Refuse a moved feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | cut -f1)"
+          test -n "$remote_sha"
+          test "$remote_sha" = "$TARGET_SHA"
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+
+      - name: Install repository-pinned rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+          rustup override set 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Reproduce exact verifier repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-continuity
+          git diff --binary -- crates/core/symthaea-continuity > /tmp/continuity-rustfmt.patch
+          actual_patch_sha256="$(sha256sum /tmp/continuity-rustfmt.patch | awk '{print $1}')"
+          printf 'rustfmt repair sha256=%s\n' "$actual_patch_sha256"
+          test "$actual_patch_sha256" = "$EXPECTED_PATCH_SHA256"
+          git diff --check -- crates/core/symthaea-continuity
+          test -s /tmp/continuity-rustfmt.patch
+
+      - name: Commit and push only the proven formatter delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- crates/core/symthaea-continuity
+          test -z "$(git diff --cached --name-only | grep -v '^crates/core/symthaea-continuity/' || true)"
+          git diff --cached --quiet && { echo 'expected a formatter delta' >&2; exit 1; }
+          git commit -m "style(continuity): apply exact verifier-produced rustfmt repair"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
