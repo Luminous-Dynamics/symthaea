@@ -39,6 +39,7 @@ pub mod radiation;
 pub mod reduced_gravity;
 pub mod reflex;
 pub mod rescue_benchmark;
+pub mod rescue_fault_campaign;
 pub mod rescue_navigation;
 pub mod rescue_propulsion;
 pub mod resource_optimizer;
