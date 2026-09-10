@@ -31,6 +31,7 @@ pub mod post_execution_health;
 pub mod post_execution_observation;
 pub mod post_transition_distributed_health;
 pub mod profile_adoption;
+pub mod promotion_eligibility;
 pub mod recovery_qualification;
 pub mod scope;
 pub mod subject_contract;
@@ -151,6 +152,9 @@ pub use profile_adoption::{
     VerifierAdoptionScopeV1, VerifierProfileAdoptionError, VerifierProfileAdoptionPredecessorV1,
     VerifierProfileAdoptionSubjectId, VerifierProfileAdoptionSubjectV1,
     VerifierProfileAdoptionTransitionDigest, VerifierProfileAdoptionTransitionV1,
+};
+pub use promotion_eligibility::{
+    LkgPromotionEligibilityId, LkgPromotionEligibilityV1, LkgPromotionError,
 };
 pub use recovery_qualification::{
     QualifiedRecoveryToActiveKnownGoodId, QualifiedRecoveryToActiveKnownGoodV1,
