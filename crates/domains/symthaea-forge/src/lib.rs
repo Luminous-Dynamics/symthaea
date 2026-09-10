@@ -14,8 +14,8 @@
 //! semantic discovery ledger only when the exact `DiscoveryRun` and complete observation archive
 //! are supplied externally. [`bundle`] proves structural persisted-file integrity, while
 //! [`bundle_verify`] proves the cross-file semantics of that bundle. [`trial_semantics`] validates
-//! the stronger event/schema/attempt/artifact/transformation relationships required before Forge
-//! history is used for learning.
+//! event/schema/attempt/artifact/transformation consistency and [`trials`] projects that validated
+//! history into canonical per-transformation learning records.
 //!
 //! # Authority boundary
 //!
@@ -27,6 +27,7 @@
 //!   benchmark is a candidate evaluation rejection.
 //! - Persistent output must resolve outside the canonical workspace and is create-new only.
 //! - Forge's local benchmark remains a search heuristic, not replicated superiority evidence.
+//! - Transformation trials are descriptive search-memory records, not promotion evidence.
 //! - No promotion, merge, activation, or runtime authority is provided here.
 
 pub mod bundle;
@@ -40,6 +41,7 @@ pub mod sandbox;
 pub mod search;
 pub mod trace;
 pub mod trial_semantics;
+pub mod trials;
 
 pub use bundle::{
     read_completed_manifest, BundleError, ForgeBundleManifest, ForgeBundleOutcome, ABORT_FILE,
@@ -65,4 +67,8 @@ pub use trial_semantics::{
     validate_forge_trial_semantics, ForgeTrialSemanticError, BENCHMARK_FAILURE_SCHEMA,
     CANDIDATE_DECISION_SCHEMA, CANDIDATE_GENERATED_SCHEMA, CORRECTNESS_GATES_SCHEMA,
     NO_CANDIDATE_SCHEMA, SEARCH_ABORTED_SCHEMA, SEARCH_SUMMARY_SCHEMA, SELECTION_SCHEMA,
+};
+pub use trials::{
+    extract_transformation_trials, ForgeTrialError, ForgeTrialOutcome, ForgeTrialSet,
+    TransformationTrial,
 };
