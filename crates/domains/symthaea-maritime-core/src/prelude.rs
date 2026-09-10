@@ -2,9 +2,10 @@
 //! Convenience imports for maritime platform adapters.
 
 pub use crate::{
-    AuthorityContext, AuthorityLease, ComponentHealth, DependencyState, FailureObservation,
-    FleetAssuranceReport, FleetMemberReport, HealthSeverity, MaritimeCapability,
-    MaritimePlatformKind, MaritimeState, NavigationQuality, OperatingEnvelope, PlatformHealth,
-    ProgressiveFailureTrace, ProgressiveFailureViolation, ResidualUtilitySnapshot,
-    UtilityAvailability, baseline_envelope,
+    AuthenticatedMachineSession, AuthorityContext, AuthorityLease, ComponentHealth,
+    DependencyState, FailureObservation, FleetAssuranceReport, FleetMemberReport,
+    HealthSeverity, MachineSessionContext, MachineSessionPolicy, MachineSessionTrust,
+    MaritimeCapability, MaritimePlatformKind, MaritimeState, NavigationQuality, OperatingEnvelope,
+    PlatformHealth, ProgressiveFailureTrace, ProgressiveFailureViolation,
+    ResidualUtilitySnapshot, UtilityAvailability, baseline_envelope, evaluate_machine_session,
 };
