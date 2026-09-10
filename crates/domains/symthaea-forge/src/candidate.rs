@@ -126,6 +126,23 @@ mod tests {
         .unwrap()
     }
 
+    fn passing_gates() -> Vec<GateEvidence> {
+        vec![
+            GateEvidence {
+                gate: "compile".into(),
+                passed: true,
+                duration_ms: 1,
+                output_tail: String::new(),
+            },
+            GateEvidence {
+                gate: "test".into(),
+                passed: true,
+                duration_ms: 1,
+                output_tail: String::new(),
+            },
+        ]
+    }
+
     fn fixture() -> (
         DiscoveryRun,
         AlgorithmRecord,
@@ -180,12 +197,7 @@ mod tests {
             mutation_operator: mutation.operator.clone(),
             mutation_detail: mutation.detail.clone(),
             mutation_history: vec![mutation],
-            gates: vec![GateEvidence {
-                gate: "test".into(),
-                passed: true,
-                duration_ms: 1,
-                output_tail: String::new(),
-            }],
+            gates: passing_gates(),
             benchmark: None,
             before_source: "fn target() -> i32 { 1 }".into(),
             after_source: "fn target() -> i32 { 2 }".into(),
