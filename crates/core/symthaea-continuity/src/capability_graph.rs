@@ -24,6 +24,7 @@ pub const CAPABILITY_GRAPH_SNAPSHOT_SCHEMA_V1: &str =
     "symthaea-continuity-capability-graph-snapshot-v1";
 
 const GRAPH_SNAPSHOT_DOMAIN: &[u8] = b"symthaea.continuity.capability-graph-snapshot.v1\0";
+const MAX_CAPABILITY_DEFINITIONS: usize = 65_536;
 
 /// Exact content identity of one canonical capability graph snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -53,6 +54,7 @@ impl CapabilityGraphSnapshotV1 {
     pub fn new(
         mut definitions: Vec<CapabilityDefinitionV1>,
     ) -> Result<Self, CapabilityGraphError> {
+        validate_count(definitions.len())?;
         for definition in &definitions {
             definition.validate()?;
         }
@@ -88,11 +90,16 @@ impl CapabilityGraphSnapshotV1 {
             ));
         }
 
+        validate_count(self.definitions.len())?;
         for definition in &self.definitions {
             definition.validate()?;
         }
 
-        if self.definitions.windows(2).any(|pair| pair[0].id() >= pair[1].id()) {
+        if self
+            .definitions
+            .windows(2)
+            .any(|pair| pair[0].id() >= pair[1].id())
+        {
             if self
                 .definitions
                 .windows(2)
@@ -175,6 +182,8 @@ pub enum CapabilityGraphError {
     UnsupportedSchema(String),
     #[error(transparent)]
     Capability(#[from] CapabilityError),
+    #[error("capability graph exceeds {MAX_CAPABILITY_DEFINITIONS} definitions")]
+    TooManyCapabilityDefinitions,
     #[error("capability graph contains duplicate stable capability identity")]
     DuplicateCapabilityDefinition,
     #[error("capability graph definitions must be in canonical capability-id order")]
@@ -186,6 +195,13 @@ pub enum CapabilityGraphError {
     },
     #[error("stored capability graph snapshot identity does not match canonical definitions")]
     SnapshotIdentityMismatch,
+}
+
+fn validate_count(count: usize) -> Result<(), CapabilityGraphError> {
+    if count > MAX_CAPABILITY_DEFINITIONS {
+        return Err(CapabilityGraphError::TooManyCapabilityDefinitions);
+    }
+    Ok(())
 }
 
 fn validate_unique_definitions(
@@ -258,6 +274,15 @@ mod tests {
 
     fn leaf_definition(name: &str) -> CapabilityDefinitionV1 {
         CapabilityDefinitionV1::new("org.example", name, None).unwrap()
+    }
+
+    #[test]
+    fn capability_graph_cardinality_is_bounded() {
+        assert_eq!(validate_count(MAX_CAPABILITY_DEFINITIONS), Ok(()));
+        assert_eq!(
+            validate_count(MAX_CAPABILITY_DEFINITIONS + 1),
+            Err(CapabilityGraphError::TooManyCapabilityDefinitions)
+        );
     }
 
     #[test]
