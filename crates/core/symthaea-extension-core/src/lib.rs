@@ -53,6 +53,7 @@ impl CapabilityId {
 /// Hosts may accept a newer minor version when the major version matches, but
 /// compatibility policy belongs to the host rather than this data crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AbiVersion {
     pub major: u16,
     pub minor: u16,
@@ -114,6 +115,7 @@ pub enum EffectClass {
 
 /// One capability exported by an extension.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CapabilityDescriptor {
     pub id: CapabilityId,
     pub description: String,
@@ -152,6 +154,7 @@ pub enum FilesystemPermission {
 
 /// Capability-based permissions. Defaults intentionally deny ambient authority.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct PermissionSet {
     #[serde(default)]
     pub network: NetworkPermission,
@@ -169,8 +172,22 @@ pub struct PermissionSet {
     pub actuators: Vec<String>,
 }
 
+impl PermissionSet {
+    /// True only when the extension requests no ambient host authority.
+    pub fn is_empty(&self) -> bool {
+        self.network == NetworkPermission::None
+            && self.filesystem == FilesystemPermission::None
+            && !self.gpu
+            && !self.wall_clock
+            && !self.randomness
+            && self.sensors.is_empty()
+            && self.actuators.is_empty()
+    }
+}
+
 /// Host-enforced resource envelope for an extension invocation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ResourceBudget {
     /// Maximum guest memory in bytes.
     pub memory_bytes: u64,
@@ -198,6 +215,7 @@ impl Default for ResourceBudget {
 
 /// Portable manifest for native, WASM, remote, and data-only extensions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExtensionManifest {
     pub id: ExtensionId,
     pub name: String,
@@ -241,11 +259,21 @@ impl ExtensionManifest {
                 field: "name",
                 message: "name cannot be empty".into(),
             });
+        } else if self.name != self.name.trim() {
+            problems.push(ManifestProblem {
+                field: "name",
+                message: "name must not contain leading or trailing whitespace".into(),
+            });
         }
         if self.version.trim().is_empty() {
             problems.push(ManifestProblem {
                 field: "version",
                 message: "version cannot be empty".into(),
+            });
+        } else if self.version != self.version.trim() {
+            problems.push(ManifestProblem {
+                field: "version",
+                message: "version must not contain leading or trailing whitespace".into(),
             });
         }
         if self.abi.major == 0 {
@@ -254,17 +282,31 @@ impl ExtensionManifest {
                 message: "ABI major version must be non-zero".into(),
             });
         }
-        if self.resources.memory_bytes == 0
-            || self.resources.fuel == 0
-            || self.resources.max_wall_time_ms == 0
-            || self.resources.max_output_bytes == 0
-            || self.resources.max_concurrency == 0
+
+        // Data-only packages are never invoked, so their resource envelope is
+        // informational/ignored. Executable or remote providers must declare
+        // non-zero invocation limits.
+        if self.runtime != RuntimeKind::DataOnly
+            && (self.resources.memory_bytes == 0
+                || self.resources.fuel == 0
+                || self.resources.max_wall_time_ms == 0
+                || self.resources.max_output_bytes == 0
+                || self.resources.max_concurrency == 0)
         {
             problems.push(ManifestProblem {
                 field: "resources",
-                message: "resource limits must all be non-zero".into(),
+                message: "resource limits must all be non-zero for executable providers".into(),
             });
         }
+
+        if self.runtime == RuntimeKind::DataOnly && !self.permissions.is_empty() {
+            problems.push(ManifestProblem {
+                field: "permissions",
+                message: "data-only extensions cannot request ambient host permissions".into(),
+            });
+        }
+
+        validate_permissions(&self.permissions, &mut problems);
 
         let mut provided = HashSet::new();
         for capability in &self.provides {
@@ -282,6 +324,15 @@ impl ExtensionManifest {
                     field: "provides",
                     message: format!(
                         "capability {:?} requires a non-empty description",
+                        capability.id.as_str()
+                    ),
+                });
+            }
+            if self.runtime == RuntimeKind::DataOnly && capability.effect != EffectClass::Pure {
+                problems.push(ManifestProblem {
+                    field: "provides",
+                    message: format!(
+                        "data-only capability {:?} must be pure",
                         capability.id.as_str()
                     ),
                 });
@@ -311,12 +362,63 @@ impl ExtensionManifest {
                     message: format!("duplicate capability requirement {:?}", capability.as_str()),
                 });
             }
+            if provided.contains(capability.as_str()) {
+                problems.push(ManifestProblem {
+                    field: "requires",
+                    message: format!(
+                        "capability {:?} cannot be both provided and required by the same extension",
+                        capability.as_str()
+                    ),
+                });
+            }
         }
 
         if problems.is_empty() {
             Ok(())
         } else {
             Err(problems)
+        }
+    }
+}
+
+fn validate_permissions(permissions: &PermissionSet, problems: &mut Vec<ManifestProblem>) {
+    match &permissions.network {
+        NetworkPermission::None | NetworkPermission::Unrestricted => {}
+        NetworkPermission::Allowlist(hosts) => {
+            validate_string_set("permissions.network", hosts, problems)
+        }
+    }
+    match &permissions.filesystem {
+        FilesystemPermission::None => {}
+        FilesystemPermission::ReadOnly(paths) | FilesystemPermission::ReadWrite(paths) => {
+            validate_string_set("permissions.filesystem", paths, problems)
+        }
+    }
+    validate_string_set("permissions.sensors", &permissions.sensors, problems);
+    validate_string_set("permissions.actuators", &permissions.actuators, problems);
+}
+
+fn validate_string_set(
+    field: &'static str,
+    values: &[String],
+    problems: &mut Vec<ManifestProblem>,
+) {
+    let mut seen = HashSet::new();
+    for value in values {
+        if value.trim().is_empty()
+            || value != value.trim()
+            || value.chars().any(char::is_control)
+        {
+            problems.push(ManifestProblem {
+                field,
+                message: format!("permission entry {value:?} must be non-empty and canonical"),
+            });
+        }
+        if !seen.insert(value.as_str()) {
+            problems.push(ManifestProblem {
+                field,
+                message: format!("duplicate permission entry {value:?}"),
+            });
         }
     }
 }
@@ -364,11 +466,7 @@ mod tests {
     #[test]
     fn default_permissions_deny_ambient_authority() {
         let permissions = PermissionSet::default();
-        assert_eq!(permissions.network, NetworkPermission::None);
-        assert_eq!(permissions.filesystem, FilesystemPermission::None);
-        assert!(!permissions.gpu);
-        assert!(permissions.sensors.is_empty());
-        assert!(permissions.actuators.is_empty());
+        assert!(permissions.is_empty());
     }
 
     #[test]
@@ -381,7 +479,57 @@ mod tests {
         let mut manifest = fixture();
         manifest.provides.push(manifest.provides[0].clone());
         let problems = manifest.validate().unwrap_err();
-        assert!(problems.iter().any(|problem| problem.message.contains("duplicate capability")));
+        assert!(problems
+            .iter()
+            .any(|problem| problem.message.contains("duplicate capability")));
+    }
+
+    #[test]
+    fn unknown_manifest_field_is_rejected() {
+        let mut value = serde_json::to_value(fixture()).unwrap();
+        value["permisisons"] = serde_json::json!({});
+        assert!(serde_json::from_value::<ExtensionManifest>(value).is_err());
+    }
+
+    #[test]
+    fn duplicate_permission_entry_is_rejected() {
+        let mut manifest = fixture();
+        manifest.permissions.sensors = vec!["camera.front".into(), "camera.front".into()];
+        let problems = manifest.validate().unwrap_err();
+        assert!(problems
+            .iter()
+            .any(|problem| problem.message.contains("duplicate permission entry")));
+    }
+
+    #[test]
+    fn self_dependency_is_rejected() {
+        let mut manifest = fixture();
+        manifest.requires = vec![CapabilityId::new("science.astronomy.orbit_propagation")];
+        let problems = manifest.validate().unwrap_err();
+        assert!(problems
+            .iter()
+            .any(|problem| problem.message.contains("both provided and required")));
+    }
+
+    #[test]
+    fn data_only_manifest_must_remain_zero_authority_and_pure() {
+        let mut manifest = fixture();
+        manifest.kind = ExtensionKind::KnowledgePack;
+        manifest.runtime = RuntimeKind::DataOnly;
+        manifest.resources = ResourceBudget {
+            memory_bytes: 0,
+            fuel: 0,
+            max_wall_time_ms: 0,
+            max_output_bytes: 0,
+            max_concurrency: 0,
+        };
+        manifest.validate().unwrap();
+
+        manifest.permissions.wall_clock = true;
+        assert!(manifest.validate().is_err());
+        manifest.permissions = PermissionSet::default();
+        manifest.provides[0].effect = EffectClass::ReadOnly;
+        assert!(manifest.validate().is_err());
     }
 
     #[test]
