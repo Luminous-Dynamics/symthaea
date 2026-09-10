@@ -3,7 +3,7 @@
 //! This module describes search runs and candidate artifacts. It deliberately has no process,
 //! filesystem-mutation, Git, merge, activation, or promotion API.
 
-use crate::evaluation::EvaluationReceipt;
+use crate::evaluation::{EvaluationError, EvaluationReceipt};
 use crate::{
     AlgorithmLineage, ContentId, DiscoveryRisk, ImplementationId, ImplementationRecord, ProblemId,
     ProblemSpec, RegistryError,
@@ -16,14 +16,20 @@ use thiserror::Error;
 pub enum DiscoveryError {
     #[error(transparent)]
     Registry(#[from] RegistryError),
+    #[error("evaluation receipt is invalid: {0}")]
+    Evaluation(#[from] EvaluationError),
     #[error("search budget values must be positive")]
     ZeroBudget,
     #[error("automated discovery policy does not admit risk class {0:?}")]
     RiskNotAdmitted(DiscoveryRisk),
-    #[error("candidate problem does not match the discovery run")]
+    #[error("candidate problem does not match the discovery run/archive")]
     ProblemMismatch,
+    #[error("candidate run does not match this archive")]
+    RunMismatch,
     #[error("candidate lineage does not match the candidate implementation")]
     LineageMismatch,
+    #[error("candidate artifact content identity does not match the implementation artifact")]
+    ArtifactMismatch,
     #[error("evaluation receipt does not match the candidate implementation/problem")]
     EvaluationMismatch,
     #[error("candidate implementation is already archived")]
@@ -35,7 +41,6 @@ pub enum DiscoveryError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
 pub struct SearchBudget {
     pub max_candidates: u64,
     pub max_generations: u64,
@@ -57,13 +62,21 @@ impl SearchBudget {
             max_evaluations,
         })
     }
+
+    pub fn validate(&self) -> Result<(), DiscoveryError> {
+        Self::new(
+            self.max_candidates,
+            self.max_generations,
+            self.max_evaluations,
+        )?;
+        Ok(())
+    }
 }
 
 /// Maximum risk class an automated discovery run may accept.
 ///
-/// The default admits only ordinary computational optimization. Security-sensitive and
-/// safety-critical discovery require a separate explicit policy decision and still gain no
-/// promotion/runtime authority from this type.
+/// The default admits only ordinary computational optimization. Raising this ceiling is an
+/// explicit research-policy decision and still grants no promotion/runtime authority.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiscoveryPolicy {
     pub maximum_risk: DiscoveryRisk,
@@ -79,6 +92,7 @@ impl Default for DiscoveryPolicy {
 
 impl DiscoveryPolicy {
     pub fn admits(&self, problem: &ProblemSpec) -> Result<(), DiscoveryError> {
+        problem.validate()?;
         if problem.risk <= self.maximum_risk {
             Ok(())
         } else {
@@ -108,6 +122,7 @@ impl DiscoveryRun {
         seed: u64,
     ) -> Result<Self, DiscoveryError> {
         policy.admits(problem)?;
+        budget.validate()?;
         let baseline_revision = baseline_revision.into();
         if baseline_revision.trim().is_empty() {
             return Err(DiscoveryError::EmptyArtifactReference);
@@ -130,6 +145,10 @@ impl DiscoveryRun {
     }
 
     pub fn validate(&self) -> Result<(), DiscoveryError> {
+        self.budget.validate()?;
+        if self.baseline_revision.trim().is_empty() {
+            return Err(DiscoveryError::EmptyArtifactReference);
+        }
         let expected = Self::derive_id(
             &self.problem_id,
             &self.generator_id,
@@ -221,12 +240,17 @@ impl CandidateProposal {
         lineage: AlgorithmLineage,
         artifact: CandidateArtifact,
     ) -> Result<Self, DiscoveryError> {
+        run.validate()?;
+        implementation.validate()?;
         if implementation.problem_id != run.problem_id {
             return Err(DiscoveryError::ProblemMismatch);
         }
         lineage
             .validate_for(&implementation)
             .map_err(|_| DiscoveryError::LineageMismatch)?;
+        if artifact.content_id != implementation.artifact_id {
+            return Err(DiscoveryError::ArtifactMismatch);
+        }
         Ok(Self {
             run_id: run.id.clone(),
             implementation,
@@ -242,21 +266,42 @@ pub struct ArchivedCandidate {
     pub evaluation: Option<EvaluationReceipt>,
 }
 
-/// In-memory/value-level candidate archive.
+/// Archive scoped to exactly one discovery run.
 ///
-/// Persistence is intentionally left to a caller-owned adapter. The archive cannot write files,
-/// invoke Git, or mint production authority.
-#[derive(Debug, Default)]
+/// Persistence is caller-owned. This type cannot write files, invoke Git, or mint production
+/// authority.
+#[derive(Debug)]
 pub struct CandidateArchive {
+    run_id: ContentId,
+    problem_id: ProblemId,
     candidates: BTreeMap<ImplementationId, ArchivedCandidate>,
 }
 
 impl CandidateArchive {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn for_run(run: &DiscoveryRun) -> Result<Self, DiscoveryError> {
+        run.validate()?;
+        Ok(Self {
+            run_id: run.id.clone(),
+            problem_id: run.problem_id.clone(),
+            candidates: BTreeMap::new(),
+        })
     }
 
     pub fn insert(&mut self, proposal: CandidateProposal) -> Result<(), DiscoveryError> {
+        if proposal.run_id != self.run_id {
+            return Err(DiscoveryError::RunMismatch);
+        }
+        if proposal.implementation.problem_id != self.problem_id {
+            return Err(DiscoveryError::ProblemMismatch);
+        }
+        proposal.implementation.validate()?;
+        proposal
+            .lineage
+            .validate_for(&proposal.implementation)
+            .map_err(|_| DiscoveryError::LineageMismatch)?;
+        if proposal.artifact.content_id != proposal.implementation.artifact_id {
+            return Err(DiscoveryError::ArtifactMismatch);
+        }
         let key = proposal.implementation.id.clone();
         if self.candidates.contains_key(&key) {
             return Err(DiscoveryError::DuplicateCandidate);
@@ -276,16 +321,21 @@ impl CandidateArchive {
         implementation_id: &ImplementationId,
         receipt: EvaluationReceipt,
     ) -> Result<(), DiscoveryError> {
+        receipt.validate()?;
         let Some(candidate) = self.candidates.get_mut(implementation_id) else {
             return Err(DiscoveryError::EvaluationMismatch);
         };
         if receipt.implementation_id != candidate.proposal.implementation.id
-            || receipt.problem_id != candidate.proposal.implementation.problem_id
+            || receipt.problem_id != self.problem_id
         {
             return Err(DiscoveryError::EvaluationMismatch);
         }
         candidate.evaluation = Some(receipt);
         Ok(())
+    }
+
+    pub fn run_id(&self) -> &ContentId {
+        &self.run_id
     }
 
     pub fn get(&self, id: &ImplementationId) -> Option<&ArchivedCandidate> {
@@ -344,11 +394,12 @@ mod tests {
     }
 
     fn proposal(run: &DiscoveryRun) -> CandidateProposal {
+        let artifact_id = cid("artifact", "candidate-1");
         let implementation = ImplementationRecord::new(
             run.problem_id.clone(),
             AlgorithmId(cid("algorithm", "family")),
             "candidate://run/1",
-            cid("artifact", "candidate-1"),
+            artifact_id.clone(),
             None,
         )
         .unwrap();
@@ -359,7 +410,7 @@ mod tests {
             lineage,
             CandidateArtifact::new(
                 CandidateArtifactKind::UnifiedDiff,
-                cid("patch", "candidate-1"),
+                artifact_id,
                 "archive://candidate-1.patch",
             )
             .unwrap(),
@@ -385,11 +436,14 @@ mod tests {
     }
 
     #[test]
-    fn zero_budget_fails_closed() {
-        assert_eq!(
-            SearchBudget::new(0, 1, 1).unwrap_err(),
-            DiscoveryError::ZeroBudget
-        );
+    fn zero_budget_fails_closed_even_after_deserialization_style_mutation() {
+        assert_eq!(SearchBudget::new(0, 1, 1).unwrap_err(), DiscoveryError::ZeroBudget);
+        let invalid = SearchBudget {
+            max_candidates: 0,
+            max_generations: 1,
+            max_evaluations: 1,
+        };
+        assert_eq!(invalid.validate().unwrap_err(), DiscoveryError::ZeroBudget);
     }
 
     #[test]
@@ -409,12 +463,38 @@ mod tests {
     }
 
     #[test]
-    fn archive_rejects_duplicate_candidates() {
+    fn candidate_artifact_must_match_implementation_artifact() {
+        let problem = problem(DiscoveryRisk::Ordinary);
+        let run = run(&problem);
+        let implementation = ImplementationRecord::new(
+            run.problem_id.clone(),
+            AlgorithmId(cid("algorithm", "family")),
+            "candidate://run/1",
+            cid("artifact", "implementation"),
+            None,
+        )
+        .unwrap();
+        let lineage = AlgorithmLineage::new(implementation.id.clone(), vec![], vec![]).unwrap();
+        let artifact = CandidateArtifact::new(
+            CandidateArtifactKind::UnifiedDiff,
+            cid("artifact", "different"),
+            "archive://candidate.patch",
+        )
+        .unwrap();
+        assert_eq!(
+            CandidateProposal::new(&run, implementation, lineage, artifact).unwrap_err(),
+            DiscoveryError::ArtifactMismatch
+        );
+    }
+
+    #[test]
+    fn archive_is_scoped_to_one_run_and_rejects_duplicates() {
         let problem = problem(DiscoveryRisk::Ordinary);
         let run = run(&problem);
         let proposal = proposal(&run);
-        let mut archive = CandidateArchive::new();
+        let mut archive = CandidateArchive::for_run(&run).unwrap();
         archive.insert(proposal.clone()).unwrap();
+        assert_eq!(archive.run_id(), &run.id);
         assert_eq!(
             archive.insert(proposal).unwrap_err(),
             DiscoveryError::DuplicateCandidate
@@ -434,18 +514,19 @@ mod tests {
             DiscoveryRisk::Ordinary,
         )
         .unwrap();
+        let artifact_id = cid("artifact", "other");
         let implementation = ImplementationRecord::new(
             second.id,
             AlgorithmId(cid("algorithm", "other")),
             "candidate://other",
-            cid("artifact", "other"),
+            artifact_id.clone(),
             None,
         )
         .unwrap();
         let lineage = AlgorithmLineage::new(implementation.id.clone(), vec![], vec![]).unwrap();
         let artifact = CandidateArtifact::new(
             CandidateArtifactKind::SourceTree,
-            cid("artifact", "tree"),
+            artifact_id,
             "archive://tree",
         )
         .unwrap();
