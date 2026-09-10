@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt;
@@ -14,6 +14,8 @@ pub enum RegistryError {
     ControlCharacters { field: &'static str },
     #[error("content id must use the sha256:<64 lowercase hex> form")]
     InvalidContentId,
+    #[error("{kind} identity does not match its canonical fields")]
+    IdentityMismatch { kind: &'static str },
     #[error("implementation does not match the exact algorithm/problem pair")]
     ProblemMismatch,
     #[error("lineage candidate does not match the implementation")]
@@ -52,7 +54,7 @@ fn digest_hex(bytes: &[u8]) -> String {
 }
 
 /// Deterministic, domain-separated SHA-256 content identity.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
 pub struct ContentId(String);
 
@@ -83,6 +85,16 @@ impl ContentId {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ContentId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::parse(value).map_err(serde::de::Error::custom)
     }
 }
 
@@ -205,7 +217,7 @@ impl ProblemSpec {
         if rebuilt.id == self.id {
             Ok(())
         } else {
-            Err(RegistryError::InvalidContentId)
+            Err(RegistryError::IdentityMismatch { kind: "problem" })
         }
     }
 }
@@ -259,6 +271,20 @@ impl AlgorithmRecord {
             provenance,
         })
     }
+
+    pub fn validate(&self) -> Result<(), RegistryError> {
+        let rebuilt = Self::new(
+            self.problem_id.clone(),
+            self.name.clone(),
+            self.description.clone(),
+            self.provenance,
+        )?;
+        if rebuilt.id == self.id {
+            Ok(())
+        } else {
+            Err(RegistryError::IdentityMismatch { kind: "algorithm" })
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -305,7 +331,26 @@ impl ImplementationRecord {
         })
     }
 
+    pub fn validate(&self) -> Result<(), RegistryError> {
+        let rebuilt = Self::new(
+            self.problem_id.clone(),
+            self.algorithm_id.clone(),
+            self.source_ref.clone(),
+            self.artifact_id.clone(),
+            self.target_profile.clone(),
+        )?;
+        if rebuilt.id == self.id {
+            Ok(())
+        } else {
+            Err(RegistryError::IdentityMismatch {
+                kind: "implementation",
+            })
+        }
+    }
+
     pub fn validate_for(&self, algorithm: &AlgorithmRecord) -> Result<(), RegistryError> {
+        self.validate()?;
+        algorithm.validate()?;
         if self.problem_id == algorithm.problem_id && self.algorithm_id == algorithm.id {
             Ok(())
         } else {
@@ -339,6 +384,17 @@ impl TransformationRecord {
             name,
             description,
         })
+    }
+
+    pub fn validate(&self) -> Result<(), RegistryError> {
+        let rebuilt = Self::new(self.name.clone(), self.description.clone())?;
+        if rebuilt.id == self.id {
+            Ok(())
+        } else {
+            Err(RegistryError::IdentityMismatch {
+                kind: "transformation",
+            })
+        }
     }
 }
 
@@ -387,19 +443,29 @@ impl AlgorithmLineage {
         })
     }
 
-    pub fn validate_for(&self, implementation: &ImplementationRecord) -> Result<(), RegistryError> {
-        if self.candidate_id != implementation.id {
-            return Err(RegistryError::CandidateMismatch);
-        }
+    pub fn validate(&self) -> Result<(), RegistryError> {
         let rebuilt = Self::new(
             self.candidate_id.clone(),
             self.parent_ids.clone(),
             self.transformation_ids.clone(),
         )?;
-        if rebuilt.id == self.id {
+        if rebuilt.id == self.id
+            && rebuilt.parent_ids == self.parent_ids
+            && rebuilt.transformation_ids == self.transformation_ids
+        {
             Ok(())
         } else {
-            Err(RegistryError::InvalidContentId)
+            Err(RegistryError::IdentityMismatch { kind: "lineage" })
+        }
+    }
+
+    pub fn validate_for(&self, implementation: &ImplementationRecord) -> Result<(), RegistryError> {
+        self.validate()?;
+        implementation.validate()?;
+        if self.candidate_id == implementation.id {
+            Ok(())
+        } else {
+            Err(RegistryError::CandidateMismatch)
         }
     }
 }
@@ -429,6 +495,12 @@ mod tests {
     }
 
     #[test]
+    fn serde_rejects_malformed_content_ids() {
+        let json = r#""not-a-content-id""#;
+        assert!(serde_json::from_str::<ContentId>(json).is_err());
+    }
+
+    #[test]
     fn semantic_change_changes_problem_identity() {
         let exact = problem();
         let approximate = ProblemSpec::new(
@@ -444,7 +516,7 @@ mod tests {
     }
 
     #[test]
-    fn implementation_binds_exact_problem_and_algorithm() {
+    fn implementation_validation_detects_redigested_field_substitution() {
         let problem = problem();
         let algorithm = AlgorithmRecord::new(
             problem.id.clone(),
@@ -453,7 +525,7 @@ mod tests {
             AlgorithmProvenance::HumanAuthored,
         )
         .unwrap();
-        let implementation = ImplementationRecord::new(
+        let mut implementation = ImplementationRecord::new(
             problem.id,
             algorithm.id.clone(),
             "crates/core/symthaea-core/src/hdc/binary_hv.rs",
@@ -462,10 +534,17 @@ mod tests {
         )
         .unwrap();
         assert!(implementation.validate_for(&algorithm).is_ok());
+        implementation.source_ref = "candidate://substituted".into();
+        assert!(matches!(
+            implementation.validate(),
+            Err(RegistryError::IdentityMismatch {
+                kind: "implementation"
+            })
+        ));
     }
 
     #[test]
-    fn lineage_is_order_independent_and_rejects_duplicates() {
+    fn lineage_is_canonical_and_rejects_duplicates() {
         let candidate = ImplementationId(ContentId::derive("impl", [b"candidate".as_slice()]));
         let p1 = ImplementationId(ContentId::derive("impl", [b"p1".as_slice()]));
         let p2 = ImplementationId(ContentId::derive("impl", [b"p2".as_slice()]));
@@ -479,6 +558,7 @@ mod tests {
         .unwrap();
         let b = AlgorithmLineage::new(candidate.clone(), vec![p2, p1.clone()], vec![t2, t1]).unwrap();
         assert_eq!(a.id, b.id);
+        assert_eq!(a.parent_ids, b.parent_ids);
         assert_eq!(
             AlgorithmLineage::new(candidate, vec![p1.clone(), p1], vec![]).unwrap_err(),
             RegistryError::DuplicateParent
