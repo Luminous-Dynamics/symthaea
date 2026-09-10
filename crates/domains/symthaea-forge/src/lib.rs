@@ -30,9 +30,10 @@
 //! [`proposal_coverage`] proves that raw proposal evidence exactly covers the search trace,
 //! [`proposal_qualification`] composes those layers while also binding no-op-only runs to the exact
 //! semantic baseline implementation, [`proposal_dataset`] freezes one exact row per
-//! `(attempt, policy family)` before any estimator or learned policy exists, and
-//! [`proposal_corpus`] binds those tables to the frozen corpus split while exposing separate
-//! training/validation datasets and an identity-only holdout seal.
+//! `(attempt, policy family)` before any estimator or learned policy exists, [`proposal_corpus`]
+//! binds those tables to the frozen corpus split while exposing separate training/validation
+//! datasets and an identity-only holdout seal, and [`proposal_history`] attaches the validated
+//! accepted state entering each generation to every proposal row, including no-op attempts.
 //!
 //! # Authority boundary
 //!
@@ -41,6 +42,8 @@
 //! - Concrete transformation identity and reusable transformation-family identity are separate.
 //! - Sequence memory conditions siblings on the state entering their generation; a winner changes
 //!   state only for later generations.
+//! - Proposal history for every row is derived only from accepted steps in strictly earlier
+//!   generations, so no sibling can observe the winner of its own generation as prior state.
 //! - History order is explicit and content-addressed; first-order and higher-order statistics do not
 //!   silently mix.
 //! - Corpus role ranking depends only on a frozen salt and semantic `DiscoveryRun` identity, never
@@ -87,6 +90,7 @@ pub mod proposal_corpus;
 pub mod proposal_coverage;
 pub mod proposal_dataset;
 pub mod proposal_exposure;
+pub mod proposal_history;
 pub mod proposal_qualification;
 pub mod proposal_recording;
 pub mod proposal_trace;
@@ -147,6 +151,10 @@ pub use proposal_exposure::{
     ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
     ForgeProposalExposureArchive, ForgeProposalExposureError, ForgeProposalLearningQualification,
     ForgeProposalPolicy, ForgeProposalRule, ForgeProposalSelection,
+};
+pub use proposal_history::{
+    ForgeConditionedProposalObservationRow, ForgeConditionedProposalObservationTable,
+    ForgeProposalGenerationState, ForgeProposalHistoryError,
 };
 pub use proposal_qualification::{
     ForgeProposalQualificationError, ForgeQualifiedProposalEvidence,
