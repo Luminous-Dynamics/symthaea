@@ -13,7 +13,9 @@
 //! supply semantic registry context and a baseline implementation. Forge-local traces become a
 //! semantic discovery ledger only when the exact `DiscoveryRun` and complete observation archive
 //! are supplied externally. [`bundle`] proves structural persisted-file integrity, while
-//! [`bundle_verify`] proves the cross-file semantics of that bundle.
+//! [`bundle_verify`] proves the cross-file semantics of that bundle. [`trial_semantics`] validates
+//! the stronger event/schema/attempt/artifact/transformation relationships required before Forge
+//! history is used for learning.
 //!
 //! # Authority boundary
 //!
@@ -37,6 +39,7 @@ pub mod observations;
 pub mod sandbox;
 pub mod search;
 pub mod trace;
+pub mod trial_semantics;
 
 pub use bundle::{
     read_completed_manifest, BundleError, ForgeBundleManifest, ForgeBundleOutcome, ABORT_FILE,
@@ -57,4 +60,9 @@ pub use search::{
 pub use trace::{
     validate_forge_trace, validate_forge_trace_observations, ForgeAttemptId, ForgeTraceError,
     ForgeTraceEvent,
+};
+pub use trial_semantics::{
+    validate_forge_trial_semantics, ForgeTrialSemanticError, BENCHMARK_FAILURE_SCHEMA,
+    CANDIDATE_DECISION_SCHEMA, CANDIDATE_GENERATED_SCHEMA, CORRECTNESS_GATES_SCHEMA,
+    NO_CANDIDATE_SCHEMA, SEARCH_ABORTED_SCHEMA, SEARCH_SUMMARY_SCHEMA, SELECTION_SCHEMA,
 };
