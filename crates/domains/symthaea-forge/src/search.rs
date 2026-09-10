@@ -3,9 +3,11 @@
 //! Mutate -> verify -> measure -> select search loop.
 //!
 //! Forge uses a deliberately narrow in-place staging window because Cargo must see candidate
-//! source on disk. Candidate failures and apparatus failures remain distinct. Every inner-loop
-//! attempt receives a deterministic content-addressed ID before mutation/gate decisions begin, and
-//! that exact ID follows any concrete candidate through its one terminal local outcome.
+//! source on disk. Candidate failures and apparatus failures remain distinct. A proposal attempt
+//! exists only after the current source parses and the target function resolves. The same live
+//! mutator draw then produces both the candidate/no-op decision and a content-addressed raw
+//! proposal record; trace/proposal coverage is validated before any completed or aborted result is
+//! returned.
 
 use crate::certificate::{
     full_source_artifact_id, gate_result_to_evidence, BenchmarkEvidence, ForgeCandidate,
@@ -14,6 +16,8 @@ use crate::certificate::{
 use crate::fitness::{run_benchmark, run_correctness_gates, EvaluationTarget};
 use crate::mutations::{find_function_body_mut, Mutator};
 use crate::observations as forge_observations;
+use crate::proposal_coverage::validate_forge_raw_proposal_coverage;
+use crate::proposal_trace::{ForgeRawProposalArchive, ForgeRawProposalRecord};
 use crate::sandbox::Sandbox;
 use crate::trace::{
     validate_forge_trace_observations, ForgeAttemptId, ForgeTraceEvent,
@@ -66,6 +70,7 @@ pub struct SearchOutcome {
     pub best: Option<ForgeCandidate>,
     pub trace: Vec<ForgeTraceEvent>,
     pub observations: ObservationStore,
+    pub raw_proposals: ForgeRawProposalArchive,
 }
 
 #[derive(Debug)]
@@ -75,6 +80,7 @@ pub struct SearchFailure {
     pub best: Option<ForgeCandidate>,
     pub trace: Vec<ForgeTraceEvent>,
     pub observations: ObservationStore,
+    pub raw_proposals: ForgeRawProposalArchive,
     pub phase: String,
     pub detail: String,
 }
@@ -134,6 +140,7 @@ fn aborted_record(
     best: Option<ForgeCandidate>,
     mut trace: Vec<ForgeTraceEvent>,
     mut observations: ObservationStore,
+    raw_proposals: Vec<ForgeRawProposalRecord>,
     phase: impl Into<String>,
     detail: impl AsRef<str>,
 ) -> anyhow::Result<SearchRecord> {
@@ -157,12 +164,15 @@ fn aborted_record(
     )?;
     trace.push(ForgeTraceEvent::aborted(observation_id));
     validate_forge_trace_observations(&trace, &observations)?;
+    let raw_proposals = ForgeRawProposalArchive::from_records(raw_proposals)?;
+    validate_forge_raw_proposal_coverage(&trace, &observations, &raw_proposals)?;
     Ok(SearchRecord::Aborted(SearchFailure {
         stats,
         baseline_benchmark_score: baseline_score,
         best,
         trace,
         observations,
+        raw_proposals,
         phase,
         detail,
     }))
@@ -180,6 +190,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
     let mut best: Option<ForgeCandidate> = None;
     let mut trace = Vec::new();
     let mut observation_store = ObservationStore::new();
+    let mut raw_proposals = Vec::new();
     let mut baseline_score = None;
 
     if config.population == 0 {
@@ -189,6 +200,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
             best,
             trace,
             observation_store,
+            raw_proposals,
             "configuration",
             "Forge population must be positive",
         );
@@ -200,6 +212,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
             best,
             trace,
             observation_store,
+            raw_proposals,
             "configuration",
             "Forge generations must be positive",
         );
@@ -219,6 +232,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                 best,
                 trace,
                 observation_store,
+                raw_proposals,
                 "sandbox-init",
                 error.to_string(),
             );
@@ -234,6 +248,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                 best,
                 trace,
                 observation_store,
+                raw_proposals,
                 "baseline-source-read",
                 error.to_string(),
             );
@@ -254,6 +269,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                 best,
                 trace,
                 observation_store,
+                raw_proposals,
                 "baseline-gate-apparatus",
                 error.to_string(),
             );
@@ -274,6 +290,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
             best,
             trace,
             observation_store,
+            raw_proposals,
             "baseline-precondition",
             detail,
         );
@@ -288,6 +305,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                 best,
                 trace,
                 observation_store,
+                raw_proposals,
                 "baseline-benchmark",
                 error.to_string(),
             );
@@ -311,6 +329,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                     best,
                     trace,
                     observation_store,
+                    raw_proposals,
                     "generation-index",
                     error.to_string(),
                 );
@@ -319,59 +338,20 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
         let mut generation_winner: Option<GenerationWinner> = None;
 
         for _ in 0..config.population {
-            let attempt_id = ForgeAttemptId::derive(
-                &baseline_artifact_id,
-                config.seed,
-                attempt_ordinal,
-                generation_u64,
-            );
-            attempt_ordinal = match attempt_ordinal.checked_add(1) {
-                Some(next) => next,
-                None => {
-                    return aborted_record(
-                        stats,
-                        baseline_score,
-                        best,
-                        trace,
-                        observation_store,
-                        "attempt-index",
-                        "Forge attempt ordinal overflow",
-                    );
-                }
-            };
-            stats.candidates_attempted = match stats.candidates_attempted.checked_add(1) {
-                Some(next) => next,
-                None => {
-                    return aborted_record(
-                        stats,
-                        baseline_score,
-                        best,
-                        trace,
-                        observation_store,
-                        "attempt-counter",
-                        "Forge attempted-candidate counter overflow",
-                    );
-                }
-            };
-
+            // Parsing and target resolution are experiment preconditions, not proposal attempts.
             let mut file: syn::File = match syn::parse_str(&current_best_source) {
                 Ok(file) => file,
-                Err(_) => {
-                    stats.candidates_no_eligible_mutation += 1;
-                    let observation_id = retain_observation(
-                        &mut observation_store,
-                        forge_observations::no_candidate(
-                            &attempt_id,
-                            "current-best-not-syn-parseable",
-                            &current_best_artifact_id,
-                        )?,
-                    )?;
-                    trace.push(ForgeTraceEvent::no_candidate(
-                        attempt_id,
-                        generation_u64,
-                        observation_id,
-                    ));
-                    continue;
+                Err(error) => {
+                    return aborted_record(
+                        stats,
+                        baseline_score,
+                        best,
+                        trace,
+                        observation_store,
+                        raw_proposals,
+                        "current-source-parse",
+                        error.to_string(),
+                    );
                 }
             };
             let Some(body) = find_function_body_mut(&mut file, &config.target_function) else {
@@ -381,6 +361,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                     best,
                     trace,
                     observation_store,
+                    raw_proposals,
                     "target-resolution",
                     format!(
                         "function `{}` not found in {}",
@@ -389,13 +370,76 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                     ),
                 );
             };
-            let Some(mutation) = mutator.mutate_one(body, &mut rng) else {
+
+            if attempt_ordinal == u64::MAX {
+                return aborted_record(
+                    stats,
+                    baseline_score,
+                    best,
+                    trace,
+                    observation_store,
+                    raw_proposals,
+                    "attempt-index",
+                    "Forge attempt ordinal overflow",
+                );
+            }
+            let attempt_id = ForgeAttemptId::derive(
+                &baseline_artifact_id,
+                config.seed,
+                attempt_ordinal,
+                generation_u64,
+            );
+            attempt_ordinal += 1;
+
+            let recorded_mutation = mutator.mutate_one_recorded(body, &mut rng);
+            let raw_proposal = match ForgeRawProposalRecord::from_recorded(
+                attempt_id.clone(),
+                current_best_artifact_id.clone(),
+                &recorded_mutation,
+            ) {
+                Ok(record) => record,
+                Err(error) => {
+                    return aborted_record(
+                        stats,
+                        baseline_score,
+                        best,
+                        trace,
+                        observation_store,
+                        raw_proposals,
+                        "proposal-recording",
+                        error.to_string(),
+                    );
+                }
+            };
+            raw_proposals.push(raw_proposal);
+            stats.candidates_attempted = match stats.candidates_attempted.checked_add(1) {
+                Some(next) => next,
+                None => {
+                    return aborted_record(
+                        stats,
+                        baseline_score,
+                        best,
+                        trace,
+                        observation_store,
+                        raw_proposals,
+                        "attempt-counter",
+                        "Forge attempted-candidate counter overflow",
+                    );
+                }
+            };
+
+            let Some(mutation) = recorded_mutation.mutation else {
                 stats.candidates_no_eligible_mutation += 1;
+                let reason = if recorded_mutation.selection.is_none() {
+                    "no-eligible-ast-mutation"
+                } else {
+                    "mutation-rendered-identical-source"
+                };
                 let observation_id = retain_observation(
                     &mut observation_store,
                     forge_observations::no_candidate(
                         &attempt_id,
-                        "no-eligible-ast-mutation",
+                        reason,
                         &current_best_artifact_id,
                     )?,
                 )?;
@@ -406,6 +450,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                 ));
                 continue;
             };
+
             let candidate_source = render_file(&file);
             let candidate_artifact_id = full_source_artifact_id(&candidate_source);
             if candidate_artifact_id == current_best_artifact_id {
@@ -454,6 +499,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                         best,
                         trace,
                         observation_store,
+                        raw_proposals,
                         "candidate-stage",
                         error.to_string(),
                     );
@@ -470,6 +516,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                     best,
                     trace,
                     observation_store,
+                    raw_proposals,
                     "candidate-stage-write",
                     detail,
                 );
@@ -488,6 +535,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                         best,
                         trace,
                         observation_store,
+                        raw_proposals,
                         "candidate-gate-apparatus",
                         detail,
                     );
@@ -524,6 +572,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                         best,
                         trace,
                         observation_store,
+                        raw_proposals,
                         "candidate-restore-after-rejection",
                         error.to_string(),
                     );
@@ -545,6 +594,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                         best,
                         trace,
                         observation_store,
+                        raw_proposals,
                         "candidate-benchmark-apparatus",
                         detail,
                     );
@@ -574,6 +624,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                             best,
                             trace,
                             observation_store,
+                            raw_proposals,
                             "candidate-restore-after-evaluation-rejection",
                             restore_error.to_string(),
                         );
@@ -592,6 +643,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                     best,
                     trace,
                     observation_store,
+                    raw_proposals,
                     "candidate-restore-after-evaluation",
                     error.to_string(),
                 );
@@ -621,6 +673,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                         best,
                         trace,
                         observation_store,
+                        raw_proposals,
                         "search-invariant",
                         "Forge benchmark configuration changed during one search run",
                     );
@@ -685,6 +738,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                         best,
                         trace,
                         observation_store,
+                        raw_proposals,
                         "candidate-certificate",
                         error.to_string(),
                     );
@@ -755,6 +809,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
                     best,
                     trace,
                     observation_store,
+                    raw_proposals,
                     "generation-winner-validation",
                     error.to_string(),
                 );
@@ -801,6 +856,8 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
     )?;
     trace.push(ForgeTraceEvent::completed(summary_observation));
     validate_forge_trace_observations(&trace, &observation_store)?;
+    let raw_proposals = ForgeRawProposalArchive::from_records(raw_proposals)?;
+    validate_forge_raw_proposal_coverage(&trace, &observation_store, &raw_proposals)?;
 
     Ok(SearchRecord::Completed(SearchOutcome {
         stats,
@@ -808,6 +865,7 @@ pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord>
         best,
         trace,
         observations: observation_store,
+        raw_proposals,
     }))
 }
 
