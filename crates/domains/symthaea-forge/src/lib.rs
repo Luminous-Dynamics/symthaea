@@ -21,8 +21,9 @@
 //! context runs, [`sequence_learning`] reconstructs accepted family history at generation
 //! boundaries, [`sequence_stats`] aggregates bounded-history conditional outcomes only across
 //! exact-context repeated-search cohorts, [`corpus_split`] freezes outcome-independent
-//! train/validation/holdout membership, and [`proposal_exposure`] defines the complete opportunity
-//! evidence required before those observational outcomes may inform future policy learning.
+//! train/validation/holdout membership, [`proposal_exposure`] defines the complete opportunity
+//! evidence required before those observational outcomes may inform future policy learning, and
+//! [`proposal_recording`] proves that opportunity evidence came from the exact live mutator draw.
 //!
 //! # Authority boundary
 //!
@@ -37,6 +38,8 @@
 //!   on outcome-bearing batch/cohort identity.
 //! - Proposal exposure records exact eligible-site counts and selected pair; raw family success is
 //!   not eligible for policy learning without complete exposure qualification.
+//! - Proposal telemetry and mutation behavior share one sampler; the recording bridge never
+//!   resamples or reapplies a mutation.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
@@ -61,6 +64,7 @@ pub mod learning;
 pub mod mutations;
 pub mod observations;
 pub mod proposal_exposure;
+pub mod proposal_recording;
 pub mod sandbox;
 pub mod search;
 pub mod sequence_learning;
@@ -104,6 +108,9 @@ pub use proposal_exposure::{
     ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
     ForgeProposalExposureArchive, ForgeProposalExposureError, ForgeProposalLearningQualification,
     ForgeProposalPolicy, ForgeProposalRule, ForgeProposalSelection,
+};
+pub use proposal_recording::{
+    exposure_from_recorded_mutation, proposal_policy_for_mutator, ForgeProposalRecordingError,
 };
 pub use search::{
     run_search, run_search_recorded, ForgeConfig, SearchFailure, SearchOutcome, SearchRecord,
