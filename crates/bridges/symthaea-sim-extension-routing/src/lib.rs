@@ -286,7 +286,8 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
     use std::sync::Arc;
     use symthaea_extension_admission::{
-        AdmissionContext, AdmissionRecord, PrincipalId, Sha256Digest, TrustLevel,
+        AdmissionContext, AdmissionCurrentnessSource, AdmissionRecord, AdmissionSubject, PrincipalId,
+        Sha256Digest, TrustLevel,
     };
     use symthaea_extension_core::{
         AbiVersion, CapabilityDescriptor, EffectClass, ExtensionKind, PermissionSet,
@@ -294,6 +295,15 @@ mod tests {
     };
     use symthaea_extension_router::ProviderState;
     use symthaea_sim_bridge::EngineeringDomain;
+
+    #[derive(Debug, Clone, Copy)]
+    struct TestCurrentness(AdmissionContext);
+
+    impl AdmissionCurrentnessSource for TestCurrentness {
+        fn current_context(&self, _subject: AdmissionSubject<'_>) -> Option<AdmissionContext> {
+            Some(self.0)
+        }
+    }
 
     #[derive(Debug)]
     struct MockBackend {
@@ -372,6 +382,7 @@ mod tests {
         let extension = ExtensionId::new(id);
         let manifest = registry.catalog().get(&extension).unwrap();
         let trust_generation = 10_000 + u64::from(seed);
+        let currentness = TestCurrentness(AdmissionContext::active(generation, trust_generation));
         AdmissionRecord::issue(
             extension,
             manifest.version.clone(),
@@ -387,7 +398,7 @@ mod tests {
             trust_generation,
         )
         .unwrap()
-        .activate(manifest, AdmissionContext::active(generation, trust_generation))
+        .activate(manifest, &currentness)
         .unwrap()
     }
 

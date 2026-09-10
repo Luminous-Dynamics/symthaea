@@ -436,10 +436,21 @@ fn effect_rank(effect: EffectClass) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_extension_admission::{AdmissionContext, AdmissionRecord, PrincipalId};
+    use symthaea_extension_admission::{
+        AdmissionContext, AdmissionCurrentnessSource, AdmissionRecord, AdmissionSubject, PrincipalId,
+    };
     use symthaea_extension_core::{
         AbiVersion, CapabilityDescriptor, ExtensionKind, PermissionSet, ResourceBudget,
     };
+
+    #[derive(Debug, Clone, Copy)]
+    struct TestCurrentness(AdmissionContext);
+
+    impl AdmissionCurrentnessSource for TestCurrentness {
+        fn current_context(&self, _subject: AdmissionSubject<'_>) -> Option<AdmissionContext> {
+            Some(self.0)
+        }
+    }
 
     fn digest(byte: u8) -> Sha256Digest {
         Sha256Digest::new([byte; 32])
@@ -484,6 +495,7 @@ mod tests {
         seed: u8,
     ) -> ActiveAdmission {
         let trust_generation = 1_000 + u64::from(seed);
+        let currentness = TestCurrentness(AdmissionContext::active(generation, trust_generation));
         AdmissionRecord::issue(
             manifest.id.clone(),
             manifest.version.clone(),
@@ -499,10 +511,7 @@ mod tests {
             trust_generation,
         )
         .unwrap()
-        .activate(
-            manifest,
-            AdmissionContext::active(generation, trust_generation),
-        )
+        .activate(manifest, &currentness)
         .unwrap()
     }
 
