@@ -18,6 +18,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod control_modes;
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
@@ -28,8 +29,11 @@ pub mod full_frame;
 pub mod hal_bridge;
 pub mod metabolism;
 pub mod perturbations;
+pub mod plss;
 pub mod plugin;
+pub mod power;
 pub mod pressure_garment;
+pub mod radiation;
 pub mod reduced_gravity;
 pub mod reflex;
 #[cfg(feature = "sensors")]
