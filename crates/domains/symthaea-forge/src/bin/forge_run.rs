@@ -2,24 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! CLI entry point for a real `symthaea-forge` search run.
 //!
-//! Example:
-//! ```sh
-//! cargo run -p symthaea-forge --bin forge-run -- \
-//!     --target-file crates/core/symthaea-core/src/consciousness_metrics/entropy.rs \
-//!     --target-fn entropy_histogram \
-//!     --package symthaea-core \
-//!     --bench-example forge_bench_entropy_histogram \
-//!     --population 6 --generations 3 \
-//!     --out /tmp/forge-out/entropy-histogram
-//! ```
-//!
-//! Candidate staging is temporary and restored by the library. Persistent output is required to
-//! resolve outside the canonical workspace and existing evidence files are never overwritten.
-//! `search-trace.json` and `observations.json` are emitted even when no winner exists, so negative
-//! search outcomes remain reconstructable. A surviving candidate is written as exact full-file
-//! source bytes and immediately re-hashed. `bundle-manifest.json` is written last; without a valid
-//! manifest, a partial directory is not a completed Forge result.
+//! Candidate staging is temporary and restored by the library. Persistent output resolves outside
+//! the canonical workspace and is create-new only. Trace + observation payloads are read back and
+//! cross-validated before survivor artifacts or the terminal manifest are written. An aborted
+//! search seals its evidence bundle first and only then returns a non-zero process result.
 
+use serde::Serialize;
 use std::ffi::OsString;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -27,9 +15,10 @@ use std::path::{Component, Path, PathBuf};
 use symthaea_algorithms::observation::{ObservationObject, ObservationStore};
 use symthaea_forge::certificate::full_source_artifact_id;
 use symthaea_forge::{
-    read_completed_manifest, run_search, validate_forge_trace_observations, ForgeBundleManifest,
-    ForgeBundleOutcome, ForgeConfig, ForgeTraceEvent, CANDIDATE_FILE, CERTIFICATE_FILE,
-    MANIFEST_FILE, OBSERVATIONS_FILE, REPORT_FILE, TRACE_FILE,
+    read_completed_manifest, run_search_recorded, validate_forge_trace_observations, ForgeBundleManifest,
+    ForgeBundleOutcome, ForgeCandidate, ForgeConfig, ForgeTraceEvent, SearchFailure, SearchOutcome,
+    SearchRecord, ABORT_FILE, CANDIDATE_FILE, CERTIFICATE_FILE, MANIFEST_FILE, OBSERVATIONS_FILE,
+    REPORT_FILE, TRACE_FILE,
 };
 
 struct Args {
@@ -44,6 +33,22 @@ struct Args {
     generations: usize,
     seed: u64,
     out_dir: PathBuf,
+}
+
+#[derive(Serialize)]
+struct AbortFile<'a> {
+    terminal: &'static str,
+    phase: &'a str,
+    detail: &'a str,
+    candidates_attempted: usize,
+    candidates_no_eligible_mutation: usize,
+    candidates_failed_compile: usize,
+    candidates_failed_test: usize,
+    candidates_failed_benchmark: usize,
+    candidates_passed_correctness: usize,
+    candidates_selected_by_search: usize,
+    baseline_score_bits: Option<u64>,
+    best_artifact_id: Option<&'a str>,
 }
 
 fn parse_args() -> anyhow::Result<Args> {
@@ -116,7 +121,7 @@ fn main() -> anyhow::Result<()> {
 
     let config = ForgeConfig {
         target_file: target_file_abs,
-        target_function: args.target_fn.clone(),
+        target_function: args.target_fn,
         package: args.package,
         workspace_root,
         test_filter: args.test_filter,
@@ -127,42 +132,113 @@ fn main() -> anyhow::Result<()> {
         seed: args.seed,
     };
 
-    let outcome = run_search(&config)?;
+    match run_search_recorded(&config)? {
+        SearchRecord::Completed(outcome) => persist_completed(&out_dir, outcome),
+        SearchRecord::Aborted(failure) => {
+            let summary = failure.summary();
+            persist_aborted(&out_dir, failure)?;
+            anyhow::bail!("{summary}")
+        }
+    }
+}
+
+fn persist_completed(out_dir: &Path, outcome: SearchOutcome) -> anyhow::Result<()> {
     validate_forge_trace_observations(&outcome.trace, &outcome.observations)?;
-    let expected_observation_snapshot = outcome.observations.snapshot_id()?;
-    let bundle_outcome = if outcome.best.is_some() {
-        ForgeBundleOutcome::Winner
-    } else {
-        ForgeBundleOutcome::NoWinner
+    preflight_bundle_names(out_dir)?;
+    persist_trace_and_observations(out_dir, &outcome.trace, &outcome.observations)?;
+
+    print_stats(
+        &outcome.stats,
+        outcome.baseline_benchmark_score,
+        "completed",
+    );
+    let bundle_outcome = match outcome.best.as_ref() {
+        Some(candidate) => {
+            persist_survivor(
+                out_dir,
+                candidate,
+                "This survivor came from a bounded search that reached SearchCompleted.",
+            )?;
+            ForgeBundleOutcome::Winner
+        }
+        None => {
+            println!(
+                "No mutation in this bounded run both passed every configured correctness gate and satisfied the search-selection rule. This is a legitimate completed negative result."
+            );
+            ForgeBundleOutcome::NoWinner
+        }
     };
 
+    seal_bundle(out_dir, bundle_outcome)?;
+    Ok(())
+}
+
+fn persist_aborted(out_dir: &Path, failure: SearchFailure) -> anyhow::Result<()> {
+    validate_forge_trace_observations(&failure.trace, &failure.observations)?;
+    preflight_bundle_names(out_dir)?;
+    persist_trace_and_observations(out_dir, &failure.trace, &failure.observations)?;
+
+    let abort = AbortFile {
+        terminal: "search-aborted",
+        phase: &failure.phase,
+        detail: &failure.detail,
+        candidates_attempted: failure.stats.candidates_attempted,
+        candidates_no_eligible_mutation: failure.stats.candidates_no_eligible_mutation,
+        candidates_failed_compile: failure.stats.candidates_failed_compile,
+        candidates_failed_test: failure.stats.candidates_failed_test,
+        candidates_failed_benchmark: failure.stats.candidates_failed_benchmark,
+        candidates_passed_correctness: failure.stats.candidates_passed_correctness,
+        candidates_selected_by_search: failure.stats.candidates_selected_by_search,
+        baseline_score_bits: failure.baseline_benchmark_score.map(f64::to_bits),
+        best_artifact_id: failure.best.as_ref().map(|candidate| candidate.artifact_id().as_str()),
+    };
+    write_new(
+        &out_dir.join(ABORT_FILE),
+        &serde_json::to_vec_pretty(&abort)?,
+    )?;
+
+    print_stats(
+        &failure.stats,
+        failure.baseline_benchmark_score,
+        "aborted",
+    );
+    if let Some(candidate) = failure.best.as_ref() {
+        persist_survivor(
+            out_dir,
+            candidate,
+            "The search later aborted. This is only the last previously validated continuation survivor, not a completed-run winner.",
+        )?;
+    }
+
+    seal_bundle(out_dir, ForgeBundleOutcome::Aborted)?;
+    eprintln!(
+        "Forge search aborted during `{}`; retained reconstructable evidence in {}",
+        failure.phase,
+        out_dir.display()
+    );
+    Ok(())
+}
+
+fn persist_trace_and_observations(
+    out_dir: &Path,
+    trace: &[ForgeTraceEvent],
+    observations: &ObservationStore,
+) -> anyhow::Result<()> {
+    validate_forge_trace_observations(trace, observations)?;
+    let expected_observation_snapshot = observations.snapshot_id()?;
     let trace_path = out_dir.join(TRACE_FILE);
     let observations_path = out_dir.join(OBSERVATIONS_FILE);
-    let candidate_path = out_dir.join(CANDIDATE_FILE);
-    let cert_path = out_dir.join(CERTIFICATE_FILE);
-    let report_path = out_dir.join(REPORT_FILE);
-    let manifest_path = out_dir.join(MANIFEST_FILE);
-    ensure_absent(&[
-        &trace_path,
-        &observations_path,
-        &candidate_path,
-        &cert_path,
-        &report_path,
-        &manifest_path,
-    ])?;
 
-    write_new(&trace_path, &serde_json::to_vec_pretty(&outcome.trace)?)?;
-    let observation_objects: Vec<ObservationObject> = outcome.observations.objects().cloned().collect();
+    write_new(&trace_path, &serde_json::to_vec_pretty(trace)?)?;
+    let observation_objects: Vec<ObservationObject> = observations.objects().cloned().collect();
     write_new(
         &observations_path,
         &serde_json::to_vec_pretty(&observation_objects)?,
     )?;
 
-    // Rehydrate both persisted files before allowing winner artifacts or the terminal manifest.
-    // This proves persistence did not sever event -> observation references.
     let persisted_trace: Vec<ForgeTraceEvent> =
         serde_json::from_slice(&std::fs::read(&trace_path)?)?;
-    if persisted_trace != outcome.trace {
+    if persisted_trace != trace {
         anyhow::bail!("persisted Forge search trace changed during immediate read-back");
     }
     let persisted_objects: Vec<ObservationObject> =
@@ -172,73 +248,82 @@ fn main() -> anyhow::Result<()> {
     if persisted_store.snapshot_id()? != expected_observation_snapshot {
         anyhow::bail!("persisted Forge observation store changed during immediate read-back");
     }
+    Ok(())
+}
 
+fn persist_survivor(
+    out_dir: &Path,
+    candidate: &ForgeCandidate,
+    run_note: &str,
+) -> anyhow::Result<()> {
+    candidate.validate()?;
+    let candidate_path = out_dir.join(CANDIDATE_FILE);
+    let cert_path = out_dir.join(CERTIFICATE_FILE);
+    let report_path = out_dir.join(REPORT_FILE);
+
+    write_new(&candidate_path, candidate.full_source().as_bytes())?;
+    let persisted_source = std::fs::read_to_string(&candidate_path)?;
+    let persisted_id = full_source_artifact_id(&persisted_source);
+    if &persisted_id != candidate.artifact_id() {
+        anyhow::bail!(
+            "persisted candidate source does not match Forge artifact identity: expected {}, observed {}",
+            candidate.artifact_id(),
+            persisted_id
+        );
+    }
+
+    let cert = candidate.certificate();
+    write_new(&cert_path, cert.to_json_pretty()?.as_bytes())?;
+    write_new(&report_path, render_report(cert, run_note).as_bytes())?;
+    println!("\n{}", cert.summary());
+    Ok(())
+}
+
+fn print_stats(stats: &symthaea_forge::SearchStats, baseline: Option<f64>, terminal: &str) {
     println!(
-        "candidates: {} attempted, {} no-eligible-mutation, {} failed compile, {} failed test, {} failed benchmark, {} passed correctness, {} satisfied search-selection rule",
-        outcome.stats.candidates_attempted,
-        outcome.stats.candidates_no_eligible_mutation,
-        outcome.stats.candidates_failed_compile,
-        outcome.stats.candidates_failed_test,
-        outcome.stats.candidates_failed_benchmark,
-        outcome.stats.candidates_passed_correctness,
-        outcome.stats.candidates_selected_by_search,
+        "search {terminal}: {} attempted, {} no-eligible-mutation, {} failed compile, {} failed test, {} failed benchmark, {} passed correctness, {} selected for continuation",
+        stats.candidates_attempted,
+        stats.candidates_no_eligible_mutation,
+        stats.candidates_failed_compile,
+        stats.candidates_failed_test,
+        stats.candidates_failed_benchmark,
+        stats.candidates_passed_correctness,
+        stats.candidates_selected_by_search,
     );
-    if let Some(baseline) = outcome.baseline_benchmark_score {
+    if let Some(baseline) = baseline {
         println!("baseline benchmark score: {baseline:.2}");
     }
+}
 
-    match outcome.best {
-        Some(candidate) => {
-            candidate.validate()?;
-            let cert = candidate.certificate();
-
-            write_new(&candidate_path, candidate.full_source().as_bytes())?;
-            let persisted_source = std::fs::read_to_string(&candidate_path)?;
-            let persisted_id = full_source_artifact_id(&persisted_source);
-            if &persisted_id != candidate.artifact_id() {
-                anyhow::bail!(
-                    "persisted candidate source does not match Forge artifact identity: expected {}, observed {}",
-                    candidate.artifact_id(),
-                    persisted_id
-                );
-            }
-
-            write_new(&cert_path, cert.to_json_pretty()?.as_bytes())?;
-            write_new(&report_path, render_report(cert).as_bytes())?;
-            println!("\n{}", cert.summary());
-            println!(
-                "\nHONEST FRAMING: this is a proposed search candidate, not an applied change or replicated performance result. Exact source: {}. Certificate: {}. Report: {}. Trace: {}. Reconstructable observations: {}.",
-                candidate_path.display(),
-                cert_path.display(),
-                report_path.display(),
-                trace_path.display(),
-                observations_path.display(),
-            );
-        }
-        None => {
-            println!(
-                "\nNo mutation in this bounded run both passed every configured correctness gate and satisfied the search-selection rule. This is a legitimate negative result; its trace and reconstructable observations were retained at {} and {}.",
-                trace_path.display(),
-                observations_path.display(),
-            );
-        }
-    }
-
-    // The manifest is the terminal commit marker for persistent output. If any earlier write or
-    // validation fails, it is never created and the directory remains an explicitly partial bundle.
-    let manifest = ForgeBundleManifest::observe(&out_dir, bundle_outcome)?;
+fn seal_bundle(out_dir: &Path, outcome: ForgeBundleOutcome) -> anyhow::Result<()> {
+    let manifest_path = out_dir.join(MANIFEST_FILE);
+    let manifest = ForgeBundleManifest::observe(out_dir, outcome)?;
     write_new(&manifest_path, manifest.to_json_pretty()?.as_bytes())?;
-    let verified = read_completed_manifest(&out_dir)?;
-    if verified.id != manifest.id {
+    let verified = read_completed_manifest(out_dir)?;
+    if verified.id != manifest.id || verified.outcome != outcome {
         anyhow::bail!("Forge bundle manifest changed during immediate read-back validation");
     }
     println!(
-        "completed Forge evidence bundle: {} (manifest {})",
+        "sealed Forge evidence bundle: {} (outcome {:?}, manifest {})",
         manifest_path.display(),
+        outcome,
         manifest.id
     );
-
     Ok(())
+}
+
+fn preflight_bundle_names(out_dir: &Path) -> anyhow::Result<()> {
+    let paths = [
+        out_dir.join(TRACE_FILE),
+        out_dir.join(OBSERVATIONS_FILE),
+        out_dir.join(ABORT_FILE),
+        out_dir.join(CANDIDATE_FILE),
+        out_dir.join(CERTIFICATE_FILE),
+        out_dir.join(REPORT_FILE),
+        out_dir.join(MANIFEST_FILE),
+    ];
+    let refs: Vec<&Path> = paths.iter().map(PathBuf::as_path).collect();
+    ensure_absent(&refs)
 }
 
 fn ensure_absent(paths: &[&Path]) -> anyhow::Result<()> {
@@ -258,8 +343,6 @@ fn write_new(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Prepare a persistent proposal directory that is provably outside the canonical workspace at
-/// the moment it is created. This prevents `--out` from becoming a hidden repository-write path.
 fn prepare_output_dir(workspace_root: &Path, requested: &Path) -> anyhow::Result<PathBuf> {
     let requested = if requested.is_absolute() {
         requested.to_path_buf()
@@ -268,8 +351,6 @@ fn prepare_output_dir(workspace_root: &Path, requested: &Path) -> anyhow::Result
     };
     let normalized = lexical_normalize(&requested)?;
 
-    // Resolve the deepest existing ancestor to catch symlink aliases into the workspace before
-    // creating missing output components.
     let mut ancestor = normalized.as_path();
     let mut missing = Vec::<OsString>::new();
     while !ancestor.exists() {
@@ -321,7 +402,7 @@ fn lexical_normalize(path: &Path) -> anyhow::Result<PathBuf> {
     Ok(out)
 }
 
-fn render_report(cert: &symthaea_forge::ForgeCertificate) -> String {
+fn render_report(cert: &symthaea_forge::ForgeCertificate, run_note: &str) -> String {
     let bench_section = match &cert.benchmark {
         Some(benchmark) => {
             let relative = benchmark
@@ -367,7 +448,7 @@ fn render_report(cert: &symthaea_forge::ForgeCertificate) -> String {
         })
         .collect();
     format!(
-        "# symthaea-forge candidate report\n\nGenerated: {generated} ms since epoch\nTarget: `{file}::{func}` (package `{package}`)\nGit SHA at search time: `{sha}`\nGeneration found: {generation}\nBaseline full-file artifact: `{baseline_artifact}`\nCandidate full-file artifact: `{candidate_artifact}`\nMutation: **{op}** — {detail}\n\n## Ordered artifact lineage\n{lineage}\n## Gates\n{gates}\n## Benchmark/search heuristic\n{bench}\n## Before\n```rust\n{before}\n```\n\n## After\n```rust\n{after}\n```\n\n## Authority boundary\n`candidate.rs` is the exact full-file survivor identified above. `search-trace.json` records the event history and `observations.json` retains the exact bounded payloads referenced by every event. `bundle-manifest.json` is the terminal completion marker and must validate before this directory is treated as a complete Forge result. This report is a human-review proposal. It does not establish replicated performance, production eligibility, or permission to modify runtime code. The candidate should be independently re-hashed and re-evaluated through the algorithm evidence pipeline before any separate promotion review.\n",
+        "# symthaea-forge candidate report\n\n{run_note}\n\nGenerated: {generated} ms since epoch\nTarget: `{file}::{func}` (package `{package}`)\nGit SHA at search time: `{sha}`\nGeneration found: {generation}\nBaseline full-file artifact: `{baseline_artifact}`\nCandidate full-file artifact: `{candidate_artifact}`\nMutation: **{op}** — {detail}\n\n## Ordered artifact lineage\n{lineage}\n## Gates\n{gates}\n## Benchmark/search heuristic\n{bench}\n## Before\n```rust\n{before}\n```\n\n## After\n```rust\n{after}\n```\n\n## Authority boundary\n`candidate.rs` is the exact full-file survivor identified above. `search-trace.json` and `observations.json` retain reconstructable search memory. `bundle-manifest.json` is the terminal persistence marker. This is a human-review proposal only; it does not establish replicated performance, production eligibility, or permission to modify runtime code.\n",
         generated = cert.generated_at_unix_ms,
         file = cert.target_file.display(),
         func = cert.target_function,
@@ -398,10 +479,7 @@ mod tests {
 
     #[test]
     fn write_new_refuses_overwrite() {
-        let root = std::env::temp_dir().join(format!(
-            "forge-output-test-{}",
-            std::process::id()
-        ));
+        let root = std::env::temp_dir().join(format!("forge-output-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let file = root.join("evidence.txt");
@@ -419,11 +497,9 @@ mod tests {
         ));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
-        let candidate = root.join(CANDIDATE_FILE);
         let manifest = root.join(MANIFEST_FILE);
         std::fs::write(&manifest, "existing").unwrap();
-        assert!(ensure_absent(&[&candidate, &manifest]).is_err());
-        assert!(!candidate.exists());
+        assert!(preflight_bundle_names(&root).is_err());
         let _ = std::fs::remove_dir_all(root);
     }
 
