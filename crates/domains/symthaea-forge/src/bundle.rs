@@ -4,8 +4,8 @@
 //!
 //! A directory containing some Forge files is not, by itself, a completed result. The manifest is
 //! written last and content-addresses the exact canonical file set for a winner, no-winner, or
-//! aborted search. An aborted run may preserve a previously valid survivor, but partial survivor
-//! triplets are rejected.
+//! aborted search. Raw proposal evidence is mandatory for every terminal outcome. An aborted run
+//! may preserve a previously valid survivor, but partial survivor triplets are rejected.
 
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -16,6 +16,7 @@ use thiserror::Error;
 pub const MANIFEST_FILE: &str = "bundle-manifest.json";
 pub const TRACE_FILE: &str = "search-trace.json";
 pub const OBSERVATIONS_FILE: &str = "observations.json";
+pub const RAW_PROPOSALS_FILE: &str = "raw-proposals.json";
 pub const ABORT_FILE: &str = "abort.json";
 pub const CANDIDATE_FILE: &str = "candidate.rs";
 pub const CERTIFICATE_FILE: &str = "certificate.json";
@@ -24,12 +25,18 @@ pub const REPORT_FILE: &str = "report.md";
 const WINNER_FILES: &[&str] = &[
     TRACE_FILE,
     OBSERVATIONS_FILE,
+    RAW_PROPOSALS_FILE,
     CANDIDATE_FILE,
     CERTIFICATE_FILE,
     REPORT_FILE,
 ];
-const NO_WINNER_FILES: &[&str] = &[TRACE_FILE, OBSERVATIONS_FILE];
-const ABORT_BASE_FILES: &[&str] = &[TRACE_FILE, OBSERVATIONS_FILE, ABORT_FILE];
+const NO_WINNER_FILES: &[&str] = &[TRACE_FILE, OBSERVATIONS_FILE, RAW_PROPOSALS_FILE];
+const ABORT_BASE_FILES: &[&str] = &[
+    TRACE_FILE,
+    OBSERVATIONS_FILE,
+    RAW_PROPOSALS_FILE,
+    ABORT_FILE,
+];
 const SURVIVOR_FILES: &[&str] = &[CANDIDATE_FILE, CERTIFICATE_FILE, REPORT_FILE];
 
 #[derive(Debug, Error)]
@@ -105,7 +112,6 @@ pub struct ForgeBundleManifest {
 }
 
 impl ForgeBundleManifest {
-    /// Observe the already-written result files and construct the terminal completion manifest.
     pub fn observe(root: &Path, outcome: ForgeBundleOutcome) -> Result<Self, BundleError> {
         let names = canonical_file_names_at(root, outcome)?;
         let mut files = names
@@ -122,11 +128,7 @@ impl ForgeBundleManifest {
         if !is_canonical_name_set(self.outcome, &observed_names) {
             return Err(BundleError::UnexpectedFileSet);
         }
-        if self
-            .files
-            .windows(2)
-            .any(|pair| pair[0].name >= pair[1].name)
-        {
+        if self.files.windows(2).any(|pair| pair[0].name >= pair[1].name) {
             return Err(BundleError::UnexpectedFileSet);
         }
         if derive_manifest_id(self.outcome, &self.files) != self.id {
@@ -135,7 +137,6 @@ impl ForgeBundleManifest {
         Ok(())
     }
 
-    /// Re-read every manifested file and prove the persisted bundle still matches this manifest.
     pub fn validate_at(&self, root: &Path) -> Result<(), BundleError> {
         self.validate()?;
         let observed = Self::observe(root, self.outcome)?;
@@ -254,6 +255,12 @@ mod tests {
         root
     }
 
+    fn write_core(root: &Path) {
+        fs::write(root.join(TRACE_FILE), b"[]").unwrap();
+        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
+        fs::write(root.join(RAW_PROPOSALS_FILE), b"{}").unwrap();
+    }
+
     fn write_survivor_triplet(root: &Path) {
         fs::write(root.join(CANDIDATE_FILE), b"fn f() {}").unwrap();
         fs::write(root.join(CERTIFICATE_FILE), b"{}").unwrap();
@@ -261,24 +268,34 @@ mod tests {
     }
 
     #[test]
-    fn no_winner_manifest_requires_trace_and_observations() {
+    fn no_winner_manifest_requires_trace_observations_and_raw_proposals() {
         let root = temp_dir("no-winner");
+        write_core(&root);
+        let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::NoWinner).unwrap();
+        assert_eq!(manifest.files.len(), 3);
+        assert!(manifest.validate_at(&root).is_ok());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn missing_raw_proposals_prevents_terminal_manifest() {
+        let root = temp_dir("missing-raw");
         fs::write(root.join(TRACE_FILE), b"[]").unwrap();
         fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
-        let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::NoWinner).unwrap();
-        assert_eq!(manifest.files.len(), 2);
-        assert!(manifest.validate_at(&root).is_ok());
+        assert!(matches!(
+            ForgeBundleManifest::observe(&root, ForgeBundleOutcome::NoWinner),
+            Err(BundleError::MissingFile(name)) if name == RAW_PROPOSALS_FILE
+        ));
         let _ = fs::remove_dir_all(root);
     }
 
     #[test]
     fn winner_manifest_binds_all_required_files() {
         let root = temp_dir("winner");
-        fs::write(root.join(TRACE_FILE), b"[]").unwrap();
-        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
+        write_core(&root);
         write_survivor_triplet(&root);
         let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::Winner).unwrap();
-        assert_eq!(manifest.files.len(), 5);
+        assert_eq!(manifest.files.len(), 6);
         assert!(manifest.validate_at(&root).is_ok());
         let _ = fs::remove_dir_all(root);
     }
@@ -286,11 +303,10 @@ mod tests {
     #[test]
     fn aborted_manifest_without_survivor_is_canonical() {
         let root = temp_dir("aborted");
-        fs::write(root.join(TRACE_FILE), b"[]").unwrap();
-        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
+        write_core(&root);
         fs::write(root.join(ABORT_FILE), b"{}").unwrap();
         let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::Aborted).unwrap();
-        assert_eq!(manifest.files.len(), 3);
+        assert_eq!(manifest.files.len(), 4);
         assert!(manifest.validate_at(&root).is_ok());
         let _ = fs::remove_dir_all(root);
     }
@@ -298,12 +314,11 @@ mod tests {
     #[test]
     fn aborted_manifest_may_preserve_complete_survivor_triplet() {
         let root = temp_dir("aborted-survivor");
-        fs::write(root.join(TRACE_FILE), b"[]").unwrap();
-        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
+        write_core(&root);
         fs::write(root.join(ABORT_FILE), b"{}").unwrap();
         write_survivor_triplet(&root);
         let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::Aborted).unwrap();
-        assert_eq!(manifest.files.len(), 6);
+        assert_eq!(manifest.files.len(), 7);
         assert!(manifest.validate_at(&root).is_ok());
         let _ = fs::remove_dir_all(root);
     }
@@ -311,8 +326,7 @@ mod tests {
     #[test]
     fn aborted_manifest_rejects_partial_survivor_triplet() {
         let root = temp_dir("aborted-partial");
-        fs::write(root.join(TRACE_FILE), b"[]").unwrap();
-        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
+        write_core(&root);
         fs::write(root.join(ABORT_FILE), b"{}").unwrap();
         fs::write(root.join(CANDIDATE_FILE), b"fn f() {}").unwrap();
         assert!(matches!(
@@ -325,10 +339,9 @@ mod tests {
     #[test]
     fn post_manifest_file_change_is_detected() {
         let root = temp_dir("mutation");
-        fs::write(root.join(TRACE_FILE), b"before").unwrap();
-        fs::write(root.join(OBSERVATIONS_FILE), b"[]").unwrap();
+        write_core(&root);
         let manifest = ForgeBundleManifest::observe(&root, ForgeBundleOutcome::NoWinner).unwrap();
-        fs::write(root.join(TRACE_FILE), b"after").unwrap();
+        fs::write(root.join(RAW_PROPOSALS_FILE), b"changed").unwrap();
         assert!(matches!(
             manifest.validate_at(&root),
             Err(BundleError::FileMismatch(_))
