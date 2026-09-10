@@ -115,11 +115,12 @@ pub use exact_distributed_health::{
     QualifiedExactDistributedHealthV2,
 };
 pub use exact_local_health::{
-    CRASH_SOURCE_HEALTH_CLAIM_SCHEMA_V1, AuthenticatedCrashSourceHealthId,
-    CrashSourceHealthClaimId, CrashSourceHealthClaimV1, CrashSourceHealthPolicyId,
-    CrashSourceHealthPolicyV1, ExactLocalHealthError, HealthyLocalSnapshotBasisV1,
-    QualifiedCrashSourceHealthId, QualifiedCrashSourceHealthV1,
+    CRASH_SOURCE_HEALTH_AUTH_PURPOSE, CRASH_SOURCE_HEALTH_CLAIM_SCHEMA_V1,
+    AuthenticatedCrashSourceHealthId, CrashSourceHealthClaimId, CrashSourceHealthClaimV1,
+    CrashSourceHealthPolicyId, CrashSourceHealthPolicyV1, ExactLocalHealthError,
+    HealthyLocalSnapshotBasisV1, QualifiedCrashSourceHealthId, QualifiedCrashSourceHealthV1,
     QualifiedHealthyLocalSnapshotId, QualifiedHealthyLocalSnapshotV1,
+    canonical_crash_source_health_claim_bytes, canonical_crash_source_health_claim_digest,
 };
 pub use exact_policy::{
     ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1,
@@ -168,10 +169,12 @@ pub use observation::{
     ObservationEnvelopeV1, ObservationError, ObservationId,
 };
 pub use post_execution_health::{
-    POST_EXECUTION_HEALTH_CLAIM_SCHEMA_V1, AuthenticatedPostExecutionHealthId,
-    PostExecutionHealthClaimId, PostExecutionHealthClaimV1, PostExecutionHealthError,
-    PostExecutionHealthOutcomeV1, PostExecutionHealthPolicyId, PostExecutionHealthPolicyV1,
-    QualifiedPostExecutionHealthId, QualifiedPostExecutionHealthV1,
+    POST_EXECUTION_HEALTH_AUTH_PURPOSE, POST_EXECUTION_HEALTH_CLAIM_SCHEMA_V1,
+    AuthenticatedPostExecutionHealthId, PostExecutionHealthClaimId, PostExecutionHealthClaimV1,
+    PostExecutionHealthError, PostExecutionHealthOutcomeV1, PostExecutionHealthPolicyId,
+    PostExecutionHealthPolicyV1, QualifiedPostExecutionHealthId,
+    QualifiedPostExecutionHealthV1, canonical_post_execution_health_claim_bytes,
+    canonical_post_execution_health_claim_digest,
 };
 pub use post_execution_observation::{
     POST_EXECUTION_OBSERVATION_CLAIM_SCHEMA_V1, AuthenticatedPostExecutionObservationId,
