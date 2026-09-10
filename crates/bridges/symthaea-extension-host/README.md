@@ -1,0 +1,150 @@
+# symthaea-extension-host
+
+Fail-closed WebAssembly Component control-plane host for public Symthaea
+extensions.
+
+## What success means
+
+`ControlPlaneHost::inspect()` proves **technical compatibility only**:
+
+- manifest JSON parses and passes structural validation;
+- runtime/ABI/resource requests fit local host policy;
+- the base control component asks for no host imports;
+- Wasmtime can compile and instantiate the component;
+- guest execution is bounded by configured store/fuel/epoch limits;
+- the guest's ID, version, ABI and SHA-256 manifest digest match the exact
+  manifest bytes presented to the host;
+- the guest can report health.
+
+It does **not** prove:
+
+- who signed the component;
+- whether that signer is trusted;
+- whether the extension is admitted to the capability registry;
+- whether an invocation is authorized;
+- whether a domain result is scientifically correct;
+- that JIT compilation itself is CPU/time/memory-contained.
+
+Those are separate layers by design.
+
+## Zero ambient authority
+
+The initial host constructs an empty Component Model `Linker`. It does not add
+WASI, filesystem, network, clock, randomness, sensor, actuator, solver, or other
+Symthaea imports. Pre-instantiation therefore fails if a component requires any
+host capability.
+
+Later capability hosts should add only the narrow WIT imports corresponding to
+permissions explicitly granted by policy.
+
+## Lean Wasmtime build
+
+The host disables Wasmtime's broad default Cargo feature set and opts into only:
+
+- `std`;
+- `runtime`;
+- `cranelift`;
+- `component-model`.
+
+Async execution, cache, GC, threads, profiling, coredumps, WAT parsing, pooling,
+and other unrelated embedding surfaces are therefore not pulled into this
+control host merely because Wasmtime supports them.
+
+The runtime also exposes a versioned control-Wasm profile. Standard SIMD remains
+available; relaxed SIMD and expanded memory/control-flow proposals are rejected
+for v1, and Cranelift NaNs are canonicalized. Widening this surface requires an
+explicit profile revision rather than silently inheriting a future runtime
+default.
+
+## Execution containment
+
+After compilation the host combines:
+
+- `StoreLimits` for guest linear memory and instance/table/memory counts;
+- fuel metering for deterministic compute exhaustion;
+- epoch interruption for an independent execution wall-time deadline;
+- output-size checks for the control-plane response.
+
+Before compilation it applies manifest/component byte-size ceilings and validates
+the manifest/resource request against an independent local `ControlHostPolicy`.
+
+### Important compilation boundary
+
+`Component::new` performs compilation **before** the store exists. Store memory
+limits, fuel, and epoch deadlines therefore do not constrain compiler CPU,
+memory, or wall time.
+
+For curated/development plugins, the current byte-size ceiling is useful defense
+in depth. It is not sufficient to claim hostile-input compilation containment.
+Before this host is promoted for arbitrary public packages, compilation should
+move behind a separately supervised worker/process with explicit CPU, memory,
+wall-time, and crash containment. The resulting evidence should bind the exact
+component digest and compiler/profile lineage.
+
+This distinction is intentional:
+
+```text
+PackageSizeBounded
+    != CompilationResourceBounded
+    != GuestExecutionBounded
+```
+
+## Defense-in-depth deployment model
+
+A public extension ecosystem should not make one in-process sandbox the only
+failure boundary. The intended deployment policy is tiered:
+
+```text
+community / unknown signer
+    -> OS-supervised extension worker
+    -> Wasmtime sandbox inside worker
+    -> permission-scoped WIT capabilities
+
+curated / locally trusted component
+    -> policy may permit lower-overhead Wasm placement
+
+built-in native provider
+    -> compiled/distributed as trusted product code
+    -> never treated as equivalent to community Wasm
+```
+
+The worker should have its own process identity and explicit CPU/memory/time
+limits, no ambient network/filesystem authority, a narrow authenticated IPC
+surface, crash containment, and an admission generation bound to the package it
+loads. On Linux, cgroup/user-namespace/seccomp-style containment can provide
+additional defense in depth; other platforms need equivalent OS-native
+supervision rather than silently dropping the boundary.
+
+This is a deployment policy, not a claim that the current crate already provides
+that process supervisor.
+
+## Placement
+
+This crate intentionally lives under `crates/bridges`, not `crates/core`.
+Wasmtime is a runtime cost and should not become part of Symthaea's default core
+substrate merely because public extensions exist.
+
+## Admission layer
+
+Technical compatibility remains separate from trust and authority:
+
+```text
+component + exact manifest bytes
+        |
+        v
+technical control inspection  <-- this crate
+        |
+        v
+signature validity
+        |
+        v
+signer authorization/currentness
+        |
+        v
+local capability admission
+        |
+        v
+point-of-use routing + authorization
+```
+
+Do not collapse these states into a single `trusted: bool`.
