@@ -10,6 +10,7 @@ pub mod discovery;
 pub mod evaluation;
 pub mod pareto;
 pub mod replication;
+pub mod robust;
 mod registry;
 
 pub use registry::*;
