@@ -239,6 +239,54 @@ pub fn search_summary(
     )
 }
 
+#[derive(Serialize)]
+struct SearchAbortPayload<'a> {
+    phase: &'a str,
+    detail: &'a str,
+    candidates_attempted: usize,
+    candidates_no_eligible_mutation: usize,
+    candidates_failed_compile: usize,
+    candidates_failed_test: usize,
+    candidates_failed_benchmark: usize,
+    candidates_passed_correctness: usize,
+    candidates_selected_by_search: usize,
+    baseline_score_bits: Option<u64>,
+    best_artifact_id: Option<&'a str>,
+}
+
+/// Record an apparatus/search failure without classifying any interrupted candidate as rejected.
+#[allow(clippy::too_many_arguments)]
+pub fn search_abort(
+    phase: &str,
+    detail: &str,
+    candidates_attempted: usize,
+    candidates_no_eligible_mutation: usize,
+    candidates_failed_compile: usize,
+    candidates_failed_test: usize,
+    candidates_failed_benchmark: usize,
+    candidates_passed_correctness: usize,
+    candidates_selected_by_search: usize,
+    baseline_score: Option<f64>,
+    best: Option<&ForgeCandidate>,
+) -> Result<ObservationObject, ForgeObservationError> {
+    json_object(
+        "symthaea.forge.search-aborted.v1",
+        &SearchAbortPayload {
+            phase,
+            detail,
+            candidates_attempted,
+            candidates_no_eligible_mutation,
+            candidates_failed_compile,
+            candidates_failed_test,
+            candidates_failed_benchmark,
+            candidates_passed_correctness,
+            candidates_selected_by_search,
+            baseline_score_bits: baseline_score.map(f64::to_bits),
+            best_artifact_id: best.map(|candidate| candidate.artifact_id().as_str()),
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,6 +316,39 @@ mod tests {
         let a = gates(&mutation, &[gate.clone()]).unwrap();
         gate.output_tail = "error B".into();
         let b = gates(&mutation, &[gate]).unwrap();
+        assert_ne!(a.id(), b.id());
+    }
+
+    #[test]
+    fn abort_object_binds_phase_and_detail() {
+        let a = search_abort(
+            "candidate-evaluation",
+            "runner lost",
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            None,
+            None,
+        )
+        .unwrap();
+        let b = search_abort(
+            "candidate-restoration",
+            "runner lost",
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            None,
+            None,
+        )
+        .unwrap();
         assert_ne!(a.id(), b.id());
     }
 }
