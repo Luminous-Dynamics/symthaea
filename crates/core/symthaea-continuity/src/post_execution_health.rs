@@ -23,9 +23,12 @@ use crate::witness::TargetRealizationId;
 
 pub const POST_EXECUTION_HEALTH_CLAIM_SCHEMA_V1: &str =
     "symthaea-continuity-post-execution-health-claim-v1";
+pub const POST_EXECUTION_HEALTH_AUTH_PURPOSE: &str =
+    "symthaea.continuity.post-execution-health.v1";
 
 const POLICY_DOMAIN: &[u8] = b"symthaea.continuity.post-execution-health-policy.v1\0";
 const CLAIM_DOMAIN: &[u8] = b"symthaea.continuity.post-execution-health-claim.v1\0";
+const CLAIM_WIRE_DOMAIN: &[u8] = b"symthaea.continuity.post-execution-health-wire.v1\0";
 const AUTH_DOMAIN: &[u8] = b"symthaea.continuity.authenticated-post-execution-health.v1\0";
 const QUALIFIED_DOMAIN: &[u8] = b"symthaea.continuity.qualified-post-execution-health.v1\0";
 
@@ -267,6 +270,41 @@ impl PostExecutionHealthClaimV1 {
     pub fn id(&self) -> PostExecutionHealthClaimId {
         self.claim_id
     }
+}
+
+/// Stable authentication bytes for a Xenia/signature/attestation adapter.
+/// Serde encoding is deliberately not part of the trust contract.
+pub fn canonical_post_execution_health_claim_bytes(
+    claim: &PostExecutionHealthClaimV1,
+) -> Result<Vec<u8>, PostExecutionHealthError> {
+    claim.validate()?;
+    let mut out = Vec::with_capacity(448);
+    out.extend_from_slice(CLAIM_WIRE_DOMAIN);
+    out.extend_from_slice(claim.post_observation_id.as_bytes());
+    out.extend_from_slice(claim.attempt_id.as_bytes());
+    out.extend_from_slice(claim.subject_id.as_bytes());
+    out.extend_from_slice(claim.target_realization_id.as_bytes());
+    out.extend_from_slice(claim.distributed_context_id.as_bytes());
+    out.extend_from_slice(claim.verifier_profile_id.as_bytes());
+    out.extend_from_slice(&claim.health_profile_digest);
+    out.extend_from_slice(&claim.observed_at_unix_ms.to_le_bytes());
+    out.push(claim.outcome.tag());
+    match claim.health_state_digest {
+        Some(digest) => {
+            out.push(1);
+            out.extend_from_slice(&digest);
+        }
+        None => out.push(0),
+    }
+    out.extend_from_slice(&claim.raw_evidence_digest);
+    out.extend_from_slice(claim.claim_id.as_bytes());
+    Ok(out)
+}
+
+pub fn canonical_post_execution_health_claim_digest(
+    claim: &PostExecutionHealthClaimV1,
+) -> Result<[u8; 32], PostExecutionHealthError> {
+    Ok(*blake3::hash(&canonical_post_execution_health_claim_bytes(claim)?).as_bytes())
 }
 
 #[derive(Debug, Clone)]
@@ -663,5 +701,14 @@ mod tests {
             .unwrap_err(),
             PostExecutionHealthError::MissingHealthStateDigest
         );
+    }
+
+    #[test]
+    fn authentication_purpose_and_wire_domain_are_explicit() {
+        assert_eq!(
+            POST_EXECUTION_HEALTH_AUTH_PURPOSE,
+            "symthaea.continuity.post-execution-health.v1"
+        );
+        assert_ne!(CLAIM_WIRE_DOMAIN, CLAIM_DOMAIN);
     }
 }
