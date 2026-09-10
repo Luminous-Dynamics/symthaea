@@ -2,18 +2,26 @@
 
 ## Current tranche
 
-Draft PR #1402 establishes SIF-001 only. The ontology is intentionally placed in `symthaea-engineering` as a thin composition vocabulary and is not yet re-exported by the crate root until the existing crate surface is reviewed and wired with compile-verified changes.
+Draft PR #1402 now contains two implementation slices:
 
-## Required next verification
+- **SIF-001:** a leaf `symthaea-infrastructure` crate containing the domain-neutral coordination vocabulary and authority boundary. The workspace already includes `crates/domains/*`, so this avoids editing the large `symthaea-engineering` facade merely to expose foundational types.
+- **SIF-002 (foundation only):** `symthaea-orbital::cislunar`, containing Earth-Moon CR3BP parameters, deterministic collinear Lagrange-point solving, rotating/inertial state transforms, and a differential third-body acceleration primitive.
 
-Before promoting PR #1402 from draft:
+The infrastructure crate intentionally has only `serde` as an internal dependency boundary. It contains no networking, flight control, robotics, physics, hardware drivers, HDC, or consciousness dependencies.
 
-1. wire `infrastructure` into `symthaea-engineering/src/lib.rs`;
-2. run `cargo test -p symthaea-engineering --lib`;
-3. run the workspace dependency/cycle checks;
-4. verify serde is already an enabled dependency for the engineering crate;
-5. confirm no canonical `AssetId`, resource, reservation, or authorization types already exist under another crate and should be reused instead;
-6. add property tests for finite-value/resource-window invariants if the crate's current testing conventions use proptest;
-7. verify the new vocabulary does not grant or imply runtime hardware authority.
+## Required verification before promotion from draft
 
-SIF-002 and SIF-003 are tracked separately in issue #1403 so orbital-physics and composition changes do not get mixed into the ontology evidence line.
+1. run `cargo test -p symthaea-infrastructure --lib`;
+2. run `cargo test -p symthaea-orbital --lib`;
+3. run workspace dependency/cycle and orphan-module checks;
+4. confirm no canonical `AssetId`, resource, reservation, or authorization type should replace the new leaf types;
+5. review the scalar `unit: String` boundary and decide whether SIF-003 adapters should normalize into `uom` before domain execution;
+6. add property tests if repository conventions require them for these value/window invariants;
+7. verify that `CommandProposal` remains non-executable and that `Authorization` cannot bypass local controller acceptance;
+8. compare CR3BP regression values with an independent reference implementation before treating them as evidence beyond unit-test scale.
+
+## Evidence boundary
+
+The CR3BP constants/solver are a circular mean-geometry model, not ephemeris-grade Earth-Moon state. The third-body primitive is a differential acceleration building block, not a complete n-body propagator. Simulation and unit-test results do not establish mission qualification.
+
+SIF-003 and the higher-fidelity parts of SIF-002 remain tracked in issue #1403 so digital-twin composition, ephemerides, perturbations, and operational benchmarks can proceed as separate evidence lines.
