@@ -31,9 +31,9 @@ pub enum LedgerError {
     CandidateCountMismatch,
     #[error("event kind has an invalid generation/artifact shape")]
     InvalidEventShape,
-    #[error("search ledger is sealed by SearchCompleted")]
+    #[error("search ledger is sealed by a terminal event")]
     LedgerSealed,
-    #[error("SearchCompleted may appear only as the final ledger event")]
+    #[error("a terminal search event may appear only as the final ledger event")]
     CompletionNotFinal,
 }
 
@@ -53,7 +53,10 @@ pub enum DiscoveryEventKind {
     ValidNotSelected,
     SelectedForContinuation,
     CandidateArchived,
+    /// The search apparatus reached its intended bounded end.
     SearchCompleted,
+    /// The search apparatus stopped early. This says nothing about candidate quality.
+    SearchAborted,
 }
 
 impl DiscoveryEventKind {
@@ -68,11 +71,19 @@ impl DiscoveryEventKind {
             Self::SelectedForContinuation => b"selected-for-continuation",
             Self::CandidateArchived => b"candidate-archived",
             Self::SearchCompleted => b"search-completed",
+            Self::SearchAborted => b"search-aborted",
         }
     }
 
     fn expects_candidate(self) -> bool {
-        !matches!(self, Self::GeneratorNoOp | Self::SearchCompleted)
+        !matches!(
+            self,
+            Self::GeneratorNoOp | Self::SearchCompleted | Self::SearchAborted
+        )
+    }
+
+    pub fn is_terminal(self) -> bool {
+        matches!(self, Self::SearchCompleted | Self::SearchAborted)
     }
 }
 
@@ -200,26 +211,24 @@ fn validate_event_shape(
     kind: DiscoveryEventKind,
     candidate_artifact_id: Option<&ContentId>,
 ) -> Result<(), LedgerError> {
-    match kind {
-        DiscoveryEventKind::SearchCompleted => {
-            if generation.is_some() || candidate_artifact_id.is_some() {
-                return Err(LedgerError::InvalidEventShape);
-            }
+    if kind.is_terminal() {
+        if generation.is_some() || candidate_artifact_id.is_some() {
+            return Err(LedgerError::InvalidEventShape);
         }
-        _ => {
-            let Some(generation) = generation else {
-                return Err(LedgerError::InvalidEventShape);
-            };
-            if generation >= run.budget.max_generations {
-                return Err(LedgerError::GenerationBudgetExceeded {
-                    generation,
-                    maximum: run.budget.max_generations,
-                });
-            }
-            if kind.expects_candidate() != candidate_artifact_id.is_some() {
-                return Err(LedgerError::InvalidEventShape);
-            }
-        }
+        return Ok(());
+    }
+
+    let Some(generation) = generation else {
+        return Err(LedgerError::InvalidEventShape);
+    };
+    if generation >= run.budget.max_generations {
+        return Err(LedgerError::GenerationBudgetExceeded {
+            generation,
+            maximum: run.budget.max_generations,
+        });
+    }
+    if kind.expects_candidate() != candidate_artifact_id.is_some() {
+        return Err(LedgerError::InvalidEventShape);
     }
     Ok(())
 }
@@ -284,7 +293,7 @@ fn validate_events(
                 });
             }
         }
-        if event.kind == DiscoveryEventKind::SearchCompleted && index + 1 != events.len() {
+        if event.kind.is_terminal() && index + 1 != events.len() {
             return Err(LedgerError::CompletionNotFinal);
         }
         previous = event.id.clone();
@@ -388,6 +397,20 @@ impl DiscoveryLedger {
         )
     }
 
+    pub fn abort(
+        &mut self,
+        run: &DiscoveryRun,
+        abort_observation_id: ContentId,
+    ) -> Result<&DiscoveryEvent, LedgerError> {
+        self.append(
+            run,
+            None,
+            DiscoveryEventKind::SearchAborted,
+            None,
+            abort_observation_id,
+        )
+    }
+
     pub fn validate_for(&self, run: &DiscoveryRun) -> Result<(), LedgerError> {
         let count = validate_events(run, &self.run_id, &self.events)?;
         if count != self.candidate_generated_count {
@@ -418,9 +441,14 @@ impl DiscoveryLedger {
     }
 
     pub fn is_sealed(&self) -> bool {
+        self.terminal_kind().is_some()
+    }
+
+    pub fn terminal_kind(&self) -> Option<DiscoveryEventKind> {
         self.events
             .last()
-            .is_some_and(|event| event.kind == DiscoveryEventKind::SearchCompleted)
+            .map(DiscoveryEvent::kind)
+            .filter(|kind| kind.is_terminal())
     }
 
     pub fn candidate_generated_count(&self) -> u64 {
@@ -512,6 +540,7 @@ mod tests {
         ledger.complete(&run, cid("summary", "no-winner")).unwrap();
 
         assert!(ledger.is_sealed());
+        assert_eq!(ledger.terminal_kind(), Some(DiscoveryEventKind::SearchCompleted));
         assert_eq!(ledger.len(), 3);
         assert_eq!(ledger.candidate_generated_count(), 1);
         assert!(ledger.validate_for(&run).is_ok());
@@ -605,6 +634,36 @@ mod tests {
     }
 
     #[test]
+    fn abort_seals_ledger_without_claiming_completion() {
+        let run = run();
+        let mut ledger = DiscoveryLedger::new(&run).unwrap();
+        ledger.abort(&run, cid("abort", "runner-lost")).unwrap();
+        assert!(ledger.is_sealed());
+        assert_eq!(ledger.terminal_kind(), Some(DiscoveryEventKind::SearchAborted));
+        assert!(ledger.validate_for(&run).is_ok());
+        assert_eq!(
+            ledger
+                .complete(&run, cid("summary", "late-completion"))
+                .unwrap_err(),
+            LedgerError::LedgerSealed
+        );
+    }
+
+    #[test]
+    fn completed_and_aborted_runs_have_distinct_snapshot_identity() {
+        let run = run();
+        let observation = cid("terminal", "same-payload-id");
+        let mut completed = DiscoveryLedger::new(&run).unwrap();
+        completed.complete(&run, observation.clone()).unwrap();
+        let mut aborted = DiscoveryLedger::new(&run).unwrap();
+        aborted.abort(&run, observation).unwrap();
+        assert_ne!(
+            completed.snapshot_id(&run).unwrap(),
+            aborted.snapshot_id(&run).unwrap()
+        );
+    }
+
+    #[test]
     fn candidate_event_requires_artifact_and_noop_forbids_it() {
         let run = run();
         let mut ledger = DiscoveryLedger::new(&run).unwrap();
@@ -628,6 +687,18 @@ mod tests {
                     DiscoveryEventKind::GeneratorNoOp,
                     Some(cid("artifact", "impossible")),
                     cid("observation", "noop"),
+                )
+                .unwrap_err(),
+            LedgerError::InvalidEventShape
+        );
+        assert_eq!(
+            ledger
+                .append(
+                    &run,
+                    Some(0),
+                    DiscoveryEventKind::SearchAborted,
+                    None,
+                    cid("observation", "bad-terminal-shape"),
                 )
                 .unwrap_err(),
             LedgerError::InvalidEventShape
