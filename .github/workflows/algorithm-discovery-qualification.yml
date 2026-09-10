@@ -1,0 +1,65 @@
+name: Algorithm Discovery Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-algorithms/**'
+      - 'crates/core/symthaea-eml-egraph/**'
+      - 'crates/domains/symthaea-algorithm-lab/**'
+      - 'crates/bridges/symthaea-algorithm-egraph-bridge/**'
+      - 'crates/bridges/symthaea-algorithm-evidence-collector/**'
+      - 'crates/bridges/symthaea-hdc-algorithm-evidence/**'
+      - '.github/workflows/algorithm-discovery-qualification.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'crates/core/symthaea-algorithms/**'
+      - 'crates/core/symthaea-eml-egraph/**'
+      - 'crates/domains/symthaea-algorithm-lab/**'
+      - 'crates/bridges/symthaea-algorithm-egraph-bridge/**'
+      - 'crates/bridges/symthaea-algorithm-evidence-collector/**'
+      - 'crates/bridges/symthaea-hdc-algorithm-evidence/**'
+      - '.github/workflows/algorithm-discovery-qualification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  focused-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Test algorithm contracts
+        run: cargo test -p symthaea-algorithms --all-features -- --test-threads=1
+
+      - name: Test HDC discovery laboratory
+        run: cargo test -p symthaea-algorithm-lab --lib -- --test-threads=1
+
+      - name: Test e-graph lineage bridge
+        run: cargo test -p symthaea-algorithm-egraph-bridge -- --test-threads=1
+
+      - name: Test experiment capsule collector
+        run: cargo test -p symthaea-algorithm-evidence-collector -- --test-threads=1
+
+      - name: Test capsule-bound HDC evidence bridge
+        run: cargo test -p symthaea-hdc-algorithm-evidence -- --test-threads=1
+
+      - name: Build HDC Criterion benchmark without measuring
+        run: cargo bench -p symthaea-algorithm-lab --bench hdc_hamming_candidates --no-run
+
+      - name: Strict Clippy over discovery stack
+        run: >-
+          cargo clippy
+          -p symthaea-algorithms
+          -p symthaea-algorithm-lab
+          -p symthaea-algorithm-egraph-bridge
+          -p symthaea-algorithm-evidence-collector
+          -p symthaea-hdc-algorithm-evidence
+          --all-targets --all-features -- -D warnings
