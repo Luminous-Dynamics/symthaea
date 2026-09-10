@@ -35,6 +35,8 @@ pub enum CollectorError {
     InvalidRepositoryRoot(String),
     #[error("path must be a canonical repository-relative file path: {0}")]
     InvalidRelativePath(String),
+    #[error("artifact path escapes the canonical repository root: {0}")]
+    ArtifactEscapesRepository(String),
     #[error("artifact group `{0}` must contain at least one file")]
     EmptyArtifactGroup(String),
     #[error("duplicate artifact group label: {0}")]
@@ -51,14 +53,24 @@ pub enum CollectorError {
     },
     #[error("metadata command `{program}` failed: {detail}")]
     CommandFailed { program: &'static str, detail: String },
+    #[error("metadata command `{program}` returned non-UTF-8 output")]
+    NonUtf8CommandOutput { program: &'static str },
     #[error("provided root is not the repository top-level directory")]
     NotRepositoryTopLevel,
     #[error("worktree is not clean; default experiment collection fails closed")]
     DirtyWorktree,
+    #[error("dirty-worktree capsules are audit evidence only and cannot mint evaluation contexts")]
+    DirtyWorktreeIneligibleForEvaluation,
+    #[error("experiment capsule must precommit at least one evaluation command")]
+    NoCommands,
     #[error("command specification requires a non-empty program")]
     EmptyCommandProgram,
     #[error("command specification contains control characters")]
     InvalidCommandText,
+    #[error("{field} must not be empty")]
+    EmptyText { field: &'static str },
+    #[error("{field} contains a NUL character")]
+    NulText { field: &'static str },
     #[error("command index {0} is out of range")]
     CommandIndexOutOfRange(usize),
     #[error("capsule contains noncanonical fields")]
@@ -92,7 +104,7 @@ impl ArtifactGroupSpec {
         relative_files: Vec<String>,
     ) -> Result<Self, CollectorError> {
         let label = label.into();
-        validate_text(&label)?;
+        validate_single_line("artifact group label", &label)?;
         if relative_files.is_empty() {
             return Err(CollectorError::EmptyArtifactGroup(label));
         }
@@ -122,6 +134,10 @@ pub struct ArtifactGroupEvidence {
 
 impl ArtifactGroupEvidence {
     pub fn validate(&self) -> Result<(), CollectorError> {
+        validate_single_line("artifact group label", &self.label)?;
+        if self.files.is_empty() {
+            return Err(CollectorError::EmptyArtifactGroup(self.label.clone()));
+        }
         let mut previous: Option<&str> = None;
         for file in &self.files {
             validate_relative_path(&file.relative_path)?;
@@ -129,9 +145,6 @@ impl ArtifactGroupEvidence {
                 return Err(CollectorError::NonCanonicalCapsule);
             }
             previous = Some(&file.relative_path);
-        }
-        if self.files.is_empty() {
-            return Err(CollectorError::EmptyArtifactGroup(self.label.clone()));
         }
         let expected = derive_artifact_group_id(&self.label, &self.files);
         if expected == self.id {
@@ -142,6 +155,8 @@ impl ArtifactGroupEvidence {
     }
 }
 
+/// Exact command specification retained as provenance. The collector records this value but does
+/// not execute it; execution remains the responsibility of the qualification/benchmark harness.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommandSpec {
     pub id: ContentId,
@@ -200,7 +215,7 @@ impl RepositoryState {
         rust_toolchain_id: Option<ContentId>,
     ) -> Result<Self, CollectorError> {
         let revision = revision.into();
-        validate_text(&revision)?;
+        validate_single_line("repository revision", &revision)?;
         let id = derive_repository_state_id(
             &revision,
             worktree_clean,
@@ -244,16 +259,19 @@ pub struct MachineProfile {
     pub architecture: String,
     pub kernel: String,
     pub cpu_model: Option<String>,
+    pub cpu_features: Vec<String>,
     pub host_triple: String,
     pub target_features: Vec<String>,
 }
 
 impl MachineProfile {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         operating_system: impl Into<String>,
         architecture: impl Into<String>,
         kernel: impl Into<String>,
         cpu_model: Option<String>,
+        mut cpu_features: Vec<String>,
         host_triple: impl Into<String>,
         mut target_features: Vec<String>,
     ) -> Result<Self, CollectorError> {
@@ -261,12 +279,21 @@ impl MachineProfile {
         let architecture = architecture.into();
         let kernel = kernel.into();
         let host_triple = host_triple.into();
-        for value in [&operating_system, &architecture, &kernel, &host_triple] {
-            validate_text(value)?;
-        }
+        validate_single_line("operating system", &operating_system)?;
+        validate_single_line("architecture", &architecture)?;
+        validate_single_line("kernel", &kernel)?;
+        validate_single_line("host triple", &host_triple)?;
         if let Some(cpu) = &cpu_model {
-            validate_text(cpu)?;
+            validate_single_line("CPU model", cpu)?;
         }
+        for feature in &cpu_features {
+            validate_single_line("CPU feature", feature)?;
+        }
+        for feature in &target_features {
+            validate_single_line("target feature", feature)?;
+        }
+        cpu_features.sort();
+        cpu_features.dedup();
         target_features.sort();
         target_features.dedup();
         let id = derive_machine_id(
@@ -274,6 +301,7 @@ impl MachineProfile {
             &architecture,
             &kernel,
             cpu_model.as_deref(),
+            &cpu_features,
             &host_triple,
             &target_features,
         );
@@ -283,6 +311,7 @@ impl MachineProfile {
             architecture,
             kernel,
             cpu_model,
+            cpu_features,
             host_triple,
             target_features,
         })
@@ -294,6 +323,7 @@ impl MachineProfile {
             self.architecture.clone(),
             self.kernel.clone(),
             self.cpu_model.clone(),
+            self.cpu_features.clone(),
             self.host_triple.clone(),
             self.target_features.clone(),
         )?;
@@ -321,10 +351,12 @@ impl ToolchainProfile {
     ) -> Result<Self, CollectorError> {
         let rustc_verbose_version = rustc_verbose_version.into();
         let cargo_version = cargo_version.into();
-        validate_text(&rustc_verbose_version)?;
-        validate_text(&cargo_version)?;
+        // `rustc -vV` is intentionally multiline. Preserve the complete output instead of
+        // flattening away provenance; only NUL is forbidden.
+        validate_multiline("rustc verbose version", &rustc_verbose_version)?;
+        validate_single_line("cargo version", &cargo_version)?;
         if let Some(nix) = &nix_version {
-            validate_text(nix)?;
+            validate_single_line("nix version", nix)?;
         }
         let id = ContentId::derive(
             "symthaea.algorithm-toolchain.v1",
@@ -377,6 +409,13 @@ impl CapturedEnvironment {
     }
 
     pub fn validate(&self) -> Result<(), CollectorError> {
+        if self
+            .variables
+            .keys()
+            .any(|key| !ENV_ALLOWLIST.contains(&key.as_str()))
+        {
+            return Err(CollectorError::NonCanonicalCapsule);
+        }
         if Self::new(self.variables.clone()) == *self {
             Ok(())
         } else {
@@ -412,16 +451,19 @@ impl ExperimentCapsule {
         for group in &artifact_groups {
             group.validate()?;
         }
+        if commands.is_empty() {
+            return Err(CollectorError::NoCommands);
+        }
         for command in &commands {
             command.validate()?;
         }
         artifact_groups.sort_by(|a, b| a.label.cmp(&b.label));
-        if artifact_groups
+        if let Some(pair) = artifact_groups
             .windows(2)
-            .any(|pair| pair[0].label == pair[1].label)
+            .find(|pair| pair[0].label == pair[1].label)
         {
             return Err(CollectorError::DuplicateArtifactGroup(
-                artifact_groups[0].label.clone(),
+                pair[0].label.clone(),
             ));
         }
         let id = derive_capsule_id(
@@ -509,6 +551,9 @@ impl ExperimentCapsule {
         seeds: Vec<u64>,
     ) -> Result<EvaluationContext, CollectorError> {
         self.validate()?;
+        if !self.repository.worktree_clean {
+            return Err(CollectorError::DirtyWorktreeIneligibleForEvaluation);
+        }
         let command = self
             .commands
             .get(command_index)
@@ -594,17 +639,19 @@ pub fn collect_experiment_capsule(
         .collect();
     let kernel = run_optional(&root, "uname", &["-srvm"])
         .unwrap_or_else(|| "unavailable".to_string());
+    let (cpu_model, cpu_features) = detect_cpu_profile();
     let machine = MachineProfile::new(
         std::env::consts::OS,
         std::env::consts::ARCH,
         kernel,
-        detect_cpu_model(),
+        cpu_model,
+        cpu_features,
         host_triple,
         target_features,
     )?;
     let toolchain = ToolchainProfile::new(
         rustc_verbose,
-        run_required(&root, "cargo", &["--version"] )?,
+        run_required(&root, "cargo", &["--version"])?,
         run_optional(&root, "nix", &["--version"]),
     )?;
 
@@ -637,9 +684,13 @@ pub fn collect_artifact_group(
     repository_root: &Path,
     spec: &ArtifactGroupSpec,
 ) -> Result<ArtifactGroupEvidence, CollectorError> {
+    validate_single_line("artifact group label", &spec.label)?;
     if spec.relative_files.is_empty() {
         return Err(CollectorError::EmptyArtifactGroup(spec.label.clone()));
     }
+    let canonical_root = repository_root
+        .canonicalize()
+        .map_err(|error| CollectorError::InvalidRepositoryRoot(error.to_string()))?;
     let mut seen = BTreeSet::new();
     let mut files = Vec::with_capacity(spec.relative_files.len());
     for relative in &spec.relative_files {
@@ -650,7 +701,15 @@ pub fn collect_artifact_group(
                 path: relative.clone(),
             });
         }
-        let full = repository_root.join(relative);
+        let requested = canonical_root.join(relative);
+        let full = requested.canonicalize().map_err(|error| CollectorError::Io {
+            operation: "canonicalizing artifact file",
+            path: relative.clone(),
+            detail: error.to_string(),
+        })?;
+        if !full.starts_with(&canonical_root) {
+            return Err(CollectorError::ArtifactEscapesRepository(relative.clone()));
+        }
         if !full.is_file() {
             return Err(CollectorError::NotAFile(relative.clone()));
         }
@@ -721,6 +780,7 @@ fn derive_machine_id(
     architecture: &str,
     kernel: &str,
     cpu_model: Option<&str>,
+    cpu_features: &[String],
     host_triple: &str,
     target_features: &[String],
 ) -> ContentId {
@@ -729,11 +789,14 @@ fn derive_machine_id(
         architecture.as_bytes().to_vec(),
         kernel.as_bytes().to_vec(),
         cpu_model.unwrap_or("").as_bytes().to_vec(),
-        host_triple.as_bytes().to_vec(),
+        (cpu_features.len() as u64).to_be_bytes().to_vec(),
     ];
+    parts.extend(cpu_features.iter().map(|feature| feature.as_bytes().to_vec()));
+    parts.push(host_triple.as_bytes().to_vec());
+    parts.push((target_features.len() as u64).to_be_bytes().to_vec());
     parts.extend(target_features.iter().map(|feature| feature.as_bytes().to_vec()));
     ContentId::derive(
-        "symthaea.algorithm-machine-profile.v1",
+        "symthaea.algorithm-machine-profile.v2",
         parts.iter().map(Vec::as_slice),
     )
 }
@@ -751,11 +814,13 @@ fn derive_capsule_id(
         machine.id.as_str().as_bytes().to_vec(),
         toolchain.id.as_str().as_bytes().to_vec(),
         environment.id.as_str().as_bytes().to_vec(),
+        (artifact_groups.len() as u64).to_be_bytes().to_vec(),
     ];
     for group in artifact_groups {
         parts.push(group.label.as_bytes().to_vec());
         parts.push(group.id.as_str().as_bytes().to_vec());
     }
+    parts.push((commands.len() as u64).to_be_bytes().to_vec());
     for command in commands {
         parts.push(command.id.as_str().as_bytes().to_vec());
     }
@@ -774,7 +839,15 @@ fn content_id_if_exists(
     if !path.exists() {
         return Ok(None);
     }
-    let bytes = fs::read(&path).map_err(|error| CollectorError::Io {
+    let full = path.canonicalize().map_err(|error| CollectorError::Io {
+        operation: "canonicalizing provenance file",
+        path: relative.to_string(),
+        detail: error.to_string(),
+    })?;
+    if !full.starts_with(root) {
+        return Err(CollectorError::ArtifactEscapesRepository(relative.to_string()));
+    }
+    let bytes = fs::read(&full).map_err(|error| CollectorError::Io {
         operation: "reading provenance file",
         path: relative.to_string(),
         detail: error.to_string(),
@@ -782,15 +855,28 @@ fn content_id_if_exists(
     Ok(Some(ContentId::derive(domain, [bytes.as_slice()])))
 }
 
-fn validate_text(value: &str) -> Result<(), CollectorError> {
-    if value.trim().is_empty() || value.chars().any(char::is_control) {
-        return Err(CollectorError::InvalidCommandText);
+fn validate_single_line(field: &'static str, value: &str) -> Result<(), CollectorError> {
+    if value.trim().is_empty() {
+        return Err(CollectorError::EmptyText { field });
+    }
+    if value.chars().any(char::is_control) {
+        return Err(CollectorError::NulText { field });
+    }
+    Ok(())
+}
+
+fn validate_multiline(field: &'static str, value: &str) -> Result<(), CollectorError> {
+    if value.trim().is_empty() {
+        return Err(CollectorError::EmptyText { field });
+    }
+    if value.contains('\0') {
+        return Err(CollectorError::NulText { field });
     }
     Ok(())
 }
 
 fn validate_relative_path(value: &str) -> Result<(), CollectorError> {
-    if value.trim().is_empty() {
+    if value.trim().is_empty() || value.chars().any(char::is_control) {
         return Err(CollectorError::InvalidRelativePath(value.to_string()));
     }
     let path = Path::new(value);
@@ -826,32 +912,57 @@ fn run_required(
             detail: String::from_utf8_lossy(&output.stderr).trim().to_string(),
         });
     }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    let stdout = String::from_utf8(output.stdout)
+        .map_err(|_| CollectorError::NonUtf8CommandOutput { program })?;
+    Ok(stdout.trim().to_string())
 }
 
 fn run_optional(root: &Path, program: &'static str, args: &[&str]) -> Option<String> {
     run_required(root, program, args).ok()
 }
 
-fn detect_cpu_model() -> Option<String> {
+fn detect_cpu_profile() -> (Option<String>, Vec<String>) {
     if let Ok(cpuinfo) = fs::read_to_string("/proc/cpuinfo") {
-        if let Some(model) = cpuinfo.lines().find_map(|line| {
-            line.strip_prefix("model name")
-                .and_then(|rest| rest.split_once(':'))
-                .map(|(_, value)| value.trim().to_string())
-        }) {
-            if !model.is_empty() {
-                return Some(model);
-            }
-        }
+        let model = cpuinfo.lines().find_map(|line| {
+            let (key, value) = line.split_once(':')?;
+            matches!(key.trim(), "model name" | "Processor")
+                .then(|| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+        });
+        let mut features: Vec<String> = cpuinfo
+            .lines()
+            .find_map(|line| {
+                let (key, value) = line.split_once(':')?;
+                matches!(key.trim(), "flags" | "Features").then_some(value)
+            })
+            .map(|value| value.split_whitespace().map(str::to_string).collect())
+            .unwrap_or_default();
+        features.sort();
+        features.dedup();
+        return (model, features);
     }
-    Command::new("sysctl")
+
+    let model = Command::new("sysctl")
         .args(["-n", "machdep.cpu.brand_string"])
         .output()
         .ok()
         .filter(|output| output.status.success())
-        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
-        .filter(|value| !value.is_empty())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let mut features = Vec::new();
+    for key in ["machdep.cpu.features", "machdep.cpu.leaf7_features"] {
+        if let Ok(output) = Command::new("sysctl").args(["-n", key]).output() {
+            if output.status.success() {
+                if let Ok(value) = String::from_utf8(output.stdout) {
+                    features.extend(value.split_whitespace().map(|feature| feature.to_lowercase()));
+                }
+            }
+        }
+    }
+    features.sort();
+    features.dedup();
+    (model, features)
 }
 
 #[cfg(test)]
@@ -875,11 +986,11 @@ mod tests {
         ContentId::derive(domain, [value.as_bytes()])
     }
 
-    fn repository() -> RepositoryState {
+    fn repository(clean: bool) -> RepositoryState {
         RepositoryState::new(
             "deadbeef",
-            true,
-            cid("status", "clean"),
+            clean,
+            cid("status", if clean { "clean" } else { "dirty" }),
             Some(cid("lock", "cargo")),
             Some(cid("lock", "flake")),
             Some(cid("toolchain-file", "rust")),
@@ -893,6 +1004,7 @@ mod tests {
             "x86_64",
             "test-kernel",
             Some("test-cpu".into()),
+            vec!["avx2".into(), "popcnt".into()],
             "x86_64-unknown-linux-gnu",
             vec!["target_feature=\"avx2\"".into()],
         )
@@ -900,7 +1012,12 @@ mod tests {
     }
 
     fn toolchain() -> ToolchainProfile {
-        ToolchainProfile::new("rustc 1.96 test", "cargo 1.96 test", Some("nix test".into())).unwrap()
+        ToolchainProfile::new(
+            "rustc 1.96 test\nbinary: rustc\nhost: x86_64-unknown-linux-gnu",
+            "cargo 1.96 test",
+            Some("nix test".into()),
+        )
+        .unwrap()
     }
 
     fn command() -> CommandSpec {
@@ -909,6 +1026,23 @@ mod tests {
             vec!["bench".into(), "-p".into(), "symthaea-algorithm-lab".into()],
         )
         .unwrap()
+    }
+
+    fn capsule(clean: bool, artifact_groups: Vec<ArtifactGroupEvidence>) -> ExperimentCapsule {
+        ExperimentCapsule::new(
+            repository(clean),
+            machine(),
+            toolchain(),
+            CapturedEnvironment::new(BTreeMap::new()),
+            artifact_groups,
+            vec![command()],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn multiline_rustc_verbose_output_is_valid_provenance() {
+        assert!(toolchain().validate().is_ok());
     }
 
     #[test]
@@ -952,45 +1086,50 @@ mod tests {
     }
 
     #[test]
+    fn no_command_capsule_fails_closed() {
+        assert!(matches!(
+            ExperimentCapsule::new(
+                repository(true),
+                machine(),
+                toolchain(),
+                CapturedEnvironment::new(BTreeMap::new()),
+                vec![],
+                vec![],
+            )
+            .unwrap_err(),
+            CollectorError::NoCommands
+        ));
+    }
+
+    #[test]
+    fn dirty_capsule_is_audit_only_not_rankable() {
+        let dirty = capsule(false, vec![]);
+        assert_eq!(
+            dirty
+                .evaluation_context(
+                    cid("evaluator", "criterion"),
+                    cid("oracle", "reference"),
+                    cid("inputs", "seeded"),
+                    0,
+                    vec![1, 2, 3],
+                )
+                .unwrap_err()
+                .to_string(),
+            CollectorError::DirtyWorktreeIneligibleForEvaluation.to_string()
+        );
+    }
+
+    #[test]
     fn candidate_artifact_changes_capsule_but_not_comparison_environment() {
-        let group_a = ArtifactGroupEvidence {
-            id: cid("group", "a"),
-            label: "candidate".into(),
-            files: vec![],
-        };
-        let group_b = ArtifactGroupEvidence {
-            id: cid("group", "b"),
-            label: "candidate".into(),
-            files: vec![],
-        };
-        // Build valid synthetic groups through a temporary directory rather than blessing the
-        // manually shaped values above.
         let root = temp_dir();
         fs::write(root.join("candidate.rs"), b"a").unwrap();
         let spec = ArtifactGroupSpec::new("candidate", vec!["candidate.rs".into()]).unwrap();
         let valid_a = collect_artifact_group(&root, &spec).unwrap();
         fs::write(root.join("candidate.rs"), b"b").unwrap();
         let valid_b = collect_artifact_group(&root, &spec).unwrap();
-        assert_ne!(group_a.id, group_b.id); // keep the intent visible without using invalid groups.
 
-        let capsule_a = ExperimentCapsule::new(
-            repository(),
-            machine(),
-            toolchain(),
-            CapturedEnvironment::new(BTreeMap::new()),
-            vec![valid_a],
-            vec![command()],
-        )
-        .unwrap();
-        let capsule_b = ExperimentCapsule::new(
-            repository(),
-            machine(),
-            toolchain(),
-            CapturedEnvironment::new(BTreeMap::new()),
-            vec![valid_b],
-            vec![command()],
-        )
-        .unwrap();
+        let capsule_a = capsule(true, vec![valid_a]);
+        let capsule_b = capsule(true, vec![valid_b]);
         assert_ne!(capsule_a.id, capsule_b.id);
         assert_eq!(
             capsule_a.comparison_environment_id(),
@@ -1020,10 +1159,54 @@ mod tests {
     }
 
     #[test]
+    fn cpu_features_are_canonicalized_into_machine_identity() {
+        let a = MachineProfile::new(
+            "linux",
+            "x86_64",
+            "kernel",
+            Some("cpu".into()),
+            vec!["popcnt".into(), "avx2".into(), "popcnt".into()],
+            "x86_64-unknown-linux-gnu",
+            vec![],
+        )
+        .unwrap();
+        let b = MachineProfile::new(
+            "linux",
+            "x86_64",
+            "kernel",
+            Some("cpu".into()),
+            vec!["avx2".into(), "popcnt".into()],
+            "x86_64-unknown-linux-gnu",
+            vec![],
+        )
+        .unwrap();
+        assert_eq!(a.id, b.id);
+        assert_eq!(a.cpu_features, vec!["avx2", "popcnt"]);
+    }
+
+    #[test]
     fn parent_directory_escape_is_rejected() {
         assert!(matches!(
             ArtifactGroupSpec::new("candidate", vec!["../secret".into()]).unwrap_err(),
             CollectorError::InvalidRelativePath(_)
         ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_escape_is_rejected() {
+        use std::os::unix::fs::symlink;
+
+        let root = temp_dir();
+        let outside = temp_dir();
+        fs::write(outside.join("secret"), b"outside").unwrap();
+        symlink(outside.join("secret"), root.join("linked-secret")).unwrap();
+        let spec = ArtifactGroupSpec::new("candidate", vec!["linked-secret".into()]).unwrap();
+        assert!(matches!(
+            collect_artifact_group(&root, &spec).unwrap_err(),
+            CollectorError::ArtifactEscapesRepository(_)
+        ));
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(outside);
     }
 }
