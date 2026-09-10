@@ -38,6 +38,7 @@ pub mod benchmarks;
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
+pub mod evidence;
 pub mod fep_agent;
 pub mod formation;
 pub mod perturbations;
