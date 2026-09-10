@@ -18521,6 +18521,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-continuity"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "symthaea-continuum-physics"
 version = "0.1.0"
 dependencies = [

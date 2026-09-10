@@ -331,13 +331,9 @@ mod tests {
 
     #[test]
     fn scope_is_part_of_subject_identity() {
-        let service = ContinuitySubjectV1::new(
-            "org.example",
-            "edge-1",
-            ContinuityScopeV1::Service,
-            None,
-        )
-        .unwrap();
+        let service =
+            ContinuitySubjectV1::new("org.example", "edge-1", ContinuityScopeV1::Service, None)
+                .unwrap();
         let device = ContinuitySubjectV1::new(
             "org.example",
             "edge-1",
@@ -351,20 +347,10 @@ mod tests {
 
     #[test]
     fn namespace_is_part_of_subject_identity() {
-        let a = ContinuitySubjectV1::new(
-            "org.a",
-            "db-primary",
-            ContinuityScopeV1::Machine,
-            None,
-        )
-        .unwrap();
-        let b = ContinuitySubjectV1::new(
-            "org.b",
-            "db-primary",
-            ContinuityScopeV1::Machine,
-            None,
-        )
-        .unwrap();
+        let a = ContinuitySubjectV1::new("org.a", "db-primary", ContinuityScopeV1::Machine, None)
+            .unwrap();
+        let b = ContinuitySubjectV1::new("org.b", "db-primary", ContinuityScopeV1::Machine, None)
+            .unwrap();
 
         assert_ne!(a.id(), b.id());
     }
@@ -426,35 +412,21 @@ mod tests {
     #[test]
     fn blank_or_control_bearing_identifiers_fail_closed() {
         assert!(matches!(
-            ContinuitySubjectV1::new(
-                "   ",
-                "node-1",
-                ContinuityScopeV1::Machine,
-                None
-            ),
+            ContinuitySubjectV1::new("   ", "node-1", ContinuityScopeV1::Machine, None),
             Err(ContinuitySubjectError::BlankText { .. })
         ));
 
         assert!(matches!(
-            ContinuitySubjectV1::new(
-                "org.example",
-                "node\n1",
-                ContinuityScopeV1::Machine,
-                None
-            ),
+            ContinuitySubjectV1::new("org.example", "node\n1", ContinuityScopeV1::Machine, None),
             Err(ContinuitySubjectError::ControlCharacters { .. })
         ));
     }
 
     #[test]
     fn mutated_transport_identity_is_rejected() {
-        let mut subject = ContinuitySubjectV1::new(
-            "org.example",
-            "cluster-a",
-            ContinuityScopeV1::Cluster,
-            None,
-        )
-        .unwrap();
+        let mut subject =
+            ContinuitySubjectV1::new("org.example", "cluster-a", ContinuityScopeV1::Cluster, None)
+                .unwrap();
 
         subject.logical_id = "cluster-b".to_owned();
         assert_eq!(
@@ -465,13 +437,9 @@ mod tests {
 
     #[test]
     fn noncanonical_transport_text_is_rejected() {
-        let mut subject = ContinuitySubjectV1::new(
-            "org.example",
-            "site-a",
-            ContinuityScopeV1::Site,
-            None,
-        )
-        .unwrap();
+        let mut subject =
+            ContinuitySubjectV1::new("org.example", "site-a", ContinuityScopeV1::Site, None)
+                .unwrap();
 
         subject.namespace = " org.example ".to_owned();
         assert_eq!(
