@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,30 @@ SELECTION_SCHEMA = "symthaea.github-trusted-main-enforcement-selection.v2"
 SELECTION_DOMAIN = b"symthaea.github-trusted-main-enforcement-selection.v2\0"
 OBSERVATION_SCHEMA = "symthaea.github-trusted-main-rule-suite-observation.v1"
 OBSERVATION_DOMAIN = b"symthaea.github-trusted-main-rule-suite-observation.v1\0"
+OPERATIONS = ("deletion", "force_push", "ordinary_direct_update")
+COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+DERIVED_FIELDS = {
+    "schema", "repository", "repository_id", "target_ref", "root_sha", "ruleset_id",
+    "policy_id", "structural_verification_id", "effective_rules_verification_id",
+    "root_subject_id", "trusted_enforcement_selection_id", "selected_rule_suite_ids",
+    "selected_rule_suite_observation_ids", "selected_actor_id", "v2_evidence_id",
+    "disposition", "bypass_assurance", "evidence_selection_basis", "evidence_authority",
+    "chronology_authority", "current_admission", "receipt_attestation",
+    "scientific_authority", "evidence_id",
+}
+CANONICAL_DERIVED_LABELS = {
+    "disposition": "EnforcementBehaviorallyCorroborated",
+    "evidence_selection_basis": "trusted-phase-independent-expected-ids-and-observation-content",
+    "evidence_authority": "server-rule-evaluation-readback-only",
+    "chronology_authority": "provider-timestamp-observed-only",
+    "current_admission": "not-evaluated",
+    "receipt_attestation": "none",
+    "scientific_authority": "none",
+}
+ALLOWED_BYPASS_ASSURANCE = {
+    "no-configured-p0-bypass-and-distinct-non-bypass-failures-observed",
+    "not-fully-established",
+}
 
 
 class EnforcementEvidenceV3Error(ValueError):
@@ -44,16 +69,24 @@ def _content_id(domain: bytes, value: Any) -> str:
     return "sha256:" + hashlib.sha256(domain + _canonical(value)).hexdigest()
 
 
-def _expected_sha256(value: str, *, where: str) -> str:
+def _expected_sha256(value: Any, *, where: str) -> str:
     try:
         return v2._sha256_id(value, where=where)
     except v2.EnforcementEvidenceError as exc:
         raise EnforcementEvidenceV3Error(str(exc)) from exc
 
 
-def _expected_positive_int(value: int, *, where: str) -> int:
+def _expected_positive_int(value: Any, *, where: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise EnforcementEvidenceV3Error(f"{where}: positive integer required")
+    return value
+
+
+def _canonical_string(value: Any, *, where: str) -> str:
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise EnforcementEvidenceV3Error(f"{where}: canonical non-empty string required")
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value):
+        raise EnforcementEvidenceV3Error(f"{where}: control characters are forbidden")
     return value
 
 
@@ -76,6 +109,86 @@ def rule_suite_observation_id(observation: Any) -> str:
         raise EnforcementEvidenceV3Error("rule-suite observation: closed normalized schema required")
     payload = {"schema": OBSERVATION_SCHEMA, **observation}
     return _content_id(OBSERVATION_DOMAIN, payload)
+
+
+def validate_enforcement_evidence_v3(value: Any) -> dict[str, Any]:
+    """Revalidate one derived V3 object, including selector and authority semantics."""
+    result = _require_mapping(value, where="enforcement_v3")
+    if set(result) != DERIVED_FIELDS:
+        raise EnforcementEvidenceV3Error("enforcement_v3: closed derived schema required")
+    if result["schema"] != SCHEMA:
+        raise EnforcementEvidenceV3Error("enforcement_v3.schema: unsupported theorem schema")
+    for field, expected in CANONICAL_DERIVED_LABELS.items():
+        if result[field] != expected:
+            raise EnforcementEvidenceV3Error(
+                f"enforcement_v3.{field}: canonical authority/selection label required"
+            )
+    if result["bypass_assurance"] not in ALLOWED_BYPASS_ASSURANCE:
+        raise EnforcementEvidenceV3Error("enforcement_v3.bypass_assurance: unsupported assurance label")
+
+    _canonical_string(result["repository"], where="enforcement_v3.repository")
+    _expected_positive_int(result["repository_id"], where="enforcement_v3.repository_id")
+    target_ref = _canonical_string(result["target_ref"], where="enforcement_v3.target_ref")
+    if not target_ref.startswith("refs/heads/"):
+        raise EnforcementEvidenceV3Error("enforcement_v3.target_ref: full refs/heads/... ref required")
+    root_sha = _canonical_string(result["root_sha"], where="enforcement_v3.root_sha")
+    if COMMIT_SHA_RE.fullmatch(root_sha) is None:
+        raise EnforcementEvidenceV3Error("enforcement_v3.root_sha: lowercase 40-hex commit SHA required")
+    _expected_positive_int(result["ruleset_id"], where="enforcement_v3.ruleset_id")
+    selected_actor_id = _expected_positive_int(
+        result["selected_actor_id"], where="enforcement_v3.selected_actor_id"
+    )
+
+    for field in (
+        "policy_id", "structural_verification_id", "effective_rules_verification_id",
+        "root_subject_id", "trusted_enforcement_selection_id", "v2_evidence_id", "evidence_id",
+    ):
+        _expected_sha256(result[field], where=f"enforcement_v3.{field}")
+
+    suite_ids = result["selected_rule_suite_ids"]
+    if not isinstance(suite_ids, dict) or set(suite_ids) != set(OPERATIONS):
+        raise EnforcementEvidenceV3Error(
+            "enforcement_v3.selected_rule_suite_ids: exact operation set required"
+        )
+    normalized_suite_ids = {
+        operation: _expected_positive_int(
+            suite_ids[operation], where=f"enforcement_v3.selected_rule_suite_ids.{operation}"
+        )
+        for operation in OPERATIONS
+    }
+    if len(set(normalized_suite_ids.values())) != len(OPERATIONS):
+        raise EnforcementEvidenceV3Error("enforcement_v3.selected_rule_suite_ids: IDs must be distinct")
+
+    observation_ids = result["selected_rule_suite_observation_ids"]
+    if not isinstance(observation_ids, dict) or set(observation_ids) != set(OPERATIONS):
+        raise EnforcementEvidenceV3Error(
+            "enforcement_v3.selected_rule_suite_observation_ids: exact operation set required"
+        )
+    normalized_observation_ids = {
+        operation: _expected_sha256(
+            observation_ids[operation],
+            where=f"enforcement_v3.selected_rule_suite_observation_ids.{operation}",
+        )
+        for operation in OPERATIONS
+    }
+
+    selection_payload = {
+        "schema": SELECTION_SCHEMA,
+        "structural_verification_id": result["structural_verification_id"],
+        "effective_rules_verification_id": result["effective_rules_verification_id"],
+        "root_subject_id": result["root_subject_id"],
+        "rule_suite_ids": normalized_suite_ids,
+        "rule_suite_observation_ids": normalized_observation_ids,
+        "actor_id": selected_actor_id,
+    }
+    if _content_id(SELECTION_DOMAIN, selection_payload) != result["trusted_enforcement_selection_id"]:
+        raise EnforcementEvidenceV3Error("enforcement_v3: trusted selection identity mismatch")
+
+    payload = dict(result)
+    del payload["evidence_id"]
+    if _content_id(DOMAIN, payload) != result["evidence_id"]:
+        raise EnforcementEvidenceV3Error("enforcement_v3: content identity mismatch")
+    return result
 
 
 def derive_enforcement_evidence_v3(
@@ -233,17 +346,11 @@ def derive_enforcement_evidence_v3(
         "selected_rule_suite_observation_ids": observed_observation_ids,
         "selected_actor_id": selected_actor_id,
         "v2_evidence_id": base["evidence_id"],
-        "disposition": "EnforcementBehaviorallyCorroborated",
         "bypass_assurance": base["bypass_assurance"],
-        "evidence_selection_basis": "trusted-phase-independent-expected-ids-and-observation-content",
-        "evidence_authority": "server-rule-evaluation-readback-only",
-        "chronology_authority": "provider-timestamp-observed-only",
-        "current_admission": "not-evaluated",
-        "receipt_attestation": "none",
-        "scientific_authority": "none",
+        **CANONICAL_DERIVED_LABELS,
     }
     result["evidence_id"] = _content_id(DOMAIN, result)
-    return result
+    return validate_enforcement_evidence_v3(result)
 
 
 def _parser() -> argparse.ArgumentParser:
