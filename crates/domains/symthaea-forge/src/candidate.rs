@@ -1,17 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Authority-free adapter from a content-addressed Forge survivor into the generic algorithm
-//! discovery protocol.
+//! Authority-free adapters from Forge output into the generic algorithm-discovery protocol.
 //!
 //! Forge does not invent the semantic problem or algorithm family. Those are supplied by the
-//! caller as already-valid registry records. The adapter only proves that the Forge survivor is
-//! tied to the same frozen baseline and that its exact artifact/ordered mutation lineage can be
-//! represented as a [`CandidateProposal`].
+//! caller as already-valid registry records. The proposal adapter binds the exact survivor to that
+//! meaning; the ledger adapter binds Forge's generator-local trace to one exact `DiscoveryRun`.
 
 use crate::certificate::{CertificateError, ForgeCandidate};
+use crate::trace::{validate_forge_trace, ForgeTraceError, ForgeTraceEvent};
 use symthaea_algorithms::discovery::{
     CandidateArtifact, CandidateArtifactKind, CandidateProposal, DiscoveryError, DiscoveryRun,
 };
+use symthaea_algorithms::ledger::{DiscoveryLedger, LedgerError};
 use symthaea_algorithms::{
     AlgorithmLineage, AlgorithmRecord, ImplementationRecord, RegistryError,
 };
@@ -25,6 +25,10 @@ pub enum ForgeProposalError {
     Registry(#[from] RegistryError),
     #[error(transparent)]
     Discovery(#[from] DiscoveryError),
+    #[error(transparent)]
+    Ledger(#[from] LedgerError),
+    #[error(transparent)]
+    Trace(#[from] ForgeTraceError),
     #[error("Forge certificate does not contain an exact Git baseline revision")]
     MissingBaselineRevision,
     #[error("Forge certificate Git revision does not match the discovery run baseline")]
@@ -101,13 +105,38 @@ pub fn proposal_from_forge(
     )?)
 }
 
+/// Replay Forge's generator-local observation stream into a semantic, hash-chained ledger.
+///
+/// Forge trace events are intentionally not trusted as a ledger by themselves. First the Forge
+/// lifecycle validator proves every generated occurrence has exactly one terminal outcome and the
+/// trace is complete; then `DiscoveryLedger` rechecks run identity, generation budget, event shape,
+/// ordering and terminal seal while reconstructing the semantic hash chain.
+pub fn ledger_from_forge_trace(
+    run: &DiscoveryRun,
+    trace: &[ForgeTraceEvent],
+) -> Result<DiscoveryLedger, ForgeProposalError> {
+    validate_forge_trace(trace)?;
+    let mut ledger = DiscoveryLedger::new(run)?;
+    for event in trace {
+        ledger.append(
+            run,
+            event.generation,
+            event.kind,
+            event.candidate_artifact_id.clone(),
+            event.observation_id.clone(),
+        )?;
+    }
+    Ok(ledger)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::certificate::{
-        ForgeCertificate, GateEvidence, MutationRecord, full_source_artifact_id,
+        full_source_artifact_id, ForgeCertificate, GateEvidence, MutationRecord,
     };
     use symthaea_algorithms::discovery::{DiscoveryPolicy, SearchBudget};
+    use symthaea_algorithms::ledger::DiscoveryEventKind;
     use symthaea_algorithms::{
         AlgorithmProvenance, ContentId, DeterminismRequirement, DiscoveryRisk, ProblemSpec,
         SemanticGuarantee,
@@ -254,6 +283,49 @@ mod tests {
         assert!(matches!(
             proposal_from_forge(&run, &algorithm, &wrong, &candidate),
             Err(ForgeProposalError::BaselineArtifactMismatch)
+        ));
+    }
+
+    #[test]
+    fn forge_trace_replays_into_sealed_semantic_ledger() {
+        let (run, _, _, candidate) = fixture();
+        let artifact = candidate.artifact_id().clone();
+        let trace = vec![
+            ForgeTraceEvent::candidate(
+                1,
+                DiscoveryEventKind::CandidateGenerated,
+                artifact.clone(),
+                ContentId::derive("observation", [b"generated".as_slice()]),
+            ),
+            ForgeTraceEvent::candidate(
+                1,
+                DiscoveryEventKind::RejectedCorrectness,
+                artifact,
+                ContentId::derive("observation", [b"counterexample".as_slice()]),
+            ),
+            ForgeTraceEvent::completed(ContentId::derive(
+                "summary",
+                [b"complete".as_slice()],
+            )),
+        ];
+        let ledger = ledger_from_forge_trace(&run, &trace).unwrap();
+        assert!(ledger.is_sealed());
+        assert_eq!(ledger.len(), trace.len());
+        assert!(ledger.validate_for(&run).is_ok());
+    }
+
+    #[test]
+    fn unterminated_forge_trace_is_rejected_before_semantic_replay() {
+        let (run, _, _, candidate) = fixture();
+        let trace = vec![ForgeTraceEvent::candidate(
+            1,
+            DiscoveryEventKind::CandidateGenerated,
+            candidate.artifact_id().clone(),
+            ContentId::derive("observation", [b"generated".as_slice()]),
+        )];
+        assert!(matches!(
+            ledger_from_forge_trace(&run, &trace),
+            Err(ForgeProposalError::Trace(ForgeTraceError::MissingCompletion))
         ));
     }
 }
