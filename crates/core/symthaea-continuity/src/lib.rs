@@ -34,6 +34,7 @@ pub mod execution_coordinator;
 pub mod execution_journal;
 pub mod execution_journal_anchor;
 pub mod execution_result;
+pub mod external_effects;
 pub mod failure_domain;
 pub mod known_good;
 pub mod observation;
@@ -164,6 +165,20 @@ pub use execution_journal_anchor::{
     canonical_execution_journal_anchor_claim_bytes, canonical_execution_journal_anchor_claim_digest,
 };
 pub use execution_result::{CanonicalExecutionAttemptResultId, CanonicalExecutionAttemptResultV1, ExecutionResultBindingError};
+pub use external_effects::{
+    EXTERNAL_EFFECT_CONTRACT_SCHEMA_V1, EXTERNAL_EFFECT_OBSERVATION_AUTH_PURPOSE,
+    EXTERNAL_EFFECT_OBSERVATION_CLAIM_SCHEMA_V1,
+    EXTERNAL_EFFECT_RECONCILIATION_RECORD_SCHEMA_V1, AuthenticatedExternalEffectObservationId,
+    ExternalEffectClassV1, ExternalEffectContractId, ExternalEffectContractV1,
+    ExternalEffectError, ExternalEffectObservationClaimId, ExternalEffectObservationClaimV1,
+    ExternalEffectObservationPolicyId, ExternalEffectObservationPolicyV1,
+    ExternalEffectObligationId, ExternalEffectObligationV1, ExternalEffectObservedStateV1,
+    ExternalEffectRecoveryPredicateV1, ExternalEffectReconciliationRecordV1,
+    QualifiedExternalEffectObservationId, QualifiedExternalEffectObservationV1,
+    QualifiedExternalEffectReconciliationId, QualifiedExternalEffectReconciliationV1,
+    canonical_external_effect_observation_claim_bytes,
+    canonical_external_effect_observation_claim_digest,
+};
 pub use failure_domain::{
     FAILURE_DOMAIN_POLICY_SCHEMA_V1, FailureDomainGroupV1, FailureDomainKindV1,
     FailureDomainPolicyError, FailureDomainPolicyId, FailureDomainPolicyV1,
