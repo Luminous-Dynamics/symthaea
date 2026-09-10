@@ -171,6 +171,10 @@ def validate_enforcement_evidence_v3(value: Any) -> dict[str, Any]:
         )
         for operation in OPERATIONS
     }
+    if len(set(normalized_observation_ids.values())) != len(OPERATIONS):
+        raise EnforcementEvidenceV3Error(
+            "enforcement_v3.selected_rule_suite_observation_ids: IDs must be distinct"
+        )
 
     selection_payload = {
         "schema": SELECTION_SCHEMA,
