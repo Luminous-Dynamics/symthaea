@@ -21,11 +21,16 @@
 //! `Deserialize`; persisted bytes cannot recreate authority. Parse persisted
 //! data as [`AdmissionRecordEvidence`] and rerun the admission pipeline to mint a
 //! new `AdmissionRecord` after restart.
+//!
+//! Currentness is never accepted as a caller-supplied boolean. Activation and
+//! point-of-use rechecks query an injected [`AdmissionCurrentnessSource`] using
+//! the immutable admission subject (extension, version, issuer, signer).
 
 #![deny(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+use std::fmt::Debug;
 use symthaea_extension_core::{
     CapabilityId, ExtensionId, ExtensionManifest, FilesystemPermission, NetworkPermission,
     PermissionSet,
@@ -74,6 +79,72 @@ pub enum TrustLevel {
     Community,
     Trusted,
     Privileged,
+}
+
+/// Stable identity facts presented to the host currentness source.
+///
+/// The source can use the issuer and signer as well as extension identity when
+/// resolving current policy and key-authority state. The subject carries no
+/// mutable authority state itself.
+#[derive(Debug, Clone, Copy)]
+pub struct AdmissionSubject<'a> {
+    extension: &'a ExtensionId,
+    extension_version: &'a str,
+    issuer: &'a PrincipalId,
+    signer: Option<&'a PrincipalId>,
+}
+
+impl<'a> AdmissionSubject<'a> {
+    pub fn extension(&self) -> &'a ExtensionId {
+        self.extension
+    }
+
+    pub const fn extension_version(&self) -> &'a str {
+        self.extension_version
+    }
+
+    pub fn issuer(&self) -> &'a PrincipalId {
+        self.issuer
+    }
+
+    pub const fn signer(&self) -> Option<&'a PrincipalId> {
+        self.signer
+    }
+}
+
+/// Live authority facts returned by a host-owned currentness source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdmissionContext {
+    pub current_generation: u64,
+    pub current_trust_generation: u64,
+    pub revoked: bool,
+}
+
+impl AdmissionContext {
+    pub const fn active(current_generation: u64, current_trust_generation: u64) -> Self {
+        Self {
+            current_generation,
+            current_trust_generation,
+            revoked: false,
+        }
+    }
+
+    pub const fn revoked(current_generation: u64, current_trust_generation: u64) -> Self {
+        Self {
+            current_generation,
+            current_trust_generation,
+            revoked: true,
+        }
+    }
+}
+
+/// Host-owned authority boundary for policy/trust currentness.
+///
+/// Returning `None` means current authority cannot be established and fails
+/// closed. Production callers should pass the host's authoritative policy/trust
+/// source, not synthesize snapshots at the call site.
+pub trait AdmissionCurrentnessSource: Debug + Send + Sync {
+    fn current_context(&self, subject: AdmissionSubject<'_>) -> Option<AdmissionContext>;
 }
 
 /// In-process host-issued admission authority.
@@ -187,13 +258,18 @@ impl AdmissionRecord {
         )
     }
 
-    /// Revalidate this in-process admission against current policy/trust state.
+    /// Activate this in-process record using the host's authoritative currentness
+    /// source. Raw caller-supplied generation/revocation snapshots are not an
+    /// activation API.
     pub fn activate(
         &self,
         manifest: &ExtensionManifest,
-        context: AdmissionContext,
+        currentness: &dyn AdmissionCurrentnessSource,
     ) -> Result<ActiveAdmission, AdmissionProblem> {
         self.validate_against_manifest(manifest)?;
+        let context = currentness
+            .current_context(self.subject())
+            .ok_or(AdmissionProblem::CurrentnessUnavailable)?;
         validate_currentness(self.generation, self.trust_generation, context)?;
         Ok(ActiveAdmission {
             record: self.clone(),
@@ -204,6 +280,15 @@ impl AdmissionRecord {
     /// Produce a persistable evidence-only representation.
     pub fn evidence(&self) -> AdmissionRecordEvidence {
         AdmissionRecordEvidence::from(self)
+    }
+
+    pub fn subject(&self) -> AdmissionSubject<'_> {
+        AdmissionSubject {
+            extension: &self.extension,
+            extension_version: &self.extension_version,
+            issuer: &self.issuer,
+            signer: self.signer.as_ref(),
+        }
     }
 
     pub fn extension(&self) -> &ExtensionId {
@@ -311,26 +396,10 @@ impl AdmissionRecordEvidence {
     }
 }
 
-/// Live host facts checked at the instant an in-process admission is used.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct AdmissionContext {
-    pub current_generation: u64,
-    pub current_trust_generation: u64,
-    pub revoked: bool,
-}
-
-impl AdmissionContext {
-    pub const fn active(current_generation: u64, current_trust_generation: u64) -> Self {
-        Self {
-            current_generation,
-            current_trust_generation,
-            revoked: false,
-        }
-    }
-}
-
-/// Non-serializable proof that one in-process admission is current for one exact
-/// manifest. This type intentionally does not implement `Clone` or serde.
+/// Non-serializable proof that one in-process admission was activated from the
+/// host's currentness source for one exact manifest. This type intentionally does
+/// not implement `Clone` or serde. Long-lived consumers must still call
+/// [`ActiveAdmission::recheck_currentness`] at the actual use boundary.
 #[derive(Debug, PartialEq, Eq)]
 pub struct ActiveAdmission {
     record: AdmissionRecord,
@@ -340,6 +409,9 @@ pub struct ActiveAdmission {
 impl ActiveAdmission {
     pub fn extension(&self) -> &ExtensionId {
         self.record.extension()
+    }
+    pub fn subject(&self) -> AdmissionSubject<'_> {
+        self.record.subject()
     }
     pub fn trust(&self) -> TrustLevel {
         self.record.trust()
@@ -371,6 +443,17 @@ impl ActiveAdmission {
     pub fn granted_permissions(&self) -> &PermissionSet {
         self.record.granted_permissions()
     }
+
+    /// Re-resolve current policy/trust/revocation state at the actual use site.
+    pub fn recheck_currentness(
+        &self,
+        currentness: &dyn AdmissionCurrentnessSource,
+    ) -> Result<(), AdmissionProblem> {
+        let context = currentness
+            .current_context(self.subject())
+            .ok_or(AdmissionProblem::CurrentnessUnavailable)?;
+        validate_currentness(self.generation(), self.trust_generation(), context)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -388,6 +471,7 @@ pub enum AdmissionProblem {
     VersionMismatch,
     CapabilityNotDeclared,
     PermissionExceedsManifest,
+    CurrentnessUnavailable,
     Revoked,
     GenerationMismatch { admitted: u64, current: u64 },
     TrustGenerationMismatch { admitted: u64, current: u64 },
@@ -553,6 +637,29 @@ mod tests {
         AbiVersion, CapabilityDescriptor, EffectClass, ExtensionKind, ResourceBudget, RuntimeKind,
     };
 
+    #[derive(Debug, Clone, Copy)]
+    struct FixedCurrentness(Option<AdmissionContext>);
+
+    impl AdmissionCurrentnessSource for FixedCurrentness {
+        fn current_context(&self, subject: AdmissionSubject<'_>) -> Option<AdmissionContext> {
+            assert_eq!(subject.extension().as_str(), "org.example.solver");
+            assert_eq!(subject.extension_version(), "1.0.0");
+            assert_eq!(subject.issuer().as_str(), "local:extension-authority");
+            assert_eq!(
+                subject.signer().map(PrincipalId::as_str),
+                Some("did:example:publisher")
+            );
+            self.0
+        }
+    }
+
+    fn current(generation: u64, trust_generation: u64) -> FixedCurrentness {
+        FixedCurrentness(Some(AdmissionContext::active(
+            generation,
+            trust_generation,
+        )))
+    }
+
     fn digest(byte: u8) -> Sha256Digest {
         Sha256Digest::new([byte; 32])
     }
@@ -611,11 +718,10 @@ mod tests {
     }
 
     #[test]
-    fn active_admission_requires_current_policy_trust_and_exact_manifest() {
+    fn active_admission_requires_authoritative_currentness_and_exact_manifest() {
         let manifest = manifest();
-        let active = record()
-            .activate(&manifest, AdmissionContext::active(7, 13))
-            .unwrap();
+        let source = current(7, 13);
+        let active = record().activate(&manifest, &source).unwrap();
         assert!(active.matches_manifest(&manifest));
         assert_eq!(active.trust_generation(), 13);
         assert!(active.allows_capability(&CapabilityId::new(
@@ -651,26 +757,49 @@ mod tests {
     }
 
     #[test]
-    fn live_revocation_and_generation_changes_fail_closed() {
+    fn unavailable_revoked_and_generation_changes_fail_closed() {
         let manifest = manifest();
         let record = record();
         assert_eq!(
+            record.activate(&manifest, &FixedCurrentness(None)),
+            Err(AdmissionProblem::CurrentnessUnavailable)
+        );
+        assert_eq!(
             record.activate(
                 &manifest,
-                AdmissionContext {
-                    current_generation: 7,
-                    current_trust_generation: 13,
-                    revoked: true,
-                },
+                &FixedCurrentness(Some(AdmissionContext::revoked(7, 13))),
             ),
             Err(AdmissionProblem::Revoked)
         );
         assert!(matches!(
-            record.activate(&manifest, AdmissionContext::active(8, 13)),
+            record.activate(&manifest, &current(8, 13)),
             Err(AdmissionProblem::GenerationMismatch { .. })
         ));
         assert!(matches!(
-            record.activate(&manifest, AdmissionContext::active(7, 14)),
+            record.activate(&manifest, &current(7, 14)),
+            Err(AdmissionProblem::TrustGenerationMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn active_admission_rechecks_live_source_at_use() {
+        let manifest = manifest();
+        let active = record().activate(&manifest, &current(7, 13)).unwrap();
+        assert!(active.recheck_currentness(&current(7, 13)).is_ok());
+        assert_eq!(
+            active.recheck_currentness(&FixedCurrentness(None)),
+            Err(AdmissionProblem::CurrentnessUnavailable)
+        );
+        assert_eq!(
+            active.recheck_currentness(&FixedCurrentness(Some(AdmissionContext::revoked(7, 13)))),
+            Err(AdmissionProblem::Revoked)
+        );
+        assert!(matches!(
+            active.recheck_currentness(&current(8, 13)),
+            Err(AdmissionProblem::GenerationMismatch { .. })
+        ));
+        assert!(matches!(
+            active.recheck_currentness(&current(7, 14)),
             Err(AdmissionProblem::TrustGenerationMismatch { .. })
         ));
     }
@@ -679,9 +808,7 @@ mod tests {
     fn manifest_and_permission_escalation_fail_closed() {
         let mut substituted = manifest();
         substituted.description = "changed after activation".into();
-        let active = record()
-            .activate(&manifest(), AdmissionContext::active(7, 13))
-            .unwrap();
+        let active = record().activate(&manifest(), &current(7, 13)).unwrap();
         assert!(!active.matches_manifest(&substituted));
 
         let mut overgrant = record();
