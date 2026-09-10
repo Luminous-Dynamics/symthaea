@@ -1,6 +1,7 @@
 # Exact-head qualification for the typed continuity subject/snapshot lineage.
 # This is intentionally narrower than repository-wide CI and carries no
 # availability, ownership, recovery, policy, or execution authority.
+# Re-qualify after the guarded one-shot Cargo.lock reconciliation.
 
 name: Continuity Subject Snapshot Qualification
 
