@@ -247,6 +247,12 @@ pub use whole_body::*;
 pub use whole_body_intent::*;
 pub use whole_body_lowering::*;
 
+impl PartialEq for HumanoidMeasuredGraspControllerQualificationTrial {
+    fn eq(&self, other: &Self) -> bool {
+        self.bundle_digest() == other.bundle_digest()
+    }
+}
+
 pub use crate::control::GaitControlProfile;
 pub use control::{
     CfcCpg, GenerativePrior, HdcWorkspace, LocomotionModule, MachineState, execute_modular_gait,
