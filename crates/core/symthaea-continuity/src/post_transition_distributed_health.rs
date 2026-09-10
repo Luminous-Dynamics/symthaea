@@ -9,8 +9,6 @@
 //!
 //! `PreTransitionSafety != PostTransitionDistributedHealth != LastKnownGood`.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -21,12 +19,11 @@ use crate::distributed_currentness::{
 use crate::distributed_evidence::{
     AuthenticatedFailureDomainStateEvidenceId, AuthenticatedFailureDomainStateEvidenceV1,
     AuthenticatedRecoveryPathStateEvidenceId, AuthenticatedRecoveryPathStateEvidenceV1,
-    FailureDomainObservationOutcomeV1, RecoveryPathObservationOutcomeV1,
 };
+use crate::distributed_health_common::evaluate_distributed_health;
 use crate::distributed_state::{
     AuthenticatedParticipantStateEvidenceId, AuthenticatedParticipantStateEvidenceV1,
-    DistributedStateContextId, ParticipantOperationalStateV1, ParticipantSetDigest,
-    ValidatedDistributedStateContextV1,
+    DistributedStateContextId, ParticipantSetDigest, ValidatedDistributedStateContextV1,
 };
 use crate::failure_domain::{FailureDomainPolicyId, ValidatedFailureDomainPolicyV1};
 use crate::post_execution_health::{
@@ -34,7 +31,7 @@ use crate::post_execution_health::{
     QualifiedPostExecutionHealthV1,
 };
 use crate::scope::ContinuitySubjectId;
-use crate::verifier::VerifierProfileId;
+use crate::verifier::{VerifierProfileId};
 
 const CURRENT_STATE_DOMAIN: &[u8] =
     b"symthaea.continuity.post-transition-distributed-current-state.v1\0";
@@ -91,8 +88,9 @@ impl QualifiedRecoveryPathSnapshotV1 {
 
 /// Non-Serde exact post-transition distributed-health proof.
 ///
-/// The candidate is no longer projected unavailable. Its fresh participant state is
-/// evaluated like every other member and must be `Healthy` before this value exists.
+/// V1 retains its original proof identity and typed local-health id. Its distributed
+/// policy/evidence evaluation is now delegated to the shared closed-world evaluator
+/// also used by V2; the V1 hash domains and field ordering remain unchanged.
 #[derive(Debug, Clone)]
 pub struct QualifiedPostTransitionDistributedHealthV1 {
     qualified_id: QualifiedPostTransitionDistributedHealthId,
@@ -171,6 +169,7 @@ pub(crate) fn compose_post_transition_distributed_health(
     recovery_evidence: &[AuthenticatedRecoveryPathStateEvidenceV1],
     evaluated_at_unix_ms: u64,
 ) -> Result<QualifiedPostTransitionDistributedHealthV1, PostTransitionDistributedHealthError> {
+    // Preserve the original V1 local checks and their fail-closed ordering.
     if evaluated_at_unix_ms == 0 {
         return Err(PostTransitionDistributedHealthError::ZeroEvaluationTime);
     }
@@ -196,266 +195,44 @@ pub(crate) fn compose_post_transition_distributed_health(
         return Err(PostTransitionDistributedHealthError::CurrentnessContextMismatch);
     }
 
-    let failure_policy_by_id =
-        validate_failure_policies(context, currentness, failure_domain_policies)?;
-
-    let mut observation_times = Vec::new();
-    let mut verifier_snapshots = BTreeSet::new();
-    let mut participant_evidence_ids = Vec::new();
-    let mut states = BTreeMap::new();
-
-    for evidence in participant_evidence {
-        require_context("participant", evidence.context_id(), context.id())?;
-        require_profile(
-            "participant",
-            evidence.profile_id(),
-            currentness.participant_verifier_profile_ids(),
-        )?;
-        check_freshness(
-            "participant",
-            evidence.observed_at_unix_ms(),
-            evaluated_at_unix_ms,
-            currentness.max_participant_state_age_ms(),
-            currentness.max_future_skew_ms(),
-        )?;
-        if context
-            .budget()
-            .participant_subject_ids()
-            .binary_search(&evidence.participant_subject_id())
-            .is_err()
-        {
-            return Err(PostTransitionDistributedHealthError::ParticipantOutsideBudget {
-                participant: evidence.participant_subject_id(),
-            });
-        }
-        if states
-            .insert(evidence.participant_subject_id(), evidence.state())
-            .is_some()
-        {
-            return Err(PostTransitionDistributedHealthError::DuplicateParticipantEvidence {
-                participant: evidence.participant_subject_id(),
-            });
-        }
-        if evidence.state() == ParticipantOperationalStateV1::Unknown {
-            return Err(PostTransitionDistributedHealthError::UnknownParticipantState {
-                participant: evidence.participant_subject_id(),
-            });
-        }
-        observation_times.push(evidence.observed_at_unix_ms());
-        participant_evidence_ids.push(evidence.id());
-        verifier_snapshots.insert(PostTransitionVerifierSnapshotV1 {
-            profile_id: evidence.profile_id(),
-            root_epoch: evidence.root_epoch(),
-        });
-    }
-
-    let expected_participants = context.budget().participant_subject_ids();
-    if states.len() != expected_participants.len() {
-        return Err(PostTransitionDistributedHealthError::IncompleteParticipantEvidence {
-            expected: expected_participants.len(),
-            observed: states.len(),
-        });
-    }
-    for participant in expected_participants {
-        if !states.contains_key(participant) {
-            return Err(PostTransitionDistributedHealthError::MissingParticipantEvidence {
-                participant: *participant,
-            });
-        }
-    }
-
-    if states.get(&local_health.subject_id()) != Some(&ParticipantOperationalStateV1::Healthy) {
-        return Err(PostTransitionDistributedHealthError::TransitionedSubjectNotHealthy {
-            participant: local_health.subject_id(),
-        });
-    }
-
-    let unavailable: BTreeSet<ContinuitySubjectId> = states
-        .iter()
-        .filter_map(|(participant, state)| {
-            matches!(
-                state,
-                ParticipantOperationalStateV1::Unhealthy
-                    | ParticipantOperationalStateV1::Transitioning
-            )
-            .then_some(*participant)
-        })
-        .collect();
-    let unavailable_count = unavailable.len() as u32;
-    if unavailable_count > context.budget().max_concurrent_unavailable() {
-        return Err(PostTransitionDistributedHealthError::AvailabilityBudgetExceeded {
-            unavailable: unavailable_count,
-            allowed: context.budget().max_concurrent_unavailable(),
-        });
-    }
-    let healthy_count = expected_participants.len() as u32 - unavailable_count;
-    if healthy_count < context.budget().minimum_healthy() {
-        return Err(PostTransitionDistributedHealthError::MinimumHealthyViolated {
-            observed: healthy_count,
-            required: context.budget().minimum_healthy(),
-        });
-    }
-    for exclusion in context.budget().mutual_exclusion_sets() {
-        let unavailable_members = exclusion
-            .members()
-            .iter()
-            .filter(|member| unavailable.contains(member))
-            .count();
-        if unavailable_members > 1 {
-            return Err(PostTransitionDistributedHealthError::MutualExclusionViolated);
-        }
-    }
-
-    let mut failure_outcomes = BTreeMap::new();
-    let mut failure_evidence_ids = Vec::new();
-    for evidence in failure_domain_evidence {
-        require_context("failure-domain", evidence.context_id(), context.id())?;
-        require_profile(
-            "failure-domain",
-            evidence.profile_id(),
-            currentness.failure_domain_verifier_profile_ids(),
-        )?;
-        check_freshness(
-            "failure-domain",
-            evidence.observed_at_unix_ms(),
-            evaluated_at_unix_ms,
-            currentness.max_failure_domain_age_ms(),
-            currentness.max_future_skew_ms(),
-        )?;
-        if !failure_policy_by_id.contains_key(&evidence.policy_id()) {
-            return Err(PostTransitionDistributedHealthError::UnexpectedFailureDomainEvidence {
-                policy_id: evidence.policy_id(),
-            });
-        }
-        if failure_outcomes
-            .insert(evidence.policy_id(), evidence.outcome())
-            .is_some()
-        {
-            return Err(PostTransitionDistributedHealthError::DuplicateFailureDomainEvidence {
-                policy_id: evidence.policy_id(),
-            });
-        }
-        observation_times.push(evidence.observed_at_unix_ms());
-        failure_evidence_ids.push(evidence.id());
-        verifier_snapshots.insert(PostTransitionVerifierSnapshotV1 {
-            profile_id: evidence.profile_id(),
-            root_epoch: evidence.root_epoch(),
-        });
-    }
-
-    if failure_outcomes.len() != currentness.required_failure_domain_policy_ids().len() {
-        return Err(PostTransitionDistributedHealthError::IncompleteFailureDomainEvidence {
-            expected: currentness.required_failure_domain_policy_ids().len(),
-            observed: failure_outcomes.len(),
-        });
-    }
-
-    let mut healthy_domains = Vec::new();
-    for policy_id in currentness.required_failure_domain_policy_ids() {
-        let outcome = failure_outcomes.get(policy_id).copied().ok_or(
-            PostTransitionDistributedHealthError::MissingFailureDomainEvidence {
-                policy_id: *policy_id,
-            },
-        )?;
-        if outcome != FailureDomainObservationOutcomeV1::MatchesPolicy {
-            return Err(PostTransitionDistributedHealthError::FailureDomainNotCurrent {
-                policy_id: *policy_id,
-            });
-        }
-        let policy = failure_policy_by_id
-            .get(policy_id)
-            .expect("validated required failure-domain policy is present");
-        let count = policy
-            .groups()
-            .iter()
-            .filter(|group| {
-                group
-                    .members()
-                    .iter()
-                    .any(|member| !unavailable.contains(member))
-            })
-            .count() as u32;
-        if count < policy.minimum_healthy_domains() {
-            return Err(PostTransitionDistributedHealthError::FailureDomainFloorViolated {
-                policy_id: *policy_id,
-                observed: count,
-                required: policy.minimum_healthy_domains(),
-            });
-        }
-        healthy_domains.push((*policy_id, count));
-    }
-
-    let mut recovery_by_class =
-        BTreeMap::<RecoveryPathClassV1, QualifiedRecoveryPathSnapshotV1>::new();
-    let mut seen_recovery_classes = BTreeSet::<RecoveryPathClassV1>::new();
-    let mut recovery_evidence_ids = Vec::new();
-    for evidence in recovery_evidence {
-        require_context("recovery", evidence.context_id(), context.id())?;
-        require_profile(
-            "recovery",
-            evidence.profile_id(),
-            currentness.recovery_verifier_profile_ids(),
-        )?;
-        check_freshness(
-            "recovery",
-            evidence.observed_at_unix_ms(),
-            evaluated_at_unix_ms,
-            currentness.max_recovery_path_age_ms(),
-            currentness.max_future_skew_ms(),
-        )?;
-        if context
-            .budget()
-            .recovery_path_any_of()
-            .binary_search(evidence.recovery_path_class())
-            .is_err()
-        {
-            return Err(PostTransitionDistributedHealthError::RecoveryClassOutsideBudget);
-        }
-        if !seen_recovery_classes.insert(evidence.recovery_path_class().clone()) {
-            return Err(PostTransitionDistributedHealthError::DuplicateRecoveryEvidence);
-        }
-        if evidence.outcome() == RecoveryPathObservationOutcomeV1::Available {
-            let identity = evidence
-                .recovery_path_identity_digest()
-                .ok_or(PostTransitionDistributedHealthError::AvailableRecoveryMissingIdentity)?;
-            recovery_by_class.insert(
-                evidence.recovery_path_class().clone(),
-                QualifiedRecoveryPathSnapshotV1 {
-                    recovery_path_class: evidence.recovery_path_class().clone(),
-                    recovery_path_identity_digest: identity,
-                },
-            );
-        }
-        observation_times.push(evidence.observed_at_unix_ms());
-        recovery_evidence_ids.push(evidence.id());
-        verifier_snapshots.insert(PostTransitionVerifierSnapshotV1 {
-            profile_id: evidence.profile_id(),
-            root_epoch: evidence.root_epoch(),
-        });
-    }
-
-    if recovery_by_class.is_empty() {
-        return Err(PostTransitionDistributedHealthError::NoAvailableRecoveryPath);
-    }
-    validate_cross_evidence_skew(
-        &observation_times,
-        currentness.max_cross_evidence_skew_ms(),
+    let evaluated = evaluate_distributed_health(
+        local_health.subject_id(),
+        context,
+        currentness,
+        failure_domain_policies,
+        participant_evidence,
+        failure_domain_evidence,
+        recovery_evidence,
+        evaluated_at_unix_ms,
     )?;
 
-    participant_evidence_ids.sort();
-    failure_evidence_ids.sort();
-    recovery_evidence_ids.sort();
-    healthy_domains.sort();
-    let recovery_paths = recovery_by_class.into_values().collect::<Vec<_>>();
-    let verifier_snapshots = verifier_snapshots.into_iter().collect::<Vec<_>>();
+    let verifier_snapshots = evaluated
+        .verifier_snapshots
+        .iter()
+        .map(|(profile_id, root_epoch)| PostTransitionVerifierSnapshotV1 {
+            profile_id: *profile_id,
+            root_epoch: *root_epoch,
+        })
+        .collect::<Vec<_>>();
+    let recovery_paths = evaluated
+        .recovery_paths
+        .iter()
+        .map(|(recovery_path_class, recovery_path_identity_digest)| {
+            QualifiedRecoveryPathSnapshotV1 {
+                recovery_path_class: recovery_path_class.clone(),
+                recovery_path_identity_digest: *recovery_path_identity_digest,
+            }
+        })
+        .collect::<Vec<_>>();
 
+    // These hashes are intentionally byte-for-byte the original V1 contracts.
     let current_state_digest = PostTransitionDistributedStateDigest(hash_current_state(
         local_health.id(),
         context.id(),
         currentness.id(),
-        &participant_evidence_ids,
-        &failure_evidence_ids,
-        &recovery_evidence_ids,
+        &evaluated.participant_evidence_ids,
+        &evaluated.failure_evidence_ids,
+        &evaluated.recovery_evidence_ids,
     ));
     let qualified_id = QualifiedPostTransitionDistributedHealthId(hash_qualified(
         current_state_digest,
@@ -464,9 +241,9 @@ pub(crate) fn compose_post_transition_distributed_health(
         currentness,
         &verifier_snapshots,
         &recovery_paths,
-        unavailable_count,
-        healthy_count,
-        &healthy_domains,
+        evaluated.unavailable_count,
+        evaluated.healthy_count,
+        &evaluated.healthy_domains,
         evaluated_at_unix_ms,
     ));
 
@@ -484,125 +261,11 @@ pub(crate) fn compose_post_transition_distributed_health(
         current_state_digest,
         verifier_snapshots,
         recovery_paths,
-        unavailable_count,
-        healthy_count,
-        healthy_domains,
+        unavailable_count: evaluated.unavailable_count,
+        healthy_count: evaluated.healthy_count,
+        healthy_domains: evaluated.healthy_domains,
         evaluated_at_unix_ms,
     })
-}
-
-fn validate_failure_policies<'a>(
-    context: &ValidatedDistributedStateContextV1,
-    currentness: &ValidatedDistributedCurrentnessPolicyV1,
-    policies: &'a [ValidatedFailureDomainPolicyV1],
-) -> Result<
-    BTreeMap<FailureDomainPolicyId, &'a ValidatedFailureDomainPolicyV1>,
-    PostTransitionDistributedHealthError,
-> {
-    let mut by_id = BTreeMap::new();
-    for policy in policies {
-        if policy.budget_id() != context.budget_id()
-            || policy.budget_generation() != context.budget_generation()
-            || policy.aggregate_subject_id() != context.aggregate_subject_id()
-        {
-            return Err(PostTransitionDistributedHealthError::FailureDomainPolicyContextMismatch {
-                policy_id: policy.id(),
-            });
-        }
-        if currentness
-            .required_failure_domain_policy_ids()
-            .binary_search(&policy.id())
-            .is_err()
-        {
-            return Err(PostTransitionDistributedHealthError::UnexpectedFailureDomainPolicy {
-                policy_id: policy.id(),
-            });
-        }
-        if by_id.insert(policy.id(), policy).is_some() {
-            return Err(PostTransitionDistributedHealthError::DuplicateFailureDomainPolicy {
-                policy_id: policy.id(),
-            });
-        }
-    }
-    if by_id.len() != currentness.required_failure_domain_policy_ids().len() {
-        return Err(PostTransitionDistributedHealthError::IncompleteFailureDomainPolicies {
-            expected: currentness.required_failure_domain_policy_ids().len(),
-            observed: by_id.len(),
-        });
-    }
-    Ok(by_id)
-}
-
-fn require_context(
-    role: &'static str,
-    observed: DistributedStateContextId,
-    expected: DistributedStateContextId,
-) -> Result<(), PostTransitionDistributedHealthError> {
-    if observed != expected {
-        return Err(PostTransitionDistributedHealthError::EvidenceContextMismatch { role });
-    }
-    Ok(())
-}
-
-fn require_profile(
-    role: &'static str,
-    profile_id: VerifierProfileId,
-    allowed: &[VerifierProfileId],
-) -> Result<(), PostTransitionDistributedHealthError> {
-    if allowed.binary_search(&profile_id).is_err() {
-        return Err(PostTransitionDistributedHealthError::UnapprovedVerifierProfile {
-            role,
-            profile_id,
-        });
-    }
-    Ok(())
-}
-
-fn check_freshness(
-    role: &'static str,
-    observed_at_unix_ms: u64,
-    evaluated_at_unix_ms: u64,
-    maximum_age_ms: u64,
-    maximum_future_skew_ms: u64,
-) -> Result<(), PostTransitionDistributedHealthError> {
-    if observed_at_unix_ms > evaluated_at_unix_ms {
-        let skew = observed_at_unix_ms - evaluated_at_unix_ms;
-        if skew > maximum_future_skew_ms {
-            return Err(PostTransitionDistributedHealthError::EvidenceFromFuture {
-                role,
-                skew_ms: skew,
-                allowed_ms: maximum_future_skew_ms,
-            });
-        }
-        return Ok(());
-    }
-    let age = evaluated_at_unix_ms - observed_at_unix_ms;
-    if age > maximum_age_ms {
-        return Err(PostTransitionDistributedHealthError::StaleEvidence {
-            role,
-            age_ms: age,
-            allowed_ms: maximum_age_ms,
-        });
-    }
-    Ok(())
-}
-
-fn validate_cross_evidence_skew(
-    times: &[u64],
-    maximum_skew_ms: u64,
-) -> Result<(), PostTransitionDistributedHealthError> {
-    let Some(minimum) = times.iter().min().copied() else {
-        return Err(PostTransitionDistributedHealthError::NoCurrentnessEvidence);
-    };
-    let maximum = times.iter().max().copied().unwrap_or(minimum);
-    let skew = maximum - minimum;
-    if skew > maximum_skew_ms {
-        return Err(PostTransitionDistributedHealthError::CrossEvidenceSkewExceeded {
-            observed_ms: skew,
-            allowed_ms: maximum_skew_ms,
-        });
-    }
-    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
