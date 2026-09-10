@@ -21,6 +21,7 @@ pub mod distributed_evidence;
 mod distributed_evidence_error_bridge;
 pub mod distributed_qualification;
 pub mod distributed_state;
+pub mod exact_local_health;
 pub mod exact_policy;
 pub mod execution_capability;
 pub mod execution_coordinator;
@@ -103,6 +104,13 @@ pub use distributed_state::{
     DistributedStateContextV1, DistributedStateError, ParticipantOperationalStateV1,
     ParticipantSetDigest, ParticipantStateClaimId, ParticipantStateClaimV1,
     ValidatedDistributedStateContextV1,
+};
+pub use exact_local_health::{
+    CRASH_SOURCE_HEALTH_CLAIM_SCHEMA_V1, AuthenticatedCrashSourceHealthId,
+    CrashSourceHealthClaimId, CrashSourceHealthClaimV1, CrashSourceHealthPolicyId,
+    CrashSourceHealthPolicyV1, ExactLocalHealthError, HealthyLocalSnapshotBasisV1,
+    QualifiedCrashSourceHealthId, QualifiedCrashSourceHealthV1,
+    QualifiedHealthyLocalSnapshotId, QualifiedHealthyLocalSnapshotV1,
 };
 pub use exact_policy::{
     ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1,
