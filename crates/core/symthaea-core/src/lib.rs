@@ -78,6 +78,8 @@ pub mod embodiment_evidence_provider;
 pub mod embodiment_provider;
 /// Timed lifecycle receipts for bound embodiment providers.
 pub mod embodiment_provider_timing;
+/// Evidence-derived provider readiness assessments for bound embodiments.
+pub mod embodiment_readiness;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
