@@ -1,0 +1,61 @@
+name: Humanoid Fast Presubmit
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-humanoid/**'
+      - 'crates/core/symthaea-core/**'
+      - 'crates/core/symthaea-fep/**'
+      - 'scripts/check-embodiment-safety-composition.sh'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain*'
+      - '.github/workflows/humanoid-presubmit.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: humanoid-presubmit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  humanoid-fast-gate:
+    name: Humanoid Fast Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-humanoid-presubmit-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-humanoid-presubmit-
+
+      - name: Check humanoid formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-humanoid/Cargo.toml -- --check
+
+      - name: Check humanoid library
+        run: cargo check -p symthaea-humanoid --lib
+
+      - name: Clippy humanoid library
+        run: cargo clippy -p symthaea-humanoid --lib -- -D warnings
+
+      - name: Test humanoid library
+        run: cargo test -p symthaea-humanoid --lib
+
+      - name: Check embodiment safety composition
+        run: bash scripts/check-embodiment-safety-composition.sh
