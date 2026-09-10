@@ -39,7 +39,12 @@ fn session(
     .unwrap()
 }
 
-fn context(now_ms: u64, authority_epoch: u64, trusted_time: bool, revoked: bool) -> MachineSessionContext {
+fn context(
+    now_ms: u64,
+    authority_epoch: u64,
+    trusted_time: bool,
+    revoked: bool,
+) -> MachineSessionContext {
     MachineSessionContext::from_authority_provider(
         SCHEMA,
         PRINCIPAL,
@@ -132,7 +137,7 @@ fn partition_revocation_and_readmission_never_inflate_authority() {
             MachineSessionTrust::Revoked
         ))
     );
-    assert_eq!(historical.evidence_binding(), historical_binding);
+    assert_eq!(historical.evidence_binding(), historical_binding.as_str());
 
     // Rotating the authority generation also invalidates the old session even if it has not
     // reached its timestamp expiry.
@@ -175,8 +180,8 @@ fn partition_revocation_and_readmission_never_inflate_authority() {
     )
     .unwrap();
 
-    assert_ne!(recovered.evidence_binding(), historical_binding);
-    assert_eq!(historical.evidence_binding(), historical_binding);
+    assert_ne!(recovered.evidence_binding(), historical_binding.as_str());
+    assert_eq!(historical.evidence_binding(), historical_binding.as_str());
 }
 
 #[test]
