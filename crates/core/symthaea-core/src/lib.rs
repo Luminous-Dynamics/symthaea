@@ -76,6 +76,8 @@ pub mod embodiment_action;
 pub mod embodiment_evidence;
 /// Additive evidence-provider seam for legacy and Embodiment-v2 migration.
 pub mod embodiment_evidence_provider;
+/// Transport-delivery evidence kept distinct from physical execution evidence.
+pub mod embodiment_transport;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
