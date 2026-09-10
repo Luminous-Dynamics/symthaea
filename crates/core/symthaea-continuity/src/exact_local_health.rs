@@ -29,9 +29,12 @@ use crate::witness::TargetRealizationId;
 
 pub const CRASH_SOURCE_HEALTH_CLAIM_SCHEMA_V1: &str =
     "symthaea-continuity-crash-source-health-claim-v1";
+pub const CRASH_SOURCE_HEALTH_AUTH_PURPOSE: &str =
+    "symthaea.continuity.crash-source-health.v1";
 
 const SOURCE_POLICY_DOMAIN: &[u8] = b"symthaea.continuity.crash-source-health-policy.v1\0";
 const SOURCE_CLAIM_DOMAIN: &[u8] = b"symthaea.continuity.crash-source-health-claim.v1\0";
+const SOURCE_CLAIM_WIRE_DOMAIN: &[u8] = b"symthaea.continuity.crash-source-health-wire.v1\0";
 const SOURCE_AUTH_DOMAIN: &[u8] = b"symthaea.continuity.authenticated-crash-source-health.v1\0";
 const SOURCE_QUALIFIED_DOMAIN: &[u8] = b"symthaea.continuity.qualified-crash-source-health.v1\0";
 const SNAPSHOT_DOMAIN: &[u8] = b"symthaea.continuity.qualified-healthy-local-snapshot.v1\0";
@@ -256,6 +259,41 @@ impl CrashSourceHealthClaimV1 {
     }
 
     pub fn id(&self) -> CrashSourceHealthClaimId { self.claim_id }
+}
+
+/// Stable authentication bytes for a Xenia/signature/attestation adapter.
+/// Serde encoding is deliberately not part of the trust contract.
+pub fn canonical_crash_source_health_claim_bytes(
+    claim: &CrashSourceHealthClaimV1,
+) -> Result<Vec<u8>, ExactLocalHealthError> {
+    claim.validate()?;
+    let mut out = Vec::with_capacity(448);
+    out.extend_from_slice(SOURCE_CLAIM_WIRE_DOMAIN);
+    out.extend_from_slice(claim.reconciliation_id.as_bytes());
+    out.extend_from_slice(claim.attempt_id.as_bytes());
+    out.extend_from_slice(claim.subject_id.as_bytes());
+    out.extend_from_slice(claim.source_realization_id.as_bytes());
+    out.extend_from_slice(claim.distributed_context_id.as_bytes());
+    out.extend_from_slice(claim.verifier_profile_id.as_bytes());
+    out.extend_from_slice(&claim.health_profile_digest);
+    out.extend_from_slice(&claim.observed_at_unix_ms.to_le_bytes());
+    out.push(health_outcome_tag(claim.outcome));
+    match claim.health_state_digest {
+        Some(digest) => {
+            out.push(1);
+            out.extend_from_slice(&digest);
+        }
+        None => out.push(0),
+    }
+    out.extend_from_slice(&claim.raw_evidence_digest);
+    out.extend_from_slice(claim.claim_id.as_bytes());
+    Ok(out)
+}
+
+pub fn canonical_crash_source_health_claim_digest(
+    claim: &CrashSourceHealthClaimV1,
+) -> Result<[u8; 32], ExactLocalHealthError> {
+    Ok(*blake3::hash(&canonical_crash_source_health_claim_bytes(claim)?).as_bytes())
 }
 
 #[derive(Debug, Clone)]
@@ -775,5 +813,14 @@ mod tests {
             health_outcome_tag(PostExecutionHealthOutcomeV1::Unknown),
             health_outcome_tag(PostExecutionHealthOutcomeV1::Healthy)
         );
+    }
+
+    #[test]
+    fn source_authentication_purpose_and_wire_domain_are_explicit() {
+        assert_eq!(
+            CRASH_SOURCE_HEALTH_AUTH_PURPOSE,
+            "symthaea.continuity.crash-source-health.v1"
+        );
+        assert_ne!(SOURCE_CLAIM_WIRE_DOMAIN, SOURCE_CLAIM_DOMAIN);
     }
 }
