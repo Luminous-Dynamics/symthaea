@@ -243,7 +243,7 @@ impl From<AdmissionProblem> for ScopedAdmissionError {
 pub enum ScopedAdmissionSetError {
     #[error(transparent)]
     Scope(#[from] AuthorityScopeError),
-    #[error("admission for {extension} is no longer current: {problem:?}")]
+    #[error("admission for {extension:?} is no longer current: {problem:?}")]
     Currentness {
         extension: ExtensionId,
         problem: AdmissionProblem,
@@ -387,7 +387,10 @@ mod tests {
         assert!(scope.accepts_set(&set));
         let admissions = scope.recheck_set(&set, &current()).unwrap();
         assert_eq!(admissions.len(), 2);
-        assert_eq!(admissions[0].extension(), &ExtensionId::new("org.example.scoped"));
+        assert_eq!(
+            admissions[0].extension(),
+            &ExtensionId::new("org.example.scoped")
+        );
     }
 
     #[test]
