@@ -23,9 +23,9 @@
 //! exact-context repeated-search cohorts, [`corpus_split`] freezes outcome-independent
 //! train/validation/holdout membership, [`proposal_exposure`] defines the complete opportunity
 //! evidence required before those observational outcomes may inform future policy learning,
-//! [`proposal_recording`] proves that opportunity evidence came from the exact live mutator draw,
-//! and [`proposal_trace`] retains that draw as generator-local content-addressed evidence before any
-//! semantic run/policy binding.
+//! [`proposal_recording`] binds either live or persisted raw proposal evidence through one semantic
+//! conversion path, and [`proposal_trace`] retains the live draw as generator-local content-
+//! addressed evidence before any semantic run/policy binding.
 //!
 //! # Authority boundary
 //!
@@ -40,8 +40,8 @@
 //!   on outcome-bearing batch/cohort identity.
 //! - Proposal exposure records exact eligible-site counts and selected pair; raw family success is
 //!   not eligible for policy learning without complete exposure qualification.
-//! - Proposal telemetry and mutation behavior share one sampler; the recording bridge never
-//!   resamples or reapplies a mutation.
+//! - Proposal telemetry and mutation behavior share one sampler; semantic binding never resamples
+//!   or reapplies a mutation.
 //! - Raw proposal archives record generator behavior faithfully even when a later semantic policy
 //!   refuses to qualify that behavior for learning.
 //! - No staged mutation can be committed through [`sandbox`].
@@ -115,7 +115,8 @@ pub use proposal_exposure::{
     ForgeProposalPolicy, ForgeProposalRule, ForgeProposalSelection,
 };
 pub use proposal_recording::{
-    exposure_from_recorded_mutation, proposal_policy_for_mutator, ForgeProposalRecordingError,
+    exposure_from_raw_record, exposure_from_recorded_mutation, proposal_policy_for_mutator,
+    ForgeProposalRecordingError,
 };
 pub use proposal_trace::{
     ForgeRawMutationEffect, ForgeRawOpportunity, ForgeRawProposalArchive, ForgeRawProposalDecision,
