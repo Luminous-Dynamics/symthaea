@@ -32,8 +32,10 @@
 //! semantic baseline implementation, [`proposal_dataset`] freezes one exact row per
 //! `(attempt, policy family)` before any estimator or learned policy exists, [`proposal_corpus`]
 //! binds those tables to the frozen corpus split while exposing separate training/validation
-//! datasets and an identity-only holdout seal, and [`proposal_history`] attaches the validated
-//! accepted state entering each generation to every proposal row, including no-op attempts.
+//! datasets and an identity-only holdout seal, [`proposal_history`] attaches the validated accepted
+//! state entering each generation to every proposal row, including no-op attempts, and
+//! [`proposal_endpoints`] freezes outcome observability so missing/censored labels cannot be
+//! silently rewritten as failures.
 //!
 //! # Authority boundary
 //!
@@ -59,6 +61,8 @@
 //! - No-op-only proposal histories still have to bind the exact declared baseline artifact.
 //! - Proposal observation tables retain zero-opportunity and unselected families; absence is never
 //!   silently converted into failure or success evidence.
+//! - Unselected family outcomes remain counterfactual-unobserved; apparatus-interrupted downstream
+//!   outcomes remain censored rather than being encoded as negative labels.
 //! - Training and validation proposal tables are exposed through different role-checked types.
 //! - Holdout is identity-only in v1; this crate provides no convenience API that exposes holdout
 //!   observation rows before a future frozen-model evaluation boundary exists.
@@ -89,6 +93,7 @@ pub mod observations;
 pub mod proposal_corpus;
 pub mod proposal_coverage;
 pub mod proposal_dataset;
+pub mod proposal_endpoints;
 pub mod proposal_exposure;
 pub mod proposal_history;
 pub mod proposal_qualification;
@@ -146,6 +151,10 @@ pub use proposal_coverage::{validate_forge_raw_proposal_coverage, ForgeProposalC
 pub use proposal_dataset::{
     ForgeProposalDatasetError, ForgeProposalObservationRow, ForgeProposalObservationTable,
     ForgeProposalRowDecision, ForgeProposalRowOutcome,
+};
+pub use proposal_endpoints::{
+    ForgeProposalEndpoint, ForgeProposalEndpointError, ForgeProposalEndpointRecord,
+    ForgeProposalEndpointTable, ForgeProposalEndpointValue,
 };
 pub use proposal_exposure::{
     ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
