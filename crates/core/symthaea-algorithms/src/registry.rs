@@ -24,8 +24,6 @@ pub enum RegistryError {
     SelfParent,
     #[error("duplicate lineage parent")]
     DuplicateParent,
-    #[error("duplicate transformation identity")]
-    DuplicateTransformation,
 }
 
 fn validate_text(field: &'static str, value: &str) -> Result<(), RegistryError> {
@@ -398,6 +396,12 @@ impl TransformationRecord {
     }
 }
 
+/// Exact derivation lineage for one implementation candidate.
+///
+/// Parent identities are a canonical unordered ancestry set. Transformation identities are an
+/// ordered derivation trace: order is semantically meaningful and the same transformation may
+/// appear multiple times. This distinction is essential for rewrite/e-graph search, where
+/// `T1 -> T2` need not produce the same candidate as `T2 -> T1` and a rule may fire repeatedly.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AlgorithmLineage {
     pub id: LineageId,
@@ -410,29 +414,32 @@ impl AlgorithmLineage {
     pub fn new(
         candidate_id: ImplementationId,
         mut parent_ids: Vec<ImplementationId>,
-        mut transformation_ids: Vec<TransformationId>,
+        transformation_ids: Vec<TransformationId>,
     ) -> Result<Self, RegistryError> {
         if parent_ids.iter().any(|parent| parent == &candidate_id) {
             return Err(RegistryError::SelfParent);
         }
         parent_ids.sort();
-        transformation_ids.sort();
         if parent_ids.iter().collect::<BTreeSet<_>>().len() != parent_ids.len() {
             return Err(RegistryError::DuplicateParent);
         }
-        if transformation_ids.iter().collect::<BTreeSet<_>>().len() != transformation_ids.len() {
-            return Err(RegistryError::DuplicateTransformation);
-        }
-        let mut owned = Vec::with_capacity(1 + parent_ids.len() + transformation_ids.len());
+
+        let parent_count = (parent_ids.len() as u64).to_be_bytes();
+        let transformation_count = (transformation_ids.len() as u64).to_be_bytes();
+        let mut owned = Vec::with_capacity(5 + parent_ids.len() + transformation_ids.len());
         owned.push(candidate_id.0.as_str().as_bytes().to_vec());
+        owned.push(b"parents".to_vec());
+        owned.push(parent_count.to_vec());
         owned.extend(parent_ids.iter().map(|id| id.0.as_str().as_bytes().to_vec()));
+        owned.push(b"transformations".to_vec());
+        owned.push(transformation_count.to_vec());
         owned.extend(
             transformation_ids
                 .iter()
                 .map(|id| id.0.as_str().as_bytes().to_vec()),
         );
         let id = LineageId(ContentId::derive(
-            "symthaea.algorithm-lineage.v1",
+            "symthaea.algorithm-lineage.v2",
             owned.iter().map(Vec::as_slice),
         ));
         Ok(Self {
@@ -544,24 +551,63 @@ mod tests {
     }
 
     #[test]
-    fn lineage_is_canonical_and_rejects_duplicates() {
+    fn parent_order_is_canonical_but_transformation_order_is_not() {
         let candidate = ImplementationId(ContentId::derive("impl", [b"candidate".as_slice()]));
         let p1 = ImplementationId(ContentId::derive("impl", [b"p1".as_slice()]));
         let p2 = ImplementationId(ContentId::derive("impl", [b"p2".as_slice()]));
         let t1 = TransformationId(ContentId::derive("transform", [b"t1".as_slice()]));
         let t2 = TransformationId(ContentId::derive("transform", [b"t2".as_slice()]));
+
         let a = AlgorithmLineage::new(
             candidate.clone(),
             vec![p1.clone(), p2.clone()],
             vec![t1.clone(), t2.clone()],
         )
         .unwrap();
-        let b = AlgorithmLineage::new(candidate.clone(), vec![p2, p1.clone()], vec![t2, t1]).unwrap();
-        assert_eq!(a.id, b.id);
-        assert_eq!(a.parent_ids, b.parent_ids);
+        let same_parent_set = AlgorithmLineage::new(
+            candidate.clone(),
+            vec![p2, p1.clone()],
+            vec![t1.clone(), t2.clone()],
+        )
+        .unwrap();
+        let reversed_transformations = AlgorithmLineage::new(
+            candidate.clone(),
+            a.parent_ids.clone(),
+            vec![t2, t1.clone()],
+        )
+        .unwrap();
+
+        assert_eq!(a.id, same_parent_set.id);
+        assert_eq!(a.parent_ids, same_parent_set.parent_ids);
+        assert_ne!(a.id, reversed_transformations.id);
+        assert_ne!(a.transformation_ids, reversed_transformations.transformation_ids);
         assert_eq!(
             AlgorithmLineage::new(candidate, vec![p1.clone(), p1], vec![]).unwrap_err(),
             RegistryError::DuplicateParent
         );
+    }
+
+    #[test]
+    fn repeated_transformation_steps_are_preserved() {
+        let candidate = ImplementationId(ContentId::derive("impl", [b"candidate".as_slice()]));
+        let t = TransformationId(ContentId::derive("transform", [b"repeatable".as_slice()]));
+        let once = AlgorithmLineage::new(candidate.clone(), vec![], vec![t.clone()]).unwrap();
+        let twice = AlgorithmLineage::new(candidate, vec![], vec![t.clone(), t]).unwrap();
+        assert_ne!(once.id, twice.id);
+        assert_eq!(twice.transformation_ids.len(), 2);
+        assert!(twice.validate().is_ok());
+    }
+
+    #[test]
+    fn noncanonical_parent_order_fails_self_validation() {
+        let candidate = ImplementationId(ContentId::derive("impl", [b"candidate".as_slice()]));
+        let p1 = ImplementationId(ContentId::derive("impl", [b"p1".as_slice()]));
+        let p2 = ImplementationId(ContentId::derive("impl", [b"p2".as_slice()]));
+        let mut lineage = AlgorithmLineage::new(candidate, vec![p1, p2], vec![]).unwrap();
+        lineage.parent_ids.reverse();
+        assert!(matches!(
+            lineage.validate(),
+            Err(RegistryError::IdentityMismatch { kind: "lineage" })
+        ));
     }
 }
