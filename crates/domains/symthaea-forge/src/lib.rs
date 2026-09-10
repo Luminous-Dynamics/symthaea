@@ -18,6 +18,7 @@
 //! # Authority boundary
 //!
 //! - Candidate failure and experiment-apparatus failure are distinct states.
+//! - Each Forge search-loop attempt has an explicit content-addressed occurrence identity.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
@@ -54,5 +55,6 @@ pub use search::{
     SearchStats,
 };
 pub use trace::{
-    validate_forge_trace, validate_forge_trace_observations, ForgeTraceError, ForgeTraceEvent,
+    validate_forge_trace, validate_forge_trace_observations, ForgeAttemptId, ForgeTraceError,
+    ForgeTraceEvent,
 };
