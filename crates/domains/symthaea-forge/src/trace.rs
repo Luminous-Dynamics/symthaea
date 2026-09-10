@@ -6,9 +6,11 @@
 //! `DiscoveryLedger`. It records only what it actually observed: generation, event class,
 //! candidate artifact identity (when one exists), and a content-addressed observation identity.
 //!
-//! A Forge trace has a stronger local lifecycle than the generic ledger: every generated candidate
-//! occurrence must eventually close with exactly one rejection/non-selection/continuation outcome.
-//! Repeated generation of identical artifact bytes is allowed and counted as distinct occurrences.
+//! A completed Forge trace has a stronger local lifecycle than the generic ledger: every generated
+//! candidate occurrence must close with exactly one rejection/non-selection/continuation outcome.
+//! An aborted trace may seal with open occurrences because interrupted candidates are not evidence
+//! of rejection. Repeated generation of identical artifact bytes is allowed and counted as distinct
+//! occurrences.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -25,9 +27,9 @@ pub enum ForgeTraceError {
     TerminalWithoutGeneration,
     #[error("SearchCompleted appeared before all generated candidate occurrences were closed")]
     CompletionWithOpenCandidates,
-    #[error("Forge trace contains an event after SearchCompleted")]
+    #[error("Forge trace contains an event after a terminal search event")]
     EventAfterCompletion,
-    #[error("Forge trace is not terminated by SearchCompleted")]
+    #[error("Forge trace is not terminated by SearchCompleted or SearchAborted")]
     MissingCompletion,
     #[error("CandidateArchived is not emitted by Forge's local search trace")]
     UnsupportedArchivedEvent,
@@ -77,18 +79,29 @@ impl ForgeTraceEvent {
             observation_id,
         }
     }
+
+    pub fn aborted(observation_id: ContentId) -> Self {
+        Self {
+            generation: None,
+            kind: DiscoveryEventKind::SearchAborted,
+            candidate_artifact_id: None,
+            observation_id,
+        }
+    }
 }
 
 /// Validate Forge's generator-local candidate lifecycle before semantic replay.
 ///
 /// The key includes generation + artifact identity, while the value is an occurrence count. This
 /// means the same exact artifact may be generated multiple times without collapsing observations.
+/// `SearchCompleted` requires the map to be empty. `SearchAborted` intentionally does not: an open
+/// occurrence at apparatus failure is interrupted/unknown, not rejected.
 pub fn validate_forge_trace(trace: &[ForgeTraceEvent]) -> Result<(), ForgeTraceError> {
     let mut open: BTreeMap<(u64, ContentId), u64> = BTreeMap::new();
-    let mut completed = false;
+    let mut terminal_seen = false;
 
     for event in trace {
-        if completed {
+        if terminal_seen {
             return Err(ForgeTraceError::EventAfterCompletion);
         }
 
@@ -141,12 +154,18 @@ pub fn validate_forge_trace(trace: &[ForgeTraceEvent]) -> Result<(), ForgeTraceE
                 if !open.is_empty() {
                     return Err(ForgeTraceError::CompletionWithOpenCandidates);
                 }
-                completed = true;
+                terminal_seen = true;
+            }
+            DiscoveryEventKind::SearchAborted => {
+                if event.generation.is_some() || event.candidate_artifact_id.is_some() {
+                    return Err(ForgeTraceError::InvalidEventShape);
+                }
+                terminal_seen = true;
             }
         }
     }
 
-    if completed {
+    if terminal_seen {
         Ok(())
     } else {
         Err(ForgeTraceError::MissingCompletion)
@@ -199,11 +218,15 @@ mod tests {
     }
 
     #[test]
-    fn completion_has_no_candidate_or_generation() {
-        let event = ForgeTraceEvent::completed(cid("summary", "complete"));
-        assert_eq!(event.kind, DiscoveryEventKind::SearchCompleted);
-        assert!(event.generation.is_none());
-        assert!(event.candidate_artifact_id.is_none());
+    fn terminal_events_have_no_candidate_or_generation() {
+        for event in [
+            ForgeTraceEvent::completed(cid("summary", "complete")),
+            ForgeTraceEvent::aborted(cid("summary", "aborted")),
+        ] {
+            assert!(event.kind.is_terminal());
+            assert!(event.generation.is_none());
+            assert!(event.candidate_artifact_id.is_none());
+        }
     }
 
     #[test]
@@ -274,21 +297,37 @@ mod tests {
     }
 
     #[test]
-    fn event_after_completion_is_rejected() {
+    fn abortion_may_preserve_open_candidate_as_interrupted() {
         let trace = vec![
-            ForgeTraceEvent::completed(cid("summary", "done")),
-            ForgeTraceEvent::no_candidate(0, cid("obs", "late")),
+            ForgeTraceEvent::candidate(
+                0,
+                DiscoveryEventKind::CandidateGenerated,
+                cid("artifact", "candidate"),
+                cid("obs", "generated"),
+            ),
+            ForgeTraceEvent::aborted(cid("summary", "runner-lost")),
         ];
-        assert_eq!(
-            validate_forge_trace(&trace).unwrap_err(),
-            ForgeTraceError::EventAfterCompletion
-        );
+        assert!(validate_forge_trace(&trace).is_ok());
     }
 
     #[test]
-    fn observation_coverage_is_required() {
-        let object = ObservationObject::utf8("forge.test.v1", "complete").unwrap();
-        let trace = vec![ForgeTraceEvent::completed(object.id().clone())];
+    fn event_after_either_terminal_is_rejected() {
+        for terminal in [
+            ForgeTraceEvent::completed(cid("summary", "done")),
+            ForgeTraceEvent::aborted(cid("summary", "aborted")),
+        ] {
+            let trace = vec![terminal, ForgeTraceEvent::no_candidate(0, cid("obs", "late"))];
+            assert_eq!(
+                validate_forge_trace(&trace).unwrap_err(),
+                ForgeTraceError::EventAfterCompletion
+            );
+        }
+    }
+
+    #[test]
+    fn observation_coverage_is_required_for_aborted_trace_too() {
+        let object = ObservationObject::utf8("forge.test.v1", "aborted").unwrap();
+        let trace = vec![ForgeTraceEvent::aborted(object.id().clone())];
         let full = ObservationStore::from_objects(vec![object]).unwrap();
         assert!(validate_forge_trace_observations(&trace, &full).is_ok());
 
