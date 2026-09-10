@@ -4,9 +4,10 @@
 //! This module does not introduce a new authentication scheme. Xenia (or another configured
 //! provider) remains responsible for cryptographic session verification and live authority.
 //! Maritime core only mints a deterministic observation binding after the provider-neutral
-//! session contract evaluates `Trusted`. The resulting BLAKE3 value is an association/integrity
-//! identifier suitable for an opaque downstream evidence field; it is not a signature or a
-//! standalone proof of authentication.
+//! session contract evaluates `Trusted` **and** local source policy authorizes that exact provider
+//! principal to speak for the named platform. The resulting BLAKE3 value is an association/
+//! integrity identifier suitable for an opaque downstream evidence field; it is not a signature
+//! or a standalone proof of authentication.
 
 use crate::{
     AuthenticatedMachineSession, MachineSessionContext, MachineSessionPolicy, MachineSessionTrust,
@@ -18,6 +19,8 @@ use serde::{Deserialize, Serialize};
 pub const SESSION_BOUND_OBSERVATION_PREFIX_V1: &str =
     "symthaea-maritime-session-bound-observation-v1:blake3-256:";
 
+const MAX_PROVIDER_NAMESPACE_BYTES: usize = 1024;
+const MAX_IDENTITY_BINDING_BYTES: usize = 1024;
 const MAX_PLATFORM_ID_BYTES: usize = 256;
 const MAX_PAYLOAD_BYTES: usize = 60 * 1024;
 const MAX_POSITION_REFERENCE_COUNT: usize = 64;
@@ -56,6 +59,84 @@ impl MaritimeObservationKind {
     }
 }
 
+/// Invalid local observation-source policy input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObservationSourcePolicyError {
+    InvalidProviderSchema,
+    InvalidPeerIdentityBinding,
+    InvalidPlatformId,
+    DuplicateGrant,
+}
+
+/// One local authorization mapping an authenticated provider principal to one platform subject.
+///
+/// This is deployment policy, not portable evidence. It deliberately has private fields and no
+/// serde surface so it cannot be confused with a remote claim embedded in an observation.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ObservationSourceGrantV1 {
+    provider_schema: String,
+    peer_identity_binding: String,
+    platform_id: String,
+}
+
+impl ObservationSourceGrantV1 {
+    pub fn new(
+        provider_schema: impl Into<String>,
+        peer_identity_binding: impl Into<String>,
+        platform_id: impl Into<String>,
+    ) -> Result<Self, ObservationSourcePolicyError> {
+        let provider_schema = provider_schema.into();
+        let peer_identity_binding = peer_identity_binding.into();
+        let platform_id = platform_id.into();
+        if !canonical_text(&provider_schema, MAX_PROVIDER_NAMESPACE_BYTES) {
+            return Err(ObservationSourcePolicyError::InvalidProviderSchema);
+        }
+        if !canonical_text(&peer_identity_binding, MAX_IDENTITY_BINDING_BYTES) {
+            return Err(ObservationSourcePolicyError::InvalidPeerIdentityBinding);
+        }
+        if !canonical_text(&platform_id, MAX_PLATFORM_ID_BYTES) {
+            return Err(ObservationSourcePolicyError::InvalidPlatformId);
+        }
+        Ok(Self {
+            provider_schema,
+            peer_identity_binding,
+            platform_id,
+        })
+    }
+}
+
+/// Validated local mapping of provider principals to platform subjects they may publish for.
+///
+/// An empty policy is a valid deny-all policy. Duplicate grants are rejected so policy generation
+/// remains unambiguous and easy to audit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObservationSourcePolicyV1 {
+    grants: Vec<ObservationSourceGrantV1>,
+}
+
+impl ObservationSourcePolicyV1 {
+    pub fn new(
+        grants: impl IntoIterator<Item = ObservationSourceGrantV1>,
+    ) -> Result<Self, ObservationSourcePolicyError> {
+        let mut grants: Vec<_> = grants.into_iter().collect();
+        grants.sort();
+        if grants.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(ObservationSourcePolicyError::DuplicateGrant);
+        }
+        Ok(Self { grants })
+    }
+
+    /// Whether this deployment authorizes the exact authenticated provider principal to publish
+    /// observations about `platform_id`.
+    pub fn permits(&self, session: &AuthenticatedMachineSession, platform_id: &str) -> bool {
+        self.grants.iter().any(|grant| {
+            grant.provider_schema == session.schema()
+                && grant.peer_identity_binding == session.peer_identity_binding()
+                && grant.platform_id == platform_id
+        })
+    }
+}
+
 /// Why a session-bound observation could not be minted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObservationBindingError {
@@ -63,7 +144,9 @@ pub enum ObservationBindingError {
     SessionNotTrusted(MachineSessionTrust),
     /// `platform_id` was empty, padded, oversized or contained control characters.
     InvalidPlatformId,
-    /// The payload exceeded the current Mycelix maritime-v1 payload bound.
+    /// The authenticated provider principal is not locally authorized for this platform subject.
+    SourceNotAuthorized,
+    /// The payload exceeded the current Mycelix maritime-v1 coarse inner payload bound.
     PayloadTooLarge,
     /// The payload was padded or was not valid JSON.
     InvalidPayloadJson,
@@ -82,12 +165,12 @@ pub enum ObservationBindingError {
 }
 
 /// In-process proof that maritime core associated one exact observation with a session that was
-/// trusted at the time this value was minted.
+/// trusted and locally authorized for the platform subject when this value was minted.
 ///
 /// Fields are private and this type deliberately has no serde surface. Persisting or transporting
-/// the returned binding does not preserve live revocation state and must not be treated as a
-/// signature. Downstream systems that need authenticated provenance must verify provider-owned
-/// evidence through that provider.
+/// the returned binding does not preserve live revocation or local source-policy state and must not
+/// be treated as a signature. Downstream systems claiming authenticated provenance must verify
+/// provider-owned evidence through that provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionBoundObservationV1 {
     binding: String,
@@ -118,23 +201,26 @@ impl SessionBoundObservationV1 {
     }
 }
 
-/// Bind exact observation bytes to an authenticated session only after current authority succeeds.
+/// Bind exact observation bytes to an authenticated session only after current authority and
+/// platform-subject authorization both succeed.
 ///
 /// The algorithm commits to the provider schema, session identifier, peer identity, provider-owned
 /// evidence binding, session admission interval/epoch, platform, observation time/class, exact JSON
 /// payload bytes, and ordered position-evidence references. Mycelix may carry the returned value as
-/// an opaque `evidence_binding` while independently owning sequence/predecessor continuity.
+/// an opaque `evidence_binding` while independently owning sequence/predecessor continuity and final
+/// serialized bridge-size validation.
 pub fn bind_observation_to_trusted_session(
     session: &AuthenticatedMachineSession,
     context: &MachineSessionContext,
-    policy: MachineSessionPolicy<'_>,
+    session_policy: MachineSessionPolicy<'_>,
+    source_policy: &ObservationSourcePolicyV1,
     platform_id: impl Into<String>,
     observed_at_us: u64,
     kind: MaritimeObservationKind,
     payload_json: &str,
     position_evidence_refs: &[String],
 ) -> Result<SessionBoundObservationV1, ObservationBindingError> {
-    let trust = evaluate_machine_session(session, context, policy);
+    let trust = evaluate_machine_session(session, context, session_policy);
     if trust != MachineSessionTrust::Trusted {
         return Err(ObservationBindingError::SessionNotTrusted(trust));
     }
@@ -142,6 +228,9 @@ pub fn bind_observation_to_trusted_session(
     let platform_id = platform_id.into();
     if !canonical_text(&platform_id, MAX_PLATFORM_ID_BYTES) {
         return Err(ObservationBindingError::InvalidPlatformId);
+    }
+    if !source_policy.permits(session, &platform_id) {
+        return Err(ObservationBindingError::SourceNotAuthorized);
     }
     if payload_json.len() > MAX_PAYLOAD_BYTES {
         return Err(ObservationBindingError::PayloadTooLarge);
@@ -252,18 +341,27 @@ mod tests {
         .unwrap()
     }
 
-    fn policy() -> MachineSessionPolicy<'static> {
+    fn session_policy() -> MachineSessionPolicy<'static> {
         MachineSessionPolicy {
             accepted_schemas: &[SCHEMA],
             max_validity_ms: 1_000,
         }
     }
 
+    fn source_policy() -> ObservationSourcePolicyV1 {
+        ObservationSourcePolicyV1::new([ObservationSourceGrantV1::new(
+            SCHEMA, IDENTITY, "auv-01",
+        )
+        .unwrap()])
+        .unwrap()
+    }
+
     fn bind(payload: &str) -> Result<SessionBoundObservationV1, ObservationBindingError> {
         bind_observation_to_trusted_session(
             &session(),
             &context(1_500, SCHEMA, IDENTITY, 9, false),
-            policy(),
+            session_policy(),
+            &source_policy(),
             "auv-01",
             1_400_000,
             MaritimeObservationKind::HealthObservation,
@@ -273,7 +371,25 @@ mod tests {
     }
 
     #[test]
-    fn trusted_session_mints_stable_binding() {
+    fn source_policy_rejects_malformed_or_duplicate_grants() {
+        assert_eq!(
+            ObservationSourceGrantV1::new("", IDENTITY, "auv-01"),
+            Err(ObservationSourcePolicyError::InvalidProviderSchema)
+        );
+        assert_eq!(
+            ObservationSourceGrantV1::new(SCHEMA, IDENTITY, " auv-01"),
+            Err(ObservationSourcePolicyError::InvalidPlatformId)
+        );
+
+        let grant = ObservationSourceGrantV1::new(SCHEMA, IDENTITY, "auv-01").unwrap();
+        assert_eq!(
+            ObservationSourcePolicyV1::new([grant.clone(), grant]),
+            Err(ObservationSourcePolicyError::DuplicateGrant)
+        );
+    }
+
+    #[test]
+    fn trusted_and_authorized_session_mints_stable_binding() {
         let first = bind(r#"{"severity":"healthy"}"#).unwrap();
         let second = bind(r#"{"severity":"healthy"}"#).unwrap();
         assert_eq!(first, second);
@@ -290,6 +406,53 @@ mod tests {
     }
 
     #[test]
+    fn trusted_principal_cannot_claim_an_unauthorized_platform() {
+        let session = session();
+        let current = context(1_500, SCHEMA, IDENTITY, 9, false);
+        assert_eq!(
+            bind_observation_to_trusted_session(
+                &session,
+                &current,
+                session_policy(),
+                &source_policy(),
+                "auv-02",
+                1_400_000,
+                MaritimeObservationKind::StateObservation,
+                "{}",
+                &[],
+            ),
+            Err(ObservationBindingError::SourceNotAuthorized)
+        );
+    }
+
+    #[test]
+    fn source_policy_is_namespaced_by_provider_and_principal() {
+        let session = session();
+        let current = context(1_500, SCHEMA, IDENTITY, 9, false);
+        let wrong_source = ObservationSourcePolicyV1::new([ObservationSourceGrantV1::new(
+            "other-provider-v1",
+            IDENTITY,
+            "auv-01",
+        )
+        .unwrap()])
+        .unwrap();
+        assert_eq!(
+            bind_observation_to_trusted_session(
+                &session,
+                &current,
+                session_policy(),
+                &wrong_source,
+                "auv-01",
+                1_400_000,
+                MaritimeObservationKind::StateObservation,
+                "{}",
+                &[],
+            ),
+            Err(ObservationBindingError::SourceNotAuthorized)
+        );
+    }
+
+    #[test]
     fn payload_and_reference_changes_change_the_binding() {
         let baseline = bind(r#"{"severity":"healthy"}"#).unwrap();
         let changed_payload = bind(r#"{"severity":"degraded"}"#).unwrap();
@@ -298,7 +461,8 @@ mod tests {
         let changed_reference = bind_observation_to_trusted_session(
             &session(),
             &context(1_500, SCHEMA, IDENTITY, 9, false),
-            policy(),
+            session_policy(),
+            &source_policy(),
             "auv-01",
             1_400_000,
             MaritimeObservationKind::HealthObservation,
@@ -312,12 +476,14 @@ mod tests {
     #[test]
     fn untrusted_session_states_cannot_mint_observation_binding() {
         let session = session();
+        let source_policy = source_policy();
         let wrong_provider = context(1_500, "other-provider-v1", IDENTITY, 9, false);
         assert_eq!(
             bind_observation_to_trusted_session(
                 &session,
                 &wrong_provider,
-                policy(),
+                session_policy(),
+                &source_policy,
                 "auv-01",
                 1_400_000,
                 MaritimeObservationKind::StateObservation,
@@ -334,7 +500,8 @@ mod tests {
             bind_observation_to_trusted_session(
                 &session,
                 &revoked,
-                policy(),
+                session_policy(),
+                &source_policy,
                 "auv-01",
                 1_400_000,
                 MaritimeObservationKind::StateObservation,
@@ -351,12 +518,14 @@ mod tests {
     fn observation_time_must_be_inside_session_and_not_after_authority_check() {
         let session = session();
         let current = context(1_500, SCHEMA, IDENTITY, 9, false);
+        let source_policy = source_policy();
 
         assert_eq!(
             bind_observation_to_trusted_session(
                 &session,
                 &current,
-                policy(),
+                session_policy(),
+                &source_policy,
                 "auv-01",
                 999_999,
                 MaritimeObservationKind::StateObservation,
@@ -369,7 +538,8 @@ mod tests {
             bind_observation_to_trusted_session(
                 &session,
                 &current,
-                policy(),
+                session_policy(),
+                &source_policy,
                 "auv-01",
                 2_000_000,
                 MaritimeObservationKind::StateObservation,
@@ -382,7 +552,8 @@ mod tests {
             bind_observation_to_trusted_session(
                 &session,
                 &current,
-                policy(),
+                session_policy(),
+                &source_policy,
                 "auv-01",
                 1_501_000,
                 MaritimeObservationKind::StateObservation,
@@ -402,12 +573,14 @@ mod tests {
 
         let session = session();
         let current = context(1_500, SCHEMA, IDENTITY, 9, false);
+        let source_policy = source_policy();
         let unsorted = vec!["position:z".into(), "position:a".into()];
         assert_eq!(
             bind_observation_to_trusted_session(
                 &session,
                 &current,
-                policy(),
+                session_policy(),
+                &source_policy,
                 "auv-01",
                 1_400_000,
                 MaritimeObservationKind::PositionEvidenceReference,
