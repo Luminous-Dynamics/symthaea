@@ -14,6 +14,7 @@
 #![deny(unsafe_code)]
 
 pub mod calibration;
+pub mod compensation;
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
