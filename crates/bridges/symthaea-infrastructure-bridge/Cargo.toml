@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-infrastructure-bridge"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Composition bridge from domain-neutral infrastructure records into Symthaea digital-twin and formal-safety primitives"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["infrastructure", "digital-twin", "safety", "interoperability"]
+categories = ["science", "simulation"]
+
+[dependencies]
+symthaea-infrastructure = { path = "../../domains/symthaea-infrastructure" }
+symthaea-digital-twin = { path = "../../domains/symthaea-digital-twin" }
+symthaea-formal-safety = { path = "../../domains/symthaea-formal-safety" }
+chrono = { workspace = true }
