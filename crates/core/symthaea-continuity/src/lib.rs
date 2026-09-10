@@ -15,6 +15,7 @@ pub mod commit_currentness;
 pub mod commit_eligibility;
 pub mod contract;
 pub mod crash_reconciliation;
+pub mod crash_recovery_qualification;
 pub mod distributed;
 pub mod distributed_currentness;
 pub mod distributed_evidence;
@@ -79,6 +80,11 @@ pub use crash_reconciliation::{
     CRASH_RECONCILIATION_RECORD_SCHEMA_V1, CrashReconciliationClassificationV1,
     CrashReconciliationError, CrashReconciliationId, CrashReconciliationNextProofV1,
     CrashReconciliationRecordV1, QualifiedCrashReconciliationV1,
+};
+pub use crash_recovery_qualification::{
+    CRASH_RECOVERED_ACTIVE_KNOWN_GOOD_RECORD_SCHEMA_V1, CrashRecoveredActiveKnownGoodRecordV1,
+    CrashRecoveryQualificationError, QualifiedCrashRecoveryToActiveKnownGoodId,
+    QualifiedCrashRecoveryToActiveKnownGoodV1,
 };
 pub use distributed::{
     DISTRIBUTED_CHANGE_BUDGET_SCHEMA_V1, DistributedChangeBudgetError, DistributedChangeBudgetId,
