@@ -22,8 +22,10 @@
 //! boundaries, [`sequence_stats`] aggregates bounded-history conditional outcomes only across
 //! exact-context repeated-search cohorts, [`corpus_split`] freezes outcome-independent
 //! train/validation/holdout membership, [`proposal_exposure`] defines the complete opportunity
-//! evidence required before those observational outcomes may inform future policy learning, and
-//! [`proposal_recording`] proves that opportunity evidence came from the exact live mutator draw.
+//! evidence required before those observational outcomes may inform future policy learning,
+//! [`proposal_recording`] proves that opportunity evidence came from the exact live mutator draw,
+//! and [`proposal_trace`] retains that draw as generator-local content-addressed evidence before any
+//! semantic run/policy binding.
 //!
 //! # Authority boundary
 //!
@@ -40,6 +42,8 @@
 //!   not eligible for policy learning without complete exposure qualification.
 //! - Proposal telemetry and mutation behavior share one sampler; the recording bridge never
 //!   resamples or reapplies a mutation.
+//! - Raw proposal archives record generator behavior faithfully even when a later semantic policy
+//!   refuses to qualify that behavior for learning.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
@@ -65,6 +69,7 @@ pub mod mutations;
 pub mod observations;
 pub mod proposal_exposure;
 pub mod proposal_recording;
+pub mod proposal_trace;
 pub mod sandbox;
 pub mod search;
 pub mod sequence_learning;
@@ -111,6 +116,10 @@ pub use proposal_exposure::{
 };
 pub use proposal_recording::{
     exposure_from_recorded_mutation, proposal_policy_for_mutator, ForgeProposalRecordingError,
+};
+pub use proposal_trace::{
+    ForgeRawMutationEffect, ForgeRawOpportunity, ForgeRawProposalArchive, ForgeRawProposalDecision,
+    ForgeRawProposalError, ForgeRawProposalRecord, ForgeRawSelection,
 };
 pub use search::{
     run_search, run_search_recorded, ForgeConfig, SearchFailure, SearchOutcome, SearchRecord,
