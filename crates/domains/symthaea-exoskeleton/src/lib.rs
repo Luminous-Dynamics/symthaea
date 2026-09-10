@@ -26,8 +26,11 @@ pub mod fep_agent;
 pub mod full_frame;
 #[cfg(feature = "hal")]
 pub mod hal_bridge;
+pub mod metabolism;
 pub mod perturbations;
 pub mod plugin;
+pub mod pressure_garment;
+pub mod reduced_gravity;
 pub mod reflex;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
