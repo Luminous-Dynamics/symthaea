@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-algorithm-lab"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Isolated exact-algorithm discovery experiments for Symthaea"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-core = { version = "0.5.0", path = "../../core/symthaea-core" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "hdc_hamming_candidates"
+harness = false
