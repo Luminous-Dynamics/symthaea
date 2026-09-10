@@ -69,6 +69,7 @@ fn context_for(
     revoked: bool,
 ) -> MachineSessionContext {
     MachineSessionContext::from_authority_provider(
+        session.schema(),
         session.peer_identity_binding(),
         now_ms,
         authority_epoch,
@@ -122,7 +123,22 @@ fn fresh_local_policy_and_authority_context_drive_fail_closed_evaluation() {
         MachineSessionTrust::UntrustedTime
     );
 
+    let wrong_provider = MachineSessionContext::from_authority_provider(
+        "other-provider-session-v1",
+        session.peer_identity_binding(),
+        1_700_000_030_000,
+        9,
+        true,
+        false,
+    )
+    .unwrap();
+    assert_eq!(
+        evaluate_machine_session(&session, &wrong_provider, policy()),
+        MachineSessionTrust::ContextProviderMismatch
+    );
+
     let wrong_identity = MachineSessionContext::from_authority_provider(
+        XENIA_SCHEMA_V1,
         "xenia-signing-identity-v1:blake3-256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         1_700_000_030_000,
         9,
