@@ -14,6 +14,8 @@
 
 /// Evidence-backed PX4 operational-readiness profiles and assessments.
 pub mod readiness;
+/// Readiness-specific content-addressed PX4 status projections.
+pub mod status;
 
 use std::fmt::Write as _;
 
