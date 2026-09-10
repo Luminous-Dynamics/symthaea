@@ -33,8 +33,6 @@ pub enum SandboxError {
     RecoveryRequired(PathBuf),
     #[error("target changed while Forge was acquiring its staging lease: {0:?}")]
     ConcurrentModification(PathBuf),
-    #[error("path is a symbolic link and will not be traversed during recovery detection: {0:?}")]
-    SymlinkEncountered(PathBuf),
     #[error("io error on {path:?}: {source}")]
     Io {
         path: PathBuf,
@@ -43,6 +41,7 @@ pub enum SandboxError {
     },
 }
 
+#[derive(Debug)]
 pub struct Sandbox {
     project_root: PathBuf,
 }
@@ -94,8 +93,6 @@ impl Sandbox {
                 source,
             })?;
             if file_type.is_symlink() {
-                // Do not follow a directory symlink outside the root. A symlink whose own name is
-                // a staging marker is also ambiguous and therefore fails closed.
                 if path
                     .file_name()
                     .and_then(|name| name.to_str())
@@ -337,7 +334,6 @@ mod tests {
         std::fs::write(backup_path_for(&canonical), "original\n").unwrap();
         let error = Sandbox::new(&root, &[root.join("src")]).unwrap_err();
         assert!(matches!(error, SandboxError::RecoveryRequired(_)));
-        // Detection itself must not overwrite either side.
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "mutated\n");
         assert_eq!(
             std::fs::read_to_string(backup_path_for(&canonical)).unwrap(),
@@ -385,7 +381,6 @@ mod tests {
             staged.write("candidate\n"),
             Err(SandboxError::ConcurrentModification(_))
         ));
-        // Drop restores the leased original as the safe fallback.
         drop(staged);
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "const X: i32 = 1;\n");
         let _ = std::fs::remove_dir_all(&root);
