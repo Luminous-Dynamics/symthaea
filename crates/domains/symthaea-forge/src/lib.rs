@@ -17,21 +17,24 @@
 //! event/schema/attempt/artifact/transformation consistency, [`trials`] preserves exact concrete
 //! rewrite instances, [`learning`] provides exact-instance audit summaries, [`context_learning`]
 //! constrains cross-run aggregation, [`family_learning`] introduces generator-scoped operator
-//! families, and [`family_context_learning`] permits family aggregation only across distinct runs
-//! sharing the exact semantic/evaluation context and generator implementation.
+//! families, [`family_context_learning`] permits family aggregation only across distinct exact-
+//! context runs, and [`sequence_learning`] reconstructs accepted family history at generation
+//! boundaries without confusing sibling attempt order with state-transition order.
 //!
 //! # Authority boundary
 //!
 //! - Candidate failure and experiment-apparatus failure are distinct states.
 //! - Each Forge search-loop attempt has an explicit content-addressed occurrence identity.
 //! - Concrete transformation identity and reusable transformation-family identity are separate.
+//! - Sequence memory conditions siblings on the state entering their generation; a winner changes
+//!   state only for later generations.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
 //!   benchmark is a candidate evaluation rejection.
 //! - Persistent output must resolve outside the canonical workspace and is create-new only.
 //! - Forge's local benchmark remains a search heuristic, not replicated superiority evidence.
-//! - Learning tables are descriptive search-memory records, not promotion evidence.
+//! - Learning tables and sequences are descriptive search-memory records, not promotion evidence.
 //! - No promotion, merge, activation, or runtime authority is provided here.
 
 pub mod bundle;
@@ -47,6 +50,7 @@ pub mod mutations;
 pub mod observations;
 pub mod sandbox;
 pub mod search;
+pub mod sequence_learning;
 pub mod trace;
 pub mod trial_semantics;
 pub mod trials;
@@ -81,6 +85,10 @@ pub use observations::ForgeObservationError;
 pub use search::{
     run_search, run_search_recorded, ForgeConfig, SearchFailure, SearchOutcome, SearchRecord,
     SearchStats,
+};
+pub use sequence_learning::{
+    ForgeAcceptedFamilyStep, ForgeConditionedFamilyTrial, ForgeFamilyHistory,
+    ForgeSearchFamilySequence, ForgeSequenceLearningError,
 };
 pub use trace::{
     validate_forge_trace, validate_forge_trace_observations, ForgeAttemptId, ForgeTraceError,
