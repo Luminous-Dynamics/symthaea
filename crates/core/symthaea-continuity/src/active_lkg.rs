@@ -94,6 +94,10 @@ impl ActiveKnownGoodSelectionRecordV1 {
         self.selection_generation
     }
 
+    pub fn predecessor_selection_id(&self) -> Option<ActiveKnownGoodSelectionId> {
+        self.predecessor_selection_id
+    }
+
     pub fn checkpoint_id(&self) -> KnownGoodCheckpointId {
         self.checkpoint_id
     }
@@ -252,6 +256,10 @@ impl ActiveKnownGoodSelectionV1 {
 
     pub fn generation(&self) -> u64 {
         self.record.generation()
+    }
+
+    pub fn predecessor_selection_id(&self) -> Option<ActiveKnownGoodSelectionId> {
+        self.record.predecessor_selection_id()
     }
 
     pub fn checkpoint_id(&self) -> KnownGoodCheckpointId {
