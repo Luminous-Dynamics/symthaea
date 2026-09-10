@@ -1243,7 +1243,7 @@ mod tests {
         )
         .unwrap();
         let (observations, assessments) =
-            evidence(10.0, true, &[1.00, 1.02, 1.04, 1.06, 1.09]);
+            evidence(10.0, true, &[1.00, 1.02, 1.04, 1.06, 1.085]);
         let trial = bind_trial(
             &policy,
             &context("center", 0.25, true),
@@ -1289,7 +1289,7 @@ mod tests {
         )
         .unwrap();
         let (observations, assessments) =
-            evidence(0.0, false, &[1.00, 1.02, 1.04, 1.06, 1.09]);
+            evidence(0.0, false, &[1.00, 1.02, 1.04, 1.06, 1.085]);
         let trial = bind_trial(
             &policy,
             &context("center", 0.25, true),
@@ -1317,7 +1317,7 @@ mod tests {
 
         let (mut observations, mut assessments) = evidence(80.0, true, &[0.98]);
         let (good_observations, good_assessments) =
-            evidence(10.0, true, &[1.00, 1.02, 1.04, 1.06, 1.09]);
+            evidence(10.0, true, &[1.00, 1.02, 1.04, 1.06, 1.085]);
         observations.extend(good_observations);
         assessments.extend(good_assessments);
 
@@ -1349,7 +1349,7 @@ mod tests {
         )
         .unwrap();
         let (observations, assessments) =
-            evidence(10.0, true, &[1.00, 1.02, 1.04, 1.06, 1.09]);
+            evidence(10.0, true, &[1.00, 1.02, 1.04, 1.06, 1.085]);
         let center = bind_trial(
             &policy,
             &context("center", 0.25, true),
