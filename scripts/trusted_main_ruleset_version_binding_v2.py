@@ -22,8 +22,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import trusted_main_enforcement_evidence_v2 as enforcement_v2
-import trusted_main_enforcement_evidence_v3 as enforcement_v3
 import trusted_main_enforcement_lineage as enforcement_lineage
 import trusted_main_ruleset as p0
 import trusted_main_ruleset_version_binding as binding_v1
@@ -163,9 +161,7 @@ def derive_version_binding_v2(
             expected_version_state_id=expected_version_state_id,
             expected_enforcement_evidence_id=expected_v3,
         )
-    except Exception as exc:  # preserve exact V1 fail-closed semantics without widening authority
-        if isinstance(exc, (KeyboardInterrupt, SystemExit)):
-            raise
+    except (binding_v1.RulesetVersionBindingError, p0.PolicyError) as exc:
         raise RulesetVersionBindingV2Error(f"binding_v1: revalidation failed: {exc}") from exc
 
     if predecessor["enforcement_evidence_id"] != lineage["v3_evidence_id"]:
