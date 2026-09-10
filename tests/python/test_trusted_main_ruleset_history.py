@@ -64,6 +64,13 @@ def verify(value: dict | None = None) -> dict:
     )
 
 
+def rehash(value: dict) -> dict:
+    changed = copy.deepcopy(value)
+    changed.pop("history_id", None)
+    changed["history_id"] = history._content_id(changed)
+    return changed
+
+
 class RulesetHistoryTests(unittest.TestCase):
     def test_two_complete_matching_passes_are_narrowly_positive(self):
         result = verify()
@@ -75,9 +82,11 @@ class RulesetHistoryTests(unittest.TestCase):
             result["completeness_basis"],
             "two-full-passes-each-ending-in-explicit-empty-page",
         )
+        self.assertEqual(result["provider_order_authority"], "github-provider-valid-utc-instants-only")
         self.assertEqual(result["capture_authentication"], "none")
         self.assertEqual(result["chronology_authority"], "not-externally-anchored")
         self.assertEqual(result["current_admission"], "not-evaluated")
+        self.assertEqual(result["scientific_authority"], "none")
         self.assertRegex(result["history_id"], r"^sha256:[0-9a-f]{64}$")
 
     def test_history_identity_is_deterministic(self):
@@ -161,6 +170,54 @@ class RulesetHistoryTests(unittest.TestCase):
         changed["versions"][1]["provider_unix_nanos"] += 1
         with self.assertRaisesRegex(history.RulesetHistoryError, "time coordinate mismatch"):
             history.validate_verified_history(changed)
+
+    def test_rehashed_chronology_authority_inflation_rejects(self):
+        changed = verify()
+        changed["chronology_authority"] = "externally-anchored"
+        with self.assertRaisesRegex(history.RulesetHistoryError, "chronology_authority.*canonical"):
+            history.validate_verified_history(rehash(changed))
+
+    def test_rehashed_capture_authentication_inflation_rejects(self):
+        changed = verify()
+        changed["capture_authentication"] = "provider-signed"
+        with self.assertRaisesRegex(history.RulesetHistoryError, "capture_authentication.*canonical"):
+            history.validate_verified_history(rehash(changed))
+
+    def test_rehashed_current_admission_inflation_rejects(self):
+        changed = verify()
+        changed["current_admission"] = "admitted"
+        with self.assertRaisesRegex(history.RulesetHistoryError, "current_admission.*canonical"):
+            history.validate_verified_history(rehash(changed))
+
+    def test_rehashed_scientific_authority_inflation_rejects(self):
+        changed = verify()
+        changed["scientific_authority"] = "established"
+        with self.assertRaisesRegex(history.RulesetHistoryError, "scientific_authority.*canonical"):
+            history.validate_verified_history(rehash(changed))
+
+    def test_rehashed_completeness_basis_drift_rejects(self):
+        changed = verify()
+        changed["completeness_basis"] = "single-page-assumed-complete"
+        with self.assertRaisesRegex(history.RulesetHistoryError, "completeness_basis.*canonical"):
+            history.validate_verified_history(rehash(changed))
+
+    def test_rehashed_policy_id_shape_rejects(self):
+        changed = verify()
+        changed["policy_id"] = "not-a-content-id"
+        with self.assertRaisesRegex(history.RulesetHistoryError, "policy_id.*sha256"):
+            history.validate_verified_history(rehash(changed))
+
+    def test_boolean_repository_id_rejects_even_if_rehashed(self):
+        changed = verify()
+        changed["repository_id"] = True
+        with self.assertRaisesRegex(history.RulesetHistoryError, "repository_id.*positive integer"):
+            history.validate_verified_history(rehash(changed))
+
+    def test_boolean_version_count_rejects_even_if_rehashed(self):
+        changed = verify()
+        changed["version_count"] = True
+        with self.assertRaisesRegex(history.RulesetHistoryError, "version_count.*positive integer"):
+            history.validate_verified_history(rehash(changed))
 
 
 if __name__ == "__main__":
