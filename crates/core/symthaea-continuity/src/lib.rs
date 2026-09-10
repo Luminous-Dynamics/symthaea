@@ -35,6 +35,7 @@ pub mod scope;
 pub mod subject_contract;
 pub mod subject_witness;
 pub mod transition_authority;
+pub mod transition_lineage;
 pub mod trusted_commit_epoch;
 pub mod verifier;
 mod witness;
@@ -170,6 +171,12 @@ pub use transition_authority::{
     TransitionAuthorityProfileId, TransitionAuthorityProfileV1,
     ValidatedTransitionAuthorityPolicyV1, canonical_transition_authority_claim_bytes,
     canonical_transition_authority_claim_digest,
+};
+pub use transition_lineage::{
+    KNOWN_GOOD_EXECUTION_INTENT_SCHEMA_V1, KNOWN_GOOD_TRANSITION_LINEAGE_SCHEMA_V1,
+    KnownGoodBoundExecutionAttemptIntentV1, KnownGoodBoundTrustedCommitEligibilityV1,
+    KnownGoodExecutionIntentId, KnownGoodTransitionLineageError, KnownGoodTransitionLineageId,
+    KnownGoodTransitionLineageV1,
 };
 pub use trusted_commit_epoch::{
     TRUSTED_COMMIT_CLOCK_PROFILE_SCHEMA_V1, TRUSTED_COMMIT_EPOCH_CLAIM_SCHEMA_V1,
