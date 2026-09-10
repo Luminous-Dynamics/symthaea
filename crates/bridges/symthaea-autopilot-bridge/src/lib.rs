@@ -16,6 +16,8 @@
 pub mod readiness;
 /// Readiness-specific content-addressed PX4 status projections.
 pub mod status;
+/// Repeated-evidence qualification for PX4 timesync readiness.
+pub mod timesync_qualification;
 
 use std::fmt::Write as _;
 
