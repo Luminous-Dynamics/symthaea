@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-extension-admission-bridge"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Thin adapter from the Symthaea Component control host into extension admission policy"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-extension-admission = { path = "../../core/symthaea-extension-admission" }
+symthaea-extension-admission-policy = { path = "../../core/symthaea-extension-admission-policy" }
+symthaea-extension-host = { path = "../symthaea-extension-host" }
