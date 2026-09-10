@@ -1,7 +1,7 @@
 {
   "schema": "xenia-verified-machine-session-evidence-v1",
   "session_id": "session-fixture-001",
-  "peer_identity_binding": "xenia-signing-identity-v1:blake3-256:5555555555555555555555555555555555555555555555555555555555555555",
+  "peer_identity_binding": "xenia-signing-identity-v1:blake3-256:12fb7634b7b55b14b996d5b984e4ce93f5db26e0aac9d5d177f2622dbeda412e",
   "authenticated_at_ms": 1700000000000,
   "expires_at_ms": 1700000060000,
   "authority_epoch": 9,
