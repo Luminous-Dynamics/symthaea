@@ -12,8 +12,8 @@
 //! [`candidate`] is the authority-free bridge into `symthaea-algorithms`: it requires the caller to
 //! supply semantic registry context and a baseline implementation. Forge-local traces become a
 //! semantic discovery ledger only when the exact `DiscoveryRun` and complete observation archive
-//! are supplied externally. [`bundle`] makes persistent CLI output complete only when a final
-//! content-addressed manifest validates the exact files on disk.
+//! are supplied externally. [`bundle`] proves structural persisted-file integrity, while
+//! [`bundle_verify`] proves the cross-file semantics of that bundle.
 //!
 //! # Authority boundary
 //!
@@ -27,6 +27,7 @@
 //! - No promotion, merge, activation, or runtime authority is provided here.
 
 pub mod bundle;
+pub mod bundle_verify;
 pub mod candidate;
 pub mod certificate;
 pub mod fitness;
@@ -39,6 +40,10 @@ pub mod trace;
 pub use bundle::{
     read_completed_manifest, BundleError, ForgeBundleManifest, ForgeBundleOutcome, ABORT_FILE,
     CANDIDATE_FILE, CERTIFICATE_FILE, MANIFEST_FILE, OBSERVATIONS_FILE, REPORT_FILE, TRACE_FILE,
+};
+pub use bundle_verify::{
+    read_completed_bundle, BundleSemanticError, ForgeAbortRecord, ForgeAbortStats,
+    VerifiedForgeBundle,
 };
 pub use candidate::{ledger_from_forge_trace, proposal_from_forge, ForgeProposalError};
 pub use certificate::{CertificateError, ForgeCandidate, ForgeCertificate};
