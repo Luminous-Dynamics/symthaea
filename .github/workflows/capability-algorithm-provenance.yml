@@ -1,5 +1,6 @@
 # Focused exact-head software-contract qualification for capability algorithm provenance.
 # Runtime semantic provenance and CI/source attestation remain separate facts.
+# Re-qualify after the permission-limited Rust 1.96 provenance formatting commit.
 
 name: Capability Algorithm Provenance Qualification
 
