@@ -3,14 +3,9 @@
 //! Mutate -> verify -> measure -> select search loop.
 //!
 //! Forge uses a deliberately narrow in-place staging window because Cargo must see candidate
-//! source on disk. Every candidate is explicitly restored before search decisions continue; the
-//! RAII drop path is only a panic/early-return fallback. A configured benchmark that fails is a
-//! rejected evaluation, never an alias for correctness-only mode.
-//!
-//! Search survivors retain the exact full-file source bytes that were staged and checked. The
-//! search also emits a generator-local trace of negative/neutral outcomes plus a bounded
-//! content-addressed observation store. That trace can later be bound to a semantic `DiscoveryRun`
-//! without making Forge itself an authority over problem meaning.
+//! source on disk. Candidate failures and apparatus failures remain distinct: candidate failures
+//! become ordinary rejection events, while infrastructure/configuration/staging failures seal a
+//! `SearchAborted` trace without inventing a candidate-quality judgment.
 
 use crate::certificate::{
     full_source_artifact_id, gate_result_to_evidence, BenchmarkEvidence, ForgeCandidate,
@@ -29,6 +24,8 @@ use symthaea_algorithms::ledger::DiscoveryEventKind;
 use symthaea_algorithms::observation::{ObservationObject, ObservationStore};
 use symthaea_algorithms::ContentId;
 
+const MAX_ABORT_DETAIL_BYTES: usize = 4_000;
+
 #[derive(Debug, Clone)]
 pub struct ForgeConfig {
     pub target_file: PathBuf,
@@ -43,18 +40,18 @@ pub struct ForgeConfig {
     pub seed: u64,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SearchStats {
     pub candidates_attempted: usize,
     pub candidates_no_eligible_mutation: usize,
     pub candidates_failed_compile: usize,
     pub candidates_failed_test: usize,
-    /// Correctness-passing candidates whose configured benchmark failed to produce one valid
-    /// finite result. These are rejected, not retained as structure-only candidates.
+    /// Correctness-passing candidates whose configured benchmark executed but failed to produce
+    /// one valid finite result. Benchmark process spawn failure is an apparatus abort instead.
     pub candidates_failed_benchmark: usize,
     pub candidates_passed_correctness: usize,
-    /// Candidates selected by Forge's local search rule. In correctness-only mode this means the
-    /// first deterministic passing survivor, not a performance improvement.
+    /// Candidates actually selected as continuation parents. This increments only when a
+    /// `SelectedForContinuation` event is emitted.
     pub candidates_selected_by_search: usize,
 }
 
@@ -64,17 +61,38 @@ impl SearchStats {
     }
 }
 
+#[derive(Debug)]
 pub struct SearchOutcome {
     pub stats: SearchStats,
     pub baseline_benchmark_score: Option<f64>,
-    /// Best search candidate under the configured heuristic. The object contains the exact full
-    /// source bytes plus a self-validating certificate; it is still only a proposal.
     pub best: Option<ForgeCandidate>,
-    /// Ordered generator-local events, including negative results and one terminal
-    /// `SearchCompleted` event.
     pub trace: Vec<ForgeTraceEvent>,
-    /// Canonical bounded payloads referenced by every event's `observation_id`.
     pub observations: ObservationStore,
+}
+
+/// A bounded search that stopped before its intended end while preserving all trustworthy history
+/// accumulated up to the failure. Open generated-candidate occurrences are interrupted/unknown.
+#[derive(Debug)]
+pub struct SearchFailure {
+    pub stats: SearchStats,
+    pub baseline_benchmark_score: Option<f64>,
+    pub best: Option<ForgeCandidate>,
+    pub trace: Vec<ForgeTraceEvent>,
+    pub observations: ObservationStore,
+    pub phase: String,
+    pub detail: String,
+}
+
+impl SearchFailure {
+    pub fn summary(&self) -> String {
+        format!("Forge search aborted during {}: {}", self.phase, self.detail)
+    }
+}
+
+#[derive(Debug)]
+pub enum SearchRecord {
+    Completed(SearchOutcome),
+    Aborted(SearchFailure),
 }
 
 fn build_eval_target<'a>(config: &'a ForgeConfig, features: &'a [&'a str]) -> EvaluationTarget<'a> {
@@ -96,12 +114,97 @@ fn retain_observation(
     Ok(id)
 }
 
+fn bounded_detail(detail: impl AsRef<str>) -> String {
+    let detail = detail.as_ref();
+    if detail.len() <= MAX_ABORT_DETAIL_BYTES {
+        return detail.to_string();
+    }
+    let mut end = MAX_ABORT_DETAIL_BYTES;
+    while end > 0 && !detail.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}...(truncated)", &detail[..end])
+}
+
+fn aborted_record(
+    stats: SearchStats,
+    baseline_score: Option<f64>,
+    best: Option<ForgeCandidate>,
+    mut trace: Vec<ForgeTraceEvent>,
+    mut observations: ObservationStore,
+    phase: impl Into<String>,
+    detail: impl AsRef<str>,
+) -> anyhow::Result<SearchRecord> {
+    let phase = phase.into();
+    let detail = bounded_detail(detail);
+    let observation_id = retain_observation(
+        &mut observations,
+        forge_observations::search_abort(
+            &phase,
+            &detail,
+            stats.candidates_attempted,
+            stats.candidates_no_eligible_mutation,
+            stats.candidates_failed_compile,
+            stats.candidates_failed_test,
+            stats.candidates_failed_benchmark,
+            stats.candidates_passed_correctness,
+            stats.candidates_selected_by_search,
+            baseline_score,
+            best.as_ref(),
+        )?,
+    )?;
+    trace.push(ForgeTraceEvent::aborted(observation_id));
+    validate_forge_trace_observations(&trace, &observations)?;
+    Ok(SearchRecord::Aborted(SearchFailure {
+        stats,
+        baseline_benchmark_score: baseline_score,
+        best,
+        trace,
+        observations,
+        phase,
+        detail,
+    }))
+}
+
+/// Compatibility API: completed searches return normally; recorded aborts remain operational
+/// failures to callers that do not opt into the richer [`run_search_recorded`] state model.
 pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
+    match run_search_recorded(config)? {
+        SearchRecord::Completed(outcome) => Ok(outcome),
+        SearchRecord::Aborted(failure) => anyhow::bail!(failure.summary()),
+    }
+}
+
+/// Execute a bounded Forge search while preserving apparatus/configuration failures as sealed
+/// `SearchAborted` evidence whenever the observation machinery itself remains operational.
+pub fn run_search_recorded(config: &ForgeConfig) -> anyhow::Result<SearchRecord> {
+    let mut stats = SearchStats::default();
+    let mut best: Option<ForgeCandidate> = None;
+    let mut trace = Vec::new();
+    let mut observation_store = ObservationStore::new();
+    let mut baseline_score = None;
+
     if config.population == 0 {
-        anyhow::bail!("Forge population must be positive");
+        return aborted_record(
+            stats,
+            baseline_score,
+            best,
+            trace,
+            observation_store,
+            "configuration",
+            "Forge population must be positive",
+        );
     }
     if config.generations == 0 {
-        anyhow::bail!("Forge generations must be positive");
+        return aborted_record(
+            stats,
+            baseline_score,
+            best,
+            trace,
+            observation_store,
+            "configuration",
+            "Forge generations must be positive",
+        );
     }
 
     let target_dir = config
@@ -109,43 +212,111 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
         .parent()
         .map(PathBuf::from)
         .unwrap_or_else(|| config.workspace_root.clone());
-    let sandbox = Sandbox::new(&config.workspace_root, &[target_dir])?;
+    let sandbox = match Sandbox::new(&config.workspace_root, &[target_dir]) {
+        Ok(sandbox) => sandbox,
+        Err(error) => {
+            return aborted_record(
+                stats,
+                baseline_score,
+                best,
+                trace,
+                observation_store,
+                "sandbox-init",
+                error.to_string(),
+            );
+        }
+    };
 
-    let original_source = std::fs::read_to_string(&config.target_file)?;
+    let original_source = match std::fs::read_to_string(&config.target_file) {
+        Ok(source) => source,
+        Err(error) => {
+            return aborted_record(
+                stats,
+                baseline_score,
+                best,
+                trace,
+                observation_store,
+                "baseline-source-read",
+                error.to_string(),
+            );
+        }
+    };
     let baseline_artifact_id = full_source_artifact_id(&original_source);
     let mut current_best_source = original_source.clone();
     let mut current_best_artifact_id = baseline_artifact_id.clone();
     let feature_refs: Vec<&str> = config.features.iter().map(String::as_str).collect();
     let target = || build_eval_target(config, &feature_refs);
 
-    // A broken baseline cannot meaningfully define candidate correctness or performance.
-    let baseline_gates = run_correctness_gates(&target());
+    let baseline_gates = match run_correctness_gates(&target()) {
+        Ok(gates) => gates,
+        Err(error) => {
+            return aborted_record(
+                stats,
+                baseline_score,
+                best,
+                trace,
+                observation_store,
+                "baseline-gate-apparatus",
+                error.to_string(),
+            );
+        }
+    };
     if !baseline_gates.iter().all(|gate| gate.passed) {
-        anyhow::bail!(
-            "baseline ({file}) failed its own correctness gates -- refusing to search on top of a broken starting point. Gate results: {gates:?}",
-            file = config.target_file.display(),
-            gates = baseline_gates
+        let detail = format!(
+            "baseline {} failed its own correctness gates: {:?}",
+            config.target_file.display(),
+            baseline_gates
                 .iter()
                 .map(|gate| (gate.gate.label(), gate.passed))
-                .collect::<Vec<_>>(),
+                .collect::<Vec<_>>()
+        );
+        return aborted_record(
+            stats,
+            baseline_score,
+            best,
+            trace,
+            observation_store,
+            "baseline-precondition",
+            detail,
         );
     }
-    let baseline_benchmark = run_benchmark(&target())
-        .map_err(|error| anyhow::anyhow!("configured baseline benchmark failed: {error}"))?;
-    let baseline_score = baseline_benchmark.as_ref().map(|benchmark| benchmark.score);
+
+    let baseline_benchmark = match run_benchmark(&target()) {
+        Ok(benchmark) => benchmark,
+        Err(error) => {
+            return aborted_record(
+                stats,
+                baseline_score,
+                best,
+                trace,
+                observation_store,
+                "baseline-benchmark",
+                error.to_string(),
+            );
+        }
+    };
+    baseline_score = baseline_benchmark.as_ref().map(|benchmark| benchmark.score);
 
     let mutator = Mutator::default();
     let mut rng = StdRng::seed_from_u64(config.seed);
-    let mut stats = SearchStats::default();
-    let mut best: Option<ForgeCandidate> = None;
     let mut current_best_score = baseline_score;
     let mut mutation_history: Vec<MutationRecord> = Vec::new();
-    let mut trace = Vec::new();
-    let mut observation_store = ObservationStore::new();
 
     for generation in 0..config.generations {
-        let generation_u64 = u64::try_from(generation)
-            .map_err(|_| anyhow::anyhow!("Forge generation cannot be represented as u64"))?;
+        let generation_u64 = match u64::try_from(generation) {
+            Ok(value) => value,
+            Err(error) => {
+                return aborted_record(
+                    stats,
+                    baseline_score,
+                    best,
+                    trace,
+                    observation_store,
+                    "generation-index",
+                    error.to_string(),
+                );
+            }
+        };
         let mut generation_winner: Option<ForgeCandidate> = None;
 
         for _ in 0..config.population {
@@ -167,10 +338,18 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 }
             };
             let Some(body) = find_function_body_mut(&mut file, &config.target_function) else {
-                anyhow::bail!(
-                    "function `{}` not found in {}",
-                    config.target_function,
-                    config.target_file.display()
+                return aborted_record(
+                    stats,
+                    baseline_score,
+                    best,
+                    trace,
+                    observation_store,
+                    "target-resolution",
+                    format!(
+                        "function `{}` not found in {}",
+                        config.target_function,
+                        config.target_file.display()
+                    ),
                 );
             };
             let Some(mutation) = mutator.mutate_one(body, &mut rng) else {
@@ -218,9 +397,54 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 generated_observation,
             ));
 
-            let mut staged = sandbox.stage(&config.target_file)?;
-            staged.write(&candidate_source)?;
-            let gates = run_correctness_gates(&target());
+            let mut staged = match sandbox.stage(&config.target_file) {
+                Ok(staged) => staged,
+                Err(error) => {
+                    return aborted_record(
+                        stats,
+                        baseline_score,
+                        best,
+                        trace,
+                        observation_store,
+                        "candidate-stage",
+                        error.to_string(),
+                    );
+                }
+            };
+            if let Err(error) = staged.write(&candidate_source) {
+                let mut detail = format!("failed to stage candidate bytes: {error}");
+                if let Err(restore_error) = staged.restore() {
+                    detail.push_str(&format!("; restoration also failed: {restore_error}"));
+                }
+                return aborted_record(
+                    stats,
+                    baseline_score,
+                    best,
+                    trace,
+                    observation_store,
+                    "candidate-stage-write",
+                    detail,
+                );
+            }
+
+            let gates = match run_correctness_gates(&target()) {
+                Ok(gates) => gates,
+                Err(error) => {
+                    let mut detail = error.to_string();
+                    if let Err(restore_error) = staged.restore() {
+                        detail.push_str(&format!("; restoration also failed: {restore_error}"));
+                    }
+                    return aborted_record(
+                        stats,
+                        baseline_score,
+                        best,
+                        trace,
+                        observation_store,
+                        "candidate-gate-apparatus",
+                        detail,
+                    );
+                }
+            };
             let all_passed = gates.iter().all(|gate| gate.passed);
 
             if !all_passed {
@@ -244,13 +468,38 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                     candidate_artifact_id,
                     observation_id,
                 ));
-                staged.restore()?;
+                if let Err(error) = staged.restore() {
+                    return aborted_record(
+                        stats,
+                        baseline_score,
+                        best,
+                        trace,
+                        observation_store,
+                        "candidate-restore-after-rejection",
+                        error.to_string(),
+                    );
+                }
                 continue;
             }
             stats.candidates_passed_correctness += 1;
 
             let bench = match run_benchmark(&target()) {
                 Ok(benchmark) => benchmark,
+                Err(error) if error.is_apparatus_failure() => {
+                    let mut detail = error.to_string();
+                    if let Err(restore_error) = staged.restore() {
+                        detail.push_str(&format!("; restoration also failed: {restore_error}"));
+                    }
+                    return aborted_record(
+                        stats,
+                        baseline_score,
+                        best,
+                        trace,
+                        observation_store,
+                        "candidate-benchmark-apparatus",
+                        detail,
+                    );
+                }
                 Err(error) => {
                     stats.candidates_failed_benchmark += 1;
                     let error_text = error.to_string();
@@ -267,7 +516,17 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                         candidate_artifact_id,
                         observation_id,
                     ));
-                    staged.restore()?;
+                    if let Err(restore_error) = staged.restore() {
+                        return aborted_record(
+                            stats,
+                            baseline_score,
+                            best,
+                            trace,
+                            observation_store,
+                            "candidate-restore-after-evaluation-rejection",
+                            restore_error.to_string(),
+                        );
+                    }
                     eprintln!(
                         "forge: rejecting candidate after benchmark evaluation failure: {error}"
                     );
@@ -275,9 +534,17 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 }
             };
 
-            // Source restoration is part of candidate validity. Nothing is retained until this
-            // succeeds, and the certificate still names the exact bytes that were just evaluated.
-            staged.restore()?;
+            if let Err(error) = staged.restore() {
+                return aborted_record(
+                    stats,
+                    baseline_score,
+                    best,
+                    trace,
+                    observation_store,
+                    "candidate-restore-after-evaluation",
+                    error.to_string(),
+                );
+            }
 
             let benchmark_evidence = match (&bench, current_best_score) {
                 (Some(candidate), Some(parent_score)) => {
@@ -296,7 +563,17 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                     })
                 }
                 (None, None) => None,
-                _ => anyhow::bail!("Forge benchmark configuration changed during one search run"),
+                _ => {
+                    return aborted_record(
+                        stats,
+                        baseline_score,
+                        best,
+                        trace,
+                        observation_store,
+                        "search-invariant",
+                        "Forge benchmark configuration changed during one search run",
+                    );
+                }
             };
 
             let selected_against_parent = match (&bench, current_best_score) {
@@ -323,7 +600,6 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 continue;
             }
 
-            stats.candidates_selected_by_search += 1;
             let before_source = extract_function_source(&original_source, &config.target_function)
                 .unwrap_or_default();
             let after_source = extract_function_source(&candidate_source, &config.target_function)
@@ -347,7 +623,20 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 before_source,
                 after_source,
             };
-            let candidate = ForgeCandidate::new(certificate, candidate_source)?;
+            let candidate = match ForgeCandidate::new(certificate, candidate_source) {
+                Ok(candidate) => candidate,
+                Err(error) => {
+                    return aborted_record(
+                        stats,
+                        baseline_score,
+                        best,
+                        trace,
+                        observation_store,
+                        "candidate-certificate",
+                        error.to_string(),
+                    );
+                }
+            };
 
             let should_replace_generation_winner = match (
                 &generation_winner,
@@ -361,8 +650,6 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                     .is_some_and(|previous_benchmark| {
                         candidate_benchmark.candidate_score < previous_benchmark.candidate_score
                     }),
-                // In correctness-only mode there is no evidence-grade ordering between two
-                // passing mutations, so keep the first deterministic survivor of the generation.
                 (Some(_), None) => false,
             };
             if should_replace_generation_winner {
@@ -399,7 +686,17 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
         }
 
         if let Some(candidate) = generation_winner {
-            candidate.validate()?;
+            if let Err(error) = candidate.validate() {
+                return aborted_record(
+                    stats,
+                    baseline_score,
+                    best,
+                    trace,
+                    observation_store,
+                    "generation-winner-validation",
+                    error.to_string(),
+                );
+            }
             let observation_id = retain_observation(
                 &mut observation_store,
                 forge_observations::candidate_decision(
@@ -413,6 +710,7 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
                 candidate.artifact_id().clone(),
                 observation_id,
             ));
+            stats.candidates_selected_by_search += 1;
             if let Some(benchmark) = &candidate.certificate().benchmark {
                 current_best_score = Some(benchmark.candidate_score);
             }
@@ -438,16 +736,15 @@ pub fn run_search(config: &ForgeConfig) -> anyhow::Result<SearchOutcome> {
         )?,
     )?;
     trace.push(ForgeTraceEvent::completed(summary_observation));
-
     validate_forge_trace_observations(&trace, &observation_store)?;
 
-    Ok(SearchOutcome {
+    Ok(SearchRecord::Completed(SearchOutcome {
         stats,
         baseline_benchmark_score: baseline_score,
         best,
         trace,
         observations: observation_store,
-    })
+    }))
 }
 
 fn render_file(file: &syn::File) -> String {
@@ -504,6 +801,14 @@ fn current_git_sha(workspace_root: &std::path::Path) -> Option<String> {
 mod tests {
     use super::*;
     use crate::fitness::GateResult;
+
+    #[test]
+    fn bounded_abort_detail_respects_utf8_boundary() {
+        let detail = "λ".repeat(3_000);
+        let bounded = bounded_detail(&detail);
+        assert!(bounded.len() <= MAX_ABORT_DETAIL_BYTES + "...(truncated)".len());
+        assert!(bounded.ends_with("...(truncated)"));
+    }
 
     #[test]
     fn extract_function_source_finds_a_free_function() {

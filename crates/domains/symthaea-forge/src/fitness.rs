@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Layered Forge fitness oracle: cheap gates first, correctness before performance.
 //!
-//! Correctness gates are strict pass/fail. A configured benchmark is also fail-closed: inability
-//! to spawn it, non-zero exit, missing/ambiguous result markers, or a non-finite score are
-//! evaluation failures, never aliases for "no benchmark configured".
+//! Candidate failures and apparatus failures are distinct. A Cargo process that executes and exits
+//! unsuccessfully is candidate evidence; inability to spawn Cargo is an apparatus failure and must
+//! abort the search rather than being mislabeled as candidate rejection. Configured benchmarks are
+//! likewise fail-closed and preserve spawn failures separately from candidate/evaluator failures.
 
 use std::path::Path;
 use std::process::Command;
@@ -37,6 +38,12 @@ pub struct GateResult {
     pub duration: Duration,
 }
 
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum GateExecutionError {
+    #[error("failed to spawn Cargo for {gate} gate: {detail}")]
+    Spawn { gate: &'static str, detail: String },
+}
+
 #[derive(Debug, Clone)]
 pub struct BenchmarkResult {
     pub metric_name: String,
@@ -61,24 +68,31 @@ pub enum BenchmarkError {
     NonFiniteResult(f64),
 }
 
+impl BenchmarkError {
+    /// Only inability to start the benchmark process is an apparatus failure. Once the configured
+    /// process executes, non-zero exit or malformed output is evidence about this evaluation path.
+    pub fn is_apparatus_failure(&self) -> bool {
+        matches!(self, Self::Spawn(_))
+    }
+}
+
 /// What a crate needs to tell the fitness runner in order to be evaluated.
 #[derive(Debug, Clone)]
 pub struct EvaluationTarget<'a> {
-    /// Cargo package name to check/test (`-p <name>`).
     pub package: &'a str,
-    /// Working directory to run Cargo from (the workspace root).
     pub workspace_root: &'a Path,
-    /// Optional test filter so every candidate need not run an entire crate suite.
     pub test_filter: Option<&'a str>,
-    /// Cargo features to enable, if any.
     pub features: &'a [&'a str],
-    /// `cargo run --release --example <name>` benchmark harness; `None` is explicitly
-    /// correctness-only search mode.
     pub bench_example: Option<&'a str>,
 }
 
-/// Run correctness gates in order, short-circuiting after the first failure.
-pub fn run_correctness_gates(target: &EvaluationTarget) -> Vec<GateResult> {
+/// Run correctness gates in order, short-circuiting after the first candidate failure.
+///
+/// Process-spawn failure is returned separately so search orchestration can record `SearchAborted`
+/// rather than teaching the discovery ledger that the candidate failed compilation/correctness.
+pub fn run_correctness_gates(
+    target: &EvaluationTarget,
+) -> Result<Vec<GateResult>, GateExecutionError> {
     let mut results = Vec::new();
 
     let compile = run_gate(Gate::Compile, target, || {
@@ -86,11 +100,11 @@ pub fn run_correctness_gates(target: &EvaluationTarget) -> Vec<GateResult> {
         cmd.arg("check").arg("-p").arg(target.package);
         apply_features(&mut cmd, target.features);
         cmd
-    });
+    })?;
     let compile_passed = compile.passed;
     results.push(compile);
     if !compile_passed {
-        return results;
+        return Ok(results);
     }
 
     let test = run_gate(Gate::Test, target, || {
@@ -101,10 +115,10 @@ pub fn run_correctness_gates(target: &EvaluationTarget) -> Vec<GateResult> {
             cmd.arg(filter);
         }
         cmd
-    });
+    })?;
     results.push(test);
 
-    results
+    Ok(results)
 }
 
 fn apply_features(cmd: &mut Command, features: &[&str]) {
@@ -117,41 +131,33 @@ fn run_gate(
     gate: Gate,
     target: &EvaluationTarget,
     build_command: impl FnOnce() -> Command,
-) -> GateResult {
+) -> Result<GateResult, GateExecutionError> {
     let start = Instant::now();
     let mut cmd = build_command();
     cmd.current_dir(target.workspace_root);
-    let output = cmd.output();
+    let output = cmd.output().map_err(|error| GateExecutionError::Spawn {
+        gate: gate.label(),
+        detail: error.to_string(),
+    })?;
     let duration = start.elapsed();
-
-    match output {
-        Ok(out) => {
-            let combined = format!(
-                "{}\n{}",
-                String::from_utf8_lossy(&out.stdout),
-                String::from_utf8_lossy(&out.stderr)
-            );
-            GateResult {
-                gate,
-                passed: out.status.success(),
-                output_tail: tail(&combined, 4000),
-                duration,
-            }
-        }
-        Err(error) => GateResult {
-            gate,
-            passed: false,
-            output_tail: format!("failed to spawn cargo: {error}"),
-            duration,
-        },
-    }
+    let combined = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(GateResult {
+        gate,
+        passed: output.status.success(),
+        output_tail: tail(&combined, 4000),
+        duration,
+    })
 }
 
 /// Run the configured benchmark harness.
 ///
 /// `Ok(None)` means and only means that no benchmark was configured. A configured benchmark that
-/// cannot produce one exact finite marker is `Err`, so search logic cannot accidentally treat a
-/// benchmark failure as correctness-only mode.
+/// cannot produce one exact finite marker is `Err`; callers can inspect [`BenchmarkError::Spawn`]
+/// to distinguish apparatus failure from an executed-but-invalid evaluation.
 pub fn run_benchmark(
     target: &EvaluationTarget,
 ) -> Result<Option<BenchmarkResult>, BenchmarkError> {
@@ -217,10 +223,6 @@ fn tail(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         return s.to_string();
     }
-
-    // Avoid slicing in the middle of a UTF-8 code point while retaining the requested tail size
-    // approximately. Gate output is evidence/report text and must never panic because it contains
-    // non-ASCII diagnostics.
     let mut start = s.len().saturating_sub(max_len);
     while start < s.len() && !s.is_char_boundary(start) {
         start += 1;
@@ -265,6 +267,12 @@ mod tests {
             parse_bench_result("FORGE_BENCH_RESULT: inf\n").unwrap_err(),
             BenchmarkError::NonFiniteResult(f64::INFINITY)
         );
+    }
+
+    #[test]
+    fn benchmark_error_classifies_only_spawn_as_apparatus_failure() {
+        assert!(BenchmarkError::Spawn("missing cargo".into()).is_apparatus_failure());
+        assert!(!BenchmarkError::MissingResult.is_apparatus_failure());
     }
 
     #[test]
