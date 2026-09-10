@@ -55,34 +55,42 @@ impl AuthenticatedMachineSession {
         Ok(session)
     }
 
+    /// Provider schema that defined this verified evidence record.
     pub fn schema(&self) -> &str {
         &self.schema
     }
 
+    /// External non-secret provider session identifier.
     pub fn session_id(&self) -> &str {
         &self.session_id
     }
 
+    /// Provider-owned binding to the authenticated machine identity.
     pub fn peer_identity_binding(&self) -> &str {
         &self.peer_identity_binding
     }
 
+    /// Trusted-time instant at which provider authority admitted the session.
     pub const fn authenticated_at_ms(&self) -> u64 {
         self.authenticated_at_ms
     }
 
+    /// Exclusive hard validity horizon carried by the verified provider evidence.
     pub const fn expires_at_ms(&self) -> u64 {
         self.expires_at_ms
     }
 
+    /// Authority generation that admitted the provider session.
     pub const fn authority_epoch(&self) -> u64 {
         self.authority_epoch
     }
 
+    /// Provider-owned binding to the verified session/transcript evidence.
     pub fn evidence_binding(&self) -> &str {
         &self.evidence_binding
     }
 
+    /// Validate only the provider-neutral immutable claim shape.
     pub fn validate_shape(&self) -> Result<(), &'static str> {
         for value in [
             self.schema.as_str(),
@@ -133,17 +141,72 @@ impl MachineSessionPolicy<'_> {
 /// Current trust facts supplied at the point where session-derived authority is used.
 ///
 /// This context is intentionally separate from immutable handshake evidence and deliberately
-/// does **not** implement serde serialization. Providers must freshly construct it from their
-/// authoritative time, enrollment and revocation state at the point of use; replaying a stale
-/// serialized `revoked = false` context must not be a supported integration path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// does **not** implement serde serialization. Its fields are private: a provider adapter must
+/// explicitly cross [`MachineSessionContext::from_authority_provider`] after refreshing current
+/// time, enrollment, revocation and authority generation. The context also carries the provider's
+/// current peer-identity binding so state for one principal cannot accidentally authorize another.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MachineSessionContext {
-    pub now_ms: u64,
-    pub authority_epoch: u64,
-    pub trusted_time_available: bool,
-    /// Current revocation result from the authority owner. This must not be an issuance-time
-    /// snapshot copied from [`AuthenticatedMachineSession`].
-    pub revoked: bool,
+    peer_identity_binding: String,
+    now_ms: u64,
+    authority_epoch: u64,
+    trusted_time_available: bool,
+    revoked: bool,
+}
+
+impl MachineSessionContext {
+    /// Cross the live authority-provider boundary into maritime core.
+    ///
+    /// Calling this constructor is an explicit assertion by the adapter that these values were
+    /// freshly obtained from the provider's current authority source. Maritime core cannot and
+    /// does not duplicate that provider's enrollment/revocation mechanism.
+    pub fn from_authority_provider(
+        peer_identity_binding: impl Into<String>,
+        now_ms: u64,
+        authority_epoch: u64,
+        trusted_time_available: bool,
+        revoked: bool,
+    ) -> Result<Self, &'static str> {
+        let peer_identity_binding = peer_identity_binding.into();
+        if peer_identity_binding.trim().is_empty()
+            || peer_identity_binding.trim() != peer_identity_binding
+            || peer_identity_binding.chars().any(char::is_control)
+        {
+            return Err("authority context identity binding must be canonical printable text");
+        }
+        Ok(Self {
+            peer_identity_binding,
+            now_ms,
+            authority_epoch,
+            trusted_time_available,
+            revoked,
+        })
+    }
+
+    /// Provider-owned binding naming the principal whose live authority was checked.
+    pub fn peer_identity_binding(&self) -> &str {
+        &self.peer_identity_binding
+    }
+
+    /// Current provider-supplied trusted-time value.
+    pub const fn now_ms(&self) -> u64 {
+        self.now_ms
+    }
+
+    /// Current authority generation for this peer identity.
+    pub const fn authority_epoch(&self) -> u64 {
+        self.authority_epoch
+    }
+
+    /// Whether current time comes from a provider-approved trusted-time source.
+    pub const fn trusted_time_available(&self) -> bool {
+        self.trusted_time_available
+    }
+
+    /// Current revocation result for this peer identity.
+    pub const fn revoked(&self) -> bool {
+        self.revoked
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,6 +215,7 @@ pub enum MachineSessionTrust {
     Malformed,
     UnsupportedSchema,
     ValidityTooLong,
+    ContextIdentityMismatch,
     UntrustedTime,
     NotYetValid,
     Expired,
@@ -164,7 +228,7 @@ pub enum MachineSessionTrust {
 /// immutable evidence record and must refresh the live context at point of use.
 pub fn evaluate_machine_session(
     session: &AuthenticatedMachineSession,
-    context: MachineSessionContext,
+    context: &MachineSessionContext,
     policy: MachineSessionPolicy<'_>,
 ) -> MachineSessionTrust {
     if session.validate_shape().is_err() {
@@ -179,19 +243,22 @@ pub fn evaluate_machine_session(
     {
         return MachineSessionTrust::ValidityTooLong;
     }
-    if !context.trusted_time_available {
+    if context.peer_identity_binding() != session.peer_identity_binding() {
+        return MachineSessionTrust::ContextIdentityMismatch;
+    }
+    if !context.trusted_time_available() {
         return MachineSessionTrust::UntrustedTime;
     }
-    if context.revoked {
+    if context.revoked() {
         return MachineSessionTrust::Revoked;
     }
-    if session.authority_epoch() != context.authority_epoch {
+    if session.authority_epoch() != context.authority_epoch() {
         return MachineSessionTrust::EpochMismatch;
     }
-    if context.now_ms < session.authenticated_at_ms() {
+    if context.now_ms() < session.authenticated_at_ms() {
         return MachineSessionTrust::NotYetValid;
     }
-    if context.now_ms >= session.expires_at_ms() {
+    if context.now_ms() >= session.expires_at_ms() {
         return MachineSessionTrust::Expired;
     }
     MachineSessionTrust::Trusted
@@ -202,12 +269,13 @@ mod tests {
     use super::*;
 
     const TEST_SCHEMA: &str = "test-session-evidence-v1";
+    const TEST_IDENTITY: &str = "xenia-fingerprint:abc";
 
     fn session() -> AuthenticatedMachineSession {
         AuthenticatedMachineSession::from_verified_provider(
             TEST_SCHEMA,
             "session-1",
-            "xenia-fingerprint:abc",
+            TEST_IDENTITY,
             100,
             200,
             9,
@@ -216,13 +284,25 @@ mod tests {
         .unwrap()
     }
 
-    fn context(now_ms: u64) -> MachineSessionContext {
-        MachineSessionContext {
+    fn context_with(
+        identity: &str,
+        now_ms: u64,
+        authority_epoch: u64,
+        trusted_time_available: bool,
+        revoked: bool,
+    ) -> MachineSessionContext {
+        MachineSessionContext::from_authority_provider(
+            identity,
             now_ms,
-            authority_epoch: 9,
-            trusted_time_available: true,
-            revoked: false,
-        }
+            authority_epoch,
+            trusted_time_available,
+            revoked,
+        )
+        .unwrap()
+    }
+
+    fn context(now_ms: u64) -> MachineSessionContext {
+        context_with(TEST_IDENTITY, now_ms, 9, true, false)
     }
 
     fn policy() -> MachineSessionPolicy<'static> {
@@ -273,9 +353,21 @@ mod tests {
     }
 
     #[test]
+    fn authority_context_handoff_rejects_malformed_identity_binding() {
+        assert!(
+            MachineSessionContext::from_authority_provider("", 150, 9, true, false).is_err()
+        );
+        assert!(
+            MachineSessionContext::from_authority_provider(" identity", 150, 9, true, false)
+                .is_err()
+        );
+    }
+
+    #[test]
     fn valid_session_is_trusted_only_in_matching_policy_time_and_epoch_context() {
+        let current = context(150);
         assert_eq!(
-            evaluate_machine_session(&session(), context(150), policy()),
+            evaluate_machine_session(&session(), &current, policy()),
             MachineSessionTrust::Trusted
         );
     }
@@ -285,15 +377,16 @@ mod tests {
         let future = AuthenticatedMachineSession::from_verified_provider(
             "test-session-evidence-v2",
             "session-1",
-            "xenia-fingerprint:abc",
+            TEST_IDENTITY,
             100,
             200,
             9,
             "xenia-transcript:xyz",
         )
         .unwrap();
+        let current = context(150);
         assert_eq!(
-            evaluate_machine_session(&future, context(150), policy()),
+            evaluate_machine_session(&future, &current, policy()),
             MachineSessionTrust::UnsupportedSchema
         );
     }
@@ -303,25 +396,34 @@ mod tests {
         let too_long = AuthenticatedMachineSession::from_verified_provider(
             TEST_SCHEMA,
             "session-1",
-            "xenia-fingerprint:abc",
+            TEST_IDENTITY,
             100,
             201,
             9,
             "xenia-transcript:xyz",
         )
         .unwrap();
+        let current = context(150);
         assert_eq!(
-            evaluate_machine_session(&too_long, context(150), policy()),
+            evaluate_machine_session(&too_long, &current, policy()),
             MachineSessionTrust::ValidityTooLong
         );
     }
 
     #[test]
-    fn trusted_time_loss_fails_closed() {
-        let mut current = context(150);
-        current.trusted_time_available = false;
+    fn live_context_must_name_the_same_peer_identity() {
+        let wrong = context_with("xenia-fingerprint:different", 150, 9, true, false);
         assert_eq!(
-            evaluate_machine_session(&session(), current, policy()),
+            evaluate_machine_session(&session(), &wrong, policy()),
+            MachineSessionTrust::ContextIdentityMismatch
+        );
+    }
+
+    #[test]
+    fn trusted_time_loss_fails_closed() {
+        let current = context_with(TEST_IDENTITY, 150, 9, false, false);
+        assert_eq!(
+            evaluate_machine_session(&session(), &current, policy()),
             MachineSessionTrust::UntrustedTime
         );
     }
@@ -329,37 +431,38 @@ mod tests {
     #[test]
     fn live_revocation_dominates_immutable_session_evidence() {
         let issued = session();
+        let current = context(150);
         assert_eq!(
-            evaluate_machine_session(&issued, context(150), policy()),
+            evaluate_machine_session(&issued, &current, policy()),
             MachineSessionTrust::Trusted
         );
 
-        let mut current = context(150);
-        current.revoked = true;
+        let revoked = context_with(TEST_IDENTITY, 150, 9, true, true);
         assert_eq!(
-            evaluate_machine_session(&issued, current, policy()),
+            evaluate_machine_session(&issued, &revoked, policy()),
             MachineSessionTrust::Revoked
         );
     }
 
     #[test]
     fn stale_epoch_and_expiry_are_rejected() {
-        let mut stale = context(150);
-        stale.authority_epoch = 10;
+        let stale = context_with(TEST_IDENTITY, 150, 10, true, false);
         assert_eq!(
-            evaluate_machine_session(&session(), stale, policy()),
+            evaluate_machine_session(&session(), &stale, policy()),
             MachineSessionTrust::EpochMismatch
         );
+        let expired = context(200);
         assert_eq!(
-            evaluate_machine_session(&session(), context(200), policy()),
+            evaluate_machine_session(&session(), &expired, policy()),
             MachineSessionTrust::Expired
         );
     }
 
     #[test]
     fn future_dated_session_is_rejected() {
+        let current = context(99);
         assert_eq!(
-            evaluate_machine_session(&session(), context(99), policy()),
+            evaluate_machine_session(&session(), &current, policy()),
             MachineSessionTrust::NotYetValid
         );
     }
