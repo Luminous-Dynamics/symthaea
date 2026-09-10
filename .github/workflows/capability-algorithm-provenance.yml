@@ -1,0 +1,105 @@
+# Focused exact-head software-contract qualification for capability algorithm provenance.
+# Runtime semantic provenance and CI/source attestation remain separate facts.
+
+name: Capability Algorithm Provenance Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/capability-algorithm-provenance.yml'
+      - 'scripts/qualify-capability-algorithm-provenance.sh'
+      - 'crates/core/symthaea-continuity/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.cargo/config.toml'
+      - 'rust-toolchain*'
+  workflow_dispatch:
+
+concurrency:
+  group: capability-algorithm-provenance-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+  CAPABILITY_PROVENANCE_RUNNER_LABEL: ubuntu-24.04
+
+jobs:
+  capability-algorithm-provenance:
+    name: Exact-head capability algorithm provenance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact qualified head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify pinned workflow actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/capability-algorithm-provenance.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/capability-algorithm-provenance.yml)" -eq 1
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/capability-algorithm-provenance.yml; then
+            echo 'mutable major-version GitHub Action tag found in capability provenance qualification workflow' >&2
+            exit 1
+          fi
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+          rustc --version
+          cargo --version
+
+      - name: Qualify capability algorithm provenance
+        env:
+          QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          CAPABILITY_PROVENANCE_RECEIPT: ${{ runner.temp }}/capability-algorithm-provenance-qualification-v1.tsv
+        run: bash scripts/qualify-capability-algorithm-provenance.sh
+
+      - name: Publish receipt digest
+        if: always()
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/capability-algorithm-provenance-qualification-v1.tsv
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RECEIPT" ]]; then
+            echo 'No qualification receipt was produced; execution did not reach the receipt-bearing verifier.'
+            exit 0
+          fi
+          digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
+          echo "capability-algorithm-provenance receipt_sha256=$digest"
+          {
+            echo
+            echo "- receipt SHA-256: \`$digest\`"
+            echo '- receipt bytes are not independently signed; this digest is witnessed by the workflow log.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: capability-algorithm-provenance-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/capability-algorithm-provenance-qualification-v1.tsv
+          if-no-files-found: warn
+          retention-days: 14
