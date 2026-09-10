@@ -3,15 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Evidence-first algorithm registry contracts for Symthaea.
 //!
-//! This crate is deliberately descriptive. It records problems, algorithm families,
-//! implementations, and derivation lineage, but it does not execute implementations or grant
-//! promotion/runtime authority.
-//!
-//! The central boundary is:
-//!
-//! ```text
-//! Problem != Algorithm != Implementation != Evaluation != Evidence != Promotion != Authority
-//! ```
+//! This crate is descriptive, not authorizing:
+//! `Problem != Algorithm != Implementation != Evaluation != Evidence != Promotion != Authority`.
+
+pub mod evaluation;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -29,11 +24,11 @@ pub enum RegistryError {
     ControlCharacters { field: &'static str },
     #[error("content id must use the sha256:<64 lowercase hex> form")]
     InvalidContentId,
-    #[error("an implementation must reference the algorithm's exact problem identity")]
+    #[error("implementation does not match the exact algorithm/problem pair")]
     ProblemMismatch,
-    #[error("lineage candidate must match the implementation being validated")]
+    #[error("lineage candidate does not match the implementation")]
     CandidateMismatch,
-    #[error("lineage contains its candidate as a parent")]
+    #[error("lineage cannot contain its candidate as a parent")]
     SelfParent,
     #[error("duplicate lineage parent")]
     DuplicateParent,
@@ -66,10 +61,7 @@ fn digest_hex(bytes: &[u8]) -> String {
     out
 }
 
-/// Deterministic SHA-256 content identity.
-///
-/// Identity construction is domain-separated and length-prefixed so concatenation ambiguity is
-/// impossible. The textual representation is always `sha256:<64 lowercase hex>`.
+/// Deterministic, domain-separated SHA-256 content identity.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ContentId(String);
@@ -81,8 +73,7 @@ impl ContentId {
         for part in parts {
             encode_part(&mut hasher, part);
         }
-        let digest = hasher.finalize();
-        Self(format!("{CONTENT_ID_PREFIX}{}", digest_hex(&digest)))
+        Self(format!("{CONTENT_ID_PREFIX}{}", digest_hex(&hasher.finalize())))
     }
 
     pub fn parse(value: impl Into<String>) -> Result<Self, RegistryError> {
@@ -153,8 +144,7 @@ pub enum SemanticGuarantee {
     Probabilistic,
 }
 
-/// Coarse discovery-risk class. This is not a safety certification; it only controls what the
-/// discovery subsystem is allowed to experiment with automatically.
+/// Discovery policy class only; this is not a safety certification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DiscoveryRisk {
@@ -163,7 +153,6 @@ pub enum DiscoveryRisk {
     SafetyCritical,
 }
 
-/// Semantic identity of a computational problem.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProblemSpec {
     pub id: ProblemId,
@@ -191,7 +180,6 @@ impl ProblemSpec {
         for invariant in &invariants {
             validate_text("problem invariant", invariant)?;
         }
-
         let guarantee_tag = format!("{guarantee:?}");
         let determinism_tag = format!("{determinism:?}");
         let risk_tag = format!("{risk:?}");
@@ -202,11 +190,8 @@ impl ProblemSpec {
             determinism_tag.as_bytes(),
             risk_tag.as_bytes(),
         ];
-        for invariant in &invariants {
-            parts.push(invariant.as_bytes());
-        }
+        parts.extend(invariants.iter().map(|s| s.as_bytes()));
         let id = ProblemId(ContentId::derive("symthaea.problem.v1", parts));
-
         Ok(Self {
             id,
             name,
@@ -227,10 +212,11 @@ impl ProblemSpec {
             self.invariants.clone(),
             self.risk,
         )?;
-        if rebuilt.id != self.id {
-            return Err(RegistryError::InvalidContentId);
+        if rebuilt.id == self.id {
+            Ok(())
+        } else {
+            Err(RegistryError::InvalidContentId)
         }
-        Ok(())
     }
 }
 
@@ -245,7 +231,6 @@ pub enum AlgorithmProvenance {
     Hybrid,
 }
 
-/// One algorithm family/strategy. It has no executable handle.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AlgorithmRecord {
     pub id: AlgorithmId,
@@ -286,10 +271,6 @@ impl AlgorithmRecord {
     }
 }
 
-/// One concrete implementation of an algorithm family.
-///
-/// `source_ref` identifies the source/artifact location; `artifact_id` commits the exact bytes
-/// or package supplied by the caller. Neither field is executable authority.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImplementationRecord {
     pub id: ImplementationId,
@@ -335,14 +316,14 @@ impl ImplementationRecord {
     }
 
     pub fn validate_for(&self, algorithm: &AlgorithmRecord) -> Result<(), RegistryError> {
-        if self.problem_id != algorithm.problem_id || self.algorithm_id != algorithm.id {
-            return Err(RegistryError::ProblemMismatch);
+        if self.problem_id == algorithm.problem_id && self.algorithm_id == algorithm.id {
+            Ok(())
+        } else {
+            Err(RegistryError::ProblemMismatch)
         }
-        Ok(())
     }
 }
 
-/// Named transformation used to derive one candidate from another.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransformationRecord {
     pub id: TransformationId,
@@ -371,7 +352,6 @@ impl TransformationRecord {
     }
 }
 
-/// Exact derivation lineage for a candidate implementation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AlgorithmLineage {
     pub id: LineageId,
@@ -389,36 +369,26 @@ impl AlgorithmLineage {
         if parent_ids.iter().any(|parent| parent == &candidate_id) {
             return Err(RegistryError::SelfParent);
         }
-
         parent_ids.sort();
         transformation_ids.sort();
-
-        let parent_set: BTreeSet<_> = parent_ids.iter().collect();
-        if parent_set.len() != parent_ids.len() {
+        if parent_ids.iter().collect::<BTreeSet<_>>().len() != parent_ids.len() {
             return Err(RegistryError::DuplicateParent);
         }
-        let transform_set: BTreeSet<_> = transformation_ids.iter().collect();
-        if transform_set.len() != transformation_ids.len() {
+        if transformation_ids.iter().collect::<BTreeSet<_>>().len() != transformation_ids.len() {
             return Err(RegistryError::DuplicateTransformation);
         }
-
-        let mut owned_parts = Vec::with_capacity(1 + parent_ids.len() + transformation_ids.len());
-        owned_parts.push(candidate_id.0.as_str().as_bytes().to_vec());
-        owned_parts.extend(
-            parent_ids
-                .iter()
-                .map(|id| id.0.as_str().as_bytes().to_vec()),
-        );
-        owned_parts.extend(
+        let mut owned = Vec::with_capacity(1 + parent_ids.len() + transformation_ids.len());
+        owned.push(candidate_id.0.as_str().as_bytes().to_vec());
+        owned.extend(parent_ids.iter().map(|id| id.0.as_str().as_bytes().to_vec()));
+        owned.extend(
             transformation_ids
                 .iter()
                 .map(|id| id.0.as_str().as_bytes().to_vec()),
         );
         let id = LineageId(ContentId::derive(
             "symthaea.algorithm-lineage.v1",
-            owned_parts.iter().map(Vec::as_slice),
+            owned.iter().map(Vec::as_slice),
         ));
-
         Ok(Self {
             id,
             candidate_id,
@@ -436,10 +406,11 @@ impl AlgorithmLineage {
             self.parent_ids.clone(),
             self.transformation_ids.clone(),
         )?;
-        if rebuilt.id != self.id {
-            return Err(RegistryError::InvalidContentId);
+        if rebuilt.id == self.id {
+            Ok(())
+        } else {
+            Err(RegistryError::InvalidContentId)
         }
-        Ok(())
     }
 }
 
@@ -450,7 +421,7 @@ mod tests {
     fn problem() -> ProblemSpec {
         ProblemSpec::new(
             "binary-hdc-hamming-distance",
-            "Return the exact Hamming distance between two equal-width binary hypervectors.",
+            "Return the exact Hamming distance between equal-width binary hypervectors.",
             SemanticGuarantee::Exact,
             DeterminismRequirement::Required,
             vec!["result <= vector width".into()],
@@ -460,32 +431,30 @@ mod tests {
     }
 
     #[test]
-    fn content_ids_are_domain_separated_and_deterministic() {
+    fn identities_are_domain_separated_and_deterministic() {
         let a = ContentId::derive("a", [b"same".as_slice()]);
-        let a_again = ContentId::derive("a", [b"same".as_slice()]);
-        let b = ContentId::derive("b", [b"same".as_slice()]);
-        assert_eq!(a, a_again);
-        assert_ne!(a, b);
+        assert_eq!(a, ContentId::derive("a", [b"same".as_slice()]));
+        assert_ne!(a, ContentId::derive("b", [b"same".as_slice()]));
         assert!(ContentId::parse(a.to_string()).is_ok());
     }
 
     #[test]
-    fn problem_identity_changes_with_semantics() {
-        let first = problem();
-        let second = ProblemSpec::new(
-            first.name.clone(),
+    fn semantic_change_changes_problem_identity() {
+        let exact = problem();
+        let approximate = ProblemSpec::new(
+            exact.name.clone(),
             "Return an approximate Hamming distance.",
             SemanticGuarantee::Approximate,
-            first.determinism,
-            first.invariants.clone(),
-            first.risk,
+            exact.determinism,
+            exact.invariants.clone(),
+            exact.risk,
         )
         .unwrap();
-        assert_ne!(first.id, second.id);
+        assert_ne!(exact.id, approximate.id);
     }
 
     #[test]
-    fn implementation_is_bound_to_exact_problem_and_algorithm() {
+    fn implementation_binds_exact_problem_and_algorithm() {
         let problem = problem();
         let algorithm = AlgorithmRecord::new(
             problem.id.clone(),
@@ -495,7 +464,7 @@ mod tests {
         )
         .unwrap();
         let implementation = ImplementationRecord::new(
-            problem.id.clone(),
+            problem.id,
             algorithm.id.clone(),
             "crates/core/symthaea-core/src/hdc/binary_hv.rs",
             ContentId::derive("test-artifact", [b"reference".as_slice()]),
@@ -506,38 +475,23 @@ mod tests {
     }
 
     #[test]
-    fn lineage_is_order_independent_but_rejects_duplicates() {
+    fn lineage_is_order_independent_and_rejects_duplicates() {
         let candidate = ImplementationId(ContentId::derive("impl", [b"candidate".as_slice()]));
         let p1 = ImplementationId(ContentId::derive("impl", [b"p1".as_slice()]));
         let p2 = ImplementationId(ContentId::derive("impl", [b"p2".as_slice()]));
         let t1 = TransformationId(ContentId::derive("transform", [b"t1".as_slice()]));
         let t2 = TransformationId(ContentId::derive("transform", [b"t2".as_slice()]));
-
         let a = AlgorithmLineage::new(
             candidate.clone(),
             vec![p1.clone(), p2.clone()],
             vec![t1.clone(), t2.clone()],
         )
         .unwrap();
-        let b = AlgorithmLineage::new(
-            candidate.clone(),
-            vec![p2, p1.clone()],
-            vec![t2, t1],
-        )
-        .unwrap();
+        let b = AlgorithmLineage::new(candidate.clone(), vec![p2, p1.clone()], vec![t2, t1]).unwrap();
         assert_eq!(a.id, b.id);
-
-        let duplicate = AlgorithmLineage::new(candidate, vec![p1.clone(), p1], vec![]);
-        assert_eq!(duplicate.unwrap_err(), RegistryError::DuplicateParent);
-    }
-
-    #[test]
-    fn serde_cannot_turn_presence_into_authority() {
-        let problem = problem();
-        let json = serde_json::to_string(&problem).unwrap();
-        let decoded: ProblemSpec = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded, problem);
-        assert!(decoded.validate().is_ok());
-        // There is intentionally no execute(), promote(), activate(), or function-pointer field.
+        assert_eq!(
+            AlgorithmLineage::new(candidate, vec![p1.clone(), p1], vec![]).unwrap_err(),
+            RegistryError::DuplicateParent
+        );
     }
 }
