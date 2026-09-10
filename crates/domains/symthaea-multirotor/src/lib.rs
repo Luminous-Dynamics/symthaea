@@ -43,6 +43,7 @@ pub mod formation;
 pub mod perturbations;
 pub mod plugin;
 pub mod simulator;
+pub mod timed_simulator;
 pub mod training;
 pub mod types;
 
@@ -67,6 +68,7 @@ pub use fep_agent::ActiveInferenceFlightAgent;
 pub use navigation_estimator::{FlightNavigationEstimate, FlightNavigationEstimator};
 pub use perturbations::{FlightPerturbation, PerturbationSchedule};
 pub use simulator::{PhysicsSimulator, SimplePhysicsSimulator};
+pub use timed_simulator::{SimulatorTimingCaptureError, TimedPhysicsSimulator};
 pub use training::FlightTrainer;
 pub use types::*;
 
