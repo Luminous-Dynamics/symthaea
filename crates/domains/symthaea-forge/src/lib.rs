@@ -15,8 +15,9 @@
 //! are supplied externally. [`bundle`] proves structural persisted-file integrity, while
 //! [`bundle_verify`] proves the cross-file semantics of that bundle. [`trial_semantics`] validates
 //! event/schema/attempt/artifact/transformation consistency, [`trials`] projects that validated
-//! history into canonical per-transformation records, and [`learning`] binds those records to one
-//! exact semantic discovery run before producing descriptive outcome summaries.
+//! history into canonical per-transformation records, [`learning`] binds those records to one exact
+//! semantic discovery run, and [`context_learning`] allows aggregation only across distinct runs
+//! sharing the same problem, baseline implementation, and exact evaluation context.
 //!
 //! # Authority boundary
 //!
@@ -28,14 +29,15 @@
 //!   benchmark is a candidate evaluation rejection.
 //! - Persistent output must resolve outside the canonical workspace and is create-new only.
 //! - Forge's local benchmark remains a search heuristic, not replicated superiority evidence.
-//! - Transformation trials and outcome tables are descriptive search-memory records, not promotion
-//!   evidence or cross-context claims.
+//! - Transformation trials and learning tables are descriptive search-memory records, not
+//!   promotion evidence. Cross-run aggregation requires exact context equality in v1.
 //! - No promotion, merge, activation, or runtime authority is provided here.
 
 pub mod bundle;
 pub mod bundle_verify;
 pub mod candidate;
 pub mod certificate;
+pub mod context_learning;
 pub mod fitness;
 pub mod learning;
 pub mod mutations;
@@ -56,6 +58,10 @@ pub use bundle_verify::{
 };
 pub use candidate::{ledger_from_forge_trace, proposal_from_forge, ForgeProposalError};
 pub use certificate::{CertificateError, ForgeCandidate, ForgeCertificate};
+pub use context_learning::{
+    ContextBoundForgeBatch, ContextualTransformationStats, ExactContextForgeCohort,
+    ExactContextTransformationTable, ForgeContextLearningError,
+};
 pub use fitness::{BenchmarkError, GateExecutionError};
 pub use learning::{
     ForgeLearningError, ForgeTrialBatch, TransformationOutcomeStats, TransformationOutcomeTable,
