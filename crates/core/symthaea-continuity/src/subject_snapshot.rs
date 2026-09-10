@@ -193,6 +193,13 @@ pub enum ContinuitySubjectSnapshotError {
         child: ContinuitySubjectId,
         parent: ContinuitySubjectId,
     },
+    #[error(
+        "subject traversal from {origin:?} reached {missing:?}, which is absent from the snapshot index"
+    )]
+    TraversalInvariantMissingSubject {
+        origin: ContinuitySubjectId,
+        missing: ContinuitySubjectId,
+    },
     #[error("subject containment parent graph contains a cycle reachable from {0:?}")]
     ParentCycle(ContinuitySubjectId),
     #[error("subject containment parent chain exceeds {MAX_PARENT_DEPTH} nodes from {0:?}")]
@@ -254,9 +261,12 @@ fn validate_parent_structure(
             if depth > MAX_PARENT_DEPTH {
                 return Err(ContinuitySubjectSnapshotError::ParentDepthExceeded(origin));
             }
-            let current_subject = index
-                .get(&subject_id)
-                .expect("parent closure validated before parent traversal");
+            let current_subject = index.get(&subject_id).ok_or(
+                ContinuitySubjectSnapshotError::TraversalInvariantMissingSubject {
+                    origin,
+                    missing: subject_id,
+                },
+            )?;
             current = current_subject.parent_subject_id();
         }
     }
@@ -323,6 +333,28 @@ mod tests {
                 child: child.id(),
                 parent: parent.id(),
             })
+        );
+    }
+
+    #[test]
+    fn parent_structure_fails_closed_without_closure_precondition() {
+        let parent = root("fabric-a", ContinuityScopeV1::NetworkFabric);
+        let child = ContinuitySubjectV1::new(
+            "org.example",
+            "leaf-01",
+            ContinuityScopeV1::NetworkDevice,
+            Some(parent.id()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            validate_parent_structure(std::slice::from_ref(&child)),
+            Err(
+                ContinuitySubjectSnapshotError::TraversalInvariantMissingSubject {
+                    origin: child.id(),
+                    missing: parent.id(),
+                }
+            )
         );
     }
 
