@@ -8,6 +8,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod active_lkg;
 pub mod auth_wire;
 mod compose;
 pub mod commit_currentness;
@@ -38,6 +39,11 @@ pub mod trusted_commit_epoch;
 pub mod verifier;
 mod witness;
 
+pub use active_lkg::{
+    ACTIVE_KNOWN_GOOD_SELECTION_RECORD_SCHEMA_V1, ActiveKnownGoodSelectionError,
+    ActiveKnownGoodSelectionId, ActiveKnownGoodSelectionRecordV1,
+    ActiveKnownGoodSelectionV1,
+};
 pub use auth_wire::{
     CONTINUITY_VERIFICATION_CLAIM_AUTH_SCHEMA, CONTINUITY_VERIFICATION_CLAIM_HASH_ALGORITHM,
     CONTINUITY_VERIFICATION_XENIA_PURPOSE, canonical_verification_claim_bytes,
