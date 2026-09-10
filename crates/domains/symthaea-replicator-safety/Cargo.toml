@@ -2,7 +2,9 @@
 name = "symthaea-replicator-safety"
 version = "0.1.0"
 edition = "2024"
-description = "Constitutional authority core for bounded autonomous fabrication and replicating systems"
+description = "Reference constitutional authority semantics for bounded replication safety; not production-admitted"
 license = "AGPL-3.0-or-later"
+publish = false
+readme = "README.md"
 
 [dependencies]
