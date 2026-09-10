@@ -7,7 +7,13 @@
 //! and tests before any configured benchmark; [`sandbox`] provides an exclusive, fail-closed
 //! temporary staging lease because Cargo must see candidate source on disk; [`search`] restores the
 //! canonical source before retaining a candidate in memory; and [`certificate`] creates a
-//! human-reviewable report of the search survivor.
+//! content-addressed human-reviewable survivor record.
+//!
+//! [`candidate`] is the authority-free bridge into `symthaea-algorithms`: it requires the caller to
+//! supply the semantic `ProblemSpec`/`AlgorithmRecord` context and a baseline implementation, then
+//! converts the exact Forge survivor into a generic `CandidateProposal`. Forge itself therefore
+//! remains a candidate generator rather than a source of semantic truth, replicated performance,
+//! or production authority.
 //!
 //! # Authority boundary
 //!
@@ -16,21 +22,19 @@
 //! - Pre-existing `.forge-orig` state is never auto-restored because it might belong to another
 //!   live Forge process. Search stops for explicit recovery.
 //! - A configured benchmark failure is an evaluation failure, not correctness-only mode.
-//! - Persistent CLI output is certificate/report evidence only and must resolve outside the
-//!   canonical workspace. Existing output files are not overwritten.
+//! - Persistent CLI output must resolve outside the canonical workspace and existing evidence
+//!   files are not overwritten.
 //! - Forge's single-run benchmark score is a search heuristic, not replicated evidence of
 //!   superiority and not a production-promotion decision.
 //! - No general-purpose program synthesis or autonomous production activation is provided here.
-//!
-//! The evidence-first `symthaea-algorithms` stack is the intended destination for typed candidate
-//! identity, ordered transformation lineage, reproducible evaluation receipts, repeatability,
-//! robust comparison, and any future separately reviewed promotion policy.
 
+pub mod candidate;
 pub mod certificate;
 pub mod fitness;
 pub mod mutations;
 pub mod sandbox;
 pub mod search;
 
-pub use certificate::ForgeCertificate;
+pub use candidate::{ForgeProposalError, proposal_from_forge};
+pub use certificate::{CertificateError, ForgeCandidate, ForgeCertificate};
 pub use search::{ForgeConfig, SearchOutcome, run_search};
