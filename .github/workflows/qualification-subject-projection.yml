@@ -1,0 +1,135 @@
+# Prove that a focused qualification head differs from its promoted feature
+# candidate only by explicitly named verifier-harness files.
+
+name: Qualification Subject Projection
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qualification-subject-projection.yml'
+      - 'scripts/verify-qualification-subject-projection.sh'
+  workflow_dispatch:
+
+concurrency:
+  group: qualification-subject-projection-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+  CANDIDATE_SHA: db4338d84af86f0b937466ca3bede81cc97658a5
+  QUALIFIER_SHA: 4e5bac55c2be32881d6a01c566748d45911a9dbf
+  STALE_CANDIDATE_SHA: d5df323dba16b7e5c9708ddb00b9a8973765b514
+  HARNESS_WORKFLOW: .github/workflows/capability-algorithm-provenance.yml
+  HARNESS_SCRIPT: scripts/qualify-capability-algorithm-provenance.sh
+
+jobs:
+  projection:
+    name: Exact qualification-subject projection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact projection-verifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 8
+          persist-credentials: false
+
+      - name: Verify pinned workflow actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/qualification-subject-projection.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/qualification-subject-projection.yml)" -eq 1
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/qualification-subject-projection.yml; then
+            echo 'mutable major-version GitHub Action tag found' >&2
+            exit 1
+          fi
+
+      - name: Verify exact ancestry objects are present
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "$CANDIDATE_SHA^{commit}"
+          git cat-file -e "$QUALIFIER_SHA^{commit}"
+          git cat-file -e "$STALE_CANDIDATE_SHA^{commit}"
+          test "$(git rev-parse "$QUALIFIER_SHA^1")" = "$CANDIDATE_SHA"
+
+      - name: Prove exact qualification subject projection
+        shell: bash
+        env:
+          QUALIFICATION_SUBJECT_RECEIPT: ${{ runner.temp }}/qualification-subject-projection-v1.tsv
+        run: |
+          set -euo pipefail
+          bash scripts/verify-qualification-subject-projection.sh \
+            "$CANDIDATE_SHA" \
+            "$QUALIFIER_SHA" \
+            "$HARNESS_WORKFLOW" \
+            "$HARNESS_SCRIPT"
+
+      - name: Exercise fail-closed projection regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expect_failure() {
+            local name="$1"
+            shift
+            local receipt="${RUNNER_TEMP}/projection-negative-${name}.tsv"
+            if QUALIFICATION_SUBJECT_RECEIPT="$receipt" bash scripts/verify-qualification-subject-projection.sh "$@"; then
+              echo "error: negative projection case unexpectedly passed: $name" >&2
+              exit 1
+            fi
+            test -f "$receipt"
+            grep -Fxq $'status\tFAIL' "$receipt"
+          }
+
+          # A stale source candidate cannot borrow qualification from its
+          # successor because exact first-parent binding fails closed.
+          expect_failure stale-candidate \
+            "$STALE_CANDIDATE_SHA" "$QUALIFIER_SHA" \
+            "$HARNESS_WORKFLOW" "$HARNESS_SCRIPT"
+
+          # Omitting one real harness delta cannot make the projected subjects
+          # appear equal.
+          expect_failure missing-exclusion \
+            "$CANDIDATE_SHA" "$QUALIFIER_SHA" \
+            "$HARNESS_WORKFLOW"
+
+          # An exclusion may never hide a path that exists in the promoted
+          # candidate, preventing policy from masking source drift.
+          expect_failure overbroad-exclusion \
+            "$CANDIDATE_SHA" "$QUALIFIER_SHA" \
+            "$HARNESS_WORKFLOW" "$HARNESS_SCRIPT" Cargo.lock
+
+      - name: Publish projection receipt digest
+        if: always()
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/qualification-subject-projection-v1.tsv
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RECEIPT" ]]; then
+            echo 'No projection receipt was produced.'
+            exit 0
+          fi
+          digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
+          echo "qualification-subject-projection receipt_sha256=$digest"
+          {
+            echo
+            echo "- receipt SHA-256: \`$digest\`"
+            echo '- scope: repository-source projection only; no operational authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload projection receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qualification-subject-projection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qualification-subject-projection-v1.tsv
+          if-no-files-found: warn
+          retention-days: 14
