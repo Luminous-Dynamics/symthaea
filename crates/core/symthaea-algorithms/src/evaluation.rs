@@ -4,7 +4,7 @@
 
 use crate::{ContentId, ImplementationId, ProblemId, RegistryError};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone, PartialEq)]
@@ -17,6 +17,10 @@ pub enum EvaluationError {
     NonFiniteObjective { name: String, value: f64 },
     #[error("duplicate objective name: {0}")]
     DuplicateObjective(String),
+    #[error("evaluation context seeds are not in canonical sorted-unique order")]
+    NonCanonicalSeeds,
+    #[error("objective measurements are not in canonical name order")]
+    NonCanonicalObjectives,
     #[error("correctness did not pass; performance evidence is ineligible for ranking")]
     CorrectnessNotPassed,
     #[error("receipt identity does not match its canonical fields")]
@@ -67,12 +71,26 @@ impl ObjectiveMeasurement {
         if !value.is_finite() {
             return Err(EvaluationError::NonFiniteObjective { name, value });
         }
+        let value = if value == 0.0 { 0.0 } else { value };
         Ok(Self {
             name,
             direction,
             value,
             unit,
         })
+    }
+
+    fn validate_canonical(&self) -> Result<(), EvaluationError> {
+        let canonical = Self::new(
+            self.name.clone(),
+            self.direction,
+            self.value,
+            self.unit.clone(),
+        )?;
+        if canonical.value.to_bits() != self.value.to_bits() {
+            return Err(EvaluationError::NonCanonicalObjectives);
+        }
+        Ok(())
     }
 }
 
@@ -124,6 +142,28 @@ impl EvaluationContext {
         })
     }
 
+    fn canonicalized(&self) -> Result<Self, EvaluationError> {
+        Self::new(
+            self.evaluator_id.clone(),
+            self.oracle_id.clone(),
+            self.input_profile_id.clone(),
+            self.environment_id.clone(),
+            self.source_revision.clone(),
+            self.toolchain_profile.clone(),
+            self.target_profile.clone(),
+            self.seeds.clone(),
+        )
+    }
+
+    pub fn validate(&self) -> Result<(), EvaluationError> {
+        let canonical = self.canonicalized()?;
+        if canonical == *self {
+            Ok(())
+        } else {
+            Err(EvaluationError::NonCanonicalSeeds)
+        }
+    }
+
     pub fn content_id(&self) -> ContentId {
         let mut owned: Vec<Vec<u8>> = vec![
             self.evaluator_id.as_str().as_bytes().to_vec(),
@@ -169,22 +209,26 @@ impl EvaluationReceipt {
         objectives: Vec<ObjectiveMeasurement>,
         evidence_run_id: Option<String>,
     ) -> Result<Self, EvaluationError> {
+        let context = context.canonicalized()?;
         if let Some(run_id) = &evidence_run_id {
             require_text("evidence run id", run_id)?;
         }
 
-        let mut seen = BTreeMap::new();
-        for objective in &objectives {
-            if !objective.value.is_finite() {
-                return Err(EvaluationError::NonFiniteObjective {
-                    name: objective.name.clone(),
-                    value: objective.value,
-                });
+        let mut canonical_objectives = Vec::with_capacity(objectives.len());
+        let mut seen = BTreeSet::new();
+        for objective in objectives {
+            let canonical = ObjectiveMeasurement::new(
+                objective.name,
+                objective.direction,
+                objective.value,
+                objective.unit,
+            )?;
+            if !seen.insert(canonical.name.clone()) {
+                return Err(EvaluationError::DuplicateObjective(canonical.name));
             }
-            if seen.insert(objective.name.clone(), ()).is_some() {
-                return Err(EvaluationError::DuplicateObjective(objective.name.clone()));
-            }
+            canonical_objectives.push(canonical);
         }
+        canonical_objectives.sort_by(|a, b| a.name.cmp(&b.name));
 
         let id = Self::derive_id(
             &problem_id,
@@ -192,7 +236,7 @@ impl EvaluationReceipt {
             &context,
             correctness,
             &correctness_evidence_id,
-            &objectives,
+            &canonical_objectives,
             evidence_run_id.as_deref(),
         );
         Ok(Self {
@@ -202,12 +246,13 @@ impl EvaluationReceipt {
             context,
             correctness,
             correctness_evidence_id,
-            objectives,
+            objectives: canonical_objectives,
             evidence_run_id,
         })
     }
 
     pub fn eligible_objectives(&self) -> Result<&[ObjectiveMeasurement], EvaluationError> {
+        self.validate()?;
         if self.correctness != CorrectnessVerdict::Passed {
             return Err(EvaluationError::CorrectnessNotPassed);
         }
@@ -215,6 +260,17 @@ impl EvaluationReceipt {
     }
 
     pub fn validate(&self) -> Result<(), EvaluationError> {
+        self.context.validate()?;
+        for objective in &self.objectives {
+            objective.validate_canonical()?;
+        }
+        if self
+            .objectives
+            .windows(2)
+            .any(|pair| pair[0].name >= pair[1].name)
+        {
+            return Err(EvaluationError::NonCanonicalObjectives);
+        }
         let rebuilt = Self::new(
             self.problem_id.clone(),
             self.implementation_id.clone(),
@@ -302,30 +358,60 @@ mod tests {
     #[test]
     fn context_seed_order_is_canonical() {
         let a = context();
-        let b = EvaluationContext::new(
-            a.evaluator_id.clone(),
-            a.oracle_id.clone(),
-            a.input_profile_id.clone(),
-            a.environment_id.clone(),
-            a.source_revision.clone(),
-            a.toolchain_profile.clone(),
-            a.target_profile.clone(),
-            vec![3, 7],
+        assert_eq!(a.seeds, vec![3, 7]);
+        assert!(a.validate().is_ok());
+    }
+
+    #[test]
+    fn deserialized_noncanonical_seed_order_is_rejected() {
+        let mut context = context();
+        context.seeds = vec![7, 3];
+        assert_eq!(context.validate().unwrap_err(), EvaluationError::NonCanonicalSeeds);
+    }
+
+    #[test]
+    fn objectives_are_canonicalized_by_name() {
+        let receipt = EvaluationReceipt::new(
+            problem_id(),
+            implementation_id(),
+            context(),
+            CorrectnessVerdict::Passed,
+            cid("correctness", "pass"),
+            vec![
+                ObjectiveMeasurement::new(
+                    "memory",
+                    ObjectiveDirection::Minimize,
+                    12.0,
+                    "bytes",
+                )
+                .unwrap(),
+                ObjectiveMeasurement::new(
+                    "latency",
+                    ObjectiveDirection::Minimize,
+                    10.0,
+                    "ns/op",
+                )
+                .unwrap(),
+            ],
+            None,
         )
         .unwrap();
-        assert_eq!(a.content_id(), b.content_id());
+        assert_eq!(receipt.objectives[0].name, "latency");
+        assert_eq!(receipt.objectives[1].name, "memory");
     }
 
     #[test]
     fn rejects_non_finite_measurements_before_ranking() {
-        let err = ObjectiveMeasurement::new(
-            "latency",
-            ObjectiveDirection::Minimize,
-            f64::NAN,
-            "ns/op",
-        )
-        .unwrap_err();
-        assert!(matches!(err, EvaluationError::NonFiniteObjective { .. }));
+        assert!(matches!(
+            ObjectiveMeasurement::new(
+                "latency",
+                ObjectiveDirection::Minimize,
+                f64::NAN,
+                "ns/op"
+            )
+            .unwrap_err(),
+            EvaluationError::NonFiniteObjective { .. }
+        ));
     }
 
     #[test]
@@ -336,13 +422,7 @@ mod tests {
             context(),
             CorrectnessVerdict::Failed,
             cid("correctness", "mismatch"),
-            vec![ObjectiveMeasurement::new(
-                "latency",
-                ObjectiveDirection::Minimize,
-                10.0,
-                "ns/op",
-            )
-            .unwrap()],
+            vec![],
             None,
         )
         .unwrap();
@@ -371,7 +451,6 @@ mod tests {
             Some("run-1".into()),
         )
         .unwrap();
-
         let mut changed = context();
         changed.target_profile = "aarch64-unknown-linux-gnu".into();
         let b = EvaluationReceipt::new(
@@ -388,7 +467,7 @@ mod tests {
     }
 
     #[test]
-    fn receipt_self_validation_detects_tampering() {
+    fn receipt_validation_detects_tampering() {
         let mut receipt = EvaluationReceipt::new(
             problem_id(),
             implementation_id(),
@@ -407,6 +486,5 @@ mod tests {
     fn algorithm_id_type_stays_distinct_from_implementation_id() {
         let _algorithm = AlgorithmId(cid("algorithm", "a"));
         let _implementation = ImplementationId(cid("implementation", "a"));
-        // Compile-time type separation is the assertion.
     }
 }
