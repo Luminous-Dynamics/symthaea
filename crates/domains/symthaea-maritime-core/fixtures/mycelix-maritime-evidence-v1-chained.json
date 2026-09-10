@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "platform_id": "auv-01",
+  "generation": 7,
+  "sequence": 43,
+  "observed_at_us": 1700000000001042,
+  "kind": "communications_state",
+  "payload_json": "{\"fleet_link\":\"degraded\",\"operator_link\":\"available\"}",
+  "evidence_binding": "xenia-handshake-transcript-v1:blake3-256:2222222222222222222222222222222222222222222222222222222222222222",
+  "position_evidence_refs": [
+    "mycelix-position:measurement:fixture-001"
+  ],
+  "previous_event_digest": "2ec31adc7f4ca9200d6c3464171ca639b3075da93e4118bfd7b4688232dfdbc4"
+}
