@@ -1,65 +1,203 @@
-name: Continuity exact rustfmt repair promotion
+name: Continuity rustfmt context diagnostic
 
 on:
   push:
     branches:
       - ci/continuity-store-authority-exact-head-v1
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: continuity-rustfmt-context-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FEATURE_SHA: a0a9ade2410f8f78c91608e652050b67dab68f19
+  FEATURE_BRANCH: architecture/continuity-verifier-adoption-trusted-store-v1
+  HISTORIC_QUALIFIER_PATCH_SHA256: f680ac318824ac3e40f7e3a504c7aea26355814b1b70673298a419adca897fff
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
 
 jobs:
-  promote-exact-repair:
+  compare-format-contexts:
+    name: Compare exact rustfmt contexts without mutation
     runs-on: ubuntu-24.04
-    env:
-      TARGET_BRANCH: architecture/continuity-verifier-adoption-trusted-store-v1
-      TARGET_SHA: a0a9ade2410f8f78c91608e652050b67dab68f19
-      EXPECTED_PATCH_SHA256: f680ac318824ac3e40f7e3a504c7aea26355814b1b70673298a419adca897fff
+    timeout-minutes: 15
+
     steps:
-      - name: Checkout exact feature head
+      - name: Checkout diagnostic head without credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ env.TARGET_SHA }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
-      - name: Refuse a moved feature branch
+      - name: Verify immutable inputs and toolchain
         shell: bash
         run: |
           set -euo pipefail
-          remote_sha="$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | cut -f1)"
-          test -n "$remote_sha"
-          test "$remote_sha" = "$TARGET_SHA"
-          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          remote_feature_sha="$(git ls-remote origin "refs/heads/${FEATURE_BRANCH}" | cut -f1)"
+          test -n "$remote_feature_sha"
+          test "$remote_feature_sha" = "$FEATURE_SHA"
 
-      - name: Install repository-pinned rustfmt
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --no-self-update
+          rustup override set "$channel"
+
+          {
+            printf 'schema\tsymthaea-continuity-rustfmt-context-v1\n'
+            printf 'diagnostic_sha\t%s\n' "$GITHUB_SHA"
+            printf 'feature_sha\t%s\n' "$FEATURE_SHA"
+            printf 'feature_branch\t%s\n' "$FEATURE_BRANCH"
+            printf 'runner_os\t%s\n' "$RUNNER_OS"
+            printf 'runner_arch\t%s\n' "$RUNNER_ARCH"
+            printf 'runner_image_os\t%s\n' "${ImageOS:-unknown}"
+            printf 'runner_image_version\t%s\n' "${ImageVersion:-unknown}"
+            printf 'kernel_release\t%s\n' "$(uname -r)"
+            printf 'git_version\t%s\n' "$(git --version)"
+            printf 'rustup_active_toolchain\t%s\n' "$(rustup show active-toolchain)"
+            printf 'rustc_version\t%s\n' "$(rustc --version)"
+            printf 'rustc_commit_hash\t%s\n' "$(rustc -vV | sed -n 's/^commit-hash: //p')"
+            printf 'rustc_host\t%s\n' "$(rustc -vV | sed -n 's/^host: //p')"
+            printf 'cargo_version\t%s\n' "$(cargo --version)"
+            printf 'rustfmt_version\t%s\n' "$(rustfmt --version)"
+            printf 'locale_lc_all\t%s\n' "${LC_ALL:-unset}"
+            printf 'locale_lang\t%s\n' "${LANG:-unset}"
+            printf 'git_core_autocrlf\t%s\n' "$(git config --get core.autocrlf || printf unset)"
+            printf 'git_core_eol\t%s\n' "$(git config --get core.eol || printf unset)"
+            printf 'git_core_safecrlf\t%s\n' "$(git config --get core.safecrlf || printf unset)"
+            printf 'git_core_filemode\t%s\n' "$(git config --get core.filemode || printf unset)"
+          } > "$RUNNER_TEMP/continuity-rustfmt-context-v1.tsv"
+
+      - name: Format feature and qualifier contexts independently
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install 1.96.0 --profile minimal --component rustfmt
-          rustup override set 1.96.0
-          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
 
-      - name: Reproduce exact verifier repair
+          hash_optional_file() {
+            local path="$1"
+            if [[ -f "$path" ]]; then
+              sha256sum "$path" | awk '{print $1}'
+            else
+              printf 'absent'
+            fi
+          }
+
+          hash_source_bytes() {
+            local root="$1"
+            (
+              cd "$root/crates/core/symthaea-continuity"
+              find . -type f -print0 \
+                | LC_ALL=C sort -z \
+                | while IFS= read -r -d '' path; do
+                    printf '%s\0' "$path"
+                    sha256sum "$path" | awk '{printf "%s\\0", $1}'
+                  done
+            ) | sha256sum | awk '{print $1}'
+          }
+
+          format_context() {
+            local label="$1"
+            local sha="$2"
+            local root="$RUNNER_TEMP/continuity-rustfmt-${label}"
+            local patch="$RUNNER_TEMP/continuity-rustfmt-${label}.patch"
+            local snapshot="$RUNNER_TEMP/continuity-rustfmt-${label}-source"
+            local receipt="$RUNNER_TEMP/continuity-rustfmt-context-v1.tsv"
+
+            git worktree add --quiet --detach "$root" "$sha"
+
+            local committed_source_tree
+            local committed_lock_sha
+            local pre_source_sha
+            local post_source_sha
+            local patch_sha
+            committed_source_tree="$(git -C "$root" rev-parse 'HEAD:crates/core/symthaea-continuity')"
+            committed_lock_sha="$(sha256sum "$root/Cargo.lock" | awk '{print $1}')"
+            pre_source_sha="$(hash_source_bytes "$root")"
+
+            (
+              cd "$root"
+              cargo fmt -p symthaea-continuity
+              git diff --binary -- crates/core/symthaea-continuity > "$patch"
+              git diff --check -- crates/core/symthaea-continuity
+            )
+
+            test -s "$patch"
+            patch_sha="$(sha256sum "$patch" | awk '{print $1}')"
+            post_source_sha="$(hash_source_bytes "$root")"
+            cp -a "$root/crates/core/symthaea-continuity" "$snapshot"
+
+            {
+              printf '%s_committed_source_tree\t%s\n' "$label" "$committed_source_tree"
+              printf '%s_committed_cargo_lock_sha256\t%s\n' "$label" "$committed_lock_sha"
+              printf '%s_pre_source_sha256\t%s\n' "$label" "$pre_source_sha"
+              printf '%s_post_source_sha256\t%s\n' "$label" "$post_source_sha"
+              printf '%s_patch_sha256\t%s\n' "$label" "$patch_sha"
+              printf '%s_patch_matches_historic_qualifier\t%s\n' "$label" "$([[ "$patch_sha" = "$HISTORIC_QUALIFIER_PATCH_SHA256" ]] && printf true || printf false)"
+              printf '%s_rustfmt_toml_sha256\t%s\n' "$label" "$(hash_optional_file "$root/rustfmt.toml")"
+              printf '%s_dot_rustfmt_toml_sha256\t%s\n' "$label" "$(hash_optional_file "$root/.rustfmt.toml")"
+              printf '%s_gitattributes_sha256\t%s\n' "$label" "$(hash_optional_file "$root/.gitattributes")"
+            } >> "$receipt"
+          }
+
+          format_context feature "$FEATURE_SHA"
+          format_context qualifier "$GITHUB_SHA"
+
+          receipt="$RUNNER_TEMP/continuity-rustfmt-context-v1.tsv"
+          feature_tree="$(awk -F '\t' '$1 == "feature_committed_source_tree" {print $2}' "$receipt")"
+          qualifier_tree="$(awk -F '\t' '$1 == "qualifier_committed_source_tree" {print $2}' "$receipt")"
+          feature_pre="$(awk -F '\t' '$1 == "feature_pre_source_sha256" {print $2}' "$receipt")"
+          qualifier_pre="$(awk -F '\t' '$1 == "qualifier_pre_source_sha256" {print $2}' "$receipt")"
+          feature_post="$(awk -F '\t' '$1 == "feature_post_source_sha256" {print $2}' "$receipt")"
+          qualifier_post="$(awk -F '\t' '$1 == "qualifier_post_source_sha256" {print $2}' "$receipt")"
+          feature_patch="$(awk -F '\t' '$1 == "feature_patch_sha256" {print $2}' "$receipt")"
+          qualifier_patch="$(awk -F '\t' '$1 == "qualifier_patch_sha256" {print $2}' "$receipt")"
+
+          test "$feature_tree" = "$qualifier_tree"
+          test "$feature_pre" = "$qualifier_pre"
+
+          {
+            printf 'same_committed_source_tree\ttrue\n'
+            printf 'same_pre_format_source_bytes\ttrue\n'
+            printf 'same_post_format_source_bytes\t%s\n' "$([[ "$feature_post" = "$qualifier_post" ]] && printf true || printf false)"
+            printf 'same_patch_bytes\t%s\n' "$([[ "$feature_patch" = "$qualifier_patch" ]] && printf true || printf false)"
+            printf 'historic_qualifier_patch_sha256\t%s\n' "$HISTORIC_QUALIFIER_PATCH_SHA256"
+          } >> "$receipt"
+
+          cat "$receipt"
+
+      - name: Publish diagnostic summary
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
-          cargo fmt -p symthaea-continuity
-          git diff --binary -- crates/core/symthaea-continuity > /tmp/continuity-rustfmt.patch
-          actual_patch_sha256="$(sha256sum /tmp/continuity-rustfmt.patch | awk '{print $1}')"
-          printf 'rustfmt repair sha256=%s\n' "$actual_patch_sha256"
-          test "$actual_patch_sha256" = "$EXPECTED_PATCH_SHA256"
-          git diff --check -- crates/core/symthaea-continuity
-          test -s /tmp/continuity-rustfmt.patch
+          receipt="$RUNNER_TEMP/continuity-rustfmt-context-v1.tsv"
+          if [[ -f "$receipt" ]]; then
+            digest="$(sha256sum "$receipt" | awk '{print $1}')"
+            echo "continuity-rustfmt-context receipt_sha256=$digest"
+            {
+              echo '## Continuity rustfmt context diagnostic'
+              echo
+              echo "Receipt SHA-256: \`$digest\`"
+              echo
+              echo 'This workflow is read-only. It cannot promote formatter output or move a branch.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-      - name: Commit and push only the proven formatter delta
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- crates/core/symthaea-continuity
-          test -z "$(git diff --cached --name-only | grep -v '^crates/core/symthaea-continuity/' || true)"
-          git diff --cached --quiet && { echo 'expected a formatter delta' >&2; exit 1; }
-          git commit -m "style(continuity): apply exact verifier-produced rustfmt repair"
-          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
+      - name: Upload read-only diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-rustfmt-context-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/continuity-rustfmt-context-v1.tsv
+            ${{ runner.temp }}/continuity-rustfmt-feature.patch
+            ${{ runner.temp }}/continuity-rustfmt-qualifier.patch
+            ${{ runner.temp }}/continuity-rustfmt-feature-source
+            ${{ runner.temp }}/continuity-rustfmt-qualifier-source
+          if-no-files-found: warn
+          retention-days: 14
