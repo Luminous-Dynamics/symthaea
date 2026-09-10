@@ -76,6 +76,8 @@ pub struct RoutingConstraints {
     pub maximum_memory_bytes: Option<u64>,
     pub maximum_fuel: Option<u64>,
     pub maximum_effect: EffectClass,
+    /// Empty means any invocable runtime is acceptable. `DataOnly` is never
+    /// eligible for this invocation router, even when explicitly listed.
     pub allowed_runtimes: Vec<RuntimeKind>,
     pub allow_degraded: bool,
 }
@@ -142,6 +144,7 @@ pub enum RejectionReason {
     LatencyAboveMaximum,
     MemoryAboveMaximum,
     FuelAboveMaximum,
+    RuntimeNotInvocable,
     RuntimeNotAllowed,
     EffectNotAllowed,
 }
@@ -183,6 +186,11 @@ pub enum RoutingError {
     },
 }
 
+/// Stateless deterministic invocation router.
+///
+/// Declarative `DataOnly` extensions remain discoverable through
+/// `ExtensionRegistry`, but are consumed through typed data loader/query paths,
+/// not through executable-provider routing.
 #[derive(Debug, Default)]
 pub struct ExtensionRouter;
 
@@ -354,7 +362,13 @@ fn assess_candidate<'a>(
     {
         reasons.push(RejectionReason::FuelAboveMaximum);
     }
-    if !request.constraints.allowed_runtimes.is_empty()
+
+    // A valid admission may authorize possession/use of a declarative pack, but
+    // it must never reinterpret that pack as executable code. Data access has a
+    // separate typed loader/query boundary.
+    if manifest.runtime == RuntimeKind::DataOnly {
+        reasons.push(RejectionReason::RuntimeNotInvocable);
+    } else if !request.constraints.allowed_runtimes.is_empty()
         && !request.constraints.allowed_runtimes.contains(&manifest.runtime)
     {
         reasons.push(RejectionReason::RuntimeNotAllowed);
@@ -492,7 +506,12 @@ mod tests {
         .unwrap()
     }
 
-    fn observation(id: &str, evidence: u8, reliability: u16, latency: Option<u64>) -> ProviderObservation {
+    fn observation(
+        id: &str,
+        evidence: u8,
+        reliability: u16,
+        latency: Option<u64>,
+    ) -> ProviderObservation {
         ProviderObservation {
             extension: ExtensionId::new(id),
             state: ProviderState::Ready,
@@ -516,20 +535,40 @@ mod tests {
     #[test]
     fn missing_admission_fails_closed() {
         let capability = "science.orbits.propagate";
-        let manifest = manifest("org.example.orbit", capability, EffectClass::Pure, RuntimeKind::Wasm, 1024, 10_000);
+        let manifest = manifest(
+            "org.example.orbit",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
         let mut registry = ExtensionRegistry::new();
         registry.register(manifest).unwrap();
         let observations = vec![observation("org.example.orbit", 5, 10_000, Some(1))];
-        let error = ExtensionRouter::route(&registry, &request(capability), &[], &observations).unwrap_err();
-        let RoutingError::NoEligibleProvider { assessments, .. } = error else { panic!("expected no eligible provider") };
-        assert_eq!(assessments[0].rejection_reasons, vec![RejectionReason::MissingAdmission]);
+        let error =
+            ExtensionRouter::route(&registry, &request(capability), &[], &observations).unwrap_err();
+        let RoutingError::NoEligibleProvider { assessments, .. } = error else {
+            panic!("expected no eligible provider")
+        };
+        assert_eq!(
+            assessments[0].rejection_reasons,
+            vec![RejectionReason::MissingAdmission]
+        );
     }
 
     #[test]
     fn capability_admission_is_narrower_than_manifest_claim() {
         let capability = "science.orbits.propagate";
         let other = CapabilityId::new("science.orbits.inspect");
-        let mut manifest = manifest("org.example.orbit", capability, EffectClass::Pure, RuntimeKind::Wasm, 1024, 10_000);
+        let mut manifest = manifest(
+            "org.example.orbit",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
         manifest.provides.push(CapabilityDescriptor {
             id: other.clone(),
             description: "inspect an orbit".into(),
@@ -539,37 +578,96 @@ mod tests {
         let mut registry = ExtensionRegistry::new();
         registry.register(manifest).unwrap();
         let observations = vec![observation("org.example.orbit", 5, 10_000, Some(1))];
-        let error = ExtensionRouter::route(&registry, &request(capability), &[active], &observations).unwrap_err();
-        let RoutingError::NoEligibleProvider { assessments, .. } = error else { panic!("expected no eligible provider") };
-        assert!(assessments[0].rejection_reasons.contains(&RejectionReason::CapabilityNotAdmitted));
+        let error = ExtensionRouter::route(
+            &registry,
+            &request(capability),
+            &[active],
+            &observations,
+        )
+        .unwrap_err();
+        let RoutingError::NoEligibleProvider { assessments, .. } = error else {
+            panic!("expected no eligible provider")
+        };
+        assert!(assessments[0]
+            .rejection_reasons
+            .contains(&RejectionReason::CapabilityNotAdmitted));
     }
 
     #[test]
     fn exact_manifest_binding_rejects_same_id_version_substitution() {
         let capability = "science.example.compute";
-        let admitted = manifest("org.example.compute", capability, EffectClass::Pure, RuntimeKind::Wasm, 1024, 10_000);
-        let active = admission(&admitted, TrustLevel::Trusted, vec![CapabilityId::new(capability)], 1, 15);
+        let admitted = manifest(
+            "org.example.compute",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
+        let active = admission(
+            &admitted,
+            TrustLevel::Trusted,
+            vec![CapabilityId::new(capability)],
+            1,
+            15,
+        );
         let mut substituted = admitted.clone();
         substituted.description = "substituted manifest".into();
         let mut registry = ExtensionRegistry::new();
         registry.register(substituted).unwrap();
         let observations = vec![observation("org.example.compute", 5, 10_000, Some(1))];
-        let error = ExtensionRouter::route(&registry, &request(capability), &[active], &observations).unwrap_err();
-        let RoutingError::NoEligibleProvider { assessments, .. } = error else { panic!("expected no eligible provider") };
-        assert!(assessments[0].rejection_reasons.contains(&RejectionReason::AdmissionManifestMismatch));
+        let error = ExtensionRouter::route(
+            &registry,
+            &request(capability),
+            &[active],
+            &observations,
+        )
+        .unwrap_err();
+        let RoutingError::NoEligibleProvider { assessments, .. } = error else {
+            panic!("expected no eligible provider")
+        };
+        assert!(assessments[0]
+            .rejection_reasons
+            .contains(&RejectionReason::AdmissionManifestMismatch));
     }
 
     #[test]
     fn trust_is_a_floor_not_a_quality_score() {
         let capability = "science.orbits.propagate";
-        let fast = manifest("org.example.fast", capability, EffectClass::Pure, RuntimeKind::Wasm, 1024, 10_000);
-        let trusted = manifest("org.example.more-trusted", capability, EffectClass::Pure, RuntimeKind::Wasm, 1024, 10_000);
+        let fast = manifest(
+            "org.example.fast",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
+        let trusted = manifest(
+            "org.example.more-trusted",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
         let mut registry = ExtensionRegistry::new();
         registry.register(fast.clone()).unwrap();
         registry.register(trusted.clone()).unwrap();
         let admissions = vec![
-            admission(&fast, TrustLevel::Community, vec![CapabilityId::new(capability)], 1, 20),
-            admission(&trusted, TrustLevel::Trusted, vec![CapabilityId::new(capability)], 1, 30),
+            admission(
+                &fast,
+                TrustLevel::Community,
+                vec![CapabilityId::new(capability)],
+                1,
+                20,
+            ),
+            admission(
+                &trusted,
+                TrustLevel::Trusted,
+                vec![CapabilityId::new(capability)],
+                1,
+                30,
+            ),
         ];
         let observations = vec![
             observation("org.example.fast", 5, 9_999, Some(1)),
@@ -577,15 +675,76 @@ mod tests {
         ];
         let mut request = request(capability);
         request.constraints.minimum_trust = TrustLevel::Community;
-        let decision = ExtensionRouter::route(&registry, &request, &admissions, &observations).unwrap();
+        let decision =
+            ExtensionRouter::route(&registry, &request, &admissions, &observations).unwrap();
         assert_eq!(decision.selected, ExtensionId::new("org.example.fast"));
+    }
+
+    #[test]
+    fn data_only_admission_never_becomes_invocation_authority() {
+        let capability = "knowledge.example.records";
+        let mut pack = manifest(
+            "org.example.knowledge-pack",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::DataOnly,
+            0,
+            0,
+        );
+        pack.kind = ExtensionKind::KnowledgePack;
+        pack.resources = ResourceBudget {
+            memory_bytes: 0,
+            fuel: 0,
+            max_wall_time_ms: 0,
+            max_output_bytes: 0,
+            max_concurrency: 0,
+        };
+        let active = admission(
+            &pack,
+            TrustLevel::Trusted,
+            vec![CapabilityId::new(capability)],
+            1,
+            35,
+        );
+        let mut registry = ExtensionRegistry::new();
+        registry.register(pack).unwrap();
+        let observations = vec![observation(
+            "org.example.knowledge-pack",
+            5,
+            10_000,
+            Some(0),
+        )];
+        let mut request = request(capability);
+        request.constraints.allowed_runtimes = vec![RuntimeKind::DataOnly];
+
+        let error = ExtensionRouter::route(&registry, &request, &[active], &observations)
+            .unwrap_err();
+        let RoutingError::NoEligibleProvider { assessments, .. } = error else {
+            panic!("expected no eligible provider")
+        };
+        assert!(assessments[0]
+            .rejection_reasons
+            .contains(&RejectionReason::RuntimeNotInvocable));
     }
 
     #[test]
     fn routing_decision_binds_policy_and_trust_lineage() {
         let capability = "science.example.compute";
-        let manifest = manifest("org.example.compute", capability, EffectClass::Pure, RuntimeKind::Wasm, 1024, 10_000);
-        let active = admission(&manifest, TrustLevel::Trusted, vec![CapabilityId::new(capability)], 9, 40);
+        let manifest = manifest(
+            "org.example.compute",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
+        let active = admission(
+            &manifest,
+            TrustLevel::Trusted,
+            vec![CapabilityId::new(capability)],
+            9,
+            40,
+        );
         let expected_manifest = active.manifest_sha256();
         let expected_payload = active.payload_sha256();
         let expected_policy = active.policy_sha256();
@@ -593,7 +752,9 @@ mod tests {
         let mut registry = ExtensionRegistry::new();
         registry.register(manifest).unwrap();
         let observations = vec![observation("org.example.compute", 5, 10_000, Some(3))];
-        let decision = ExtensionRouter::route(&registry, &request(capability), &[active], &observations).unwrap();
+        let decision =
+            ExtensionRouter::route(&registry, &request(capability), &[active], &observations)
+                .unwrap();
         assert_eq!(decision.selected_admission_generation, 9);
         assert_eq!(decision.selected_trust_generation, expected_trust_generation);
         assert_eq!(decision.selected_manifest_sha256, expected_manifest);
@@ -604,49 +765,125 @@ mod tests {
     #[test]
     fn duplicate_admissions_fail_closed() {
         let capability = "science.example.compute";
-        let manifest = manifest("org.example.compute", capability, EffectClass::Pure, RuntimeKind::Wasm, 1024, 10_000);
-        let first = admission(&manifest, TrustLevel::Trusted, vec![CapabilityId::new(capability)], 1, 50);
-        let second = admission(&manifest, TrustLevel::Trusted, vec![CapabilityId::new(capability)], 1, 51);
+        let manifest = manifest(
+            "org.example.compute",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
+        let first = admission(
+            &manifest,
+            TrustLevel::Trusted,
+            vec![CapabilityId::new(capability)],
+            1,
+            50,
+        );
+        let second = admission(
+            &manifest,
+            TrustLevel::Trusted,
+            vec![CapabilityId::new(capability)],
+            1,
+            51,
+        );
         let mut registry = ExtensionRegistry::new();
         registry.register(manifest).unwrap();
         let observations = vec![observation("org.example.compute", 5, 10_000, Some(1))];
-        let error = ExtensionRouter::route(&registry, &request(capability), &[first, second], &observations).unwrap_err();
-        let RoutingError::NoEligibleProvider { assessments, .. } = error else { panic!("expected no eligible provider") };
-        assert_eq!(assessments[0].rejection_reasons, vec![RejectionReason::DuplicateAdmission]);
+        let error = ExtensionRouter::route(
+            &registry,
+            &request(capability),
+            &[first, second],
+            &observations,
+        )
+        .unwrap_err();
+        let RoutingError::NoEligibleProvider { assessments, .. } = error else {
+            panic!("expected no eligible provider")
+        };
+        assert_eq!(
+            assessments[0].rejection_reasons,
+            vec![RejectionReason::DuplicateAdmission]
+        );
     }
 
     #[test]
     fn bounded_latency_rejects_unknown_latency() {
         let capability = "science.example.compute";
-        let manifest = manifest("org.example.compute", capability, EffectClass::Pure, RuntimeKind::Wasm, 1024, 10_000);
-        let active = admission(&manifest, TrustLevel::Trusted, vec![CapabilityId::new(capability)], 1, 60);
+        let manifest = manifest(
+            "org.example.compute",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
+        let active = admission(
+            &manifest,
+            TrustLevel::Trusted,
+            vec![CapabilityId::new(capability)],
+            1,
+            60,
+        );
         let mut registry = ExtensionRegistry::new();
         registry.register(manifest).unwrap();
         let observations = vec![observation("org.example.compute", 5, 10_000, None)];
         let mut request = request(capability);
         request.constraints.maximum_latency_ms = Some(10);
-        let error = ExtensionRouter::route(&registry, &request, &[active], &observations).unwrap_err();
-        let RoutingError::NoEligibleProvider { assessments, .. } = error else { panic!("expected no eligible provider") };
-        assert!(assessments[0].rejection_reasons.contains(&RejectionReason::LatencyUnknown));
+        let error = ExtensionRouter::route(&registry, &request, &[active], &observations)
+            .unwrap_err();
+        let RoutingError::NoEligibleProvider { assessments, .. } = error else {
+            panic!("expected no eligible provider")
+        };
+        assert!(assessments[0]
+            .rejection_reasons
+            .contains(&RejectionReason::LatencyUnknown));
     }
 
     #[test]
     fn complete_quality_tie_resolves_by_extension_id() {
         let capability = "science.example.compute";
-        let a = manifest("org.example.a", capability, EffectClass::Pure, RuntimeKind::Wasm, 1024, 10_000);
-        let b = manifest("org.example.b", capability, EffectClass::Pure, RuntimeKind::Wasm, 1024, 10_000);
+        let a = manifest(
+            "org.example.a",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
+        let b = manifest(
+            "org.example.b",
+            capability,
+            EffectClass::Pure,
+            RuntimeKind::Wasm,
+            1024,
+            10_000,
+        );
         let mut registry = ExtensionRegistry::new();
         registry.register(b.clone()).unwrap();
         registry.register(a.clone()).unwrap();
         let admissions = vec![
-            admission(&b, TrustLevel::Trusted, vec![CapabilityId::new(capability)], 1, 70),
-            admission(&a, TrustLevel::Trusted, vec![CapabilityId::new(capability)], 1, 80),
+            admission(
+                &b,
+                TrustLevel::Trusted,
+                vec![CapabilityId::new(capability)],
+                1,
+                70,
+            ),
+            admission(
+                &a,
+                TrustLevel::Trusted,
+                vec![CapabilityId::new(capability)],
+                1,
+                80,
+            ),
         ];
         let observations = vec![
             observation("org.example.b", 4, 9_000, Some(5)),
             observation("org.example.a", 4, 9_000, Some(5)),
         ];
-        let decision = ExtensionRouter::route(&registry, &request(capability), &admissions, &observations).unwrap();
+        let decision =
+            ExtensionRouter::route(&registry, &request(capability), &admissions, &observations)
+                .unwrap();
         assert_eq!(decision.selected, ExtensionId::new("org.example.a"));
     }
 }
