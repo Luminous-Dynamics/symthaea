@@ -3,9 +3,15 @@
 //!
 //! Cryptographic verification belongs to Xenia (or another session provider). Maritime core
 //! consumes only the post-verification facts needed to bound authority and fail closed when
-//! identity, freshness, epoch, time trust or revocation state is unacceptable.
+//! provider, identity, freshness, epoch, time trust or revocation state is unacceptable.
 
 use serde::{Deserialize, Serialize};
+
+fn canonical_text(value: &str) -> bool {
+    !value.trim().is_empty()
+        && value.trim() == value
+        && !value.chars().any(char::is_control)
+}
 
 /// Immutable claims handed to maritime core **after** an external secure-session provider
 /// verifies its own evidence.
@@ -98,10 +104,7 @@ impl AuthenticatedMachineSession {
             self.peer_identity_binding.as_str(),
             self.evidence_binding.as_str(),
         ] {
-            if value.trim().is_empty() {
-                return Err("session evidence text fields must not be empty");
-            }
-            if value.trim() != value || value.chars().any(char::is_control) {
+            if !canonical_text(value) {
                 return Err("session evidence text fields must be canonical printable text");
             }
         }
@@ -143,10 +146,14 @@ impl MachineSessionPolicy<'_> {
 /// This context is intentionally separate from immutable handshake evidence and deliberately
 /// does **not** implement serde serialization. Its fields are private: a provider adapter must
 /// explicitly cross [`MachineSessionContext::from_authority_provider`] after refreshing current
-/// time, enrollment, revocation and authority generation. The context also carries the provider's
-/// current peer-identity binding so state for one principal cannot accidentally authorize another.
+/// time, enrollment, revocation and authority generation.
+///
+/// Both the provider schema and provider-owned peer-identity binding are carried. Treating opaque
+/// identity strings as globally unique would allow a context from provider B to collide with a
+/// session from provider A; authority is therefore matched on `(provider schema, principal)`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MachineSessionContext {
+    provider_schema: String,
     peer_identity_binding: String,
     now_ms: u64,
     authority_epoch: u64,
@@ -158,29 +165,37 @@ impl MachineSessionContext {
     /// Cross the live authority-provider boundary into maritime core.
     ///
     /// Calling this constructor is an explicit assertion by the adapter that these values were
-    /// freshly obtained from the provider's current authority source. Maritime core cannot and
-    /// does not duplicate that provider's enrollment/revocation mechanism.
+    /// freshly obtained from the named provider's current authority source. Maritime core cannot
+    /// and does not duplicate that provider's enrollment/revocation mechanism.
     pub fn from_authority_provider(
+        provider_schema: impl Into<String>,
         peer_identity_binding: impl Into<String>,
         now_ms: u64,
         authority_epoch: u64,
         trusted_time_available: bool,
         revoked: bool,
     ) -> Result<Self, &'static str> {
+        let provider_schema = provider_schema.into();
         let peer_identity_binding = peer_identity_binding.into();
-        if peer_identity_binding.trim().is_empty()
-            || peer_identity_binding.trim() != peer_identity_binding
-            || peer_identity_binding.chars().any(char::is_control)
-        {
+        if !canonical_text(&provider_schema) {
+            return Err("authority context provider schema must be canonical printable text");
+        }
+        if !canonical_text(&peer_identity_binding) {
             return Err("authority context identity binding must be canonical printable text");
         }
         Ok(Self {
+            provider_schema,
             peer_identity_binding,
             now_ms,
             authority_epoch,
             trusted_time_available,
             revoked,
         })
+    }
+
+    /// Provider schema whose live authority source produced this context.
+    pub fn provider_schema(&self) -> &str {
+        &self.provider_schema
     }
 
     /// Provider-owned binding naming the principal whose live authority was checked.
@@ -203,7 +218,7 @@ impl MachineSessionContext {
         self.trusted_time_available
     }
 
-    /// Current revocation result for this peer identity.
+    /// Current revocation/denial result for this peer identity.
     pub const fn revoked(&self) -> bool {
         self.revoked
     }
@@ -215,6 +230,7 @@ pub enum MachineSessionTrust {
     Malformed,
     UnsupportedSchema,
     ValidityTooLong,
+    ContextProviderMismatch,
     ContextIdentityMismatch,
     UntrustedTime,
     NotYetValid,
@@ -242,6 +258,9 @@ pub fn evaluate_machine_session(
         .is_none_or(|validity| validity > policy.max_validity_ms)
     {
         return MachineSessionTrust::ValidityTooLong;
+    }
+    if context.provider_schema() != session.schema() {
+        return MachineSessionTrust::ContextProviderMismatch;
     }
     if context.peer_identity_binding() != session.peer_identity_binding() {
         return MachineSessionTrust::ContextIdentityMismatch;
@@ -285,6 +304,7 @@ mod tests {
     }
 
     fn context_with(
+        provider_schema: &str,
         identity: &str,
         now_ms: u64,
         authority_epoch: u64,
@@ -292,6 +312,7 @@ mod tests {
         revoked: bool,
     ) -> MachineSessionContext {
         MachineSessionContext::from_authority_provider(
+            provider_schema,
             identity,
             now_ms,
             authority_epoch,
@@ -302,7 +323,7 @@ mod tests {
     }
 
     fn context(now_ms: u64) -> MachineSessionContext {
-        context_with(TEST_IDENTITY, now_ms, 9, true, false)
+        context_with(TEST_SCHEMA, TEST_IDENTITY, now_ms, 9, true, false)
     }
 
     fn policy() -> MachineSessionPolicy<'static> {
@@ -353,14 +374,25 @@ mod tests {
     }
 
     #[test]
-    fn authority_context_handoff_rejects_malformed_identity_binding() {
-        assert!(
-            MachineSessionContext::from_authority_provider("", 150, 9, true, false).is_err()
-        );
-        assert!(
-            MachineSessionContext::from_authority_provider(" identity", 150, 9, true, false)
-                .is_err()
-        );
+    fn authority_context_handoff_rejects_malformed_namespace() {
+        assert!(MachineSessionContext::from_authority_provider(
+            "",
+            TEST_IDENTITY,
+            150,
+            9,
+            true,
+            false
+        )
+        .is_err());
+        assert!(MachineSessionContext::from_authority_provider(
+            TEST_SCHEMA,
+            " identity",
+            150,
+            9,
+            true,
+            false
+        )
+        .is_err());
     }
 
     #[test]
@@ -384,7 +416,14 @@ mod tests {
             "xenia-transcript:xyz",
         )
         .unwrap();
-        let current = context(150);
+        let current = context_with(
+            "test-session-evidence-v2",
+            TEST_IDENTITY,
+            150,
+            9,
+            true,
+            false,
+        );
         assert_eq!(
             evaluate_machine_session(&future, &current, policy()),
             MachineSessionTrust::UnsupportedSchema
@@ -411,17 +450,37 @@ mod tests {
     }
 
     #[test]
-    fn live_context_must_name_the_same_peer_identity() {
-        let wrong = context_with("xenia-fingerprint:different", 150, 9, true, false);
+    fn live_context_must_name_same_provider_and_peer_identity() {
+        let wrong_provider = context_with(
+            "other-provider-v1",
+            TEST_IDENTITY,
+            150,
+            9,
+            true,
+            false,
+        );
         assert_eq!(
-            evaluate_machine_session(&session(), &wrong, policy()),
+            evaluate_machine_session(&session(), &wrong_provider, policy()),
+            MachineSessionTrust::ContextProviderMismatch
+        );
+
+        let wrong_identity = context_with(
+            TEST_SCHEMA,
+            "xenia-fingerprint:different",
+            150,
+            9,
+            true,
+            false,
+        );
+        assert_eq!(
+            evaluate_machine_session(&session(), &wrong_identity, policy()),
             MachineSessionTrust::ContextIdentityMismatch
         );
     }
 
     #[test]
     fn trusted_time_loss_fails_closed() {
-        let current = context_with(TEST_IDENTITY, 150, 9, false, false);
+        let current = context_with(TEST_SCHEMA, TEST_IDENTITY, 150, 9, false, false);
         assert_eq!(
             evaluate_machine_session(&session(), &current, policy()),
             MachineSessionTrust::UntrustedTime
@@ -437,7 +496,7 @@ mod tests {
             MachineSessionTrust::Trusted
         );
 
-        let revoked = context_with(TEST_IDENTITY, 150, 9, true, true);
+        let revoked = context_with(TEST_SCHEMA, TEST_IDENTITY, 150, 9, true, true);
         assert_eq!(
             evaluate_machine_session(&issued, &revoked, policy()),
             MachineSessionTrust::Revoked
@@ -446,7 +505,7 @@ mod tests {
 
     #[test]
     fn stale_epoch_and_expiry_are_rejected() {
-        let stale = context_with(TEST_IDENTITY, 150, 10, true, false);
+        let stale = context_with(TEST_SCHEMA, TEST_IDENTITY, 150, 10, true, false);
         assert_eq!(
             evaluate_machine_session(&session(), &stale, policy()),
             MachineSessionTrust::EpochMismatch
