@@ -95,7 +95,7 @@ impl ExoskeletonState {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ExoskeletonCommand {
     pub joint_torques: [f32; NUM_ACTUATORS],
     pub stiffness_gain: f32,
