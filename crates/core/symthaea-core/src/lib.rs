@@ -74,6 +74,10 @@ pub mod embodiment;
 pub mod embodiment_evidence;
 /// Additive evidence-provider seam for legacy and Embodiment-v2 migration.
 pub mod embodiment_evidence_provider;
+/// Provider/binding and bound-instance lifecycle primitives for Embodiment v2.
+pub mod embodiment_provider;
+/// Timed lifecycle receipts for bound embodiment providers.
+pub mod embodiment_provider_timing;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
@@ -89,7 +93,6 @@ pub mod observability;
 #[allow(missing_docs)]
 pub mod observation;
 /// Integrated Information (Phi) calculation engine.
-#[allow(missing_docs)]
 pub mod phi_engine;
 /// Physics-grounded modeling: periodic table, emergence, kinetics, and thermodynamics.
 #[allow(missing_docs)]
