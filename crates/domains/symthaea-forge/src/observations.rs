@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Canonical observation payloads emitted by Forge search.
 //!
-//! These objects make `observation_id` reconstructable without turning a Forge-local observation
-//! into correctness, performance, replication, promotion, or runtime authority.
+//! Attempt-scoped payloads include the exact [`ForgeAttemptId`](crate::trace::ForgeAttemptId), so
+//! repeated generation of identical candidate bytes cannot cause one outcome to be attributed to a
+//! different occurrence. These remain Forge-local observations, not promotion authority.
 
 use crate::certificate::{CertificateError, ForgeCandidate, MutationRecord};
 use crate::fitness::{BenchmarkResult, GateResult};
+use crate::trace::ForgeAttemptId;
 use serde::Serialize;
 use symthaea_algorithms::observation::{ObservationEncoding, ObservationError, ObservationObject};
 use thiserror::Error;
@@ -36,6 +38,7 @@ fn json_object(
 
 #[derive(Serialize)]
 struct CandidateGeneratedPayload<'a> {
+    attempt_id: &'a str,
     generation: usize,
     transformation_id: &'a str,
     operator: &'a str,
@@ -45,11 +48,13 @@ struct CandidateGeneratedPayload<'a> {
 }
 
 pub fn candidate_generated(
+    attempt_id: &ForgeAttemptId,
     mutation: &MutationRecord,
 ) -> Result<ObservationObject, ForgeObservationError> {
     json_object(
-        "symthaea.forge.candidate-generated.v1",
+        "symthaea.forge.candidate-generated.v2",
         &CandidateGeneratedPayload {
+            attempt_id: attempt_id.as_content_id().as_str(),
             generation: mutation.generation,
             transformation_id: mutation.transformation_id.as_content_id().as_str(),
             operator: &mutation.operator,
@@ -62,17 +67,20 @@ pub fn candidate_generated(
 
 #[derive(Serialize)]
 struct NoCandidatePayload<'a> {
+    attempt_id: &'a str,
     reason: &'a str,
     parent_artifact_id: &'a str,
 }
 
 pub fn no_candidate(
+    attempt_id: &ForgeAttemptId,
     reason: &str,
     parent_artifact_id: &symthaea_algorithms::ContentId,
 ) -> Result<ObservationObject, ForgeObservationError> {
     json_object(
-        "symthaea.forge.no-candidate.v1",
+        "symthaea.forge.no-candidate.v2",
         &NoCandidatePayload {
+            attempt_id: attempt_id.as_content_id().as_str(),
             reason,
             parent_artifact_id: parent_artifact_id.as_str(),
         },
@@ -89,11 +97,13 @@ struct GatePayload<'a> {
 
 #[derive(Serialize)]
 struct GateObservationPayload<'a> {
+    attempt_id: &'a str,
     transformation_id: &'a str,
     gates: Vec<GatePayload<'a>>,
 }
 
 pub fn gates(
+    attempt_id: &ForgeAttemptId,
     mutation: &MutationRecord,
     gate_results: &[GateResult],
 ) -> Result<ObservationObject, ForgeObservationError> {
@@ -107,8 +117,9 @@ pub fn gates(
         })
         .collect();
     json_object(
-        "symthaea.forge.correctness-gates.v1",
+        "symthaea.forge.correctness-gates.v2",
         &GateObservationPayload {
+            attempt_id: attempt_id.as_content_id().as_str(),
             transformation_id: mutation.transformation_id.as_content_id().as_str(),
             gates,
         },
@@ -117,17 +128,20 @@ pub fn gates(
 
 #[derive(Serialize)]
 struct BenchmarkFailurePayload<'a> {
+    attempt_id: &'a str,
     transformation_id: &'a str,
     error: &'a str,
 }
 
 pub fn benchmark_failure(
+    attempt_id: &ForgeAttemptId,
     mutation: &MutationRecord,
     error: &str,
 ) -> Result<ObservationObject, ForgeObservationError> {
     json_object(
-        "symthaea.forge.benchmark-failure.v1",
+        "symthaea.forge.benchmark-failure.v2",
         &BenchmarkFailurePayload {
+            attempt_id: attempt_id.as_content_id().as_str(),
             transformation_id: mutation.transformation_id.as_content_id().as_str(),
             error,
         },
@@ -136,6 +150,7 @@ pub fn benchmark_failure(
 
 #[derive(Serialize)]
 struct SelectionPayload<'a> {
+    attempt_id: &'a str,
     transformation_id: &'a str,
     decision: &'a str,
     metric_name: Option<&'a str>,
@@ -144,14 +159,16 @@ struct SelectionPayload<'a> {
 }
 
 pub fn selection(
+    attempt_id: &ForgeAttemptId,
     mutation: &MutationRecord,
     benchmark: Option<&BenchmarkResult>,
     parent_score: Option<f64>,
     decision: &str,
 ) -> Result<ObservationObject, ForgeObservationError> {
     json_object(
-        "symthaea.forge.selection.v1",
+        "symthaea.forge.selection.v2",
         &SelectionPayload {
+            attempt_id: attempt_id.as_content_id().as_str(),
             transformation_id: mutation.transformation_id.as_content_id().as_str(),
             decision,
             metric_name: benchmark.map(|result| result.metric_name.as_str()),
@@ -163,6 +180,7 @@ pub fn selection(
 
 #[derive(Serialize)]
 struct CandidateDecisionPayload<'a> {
+    attempt_id: &'a str,
     candidate_artifact_id: &'a str,
     transformation_id: &'a str,
     decision: &'a str,
@@ -171,6 +189,7 @@ struct CandidateDecisionPayload<'a> {
 }
 
 pub fn candidate_decision(
+    attempt_id: &ForgeAttemptId,
     candidate: &ForgeCandidate,
     decision: &str,
 ) -> Result<ObservationObject, ForgeObservationError> {
@@ -181,8 +200,9 @@ pub fn candidate_decision(
         .last()
         .expect("validated Forge candidate contains a mutation");
     json_object(
-        "symthaea.forge.candidate-decision.v1",
+        "symthaea.forge.candidate-decision.v2",
         &CandidateDecisionPayload {
+            attempt_id: attempt_id.as_content_id().as_str(),
             candidate_artifact_id: candidate.artifact_id().as_str(),
             transformation_id: final_mutation.transformation_id.as_content_id().as_str(),
             decision,
@@ -254,7 +274,6 @@ struct SearchAbortPayload<'a> {
     best_artifact_id: Option<&'a str>,
 }
 
-/// Record an apparatus/search failure without classifying any interrupted candidate as rejected.
 #[allow(clippy::too_many_arguments)]
 pub fn search_abort(
     phase: &str,
@@ -292,18 +311,22 @@ mod tests {
     use super::*;
     use crate::certificate::full_source_artifact_id;
 
-    #[test]
-    fn candidate_generated_object_changes_with_transformation() {
-        let parent = full_source_artifact_id("fn f() {}\n");
-        let child_a = full_source_artifact_id("fn f() { let _a = 1; }\n");
-        let child_b = full_source_artifact_id("fn f() { let _b = 2; }\n");
-        let a = MutationRecord::new(0, "literal", "a", parent.clone(), child_a);
-        let b = MutationRecord::new(0, "literal", "b", parent, child_b);
-        assert_ne!(candidate_generated(&a).unwrap().id(), candidate_generated(&b).unwrap().id());
+    fn attempt(ordinal: u64) -> ForgeAttemptId {
+        ForgeAttemptId::derive(&full_source_artifact_id("baseline"), 7, ordinal, 0)
     }
 
     #[test]
-    fn gate_object_preserves_output_and_duration() {
+    fn repeated_identical_candidate_observations_differ_by_attempt() {
+        let parent = full_source_artifact_id("fn f() {}\n");
+        let child = full_source_artifact_id("fn f() { let _a = 1; }\n");
+        let mutation = MutationRecord::new(0, "literal", "a", parent, child);
+        let a = candidate_generated(&attempt(0), &mutation).unwrap();
+        let b = candidate_generated(&attempt(1), &mutation).unwrap();
+        assert_ne!(a.id(), b.id());
+    }
+
+    #[test]
+    fn gate_object_preserves_attempt_output_and_duration() {
         let parent = full_source_artifact_id("fn f() {}\n");
         let child = full_source_artifact_id("fn f() { let _a = 1; }\n");
         let mutation = MutationRecord::new(0, "literal", "a", parent, child);
@@ -313,9 +336,10 @@ mod tests {
             output_tail: "error A".into(),
             duration: std::time::Duration::from_nanos(10),
         };
-        let a = gates(&mutation, &[gate.clone()]).unwrap();
+        let id = attempt(0);
+        let a = gates(&id, &mutation, &[gate.clone()]).unwrap();
         gate.output_tail = "error B".into();
-        let b = gates(&mutation, &[gate]).unwrap();
+        let b = gates(&id, &mutation, &[gate]).unwrap();
         assert_ne!(a.id(), b.id());
     }
 
