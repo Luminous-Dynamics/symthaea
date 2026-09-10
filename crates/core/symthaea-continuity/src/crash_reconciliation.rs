@@ -234,6 +234,7 @@ impl QualifiedCrashReconciliationV1 {
         if intent_anchor.journal_digest() != journal.digest()
             || intent_anchor.journal_entry_count() != journal.len() as u64
             || intent_anchor.subject_id() != execution_intent.subject_id()
+            || intent_anchor.trusted_epoch_id() != execution_intent.trusted_epoch_id()
         {
             return Err(CrashReconciliationError::AnchorDoesNotCoverPendingJournal);
         }
@@ -429,7 +430,7 @@ pub enum CrashReconciliationError {
     JournalEligibilityMismatch { attempt_id: ExecutionAttemptId },
     #[error("attempt {attempt_id:?} is not an intent-only pending reconciliation world")]
     AttemptNotPendingReconciliation { attempt_id: ExecutionAttemptId },
-    #[error("qualified anchor does not cover the exact pending journal/subject world")]
+    #[error("qualified anchor does not cover the exact pending journal/subject/trusted-epoch world")]
     AnchorDoesNotCoverPendingJournal,
     #[error("qualified post-execution observation does not bind the exact durable A -> B attempt")]
     ObservationIntentMismatch,
