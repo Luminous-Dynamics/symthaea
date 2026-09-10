@@ -1,0 +1,47 @@
+name: Autopilot Bridge Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-autopilot-bridge/**'
+      - 'crates/core/symthaea-core/src/embodiment_clock_alignment.rs'
+      - '.github/workflows/autopilot-bridge.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  px4-timesync-evidence:
+    name: PX4 Timesync Evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/autopilot-bridge
+          key: ${{ runner.os }}-cargo-autopilot-bridge-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-autopilot-bridge-
+
+      - name: Unit qualification
+        env:
+          CARGO_TARGET_DIR: target/autopilot-bridge
+        run: cargo test -p symthaea-autopilot-bridge -- --test-threads=1
+
+      - name: Clippy
+        env:
+          CARGO_TARGET_DIR: target/autopilot-bridge
+        run: cargo clippy -p symthaea-autopilot-bridge --all-targets -- -D warnings
