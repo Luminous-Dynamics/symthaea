@@ -1,0 +1,105 @@
+# One-shot lock reconciliation for the already-formatted typed-subject qualification branch.
+# This may commit Cargo.lock only, then deletes itself. It does not modify subject code.
+
+name: Continuity Subject Lockfile Once
+
+on:
+  push:
+    branches:
+      - ci/continuity-subject-snapshot-exact-head-v1
+    paths:
+      - .github/workflows/continuity-subject-lockfile-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    name: Reconcile subject qualification lockfile once
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ci/continuity-subject-snapshot-exact-head-v1
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Reconcile only Cargo.lock and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-continuity --all-targets
+
+          mapfile -t changed < <(git diff --name-only)
+          if [[ "${#changed[@]}" -ne 1 || "${changed[0]}" != "Cargo.lock" ]]; then
+            echo "error: subject lock reconciliation changed unexpected tracked paths" >&2
+            printf '%s\n' "${changed[@]}" >&2
+            exit 1
+          fi
+
+          # Preserve every pre-existing package record exactly; require the only
+          # added package record to be symthaea-continuity.
+          python3 - <<'PY'
+          import collections, json, tomllib
+          from pathlib import Path
+
+          def load(path):
+              return tomllib.loads(Path(path).read_text())
+
+          before = load('/tmp/Cargo.lock.before')
+          after = load('Cargo.lock')
+          if before.get('version') != after.get('version'):
+              raise SystemExit('Cargo.lock version changed')
+
+          def bag(doc):
+              return collections.Counter(
+                  json.dumps(pkg, sort_keys=True, separators=(',', ':'))
+                  for pkg in doc.get('package', [])
+              )
+
+          old = bag(before)
+          new = bag(after)
+          removed = old - new
+          added = new - old
+          if removed:
+              raise SystemExit(f'pre-existing lock package records changed/removed: {list(removed.elements())[:3]}')
+          added_records = [json.loads(item) for item in added.elements()]
+          if len(added_records) != 1 or added_records[0].get('name') != 'symthaea-continuity':
+              raise SystemExit(f'expected exactly one added symthaea-continuity package, got {added_records}')
+          print('lock reconciliation: exactly one symthaea-continuity package added')
+          PY
+
+          cargo check --locked -p symthaea-continuity --all-targets
+
+          git add Cargo.lock
+          rm .github/workflows/continuity-subject-lockfile-once.yml
+          git add .github/workflows/continuity-subject-lockfile-once.yml
+
+          mapfile -t staged < <(git diff --cached --name-only)
+          if [[ "${#staged[@]}" -ne 2 ]]; then
+            echo "error: unexpected staged path count" >&2
+            printf '%s\n' "${staged[@]}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${staged[@]}" | grep -Fxq Cargo.lock
+          printf '%s\n' "${staged[@]}" | grep -Fxq .github/workflows/continuity-subject-lockfile-once.yml
+          git diff --cached --check
+
+          git commit -m "chore(continuity): reconcile subject qualification lockfile"
+          git push origin HEAD:ci/continuity-subject-snapshot-exact-head-v1
