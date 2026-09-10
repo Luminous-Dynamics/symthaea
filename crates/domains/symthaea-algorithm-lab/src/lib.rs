@@ -31,8 +31,12 @@ pub enum HdcLabError {
     Evaluation(#[from] EvaluationError),
     #[error("candidate failed exact correctness and cannot produce performance evidence")]
     CorrectnessFailed,
-    #[error("implementation does not belong to the HDC Hamming problem")]
+    #[error("HDC correctness evidence is noncanonical or has been modified")]
+    InvalidCorrectnessEvidence,
+    #[error("implementation does not belong to the exact HDC Hamming problem/algorithm")]
     ImplementationProblemMismatch,
+    #[error("correctness evidence describes a different candidate implementation")]
+    CandidateImplementationMismatch,
 }
 
 /// Small, auditable initial search space. Later generators can emit additional implementations
@@ -61,6 +65,10 @@ impl HammingCandidate {
             Self::NativeSimd => "native-simd",
         }
     }
+
+    fn source_ref(self) -> String {
+        format!("symthaea-algorithm-lab::{}", self.name())
+    }
 }
 
 pub fn hamming_problem() -> Result<ProblemSpec, RegistryError> {
@@ -80,6 +88,7 @@ pub fn hamming_problem() -> Result<ProblemSpec, RegistryError> {
 }
 
 pub fn hamming_algorithm(problem: &ProblemSpec) -> Result<AlgorithmRecord, RegistryError> {
+    problem.validate()?;
     AlgorithmRecord::new(
         problem.id.clone(),
         "xor-popcount",
@@ -154,17 +163,45 @@ pub struct HammingMismatch {
     pub observed: u32,
 }
 
+/// Opaque correctness result minted only by [`verify_candidate`].
+///
+/// Fields are intentionally private: performance receipt construction must validate the exact
+/// correctness record rather than trust a caller-written `passed = true` bit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HammingCorrectnessEvidence {
-    pub id: ContentId,
-    pub candidate: HammingCandidate,
-    pub seeds: Vec<u64>,
-    pub cases_checked: u64,
-    pub passed: bool,
-    pub first_mismatch: Option<HammingMismatch>,
+    id: ContentId,
+    candidate: HammingCandidate,
+    seeds: Vec<u64>,
+    cases_checked: u64,
+    passed: bool,
+    first_mismatch: Option<HammingMismatch>,
 }
 
 impl HammingCorrectnessEvidence {
+    pub fn id(&self) -> &ContentId {
+        &self.id
+    }
+
+    pub fn candidate(&self) -> HammingCandidate {
+        self.candidate
+    }
+
+    pub fn seeds(&self) -> &[u64] {
+        &self.seeds
+    }
+
+    pub fn cases_checked(&self) -> u64 {
+        self.cases_checked
+    }
+
+    pub fn passed(&self) -> bool {
+        self.passed
+    }
+
+    pub fn first_mismatch(&self) -> Option<&HammingMismatch> {
+        self.first_mismatch.as_ref()
+    }
+
     pub fn verdict(&self) -> CorrectnessVerdict {
         if self.passed {
             CorrectnessVerdict::Passed
@@ -172,6 +209,56 @@ impl HammingCorrectnessEvidence {
             CorrectnessVerdict::Failed
         }
     }
+
+    pub fn validate(&self) -> Result<(), HdcLabError> {
+        let mut canonical_seeds = self.seeds.clone();
+        canonical_seeds.sort_unstable();
+        canonical_seeds.dedup();
+        if canonical_seeds != self.seeds
+            || self.cases_checked != 4 + 2 * self.seeds.len() as u64
+            || self.passed != self.first_mismatch.is_none()
+        {
+            return Err(HdcLabError::InvalidCorrectnessEvidence);
+        }
+
+        let expected = derive_correctness_id(
+            self.candidate,
+            &self.seeds,
+            self.cases_checked,
+            self.passed,
+            self.first_mismatch.as_ref(),
+        );
+        if expected != self.id {
+            return Err(HdcLabError::InvalidCorrectnessEvidence);
+        }
+        Ok(())
+    }
+}
+
+fn derive_correctness_id(
+    candidate: HammingCandidate,
+    seeds: &[u64],
+    cases_checked: u64,
+    passed: bool,
+    first_mismatch: Option<&HammingMismatch>,
+) -> ContentId {
+    let cases = cases_checked.to_be_bytes();
+    let verdict: &[u8] = if passed { b"pass" } else { b"fail" };
+    let mut owned = vec![
+        candidate.name().as_bytes().to_vec(),
+        cases.to_vec(),
+        verdict.to_vec(),
+    ];
+    owned.extend(seeds.iter().map(|seed| seed.to_be_bytes().to_vec()));
+    if let Some(mismatch) = first_mismatch {
+        owned.push(mismatch.case_label.as_bytes().to_vec());
+        owned.push(mismatch.expected.to_be_bytes().to_vec());
+        owned.push(mismatch.observed.to_be_bytes().to_vec());
+    }
+    ContentId::derive(
+        "symthaea.hdc-hamming-correctness.v1",
+        owned.iter().map(Vec::as_slice),
+    )
 }
 
 pub fn verify_candidate(
@@ -194,15 +281,13 @@ pub fn verify_candidate(
 
     for (label, left, right) in edge_cases {
         cases_checked += 1;
-        let expected = oracle_distance(&left, &right);
-        let observed = candidate_distance(candidate, &left, &right);
-        if expected != observed && first_mismatch.is_none() {
-            first_mismatch = Some(HammingMismatch {
-                case_label: label.into(),
-                expected,
-                observed,
-            });
-        }
+        check_pair(
+            candidate,
+            label,
+            &left,
+            &right,
+            &mut first_mismatch,
+        );
     }
 
     for &seed in &canonical_seeds {
@@ -226,23 +311,12 @@ pub fn verify_candidate(
     }
 
     let passed = first_mismatch.is_none();
-    let candidate_name = candidate.name();
-    let cases = cases_checked.to_be_bytes();
-    let verdict = if passed { b"pass".as_slice() } else { b"fail".as_slice() };
-    let mut owned = vec![
-        candidate_name.as_bytes().to_vec(),
-        cases.as_slice().to_vec(),
-        verdict.to_vec(),
-    ];
-    owned.extend(canonical_seeds.iter().map(|seed| seed.to_be_bytes().to_vec()));
-    if let Some(mismatch) = &first_mismatch {
-        owned.push(mismatch.case_label.as_bytes().to_vec());
-        owned.push(mismatch.expected.to_be_bytes().to_vec());
-        owned.push(mismatch.observed.to_be_bytes().to_vec());
-    }
-    let id = ContentId::derive(
-        "symthaea.hdc-hamming-correctness.v1",
-        owned.iter().map(Vec::as_slice),
+    let id = derive_correctness_id(
+        candidate,
+        &canonical_seeds,
+        cases_checked,
+        passed,
+        first_mismatch.as_ref(),
     );
 
     HammingCorrectnessEvidence {
@@ -285,7 +359,7 @@ pub fn implementation_record(
     Ok(ImplementationRecord::new(
         problem.id,
         algorithm.id,
-        format!("symthaea-algorithm-lab::{}", candidate.name()),
+        candidate.source_ref(),
         source_artifact_id,
         None,
     )?)
@@ -299,9 +373,16 @@ pub fn pilot_run(
     Ok(DiscoveryRun::new(
         &problem,
         DiscoveryPolicy::default(),
-        ContentId::derive("symthaea.generator.v1", [b"hdc-hamming-enumeration".as_slice()]),
+        ContentId::derive(
+            "symthaea.generator.v1",
+            [b"hdc-hamming-enumeration".as_slice()],
+        ),
         baseline_revision,
-        SearchBudget::new(HammingCandidate::ALL.len() as u64, 1, HammingCandidate::ALL.len() as u64)?,
+        SearchBudget::new(
+            HammingCandidate::ALL.len() as u64,
+            1,
+            HammingCandidate::ALL.len() as u64,
+        )?,
         seed,
     )?)
 }
@@ -318,7 +399,12 @@ pub fn proposal_for(
         source_artifact_id,
         format!("source://symthaea-algorithm-lab/{}", candidate.name()),
     )?;
-    Ok(CandidateProposal::new(run, implementation, lineage, artifact)?)
+    Ok(CandidateProposal::new(
+        run,
+        implementation,
+        lineage,
+        artifact,
+    )?)
 }
 
 /// Turn an externally measured latency into a canonical evaluation receipt only after the exact
@@ -333,19 +419,30 @@ pub fn latency_receipt(
     target_profile: impl Into<String>,
     latency_ns_per_op: f64,
 ) -> Result<EvaluationReceipt, HdcLabError> {
+    correctness.validate()?;
+
     let problem = hamming_problem()?;
-    if implementation.problem_id != problem.id {
-        return Err(HdcLabError::ImplementationProblemMismatch);
+    let algorithm = hamming_algorithm(&problem)?;
+    implementation
+        .validate_for(&algorithm)
+        .map_err(|_| HdcLabError::ImplementationProblemMismatch)?;
+    if implementation.source_ref != correctness.candidate.source_ref() {
+        return Err(HdcLabError::CandidateImplementationMismatch);
     }
-    implementation.validate()?;
     if !correctness.passed {
         return Err(HdcLabError::CorrectnessFailed);
     }
 
     let target_profile = target_profile.into();
     let context = EvaluationContext::new(
-        ContentId::derive("symthaea.evaluator.v1", [b"criterion-hdc-hamming".as_slice()]),
-        ContentId::derive("symthaea.oracle.v1", [b"bitwise-hamming-oracle".as_slice()]),
+        ContentId::derive(
+            "symthaea.evaluator.v1",
+            [b"criterion-hdc-hamming".as_slice()],
+        ),
+        ContentId::derive(
+            "symthaea.oracle.v1",
+            [b"bitwise-hamming-oracle".as_slice()],
+        ),
         correctness.id.clone(),
         ContentId::derive("symthaea.environment.v1", [target_profile.as_bytes()]),
         source_revision,
@@ -380,19 +477,24 @@ mod tests {
         for candidate in HammingCandidate::ALL {
             let evidence = verify_candidate(candidate, &seeds);
             assert!(
-                evidence.passed,
+                evidence.passed(),
                 "{} failed: {:?}",
                 candidate.name(),
-                evidence.first_mismatch
+                evidence.first_mismatch()
             );
-            assert_eq!(evidence.cases_checked, 4 + seeds.len() as u64 * 2);
+            assert_eq!(evidence.cases_checked(), 4 + seeds.len() as u64 * 2);
+            assert!(evidence.validate().is_ok());
         }
     }
 
     #[test]
     fn production_native_simd_matches_extreme_case() {
         assert_eq!(
-            candidate_distance(HammingCandidate::NativeSimd, &BinaryHV::zero(), &BinaryHV::ones()),
+            candidate_distance(
+                HammingCandidate::NativeSimd,
+                &BinaryHV::zero(),
+                &BinaryHV::ones()
+            ),
             BinaryHV::DIM as u32
         );
     }
@@ -416,11 +518,20 @@ mod tests {
     }
 
     #[test]
-    fn latency_receipt_requires_passed_correctness() {
-        let artifact = ContentId::derive("source-blob", [b"candidate-source".as_slice()]);
-        let implementation = implementation_record(HammingCandidate::BytePopcount, artifact).unwrap();
+    fn correctness_evidence_detects_field_tampering() {
         let mut evidence = verify_candidate(HammingCandidate::BytePopcount, &[1, 2, 3]);
-        evidence.passed = false;
+        evidence.cases_checked += 1;
+        assert_eq!(
+            evidence.validate().unwrap_err(),
+            HdcLabError::InvalidCorrectnessEvidence
+        );
+    }
+
+    #[test]
+    fn latency_receipt_rejects_candidate_substitution() {
+        let artifact = ContentId::derive("source-blob", [b"candidate-source".as_slice()]);
+        let implementation = implementation_record(HammingCandidate::U64Popcount, artifact).unwrap();
+        let evidence = verify_candidate(HammingCandidate::BytePopcount, &[1, 2, 3]);
         assert_eq!(
             latency_receipt(
                 &implementation,
@@ -431,7 +542,7 @@ mod tests {
                 10.0,
             )
             .unwrap_err(),
-            HdcLabError::CorrectnessFailed
+            HdcLabError::CandidateImplementationMismatch
         );
     }
 }
