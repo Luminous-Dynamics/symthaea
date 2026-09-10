@@ -31,6 +31,15 @@ DOMAIN = b"symthaea.github-trusted-main-ruleset-history.v1\0"
 MAX_JSON_BYTES = 4_000_000
 CANONICAL_PER_PAGE = 100
 SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+CANONICAL_DERIVED_LABELS = {
+    "disposition": "RulesetHistoryStableCompleteReadback",
+    "completeness_basis": "two-full-passes-each-ending-in-explicit-empty-page",
+    "provider_order_authority": "github-provider-valid-utc-instants-only",
+    "capture_authentication": "none",
+    "chronology_authority": "not-externally-anchored",
+    "current_admission": "not-evaluated",
+    "scientific_authority": "none",
+}
 
 
 class RulesetHistoryError(ValueError):
@@ -76,6 +85,12 @@ def _string(value: Any, *, where: str) -> str:
         raise RulesetHistoryError(f"{where}: canonical non-empty string required")
     if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value):
         raise RulesetHistoryError(f"{where}: control characters are forbidden")
+    return value
+
+
+def _sha256(value: Any, *, where: str) -> str:
+    if not isinstance(value, str) or SHA256_RE.fullmatch(value) is None:
+        raise RulesetHistoryError(f"{where}: sha256 identity required")
     return value
 
 
@@ -181,20 +196,14 @@ def verify_history_capture(capture: Any, policy: Any, *, expected_ruleset_id: in
         "per_page": CANONICAL_PER_PAGE,
         "version_count": len(first),
         "versions": first,
-        "disposition": "RulesetHistoryStableCompleteReadback",
-        "completeness_basis": "two-full-passes-each-ending-in-explicit-empty-page",
-        "provider_order_authority": "github-provider-valid-utc-instants-only",
-        "capture_authentication": "none",
-        "chronology_authority": "not-externally-anchored",
-        "current_admission": "not-evaluated",
-        "scientific_authority": "none",
+        **CANONICAL_DERIVED_LABELS,
     }
     result["history_id"] = _content_id(result)
     return result
 
 
 def validate_verified_history(value: Any) -> dict[str, Any]:
-    """Revalidate a derived history object and its content identity."""
+    """Revalidate one derived history object, including its authority ceiling."""
     if not isinstance(value, dict):
         raise RulesetHistoryError("verified history: object required")
     expected_fields = {
@@ -205,13 +214,26 @@ def validate_verified_history(value: Any) -> dict[str, Any]:
     }
     if set(value) != expected_fields:
         raise RulesetHistoryError("verified history: closed derived schema required")
-    if value["schema"] != SCHEMA or value["disposition"] != "RulesetHistoryStableCompleteReadback":
-        raise RulesetHistoryError("verified history: unsupported theorem/disposition")
+    if value["schema"] != SCHEMA:
+        raise RulesetHistoryError("verified history.schema: unsupported theorem schema")
+    for field, expected in CANONICAL_DERIVED_LABELS.items():
+        if value[field] != expected:
+            raise RulesetHistoryError(
+                f"verified history.{field}: canonical authority/completeness label required"
+            )
+
+    _sha256(value["policy_id"], where="verified history.policy_id")
+    _string(value["repository"], where="verified history.repository")
+    _positive_int(value["repository_id"], where="verified history.repository_id")
+    _string(value["target_ref"], where="verified history.target_ref")
+    _positive_int(value["ruleset_id"], where="verified history.ruleset_id")
     if value["per_page"] != CANONICAL_PER_PAGE:
         raise RulesetHistoryError("verified history: non-canonical pagination")
+    version_count = _positive_int(value["version_count"], where="verified history.version_count")
     versions = value["versions"]
-    if not isinstance(versions, list) or not versions or value["version_count"] != len(versions):
+    if not isinstance(versions, list) or not versions or version_count != len(versions):
         raise RulesetHistoryError("verified history: version_count/versions mismatch")
+
     prior_nanos: int | None = None
     seen_ids: set[int] = set()
     for index, item in enumerate(versions):
@@ -230,6 +252,10 @@ def validate_verified_history(value: Any) -> dict[str, Any]:
             )
         except provider_time.ProviderTimeError as exc:
             raise RulesetHistoryError(str(exc)) from exc
+        if isinstance(item["provider_unix_nanos"], bool) or not isinstance(item["provider_unix_nanos"], int):
+            raise RulesetHistoryError(
+                f"verified history.versions[{index}].provider_unix_nanos: integer required"
+            )
         if item["provider_unix_nanos"] != parsed.unix_nanos:
             raise RulesetHistoryError("verified history: provider time coordinate mismatch")
         if prior_nanos is not None and parsed.unix_nanos <= prior_nanos:
@@ -237,9 +263,8 @@ def validate_verified_history(value: Any) -> dict[str, Any]:
         prior_nanos = parsed.unix_nanos
         _positive_int(item["provider_actor_id"], where=f"verified history.versions[{index}].provider_actor_id")
         _string(item["provider_actor_type"], where=f"verified history.versions[{index}].provider_actor_type")
-    observed_id = value["history_id"]
-    if not isinstance(observed_id, str) or SHA256_RE.fullmatch(observed_id) is None:
-        raise RulesetHistoryError("verified history.history_id: sha256 identity required")
+
+    observed_id = _sha256(value["history_id"], where="verified history.history_id")
     payload = dict(value)
     del payload["history_id"]
     if _content_id(payload) != observed_id:
