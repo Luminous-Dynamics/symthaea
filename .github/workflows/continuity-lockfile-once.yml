@@ -1,0 +1,68 @@
+name: Continuity Lockfile Once
+
+on:
+  push:
+    branches:
+      - ci/continuity-contract-exact-head-v1
+    paths:
+      - .github/workflows/continuity-lockfile-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    name: Reconcile continuity lockfile once
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ci/continuity-contract-exact-head-v1
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Reconcile only Cargo.lock and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          cargo check -p symthaea-continuity --all-targets
+
+          mapfile -t changed < <(git diff --name-only)
+          if [[ "${#changed[@]}" -ne 1 || "${changed[0]}" != "Cargo.lock" ]]; then
+            echo "error: lockfile reconciliation changed unexpected tracked paths" >&2
+            printf '%s\n' "${changed[@]}" >&2
+            exit 1
+          fi
+
+          echo "--- exact Cargo.lock reconciliation ---"
+          git diff -- Cargo.lock
+
+          git add Cargo.lock
+          rm .github/workflows/continuity-lockfile-once.yml
+          git add .github/workflows/continuity-lockfile-once.yml
+
+          mapfile -t staged < <(git diff --cached --name-only)
+          if [[ "${#staged[@]}" -ne 2 ]]; then
+            echo "error: unexpected staged path count" >&2
+            printf '%s\n' "${staged[@]}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${staged[@]}" | grep -Fxq Cargo.lock
+          printf '%s\n' "${staged[@]}" | grep -Fxq .github/workflows/continuity-lockfile-once.yml
+
+          git commit -m "chore(continuity): reconcile exact-head lockfile"
+          git push origin HEAD:ci/continuity-contract-exact-head-v1
