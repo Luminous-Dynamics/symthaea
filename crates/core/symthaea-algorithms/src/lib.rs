@@ -9,6 +9,7 @@
 pub mod discovery;
 pub mod evaluation;
 pub mod pareto;
+pub mod replication;
 mod registry;
 
 pub use registry::*;

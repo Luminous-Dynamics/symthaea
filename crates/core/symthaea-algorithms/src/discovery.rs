@@ -34,6 +34,8 @@ pub enum DiscoveryError {
     EvaluationMismatch,
     #[error("candidate implementation is already archived")]
     DuplicateCandidate,
+    #[error("evaluation receipt is already archived for this candidate")]
+    DuplicateEvaluation,
     #[error("discovery run identity does not match its canonical fields")]
     IdentityMismatch,
     #[error("candidate source/artifact reference must not be empty")]
@@ -260,10 +262,28 @@ impl CandidateProposal {
     }
 }
 
+/// One candidate plus its append-only set of historical evaluation receipts.
+///
+/// The map key is the receipt content identity, so attaching a receipt never overwrites a prior
+/// measurement. The fields are private to prevent callers from bypassing archive invariants.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArchivedCandidate {
-    pub proposal: CandidateProposal,
-    pub evaluation: Option<EvaluationReceipt>,
+    proposal: CandidateProposal,
+    evaluations: BTreeMap<ContentId, EvaluationReceipt>,
+}
+
+impl ArchivedCandidate {
+    pub fn proposal(&self) -> &CandidateProposal {
+        &self.proposal
+    }
+
+    pub fn evaluations(&self) -> impl Iterator<Item = &EvaluationReceipt> {
+        self.evaluations.values()
+    }
+
+    pub fn evaluation_count(&self) -> usize {
+        self.evaluations.len()
+    }
 }
 
 /// Archive scoped to exactly one discovery run.
@@ -310,7 +330,7 @@ impl CandidateArchive {
             key,
             ArchivedCandidate {
                 proposal,
-                evaluation: None,
+                evaluations: BTreeMap::new(),
             },
         );
         Ok(())
@@ -330,7 +350,10 @@ impl CandidateArchive {
         {
             return Err(DiscoveryError::EvaluationMismatch);
         }
-        candidate.evaluation = Some(receipt);
+        if candidate.evaluations.contains_key(&receipt.id) {
+            return Err(DiscoveryError::DuplicateEvaluation);
+        }
+        candidate.evaluations.insert(receipt.id.clone(), receipt);
         Ok(())
     }
 
@@ -353,13 +376,16 @@ impl CandidateArchive {
     pub fn evaluated(&self) -> impl Iterator<Item = &EvaluationReceipt> {
         self.candidates
             .values()
-            .filter_map(|candidate| candidate.evaluation.as_ref())
+            .flat_map(ArchivedCandidate::evaluations)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::evaluation::{
+        CorrectnessVerdict, EvaluationContext, ObjectiveDirection, ObjectiveMeasurement,
+    };
     use crate::{
         AlgorithmId, AlgorithmLineage, ContentId, DeterminismRequirement, DiscoveryRisk,
         ImplementationRecord, SemanticGuarantee,
@@ -414,6 +440,37 @@ mod tests {
                 "archive://candidate-1.patch",
             )
             .unwrap(),
+        )
+        .unwrap()
+    }
+
+    fn evaluation(proposal: &CandidateProposal, run_id: &str, latency: f64) -> EvaluationReceipt {
+        EvaluationReceipt::new(
+            proposal.implementation.problem_id.clone(),
+            proposal.implementation.id.clone(),
+            EvaluationContext::new(
+                cid("evaluator", "criterion"),
+                cid("oracle", "reference"),
+                cid("inputs", "seeded"),
+                cid("environment", "test-machine"),
+                "abc123",
+                "rust-1.96.0",
+                "x86_64-test",
+                vec![1, 2, 3],
+            )
+            .unwrap(),
+            CorrectnessVerdict::Passed,
+            cid("correctness", "pass"),
+            vec![
+                ObjectiveMeasurement::new(
+                    "latency",
+                    ObjectiveDirection::Minimize,
+                    latency,
+                    "ns/op",
+                )
+                .unwrap(),
+            ],
+            Some(run_id.into()),
         )
         .unwrap()
     }
@@ -499,6 +556,41 @@ mod tests {
             archive.insert(proposal).unwrap_err(),
             DiscoveryError::DuplicateCandidate
         );
+    }
+
+    #[test]
+    fn archive_retains_multiple_evaluations_without_overwrite() {
+        let problem = problem(DiscoveryRisk::Ordinary);
+        let run = run(&problem);
+        let proposal = proposal(&run);
+        let implementation_id = proposal.implementation.id.clone();
+        let first = evaluation(&proposal, "measurement-a", 10.0);
+        let second = evaluation(&proposal, "measurement-b", 11.0);
+        let mut archive = CandidateArchive::for_run(&run).unwrap();
+        archive.insert(proposal).unwrap();
+        archive.attach_evaluation(&implementation_id, first).unwrap();
+        archive.attach_evaluation(&implementation_id, second).unwrap();
+        assert_eq!(archive.get(&implementation_id).unwrap().evaluation_count(), 2);
+        assert_eq!(archive.evaluated().count(), 2);
+    }
+
+    #[test]
+    fn duplicate_evaluation_receipt_is_rejected_not_replaced() {
+        let problem = problem(DiscoveryRisk::Ordinary);
+        let run = run(&problem);
+        let proposal = proposal(&run);
+        let implementation_id = proposal.implementation.id.clone();
+        let receipt = evaluation(&proposal, "measurement-a", 10.0);
+        let mut archive = CandidateArchive::for_run(&run).unwrap();
+        archive.insert(proposal).unwrap();
+        archive
+            .attach_evaluation(&implementation_id, receipt.clone())
+            .unwrap();
+        assert_eq!(
+            archive.attach_evaluation(&implementation_id, receipt).unwrap_err(),
+            DiscoveryError::DuplicateEvaluation
+        );
+        assert_eq!(archive.get(&implementation_id).unwrap().evaluation_count(), 1);
     }
 
     #[test]
