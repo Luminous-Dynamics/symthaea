@@ -18,8 +18,7 @@ use thiserror::Error;
 use crate::{ContinuitySubjectError, ContinuitySubjectId, ContinuitySubjectV1};
 
 /// Stable schema for one closed typed-subject snapshot.
-pub const CONTINUITY_SUBJECT_SNAPSHOT_SCHEMA_V1: &str =
-    "symthaea-continuity-subject-snapshot-v1";
+pub const CONTINUITY_SUBJECT_SNAPSHOT_SCHEMA_V1: &str = "symthaea-continuity-subject-snapshot-v1";
 
 const SUBJECT_SNAPSHOT_DOMAIN: &[u8] = b"symthaea.continuity.subject-snapshot.v1\0";
 const MAX_SUBJECTS: usize = 65_536;
@@ -193,6 +192,13 @@ pub enum ContinuitySubjectSnapshotError {
         child: ContinuitySubjectId,
         parent: ContinuitySubjectId,
     },
+    #[error(
+        "subject traversal from {origin:?} reached {missing:?}, which is absent from the snapshot index"
+    )]
+    TraversalInvariantMissingSubject {
+        origin: ContinuitySubjectId,
+        missing: ContinuitySubjectId,
+    },
     #[error("subject containment parent graph contains a cycle reachable from {0:?}")]
     ParentCycle(ContinuitySubjectId),
     #[error("subject containment parent chain exceeds {MAX_PARENT_DEPTH} nodes from {0:?}")]
@@ -209,10 +215,7 @@ fn validate_count(count: usize) -> Result<(), ContinuitySubjectSnapshotError> {
 }
 
 fn validate_unique(subjects: &[ContinuitySubjectV1]) -> Result<(), ContinuitySubjectSnapshotError> {
-    if subjects
-        .windows(2)
-        .any(|pair| pair[0].id() == pair[1].id())
-    {
+    if subjects.windows(2).any(|pair| pair[0].id() == pair[1].id()) {
         return Err(ContinuitySubjectSnapshotError::DuplicateSubject);
     }
     Ok(())
@@ -223,13 +226,13 @@ fn validate_parent_closure(
 ) -> Result<(), ContinuitySubjectSnapshotError> {
     let known: BTreeSet<_> = subjects.iter().map(ContinuitySubjectV1::id).collect();
     for subject in subjects {
-        if let Some(parent) = subject.parent_subject_id() {
-            if !known.contains(&parent) {
-                return Err(ContinuitySubjectSnapshotError::MissingParent {
-                    child: subject.id(),
-                    parent,
-                });
-            }
+        if let Some(parent) = subject.parent_subject_id()
+            && !known.contains(&parent)
+        {
+            return Err(ContinuitySubjectSnapshotError::MissingParent {
+                child: subject.id(),
+                parent,
+            });
         }
     }
     Ok(())
@@ -238,7 +241,10 @@ fn validate_parent_closure(
 fn validate_parent_structure(
     subjects: &[ContinuitySubjectV1],
 ) -> Result<(), ContinuitySubjectSnapshotError> {
-    let index: BTreeMap<_, _> = subjects.iter().map(|subject| (subject.id(), subject)).collect();
+    let index: BTreeMap<_, _> = subjects
+        .iter()
+        .map(|subject| (subject.id(), subject))
+        .collect();
 
     for subject in subjects {
         let origin = subject.id();
@@ -254,9 +260,12 @@ fn validate_parent_structure(
             if depth > MAX_PARENT_DEPTH {
                 return Err(ContinuitySubjectSnapshotError::ParentDepthExceeded(origin));
             }
-            let current_subject = index
-                .get(&subject_id)
-                .expect("parent closure validated before parent traversal");
+            let current_subject = index.get(&subject_id).ok_or(
+                ContinuitySubjectSnapshotError::TraversalInvariantMissingSubject {
+                    origin,
+                    missing: subject_id,
+                },
+            )?;
             current = current_subject.parent_subject_id();
         }
     }
@@ -327,6 +336,28 @@ mod tests {
     }
 
     #[test]
+    fn parent_structure_fails_closed_without_closure_precondition() {
+        let parent = root("fabric-a", ContinuityScopeV1::NetworkFabric);
+        let child = ContinuitySubjectV1::new(
+            "org.example",
+            "leaf-01",
+            ContinuityScopeV1::NetworkDevice,
+            Some(parent.id()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            validate_parent_structure(std::slice::from_ref(&child)),
+            Err(
+                ContinuitySubjectSnapshotError::TraversalInvariantMissingSubject {
+                    origin: child.id(),
+                    missing: parent.id(),
+                }
+            )
+        );
+    }
+
+    #[test]
     fn exact_duplicate_subject_is_rejected() {
         let subject = root("payments-api", ContinuityScopeV1::Service);
         assert_eq!(
@@ -379,11 +410,9 @@ mod tests {
 
     #[test]
     fn transported_snapshot_identity_mismatch_is_rejected() {
-        let mut snapshot = ContinuitySubjectSnapshotV1::new(vec![root(
-            "service-a",
-            ContinuityScopeV1::Service,
-        )])
-        .unwrap();
+        let mut snapshot =
+            ContinuitySubjectSnapshotV1::new(vec![root("service-a", ContinuityScopeV1::Service)])
+                .unwrap();
         snapshot.snapshot_id = ContinuitySubjectSnapshotId([7; 32]);
         assert_eq!(
             snapshot.validate(),
