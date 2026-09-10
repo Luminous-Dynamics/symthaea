@@ -15,12 +15,14 @@
 //!
 //! Candidate staging is temporary and restored by the library. Persistent proposal output is
 //! required to resolve outside the canonical workspace and existing evidence files are never
-//! overwritten.
+//! overwritten. A surviving candidate is written as exact full-file source bytes and immediately
+//! re-hashed against the certificate before the report is considered complete.
 
 use std::ffi::OsString;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
+use symthaea_forge::certificate::full_source_artifact_id;
 use symthaea_forge::{ForgeConfig, run_search};
 
 struct Args {
@@ -135,17 +137,33 @@ fn main() -> anyhow::Result<()> {
     }
 
     match outcome.best {
-        Some(cert) => {
+        Some(candidate) => {
+            candidate.validate()?;
+            let cert = candidate.certificate();
+            let candidate_path = out_dir.join("candidate.rs");
             let cert_path = out_dir.join("certificate.json");
-            write_new(&cert_path, cert.to_json_pretty()?.as_bytes())?;
             let report_path = out_dir.join("report.md");
-            write_new(&report_path, render_report(&cert).as_bytes())?;
+            ensure_absent(&[&candidate_path, &cert_path, &report_path])?;
+
+            write_new(&candidate_path, candidate.full_source().as_bytes())?;
+            let persisted_source = std::fs::read_to_string(&candidate_path)?;
+            let persisted_id = full_source_artifact_id(&persisted_source);
+            if &persisted_id != candidate.artifact_id() {
+                anyhow::bail!(
+                    "persisted candidate source does not match Forge artifact identity: expected {}, observed {}",
+                    candidate.artifact_id(),
+                    persisted_id
+                );
+            }
+
+            write_new(&cert_path, cert.to_json_pretty()?.as_bytes())?;
+            write_new(&report_path, render_report(cert).as_bytes())?;
             println!("\n{}", cert.summary());
             println!(
-                "\nHONEST FRAMING: this is a proposed search candidate, not an applied change or replicated performance result. Review {} and {} before any separate promotion decision for {}.",
+                "\nHONEST FRAMING: this is a proposed search candidate, not an applied change or replicated performance result. Exact source: {}. Certificate: {}. Report: {}. A later evidence collector can independently hash candidate.rs before any evaluation-grade receipt is minted.",
+                candidate_path.display(),
                 cert_path.display(),
                 report_path.display(),
-                args.target_fn,
             );
         }
         None => {
@@ -155,6 +173,16 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn ensure_absent(paths: &[&Path]) -> anyhow::Result<()> {
+    if let Some(existing) = paths.iter().find(|path| path.exists()) {
+        anyhow::bail!(
+            "refusing to overwrite existing Forge output evidence: {}",
+            existing.display()
+        );
+    }
     Ok(())
 }
 
@@ -256,39 +284,36 @@ fn render_report(cert: &symthaea_forge::ForgeCertificate) -> String {
             )
         })
         .collect();
-    let lineage_section: String = if cert.mutation_history.len() > 1 {
-        let entries: String = cert
-            .mutation_history
-            .iter()
-            .enumerate()
-            .map(|(index, mutation)| {
-                format!(
-                    "{}. gen {}: **{}** — {}\n",
-                    index + 1,
-                    mutation.generation,
-                    mutation.operator,
-                    mutation.detail
-                )
-            })
-            .collect();
-        format!(
-            "\n**⚠ This diff compounds {n} mutations**. Review each ordered transformation, not only the final label:\n\n{entries}\n",
-            n = cert.mutation_history.len(),
-        )
-    } else {
-        String::new()
-    };
+    let lineage_entries: String = cert
+        .mutation_history
+        .iter()
+        .enumerate()
+        .map(|(index, mutation)| {
+            format!(
+                "{}. gen {}: **{}** — {}\n   - parent: `{}`\n   - child: `{}`\n   - transformation: `{}`\n",
+                index + 1,
+                mutation.generation,
+                mutation.operator,
+                mutation.detail,
+                mutation.parent_artifact_id,
+                mutation.candidate_artifact_id,
+                mutation.transformation_id,
+            )
+        })
+        .collect();
     format!(
-        "# symthaea-forge candidate report\n\nGenerated: {generated} ms since epoch\nTarget: `{file}::{func}` (package `{package}`)\nGit SHA at search time: `{sha}`\nGeneration found: {generation}\nMutation: **{op}** — {detail}\n{lineage}\n## Gates\n{gates}\n## Benchmark/search heuristic\n{bench}\n## Before\n```rust\n{before}\n```\n\n## After\n```rust\n{after}\n```\n\n## Authority boundary\nThis report is a human-review proposal. It does not establish replicated performance, production eligibility, or permission to modify runtime code. Promotion must occur through a separate reviewed/evidence-bearing path.\n",
+        "# symthaea-forge candidate report\n\nGenerated: {generated} ms since epoch\nTarget: `{file}::{func}` (package `{package}`)\nGit SHA at search time: `{sha}`\nGeneration found: {generation}\nBaseline full-file artifact: `{baseline_artifact}`\nCandidate full-file artifact: `{candidate_artifact}`\nMutation: **{op}** — {detail}\n\n## Ordered artifact lineage\n{lineage}\n## Gates\n{gates}\n## Benchmark/search heuristic\n{bench}\n## Before\n```rust\n{before}\n```\n\n## After\n```rust\n{after}\n```\n\n## Authority boundary\n`candidate.rs` is the exact full-file survivor identified above. This report is a human-review proposal. It does not establish replicated performance, production eligibility, or permission to modify runtime code. The candidate should be independently re-hashed and re-evaluated through the algorithm evidence pipeline before any separate promotion review.\n",
         generated = cert.generated_at_unix_ms,
         file = cert.target_file.display(),
         func = cert.target_function,
         package = cert.package,
         sha = cert.git_sha.as_deref().unwrap_or("unknown"),
         generation = cert.generation,
+        baseline_artifact = cert.baseline_artifact_id,
+        candidate_artifact = cert.candidate_artifact_id,
         op = cert.mutation_operator,
         detail = cert.mutation_detail,
-        lineage = lineage_section,
+        lineage = lineage_entries,
         gates = gates_section,
         bench = bench_section,
         before = cert.before_source,
@@ -318,6 +343,22 @@ mod tests {
         write_new(&file, b"first").unwrap();
         assert!(write_new(&file, b"second").is_err());
         assert_eq!(std::fs::read(&file).unwrap(), b"first");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn ensure_absent_detects_bundle_collision_before_writes() {
+        let root = std::env::temp_dir().join(format!(
+            "forge-output-preflight-test-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let candidate = root.join("candidate.rs");
+        let cert = root.join("certificate.json");
+        std::fs::write(&cert, "existing").unwrap();
+        assert!(ensure_absent(&[&candidate, &cert]).is_err());
+        assert!(!candidate.exists());
         let _ = std::fs::remove_dir_all(root);
     }
 
