@@ -5,10 +5,15 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Evidence-first algorithm registry and discovery contracts for Symthaea"
 
+[features]
+default = []
+evidence-plane = ["dep:symthaea-evidence-plane"]
+
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
+symthaea-evidence-plane = { path = "../symthaea-evidence-plane", optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
