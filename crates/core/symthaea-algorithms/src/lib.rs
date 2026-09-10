@@ -9,6 +9,7 @@
 pub mod discovery;
 pub mod evaluation;
 pub mod ledger;
+pub mod observation;
 pub mod pareto;
 pub mod replication;
 pub mod robust;
