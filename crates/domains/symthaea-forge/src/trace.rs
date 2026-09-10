@@ -3,27 +3,29 @@
 //! Generator-local trace events that can later be bound to a semantic `DiscoveryRun`.
 //!
 //! Forge itself does not know the semantic problem contract, so it cannot directly mint a
-//! `DiscoveryLedger`. Every local search-loop attempt has a deterministic content-addressed
+//! `DiscoveryLedger`. Every local search-loop attempt has a deterministic, self-validating
 //! [`ForgeAttemptId`]. Candidate generation and its terminal outcome must carry the same attempt ID,
 //! removing ambiguity when identical candidate bytes are generated more than once.
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use serde_json::Value;
+use std::collections::BTreeMap;
 use std::fmt;
 use symthaea_algorithms::ledger::DiscoveryEventKind;
-use symthaea_algorithms::observation::ObservationStore;
+use symthaea_algorithms::observation::{ObservationEncoding, ObservationStore};
 use symthaea_algorithms::ContentId;
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ForgeAttemptId(ContentId);
+pub struct ForgeAttemptId {
+    id: ContentId,
+    baseline_artifact_id: ContentId,
+    seed: u64,
+    ordinal: u64,
+    generation: u64,
+}
 
 impl ForgeAttemptId {
-    /// Deterministic identity of one Forge inner-loop attempt.
-    ///
-    /// `ordinal` is global within the search, while `generation` is retained independently so an
-    /// impossible scheduler/replay mismatch cannot silently reuse the same ordinal in another
-    /// generation. The pristine baseline + seed bind the attempt to one reproducible search plan.
     pub fn derive(
         baseline_artifact_id: &ContentId,
         seed: u64,
@@ -33,7 +35,7 @@ impl ForgeAttemptId {
         let seed_bytes = seed.to_be_bytes();
         let ordinal_bytes = ordinal.to_be_bytes();
         let generation_bytes = generation.to_be_bytes();
-        Self(ContentId::derive(
+        let id = ContentId::derive(
             "symthaea.forge-attempt.v1",
             [
                 baseline_artifact_id.as_str().as_bytes(),
@@ -41,17 +43,54 @@ impl ForgeAttemptId {
                 ordinal_bytes.as_slice(),
                 generation_bytes.as_slice(),
             ],
-        ))
+        );
+        Self {
+            id,
+            baseline_artifact_id: baseline_artifact_id.clone(),
+            seed,
+            ordinal,
+            generation,
+        }
     }
 
     pub fn as_content_id(&self) -> &ContentId {
-        &self.0
+        &self.id
+    }
+
+    pub fn baseline_artifact_id(&self) -> &ContentId {
+        &self.baseline_artifact_id
+    }
+
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    pub fn ordinal(&self) -> u64 {
+        self.ordinal
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    pub fn validate(&self) -> Result<(), ForgeTraceError> {
+        let rebuilt = Self::derive(
+            &self.baseline_artifact_id,
+            self.seed,
+            self.ordinal,
+            self.generation,
+        );
+        if rebuilt == *self {
+            Ok(())
+        } else {
+            Err(ForgeTraceError::AttemptIdentityMismatch)
+        }
     }
 }
 
 impl fmt::Display for ForgeAttemptId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        self.id.fmt(f)
     }
 }
 
@@ -59,14 +98,20 @@ impl fmt::Display for ForgeAttemptId {
 pub enum ForgeTraceError {
     #[error("Forge trace event has an invalid local shape")]
     InvalidEventShape,
-    #[error("Forge trace reuses one attempt identity")]
-    DuplicateAttemptId,
+    #[error("Forge attempt identity does not match its canonical fields")]
+    AttemptIdentityMismatch,
+    #[error("Forge trace attempt baseline/seed changed during one search")]
+    AttemptSearchIdentityMismatch,
+    #[error("Forge trace attempt ordinal is not the next canonical search ordinal")]
+    AttemptOrdinalMismatch,
     #[error("candidate terminal event references an unknown or already-closed attempt")]
     UnknownAttemptId,
-    #[error("candidate terminal event generation disagrees with CandidateGenerated")]
+    #[error("candidate terminal event generation disagrees with its attempt")]
     AttemptGenerationMismatch,
     #[error("candidate terminal event artifact disagrees with CandidateGenerated")]
     AttemptArtifactMismatch,
+    #[error("attempt-scoped observation does not bind the same attempt identity")]
+    ObservationAttemptMismatch,
     #[error("SearchCompleted appeared before all generated candidate attempts were closed")]
     CompletionWithOpenCandidates,
     #[error("Forge trace contains an event after a terminal search event")]
@@ -83,8 +128,6 @@ pub enum ForgeTraceError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ForgeTraceEvent {
-    /// Generator-local occurrence identity. Present for every inner-loop attempt event and absent
-    /// only for search-level terminal events.
     pub attempt_id: Option<ForgeAttemptId>,
     pub generation: Option<u64>,
     pub kind: DiscoveryEventKind,
@@ -146,13 +189,14 @@ impl ForgeTraceEvent {
 
 /// Validate Forge's generator-local candidate lifecycle before semantic replay.
 ///
-/// Each inner-loop attempt identity is globally unique. `GeneratorNoOp` closes its attempt in one
-/// event. A concrete candidate opens at `CandidateGenerated` and must close with exactly one
-/// candidate terminal event carrying the same attempt ID, generation, and artifact. Search abort
-/// may retain open attempts as interrupted/unknown; search completion may not.
+/// New attempt occurrences must appear in exact global ordinal order under one pristine baseline
+/// and search seed. `GeneratorNoOp` closes its attempt in one event. A concrete candidate opens at
+/// `CandidateGenerated` and must close with exactly one candidate terminal event carrying the same
+/// attempt, generation, and artifact. Abort may retain open candidates as interrupted/unknown.
 pub fn validate_forge_trace(trace: &[ForgeTraceEvent]) -> Result<(), ForgeTraceError> {
-    let mut seen_attempts = BTreeSet::<String>::new();
-    let mut open = BTreeMap::<String, (u64, ContentId)>::new();
+    let mut open = BTreeMap::<String, (ForgeAttemptId, ContentId)>::new();
+    let mut expected_ordinal = 0u64;
+    let mut search_identity: Option<(ContentId, u64)> = None;
     let mut terminal_seen = false;
 
     for event in trace {
@@ -169,11 +213,16 @@ pub fn validate_forge_trace(trace: &[ForgeTraceEvent]) -> Result<(), ForgeTraceE
                 ) else {
                     return Err(ForgeTraceError::InvalidEventShape);
                 };
-                let key = attempt.as_content_id().as_str().to_string();
-                if !seen_attempts.insert(key.clone()) {
-                    return Err(ForgeTraceError::DuplicateAttemptId);
-                }
-                open.insert(key, (generation, artifact.clone()));
+                validate_new_attempt(
+                    attempt,
+                    generation,
+                    &mut expected_ordinal,
+                    &mut search_identity,
+                )?;
+                open.insert(
+                    attempt.as_content_id().as_str().to_string(),
+                    (attempt.clone(), artifact.clone()),
+                );
             }
             DiscoveryEventKind::RejectedCompilation
             | DiscoveryEventKind::RejectedCorrectness
@@ -187,12 +236,16 @@ pub fn validate_forge_trace(trace: &[ForgeTraceEvent]) -> Result<(), ForgeTraceE
                 ) else {
                     return Err(ForgeTraceError::InvalidEventShape);
                 };
+                attempt.validate()?;
+                if attempt.generation() != generation {
+                    return Err(ForgeTraceError::AttemptGenerationMismatch);
+                }
                 let key = attempt.as_content_id().as_str();
-                let Some((generated_generation, generated_artifact)) = open.get(key) else {
+                let Some((generated_attempt, generated_artifact)) = open.get(key) else {
                     return Err(ForgeTraceError::UnknownAttemptId);
                 };
-                if *generated_generation != generation {
-                    return Err(ForgeTraceError::AttemptGenerationMismatch);
+                if generated_attempt != attempt {
+                    return Err(ForgeTraceError::AttemptIdentityMismatch);
                 }
                 if generated_artifact != artifact {
                     return Err(ForgeTraceError::AttemptArtifactMismatch);
@@ -200,7 +253,7 @@ pub fn validate_forge_trace(trace: &[ForgeTraceEvent]) -> Result<(), ForgeTraceE
                 open.remove(key);
             }
             DiscoveryEventKind::GeneratorNoOp => {
-                let (Some(attempt), Some(_generation)) =
+                let (Some(attempt), Some(generation)) =
                     (event.attempt_id.as_ref(), event.generation)
                 else {
                     return Err(ForgeTraceError::InvalidEventShape);
@@ -208,33 +261,25 @@ pub fn validate_forge_trace(trace: &[ForgeTraceEvent]) -> Result<(), ForgeTraceE
                 if event.candidate_artifact_id.is_some() {
                     return Err(ForgeTraceError::InvalidEventShape);
                 }
-                let key = attempt.as_content_id().as_str().to_string();
-                if !seen_attempts.insert(key) {
-                    return Err(ForgeTraceError::DuplicateAttemptId);
-                }
+                validate_new_attempt(
+                    attempt,
+                    generation,
+                    &mut expected_ordinal,
+                    &mut search_identity,
+                )?;
             }
             DiscoveryEventKind::CandidateArchived => {
                 return Err(ForgeTraceError::UnsupportedArchivedEvent);
             }
             DiscoveryEventKind::SearchCompleted => {
-                if event.attempt_id.is_some()
-                    || event.generation.is_some()
-                    || event.candidate_artifact_id.is_some()
-                {
-                    return Err(ForgeTraceError::InvalidEventShape);
-                }
+                validate_search_terminal_shape(event)?;
                 if !open.is_empty() {
                     return Err(ForgeTraceError::CompletionWithOpenCandidates);
                 }
                 terminal_seen = true;
             }
             DiscoveryEventKind::SearchAborted => {
-                if event.attempt_id.is_some()
-                    || event.generation.is_some()
-                    || event.candidate_artifact_id.is_some()
-                {
-                    return Err(ForgeTraceError::InvalidEventShape);
-                }
+                validate_search_terminal_shape(event)?;
                 terminal_seen = true;
             }
         }
@@ -247,6 +292,49 @@ pub fn validate_forge_trace(trace: &[ForgeTraceEvent]) -> Result<(), ForgeTraceE
     }
 }
 
+fn validate_new_attempt(
+    attempt: &ForgeAttemptId,
+    generation: u64,
+    expected_ordinal: &mut u64,
+    search_identity: &mut Option<(ContentId, u64)>,
+) -> Result<(), ForgeTraceError> {
+    attempt.validate()?;
+    if attempt.generation() != generation {
+        return Err(ForgeTraceError::AttemptGenerationMismatch);
+    }
+    if attempt.ordinal() != *expected_ordinal {
+        return Err(ForgeTraceError::AttemptOrdinalMismatch);
+    }
+    match search_identity {
+        Some((baseline, seed))
+            if baseline != attempt.baseline_artifact_id() || *seed != attempt.seed() =>
+        {
+            return Err(ForgeTraceError::AttemptSearchIdentityMismatch);
+        }
+        None => {
+            *search_identity = Some((attempt.baseline_artifact_id().clone(), attempt.seed()));
+        }
+        Some(_) => {}
+    }
+    *expected_ordinal = expected_ordinal
+        .checked_add(1)
+        .ok_or(ForgeTraceError::AttemptOrdinalMismatch)?;
+    Ok(())
+}
+
+fn validate_search_terminal_shape(event: &ForgeTraceEvent) -> Result<(), ForgeTraceError> {
+    if event.attempt_id.is_some()
+        || event.generation.is_some()
+        || event.candidate_artifact_id.is_some()
+    {
+        Err(ForgeTraceError::InvalidEventShape)
+    } else {
+        Ok(())
+    }
+}
+
+/// Prove that every event reference resolves to an exact canonical object and every attempt-scoped
+/// observation independently names the same attempt as its trace event.
 pub fn validate_forge_trace_observations(
     trace: &[ForgeTraceEvent],
     observations: &ObservationStore,
@@ -256,10 +344,20 @@ pub fn validate_forge_trace_observations(
         .validate()
         .map_err(|error| ForgeTraceError::InvalidObservationStore(error.to_string()))?;
     for event in trace {
-        if !observations.contains(&event.observation_id) {
-            return Err(ForgeTraceError::MissingObservation(
-                event.observation_id.as_str().to_string(),
-            ));
+        let object = observations.get(&event.observation_id).ok_or_else(|| {
+            ForgeTraceError::MissingObservation(event.observation_id.as_str().to_string())
+        })?;
+        if let Some(attempt) = event.attempt_id.as_ref() {
+            if object.encoding() != ObservationEncoding::Json {
+                return Err(ForgeTraceError::ObservationAttemptMismatch);
+            }
+            let value: Value = serde_json::from_slice(object.payload())
+                .map_err(|_| ForgeTraceError::ObservationAttemptMismatch)?;
+            if value.get("attempt_id").and_then(Value::as_str)
+                != Some(attempt.as_content_id().as_str())
+            {
+                return Err(ForgeTraceError::ObservationAttemptMismatch);
+            }
         }
     }
     Ok(())
@@ -268,7 +366,7 @@ pub fn validate_forge_trace_observations(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_algorithms::observation::ObservationObject;
+    use symthaea_algorithms::observation::{ObservationEncoding, ObservationObject};
 
     fn cid(domain: &str, value: &str) -> ContentId {
         ContentId::derive(domain, [value.as_bytes()])
@@ -278,17 +376,25 @@ mod tests {
         ForgeAttemptId::derive(&cid("baseline", "a"), 7, ordinal, 0)
     }
 
+    fn attempt_object(id: &ForgeAttemptId, label: &str) -> ObservationObject {
+        ObservationObject::new(
+            "forge.test.attempt.v1",
+            ObservationEncoding::Json,
+            serde_json::to_vec(&serde_json::json!({
+                "attempt_id": id.as_content_id().as_str(),
+                "label": label
+            }))
+            .unwrap(),
+        )
+        .unwrap()
+    }
+
     #[test]
-    fn attempt_identity_changes_with_ordinal_or_generation() {
-        let baseline = cid("baseline", "a");
-        assert_ne!(
-            ForgeAttemptId::derive(&baseline, 7, 0, 0),
-            ForgeAttemptId::derive(&baseline, 7, 1, 0)
-        );
-        assert_ne!(
-            ForgeAttemptId::derive(&baseline, 7, 0, 0),
-            ForgeAttemptId::derive(&baseline, 7, 0, 1)
-        );
+    fn attempt_identity_is_self_validating() {
+        let id = attempt(0);
+        assert!(id.validate().is_ok());
+        assert_eq!(id.ordinal(), 0);
+        assert_eq!(id.generation(), 0);
     }
 
     #[test]
@@ -329,22 +435,33 @@ mod tests {
     }
 
     #[test]
+    fn skipped_attempt_ordinal_is_rejected() {
+        let trace = vec![
+            ForgeTraceEvent::no_candidate(attempt(0), 0, cid("obs", "zero")),
+            ForgeTraceEvent::no_candidate(attempt(2), 0, cid("obs", "two")),
+            ForgeTraceEvent::completed(cid("summary", "done")),
+        ];
+        assert_eq!(
+            validate_forge_trace(&trace).unwrap_err(),
+            ForgeTraceError::AttemptOrdinalMismatch
+        );
+    }
+
+    #[test]
     fn terminal_cannot_borrow_another_attempts_artifact() {
-        let generated = cid("artifact", "generated");
-        let substituted = cid("artifact", "substituted");
         let trace = vec![
             ForgeTraceEvent::candidate(
                 attempt(0),
                 0,
                 DiscoveryEventKind::CandidateGenerated,
-                generated,
+                cid("artifact", "generated"),
                 cid("obs", "g"),
             ),
             ForgeTraceEvent::candidate(
                 attempt(0),
                 0,
                 DiscoveryEventKind::RejectedCorrectness,
-                substituted,
+                cid("artifact", "substituted"),
                 cid("obs", "r"),
             ),
             ForgeTraceEvent::aborted(cid("summary", "abort")),
@@ -352,20 +469,6 @@ mod tests {
         assert_eq!(
             validate_forge_trace(&trace).unwrap_err(),
             ForgeTraceError::AttemptArtifactMismatch
-        );
-    }
-
-    #[test]
-    fn no_op_attempt_identity_cannot_be_reused() {
-        let id = attempt(0);
-        let trace = vec![
-            ForgeTraceEvent::no_candidate(id.clone(), 0, cid("obs", "noop")),
-            ForgeTraceEvent::no_candidate(id, 0, cid("obs", "noop-again")),
-            ForgeTraceEvent::completed(cid("summary", "done")),
-        ];
-        assert_eq!(
-            validate_forge_trace(&trace).unwrap_err(),
-            ForgeTraceError::DuplicateAttemptId
         );
     }
 
@@ -403,16 +506,53 @@ mod tests {
     }
 
     #[test]
-    fn observation_coverage_is_required() {
-        let object = ObservationObject::utf8("forge.test.v1", "complete").unwrap();
-        let trace = vec![ForgeTraceEvent::completed(object.id().clone())];
-        let full = ObservationStore::from_objects(vec![object]).unwrap();
-        assert!(validate_forge_trace_observations(&trace, &full).is_ok());
+    fn observation_must_name_same_attempt() {
+        let id = attempt(0);
+        let wrong = attempt(1);
+        let object = attempt_object(&wrong, "generated");
+        let terminal = ObservationObject::utf8("forge.test.terminal.v1", "aborted").unwrap();
+        let trace = vec![
+            ForgeTraceEvent::candidate(
+                id,
+                0,
+                DiscoveryEventKind::CandidateGenerated,
+                cid("artifact", "candidate"),
+                object.id().clone(),
+            ),
+            ForgeTraceEvent::aborted(terminal.id().clone()),
+        ];
+        let store = ObservationStore::from_objects(vec![object, terminal]).unwrap();
+        assert_eq!(
+            validate_forge_trace_observations(&trace, &store).unwrap_err(),
+            ForgeTraceError::ObservationAttemptMismatch
+        );
+    }
 
-        let empty = ObservationStore::new();
-        assert!(matches!(
-            validate_forge_trace_observations(&trace, &empty),
-            Err(ForgeTraceError::MissingObservation(_))
-        ));
+    #[test]
+    fn observation_coverage_and_attempt_binding_can_pass() {
+        let id = attempt(0);
+        let generated = attempt_object(&id, "generated");
+        let rejected = attempt_object(&id, "rejected");
+        let completed = ObservationObject::utf8("forge.test.terminal.v1", "complete").unwrap();
+        let artifact = cid("artifact", "candidate");
+        let trace = vec![
+            ForgeTraceEvent::candidate(
+                id.clone(),
+                0,
+                DiscoveryEventKind::CandidateGenerated,
+                artifact.clone(),
+                generated.id().clone(),
+            ),
+            ForgeTraceEvent::candidate(
+                id,
+                0,
+                DiscoveryEventKind::RejectedCorrectness,
+                artifact,
+                rejected.id().clone(),
+            ),
+            ForgeTraceEvent::completed(completed.id().clone()),
+        ];
+        let store = ObservationStore::from_objects(vec![generated, rejected, completed]).unwrap();
+        assert!(validate_forge_trace_observations(&trace, &store).is_ok());
     }
 }
