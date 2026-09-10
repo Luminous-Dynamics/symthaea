@@ -12,6 +12,7 @@
 pub mod auth_wire;
 pub mod capability;
 pub mod capability_activation;
+pub mod capability_analysis_provenance;
 pub mod capability_analysis_receipt;
 pub mod capability_counterfactual;
 pub mod capability_graph;
@@ -38,6 +39,15 @@ pub use capability_activation::{
     CapabilityActivationClosureV1, CapabilityActivationError, CapabilityActivationRoundV1,
     UnsatisfiedCapabilityRequirementV1, ValidatedCapabilityActivationAssumptionsV1,
     derive_capability_activation_closure,
+};
+pub use capability_analysis_provenance::{
+    CAPABILITY_ACTIVATION_ALGORITHM_SEMANTICS_V1, CAPABILITY_ACTIVATION_PROVENANCE_SCHEMA_V1,
+    CAPABILITY_COUNTERFACTUAL_ALGORITHM_SEMANTICS_V1,
+    CAPABILITY_COUNTERFACTUAL_PROVENANCE_SCHEMA_V1, CapabilityActivationAlgorithmId,
+    CapabilityActivationProvenanceId, CapabilityActivationProvenanceV1,
+    CapabilityAnalysisProvenanceError, CapabilityCounterfactualAlgorithmId,
+    CapabilityCounterfactualProvenanceId, CapabilityCounterfactualProvenanceV1,
+    capability_activation_algorithm_id_v1, capability_counterfactual_algorithm_id_v1,
 };
 pub use capability_analysis_receipt::{
     CAPABILITY_ACTIVATION_CLOSURE_RECEIPT_SCHEMA_V1,
