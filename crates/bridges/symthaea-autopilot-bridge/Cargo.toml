@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-autopilot-bridge"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Transport-neutral autopilot evidence adapters for Symthaea Embodiment v2"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["robotics", "autopilot", "px4", "mavlink"]
+categories = ["science", "aerospace"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+blake3 = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -69,6 +69,8 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Evidence-bound cross-clock correspondence samples for Embodiment-v2 migration.
+pub mod embodiment_clock_alignment;
 /// Evidence primitives for explicit embodiment availability, source, time, and metric semantics.
 pub mod embodiment_evidence;
 /// Additive evidence-provider seam for legacy and Embodiment-v2 migration.
