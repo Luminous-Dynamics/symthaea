@@ -13,9 +13,9 @@
 //! create a different authority instance, but admissions minted by that instance
 //! are rejected by consumers bound to another [`AuthorityScope`].
 //!
-//! Checked access to the inner `ActiveAdmission` is closure-scoped. Public callers
-//! cannot obtain a raw active-admission borrow and carry it beyond the currentness
-//! check that authorized one operation.
+//! Checked access to one or many `ActiveAdmission` values is closure-scoped.
+//! Public callers cannot obtain a raw active-admission borrow or slice and carry
+//! it beyond the currentness check that authorized one operation.
 
 #![deny(unsafe_code)]
 
@@ -30,31 +30,24 @@ use thiserror::Error;
 struct AuthoritySeal;
 
 /// Minting owner for one process-local extension authority instance.
-///
-/// Keep this value inside trusted host orchestration. Hand verification-only
-/// [`AuthorityScope`] values to consumers that need to accept scoped admissions.
 #[derive(Debug)]
 pub struct AdmissionAuthority {
     seal: Arc<AuthoritySeal>,
 }
 
 impl AdmissionAuthority {
-    /// Create a fresh authority instance. Each call produces a distinct scope.
     pub fn new() -> Self {
         Self {
             seal: Arc::new(AuthoritySeal),
         }
     }
 
-    /// Obtain a verification-only handle for consumers owned by this authority.
     pub fn scope(&self) -> AuthorityScope {
         AuthorityScope {
             seal: Arc::clone(&self.seal),
         }
     }
 
-    /// Activate an admission against live host currentness and bind the resulting
-    /// token to this exact process-local authority instance.
     pub fn activate(
         &self,
         record: &AdmissionRecord,
@@ -76,28 +69,25 @@ impl Default for AdmissionAuthority {
 }
 
 /// Cloneable verification-only scope for one [`AdmissionAuthority`].
-///
-/// This handle can verify and use admissions from its authority instance but
-/// cannot mint new [`ScopedAdmission`] values. Checked active authority is only
-/// made available inside [`AuthorityScope::with_rechecked`].
 #[derive(Debug, Clone)]
 pub struct AuthorityScope {
     seal: Arc<AuthoritySeal>,
 }
 
 impl AuthorityScope {
-    /// Return true only when `admission` was minted by this exact authority
-    /// instance. Equality is process-local pointer identity, not string identity.
     pub fn accepts(&self, admission: &ScopedAdmission) -> bool {
         Arc::ptr_eq(&self.seal, &admission.seal)
+    }
+
+    pub fn accepts_set(&self, admissions: &ScopedAdmissionSet) -> bool {
+        Arc::ptr_eq(&self.seal, &admissions.seal)
     }
 
     /// Verify authority-instance identity and live currentness, then run exactly
     /// one operation with the checked admission.
     ///
-    /// The higher-ranked callback prevents the borrow supplied to `operation`
-    /// from escaping as the return value. Consumers therefore cannot turn this
-    /// API into a long-lived bearer reference after the currentness check.
+    /// The higher-ranked callback prevents the supplied borrow from escaping as
+    /// the operation's return value.
     pub fn with_rechecked<R, F>(
         &self,
         admission: &ScopedAdmission,
@@ -113,13 +103,64 @@ impl AuthorityScope {
         admission.admission.recheck_currentness(currentness)?;
         Ok(operation(&admission.admission))
     }
+
+    /// Combine multiple already-scoped admissions into one non-cloneable,
+    /// process-local set without cloning or serializing authority.
+    ///
+    /// Every member must belong to this exact authority instance. Duplicate
+    /// extensions are intentionally preserved so downstream routing keeps its
+    /// duplicate-admission fail-closed behavior.
+    pub fn bundle(
+        &self,
+        admissions: Vec<ScopedAdmission>,
+    ) -> Result<ScopedAdmissionSet, AuthorityScopeError> {
+        if admissions.iter().any(|admission| !self.accepts(admission)) {
+            return Err(AuthorityScopeError::ForeignAuthority);
+        }
+
+        Ok(ScopedAdmissionSet {
+            admissions: admissions
+                .into_iter()
+                .map(|admission| admission.admission)
+                .collect(),
+            seal: Arc::clone(&self.seal),
+        })
+    }
+
+    /// Verify this set belongs to the same host authority and recheck every
+    /// admission before running exactly one operation with the contiguous slice.
+    ///
+    /// The slice never escapes this checked callback. Currentness lookups are
+    /// sequential unless the injected source itself provides stronger snapshot
+    /// semantics; this API guarantees all-or-nothing exposure, not an atomic
+    /// multi-subject trust-store snapshot.
+    pub fn with_rechecked_set<R, F>(
+        &self,
+        admissions: &ScopedAdmissionSet,
+        currentness: &dyn AdmissionCurrentnessSource,
+        operation: F,
+    ) -> Result<R, ScopedAdmissionSetError>
+    where
+        F: for<'a> FnOnce(&'a [ActiveAdmission]) -> R,
+    {
+        if !self.accepts_set(admissions) {
+            return Err(AuthorityScopeError::ForeignAuthority.into());
+        }
+
+        for admission in &admissions.admissions {
+            if let Err(problem) = admission.recheck_currentness(currentness) {
+                return Err(ScopedAdmissionSetError::Currentness {
+                    extension: admission.extension().clone(),
+                    problem,
+                });
+            }
+        }
+
+        Ok(operation(&admissions.admissions))
+    }
 }
 
 /// Non-serializable active admission bound to one process-local authority.
-///
-/// The underlying `ActiveAdmission` is deliberately never returned by the public
-/// API. A consumer must present the matching [`AuthorityScope`] and perform its
-/// use inside a fresh currentness-checked callback.
 #[derive(Debug)]
 pub struct ScopedAdmission {
     admission: ActiveAdmission,
@@ -130,6 +171,28 @@ impl ScopedAdmission {
     /// Convenience identity accessor that does not grant use authority.
     pub fn extension(&self) -> &ExtensionId {
         self.admission.extension()
+    }
+}
+
+/// Non-serializable collection of admissions from one process-local authority.
+#[derive(Debug)]
+pub struct ScopedAdmissionSet {
+    admissions: Vec<ActiveAdmission>,
+    seal: Arc<AuthoritySeal>,
+}
+
+impl ScopedAdmissionSet {
+    pub fn len(&self) -> usize {
+        self.admissions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.admissions.is_empty()
+    }
+
+    /// Iterate provider identities without exposing use authority.
+    pub fn extensions(&self) -> impl Iterator<Item = &ExtensionId> {
+        self.admissions.iter().map(ActiveAdmission::extension)
     }
 }
 
@@ -151,6 +214,17 @@ impl From<AdmissionProblem> for ScopedAdmissionError {
     fn from(value: AdmissionProblem) -> Self {
         Self::Currentness(value)
     }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ScopedAdmissionSetError {
+    #[error(transparent)]
+    Scope(#[from] AuthorityScopeError),
+    #[error("admission for {extension:?} is no longer current: {problem:?}")]
+    Currentness {
+        extension: ExtensionId,
+        problem: AdmissionProblem,
+    },
 }
 
 #[cfg(test)]
@@ -240,14 +314,10 @@ mod tests {
         let host_scoped = host.activate(&record(), &manifest(), &current()).unwrap();
         let impostor_scoped = impostor.activate(&record(), &manifest(), &current()).unwrap();
 
-        assert_eq!(
-            host.scope()
-                .with_rechecked(&host_scoped, &current(), |admission| {
-                    admission.extension().clone()
-                })
-                .unwrap(),
-            ExtensionId::new("org.example.scoped")
-        );
+        assert!(host
+            .scope()
+            .with_rechecked(&host_scoped, &current(), |_| ())
+            .is_ok());
         assert!(matches!(
             host.scope()
                 .with_rechecked(&impostor_scoped, &current(), |_| ()),
@@ -291,5 +361,94 @@ mod tests {
         assert!(scope.accepts(&scoped));
         assert!(clone.accepts(&scoped));
         assert!(clone.with_rechecked(&scoped, &current(), |_| ()).is_ok());
+    }
+
+    #[test]
+    fn scoped_set_exposes_admissions_only_inside_checked_operation() {
+        let host = AdmissionAuthority::new();
+        let scope = host.scope();
+        let first = host.activate(&record(), &manifest(), &current()).unwrap();
+        let second = host.activate(&record(), &manifest(), &current()).unwrap();
+        let set = scope.bundle(vec![first, second]).unwrap();
+
+        assert_eq!(set.len(), 2);
+        assert!(scope.accepts_set(&set));
+        let seen = scope
+            .with_rechecked_set(&set, &current(), |admissions| {
+                assert_eq!(admissions.len(), 2);
+                assert_eq!(
+                    admissions[0].extension(),
+                    &ExtensionId::new("org.example.scoped")
+                );
+                admissions.len()
+            })
+            .unwrap();
+        assert_eq!(seen, 2);
+    }
+
+    #[test]
+    fn foreign_member_rejects_whole_bundle_before_authority_is_stripped() {
+        let host = AdmissionAuthority::new();
+        let foreign = AdmissionAuthority::new();
+        let own = host.activate(&record(), &manifest(), &current()).unwrap();
+        let outsider = foreign.activate(&record(), &manifest(), &current()).unwrap();
+
+        assert_eq!(
+            host.scope().bundle(vec![own, outsider]).unwrap_err(),
+            AuthorityScopeError::ForeignAuthority
+        );
+    }
+
+    #[test]
+    fn foreign_scope_cannot_use_scoped_set() {
+        let host = AdmissionAuthority::new();
+        let foreign = AdmissionAuthority::new();
+        let scoped = host.activate(&record(), &manifest(), &current()).unwrap();
+        let set = host.scope().bundle(vec![scoped]).unwrap();
+
+        assert!(matches!(
+            foreign
+                .scope()
+                .with_rechecked_set(&set, &current(), |_| ()),
+            Err(ScopedAdmissionSetError::Scope(
+                AuthorityScopeError::ForeignAuthority
+            ))
+        ));
+    }
+
+    #[test]
+    fn one_revoked_member_fails_entire_set_without_running_operation() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let host = AdmissionAuthority::new();
+        let scope = host.scope();
+        let scoped = host.activate(&record(), &manifest(), &current()).unwrap();
+        let set = scope.bundle(vec![scoped]).unwrap();
+        let revoked = Currentness(Some(AdmissionContext::revoked(7, 11)));
+        let calls = AtomicUsize::new(0);
+
+        assert!(matches!(
+            scope.with_rechecked_set(&set, &revoked, |_| {
+                calls.fetch_add(1, Ordering::SeqCst);
+            }),
+            Err(ScopedAdmissionSetError::Currentness {
+                problem: AdmissionProblem::Revoked,
+                ..
+            })
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn empty_scoped_set_is_valid_and_runs_with_empty_slice() {
+        let host = AdmissionAuthority::new();
+        let scope = host.scope();
+        let set = scope.bundle(Vec::new()).unwrap();
+
+        assert!(set.is_empty());
+        let count = scope
+            .with_rechecked_set(&set, &current(), |admissions| admissions.len())
+            .unwrap();
+        assert_eq!(count, 0);
     }
 }
