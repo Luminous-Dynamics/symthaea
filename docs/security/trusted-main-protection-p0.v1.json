@@ -1,0 +1,36 @@
+{
+  "schema": "symthaea.github-trusted-main-protection-policy.v1",
+  "repository": "Luminous-Dynamics/symthaea",
+  "repository_id": 1136141775,
+  "target_ref": "refs/heads/main",
+  "ruleset_name": "trusted-main-p0",
+  "required_enforcement": "active",
+  "allowed_bypass_actors": [],
+  "required_rules": [
+    "deletion",
+    "non_fast_forward",
+    "pull_request"
+  ],
+  "pull_request_policy": {
+    "required_approving_review_count_min": 0,
+    "required_review_thread_resolution": true,
+    "require_code_owner_review": false,
+    "require_last_push_approval": false,
+    "dismiss_stale_reviews_on_push": false,
+    "allowed_merge_methods": [
+      "merge",
+      "rebase",
+      "squash"
+    ]
+  },
+  "p0_required_status_checks": [],
+  "non_claims": [
+    "does not activate a trusted self-hosted runner",
+    "does not prove a negative direct-push test has been performed",
+    "does not prove bypass identities are globally impossible",
+    "does not prove organization or enterprise rules are absent",
+    "does not prove the ruleset is applied on GitHub",
+    "does not qualify any source code or scientific result",
+    "does not replace later P1 qualification admission policy"
+  ]
+}
