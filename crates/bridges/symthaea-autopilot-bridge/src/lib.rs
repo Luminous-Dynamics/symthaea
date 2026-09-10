@@ -14,6 +14,8 @@
 
 /// Evidence-backed PX4 operational-readiness profiles and assessments.
 pub mod readiness;
+/// Lossless projection of PX4 readiness into generic provider readiness evidence.
+pub mod provider_readiness;
 /// Readiness-specific content-addressed PX4 status projections.
 pub mod status;
 /// Repeated-evidence qualification for PX4 timesync readiness.
