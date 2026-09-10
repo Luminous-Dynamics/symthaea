@@ -7,7 +7,6 @@
 //! cross-validated before survivor artifacts or the terminal manifest are written. An aborted
 //! search seals its evidence bundle first and only then returns a non-zero process result.
 
-use serde::Serialize;
 use std::ffi::OsString;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -15,10 +14,10 @@ use std::path::{Component, Path, PathBuf};
 use symthaea_algorithms::observation::{ObservationObject, ObservationStore};
 use symthaea_forge::certificate::full_source_artifact_id;
 use symthaea_forge::{
-    read_completed_manifest, run_search_recorded, validate_forge_trace_observations, ForgeBundleManifest,
-    ForgeBundleOutcome, ForgeCandidate, ForgeConfig, ForgeTraceEvent, SearchFailure, SearchOutcome,
-    SearchRecord, ABORT_FILE, CANDIDATE_FILE, CERTIFICATE_FILE, MANIFEST_FILE, OBSERVATIONS_FILE,
-    REPORT_FILE, TRACE_FILE,
+    read_completed_bundle, run_search_recorded, validate_forge_trace_observations, ForgeAbortRecord,
+    ForgeBundleManifest, ForgeBundleOutcome, ForgeCandidate, ForgeConfig, ForgeTraceEvent,
+    SearchFailure, SearchOutcome, SearchRecord, ABORT_FILE, CANDIDATE_FILE, CERTIFICATE_FILE,
+    MANIFEST_FILE, OBSERVATIONS_FILE, REPORT_FILE, TRACE_FILE,
 };
 
 struct Args {
@@ -33,22 +32,6 @@ struct Args {
     generations: usize,
     seed: u64,
     out_dir: PathBuf,
-}
-
-#[derive(Serialize)]
-struct AbortFile<'a> {
-    terminal: &'static str,
-    phase: &'a str,
-    detail: &'a str,
-    candidates_attempted: usize,
-    candidates_no_eligible_mutation: usize,
-    candidates_failed_compile: usize,
-    candidates_failed_test: usize,
-    candidates_failed_benchmark: usize,
-    candidates_passed_correctness: usize,
-    candidates_selected_by_search: usize,
-    baseline_score_bits: Option<u64>,
-    best_artifact_id: Option<&'a str>,
 }
 
 fn parse_args() -> anyhow::Result<Args> {
@@ -178,23 +161,11 @@ fn persist_aborted(out_dir: &Path, failure: SearchFailure) -> anyhow::Result<()>
     preflight_bundle_names(out_dir)?;
     persist_trace_and_observations(out_dir, &failure.trace, &failure.observations)?;
 
-    let abort = AbortFile {
-        terminal: "search-aborted",
-        phase: &failure.phase,
-        detail: &failure.detail,
-        candidates_attempted: failure.stats.candidates_attempted,
-        candidates_no_eligible_mutation: failure.stats.candidates_no_eligible_mutation,
-        candidates_failed_compile: failure.stats.candidates_failed_compile,
-        candidates_failed_test: failure.stats.candidates_failed_test,
-        candidates_failed_benchmark: failure.stats.candidates_failed_benchmark,
-        candidates_passed_correctness: failure.stats.candidates_passed_correctness,
-        candidates_selected_by_search: failure.stats.candidates_selected_by_search,
-        baseline_score_bits: failure.baseline_benchmark_score.map(f64::to_bits),
-        best_artifact_id: failure.best.as_ref().map(|candidate| candidate.artifact_id().as_str()),
-    };
+    let abort = ForgeAbortRecord::from_failure(&failure);
+    abort.validate()?;
     write_new(
         &out_dir.join(ABORT_FILE),
-        &serde_json::to_vec_pretty(&abort)?,
+        abort.to_json_pretty()?.as_bytes(),
     )?;
 
     print_stats(
@@ -299,9 +270,9 @@ fn seal_bundle(out_dir: &Path, outcome: ForgeBundleOutcome) -> anyhow::Result<()
     let manifest_path = out_dir.join(MANIFEST_FILE);
     let manifest = ForgeBundleManifest::observe(out_dir, outcome)?;
     write_new(&manifest_path, manifest.to_json_pretty()?.as_bytes())?;
-    let verified = read_completed_manifest(out_dir)?;
-    if verified.id != manifest.id || verified.outcome != outcome {
-        anyhow::bail!("Forge bundle manifest changed during immediate read-back validation");
+    let verified = read_completed_bundle(out_dir)?;
+    if verified.manifest.id != manifest.id || verified.manifest.outcome != outcome {
+        anyhow::bail!("Forge bundle changed during immediate semantic read-back validation");
     }
     println!(
         "sealed Forge evidence bundle: {} (outcome {:?}, manifest {})",
