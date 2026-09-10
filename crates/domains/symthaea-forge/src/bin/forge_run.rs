@@ -3,9 +3,9 @@
 //! CLI entry point for a real `symthaea-forge` search run.
 //!
 //! Candidate staging is temporary and restored by the library. Persistent output resolves outside
-//! the canonical workspace and is create-new only. Trace + observation payloads are read back and
-//! cross-validated before survivor artifacts or the terminal manifest are written. An aborted
-//! search seals its evidence bundle first and only then returns a non-zero process result.
+//! the canonical workspace and is create-new only. Trace, observation, and raw proposal evidence
+//! are read back and cross-validated before survivor artifacts or the terminal manifest are written.
+//! An aborted search seals its evidence bundle first and only then returns a non-zero process result.
 
 use std::ffi::OsString;
 use std::fs::OpenOptions;
@@ -14,10 +14,11 @@ use std::path::{Component, Path, PathBuf};
 use symthaea_algorithms::observation::{ObservationObject, ObservationStore};
 use symthaea_forge::certificate::full_source_artifact_id;
 use symthaea_forge::{
-    read_completed_bundle, run_search_recorded, validate_forge_trace_observations, ForgeAbortRecord,
-    ForgeBundleManifest, ForgeBundleOutcome, ForgeCandidate, ForgeConfig, ForgeTraceEvent,
-    SearchFailure, SearchOutcome, SearchRecord, ABORT_FILE, CANDIDATE_FILE, CERTIFICATE_FILE,
-    MANIFEST_FILE, OBSERVATIONS_FILE, REPORT_FILE, TRACE_FILE,
+    read_completed_proposal_bundle, run_search_recorded, validate_forge_raw_proposal_coverage,
+    validate_forge_trace_observations, ForgeAbortRecord, ForgeBundleManifest, ForgeBundleOutcome,
+    ForgeCandidate, ForgeConfig, ForgeRawProposalArchive, ForgeTraceEvent, SearchFailure,
+    SearchOutcome, SearchRecord, ABORT_FILE, CANDIDATE_FILE, CERTIFICATE_FILE, MANIFEST_FILE,
+    OBSERVATIONS_FILE, RAW_PROPOSALS_FILE, REPORT_FILE, TRACE_FILE,
 };
 
 struct Args {
@@ -127,8 +128,18 @@ fn main() -> anyhow::Result<()> {
 
 fn persist_completed(out_dir: &Path, outcome: SearchOutcome) -> anyhow::Result<()> {
     validate_forge_trace_observations(&outcome.trace, &outcome.observations)?;
+    validate_forge_raw_proposal_coverage(
+        &outcome.trace,
+        &outcome.observations,
+        &outcome.raw_proposals,
+    )?;
     preflight_bundle_names(out_dir)?;
-    persist_trace_and_observations(out_dir, &outcome.trace, &outcome.observations)?;
+    persist_search_evidence(
+        out_dir,
+        &outcome.trace,
+        &outcome.observations,
+        &outcome.raw_proposals,
+    )?;
 
     print_stats(
         &outcome.stats,
@@ -158,8 +169,18 @@ fn persist_completed(out_dir: &Path, outcome: SearchOutcome) -> anyhow::Result<(
 
 fn persist_aborted(out_dir: &Path, failure: SearchFailure) -> anyhow::Result<()> {
     validate_forge_trace_observations(&failure.trace, &failure.observations)?;
+    validate_forge_raw_proposal_coverage(
+        &failure.trace,
+        &failure.observations,
+        &failure.raw_proposals,
+    )?;
     preflight_bundle_names(out_dir)?;
-    persist_trace_and_observations(out_dir, &failure.trace, &failure.observations)?;
+    persist_search_evidence(
+        out_dir,
+        &failure.trace,
+        &failure.observations,
+        &failure.raw_proposals,
+    )?;
 
     let abort = ForgeAbortRecord::from_failure(&failure);
     abort.validate()?;
@@ -190,21 +211,31 @@ fn persist_aborted(out_dir: &Path, failure: SearchFailure) -> anyhow::Result<()>
     Ok(())
 }
 
-fn persist_trace_and_observations(
+fn persist_search_evidence(
     out_dir: &Path,
     trace: &[ForgeTraceEvent],
     observations: &ObservationStore,
+    raw_proposals: &ForgeRawProposalArchive,
 ) -> anyhow::Result<()> {
     validate_forge_trace_observations(trace, observations)?;
+    raw_proposals.validate()?;
+    validate_forge_raw_proposal_coverage(trace, observations, raw_proposals)?;
+
     let expected_observation_snapshot = observations.snapshot_id()?;
+    let expected_raw_archive_id = raw_proposals.id().clone();
     let trace_path = out_dir.join(TRACE_FILE);
     let observations_path = out_dir.join(OBSERVATIONS_FILE);
+    let raw_proposals_path = out_dir.join(RAW_PROPOSALS_FILE);
 
     write_new(&trace_path, &serde_json::to_vec_pretty(trace)?)?;
     let observation_objects: Vec<ObservationObject> = observations.objects().cloned().collect();
     write_new(
         &observations_path,
         &serde_json::to_vec_pretty(&observation_objects)?,
+    )?;
+    write_new(
+        &raw_proposals_path,
+        &serde_json::to_vec_pretty(raw_proposals)?,
     )?;
 
     let persisted_trace: Vec<ForgeTraceEvent> =
@@ -219,6 +250,18 @@ fn persist_trace_and_observations(
     if persisted_store.snapshot_id()? != expected_observation_snapshot {
         anyhow::bail!("persisted Forge observation store changed during immediate read-back");
     }
+
+    let persisted_raw: ForgeRawProposalArchive =
+        serde_json::from_slice(&std::fs::read(&raw_proposals_path)?)?;
+    persisted_raw.validate()?;
+    if persisted_raw.id() != &expected_raw_archive_id || &persisted_raw != raw_proposals {
+        anyhow::bail!("persisted Forge raw proposal archive changed during immediate read-back");
+    }
+    validate_forge_raw_proposal_coverage(
+        &persisted_trace,
+        &persisted_store,
+        &persisted_raw,
+    )?;
     Ok(())
 }
 
@@ -270,15 +313,16 @@ fn seal_bundle(out_dir: &Path, outcome: ForgeBundleOutcome) -> anyhow::Result<()
     let manifest_path = out_dir.join(MANIFEST_FILE);
     let manifest = ForgeBundleManifest::observe(out_dir, outcome)?;
     write_new(&manifest_path, manifest.to_json_pretty()?.as_bytes())?;
-    let verified = read_completed_bundle(out_dir)?;
-    if verified.manifest.id != manifest.id || verified.manifest.outcome != outcome {
-        anyhow::bail!("Forge bundle changed during immediate semantic read-back validation");
+    let verified = read_completed_proposal_bundle(out_dir)?;
+    if verified.base.manifest.id != manifest.id || verified.base.manifest.outcome != outcome {
+        anyhow::bail!("Forge bundle changed during immediate proposal-aware semantic read-back validation");
     }
     println!(
-        "sealed Forge evidence bundle: {} (outcome {:?}, manifest {})",
+        "sealed Forge evidence bundle: {} (outcome {:?}, manifest {}, raw proposals {})",
         manifest_path.display(),
         outcome,
-        manifest.id
+        manifest.id,
+        verified.raw_proposals.id(),
     );
     Ok(())
 }
@@ -287,6 +331,7 @@ fn preflight_bundle_names(out_dir: &Path) -> anyhow::Result<()> {
     let paths = [
         out_dir.join(TRACE_FILE),
         out_dir.join(OBSERVATIONS_FILE),
+        out_dir.join(RAW_PROPOSALS_FILE),
         out_dir.join(ABORT_FILE),
         out_dir.join(CANDIDATE_FILE),
         out_dir.join(CERTIFICATE_FILE),
@@ -419,7 +464,7 @@ fn render_report(cert: &symthaea_forge::ForgeCertificate, run_note: &str) -> Str
         })
         .collect();
     format!(
-        "# symthaea-forge candidate report\n\n{run_note}\n\nGenerated: {generated} ms since epoch\nTarget: `{file}::{func}` (package `{package}`)\nGit SHA at search time: `{sha}`\nGeneration found: {generation}\nBaseline full-file artifact: `{baseline_artifact}`\nCandidate full-file artifact: `{candidate_artifact}`\nMutation: **{op}** — {detail}\n\n## Ordered artifact lineage\n{lineage}\n## Gates\n{gates}\n## Benchmark/search heuristic\n{bench}\n## Before\n```rust\n{before}\n```\n\n## After\n```rust\n{after}\n```\n\n## Authority boundary\n`candidate.rs` is the exact full-file survivor identified above. `search-trace.json` and `observations.json` retain reconstructable search memory. `bundle-manifest.json` is the terminal persistence marker. This is a human-review proposal only; it does not establish replicated performance, production eligibility, or permission to modify runtime code.\n",
+        "# symthaea-forge candidate report\n\n{run_note}\n\nGenerated: {generated} ms since epoch\nTarget: `{file}::{func}` (package `{package}`)\nGit SHA at search time: `{sha}`\nGeneration found: {generation}\nBaseline full-file artifact: `{baseline_artifact}`\nCandidate full-file artifact: `{candidate_artifact}`\nMutation: **{op}** — {detail}\n\n## Ordered artifact lineage\n{lineage}\n## Gates\n{gates}\n## Benchmark/search heuristic\n{bench}\n## Before\n```rust\n{before}\n```\n\n## After\n```rust\n{after}\n```\n\n## Authority boundary\n`candidate.rs` is the exact full-file survivor identified above. `search-trace.json`, `observations.json`, and `raw-proposals.json` retain reconstructable search and proposal memory. `bundle-manifest.json` is the terminal persistence marker. This is a human-review proposal only; it does not establish replicated performance, production eligibility, or permission to modify runtime code.\n",
         generated = cert.generated_at_unix_ms,
         file = cert.target_file.display(),
         func = cert.target_function,
@@ -468,8 +513,8 @@ mod tests {
         ));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
-        let manifest = root.join(MANIFEST_FILE);
-        std::fs::write(&manifest, "existing").unwrap();
+        let raw_proposals = root.join(RAW_PROPOSALS_FILE);
+        std::fs::write(&raw_proposals, "existing").unwrap();
         assert!(preflight_bundle_names(&root).is_err());
         let _ = std::fs::remove_dir_all(root);
     }
