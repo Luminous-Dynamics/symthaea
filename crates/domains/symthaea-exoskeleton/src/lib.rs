@@ -26,6 +26,7 @@ pub mod perturbations;
 pub mod plugin;
 pub mod power;
 pub mod reflex;
+pub mod sensor_confidence;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
 pub mod simulator;
