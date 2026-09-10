@@ -18,8 +18,7 @@ use thiserror::Error;
 use crate::{ContinuitySubjectError, ContinuitySubjectId, ContinuitySubjectV1};
 
 /// Stable schema for one closed typed-subject snapshot.
-pub const CONTINUITY_SUBJECT_SNAPSHOT_SCHEMA_V1: &str =
-    "symthaea-continuity-subject-snapshot-v1";
+pub const CONTINUITY_SUBJECT_SNAPSHOT_SCHEMA_V1: &str = "symthaea-continuity-subject-snapshot-v1";
 
 const SUBJECT_SNAPSHOT_DOMAIN: &[u8] = b"symthaea.continuity.subject-snapshot.v1\0";
 const MAX_SUBJECTS: usize = 65_536;
@@ -216,10 +215,7 @@ fn validate_count(count: usize) -> Result<(), ContinuitySubjectSnapshotError> {
 }
 
 fn validate_unique(subjects: &[ContinuitySubjectV1]) -> Result<(), ContinuitySubjectSnapshotError> {
-    if subjects
-        .windows(2)
-        .any(|pair| pair[0].id() == pair[1].id())
-    {
+    if subjects.windows(2).any(|pair| pair[0].id() == pair[1].id()) {
         return Err(ContinuitySubjectSnapshotError::DuplicateSubject);
     }
     Ok(())
@@ -245,7 +241,10 @@ fn validate_parent_closure(
 fn validate_parent_structure(
     subjects: &[ContinuitySubjectV1],
 ) -> Result<(), ContinuitySubjectSnapshotError> {
-    let index: BTreeMap<_, _> = subjects.iter().map(|subject| (subject.id(), subject)).collect();
+    let index: BTreeMap<_, _> = subjects
+        .iter()
+        .map(|subject| (subject.id(), subject))
+        .collect();
 
     for subject in subjects {
         let origin = subject.id();
@@ -411,11 +410,9 @@ mod tests {
 
     #[test]
     fn transported_snapshot_identity_mismatch_is_rejected() {
-        let mut snapshot = ContinuitySubjectSnapshotV1::new(vec![root(
-            "service-a",
-            ContinuityScopeV1::Service,
-        )])
-        .unwrap();
+        let mut snapshot =
+            ContinuitySubjectSnapshotV1::new(vec![root("service-a", ContinuityScopeV1::Service)])
+                .unwrap();
         snapshot.snapshot_id = ContinuitySubjectSnapshotId([7; 32]);
         assert_eq!(
             snapshot.validate(),
