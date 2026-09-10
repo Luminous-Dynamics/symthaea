@@ -27,6 +27,7 @@ pub mod failure_domain;
 pub mod observation;
 pub mod post_execution_health;
 pub mod post_execution_observation;
+pub mod post_transition_distributed_health;
 pub mod profile_adoption;
 pub mod scope;
 pub mod subject_contract;
@@ -125,6 +126,11 @@ pub use post_execution_observation::{
     PostExecutionObservationError, PostExecutionObservationPolicyId,
     PostExecutionObservationPolicyV1, PostExecutionObservedStateV1,
     QualifiedPostExecutionObservationId, QualifiedPostExecutionObservationV1,
+};
+pub use post_transition_distributed_health::{
+    PostTransitionDistributedHealthError, PostTransitionDistributedStateDigest,
+    PostTransitionVerifierSnapshotV1, QualifiedPostTransitionDistributedHealthId,
+    QualifiedPostTransitionDistributedHealthV1, QualifiedRecoveryPathSnapshotV1,
 };
 pub use profile_adoption::{
     VERIFIER_PROFILE_ADOPTION_SUBJECT_SCHEMA_V1, VERIFIER_PROFILE_ADOPTION_TRANSITION_SCHEMA_V1,
