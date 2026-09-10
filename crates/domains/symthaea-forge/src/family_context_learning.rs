@@ -11,7 +11,9 @@
 //! These records remain descriptive search memory. Forge-local continuation selection is not
 //! replicated superiority evidence, promotion eligibility, or runtime authority.
 
-use crate::context_learning::{ContextBoundForgeBatch, ExactContextForgeCohort, ForgeContextLearningError};
+use crate::context_learning::{
+    ContextBoundForgeBatch, ExactContextForgeCohort, ForgeContextLearningError,
+};
 use crate::family_learning::{
     ForgeFamilyLearningError, ForgeFamilyOutcomeStats, ForgeFamilyOutcomeTable, ForgeFamilyTrialSet,
     ForgeTransformationFamilyId,
@@ -96,17 +98,33 @@ impl ContextBoundForgeFamilyBatch {
         Ok(batch)
     }
 
-    pub fn id(&self) -> &ContentId { &self.id }
-    pub fn run_id(&self) -> &ContentId { self.concrete.run_id() }
-    pub fn problem_id(&self) -> &ProblemId { self.concrete.problem_id() }
+    pub fn id(&self) -> &ContentId {
+        &self.id
+    }
+    pub fn run_id(&self) -> &ContentId {
+        self.concrete.run_id()
+    }
+    pub fn problem_id(&self) -> &ProblemId {
+        self.concrete.problem_id()
+    }
     pub fn baseline_implementation_id(&self) -> &ImplementationId {
         self.concrete.baseline_implementation_id()
     }
-    pub fn context_id(&self) -> &ContentId { self.concrete.context_id() }
-    pub fn generator_id(&self) -> &ContentId { &self.generator_id }
-    pub fn concrete(&self) -> &ContextBoundForgeBatch { &self.concrete }
-    pub fn family_trials(&self) -> &ForgeFamilyTrialSet { &self.family_trials }
-    pub fn family_table(&self) -> &ForgeFamilyOutcomeTable { &self.family_table }
+    pub fn context_id(&self) -> &ContentId {
+        self.concrete.context_id()
+    }
+    pub fn generator_id(&self) -> &ContentId {
+        &self.generator_id
+    }
+    pub fn concrete(&self) -> &ContextBoundForgeBatch {
+        &self.concrete
+    }
+    pub fn family_trials(&self) -> &ForgeFamilyTrialSet {
+        &self.family_trials
+    }
+    pub fn family_table(&self) -> &ForgeFamilyOutcomeTable {
+        &self.family_table
+    }
 
     pub fn validate(&self) -> Result<(), ForgeFamilyContextError> {
         self.concrete.validate()?;
@@ -203,7 +221,7 @@ impl ExactContextForgeFamilyCohort {
             &generator_id,
             &batches,
         );
-        let cohort = Self {
+        Ok(Self {
             id,
             context_cohort_id,
             problem_id,
@@ -211,21 +229,33 @@ impl ExactContextForgeFamilyCohort {
             context_id,
             generator_id,
             batches,
-        };
-        cohort.validate()?;
-        Ok(cohort)
+        })
     }
 
-    pub fn id(&self) -> &ContentId { &self.id }
-    pub fn context_cohort_id(&self) -> &ContentId { &self.context_cohort_id }
-    pub fn problem_id(&self) -> &ProblemId { &self.problem_id }
+    pub fn id(&self) -> &ContentId {
+        &self.id
+    }
+    pub fn context_cohort_id(&self) -> &ContentId {
+        &self.context_cohort_id
+    }
+    pub fn problem_id(&self) -> &ProblemId {
+        &self.problem_id
+    }
     pub fn baseline_implementation_id(&self) -> &ImplementationId {
         &self.baseline_implementation_id
     }
-    pub fn context_id(&self) -> &ContentId { &self.context_id }
-    pub fn generator_id(&self) -> &ContentId { &self.generator_id }
-    pub fn batches(&self) -> &[ContextBoundForgeFamilyBatch] { &self.batches }
-    pub fn run_count(&self) -> u64 { self.batches.len() as u64 }
+    pub fn context_id(&self) -> &ContentId {
+        &self.context_id
+    }
+    pub fn generator_id(&self) -> &ContentId {
+        &self.generator_id
+    }
+    pub fn batches(&self) -> &[ContextBoundForgeFamilyBatch] {
+        &self.batches
+    }
+    pub fn run_count(&self) -> u64 {
+        self.batches.len() as u64
+    }
 
     pub fn validate(&self) -> Result<(), ForgeFamilyContextError> {
         let rebuilt = Self::new(self.batches.clone())?;
@@ -284,7 +314,10 @@ struct Counts {
 }
 
 impl Counts {
-    fn add_run_row(&mut self, row: &ForgeFamilyOutcomeStats) -> Result<(), ForgeFamilyContextError> {
+    fn add_run_row(
+        &mut self,
+        row: &ForgeFamilyOutcomeStats,
+    ) -> Result<(), ForgeFamilyContextError> {
         self.runs_observed = add(self.runs_observed, 1)?;
         self.trials = add(self.trials, row.trials())?;
         self.compile = add(self.compile, row.rejected_compilation())?;
@@ -318,7 +351,10 @@ impl ContextualForgeFamilyStats {
         counts: Counts,
     ) -> Result<Self, ForgeFamilyContextError> {
         let mut row = Self {
-            id: ContentId::derive("symthaea.forge-context-family-row.uninitialized", [b"v1".as_slice()]),
+            id: ContentId::derive(
+                "symthaea.forge-context-family-row.uninitialized",
+                [b"v1".as_slice()],
+            ),
             family_id,
             cohort_runs,
             counts: [
@@ -337,18 +373,42 @@ impl ContextualForgeFamilyStats {
         Ok(row)
     }
 
-    pub fn id(&self) -> &ContentId { &self.id }
-    pub fn family_id(&self) -> &ForgeTransformationFamilyId { &self.family_id }
-    pub fn cohort_runs(&self) -> u64 { self.cohort_runs }
-    pub fn runs_observed(&self) -> u64 { self.counts[0] }
-    pub fn trials(&self) -> u64 { self.counts[1] }
-    pub fn rejected_compilation(&self) -> u64 { self.counts[2] }
-    pub fn rejected_correctness(&self) -> u64 { self.counts[3] }
-    pub fn rejected_evaluation(&self) -> u64 { self.counts[4] }
-    pub fn valid_not_selected(&self) -> u64 { self.counts[5] }
-    pub fn selected_for_continuation(&self) -> u64 { self.counts[6] }
-    pub fn interrupted(&self) -> u64 { self.counts[7] }
-    pub fn completed_trials(&self) -> u64 { self.trials() - self.interrupted() }
+    pub fn id(&self) -> &ContentId {
+        &self.id
+    }
+    pub fn family_id(&self) -> &ForgeTransformationFamilyId {
+        &self.family_id
+    }
+    pub fn cohort_runs(&self) -> u64 {
+        self.cohort_runs
+    }
+    pub fn runs_observed(&self) -> u64 {
+        self.counts[0]
+    }
+    pub fn trials(&self) -> u64 {
+        self.counts[1]
+    }
+    pub fn rejected_compilation(&self) -> u64 {
+        self.counts[2]
+    }
+    pub fn rejected_correctness(&self) -> u64 {
+        self.counts[3]
+    }
+    pub fn rejected_evaluation(&self) -> u64 {
+        self.counts[4]
+    }
+    pub fn valid_not_selected(&self) -> u64 {
+        self.counts[5]
+    }
+    pub fn selected_for_continuation(&self) -> u64 {
+        self.counts[6]
+    }
+    pub fn interrupted(&self) -> u64 {
+        self.counts[7]
+    }
+    pub fn completed_trials(&self) -> u64 {
+        self.trials() - self.interrupted()
+    }
 
     pub fn run_coverage_rate(&self) -> Option<f64> {
         ratio(self.runs_observed(), self.cohort_runs)
@@ -402,7 +462,11 @@ fn ratio(numerator: u64, denominator: u64) -> Option<f64> {
 
 fn derive_row_id(row: &ContextualForgeFamilyStats) -> ContentId {
     let mut parts = vec![
-        row.family_id.as_content_id().as_str().as_bytes().to_vec(),
+        row.family_id
+            .as_content_id()
+            .as_str()
+            .as_bytes()
+            .to_vec(),
         row.cohort_runs.to_be_bytes().to_vec(),
     ];
     parts.extend(row.counts.iter().map(|value| value.to_be_bytes().to_vec()));
@@ -438,7 +502,9 @@ impl ExactContextForgeFamilyOutcomeTable {
         let cohort_runs = cohort.run_count();
         let rows = grouped
             .into_iter()
-            .map(|(family, counts)| ContextualForgeFamilyStats::from_counts(family, cohort_runs, counts))
+            .map(|(family, counts)| {
+                ContextualForgeFamilyStats::from_counts(family, cohort_runs, counts)
+            })
             .collect::<Result<Vec<_>, _>>()?;
         let id = derive_table_id(cohort.id(), cohort_runs, &rows);
         let table = Self {
@@ -451,12 +517,23 @@ impl ExactContextForgeFamilyOutcomeTable {
         Ok(table)
     }
 
-    pub fn id(&self) -> &ContentId { &self.id }
-    pub fn cohort_id(&self) -> &ContentId { &self.cohort_id }
-    pub fn cohort_runs(&self) -> u64 { self.cohort_runs }
-    pub fn rows(&self) -> &[ContextualForgeFamilyStats] { &self.rows }
+    pub fn id(&self) -> &ContentId {
+        &self.id
+    }
+    pub fn cohort_id(&self) -> &ContentId {
+        &self.cohort_id
+    }
+    pub fn cohort_runs(&self) -> u64 {
+        self.cohort_runs
+    }
+    pub fn rows(&self) -> &[ContextualForgeFamilyStats] {
+        &self.rows
+    }
 
-    pub fn get(&self, family: &ForgeTransformationFamilyId) -> Option<&ContextualForgeFamilyStats> {
+    pub fn get(
+        &self,
+        family: &ForgeTransformationFamilyId,
+    ) -> Option<&ContextualForgeFamilyStats> {
         self.rows
             .binary_search_by(|row| row.family_id().cmp(family))
             .ok()
@@ -534,13 +611,15 @@ mod tests {
             DeterminismRequirement::Required,
             vec!["matches oracle".into()],
             DiscoveryRisk::Ordinary,
-        ).unwrap();
+        )
+        .unwrap();
         let algorithm = AlgorithmRecord::new(
             problem.id.clone(),
             "baseline",
             "family context baseline",
             AlgorithmProvenance::HumanAuthored,
-        ).unwrap();
+        )
+        .unwrap();
         let baseline_artifact = full_source_artifact_id("fn f() -> i32 { 1 }\n");
         let baseline = ImplementationRecord::new(
             problem.id.clone(),
@@ -548,7 +627,8 @@ mod tests {
             "repo://src/f.rs",
             baseline_artifact,
             Some("x86_64-test".into()),
-        ).unwrap();
+        )
+        .unwrap();
         let generator = ContentId::derive("generator", [b"forge-v1".as_slice()]);
         let context = EvaluationContext::new(
             ContentId::derive("evaluator", [b"v1".as_slice()]),
@@ -559,8 +639,14 @@ mod tests {
             "rust-1.96.0",
             "x86_64-test",
             vec![1, 2, 3],
-        ).unwrap();
-        Fixture { problem, baseline, generator, context }
+        )
+        .unwrap();
+        Fixture {
+            problem,
+            baseline,
+            generator,
+            context,
+        }
     }
 
     fn run_and_trace(
@@ -576,7 +662,8 @@ mod tests {
             "abc123",
             SearchBudget::new(10, 1, 10).unwrap(),
             seed,
-        ).unwrap();
+        )
+        .unwrap();
         let candidate_source = format!("fn f() -> i32 {{ {candidate_value} }}\n");
         let candidate_artifact = full_source_artifact_id(&candidate_source);
         let mutation = MutationRecord::new(
@@ -595,7 +682,8 @@ mod tests {
             duration: Duration::from_nanos(1),
         }];
         let rejected = forge_observations::gates(&attempt, &mutation, &gates).unwrap();
-        let summary = forge_observations::search_summary(1, 0, 1, 0, 0, 0, 0, None, None).unwrap();
+        let summary =
+            forge_observations::search_summary(1, 0, 1, 0, 0, 0, 0, None, None).unwrap();
         let trace = vec![
             ForgeTraceEvent::candidate(
                 attempt.clone(),
@@ -613,7 +701,8 @@ mod tests {
             ),
             ForgeTraceEvent::completed(summary.id().clone()),
         ];
-        let observations = ObservationStore::from_objects(vec![generated, rejected, summary]).unwrap();
+        let observations =
+            ObservationStore::from_objects(vec![generated, rejected, summary]).unwrap();
         (run, trace, observations)
     }
 
@@ -623,11 +712,21 @@ mod tests {
         let (run_a, trace_a, obs_a) = run_and_trace(&f, 7, 2, f.generator.clone());
         let (run_b, trace_b, obs_b) = run_and_trace(&f, 8, 3, f.generator.clone());
         let batch_a = ContextBoundForgeFamilyBatch::from_trace(
-            &run_a, &f.baseline, f.context.clone(), &trace_a, &obs_a,
-        ).unwrap();
+            &run_a,
+            &f.baseline,
+            f.context.clone(),
+            &trace_a,
+            &obs_a,
+        )
+        .unwrap();
         let batch_b = ContextBoundForgeFamilyBatch::from_trace(
-            &run_b, &f.baseline, f.context.clone(), &trace_b, &obs_b,
-        ).unwrap();
+            &run_b,
+            &f.baseline,
+            f.context.clone(),
+            &trace_b,
+            &obs_b,
+        )
+        .unwrap();
         let cohort = ExactContextForgeFamilyCohort::new(vec![batch_a, batch_b]).unwrap();
         let table = ExactContextForgeFamilyOutcomeTable::from_cohort(&cohort).unwrap();
         assert_eq!(cohort.run_count(), 2);
@@ -646,8 +745,13 @@ mod tests {
         let f = fixture();
         let (run, trace, obs) = run_and_trace(&f, 7, 2, f.generator.clone());
         let batch = ContextBoundForgeFamilyBatch::from_trace(
-            &run, &f.baseline, f.context.clone(), &trace, &obs,
-        ).unwrap();
+            &run,
+            &f.baseline,
+            f.context.clone(),
+            &trace,
+            &obs,
+        )
+        .unwrap();
         assert!(matches!(
             ExactContextForgeFamilyCohort::new(vec![batch]),
             Err(ForgeFamilyContextError::InsufficientRuns)
@@ -661,11 +765,21 @@ mod tests {
         let (run_a, trace_a, obs_a) = run_and_trace(&f, 7, 2, f.generator.clone());
         let (run_b, trace_b, obs_b) = run_and_trace(&f, 8, 3, other_generator);
         let batch_a = ContextBoundForgeFamilyBatch::from_trace(
-            &run_a, &f.baseline, f.context.clone(), &trace_a, &obs_a,
-        ).unwrap();
+            &run_a,
+            &f.baseline,
+            f.context.clone(),
+            &trace_a,
+            &obs_a,
+        )
+        .unwrap();
         let batch_b = ContextBoundForgeFamilyBatch::from_trace(
-            &run_b, &f.baseline, f.context.clone(), &trace_b, &obs_b,
-        ).unwrap();
+            &run_b,
+            &f.baseline,
+            f.context.clone(),
+            &trace_b,
+            &obs_b,
+        )
+        .unwrap();
         assert!(matches!(
             ExactContextForgeFamilyCohort::new(vec![batch_a, batch_b]),
             Err(ForgeFamilyContextError::GeneratorMismatch)
