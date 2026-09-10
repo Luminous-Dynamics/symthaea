@@ -98,9 +98,11 @@ impl CapabilityActivationClosureReceiptV1 {
         closure: &CapabilityActivationClosureV1,
     ) -> Result<(), CapabilityAnalysisReceiptError> {
         if self.schema_version != CAPABILITY_ACTIVATION_CLOSURE_RECEIPT_SCHEMA_V1 {
-            return Err(CapabilityAnalysisReceiptError::UnsupportedActivationReceiptSchema(
-                self.schema_version.clone(),
-            ));
+            return Err(
+                CapabilityAnalysisReceiptError::UnsupportedActivationReceiptSchema(
+                    self.schema_version.clone(),
+                ),
+            );
         }
         if self.source_snapshot_id != closure.source_snapshot_id() {
             return Err(CapabilityAnalysisReceiptError::ActivationSourceMismatch);
@@ -174,9 +176,11 @@ impl CapabilityCounterfactualFrontierReceiptV1 {
         frontier: &CapabilityCounterfactualFrontierV1,
     ) -> Result<(), CapabilityAnalysisReceiptError> {
         if self.schema_version != CAPABILITY_COUNTERFACTUAL_FRONTIER_RECEIPT_SCHEMA_V1 {
-            return Err(CapabilityAnalysisReceiptError::UnsupportedFrontierReceiptSchema(
-                self.schema_version.clone(),
-            ));
+            return Err(
+                CapabilityAnalysisReceiptError::UnsupportedFrontierReceiptSchema(
+                    self.schema_version.clone(),
+                ),
+            );
         }
         if self.source_snapshot_id != frontier.source_snapshot_id() {
             return Err(CapabilityAnalysisReceiptError::FrontierSourceMismatch);
@@ -359,14 +363,11 @@ mod tests {
             .unwrap()
             .validate()
             .unwrap();
-        let assumptions = CapabilityActivationAssumptionsV1::new(
-            &graph,
-            vec![dependency.id()],
-            vec![target_id],
-        )
-        .unwrap()
-        .validate(&graph)
-        .unwrap();
+        let assumptions =
+            CapabilityActivationAssumptionsV1::new(&graph, vec![dependency.id()], vec![target_id])
+                .unwrap()
+                .validate(&graph)
+                .unwrap();
         let closure = derive_capability_activation_closure(&graph, &assumptions).unwrap();
 
         let left = CapabilityActivationClosureReceiptV1::from_closure(&closure);
@@ -422,13 +423,9 @@ mod tests {
             .unwrap()
             .validate()
             .unwrap();
-        let frontier = derive_capability_counterfactual_frontier(
-            &graph,
-            &assumptions,
-            &query,
-            &config,
-        )
-        .unwrap();
+        let frontier =
+            derive_capability_counterfactual_frontier(&graph, &assumptions, &query, &config)
+                .unwrap();
 
         let receipt = CapabilityCounterfactualFrontierReceiptV1::from_frontier(&frontier);
         receipt.validate_against(&frontier).unwrap();

@@ -77,7 +77,9 @@ impl CapabilityDefinitionId {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum CapabilityRequirementV1 {
-    Leaf { capability_id: CapabilityId },
+    Leaf {
+        capability_id: CapabilityId,
+    },
     AllOf {
         requirements: Vec<CapabilityRequirementV1>,
     },
@@ -96,9 +98,7 @@ impl CapabilityRequirementV1 {
     ///
     /// The returned expression is canonical. Empty groups are rejected and a
     /// one-child group collapses to that child.
-    pub fn all_of(
-        requirements: Vec<CapabilityRequirementV1>,
-    ) -> Result<Self, CapabilityError> {
+    pub fn all_of(requirements: Vec<CapabilityRequirementV1>) -> Result<Self, CapabilityError> {
         Self::AllOf { requirements }.canonicalize()
     }
 
@@ -106,9 +106,7 @@ impl CapabilityRequirementV1 {
     ///
     /// The returned expression is canonical. Empty groups are rejected and a
     /// one-child group collapses to that child.
-    pub fn any_of(
-        requirements: Vec<CapabilityRequirementV1>,
-    ) -> Result<Self, CapabilityError> {
+    pub fn any_of(requirements: Vec<CapabilityRequirementV1>) -> Result<Self, CapabilityError> {
         Self::AnyOf { requirements }.canonicalize()
     }
 
@@ -137,11 +135,7 @@ impl CapabilityRequirementV1 {
         self.canonicalize_inner(0, &mut nodes)
     }
 
-    fn canonicalize_inner(
-        self,
-        depth: usize,
-        nodes: &mut usize,
-    ) -> Result<Self, CapabilityError> {
+    fn canonicalize_inner(self, depth: usize, nodes: &mut usize) -> Result<Self, CapabilityError> {
         if depth > MAX_REQUIREMENT_DEPTH {
             return Err(CapabilityError::RequirementTooDeep);
         }
@@ -152,12 +146,8 @@ impl CapabilityRequirementV1 {
 
         match self {
             Self::Leaf { capability_id } => Ok(Self::Leaf { capability_id }),
-            Self::AllOf { requirements } => {
-                canonicalize_group(requirements, true, depth, nodes)
-            }
-            Self::AnyOf { requirements } => {
-                canonicalize_group(requirements, false, depth, nodes)
-            }
+            Self::AllOf { requirements } => canonicalize_group(requirements, true, depth, nodes),
+            Self::AnyOf { requirements } => canonicalize_group(requirements, false, depth, nodes),
         }
     }
 
@@ -582,8 +572,8 @@ mod tests {
         ])
         .unwrap();
 
-        let a =
-            CapabilityDefinitionV1::new("org.example", "pumping", Some(requirement.clone())).unwrap();
+        let a = CapabilityDefinitionV1::new("org.example", "pumping", Some(requirement.clone()))
+            .unwrap();
         let b = CapabilityDefinitionV1::new("org.example", "pumping", Some(requirement)).unwrap();
 
         assert_eq!(a.definition_id(), b.definition_id());

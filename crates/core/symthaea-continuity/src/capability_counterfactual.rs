@@ -463,7 +463,9 @@ pub enum CapabilityCounterfactualError {
     ConfigIdentityMismatch,
     #[error("counterfactual max universe size must be in 1..={HARD_MAX_UNIVERSE_SIZE}")]
     InvalidUniverseLimit,
-    #[error("counterfactual max support width must be in 1..={HARD_MAX_SUPPORT_WIDTH} and not exceed max universe size")]
+    #[error(
+        "counterfactual max support width must be in 1..={HARD_MAX_SUPPORT_WIDTH} and not exceed max universe size"
+    )]
     InvalidSupportWidth,
     #[error("counterfactual max options per target must be in 1..={HARD_MAX_OPTIONS_PER_TARGET}")]
     InvalidOptionLimit,
@@ -473,13 +475,17 @@ pub enum CapabilityCounterfactualError {
     Activation(#[from] CapabilityActivationError),
     #[error("counterfactual analysis references capability unexpectedly absent from graph: {0:?}")]
     MissingDefinition(CapabilityId),
-    #[error("target {target:?} has dependency universe size {actual}, above configured maximum {max}")]
+    #[error(
+        "target {target:?} has dependency universe size {actual}, above configured maximum {max}"
+    )]
     UniverseLimitExceeded {
         target: CapabilityId,
         actual: usize,
         max: usize,
     },
-    #[error("target {target:?} needs upper-bound {required_upper_bound} subset simulations but only {remaining} remain")]
+    #[error(
+        "target {target:?} needs upper-bound {required_upper_bound} subset simulations but only {remaining} remain"
+    )]
     SimulationLimitExceeded {
         target: CapabilityId,
         required_upper_bound: u64,
@@ -487,7 +493,9 @@ pub enum CapabilityCounterfactualError {
     },
     #[error("target {target:?} produced more than {max} inclusion-minimal support options")]
     OptionLimitExceeded { target: CapabilityId, max: usize },
-    #[error("counterfactual support set did not produce a consistent activation result for target {0:?}")]
+    #[error(
+        "counterfactual support set did not produce a consistent activation result for target {0:?}"
+    )]
     InconsistentCounterfactual(CapabilityId),
 }
 
@@ -551,7 +559,8 @@ pub fn derive_capability_counterfactual_frontier(
         }
 
         let search_width = config.max_support_width().min(dependency_universe.len());
-        let required_upper_bound = subset_count_upper_bound(dependency_universe.len(), search_width);
+        let required_upper_bound =
+            subset_count_upper_bound(dependency_universe.len(), search_width);
         let remaining = config
             .max_total_simulations()
             .saturating_sub(simulations_evaluated);
@@ -740,9 +749,7 @@ fn binomial(n: usize, k: usize) -> u128 {
     let k = k.min(n - k);
     let mut value = 1_u128;
     for index in 0..k {
-        value = value
-            .saturating_mul((n - index) as u128)
-            / (index + 1) as u128;
+        value = value.saturating_mul((n - index) as u128) / (index + 1) as u128;
     }
     value
 }
@@ -837,9 +844,7 @@ fn put_str(out: &mut Vec<u8>, value: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        CapabilityDefinitionV1, CapabilityGraphSnapshotV1, CapabilityRequirementV1,
-    };
+    use crate::{CapabilityDefinitionV1, CapabilityGraphSnapshotV1, CapabilityRequirementV1};
 
     fn leaf(name: &str) -> CapabilityDefinitionV1 {
         CapabilityDefinitionV1::new("org.example", name, None).unwrap()
@@ -998,8 +1003,16 @@ mod tests {
             .expect("indirect b support");
         assert_eq!(by_b.marginal_activation_count(), 2);
         assert!(by_b.marginally_activated().binary_search(&a_id).is_ok());
-        assert!(by_b.marginally_activated().binary_search(&target_id).is_ok());
-        assert!(options.iter().any(|option| option.assumed_support() == [a_id]));
+        assert!(
+            by_b.marginally_activated()
+                .binary_search(&target_id)
+                .is_ok()
+        );
+        assert!(
+            options
+                .iter()
+                .any(|option| option.assumed_support() == [a_id])
+        );
     }
 
     #[test]
@@ -1032,7 +1045,10 @@ mod tests {
         assert_eq!(frontier.targets().len(), 1);
         assert_eq!(frontier.targets()[0].target_capability_id(), a_id);
         assert_eq!(frontier.targets()[0].options().len(), 1);
-        assert_eq!(frontier.targets()[0].options()[0].assumed_support(), &[b_id]);
+        assert_eq!(
+            frontier.targets()[0].options()[0].assumed_support(),
+            &[b_id]
+        );
     }
 
     #[test]
@@ -1173,10 +1189,7 @@ mod tests {
         .unwrap();
         let small_target_id = small_target.id();
 
-        let large_leaves: Vec<_> = ["l1", "l2", "l3", "l4"]
-            .into_iter()
-            .map(leaf)
-            .collect();
+        let large_leaves: Vec<_> = ["l1", "l2", "l3", "l4"].into_iter().map(leaf).collect();
         let large_target = CapabilityDefinitionV1::new(
             "org.example",
             "large-target",
@@ -1196,11 +1209,7 @@ mod tests {
         let mut definitions = vec![small_target, small_dependency, large_target];
         definitions.extend(large_leaves);
         let graph = graph(definitions);
-        let assumptions = assumptions(
-            &graph,
-            vec![],
-            vec![small_target_id, large_target_id],
-        );
+        let assumptions = assumptions(&graph, vec![], vec![small_target_id, large_target_id]);
         let query = query(&graph, &assumptions, vec![small_target_id]);
 
         let frontier = derive_capability_counterfactual_frontier(
@@ -1211,7 +1220,10 @@ mod tests {
         )
         .expect("unqueried large target must not poison scoped analysis");
         assert_eq!(frontier.targets().len(), 1);
-        assert_eq!(frontier.targets()[0].target_capability_id(), small_target_id);
+        assert_eq!(
+            frontier.targets()[0].target_capability_id(),
+            small_target_id
+        );
     }
 
     #[test]

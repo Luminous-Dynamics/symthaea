@@ -50,9 +50,7 @@ pub struct CapabilityGraphSnapshotV1 {
 
 impl CapabilityGraphSnapshotV1 {
     /// Construct a canonical, structurally closed graph snapshot.
-    pub fn new(
-        mut definitions: Vec<CapabilityDefinitionV1>,
-    ) -> Result<Self, CapabilityGraphError> {
+    pub fn new(mut definitions: Vec<CapabilityDefinitionV1>) -> Result<Self, CapabilityGraphError> {
         for definition in &definitions {
             definition.validate()?;
         }
@@ -92,7 +90,11 @@ impl CapabilityGraphSnapshotV1 {
             definition.validate()?;
         }
 
-        if self.definitions.windows(2).any(|pair| pair[0].id() >= pair[1].id()) {
+        if self
+            .definitions
+            .windows(2)
+            .any(|pair| pair[0].id() >= pair[1].id())
+        {
             if self
                 .definitions
                 .windows(2)
@@ -179,9 +181,9 @@ pub enum CapabilityGraphError {
     DuplicateCapabilityDefinition,
     #[error("capability graph definitions must be in canonical capability-id order")]
     NonCanonicalDefinitionOrder,
-    #[error("capability {source:?} references undefined capability {missing:?}")]
+    #[error("capability {referencing:?} references undefined capability {missing:?}")]
     MissingCapabilityReference {
-        source: CapabilityId,
+        referencing: CapabilityId,
         missing: CapabilityId,
     },
     #[error("stored capability graph snapshot identity does not match canonical definitions")]
@@ -212,7 +214,7 @@ fn validate_closed_world(
         for referenced in definition.referenced_capabilities() {
             if !known.contains_key(&referenced) {
                 return Err(CapabilityGraphError::MissingCapabilityReference {
-                    source: definition.id(),
+                    referencing: definition.id(),
                     missing: referenced,
                 });
             }
@@ -285,7 +287,7 @@ mod tests {
         assert_eq!(
             CapabilityGraphSnapshotV1::new(vec![target.clone()]),
             Err(CapabilityGraphError::MissingCapabilityReference {
-                source: target.id(),
+                referencing: target.id(),
                 missing,
             })
         );

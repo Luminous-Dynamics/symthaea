@@ -22,8 +22,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    CapabilityGraphSnapshotId, CapabilityId, CapabilityRequirementV1,
-    ValidatedCapabilityGraphV1,
+    CapabilityGraphSnapshotId, CapabilityId, CapabilityRequirementV1, ValidatedCapabilityGraphV1,
 };
 
 /// Stable schema for one assumption set.
@@ -281,7 +280,9 @@ impl CapabilityActivationClosureV1 {
     }
 
     pub fn is_available_after_closure(&self, capability_id: CapabilityId) -> bool {
-        self.available_after_closure.binary_search(&capability_id).is_ok()
+        self.available_after_closure
+            .binary_search(&capability_id)
+            .is_ok()
     }
 }
 
@@ -304,7 +305,9 @@ pub enum CapabilityActivationError {
     UnknownCapability(CapabilityId),
     #[error("stored activation-assumption identity does not match canonical fields")]
     AssumptionIdentityMismatch,
-    #[error("validated activation assumption references capability unexpectedly absent from graph: {0:?}")]
+    #[error(
+        "validated activation assumption references capability unexpectedly absent from graph: {0:?}"
+    )]
     MissingDefinition(CapabilityId),
     #[error("blocked activatable capability has no unsatisfied requirement: {0:?}")]
     InconsistentBlockedState(CapabilityId),
@@ -411,13 +414,10 @@ fn explain_unsatisfied(
     available: &BTreeSet<CapabilityId>,
 ) -> Option<UnsatisfiedCapabilityRequirementV1> {
     match requirement {
-        CapabilityRequirementV1::Leaf { capability_id } => {
-            (!available.contains(capability_id)).then_some(
-                UnsatisfiedCapabilityRequirementV1::Leaf {
-                    capability_id: *capability_id,
-                },
-            )
-        }
+        CapabilityRequirementV1::Leaf { capability_id } => (!available.contains(capability_id))
+            .then_some(UnsatisfiedCapabilityRequirementV1::Leaf {
+                capability_id: *capability_id,
+            }),
         CapabilityRequirementV1::AllOf { requirements } => {
             let unsatisfied: Vec<_> = requirements
                 .iter()
@@ -458,9 +458,7 @@ fn canonicalize_ids(capability_ids: &mut Vec<CapabilityId>) {
 }
 
 fn strictly_sorted(capability_ids: &[CapabilityId]) -> bool {
-    capability_ids
-        .windows(2)
-        .all(|pair| pair[0] < pair[1])
+    capability_ids.windows(2).all(|pair| pair[0] < pair[1])
 }
 
 fn hash_assumptions(
@@ -508,10 +506,7 @@ mod tests {
         CapabilityDefinitionV1::new("org.example", name, None).unwrap()
     }
 
-    fn definition(
-        name: &str,
-        requirements: CapabilityRequirementV1,
-    ) -> CapabilityDefinitionV1 {
+    fn definition(name: &str, requirements: CapabilityRequirementV1) -> CapabilityDefinitionV1 {
         CapabilityDefinitionV1::new("org.example", name, Some(requirements)).unwrap()
     }
 
@@ -547,12 +542,7 @@ mod tests {
             vec![a_id, b_id, b_id],
         )
         .unwrap();
-        let right = CapabilityActivationAssumptionsV1::new(
-            &graph,
-            vec![a_id],
-            vec![b_id],
-        )
-        .unwrap();
+        let right = CapabilityActivationAssumptionsV1::new(&graph, vec![a_id], vec![b_id]).unwrap();
 
         assert_eq!(left, right);
         assert_eq!(left.id(), right.id());
