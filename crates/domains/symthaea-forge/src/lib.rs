@@ -14,23 +14,23 @@
 //! semantic discovery ledger only when the exact `DiscoveryRun` and complete observation archive
 //! are supplied externally. [`bundle`] proves structural persisted-file integrity, while
 //! [`bundle_verify`] proves the cross-file semantics of that bundle. [`trial_semantics`] validates
-//! event/schema/attempt/artifact/transformation consistency, [`trials`] projects that validated
-//! history into canonical per-transformation records, [`learning`] binds those records to one exact
-//! semantic discovery run, and [`context_learning`] allows aggregation only across distinct runs
-//! sharing the same problem, baseline implementation, and exact evaluation context.
+//! event/schema/attempt/artifact/transformation consistency, [`trials`] preserves exact concrete
+//! rewrite instances, [`learning`] provides exact-instance audit summaries, [`context_learning`]
+//! constrains cross-run aggregation, and [`family_learning`] introduces the generator-scoped
+//! operator-family identity suitable for statistical search learning.
 //!
 //! # Authority boundary
 //!
 //! - Candidate failure and experiment-apparatus failure are distinct states.
 //! - Each Forge search-loop attempt has an explicit content-addressed occurrence identity.
+//! - Concrete transformation identity and reusable transformation-family identity are separate.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
 //!   benchmark is a candidate evaluation rejection.
 //! - Persistent output must resolve outside the canonical workspace and is create-new only.
 //! - Forge's local benchmark remains a search heuristic, not replicated superiority evidence.
-//! - Transformation trials and learning tables are descriptive search-memory records, not
-//!   promotion evidence. Cross-run aggregation requires exact context equality in v1.
+//! - Learning tables are descriptive search-memory records, not promotion evidence.
 //! - No promotion, merge, activation, or runtime authority is provided here.
 
 pub mod bundle;
@@ -38,6 +38,7 @@ pub mod bundle_verify;
 pub mod candidate;
 pub mod certificate;
 pub mod context_learning;
+pub mod family_learning;
 pub mod fitness;
 pub mod learning;
 pub mod mutations;
@@ -61,6 +62,10 @@ pub use certificate::{CertificateError, ForgeCandidate, ForgeCertificate};
 pub use context_learning::{
     ContextBoundForgeBatch, ContextualTransformationStats, ExactContextForgeCohort,
     ExactContextTransformationTable, ForgeContextLearningError,
+};
+pub use family_learning::{
+    ForgeFamilyLearningError, ForgeFamilyOutcomeStats, ForgeFamilyOutcomeTable, ForgeFamilyTrial,
+    ForgeFamilyTrialSet, ForgeTransformationFamilyId,
 };
 pub use fitness::{BenchmarkError, GateExecutionError};
 pub use learning::{
