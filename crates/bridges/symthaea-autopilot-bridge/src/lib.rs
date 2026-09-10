@@ -12,6 +12,9 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
+/// Evidence-backed PX4 operational-readiness profiles and assessments.
+pub mod readiness;
+
 use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
