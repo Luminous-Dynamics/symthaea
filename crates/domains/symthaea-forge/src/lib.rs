@@ -24,8 +24,9 @@
 //! train/validation/holdout membership, [`proposal_exposure`] defines the complete opportunity
 //! evidence required before those observational outcomes may inform future policy learning,
 //! [`proposal_recording`] binds either live or persisted raw proposal evidence through one semantic
-//! conversion path, and [`proposal_trace`] retains the live draw as generator-local content-
-//! addressed evidence before any semantic run/policy binding.
+//! conversion path, [`proposal_trace`] retains the live draw as generator-local content-addressed
+//! evidence, and [`proposal_coverage`] proves that raw proposal evidence exactly covers the search
+//! trace before any semantic run/policy binding.
 //!
 //! # Authority boundary
 //!
@@ -44,6 +45,7 @@
 //!   or reapplies a mutation.
 //! - Raw proposal archives record generator behavior faithfully even when a later semantic policy
 //!   refuses to qualify that behavior for learning.
+//! - Proposal-stage traces and raw proposal archives must provide one-to-one coverage.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
@@ -67,6 +69,7 @@ pub mod fitness;
 pub mod learning;
 pub mod mutations;
 pub mod observations;
+pub mod proposal_coverage;
 pub mod proposal_exposure;
 pub mod proposal_recording;
 pub mod proposal_trace;
@@ -109,6 +112,7 @@ pub use learning::{
     ForgeLearningError, ForgeTrialBatch, TransformationOutcomeStats, TransformationOutcomeTable,
 };
 pub use observations::ForgeObservationError;
+pub use proposal_coverage::{validate_forge_raw_proposal_coverage, ForgeProposalCoverageError};
 pub use proposal_exposure::{
     ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
     ForgeProposalExposureArchive, ForgeProposalExposureError, ForgeProposalLearningQualification,
