@@ -23,6 +23,7 @@ pub mod controller;
 pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
+pub mod fault_campaign;
 #[cfg(feature = "symtropy")]
 pub mod full_frame;
 #[cfg(feature = "hal")]
@@ -36,6 +37,7 @@ pub mod pressure_garment;
 pub mod radiation;
 pub mod reduced_gravity;
 pub mod reflex;
+pub mod resource_optimizer;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
 pub mod simulator;
@@ -44,3 +46,4 @@ pub mod space_exosuit;
 pub mod symtropy_sim;
 pub mod training;
 pub mod types;
+pub mod workout;
