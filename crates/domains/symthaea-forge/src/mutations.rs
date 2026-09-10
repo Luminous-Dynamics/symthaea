@@ -5,9 +5,11 @@
 //! Unlike text/regex-based mutation (which can accidentally match digits
 //! inside identifiers, comments, or string literals), these operators walk
 //! a real `syn` AST and only ever touch genuine expression nodes within the
-//! chosen function's body. Each call to [`Mutator::mutate_one`] applies
-//! exactly one mutation at one randomly-chosen eligible site, keeping every
-//! candidate a small, human-reviewable diff.
+//! chosen function's body. Each call to [`Mutator::mutate_one_recorded`]
+//! applies at most one mutation at one randomly-chosen eligible site while
+//! returning the exact opportunity set and selected pair used by that same
+//! random draw. [`Mutator::mutate_one`] is a compatibility wrapper over the
+//! recorded path so proposal telemetry cannot drift into a second sampler.
 
 use rand::Rng;
 use syn::visit::Visit;
@@ -15,10 +17,40 @@ use syn::visit_mut::VisitMut;
 use syn::{BinOp, ExprBinary, ExprLit, ImplItemFn, ItemFn, Lit};
 
 /// A human-readable record of what a mutation changed, for the certificate.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MutationDescription {
     pub operator: &'static str,
     pub detail: String,
+}
+
+/// Exact proposal opportunity for one registered mutation operator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutationOpportunity {
+    pub operator: &'static str,
+    pub eligible_sites: usize,
+}
+
+/// Exact selected `(operator slot, site)` pair under the current uniform-site sampler.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutationSelection {
+    pub operator_index: usize,
+    pub operator: &'static str,
+    pub site_index: usize,
+    pub global_pair_index: usize,
+}
+
+/// Result of one proposal attempt, including the complete opportunity set.
+///
+/// `selection == None` means no registered operator had an eligible site.
+/// `selection == Some(_) && mutation == None` means a concrete pair was
+/// selected but applying it produced no semantic source change (for example,
+/// a numeric perturbation that rounds back to the original integer).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordedMutation {
+    pub opportunities: Vec<MutationOpportunity>,
+    pub total_eligible_sites: usize,
+    pub selection: Option<MutationSelection>,
+    pub mutation: Option<MutationDescription>,
 }
 
 /// One independently-applicable mutation strategy.
@@ -421,8 +453,7 @@ impl MutationOperator for BooleanOperatorSwap {
 }
 
 /// Picks one random operator and one random eligible site among all
-/// registered operators, applies it, and returns the description -- or
-/// `None` if no operator has any eligible site in this function body.
+/// registered operators.
 pub struct Mutator {
     operators: Vec<Box<dyn MutationOperator>>,
 }
@@ -445,30 +476,78 @@ impl Mutator {
         Self { operators }
     }
 
-    /// Apply exactly one mutation, chosen uniformly among all (operator,
-    /// site) pairs currently eligible in `body`. Mutates `body` in place.
+    /// Registered operator names in the exact order used to map the global
+    /// eligible-pair index onto an operator-local site index.
+    pub fn operator_names(&self) -> impl Iterator<Item = &'static str> + '_ {
+        self.operators.iter().map(|operator| operator.name())
+    }
+
+    /// Apply at most one mutation using the existing uniform eligible-site
+    /// sampler and return the exact opportunity/selection record produced by
+    /// that same draw.
+    pub fn mutate_one_recorded(
+        &self,
+        body: &mut syn::Block,
+        rng: &mut impl Rng,
+    ) -> RecordedMutation {
+        let opportunities = self
+            .operators
+            .iter()
+            .map(|operator| MutationOpportunity {
+                operator: operator.name(),
+                eligible_sites: operator.count_sites(body),
+            })
+            .collect::<Vec<_>>();
+        let total_eligible_sites = opportunities
+            .iter()
+            .map(|opportunity| opportunity.eligible_sites)
+            .sum::<usize>();
+        if total_eligible_sites == 0 {
+            return RecordedMutation {
+                opportunities,
+                total_eligible_sites,
+                selection: None,
+                mutation: None,
+            };
+        }
+
+        let global_pair_index = rng.gen_range(0..total_eligible_sites);
+        let mut local_index = global_pair_index;
+        for (operator_index, (operator, opportunity)) in self
+            .operators
+            .iter()
+            .zip(opportunities.iter())
+            .enumerate()
+        {
+            if local_index < opportunity.eligible_sites {
+                let selection = MutationSelection {
+                    operator_index,
+                    operator: operator.name(),
+                    site_index: local_index,
+                    global_pair_index,
+                };
+                let mutation = operator.apply_at(body, local_index, rng);
+                return RecordedMutation {
+                    opportunities,
+                    total_eligible_sites,
+                    selection: Some(selection),
+                    mutation,
+                };
+            }
+            local_index -= opportunity.eligible_sites;
+        }
+
+        unreachable!("global eligible-pair index must resolve to a registered operator site");
+    }
+
+    /// Compatibility wrapper over [`Self::mutate_one_recorded`]. There is
+    /// intentionally only one proposal sampler implementation.
     pub fn mutate_one(
         &self,
         body: &mut syn::Block,
         rng: &mut impl Rng,
     ) -> Option<MutationDescription> {
-        let counts: Vec<usize> = self
-            .operators
-            .iter()
-            .map(|op| op.count_sites(body))
-            .collect();
-        let total: usize = counts.iter().sum();
-        if total == 0 {
-            return None;
-        }
-        let mut pick = rng.gen_range(0..total);
-        for (op, &count) in self.operators.iter().zip(counts.iter()) {
-            if pick < count {
-                return op.apply_at(body, pick, rng);
-            }
-            pick -= count;
-        }
-        None
+        self.mutate_one_recorded(body, rng).mutation
     }
 }
 
@@ -501,8 +580,8 @@ pub fn find_function_body_mut<'f>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     fn parse_fn_body(src: &str) -> syn::Block {
         let file: syn::File = syn::parse_str(src).expect("test fixture must parse");
@@ -565,6 +644,88 @@ mod tests {
         let desc = op.apply_at(&mut body, 0, &mut rng).unwrap();
         assert_eq!(desc.operator, "NumericLiteralPerturb");
         assert!(desc.detail.contains("0.2 ->"));
+    }
+
+    #[test]
+    fn recorded_mutation_preserves_ordered_opportunity_set() {
+        let mut body = parse_fn_body("fn f(x: i32, y: i32) -> bool { x < 5 && y + 2 > 9 }");
+        let mutator = Mutator::default();
+        let mut rng = StdRng::seed_from_u64(9);
+        let recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
+        assert_eq!(
+            recorded
+                .opportunities
+                .iter()
+                .map(|opportunity| opportunity.operator)
+                .collect::<Vec<_>>(),
+            mutator.operator_names().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            recorded.total_eligible_sites,
+            recorded
+                .opportunities
+                .iter()
+                .map(|opportunity| opportunity.eligible_sites)
+                .sum::<usize>()
+        );
+        let selection = recorded.selection.as_ref().unwrap();
+        let opportunity = &recorded.opportunities[selection.operator_index];
+        assert_eq!(opportunity.operator, selection.operator);
+        assert!(selection.site_index < opportunity.eligible_sites);
+        let offset = recorded.opportunities[..selection.operator_index]
+            .iter()
+            .map(|opportunity| opportunity.eligible_sites)
+            .sum::<usize>();
+        assert_eq!(selection.global_pair_index, offset + selection.site_index);
+    }
+
+    #[test]
+    fn duplicate_operator_names_still_have_distinct_registration_slots() {
+        let mut body = parse_fn_body("fn f(x: i32) -> bool { x < 5 }");
+        let mutator = Mutator::new(vec![
+            Box::new(ComparisonOperatorSwap),
+            Box::new(ComparisonOperatorSwap),
+        ]);
+        let mut rng = StdRng::seed_from_u64(13);
+        let recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
+        assert_eq!(recorded.opportunities.len(), 2);
+        let selection = recorded.selection.unwrap();
+        assert!(selection.operator_index < 2);
+        assert_eq!(
+            recorded.opportunities[selection.operator_index].operator,
+            selection.operator
+        );
+    }
+
+    #[test]
+    fn compatibility_wrapper_uses_the_same_recorded_sampler() {
+        let original = parse_fn_body("fn f(x: i32, y: i32) -> bool { x < 5 && y + 2 > 9 }");
+        let mut legacy_body = original.clone();
+        let mut recorded_body = original;
+        let mut legacy_rng = StdRng::seed_from_u64(17);
+        let mut recorded_rng = StdRng::seed_from_u64(17);
+        let mutator = Mutator::default();
+
+        let legacy = mutator.mutate_one(&mut legacy_body, &mut legacy_rng);
+        let recorded = mutator.mutate_one_recorded(&mut recorded_body, &mut recorded_rng);
+
+        assert_eq!(legacy, recorded.mutation);
+        assert_eq!(quote::quote!(#legacy_body).to_string(), quote::quote!(#recorded_body).to_string());
+        assert_eq!(legacy_rng.r#gen::<u64>(), recorded_rng.r#gen::<u64>());
+    }
+
+    #[test]
+    fn recorded_no_eligible_sites_retains_zero_opportunities() {
+        let mut body =
+            parse_fn_body("fn f() -> &'static str { \"no numbers or comparisons here\" }");
+        let mutator = Mutator::new(vec![Box::new(ComparisonOperatorSwap)]);
+        let mut rng = StdRng::seed_from_u64(1);
+        let recorded = mutator.mutate_one_recorded(&mut body, &mut rng);
+        assert_eq!(recorded.total_eligible_sites, 0);
+        assert_eq!(recorded.opportunities.len(), 1);
+        assert_eq!(recorded.opportunities[0].eligible_sites, 0);
+        assert!(recorded.selection.is_none());
+        assert!(recorded.mutation.is_none());
     }
 
     #[test]
