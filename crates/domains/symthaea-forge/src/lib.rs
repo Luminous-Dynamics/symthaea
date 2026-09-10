@@ -12,22 +12,24 @@
 //! [`candidate`] is the authority-free bridge into `symthaea-algorithms`: it requires the caller to
 //! supply semantic registry context and a baseline implementation. Forge-local traces become a
 //! semantic discovery ledger only when the exact `DiscoveryRun` and complete observation archive
-//! are supplied externally. [`bundle`] proves structural persisted-file integrity, while
-//! [`bundle_verify`] proves the cross-file semantics of that bundle. [`trial_semantics`] validates
-//! event/schema/attempt/artifact/transformation consistency, [`trials`] preserves exact concrete
-//! rewrite instances, [`learning`] provides exact-instance audit summaries, [`context_learning`]
-//! constrains cross-run aggregation, [`family_learning`] introduces generator-scoped operator
-//! families, [`family_context_learning`] permits family aggregation only across distinct exact-
-//! context runs, [`sequence_learning`] reconstructs accepted family history at generation
-//! boundaries, [`sequence_stats`] aggregates bounded-history conditional outcomes only across
-//! exact-context repeated-search cohorts, [`corpus_split`] freezes outcome-independent
-//! train/validation/holdout membership, [`proposal_exposure`] defines the complete opportunity
-//! evidence required before those observational outcomes may inform future policy learning,
-//! [`proposal_recording`] binds either live or persisted raw proposal evidence through one semantic
-//! conversion path, [`proposal_trace`] retains the live draw as generator-local content-addressed
-//! evidence, [`proposal_coverage`] proves that raw proposal evidence exactly covers the search
-//! trace, and [`proposal_qualification`] composes those layers while also binding no-op-only runs to
-//! the exact semantic baseline implementation.
+//! are supplied externally. [`bundle`] proves structural persisted-file integrity,
+//! [`bundle_verify`] proves the existing cross-file semantics of that bundle, and
+//! [`bundle_proposal_verify`] additionally rehydrates generator-local proposal evidence and proves
+//! exact trace/proposal coverage. [`trial_semantics`] validates event/schema/attempt/artifact/
+//! transformation consistency, [`trials`] preserves exact concrete rewrite instances, [`learning`]
+//! provides exact-instance audit summaries, [`context_learning`] constrains cross-run aggregation,
+//! [`family_learning`] introduces generator-scoped operator families,
+//! [`family_context_learning`] permits family aggregation only across distinct exact-context runs,
+//! [`sequence_learning`] reconstructs accepted family history at generation boundaries,
+//! [`sequence_stats`] aggregates bounded-history conditional outcomes only across exact-context
+//! repeated-search cohorts, [`corpus_split`] freezes outcome-independent train/validation/holdout
+//! membership, [`proposal_exposure`] defines the complete opportunity evidence required before
+//! those observational outcomes may inform future policy learning, [`proposal_recording`] binds
+//! either live or persisted raw proposal evidence through one semantic conversion path,
+//! [`proposal_trace`] retains the live draw as generator-local content-addressed evidence,
+//! [`proposal_coverage`] proves that raw proposal evidence exactly covers the search trace, and
+//! [`proposal_qualification`] composes those layers while also binding no-op-only runs to the exact
+//! semantic baseline implementation.
 //!
 //! # Authority boundary
 //!
@@ -46,7 +48,8 @@
 //!   or reapplies a mutation.
 //! - Raw proposal archives record generator behavior faithfully even when a later semantic policy
 //!   refuses to qualify that behavior for learning.
-//! - Proposal-stage traces and raw proposal archives must provide one-to-one coverage.
+//! - Proposal-stage traces and raw proposal archives must provide one-to-one coverage both before
+//!   return from search and after persistent bundle rehydration.
 //! - No-op-only proposal histories still have to bind the exact declared baseline artifact.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
@@ -60,6 +63,7 @@
 //!   mutation, or runtime authority is provided here.
 
 pub mod bundle;
+pub mod bundle_proposal_verify;
 pub mod bundle_verify;
 pub mod candidate;
 pub mod certificate;
@@ -86,7 +90,11 @@ pub mod trials;
 
 pub use bundle::{
     read_completed_manifest, BundleError, ForgeBundleManifest, ForgeBundleOutcome, ABORT_FILE,
-    CANDIDATE_FILE, CERTIFICATE_FILE, MANIFEST_FILE, OBSERVATIONS_FILE, REPORT_FILE, TRACE_FILE,
+    CANDIDATE_FILE, CERTIFICATE_FILE, MANIFEST_FILE, OBSERVATIONS_FILE, RAW_PROPOSALS_FILE,
+    REPORT_FILE, TRACE_FILE,
+};
+pub use bundle_proposal_verify::{
+    read_completed_proposal_bundle, BundleProposalSemanticError, VerifiedForgeProposalBundle,
 };
 pub use bundle_verify::{
     read_completed_bundle, BundleSemanticError, ForgeAbortRecord, ForgeAbortStats,
