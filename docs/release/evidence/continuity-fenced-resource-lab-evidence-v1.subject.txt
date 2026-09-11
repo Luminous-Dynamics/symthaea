@@ -1,4 +1,5 @@
-retained_evidence_subject=e4099ed48a4a677d69c4787761327325f9634dd7
+retained_evidence_code_subject=e4099ed48a4a677d69c4787761327325f9634dd7
 parent_contained_lab_subject=ccb6ce81eac5b4dcc638acaa7cc5cca4880233d0
 parent_contained_lab_run=34620171980
+note=later evidence-only metadata commits may advance the PR head without changing the frozen code subject
 status=NOT_ESTABLISHED_UNTIL_EXACT_HEAD_WORKFLOW_PASSES
