@@ -5,6 +5,7 @@
 pub mod cislunar;
 pub mod cislunar_oracle;
 pub mod cislunar_target;
+pub mod lunar_site_release;
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
