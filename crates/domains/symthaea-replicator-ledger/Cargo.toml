@@ -2,8 +2,10 @@
 name = "symthaea-replicator-ledger"
 version = "0.1.0"
 edition = "2024"
-description = "Append-only lineage and atomic budget ledger for the Symthaea Replicator Safety Kernel"
+description = "Reference lineage and atomic budget semantics for the Symthaea Replicator Safety Kernel; not production-admitted"
 license = "AGPL-3.0-or-later"
+publish = false
+readme = "README.md"
 
 [dependencies]
 symthaea-replicator-safety = { path = "../symthaea-replicator-safety" }

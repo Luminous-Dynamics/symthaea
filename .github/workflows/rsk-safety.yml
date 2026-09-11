@@ -1,0 +1,179 @@
+name: RSK Safety Kernel
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-replicator-safety/**'
+      - 'crates/domains/symthaea-replicator-ledger/**'
+      - 'docs/architecture/replicator-safety/**'
+      - '.github/workflows/rsk-safety.yml'
+      - 'scripts/check-class-a-changes.sh'
+      - 'docs/compliance/GOVERNANCE_CHARTER.md'
+  push:
+    branches: [main]
+    paths:
+      - 'crates/domains/symthaea-replicator-safety/**'
+      - 'crates/domains/symthaea-replicator-ledger/**'
+      - 'docs/architecture/replicator-safety/**'
+      - '.github/workflows/rsk-safety.yml'
+      - 'scripts/check-class-a-changes.sh'
+      - 'docs/compliance/GOVERNANCE_CHARTER.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rsk-safety-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rsk-governance:
+    name: RSK Class A ADR gate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require an RSK Class A ADR for safety-boundary changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha='${{ github.event.pull_request.base.sha }}'
+          changed_files="$(git diff --name-only "${base_sha}"...HEAD)"
+
+          class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-ledger/|\.github/workflows/rsk-safety\.yml$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
+
+          if ! printf '%s\n' "${changed_files}" | grep -Eq "${class_a_pattern}"; then
+            echo "No RSK Class A implementation/governance surface changed."
+            exit 0
+          fi
+
+          echo "RSK Class A surface changed; verifying ADR evidence."
+          adr_files="$(printf '%s\n' "${changed_files}" | grep -E '^docs/compliance/adr/ADR-[0-9]+.*\.md$' || true)"
+          if [ -z "${adr_files}" ]; then
+            echo "ERROR: RSK Class A changes require a changed ADR under docs/compliance/adr/."
+            exit 1
+          fi
+
+          valid_adr=false
+          while IFS= read -r adr; do
+            [ -n "${adr}" ] || continue
+            if grep -Eq '(Replicator Safety Kernel|RSK)' "${adr}" \
+              && grep -Eq '^\*\*Change Class\*\*: A([[:space:]]|$)' "${adr}"; then
+              echo "RSK Class A ADR found: ${adr}"
+              valid_adr=true
+              break
+            fi
+          done <<< "${adr_files}"
+
+          if ! ${valid_adr}; then
+            echo "ERROR: changed ADRs do not identify RSK and declare Change Class A."
+            exit 1
+          fi
+
+      - name: Verify generic Class A detector retains RSK coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_paths=(
+            'crates/domains/symthaea-replicator-safety/'
+            'crates/domains/symthaea-replicator-ledger/'
+            '.github/workflows/rsk-safety.yml'
+            'scripts/check-class-a-changes.sh'
+            'docs/compliance/GOVERNANCE_CHARTER.md'
+          )
+
+          for path in "${required_paths[@]}"; do
+            if ! grep -Fq "\"${path}\"" scripts/check-class-a-changes.sh; then
+              echo "ERROR: generic Class A detector lost required RSK/governance path: ${path}"
+              exit 1
+            fi
+          done
+
+          echo "Generic Class A detector retains all required RSK/governance paths."
+
+      - name: Keep RSK reference crates non-publishable until admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifests=(
+            crates/domains/symthaea-replicator-safety/Cargo.toml
+            crates/domains/symthaea-replicator-ledger/Cargo.toml
+          )
+
+          for manifest in "${manifests[@]}"; do
+            if ! grep -Eq '^publish[[:space:]]*=[[:space:]]*false[[:space:]]*$' "${manifest}"; then
+              echo "ERROR: ${manifest} is publishable while RSK production admission remains denied."
+              exit 1
+            fi
+          done
+
+          if ! grep -Fq 'Production admission status: DENIED / NOT YET ELIGIBLE.' \
+            docs/architecture/replicator-safety/RSK_PRODUCTION_ADMISSION_GATES_V0_1.md; then
+            echo "ERROR: production-admission status marker is missing or changed."
+            exit 1
+          fi
+
+          echo "RSK reference crates remain non-publishable and admission remains explicitly denied."
+
+  rsk-format:
+    name: RSK format check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust formatter
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format only the RSK crates
+        run: cargo fmt --check -p symthaea-replicator-safety -p symthaea-replicator-ledger
+
+  rsk-core:
+    name: RSK compile + test + clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-rsk-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-rsk-
+
+      - name: Compile the RSK crates and all test targets
+        run: |
+          cargo check -p symthaea-replicator-safety --all-targets
+          cargo check -p symthaea-replicator-ledger --all-targets
+
+      - name: Run the constitutional authority tests
+        run: cargo test -p symthaea-replicator-safety --all-targets
+
+      - name: Run lineage, budget, replay-resistance, and adversarial tests
+        run: cargo test -p symthaea-replicator-ledger --all-targets
+
+      - name: Clippy the complete RSK target surface
+        run: |
+          cargo clippy -p symthaea-replicator-safety --all-targets -- -D warnings
+          cargo clippy -p symthaea-replicator-ledger --all-targets -- -D warnings
