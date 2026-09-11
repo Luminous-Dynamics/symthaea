@@ -81,6 +81,7 @@ def init_db(path: str, resource_id: str, backend_id: str, profile_id: str) -> No
           disposition TEXT NOT NULL,
           deny_reason TEXT,
           emergency_stop INTEGER NOT NULL,
+          current_token_id TEXT,
           value INTEGER NOT NULL
         );
         CREATE TABLE IF NOT EXISTS consumed_tokens(
@@ -95,7 +96,7 @@ def init_db(path: str, resource_id: str, backend_id: str, profile_id: str) -> No
                 deny("init:identity_mismatch")
             return
         conn.execute("BEGIN IMMEDIATE")
-        conn.execute("INSERT INTO resource_state VALUES(1,?,?,?,0,'deny','uninitialized',0,0)", (resource_id, backend_id, profile_id))
+        conn.execute("INSERT INTO resource_state VALUES(1,?,?,?,0,'deny','uninitialized',0,NULL,0)", (resource_id, backend_id, profile_id))
         conn.commit()
     finally:
         conn.close()
@@ -117,7 +118,6 @@ def issue(path: str, disposition: str, reason: str | None, challenge: str) -> di
             deny("issue:emergency_stop_sticky")
         new_generation = generation + 1
         new_stopped = 1 if stopped or reason == "emergency_stop" else 0
-        conn.execute("UPDATE resource_state SET current_generation=?,disposition=?,deny_reason=?,emergency_stop=? WHERE singleton=1", (new_generation, disposition, reason, new_stopped))
         token = {
             "resource_id": resource_id,
             "backend_id": backend_id,
@@ -129,6 +129,7 @@ def issue(path: str, disposition: str, reason: str | None, challenge: str) -> di
             "token_id": "",
         }
         token["token_id"] = token_id(token)
+        conn.execute("UPDATE resource_state SET current_generation=?,disposition=?,deny_reason=?,emergency_stop=?,current_token_id=? WHERE singleton=1", (new_generation, disposition, reason, new_stopped, token["token_id"]))
         conn.commit()
         return token
     except Exception:
@@ -148,8 +149,8 @@ def actuate(path: str, token: dict[str, Any], delta: int, operation_digest: str,
     conn = connect(path)
     try:
         conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute("SELECT resource_id,backend_id,enforcement_profile_id,current_generation,disposition,emergency_stop,value FROM resource_state WHERE singleton=1").fetchone()
-        resource_id, backend_id, profile_id, current_generation, disposition, stopped, value = row
+        row = conn.execute("SELECT resource_id,backend_id,enforcement_profile_id,current_generation,disposition,emergency_stop,current_token_id,value FROM resource_state WHERE singleton=1").fetchone()
+        resource_id, backend_id, profile_id, current_generation, disposition, stopped, current_token_id, value = row
         if token["resource_id"] != resource_id:
             deny("actuate:resource_mismatch")
         if token["backend_id"] != backend_id:
@@ -158,6 +159,8 @@ def actuate(path: str, token: dict[str, Any], delta: int, operation_digest: str,
             deny("actuate:profile_mismatch")
         if token["generation"] != current_generation:
             deny("actuate:stale_generation")
+        if token["token_id"] != current_token_id:
+            deny("actuate:token_mismatch")
         if stopped:
             deny("actuate:emergency_stop")
         if disposition != "permit" or token["disposition"] != "permit":
@@ -183,12 +186,12 @@ def actuate(path: str, token: dict[str, Any], delta: int, operation_digest: str,
 def snapshot(path: str) -> dict[str, Any]:
     conn = connect(path)
     try:
-        row = conn.execute("SELECT resource_id,backend_id,enforcement_profile_id,current_generation,disposition,deny_reason,emergency_stop,value FROM resource_state WHERE singleton=1").fetchone()
+        row = conn.execute("SELECT resource_id,backend_id,enforcement_profile_id,current_generation,disposition,deny_reason,emergency_stop,current_token_id,value FROM resource_state WHERE singleton=1").fetchone()
         consumed = conn.execute("SELECT token_id,generation,operation_digest FROM consumed_tokens ORDER BY token_id").fetchall()
         return {
             "resource_id": row[0], "backend_id": row[1], "enforcement_profile_id": row[2],
             "current_generation": row[3], "disposition": row[4], "deny_reason": row[5],
-            "emergency_stop": bool(row[6]), "value": row[7],
+            "emergency_stop": bool(row[6]), "current_token_id": row[7], "value": row[8],
             "consumed_tokens": [{"token_id": x[0], "generation": x[1], "operation_digest": x[2]} for x in consumed],
         }
     finally:
