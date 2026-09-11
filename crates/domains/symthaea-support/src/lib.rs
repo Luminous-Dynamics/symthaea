@@ -18,6 +18,8 @@ pub mod it_qualification;
 pub mod knowledge;
 pub mod knowledge_source;
 pub mod legacy_computing;
+#[cfg(test)]
+mod legacy_computing_pack_tests;
 #[cfg(feature = "logparse-adapter")]
 pub mod logparse_adapter;
 pub mod predictive;
