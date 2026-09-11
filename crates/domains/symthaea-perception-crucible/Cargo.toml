@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-perception-crucible"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Evidence-first perception stress/crucible assessment for false alarms, abstention, and safety boundaries"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["perception", "safety", "testing", "uncertainty"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-tracking-eval = { path = "../symthaea-tracking-eval" }
+symthaea-selective-classification = { path = "../symthaea-selective-classification" }
