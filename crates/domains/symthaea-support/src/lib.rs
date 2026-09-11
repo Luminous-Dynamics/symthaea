@@ -21,6 +21,7 @@ pub mod legacy_artifact_qualification;
 pub mod legacy_computing;
 #[cfg(test)]
 mod legacy_computing_pack_tests;
+pub mod legacy_platform_identity;
 pub mod legacy_qualification_profile;
 pub mod legacy_source_artifacts;
 pub mod legacy_source_readiness;
@@ -82,6 +83,11 @@ pub use legacy_computing::{
     LegacyCoverageStateV1, LegacyKnowledgeAreaV1, LegacyPlatformProfileV1, LegacyPlatformV1,
     LegacyProcedureAuthorityV1, LegacyProcedureKindV1, LegacyProcedureStepV1,
     LegacyProcedureV1, LEGACY_COMPUTING_PACK_SCHEMA_V1,
+};
+pub use legacy_platform_identity::{
+    assess_legacy_platform_identity_v1, legacy_platform_identity_spec_v1,
+    legacy_platform_identity_v1, legacy_platform_scope_v1, LegacyPlatformIdentitySpecV1,
+    LEGACY_PLATFORM_ECOSYSTEM_V1, LEGACY_PLATFORM_IDENTITY_SCHEMA_V1,
 };
 pub use legacy_qualification_profile::{
     area_tag, assess_legacy_qualification_profile_v1, exhaustive_legacy_qualification_profile_v1,
