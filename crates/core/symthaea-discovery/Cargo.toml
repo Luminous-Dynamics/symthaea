@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-discovery"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Domain-neutral discovery contracts for candidates, predictions, uncertainty, evidence, experiments, and deterministic review certificates."
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+blake3 = { workspace = true }
