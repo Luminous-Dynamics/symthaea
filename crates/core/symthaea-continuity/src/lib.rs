@@ -34,6 +34,7 @@ pub mod execution_coordinator;
 pub mod execution_journal;
 pub mod execution_journal_anchor;
 pub mod execution_result;
+pub mod external_effect_authority;
 pub mod external_effects;
 pub mod failure_domain;
 pub mod known_good;
@@ -77,7 +78,9 @@ pub use commit_currentness::{
     QualifiedLocalCommitCurrentnessId, QualifiedLocalCommitCurrentnessV1,
     ValidatedLocalCommitCurrentnessPolicyV1,
 };
-pub use commit_eligibility::{CommitEligibilityError, CommitEligibleTransitionId, CommitEligibleTransitionV1};
+pub use commit_eligibility::{
+    CommitEligibilityError, CommitEligibleTransitionId, CommitEligibleTransitionV1,
+};
 pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
     ContinuityRequirementV1, ContractError, EquivalencePredicate, RequirementCriticality,
@@ -95,8 +98,7 @@ pub use crash_recovery_qualification::{
 };
 pub use current_crash_recovery::{
     CURRENT_CRASH_RECOVERY_RECORD_SCHEMA_V1, CurrentCrashRecoveryError,
-    CurrentCrashRecoveryRecordV1, QualifiedCurrentCrashRecoveryId,
-    QualifiedCurrentCrashRecoveryV1,
+    CurrentCrashRecoveryRecordV1, QualifiedCurrentCrashRecoveryId, QualifiedCurrentCrashRecoveryV1,
 };
 pub use distributed::{
     DISTRIBUTED_CHANGE_BUDGET_SCHEMA_V1, DistributedChangeBudgetError, DistributedChangeBudgetId,
@@ -139,7 +141,9 @@ pub use exact_local_health::{
     QualifiedHealthyLocalSnapshotId, QualifiedHealthyLocalSnapshotV1,
     canonical_crash_source_health_claim_bytes, canonical_crash_source_health_claim_digest,
 };
-pub use exact_policy::{ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1};
+pub use exact_policy::{
+    ExactVerificationPolicyError, ExactVerificationPolicyId, ExactVerificationPolicyV1,
+};
 pub use execution_capability::{
     EXECUTION_ATTEMPT_INTENT_SCHEMA_V1, EXECUTION_ATTEMPT_RECEIPT_SCHEMA_V1,
     EXECUTION_BACKEND_PROFILE_SCHEMA_V1, ExecutionAttemptId, ExecutionAttemptIntentV1,
@@ -164,19 +168,30 @@ pub use execution_journal_anchor::{
     QualifiedExecutionJournalAnchorId, QualifiedExecutionJournalAnchorV1,
     canonical_execution_journal_anchor_claim_bytes, canonical_execution_journal_anchor_claim_digest,
 };
-pub use execution_result::{CanonicalExecutionAttemptResultId, CanonicalExecutionAttemptResultV1, ExecutionResultBindingError};
+pub use execution_result::{
+    CanonicalExecutionAttemptResultId, CanonicalExecutionAttemptResultV1,
+    ExecutionResultBindingError,
+};
+pub use external_effect_authority::{
+    EXTERNAL_EFFECT_AUTHORITY_CLAIM_SCHEMA_V1, EXTERNAL_EFFECT_AUTHORITY_PURPOSE,
+    EXTERNAL_EFFECT_PLAN_SCHEMA_V1, AuthenticatedExternalEffectAuthorityId,
+    EffectAuthorizedTrustedCommitEligibilityV1, EffectScopedKnownGoodBoundEligibilityV1,
+    ExternalEffectAuthorityClaimId, ExternalEffectAuthorityClaimV1, ExternalEffectAuthorityError,
+    ExternalEffectPlanId, ExternalEffectPlanV1, QualifiedExternalEffectAuthorizationId,
+    QualifiedExternalEffectAuthorizationV1, canonical_external_effect_authority_claim_bytes,
+    canonical_external_effect_authority_claim_digest,
+};
 pub use external_effects::{
     EXTERNAL_EFFECT_CONTRACT_SCHEMA_V1, EXTERNAL_EFFECT_OBSERVATION_AUTH_PURPOSE,
-    EXTERNAL_EFFECT_OBSERVATION_CLAIM_SCHEMA_V1,
-    EXTERNAL_EFFECT_RECONCILIATION_RECORD_SCHEMA_V1, AuthenticatedExternalEffectObservationId,
-    ExternalEffectClassV1, ExternalEffectContractId, ExternalEffectContractV1,
-    ExternalEffectError, ExternalEffectObservationClaimId, ExternalEffectObservationClaimV1,
-    ExternalEffectObservationPolicyId, ExternalEffectObservationPolicyV1,
-    ExternalEffectObligationId, ExternalEffectObligationV1, ExternalEffectObservedStateV1,
-    ExternalEffectRecoveryPredicateV1, ExternalEffectReconciliationRecordV1,
-    QualifiedExternalEffectObservationId, QualifiedExternalEffectObservationV1,
-    QualifiedExternalEffectReconciliationId, QualifiedExternalEffectReconciliationV1,
-    canonical_external_effect_observation_claim_bytes,
+    EXTERNAL_EFFECT_OBSERVATION_CLAIM_SCHEMA_V1, EXTERNAL_EFFECT_RECONCILIATION_RECORD_SCHEMA_V1,
+    AuthenticatedExternalEffectObservationId, ExternalEffectClassV1, ExternalEffectContractId,
+    ExternalEffectContractV1, ExternalEffectError, ExternalEffectObservationClaimId,
+    ExternalEffectObservationClaimV1, ExternalEffectObservationPolicyId,
+    ExternalEffectObservationPolicyV1, ExternalEffectObligationId, ExternalEffectObligationV1,
+    ExternalEffectObservedStateV1, ExternalEffectRecoveryPredicateV1,
+    ExternalEffectReconciliationRecordV1, QualifiedExternalEffectObservationId,
+    QualifiedExternalEffectObservationV1, QualifiedExternalEffectReconciliationId,
+    QualifiedExternalEffectReconciliationV1, canonical_external_effect_observation_claim_bytes,
     canonical_external_effect_observation_claim_digest,
 };
 pub use failure_domain::{
@@ -201,10 +216,10 @@ pub use post_execution_health::{
 };
 pub use post_execution_observation::{
     POST_EXECUTION_OBSERVATION_CLAIM_SCHEMA_V1, AuthenticatedPostExecutionObservationId,
-    PostExecutionObservationClaimId, PostExecutionObservationClaimV1,
-    PostExecutionObservationError, PostExecutionObservationPolicyId,
-    PostExecutionObservationPolicyV1, PostExecutionObservedStateV1,
-    QualifiedPostExecutionObservationId, QualifiedPostExecutionObservationV1,
+    PostExecutionObservationClaimId, PostExecutionObservationClaimV1, PostExecutionObservationError,
+    PostExecutionObservationPolicyId, PostExecutionObservationPolicyV1,
+    PostExecutionObservedStateV1, QualifiedPostExecutionObservationId,
+    QualifiedPostExecutionObservationV1,
 };
 pub use post_transition_distributed_health::{
     PostTransitionDistributedHealthError, PostTransitionDistributedStateDigest,
@@ -217,21 +232,33 @@ pub use profile_adoption::{
     VerifierProfileAdoptionSubjectId, VerifierProfileAdoptionSubjectV1,
     VerifierProfileAdoptionTransitionDigest, VerifierProfileAdoptionTransitionV1,
 };
-pub use promotion_eligibility::{LkgPromotionEligibilityId, LkgPromotionEligibilityV1, LkgPromotionError};
+pub use promotion_eligibility::{
+    LkgPromotionEligibilityId, LkgPromotionEligibilityV1, LkgPromotionError,
+};
 pub use recovery_qualification::{
     QualifiedRecoveryToActiveKnownGoodId, QualifiedRecoveryToActiveKnownGoodV1,
     RecoveryQualificationError,
 };
-pub use scope::{CONTINUITY_SUBJECT_SCHEMA_V1, ContinuityScopeV1, ContinuitySubjectError, ContinuitySubjectId, ContinuitySubjectV1};
-pub use subject_contract::{SubjectBoundContinuityContractId, SubjectBoundContinuityContractV1, SubjectContractBindingError};
-pub use subject_witness::{SubjectBoundQualifiedContinuityWitnessId, SubjectBoundQualifiedContinuityWitnessV1, SubjectWitnessBindingError};
+pub use scope::{
+    CONTINUITY_SUBJECT_SCHEMA_V1, ContinuityScopeV1, ContinuitySubjectError, ContinuitySubjectId,
+    ContinuitySubjectV1,
+};
+pub use subject_contract::{
+    SubjectBoundContinuityContractId, SubjectBoundContinuityContractV1,
+    SubjectContractBindingError,
+};
+pub use subject_witness::{
+    SubjectBoundQualifiedContinuityWitnessId, SubjectBoundQualifiedContinuityWitnessV1,
+    SubjectWitnessBindingError,
+};
 pub use transition_authority::{
     TRANSITION_AUTHORITY_CLAIM_SCHEMA_V1, TRANSITION_AUTHORITY_POLICY_SCHEMA_V1,
     TRANSITION_AUTHORITY_PROFILE_SCHEMA_V1, TRANSITION_AUTHORITY_XENIA_PURPOSE,
     AuthenticatedTransitionAuthorityId, TransitionAuthorityClaimId, TransitionAuthorityClaimV1,
     TransitionAuthorityError, TransitionAuthorityPolicyId, TransitionAuthorityPolicyV1,
-    TransitionAuthorityProfileId, TransitionAuthorityProfileV1, ValidatedTransitionAuthorityPolicyV1,
-    canonical_transition_authority_claim_bytes, canonical_transition_authority_claim_digest,
+    TransitionAuthorityProfileId, TransitionAuthorityProfileV1,
+    ValidatedTransitionAuthorityPolicyV1, canonical_transition_authority_claim_bytes,
+    canonical_transition_authority_claim_digest,
 };
 pub use transition_lineage::{
     KNOWN_GOOD_EXECUTION_INTENT_SCHEMA_V1, KNOWN_GOOD_TRANSITION_LINEAGE_SCHEMA_V1,
