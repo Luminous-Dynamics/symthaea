@@ -169,11 +169,29 @@ impl PlssReferenceTwin {
         &self.config
     }
 
+    /// Nominal PLSS step with no external radiator derating.
     pub fn step(&mut self, input: PlssStepInput) -> Result<(), PlssStepError> {
+        self.step_with_heat_rejection_fraction(input, 1.0)
+    }
+
+    /// Step the PLSS while applying an externally established heat-rejection
+    /// fraction in [0,1]. This supports evidence-bearing environmental effects
+    /// such as radiator dust loading without mutating the baseline PLSS config.
+    ///
+    /// The fraction is a simulation input; this method does not infer it from
+    /// dust, coatings, or EDS state and never commands thermal hardware.
+    pub fn step_with_heat_rejection_fraction(
+        &mut self,
+        input: PlssStepInput,
+        heat_rejection_fraction: f64,
+    ) -> Result<(), PlssStepError> {
         if !self.config.is_valid() {
             return Err(PlssStepError::InvalidConfig);
         }
-        if !input.is_valid() {
+        if !input.is_valid()
+            || !heat_rejection_fraction.is_finite()
+            || !(0.0..=1.0).contains(&heat_rejection_fraction)
+        {
             return Err(PlssStepError::InvalidInput);
         }
         if self.state.ventilation == PlssPathState::Failed {
@@ -204,7 +222,7 @@ impl PlssReferenceTwin {
             (self.state.humidity_burden + humidity_added - humidity_removed).max(0.0);
 
         let heat_in_w = input.metabolism.metabolic_heat_w + input.equipment_heat_w;
-        let heat_rejection_w = self.available_heat_rejection_w()?;
+        let heat_rejection_w = self.available_heat_rejection_w()? * heat_rejection_fraction;
         let net_heat_j = (heat_in_w - heat_rejection_w) * input.dt_s;
         self.state.thermal_store_k += net_heat_j / self.config.thermal_capacitance_j_k;
 
@@ -263,17 +281,20 @@ mod tests {
             .unwrap()
     }
 
-    #[test]
-    fn nominal_step_consumes_oxygen() {
-        let mut twin = PlssReferenceTwin::simulation_reference();
-        let before = twin.state().primary_o2_remaining_l;
-        twin.step(PlssStepInput {
+    fn input() -> PlssStepInput {
+        PlssStepInput {
             metabolism: metabolism(),
             equipment_heat_w: 50.0,
             humidity_generation_per_min: 0.2,
             dt_s: 60.0,
-        })
-        .unwrap();
+        }
+    }
+
+    #[test]
+    fn nominal_step_consumes_oxygen() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        let before = twin.state().primary_o2_remaining_l;
+        twin.step(input()).unwrap();
         assert!(twin.state().primary_o2_remaining_l < before);
     }
 
@@ -304,5 +325,31 @@ mod tests {
             dt_s: 1.0,
         });
         assert_eq!(result, Err(PlssStepError::NoThermalPath));
+    }
+
+    #[test]
+    fn radiator_derating_increases_stored_heat() {
+        let mut clean = PlssReferenceTwin::simulation_reference();
+        let mut dusted = PlssReferenceTwin::simulation_reference();
+        clean
+            .step_with_heat_rejection_fraction(input(), 1.0)
+            .unwrap();
+        dusted
+            .step_with_heat_rejection_fraction(input(), 0.5)
+            .unwrap();
+        assert!(dusted.state().thermal_store_k > clean.state().thermal_store_k);
+    }
+
+    #[test]
+    fn malformed_heat_rejection_fraction_fails_closed() {
+        let mut twin = PlssReferenceTwin::simulation_reference();
+        assert_eq!(
+            twin.step_with_heat_rejection_fraction(input(), f64::NAN),
+            Err(PlssStepError::InvalidInput)
+        );
+        assert_eq!(
+            twin.step_with_heat_rejection_fraction(input(), 1.1),
+            Err(PlssStepError::InvalidInput)
+        );
     }
 }
