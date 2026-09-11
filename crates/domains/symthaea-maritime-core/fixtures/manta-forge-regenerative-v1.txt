@@ -1,0 +1,11 @@
+schema=manta-forge-regenerative-v1
+period_duration_ms=31557600000
+dependency=structural-steel|ordinary|1000000|950000|50000|0|1000
+dependency=control-electronics|ordinary|100|90|0|1000|10
+dependency=qualified-reactor-fuel-service|safeguarded_external|1|0|0|30|1
+capability=persistent-ocean-infrastructure|essential|control-electronics,qualified-reactor-fuel-service,structural-steel
+expected_mass_closure_basis_points=9999
+expected_static_horizon_periods=30
+expected_dynamic_survived_ticks=30
+expected_dynamic_failure_tick=31
+expected_limiting_dependency=qualified-reactor-fuel-service
