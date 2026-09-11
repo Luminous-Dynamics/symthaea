@@ -406,8 +406,9 @@ impl From<ItQualificationErrorV1> for LegacyNetworkingScenarioErrorV1 {
 mod tests {
     use super::*;
     use crate::{
-        build_legacy_five_platform_portfolio_v1, enrich_legacy_aix_ibmi_networking_v1,
-        legacy_blocker_matrix_v1,
+        assess_legacy_qualification_profile_v1, build_legacy_five_platform_portfolio_v1,
+        enrich_legacy_aix_ibmi_networking_v1, exhaustive_legacy_qualification_profile_v1,
+        LegacyQualificationBlockerV1,
     };
 
     fn pack() -> LegacyComputingPackV1 {
@@ -479,15 +480,23 @@ mod tests {
             register_legacy_networking_qualification_cases_v1(&pack, &mut matrix).unwrap(),
             0
         );
-        let blockers = legacy_blocker_matrix_v1(&pack, &matrix).unwrap();
+
+        let profile = exhaustive_legacy_qualification_profile_v1();
+        let assessment = assess_legacy_qualification_profile_v1(&pack, &profile, &matrix).unwrap();
+        assert!(!assessment.source_qualification_ready);
         for platform in [LegacyPlatformV1::Aix, LegacyPlatformV1::IbmI] {
-            let cell = blockers
-                .cell(platform, LegacyKnowledgeAreaV1::Networking)
+            let cell = assessment
+                .requirements
+                .iter()
+                .find(|requirement| {
+                    requirement.platform == platform
+                        && requirement.area == LegacyKnowledgeAreaV1::Networking
+                })
                 .unwrap();
             assert!(cell.matching_active_cases >= 3);
             assert!(cell
-                .blocker_classes
-                .contains(&crate::LegacyBlockerClassV1::SourceProvenance));
+                .blockers
+                .contains(&LegacyQualificationBlockerV1::SourceNotContentDigestBound));
             assert!(!cell.ready_for_evaluation());
         }
     }
