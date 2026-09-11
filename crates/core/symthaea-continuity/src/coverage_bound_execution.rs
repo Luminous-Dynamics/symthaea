@@ -6,6 +6,7 @@
 //! mutation and must itself be committed into the exact protected post-intent world.
 
 pub mod current_authorized;
+pub mod current_transition_authority;
 pub mod current_verifier_commitment;
 
 use serde::{Deserialize, Serialize};
