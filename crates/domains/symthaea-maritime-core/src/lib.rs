@@ -6,15 +6,16 @@
 //! platform state, health, authority, degraded-operation, fleet-assurance,
 //! operating-mode/limit evaluation, resident docking/service, independent resource
 //! envelopes, wet/dry bay safety, maintenance/requalification, regenerative
-//! industrial-closure/substitution/genome analysis and progressive-failure recording
-//! contracts reusable by AUVs, USVs, research vessels, logistics craft and other
-//! maritime platforms.
+//! industrial-closure/substitution/genome/flow-support analysis and progressive-failure
+//! recording contracts reusable by AUVs, USVs, research vessels, logistics craft and
+//! other maritime platforms.
 
 pub mod authority;
 pub mod bay;
 pub mod degraded;
 pub mod docking;
 pub mod fleet;
+pub mod flow_support;
 pub mod genome;
 pub mod health;
 pub mod maintenance;
@@ -31,6 +32,7 @@ pub use bay::*;
 pub use degraded::*;
 pub use docking::*;
 pub use fleet::*;
+pub use flow_support::*;
 pub use genome::*;
 pub use health::*;
 pub use maintenance::*;
