@@ -228,6 +228,7 @@ pub use proposal_validation_coverage::{
 };
 pub use proposal_validation_predictions::{
     forge_deterministic_brier_configuration_id, forge_deterministic_brier_scorer_id,
+    ForgeProposalValidationPredictionError,
 };
 pub use search::{
     run_search, run_search_recorded, ForgeConfig, SearchFailure, SearchOutcome, SearchRecord,
