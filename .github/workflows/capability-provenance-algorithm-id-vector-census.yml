@@ -1,0 +1,133 @@
+# Evidence-only independent derivation of V1 capability algorithm-ID golden vectors.
+# No product source is modified.
+
+name: Capability Provenance Algorithm ID Vector Census
+
+on:
+  push:
+    branches:
+      - evidence/capability-provenance-algorithm-id-vectors-v1
+    paths:
+      - .github/workflows/capability-provenance-algorithm-id-vector-census.yml
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  derive-vectors:
+    name: Independently derive V1 algorithm ID vectors
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact evidence head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: evidence/capability-provenance-algorithm-id-vectors-v1
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Derive vectors with direct BLAKE3 composition
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe='crates/core/symthaea-continuity/tests/capability_provenance_algorithm_id_vector_probe.rs'
+          cat >"$probe" <<'RS'
+          use symthaea_continuity::{
+              CAPABILITY_ACTIVATION_ALGORITHM_SEMANTICS_V1,
+              CAPABILITY_COUNTERFACTUAL_ALGORITHM_SEMANTICS_V1,
+              capability_activation_algorithm_id_v1,
+              capability_counterfactual_algorithm_id_v1,
+          };
+
+          const ACTIVATION_DOMAIN: &[u8] =
+              b"symthaea.continuity.capability-activation.algorithm-semantics.v1\0";
+          const COUNTERFACTUAL_DOMAIN: &[u8] =
+              b"symthaea.continuity.capability-counterfactual.algorithm-semantics.v1\0";
+          const EXPECTED_ACTIVATION_SEMANTICS: &str =
+              "symthaea-continuity-capability-activation-monotone-fixed-point-v1";
+          const EXPECTED_COUNTERFACTUAL_SEMANTICS: &str =
+              "symthaea-continuity-capability-counterfactual-bounded-support-frontier-v1";
+
+          fn direct_hash(domain: &[u8], semantics: &str) -> [u8; 32] {
+              let mut hasher = blake3::Hasher::new();
+              hasher.update(domain);
+              hasher.update(semantics.as_bytes());
+              *hasher.finalize().as_bytes()
+          }
+
+          fn hex(bytes: &[u8; 32]) -> String {
+              let mut out = String::with_capacity(64);
+              for byte in bytes {
+                  use std::fmt::Write as _;
+                  write!(&mut out, "{byte:02x}").unwrap();
+              }
+              out
+          }
+
+          #[test]
+          fn independently_derive_v1_algorithm_ids() {
+              assert_eq!(CAPABILITY_ACTIVATION_ALGORITHM_SEMANTICS_V1, EXPECTED_ACTIVATION_SEMANTICS);
+              assert_eq!(CAPABILITY_COUNTERFACTUAL_ALGORITHM_SEMANTICS_V1, EXPECTED_COUNTERFACTUAL_SEMANTICS);
+
+              let activation = direct_hash(ACTIVATION_DOMAIN, EXPECTED_ACTIVATION_SEMANTICS);
+              let counterfactual = direct_hash(COUNTERFACTUAL_DOMAIN, EXPECTED_COUNTERFACTUAL_SEMANTICS);
+
+              assert_eq!(activation, *capability_activation_algorithm_id_v1().as_bytes());
+              assert_eq!(counterfactual, *capability_counterfactual_algorithm_id_v1().as_bytes());
+              assert_ne!(activation, counterfactual);
+
+              println!("ACTIVATION_ALGORITHM_ID_V1={}", hex(&activation));
+              println!("COUNTERFACTUAL_ALGORITHM_ID_V1={}", hex(&counterfactual));
+          }
+          RS
+
+          cargo test --locked -p symthaea-continuity \
+            --test capability_provenance_algorithm_id_vector_probe \
+            -- --nocapture | tee /tmp/capability-provenance-algorithm-id-vectors.log
+
+          activation="$(grep -Eo 'ACTIVATION_ALGORITHM_ID_V1=[0-9a-f]{64}' /tmp/capability-provenance-algorithm-id-vectors.log | tail -n1 | cut -d= -f2)"
+          counterfactual="$(grep -Eo 'COUNTERFACTUAL_ALGORITHM_ID_V1=[0-9a-f]{64}' /tmp/capability-provenance-algorithm-id-vectors.log | tail -n1 | cut -d= -f2)"
+          test "${#activation}" -eq 64
+          test "${#counterfactual}" -eq 64
+          test "$activation" != "$counterfactual"
+
+          {
+            printf 'schema\tsymthaea-capability-provenance-algorithm-id-vector-census-v1\n'
+            printf 'subject_sha\t%s\n' "$(git rev-parse HEAD)"
+            printf 'subject_tree\t%s\n' "$(git rev-parse 'HEAD^{tree}')"
+            printf 'rustc\t%s\n' "$(rustc --version)"
+            printf 'activation_algorithm_id_v1\t%s\n' "$activation"
+            printf 'counterfactual_algorithm_id_v1\t%s\n' "$counterfactual"
+            printf 'derivation\tdirect-blake3-domain-then-semantic-bytes\n'
+            printf 'cross_check\tpublic-api-equality\n'
+          } | tee /tmp/capability-provenance-algorithm-id-vectors.tsv
+
+          rm "$probe"
+          test -z "$(git status --porcelain)"
+
+      - name: Publish vector receipt digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum /tmp/capability-provenance-algorithm-id-vectors.tsv
+
+      - name: Upload vector receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: capability-provenance-algorithm-id-vector-census-${{ github.run_id }}
+          path: /tmp/capability-provenance-algorithm-id-vectors.tsv
+          if-no-files-found: error
+          retention-days: 14
