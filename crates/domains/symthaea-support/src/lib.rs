@@ -13,6 +13,7 @@ pub mod dependency_impact;
 pub mod diagnostic_beliefs;
 pub mod diagnostics;
 pub mod federation;
+pub mod golden_incidents;
 pub mod it_qualification;
 pub mod knowledge;
 pub mod knowledge_source;
@@ -43,6 +44,12 @@ pub use diagnostic_beliefs::{
     rank_tests_by_information_gain, CausalHypothesisV1, DiagnosticBeliefError,
     DiagnosticOutcomeId, DiagnosticTestId, DiagnosticTestModelV1, ExpectedInformationGainV1,
     HypothesisDistributionV1, HypothesisId, HypothesisStatusV1,
+};
+pub use golden_incidents::{
+    seed_golden_incidents_v1, DiagnosticActionRiskV1, DiagnosticAuthorityRequirementV1,
+    GoldenDiagnosticActionV1, GoldenIncidentCaseV1, GoldenIncidentCorpusV1,
+    GoldenIncidentErrorV1, GoldenIncidentEvidenceKindV1, GoldenIncidentEvidenceV1,
+    GOLDEN_INCIDENT_SCHEMA_V1,
 };
 pub use it_qualification::{
     case_digest_v1, qualification_failures_v1, AdversarialConditionV1,
