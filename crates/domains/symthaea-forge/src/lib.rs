@@ -52,10 +52,12 @@
 //! [`proposal_launch_validation`] binds deterministic validation/holdout evidence to that exact
 //! direct-launch receipt, [`proposal_executable_model`] makes v1 model payload equal the exact
 //! evaluator executable artifact, [`proposal_model_validation`] carries that exact executable-model
-//! provenance through deterministic validation and the identity-only holdout boundary, the
-//! crate-private deterministic scorer joins frozen predictions to labels only during scoring, and
-//! [`proposal_validation_chain`] retains the earlier blind deterministic receipt machinery for
-//! compatibility while constructor visibility is narrowed in a later follow-up.
+//! provenance through deterministic validation and the identity-only holdout boundary,
+//! [`proposal_linux_isolation`] adds a stronger Linux bubblewrap namespace/filesystem/network
+//! isolation backend while keeping seccomp, Landlock, and cgroup resource enforcement as explicit
+//! nonclaims, the crate-private deterministic scorer joins frozen predictions to labels only during
+//! scoring, and [`proposal_validation_chain`] retains the earlier blind deterministic receipt
+//! machinery for compatibility while constructor visibility is narrowed in a later follow-up.
 //!
 //! # Authority boundary
 //!
@@ -108,11 +110,14 @@
 //!   launcher then proves the exact executable bytes hash to that same artifact identity.
 //! - Executable-model validation composes that payload/runner equality with exact launch evidence,
 //!   label-blind predictions, deterministic Brier scoring, and the holdout prerequisite.
-//! - The direct launcher still does not isolate filesystem or network access; no v1 receipt claims
-//!   namespace/seccomp/cgroup/VM/network/filesystem containment.
+//! - The Linux bubblewrap backend uses separate user/PID/IPC/UTS/network namespaces and a fresh
+//!   mount namespace exposing only read-only `/nix/store`, the exact read-only model executable,
+//!   isolated `/proc`, `/dev`, and fresh tmpfs `/tmp`; inherited environment is cleared.
+//! - Bubblewrap v1 still does not claim seccomp filtering, Landlock policy, or cgroup CPU/memory
+//!   enforcement; those properties remain `NotEstablishedV1` in the isolation receipt.
 //! - The earlier direct blind deterministic validation path remains a compatibility bypass in this
-//!   tranche; executable-model validation is the strongest proposition, not yet the only
-//!   constructible one.
+//!   tranche; executable-model validation is the strongest validation proposition, while the Linux
+//!   isolation receipt is the strongest runtime-containment proposition.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
 //! - Training support is counted only from observed labels; censored and counterfactual outcomes
@@ -165,6 +170,7 @@ pub mod proposal_executable_model;
 pub mod proposal_exposure;
 pub mod proposal_history;
 pub mod proposal_launch_validation;
+pub mod proposal_linux_isolation;
 mod proposal_model;
 pub mod proposal_model_validation;
 pub mod proposal_qualification;
@@ -272,6 +278,12 @@ pub use proposal_launch_validation::{
     validate_direct_launch_receipt, ForgeProposalLaunchValidationError,
     ForgeProposalLaunchedEvaluatorHoldoutPermit,
     ForgeProposalLaunchedEvaluatorValidationReceipt,
+};
+pub use proposal_linux_isolation::{
+    forge_bubblewrap_artifact_id, forge_bubblewrap_isolation_recipe_id,
+    run_bubblewrap_executable_model_evaluator, ForgeProposalBubblewrapExecutionReceipt,
+    ForgeProposalBubblewrapIsolationPolicy, ForgeProposalIsolationState,
+    ForgeProposalLinuxIsolationError, ForgeProposalLinuxIsolationStatus,
 };
 pub use proposal_model::{
     ForgeProposalFrozenModel, ForgeProposalMetricScore, ForgeProposalModelError,
