@@ -13,6 +13,7 @@ pub mod dependency_impact;
 pub mod diagnostic_beliefs;
 pub mod diagnostics;
 pub mod federation;
+pub mod golden_binding_ledger;
 pub mod golden_bound_result;
 pub mod golden_incidents;
 pub mod golden_incidents_v2;
@@ -50,6 +51,11 @@ pub use diagnostic_beliefs::{
     rank_tests_by_information_gain, CausalHypothesisV1, DiagnosticBeliefError,
     DiagnosticOutcomeId, DiagnosticTestId, DiagnosticTestModelV1, ExpectedInformationGainV1,
     HypothesisDistributionV1, HypothesisId, HypothesisStatusV1,
+};
+pub use golden_binding_ledger::{
+    record_and_ledger_derived_golden_result_v1, GoldenQualificationBindingLedgerV1,
+    GoldenQualificationLedgerEntryV1, GoldenQualificationLedgerErrorV1,
+    GoldenQualificationRecordingOutcomeV1, GOLDEN_QUALIFICATION_LEDGER_SCHEMA_V1,
 };
 pub use golden_bound_result::{
     bind_derived_golden_qualification_result_v1,
