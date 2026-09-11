@@ -309,19 +309,26 @@ fn hash_recovery(
     recovered_at: u64,
     currentness_at: u64,
 ) -> [u8; 32] {
+    let protected_at_bytes = protected_at.to_le_bytes();
+    let recovered_at_bytes = recovered_at.to_le_bytes();
+    let currentness_at_bytes = currentness_at.to_le_bytes();
+    domain_hash_parts(
+        RECOVERY_DOMAIN,
+        &[
+            current_id.as_bytes(), crash_id.as_bytes(), rebound_id.as_bytes(),
+            commitment_id.as_bytes(), anchor_id.as_bytes(), attempt_id.as_bytes(),
+            subject_id.as_bytes(), recovered_id.as_bytes(), target_id.as_bytes(),
+            declaration_id.as_bytes(), authorization_id.as_bytes(), coverage_id.as_bytes(),
+            backend_id.as_bytes(), &manifest, &protected_at_bytes, &recovered_at_bytes,
+            &currentness_at_bytes,
+        ],
+    )
+}
+
+fn domain_hash_parts(domain: &[u8], parts: &[&[u8]]) -> [u8; 32] {
     let mut h = blake3::Hasher::new();
-    h.update(RECOVERY_DOMAIN);
-    for part in [
-        current_id.as_bytes().as_slice(), crash_id.as_bytes().as_slice(),
-        rebound_id.as_bytes().as_slice(), commitment_id.as_bytes().as_slice(),
-        anchor_id.as_bytes().as_slice(), attempt_id.as_bytes().as_slice(),
-        subject_id.as_bytes().as_slice(), recovered_id.as_bytes().as_slice(),
-        target_id.as_bytes().as_slice(), declaration_id.as_bytes().as_slice(),
-        authorization_id.as_bytes().as_slice(), coverage_id.as_bytes().as_slice(),
-        backend_id.as_bytes().as_slice(), manifest.as_slice(),
-        protected_at.to_le_bytes().as_slice(), recovered_at.to_le_bytes().as_slice(),
-        currentness_at.to_le_bytes().as_slice(),
-    ] {
+    h.update(domain);
+    for part in parts {
         h.update(&(part.len() as u64).to_le_bytes());
         h.update(part);
     }
