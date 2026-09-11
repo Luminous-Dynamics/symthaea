@@ -36,6 +36,7 @@ pub mod glove_benchmark;
 pub mod glove_dust;
 #[cfg(feature = "hal")]
 pub mod hal_bridge;
+pub mod integrated_adversarial_campaign;
 pub mod metabolism;
 pub mod perturbations;
 pub mod plss;
