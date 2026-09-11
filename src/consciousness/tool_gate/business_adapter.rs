@@ -42,7 +42,7 @@ pub struct BusinessCognitiveAssessment {
 impl BusinessCognitiveAssessment {
     /// Convert an internal tool-gate result into a non-authorizing business view.
     pub fn from_gate_result(result: &GateResult) -> Self {
-        let clearance = match result.decision {
+        let clearance = match &result.decision {
             GateDecision::Allowed => BusinessCognitiveClearance::AcceptableForFurtherGating,
             GateDecision::InsufficientConfidence { .. } => {
                 BusinessCognitiveClearance::NeedsMoreEvidence
@@ -87,7 +87,8 @@ mod tests {
 
     #[test]
     fn allowed_gate_is_only_acceptable_for_further_gating() {
-        let assessment = BusinessCognitiveAssessment::from_gate_result(&result(GateDecision::Allowed));
+        let assessment =
+            BusinessCognitiveAssessment::from_gate_result(&result(GateDecision::Allowed));
         assert_eq!(
             assessment.clearance,
             BusinessCognitiveClearance::AcceptableForFurtherGating
@@ -118,7 +119,10 @@ mod tests {
                 required: 0.5,
             },
         ));
-        assert_eq!(assessment.clearance, BusinessCognitiveClearance::NeedsReview);
+        assert_eq!(
+            assessment.clearance,
+            BusinessCognitiveClearance::NeedsReview
+        );
         assert!(assessment.requires_external_authority());
     }
 }
