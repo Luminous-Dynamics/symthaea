@@ -87,7 +87,7 @@ impl TradeStudyBundle {
         })
     }
 
-    fn claim_refs_exist<'a>(&self, refs: impl Iterator<Item = &'a ClaimId>) -> bool {
+    fn claim_refs_exist<'a>(&self, mut refs: impl Iterator<Item = &'a ClaimId>) -> bool {
         refs.all(|id| self.claims.get(id).is_some())
     }
 }
