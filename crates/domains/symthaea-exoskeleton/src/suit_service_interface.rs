@@ -68,6 +68,8 @@ pub struct SuitServiceNodeAdvertisement {
     pub kind: SuitServiceNodeKind,
     /// Local identity/authentication result. Discovery alone is insufficient.
     pub identity_verified: bool,
+    /// Confidence in the local identity/authentication result [0,1].
+    pub identity_confidence: f64,
     /// Age of the local advertisement/observation, seconds.
     pub observation_age_s: f64,
     pub capabilities: Vec<SuitServiceCapability>,
@@ -77,6 +79,8 @@ pub struct SuitServiceNodeAdvertisement {
 impl SuitServiceNodeAdvertisement {
     pub fn is_valid(&self) -> bool {
         !self.node_id.trim().is_empty()
+            && self.identity_confidence.is_finite()
+            && (0.0..=1.0).contains(&self.identity_confidence)
             && self.observation_age_s.is_finite()
             && self.observation_age_s >= 0.0
             && self.capabilities.iter().all(SuitServiceCapability::is_valid)
@@ -104,7 +108,7 @@ impl SuitServicePolicy {
     pub fn simulation_reference() -> Self {
         Self {
             max_observation_age_s: 10.0,
-            min_identity_confidence: 1.0,
+            min_identity_confidence: 0.99,
             min_capability_confidence: 0.90,
             evidence: ExosuitEvidenceLevel::Simulation,
         }
@@ -125,6 +129,7 @@ pub enum ServiceAdmissionDenial {
     InvalidNode,
     InvalidPolicy,
     IdentityUnverified,
+    IdentityConfidenceLow,
     StaleAdvertisement,
     CapabilityMissing,
     CapabilityUnavailable,
@@ -144,6 +149,9 @@ pub fn admit_service(
     }
     if !node.identity_verified {
         return Err(ServiceAdmissionDenial::IdentityUnverified);
+    }
+    if node.identity_confidence < policy.min_identity_confidence {
+        return Err(ServiceAdmissionDenial::IdentityConfidenceLow);
     }
     if node.observation_age_s > policy.max_observation_age_s {
         return Err(ServiceAdmissionDenial::StaleAdvertisement);
@@ -181,6 +189,7 @@ mod tests {
             node_id: "rover-7".into(),
             kind: SuitServiceNodeKind::PressurizedRover,
             identity_verified: true,
+            identity_confidence: 1.0,
             observation_age_s: 1.0,
             capabilities: vec![SuitServiceCapability {
                 kind: SuitServiceKind::ElectricalCharge,
@@ -213,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    fn stale_or_unverified_nodes_fail_closed() {
+    fn stale_unverified_or_low_confidence_identity_fails_closed() {
         let mut stale = node();
         stale.observation_age_s = 60.0;
         assert_eq!(
@@ -234,6 +243,17 @@ mod tests {
                 SuitServicePolicy::simulation_reference()
             ),
             Err(ServiceAdmissionDenial::IdentityUnverified)
+        );
+
+        let mut weak = node();
+        weak.identity_confidence = 0.5;
+        assert_eq!(
+            admit_service(
+                &weak,
+                SuitServiceKind::ElectricalCharge,
+                SuitServicePolicy::simulation_reference()
+            ),
+            Err(ServiceAdmissionDenial::IdentityConfidenceLow)
         );
     }
 }
