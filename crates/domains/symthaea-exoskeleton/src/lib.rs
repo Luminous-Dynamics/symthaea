@@ -21,6 +21,7 @@
 
 pub mod control_modes;
 pub mod controller;
+pub mod dust;
 pub mod embodiment;
 pub mod encoder;
 pub mod eva_mission;
