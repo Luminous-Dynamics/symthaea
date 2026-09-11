@@ -18,6 +18,7 @@ pub mod it_qualification;
 pub mod knowledge;
 pub mod knowledge_source;
 pub mod legacy_aix;
+pub mod legacy_aix_scenarios;
 pub mod legacy_artifact_qualification;
 pub mod legacy_computing;
 #[cfg(test)]
@@ -78,6 +79,12 @@ pub use legacy_aix::{
     enrich_legacy_aix_foundation_v1, AixEvidenceSignalV1, AixFailureModeV1, AixFoundationV1,
     AixMechanismKindV1, AixMechanismModelV1, LegacyAixErrorV1,
     LEGACY_AIX_FOUNDATION_SCHEMA_V1,
+};
+pub use legacy_aix_scenarios::{
+    register_aix_qualification_cases_v1, seed_aix_qualification_scenarios_v1,
+    AixQualificationScenarioV1, AixScenarioActionClassV1, AixScenarioActionV1,
+    AixScenarioErrorV1, AixScenarioEvidenceCurrentnessV1, AixScenarioEvidenceV1,
+    LEGACY_AIX_SCENARIO_SCHEMA_V1,
 };
 pub use legacy_artifact_qualification::{
     assess_legacy_strong_qualification_v1, LegacyArtifactQualificationErrorV1,
