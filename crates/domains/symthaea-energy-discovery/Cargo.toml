@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-energy-discovery"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Energy-domain candidate semantics and application-dependent discovery profiles built on symthaea-discovery."
+
+[dependencies]
+symthaea-discovery = { path = "../../core/symthaea-discovery" }
+serde = { workspace = true }
+thiserror = { workspace = true }
