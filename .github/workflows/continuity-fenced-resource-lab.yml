@@ -1,0 +1,59 @@
+name: Continuity Fenced Resource Lab
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/continuity-fenced-resource-lab.yml'
+      - 'scripts/continuity-fenced-resource-lab.py'
+      - 'scripts/test-continuity-fenced-resource-lab.py'
+      - 'docs/release/evidence/continuity-fenced-resource-lab-v1.md'
+  workflow_dispatch:
+
+concurrency:
+  group: continuity-fenced-resource-lab-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+
+jobs:
+  fenced-resource-lab:
+    name: Contained fencing boundary scenarios
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify immutable workflow dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/continuity-fenced-resource-lab.yml)" -eq 1
+          if grep -Eq 'uses: actions/checkout@v[0-9]+' .github/workflows/continuity-fenced-resource-lab.yml; then
+            echo 'mutable checkout action tag found' >&2
+            exit 1
+          fi
+
+      - name: Record Python and SQLite runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 --version
+          python3 - <<'PY'
+          import sqlite3
+          print('sqlite=' + sqlite3.sqlite_version)
+          PY
+
+      - name: Syntax-check lab and harness
+        run: python3 -m py_compile scripts/continuity-fenced-resource-lab.py scripts/test-continuity-fenced-resource-lab.py
+
+      - name: Execute contained fencing scenarios
+        run: python3 scripts/test-continuity-fenced-resource-lab.py
