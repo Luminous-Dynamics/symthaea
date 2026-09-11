@@ -1,0 +1,56 @@
+name: Actuation Enforcement Invalidation Oracle
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/continuity-actuation-enforcement-invalidation-oracle.yml'
+      - 'scripts/continuity-actuation-enforcement-invalidation-oracle.py'
+      - 'scripts/test-continuity-actuation-enforcement-invalidation-oracle.py'
+      - 'docs/release/evidence/continuity-actuation-enforcement-invalidation-v1.md'
+      - 'docs/release/evidence/continuity-actuation-enforcement-invalidation-oracle-v1.md'
+  workflow_dispatch:
+
+concurrency:
+  group: continuity-enforcement-invalidation-oracle-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+
+jobs:
+  invalidation-oracle:
+    name: Frozen invalidation precedence contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify immutable workflow dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/continuity-actuation-enforcement-invalidation-oracle.yml)" -eq 1
+          if grep -Eq 'uses: actions/checkout@v[0-9]+' .github/workflows/continuity-actuation-enforcement-invalidation-oracle.yml; then
+            echo 'mutable checkout action tag found' >&2
+            exit 1
+          fi
+
+      - name: Record Python runtime
+        run: python3 --version
+
+      - name: Syntax-check oracle and adversarial harness
+        run: >-
+          python3 -m py_compile
+          scripts/continuity-actuation-enforcement-invalidation-oracle.py
+          scripts/test-continuity-actuation-enforcement-invalidation-oracle.py
+
+      - name: Execute invalidation precedence and adversarial cases
+        run: python3 scripts/test-continuity-actuation-enforcement-invalidation-oracle.py
