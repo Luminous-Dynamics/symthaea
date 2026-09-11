@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-sensor-trust"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Replay-resistant observation admission and source-trust supervision for Symthaea"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["sensor-fusion", "safety", "replay-protection", "robotics"]
+categories = ["science", "aerospace"]
+
+[dependencies]
+symthaea-domain-awareness = { path = "../symthaea-domain-awareness" }
+uuid = { workspace = true }
