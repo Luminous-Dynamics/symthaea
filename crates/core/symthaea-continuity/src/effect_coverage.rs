@@ -427,6 +427,12 @@ impl QualifiedExternalEffectCoverageV1 {
     pub fn backend_generation(&self) -> u64 { self.backend_generation }
     pub fn coverage_manifest_digest(&self) -> [u8; 32] { self.coverage_manifest_digest }
     pub fn declared_obligation_set_digest(&self) -> [u8; 32] { self.declared_obligation_set_digest }
+    pub fn profile_id(&self) -> EffectCoverageProfileId { self.profile_id }
+    pub fn verifier_profile_id(&self) -> VerifierProfileId { self.verifier_profile_id }
+    pub fn verifier_root_epoch(&self) -> u64 { self.verifier_root_epoch }
+    pub fn analysis_model_digest(&self) -> [u8; 32] { self.analysis_model_digest }
+    pub fn external_boundary_definition_digest(&self) -> [u8; 32] { self.external_boundary_definition_digest }
+    pub fn effect_taxonomy_digest(&self) -> [u8; 32] { self.effect_taxonomy_digest }
     pub fn analyzed_at_unix_ms(&self) -> u64 { self.analyzed_at_unix_ms }
     pub fn transaction_challenge(&self) -> [u8; 32] { self.transaction_challenge }
 }
