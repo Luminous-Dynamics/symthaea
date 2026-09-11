@@ -1,0 +1,99 @@
+name: Continuity Actuation Evidence Runtime Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/continuity-actuation-evidence-runtime.yml'
+      - 'scripts/qualify-continuity-actuation-evidence-runtime.sh'
+      - 'crates/core/symthaea-continuity/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+  workflow_dispatch:
+
+concurrency:
+  group: continuity-actuation-evidence-runtime-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+  RUNTIME_SUBJECT_SHA: b1dd08e54bc111f66f197434b72bd92e8add4366
+
+jobs:
+  qualify-continuity-runtime:
+    name: Exact symthaea-continuity runtime subject
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact qualifier head with subject ancestry
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable workflow actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/continuity-actuation-evidence-runtime.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/continuity-actuation-evidence-runtime.yml)" -eq 1
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/continuity-actuation-evidence-runtime.yml; then
+            echo 'mutable GitHub Action tag found' >&2
+            exit 1
+          fi
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test "$channel" = "1.96.0"
+          rustup toolchain install "$channel" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+          rustc --version
+          cargo --version
+
+      - name: Qualify frozen continuity runtime subject
+        env:
+          QUALIFIER_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          CONTINUITY_RUNTIME_RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v1.tsv
+        run: bash scripts/qualify-continuity-actuation-evidence-runtime.sh
+
+      - name: Publish receipt digest
+        if: always()
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v1.tsv
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RECEIPT" ]]; then
+            echo 'No continuity runtime qualification receipt was produced.'
+            exit 0
+          fi
+          digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
+          echo "continuity-actuation-evidence-runtime receipt_sha256=$digest"
+          {
+            echo
+            echo "- continuity runtime receipt SHA-256: \`$digest\`"
+            echo "- frozen runtime subject: \`$RUNTIME_SUBJECT_SHA\`"
+            echo '- receipt is workflow-witnessed and not independently signed.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-actuation-evidence-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v1.tsv
+          if-no-files-found: warn
+          retention-days: 14
