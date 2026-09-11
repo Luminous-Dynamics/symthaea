@@ -48,6 +48,7 @@ pub mod profile_adoption;
 pub mod promotion_eligibility;
 pub mod recovery_qualification;
 pub mod scope;
+pub mod scope_bound_recovery;
 pub mod subject_contract;
 pub mod subject_witness;
 pub mod transition_authority;
@@ -256,6 +257,11 @@ pub use recovery_qualification::{
 pub use scope::{
     CONTINUITY_SUBJECT_SCHEMA_V1, ContinuityScopeV1, ContinuitySubjectError, ContinuitySubjectId,
     ContinuitySubjectV1,
+};
+pub use scope_bound_recovery::{
+    SCOPE_BOUND_RECOVERY_RECORD_SCHEMA_V1, QualifiedScopeBoundContinuityRecoveryId,
+    QualifiedScopeBoundContinuityRecoveryV1, ScopeBoundContinuityRecoveryRecordV1,
+    ScopeBoundRecoveryError,
 };
 pub use subject_contract::{
     SubjectBoundContinuityContractId, SubjectBoundContinuityContractV1,
