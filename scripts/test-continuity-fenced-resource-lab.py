@@ -36,6 +36,17 @@ def save(path, obj): path.write_text(json.dumps(obj, sort_keys=True), encoding="
 def require_deny(result, code):
     if code not in result.stderr: raise AssertionError(f"missing deny {code!r}: {result.stderr!r}")
 
+def lab_token_id(token) -> str:
+    h = hashlib.sha256(); h.update(b"symthaea.continuity.fenced-resource-lab-token.v1\0")
+    for field in ("resource_id", "backend_id", "enforcement_profile_id"):
+        h.update(bytes.fromhex(token[field]))
+    h.update(token["generation"].to_bytes(8, "little"))
+    h.update(b"\x01" if token["disposition"] == "permit" else b"\x02")
+    reason = (token.get("deny_reason") or "").encode("utf-8")
+    h.update(len(reason).to_bytes(2, "little")); h.update(reason)
+    h.update(bytes.fromhex(token["challenge"]))
+    return h.hexdigest()
+
 def observation_id(obligation: str, basis: str, evidence) -> str:
     h = hashlib.sha256(); h.update(RECORD_DOMAIN)
     for value in (obligation, basis):
@@ -58,6 +69,13 @@ def main() -> int:
         p1, p2 = root / "t1.json", root / "t2.json"; save(p1, token1); save(p2, token2)
         stale1 = run("actuate", "--db", db, "--token", p1, "--delta", 5, "--operation-digest", hx(20), expect=2)
         require_deny(stale1, "actuate:stale_generation"); mark("reject_stale_generation", {"stderr": stale1.stderr})
+
+        forged2 = dict(token2)
+        forged2["challenge"] = hx(99)
+        forged2["token_id"] = lab_token_id(forged2)
+        p2_forged = root / "t2-forged.json"; save(p2_forged, forged2)
+        forged_attempt = run("actuate", "--db", db, "--token", p2_forged, "--delta", 5, "--operation-digest", hx(21), expect=2)
+        require_deny(forged_attempt, "actuate:token_mismatch")
 
         applied2 = parsed(run("actuate", "--db", db, "--token", p2, "--delta", 5, "--operation-digest", hx(21)))
         assert applied2["value"] == 5; mark("same_boundary_checks_and_mutates", applied2)
@@ -123,7 +141,7 @@ def main() -> int:
         final = parsed(run("snapshot", "--db", db))
         assert final["value"] == 13 and final["current_generation"] == 7 and final["emergency_stop"] is True
         assert len(final["consumed_tokens"]) == 3
-        mark("one_use_permit_consumption", {"consumed_tokens": final["consumed_tokens"]})
+        mark("one_use_permit_consumption", {"consumed_tokens": final["consumed_tokens"], "same_generation_forgery": forged_attempt.stderr})
         mark("durable_monotonic_fence", {"generation_2": snap2["current_generation"], "generation_3": snap_after_crash["current_generation"], "generation_7": final["current_generation"]})
 
         campaign_end = max(now_ms(), max(ts for ts, _ in observed.values()))
@@ -132,9 +150,9 @@ def main() -> int:
         bases = {}
         for obligation, basis in OBLIGATIONS:
             ts, evidence = observed[obligation]
-            record_id = observation_id(obligation, basis, evidence)
-            record_ids.append(record_id); bases[obligation] = basis
-            records.append({"obligation": obligation, "record_id": record_id, "observed_at_unix_ms": ts})
+            rid_obs = observation_id(obligation, basis, evidence)
+            record_ids.append(rid_obs); bases[obligation] = basis
+            records.append({"obligation": obligation, "record_id": rid_obs, "observed_at_unix_ms": ts})
 
         complete_set_id = sha(COMPLETE_DOMAIN + b"".join(bytes.fromhex(x) for x in record_ids))
         lab_bytes = LAB.read_bytes(); harness_bytes = pathlib.Path(__file__).read_bytes()
@@ -182,7 +200,7 @@ def main() -> int:
             "campaign_oracle": oracle_summary,
             "obligation_bases": bases,
             "properties": [
-                "stale_generation_rejected", "one_use_replay_rejected", "committed_state_survives_reopen",
+                "stale_generation_rejected", "one_use_replay_rejected", "same_generation_token_substitution_rejected", "committed_state_survives_reopen",
                 "crash_before_commit_is_atomic", "crash_after_commit_is_durable", "emergency_stop_dominates", "deny_token_cannot_mutate",
                 "cross_resource_token_rejected", "nine_obligation_campaign_shape_accepted",
             ],
