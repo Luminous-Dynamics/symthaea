@@ -5,8 +5,9 @@
 //! A verifier proof that the declared effect set is complete must exist before
 //! mutation and must itself be committed into the exact protected post-intent world.
 
+pub mod current_authority_release;
 pub mod current_authorized;
-pub mod current_transition_authority;
+mod current_transition_authority;
 pub mod current_transition_authority_commitment;
 pub mod current_verifier_commitment;
 
