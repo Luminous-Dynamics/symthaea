@@ -31,6 +31,7 @@ pub mod legacy_networking_depth;
 pub mod legacy_networking_scenarios;
 pub mod legacy_platform_identity;
 pub mod legacy_portfolio;
+pub mod legacy_portfolio_v2;
 pub mod legacy_qualification_profile;
 pub mod legacy_solaris;
 pub mod legacy_solaris_scenarios;
@@ -151,6 +152,10 @@ pub use legacy_platform_identity::{
 pub use legacy_portfolio::{
     build_legacy_five_platform_portfolio_v1, LegacyPortfolioErrorV1, LegacyPortfolioSummaryV1,
     LEGACY_PORTFOLIO_SCHEMA_V1,
+};
+pub use legacy_portfolio_v2::{
+    build_legacy_five_platform_portfolio_v2, LegacyPortfolioSummaryV2,
+    LegacyPortfolioV2ErrorV1, LEGACY_PORTFOLIO_SCHEMA_V2,
 };
 pub use legacy_qualification_profile::{
     area_tag, assess_legacy_qualification_profile_v1, exhaustive_legacy_qualification_profile_v1,
