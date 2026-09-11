@@ -25,6 +25,7 @@ pub mod legacy_qualification_profile;
 pub mod legacy_source_artifacts;
 pub mod legacy_source_readiness;
 pub mod legacy_zos;
+pub mod legacy_zos_scenarios;
 #[cfg(feature = "logparse-adapter")]
 pub mod logparse_adapter;
 pub mod predictive;
@@ -106,6 +107,12 @@ pub use legacy_zos::{
     enrich_legacy_zos_foundation_v1, LegacyZosErrorV1, ZosEvidenceSignalV1,
     ZosFailureModeV1, ZosFoundationV1, ZosMechanismKindV1, ZosMechanismModelV1,
     LEGACY_ZOS_FOUNDATION_SCHEMA_V1,
+};
+pub use legacy_zos_scenarios::{
+    register_zos_qualification_cases_v1, seed_zos_qualification_scenarios_v1,
+    ZosQualificationScenarioV1, ZosScenarioActionClassV1, ZosScenarioActionV1,
+    ZosScenarioErrorV1, ZosScenarioEvidenceCurrentnessV1, ZosScenarioEvidenceV1,
+    LEGACY_ZOS_SCENARIO_SCHEMA_V1,
 };
 #[cfg(feature = "logparse-adapter")]
 pub use logparse_adapter::{
