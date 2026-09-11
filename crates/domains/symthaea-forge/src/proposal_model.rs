@@ -3,8 +3,8 @@
 //! Frozen-model and validation-receipt boundary for Forge proposal studies.
 //!
 //! This module still does not train or score a model. It makes the intended order explicit:
-//! precommit the study -> satisfy frozen support -> mint fit permit -> precommit validation gate and
-//! validation-coverage requirements -> freeze one trained model identity -> prove validation
+//! precommit the study -> satisfy frozen support -> mint fit permit bound to validation coverage ->
+//! precommit validation metric gate -> freeze one trained model identity -> prove validation
 //! coverage -> record validation for that exact model -> only a passing receipt may mint an
 //! identity-only holdout-evaluation permit. Holdout rows remain inaccessible.
 
@@ -37,7 +37,7 @@ pub enum ForgeProposalModelError {
     GateStudyMismatch,
     #[error("validation gate identity does not match canonical fields")]
     GateIdentityMismatch,
-    #[error("fit permit does not bind the supplied study/training identity")]
+    #[error("fit permit does not bind the supplied study/training/validation-coverage identity")]
     FitPermitMismatch,
     #[error("metric score identity does not match canonical fields")]
     MetricScoreIdentityMismatch,
@@ -252,7 +252,7 @@ impl ForgeProposalFrozenModel {
     ) -> Result<Self, ForgeProposalModelError> {
         gate.validate_for(study)?;
         coverage_spec.validate_for(study)?;
-        validate_fit_permit_scope(study, fit_permit)?;
+        validate_fit_permit_scope(study, coverage_spec, fit_permit)?;
         let id = derive_model_id(
             study.id(),
             gate.id(),
@@ -298,7 +298,7 @@ impl ForgeProposalFrozenModel {
     ) -> Result<(), ForgeProposalModelError> {
         gate.validate_for(study)?;
         coverage_spec.validate_for(study)?;
-        validate_fit_permit_scope(study, fit_permit)?;
+        validate_fit_permit_scope(study, coverage_spec, fit_permit)?;
         if self.study_id != *study.id()
             || self.validation_gate_id != *gate.id()
             || self.validation_coverage_spec_id != *coverage_spec.id()
@@ -331,9 +331,13 @@ impl ForgeProposalFrozenModel {
 
 fn validate_fit_permit_scope(
     study: &ForgeProposalStudySpec,
+    coverage_spec: &ForgeProposalValidationCoverageSpec,
     permit: &ForgeProposalFitPermit,
 ) -> Result<(), ForgeProposalModelError> {
-    if permit.study_id() != study.id() || permit.training_set_id() != study.training_set_id() {
+    if permit.study_id() != study.id()
+        || permit.training_set_id() != study.training_set_id()
+        || permit.validation_coverage_spec_id() != coverage_spec.id()
+    {
         Err(ForgeProposalModelError::FitPermitMismatch)
     } else {
         Ok(())
@@ -413,7 +417,7 @@ impl ForgeProposalValidationReceipt {
         coverage_spec.validate_for(study)?;
         coverage_receipt.validate_for(coverage_spec, manifest, study, validation)?;
         score_permit.validate_for(coverage_spec, coverage_receipt)?;
-        validate_fit_permit_scope(study, fit_permit)?;
+        validate_fit_permit_scope(study, coverage_spec, fit_permit)?;
         model.validate_for(study, gate, coverage_spec, fit_permit)?;
         if manifest.id() != study.corpus_manifest_id()
             || validation.id() != study.validation_set_id()
@@ -491,7 +495,7 @@ impl ForgeProposalValidationReceipt {
         coverage_spec.validate_for(study)?;
         coverage_receipt.validate_for(coverage_spec, manifest, study, validation)?;
         score_permit.validate_for(coverage_spec, coverage_receipt)?;
-        validate_fit_permit_scope(study, fit_permit)?;
+        validate_fit_permit_scope(study, coverage_spec, fit_permit)?;
         model.validate_for(study, gate, coverage_spec, fit_permit)?;
         if self.study_id != *study.id()
             || self.gate_id != *gate.id()
@@ -644,7 +648,7 @@ impl ForgeProposalHoldoutEvaluationPermit {
         holdout.validate_for(manifest)?;
         coverage_receipt.validate_for(coverage_spec, manifest, study, validation)?;
         score_permit.validate_for(coverage_spec, coverage_receipt)?;
-        validate_fit_permit_scope(study, fit_permit)?;
+        validate_fit_permit_scope(study, coverage_spec, fit_permit)?;
         receipt.validate_for(
             manifest,
             study,
@@ -706,7 +710,7 @@ impl ForgeProposalHoldoutEvaluationPermit {
     ) -> Result<(), ForgeProposalModelError> {
         coverage_spec.validate_for(study)?;
         score_permit.validate_for(coverage_spec, coverage_receipt)?;
-        validate_fit_permit_scope(study, fit_permit)?;
+        validate_fit_permit_scope(study, coverage_spec, fit_permit)?;
         if !receipt.passed()
             || self.study_id != *study.id()
             || self.validation_coverage_spec_id != *coverage_spec.id()
