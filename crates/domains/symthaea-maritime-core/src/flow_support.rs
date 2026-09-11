@@ -2,9 +2,10 @@
 //! Recipe-free support evidence for regenerative production and recycling claims.
 //!
 //! A closure model may claim recurring local production or recycling. This module
-//! requires those positive flows to be backed by explicit capability/evidence
-//! support and prerequisite dependencies, without embedding process recipes,
-//! machine settings, or physical control instructions.
+//! requires every positive local flow to be backed by explicit capability/evidence
+//! support and either modeled prerequisite dependencies or an explicit opaque
+//! external-input binding. It contains no process recipes, machine settings, or
+//! physical control instructions.
 
 use crate::{DependencyGovernance, RegenerativeClosureModel};
 use serde::{Deserialize, Serialize};
@@ -40,12 +41,14 @@ pub struct RegenerativeFlowSupportClaimV1 {
     /// Closure-model dependencies required to sustain this local flow.
     /// Sorted and unique.
     pub prerequisite_dependency_ids: Vec<String>,
+    /// Optional opaque binding to a required environmental/exogenous input not
+    /// represented as a closure-model dependency.
+    pub external_input_binding: Option<String>,
     /// Opaque metrology/inspection evidence for the claimed output.
     pub metrology_binding: String,
     /// Opaque qualification evidence for the claimed local capability.
     pub qualification_binding: String,
-    /// Optional evidence establishing how a dependency cycle is initially bootstrapped.
-    /// Required for claims that participate in a support cycle unless stockpile exists.
+    /// Optional evidence establishing how a cyclic dependency network is bootstrapped.
     pub bootstrap_binding: Option<String>,
 }
 
@@ -55,8 +58,17 @@ impl RegenerativeFlowSupportClaimV1 {
         validate_binding(&self.capability_binding)?;
         validate_binding(&self.metrology_binding)?;
         validate_binding(&self.qualification_binding)?;
+        if let Some(binding) = &self.external_input_binding {
+            validate_binding(binding)?;
+        }
         if let Some(binding) = &self.bootstrap_binding {
             validate_binding(binding)?;
+        }
+        if self.prerequisite_dependency_ids.is_empty() && self.external_input_binding.is_none() {
+            return Err(RegenerativeFlowSupportError::UngroundedFlowClaim {
+                dependency_id: self.dependency_id.clone(),
+                flow_kind: self.flow_kind,
+            });
         }
         if self.prerequisite_dependency_ids.len() > MAX_ITEMS {
             return Err(RegenerativeFlowSupportError::TooManyPrerequisites {
@@ -105,7 +117,7 @@ pub struct RegenerativeFlowSupportV1 {
 }
 
 impl RegenerativeFlowSupportV1 {
-    /// Validate complete coverage and bootstrap-safe support cycles.
+    /// Validate complete positive-flow coverage and bootstrap-safe support cycles.
     pub fn validate_against_model(
         &self,
         model: &RegenerativeClosureModel,
@@ -136,7 +148,6 @@ impl RegenerativeFlowSupportV1 {
             .iter()
             .map(|dependency| (dependency.dependency_id.as_str(), dependency))
             .collect();
-
         let mut expected = BTreeSet::new();
         for dependency in &model.dependencies {
             if dependency.local_production_units_per_period > 0 {
@@ -202,19 +213,16 @@ impl RegenerativeFlowSupportV1 {
             return Err(RegenerativeFlowSupportError::NonCanonicalClaimOrder);
         }
         if seen != expected {
-            let missing = expected.difference(&seen).next().cloned();
-            let extra = seen.difference(&expected).next().cloned();
-            return Err(RegenerativeFlowSupportError::FlowCoverageMismatch { missing, extra });
+            return Err(RegenerativeFlowSupportError::FlowCoverageMismatch {
+                missing: expected.difference(&seen).next().cloned(),
+                extra: seen.difference(&expected).next().cloned(),
+            });
         }
-
-        self.validate_cycles(&dependencies)
+        self.validate_cycles()
     }
 
-    fn validate_cycles(
-        &self,
-        dependencies: &BTreeMap<&str, &crate::RegenerativeDependency>,
-    ) -> Result<(), RegenerativeFlowSupportError> {
-        let produced: BTreeSet<&str> = self
+    fn validate_cycles(&self) -> Result<(), RegenerativeFlowSupportError> {
+        let supported_dependencies: BTreeSet<&str> = self
             .claims
             .iter()
             .map(|claim| claim.dependency_id.as_str())
@@ -223,32 +231,34 @@ impl RegenerativeFlowSupportV1 {
         for claim in &self.claims {
             let entry = adjacency.entry(claim.dependency_id.as_str()).or_default();
             for prerequisite in &claim.prerequisite_dependency_ids {
-                if produced.contains(prerequisite.as_str()) {
+                if supported_dependencies.contains(prerequisite.as_str()) {
                     entry.insert(prerequisite.as_str());
                 }
             }
         }
 
-        for claim in &self.claims {
-            if reaches(
-                claim.dependency_id.as_str(),
-                claim.dependency_id.as_str(),
-                &adjacency,
-                true,
-                &mut BTreeSet::new(),
-            ) && claim.bootstrap_binding.is_none()
-            {
-                let dependency = dependencies
-                    .get(claim.dependency_id.as_str())
-                    .ok_or_else(|| RegenerativeFlowSupportError::UnknownDependency {
-                        dependency_id: claim.dependency_id.clone(),
-                    })?;
-                if dependency.stockpile_units == 0 {
-                    return Err(RegenerativeFlowSupportError::UnbootstrappedCycle {
-                        dependency_id: claim.dependency_id.clone(),
-                        flow_kind: claim.flow_kind,
-                    });
-                }
+        let cyclic_dependencies: BTreeSet<&str> = supported_dependencies
+            .iter()
+            .copied()
+            .filter(|dependency_id| {
+                reaches(
+                    dependency_id,
+                    dependency_id,
+                    &adjacency,
+                    true,
+                    &mut BTreeSet::new(),
+                )
+            })
+            .collect();
+
+        for dependency_id in cyclic_dependencies {
+            let has_bootstrap = self.claims.iter().any(|claim| {
+                claim.dependency_id == dependency_id && claim.bootstrap_binding.is_some()
+            });
+            if !has_bootstrap {
+                return Err(RegenerativeFlowSupportError::UnbootstrappedCycle {
+                    dependency_id: dependency_id.to_string(),
+                });
             }
         }
         Ok(())
@@ -269,73 +279,58 @@ fn reaches<'a>(
         return false;
     }
     adjacency.get(current).is_some_and(|nexts| {
-        nexts.iter().copied().any(|next| {
-            reaches(origin, next, adjacency, false, &mut visited.clone())
-        })
+        nexts
+            .iter()
+            .copied()
+            .any(|next| reaches(origin, next, adjacency, false, &mut visited.clone()))
     })
 }
 
 /// Validation errors for regenerative-flow support graphs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegenerativeFlowSupportError {
-    /// Unsupported schema version.
     UnsupportedSchemaVersion { schema_version: u8 },
-    /// Identifier is malformed.
     InvalidIdentifier { field: &'static str },
-    /// Evidence binding is malformed.
     InvalidBinding,
-    /// Bound closure model is invalid.
     ClosureModelInvalid,
-    /// Support graph does not bind the exact closure model.
     ClosureModelBindingMismatch,
-    /// Too many support claims.
     TooManyClaims,
-    /// Claim has too many prerequisite dependencies.
     TooManyPrerequisites { dependency_id: String },
-    /// Claim directly requires the same dependency it claims to produce/recycle.
+    UngroundedFlowClaim {
+        dependency_id: String,
+        flow_kind: RegenerativeFlowKindV1,
+    },
     DirectSelfDependency {
         dependency_id: String,
         flow_kind: RegenerativeFlowKindV1,
     },
-    /// Prerequisites are not strictly sorted and unique.
     NonCanonicalPrerequisites {
         dependency_id: String,
         flow_kind: RegenerativeFlowKindV1,
     },
-    /// Claim names an unknown dependency.
     UnknownDependency { dependency_id: String },
-    /// Claim names an unknown prerequisite dependency.
     UnknownPrerequisite {
         dependency_id: String,
         prerequisite_dependency_id: String,
     },
-    /// Safeguarded dependency entered generic ordinary flow support.
     SafeguardedDependencyClaimsOrdinaryFlow {
         dependency_id: String,
         flow_kind: RegenerativeFlowKindV1,
     },
-    /// Claim exists for a zero flow in the bound model.
     ClaimForAbsentFlow {
         dependency_id: String,
         flow_kind: RegenerativeFlowKindV1,
     },
-    /// More than one claim covers the same dependency/flow pair.
     DuplicateFlowClaim {
         dependency_id: String,
         flow_kind: RegenerativeFlowKindV1,
     },
-    /// Claims are not strictly sorted by dependency and flow kind.
     NonCanonicalClaimOrder,
-    /// Positive model flows and support-graph claims differ.
     FlowCoverageMismatch {
         missing: Option<(String, RegenerativeFlowKindV1)>,
         extra: Option<(String, RegenerativeFlowKindV1)>,
     },
-    /// A cyclic support dependency has neither bootstrap evidence nor initial stockpile.
-    UnbootstrappedCycle {
-        dependency_id: String,
-        flow_kind: RegenerativeFlowKindV1,
-    },
+    UnbootstrappedCycle { dependency_id: String },
 }
 
 fn validate_id(field: &'static str, value: &str) -> Result<(), RegenerativeFlowSupportError> {
@@ -365,9 +360,7 @@ fn validate_binding(value: &str) -> Result<(), RegenerativeFlowSupportError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        RegenerativeCapability, RegenerativeDependency, RegenerativeDependencyKind,
-    };
+    use crate::{RegenerativeCapability, RegenerativeDependency, RegenerativeDependencyKind};
 
     fn model() -> RegenerativeClosureModel {
         RegenerativeClosureModel {
@@ -381,7 +374,7 @@ mod tests {
                     demand_units_per_period: 10,
                     local_production_units_per_period: 10,
                     recycling_units_per_period: 0,
-                    stockpile_units: 1,
+                    stockpile_units: 0,
                     unit_mass_grams: None,
                     evidence_binding: "dep:energy".into(),
                 },
@@ -392,7 +385,7 @@ mod tests {
                     demand_units_per_period: 1,
                     local_production_units_per_period: 1,
                     recycling_units_per_period: 0,
-                    stockpile_units: 1,
+                    stockpile_units: 0,
                     unit_mass_grams: None,
                     evidence_binding: "dep:metrology".into(),
                 },
@@ -444,6 +437,7 @@ mod tests {
             flow_kind,
             capability_binding: format!("capability:{dependency_id}:{flow_kind:?}"),
             prerequisite_dependency_ids: prerequisites.iter().map(|value| (*value).into()).collect(),
+            external_input_binding: None,
             metrology_binding: format!("metrology:{dependency_id}:{flow_kind:?}"),
             qualification_binding: format!("qualification:{dependency_id}:{flow_kind:?}"),
             bootstrap_binding: None,
@@ -466,7 +460,6 @@ mod tests {
             ),
         ];
         claims[0].bootstrap_binding = Some("bootstrap:energy-metrology-loop".into());
-        claims[1].bootstrap_binding = Some("bootstrap:energy-metrology-loop".into());
         claims.sort_by(|a, b| {
             (a.dependency_id.as_str(), a.flow_kind)
                 .cmp(&(b.dependency_id.as_str(), b.flow_kind))
@@ -500,40 +493,46 @@ mod tests {
     }
 
     #[test]
-    fn unbootstrapped_production_cycle_is_rejected() {
+    fn ungrounded_flow_claim_is_rejected() {
+        let mut support = support();
+        let structural = support
+            .claims
+            .iter_mut()
+            .find(|claim| {
+                claim.dependency_id == "structural-material"
+                    && claim.flow_kind == RegenerativeFlowKindV1::Production
+            })
+            .unwrap();
+        structural.prerequisite_dependency_ids.clear();
+        assert!(matches!(
+            support.validate_against_model(&model()),
+            Err(RegenerativeFlowSupportError::UngroundedFlowClaim { .. })
+        ));
+        structural.external_input_binding = Some("external-input:qualified-natural-feed".into());
+        assert!(support.validate_against_model(&model()).is_ok());
+    }
+
+    #[test]
+    fn cyclic_dependency_requires_explicit_bootstrap_evidence() {
         let mut support = support();
         for claim in &mut support.claims {
             claim.bootstrap_binding = None;
         }
-        let mut model = model();
-        model.dependencies
-            .iter_mut()
-            .find(|dependency| dependency.dependency_id == "energy-service")
-            .unwrap()
-            .stockpile_units = 0;
-        model.dependencies
-            .iter_mut()
-            .find(|dependency| dependency.dependency_id == "metrology")
-            .unwrap()
-            .stockpile_units = 0;
         assert!(matches!(
-            support.validate_against_model(&model),
+            support.validate_against_model(&model()),
             Err(RegenerativeFlowSupportError::UnbootstrappedCycle { .. })
         ));
     }
 
     #[test]
     fn safeguarded_dependency_cannot_enter_generic_local_flow_support() {
-        let mut support = support();
-        support.claims.push(claim(
-            "qualified-reactor-service",
-            RegenerativeFlowKindV1::Production,
-            &[],
-        ));
-        support.claims.sort_by(|a, b| {
-            (a.dependency_id.as_str(), a.flow_kind)
-                .cmp(&(b.dependency_id.as_str(), b.flow_kind))
-        });
-        assert!(support.validate_against_model(&model()).is_err());
+        let mut model = model();
+        let reactor = model
+            .dependencies
+            .iter_mut()
+            .find(|dependency| dependency.dependency_id == "qualified-reactor-service")
+            .unwrap();
+        reactor.local_production_units_per_period = 1;
+        assert!(model.validate().is_err());
     }
 }
