@@ -150,6 +150,35 @@ impl TryFrom<CapabilityActivationProvenanceWireV1> for CapabilityActivationProve
     }
 }
 
+/// Runtime proof that canonical activation provenance was rebound to this exact closure.
+///
+/// This token borrows both proof inputs and is deliberately not serializable.
+/// It cannot be transported as a claim of prior validation or outlive either input.
+#[derive(Debug)]
+#[must_use = "bound provenance is a runtime proof token and should be consumed explicitly"]
+pub struct BoundCapabilityActivationProvenanceV1<'a> {
+    provenance: &'a CapabilityActivationProvenanceV1,
+    closure: &'a CapabilityActivationClosureV1,
+}
+
+impl<'a> BoundCapabilityActivationProvenanceV1<'a> {
+    pub fn provenance(&self) -> &'a CapabilityActivationProvenanceV1 {
+        self.provenance
+    }
+
+    pub fn runtime_result(&self) -> &'a CapabilityActivationClosureV1 {
+        self.closure
+    }
+
+    pub fn provenance_id(&self) -> CapabilityActivationProvenanceId {
+        self.provenance.id()
+    }
+
+    pub fn result_receipt_id(&self) -> CapabilityActivationClosureReceiptId {
+        self.provenance.result_receipt_id()
+    }
+}
+
 impl CapabilityActivationProvenanceV1 {
     pub fn from_closure(closure: &CapabilityActivationClosureV1) -> Self {
         let algorithm_semantics = CAPABILITY_ACTIVATION_ALGORITHM_SEMANTICS_V1.to_owned();
@@ -229,6 +258,19 @@ impl CapabilityActivationProvenanceV1 {
         }
         Ok(())
     }
+
+    /// Rebind canonical provenance to this exact runtime closure and return a
+    /// non-transportable proof token borrowing both values.
+    pub fn bind_to<'a>(
+        &'a self,
+        closure: &'a CapabilityActivationClosureV1,
+    ) -> Result<BoundCapabilityActivationProvenanceV1<'a>, CapabilityAnalysisProvenanceError> {
+        self.validate_against(closure)?;
+        Ok(BoundCapabilityActivationProvenanceV1 {
+            provenance: self,
+            closure,
+        })
+    }
 }
 
 /// Stronger replay provenance for one exact counterfactual-frontier receipt.
@@ -269,6 +311,35 @@ impl TryFrom<CapabilityCounterfactualProvenanceWireV1> for CapabilityCounterfact
         };
         provenance.validate_canonical()?;
         Ok(provenance)
+    }
+}
+
+/// Runtime proof that canonical counterfactual provenance was rebound to this exact frontier.
+///
+/// This token borrows both proof inputs and is deliberately not serializable.
+/// It cannot be transported as a claim of prior validation or outlive either input.
+#[derive(Debug)]
+#[must_use = "bound provenance is a runtime proof token and should be consumed explicitly"]
+pub struct BoundCapabilityCounterfactualProvenanceV1<'a> {
+    provenance: &'a CapabilityCounterfactualProvenanceV1,
+    frontier: &'a CapabilityCounterfactualFrontierV1,
+}
+
+impl<'a> BoundCapabilityCounterfactualProvenanceV1<'a> {
+    pub fn provenance(&self) -> &'a CapabilityCounterfactualProvenanceV1 {
+        self.provenance
+    }
+
+    pub fn runtime_result(&self) -> &'a CapabilityCounterfactualFrontierV1 {
+        self.frontier
+    }
+
+    pub fn provenance_id(&self) -> CapabilityCounterfactualProvenanceId {
+        self.provenance.id()
+    }
+
+    pub fn result_receipt_id(&self) -> CapabilityCounterfactualFrontierReceiptId {
+        self.provenance.result_receipt_id()
     }
 }
 
@@ -350,6 +421,20 @@ impl CapabilityCounterfactualProvenanceV1 {
             return Err(CapabilityAnalysisProvenanceError::CounterfactualResultReceiptMismatch);
         }
         Ok(())
+    }
+
+    /// Rebind canonical provenance to this exact runtime frontier and return a
+    /// non-transportable proof token borrowing both values.
+    pub fn bind_to<'a>(
+        &'a self,
+        frontier: &'a CapabilityCounterfactualFrontierV1,
+    ) -> Result<BoundCapabilityCounterfactualProvenanceV1<'a>, CapabilityAnalysisProvenanceError>
+    {
+        self.validate_against(frontier)?;
+        Ok(BoundCapabilityCounterfactualProvenanceV1 {
+            provenance: self,
+            frontier,
+        })
     }
 }
 

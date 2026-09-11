@@ -34,13 +34,14 @@ pub use capability::{
     CapabilityError, CapabilityId, CapabilityRequirementV1,
 };
 pub use capability_activation::{
-    CAPABILITY_ACTIVATION_ASSUMPTIONS_SCHEMA_V1, BlockedCapabilityActivationV1,
+    BlockedCapabilityActivationV1, CAPABILITY_ACTIVATION_ASSUMPTIONS_SCHEMA_V1,
     CapabilityActivationAssumptionsId, CapabilityActivationAssumptionsV1,
     CapabilityActivationClosureV1, CapabilityActivationError, CapabilityActivationRoundV1,
     UnsatisfiedCapabilityRequirementV1, ValidatedCapabilityActivationAssumptionsV1,
     derive_capability_activation_closure,
 };
 pub use capability_analysis_provenance::{
+    BoundCapabilityActivationProvenanceV1, BoundCapabilityCounterfactualProvenanceV1,
     CAPABILITY_ACTIVATION_ALGORITHM_SEMANTICS_V1, CAPABILITY_ACTIVATION_PROVENANCE_SCHEMA_V1,
     CAPABILITY_COUNTERFACTUAL_ALGORITHM_SEMANTICS_V1,
     CAPABILITY_COUNTERFACTUAL_PROVENANCE_SCHEMA_V1, CapabilityActivationAlgorithmId,

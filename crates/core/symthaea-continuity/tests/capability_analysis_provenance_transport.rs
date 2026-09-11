@@ -21,7 +21,7 @@ fn activation_fixture(prefix: &str) -> symthaea_continuity::CapabilityActivation
     let dependency = leaf(&format!("{prefix}-dependency"));
     let target = CapabilityDefinitionV1::new(
         "org.example",
-        &format!("{prefix}-target"),
+        format!("{prefix}-target"),
         Some(CapabilityRequirementV1::leaf(dependency.id())),
     )
     .unwrap();
@@ -42,7 +42,7 @@ fn counterfactual_fixture(prefix: &str) -> CapabilityCounterfactualFrontierV1 {
     let dependency = leaf(&format!("{prefix}-dependency"));
     let target = CapabilityDefinitionV1::new(
         "org.example",
-        &format!("{prefix}-target"),
+        format!("{prefix}-target"),
         Some(CapabilityRequirementV1::leaf(dependency.id())),
     )
     .unwrap();
@@ -306,5 +306,43 @@ fn counterfactual_payload_cannot_decode_as_activation_provenance() {
         error
             .to_string()
             .contains("unsupported activation provenance schema")
+    );
+}
+
+#[test]
+fn decoded_activation_provenance_binding_is_runtime_specific() {
+    let left = activation_fixture("activation-bound-left");
+    let right = activation_fixture("activation-bound-right");
+    let encoded =
+        serde_json::to_vec(&CapabilityActivationProvenanceV1::from_closure(&left)).unwrap();
+    let decoded: CapabilityActivationProvenanceV1 = serde_json::from_slice(&encoded).unwrap();
+
+    let bound = decoded.bind_to(&left).unwrap();
+    assert_eq!(bound.provenance_id(), decoded.id());
+    assert_eq!(bound.result_receipt_id(), decoded.result_receipt_id());
+    assert!(std::ptr::eq(bound.provenance(), &decoded));
+    assert!(std::ptr::eq(bound.runtime_result(), &left));
+    assert_eq!(
+        decoded.bind_to(&right).unwrap_err(),
+        CapabilityAnalysisProvenanceError::ActivationResultReceiptMismatch
+    );
+}
+
+#[test]
+fn decoded_counterfactual_provenance_binding_is_runtime_specific() {
+    let left = counterfactual_fixture("counterfactual-bound-left");
+    let right = counterfactual_fixture("counterfactual-bound-right");
+    let encoded =
+        serde_json::to_vec(&CapabilityCounterfactualProvenanceV1::from_frontier(&left)).unwrap();
+    let decoded: CapabilityCounterfactualProvenanceV1 = serde_json::from_slice(&encoded).unwrap();
+
+    let bound = decoded.bind_to(&left).unwrap();
+    assert_eq!(bound.provenance_id(), decoded.id());
+    assert_eq!(bound.result_receipt_id(), decoded.result_receipt_id());
+    assert!(std::ptr::eq(bound.provenance(), &decoded));
+    assert!(std::ptr::eq(bound.runtime_result(), &left));
+    assert_eq!(
+        decoded.bind_to(&right).unwrap_err(),
+        CapabilityAnalysisProvenanceError::CounterfactualResultReceiptMismatch
     );
 }
