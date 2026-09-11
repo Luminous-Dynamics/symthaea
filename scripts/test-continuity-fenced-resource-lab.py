@@ -4,8 +4,10 @@ import hashlib, json, os, pathlib, platform, sqlite3, subprocess, sys, tempfile,
 
 LAB = pathlib.Path(__file__).with_name("continuity-fenced-resource-lab.py")
 ORACLE = pathlib.Path(__file__).with_name("continuity-actuation-enforcement-campaign-oracle.py")
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 RECORD_DOMAIN = b"symthaea.continuity.fenced-resource-lab-observation.v1\0"
 COMPLETE_DOMAIN = b"symthaea.continuity.fenced-resource-lab-complete-set.v1\0"
+BUNDLE_SCHEMA = "symthaea-continuity-fenced-resource-lab-evidence-bundle-v1"
 
 OBLIGATIONS = (
     ("boundary_identity", "static_implementation_inspection"),
@@ -53,6 +55,96 @@ def observation_id(obligation: str, basis: str, evidence) -> str:
         raw = value.encode("utf-8"); h.update(len(raw).to_bytes(2, "little")); h.update(raw)
     h.update(hashlib.sha256(canonical(evidence)).digest())
     return h.hexdigest()
+
+def atomic_json(path: pathlib.Path, obj) -> None:
+    data = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8") + b"\n"
+    tmp = path.with_name(path.name + ".tmp")
+    with tmp.open("wb") as fh:
+        fh.write(data)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+def checked_git_head() -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+    if result.returncode != 0:
+        raise AssertionError(f"cannot resolve git HEAD: {result.stderr}")
+    head = result.stdout.strip().lower()
+    if len(head) != 40 or any(c not in "0123456789abcdef" for c in head):
+        raise AssertionError(f"non-canonical git HEAD: {head!r}")
+    expected = os.environ.get("CONTINUITY_SUBJECT_SHA", "").strip().lower()
+    if expected and expected != head:
+        raise AssertionError(f"subject SHA mismatch: expected={expected} actual={head}")
+    return head
+
+def write_evidence_bundle(out_dir: pathlib.Path, manifest, observed, bases, summary) -> dict:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if any(out_dir.iterdir()):
+        raise AssertionError(f"evidence directory must start empty: {out_dir}")
+
+    subject_sha = checked_git_head()
+    observation_rows = []
+    for obligation, basis in OBLIGATIONS:
+        ts, evidence = observed[obligation]
+        observation_rows.append({
+            "obligation": obligation,
+            "required_basis": basis,
+            "observed_at_unix_ms": ts,
+            "record_id": observation_id(obligation, basis, evidence),
+            "evidence": evidence,
+        })
+
+    observations_doc = {
+        "schema": "symthaea-continuity-fenced-resource-lab-observations-v1",
+        "obligation_count": len(observation_rows),
+        "observations": observation_rows,
+    }
+    context = {
+        "schema": "symthaea-continuity-fenced-resource-lab-run-context-v1",
+        "subject_sha": subject_sha,
+        "repository": os.environ.get("GITHUB_REPOSITORY", ""),
+        "workflow": os.environ.get("GITHUB_WORKFLOW", ""),
+        "run_id": os.environ.get("GITHUB_RUN_ID", ""),
+        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
+        "job": os.environ.get("GITHUB_JOB", ""),
+        "runner_os": os.environ.get("RUNNER_OS", ""),
+        "python": sys.version,
+        "sqlite": sqlite3.sqlite_version,
+        "platform": platform.platform(),
+    }
+    bundle_summary = {
+        "schema": BUNDLE_SCHEMA,
+        **summary,
+        "subject_sha": subject_sha,
+        "obligation_count": len(observation_rows),
+        "obligation_bases": bases,
+    }
+
+    documents = {
+        "campaign-manifest.json": manifest,
+        "campaign-observations.json": observations_doc,
+        "campaign-summary.json": bundle_summary,
+        "campaign-run-context.json": context,
+    }
+    for name, obj in documents.items():
+        atomic_json(out_dir / name, obj)
+
+    checksums = []
+    for name in sorted(documents):
+        digest = sha((out_dir / name).read_bytes())
+        checksums.append(f"{digest}  {name}")
+    checksum_text = "\n".join(checksums) + "\n"
+    checksum_path = out_dir / "SHA256SUMS"
+    checksum_path.write_text(checksum_text, encoding="utf-8")
+
+    return {
+        "subject_sha": subject_sha,
+        "sha256sums_sha256": sha(checksum_path.read_bytes()),
+        "files": sorted([*documents, "SHA256SUMS"]),
+    }
 
 def main() -> int:
     campaign_start = now_ms()
@@ -244,7 +336,7 @@ os.execv(sys.executable,[sys.executable,sys.argv[2],'actuate','--db',sys.argv[3]
         oracle_summary = json.loads(oracle.stdout)
         assert oracle_summary["obligation_count"] == 9
 
-        print(json.dumps({
+        summary = {
             "status": "PASS",
             "final_generation": final["current_generation"],
             "final_value": final["value"],
@@ -257,7 +349,12 @@ os.execv(sys.executable,[sys.executable,sys.argv[2],'actuate','--db',sys.argv[3]
                 "crash_before_commit_is_atomic", "crash_after_commit_is_durable", "emergency_stop_dominates", "deny_token_cannot_mutate",
                 "cross_resource_token_rejected", "nine_obligation_campaign_shape_accepted",
             ],
-        }, sort_keys=True))
+        }
+        evidence_dir_raw = os.environ.get("CONTINUITY_FENCED_RESOURCE_EVIDENCE_DIR", "").strip()
+        if evidence_dir_raw:
+            bundle = write_evidence_bundle(pathlib.Path(evidence_dir_raw), manifest, observed, bases, summary)
+            summary["evidence_bundle"] = bundle
+        print(json.dumps(summary, sort_keys=True))
     return 0
 
 if __name__ == "__main__": raise SystemExit(main())
