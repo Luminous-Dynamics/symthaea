@@ -30,14 +30,11 @@ fn activation_fixture(prefix: &str) -> symthaea_continuity::CapabilityActivation
         .unwrap()
         .validate()
         .unwrap();
-    let assumptions = CapabilityActivationAssumptionsV1::new(
-        &graph,
-        vec![dependency.id()],
-        vec![target_id],
-    )
-    .unwrap()
-    .validate(&graph)
-    .unwrap();
+    let assumptions =
+        CapabilityActivationAssumptionsV1::new(&graph, vec![dependency.id()], vec![target_id])
+            .unwrap()
+            .validate(&graph)
+            .unwrap();
     derive_capability_activation_closure(&graph, &assumptions).unwrap()
 }
 
@@ -94,13 +91,16 @@ fn activation_transport_schema_substitution_fails_closed() {
     let provenance = CapabilityActivationProvenanceV1::from_closure(&closure);
     let mut transported = serde_json::to_value(provenance).unwrap();
     transported["schema_version"] = json!("future-activation-provenance-v2");
-    let transported: CapabilityActivationProvenanceV1 = serde_json::from_value(transported).unwrap();
+    let transported: CapabilityActivationProvenanceV1 =
+        serde_json::from_value(transported).unwrap();
 
     assert_eq!(
         transported.validate_against(&closure),
-        Err(CapabilityAnalysisProvenanceError::UnsupportedActivationProvenanceSchema(
-            "future-activation-provenance-v2".to_owned(),
-        ))
+        Err(
+            CapabilityAnalysisProvenanceError::UnsupportedActivationProvenanceSchema(
+                "future-activation-provenance-v2".to_owned(),
+            )
+        )
     );
 }
 
@@ -110,13 +110,16 @@ fn activation_transport_semantics_substitution_fails_closed() {
     let provenance = CapabilityActivationProvenanceV1::from_closure(&closure);
     let mut transported = serde_json::to_value(provenance).unwrap();
     transported["algorithm_semantics"] = json!("future-activation-semantics-v2");
-    let transported: CapabilityActivationProvenanceV1 = serde_json::from_value(transported).unwrap();
+    let transported: CapabilityActivationProvenanceV1 =
+        serde_json::from_value(transported).unwrap();
 
     assert_eq!(
         transported.validate_against(&closure),
-        Err(CapabilityAnalysisProvenanceError::UnsupportedActivationAlgorithmSemantics(
-            "future-activation-semantics-v2".to_owned(),
-        ))
+        Err(
+            CapabilityAnalysisProvenanceError::UnsupportedActivationAlgorithmSemantics(
+                "future-activation-semantics-v2".to_owned(),
+            )
+        )
     );
 }
 
@@ -126,7 +129,8 @@ fn activation_transport_algorithm_id_substitution_fails_closed() {
     let provenance = CapabilityActivationProvenanceV1::from_closure(&closure);
     let mut transported = serde_json::to_value(provenance).unwrap();
     mutate_32_byte_id(&mut transported, "algorithm_id", 9);
-    let transported: CapabilityActivationProvenanceV1 = serde_json::from_value(transported).unwrap();
+    let transported: CapabilityActivationProvenanceV1 =
+        serde_json::from_value(transported).unwrap();
 
     assert_eq!(
         transported.validate_against(&closure),
@@ -152,7 +156,8 @@ fn activation_transport_provenance_id_substitution_fails_closed() {
     let provenance = CapabilityActivationProvenanceV1::from_closure(&closure);
     let mut transported = serde_json::to_value(provenance).unwrap();
     mutate_32_byte_id(&mut transported, "provenance_id", 11);
-    let transported: CapabilityActivationProvenanceV1 = serde_json::from_value(transported).unwrap();
+    let transported: CapabilityActivationProvenanceV1 =
+        serde_json::from_value(transported).unwrap();
 
     assert_eq!(
         transported.validate_against(&closure),
@@ -165,7 +170,8 @@ fn counterfactual_transport_round_trip_preserves_exact_provenance() {
     let frontier = counterfactual_fixture("counterfactual-roundtrip");
     let provenance = CapabilityCounterfactualProvenanceV1::from_frontier(&frontier);
     let encoded = serde_json::to_vec(&provenance).unwrap();
-    let transported: CapabilityCounterfactualProvenanceV1 = serde_json::from_slice(&encoded).unwrap();
+    let transported: CapabilityCounterfactualProvenanceV1 =
+        serde_json::from_slice(&encoded).unwrap();
 
     assert_eq!(transported, provenance);
     assert_eq!(
@@ -186,9 +192,11 @@ fn counterfactual_transport_schema_substitution_fails_closed() {
 
     assert_eq!(
         transported.validate_against(&frontier),
-        Err(CapabilityAnalysisProvenanceError::UnsupportedCounterfactualProvenanceSchema(
-            "future-counterfactual-provenance-v2".to_owned(),
-        ))
+        Err(
+            CapabilityAnalysisProvenanceError::UnsupportedCounterfactualProvenanceSchema(
+                "future-counterfactual-provenance-v2".to_owned(),
+            )
+        )
     );
 }
 
@@ -203,9 +211,11 @@ fn counterfactual_transport_semantics_substitution_fails_closed() {
 
     assert_eq!(
         transported.validate_against(&frontier),
-        Err(CapabilityAnalysisProvenanceError::UnsupportedCounterfactualAlgorithmSemantics(
-            "future-counterfactual-semantics-v2".to_owned(),
-        ))
+        Err(
+            CapabilityAnalysisProvenanceError::UnsupportedCounterfactualAlgorithmSemantics(
+                "future-counterfactual-semantics-v2".to_owned(),
+            )
+        )
     );
 }
 
