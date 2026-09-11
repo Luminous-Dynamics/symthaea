@@ -156,6 +156,32 @@ impl TryFrom<CapabilityActivationProvenanceWireV1> for CapabilityActivationProve
 /// It cannot be transported as a claim of prior validation or outlive either input.
 #[derive(Debug)]
 #[must_use = "bound provenance is a runtime proof token and should be consumed explicitly"]
+///
+/// # Runtime-only transport boundary
+///
+/// The public type and Serde traits must resolve in rustdoc:
+/// ```
+/// use std::fmt::Debug;
+/// use symthaea_continuity::BoundCapabilityActivationProvenanceV1;
+/// fn serde_trait_resolves<T: serde::Serialize>() {}
+/// fn assert_debug<T: Debug>() {}
+/// serde_trait_resolves::<String>();
+/// assert_debug::<BoundCapabilityActivationProvenanceV1<'static>>();
+/// ```
+///
+/// The borrowed proof token must not implement `Serialize`:
+/// ```compile_fail
+/// use symthaea_continuity::BoundCapabilityActivationProvenanceV1;
+/// fn assert_serialize<T: serde::Serialize>() {}
+/// assert_serialize::<BoundCapabilityActivationProvenanceV1<'static>>();
+/// ```
+///
+/// It must not implement owned deserialization either:
+/// ```compile_fail
+/// use symthaea_continuity::BoundCapabilityActivationProvenanceV1;
+/// fn assert_deserialize_owned<T: serde::de::DeserializeOwned>() {}
+/// assert_deserialize_owned::<BoundCapabilityActivationProvenanceV1<'static>>();
+/// ```
 pub struct BoundCapabilityActivationProvenanceV1<'a> {
     provenance: &'a CapabilityActivationProvenanceV1,
     closure: &'a CapabilityActivationClosureV1,
@@ -320,6 +346,32 @@ impl TryFrom<CapabilityCounterfactualProvenanceWireV1> for CapabilityCounterfact
 /// It cannot be transported as a claim of prior validation or outlive either input.
 #[derive(Debug)]
 #[must_use = "bound provenance is a runtime proof token and should be consumed explicitly"]
+///
+/// # Runtime-only transport boundary
+///
+/// The public type and Serde traits must resolve in rustdoc:
+/// ```
+/// use std::fmt::Debug;
+/// use symthaea_continuity::BoundCapabilityCounterfactualProvenanceV1;
+/// fn serde_trait_resolves<T: serde::Serialize>() {}
+/// fn assert_debug<T: Debug>() {}
+/// serde_trait_resolves::<String>();
+/// assert_debug::<BoundCapabilityCounterfactualProvenanceV1<'static>>();
+/// ```
+///
+/// The borrowed proof token must not implement `Serialize`:
+/// ```compile_fail
+/// use symthaea_continuity::BoundCapabilityCounterfactualProvenanceV1;
+/// fn assert_serialize<T: serde::Serialize>() {}
+/// assert_serialize::<BoundCapabilityCounterfactualProvenanceV1<'static>>();
+/// ```
+///
+/// It must not implement owned deserialization either:
+/// ```compile_fail
+/// use symthaea_continuity::BoundCapabilityCounterfactualProvenanceV1;
+/// fn assert_deserialize_owned<T: serde::de::DeserializeOwned>() {}
+/// assert_deserialize_owned::<BoundCapabilityCounterfactualProvenanceV1<'static>>();
+/// ```
 pub struct BoundCapabilityCounterfactualProvenanceV1<'a> {
     provenance: &'a CapabilityCounterfactualProvenanceV1,
     frontier: &'a CapabilityCounterfactualFrontierV1,
