@@ -11,12 +11,13 @@
 pub mod active_lkg;
 pub mod active_lkg_currentness;
 pub mod auth_wire;
-pub mod backend_bound_execution;
+mod backend_bound_execution;
 pub mod backend_effect_authority;
 mod compose;
 pub mod commit_currentness;
 pub mod commit_eligibility;
 pub mod contract;
+pub mod coverage_bound_execution;
 pub mod crash_reconciliation;
 pub mod crash_recovery_qualification;
 pub mod current_crash_recovery;
@@ -28,6 +29,7 @@ mod distributed_health_common;
 mod distributed_health_v1_error_bridge;
 pub mod distributed_qualification;
 pub mod distributed_state;
+pub mod effect_coverage;
 pub mod effect_scope_rebind;
 mod effect_scoped_execution;
 pub mod exact_distributed_health;
@@ -82,7 +84,7 @@ pub use backend_bound_execution::{
     PendingBackendBoundEffectExecutionV1, QualifiedBackendEffectCommitmentId,
     QualifiedBackendEffectCommitmentV1, ReadyBackendBoundEffectExecutionV1,
     canonical_backend_effect_commitment_claim_bytes,
-    canonical_backend_effect_commitment_claim_digest, prepare_backend_bound_effect_execution,
+    canonical_backend_effect_commitment_claim_digest,
 };
 pub use backend_effect_authority::{
     BACKEND_EFFECT_AUTHORITY_CLAIM_SCHEMA_V1, BACKEND_EFFECT_AUTHORITY_PURPOSE,
@@ -108,6 +110,16 @@ pub use contract::{
     ApprovalBasis, ContinuityContractId, ContinuityContractV1, ContinuityRequirementId,
     ContinuityRequirementV1, ContractError, EquivalencePredicate, RequirementCriticality,
     ValidatedContinuityContractV1,
+};
+pub use coverage_bound_execution::{
+    EFFECT_COVERAGE_COMMITMENT_AUTH_PURPOSE, EFFECT_COVERAGE_COMMITMENT_CLAIM_SCHEMA_V1,
+    AuthenticatedEffectCoverageCommitmentId, CoverageBoundExecutionError,
+    CoverageQualifiedBackendEffectEligibilityV1, EffectCoverageCommitmentClaimId,
+    EffectCoverageCommitmentClaimV1, PendingCoverageQualifiedEffectExecutionV1,
+    QualifiedEffectCoverageCommitmentId, QualifiedEffectCoverageCommitmentV1,
+    ReadyCoverageQualifiedEffectExecutionV1, canonical_effect_coverage_commitment_claim_bytes,
+    canonical_effect_coverage_commitment_claim_digest,
+    prepare_coverage_qualified_effect_execution,
 };
 pub use crash_reconciliation::{
     CRASH_RECONCILIATION_RECORD_SCHEMA_V1, CrashReconciliationClassificationV1,
@@ -150,6 +162,15 @@ pub use distributed_state::{
     AuthenticatedParticipantStateEvidenceId, DistributedStateContextId, DistributedStateContextV1,
     DistributedStateError, ParticipantOperationalStateV1, ParticipantSetDigest,
     ParticipantStateClaimId, ParticipantStateClaimV1, ValidatedDistributedStateContextV1,
+};
+pub use effect_coverage::{
+    EFFECT_COVERAGE_AUTH_PURPOSE, EFFECT_COVERAGE_CLAIM_SCHEMA_V1,
+    EFFECT_COVERAGE_PROFILE_SCHEMA_V1, EFFECT_COVERAGE_SUBJECT_SCHEMA_V1,
+    AuthenticatedEffectCoverageId, EffectCoverageClaimId, EffectCoverageClaimV1,
+    EffectCoverageError, EffectCoverageOutcomeV1, EffectCoverageProfileId,
+    EffectCoverageProfileV1, EffectCoverageSubjectId, EffectCoverageSubjectV1,
+    QualifiedExternalEffectCoverageId, QualifiedExternalEffectCoverageV1,
+    canonical_effect_coverage_claim_bytes, canonical_effect_coverage_claim_digest,
 };
 pub use effect_scope_rebind::{
     EffectScopeRebindError, ReboundEffectScopeId, ReboundEffectScopedExecutionV1,
