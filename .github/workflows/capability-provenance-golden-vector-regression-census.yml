@@ -1,0 +1,88 @@
+# Evidence-only experiment: validate permanent public-API golden-vector tests
+# against IDs independently derived in run 34595293482.
+name: Capability Provenance Golden Vector Regression Census
+
+on:
+  push:
+    branches:
+      - evidence/capability-provenance-golden-vector-regression-v1
+
+permissions:
+  contents: read
+
+jobs:
+  census:
+    name: Validate public provenance ID golden regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout evidence branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: evidence/capability-provenance-golden-vector-regression-v1
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Inject exact public-API vectors, test, and restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='crates/core/symthaea-continuity/tests/capability_analysis_provenance_transport.rs'
+          original_sha="$(sha256sum "$target" | awk '{print $1}')"
+
+          cat >> "$target" <<'RS'
+
+          #[test]
+          fn activation_algorithm_id_v1_matches_independent_golden_vector() {
+              let expected = [
+                  0x37, 0xc4, 0x19, 0x59, 0x4f, 0xf6, 0x86, 0xd8,
+                  0x75, 0xb9, 0xd7, 0x4c, 0x46, 0xfe, 0x50, 0x67,
+                  0xaf, 0x58, 0xdd, 0xd9, 0x34, 0xd5, 0xf2, 0x2d,
+                  0xf2, 0xaa, 0x28, 0xac, 0x0b, 0x03, 0xc8, 0x91,
+              ];
+              assert_eq!(
+                  *symthaea_continuity::capability_activation_algorithm_id_v1().as_bytes(),
+                  expected
+              );
+          }
+
+          #[test]
+          fn counterfactual_algorithm_id_v1_matches_independent_golden_vector() {
+              let expected = [
+                  0x64, 0xce, 0x9f, 0x30, 0xf8, 0x49, 0xb2, 0x07,
+                  0x35, 0xc6, 0x10, 0x88, 0x85, 0x53, 0x49, 0x8f,
+                  0x12, 0x35, 0x5e, 0x1b, 0x9b, 0x38, 0x41, 0x7d,
+                  0xd3, 0x33, 0x80, 0xf1, 0xc4, 0x2b, 0x31, 0x74,
+              ];
+              assert_eq!(
+                  *symthaea_continuity::capability_counterfactual_algorithm_id_v1().as_bytes(),
+                  expected
+              );
+          }
+          RS
+
+          rustfmt --edition 2024 "$target"
+          rustfmt --edition 2024 --check "$target"
+          cargo check --locked -p symthaea-continuity --all-targets
+          cargo clippy --locked -p symthaea-continuity --test capability_analysis_provenance_transport -- -A dead_code -A clippy::too_many_arguments -D warnings
+
+          output="$(mktemp)"
+          cargo test --locked -p symthaea-continuity --test capability_analysis_provenance_transport -- --nocapture 2>&1 | tee "$output"
+          count="$(sed -nE 's/^test result: ok\. ([0-9]+) passed;.*/\1/p' "$output" | tail -n1)"
+          rm -f "$output"
+          [[ "$count" == '21' ]] || { echo "error: expected 21 focused tests, got $count" >&2; exit 1; }
+
+          git checkout -- "$target"
+          restored_sha="$(sha256sum "$target" | awk '{print $1}')"
+          [[ "$restored_sha" == "$original_sha" ]] || { echo 'error: source bytes not restored' >&2; exit 1; }
+          test -z "$(git status --porcelain)"
