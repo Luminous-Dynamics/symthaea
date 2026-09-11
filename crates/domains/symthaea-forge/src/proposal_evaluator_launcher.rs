@@ -495,14 +495,12 @@ pub fn run_direct_evaluator(
     let stdout_joined = stdout_reader.join();
     let stderr_joined = stderr_reader.join();
 
-    if let BoundedWaitOutcome::TimedOut { wall_time_ms } = wait_outcome {
-        let _ = wall_time_ms;
-        return Err(ForgeProposalEvaluatorLauncherError::TimedOut);
-    }
-
     let (status, wall_time_ms) = match wait_outcome {
         BoundedWaitOutcome::Exited { status, wall_time_ms } => (status, wall_time_ms),
-        BoundedWaitOutcome::TimedOut { .. } => unreachable!("timeout handled above"),
+        BoundedWaitOutcome::TimedOut { wall_time_ms } => {
+            let _ = wall_time_ms;
+            return Err(ForgeProposalEvaluatorLauncherError::TimedOut);
+        }
     };
 
     let writer_result = writer_joined
