@@ -45,7 +45,7 @@ jobs:
           path = Path('crates/core/symthaea-continuity/src/capability_analysis_provenance.rs')
           text = path.read_text()
 
-          def add(name, prefix):
+          def add(name):
               global text
               marker = f'pub struct {name}<\'a> {{'
               if text.count(marker) != 1:
@@ -53,15 +53,21 @@ jobs:
               docs = f'''/// Compiler contract: the borrowed proof token is runtime-only.\n///\n/// The public type and Serde traits must resolve in rustdoc:\n/// ```\n/// use std::fmt::Debug;\n/// use symthaea_continuity::{name};\n/// fn assert_debug<T: Debug>() {{}}\n/// fn serde_trait_resolves<T: serde::Serialize>() {{}}\n/// assert_debug::<{name}<\'static>>();\n/// ```\n///\n/// It must not implement `Serialize`:\n/// ```compile_fail\n/// use symthaea_continuity::{name};\n/// fn assert_serialize<T: serde::Serialize>() {{}}\n/// assert_serialize::<{name}<\'static>>();\n/// ```\n///\n/// It must not implement owned deserialization:\n/// ```compile_fail\n/// use symthaea_continuity::{name};\n/// fn assert_deserialize_owned<T: serde::de::DeserializeOwned>() {{}}\n/// assert_deserialize_owned::<{name}<\'static>>();\n/// ```\n'''
               text = text.replace(marker, docs + marker, 1)
 
-          add('BoundCapabilityActivationProvenanceV1', 'activation')
-          add('BoundCapabilityCounterfactualProvenanceV1', 'counterfactual')
+          add('BoundCapabilityActivationProvenanceV1')
+          add('BoundCapabilityCounterfactualProvenanceV1')
           path.write_text(text)
           PY
 
           output="$(mktemp)"
           cargo test --locked -p symthaea-continuity --doc 2>&1 | tee "$output"
-          count="$(sed -nE 's/^test result: ok\. ([0-9]+) passed;.*/\1/p' "$output" | tail -n1)"
-          [[ "$count" == '6' ]] || { echo "error: expected six doctests, got $count" >&2; cat "$output" >&2; exit 1; }
+          mapfile -t counts < <(sed -nE 's/^test result: ok\. ([0-9]+) passed;.*/\1/p' "$output")
+          [[ "${#counts[@]}" -eq 2 ]] || { echo "error: expected two rustdoc result batches" >&2; cat "$output" >&2; exit 1; }
+          [[ "${counts[0]}" == '2' && "${counts[1]}" == '4' ]] || {
+            echo "error: expected rustdoc batches 2 passing + 4 compile-fail, got ${counts[*]}" >&2
+            cat "$output" >&2
+            exit 1
+          }
+          [[ "$(grep -Fc ' - compile fail ... ok' "$output")" -eq 4 ]] || { echo 'error: expected four successful compile-fail cases' >&2; exit 1; }
           grep -Fq 'BoundCapabilityActivationProvenanceV1' "$output"
           grep -Fq 'BoundCapabilityCounterfactualProvenanceV1' "$output"
           rm -f "$output"
