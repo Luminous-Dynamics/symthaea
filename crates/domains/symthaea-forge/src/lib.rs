@@ -47,10 +47,11 @@
 //! that carries only blind features and probabilities, [`proposal_evaluator_validation`] binds a
 //! stronger validation/holdout proposition to the exact evaluator request and response,
 //! [`proposal_evaluator_execution`] freezes launch/resource semantics and byte commitments while
-//! making runtime-isolation non-evidence explicit, the crate-private deterministic scorer joins
-//! frozen predictions to labels only during scoring, and [`proposal_validation_chain`] retains the
-//! earlier blind deterministic receipt machinery for compatibility while constructor visibility is
-//! narrowed in a later follow-up.
+//! making runtime-isolation non-evidence explicit, [`proposal_evaluator_launcher`] is the first
+//! backend that actually executes that protocol through bounded direct child-process I/O, the
+//! crate-private deterministic scorer joins frozen predictions to labels only during scoring, and
+//! [`proposal_validation_chain`] retains the earlier blind deterministic receipt machinery for
+//! compatibility while constructor visibility is narrowed in a later follow-up.
 //!
 //! # Authority boundary
 //!
@@ -94,8 +95,11 @@
 //!   request/response/stderr size bounds, and wall-time bounds before execution evidence exists.
 //! - Evaluator execution records bind exact JSON request/response byte commitments plus launcher and
 //!   stderr evidence, but v1 hard-codes runtime isolation status to `NotEstablishedV1`.
-//! - The evaluator request/response and execution-evidence contracts do not by themselves prove
-//!   OS/process/VM/network/filesystem isolation; a later launcher-backed v2 theorem must do so.
+//! - The direct launcher checks the exact runner binary bytes, ordered argv and wire-schema IDs;
+//!   executes without a shell; clears inherited environment; uses a fresh empty CWD; bounds wall
+//!   time and captured output; and converts only complete probability coverage into a response.
+//! - The direct launcher still does not isolate filesystem or network access; no v1 receipt claims
+//!   namespace/seccomp/cgroup/VM/network/filesystem containment.
 //! - The earlier direct blind deterministic validation path remains a compatibility bypass in this
 //!   tranche; the evaluator-bound receipt is the stronger proposition, not yet the only constructible one.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
@@ -142,6 +146,7 @@ pub mod proposal_coverage;
 pub mod proposal_dataset;
 pub mod proposal_endpoints;
 pub mod proposal_evaluator_execution;
+pub mod proposal_evaluator_launcher;
 pub mod proposal_evaluator_protocol;
 pub mod proposal_evaluator_validation;
 pub mod proposal_exposure;
@@ -219,6 +224,12 @@ pub use proposal_evaluator_execution::{
     ForgeProposalEvaluatorExecutionRecord, ForgeProposalEvaluatorLaunchMode,
     ForgeProposalEvaluatorLaunchPolicy, ForgeProposalEvaluatorRuntimeIsolationStatus,
     ForgeProposalEvaluatorWorkingDirectoryMode,
+};
+pub use proposal_evaluator_launcher::{
+    forge_direct_evaluator_launcher_configuration_id,
+    forge_direct_evaluator_launcher_implementation_id, forge_direct_evaluator_transport_schema_id,
+    forge_evaluator_runner_argv_id, forge_evaluator_runner_artifact_id, run_direct_evaluator,
+    ForgeProposalDirectLaunchReceipt, ForgeProposalEvaluatorLauncherError,
 };
 pub use proposal_evaluator_protocol::{
     ForgeProposalEvaluationRequest, ForgeProposalEvaluationResponse,
