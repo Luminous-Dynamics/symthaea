@@ -81,6 +81,7 @@ jobs:
             -p symthaea-extension-router \
             -p symthaea-extension-admission \
             -p symthaea-extension-admission-policy \
+            -p symthaea-extension-authority \
             -p symthaea-sim-extension-routing
 
       - name: Test extension contract crates
@@ -91,6 +92,7 @@ jobs:
             -p symthaea-extension-router \
             -p symthaea-extension-admission \
             -p symthaea-extension-admission-policy \
+            -p symthaea-extension-authority \
             -p symthaea-sim-extension-routing
 
       - name: Check concrete ngspice provider
@@ -106,6 +108,7 @@ jobs:
             -p symthaea-extension-router \
             -p symthaea-extension-admission \
             -p symthaea-extension-admission-policy \
+            -p symthaea-extension-authority \
             -p symthaea-sim-extension-routing \
             --all-targets -- -D warnings
           cargo clippy --locked -p symthaea-ngspice-bridge \

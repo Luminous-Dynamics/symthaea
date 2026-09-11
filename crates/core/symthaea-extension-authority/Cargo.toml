@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-extension-authority"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Process-local host authority scoping for Symthaea extension admissions"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-extension-admission = { path = "../symthaea-extension-admission" }
+symthaea-extension-core = { path = "../symthaea-extension-core" }
+thiserror.workspace = true
