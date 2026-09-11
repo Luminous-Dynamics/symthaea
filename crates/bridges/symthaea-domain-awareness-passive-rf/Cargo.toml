@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-domain-awareness-passive-rf"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Receive-only passive RF evidence bridge into Symthaea domain awareness"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["sdr", "spectrum", "radio", "sensor-fusion"]
+categories = ["science", "aerospace"]
+
+[dependencies]
+symthaea-domain-awareness = { path = "../../domains/symthaea-domain-awareness" }
+uuid = { workspace = true }
