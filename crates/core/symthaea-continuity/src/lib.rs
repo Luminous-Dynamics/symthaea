@@ -45,6 +45,7 @@ pub mod external_effects;
 pub mod failure_domain;
 pub mod known_good;
 pub mod no_effects_execution;
+pub mod no_effects_rebind;
 pub mod no_external_effects;
 pub mod observation;
 pub mod post_execution_health;
@@ -260,6 +261,9 @@ pub use failure_domain::{
 pub use known_good::{
     KNOWN_GOOD_CHECKPOINT_RECORD_SCHEMA_V1, KnownGoodCheckpointError, KnownGoodCheckpointId,
     KnownGoodCheckpointRecordV1, KnownGoodRecoveryPathV1, QualifiedKnownGoodCheckpointV1,
+};
+pub use no_effects_rebind::{
+    NoEffectsRebindError, ReboundNoEffectsExecutionId, ReboundNoEffectsExecutionV1,
 };
 pub use observation::{
     DependencyBasis, DependencyClaimId, DependencyClaimV1, EvidenceBasis, ObservationCoverage,
