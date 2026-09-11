@@ -10,6 +10,8 @@
 //! - **Running couplings**: α_s(Q²), α_EM(Q²), gauge unification projection
 //! - **Symmetry groups**: SU(2) Pauli matrices, SU(3) Gell-Mann matrices,
 //!   structure constants, Casimir operators
+//! - **Lattice statistics**: explicit burn-in, autocorrelation time, effective
+//!   sample size, blocking errors, and acceptance diagnostics
 //!
 //! ## Natural Units
 //!
@@ -28,6 +30,7 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_qcd;
+pub mod lattice_statistics;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -41,6 +44,10 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use lattice_statistics::{
+    ChainDiagnostics, LatticeStatisticsError, acceptance_rate, analyze_scalar_chain,
+    blocking_standard_error, integrated_autocorrelation_time, sample_mean, sample_variance,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
