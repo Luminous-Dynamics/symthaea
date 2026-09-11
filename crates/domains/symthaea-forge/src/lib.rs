@@ -36,13 +36,14 @@
 //! state entering each generation to every proposal row, including no-op attempts,
 //! [`proposal_endpoints`] freezes outcome observability so missing/censored labels cannot be
 //! silently rewritten as failures, [`proposal_study`] freezes the feature/target/estimator/
-//! validation contract before any model can be fitted, [`proposal_model`] separates validation
-//! gate precommitment, frozen model identity, validation receipt, and holdout-evaluation permission,
-//! [`proposal_support`] proves the role-isolated training corpus satisfies every precommitted
-//! family-support threshold before a fit permit can exist, [`proposal_validation_coverage`]
-//! separately proves the validation corpus has enough actually observed labels before scoring,
-//! [`proposal_validation_blind`] exposes only label-blind validation targets/predictions, and the
-//! crate-private deterministic scorer joins frozen predictions to labels only during scoring.
+//! validation contract before any model can be fitted, crate-private model machinery binds the
+//! frozen model and generic receipt internals, [`proposal_support`] proves the role-isolated training
+//! corpus satisfies every precommitted family-support threshold before a fit permit can exist,
+//! [`proposal_validation_coverage`] separately proves the validation corpus has enough actually
+//! observed labels before scoring, [`proposal_validation_blind`] exposes only label-blind
+//! validation targets/predictions, the crate-private deterministic scorer joins frozen predictions
+//! to labels only during scoring, and [`proposal_validation_chain`] is the only public
+//! validation/holdout receipt path, requiring that exact blind row-reconstructable evidence.
 //!
 //! # Authority boundary
 //!
@@ -83,6 +84,10 @@
 //!   distinct validation runs; an under-observed validation slice cannot mint a score permit.
 //! - Public validation prediction generation covers every proposal row through label-blind targets;
 //!   whether a row is observed/censored/counterfactual is joined only after predictions are frozen.
+//! - Generic aggregate validation/holdout constructors remain crate-internal; the public receipt
+//!   path requires the exact blind target set, blind prediction set, and deterministic Brier receipt.
+//! - Deterministic validation v1 rejects report-only metrics until they also have deterministic,
+//!   row-reconstructable scorers.
 //! - Validation acceptance threshold/scorer identity is precommitted before a model artifact can be
 //!   frozen; failed validation cannot mint even an identity-only holdout evaluation permit.
 //! - Holdout permits still expose no holdout observations and grant no search or deployment authority.
@@ -116,13 +121,14 @@ pub mod proposal_dataset;
 pub mod proposal_endpoints;
 pub mod proposal_exposure;
 pub mod proposal_history;
-pub mod proposal_model;
+mod proposal_model;
 pub mod proposal_qualification;
 pub mod proposal_recording;
 pub mod proposal_study;
 pub mod proposal_support;
 pub mod proposal_trace;
 pub mod proposal_validation_blind;
+pub mod proposal_validation_chain;
 pub mod proposal_validation_coverage;
 mod proposal_validation_predictions;
 pub mod sandbox;
@@ -192,8 +198,8 @@ pub use proposal_history::{
     ForgeProposalGenerationState, ForgeProposalHistoryError,
 };
 pub use proposal_model::{
-    ForgeProposalFrozenModel, ForgeProposalHoldoutEvaluationPermit, ForgeProposalMetricScore,
-    ForgeProposalModelError, ForgeProposalValidationGateSpec, ForgeProposalValidationReceipt,
+    ForgeProposalFrozenModel, ForgeProposalMetricScore, ForgeProposalModelError,
+    ForgeProposalValidationGateSpec,
 };
 pub use proposal_qualification::{
     ForgeProposalQualificationError, ForgeQualifiedProposalEvidence,
@@ -220,6 +226,10 @@ pub use proposal_validation_blind::{
     ForgeProposalBlindDeterministicBrierReceipt, ForgeProposalBlindValidationError,
     ForgeProposalBlindValidationPrediction, ForgeProposalBlindValidationPredictionSet,
     ForgeProposalValidationTarget, ForgeProposalValidationTargetSet,
+};
+pub use proposal_validation_chain::{
+    ForgeProposalDeterministicHoldoutPermit, ForgeProposalDeterministicValidationError,
+    ForgeProposalDeterministicValidationReceipt,
 };
 pub use proposal_validation_coverage::{
     ForgeProposalValidationCoverageError, ForgeProposalValidationCoverageReceipt,
