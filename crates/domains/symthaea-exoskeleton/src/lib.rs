@@ -51,10 +51,14 @@ pub mod rescue_fault_campaign;
 pub mod rescue_navigation;
 pub mod rescue_propulsion;
 pub mod resource_optimizer;
+pub mod resource_transfer;
+pub mod safe_haven;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
 pub mod simulator;
 pub mod space_exosuit;
+pub mod suit_service_interface;
+pub mod suitport_state_machine;
 #[cfg(feature = "symtropy")]
 pub mod symtropy_sim;
 pub mod training;
