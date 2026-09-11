@@ -16,6 +16,8 @@
 
 #![deny(unsafe_code)]
 
+pub mod transport;
+
 use serde::{Deserialize, Serialize};
 
 /// Stable identifier for a physical or virtual infrastructure asset.
