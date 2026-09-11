@@ -7,6 +7,7 @@ on:
       - 'scripts/continuity-fenced-resource-lab.py'
       - 'scripts/test-continuity-fenced-resource-lab.py'
       - 'docs/release/evidence/continuity-fenced-resource-lab-v1.md'
+      - 'docs/release/evidence/continuity-fenced-resource-lab-evidence-v1.md'
   workflow_dispatch:
 
 concurrency:
@@ -18,6 +19,7 @@ permissions:
 
 env:
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
 
 jobs:
   fenced-resource-lab:
@@ -32,13 +34,14 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Verify immutable workflow dependency
+      - name: Verify immutable workflow dependencies
         shell: bash
         run: |
           set -euo pipefail
           test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/continuity-fenced-resource-lab.yml)" -eq 1
-          if grep -Eq 'uses: actions/checkout@v[0-9]+' .github/workflows/continuity-fenced-resource-lab.yml; then
-            echo 'mutable checkout action tag found' >&2
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/continuity-fenced-resource-lab.yml)" -eq 1
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/continuity-fenced-resource-lab.yml; then
+            echo 'mutable GitHub Action tag found' >&2
             exit 1
           fi
 
@@ -55,5 +58,56 @@ jobs:
       - name: Syntax-check lab and harness
         run: python3 -m py_compile scripts/continuity-fenced-resource-lab.py scripts/test-continuity-fenced-resource-lab.py
 
-      - name: Execute contained fencing scenarios
+      - name: Execute contained fencing scenarios and retain evidence
+        env:
+          CONTINUITY_FENCED_RESOURCE_EVIDENCE_DIR: ${{ runner.temp }}/continuity-fenced-resource-evidence
+          CONTINUITY_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: python3 scripts/test-continuity-fenced-resource-lab.py
+
+      - name: Verify retained evidence bundle
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/continuity-fenced-resource-evidence
+          EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test -f "$EVIDENCE_DIR/SHA256SUMS"
+          (
+            cd "$EVIDENCE_DIR"
+            sha256sum -c SHA256SUMS
+          )
+          python3 - <<'PY'
+          import json, os, pathlib
+          evidence = pathlib.Path(os.environ['EVIDENCE_DIR'])
+          context = json.loads((evidence / 'campaign-run-context.json').read_text(encoding='utf-8'))
+          expected = os.environ['EXPECTED_SUBJECT_SHA'].lower()
+          actual = context['subject_sha'].lower()
+          if actual != expected:
+              raise SystemExit(f'subject SHA mismatch in retained evidence: expected={expected} actual={actual}')
+          observations = json.loads((evidence / 'campaign-observations.json').read_text(encoding='utf-8'))
+          if observations.get('obligation_count') != 9 or len(observations.get('observations', [])) != 9:
+              raise SystemExit('retained evidence does not contain exactly nine obligations')
+          print('retained_subject_sha=' + actual)
+          PY
+
+      - name: Publish retained-evidence digest
+        shell: bash
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/continuity-fenced-resource-evidence
+        run: |
+          set -euo pipefail
+          digest="$(sha256sum "$EVIDENCE_DIR/SHA256SUMS" | awk '{print $1}')"
+          echo "fenced-resource-evidence sha256sums_sha256=$digest"
+          {
+            echo
+            echo "- retained evidence SHA256SUMS digest: \`$digest\`"
+            echo '- bundle is descriptive contained-simulation evidence; it is not verifier-qualified or independently signed.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload retained evidence bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-fenced-resource-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/continuity-fenced-resource-evidence
+          if-no-files-found: error
+          retention-days: 14
