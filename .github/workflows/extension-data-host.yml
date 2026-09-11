@@ -1,0 +1,84 @@
+name: Extension Data Host
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-extension-core/**"
+      - "crates/core/symthaea-extension-admission/**"
+      - "crates/core/symthaea-extension-admission-policy/**"
+      - "crates/core/symthaea-extension-authority/**"
+      - "crates/bridges/symthaea-extension-data-host/**"
+      - ".github/workflows/extension-data-host.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  extension-data-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-extension-data-host-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-extension-data-host-
+
+      - name: Reconcile candidate lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > extension-data-host-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the extension data-host graph."
+          else
+            echo "Cargo.lock requires the following generated update:"
+            cat extension-data-host-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-data-host-cargo-lock-patch
+          path: extension-data-host-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check data host
+        run: cargo check --locked -p symthaea-extension-data-host --all-targets
+
+      - name: Test data host
+        run: cargo test --locked -p symthaea-extension-data-host
+
+      - name: Clippy data host
+        run: cargo clippy --locked -p symthaea-extension-data-host --all-targets -- -D warnings
+
+      - name: Require committed lockfile
+        run: git diff --exit-code -- Cargo.lock
