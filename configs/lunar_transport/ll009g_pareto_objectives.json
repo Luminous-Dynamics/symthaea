@@ -1,0 +1,88 @@
+{
+  "non_claims": [
+    "Objective choice is a declared Phase-0 policy, not a universal value system.",
+    "Pareto membership does not select infrastructure or establish operational safety."
+  ],
+  "objectives": [
+    {
+      "direction": "minimize",
+      "domain": "nonnegative",
+      "metric": "imported_mass_kg",
+      "rationale": "Reduce Earth-launched/imported infrastructure burden."
+    },
+    {
+      "direction": "minimize",
+      "domain": "nonnegative",
+      "metric": "energy_kwh_per_delivered_kg",
+      "rationale": "Reduce lifecycle transport energy intensity."
+    },
+    {
+      "direction": "minimize",
+      "domain": "nonnegative",
+      "metric": "peak_power_kw",
+      "rationale": "Reduce required peak power infrastructure."
+    },
+    {
+      "direction": "minimize",
+      "domain": "nonnegative",
+      "metric": "maintenance_import_mass_kg_per_year",
+      "rationale": "Reduce recurring Earth-imported maintenance/spares burden."
+    },
+    {
+      "direction": "minimize",
+      "domain": "nonnegative",
+      "metric": "propellant_reaction_mass_kg_per_year",
+      "rationale": "Reduce recurring propellant/reaction-mass burden."
+    },
+    {
+      "direction": "minimize",
+      "domain": "nonnegative",
+      "metric": "expected_lost_cargo_kg_per_year",
+      "rationale": "Reduce expected cargo loss under the declared reliability model."
+    },
+    {
+      "direction": "minimize",
+      "domain": "nonnegative",
+      "metric": "reusable_hardware_inventory_kg",
+      "rationale": "Reduce tied-up reusable transport hardware for equal service."
+    },
+    {
+      "direction": "minimize",
+      "domain": "nonnegative",
+      "metric": "latency_hours",
+      "rationale": "Reduce service latency."
+    },
+    {
+      "direction": "maximize",
+      "domain": "nonnegative",
+      "metric": "throughput_capacity_kg_per_year",
+      "rationale": "Increase freight capacity under the common corridor boundary."
+    },
+    {
+      "direction": "maximize",
+      "domain": "fraction",
+      "metric": "availability_fraction",
+      "rationale": "Increase service availability."
+    },
+    {
+      "direction": "maximize",
+      "domain": "fraction",
+      "metric": "reliability_success_probability",
+      "rationale": "Increase successful-delivery probability."
+    }
+  ],
+  "policy_name": "lunar-transport-phase0-multimetric-v1",
+  "report_only_metrics": [
+    {
+      "metric": "local_mass_kg",
+      "rationale": "Local construction mass is both a resource burden and a possible substitute for Earth imports; do not blindly optimize one direction."
+    }
+  ],
+  "rules": {
+    "allow_unlisted_metrics_as_report_only": true,
+    "joint_probability_claims_forbidden_without_joint_model": true,
+    "robust_dominance": "interval_separation",
+    "weighted_scores_forbidden": true
+  },
+  "schema_version": "ll009g.objective-policy.v1"
+}
