@@ -131,9 +131,6 @@ pub fn plan_legacy_qualification_source_captures_v3(
             .as_ref()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
-        if canonical_locator.is_none() {
-            requests_missing_locator += 1;
-        }
         if let Some(locator) = &canonical_locator {
             reuse_candidates
                 .entry((document.id.clone(), locator.clone()))
@@ -145,6 +142,8 @@ pub fn plan_legacy_qualification_source_captures_v3(
             matches!(&snapshot.capture, SourceCaptureV1::ContentDigest { .. });
         if existing_content_bound {
             already_content_bound_revisions += 1;
+        } else if canonical_locator.is_none() {
+            requests_missing_locator += 1;
         }
         let (retention, redistribution_policy) = capture_policy(document);
         requests.push(LegacySourceRevisionCaptureRequestV3 {
@@ -163,7 +162,7 @@ pub fn plan_legacy_qualification_source_captures_v3(
             retention,
             redistribution_policy,
             capture_needed: !existing_content_bound,
-            capture_ready: !existing_content_bound || document.canonical_locator.is_some(),
+            capture_ready: existing_content_bound || document.canonical_locator.is_some(),
         });
     }
 
