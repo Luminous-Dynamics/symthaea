@@ -4,110 +4,63 @@
 
 `CONTAINED_SIMULATION / NOT_PRODUCTION_QUALIFICATION`
 
-This evidence note freezes the first contained resource-boundary lab for the #1528 actuation-fencing theorem.
+This note freezes the first contained resource-boundary experiment for #1528. It mutates only caller-supplied SQLite files and grants no production execution authority.
 
-It grants no production execution authority, does not qualify NETCONF/Redfish/gNOI/storage/BMC/Spore adapters, and does not prove any external device enforces fencing.
-
-## Purpose
-
-The lab tests one deliberately small theorem using only a caller-supplied SQLite file:
+Core theorem:
 
 ```text
-stale or replayed authority
+stale / replayed / substituted authority
 must be rejected by the same transactional boundary
 that checks the fence and mutates the simulated resource
 ```
 
-The resource boundary stores:
+Contained simulation evidence is not verifier qualification, production-adapter qualification, or physical infrastructure authority.
 
-- exact resource ID;
-- exact backend ID;
-- exact enforcement-profile ID;
-- current monotonic fence generation;
-- current permit/deny disposition;
-- sticky emergency-stop state;
-- simulated resource value;
-- durably consumed token IDs.
+## Resource boundary
 
-A permit token binds the exact resource/backend/profile identities, fence generation, disposition, fresh challenge and token identity.
+The SQLite resource stores exact resource/backend/enforcement-profile identities, current monotonic fence generation, the exact token ID issued for that generation, permit/deny state, sticky emergency-stop state, simulated resource value, and durably consumed token IDs.
 
-## Atomic mutation boundary
+`actuate` performs, inside one `BEGIN IMMEDIATE` transaction:
 
-`actuate` executes inside one SQLite `BEGIN IMMEDIATE` transaction.
+1. resource/backend/profile identity checks;
+2. newest-generation check;
+3. exact current-token-ID check;
+4. emergency-stop / permit-disposition check;
+5. replay check;
+6. simulated mutation;
+7. one-use token-consumption insert;
+8. one commit for mutation + consumption.
 
-Inside that same transaction it:
-
-1. reads the current resource/fence state;
-2. rejects wrong resource/backend/profile identity;
-3. rejects stale generation;
-4. rejects emergency-stop / deny state;
-5. rejects a previously consumed token;
-6. mutates the simulated resource value;
-7. inserts the consumed-token record;
-8. commits both together.
-
-The lab therefore does not model the unsafe pattern:
-
-```text
-check fence
-commit check
-later mutate resource somewhere else
-```
-
-It models one transactional check-and-mutate boundary.
+The unkeyed token digest is intentionally **not** authentication. Persisting and checking the exact token ID prevents a caller from creating a different same-generation token with another challenge and bypassing one-use semantics.
 
 ## Adversarial scenarios
 
-`scripts/test-continuity-fenced-resource-lab.py` executes the lab as separate subprocesses and requires:
+The subprocess harness currently requires all of the following:
 
-1. **stale holder rejection** — generation `N` is rejected after the resource advances to `N+1`;
-2. **one-use consumption** — a successfully consumed permit cannot mutate twice;
-3. **durable reopen** — committed resource value and token-consumption state survive closing/reopening the SQLite database;
-4. **crash-before-commit atomicity** — the actuator process exits with code `91` after executing the mutation statements but before `COMMIT`; reopening the database must show neither the value change nor token consumption, after which the exact same current permit may execute once;
-5. **emergency-stop dominance** — a newer emergency-stop generation makes older permits stale;
-6. **deny cannot mutate** — the deny token itself cannot perform a resource mutation;
-7. **sticky emergency stop** — V1 refuses to issue a later permit after emergency stop;
-8. **cross-resource rejection** — a valid token for another resource is rejected even when backend/profile identities and generation are otherwise compatible.
+- **literal paused stale holder** — a live process holds generation `N`, blocks before actuation, the resource advances to `N+1`, then the old process resumes and must be rejected as `stale_generation`;
+- **same-generation token substitution rejection** — a caller recomputes a syntactically valid token hash with a different challenge for the current generation and must be rejected as `token_mismatch`;
+- **sequential replay rejection** — a successfully consumed exact permit cannot mutate twice;
+- **concurrent one-use race** — two live processes race the same exact current permit; exactly one commits and the other is serialized behind it and rejected as replay; exactly one mutation and one consumption remain;
+- **crash before COMMIT** — exit `91` after mutation statements but before commit; reopen must show neither mutation nor consumption, and the same still-current permit may execute once;
+- **crash after COMMIT before response** — exit `92` after commit; reopen must show mutation + consumption persisted and retry must be rejected;
+- **ordinary policy deny** — the deny generation fails specifically as `deny_disposition` and may later be superseded by a newer permit;
+- **emergency-stop dominance** — a later emergency-stop generation makes older permits stale, cannot itself actuate, and is sticky in V1 so later permit issuance is refused;
+- **boundary substitution rejection** — wrong resource ID, wrong backend ID, and wrong enforcement-profile ID each fail independently.
 
-## Executed local result
-
-Before repository commit, the initial lab/harness pair was syntax-checked and executed in a local Linux/Python environment.
-
-Observed summary:
+The expanded scenario engine was syntax-checked and executed locally before commit. The latest local result was:
 
 ```text
 status=PASS
-final_generation=4
-final_value=12
-consumed_count=2
+final_generation=7
+final_value=13
+consumed_count=3
 ```
 
-The executed property set was:
-
-- `stale_generation_rejected`;
-- `one_use_replay_rejected`;
-- `committed_state_survives_reopen`;
-- `crash_before_commit_is_atomic`;
-- `emergency_stop_dominates`;
-- `deny_token_cannot_mutate`;
-- `cross_resource_token_rejected`.
-
-Local execution is not repository qualification; the dedicated exact-head workflow is the repository evidence boundary.
-
-## Dedicated workflow
-
-`.github/workflows/continuity-fenced-resource-lab.yml` uses:
-
-- exact PR-head checkout;
-- immutable `actions/checkout` SHA;
-- read-only repository permissions;
-- Python syntax checks;
-- recorded Python/SQLite versions;
-- execution of the full subprocess harness.
+Local execution is not repository qualification.
 
 ## Nine-obligation campaign composition
 
-The current harness maps its observations onto every fixed #1549 V1 obligation and required basis:
+The harness maps observations onto every fixed #1549 V1 obligation and required basis:
 
 | obligation | descriptive basis |
 | --- | --- |
@@ -121,75 +74,30 @@ The current harness maps its observations onto every fixed #1549 V1 obligation a
 | `one_use_permit_consumption` | `one_use_consumption_scenario` |
 | `crash_recovery_preserves_fence` | `crash_restart_scenario` |
 
-Each observation receives a domain-separated descriptive record ID over the obligation, basis and canonical observation payload.
+Each observation gets a domain-separated descriptive record ID. The harness then constructs one campaign manifest binding the ordered nine-record set; simulation enforcement/authentication/backend identities; exact lab and harness digests; backend/profile generations; boundary and one-use implementation digests; scenario-suite, Python/SQLite/platform, topology/dependency, no-physical-hardware, and Python-toolchain identities; campaign nonce/interval; and all nine observation IDs/timestamps.
 
-The harness then constructs a campaign manifest binding:
+That manifest is handed to #1578's independent `continuity-actuation-enforcement-campaign-oracle.py`; the harness fails if the independent oracle rejects it.
 
-- the complete ordered nine-record set;
-- simulation enforcement-profile identity;
-- simulation authentication-profile identity explicitly marked unqualified;
-- backend ID and digest of the exact lab implementation;
-- backend generation;
-- boundary implementation digest;
-- one-use mechanism digest;
-- enforcement-profile generation;
-- campaign nonce;
-- digest of the exact harness implementation;
-- scenario-suite manifest digest;
-- Python/SQLite/platform environment digest;
-- topology/dependency digest;
-- explicit no-physical-hardware manifest digest;
-- Python toolchain identity;
-- exact campaign interval;
-- all nine observation IDs and timestamps.
-
-That manifest is handed to #1578's independent `continuity-actuation-enforcement-campaign-oracle.py`. The lab harness fails if the oracle rejects it.
-
-This proves only:
+Therefore a successful dedicated run establishes only:
 
 ```text
-lab observations
--> closed nine-obligation shape
--> one coherent descriptive campaign manifest
--> independent structural-oracle acceptance
+contained lab observations
+-> nine-obligation descriptive campaign
+-> independent #1578 structural-oracle acceptance
 ```
 
-It does **not** prove:
+It does **not** establish evidence truth, #1550 verifier admission, current owner/verifier authority, cryptographic token authenticity, or live production-resource enforcement.
 
-```text
-campaign manifest accepted
--> evidence is true
--> verifier qualified evidence
--> live production resource enforces fencing
-```
+## Dedicated workflow
 
-Verifier-owned admission remains #1550 and real resource enforcement remains #1528.
+`.github/workflows/continuity-fenced-resource-lab.yml` uses exact PR-head checkout, immutable `actions/checkout` SHA, read-only permissions, records Python/SQLite runtime, syntax-checks both scripts, and executes the full black-box harness.
 
-## Relationship to #1549 / #1550 / #1528
+## Relationship to #1549 / #1578 / #1550 / #1528
 
-This lab is downstream experimental evidence, not a replacement for the closed-world qualification protocol.
+This lab cannot bypass the qualification stack. It should become verifier-qualified campaign evidence only after the parent Rust continuity stack compiles/qualifies, the campaign-bound Rust evidence wrapper matches #1578's independent semantic preimage, and #1550 admits the exact campaign under explicit invalidation semantics.
 
-It should only become verifier-qualified campaign evidence after:
-
-- the parent Rust continuity stack compiles/qualifies;
-- the campaign-bound Rust evidence wrapper exists and matches #1578's independent semantic preimage;
-- #1550 defines verifier-owned admission and invalidation semantics;
-- the exact lab campaign identities are admitted by that verifier rather than trusted because the harness emitted them.
-
-Even then, qualification of this SQLite simulation does not imply that a switch, BMC, storage controller, hypervisor, database or Spore privileged helper enforces the same property.
-
-Each real adapter needs its own backend/resource campaign under #1528.
+Even then, a qualified SQLite simulation does not imply that a switch, BMC, storage controller, hypervisor, database, network device, or Spore privileged helper enforces the same theorem. Every real backend needs its own #1528 qualification campaign against the actual mutation boundary.
 
 ## Non-claims
 
-This lab does not establish:
-
-- cryptographic authentication of permits;
-- current owner/verifier authority;
-- a production execution capability;
-- hardware monotonic storage;
-- resistance to malicious privileged modification of the SQLite file;
-- multi-host consensus correctness;
-- NETCONF/gNMI/Redfish/gNOI behavior;
-- production crash consistency outside SQLite's transactional model;
-- any permission to mutate real infrastructure.
+This lab does not establish cryptographic permit authentication, hardware monotonic storage, protection against malicious privileged modification of the SQLite file, multi-host consensus correctness, NETCONF/gNMI/Redfish/gNOI behavior, production crash consistency outside SQLite's transactional model, or permission to mutate real infrastructure.
