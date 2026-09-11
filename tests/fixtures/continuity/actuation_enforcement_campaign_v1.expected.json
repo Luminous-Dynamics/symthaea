@@ -1,0 +1,10 @@
+{
+  "backend_generation": 7,
+  "canonical_preimage_sha256": "b1c898d59fe1218e2cb9ccd1eb18cd15163e9c5e855990c10307cbae29a3ddeb",
+  "ended_at_unix_ms": 2000,
+  "enforcement_profile_generation": 3,
+  "evidence_manifest_sha256": "f0c0690664c45f4ef0f875c88e6ba5a8150bd5649f5f7cf9e8b7906fbdff0c3a",
+  "obligation_count": 9,
+  "schema": "symthaea-continuity-actuation-enforcement-campaign-manifest-v1",
+  "started_at_unix_ms": 1000
+}

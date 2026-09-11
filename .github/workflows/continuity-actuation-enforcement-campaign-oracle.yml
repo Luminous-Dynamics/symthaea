@@ -1,0 +1,74 @@
+# Structural qualification for the independent actuation-enforcement campaign oracle.
+#
+# This workflow proves only that the checked-in oracle, frozen fixture and adversarial
+# harness execute coherently on the exact PR head. It does not qualify Rust code,
+# evidence truth, a verifier, an adapter, or physical resource enforcement.
+
+name: Actuation Enforcement Campaign Oracle
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/continuity-actuation-enforcement-campaign-oracle.yml'
+      - 'scripts/continuity-actuation-enforcement-campaign-oracle.py'
+      - 'scripts/test-continuity-actuation-enforcement-campaign-oracle.py'
+      - 'tests/fixtures/continuity/actuation_enforcement_campaign_v1.json'
+      - 'tests/fixtures/continuity/actuation_enforcement_campaign_v1.expected.json'
+      - 'docs/release/evidence/continuity-actuation-enforcement-campaign-oracle-v1.md'
+      - 'docs/release/evidence/continuity-actuation-enforcement-campaign-v1.md'
+      - 'docs/release/evidence/continuity-actuation-enforcement-invalidation-v1.md'
+  workflow_dispatch:
+
+concurrency:
+  group: actuation-enforcement-campaign-oracle-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+
+jobs:
+  campaign-oracle:
+    name: Frozen campaign oracle parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify immutable workflow dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=.github/workflows/continuity-actuation-enforcement-campaign-oracle.yml
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" "$workflow")" -eq 1
+          if grep -Eq 'uses: actions/checkout@v[0-9]+' "$workflow"; then
+            echo 'mutable actions/checkout major-version tag found' >&2
+            exit 1
+          fi
+
+      - name: Record Python runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 --version
+
+      - name: Syntax-check structural oracle and harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            scripts/continuity-actuation-enforcement-campaign-oracle.py \
+            scripts/test-continuity-actuation-enforcement-campaign-oracle.py
+
+      - name: Execute frozen campaign parity and adversarial contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/test-continuity-actuation-enforcement-campaign-oracle.py
