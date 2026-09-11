@@ -43,9 +43,10 @@
 //! observed labels before scoring, [`proposal_validation_blind`] exposes only label-blind
 //! validation targets/predictions, [`proposal_validation_features`] derives exactly the frozen
 //! pre-decision feature schema including accepted-history suffixes from the bound sequence cohort,
-//! the crate-private deterministic scorer joins frozen predictions to labels only during scoring,
-//! and [`proposal_validation_chain`] is the only public validation/holdout receipt path, requiring
-//! that exact blind row-reconstructable evidence.
+//! [`proposal_evaluator_protocol`] defines a serialization-safe request/response artifact boundary
+//! that carries only blind features and probabilities, the crate-private deterministic scorer joins
+//! frozen predictions to labels only during scoring, and [`proposal_validation_chain`] is the only
+//! public validation/holdout receipt path, requiring that exact blind row-reconstructable evidence.
 //!
 //! # Authority boundary
 //!
@@ -80,6 +81,11 @@
 //!   fields are intentionally absent from the v1 feature vocabulary.
 //! - Validation feature tables emit exactly that frozen schema; accepted-history features are
 //!   reconstructed from the exact sequence batch bound to each validation corpus member.
+//! - Label-blind evaluator requests serialize only opaque gate/provenance identities plus the frozen
+//!   blind feature table; validation labels, endpoint observability, raw validation tables, and
+//!   per-family coverage counts are not request fields.
+//! - The evaluator request/response protocol does not by itself prove OS/process/VM/network
+//!   isolation; a later worker execution receipt must establish those runtime properties.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
 //! - Training support is counted only from observed labels; censored and counterfactual outcomes
@@ -123,6 +129,7 @@ pub mod proposal_corpus;
 pub mod proposal_coverage;
 pub mod proposal_dataset;
 pub mod proposal_endpoints;
+pub mod proposal_evaluator_protocol;
 pub mod proposal_exposure;
 pub mod proposal_history;
 mod proposal_model;
@@ -192,6 +199,11 @@ pub use proposal_dataset::{
 pub use proposal_endpoints::{
     ForgeProposalEndpoint, ForgeProposalEndpointError, ForgeProposalEndpointRecord,
     ForgeProposalEndpointTable, ForgeProposalEndpointValue,
+};
+pub use proposal_evaluator_protocol::{
+    ForgeProposalEvaluationRequest, ForgeProposalEvaluationResponse,
+    ForgeProposalEvaluatorPrediction, ForgeProposalEvaluatorProtocolError,
+    ForgeProposalEvaluatorProtocolSpec,
 };
 pub use proposal_exposure::{
     ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
