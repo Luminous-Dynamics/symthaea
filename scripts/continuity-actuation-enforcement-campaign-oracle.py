@@ -31,6 +31,12 @@ OBLIGATIONS = (
 
 DIGEST_FIELDS = (
     "complete_set_id",
+    "enforcement_profile_id",
+    "authentication_profile_id",
+    "backend_id",
+    "backend_implementation_digest",
+    "boundary_implementation_digest",
+    "one_use_mechanism_digest",
     "campaign_nonce",
     "harness_implementation_digest",
     "scenario_suite_manifest_digest",
@@ -40,8 +46,20 @@ DIGEST_FIELDS = (
     "toolchain_realization_digest",
 )
 
+GENERATION_FIELDS = (
+    "backend_generation",
+    "enforcement_profile_generation",
+)
+
 TOP_LEVEL_FIELDS = frozenset(
-    ("schema", *DIGEST_FIELDS, "started_at_unix_ms", "ended_at_unix_ms", "records")
+    (
+        "schema",
+        *DIGEST_FIELDS,
+        *GENERATION_FIELDS,
+        "started_at_unix_ms",
+        "ended_at_unix_ms",
+        "records",
+    )
 )
 RECORD_FIELDS = frozenset(("obligation", "record_id", "observed_at_unix_ms"))
 
@@ -78,9 +96,9 @@ def parse_digest(value: Any, field: str) -> bytes:
     return raw
 
 
-def parse_time(value: Any, field: str) -> int:
+def parse_u64(value: Any, field: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-        raise ManifestError(f"{field}: expected positive integer unix milliseconds")
+        raise ManifestError(f"{field}: expected positive integer")
     if value > (1 << 64) - 1:
         raise ManifestError(f"{field}: exceeds u64")
     return value
@@ -98,8 +116,12 @@ def validate_manifest(obj: Any) -> tuple[bytes, dict[str, Any]]:
         raise ManifestError(f"schema: expected {SCHEMA!r}")
 
     digests = {field: parse_digest(obj[field], field) for field in DIGEST_FIELDS}
-    start = parse_time(obj["started_at_unix_ms"], "started_at_unix_ms")
-    end = parse_time(obj["ended_at_unix_ms"], "ended_at_unix_ms")
+    backend_generation = parse_u64(obj["backend_generation"], "backend_generation")
+    enforcement_profile_generation = parse_u64(
+        obj["enforcement_profile_generation"], "enforcement_profile_generation"
+    )
+    start = parse_u64(obj["started_at_unix_ms"], "started_at_unix_ms")
+    end = parse_u64(obj["ended_at_unix_ms"], "ended_at_unix_ms")
     if end < start:
         raise ManifestError("campaign end precedes campaign start")
 
@@ -122,7 +144,7 @@ def validate_manifest(obj: Any) -> tuple[bytes, dict[str, Any]]:
         if record_id in seen_record_ids:
             raise ManifestError(f"duplicate record_id at records[{i}]")
         seen_record_ids.add(record_id)
-        observed = parse_time(
+        observed = parse_u64(
             rec["observed_at_unix_ms"],
             f"records[{i}].observed_at_unix_ms",
         )
@@ -150,8 +172,22 @@ def validate_manifest(obj: Any) -> tuple[bytes, dict[str, Any]]:
     evidence_manifest_sha256 = evidence_hasher.digest()
 
     out = bytearray(PREIMAGE_DOMAIN)
-    for field in DIGEST_FIELDS:
-        out.extend(digests[field])
+    out.extend(digests["complete_set_id"])
+    out.extend(digests["enforcement_profile_id"])
+    out.extend(digests["authentication_profile_id"])
+    out.extend(digests["backend_id"])
+    out.extend(digests["backend_implementation_digest"])
+    out.extend(encode_u64(backend_generation))
+    out.extend(digests["boundary_implementation_digest"])
+    out.extend(digests["one_use_mechanism_digest"])
+    out.extend(encode_u64(enforcement_profile_generation))
+    out.extend(digests["campaign_nonce"])
+    out.extend(digests["harness_implementation_digest"])
+    out.extend(digests["scenario_suite_manifest_digest"])
+    out.extend(digests["environment_manifest_digest"])
+    out.extend(digests["topology_dependency_manifest_digest"])
+    out.extend(digests["hardware_firmware_manifest_digest"])
+    out.extend(digests["toolchain_realization_digest"])
     out.extend(encode_u64(start))
     out.extend(encode_u64(end))
     out.extend(evidence_manifest_sha256)
@@ -159,6 +195,8 @@ def validate_manifest(obj: Any) -> tuple[bytes, dict[str, Any]]:
     summary = {
         "schema": SCHEMA,
         "obligation_count": len(OBLIGATIONS),
+        "backend_generation": backend_generation,
+        "enforcement_profile_generation": enforcement_profile_generation,
         "started_at_unix_ms": start,
         "ended_at_unix_ms": end,
         "evidence_manifest_sha256": evidence_manifest_sha256.hex(),
@@ -174,6 +212,8 @@ def self_test() -> None:
     base = {
         "schema": SCHEMA,
         **{field: hx(i + 1) for i, field in enumerate(DIGEST_FIELDS)},
+        "backend_generation": 7,
+        "enforcement_profile_generation": 3,
         "started_at_unix_ms": 1000,
         "ended_at_unix_ms": 2000,
         "records": [
@@ -247,6 +287,16 @@ def self_test() -> None:
     changed["toolchain_realization_digest"] = hx(99)
     p3, _ = validate_manifest(changed)
     assert p1 != p3, "toolchain drift must change canonical preimage"
+
+    changed = json.loads(json.dumps(base))
+    changed["backend_generation"] += 1
+    p4, _ = validate_manifest(changed)
+    assert p1 != p4, "backend generation drift must change canonical preimage"
+
+    changed = json.loads(json.dumps(base))
+    changed["enforcement_profile_id"] = hx(99)
+    p5, _ = validate_manifest(changed)
+    assert p1 != p5, "enforcement-profile substitution must change canonical preimage"
 
 
 def main() -> int:
