@@ -97,6 +97,7 @@ pub fn assess_legacy_platform_identity_v1(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::legacy_computing::seed_legacy_computing_pack_v1;
     use crate::technology::ApplicabilityStatusV1;
 
     #[test]
@@ -171,5 +172,32 @@ mod tests {
                 .status,
             ApplicabilityStatusV1::Inapplicable
         );
+    }
+
+    #[test]
+    fn seeded_profiles_match_canonical_version_families() {
+        let pack = seed_legacy_computing_pack_v1(1_800_000_000_000).unwrap();
+        for platform in LegacyPlatformV1::ALL {
+            let profile = pack.profile(platform).unwrap();
+            let spec = legacy_platform_identity_spec_v1(platform);
+            assert_eq!(profile.version_family, spec.version_family);
+        }
+    }
+
+    #[test]
+    fn seeded_procedures_are_applicable_only_to_their_own_platform_identity() {
+        let pack = seed_legacy_computing_pack_v1(1_800_000_000_000).unwrap();
+        for procedure in &pack.procedures {
+            for observed_platform in LegacyPlatformV1::ALL {
+                let observed = legacy_platform_identity_v1(observed_platform);
+                let assessment = procedure.applicability.assess(&observed).unwrap();
+                let expected_status = if observed_platform == procedure.platform {
+                    ApplicabilityStatusV1::Applicable
+                } else {
+                    ApplicabilityStatusV1::Inapplicable
+                };
+                assert_eq!(assessment.status, expected_status);
+            }
+        }
     }
 }
