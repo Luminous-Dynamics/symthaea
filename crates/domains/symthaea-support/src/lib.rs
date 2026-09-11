@@ -27,6 +27,7 @@ pub mod legacy_hpux;
 pub mod legacy_hpux_scenarios;
 pub mod legacy_ibmi;
 pub mod legacy_ibmi_scenarios;
+pub mod legacy_networking_depth;
 pub mod legacy_platform_identity;
 pub mod legacy_portfolio;
 pub mod legacy_qualification_profile;
@@ -127,6 +128,11 @@ pub use legacy_ibmi_scenarios::{
     IbmiQualificationScenarioV1, IbmiScenarioActionClassV1, IbmiScenarioActionV1,
     IbmiScenarioErrorV1, IbmiScenarioEvidenceCurrentnessV1, IbmiScenarioEvidenceV1,
     LEGACY_IBMI_SCENARIO_SCHEMA_V1,
+};
+pub use legacy_networking_depth::{
+    enrich_legacy_aix_ibmi_networking_v1, LegacyNetworkEvidenceSignalV1,
+    LegacyNetworkFailureModeV1, LegacyNetworkMechanismKindV1, LegacyNetworkMechanismModelV1,
+    LegacyNetworkingDepthErrorV1, LegacyNetworkingDepthV1, LEGACY_NETWORKING_DEPTH_SCHEMA_V1,
 };
 pub use legacy_platform_identity::{
     assess_legacy_platform_identity_v1, legacy_platform_identity_spec_v1,
