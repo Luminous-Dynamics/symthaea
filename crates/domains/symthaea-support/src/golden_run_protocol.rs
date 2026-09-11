@@ -273,6 +273,11 @@ impl GoldenSolverSubmissionV1 {
         {
             return Err(GoldenRunProtocolErrorV1::SubmissionTranscriptMismatch);
         }
+        if self.submitted_at_unix_ms < transcript.finished_at_unix_ms {
+            return Err(GoldenRunProtocolErrorV1::InvalidField(
+                "solver submission precedes transcript finish".into(),
+            ));
+        }
         validate_unit(self.final_confidence, "final confidence")?;
         if self.findings.is_empty() && self.abstention.is_none() {
             return Err(GoldenRunProtocolErrorV1::InvalidField(
@@ -461,11 +466,10 @@ mod tests {
         transcript(&view).validate_against(&view).unwrap();
         let mut changed = view.clone();
         changed.symptom.push_str(" changed");
-        assert_eq!(
+        assert!(matches!(
             transcript(&view).validate_against(&changed),
-            Err(GoldenRunProtocolErrorV1::CaseIdentityMismatch)
-                .or(Err(GoldenRunProtocolErrorV1::SolverViewDigestMismatch))
-        );
+            Err(GoldenRunProtocolErrorV1::SolverViewDigestMismatch)
+        ));
     }
 
     #[test]
