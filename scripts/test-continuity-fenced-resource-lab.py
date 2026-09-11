@@ -102,6 +102,41 @@ os.execv(sys.executable,[sys.executable,sys.argv[2],'actuate','--db',sys.argv[3]
         snap2 = parsed(run("snapshot", "--db", db))
         assert snap2["value"] == 5 and snap2["current_generation"] == 2 and len(snap2["consumed_tokens"]) == 1
 
+        race_db = root / "race.sqlite"
+        race_token_path = root / "race-token.json"
+        race_gate = root / "race-go"
+        run("init", "--db", race_db, "--resource-id", rid, "--backend-id", bid, "--profile-id", pid)
+        race_token = parsed(run("issue", "--db", race_db, "--disposition", "permit", "--challenge", hx(30)))
+        save(race_token_path, race_token)
+        race_waiter = """import os,pathlib,sys,time
+gate=pathlib.Path(sys.argv[1])
+deadline=time.time()+10
+while not gate.exists():
+    if time.time() > deadline:
+        raise SystemExit(70)
+    time.sleep(0.005)
+os.execv(sys.executable,[sys.executable,sys.argv[2],'actuate','--db',sys.argv[3],'--token',sys.argv[4],'--delta','1','--operation-digest',sys.argv[5]])
+"""
+        racers = [
+            subprocess.Popen(
+                [sys.executable, "-c", race_waiter, str(race_gate), str(LAB), str(race_db), str(race_token_path), hx(31 + i)],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            for i in range(2)
+        ]
+        race_gate.write_text("go", encoding="utf-8")
+        race_results = []
+        for racer in racers:
+            out, err = racer.communicate(timeout=10)
+            race_results.append({"returncode": racer.returncode, "stdout": out, "stderr": err})
+        if sorted(result["returncode"] for result in race_results) != [0, 2]:
+            raise AssertionError(f"concurrent one-use permit did not yield one success + one deny: {race_results!r}")
+        if sum("actuate:replay" in result["stderr"] for result in race_results) != 1:
+            raise AssertionError(f"concurrent loser was not rejected as replay: {race_results!r}")
+        race_snapshot = parsed(run("snapshot", "--db", race_db))
+        assert race_snapshot["value"] == 1 and len(race_snapshot["consumed_tokens"]) == 1
+        concurrency_evidence = {"results": race_results, "snapshot": race_snapshot}
+
         token3 = parsed(run("issue", "--db", db, "--disposition", "permit", "--challenge", hx(12)))
         p3 = root / "t3.json"; save(p3, token3)
         run("actuate", "--db", db, "--token", p3, "--delta", 7, "--operation-digest", hx(23), "--crash-before-commit", expect=91)
@@ -159,7 +194,7 @@ os.execv(sys.executable,[sys.executable,sys.argv[2],'actuate','--db',sys.argv[3]
         final = parsed(run("snapshot", "--db", db))
         assert final["value"] == 13 and final["current_generation"] == 7 and final["emergency_stop"] is True
         assert len(final["consumed_tokens"]) == 3
-        mark("one_use_permit_consumption", {"consumed_tokens": final["consumed_tokens"], "same_generation_forgery": forged_attempt.stderr})
+        mark("one_use_permit_consumption", {"consumed_tokens": final["consumed_tokens"], "same_generation_forgery": forged_attempt.stderr, "concurrent_exact_token": concurrency_evidence})
         mark("durable_monotonic_fence", {"generation_2": snap2["current_generation"], "generation_3": snap_after_crash["current_generation"], "generation_7": final["current_generation"]})
 
         campaign_end = max(now_ms(), max(ts for ts, _ in observed.values()))
@@ -218,7 +253,7 @@ os.execv(sys.executable,[sys.executable,sys.argv[2],'actuate','--db',sys.argv[3]
             "campaign_oracle": oracle_summary,
             "obligation_bases": bases,
             "properties": [
-                "paused_stale_holder_rejected", "one_use_replay_rejected", "same_generation_token_substitution_rejected", "committed_state_survives_reopen",
+                "paused_stale_holder_rejected", "one_use_replay_rejected", "concurrent_one_use_race_serialized", "same_generation_token_substitution_rejected", "committed_state_survives_reopen",
                 "crash_before_commit_is_atomic", "crash_after_commit_is_durable", "emergency_stop_dominates", "deny_token_cannot_mutate",
                 "cross_resource_token_rejected", "nine_obligation_campaign_shape_accepted",
             ],
