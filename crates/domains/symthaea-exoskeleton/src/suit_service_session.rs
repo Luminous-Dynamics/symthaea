@@ -57,6 +57,9 @@ pub struct ServiceNegotiationFailure {
 pub struct ServiceNegotiationResult {
     pub permissions: ResourceTransferPermissions,
     pub failures: Vec<ServiceNegotiationFailure>,
+    pub request_valid: bool,
+    pub node_valid: bool,
+    pub policy_valid: bool,
     pub all_required_services_admitted: bool,
     pub evidence: ExosuitEvidenceLevel,
 }
@@ -68,49 +71,61 @@ pub fn negotiate_resource_services(
 ) -> ServiceNegotiationResult {
     let mut permissions = ResourceTransferPermissions::none();
     let mut failures = Vec::new();
+    let request_valid = request.is_valid();
+    let node_valid = node.is_valid();
+    let policy_valid = policy.is_valid();
 
-    let needs_charge = requested(&request.electrical_energy_wh);
-    let needs_oxygen = requested(&request.primary_oxygen_l) || requested(&request.secondary_oxygen_l);
-    let needs_coolant = requested(&request.thermal_service_j);
-    let needs_regeneration = requested(&request.co2_regeneration_l)
-        || requested(&request.humidity_regeneration);
+    if request_valid && node_valid && policy_valid {
+        let needs_charge = requested(&request.electrical_energy_wh);
+        let needs_oxygen =
+            requested(&request.primary_oxygen_l) || requested(&request.secondary_oxygen_l);
+        let needs_coolant = requested(&request.thermal_service_j);
+        let needs_regeneration = requested(&request.co2_regeneration_l)
+            || requested(&request.humidity_regeneration);
 
-    admit_if_required(
-        node,
-        policy,
-        needs_charge,
-        SuitServiceKind::ElectricalCharge,
-        &mut permissions.electrical_charge,
-        &mut failures,
-    );
-    admit_if_required(
-        node,
-        policy,
-        needs_oxygen,
-        SuitServiceKind::OxygenReplenish,
-        &mut permissions.oxygen_replenish,
-        &mut failures,
-    );
-    admit_if_required(
-        node,
-        policy,
-        needs_coolant,
-        SuitServiceKind::CoolantService,
-        &mut permissions.coolant_service,
-        &mut failures,
-    );
-    admit_if_required(
-        node,
-        policy,
-        needs_regeneration,
-        SuitServiceKind::PlssRegeneration,
-        &mut permissions.plss_regeneration,
-        &mut failures,
-    );
+        admit_if_required(
+            node,
+            policy,
+            needs_charge,
+            SuitServiceKind::ElectricalCharge,
+            &mut permissions.electrical_charge,
+            &mut failures,
+        );
+        admit_if_required(
+            node,
+            policy,
+            needs_oxygen,
+            SuitServiceKind::OxygenReplenish,
+            &mut permissions.oxygen_replenish,
+            &mut failures,
+        );
+        admit_if_required(
+            node,
+            policy,
+            needs_coolant,
+            SuitServiceKind::CoolantService,
+            &mut permissions.coolant_service,
+            &mut failures,
+        );
+        admit_if_required(
+            node,
+            policy,
+            needs_regeneration,
+            SuitServiceKind::PlssRegeneration,
+            &mut permissions.plss_regeneration,
+            &mut failures,
+        );
+    }
 
     ServiceNegotiationResult {
         permissions,
-        all_required_services_admitted: failures.is_empty(),
+        request_valid,
+        node_valid,
+        policy_valid,
+        all_required_services_admitted: request_valid
+            && node_valid
+            && policy_valid
+            && failures.is_empty(),
         failures,
         evidence: node.evidence.min(policy.evidence),
     }
@@ -177,9 +192,7 @@ mod tests {
     use super::*;
     use crate::dust::{DustExposure, DUST_ZONE_COUNT};
     use crate::resource_transfer::MeteredAmount;
-    use crate::suit_service_interface::{
-        SuitServiceCapability, SuitServiceNodeKind,
-    };
+    use crate::suit_service_interface::{SuitServiceCapability, SuitServiceNodeKind};
 
     fn metered(value: f64) -> MeteredAmount {
         MeteredAmount {
@@ -237,6 +250,9 @@ mod tests {
             SuitServicePolicy::simulation_reference(),
         );
         assert!(result.all_required_services_admitted);
+        assert!(result.request_valid);
+        assert!(result.node_valid);
+        assert!(result.policy_valid);
         assert!(result.permissions.electrical_charge);
         assert!(result.permissions.oxygen_replenish);
         assert!(!result.permissions.coolant_service);
@@ -244,9 +260,24 @@ mod tests {
     }
 
     #[test]
+    fn malformed_request_cannot_pass_utility_negotiation() {
+        let mut malformed = request();
+        malformed.duration_s = f64::NAN;
+        let result = negotiate_resource_services(
+            &node(),
+            &malformed,
+            SuitServicePolicy::simulation_reference(),
+        );
+        assert!(!result.request_valid);
+        assert!(!result.all_required_services_admitted);
+        assert_eq!(result.permissions, ResourceTransferPermissions::none());
+    }
+
+    #[test]
     fn missing_required_service_is_explicit_failure() {
         let mut node = node();
-        node.capabilities.retain(|capability| capability.kind != SuitServiceKind::OxygenReplenish);
+        node.capabilities
+            .retain(|capability| capability.kind != SuitServiceKind::OxygenReplenish);
         let result = negotiate_resource_services(
             &node,
             &request(),
