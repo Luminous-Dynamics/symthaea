@@ -109,6 +109,53 @@ def deny(reasons: set[str]) -> dict[str, Any]:
     return {"decision": "Deny", "reasons": sorted(reasons, key=RANK.__getitem__)}
 
 
+def normalized_uncertainty(value: dict[str, Any]) -> dict[str, Any]:
+    interval = value.get("interval")
+    normalized_interval = None if interval is None else {
+        "lower": interval["lower"], "upper": interval["upper"]
+    }
+    return {"epistemic": value["epistemic"], "aleatoric": value["aleatoric"],
+            "interval": normalized_interval}
+
+
+def normalized_identity(o: dict[str, Any], c: dict[str, Any], e: dict[str, Any]) -> dict[str, Any]:
+    p = o["required_metric"]
+    obligation = {
+        "obligation_id": o["obligation_id"], "obligation_revision": o["obligation_revision"],
+        "subject_id": o["subject_id"], "twin_revision": o["twin_revision"],
+        "requirement_revision": o["requirement_revision"],
+        "expected_evidence_kind": o["expected_evidence_kind"],
+        "evidence_policy_id": o["evidence_policy_id"], "request_id": o["request_id"],
+        "validity_domain_id": o["validity_domain_id"],
+        "required_metric": {"name": p["name"], "unit": p["unit"],
+            "operator": p["operator"], "threshold": p["threshold"],
+            "max_epistemic": p["max_epistemic"], "max_aleatoric": p["max_aleatoric"]},
+    }
+    metrics = []
+    for m in c["metrics"]:
+        uncertainty = m.get("uncertainty")
+        metrics.append({"name": m["name"], "value": m["value"], "unit": m["unit"],
+                        "uncertainty": None if uncertainty is None else normalized_uncertainty(uncertainty)})
+    x = c["execution"]
+    candidate = {
+        "candidate_artifact_id": c["candidate_artifact_id"], "evidence_kind": c["evidence_kind"],
+        "binds_obligation_id": c["binds_obligation_id"],
+        "obligation_revision": c["obligation_revision"], "subject_id": c["subject_id"],
+        "twin_revision": c["twin_revision"], "requirement_revision": c["requirement_revision"],
+        "request_id": c["request_id"], "converged": c["converged"],
+        "confidence": c["confidence"], "run_uncertainty": normalized_uncertainty(c["run_uncertainty"]),
+        "metrics": metrics,
+        "execution": {"mode": x["mode"], "backend": x["backend"],
+            "solver_version": x["solver_version"], "input_digest": x["input_digest"],
+            "output_digest": x["output_digest"], "parser_version": x["parser_version"]},
+        "validity_domain_id": c["validity_domain_id"], "currentness": c["currentness"],
+        "currentness_proof_id": c["currentness_proof_id"],
+        "source_lineage_id": c["source_lineage_id"],
+    }
+    return {"schema": SCHEMA, "obligation": obligation, "candidate": candidate,
+            "expected": {"input_digest": e["input_digest"]}}
+
+
 def evaluate(payload: Any) -> dict[str, Any]:
     r: set[str] = set()
     if not isinstance(payload, dict):
@@ -194,7 +241,7 @@ def evaluate(payload: Any) -> dict[str, Any]:
                     r.add("acceptance_predicate_failed")
 
     if r: return deny(r)
-    identity = {"schema": SCHEMA, "obligation": o, "candidate": c, "expected": e}
+    identity = normalized_identity(o, c, e)
     eid = "sha256:" + hashlib.sha256(ID_DOMAIN + canonical(identity)).hexdigest()
     return {"decision": "Admit", "admitted_evidence_id": eid,
             "obligation_id": o["obligation_id"],
@@ -234,6 +281,8 @@ def expect_deny(p: dict[str, Any], code: str) -> None:
 
 def self_test() -> str:
     f = fixture(); a = evaluate(f); assert a["decision"] == "Admit"; assert a == evaluate(copy.deepcopy(f))
+    equivalent = copy.deepcopy(f); del equivalent["candidate"]["metrics"][1]["uncertainty"]["interval"]
+    assert evaluate(equivalent) == a
     cases = []
     p=copy.deepcopy(f); p["candidate"]["execution"]["mode"]="dry_run"; cases.append((p,"execution_mode_not_external_solver"))
     p=copy.deepcopy(f); p["candidate"]["currentness"]="HistoricallyValid"; cases.append((p,"candidate_not_current"))
