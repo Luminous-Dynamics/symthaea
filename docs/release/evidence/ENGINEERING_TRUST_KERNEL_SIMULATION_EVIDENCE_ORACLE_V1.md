@@ -68,7 +68,7 @@ V1 intentionally supports only scalar inequality predicates: `<`, `<=`, `>`, and
 
 For a `<=` or `<` obligation, an uncertainty interval is checked at its upper bound. For a `>=` or `>` obligation, it is checked at its lower bound. Therefore a mean value cannot pass while the declared interval crosses the acceptance threshold.
 
-## Deterministic decision
+## Deterministic decision and canonical identity
 
 The oracle returns exactly one of:
 
@@ -85,7 +85,9 @@ Deny { ordered_reasons[] }
 
 There is no scalar trust score and no optimizer override. Multiple simultaneous failures are returned in a frozen deterministic reason order.
 
-The admitted-evidence identity is SHA-256 over a domain-separated canonical JSON preimage containing the exact schema, obligation, candidate, uncertainty declarations, and expected-input binding. This identifier is an audit/content identity only; possession of it grants no authority.
+Before hashing, the oracle projects an admitted candidate into a normalized semantic V1 identity with all authority-relevant fields explicit. Optional uncertainty intervals are normalized to explicit `null` when absent. This prevents semantically equivalent JSON spellings from producing different admitted-evidence IDs.
+
+The admitted-evidence identity is SHA-256 over a domain-separated, key-sorted canonical JSON preimage containing the exact schema, obligation, candidate, uncertainty declarations, and expected-input binding. This identifier is an audit/content identity only; possession of it grants no authority.
 
 ## Synthetic positive fixture
 
@@ -132,11 +134,12 @@ The built-in self-test requires fail-closed denial for:
 - request-ID substitution;
 - unknown/shadow execution fields;
 - non-finite confidence;
-- deterministic ordered reporting of simultaneous independent faults.
+- deterministic ordered reporting of simultaneous independent faults;
+- canonical-ID equivalence when an optional `interval: null` is omitted from an otherwise identical uncertainty object.
 
 ## Exact local execution evidence
 
-After the uncertainty hardening, the exact checked-in candidate bytes were executed with:
+After the uncertainty and canonical-identity hardening, the exact checked-in candidate bytes were executed with:
 
 ```text
 Python 3.13.5
@@ -154,16 +157,16 @@ ok sha256:7066c8509f0563484acc3a2d16d5b9b689606a2250389da56ad66560dbc83ff8
 Executed source SHA-256:
 
 ```text
-48d6d9dc89cd64839e0ffb8e24695c9317360d6a9fc4b28ad6d3ba48f1931360
+312d364fd51ec8c3ef430923d17dbd9bf45493c87d904d8b96e696779adb0195
 ```
 
 Executed source Git blob identity:
 
 ```text
-256ba3e2777d44544b18df35742c02aa43d78e3c
+5b928f95a69c1c97acad941efbd7423d6d810e9f
 ```
 
-GitHub reports the checked-in script with the same Git blob identity `256ba3e2777d44544b18df35742c02aa43d78e3c`. Therefore the locally executed candidate bytes and the checked-in oracle bytes are identical.
+GitHub reports the checked-in script with the same Git blob identity `5b928f95a69c1c97acad941efbd7423d6d810e9f`. Therefore the locally executed candidate bytes and the checked-in oracle bytes are identical.
 
 This local execution is useful implementation evidence, but it is **not repository qualification**. Exact-head CI remains a separate evidence boundary.
 
