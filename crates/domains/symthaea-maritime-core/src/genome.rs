@@ -154,8 +154,10 @@ impl RegenerativeGenomeV1 {
 
         let mut requirement_ids = BTreeSet::new();
         let mut covered_pairs = BTreeSet::new();
+        let mut has_substitution_evidence = false;
         for requirement in &self.requirements {
             requirement.validate_shape()?;
+            has_substitution_evidence |= !requirement.qualified_substitution_bindings.is_empty();
             if !requirement_ids.insert(requirement.requirement_id.clone()) {
                 return Err(RegenerativeGenomeError::DuplicateRequirement {
                     requirement_id: requirement.requirement_id.clone(),
@@ -197,6 +199,9 @@ impl RegenerativeGenomeV1 {
                     dependency_id: pair.1,
                 });
             }
+        }
+        if has_substitution_evidence && self.lineage_parent_binding.is_none() {
+            return Err(RegenerativeGenomeError::SubstitutionDerivedGenomeRequiresParent);
         }
         if self
             .requirements
@@ -342,6 +347,8 @@ pub enum RegenerativeGenomeError {
     InvalidBinding,
     /// Genome points to its own evidence binding as its parent.
     SelfParentGenomeLineage,
+    /// A genome that cites qualified substitution evidence must name a parent lineage.
+    SubstitutionDerivedGenomeRequiresParent,
     /// Genome has no requirements.
     NoRequirements,
     /// Genome exceeds bounded cardinality.
@@ -522,6 +529,18 @@ mod tests {
         assert_eq!(
             genome.validate_against_model(&model()),
             Err(RegenerativeGenomeError::SelfParentGenomeLineage)
+        );
+    }
+
+    #[test]
+    fn substitution_derived_genome_requires_parent_lineage() {
+        let mut genome = genome();
+        genome.lineage_parent_binding = None;
+        genome.requirements[0].qualified_substitution_bindings =
+            vec!["substitution:electronics-local-v1".into()];
+        assert_eq!(
+            genome.validate_against_model(&model()),
+            Err(RegenerativeGenomeError::SubstitutionDerivedGenomeRequiresParent)
         );
     }
 
