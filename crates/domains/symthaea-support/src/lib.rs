@@ -17,6 +17,7 @@ pub mod it_coverage;
 pub mod it_qualification;
 pub mod knowledge;
 pub mod knowledge_source;
+pub mod legacy_artifact_qualification;
 pub mod legacy_computing;
 #[cfg(test)]
 mod legacy_computing_pack_tests;
@@ -71,6 +72,10 @@ pub use knowledge_source::{
     KnowledgeOriginV1, KnowledgeQueryPurposeV1, KnowledgeShareabilityV1,
     KnowledgeSourceErrorV1, KnowledgeStabilityV1, SupportKnowledgeHitV1,
     SupportKnowledgeQueryV1, SupportKnowledgeSourceV1,
+};
+pub use legacy_artifact_qualification::{
+    assess_legacy_strong_qualification_v1, LegacyArtifactQualificationErrorV1,
+    LegacyStrongQualificationAssessmentV1, LegacyStrongQualificationBlockerV1,
 };
 pub use legacy_computing::{
     seed_legacy_computing_pack_v1, LegacyComputingErrorV1, LegacyComputingPackV1,
