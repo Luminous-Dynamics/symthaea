@@ -30,9 +30,20 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # A newer commit on the same branch supersedes older qualification work. This is
+  # especially important for the discovery stack, where a hung Cargo test on an old
+  # head must never occupy a runner indefinitely while the exact head waits in queue.
+  group: algorithm-discovery-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   focused-contracts:
     runs-on: ubuntu-latest
+    # Fail closed rather than leaving a deadlocked Cargo/benchmark process consuming
+    # hosted-runner capacity indefinitely. This is a qualification timeout, not a
+    # performance threshold or algorithm-quality claim.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 

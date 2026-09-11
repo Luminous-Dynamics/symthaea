@@ -1,0 +1,15 @@
+# Fail-closed timeout policy for cargo-nextest.
+#
+# This repository has observed nextest jobs remaining in-progress for more than a day after a test
+# deadlocked. The job is intentionally observational/non-blocking in ci.yml, but an observational
+# job must still release runner capacity. These limits are deliberately generous relative to normal
+# unit-test duration and are not performance thresholds.
+
+[profile.default]
+# Bound the complete nextest invocation, including a sequence of merely-slow tests.
+global-timeout = "45m"
+
+# Mark a test slow after five minutes and terminate it after ten minutes. A terminated test remains
+# a failure under nextest's default timeout semantics; ci.yml already decides whether the
+# observational nextest job itself is blocking.
+slow-timeout = { period = "5m", terminate-after = 2, grace-period = "10s" }
