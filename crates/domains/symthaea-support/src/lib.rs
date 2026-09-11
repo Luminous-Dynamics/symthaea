@@ -24,6 +24,7 @@ mod legacy_computing_pack_tests;
 pub mod legacy_platform_identity;
 pub mod legacy_qualification_profile;
 pub mod legacy_solaris;
+pub mod legacy_solaris_scenarios;
 pub mod legacy_source_artifacts;
 pub mod legacy_source_readiness;
 #[cfg(feature = "logparse-adapter")]
@@ -101,6 +102,12 @@ pub use legacy_solaris::{
     enrich_legacy_solaris_foundation_v1, LegacySolarisErrorV1, SolarisEvidenceSignalV1,
     SolarisFailureModeV1, SolarisFoundationV1, SolarisMechanismKindV1,
     SolarisMechanismModelV1, LEGACY_SOLARIS_FOUNDATION_SCHEMA_V1,
+};
+pub use legacy_solaris_scenarios::{
+    register_solaris_qualification_cases_v1, seed_solaris_qualification_scenarios_v1,
+    SolarisQualificationScenarioV1, SolarisScenarioActionClassV1, SolarisScenarioActionV1,
+    SolarisScenarioErrorV1, SolarisScenarioEvidenceCurrentnessV1, SolarisScenarioEvidenceV1,
+    LEGACY_SOLARIS_SCENARIO_SCHEMA_V1,
 };
 pub use legacy_source_artifacts::{
     assess_legacy_source_artifact_readiness_v1, LegacyArtifactAccessPolicyV1,
