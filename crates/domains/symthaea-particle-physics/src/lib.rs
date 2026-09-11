@@ -11,7 +11,7 @@
 //! - **Symmetry groups**: SU(2) Pauli matrices, SU(3) Gell-Mann matrices,
 //!   structure constants, Casimir operators
 //! - **Prediction protocol**: blinded holdouts, frozen uncertainty/lineage,
-//!   post-reveal scoring, and compute-aware calculation ranking
+//!   post-reveal scoring, compute-aware calculation ranking, and Mycelix export
 //!
 //! ## Natural Units
 //!
@@ -46,7 +46,9 @@ pub use decay_widths::{
     w_boson_channels, w_total_width, z_total_width,
 };
 pub use lattice_prediction::{
-    BlindBenchmarkManifest, CandidateCalculation, FrozenPrediction, PredictionLineage,
+    BlindBenchmarkManifest, CandidateCalculation, FrozenPrediction,
+    MYCELIX_LATTICE_PREDICTION_PROTOCOL, MYCELIX_LATTICE_PREDICTION_SCHEMA_VERSION,
+    MycelixLatticePredictionCommitment, MycelixLatticePredictionReveal, PredictionLineage,
     PredictionMethod, PredictionProtocolError, PredictionReveal, PredictionScore,
     PredictionTarget, rank_candidate_calculations, score_prediction,
 };
