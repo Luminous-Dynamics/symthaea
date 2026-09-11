@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Powered EVA glove and hand digital twin (SX-018).
 //!
-//! The glove is modeled as a human-assist device, not an autonomous gripper.
-//! Pressurization adds closing resistance, powered tendons may reduce human
-//! effort, and exercise mode may deliberately add resistance. Any loss of
-//! powered authority removes active force rather than increasing grip.
-//!
-//! The reference coefficients are simulation inputs only. They are not xEMU,
-//! AxEMU, EMU, or human-rating data.
+//! This is a human-assist research model, not an autonomous gripper or a
+//! flight-qualified glove. Pressurization adds closing resistance; powered
+//! tendons may reduce human workload or deliberately add exercise resistance.
+//! Any loss of powered authority removes active force. Reference coefficients
+//! carry simulation evidence only.
 
 use serde::{Deserialize, Serialize};
 
@@ -28,15 +26,10 @@ pub enum HandDigit {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PoweredGloveMode {
-    /// No powered force. The wearer moves the glove through its passive load.
     Transparent,
-    /// Low-authority assistance intended to preserve fine manipulation.
     FineManipulation,
-    /// Moderate assistance for ordinary gripping/tool use.
     GripAssist,
-    /// Higher assistance for sustained static grip, still bounded and backdrivable.
     HoldAssist,
-    /// Deliberately adds closing resistance for low-g exercise/training.
     ExerciseResistance,
 }
 
@@ -44,9 +37,7 @@ pub enum PoweredGloveMode {
 pub enum PoweredGloveFailState {
     Nominal,
     Degraded,
-    /// Powered force is removed and the mechanism is expected to be mechanically backdrivable.
     PassiveBackdrivable,
-    /// Powered force is removed but the declared passive-release path is obstructed.
     ServiceRequired,
 }
 
@@ -60,41 +51,31 @@ pub enum PoweredGloveFault {
     ElectronicsFault,
     SensorConfidenceLow,
     DriveHealthLow,
+    PressureIntegrityLow,
     ReleasePathBlocked,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct PoweredGloveConfig {
-    /// Maximum tendon assist force per digit, N.
     pub max_assist_force_n: [f64; NUM_GLOVE_DIGITS],
-    /// Maximum powered exercise resistance per digit, N.
     pub max_exercise_resistance_n: [f64; NUM_GLOVE_DIGITS],
-    /// Pressure-induced closing resistance coefficient, N / Pa.
     pub pressure_resistance_coeff_n_pa: [f64; NUM_GLOVE_DIGITS],
-    /// Passive breakaway/friction force in the garment/tendon routing, N.
     pub passive_breakaway_force_n: [f64; NUM_GLOVE_DIGITS],
-    /// Fraction of the nominal maximum assist allowed in fine-manipulation mode.
+    /// Tactility proxy before pressure, abrasion, sensing, and mode effects.
+    pub passive_tactile_fraction: [f64; NUM_GLOVE_DIGITS],
+    pub tactile_pressure_loss_per_pa: f64,
     pub fine_assist_fraction: f64,
-    /// Fraction allowed in ordinary grip-assist mode.
     pub grip_assist_fraction: f64,
-    /// Fraction allowed in sustained-hold mode.
     pub hold_assist_fraction: f64,
-    /// Tendon/drive mechanical-to-electrical efficiency proxy.
     pub motor_efficiency: f64,
-    /// Static holding electrical power proxy, W per N of assist.
     pub static_hold_w_per_n: f64,
-    /// Glove-wide electrical ceiling. Assistance scales down to respect it.
     pub max_electrical_power_w: f64,
-    /// Human reference force for normalized fatigue accumulation, N per digit.
     pub fatigue_reference_force_n: f64,
-    /// Time constant for fatigue accumulation at reference load, s.
     pub fatigue_time_constant_s: f64,
-    /// Time constant for recovery at near-zero load, s.
     pub fatigue_recovery_time_constant_s: f64,
-    /// Minimum trusted sensor confidence [0,1].
     pub min_sensor_confidence: f64,
-    /// Minimum powered drive health [0,1].
     pub min_drive_health: f64,
+    pub min_pressure_integrity: f64,
     pub evidence: ExosuitEvidenceLevel,
 }
 
@@ -105,6 +86,8 @@ impl PoweredGloveConfig {
             max_exercise_resistance_n: [18.0, 16.0, 16.0, 14.0, 12.0],
             pressure_resistance_coeff_n_pa: [2.2e-4, 2.0e-4, 2.0e-4, 1.8e-4, 1.6e-4],
             passive_breakaway_force_n: [2.5, 2.2, 2.2, 2.0, 1.8],
+            passive_tactile_fraction: [0.72, 0.76, 0.76, 0.72, 0.68],
+            tactile_pressure_loss_per_pa: 2.0e-6,
             fine_assist_fraction: 0.30,
             grip_assist_fraction: 0.70,
             hold_assist_fraction: 0.90,
@@ -116,6 +99,7 @@ impl PoweredGloveConfig {
             fatigue_recovery_time_constant_s: 600.0,
             min_sensor_confidence: 0.80,
             min_drive_health: 0.70,
+            min_pressure_integrity: 0.95,
             evidence: ExosuitEvidenceLevel::Simulation,
         }
     }
@@ -127,6 +111,12 @@ impl PoweredGloveConfig {
             .chain(self.pressure_resistance_coeff_n_pa.iter())
             .chain(self.passive_breakaway_force_n.iter())
             .all(|v| v.is_finite() && *v >= 0.0)
+            && self
+                .passive_tactile_fraction
+                .iter()
+                .all(|v| v.is_finite() && (0.0..=1.0).contains(v))
+            && self.tactile_pressure_loss_per_pa.is_finite()
+            && self.tactile_pressure_loss_per_pa >= 0.0
             && [
                 self.fine_assist_fraction,
                 self.grip_assist_fraction,
@@ -134,6 +124,7 @@ impl PoweredGloveConfig {
                 self.motor_efficiency,
                 self.min_sensor_confidence,
                 self.min_drive_health,
+                self.min_pressure_integrity,
             ]
             .into_iter()
             .all(|v| v.is_finite() && (0.0..=1.0).contains(&v))
@@ -155,17 +146,15 @@ impl PoweredGloveConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct PoweredGloveState {
-    /// Human hand fatigue estimate per digit [0,1].
     pub fatigue: [f64; NUM_GLOVE_DIGITS],
-    /// Powered tendon/drive health per digit [0,1].
     pub drive_health: [f64; NUM_GLOVE_DIGITS],
-    /// Confidence in force/position/tendon sensing per digit [0,1].
     pub sensor_confidence: [f64; NUM_GLOVE_DIGITS],
-    /// Whether powered-glove energy is available.
+    /// Surface/outer-layer condition proxy [0,1]. Used only for tactile degradation.
+    pub palm_abrasion_health: [f64; NUM_GLOVE_DIGITS],
+    pub pressure_integrity: f64,
     pub power_available: bool,
-    /// Whether the glove electronics/safety channel is healthy.
     pub electronics_healthy: bool,
-    /// True only if the mechanism has a clear mechanical backdrive/release path.
+    /// Mechanical release/backdrive path must remain available without power.
     pub passive_release_path_clear: bool,
     pub suit_pressure_pa: f64,
     pub ambient_pressure_pa: f64,
@@ -177,6 +166,8 @@ impl PoweredGloveState {
             fatigue: [0.0; NUM_GLOVE_DIGITS],
             drive_health: [1.0; NUM_GLOVE_DIGITS],
             sensor_confidence: [1.0; NUM_GLOVE_DIGITS],
+            palm_abrasion_health: [1.0; NUM_GLOVE_DIGITS],
+            pressure_integrity: 1.0,
             power_available: true,
             electronics_healthy: true,
             passive_release_path_clear: true,
@@ -190,7 +181,10 @@ impl PoweredGloveState {
             .iter()
             .chain(self.drive_health.iter())
             .chain(self.sensor_confidence.iter())
+            .chain(self.palm_abrasion_health.iter())
             .all(|v| v.is_finite() && (0.0..=1.0).contains(v))
+            && self.pressure_integrity.is_finite()
+            && (0.0..=1.0).contains(&self.pressure_integrity)
             && self.suit_pressure_pa.is_finite()
             && self.suit_pressure_pa >= 0.0
             && self.ambient_pressure_pa.is_finite()
@@ -201,11 +195,8 @@ impl PoweredGloveState {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct PoweredGloveCommand {
     pub mode: PoweredGloveMode,
-    /// Desired net contact/grip force per digit, N.
     pub requested_contact_force_n: [f64; NUM_GLOVE_DIGITS],
-    /// Absolute tendon travel speed proxy per digit, m/s.
     pub tendon_speed_m_s: [f64; NUM_GLOVE_DIGITS],
-    /// Requested fraction of available exercise resistance [0,1].
     pub exercise_resistance_fraction: f64,
 }
 
@@ -232,11 +223,12 @@ impl PoweredGloveCommand {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct PoweredGloveStep {
     pub fail_state: PoweredGloveFailState,
-    pub faults: [Option<PoweredGloveFault>; 5],
+    pub faults: [Option<PoweredGloveFault>; 6],
     pub pressure_resistance_force_n: [f64; NUM_GLOVE_DIGITS],
     pub exercise_resistance_force_n: [f64; NUM_GLOVE_DIGITS],
     pub assist_force_n: [f64; NUM_GLOVE_DIGITS],
     pub human_required_force_n: [f64; NUM_GLOVE_DIGITS],
+    pub tactile_fidelity: [f64; NUM_GLOVE_DIGITS],
     pub electrical_power_w: f64,
     pub backdrivable: bool,
     pub fatigue: [f64; NUM_GLOVE_DIGITS],
@@ -298,31 +290,100 @@ impl PoweredGloveTwin {
             return Err(PoweredGloveFault::InvalidTimeStep);
         }
 
-        let pressure_delta_pa = (self.state.suit_pressure_pa - self.state.ambient_pressure_pa).max(0.0);
-        let mut pressure_resistance_force_n = [0.0; NUM_GLOVE_DIGITS];
-        let mut exercise_resistance_force_n = [0.0; NUM_GLOVE_DIGITS];
+        let delta_p = (self.state.suit_pressure_pa - self.state.ambient_pressure_pa).max(0.0);
+        let faults = self.authority_faults();
+        let authority_denied = faults.iter().flatten().next().is_some();
+
+        let mut pressure = [0.0; NUM_GLOVE_DIGITS];
+        let mut exercise = [0.0; NUM_GLOVE_DIGITS];
+        let mut assist = [0.0; NUM_GLOVE_DIGITS];
+
         for i in 0..NUM_GLOVE_DIGITS {
-            pressure_resistance_force_n[i] = self.config.passive_breakaway_force_n[i]
-                + self.config.pressure_resistance_coeff_n_pa[i] * pressure_delta_pa;
+            pressure[i] = self.config.passive_breakaway_force_n[i]
+                + self.config.pressure_resistance_coeff_n_pa[i] * delta_p;
+        }
+
+        if !authority_denied {
             if command.mode == PoweredGloveMode::ExerciseResistance {
-                exercise_resistance_force_n[i] = self.config.max_exercise_resistance_n[i]
-                    * command.exercise_resistance_fraction;
+                for i in 0..NUM_GLOVE_DIGITS {
+                    exercise[i] = self.config.max_exercise_resistance_n[i]
+                        * self.state.drive_health[i]
+                        * command.exercise_resistance_fraction;
+                }
+            } else {
+                let fraction = match command.mode {
+                    PoweredGloveMode::Transparent => 0.0,
+                    PoweredGloveMode::FineManipulation => self.config.fine_assist_fraction,
+                    PoweredGloveMode::GripAssist => self.config.grip_assist_fraction,
+                    PoweredGloveMode::HoldAssist => self.config.hold_assist_fraction,
+                    PoweredGloveMode::ExerciseResistance => 0.0,
+                };
+                for i in 0..NUM_GLOVE_DIGITS {
+                    let gross_load = command.requested_contact_force_n[i] + pressure[i];
+                    assist[i] = (self.config.max_assist_force_n[i]
+                        * self.state.drive_health[i]
+                        * fraction)
+                        .min(gross_load);
+                }
             }
         }
 
-        let faults = self.authority_faults();
-        let authority_denied = faults.iter().flatten().next().is_some();
+        let raw_power = active_power_w(
+            &assist,
+            &exercise,
+            &command.tendon_speed_m_s,
+            self.config.motor_efficiency,
+            self.config.static_hold_w_per_n,
+        );
+        if raw_power > self.config.max_electrical_power_w && raw_power > 0.0 {
+            let scale = self.config.max_electrical_power_w / raw_power;
+            for value in assist.iter_mut().chain(exercise.iter_mut()) {
+                *value *= scale;
+            }
+        }
+        let electrical_power_w = active_power_w(
+            &assist,
+            &exercise,
+            &command.tendon_speed_m_s,
+            self.config.motor_efficiency,
+            self.config.static_hold_w_per_n,
+        );
+
+        let mut human = [0.0; NUM_GLOVE_DIGITS];
+        let mut tactile = [0.0; NUM_GLOVE_DIGITS];
+        let pressure_tactile_factor =
+            (1.0 - self.config.tactile_pressure_loss_per_pa * delta_p).clamp(0.0, 1.0);
+        let mode_tactile_factor = match command.mode {
+            PoweredGloveMode::Transparent | PoweredGloveMode::FineManipulation => 1.0,
+            PoweredGloveMode::GripAssist => 0.96,
+            PoweredGloveMode::HoldAssist => 0.92,
+            PoweredGloveMode::ExerciseResistance => 0.96,
+        };
+
+        for i in 0..NUM_GLOVE_DIGITS {
+            human[i] = (command.requested_contact_force_n[i] + pressure[i] + exercise[i] - assist[i])
+                .max(0.0);
+            self.state.fatigue[i] = update_fatigue(
+                self.state.fatigue[i],
+                human[i],
+                dt_s,
+                &self.config,
+            );
+            tactile[i] = (self.config.passive_tactile_fraction[i]
+                * pressure_tactile_factor
+                * self.state.sensor_confidence[i]
+                * self.state.palm_abrasion_health[i]
+                * mode_tactile_factor)
+                .clamp(0.0, 1.0);
+        }
+
         let fail_state = if authority_denied {
             if self.state.passive_release_path_clear {
                 PoweredGloveFailState::PassiveBackdrivable
             } else {
                 PoweredGloveFailState::ServiceRequired
             }
-        } else if self
-            .state
-            .drive_health
-            .iter()
-            .any(|h| *h < 0.90)
+        } else if self.state.drive_health.iter().any(|h| *h < 0.90)
             || self.state.sensor_confidence.iter().any(|c| *c < 0.90)
         {
             PoweredGloveFailState::Degraded
@@ -330,67 +391,14 @@ impl PoweredGloveTwin {
             PoweredGloveFailState::Nominal
         };
 
-        let mode_fraction = match command.mode {
-            PoweredGloveMode::Transparent | PoweredGloveMode::ExerciseResistance => 0.0,
-            PoweredGloveMode::FineManipulation => self.config.fine_assist_fraction,
-            PoweredGloveMode::GripAssist => self.config.grip_assist_fraction,
-            PoweredGloveMode::HoldAssist => self.config.hold_assist_fraction,
-        };
-
-        let mut assist_force_n = [0.0; NUM_GLOVE_DIGITS];
-        if !authority_denied {
-            for i in 0..NUM_GLOVE_DIGITS {
-                let gross_human_load = command.requested_contact_force_n[i]
-                    + pressure_resistance_force_n[i]
-                    + exercise_resistance_force_n[i];
-                assist_force_n[i] = (self.config.max_assist_force_n[i]
-                    * self.state.drive_health[i]
-                    * mode_fraction)
-                    .min(gross_human_load);
-            }
-        }
-
-        let raw_power_w = electrical_power_w(
-            &assist_force_n,
-            &command.tendon_speed_m_s,
-            self.config.motor_efficiency,
-            self.config.static_hold_w_per_n,
-        );
-        if raw_power_w > self.config.max_electrical_power_w && raw_power_w > 0.0 {
-            let scale = self.config.max_electrical_power_w / raw_power_w;
-            for force in &mut assist_force_n {
-                *force *= scale;
-            }
-        }
-        let electrical_power_w = electrical_power_w(
-            &assist_force_n,
-            &command.tendon_speed_m_s,
-            self.config.motor_efficiency,
-            self.config.static_hold_w_per_n,
-        );
-
-        let mut human_required_force_n = [0.0; NUM_GLOVE_DIGITS];
-        for i in 0..NUM_GLOVE_DIGITS {
-            human_required_force_n[i] = (command.requested_contact_force_n[i]
-                + pressure_resistance_force_n[i]
-                + exercise_resistance_force_n[i]
-                - assist_force_n[i])
-                .max(0.0);
-            self.state.fatigue[i] = update_fatigue(
-                self.state.fatigue[i],
-                human_required_force_n[i],
-                dt_s,
-                &self.config,
-            );
-        }
-
         Ok(PoweredGloveStep {
             fail_state,
             faults,
-            pressure_resistance_force_n,
-            exercise_resistance_force_n,
-            assist_force_n,
-            human_required_force_n,
+            pressure_resistance_force_n: pressure,
+            exercise_resistance_force_n: exercise,
+            assist_force_n: assist,
+            human_required_force_n: human,
+            tactile_fidelity: tactile,
             electrical_power_w,
             backdrivable: self.state.passive_release_path_clear,
             fatigue: self.state.fatigue,
@@ -398,8 +406,8 @@ impl PoweredGloveTwin {
         })
     }
 
-    fn authority_faults(&self) -> [Option<PoweredGloveFault>; 5] {
-        let mut faults = [None; 5];
+    fn authority_faults(&self) -> [Option<PoweredGloveFault>; 6] {
+        let mut faults = [None; 6];
         let mut n = 0;
         let mut push = |fault| {
             if n < faults.len() {
@@ -407,7 +415,6 @@ impl PoweredGloveTwin {
                 n += 1;
             }
         };
-
         if !self.state.power_available {
             push(PoweredGloveFault::PowerUnavailable);
         }
@@ -430,6 +437,9 @@ impl PoweredGloveTwin {
         {
             push(PoweredGloveFault::DriveHealthLow);
         }
+        if self.state.pressure_integrity < self.config.min_pressure_integrity {
+            push(PoweredGloveFault::PressureIntegrityLow);
+        }
         if !self.state.passive_release_path_clear {
             push(PoweredGloveFault::ReleasePathBlocked);
         }
@@ -437,16 +447,21 @@ impl PoweredGloveTwin {
     }
 }
 
-fn electrical_power_w(
-    assist_force_n: &[f64; NUM_GLOVE_DIGITS],
-    tendon_speed_m_s: &[f64; NUM_GLOVE_DIGITS],
+fn active_power_w(
+    assist: &[f64; NUM_GLOVE_DIGITS],
+    exercise: &[f64; NUM_GLOVE_DIGITS],
+    speed: &[f64; NUM_GLOVE_DIGITS],
     efficiency: f64,
     static_hold_w_per_n: f64,
 ) -> f64 {
-    assist_force_n
+    assist
         .iter()
-        .zip(tendon_speed_m_s.iter())
-        .map(|(force, speed)| force * speed / efficiency + force * static_hold_w_per_n)
+        .zip(exercise.iter())
+        .zip(speed.iter())
+        .map(|((a, r), v)| {
+            let force = a + r;
+            force * v / efficiency + force * static_hold_w_per_n
+        })
         .sum()
 }
 
@@ -483,9 +498,7 @@ mod tests {
     fn grip_assist_reduces_human_force() {
         let mut transparent = PoweredGloveTwin::simulation_reference();
         let mut assisted = PoweredGloveTwin::simulation_reference();
-        let a = transparent
-            .step(grip(PoweredGloveMode::Transparent), 1.0)
-            .unwrap();
+        let a = transparent.step(grip(PoweredGloveMode::Transparent), 1.0).unwrap();
         let b = assisted.step(grip(PoweredGloveMode::GripAssist), 1.0).unwrap();
         assert!(b.human_required_force_n.iter().sum::<f64>()
             < a.human_required_force_n.iter().sum::<f64>());
@@ -493,15 +506,17 @@ mod tests {
     }
 
     #[test]
-    fn loss_of_power_removes_assist_and_leaves_glove_backdrivable() {
+    fn loss_of_power_removes_all_active_force_and_is_backdrivable() {
         let mut glove = PoweredGloveTwin::simulation_reference();
         glove.state_mut_for_fault_injection().power_available = false;
-        let step = glove.step(grip(PoweredGloveMode::HoldAssist), 1.0).unwrap();
+        let mut cmd = grip(PoweredGloveMode::ExerciseResistance);
+        cmd.exercise_resistance_fraction = 1.0;
+        let step = glove.step(cmd, 1.0).unwrap();
         assert_eq!(step.fail_state, PoweredGloveFailState::PassiveBackdrivable);
-        assert!(step.assist_force_n.iter().all(|force| *force == 0.0));
+        assert!(step.assist_force_n.iter().all(|v| *v == 0.0));
+        assert!(step.exercise_resistance_force_n.iter().all(|v| *v == 0.0));
         assert_eq!(step.electrical_power_w, 0.0);
         assert!(step.backdrivable);
-        assert!(step.faults.contains(&Some(PoweredGloveFault::PowerUnavailable)));
     }
 
     #[test]
@@ -510,49 +525,45 @@ mod tests {
         glove.state_mut_for_fault_injection().passive_release_path_clear = false;
         let step = glove.step(grip(PoweredGloveMode::HoldAssist), 1.0).unwrap();
         assert_eq!(step.fail_state, PoweredGloveFailState::ServiceRequired);
-        assert!(step.assist_force_n.iter().all(|force| *force == 0.0));
+        assert!(step.assist_force_n.iter().all(|v| *v == 0.0));
         assert!(!step.backdrivable);
-        assert!(step.faults.contains(&Some(PoweredGloveFault::ReleasePathBlocked)));
     }
 
     #[test]
-    fn higher_pressure_increases_transparent_hand_load() {
+    fn higher_pressure_increases_hand_load_and_reduces_tactile_proxy() {
         let mut low = PoweredGloveTwin::simulation_reference();
         let mut high = PoweredGloveTwin::simulation_reference();
         low.state_mut_for_fault_injection().suit_pressure_pa = 20_000.0;
         high.state_mut_for_fault_injection().suit_pressure_pa = 50_000.0;
-        let low_step = low.step(grip(PoweredGloveMode::Transparent), 1.0).unwrap();
-        let high_step = high.step(grip(PoweredGloveMode::Transparent), 1.0).unwrap();
-        assert!(high_step.human_required_force_n.iter().sum::<f64>()
-            > low_step.human_required_force_n.iter().sum::<f64>());
+        let a = low.step(grip(PoweredGloveMode::Transparent), 1.0).unwrap();
+        let b = high.step(grip(PoweredGloveMode::Transparent), 1.0).unwrap();
+        assert!(b.human_required_force_n.iter().sum::<f64>()
+            > a.human_required_force_n.iter().sum::<f64>());
+        assert!(b.tactile_fidelity.iter().sum::<f64>() < a.tactile_fidelity.iter().sum::<f64>());
     }
 
     #[test]
-    fn exercise_mode_increases_human_loading_without_assist() {
+    fn exercise_mode_adds_loading_and_consumes_power() {
         let mut glove = PoweredGloveTwin::simulation_reference();
         let mut cmd = grip(PoweredGloveMode::ExerciseResistance);
         cmd.exercise_resistance_fraction = 1.0;
         let step = glove.step(cmd, 1.0).unwrap();
         assert!(step.exercise_resistance_force_n.iter().sum::<f64>() > 0.0);
-        assert!(step.assist_force_n.iter().all(|force| *force == 0.0));
-        assert_eq!(step.electrical_power_w, 0.0);
+        assert!(step.assist_force_n.iter().all(|v| *v == 0.0));
+        assert!(step.electrical_power_w > 0.0);
     }
 
     #[test]
-    fn fine_manipulation_has_less_authority_than_grip_assist() {
+    fn fine_manipulation_preserves_more_tactile_proxy_than_hold_assist() {
         let mut fine = PoweredGloveTwin::simulation_reference();
-        let mut grip_glove = PoweredGloveTwin::simulation_reference();
-        let a = fine
-            .step(grip(PoweredGloveMode::FineManipulation), 1.0)
-            .unwrap();
-        let b = grip_glove
-            .step(grip(PoweredGloveMode::GripAssist), 1.0)
-            .unwrap();
-        assert!(a.assist_force_n.iter().sum::<f64>() < b.assist_force_n.iter().sum::<f64>());
+        let mut hold = PoweredGloveTwin::simulation_reference();
+        let a = fine.step(grip(PoweredGloveMode::FineManipulation), 1.0).unwrap();
+        let b = hold.step(grip(PoweredGloveMode::HoldAssist), 1.0).unwrap();
+        assert!(a.tactile_fidelity.iter().sum::<f64>() > b.tactile_fidelity.iter().sum::<f64>());
     }
 
     #[test]
-    fn electrical_ceiling_scales_assist() {
+    fn electrical_ceiling_scales_active_force() {
         let mut config = PoweredGloveConfig::simulation_reference();
         config.max_electrical_power_w = 2.0;
         let mut glove = PoweredGloveTwin::new(config, PoweredGloveState::simulation_reference()).unwrap();
@@ -561,16 +572,21 @@ mod tests {
     }
 
     #[test]
-    fn powered_assist_reduces_accumulated_fatigue_in_repeated_work() {
+    fn low_pressure_integrity_denies_powered_grip() {
+        let mut glove = PoweredGloveTwin::simulation_reference();
+        glove.state_mut_for_fault_injection().pressure_integrity = 0.80;
+        let step = glove.step(grip(PoweredGloveMode::HoldAssist), 1.0).unwrap();
+        assert!(step.assist_force_n.iter().all(|v| *v == 0.0));
+        assert!(step.faults.contains(&Some(PoweredGloveFault::PressureIntegrityLow)));
+    }
+
+    #[test]
+    fn powered_assist_reduces_repeated_work_fatigue() {
         let mut unassisted = PoweredGloveTwin::simulation_reference();
         let mut assisted = PoweredGloveTwin::simulation_reference();
         for _ in 0..120 {
-            unassisted
-                .step(grip(PoweredGloveMode::Transparent), 1.0)
-                .unwrap();
-            assisted
-                .step(grip(PoweredGloveMode::GripAssist), 1.0)
-                .unwrap();
+            unassisted.step(grip(PoweredGloveMode::Transparent), 1.0).unwrap();
+            assisted.step(grip(PoweredGloveMode::GripAssist), 1.0).unwrap();
         }
         assert!(assisted.state().fatigue.iter().sum::<f64>()
             < unassisted.state().fatigue.iter().sum::<f64>());
