@@ -39,8 +39,10 @@
 //! validation contract before any model can be fitted, [`proposal_model`] separates validation
 //! gate precommitment, frozen model identity, validation receipt, and holdout-evaluation permission,
 //! [`proposal_support`] proves the role-isolated training corpus satisfies every precommitted
-//! family-support threshold before a fit permit can exist, and [`proposal_validation_coverage`]
-//! separately proves the validation corpus has enough actually observed labels before scoring.
+//! family-support threshold before a fit permit can exist, [`proposal_validation_coverage`]
+//! separately proves the validation corpus has enough actually observed labels before scoring,
+//! [`proposal_validation_blind`] exposes only label-blind validation targets/predictions, and the
+//! crate-private deterministic scorer joins frozen predictions to labels only during scoring.
 //!
 //! # Authority boundary
 //!
@@ -79,6 +81,8 @@
 //!   remain visible but cannot satisfy label-support thresholds or mint a fit permit.
 //! - Validation coverage is independently precommitted and counted only from observed labels across
 //!   distinct validation runs; an under-observed validation slice cannot mint a score permit.
+//! - Public validation prediction generation covers every proposal row through label-blind targets;
+//!   whether a row is observed/censored/counterfactual is joined only after predictions are frozen.
 //! - Validation acceptance threshold/scorer identity is precommitted before a model artifact can be
 //!   frozen; failed validation cannot mint even an identity-only holdout evaluation permit.
 //! - Holdout permits still expose no holdout observations and grant no search or deployment authority.
@@ -118,7 +122,9 @@ pub mod proposal_recording;
 pub mod proposal_study;
 pub mod proposal_support;
 pub mod proposal_trace;
+pub mod proposal_validation_blind;
 pub mod proposal_validation_coverage;
+mod proposal_validation_predictions;
 pub mod sandbox;
 pub mod search;
 pub mod sequence_learning;
@@ -210,10 +216,19 @@ pub use proposal_trace::{
     ForgeRawMutationEffect, ForgeRawOpportunity, ForgeRawProposalArchive, ForgeRawProposalDecision,
     ForgeRawProposalError, ForgeRawProposalRecord, ForgeRawSelection,
 };
+pub use proposal_validation_blind::{
+    ForgeProposalBlindDeterministicBrierReceipt, ForgeProposalBlindValidationError,
+    ForgeProposalBlindValidationPrediction, ForgeProposalBlindValidationPredictionSet,
+    ForgeProposalValidationTarget, ForgeProposalValidationTargetSet,
+};
 pub use proposal_validation_coverage::{
     ForgeProposalValidationCoverageError, ForgeProposalValidationCoverageReceipt,
     ForgeProposalValidationCoverageSpec, ForgeProposalValidationFamilyCoverage,
     ForgeProposalValidationScorePermit,
+};
+pub use proposal_validation_predictions::{
+    forge_deterministic_brier_configuration_id, forge_deterministic_brier_scorer_id,
+    ForgeProposalValidationPredictionError,
 };
 pub use search::{
     run_search, run_search_recorded, ForgeConfig, SearchFailure, SearchOutcome, SearchRecord,
