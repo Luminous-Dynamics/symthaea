@@ -27,14 +27,16 @@ SCHEMA = "symthaea.etk-simulation-evidence-admission.v1"
 ID_DOMAIN = b"symthaea.etk-admitted-simulation-evidence.v1\x00"
 TOP = {"schema", "obligation", "candidate", "expected"}
 OBL = {"obligation_id", "obligation_revision", "subject_id", "twin_revision",
-       "requirement_revision", "expected_evidence_kind", "request_id",
-       "validity_domain_id", "required_metric"}
-POL = {"name", "unit", "operator", "threshold"}
+       "requirement_revision", "expected_evidence_kind", "evidence_policy_id",
+       "request_id", "validity_domain_id", "required_metric"}
+POL = {"name", "unit", "operator", "threshold", "max_epistemic", "max_aleatoric"}
 CAN = {"candidate_artifact_id", "evidence_kind", "binds_obligation_id",
        "obligation_revision", "subject_id", "twin_revision", "requirement_revision",
-       "request_id", "converged", "confidence", "metrics", "execution",
-       "validity_domain_id", "currentness", "source_lineage_id"}
-MET = {"name", "value", "unit"}
+       "request_id", "converged", "confidence", "run_uncertainty", "metrics", "execution",
+       "validity_domain_id", "currentness", "currentness_proof_id", "source_lineage_id"}
+MET = {"name", "value", "unit", "uncertainty"}
+UNC = {"epistemic", "aleatoric", "interval"}
+INTERVAL = {"lower", "upper"}
 EXE = {"mode", "backend", "solver_version", "input_digest", "output_digest", "parser_version"}
 EXP = {"input_digest"}
 OPS = {"<", "<=", ">", ">="}
@@ -45,10 +47,13 @@ REASON_ORDER = (
     "unknown_execution_field", "malformed_expected", "unknown_expected_field",
     "evidence_kind_mismatch", "obligation_binding_mismatch", "obligation_revision_mismatch",
     "subject_mismatch", "twin_revision_mismatch", "requirement_revision_mismatch",
-    "request_id_mismatch", "validity_domain_mismatch", "candidate_not_current",
+    "request_id_mismatch", "validity_domain_mismatch", "evidence_policy_invalid",
+    "candidate_not_current", "currentness_proof_missing",
     "execution_mode_not_external_solver", "simulation_not_converged", "confidence_invalid",
-    "metrics_missing", "malformed_metric", "unknown_metric_field", "required_metric_missing",
-    "metric_unit_mismatch", "metric_value_invalid", "acceptance_predicate_invalid",
+    "run_uncertainty_invalid", "metrics_missing", "malformed_metric", "unknown_metric_field",
+    "required_metric_missing", "metric_unit_mismatch", "metric_value_invalid",
+    "metric_uncertainty_invalid", "metric_value_outside_uncertainty_interval",
+    "acceptance_predicate_invalid", "uncertainty_budget_exceeded",
     "acceptance_predicate_failed", "provenance_incomplete", "input_digest_mismatch",
     "candidate_identity_incomplete",
 )
@@ -70,6 +75,29 @@ def finite(v: Any) -> bool:
 
 def unknown(v: Any, allowed: set[str]) -> bool:
     return isinstance(v, dict) and bool(set(v) - allowed)
+
+
+def validate_uncertainty(value: Any) -> bool:
+    if not isinstance(value, dict) or unknown(value, UNC):
+        return False
+    epistemic, aleatoric = value.get("epistemic"), value.get("aleatoric")
+    if not finite(epistemic) or not 0.0 <= float(epistemic) <= 1.0:
+        return False
+    if not finite(aleatoric) or not 0.0 <= float(aleatoric) <= 1.0:
+        return False
+    interval = value.get("interval")
+    if interval is None:
+        return True
+    return (isinstance(interval, dict) and not unknown(interval, INTERVAL)
+            and finite(interval.get("lower")) and finite(interval.get("upper"))
+            and float(interval["lower"]) <= float(interval["upper"]))
+
+
+def conservative_metric_value(value: float, op: str, uncertainty: dict[str, Any]) -> float:
+    interval = uncertainty.get("interval")
+    if not isinstance(interval, dict):
+        return value
+    return float(interval["upper"] if op in {"<", "<="} else interval["lower"])
 
 
 def compare(value: float, op: str, threshold: float) -> bool:
@@ -111,10 +139,15 @@ def evaluate(payload: Any) -> dict[str, Any]:
     if c.get("requirement_revision") != o.get("requirement_revision"): r.add("requirement_revision_mismatch")
     if c.get("request_id") != o.get("request_id"): r.add("request_id_mismatch")
     if c.get("validity_domain_id") != o.get("validity_domain_id"): r.add("validity_domain_mismatch")
+    if not nonempty(o.get("evidence_policy_id")): r.add("evidence_policy_invalid")
     if c.get("currentness") != "Current": r.add("candidate_not_current")
+    if not nonempty(c.get("currentness_proof_id")): r.add("currentness_proof_missing")
     if c.get("converged") is not True: r.add("simulation_not_converged")
     q = c.get("confidence")
     if not finite(q) or not 0.0 <= float(q) <= 1.0: r.add("confidence_invalid")
+    run_uncertainty = c.get("run_uncertainty")
+    run_uncertainty_ok = validate_uncertainty(run_uncertainty)
+    if not run_uncertainty_ok: r.add("run_uncertainty_invalid")
     if any(not nonempty(c.get(k)) for k in ("candidate_artifact_id", "source_lineage_id")): r.add("candidate_identity_incomplete")
 
     if isinstance(x, dict):
@@ -133,7 +166,10 @@ def evaluate(payload: Any) -> dict[str, Any]:
 
     if isinstance(p, dict):
         name, unit, op, threshold = p.get("name"), p.get("unit"), p.get("operator"), p.get("threshold")
-        pred_ok = nonempty(name) and nonempty(unit) and op in OPS and finite(threshold)
+        max_epistemic, max_aleatoric = p.get("max_epistemic"), p.get("max_aleatoric")
+        pred_ok = (nonempty(name) and nonempty(unit) and op in OPS and finite(threshold)
+                   and finite(max_epistemic) and 0.0 <= float(max_epistemic) <= 1.0
+                   and finite(max_aleatoric) and 0.0 <= float(max_aleatoric) <= 1.0)
         if not pred_ok: r.add("acceptance_predicate_invalid")
         matches = [m for m in usable if m.get("name") == name]
         if len(matches) != 1: r.add("required_metric_missing")
@@ -142,8 +178,20 @@ def evaluate(payload: Any) -> dict[str, Any]:
             if m.get("unit") != unit: r.add("metric_unit_mismatch")
             value = m.get("value")
             if not finite(value): r.add("metric_value_invalid")
-            elif pred_ok and m.get("unit") == unit and not compare(float(value), op, float(threshold)):
-                r.add("acceptance_predicate_failed")
+            metric_uncertainty = m.get("uncertainty")
+            effective_uncertainty = metric_uncertainty if metric_uncertainty is not None else run_uncertainty
+            uncertainty_ok = validate_uncertainty(effective_uncertainty)
+            if metric_uncertainty is not None and not uncertainty_ok: r.add("metric_uncertainty_invalid")
+            if uncertainty_ok and finite(value):
+                interval = effective_uncertainty.get("interval")
+                if isinstance(interval, dict) and not (float(interval["lower"]) <= float(value) <= float(interval["upper"])):
+                    r.add("metric_value_outside_uncertainty_interval")
+                if pred_ok and (float(effective_uncertainty["epistemic"]) > float(max_epistemic)
+                                or float(effective_uncertainty["aleatoric"]) > float(max_aleatoric)):
+                    r.add("uncertainty_budget_exceeded")
+                conservative = conservative_metric_value(float(value), op, effective_uncertainty)
+                if pred_ok and m.get("unit") == unit and not compare(conservative, op, float(threshold)):
+                    r.add("acceptance_predicate_failed")
 
     if r: return deny(r)
     identity = {"schema": SCHEMA, "obligation": o, "candidate": c, "expected": e}
@@ -159,17 +207,24 @@ def fixture() -> dict[str, Any]:
       "schema": SCHEMA,
       "obligation": {"obligation_id":"O-structural-stress-42","obligation_revision":"O-structural-stress-42:r3",
         "subject_id":"bracket-alpha","twin_revision":"design:G17","requirement_revision":"REQ-STRESS:r5",
-        "expected_evidence_kind":"Simulation","request_id":"sim-static-G17-LC9",
-        "validity_domain_id":"VD-static-G17-LC9",
-        "required_metric":{"name":"max_stress_mpa","unit":"MPa","operator":"<=","threshold":250.0}},
+        "expected_evidence_kind":"Simulation","evidence_policy_id":"ETK-SIM-ADMISSION-V1",
+        "request_id":"sim-static-G17-LC9","validity_domain_id":"VD-static-G17-LC9",
+        "required_metric":{"name":"max_stress_mpa","unit":"MPa","operator":"<=","threshold":250.0,
+          "max_epistemic":0.2,"max_aleatoric":0.1}},
       "candidate": {"candidate_artifact_id":"solver-output:run-0007","evidence_kind":"Simulation",
         "binds_obligation_id":"O-structural-stress-42","obligation_revision":"O-structural-stress-42:r3",
         "subject_id":"bracket-alpha","twin_revision":"design:G17","requirement_revision":"REQ-STRESS:r5",
         "request_id":"sim-static-G17-LC9","converged":True,"confidence":0.94,
-        "metrics":[{"name":"max_stress_mpa","value":181.2,"unit":"MPa"},{"name":"max_displacement_mm","value":0.82,"unit":"mm"}],
+        "run_uncertainty":{"epistemic":0.12,"aleatoric":0.05,"interval":None},
+        "metrics":[{"name":"max_stress_mpa","value":181.2,"unit":"MPa",
+          "uncertainty":{"epistemic":0.08,"aleatoric":0.04,"interval":{"lower":175.0,"upper":190.0}}},
+          {"name":"max_displacement_mm","value":0.82,"unit":"mm",
+          "uncertainty":{"epistemic":0.1,"aleatoric":0.05,"interval":None}}],
         "execution":{"mode":"external_solver","backend":"calculix","solver_version":"2.22",
           "input_digest":"sha256:input-G17-LC9","output_digest":"sha256:output-run-0007","parser_version":"symthaea-calculix-parser-v1"},
-        "validity_domain_id":"VD-static-G17-LC9","currentness":"Current","source_lineage_id":"calculix:2.22:mesh-M14:material-M4"},
+        "validity_domain_id":"VD-static-G17-LC9","currentness":"Current",
+        "currentness_proof_id":"currentness:design-G17:fixture-v1",
+        "source_lineage_id":"calculix:2.22:mesh-M14:material-M4"},
       "expected":{"input_digest":"sha256:input-G17-LC9"}}
 
 
@@ -187,12 +242,16 @@ def self_test() -> str:
     p=copy.deepcopy(f); p["candidate"]["evidence_kind"]="Telemetry"; cases.append((p,"evidence_kind_mismatch"))
     p=copy.deepcopy(f); p["candidate"]["validity_domain_id"]="VD-other"; cases.append((p,"validity_domain_mismatch"))
     p=copy.deepcopy(f); p["candidate"]["execution"]["parser_version"]=""; cases.append((p,"provenance_incomplete"))
-    p=copy.deepcopy(f); p["candidate"]["metrics"]=[{"name":"max_displacement_mm","value":0.82,"unit":"mm"}]; cases.append((p,"required_metric_missing"))
-    p=copy.deepcopy(f); p["candidate"]["metrics"][0]["value"]=251.0; cases.append((p,"acceptance_predicate_failed"))
+    p=copy.deepcopy(f); p["candidate"]["metrics"]=[{"name":"max_displacement_mm","value":0.82,"unit":"mm","uncertainty":{"epistemic":0.1,"aleatoric":0.05,"interval":None}}]; cases.append((p,"required_metric_missing"))
+    p=copy.deepcopy(f); p["candidate"]["metrics"][0]["value"]=251.0; p["candidate"]["metrics"][0]["uncertainty"]["interval"]={"lower":245.0,"upper":255.0}; cases.append((p,"acceptance_predicate_failed"))
     p=copy.deepcopy(f); p["candidate"]["converged"]=False; cases.append((p,"simulation_not_converged"))
     p=copy.deepcopy(f); p["candidate"]["request_id"]="sim-other"; cases.append((p,"request_id_mismatch"))
     p=copy.deepcopy(f); p["candidate"]["execution"]["shadow_authority"]=True; cases.append((p,"unknown_execution_field"))
     p=copy.deepcopy(f); p["candidate"]["confidence"]=float("nan"); cases.append((p,"confidence_invalid"))
+    p=copy.deepcopy(f); p["candidate"]["metrics"][0]["uncertainty"]["epistemic"]=0.25; cases.append((p,"uncertainty_budget_exceeded"))
+    p=copy.deepcopy(f); p["candidate"]["metrics"][0]["value"]=249.0; p["candidate"]["metrics"][0]["uncertainty"]["interval"]={"lower":240.0,"upper":260.0}; cases.append((p,"acceptance_predicate_failed"))
+    p=copy.deepcopy(f); p["candidate"]["metrics"][0]["uncertainty"]["interval"]={"lower":190.0,"upper":180.0}; cases.append((p,"metric_uncertainty_invalid"))
+    p=copy.deepcopy(f); p["candidate"]["currentness_proof_id"]=""; cases.append((p,"currentness_proof_missing"))
     for p, code in cases: expect_deny(p, code)
     p=copy.deepcopy(f); p["candidate"]["evidence_kind"]="Telemetry"; p["candidate"]["currentness"]="HistoricallyValid"; p["candidate"]["execution"]["mode"]="dry_run"
     assert evaluate(p)["reasons"] == ["evidence_kind_mismatch","candidate_not_current","execution_mode_not_external_solver"]
