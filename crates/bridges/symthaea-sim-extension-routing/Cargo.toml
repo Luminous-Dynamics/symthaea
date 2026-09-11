@@ -8,6 +8,7 @@ repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [dependencies]
 symthaea-extension-admission = { path = "../../core/symthaea-extension-admission" }
+symthaea-extension-authority = { path = "../../core/symthaea-extension-authority" }
 symthaea-extension-core = { path = "../../core/symthaea-extension-core" }
 symthaea-extension-registry = { path = "../../core/symthaea-extension-registry" }
 symthaea-extension-router = { path = "../../core/symthaea-extension-router" }
