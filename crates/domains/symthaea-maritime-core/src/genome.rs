@@ -198,6 +198,13 @@ impl RegenerativeGenomeV1 {
                 });
             }
         }
+        if self
+            .requirements
+            .windows(2)
+            .any(|pair| pair[0].requirement_id >= pair[1].requirement_id)
+        {
+            return Err(RegenerativeGenomeError::NonCanonicalRequirementOrder);
+        }
 
         for capability in model.capabilities.iter().filter(|capability| capability.essential) {
             for dependency_id in &capability.dependency_ids {
@@ -345,6 +352,8 @@ pub enum RegenerativeGenomeError {
     ClosureModelBindingMismatch,
     /// Requirement identifier is duplicated.
     DuplicateRequirement { requirement_id: String },
+    /// Requirement vector is not strictly sorted by requirement ID.
+    NonCanonicalRequirementOrder,
     /// Requirement names an unknown capability.
     UnknownCapability { capability_id: String },
     /// Requirement names an unknown dependency.
@@ -513,6 +522,16 @@ mod tests {
         assert_eq!(
             genome.validate_against_model(&model()),
             Err(RegenerativeGenomeError::SelfParentGenomeLineage)
+        );
+    }
+
+    #[test]
+    fn requirement_order_is_canonical() {
+        let mut genome = genome();
+        genome.requirements.swap(0, 1);
+        assert_eq!(
+            genome.validate_against_model(&model()),
+            Err(RegenerativeGenomeError::NonCanonicalRequirementOrder)
         );
     }
 
