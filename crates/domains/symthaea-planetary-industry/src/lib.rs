@@ -2,19 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Neutral, evidence-bearing ontology for planetary industrial ecology.
 //!
-//! PIE-000 models what an industrial process graph contains, not whether a
-//! particular lunar or Martian process is feasible. Conservation, chemistry,
-//! detailed utility optimization, equipment reproduction, and control authority
-//! belong to later layers.
+//! PIE-000 models what an industrial process graph contains. PIE-001 adds
+//! interval-aware bulk-mass conservation. Chemistry, detailed thermodynamics,
+//! equipment reproduction, optimization, and control authority belong to later
+//! layers.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
 mod graph;
+mod mass_balance;
 mod process;
 mod types;
 
 pub use graph::*;
+pub use mass_balance::*;
 pub use process::*;
 pub use types::*;
 
@@ -216,9 +218,6 @@ mod tests {
 
     #[test]
     fn matter_has_no_utility_side_channel() {
-        // The utility vocabulary contains only non-material services. Material
-        // such as water/process gases must use ProcessInput/ProcessOutput so
-        // later mass-balance logic sees every kilogram.
         let utilities = [
             UtilityDemand::ElectricalEnergy(EnergyRangeJ::new(1.0, 2.0).unwrap()),
             UtilityDemand::ThermalEnergy(EnergyRangeJ::new(1.0, 2.0).unwrap()),
