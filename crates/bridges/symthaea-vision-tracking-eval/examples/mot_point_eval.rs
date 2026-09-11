@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use blake3::Hasher;
 use image::GenericImageView;
@@ -266,8 +266,10 @@ fn bind_optional_blob(hasher: &mut Hasher, label: &[u8], bytes: Option<&[u8]>) {
             hasher.update(&(bytes.len() as u64).to_le_bytes());
             hasher.update(bytes);
         }
-        None => hasher.update(&[0]),
-    };
+        None => {
+            hasher.update(&[0]);
+        }
+    }
 }
 
 fn bind_frame_blob(hasher: &mut Hasher, frame_index: u64, bytes: &[u8]) {
