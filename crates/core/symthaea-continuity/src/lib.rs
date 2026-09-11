@@ -46,6 +46,7 @@ pub mod failure_domain;
 pub mod known_good;
 pub mod no_effects_execution;
 pub mod no_effects_rebind;
+pub mod no_effects_recovery;
 pub mod no_external_effects;
 pub mod observation;
 pub mod post_execution_health;
