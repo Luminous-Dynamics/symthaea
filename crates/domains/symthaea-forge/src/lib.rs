@@ -33,9 +33,10 @@
 //! `(attempt, policy family)` before any estimator or learned policy exists, [`proposal_corpus`]
 //! binds those tables to the frozen corpus split while exposing separate training/validation
 //! datasets and an identity-only holdout seal, [`proposal_history`] attaches the validated accepted
-//! state entering each generation to every proposal row, including no-op attempts, and
+//! state entering each generation to every proposal row, including no-op attempts,
 //! [`proposal_endpoints`] freezes outcome observability so missing/censored labels cannot be
-//! silently rewritten as failures.
+//! silently rewritten as failures, and [`proposal_study`] freezes the feature/target/estimator/
+//! validation contract before any model can be fitted.
 //!
 //! # Authority boundary
 //!
@@ -66,6 +67,10 @@
 //! - Training and validation proposal tables are exposed through different role-checked types.
 //! - Holdout is identity-only in v1; this crate provides no convenience API that exposes holdout
 //!   observation rows before a future frozen-model evaluation boundary exists.
+//! - Proposal-study feature schemas can name only pre-decision observables; post-decision leakage
+//!   fields are intentionally absent from the v1 feature vocabulary.
+//! - The primary validation metric, estimator implementation/configuration, training seed, support
+//!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
@@ -98,6 +103,7 @@ pub mod proposal_exposure;
 pub mod proposal_history;
 pub mod proposal_qualification;
 pub mod proposal_recording;
+pub mod proposal_study;
 pub mod proposal_trace;
 pub mod sandbox;
 pub mod search;
@@ -171,6 +177,12 @@ pub use proposal_qualification::{
 pub use proposal_recording::{
     exposure_from_raw_record, exposure_from_recorded_mutation, proposal_policy_for_mutator,
     ForgeProposalRecordingError,
+};
+pub use proposal_study::{
+    ForgeProposalEstimatorSpec, ForgeProposalEvaluationSpec, ForgeProposalExposureUnit,
+    ForgeProposalFeature, ForgeProposalFeatureSchema, ForgeProposalMetric,
+    ForgeProposalMissingnessPolicy, ForgeProposalStudyError, ForgeProposalStudySpec,
+    ForgeProposalSupportSpec,
 };
 pub use proposal_trace::{
     ForgeRawMutationEffect, ForgeRawOpportunity, ForgeRawProposalArchive, ForgeRawProposalDecision,
