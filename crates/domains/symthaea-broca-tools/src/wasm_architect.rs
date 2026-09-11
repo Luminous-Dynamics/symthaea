@@ -1,43 +1,50 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! WASM Architect — Automated plugin compilation and sandboxed execution.
+//! WASM Architect — automated plugin compilation and sandboxed execution.
 //!
-//! Provides the runtime bridge to compile synthesized Rust code into WASM
-//! and execute it within a secure, isolated sandbox.
+//! Synthesized Rust is compiled to portable WebAssembly, wrapped in a signed
+//! artifact, and executed only after the artifact is verified against the
+//! architect's configured Dilithium signer. Persisted artifacts deliberately
+//! contain portable WASM rather than serialized native/AOT code, so loading never
+//! requires Wasmtime's unsafe precompiled-deserialization boundary.
 
 use anyhow::Result;
 use lru::LruCache;
-use mycelix_zkp_core::dilithium::DilithiumKeypair;
+use mycelix_zkp_core::dilithium::{DilithiumKeypair, verify_signature};
 use parking_lot::Mutex;
+use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 use std::fs;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 
-/// An AOT artifact signed by her local DID.
-#[derive(serde::Serialize, serde::Deserialize)]
+const SIGNED_ARTIFACT_FORMAT_VERSION: u16 = 2;
+const SIGNING_DOMAIN: &[u8] = b"symthaea.wasm-artifact.v2\0";
+const CACHE_DOMAIN: &[u8] = b"symthaea.wasm-source-cache.v2\0";
+
+/// Portable WASM artifact signed by the architect's configured local signer.
+///
+/// The artifact intentionally does **not** carry a public key that can authorize
+/// itself. Verification is performed against the trusted key configured on the
+/// [`WasmArchitect`] instance that consumes it.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct SignedArtifact {
-    pub bytes: Vec<u8>,
-    pub signature: Vec<u8>,
-    pub public_key: Vec<u8>,
-    /// Hash of the compiling `wasmtime::Engine`'s
-    /// `precompile_compatibility_hash()` at signing time. `bytes` is only
-    /// safe to pass to the unsafe `Module::deserialize` path when this
-    /// matches the *executing* engine's hash -- otherwise `bytes` may not
-    /// actually be a valid precompiled artifact for the current
-    /// wasmtime version/target, and `Module::deserialize` on such input is
-    /// undefined behavior (not merely "untrusted wasm").
-    pub compat_hash: u64,
+    format_version: u16,
+    wasm_bytes: Vec<u8>,
+    wasm_sha256: [u8; 32],
+    signature: Vec<u8>,
 }
 
-/// Manages the compilation and execution of WASM plugins.
+/// Manages compilation and execution of locally synthesized WASM plugins.
 pub struct WasmArchitect {
     pub build_dir: PathBuf,
-    /// AOT Cache: Bounded LRU map from code hash to signed machine-specific bytes.
-    pub aot_cache: Arc<Mutex<LruCache<String, Vec<u8>>>>,
-    /// Local DID keypair for artifact signing.
+    /// Bounded cache of signed portable artifacts. Disk entries are treated as
+    /// untrusted bytes until `verify_signed_artifact` succeeds at use time.
+    pub artifact_cache: Arc<Mutex<LruCache<String, Vec<u8>>>>,
+    /// Local signer and trust root for synthesized artifact verification.
     pub keypair: Arc<DilithiumKeypair>,
 }
 
@@ -45,7 +52,7 @@ impl Clone for WasmArchitect {
     fn clone(&self) -> Self {
         Self {
             build_dir: self.build_dir.clone(),
-            aot_cache: Arc::clone(&self.aot_cache),
+            artifact_cache: Arc::clone(&self.artifact_cache),
             keypair: Arc::clone(&self.keypair),
         }
     }
@@ -57,11 +64,9 @@ impl WasmArchitect {
         let artifact_dir = build_dir.join("artifacts");
         fs::create_dir_all(&artifact_dir)?;
 
-        // Capped at 512 plugins
+        // Capped at 512 plugins. Persistence is only an optimization: every
+        // cached entry is cryptographically revalidated before it is trusted.
         let mut cache = LruCache::new(NonZeroUsize::new(512).unwrap());
-
-        // --- IMPROVEMENT: AOT Persistence ---
-        // Load existing artifacts from disk
         if let Ok(entries) = fs::read_dir(&artifact_dir) {
             for entry in entries.flatten() {
                 if let Some(name) = entry.file_name().to_str() {
@@ -77,16 +82,16 @@ impl WasmArchitect {
 
         Ok(Self {
             build_dir,
-            aot_cache: Arc::new(Mutex::new(cache)),
+            artifact_cache: Arc::new(Mutex::new(cache)),
             keypair: Arc::new(keypair),
         })
     }
+
     /// Compile high-level logic into a 'Holographic Intermediate Representation' (HIR).
     /// This makes her architectural breakthroughs hardware-agnostic.
     pub fn compile_to_hir(&self, code: &str) -> Result<Vec<u8>> {
         println!("🔮 Wasm Architect: Compiling logic to Holographic IR (HIR)...");
 
-        // 1. Scan code for algebraic primitives
         let mut hir_ops = Vec::new();
         if code.contains("bind") {
             hir_ops.push("HDC_BIND_OP");
@@ -101,38 +106,33 @@ impl WasmArchitect {
             hir_ops.push("SSM_SCAN_OP");
         }
 
-        // 2. Map to hardware-agnostic bytecode
         let encoded = bincode::serialize(&hir_ops)?;
         println!("   ✅ HIR COMPILATION SUCCESS. Substrate-agnostic mind-kernel captured.");
         Ok(encoded)
     }
 
     /// Register a synthesized WASM tool as a permanent system extension.
+    ///
+    /// This remains a placeholder for the future extension manifest, but an
+    /// artifact must now be structurally valid and signed by this architect's
+    /// configured signer before registration can succeed.
     pub fn register_system_extension(&self, code_hash: &str) -> Result<()> {
         println!(
             "🚀 Wasm Architect: Registering system extension {:?}...",
             code_hash
         );
-        // (In real: we would add this to a permanent 'Extension Manifest')
         let artifact_path = self
             .build_dir
             .join("artifacts")
             .join(format!("{}.artifact", code_hash));
-        if artifact_path.exists() {
-            println!("   ✅ Extension HOT-SWAPPED into runtime registry.");
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("Extension artifact not found."))
-        }
+        let encoded = fs::read(&artifact_path)
+            .map_err(|_| anyhow::anyhow!("Extension artifact not found."))?;
+        self.verify_signed_artifact(&encoded)?;
+        println!("   ✅ Signed extension artifact accepted for runtime registration.");
+        Ok(())
     }
 
-    /// Build a wasmtime `Engine` configured for sandboxed execution: fuel
-    /// metering enabled so any loaded module (however it was obtained) is
-    /// time-bounded rather than able to spin or hang forever. Must be used
-    /// consistently at both precompile time and execute time -- a mismatch
-    /// changes the engine's `precompile_compatibility_hash()`, which
-    /// [`Self::execute_plugin`]/[`Self::execute_with_hypervector`] already
-    /// check for before attempting the unsafe deserialize path.
+    /// Build the one Wasmtime engine configuration used by this host.
     #[cfg(feature = "wasm-sandbox")]
     fn sandboxed_engine() -> Result<wasmtime::Engine> {
         let mut config = wasmtime::Config::new();
@@ -141,47 +141,120 @@ impl WasmArchitect {
             .map_err(|e| anyhow::anyhow!("failed to initialize sandboxed wasmtime engine: {e}"))
     }
 
-    /// Hash of `engine.precompile_compatibility_hash()`, used to detect
-    /// whether a precompiled artifact was produced by an engine with the
-    /// same wasmtime version/target/`Config` as the one about to load it.
-    #[cfg(feature = "wasm-sandbox")]
-    fn engine_compat_hash(engine: &wasmtime::Engine) -> u64 {
-        use std::hash::{Hash, Hasher};
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        engine.precompile_compatibility_hash().hash(&mut hasher);
-        hasher.finish()
+    fn sha256(bytes: &[u8]) -> [u8; 32] {
+        Sha256::digest(bytes).into()
     }
 
-    /// Compute a simple hash for code indexing.
-    fn compute_hash(code: &str) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        let mut hasher = DefaultHasher::new();
-        code.hash(&mut hasher);
-        format!("{:x}", hasher.finish())
+    fn artifact_signing_message(wasm_sha256: [u8; 32]) -> Vec<u8> {
+        let mut message = Vec::with_capacity(SIGNING_DOMAIN.len() + 2 + 32);
+        message.extend_from_slice(SIGNING_DOMAIN);
+        message.extend_from_slice(&SIGNED_ARTIFACT_FORMAT_VERSION.to_le_bytes());
+        message.extend_from_slice(&wasm_sha256);
+        message
     }
 
-    /// Compile a synthesized Rust code block into a .wasm binary.
-    /// Uses LRU AOT caching to skip compilation if the code has been seen before.
+    fn encode_signed_artifact(&self, wasm_bytes: &[u8]) -> Result<Vec<u8>> {
+        let wasm_sha256 = Self::sha256(wasm_bytes);
+        let message = Self::artifact_signing_message(wasm_sha256);
+        let signature = self
+            .keypair
+            .sign(&message)
+            .map_err(|e| anyhow::anyhow!("Artifact signing failed: {e:?}"))?;
+        let artifact = SignedArtifact {
+            format_version: SIGNED_ARTIFACT_FORMAT_VERSION,
+            wasm_bytes: wasm_bytes.to_vec(),
+            wasm_sha256,
+            signature,
+        };
+        Ok(bincode::serialize(&artifact)?)
+    }
+
+    /// Verify an artifact against the signer configured on this host.
+    ///
+    /// The artifact cannot nominate its own trust root. Old self-signed/AOT
+    /// artifact formats therefore fail closed and are rebuilt from source when a
+    /// cache hit encounters them.
+    fn verify_signed_artifact(&self, artifact: &[u8]) -> Result<SignedArtifact> {
+        let signed: SignedArtifact = bincode::deserialize(artifact).map_err(|_| {
+            anyhow::anyhow!("Refusing artifact: unrecognized signed WASM format")
+        })?;
+        if signed.format_version != SIGNED_ARTIFACT_FORMAT_VERSION {
+            return Err(anyhow::anyhow!(
+                "Refusing artifact format version {}; expected {}",
+                signed.format_version,
+                SIGNED_ARTIFACT_FORMAT_VERSION
+            ));
+        }
+
+        let actual_wasm_sha256 = Self::sha256(&signed.wasm_bytes);
+        if actual_wasm_sha256 != signed.wasm_sha256 {
+            return Err(anyhow::anyhow!(
+                "Refusing artifact: portable WASM digest mismatch"
+            ));
+        }
+
+        let message = Self::artifact_signing_message(signed.wasm_sha256);
+        let valid = verify_signature(&message, &signed.signature, self.keypair.public_key())
+            .map_err(|e| anyhow::anyhow!("Artifact signature verification failed: {e:?}"))?;
+        if !valid {
+            return Err(anyhow::anyhow!(
+                "Artifact signer is not trusted by this WASM architect"
+            ));
+        }
+        Ok(signed)
+    }
+
+    /// Cryptographic cache key binding both the package name and exact source.
+    fn compute_hash(code: &str, plugin_name: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(CACHE_DOMAIN);
+        hasher.update((plugin_name.len() as u64).to_le_bytes());
+        hasher.update(plugin_name.as_bytes());
+        hasher.update((code.len() as u64).to_le_bytes());
+        hasher.update(code.as_bytes());
+        let digest = hasher.finalize();
+        let mut encoded = String::with_capacity(64);
+        for byte in digest {
+            write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
+        }
+        encoded
+    }
+
+    /// Compile synthesized Rust into portable WASM and return a signed artifact.
+    ///
+    /// The return format is identical whether or not `wasm-sandbox` is enabled;
+    /// build features no longer change an artifact from signed bytes into raw
+    /// executable input. A cached artifact is reused only after signature and
+    /// digest verification against this host's configured signer.
     pub fn compile_to_wasm(&self, code: &str, plugin_name: &str) -> Result<Vec<u8>> {
-        let code_hash = Self::compute_hash(code);
+        let code_hash = Self::compute_hash(code, plugin_name);
 
-        // 1. Check AOT Cache (LRU)
-        {
-            let mut cache = self.aot_cache.lock();
-            if let Some(artifact) = cache.get(&code_hash) {
-                println!(
-                    "⚡ AOT Cache HIT (LRU): skipping compilation for {}.",
-                    plugin_name
-                );
-                return Ok(artifact.clone());
+        let cached = {
+            let mut cache = self.artifact_cache.lock();
+            cache.get(&code_hash).cloned()
+        };
+        if let Some(artifact) = cached {
+            match self.verify_signed_artifact(&artifact) {
+                Ok(_) => {
+                    println!(
+                        "⚡ Signed WASM cache HIT: skipping compilation for {}.",
+                        plugin_name
+                    );
+                    return Ok(artifact);
+                }
+                Err(error) => {
+                    eprintln!(
+                        "⚠️ Ignoring invalid/stale WASM cache entry for {}: {}",
+                        plugin_name, error
+                    );
+                    self.artifact_cache.lock().pop(&code_hash);
+                }
             }
         }
 
         let plugin_dir = self.build_dir.join(plugin_name);
         fs::create_dir_all(&plugin_dir)?;
 
-        // 1. Create a temporary Cargo project
         let cargo_toml = format!(
             r#"[package]
         name = "{}"
@@ -202,8 +275,7 @@ impl WasmArchitect {
         fs::create_dir_all(&src_dir)?;
         fs::write(src_dir.join("lib.rs"), code)?;
 
-        // 3. Invoke cargo build
-        println!("🛠️ Compiling {} to WASM...", plugin_name);
+        println!("🛠️ Compiling {} to portable WASM...", plugin_name);
         let output = Command::new("cargo")
             .arg("build")
             .arg("--target")
@@ -231,95 +303,44 @@ impl WasmArchitect {
         }
 
         let wasm_bytes = fs::read(&wasm_path)?;
+        let encoded = self.encode_signed_artifact(&wasm_bytes)?;
 
-        // 4. Pre-compile and Sign for AOT
-        #[cfg(feature = "wasm-sandbox")]
-        {
-            let engine = Self::sandboxed_engine()?;
-            if let Ok(serialized) = engine.precompile_module(&wasm_bytes) {
-                // --- IMPROVEMENT: DID Cryptographic Signing Layer ---
-                // Sign the artifact to bulletproof the unsafe loading boundary.
-                let signature = self
-                    .keypair
-                    .sign(&serialized)
-                    .map_err(|e| anyhow::anyhow!("Artifact signing failed: {:?}", e))?;
+        let artifact_path = self
+            .build_dir
+            .join("artifacts")
+            .join(format!("{}.artifact", &code_hash));
+        fs::write(artifact_path, &encoded)?;
+        self.artifact_cache
+            .lock()
+            .put(code_hash, encoded.clone());
 
-                let signed_artifact = SignedArtifact {
-                    bytes: serialized.clone(),
-                    signature,
-                    public_key: self.keypair.public_key().to_vec(),
-                    compat_hash: Self::engine_compat_hash(&engine),
-                };
-
-                let encoded = bincode::serialize(&signed_artifact)?;
-
-                // --- IMPROVEMENT: AOT Persistence ---
-                let artifact_path = self
-                    .build_dir
-                    .join("artifacts")
-                    .join(format!("{}.artifact", &code_hash));
-                let _ = fs::write(artifact_path, &encoded);
-
-                let mut cache = self.aot_cache.lock();
-                cache.put(code_hash, encoded.clone());
-
-                println!(
-                    "💾 Signed AOT Artifact cached (LRU + Disk) for {}.",
-                    plugin_name
-                );
-                return Ok(encoded);
-            }
-        }
-        Ok(wasm_bytes)
+        println!("💾 Signed portable WASM artifact cached for {}.", plugin_name);
+        Ok(encoded)
     }
 
-    /// Amount of wasmtime "fuel" granted per sandboxed execution -- a
-    /// coarse, roughly instruction-proportional bound that prevents a
-    /// loaded module from spinning or hanging the host forever.
+    /// Amount of Wasmtime fuel granted per sandboxed execution.
     #[cfg(feature = "wasm-sandbox")]
     const WASM_FUEL_BUDGET: u64 = 50_000_000;
 
-    /// Maximum linear memory (bytes) a sandboxed module may grow to.
+    /// Maximum linear memory a sandboxed module may grow to.
     #[cfg(feature = "wasm-sandbox")]
-    const WASM_MEMORY_LIMIT_BYTES: usize = 64 * 1024 * 1024; // 64 MiB
+    const WASM_MEMORY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
 
-    /// Verify an artifact's DID signature and load it into `engine` as a
-    /// `Module`, using the unsafe precompiled-deserialize path only when
-    /// the artifact's recorded `compat_hash` matches this engine's -- see
-    /// [`SignedArtifact::compat_hash`] for why that check is required for
-    /// soundness. Refuses to load anything that isn't a validly-signed
-    /// [`SignedArtifact`]: there is no unauthenticated fallback.
+    /// Verify the signed portable artifact and compile it through Wasmtime's safe
+    /// portable-WASM path. Persisted native/AOT deserialization is deliberately
+    /// not used here.
     #[cfg(feature = "wasm-sandbox")]
     fn load_verified_module(
+        &self,
         engine: &wasmtime::Engine,
         artifact: &[u8],
     ) -> Result<wasmtime::Module> {
-        use wasmtime::Module;
-
-        let signed: SignedArtifact = bincode::deserialize(artifact).map_err(|_| {
-            anyhow::anyhow!("Refusing to execute: artifact is not a recognized signed format")
-        })?;
-        let valid = verify_signature(&signed.bytes, &signed.signature, &signed.public_key)
-            .map_err(|e| anyhow::anyhow!("Signature verification failed: {:?}", e))?;
-        if !valid {
-            return Err(anyhow::anyhow!(
-                "Artifact signature INVALID: refusing to execute."
-            ));
-        }
-
-        if signed.compat_hash == Self::engine_compat_hash(engine) {
-            if let Ok(module) = unsafe { Module::deserialize(engine, &signed.bytes) } {
-                return Ok(module);
-            }
-            // Compat hash matched but deserialize still failed (e.g. corrupted
-            // cache entry) -- fall through to the safe compile-from-source path.
-        }
-        Ok(Module::new(engine, &signed.bytes)?)
+        let signed = self.verify_signed_artifact(artifact)?;
+        wasmtime::Module::new(engine, &signed.wasm_bytes)
+            .map_err(|e| anyhow::anyhow!("verified portable WASM failed to compile: {e}"))
     }
 
-    /// Build a `Store` with fuel metering and a memory/instance limiter
-    /// applied, so a successfully-loaded module still cannot exhaust host
-    /// resources or run unboundedly.
+    /// Build a Store with fuel metering and strict instance/memory limits.
     #[cfg(feature = "wasm-sandbox")]
     fn sandboxed_store(
         engine: &wasmtime::Engine,
@@ -341,13 +362,13 @@ impl WasmArchitect {
         Ok(store)
     }
 
-    /// Execute a WASM plugin in a sandboxed environment.
+    /// Execute a verified WASM plugin in the sandboxed host.
     #[cfg(feature = "wasm-sandbox")]
     pub fn execute_plugin(&self, artifact: &[u8], func_name: &str) -> Result<()> {
-        use wasmtime::*;
+        use wasmtime::Instance;
 
         let engine = Self::sandboxed_engine()?;
-        let module = Self::load_verified_module(&engine, artifact)?;
+        let module = self.load_verified_module(&engine, artifact)?;
         let mut store = Self::sandboxed_store(&engine)?;
         let instance = Instance::new(&mut store, &module, &[])?;
 
@@ -358,7 +379,7 @@ impl WasmArchitect {
         Ok(())
     }
 
-    /// Execute a WASM plugin with a high-dimensional hypervector as a direct memory arena.
+    /// Execute a verified WASM plugin with a high-dimensional hypervector arena.
     #[cfg(feature = "wasm-sandbox")]
     pub fn execute_with_hypervector(
         &self,
@@ -367,28 +388,23 @@ impl WasmArchitect {
         func_name: &str,
         projection: &symthaea_broca::projection::HdcSsmProjection,
     ) -> Result<()> {
-        use wasmtime::*;
+        use wasmtime::Instance;
 
         let engine = Self::sandboxed_engine()?;
-        let module = Self::load_verified_module(&engine, artifact)?;
+        let module = self.load_verified_module(&engine, artifact)?;
         let mut store = Self::sandboxed_store(&engine)?;
         let instance = Instance::new(&mut store, &module, &[])?;
 
-        // 1. Locate the plugin's exported linear memory allocation
         let memory = instance
             .get_memory(&mut store, "memory")
             .ok_or_else(|| anyhow::anyhow!("Failed to locate WASM linear memory arena"))?;
 
-        // 2. Query the plugin's internal allocator for a safe destination pointer
-        // This prevents the 'Host-Stomp Trap' (overwriting offset 0)
         let get_buffer_ptr =
             instance.get_typed_func::<(), i32>(&mut store, "get_hypervector_buffer_ptr")?;
         let safe_ptr_offset = get_buffer_ptr.call(&mut store, ())? as u32;
 
-        // 3. Fetch the target function signature mapping raw pointers (offset, size)
         let mutate_hv = instance.get_typed_func::<(i32, i32), ()>(&mut store, func_name)?;
 
-        // 4. Stream the float elements safely into the guest-allocated arena
         let slice = hv.as_slice();
         memory.write(
             &mut store,
@@ -396,10 +412,8 @@ impl WasmArchitect {
             bytemuck::cast_slice(slice),
         )?;
 
-        // 5. Trigger isolated processing inside the sandbox at the safe offset
         mutate_hv.call(&mut store, (safe_ptr_offset as i32, hv.dim() as i32))?;
 
-        // 6. Read back the mutated state directly from the same safe pointer
         let mut buffer = vec![0.0f32; hv.dim()];
         memory.read(
             &store,
@@ -407,10 +421,9 @@ impl WasmArchitect {
             bytemuck::cast_slice_mut(&mut buffer),
         )?;
 
-        // 6. Audit mutated output via our safety sentinel before committing
         if projection.verify_metamorphic_kernel(&buffer) {
             hv.update_from_slice(&buffer);
-            println!("🚀 Zero-copy hypervector mutation SUCCESS and verified.");
+            println!("🚀 Hypervector mutation SUCCESS and verified.");
         } else {
             return Err(anyhow::anyhow!(
                 "WASM mutation REJECTED: integrity sentinel violation."
@@ -420,10 +433,100 @@ impl WasmArchitect {
         Ok(())
     }
 
-    /// Non-wasmtime fallback.
+    /// No runtime means no execution. Verification-only builds fail closed rather
+    /// than reporting a synthetic successful execution.
     #[cfg(not(feature = "wasm-sandbox"))]
     pub fn execute_plugin(&self, _artifact: &[u8], _func_name: &str) -> Result<()> {
-        println!("🚀 WASM plugin verification (no runtime enabled).");
-        Ok(())
+        Err(anyhow::anyhow!(
+            "wasm-sandbox feature is not enabled; refusing to execute plugin"
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_base(label: &str) -> PathBuf {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "symthaea-wasm-architect-{label}-{}-{unique}",
+            std::process::id()
+        ))
+    }
+
+    fn architect(label: &str) -> WasmArchitect {
+        WasmArchitect::new(
+            temp_base(label).to_str().unwrap(),
+            DilithiumKeypair::generate(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn cache_key_is_cryptographic_and_binds_plugin_name() {
+        let first = WasmArchitect::compute_hash("pub fn x() {}", "plugin-a");
+        let same = WasmArchitect::compute_hash("pub fn x() {}", "plugin-a");
+        let renamed = WasmArchitect::compute_hash("pub fn x() {}", "plugin-b");
+        assert_eq!(first.len(), 64);
+        assert_eq!(first, same);
+        assert_ne!(first, renamed);
+    }
+
+    #[test]
+    fn artifact_rejects_foreign_signer() {
+        let trusted = architect("trusted");
+        let foreign = architect("foreign");
+        let encoded = foreign
+            .encode_signed_artifact(b"\0asm\x01\0\0\0")
+            .unwrap();
+        let error = trusted.verify_signed_artifact(&encoded).unwrap_err();
+        assert!(error.to_string().contains("not trusted"));
+    }
+
+    #[test]
+    fn artifact_rejects_tampered_portable_wasm() {
+        let host = architect("tamper");
+        let encoded = host
+            .encode_signed_artifact(b"\0asm\x01\0\0\0")
+            .unwrap();
+        let mut decoded: SignedArtifact = bincode::deserialize(&encoded).unwrap();
+        decoded.wasm_bytes[0] ^= 0xff;
+        let tampered = bincode::serialize(&decoded).unwrap();
+        let error = host.verify_signed_artifact(&tampered).unwrap_err();
+        assert!(error.to_string().contains("digest mismatch"));
+    }
+
+    #[test]
+    fn artifact_rejects_tampered_digest_even_with_untouched_signature() {
+        let host = architect("digest");
+        let encoded = host
+            .encode_signed_artifact(b"\0asm\x01\0\0\0")
+            .unwrap();
+        let mut decoded: SignedArtifact = bincode::deserialize(&encoded).unwrap();
+        decoded.wasm_sha256[0] ^= 0x01;
+        let tampered = bincode::serialize(&decoded).unwrap();
+        assert!(host.verify_signed_artifact(&tampered).is_err());
+    }
+
+    #[cfg(feature = "wasm-sandbox")]
+    #[test]
+    fn verified_portable_wasm_loads_without_native_deserialization() {
+        let host = architect("portable");
+        let encoded = host
+            .encode_signed_artifact(b"\0asm\x01\0\0\0")
+            .unwrap();
+        let engine = WasmArchitect::sandboxed_engine().unwrap();
+        host.load_verified_module(&engine, &encoded).unwrap();
+    }
+
+    #[cfg(not(feature = "wasm-sandbox"))]
+    #[test]
+    fn execution_without_runtime_fails_closed() {
+        let host = architect("no-runtime");
+        assert!(host.execute_plugin(&[], "run").is_err());
     }
 }
