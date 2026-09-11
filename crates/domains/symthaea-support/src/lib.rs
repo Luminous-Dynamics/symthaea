@@ -15,6 +15,7 @@ pub mod diagnostics;
 pub mod federation;
 pub mod golden_incidents;
 pub mod golden_incidents_v2;
+pub mod golden_metric_derivation;
 pub mod golden_qualification_binding;
 pub mod golden_run_protocol;
 pub mod golden_solver_view_v2;
@@ -59,6 +60,12 @@ pub use golden_incidents_v2::{
     seed_golden_incidents_v2, DiagnosticAuthorityRequirementV2, GoldenDiagnosticActionV2,
     GoldenEvidenceCurrentnessV2, GoldenIncidentCaseV2, GoldenIncidentCorpusV2,
     GoldenIncidentErrorV2, GoldenIncidentEvidenceV2, GOLDEN_INCIDENT_SCHEMA_V2,
+};
+pub use golden_metric_derivation::{
+    derive_golden_qualification_metrics_v1, GoldenApplicabilityStatusV1,
+    GoldenApplicabilityVerdictV1, GoldenDerivedMetricsV1, GoldenDiagnosticActionVerdictV1,
+    GoldenFindingVerdictV1, GoldenMetricDerivationErrorV1, GoldenPrivateEvaluationV1,
+    GoldenRequiredFindingV1, GOLDEN_PRIVATE_EVALUATION_SCHEMA_V1,
 };
 pub use golden_qualification_binding::{
     bind_golden_qualification_result_v1, golden_qualification_metrics_digest_v1,
