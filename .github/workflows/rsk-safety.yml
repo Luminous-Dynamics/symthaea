@@ -124,8 +124,23 @@ jobs:
 
           echo "RSK reference crates remain non-publishable and admission remains explicitly denied."
 
+  rsk-format:
+    name: RSK format check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust formatter
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format only the RSK crates
+        run: cargo fmt --check -p symthaea-replicator-safety -p symthaea-replicator-ledger
+
   rsk-core:
-    name: RSK constitutional + ledger checks
+    name: RSK compile + test + clippy
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -134,7 +149,7 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
-          components: rustfmt, clippy
+          components: clippy
 
       - name: Cache cargo registry and target
         uses: actions/cache@v4
@@ -146,9 +161,6 @@ jobs:
           key: ${{ runner.os }}-cargo-rsk-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-rsk-
-
-      - name: Format only the RSK crates
-        run: cargo fmt --check -p symthaea-replicator-safety -p symthaea-replicator-ledger
 
       - name: Compile the RSK crates and all test targets
         run: |
