@@ -1,0 +1,83 @@
+# One-shot Rust 1.96 formatting normalization for the public provenance transport suite.
+# It may modify only the transport regression file and then self-deletes.
+
+name: Capability Provenance Transport Format Once
+
+on:
+  push:
+    branches:
+      - architecture/capability-analysis-algorithm-provenance-hardening-v1
+    paths:
+      - .github/workflows/capability-provenance-transport-format-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format-once:
+    name: Normalize provenance transport formatting once
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: architecture/capability-analysis-algorithm-provenance-hardening-v1
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Normalize exact test file and self-delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          target='crates/core/symthaea-continuity/tests/capability_analysis_provenance_transport.rs'
+          helper='.github/workflows/capability-provenance-transport-format-once.yml'
+          before="$(sha256sum "$target" | awk '{print $1}')"
+
+          rustfmt --edition 2024 "$target"
+          rustfmt --edition 2024 --check "$target"
+          cargo check --locked -p symthaea-continuity --all-targets
+          cargo test --locked -p symthaea-continuity --test capability_analysis_provenance_transport -- --nocapture
+
+          after="$(sha256sum "$target" | awk '{print $1}')"
+          if [[ "$before" == "$after" ]]; then
+            echo 'error: expected Rustfmt normalization but file bytes were unchanged' >&2
+            exit 1
+          fi
+
+          mapfile -t changed < <(git diff --name-only)
+          if [[ "${#changed[@]}" -ne 1 || "${changed[0]}" != "$target" ]]; then
+            echo 'error: formatter changed unexpected tracked paths' >&2
+            printf '%s\n' "${changed[@]}" >&2
+            exit 1
+          fi
+
+          git add "$target"
+          rm "$helper"
+          git add "$helper"
+          git diff --cached --check
+
+          mapfile -t staged < <(git diff --cached --name-only)
+          if [[ "${#staged[@]}" -ne 2 ]]; then
+            echo 'error: unexpected staged path count' >&2
+            printf '%s\n' "${staged[@]}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${staged[@]}" | grep -Fxq "$target"
+          printf '%s\n' "${staged[@]}" | grep -Fxq "$helper"
+
+          git commit -m "style(continuity): normalize provenance transport tests"
+          git push origin HEAD:architecture/capability-analysis-algorithm-provenance-hardening-v1
