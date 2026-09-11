@@ -17,6 +17,7 @@ pub mod it_coverage;
 pub mod it_qualification;
 pub mod knowledge;
 pub mod knowledge_source;
+pub mod legacy_aix;
 pub mod legacy_artifact_qualification;
 pub mod legacy_computing;
 #[cfg(test)]
@@ -72,6 +73,11 @@ pub use knowledge_source::{
     KnowledgeOriginV1, KnowledgeQueryPurposeV1, KnowledgeShareabilityV1,
     KnowledgeSourceErrorV1, KnowledgeStabilityV1, SupportKnowledgeHitV1,
     SupportKnowledgeQueryV1, SupportKnowledgeSourceV1,
+};
+pub use legacy_aix::{
+    enrich_legacy_aix_foundation_v1, AixEvidenceSignalV1, AixFailureModeV1, AixFoundationV1,
+    AixMechanismKindV1, AixMechanismModelV1, LegacyAixErrorV1,
+    LEGACY_AIX_FOUNDATION_SCHEMA_V1,
 };
 pub use legacy_artifact_qualification::{
     assess_legacy_strong_qualification_v1, LegacyArtifactQualificationErrorV1,
