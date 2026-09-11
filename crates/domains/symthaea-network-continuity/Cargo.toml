@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-network-continuity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Provider-neutral network continuity evidence semantics for Symthaea"
+license = "AGPL-3.0-or-later"
+
+[lib]
+name = "symthaea_network_continuity"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+symthaea-support = { path = "../symthaea-support" }
