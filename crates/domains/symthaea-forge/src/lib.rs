@@ -45,10 +45,12 @@
 //! pre-decision feature schema including accepted-history suffixes from the bound sequence cohort,
 //! [`proposal_evaluator_protocol`] defines a serialization-safe request/response artifact boundary
 //! that carries only blind features and probabilities, [`proposal_evaluator_validation`] binds a
-//! stronger validation/holdout proposition to the exact evaluator request and response, the
-//! crate-private deterministic scorer joins frozen predictions to labels only during scoring, and
-//! [`proposal_validation_chain`] retains the earlier blind deterministic receipt machinery for
-//! compatibility while constructor visibility is narrowed in a later follow-up.
+//! stronger validation/holdout proposition to the exact evaluator request and response,
+//! [`proposal_evaluator_execution`] freezes launch/resource semantics and byte commitments while
+//! making runtime-isolation non-evidence explicit, the crate-private deterministic scorer joins
+//! frozen predictions to labels only during scoring, and [`proposal_validation_chain`] retains the
+//! earlier blind deterministic receipt machinery for compatibility while constructor visibility is
+//! narrowed in a later follow-up.
 //!
 //! # Authority boundary
 //!
@@ -88,8 +90,12 @@
 //!   per-family coverage counts are not request fields.
 //! - Evaluator-bound validation receipts commit the exact request, response, execution-context ID,
 //!   reconstructed blind predictions, deterministic Brier evidence, and downstream holdout permit.
-//! - The evaluator request/response protocol does not by itself prove OS/process/VM/network
-//!   isolation; a later worker execution receipt must establish those runtime properties.
+//! - Evaluator launch policies precommit direct-exec/no-shell, cleared-environment, fresh-empty-CWD,
+//!   request/response/stderr size bounds, and wall-time bounds before execution evidence exists.
+//! - Evaluator execution records bind exact JSON request/response byte commitments plus launcher and
+//!   stderr evidence, but v1 hard-codes runtime isolation status to `NotEstablishedV1`.
+//! - The evaluator request/response and execution-evidence contracts do not by themselves prove
+//!   OS/process/VM/network/filesystem isolation; a later launcher-backed v2 theorem must do so.
 //! - The earlier direct blind deterministic validation path remains a compatibility bypass in this
 //!   tranche; the evaluator-bound receipt is the stronger proposition, not yet the only constructible one.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
@@ -135,6 +141,7 @@ pub mod proposal_corpus;
 pub mod proposal_coverage;
 pub mod proposal_dataset;
 pub mod proposal_endpoints;
+pub mod proposal_evaluator_execution;
 pub mod proposal_evaluator_protocol;
 pub mod proposal_evaluator_validation;
 pub mod proposal_exposure;
@@ -206,6 +213,12 @@ pub use proposal_dataset::{
 pub use proposal_endpoints::{
     ForgeProposalEndpoint, ForgeProposalEndpointError, ForgeProposalEndpointRecord,
     ForgeProposalEndpointTable, ForgeProposalEndpointValue,
+};
+pub use proposal_evaluator_execution::{
+    ForgeProposalEvaluatorEnvironmentMode, ForgeProposalEvaluatorExecutionError,
+    ForgeProposalEvaluatorExecutionRecord, ForgeProposalEvaluatorLaunchMode,
+    ForgeProposalEvaluatorLaunchPolicy, ForgeProposalEvaluatorRuntimeIsolationStatus,
+    ForgeProposalEvaluatorWorkingDirectoryMode,
 };
 pub use proposal_evaluator_protocol::{
     ForgeProposalEvaluationRequest, ForgeProposalEvaluationResponse,
