@@ -71,7 +71,7 @@ It models one transactional check-and-mutate boundary.
 
 ## Executed local result
 
-Before repository commit, the exact lab/harness pair was syntax-checked and executed in a local Linux/Python environment.
+Before repository commit, the initial lab/harness pair was syntax-checked and executed in a local Linux/Python environment.
 
 Observed summary:
 
@@ -105,16 +105,76 @@ Local execution is not repository qualification; the dedicated exact-head workfl
 - recorded Python/SQLite versions;
 - execution of the full subprocess harness.
 
+## Nine-obligation campaign composition
+
+The current harness maps its observations onto every fixed #1549 V1 obligation and required basis:
+
+| obligation | descriptive basis |
+| --- | --- |
+| `boundary_identity` | `static_implementation_inspection` |
+| `same_boundary_checks_and_mutates` | `atomic_check_and_actuate_scenario` |
+| `durable_monotonic_fence` | `crash_restart_scenario` |
+| `reject_stale_generation` | `stale_holder_scenario` |
+| `reject_replay` | `replay_scenario` |
+| `reject_deny_disposition` | `deny_scenario` |
+| `emergency_stop_dominates` | `emergency_stop_scenario` |
+| `one_use_permit_consumption` | `one_use_consumption_scenario` |
+| `crash_recovery_preserves_fence` | `crash_restart_scenario` |
+
+Each observation receives a domain-separated descriptive record ID over the obligation, basis and canonical observation payload.
+
+The harness then constructs a campaign manifest binding:
+
+- the complete ordered nine-record set;
+- simulation enforcement-profile identity;
+- simulation authentication-profile identity explicitly marked unqualified;
+- backend ID and digest of the exact lab implementation;
+- backend generation;
+- boundary implementation digest;
+- one-use mechanism digest;
+- enforcement-profile generation;
+- campaign nonce;
+- digest of the exact harness implementation;
+- scenario-suite manifest digest;
+- Python/SQLite/platform environment digest;
+- topology/dependency digest;
+- explicit no-physical-hardware manifest digest;
+- Python toolchain identity;
+- exact campaign interval;
+- all nine observation IDs and timestamps.
+
+That manifest is handed to #1578's independent `continuity-actuation-enforcement-campaign-oracle.py`. The lab harness fails if the oracle rejects it.
+
+This proves only:
+
+```text
+lab observations
+-> closed nine-obligation shape
+-> one coherent descriptive campaign manifest
+-> independent structural-oracle acceptance
+```
+
+It does **not** prove:
+
+```text
+campaign manifest accepted
+-> evidence is true
+-> verifier qualified evidence
+-> live production resource enforces fencing
+```
+
+Verifier-owned admission remains #1550 and real resource enforcement remains #1528.
+
 ## Relationship to #1549 / #1550 / #1528
 
 This lab is downstream experimental evidence, not a replacement for the closed-world qualification protocol.
 
-It should eventually contribute evidence to the nine-obligation campaign only after:
+It should only become verifier-qualified campaign evidence after:
 
 - the parent Rust continuity stack compiles/qualifies;
-- the campaign-bound evidence wrapper exists and matches #1578's independent oracle;
-- #1550 defines verifier-owned admission;
-- the lab campaign binds exact harness/environment/toolchain identities.
+- the campaign-bound Rust evidence wrapper exists and matches #1578's independent semantic preimage;
+- #1550 defines verifier-owned admission and invalidation semantics;
+- the exact lab campaign identities are admitted by that verifier rather than trusted because the harness emitted them.
 
 Even then, qualification of this SQLite simulation does not imply that a switch, BMC, storage controller, hypervisor, database or Spore privileged helper enforces the same property.
 
