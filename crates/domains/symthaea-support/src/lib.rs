@@ -21,6 +21,7 @@ pub mod legacy_computing;
 #[cfg(test)]
 mod legacy_computing_pack_tests;
 pub mod legacy_qualification_profile;
+pub mod legacy_source_artifacts;
 pub mod legacy_source_readiness;
 #[cfg(feature = "logparse-adapter")]
 pub mod logparse_adapter;
@@ -83,6 +84,12 @@ pub use legacy_qualification_profile::{
     LegacyQualificationProfileErrorV1, LegacyQualificationProfileV1,
     LegacyQualificationRequirementAssessmentV1, LegacyQualificationRequirementV1,
     LEGACY_QUALIFICATION_PROFILE_SCHEMA_V1,
+};
+pub use legacy_source_artifacts::{
+    assess_legacy_source_artifact_readiness_v1, LegacyArtifactAccessPolicyV1,
+    LegacyArtifactStorageClassV1, LegacySourceArtifactErrorV1, LegacySourceArtifactLedgerV1,
+    LegacySourceArtifactReadinessV1, LegacySourceArtifactRefV1,
+    LEGACY_SOURCE_ARTIFACT_LEDGER_SCHEMA_V1,
 };
 pub use legacy_source_readiness::{
     admit_legacy_knowledge_use_v1, assess_legacy_source_readiness_v1,
