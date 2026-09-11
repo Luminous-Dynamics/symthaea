@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Carry backend-relative effect-coverage qualification into the pre-mutation world.
 //!
-//! A verifier proof that the declared effect set is complete before
+//! A verifier proof that the declared effect set is complete must exist before
 //! mutation and must itself be committed into the exact protected post-intent world.
 
 pub mod actuation_interlock;
+pub mod actuation_interlock_auth;
 pub mod current_authority_release;
 pub mod current_authorized;
 mod current_transition_authority;
