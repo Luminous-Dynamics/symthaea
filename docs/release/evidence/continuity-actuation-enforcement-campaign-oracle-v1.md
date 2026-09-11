@@ -37,7 +37,9 @@ The oracle requires one exact:
 - campaign start/end interval;
 - set of exactly nine obligation records.
 
-All digest fields are 32-byte lowercase hex and must be non-zero.
+All digest fields are 32-byte lowercase hex and must be non-zero. A platform with no meaningful hardware/firmware dimension should bind an explicit non-applicability manifest digest rather than a zero/missing field.
+
+The manifest and each evidence-record object use an exact closed field set. Unknown/shadow fields fail closed so policy or result semantics cannot exist outside the canonical preimage.
 
 ## Closed-world obligations
 
@@ -73,22 +75,30 @@ The campaign preimage is domain-separated and contains the eight fixed campaign 
 
 SHA-256 is used here as an independent audit/preimage digest, not as a replacement for any future Rust campaign-ID algorithm. A future Rust implementation should reproduce the same semantic preimage and may domain-separate/hash it under the repository's selected identity algorithm.
 
-## Executed self-test fixture
+## Frozen parity fixture
 
-The oracle was syntax-checked and its in-memory self-test executed before commit.
+The exact positive fixture is checked in at:
 
-For the deterministic fixture with digest bytes `01..08`, record-ID bytes `20..28`, campaign interval `[1000, 2000]`, and observations `1100..1108`, it produced:
+`tests/fixtures/continuity/actuation_enforcement_campaign_v1.json`
+
+For the deterministic fixture with digest bytes `01..08`, record-ID bytes `20..28`, campaign interval `[1000, 2000]`, and observations `1100..1108`, the oracle produces:
 
 - evidence-manifest SHA-256: `f0c0690664c45f4ef0f875c88e6ba5a8150bd5649f5f7cf9e8b7906fbdff0c3a`;
 - canonical-preimage SHA-256: `6781f81213b8eb04a022a1d11001e78ffa11cd2d76edc331da5e7717f15cd78f`.
 
-The self-test additionally established:
+## Executed self-tests
+
+The oracle was syntax-checked and its in-memory self-test executed before commit.
+
+The self-test establishes:
 
 - reversing input record order leaves the canonical preimage unchanged;
 - an observation before the campaign start fails closed;
 - duplicate obligations fail closed;
 - a zero environment digest fails closed;
 - duplicate record IDs fail closed;
+- unknown top-level fields fail closed;
+- unknown per-record fields fail closed;
 - toolchain-realization drift changes the canonical preimage.
 
 ## Required future Rust parity
@@ -99,9 +109,11 @@ The additive Rust campaign wrapper should be accepted only after an independent 
 2. the exact same campaign interval semantics;
 3. exact campaign/environment/toolchain binding;
 4. no caller-controlled omission of one of the eight campaign digests;
-5. canonical evidence manifest over the exact nine V1 record IDs;
-6. mixed-campaign or environment-drift cases fail closed;
-7. the wrapper remains descriptive/non-authoritative until verifier-owned admission in #1550.
+5. no uncommitted shadow fields or extension semantics in V1;
+6. canonical evidence manifest over the exact nine V1 record IDs;
+7. exact parity against the checked-in positive fixture;
+8. mixed-campaign or environment-drift cases fail closed;
+9. the wrapper remains descriptive/non-authoritative until verifier-owned admission in #1550.
 
 ## Non-claims
 
