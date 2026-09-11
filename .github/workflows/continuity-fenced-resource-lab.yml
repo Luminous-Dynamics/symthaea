@@ -6,8 +6,11 @@ on:
       - '.github/workflows/continuity-fenced-resource-lab.yml'
       - 'scripts/continuity-fenced-resource-lab.py'
       - 'scripts/test-continuity-fenced-resource-lab.py'
+      - 'scripts/verify-continuity-fenced-resource-evidence.py'
+      - 'scripts/test-continuity-fenced-resource-evidence-auditor.py'
       - 'docs/release/evidence/continuity-fenced-resource-lab-v1.md'
       - 'docs/release/evidence/continuity-fenced-resource-lab-evidence-v1.md'
+      - 'docs/release/evidence/continuity-fenced-resource-evidence-auditor-v1.md'
   workflow_dispatch:
 
 concurrency:
@@ -55,8 +58,13 @@ jobs:
           print('sqlite=' + sqlite3.sqlite_version)
           PY
 
-      - name: Syntax-check lab and harness
-        run: python3 -m py_compile scripts/continuity-fenced-resource-lab.py scripts/test-continuity-fenced-resource-lab.py
+      - name: Syntax-check lab, harness and independent auditor
+        run: >-
+          python3 -m py_compile
+          scripts/continuity-fenced-resource-lab.py
+          scripts/test-continuity-fenced-resource-lab.py
+          scripts/verify-continuity-fenced-resource-evidence.py
+          scripts/test-continuity-fenced-resource-evidence-auditor.py
 
       - name: Execute contained fencing scenarios and retain evidence
         env:
@@ -89,6 +97,24 @@ jobs:
               raise SystemExit('retained evidence does not contain exactly nine obligations')
           print('retained_subject_sha=' + actual)
           PY
+
+      - name: Independently audit retained evidence semantics
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/continuity-fenced-resource-evidence
+          EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          python3 scripts/verify-continuity-fenced-resource-evidence.py
+          "$EVIDENCE_DIR"
+          --expected-subject "$EXPECTED_SUBJECT_SHA"
+
+      - name: Adversarially exercise retained evidence auditor
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/continuity-fenced-resource-evidence
+          EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          python3 scripts/test-continuity-fenced-resource-evidence-auditor.py
+          "$EVIDENCE_DIR"
+          --expected-subject "$EXPECTED_SUBJECT_SHA"
 
       - name: Publish retained-evidence digest
         shell: bash
