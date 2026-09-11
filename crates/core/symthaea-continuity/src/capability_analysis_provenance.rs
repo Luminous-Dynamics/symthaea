@@ -115,13 +115,39 @@ pub fn capability_counterfactual_algorithm_id_v1() -> CapabilityCounterfactualAl
 /// blocked requirements, and final closure. This value adds the algorithm
 /// semantics under which that exact result was derived.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "CapabilityActivationProvenanceWireV1")]
 pub struct CapabilityActivationProvenanceV1 {
     schema_version: String,
     algorithm_semantics: String,
     algorithm_id: CapabilityActivationAlgorithmId,
     result_receipt_id: CapabilityActivationClosureReceiptId,
     provenance_id: CapabilityActivationProvenanceId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapabilityActivationProvenanceWireV1 {
+    schema_version: String,
+    algorithm_semantics: String,
+    algorithm_id: CapabilityActivationAlgorithmId,
+    result_receipt_id: CapabilityActivationClosureReceiptId,
+    provenance_id: CapabilityActivationProvenanceId,
+}
+
+impl TryFrom<CapabilityActivationProvenanceWireV1> for CapabilityActivationProvenanceV1 {
+    type Error = CapabilityAnalysisProvenanceError;
+
+    fn try_from(wire: CapabilityActivationProvenanceWireV1) -> Result<Self, Self::Error> {
+        let provenance = Self {
+            schema_version: wire.schema_version,
+            algorithm_semantics: wire.algorithm_semantics,
+            algorithm_id: wire.algorithm_id,
+            result_receipt_id: wire.result_receipt_id,
+            provenance_id: wire.provenance_id,
+        };
+        provenance.validate_canonical()?;
+        Ok(provenance)
+    }
 }
 
 impl CapabilityActivationProvenanceV1 {
@@ -161,10 +187,7 @@ impl CapabilityActivationProvenanceV1 {
 
     /// Rebind transported provenance to an exact runtime closure and the V1
     /// algorithm-semantics contract. No operational authority is inferred.
-    pub fn validate_against(
-        &self,
-        closure: &CapabilityActivationClosureV1,
-    ) -> Result<(), CapabilityAnalysisProvenanceError> {
+    fn validate_canonical(&self) -> Result<(), CapabilityAnalysisProvenanceError> {
         if self.schema_version != CAPABILITY_ACTIVATION_PROVENANCE_SCHEMA_V1 {
             return Err(
                 CapabilityAnalysisProvenanceError::UnsupportedActivationProvenanceSchema(
@@ -182,10 +205,6 @@ impl CapabilityActivationProvenanceV1 {
         if self.algorithm_id != capability_activation_algorithm_id_v1() {
             return Err(CapabilityAnalysisProvenanceError::ActivationAlgorithmIdentityMismatch);
         }
-        let expected_receipt_id = CapabilityActivationClosureReceiptV1::from_closure(closure).id();
-        if self.result_receipt_id != expected_receipt_id {
-            return Err(CapabilityAnalysisProvenanceError::ActivationResultReceiptMismatch);
-        }
         let expected_id = CapabilityActivationProvenanceId(hash_activation_provenance(
             &self.algorithm_semantics,
             self.algorithm_id,
@@ -193,6 +212,20 @@ impl CapabilityActivationProvenanceV1 {
         ));
         if self.provenance_id != expected_id {
             return Err(CapabilityAnalysisProvenanceError::ActivationProvenanceIdentityMismatch);
+        }
+        Ok(())
+    }
+
+    /// Rebind internally canonical provenance to an exact runtime closure.
+    /// No operational authority is inferred.
+    pub fn validate_against(
+        &self,
+        closure: &CapabilityActivationClosureV1,
+    ) -> Result<(), CapabilityAnalysisProvenanceError> {
+        self.validate_canonical()?;
+        let expected_receipt_id = CapabilityActivationClosureReceiptV1::from_closure(closure).id();
+        if self.result_receipt_id != expected_receipt_id {
+            return Err(CapabilityAnalysisProvenanceError::ActivationResultReceiptMismatch);
         }
         Ok(())
     }
@@ -204,13 +237,39 @@ impl CapabilityActivationProvenanceV1 {
 /// configuration, search coverage, and exact options. This value adds the
 /// algorithm semantics under which that exact frontier was derived.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "CapabilityCounterfactualProvenanceWireV1")]
 pub struct CapabilityCounterfactualProvenanceV1 {
     schema_version: String,
     algorithm_semantics: String,
     algorithm_id: CapabilityCounterfactualAlgorithmId,
     result_receipt_id: CapabilityCounterfactualFrontierReceiptId,
     provenance_id: CapabilityCounterfactualProvenanceId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapabilityCounterfactualProvenanceWireV1 {
+    schema_version: String,
+    algorithm_semantics: String,
+    algorithm_id: CapabilityCounterfactualAlgorithmId,
+    result_receipt_id: CapabilityCounterfactualFrontierReceiptId,
+    provenance_id: CapabilityCounterfactualProvenanceId,
+}
+
+impl TryFrom<CapabilityCounterfactualProvenanceWireV1> for CapabilityCounterfactualProvenanceV1 {
+    type Error = CapabilityAnalysisProvenanceError;
+
+    fn try_from(wire: CapabilityCounterfactualProvenanceWireV1) -> Result<Self, Self::Error> {
+        let provenance = Self {
+            schema_version: wire.schema_version,
+            algorithm_semantics: wire.algorithm_semantics,
+            algorithm_id: wire.algorithm_id,
+            result_receipt_id: wire.result_receipt_id,
+            provenance_id: wire.provenance_id,
+        };
+        provenance.validate_canonical()?;
+        Ok(provenance)
+    }
 }
 
 impl CapabilityCounterfactualProvenanceV1 {
@@ -249,10 +308,7 @@ impl CapabilityCounterfactualProvenanceV1 {
         self.result_receipt_id
     }
 
-    pub fn validate_against(
-        &self,
-        frontier: &CapabilityCounterfactualFrontierV1,
-    ) -> Result<(), CapabilityAnalysisProvenanceError> {
+    fn validate_canonical(&self) -> Result<(), CapabilityAnalysisProvenanceError> {
         if self.schema_version != CAPABILITY_COUNTERFACTUAL_PROVENANCE_SCHEMA_V1 {
             return Err(
                 CapabilityAnalysisProvenanceError::UnsupportedCounterfactualProvenanceSchema(
@@ -270,11 +326,6 @@ impl CapabilityCounterfactualProvenanceV1 {
         if self.algorithm_id != capability_counterfactual_algorithm_id_v1() {
             return Err(CapabilityAnalysisProvenanceError::CounterfactualAlgorithmIdentityMismatch);
         }
-        let expected_receipt_id =
-            CapabilityCounterfactualFrontierReceiptV1::from_frontier(frontier).id();
-        if self.result_receipt_id != expected_receipt_id {
-            return Err(CapabilityAnalysisProvenanceError::CounterfactualResultReceiptMismatch);
-        }
         let expected_id = CapabilityCounterfactualProvenanceId(hash_counterfactual_provenance(
             &self.algorithm_semantics,
             self.algorithm_id,
@@ -284,6 +335,19 @@ impl CapabilityCounterfactualProvenanceV1 {
             return Err(
                 CapabilityAnalysisProvenanceError::CounterfactualProvenanceIdentityMismatch,
             );
+        }
+        Ok(())
+    }
+
+    pub fn validate_against(
+        &self,
+        frontier: &CapabilityCounterfactualFrontierV1,
+    ) -> Result<(), CapabilityAnalysisProvenanceError> {
+        self.validate_canonical()?;
+        let expected_receipt_id =
+            CapabilityCounterfactualFrontierReceiptV1::from_frontier(frontier).id();
+        if self.result_receipt_id != expected_receipt_id {
+            return Err(CapabilityAnalysisProvenanceError::CounterfactualResultReceiptMismatch);
         }
         Ok(())
     }
