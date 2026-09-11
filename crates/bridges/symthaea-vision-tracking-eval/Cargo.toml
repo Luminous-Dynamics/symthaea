@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-vision-tracking-eval"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Adapter from Symthaea vision-manifold centroid tracks into point-tracking evaluation"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["vision", "tracking", "evaluation", "benchmark"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-tracking-eval = { path = "../../domains/symthaea-tracking-eval" }
+symthaea-vision-manifold = { path = "../../domains/symthaea-vision-manifold" }
