@@ -35,8 +35,9 @@
 //! datasets and an identity-only holdout seal, [`proposal_history`] attaches the validated accepted
 //! state entering each generation to every proposal row, including no-op attempts,
 //! [`proposal_endpoints`] freezes outcome observability so missing/censored labels cannot be
-//! silently rewritten as failures, and [`proposal_study`] freezes the feature/target/estimator/
-//! validation contract before any model can be fitted.
+//! silently rewritten as failures, [`proposal_study`] freezes the feature/target/estimator/
+//! validation contract before any model can be fitted, and [`proposal_model`] separates validation
+//! gate precommitment, frozen model identity, validation receipt, and holdout-evaluation permission.
 //!
 //! # Authority boundary
 //!
@@ -71,6 +72,9 @@
 //!   fields are intentionally absent from the v1 feature vocabulary.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
+//! - Validation acceptance threshold/scorer identity is precommitted before a model artifact can be
+//!   frozen; failed validation cannot mint even an identity-only holdout evaluation permit.
+//! - Holdout permits still expose no holdout observations and grant no search or deployment authority.
 //! - No staged mutation can be committed through [`sandbox`].
 //! - Pre-existing `.forge-orig` state is never auto-restored.
 //! - A benchmark process spawn failure aborts the experiment; an executed-but-invalid candidate
@@ -101,6 +105,7 @@ pub mod proposal_dataset;
 pub mod proposal_endpoints;
 pub mod proposal_exposure;
 pub mod proposal_history;
+pub mod proposal_model;
 pub mod proposal_qualification;
 pub mod proposal_recording;
 pub mod proposal_study;
@@ -170,6 +175,10 @@ pub use proposal_exposure::{
 pub use proposal_history::{
     ForgeConditionedProposalObservationRow, ForgeConditionedProposalObservationTable,
     ForgeProposalGenerationState, ForgeProposalHistoryError,
+};
+pub use proposal_model::{
+    ForgeProposalFrozenModel, ForgeProposalHoldoutEvaluationPermit, ForgeProposalMetricScore,
+    ForgeProposalModelError, ForgeProposalValidationGateSpec, ForgeProposalValidationReceipt,
 };
 pub use proposal_qualification::{
     ForgeProposalQualificationError, ForgeQualifiedProposalEvidence,
