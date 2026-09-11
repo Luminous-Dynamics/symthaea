@@ -497,7 +497,7 @@ impl ReadyProvenNoEffectsExecutionV1 {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn prepare_proven_no_effects_execution(
+pub(crate) fn prepare_proven_no_effects_execution(
     bound: NoEffectsKnownGoodBoundEligibilityV1,
     current_epoch: &QualifiedTrustedCommitEpochV1,
     previous_epoch: Option<&QualifiedTrustedCommitEpochV1>,
