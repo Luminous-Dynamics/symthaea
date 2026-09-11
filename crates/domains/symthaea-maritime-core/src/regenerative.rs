@@ -28,13 +28,21 @@ pub enum DependencyGovernance {
 /// Coarse type of dependency represented by the closure model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RegenerativeDependencyKind {
+    /// Physical feedstock or bulk material.
     Material,
+    /// Manufactured component or replaceable module.
     Component,
+    /// Machine tool or production-equipment capacity.
     Tooling,
+    /// Calibration, inspection or measurement capacity.
     Metrology,
+    /// Consumable or other process input.
     ProcessInput,
+    /// Energy or supporting infrastructure service.
     EnergyService,
+    /// Software, design or another reproducible digital artifact.
     SoftwareArtifact,
+    /// Other externally provided service.
     ExternalService,
 }
 
@@ -42,20 +50,29 @@ pub enum RegenerativeDependencyKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegenerativeDependency {
+    /// Canonical dependency identifier.
     pub dependency_id: String,
+    /// Dependency category.
     pub kind: RegenerativeDependencyKind,
+    /// Governance boundary.
     pub governance: DependencyGovernance,
+    /// Units consumed during one model period.
     pub demand_units_per_period: u64,
+    /// Units ordinary local production can create during one period.
     pub local_production_units_per_period: u64,
+    /// Units recoverable by recycling during one period.
     pub recycling_units_per_period: u64,
+    /// Qualified units stockpiled when autonomous operation begins.
     pub stockpile_units: u64,
     /// Optional mass of one unit, in grams, for physical-mass closure metrics.
+    /// Non-physical services/software use `None`.
     pub unit_mass_grams: Option<u64>,
     /// Opaque binding to evidence supporting the modeled rates/inventory.
     pub evidence_binding: String,
 }
 
 impl RegenerativeDependency {
+    /// Validate shape and governance invariants.
     pub fn validate(&self) -> Result<(), RegenerativeClosureError> {
         validate_id("dependency_id", &self.dependency_id)?;
         validate_evidence(&self.evidence_binding)?;
@@ -86,7 +103,7 @@ impl RegenerativeDependency {
             + u128::from(self.recycling_units_per_period)
     }
 
-    /// Autonomous horizon under this dependency's static modeled rates.
+    /// Autonomous horizon under the static rates represented by this dependency.
     ///
     /// `IndefiniteUnderStaticModel` means recurring modeled local flow meets
     /// recurring modeled demand; it is not a perpetual-operation claim.
@@ -99,8 +116,7 @@ impl RegenerativeDependency {
         }
         let deficit = demand - local;
         let periods = u128::from(self.stockpile_units) / deficit;
-        let periods = u64::try_from(periods).map_err(|_| RegenerativeClosureError::ArithmeticOverflow)?;
-        Ok(RegenerativeHorizon::FinitePeriods(periods))
+        Ok(RegenerativeHorizon::FinitePeriods(periods as u64))
     }
 }
 
@@ -108,15 +124,18 @@ impl RegenerativeDependency {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegenerativeCapability {
+    /// Canonical capability identifier.
     pub capability_id: String,
     /// Whether loss of this capability ends the modeled autonomous system/mission.
     pub essential: bool,
+    /// Dependencies required by this capability.
     pub dependency_ids: BTreeSet<String>,
     /// Opaque evidence/design binding for the capability definition.
     pub evidence_binding: String,
 }
 
 impl RegenerativeCapability {
+    /// Validate standalone capability shape.
     pub fn validate(&self) -> Result<(), RegenerativeClosureError> {
         validate_id("capability_id", &self.capability_id)?;
         validate_evidence(&self.evidence_binding)?;
@@ -136,16 +155,20 @@ impl RegenerativeCapability {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegenerativeClosureModel {
+    /// Canonical model identifier.
     pub model_id: String,
     /// Duration of one demand/production period in milliseconds.
     pub period_duration_ms: u64,
+    /// Recurring dependencies considered by the model.
     pub dependencies: Vec<RegenerativeDependency>,
+    /// Capabilities evaluated from those dependencies.
     pub capabilities: Vec<RegenerativeCapability>,
     /// Opaque evidence/version binding for the complete model definition.
     pub evidence_binding: String,
 }
 
 impl RegenerativeClosureModel {
+    /// Validate identifiers, references, cardinality and governance boundaries.
     pub fn validate(&self) -> Result<(), RegenerativeClosureError> {
         validate_id("model_id", &self.model_id)?;
         validate_evidence(&self.evidence_binding)?;
@@ -341,6 +364,7 @@ fn basis_points(
     Ok(Some(ratio))
 }
 
+/// Autonomous horizon under the static rates and stockpiles in a closure model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RegenerativeHorizon {
     /// Number of complete model periods sustainable without external supply.
@@ -349,12 +373,17 @@ pub enum RegenerativeHorizon {
     IndefiniteUnderStaticModel,
 }
 
+/// Derived viability result for one capability.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CapabilityViability {
+    /// Capability identifier from the source model.
     pub capability_id: String,
+    /// Whether this capability participates in the system-level horizon.
     pub essential: bool,
+    /// Autonomous horizon of this capability.
     pub horizon: RegenerativeHorizon,
+    /// Dependencies establishing the finite horizon, if any.
     pub limiting_dependency_ids: Vec<String>,
 }
 
@@ -362,38 +391,60 @@ pub struct CapabilityViability {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegenerativeClosureReport {
+    /// Source model identifier.
     pub model_id: String,
+    /// Duration of each reported period in milliseconds.
     pub period_duration_ms: u64,
     /// Regenerated share of recurring physical mass demand, in basis points.
     /// Stockpile inventory is deliberately excluded from regenerative flow.
     pub physical_mass_flow_closure_basis_points: Option<u16>,
     /// Share of ordinary dependency categories fully closed by recurring local flow.
     pub ordinary_dependency_flow_closure_basis_points: Option<u16>,
+    /// Earliest finite loss horizon among essential capabilities.
     pub essential_horizon: RegenerativeHorizon,
+    /// Dependencies responsible for that system-level finite horizon.
     pub limiting_dependency_ids: Vec<String>,
+    /// Dependencies intentionally outside ordinary industrial closure.
     pub safeguarded_external_dependency_ids: Vec<String>,
+    /// Per-capability viability results.
     pub capability_viability: Vec<CapabilityViability>,
 }
 
+/// Validation/evaluation errors for regenerative closure models.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RegenerativeClosureError {
+    /// Identifier is empty, padded, contains control characters or is too long.
     InvalidIdentifier { field: &'static str },
+    /// Evidence binding is empty, padded, contains control characters or is too long.
     InvalidEvidenceBinding,
+    /// Model period has zero duration.
     ZeroPeriodDuration,
+    /// Model contains no dependencies.
     NoDependencies,
+    /// Model contains no capabilities.
     NoCapabilities,
+    /// Model contains no essential capability.
     NoEssentialCapabilities,
+    /// Model exceeds bounded dependency/capability cardinality.
     ModelTooLarge,
+    /// Dependency has zero recurring demand.
     ZeroDemand { dependency_id: String },
+    /// A dependency marked as physical has zero unit mass.
     ZeroPhysicalMass { dependency_id: String },
+    /// Safeguarded dependency incorrectly claims ordinary local supply.
     SafeguardedDependencyClaimsLocalSupply { dependency_id: String },
+    /// Dependency identifier is duplicated.
     DuplicateDependency { dependency_id: String },
+    /// Capability identifier is duplicated.
     DuplicateCapability { capability_id: String },
+    /// Capability declares no dependencies.
     CapabilityHasNoDependencies { capability_id: String },
+    /// Capability refers to a dependency absent from the same model.
     UnknownDependencyReference {
         capability_id: String,
         dependency_id: String,
     },
+    /// Integer arithmetic overflowed while deriving aggregate closure metrics.
     ArithmeticOverflow,
 }
 
@@ -597,32 +648,25 @@ mod tests {
             1_000,
             Some(10),
         );
-        assert_eq!(
-            baseline.autonomous_horizon().unwrap(),
-            RegenerativeHorizon::FinitePeriods(20)
-        );
-        assert_eq!(
-            improved.autonomous_horizon().unwrap(),
-            RegenerativeHorizon::FinitePeriods(50)
-        );
+        assert_eq!(baseline.autonomous_horizon().unwrap(), RegenerativeHorizon::FinitePeriods(20));
+        assert_eq!(improved.autonomous_horizon().unwrap(), RegenerativeHorizon::FinitePeriods(50));
     }
 
     #[test]
-    fn ratio_overflow_fails_closed_instead_of_saturating() {
-        let mut huge = model();
-        huge.dependencies = vec![dependency(
-            "huge-physical-flow",
+    fn extreme_ratio_arithmetic_fails_closed_instead_of_saturating() {
+        let mut extreme = model();
+        extreme.dependencies = vec![dependency(
+            "extreme-mass",
             DependencyGovernance::Ordinary,
             u64::MAX,
-            u64::MAX - 1,
-            0,
             u64::MAX,
+            0,
+            0,
             Some(u64::MAX),
         )];
-        huge.capabilities[0].dependency_ids =
-            BTreeSet::from(["huge-physical-flow".to_string()]);
+        extreme.capabilities[0].dependency_ids = BTreeSet::from(["extreme-mass".into()]);
         assert_eq!(
-            huge.evaluate(),
+            extreme.evaluate(),
             Err(RegenerativeClosureError::ArithmeticOverflow)
         );
     }
