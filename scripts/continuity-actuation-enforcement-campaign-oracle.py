@@ -12,7 +12,7 @@ import argparse
 import hashlib
 import json
 import sys
-from typing import Any
+from typing import Any, Collection
 
 SCHEMA = "symthaea-continuity-actuation-enforcement-campaign-manifest-v1"
 PREIMAGE_DOMAIN = b"symthaea.continuity.actuation-enforcement-campaign-preimage.v1\0"
@@ -40,9 +40,28 @@ DIGEST_FIELDS = (
     "toolchain_realization_digest",
 )
 
+TOP_LEVEL_FIELDS = frozenset(
+    ("schema", *DIGEST_FIELDS, "started_at_unix_ms", "ended_at_unix_ms", "records")
+)
+RECORD_FIELDS = frozenset(("obligation", "record_id", "observed_at_unix_ms"))
+
 
 class ManifestError(ValueError):
     pass
+
+
+def require_exact_keys(obj: dict[str, Any], allowed: Collection[str], context: str) -> None:
+    observed = set(obj)
+    allowed_set = set(allowed)
+    missing = sorted(allowed_set - observed)
+    extra = sorted(observed - allowed_set)
+    if missing or extra:
+        pieces = []
+        if missing:
+            pieces.append(f"missing={','.join(missing)}")
+        if extra:
+            pieces.append(f"unexpected={','.join(extra)}")
+        raise ManifestError(f"{context}: exact field set required ({'; '.join(pieces)})")
 
 
 def parse_digest(value: Any, field: str) -> bytes:
@@ -74,16 +93,17 @@ def encode_u64(value: int) -> bytes:
 def validate_manifest(obj: Any) -> tuple[bytes, dict[str, Any]]:
     if not isinstance(obj, dict):
         raise ManifestError("manifest must be a JSON object")
-    if obj.get("schema") != SCHEMA:
+    require_exact_keys(obj, TOP_LEVEL_FIELDS, "manifest")
+    if obj["schema"] != SCHEMA:
         raise ManifestError(f"schema: expected {SCHEMA!r}")
 
-    digests = {field: parse_digest(obj.get(field), field) for field in DIGEST_FIELDS}
-    start = parse_time(obj.get("started_at_unix_ms"), "started_at_unix_ms")
-    end = parse_time(obj.get("ended_at_unix_ms"), "ended_at_unix_ms")
+    digests = {field: parse_digest(obj[field], field) for field in DIGEST_FIELDS}
+    start = parse_time(obj["started_at_unix_ms"], "started_at_unix_ms")
+    end = parse_time(obj["ended_at_unix_ms"], "ended_at_unix_ms")
     if end < start:
         raise ManifestError("campaign end precedes campaign start")
 
-    records = obj.get("records")
+    records = obj["records"]
     if not isinstance(records, list) or len(records) != len(OBLIGATIONS):
         raise ManifestError(f"records: expected exactly {len(OBLIGATIONS)} entries")
 
@@ -92,17 +112,18 @@ def validate_manifest(obj: Any) -> tuple[bytes, dict[str, Any]]:
     for i, rec in enumerate(records):
         if not isinstance(rec, dict):
             raise ManifestError(f"records[{i}]: expected object")
-        obligation = rec.get("obligation")
+        require_exact_keys(rec, RECORD_FIELDS, f"records[{i}]")
+        obligation = rec["obligation"]
         if obligation not in OBLIGATIONS:
             raise ManifestError(f"records[{i}].obligation: unexpected {obligation!r}")
         if obligation in by_obligation:
             raise ManifestError(f"duplicate obligation: {obligation}")
-        record_id = parse_digest(rec.get("record_id"), f"records[{i}].record_id")
+        record_id = parse_digest(rec["record_id"], f"records[{i}].record_id")
         if record_id in seen_record_ids:
             raise ManifestError(f"duplicate record_id at records[{i}]")
         seen_record_ids.add(record_id)
         observed = parse_time(
-            rec.get("observed_at_unix_ms"),
+            rec["observed_at_unix_ms"],
             f"records[{i}].observed_at_unix_ms",
         )
         if not (start <= observed <= end):
@@ -203,6 +224,24 @@ def self_test() -> None:
         pass
     else:
         raise AssertionError("duplicate record id accepted")
+
+    bad = json.loads(json.dumps(base))
+    bad["shadow_policy"] = "permit"
+    try:
+        validate_manifest(bad)
+    except ManifestError:
+        pass
+    else:
+        raise AssertionError("unknown top-level field accepted")
+
+    bad = json.loads(json.dumps(base))
+    bad["records"][0]["shadow_result"] = "satisfied"
+    try:
+        validate_manifest(bad)
+    except ManifestError:
+        pass
+    else:
+        raise AssertionError("unknown record field accepted")
 
     changed = json.loads(json.dumps(base))
     changed["toolchain_realization_digest"] = hx(99)
