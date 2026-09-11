@@ -268,6 +268,7 @@ fn register_aix_claims(pack: &mut LegacyComputingPackV1) -> Result<(), LegacyAix
             "AIX device configuration uses ODM-backed predefined and customized object classes; a device can be defined in configuration data independently of whether the current runtime device path is healthy or available.",
             "Device Configuration Database Overview",
             SupportCategory::Hardware,
+            &[],
         ),
         claim(
             "legacy:aix:lvm-layering",
@@ -275,6 +276,7 @@ fn register_aix_claims(pack: &mut LegacyComputingPackV1) -> Result<(), LegacyAix
             "AIX LVM separates physical volumes, volume groups, physical/logical partitions, and logical volumes; storage diagnosis must preserve these layers instead of treating every filesystem symptom as a physical-disk failure.",
             "Logical volume storage concepts",
             SupportCategory::Software,
+            &[],
         ),
         claim(
             "legacy:aix:src-subsystem-control",
@@ -282,6 +284,7 @@ fn register_aix_claims(pack: &mut LegacyComputingPackV1) -> Result<(), LegacyAix
             "AIX SRC provides a common control and status interface for subsystems and subservers; subsystem state is distinct from generic process existence and can include subsystem-specific refresh, trace, and notification behavior.",
             "System resource controller",
             SupportCategory::Software,
+            &[],
         ),
         claim(
             "legacy:aix:error-log",
@@ -289,6 +292,7 @@ fn register_aix_claims(pack: &mut LegacyComputingPackV1) -> Result<(), LegacyAix
             "The AIX error-logging facility records hardware and software failures for fault detection and corrective action, providing evidence that is distinct from ordinary application or syslog messages.",
             "Error-logging facility",
             SupportCategory::Hardware,
+            &[],
         ),
         claim(
             "legacy:aix:nim-model",
@@ -296,6 +300,7 @@ fn register_aix_claims(pack: &mut LegacyComputingPackV1) -> Result<(), LegacyAix
             "AIX NIM models a master, clients, resources, and networks so BOS/software installation and maintenance can be managed centrally; NIM object/resource state is separate from the live operating state of a client.",
             "Network Installation Management",
             SupportCategory::Software,
+            &["nim"],
         ),
         claim(
             "legacy:aix:lpar-resource-boundary",
@@ -303,13 +308,15 @@ fn register_aix_claims(pack: &mut LegacyComputingPackV1) -> Result<(), LegacyAix
             "AIX logical partitions isolate operating-system environments while assigning processor, memory, boot, network, and I/O resources; an AIX guest symptom can therefore originate in partition/resource assignment as well as inside the guest OS.",
             "Logical partitions",
             SupportCategory::Hardware,
+            &["lpar"],
         ),
         claim(
             "legacy:aix:powerha-version-context",
             "ibm:powerha-aix-7210sp1@2026-04",
-            "Current IBM PowerHA 7.2.10 SP1 guidance lists multiple AIX 7.3 TL/SP levels as tested/recommended, so PowerHA diagnosis and remediation must bind both AIX and PowerHA maintenance levels rather than assuming any AIX 7.3 combination is equivalent.",
+            "Current IBM PowerHA 7.2.10 SP1 guidance lists multiple AIX 7.3 TL/SP levels as tested or recommended, so PowerHA diagnosis must bind both AIX and PowerHA maintenance levels rather than assuming every AIX 7.3 combination is equivalent.",
             "Recommended levels",
             SupportCategory::Software,
+            &["powerha-systemmirror", "powerha:7.2.10-sp1"],
         ),
     ];
     for claim in claims {
@@ -324,7 +331,12 @@ fn claim(
     statement: &str,
     section: &str,
     category: SupportCategory,
+    required_features: &[&str],
 ) -> TechnicalKnowledgeClaimV1 {
+    let mut applicability = aix_scope();
+    applicability
+        .required_features
+        .extend(required_features.iter().map(|value| (*value).into()));
     TechnicalKnowledgeClaimV1 {
         id: TechnicalClaimIdV1(id.into()),
         statement: statement.into(),
@@ -334,7 +346,7 @@ fn claim(
             fragment: None,
         }),
         modality: ClaimModalityV1::Descriptive,
-        applicability: Some(aix_scope()),
+        applicability: Some(applicability),
         extraction_quality: Some(0.95),
         category: Some(category),
     }
@@ -395,90 +407,48 @@ fn add_aix_procedures(
     snapshots: &BTreeSet<SourceSnapshotIdV1>,
 ) -> Result<BTreeSet<String>, LegacyAixErrorV1> {
     let procedures = vec![
-        procedure(
-            "legacy:aix:triage-device-odm",
-            LegacyKnowledgeAreaV1::SystemLifecycle,
-            LegacyProcedureKindV1::Diagnose,
-            "Triage AIX device/ODM configuration state",
-            &[
-                "Establish exact AIX TL/SP, LPAR identity, device logical name, parent path and expected hardware relationship.",
-                "Compare predefined/customized ODM device state, attributes, parent/location data and current device availability read-only.",
-                "Distinguish a configuration-database mismatch from an absent path, failed hardware, or driver/runtime problem.",
-                "Any cfgmgr/device-definition/attribute mutation remains an operator-reviewed proposal with rollback and post-change verification.",
-            ],
-        ),
-        procedure(
-            "legacy:aix:triage-lvm-storage",
-            LegacyKnowledgeAreaV1::Storage,
-            LegacyProcedureKindV1::Diagnose,
-            "Triage AIX LVM storage failure",
-            &[
-                "Establish the exact filesystem/logical-volume/volume-group/physical-volume chain and current mount/use context.",
-                "Inspect PV/VG/LV state, partition mappings, mirrors and relevant filesystem evidence without changing allocation.",
-                "Separate logical-volume/filesystem problems from missing paths, physical-volume failures, or stale device configuration.",
-                "Any varyon/import/mirror/LV/filesystem/storage change remains proposal-only with data-protection and rollback review.",
-            ],
-        ),
-        procedure(
-            "legacy:aix:triage-src-subsystem",
-            LegacyKnowledgeAreaV1::WorkloadAndJobs,
-            LegacyProcedureKindV1::Diagnose,
-            "Triage AIX SRC-managed subsystem",
-            &[
-                "Establish exact subsystem/subserver identity, SRC group, expected service state and dependent resources.",
-                "Inspect SRC status, process state, subsystem configuration and recent termination/notification evidence read-only.",
-                "Distinguish an SRC registration/state problem from a daemon process crash or dependency failure.",
-                "Any start/stop/refresh/configuration operation remains an operator-reviewed proposal.",
-            ],
-        ),
-        procedure(
-            "legacy:aix:triage-error-log",
-            LegacyKnowledgeAreaV1::ObservabilityAndProblemManagement,
-            LegacyProcedureKindV1::Diagnose,
-            "Correlate AIX error-log evidence",
-            &[
-                "Establish the failure window, affected resource and exact system/LPAR identity.",
-                "Inspect current AIX error-log entries and correlate identifiers/resources/timestamps with application, storage, and platform evidence.",
-                "Treat an error-log record as evidence to interpret, not automatic proof that its named component is the unique root cause.",
-                "Any repair or component reset derived from the evidence remains proposal-only until the causal chain is established.",
-            ],
-        ),
-        procedure(
-            "legacy:aix:triage-nim",
-            LegacyKnowledgeAreaV1::SoftwareLifecycle,
-            LegacyProcedureKindV1::Diagnose,
-            "Triage AIX NIM operation",
-            &[
-                "Establish exact NIM master/client identity, operation, object/resource assignments, AIX levels, and control ownership.",
-                "Inspect NIM object/resource/network state and the client boot/runtime stage without changing allocations.",
-                "Distinguish NIM database/resource problems from firmware/SMS network boot, client OS, or general network failures.",
-                "Any resource allocation, install, migration, mksysb, SPOT or lpp_source mutation remains proposal-only.",
-            ],
-        ),
-        procedure(
-            "legacy:aix:triage-lpar",
-            LegacyKnowledgeAreaV1::VirtualizationAndPartitioning,
-            LegacyProcedureKindV1::Diagnose,
-            "Triage AIX LPAR resource boundary",
-            &[
-                "Establish exact managed-system/LPAR identity and current processor, memory, virtual-I/O and boot/network assignments.",
-                "Compare AIX guest observations with partition/HMC/PowerVM evidence without assuming the guest sees the full physical topology.",
-                "Distinguish guest OS failure from unavailable or changed partition resources and VIOS-backed dependencies.",
-                "Any DLPAR/profile/virtual-I/O/HMC change remains proposal-only with peer-impact and rollback review.",
-            ],
-        ),
-        procedure(
-            "legacy:aix:triage-powerha",
-            LegacyKnowledgeAreaV1::AvailabilityAndRecovery,
-            LegacyProcedureKindV1::Recover,
-            "Triage AIX PowerHA partial failure",
-            &[
-                "Establish exact AIX TL/SP, PowerHA release/SP, cluster/node/resource-group identities and recent topology/change history.",
-                "Inspect node, cluster, network, storage and resource-group state across members rather than relying on one healthy node.",
-                "Separate local AIX health from cluster coordination, dependency, storage/network or version-compatibility problems.",
-                "Any resource-group movement, cluster restart, DLPAR or storage/network change remains proposal-only with quorum/blast-radius/rollback review.",
-            ],
-        ),
+        procedure("legacy:aix:triage-device-odm", LegacyKnowledgeAreaV1::SystemLifecycle, LegacyProcedureKindV1::Diagnose, "Triage AIX device/ODM configuration state", &[
+            "Establish exact AIX TL/SP, LPAR identity, device logical name, parent path and expected hardware relationship.",
+            "Compare predefined/customized ODM device state, attributes, parent/location data and current device availability read-only.",
+            "Distinguish a configuration-database mismatch from an absent path, failed hardware, or driver/runtime problem.",
+            "Any cfgmgr/device-definition/attribute mutation remains an operator-reviewed proposal with rollback and post-change verification.",
+        ]),
+        procedure("legacy:aix:triage-lvm-storage", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "Triage AIX LVM storage failure", &[
+            "Establish the exact filesystem/logical-volume/volume-group/physical-volume chain and current mount/use context.",
+            "Inspect PV/VG/LV state, partition mappings, mirrors and relevant filesystem evidence without changing allocation.",
+            "Separate logical-volume/filesystem problems from missing paths, physical-volume failures, or stale device configuration.",
+            "Any varyon/import/mirror/LV/filesystem/storage change remains proposal-only with data-protection and rollback review.",
+        ]),
+        procedure("legacy:aix:triage-src-subsystem", LegacyKnowledgeAreaV1::WorkloadAndJobs, LegacyProcedureKindV1::Diagnose, "Triage AIX SRC-managed subsystem", &[
+            "Establish exact subsystem/subserver identity, SRC group, expected service state and dependent resources.",
+            "Inspect SRC status, process state, subsystem configuration and recent termination/notification evidence read-only.",
+            "Distinguish an SRC registration/state problem from a daemon process crash or dependency failure.",
+            "Any start/stop/refresh/configuration operation remains an operator-reviewed proposal.",
+        ]),
+        procedure("legacy:aix:triage-error-log", LegacyKnowledgeAreaV1::ObservabilityAndProblemManagement, LegacyProcedureKindV1::Diagnose, "Correlate AIX error-log evidence", &[
+            "Establish the failure window, affected resource and exact system/LPAR identity.",
+            "Inspect current AIX error-log entries and correlate identifiers/resources/timestamps with application, storage, and platform evidence.",
+            "Treat an error-log record as evidence to interpret, not automatic proof that its named component is the unique root cause.",
+            "Any repair or component reset derived from the evidence remains proposal-only until the causal chain is established.",
+        ]),
+        procedure("legacy:aix:triage-nim", LegacyKnowledgeAreaV1::SoftwareLifecycle, LegacyProcedureKindV1::Diagnose, "Triage AIX NIM operation", &[
+            "Establish exact NIM master/client identity, operation, object/resource assignments, AIX levels, and control ownership.",
+            "Inspect NIM object/resource/network state and the client boot/runtime stage without changing allocations.",
+            "Distinguish NIM database/resource problems from firmware/SMS network boot, client OS, or general network failures.",
+            "Any resource allocation, install, migration, mksysb, SPOT or lpp_source mutation remains proposal-only.",
+        ]),
+        procedure("legacy:aix:triage-lpar", LegacyKnowledgeAreaV1::VirtualizationAndPartitioning, LegacyProcedureKindV1::Diagnose, "Triage AIX LPAR resource boundary", &[
+            "Establish exact managed-system/LPAR identity and current processor, memory, virtual-I/O and boot/network assignments.",
+            "Compare AIX guest observations with partition/HMC/PowerVM evidence without assuming the guest sees the full physical topology.",
+            "Distinguish guest OS failure from unavailable or changed partition resources and VIOS-backed dependencies.",
+            "Any DLPAR/profile/virtual-I/O/HMC change remains proposal-only with peer-impact and rollback review.",
+        ]),
+        procedure("legacy:aix:triage-powerha", LegacyKnowledgeAreaV1::AvailabilityAndRecovery, LegacyProcedureKindV1::Recover, "Triage AIX PowerHA partial failure", &[
+            "Establish exact AIX TL/SP, PowerHA release/SP, cluster/node/resource-group identities and recent topology/change history.",
+            "Inspect node, cluster, network, storage and resource-group state across members rather than relying on one healthy node.",
+            "Separate local AIX health from cluster coordination, dependency, storage/network or version-compatibility problems.",
+            "Any resource-group movement, cluster restart, DLPAR or storage/network change remains proposal-only with quorum/blast-radius/rollback review.",
+        ]),
     ];
 
     let mut ids = BTreeSet::new();
@@ -539,125 +509,62 @@ fn procedure(
 fn seed_mechanisms() -> Vec<AixMechanismModelV1> {
     use AixMechanismKindV1 as M;
     vec![
-        mechanism(
-            M::DeviceConfigurationOdm,
-            LegacyKnowledgeAreaV1::SystemLifecycle,
-            "ODM-backed device configuration",
-            "AIX maintains predefined and customized device objects whose configured state, attributes, parentage, driver methods and runtime availability are distinct diagnostic layers.",
-            &[],
-            &["legacy:aix:odm-device-state"],
-            &[
-                ("odm-device", "Predefined/customized ODM device identity, attributes, parent/location and current state."),
-                ("runtime-path", "Current operating-system visibility and path/device availability."),
-                ("driver-method", "Configured driver/method relationship and relevant configuration evidence."),
-            ],
-            &[
-                ("defined-not-available", "A device remains defined in ODM but is not currently available through the expected runtime path.", &["ODM object exists", "runtime availability/path evidence fails"], &["deleting ODM objects before preserving attributes and verifying hardware/path state"]),
-                ("stale-device-attributes", "Customized configuration no longer matches current adapter/storage topology.", &["configured attributes or parent/location differ from current topology evidence"], &["running broad reconfiguration without identifying affected devices and rollback"]),
-            ],
-        ),
-        mechanism(
-            M::LvmStorage,
-            LegacyKnowledgeAreaV1::Storage,
-            "LVM storage hierarchy",
-            "AIX storage separates physical volumes, volume groups, partitions and logical volumes; filesystem symptoms must be localized within that hierarchy and underlying path state.",
-            &[M::DeviceConfigurationOdm],
-            &["legacy:aix:lvm-layering"],
-            &[
-                ("pv-vg-lv", "Physical-volume, volume-group, logical-volume and partition mapping/state."),
-                ("mirror-state", "Copy/mirror allocation and stale/synchronized state where applicable."),
-                ("filesystem-state", "Filesystem/mount/log relationship to the affected logical volume."),
-            ],
-            &[
-                ("logical-not-physical", "An LV/filesystem allocation/state problem is mistaken for physical media failure.", &["physical path/PV remains healthy", "LV/filesystem state explains symptom"], &["replacing a disk before isolating the failed LVM layer"]),
-                ("path-loss-versus-vg", "A storage path/device configuration problem makes a PV/VG appear unhealthy while LVM metadata is not the originating fault.", &["device/path evidence changed", "LVM symptom follows missing/degraded path"], &["forcing volume-group changes before restoring or understanding path state"]),
-            ],
-        ),
-        mechanism(
-            M::SrcSubsystems,
-            LegacyKnowledgeAreaV1::WorkloadAndJobs,
-            "System Resource Controller",
-            "SRC manages subsystem and subserver lifecycle/status through a common interface, so service state, registered subsystem state and raw process state must not be conflated.",
-            &[],
-            &["legacy:aix:src-subsystem-control"],
-            &[
-                ("src-status", "Subsystem/subserver status and group identity from SRC."),
-                ("process-state", "Current process/PID existence and termination behavior."),
-                ("src-config", "Subsystem registration/configuration and notification/refresh characteristics."),
-            ],
-            &[
-                ("process-up-src-down", "A daemon process exists but SRC state/configuration is inconsistent with the expected managed service.", &["process exists", "SRC status/registration differs"], &["killing the process before establishing SRC ownership and dependencies"]),
-                ("src-up-service-unhealthy", "SRC reports an active subsystem while its application-level function is unhealthy.", &["SRC active", "functional/service evidence fails"], &["assuming active SRC status proves end-to-end service health"]),
-            ],
-        ),
-        mechanism(
-            M::ErrorLogging,
-            LegacyKnowledgeAreaV1::ObservabilityAndProblemManagement,
-            "AIX error logging",
-            "AIX has a dedicated error-logging facility for hardware/software failures whose records should be temporally and causally correlated with other evidence rather than treated as self-proving root cause.",
-            &[M::DeviceConfigurationOdm],
-            &["legacy:aix:error-log"],
-            &[
-                ("errlog-record", "Error identifier, resource, timestamp, class/type and detail data."),
-                ("failure-window", "Temporal relation between error-log records and the reported symptom/change window."),
-                ("corroboration", "Matching device, LVM, service, platform or application evidence."),
-            ],
-            &[
-                ("stale-error-anchor", "An older persistent error record is incorrectly assumed to explain a newer unrelated incident.", &["error timestamp predates failure window", "fresh evidence points elsewhere"], &["replacing/restarting the named component based on stale errpt history alone"]),
-                ("symptom-not-root", "The error log records a downstream symptom produced by an upstream path/resource problem.", &["upstream evidence precedes/correlates with the logged error", "named resource is otherwise locally healthy"], &["treating the first error identifier as unique root cause without causal correlation"]),
-            ],
-        ),
-        mechanism(
-            M::Nim,
-            LegacyKnowledgeAreaV1::SoftwareLifecycle,
-            "Network Installation Management",
-            "NIM represents masters, clients, resources and networks as management objects for BOS/software installation; NIM control/resource state and client firmware/boot/runtime state are separate layers.",
-            &[M::LvmStorage],
-            &["legacy:aix:nim-model"],
-            &[
-                ("nim-objects", "Master/client/network/resource object definitions and current allocations/control ownership."),
-                ("resource-state", "lpp_source/SPOT/mksysb or other resource identity, level and availability."),
-                ("boot-stage", "Whether failure occurs in firmware/SMS network boot, NIM transfer/install, or running AIX."),
-            ],
-            &[
-                ("nim-object-versus-network", "NIM object/resource configuration is valid but firmware/SMS boot networking fails before AIX is running.", &["NIM objects/resources validate", "failure occurs before AIX runtime networking"], &["changing running AIX network configuration to solve firmware/SMS boot failure"]),
-                ("resource-level-mismatch", "Client install/update fails because NIM resource levels or composition do not match the intended operation.", &["resource metadata differs from target/install expectation"], &["rebuilding all NIM resources before identifying the mismatched resource"]),
-            ],
-        ),
-        mechanism(
-            M::LogicalPartitions,
-            LegacyKnowledgeAreaV1::VirtualizationAndPartitioning,
-            "LPAR resource boundary",
-            "AIX runs within an isolated logical partition whose processors, memory, I/O and virtualized resources can change independently of guest OS configuration.",
-            &[M::DeviceConfigurationOdm],
-            &["legacy:aix:lpar-resource-boundary"],
-            &[
-                ("lpar-profile", "Current versus profile processor/memory/I/O/virtual-adapter assignments."),
-                ("guest-view", "AIX-visible CPU/memory/device/path observations."),
-                ("vios-dependency", "Virtual-I/O backing/path relationship where applicable."),
-            ],
-            &[
-                ("guest-healthy-resource-missing", "The AIX kernel is running but an expected virtual/physical resource is absent or changed at the partition/VIOS layer.", &["guest OS otherwise healthy", "partition/resource assignment differs"], &["reconfiguring AIX device state before confirming partition/VIOS resource assignment"]),
-                ("profile-runtime-drift", "Saved LPAR profile and current dynamic allocation differ, misleading capacity/topology assumptions.", &["profile and current allocation differ"], &["activating/reapplying profiles without checking running workload impact"]),
-            ],
-        ),
-        mechanism(
-            M::PowerHa,
-            LegacyKnowledgeAreaV1::AvailabilityAndRecovery,
-            "PowerHA SystemMirror",
-            "PowerHA cluster/resource-group health spans multiple nodes, networks, storage dependencies and version combinations; one healthy AIX node is insufficient evidence of cluster health.",
-            &[M::LogicalPartitions, M::LvmStorage, M::SrcSubsystems],
-            &["legacy:aix:powerha-version-context"],
-            &[
-                ("cluster-state", "Cluster/node/resource-group state across members."),
-                ("dependency-state", "Network/storage/application-controller dependency evidence."),
-                ("version-level", "AIX TL/SP and PowerHA release/SP compatibility context."),
-            ],
-            &[
-                ("local-up-cluster-degraded", "An AIX node is locally healthy while cluster coordination or a resource group is degraded.", &["local OS checks pass", "cross-node/resource-group state is degraded"], &["restarting healthy local services before examining cluster/resource-group state"]),
-                ("version-context-drift", "A cluster problem appears after AIX/PowerHA maintenance changes whose combination differs from tested/recommended levels.", &["maintenance level changed near failure", "cluster behavior differs across nodes/levels"], &["upgrading or downgrading cluster nodes ad hoc without a coordinated compatibility/rollback plan"]),
-            ],
-        ),
+        mechanism(M::DeviceConfigurationOdm, LegacyKnowledgeAreaV1::SystemLifecycle, "ODM-backed device configuration", "AIX maintains predefined and customized device objects whose configured state, attributes, parentage, driver methods and runtime availability are distinct diagnostic layers.", &[], &["legacy:aix:odm-device-state"], &[
+            ("odm-device", "Predefined/customized ODM device identity, attributes, parent/location and current state."),
+            ("runtime-path", "Current operating-system visibility and path/device availability."),
+            ("driver-method", "Configured driver/method relationship and relevant configuration evidence."),
+        ], &[
+            ("defined-not-available", "A device remains defined in ODM but is not currently available through the expected runtime path.", &["ODM object exists", "runtime availability/path evidence fails"], &["deleting ODM objects before preserving attributes and verifying hardware/path state"]),
+            ("stale-device-attributes", "Customized configuration no longer matches current adapter/storage topology.", &["configured attributes or parent/location differ from current topology evidence"], &["running broad reconfiguration without identifying affected devices and rollback"]),
+        ]),
+        mechanism(M::LvmStorage, LegacyKnowledgeAreaV1::Storage, "LVM storage hierarchy", "AIX storage separates physical volumes, volume groups, partitions and logical volumes; filesystem symptoms must be localized within that hierarchy and underlying path state.", &[M::DeviceConfigurationOdm], &["legacy:aix:lvm-layering"], &[
+            ("pv-vg-lv", "Physical-volume, volume-group, logical-volume and partition mapping/state."),
+            ("mirror-state", "Copy/mirror allocation and stale/synchronized state where applicable."),
+            ("filesystem-state", "Filesystem/mount/log relationship to the affected logical volume."),
+        ], &[
+            ("logical-not-physical", "An LV/filesystem allocation/state problem is mistaken for physical media failure.", &["physical path/PV remains healthy", "LV/filesystem state explains symptom"], &["replacing a disk before isolating the failed LVM layer"]),
+            ("path-loss-versus-vg", "A storage path/device configuration problem makes a PV/VG appear unhealthy while LVM metadata is not the originating fault.", &["device/path evidence changed", "LVM symptom follows missing/degraded path"], &["forcing volume-group changes before restoring or understanding path state"]),
+        ]),
+        mechanism(M::SrcSubsystems, LegacyKnowledgeAreaV1::WorkloadAndJobs, "System Resource Controller", "SRC manages subsystem and subserver lifecycle/status through a common interface, so service state, registered subsystem state and raw process state must not be conflated.", &[], &["legacy:aix:src-subsystem-control"], &[
+            ("src-status", "Subsystem/subserver status and group identity from SRC."),
+            ("process-state", "Current process/PID existence and termination behavior."),
+            ("src-config", "Subsystem registration/configuration and notification/refresh characteristics."),
+        ], &[
+            ("process-up-src-down", "A daemon process exists but SRC state/configuration is inconsistent with the expected managed service.", &["process exists", "SRC status/registration differs"], &["killing the process before establishing SRC ownership and dependencies"]),
+            ("src-up-service-unhealthy", "SRC reports an active subsystem while its application-level function is unhealthy.", &["SRC active", "functional/service evidence fails"], &["assuming active SRC status proves end-to-end service health"]),
+        ]),
+        mechanism(M::ErrorLogging, LegacyKnowledgeAreaV1::ObservabilityAndProblemManagement, "AIX error logging", "AIX has a dedicated error-logging facility for hardware/software failures whose records should be temporally and causally correlated with other evidence rather than treated as self-proving root cause.", &[M::DeviceConfigurationOdm], &["legacy:aix:error-log"], &[
+            ("errlog-record", "Error identifier, resource, timestamp, class/type and detail data."),
+            ("failure-window", "Temporal relation between error-log records and the reported symptom/change window."),
+            ("corroboration", "Matching device, LVM, service, platform or application evidence."),
+        ], &[
+            ("stale-error-anchor", "An older persistent error record is incorrectly assumed to explain a newer unrelated incident.", &["error timestamp predates failure window", "fresh evidence points elsewhere"], &["replacing or restarting the named component based on stale error history alone"]),
+            ("symptom-not-root", "The error log records a downstream symptom produced by an upstream path/resource problem.", &["upstream evidence precedes or correlates with logged error", "named resource is otherwise locally healthy"], &["treating the first error identifier as unique root cause without causal correlation"]),
+        ]),
+        mechanism(M::Nim, LegacyKnowledgeAreaV1::SoftwareLifecycle, "Network Installation Management", "NIM represents masters, clients, resources and networks as management objects for BOS/software installation; NIM control/resource state and client firmware/boot/runtime state are separate layers.", &[M::LvmStorage], &["legacy:aix:nim-model"], &[
+            ("nim-objects", "Master/client/network/resource object definitions and current allocations/control ownership."),
+            ("resource-state", "lpp_source/SPOT/mksysb or other resource identity, level and availability."),
+            ("boot-stage", "Whether failure occurs in firmware/SMS network boot, NIM transfer/install, or running AIX."),
+        ], &[
+            ("nim-object-versus-network", "NIM object/resource configuration is valid but firmware/SMS boot networking fails before AIX is running.", &["NIM objects/resources validate", "failure occurs before AIX runtime networking"], &["changing running AIX network configuration to solve firmware/SMS boot failure"]),
+            ("resource-level-mismatch", "Client install/update fails because NIM resource levels or composition do not match the intended operation.", &["resource metadata differs from target/install expectation"], &["rebuilding all NIM resources before identifying the mismatched resource"]),
+        ]),
+        mechanism(M::LogicalPartitions, LegacyKnowledgeAreaV1::VirtualizationAndPartitioning, "LPAR resource boundary", "AIX runs within an isolated logical partition whose processors, memory, I/O and virtualized resources can change independently of guest OS configuration.", &[M::DeviceConfigurationOdm], &["legacy:aix:lpar-resource-boundary"], &[
+            ("lpar-profile", "Current versus profile processor/memory/I/O/virtual-adapter assignments."),
+            ("guest-view", "AIX-visible CPU/memory/device/path observations."),
+            ("vios-dependency", "Virtual-I/O backing/path relationship where applicable."),
+        ], &[
+            ("guest-healthy-resource-missing", "The AIX kernel is running but an expected virtual or physical resource is absent or changed at the partition/VIOS layer.", &["guest OS otherwise healthy", "partition/resource assignment differs"], &["reconfiguring AIX device state before confirming partition/VIOS resource assignment"]),
+            ("profile-runtime-drift", "Saved LPAR profile and current dynamic allocation differ, misleading capacity/topology assumptions.", &["profile and current allocation differ"], &["activating or reapplying profiles without checking running workload impact"]),
+        ]),
+        mechanism(M::PowerHa, LegacyKnowledgeAreaV1::AvailabilityAndRecovery, "PowerHA SystemMirror", "PowerHA cluster/resource-group health spans multiple nodes, networks, storage dependencies and version combinations; one healthy AIX node is insufficient evidence of cluster health.", &[M::LogicalPartitions, M::LvmStorage, M::SrcSubsystems], &["legacy:aix:powerha-version-context"], &[
+            ("cluster-state", "Cluster/node/resource-group state across members."),
+            ("dependency-state", "Network/storage/application-controller dependency evidence."),
+            ("version-level", "AIX TL/SP and PowerHA release/SP compatibility context."),
+        ], &[
+            ("local-up-cluster-degraded", "An AIX node is locally healthy while cluster coordination or a resource group is degraded.", &["local OS checks pass", "cross-node/resource-group state is degraded"], &["restarting healthy local services before examining cluster/resource-group state"]),
+            ("version-context-drift", "A cluster problem appears after AIX/PowerHA maintenance changes whose combination differs from tested or recommended levels.", &["maintenance level changed near failure", "cluster behavior differs across nodes or levels"], &["upgrading or downgrading cluster nodes ad hoc without a coordinated compatibility and rollback plan"]),
+        ]),
     ]
 }
 
@@ -736,9 +643,7 @@ impl fmt::Display for LegacyAixErrorV1 {
             Self::DuplicateFailureMode(id) => write!(f, "duplicate AIX failure mode {id}"),
             Self::UnknownClaim(id) => write!(f, "unknown AIX source claim {}", id.0),
             Self::UnknownProcedure(id) => write!(f, "unknown AIX procedure {id}"),
-            Self::ProcedureIdentityConflict(id) => {
-                write!(f, "AIX procedure identity conflict for {id}")
-            }
+            Self::ProcedureIdentityConflict(id) => write!(f, "AIX procedure identity conflict for {id}"),
         }
     }
 }
@@ -760,7 +665,10 @@ impl From<StandardsRegistryErrorV1> for LegacyAixErrorV1 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::seed_legacy_computing_pack_v1;
+    use crate::{
+        KnowledgeQueryPurposeV1, SupportKnowledgeQueryV1, SupportKnowledgeSourceV1,
+        TechnologyIdentityV1, seed_legacy_computing_pack_v1,
+    };
 
     #[test]
     fn enrichment_is_idempotent_for_same_source_snapshot_time() {
@@ -813,6 +721,34 @@ mod tests {
                 .iter()
                 .all(|failure| !failure.discriminators.is_empty()));
         }
+    }
+
+    #[test]
+    fn optional_subsystem_claims_require_positive_feature_observation() {
+        let mut pack = seed_legacy_computing_pack_v1(1_800_000_000_000).unwrap();
+        enrich_legacy_aix_foundation_v1(&mut pack, 1_800_000_000_100).unwrap();
+        let technology = TechnologyIdentityV1 {
+            ecosystem: Some("legacy-enterprise-unix".into()),
+            vendor: Some("IBM".into()),
+            product: "AIX".into(),
+            edition: None,
+            version: Some("7.3".into()),
+            build: None,
+            architecture: None,
+            platform: None,
+            profile: None,
+            observed_features: BTreeSet::new(),
+        };
+        let query = SupportKnowledgeQueryV1 {
+            text: "PowerHA recommended levels".into(),
+            limit: 10,
+            category: Some(SupportCategory::Software),
+            technology: Some(technology),
+            purpose: KnowledgeQueryPurposeV1::LocalReasoning,
+        };
+        let hits = pack.sources.search_support_knowledge(&query).unwrap();
+        let powerha = hits.iter().find(|hit| hit.source_id.contains("powerha-version-context")).unwrap();
+        assert!(powerha.technology.is_none());
     }
 
     #[test]
