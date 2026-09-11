@@ -26,6 +26,7 @@ mod distributed_health_common;
 mod distributed_health_v1_error_bridge;
 pub mod distributed_qualification;
 pub mod distributed_state;
+pub mod effect_scoped_execution;
 pub mod exact_distributed_health;
 pub mod exact_local_health;
 pub mod exact_policy;
@@ -127,6 +128,15 @@ pub use distributed_state::{
     AuthenticatedParticipantStateEvidenceId, DistributedStateContextId, DistributedStateContextV1,
     DistributedStateError, ParticipantOperationalStateV1, ParticipantSetDigest,
     ParticipantStateClaimId, ParticipantStateClaimV1, ValidatedDistributedStateContextV1,
+};
+pub use effect_scoped_execution::{
+    EFFECT_SCOPED_EXECUTION_ENVELOPE_SCHEMA_V1, EFFECT_SCOPE_COMMITMENT_AUTH_PURPOSE,
+    EFFECT_SCOPE_COMMITMENT_CLAIM_SCHEMA_V1, AuthenticatedEffectScopeCommitmentId,
+    EffectScopeCommitmentClaimId, EffectScopeCommitmentClaimV1, EffectScopedExecutionEnvelopeId,
+    EffectScopedExecutionEnvelopeV1, EffectScopedExecutionError, PendingEffectScopedExecutionV1,
+    QualifiedEffectScopeCommitmentId, QualifiedEffectScopeCommitmentV1,
+    ReadyEffectScopedExecutionV1, canonical_effect_scope_commitment_claim_bytes,
+    canonical_effect_scope_commitment_claim_digest, prepare_effect_scoped_execution,
 };
 pub use exact_distributed_health::{
     ExactDistributedHealthError, ExactDistributedRecoveryPathV2, ExactDistributedStateDigestV2,
