@@ -78,9 +78,9 @@ impl LegacySourceArtifactRefV1 {
             ));
         }
         if looks_secret_bearing(&self.artifact_locator) {
-            return Err(LegacySourceArtifactErrorV1::SecretBearingLocator(
-                self.artifact_locator.clone(),
-            ));
+            // Deliberately do not echo the rejected locator: doing so could put the
+            // credential we detected into logs, traces, or user-visible errors.
+            return Err(LegacySourceArtifactErrorV1::SecretBearingLocator);
         }
         if let Some(receipt) = &self.retention_receipt_digest {
             validate_hex_digest(receipt, "retention receipt digest")?;
@@ -208,7 +208,7 @@ pub fn assess_legacy_source_artifact_readiness_v1(
 
     for snapshot in pack.sources.snapshots() {
         required_snapshots += 1;
-        if !matches!(snapshot.capture, SourceCaptureV1::ContentDigest { .. }) {
+        if !matches!(&snapshot.capture, SourceCaptureV1::ContentDigest { .. }) {
             all_content_bound = false;
         }
         match ledger.artifact(&snapshot.id) {
@@ -285,7 +285,9 @@ pub enum LegacySourceArtifactErrorV1 {
     SnapshotNotContentDigestBound(SourceSnapshotIdV1),
     ContentDigestMismatch(SourceSnapshotIdV1),
     ArtifactIdentityConflict(SourceSnapshotIdV1),
-    SecretBearingLocator(String),
+    /// Locator was rejected because it appears credential-bearing. The locator
+    /// itself is intentionally not retained in the error value.
+    SecretBearingLocator,
 }
 
 impl fmt::Display for LegacySourceArtifactErrorV1 {
@@ -310,8 +312,8 @@ impl fmt::Display for LegacySourceArtifactErrorV1 {
             Self::ArtifactIdentityConflict(id) => {
                 write!(f, "retained artifact identity was rebound for {}", id.0)
             }
-            Self::SecretBearingLocator(locator) => {
-                write!(f, "legacy artifact locator appears to contain credentials: {locator}")
+            Self::SecretBearingLocator => {
+                write!(f, "legacy artifact locator appears to contain credentials")
             }
         }
     }
@@ -369,19 +371,15 @@ mod tests {
     }
 
     #[test]
-    fn secret_bearing_locator_is_rejected_before_storage() {
-        let reference = LegacySourceArtifactRefV1 {
-            snapshot_id: SourceSnapshotIdV1("source@test".into()),
-            content_algorithm: "sha256".into(),
-            content_digest: digest('b'),
-            byte_length: 1,
-            media_type: "application/pdf".into(),
-            retrieved_at_unix_ms: 1,
-            artifact_locator: "https://archive.invalid/file?token=secret".into(),
-            storage_class: LegacyArtifactStorageClassV1::OrganizationArchive,
-            access_policy: LegacyArtifactAccessPolicyV1::AuthorizedLocal,
-            retention_receipt_digest: None,
-        };
-        assert!(looks_secret_bearing(&reference.artifact_locator));
+    fn secret_bearing_locator_is_detected_without_echoing_it() {
+        let locator = "https://archive.invalid/file?token=secret";
+        assert!(looks_secret_bearing(locator));
+        assert_eq!(
+            LegacySourceArtifactErrorV1::SecretBearingLocator.to_string(),
+            "legacy artifact locator appears to contain credentials"
+        );
+        assert!(!LegacySourceArtifactErrorV1::SecretBearingLocator
+            .to_string()
+            .contains("secret"));
     }
 }
