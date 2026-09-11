@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-extension-data-host"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Fail-closed non-executable data-pack inspection and point-of-use loading for Symthaea extensions"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-extension-admission = { path = "../../core/symthaea-extension-admission" }
+symthaea-extension-admission-policy = { path = "../../core/symthaea-extension-admission-policy" }
+symthaea-extension-authority = { path = "../../core/symthaea-extension-authority" }
+symthaea-extension-core = { path = "../../core/symthaea-extension-core" }
+serde_json.workspace = true
+sha2 = "0.10"
+thiserror.workspace = true
