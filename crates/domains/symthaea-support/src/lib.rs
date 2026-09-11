@@ -19,6 +19,7 @@ pub mod knowledge;
 pub mod knowledge_source;
 #[cfg(feature = "logparse-adapter")]
 pub mod logparse_adapter;
+pub mod multifault_diagnosis;
 pub mod predictive;
 pub mod privacy;
 pub mod protocol_evidence;
@@ -71,6 +72,12 @@ pub use knowledge_source::{
 pub use logparse_adapter::{
     LogObservationAdapterConfigV1, LogObservationAdapterError, LogObservationAdapterV1,
     LogObservationPolicyV1,
+};
+pub use multifault_diagnosis::{
+    rank_multifault_tests_by_information_gain_v1, FaultStateV1, JointFaultDistributionV1,
+    MultiFaultDiagnosticErrorV1, MultiFaultDiagnosticTestModelV1,
+    MultiFaultExpectedInformationGainV1, MAX_EXACT_MULTI_FAULT_STATES_V1,
+    MAX_MULTI_FAULT_HYPOTHESES_V1,
 };
 pub use protocol_evidence::{
     DnsProtocolEventV1, IcmpProtocolEventV1, ProtocolEvidenceBasisV1,
