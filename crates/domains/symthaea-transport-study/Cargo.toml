@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-transport-study"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Evidence-bearing demand, claims, lifecycle, reliability, and Pareto schemas for infrastructure transport trade studies"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["transport", "infrastructure", "trade-study", "cislunar"]
+categories = ["science", "simulation"]
+
+[dependencies]
+serde = { workspace = true }
+symthaea-infrastructure = { path = "../symthaea-infrastructure" }
