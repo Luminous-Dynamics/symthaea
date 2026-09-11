@@ -10,6 +10,7 @@
 //! requires Wasmtime's unsafe precompiled-deserialization boundary.
 
 use anyhow::Result;
+use bincode::Options;
 use lru::LruCache;
 use mycelix_zkp_core::dilithium::{DilithiumKeypair, verify_signature};
 use parking_lot::Mutex;
@@ -25,6 +26,8 @@ const SIGNED_ARTIFACT_FORMAT_VERSION: u16 = 2;
 const SIGNING_DOMAIN: &[u8] = b"symthaea.wasm-artifact.v2\0";
 const CACHE_DOMAIN: &[u8] = b"symthaea.wasm-source-cache.v2\0";
 const MAX_PLUGIN_NAME_LEN: usize = 64;
+const MAX_PORTABLE_WASM_BYTES: usize = 16 * 1024 * 1024;
+const MAX_SIGNED_ARTIFACT_BYTES: usize = 24 * 1024 * 1024;
 
 /// Portable WASM artifact signed by the architect's configured local signer.
 ///
@@ -73,6 +76,11 @@ impl WasmArchitect {
                 if let Some(name) = entry.file_name().to_str() {
                     if let Some(code_hash) = name.strip_suffix(".artifact") {
                         if Self::valid_cache_key(code_hash) {
+                            if let Ok(metadata) = entry.metadata() {
+                                if metadata.len() > MAX_SIGNED_ARTIFACT_BYTES as u64 {
+                                    continue;
+                                }
+                            }
                             if let Ok(bytes) = fs::read(entry.path()) {
                                 cache.put(code_hash.to_string(), bytes);
                             }
@@ -128,8 +136,12 @@ impl WasmArchitect {
             .build_dir
             .join("artifacts")
             .join(format!("{}.artifact", code_hash));
-        let encoded = fs::read(&artifact_path)
+        let metadata = fs::metadata(&artifact_path)
             .map_err(|_| anyhow::anyhow!("Extension artifact not found."))?;
+        if metadata.len() > MAX_SIGNED_ARTIFACT_BYTES as u64 {
+            return Err(anyhow::anyhow!("Extension artifact exceeds host size limit"));
+        }
+        let encoded = fs::read(&artifact_path)?;
         self.verify_signed_artifact(&encoded)?;
         println!("   ✅ Signed extension artifact accepted for runtime registration.");
         Ok(())
@@ -157,6 +169,12 @@ impl WasmArchitect {
     }
 
     fn encode_signed_artifact(&self, wasm_bytes: &[u8]) -> Result<Vec<u8>> {
+        if wasm_bytes.len() > MAX_PORTABLE_WASM_BYTES {
+            return Err(anyhow::anyhow!(
+                "portable WASM exceeds {} byte host limit",
+                MAX_PORTABLE_WASM_BYTES
+            ));
+        }
         let wasm_sha256 = Self::sha256(wasm_bytes);
         let message = Self::artifact_signing_message(wasm_sha256);
         let signature = self
@@ -169,24 +187,40 @@ impl WasmArchitect {
             wasm_sha256,
             signature,
         };
-        Ok(bincode::serialize(&artifact)?)
+        let encoded = bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .serialize(&artifact)?;
+        if encoded.len() > MAX_SIGNED_ARTIFACT_BYTES {
+            return Err(anyhow::anyhow!("signed WASM artifact exceeds host size limit"));
+        }
+        Ok(encoded)
     }
 
     /// Verify an artifact against the signer configured on this host.
     ///
     /// The artifact cannot nominate its own trust root. Old self-signed/AOT
     /// artifact formats therefore fail closed and are rebuilt from source when a
-    /// cache hit encounters them.
+    /// cache hit encounters them. Decoding itself is byte-limited before any
+    /// signature or module work is attempted.
     fn verify_signed_artifact(&self, artifact: &[u8]) -> Result<SignedArtifact> {
-        let signed: SignedArtifact = bincode::deserialize(artifact).map_err(|_| {
-            anyhow::anyhow!("Refusing artifact: unrecognized signed WASM format")
-        })?;
+        if artifact.len() > MAX_SIGNED_ARTIFACT_BYTES {
+            return Err(anyhow::anyhow!("signed WASM artifact exceeds host size limit"));
+        }
+        let signed: SignedArtifact = bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .with_limit(MAX_SIGNED_ARTIFACT_BYTES as u64)
+            .reject_trailing_bytes()
+            .deserialize(artifact)
+            .map_err(|_| anyhow::anyhow!("Refusing artifact: unrecognized signed WASM format"))?;
         if signed.format_version != SIGNED_ARTIFACT_FORMAT_VERSION {
             return Err(anyhow::anyhow!(
                 "Refusing artifact format version {}; expected {}",
                 signed.format_version,
                 SIGNED_ARTIFACT_FORMAT_VERSION
             ));
+        }
+        if signed.wasm_bytes.len() > MAX_PORTABLE_WASM_BYTES {
+            return Err(anyhow::anyhow!("portable WASM exceeds host size limit"));
         }
 
         let actual_wasm_sha256 = Self::sha256(&signed.wasm_bytes);
@@ -347,6 +381,10 @@ impl WasmArchitect {
             ));
         }
 
+        let wasm_metadata = fs::metadata(&wasm_path)?;
+        if wasm_metadata.len() > MAX_PORTABLE_WASM_BYTES as u64 {
+            return Err(anyhow::anyhow!("compiled portable WASM exceeds host size limit"));
+        }
         let wasm_bytes = fs::read(&wasm_path)?;
         let encoded = self.encode_signed_artifact(&wasm_bytes)?;
 
@@ -511,6 +549,21 @@ mod tests {
         .unwrap()
     }
 
+    fn decode_artifact(bytes: &[u8]) -> SignedArtifact {
+        bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .reject_trailing_bytes()
+            .deserialize(bytes)
+            .unwrap()
+    }
+
+    fn encode_artifact(artifact: &SignedArtifact) -> Vec<u8> {
+        bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .serialize(artifact)
+            .unwrap()
+    }
+
     #[test]
     fn cache_key_is_cryptographic_and_binds_plugin_name() {
         let first = WasmArchitect::compute_hash("pub fn x() {}", "plugin-a");
@@ -558,9 +611,9 @@ mod tests {
         let encoded = host
             .encode_signed_artifact(b"\0asm\x01\0\0\0")
             .unwrap();
-        let mut decoded: SignedArtifact = bincode::deserialize(&encoded).unwrap();
+        let mut decoded = decode_artifact(&encoded);
         decoded.wasm_bytes[0] ^= 0xff;
-        let tampered = bincode::serialize(&decoded).unwrap();
+        let tampered = encode_artifact(&decoded);
         let error = host.verify_signed_artifact(&tampered).unwrap_err();
         assert!(error.to_string().contains("digest mismatch"));
     }
@@ -571,10 +624,18 @@ mod tests {
         let encoded = host
             .encode_signed_artifact(b"\0asm\x01\0\0\0")
             .unwrap();
-        let mut decoded: SignedArtifact = bincode::deserialize(&encoded).unwrap();
+        let mut decoded = decode_artifact(&encoded);
         decoded.wasm_sha256[0] ^= 0x01;
-        let tampered = bincode::serialize(&decoded).unwrap();
+        let tampered = encode_artifact(&decoded);
         assert!(host.verify_signed_artifact(&tampered).is_err());
+    }
+
+    #[test]
+    fn oversized_artifact_is_rejected_before_deserialization() {
+        let host = architect("oversized-artifact");
+        let oversized = vec![0u8; MAX_SIGNED_ARTIFACT_BYTES + 1];
+        let error = host.verify_signed_artifact(&oversized).unwrap_err();
+        assert!(error.to_string().contains("size limit"));
     }
 
     #[cfg(feature = "wasm-sandbox")]
