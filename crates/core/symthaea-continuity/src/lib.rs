@@ -11,6 +11,8 @@
 pub mod active_lkg;
 pub mod active_lkg_currentness;
 pub mod auth_wire;
+pub mod backend_bound_execution;
+pub mod backend_effect_authority;
 mod compose;
 pub mod commit_currentness;
 pub mod commit_eligibility;
@@ -72,6 +74,24 @@ pub use auth_wire::{
     CONTINUITY_VERIFICATION_CLAIM_AUTH_SCHEMA, CONTINUITY_VERIFICATION_CLAIM_HASH_ALGORITHM,
     CONTINUITY_VERIFICATION_XENIA_PURPOSE, canonical_verification_claim_bytes,
     canonical_verification_claim_digest,
+};
+pub use backend_bound_execution::{
+    BACKEND_EFFECT_COMMITMENT_AUTH_PURPOSE, BACKEND_EFFECT_COMMITMENT_CLAIM_SCHEMA_V1,
+    AuthenticatedBackendEffectCommitmentId, BackendBoundExecutionError,
+    BackendEffectCommitmentClaimId, BackendEffectCommitmentClaimV1,
+    PendingBackendBoundEffectExecutionV1, QualifiedBackendEffectCommitmentId,
+    QualifiedBackendEffectCommitmentV1, ReadyBackendBoundEffectExecutionV1,
+    canonical_backend_effect_commitment_claim_bytes,
+    canonical_backend_effect_commitment_claim_digest, prepare_backend_bound_effect_execution,
+};
+pub use backend_effect_authority::{
+    BACKEND_EFFECT_AUTHORITY_CLAIM_SCHEMA_V1, BACKEND_EFFECT_AUTHORITY_PURPOSE,
+    BACKEND_EFFECT_BINDING_SCHEMA_V1, AuthenticatedBackendEffectAuthorityId,
+    BackendBoundEffectScopedEligibilityV1, BackendEffectAuthorityClaimId,
+    BackendEffectAuthorityClaimV1, BackendEffectAuthorityError, BackendEffectBindingId,
+    BackendEffectBindingV1, QualifiedBackendEffectAuthorizationId,
+    QualifiedBackendEffectAuthorizationV1, canonical_backend_effect_authority_claim_bytes,
+    canonical_backend_effect_authority_claim_digest,
 };
 pub use commit_currentness::{
     LOCAL_COMMIT_CURRENTNESS_POLICY_SCHEMA_V1, LOCAL_COMMIT_STATE_CLAIM_SCHEMA_V1,
