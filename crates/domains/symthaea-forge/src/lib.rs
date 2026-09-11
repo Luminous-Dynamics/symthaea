@@ -41,9 +41,11 @@
 //! corpus satisfies every precommitted family-support threshold before a fit permit can exist,
 //! [`proposal_validation_coverage`] separately proves the validation corpus has enough actually
 //! observed labels before scoring, [`proposal_validation_blind`] exposes only label-blind
-//! validation targets/predictions, the crate-private deterministic scorer joins frozen predictions
-//! to labels only during scoring, and [`proposal_validation_chain`] is the only public
-//! validation/holdout receipt path, requiring that exact blind row-reconstructable evidence.
+//! validation targets/predictions, [`proposal_validation_features`] derives exactly the frozen
+//! pre-decision feature schema including accepted-history suffixes from the bound sequence cohort,
+//! the crate-private deterministic scorer joins frozen predictions to labels only during scoring,
+//! and [`proposal_validation_chain`] is the only public validation/holdout receipt path, requiring
+//! that exact blind row-reconstructable evidence.
 //!
 //! # Authority boundary
 //!
@@ -76,6 +78,8 @@
 //!   observation rows before a future frozen-model evaluation boundary exists.
 //! - Proposal-study feature schemas can name only pre-decision observables; post-decision leakage
 //!   fields are intentionally absent from the v1 feature vocabulary.
+//! - Validation feature tables emit exactly that frozen schema; accepted-history features are
+//!   reconstructed from the exact sequence batch bound to each validation corpus member.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
 //! - Training support is counted only from observed labels; censored and counterfactual outcomes
@@ -130,6 +134,7 @@ pub mod proposal_trace;
 pub mod proposal_validation_blind;
 pub mod proposal_validation_chain;
 pub mod proposal_validation_coverage;
+pub mod proposal_validation_features;
 mod proposal_validation_predictions;
 pub mod sandbox;
 pub mod search;
@@ -235,6 +240,10 @@ pub use proposal_validation_coverage::{
     ForgeProposalValidationCoverageError, ForgeProposalValidationCoverageReceipt,
     ForgeProposalValidationCoverageSpec, ForgeProposalValidationFamilyCoverage,
     ForgeProposalValidationScorePermit,
+};
+pub use proposal_validation_features::{
+    ForgeProposalValidationFeatureError, ForgeProposalValidationFeatureRow,
+    ForgeProposalValidationFeatureTable, ForgeProposalValidationFeatureValue,
 };
 pub use proposal_validation_predictions::{
     forge_deterministic_brier_configuration_id, forge_deterministic_brier_scorer_id,
