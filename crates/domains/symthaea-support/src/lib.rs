@@ -15,6 +15,7 @@ pub mod diagnostics;
 pub mod federation;
 pub mod golden_binding_ledger;
 pub mod golden_bound_result;
+pub mod golden_checkpoint;
 pub mod golden_cross_environment;
 pub mod golden_incidents;
 pub mod golden_incidents_v2;
@@ -63,6 +64,11 @@ pub use golden_bound_result::{
     bind_derived_golden_qualification_result_v1,
     record_derived_golden_qualification_result_v1, GoldenBoundQualificationResultV1,
     GoldenBoundResultErrorV1,
+};
+pub use golden_checkpoint::{
+    GoldenCheckpointErrorV1, GoldenQualificationCheckpointV1,
+    GOLDEN_QUALIFICATION_ATTESTATION_DOMAIN_V1,
+    GOLDEN_QUALIFICATION_CHECKPOINT_SCHEMA_V1,
 };
 pub use golden_cross_environment::{
     assess_golden_cross_environment_robustness_v1, GoldenCrossEnvironmentAssessmentV1,
