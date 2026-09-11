@@ -63,6 +63,7 @@ pub mod transition_authority;
 pub mod transition_lineage;
 pub mod trusted_commit_epoch;
 pub mod verifier;
+pub mod verifier_adoption_authority;
 mod witness;
 
 pub use active_lkg::{
@@ -347,6 +348,19 @@ pub use trusted_commit_epoch::{
 pub use verifier::{
     AuthenticatedVerificationEvidenceId, VerificationAdmissionError, VerificationEvidenceClaimId,
     VerificationEvidenceClaimV1, VerificationOutcomeV1, VerifierProfileId, VerifierProfileV1,
+};
+pub use verifier_adoption_authority::{
+    VERIFIER_ADOPTION_AUTH_PURPOSE, VERIFIER_ADOPTION_CURRENTNESS_AUTH_PURPOSE,
+    VERIFIER_ADOPTION_CURRENTNESS_CLAIM_SCHEMA_V1, AuthenticatedVerifierAdoptionCurrentnessId,
+    AuthenticatedVerifierAdoptionId, CurrentAuthorizedVerifierProfileId,
+    CurrentAuthorizedVerifierProfileV1, QualifiedVerifierProfileAdoptionId,
+    QualifiedVerifierProfileAdoptionV1, TrustedVerifierAdoptionAuthorityRootId,
+    TrustedVerifierAdoptionAuthorityRootV1, VerifierAdoptionAuthorityError,
+    VerifierAdoptionCurrentnessClaimId, VerifierAdoptionCurrentnessClaimV1,
+    canonical_verifier_adoption_authentication_bytes,
+    canonical_verifier_adoption_authentication_digest,
+    canonical_verifier_adoption_currentness_claim_bytes,
+    canonical_verifier_adoption_currentness_claim_digest,
 };
 pub use witness::{
     EvidenceClass, ObligationDispositionV1, QualifiedContinuityWitnessV1, TargetRealizationId,
