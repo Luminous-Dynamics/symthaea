@@ -3,15 +3,16 @@
 //! Frozen-model and validation-receipt boundary for Forge proposal studies.
 //!
 //! This module still does not train or score a model. It makes the intended order explicit:
-//! precommit the study -> precommit the validation gate -> freeze one trained model identity ->
-//! record validation for that exact model -> only a passing receipt may mint an identity-only
-//! holdout-evaluation permit. Holdout rows remain inaccessible here.
+//! precommit the study -> satisfy frozen support -> mint fit permit -> precommit validation gate ->
+//! freeze one trained model identity -> record validation for that exact model -> only a passing
+//! receipt may mint an identity-only holdout-evaluation permit. Holdout rows remain inaccessible.
 
 use crate::proposal_corpus::{
     ForgeProposalCorpusError, ForgeProposalCorpusManifest, ForgeProposalHoldoutSeal,
     ForgeProposalValidationSet,
 };
 use crate::proposal_study::{ForgeProposalMetric, ForgeProposalStudySpec};
+use crate::proposal_support::ForgeProposalFitPermit;
 use serde::Serialize;
 use std::collections::BTreeSet;
 use symthaea_algorithms::ContentId;
@@ -29,9 +30,11 @@ pub enum ForgeProposalModelError {
     GateStudyMismatch,
     #[error("validation gate identity does not match canonical fields")]
     GateIdentityMismatch,
+    #[error("fit permit does not bind the supplied study/training identity")]
+    FitPermitMismatch,
     #[error("metric score identity does not match canonical fields")]
     MetricScoreIdentityMismatch,
-    #[error("frozen model does not bind the supplied study/gate")]
+    #[error("frozen model does not bind the supplied study/gate/fit permit")]
     FrozenModelScopeMismatch,
     #[error("frozen model identity does not match canonical fields")]
     FrozenModelIdentityMismatch,
@@ -43,7 +46,7 @@ pub enum ForgeProposalModelError {
     ValidationReceiptIdentityMismatch,
     #[error("holdout evaluation permit requires a passing validation receipt")]
     ValidationDidNotPass,
-    #[error("holdout permit scope does not match the supplied study/model/receipt/seal")]
+    #[error("holdout permit scope does not match the supplied study/model/receipt/seal/fit permit")]
     HoldoutScopeMismatch,
     #[error("holdout permit identity does not match canonical fields")]
     HoldoutPermitIdentityMismatch,
@@ -210,7 +213,8 @@ fn derive_metric_score_id(metric: ForgeProposalMetric, scale: u64, value: u64) -
     )
 }
 
-/// Immutable identity of one trained model payload under one already-frozen study and validation gate.
+/// Immutable identity of one trained model payload under one already-frozen study, fit permit, and
+/// validation gate.
 ///
 /// The constructor accepts no validation rows and no holdout rows. The model payload and external
 /// training evidence remain content-addressed inputs supplied by a future trainer implementation.
@@ -219,6 +223,7 @@ pub struct ForgeProposalFrozenModel {
     id: ContentId,
     study_id: ContentId,
     validation_gate_id: ContentId,
+    fit_permit_id: ContentId,
     training_set_id: ContentId,
     estimator_spec_id: ContentId,
     training_seed: u64,
@@ -231,14 +236,17 @@ impl ForgeProposalFrozenModel {
     pub fn freeze(
         study: &ForgeProposalStudySpec,
         gate: &ForgeProposalValidationGateSpec,
+        fit_permit: &ForgeProposalFitPermit,
         model_payload_id: ContentId,
         trainer_context_id: ContentId,
         training_evidence_id: ContentId,
     ) -> Result<Self, ForgeProposalModelError> {
         gate.validate_for(study)?;
+        validate_fit_permit_scope(study, fit_permit)?;
         let id = derive_model_id(
             study.id(),
             gate.id(),
+            fit_permit.id(),
             study.training_set_id(),
             study.estimator().id(),
             study.training_seed(),
@@ -250,6 +258,7 @@ impl ForgeProposalFrozenModel {
             id,
             study_id: study.id().clone(),
             validation_gate_id: gate.id().clone(),
+            fit_permit_id: fit_permit.id().clone(),
             training_set_id: study.training_set_id().clone(),
             estimator_spec_id: study.estimator().id().clone(),
             training_seed: study.training_seed(),
@@ -262,6 +271,7 @@ impl ForgeProposalFrozenModel {
     pub fn id(&self) -> &ContentId { &self.id }
     pub fn study_id(&self) -> &ContentId { &self.study_id }
     pub fn validation_gate_id(&self) -> &ContentId { &self.validation_gate_id }
+    pub fn fit_permit_id(&self) -> &ContentId { &self.fit_permit_id }
     pub fn model_payload_id(&self) -> &ContentId { &self.model_payload_id }
     pub fn trainer_context_id(&self) -> &ContentId { &self.trainer_context_id }
     pub fn training_evidence_id(&self) -> &ContentId { &self.training_evidence_id }
@@ -270,10 +280,13 @@ impl ForgeProposalFrozenModel {
         &self,
         study: &ForgeProposalStudySpec,
         gate: &ForgeProposalValidationGateSpec,
+        fit_permit: &ForgeProposalFitPermit,
     ) -> Result<(), ForgeProposalModelError> {
         gate.validate_for(study)?;
+        validate_fit_permit_scope(study, fit_permit)?;
         if self.study_id != *study.id()
             || self.validation_gate_id != *gate.id()
+            || self.fit_permit_id != *fit_permit.id()
             || self.training_set_id != *study.training_set_id()
             || self.estimator_spec_id != *study.estimator().id()
             || self.training_seed != study.training_seed()
@@ -283,6 +296,7 @@ impl ForgeProposalFrozenModel {
         let expected = derive_model_id(
             &self.study_id,
             &self.validation_gate_id,
+            &self.fit_permit_id,
             &self.training_set_id,
             &self.estimator_spec_id,
             self.training_seed,
@@ -298,10 +312,22 @@ impl ForgeProposalFrozenModel {
     }
 }
 
+fn validate_fit_permit_scope(
+    study: &ForgeProposalStudySpec,
+    permit: &ForgeProposalFitPermit,
+) -> Result<(), ForgeProposalModelError> {
+    if permit.study_id() != study.id() || permit.training_set_id() != study.training_set_id() {
+        Err(ForgeProposalModelError::FitPermitMismatch)
+    } else {
+        Ok(())
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn derive_model_id(
     study_id: &ContentId,
     gate_id: &ContentId,
+    fit_permit_id: &ContentId,
     training_set_id: &ContentId,
     estimator_spec_id: &ContentId,
     training_seed: u64,
@@ -311,10 +337,11 @@ fn derive_model_id(
 ) -> ContentId {
     let seed = training_seed.to_be_bytes();
     ContentId::derive(
-        "symthaea.forge-proposal-frozen-model.v1",
+        "symthaea.forge-proposal-frozen-model.v2",
         [
             study_id.as_str().as_bytes(),
             gate_id.as_str().as_bytes(),
+            fit_permit_id.as_str().as_bytes(),
             training_set_id.as_str().as_bytes(),
             estimator_spec_id.as_str().as_bytes(),
             seed.as_slice(),
@@ -331,6 +358,7 @@ pub struct ForgeProposalValidationReceipt {
     id: ContentId,
     study_id: ContentId,
     gate_id: ContentId,
+    fit_permit_id: ContentId,
     model_id: ContentId,
     validation_set_id: ContentId,
     context_id: ContentId,
@@ -346,6 +374,7 @@ impl ForgeProposalValidationReceipt {
         manifest: &ForgeProposalCorpusManifest,
         study: &ForgeProposalStudySpec,
         gate: &ForgeProposalValidationGateSpec,
+        fit_permit: &ForgeProposalFitPermit,
         model: &ForgeProposalFrozenModel,
         validation: &ForgeProposalValidationSet,
         primary_score: ForgeProposalMetricScore,
@@ -355,7 +384,8 @@ impl ForgeProposalValidationReceipt {
         manifest.validate()?;
         validation.validate_for(manifest)?;
         gate.validate_for(study)?;
-        model.validate_for(study, gate)?;
+        validate_fit_permit_scope(study, fit_permit)?;
+        model.validate_for(study, gate, fit_permit)?;
         if manifest.id() != study.corpus_manifest_id()
             || validation.id() != study.validation_set_id()
             || validation.manifest_id() != manifest.id()
@@ -369,6 +399,7 @@ impl ForgeProposalValidationReceipt {
         let id = derive_validation_receipt_id(
             study.id(),
             gate.id(),
+            fit_permit.id(),
             model.id(),
             validation.id(),
             &context_id,
@@ -381,6 +412,7 @@ impl ForgeProposalValidationReceipt {
             id,
             study_id: study.id().clone(),
             gate_id: gate.id().clone(),
+            fit_permit_id: fit_permit.id().clone(),
             model_id: model.id().clone(),
             validation_set_id: validation.id().clone(),
             context_id,
@@ -393,6 +425,7 @@ impl ForgeProposalValidationReceipt {
 
     pub fn id(&self) -> &ContentId { &self.id }
     pub fn model_id(&self) -> &ContentId { &self.model_id }
+    pub fn fit_permit_id(&self) -> &ContentId { &self.fit_permit_id }
     pub fn primary_score(&self) -> &ForgeProposalMetricScore { &self.primary_score }
     pub fn report_scores(&self) -> &[ForgeProposalMetricScore] { &self.report_scores }
     pub fn evaluation_evidence_id(&self) -> &ContentId { &self.evaluation_evidence_id }
@@ -404,15 +437,18 @@ impl ForgeProposalValidationReceipt {
         manifest: &ForgeProposalCorpusManifest,
         study: &ForgeProposalStudySpec,
         gate: &ForgeProposalValidationGateSpec,
+        fit_permit: &ForgeProposalFitPermit,
         model: &ForgeProposalFrozenModel,
         validation: &ForgeProposalValidationSet,
     ) -> Result<(), ForgeProposalModelError> {
         manifest.validate()?;
         validation.validate_for(manifest)?;
         gate.validate_for(study)?;
-        model.validate_for(study, gate)?;
+        validate_fit_permit_scope(study, fit_permit)?;
+        model.validate_for(study, gate, fit_permit)?;
         if self.study_id != *study.id()
             || self.gate_id != *gate.id()
+            || self.fit_permit_id != *fit_permit.id()
             || self.model_id != *model.id()
             || self.validation_set_id != *validation.id()
             || self.context_id != *manifest.context_id()
@@ -430,6 +466,7 @@ impl ForgeProposalValidationReceipt {
         let expected = derive_validation_receipt_id(
             &self.study_id,
             &self.gate_id,
+            &self.fit_permit_id,
             &self.model_id,
             &self.validation_set_id,
             &self.context_id,
@@ -481,6 +518,7 @@ fn validate_metric_set(
 fn derive_validation_receipt_id(
     study_id: &ContentId,
     gate_id: &ContentId,
+    fit_permit_id: &ContentId,
     model_id: &ContentId,
     validation_set_id: &ContentId,
     context_id: &ContentId,
@@ -493,6 +531,7 @@ fn derive_validation_receipt_id(
     let mut parts = vec![
         study_id.as_str().as_bytes().to_vec(),
         gate_id.as_str().as_bytes().to_vec(),
+        fit_permit_id.as_str().as_bytes().to_vec(),
         model_id.as_str().as_bytes().to_vec(),
         validation_set_id.as_str().as_bytes().to_vec(),
         context_id.as_str().as_bytes().to_vec(),
@@ -507,7 +546,7 @@ fn derive_validation_receipt_id(
     parts.push(evidence_id.as_str().as_bytes().to_vec());
     parts.push(if passed { b"pass".to_vec() } else { b"fail".to_vec() });
     ContentId::derive(
-        "symthaea.forge-proposal-validation-receipt.v1",
+        "symthaea.forge-proposal-validation-receipt.v2",
         parts.iter().map(Vec::as_slice),
     )
 }
@@ -518,33 +557,44 @@ fn derive_validation_receipt_id(
 pub struct ForgeProposalHoldoutEvaluationPermit {
     id: ContentId,
     study_id: ContentId,
+    fit_permit_id: ContentId,
     model_id: ContentId,
     validation_receipt_id: ContentId,
     holdout_seal_id: ContentId,
 }
 
 impl ForgeProposalHoldoutEvaluationPermit {
+    #[allow(clippy::too_many_arguments)]
     pub fn issue(
         manifest: &ForgeProposalCorpusManifest,
         study: &ForgeProposalStudySpec,
         gate: &ForgeProposalValidationGateSpec,
+        fit_permit: &ForgeProposalFitPermit,
         model: &ForgeProposalFrozenModel,
         receipt: &ForgeProposalValidationReceipt,
         validation: &ForgeProposalValidationSet,
         holdout: &ForgeProposalHoldoutSeal,
     ) -> Result<Self, ForgeProposalModelError> {
         holdout.validate_for(manifest)?;
-        receipt.validate_for(manifest, study, gate, model, validation)?;
+        validate_fit_permit_scope(study, fit_permit)?;
+        receipt.validate_for(manifest, study, gate, fit_permit, model, validation)?;
         if !receipt.passed() {
             return Err(ForgeProposalModelError::ValidationDidNotPass);
         }
         if holdout.id() != study.holdout_seal_id() || holdout.manifest_id() != manifest.id() {
             return Err(ForgeProposalModelError::HoldoutScopeMismatch);
         }
-        let id = derive_holdout_permit_id(study.id(), model.id(), receipt.id(), holdout.id());
+        let id = derive_holdout_permit_id(
+            study.id(),
+            fit_permit.id(),
+            model.id(),
+            receipt.id(),
+            holdout.id(),
+        );
         Ok(Self {
             id,
             study_id: study.id().clone(),
+            fit_permit_id: fit_permit.id().clone(),
             model_id: model.id().clone(),
             validation_receipt_id: receipt.id().clone(),
             holdout_seal_id: holdout.id().clone(),
@@ -553,6 +603,7 @@ impl ForgeProposalHoldoutEvaluationPermit {
 
     pub fn id(&self) -> &ContentId { &self.id }
     pub fn study_id(&self) -> &ContentId { &self.study_id }
+    pub fn fit_permit_id(&self) -> &ContentId { &self.fit_permit_id }
     pub fn model_id(&self) -> &ContentId { &self.model_id }
     pub fn validation_receipt_id(&self) -> &ContentId { &self.validation_receipt_id }
     pub fn holdout_seal_id(&self) -> &ContentId { &self.holdout_seal_id }
@@ -560,21 +611,27 @@ impl ForgeProposalHoldoutEvaluationPermit {
     pub fn validate_for(
         &self,
         study: &ForgeProposalStudySpec,
+        fit_permit: &ForgeProposalFitPermit,
         model: &ForgeProposalFrozenModel,
         receipt: &ForgeProposalValidationReceipt,
         holdout: &ForgeProposalHoldoutSeal,
     ) -> Result<(), ForgeProposalModelError> {
+        validate_fit_permit_scope(study, fit_permit)?;
         if !receipt.passed()
             || self.study_id != *study.id()
+            || self.fit_permit_id != *fit_permit.id()
             || self.model_id != *model.id()
             || self.validation_receipt_id != *receipt.id()
             || self.holdout_seal_id != *holdout.id()
             || holdout.id() != study.holdout_seal_id()
+            || model.fit_permit_id() != fit_permit.id()
+            || receipt.fit_permit_id() != fit_permit.id()
         {
             return Err(ForgeProposalModelError::HoldoutScopeMismatch);
         }
         let expected = derive_holdout_permit_id(
             &self.study_id,
+            &self.fit_permit_id,
             &self.model_id,
             &self.validation_receipt_id,
             &self.holdout_seal_id,
@@ -589,14 +646,16 @@ impl ForgeProposalHoldoutEvaluationPermit {
 
 fn derive_holdout_permit_id(
     study_id: &ContentId,
+    fit_permit_id: &ContentId,
     model_id: &ContentId,
     receipt_id: &ContentId,
     holdout_seal_id: &ContentId,
 ) -> ContentId {
     ContentId::derive(
-        "symthaea.forge-proposal-holdout-evaluation-permit.v1",
+        "symthaea.forge-proposal-holdout-evaluation-permit.v2",
         [
             study_id.as_str().as_bytes(),
+            fit_permit_id.as_str().as_bytes(),
             model_id.as_str().as_bytes(),
             receipt_id.as_str().as_bytes(),
             holdout_seal_id.as_str().as_bytes(),
