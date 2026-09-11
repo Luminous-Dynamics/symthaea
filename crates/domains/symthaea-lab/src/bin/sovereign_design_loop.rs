@@ -52,26 +52,29 @@ mod gated_run {
             }
         }
 
-        // 1. Propose Requirements
-        let mut requirements = assistant.propose_requirements(goal, EngineeringDomain::Aerospace);
+        // 1. Propose Requirements. Generated output remains proposal material.
+        let mut proposals = assistant.propose_requirements(goal, EngineeringDomain::Aerospace);
         println!(
-            "✅ Step 1: Broca synthesized {} requirements.",
-            requirements.len()
+            "✅ Step 1: Broca synthesized {} requirement proposals.",
+            proposals.len()
         );
 
-        // Add symbolic invariants to trigger dynamic Pareto weighting
-        if let Some(req) = requirements.first_mut() {
-            req.structural_invariants
+        // Add symbolic invariants to the proposals before local acceptance.
+        if let Some(proposal) = proposals.first_mut() {
+            proposal
+                .structural_invariants
                 .push("(>= thickness 3.0)".to_string());
-            req.structural_invariants
+            proposal
+                .structural_invariants
                 .push("(<= temperature 1500)".to_string());
         }
 
-        // 2. Create Engineering Concept
+        // 2. Create Engineering Concept and make the local-design acceptance
+        // transition explicit. This is not verification/certification authority.
         let mut concept =
             EngineeringConcept::new("arm-v1", "Phase 1", EngineeringDomain::Aerospace);
-        for req in requirements {
-            concept.add_requirement(req);
+        for proposal in proposals {
+            concept.accept_requirement_proposal_for_local_design(proposal);
         }
 
         // 2.1 Dynamic Pareto Material Sifting
