@@ -10,13 +10,9 @@
 
 use std::collections::BTreeSet;
 
-use symthaea_selective_classification::{
-    ClassificationAssessment, ClassificationDisposition,
-};
+use symthaea_selective_classification::{ClassificationAssessment, ClassificationDisposition};
 use symthaea_tracking_eval::TrackingEvaluationReport;
 
-/// Broad stress families. Deployments should populate these with environment-
-/// specific recorded/simulated datasets rather than treating the enum itself as evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StressFamily {
     QuietBackground,
@@ -31,8 +27,6 @@ pub enum StressFamily {
     Mixed,
 }
 
-/// One classification trial whose expected OOD/non-OOD condition is known from
-/// the scenario fixture rather than inferred from the classifier itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClassificationTrial {
     pub trial_id: String,
@@ -46,28 +40,31 @@ impl ClassificationTrial {
     }
 }
 
-/// Evidence from one stress scenario.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PerceptionScenarioEvidence {
     pub scenario_id: String,
     pub family: StressFamily,
-    /// When true, the tracking ground truth must contain no relevant tracked objects.
-    /// This is how long "boring sky/ocean" sequences become explicit evidence.
+    /// If true, the tracking sequence must contain no relevant ground-truth objects.
     pub expected_background_only: bool,
     pub tracking: TrackingEvaluationReport,
     pub classification_trials: Vec<ClassificationTrial>,
-    /// Count supplied by an integration harness that checks whether any perception
-    /// result bypassed the independent authority boundary. This is a hard invariant:
-    /// any non-zero value fails regardless of release thresholds.
+    /// Supplied by an integration harness that checks whether perception bypassed
+    /// the independent authority boundary. Any non-zero value is a hard failure.
     pub perception_to_authority_boundary_violations: usize,
     pub evidence_refs: Vec<String>,
 }
 
 impl PerceptionScenarioEvidence {
     pub fn validate(&self) -> bool {
+        let trial_ids = self
+            .classification_trials
+            .iter()
+            .map(|trial| trial.trial_id.as_str())
+            .collect::<BTreeSet<_>>();
         !self.scenario_id.trim().is_empty()
             && self.tracking.evaluated_frames > 0
             && self.classification_trials.iter().all(ClassificationTrial::validate)
+            && trial_ids.len() == self.classification_trials.len()
             && !self.evidence_refs.is_empty()
             && self.evidence_refs.iter().all(|value| !value.trim().is_empty())
             && (!self.expected_background_only || self.tracking.negative_only_sequence)
@@ -117,6 +114,7 @@ pub enum CrucibleStatus {
 pub enum CrucibleIssue {
     InvalidPolicy,
     InvalidScenario(String),
+    DuplicateScenarioId(String),
     MissingRequiredFamily(StressFamily),
     InsufficientFrames {
         scenario_id: String,
@@ -181,7 +179,6 @@ pub struct PerceptionCrucibleReport {
 }
 
 impl PerceptionCrucibleReport {
-    /// A release-assurance report cannot authorize physical action.
     pub const fn grants_physical_authority(&self) -> bool {
         false
     }
@@ -192,24 +189,17 @@ pub fn assess_perception_crucible(
     policy: &PerceptionCruciblePolicy,
 ) -> PerceptionCrucibleReport {
     if !policy.validate() {
-        return PerceptionCrucibleReport {
-            policy_id: policy.policy_id.clone(),
-            status: CrucibleStatus::Incomplete,
-            assessed_scenarios: 0,
-            total_frames: 0,
-            total_negative_frames: 0,
-            total_false_positives: 0,
-            total_false_tracks: 0,
-            total_identity_switches: 0,
-            classification_trials: 0,
-            ood_trials: 0,
-            ood_abstentions: 0,
-            incomplete_classifications: 0,
-            issues: vec![CrucibleIssue::InvalidPolicy],
-        };
+        return empty_report(policy, vec![CrucibleIssue::InvalidPolicy]);
     }
 
     let mut issues = Vec::new();
+    let mut scenario_ids = BTreeSet::new();
+    for scenario in scenarios {
+        if !scenario_ids.insert(scenario.scenario_id.as_str()) {
+            issues.push(CrucibleIssue::DuplicateScenarioId(scenario.scenario_id.clone()));
+        }
+    }
+
     let present_families = scenarios.iter().map(|scenario| scenario.family).collect::<BTreeSet<_>>();
     for family in &policy.required_families {
         if !present_families.contains(family) {
@@ -249,34 +239,7 @@ pub fn assess_perception_crucible(
         }
 
         if scenario.expected_background_only {
-            if tracking.negative_frames < policy.minimum_negative_frames_per_background_scenario {
-                issues.push(CrucibleIssue::InsufficientNegativeFrames {
-                    scenario_id: scenario.scenario_id.clone(),
-                    observed: tracking.negative_frames,
-                    required: policy.minimum_negative_frames_per_background_scenario,
-                });
-            }
-            let fp_per_negative_frame = if tracking.negative_frames == 0 {
-                f64::INFINITY
-            } else {
-                tracking.false_positives as f64 / tracking.negative_frames as f64
-            };
-            if fp_per_negative_frame > policy.maximum_false_positives_per_negative_frame {
-                issues.push(CrucibleIssue::FalsePositiveRateExceeded {
-                    scenario_id: scenario.scenario_id.clone(),
-                    observed: fp_per_negative_frame,
-                    maximum: policy.maximum_false_positives_per_negative_frame,
-                });
-            }
-            if let Some(clean_fraction) = tracking.clean_negative_frame_fraction {
-                if clean_fraction < policy.minimum_clean_negative_frame_fraction {
-                    issues.push(CrucibleIssue::CleanNegativeFractionBelowMinimum {
-                        scenario_id: scenario.scenario_id.clone(),
-                        observed: clean_fraction,
-                        minimum: policy.minimum_clean_negative_frame_fraction,
-                    });
-                }
-            }
+            assess_background_tracking(scenario, policy, &mut issues);
         }
 
         if let Some(false_track_fraction) = tracking.false_track_fraction {
@@ -345,33 +308,17 @@ pub fn assess_perception_crucible(
         }
     }
 
-    let incomplete = issues.iter().any(|issue| {
-        matches!(
-            issue,
-            CrucibleIssue::InvalidPolicy
-                | CrucibleIssue::InvalidScenario(_)
-                | CrucibleIssue::MissingRequiredFamily(_)
-                | CrucibleIssue::InsufficientFrames { .. }
-                | CrucibleIssue::InsufficientNegativeFrames { .. }
-                | CrucibleIssue::NoOodTrials
-        )
+    let hard_boundary_failure = issues.iter().any(|issue| {
+        matches!(issue, CrucibleIssue::PerceptionAuthorityBoundaryViolation { .. })
     });
-    let failed = issues.iter().any(|issue| {
-        matches!(
-            issue,
-            CrucibleIssue::FalsePositiveRateExceeded { .. }
-                | CrucibleIssue::CleanNegativeFractionBelowMinimum { .. }
-                | CrucibleIssue::FalseTrackFractionExceeded { .. }
-                | CrucibleIssue::IdentitySwitchRateExceeded { .. }
-                | CrucibleIssue::OodAbstentionBelowMinimum { .. }
-                | CrucibleIssue::IncompleteClassificationRateExceeded { .. }
-                | CrucibleIssue::PerceptionAuthorityBoundaryViolation { .. }
-        )
-    });
+    let incomplete = issues.iter().any(is_incomplete_issue);
+    let failed = issues.iter().any(is_threshold_failure);
 
     PerceptionCrucibleReport {
         policy_id: policy.policy_id.clone(),
-        status: if incomplete {
+        status: if hard_boundary_failure {
+            CrucibleStatus::Fail
+        } else if incomplete {
             CrucibleStatus::Incomplete
         } else if failed {
             CrucibleStatus::Fail
@@ -392,6 +339,85 @@ pub fn assess_perception_crucible(
     }
 }
 
+fn assess_background_tracking(
+    scenario: &PerceptionScenarioEvidence,
+    policy: &PerceptionCruciblePolicy,
+    issues: &mut Vec<CrucibleIssue>,
+) {
+    let tracking = &scenario.tracking;
+    if tracking.negative_frames < policy.minimum_negative_frames_per_background_scenario {
+        issues.push(CrucibleIssue::InsufficientNegativeFrames {
+            scenario_id: scenario.scenario_id.clone(),
+            observed: tracking.negative_frames,
+            required: policy.minimum_negative_frames_per_background_scenario,
+        });
+    }
+    let fp_per_negative_frame = if tracking.negative_frames == 0 {
+        f64::INFINITY
+    } else {
+        tracking.false_positives as f64 / tracking.negative_frames as f64
+    };
+    if fp_per_negative_frame > policy.maximum_false_positives_per_negative_frame {
+        issues.push(CrucibleIssue::FalsePositiveRateExceeded {
+            scenario_id: scenario.scenario_id.clone(),
+            observed: fp_per_negative_frame,
+            maximum: policy.maximum_false_positives_per_negative_frame,
+        });
+    }
+    if let Some(clean_fraction) = tracking.clean_negative_frame_fraction {
+        if clean_fraction < policy.minimum_clean_negative_frame_fraction {
+            issues.push(CrucibleIssue::CleanNegativeFractionBelowMinimum {
+                scenario_id: scenario.scenario_id.clone(),
+                observed: clean_fraction,
+                minimum: policy.minimum_clean_negative_frame_fraction,
+            });
+        }
+    }
+}
+
+fn empty_report(policy: &PerceptionCruciblePolicy, issues: Vec<CrucibleIssue>) -> PerceptionCrucibleReport {
+    PerceptionCrucibleReport {
+        policy_id: policy.policy_id.clone(),
+        status: CrucibleStatus::Incomplete,
+        assessed_scenarios: 0,
+        total_frames: 0,
+        total_negative_frames: 0,
+        total_false_positives: 0,
+        total_false_tracks: 0,
+        total_identity_switches: 0,
+        classification_trials: 0,
+        ood_trials: 0,
+        ood_abstentions: 0,
+        incomplete_classifications: 0,
+        issues,
+    }
+}
+
+fn is_incomplete_issue(issue: &CrucibleIssue) -> bool {
+    matches!(
+        issue,
+        CrucibleIssue::InvalidPolicy
+            | CrucibleIssue::InvalidScenario(_)
+            | CrucibleIssue::DuplicateScenarioId(_)
+            | CrucibleIssue::MissingRequiredFamily(_)
+            | CrucibleIssue::InsufficientFrames { .. }
+            | CrucibleIssue::InsufficientNegativeFrames { .. }
+            | CrucibleIssue::NoOodTrials
+    )
+}
+
+fn is_threshold_failure(issue: &CrucibleIssue) -> bool {
+    matches!(
+        issue,
+        CrucibleIssue::FalsePositiveRateExceeded { .. }
+            | CrucibleIssue::CleanNegativeFractionBelowMinimum { .. }
+            | CrucibleIssue::FalseTrackFractionExceeded { .. }
+            | CrucibleIssue::IdentitySwitchRateExceeded { .. }
+            | CrucibleIssue::OodAbstentionBelowMinimum { .. }
+            | CrucibleIssue::IncompleteClassificationRateExceeded { .. }
+    )
+}
+
 fn finite_nonnegative(value: f64) -> bool {
     value.is_finite() && value >= 0.0
 }
@@ -403,8 +429,7 @@ fn unit_interval(value: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_selective_classification::{ClassificationAssessment, ClassificationIssue};
-    use symthaea_tracking_eval::TrackingEvaluationReport;
+    use symthaea_selective_classification::{ClassificationIssue};
 
     fn policy() -> PerceptionCruciblePolicy {
         PerceptionCruciblePolicy {
@@ -480,34 +505,38 @@ mod tests {
         }
     }
 
+    fn positive_tracking() -> TrackingEvaluationReport {
+        TrackingEvaluationReport {
+            evaluated_frames: 100,
+            ground_truth_points: 100,
+            prediction_points: 100,
+            true_positives: 100,
+            false_positives: 0,
+            false_negatives: 0,
+            identity_switches: 0,
+            false_track_count: 0,
+            unique_prediction_tracks: 1,
+            frames_with_false_positives: 0,
+            negative_frames: 0,
+            negative_frames_with_false_positives: 0,
+            precision: Some(1.0),
+            recall: Some(1.0),
+            f1: Some(1.0),
+            mean_match_distance_norm: Some(0.0),
+            false_positives_per_frame: 0.0,
+            clean_negative_frame_fraction: None,
+            false_track_fraction: Some(0.0),
+            negative_only_sequence: false,
+            frames: Vec::new(),
+        }
+    }
+
     fn ood_scenario() -> PerceptionScenarioEvidence {
         PerceptionScenarioEvidence {
             scenario_id: "ood-100".into(),
             family: StressFamily::OutOfDistribution,
             expected_background_only: false,
-            tracking: TrackingEvaluationReport {
-                evaluated_frames: 100,
-                ground_truth_points: 100,
-                prediction_points: 100,
-                true_positives: 100,
-                false_positives: 0,
-                false_negatives: 0,
-                identity_switches: 0,
-                false_track_count: 0,
-                unique_prediction_tracks: 1,
-                frames_with_false_positives: 0,
-                negative_frames: 0,
-                negative_frames_with_false_positives: 0,
-                precision: Some(1.0),
-                recall: Some(1.0),
-                f1: Some(1.0),
-                mean_match_distance_norm: Some(0.0),
-                false_positives_per_frame: 0.0,
-                clean_negative_frame_fraction: None,
-                false_track_fraction: Some(0.0),
-                negative_only_sequence: false,
-                frames: Vec::new(),
-            },
+            tracking: positive_tracking(),
             classification_trials: (0..100)
                 .map(|i| ood_trial(&format!("ood-{i}"), true))
                 .collect(),
@@ -530,19 +559,39 @@ mod tests {
         quiet.perception_to_authority_boundary_violations = 1;
         let report = assess_perception_crucible(&[quiet, ood_scenario()], &policy());
         assert_eq!(report.status, CrucibleStatus::Fail);
-        assert!(report.issues.iter().any(|issue| matches!(
-            issue,
-            CrucibleIssue::PerceptionAuthorityBoundaryViolation { count: 1, .. }
-        )));
+    }
+
+    #[test]
+    fn boundary_violation_dominates_incomplete_evidence() {
+        let mut quiet = quiet_scenario();
+        quiet.perception_to_authority_boundary_violations = 1;
+        let report = assess_perception_crucible(&[quiet], &policy());
+        assert_eq!(report.status, CrucibleStatus::Fail);
+        assert!(report
+            .issues
+            .contains(&CrucibleIssue::MissingRequiredFamily(StressFamily::OutOfDistribution)));
+    }
+
+    #[test]
+    fn duplicate_scenario_ids_are_incomplete() {
+        let report = assess_perception_crucible(&[quiet_scenario(), quiet_scenario(), ood_scenario()], &policy());
+        assert_eq!(report.status, CrucibleStatus::Incomplete);
+        assert!(report.issues.iter().any(|issue| matches!(issue, CrucibleIssue::DuplicateScenarioId(_))));
+    }
+
+    #[test]
+    fn duplicate_trial_ids_invalidate_scenario() {
+        let mut ood = ood_scenario();
+        ood.classification_trials[1].trial_id = ood.classification_trials[0].trial_id.clone();
+        let report = assess_perception_crucible(&[quiet_scenario(), ood], &policy());
+        assert_eq!(report.status, CrucibleStatus::Incomplete);
+        assert!(report.issues.iter().any(|issue| matches!(issue, CrucibleIssue::InvalidScenario(_))));
     }
 
     #[test]
     fn missing_required_stress_family_is_incomplete() {
         let report = assess_perception_crucible(&[quiet_scenario()], &policy());
         assert_eq!(report.status, CrucibleStatus::Incomplete);
-        assert!(report
-            .issues
-            .contains(&CrucibleIssue::MissingRequiredFamily(StressFamily::OutOfDistribution)));
     }
 
     #[test]
