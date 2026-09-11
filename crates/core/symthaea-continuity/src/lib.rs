@@ -124,7 +124,16 @@ pub use coverage_bound_execution::{
     QualifiedEffectCoverageCommitmentId, QualifiedEffectCoverageCommitmentV1,
     ReadyCoverageQualifiedEffectExecutionV1, canonical_effect_coverage_commitment_claim_bytes,
     canonical_effect_coverage_commitment_claim_digest,
-    prepare_coverage_qualified_effect_execution,
+};
+pub use coverage_bound_execution::current_authorized::{
+    CurrentAuthorizedCoverageError, CurrentAuthorizedEffectExecutionEligibilityV1,
+    CurrentAuthorizedExternalEffectCoverageId, CurrentAuthorizedExternalEffectCoverageV1,
+    CurrentAuthorizedNoEffectsExecutionEligibilityV1,
+    CurrentAuthorizedNoExternalEffectsCoverageId, CurrentAuthorizedNoExternalEffectsCoverageV1,
+    PendingCurrentAuthorizedEffectExecutionV1, PendingCurrentAuthorizedNoEffectsExecutionV1,
+    ReadyCurrentAuthorizedEffectExecutionV1, ReadyCurrentAuthorizedNoEffectsExecutionV1,
+    prepare_current_authorized_effect_execution,
+    prepare_current_authorized_no_effects_execution,
 };
 pub use crash_reconciliation::{
     CRASH_RECONCILIATION_RECORD_SCHEMA_V1, CrashReconciliationClassificationV1,

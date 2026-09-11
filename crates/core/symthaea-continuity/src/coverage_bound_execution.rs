@@ -5,6 +5,8 @@
 //! A verifier proof that the declared effect set is complete must exist before
 //! mutation and must itself be committed into the exact protected post-intent world.
 
+pub mod current_authorized;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -409,7 +411,7 @@ impl ReadyCoverageQualifiedEffectExecutionV1 {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn prepare_coverage_qualified_effect_execution(
+pub(crate) fn prepare_coverage_qualified_effect_execution(
     bound: CoverageQualifiedBackendEffectEligibilityV1,
     current_epoch: &QualifiedTrustedCommitEpochV1,
     previous_epoch: Option<&QualifiedTrustedCommitEpochV1>,
