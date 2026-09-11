@@ -13,6 +13,7 @@ pub mod dependency_impact;
 pub mod diagnostic_beliefs;
 pub mod diagnostics;
 pub mod federation;
+pub mod it_coverage;
 pub mod it_qualification;
 pub mod knowledge;
 pub mod knowledge_source;
@@ -43,6 +44,11 @@ pub use diagnostic_beliefs::{
     rank_tests_by_information_gain, CausalHypothesisV1, DiagnosticBeliefError,
     DiagnosticOutcomeId, DiagnosticTestId, DiagnosticTestModelV1, ExpectedInformationGainV1,
     HypothesisDistributionV1, HypothesisId, HypothesisStatusV1,
+};
+pub use it_coverage::{
+    seed_it_coverage_inventory_v1, ItCoverageErrorV1, ItCoverageInventoryV1,
+    ItCoverageSignalKindV1, ItCoverageSignalV1, ItCoverageSourceV1, ItDomainCoverageV1,
+    ItImplementationFootprintV1, ALL_IT_DOMAINS_V1, IT_COVERAGE_INVENTORY_SCHEMA_V1,
 };
 pub use it_qualification::{
     case_digest_v1, qualification_failures_v1, AdversarialConditionV1,
