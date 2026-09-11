@@ -1,0 +1,81 @@
+name: WASM Artifact Boundary
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-broca-tools/Cargo.toml"
+      - "crates/domains/symthaea-broca-tools/src/wasm_architect.rs"
+      - ".github/workflows/wasm-artifact-boundary.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  wasm-artifact-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-wasm-artifact-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-wasm-artifact-
+
+      - name: Reconcile candidate lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > wasm-artifact-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the WASM artifact graph."
+          else
+            echo "Cargo.lock requires the following generated update:"
+            cat wasm-artifact-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-artifact-cargo-lock-patch
+          path: wasm-artifact-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check WASM artifact boundary
+        run: cargo check --locked -p symthaea-broca-tools --features wasm-sandbox --lib
+
+      - name: Test WASM artifact boundary
+        run: cargo test --locked -p symthaea-broca-tools --features wasm-sandbox --lib wasm_architect::tests
+
+      - name: Clippy WASM artifact boundary
+        run: cargo clippy --locked -p symthaea-broca-tools --features wasm-sandbox --lib -- -D warnings
+
+      - name: Require committed lockfile
+        run: git diff --exit-code -- Cargo.lock
