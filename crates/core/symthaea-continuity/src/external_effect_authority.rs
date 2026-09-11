@@ -15,9 +15,7 @@ use thiserror::Error;
 use crate::active_lkg::ActiveKnownGoodSelectionV1;
 use crate::commit_eligibility::{CommitEligibleTransitionId, CommitEligibleTransitionV1};
 use crate::distributed_state::DistributedStateContextId;
-use crate::external_effects::{
-    ExternalEffectError, ExternalEffectObligationV1,
-};
+use crate::external_effects::{ExternalEffectError, ExternalEffectObligationV1};
 use crate::known_good::QualifiedKnownGoodCheckpointV1;
 use crate::scope::ContinuitySubjectId;
 use crate::transition_authority::{
@@ -26,9 +24,8 @@ use crate::transition_authority::{
 };
 use crate::transition_lineage::{
     KnownGoodBoundTrustedCommitEligibilityV1, KnownGoodTransitionLineageError,
-    KnownGoodTransitionLineageId,
 };
-use crate::trusted_commit_epoch::{TrustedCommitEligibilityId, TrustedCommitEligibilityV1};
+use crate::trusted_commit_epoch::TrustedCommitEligibilityV1;
 use crate::witness::TargetRealizationId;
 
 pub const EXTERNAL_EFFECT_PLAN_SCHEMA_V1: &str =
@@ -340,7 +337,12 @@ impl AuthenticatedExternalEffectAuthorityV1 {
                 &authentication_evidence_digest,
             ],
         ));
-        Ok(Self { claim, profile, authentication_evidence_digest, evidence_id })
+        Ok(Self {
+            claim,
+            profile,
+            authentication_evidence_digest,
+            evidence_id,
+        })
     }
 }
 
@@ -422,6 +424,7 @@ impl QualifiedExternalEffectAuthorizationV1 {
     pub fn id(&self) -> QualifiedExternalEffectAuthorizationId { self.authorization_id }
     pub fn plan_id(&self) -> ExternalEffectPlanId { self.plan_id }
     pub fn commit_eligibility_id(&self) -> CommitEligibleTransitionId { self.commit_eligibility_id }
+    pub fn original_authority_claim_id(&self) -> TransitionAuthorityClaimId { self.original_authority_claim_id }
     pub fn authority_profile_id(&self) -> TransitionAuthorityProfileId { self.authority_profile_id }
     pub fn authority_root_epoch(&self) -> u64 { self.authority_root_epoch }
     pub fn subject_id(&self) -> ContinuitySubjectId { self.subject_id }
@@ -462,7 +465,11 @@ impl EffectAuthorizedTrustedCommitEligibilityV1 {
         {
             return Err(ExternalEffectAuthorityError::TrustedEligibilityMismatch);
         }
-        Ok(Self { trusted, plan, authorization })
+        Ok(Self {
+            trusted,
+            plan,
+            authorization,
+        })
     }
 
     pub fn plan(&self) -> &ExternalEffectPlanV1 { &self.plan }
@@ -501,11 +508,14 @@ impl EffectScopedKnownGoodBoundEligibilityV1 {
             || lineage.target_realization_id() != plan.target_realization_id()
             || lineage.distributed_context_id() != plan.distributed_context_id()
             || lineage.commit_time_unix_ms() != plan.commit_time_unix_ms()
-            || lineage.trusted_eligibility_id() == TrustedCommitEligibilityId::from_bytes_forbidden_placeholder()
         {
             return Err(ExternalEffectAuthorityError::KnownGoodLineageMismatch);
         }
-        Ok(Self { bound, plan, authorization })
+        Ok(Self {
+            bound,
+            plan,
+            authorization,
+        })
     }
 
     pub fn lineage(&self) -> &crate::transition_lineage::KnownGoodTransitionLineageV1 {
