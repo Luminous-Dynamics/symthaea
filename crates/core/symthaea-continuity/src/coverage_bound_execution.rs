@@ -373,7 +373,7 @@ impl PendingCoverageQualifiedEffectExecutionV1 {
             return Err(CoverageBoundExecutionError::ReleaseContextMismatch);
         }
         let ready = self.inner.release_after_durable_backend_scope(
-            journal, journal_anchor, effect_scope, backend_commitment, coverage_commitment,
+            journal, journal_anchor, effect_scope, backend_commitment,
         )?;
         if ready.backend_id() != self.coverage.backend_id()
             || ready.backend_binding().id() != self.coverage.backend_binding_id()
