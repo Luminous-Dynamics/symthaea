@@ -14,3 +14,4 @@ categories = ["science", "algorithms"]
 [dependencies]
 symthaea-tracking-eval = { path = "../../domains/symthaea-tracking-eval" }
 symthaea-vision-manifold = { path = "../../domains/symthaea-vision-manifold" }
+image = "0.24"
