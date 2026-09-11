@@ -57,6 +57,7 @@ pub mod safe_haven;
 pub mod sensored_suite;
 pub mod simulator;
 pub mod space_exosuit;
+pub mod suit_service_fault_campaign;
 pub mod suit_service_interface;
 pub mod suit_service_session;
 pub mod suitport_state_machine;
