@@ -12,7 +12,7 @@
 //!    trusted adoption-authority root; and
 //! 2. a fresh rollback-resistant current-head attestation proving that exact admitted
 //!    transition has not been superseded.
-//! 
+//!
 //! A validity interval is necessary but never sufficient for currentness. Supersession
 //! is established by exact predecessor lineage plus a fresh protected head, not by TTL.
 
@@ -68,9 +68,6 @@ digest_id!(VerifierAdoptionCurrentnessClaimId);
 digest_id!(AuthenticatedVerifierAdoptionCurrentnessId);
 digest_id!(CurrentAuthorizedVerifierProfileId);
 
-/// Provisioned adoption-authority root. This is intentionally non-Serde and has no
-/// public constructor. A future Xenia/provisioning adapter must create it only after
-/// the organizational adoption root has independently earned trust.
 #[derive(Debug)]
 pub struct TrustedVerifierAdoptionAuthorityRootV1 {
     root_id: TrustedVerifierAdoptionAuthorityRootId,
@@ -102,7 +99,6 @@ impl TrustedVerifierAdoptionAuthorityRootV1 {
     pub fn authority_root_digest(&self) -> [u8; 32] { self.authority_root_digest }
 }
 
-/// Domain-separated bytes authenticated by the external verifier-adoption authority.
 pub fn canonical_verifier_adoption_authentication_bytes(
     transition: &VerifierProfileAdoptionTransitionV1,
 ) -> Result<Vec<u8>, VerifierAdoptionAuthorityError> {
@@ -122,8 +118,6 @@ pub fn canonical_verifier_adoption_authentication_digest(
     Ok(*blake3::hash(&canonical_verifier_adoption_authentication_bytes(transition)?).as_bytes())
 }
 
-/// Result of external cryptographic authentication under the exact provisioned
-/// adoption-authority root. Constructor remains crate-owned.
 #[derive(Debug)]
 pub(crate) struct AuthenticatedVerifierAdoptionV1 {
     transition_digest: VerifierProfileAdoptionTransitionDigest,
@@ -153,8 +147,6 @@ impl AuthenticatedVerifierAdoptionV1 {
     }
 }
 
-/// Non-Serde proof that one exact adoption transition was authenticated by the exact
-/// provisioned adoption authority and admitted against its exact verifier profile.
 #[derive(Debug)]
 pub struct QualifiedVerifierProfileAdoptionV1 {
     adoption_id: QualifiedVerifierProfileAdoptionId,
@@ -193,11 +185,12 @@ impl QualifiedVerifierProfileAdoptionV1 {
         {
             return Err(VerifierAdoptionAuthorityError::AuthenticatedTransitionMismatch);
         }
+        let admission_time = admitted_at_unix_ms.to_le_bytes();
         let adoption_id = QualifiedVerifierProfileAdoptionId(domain_hash_parts(
             QUALIFIED_ADOPTION_DOMAIN,
             &[transition_digest.as_bytes(), transition.subject().id().as_bytes(),
                 verifier_profile.id().as_bytes(), trusted_root.id().as_bytes(),
-                authenticated.evidence_id.as_bytes(), &admitted_at_unix_ms.to_le_bytes()],
+                authenticated.evidence_id.as_bytes(), &admission_time],
         ));
         Ok(Self {
             adoption_id,
@@ -222,9 +215,6 @@ impl QualifiedVerifierProfileAdoptionV1 {
     pub fn admitted_at_unix_ms(&self) -> u64 { self.admitted_at_unix_ms }
 }
 
-/// Serializable fresh protected-head claim. It is evidence, not current authority,
-/// until authenticated and qualified against the exact admitted transition and exact
-/// predecessor currentness proof.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerifierAdoptionCurrentnessClaimV1 {
     schema_version: String,
@@ -419,8 +409,6 @@ impl AuthenticatedVerifierAdoptionCurrentnessV1 {
     }
 }
 
-/// Fresh, rollback-resistant, non-Serde proof that the exact admitted adoption is
-/// still the current verifier-role head.
 #[derive(Debug)]
 pub struct CurrentAuthorizedVerifierProfileV1 {
     current_id: CurrentAuthorizedVerifierProfileId,
@@ -474,12 +462,12 @@ impl CurrentAuthorizedVerifierProfileV1 {
         validate_currentness_progression(previous, adoption, claim,
             authenticated.platform_profile.id(), authenticated.platform_profile.root_epoch())?;
 
+        let anchored_at = claim.anchored_at_unix_ms.to_le_bytes();
         let current_id = CurrentAuthorizedVerifierProfileId(domain_hash_parts(
             CURRENT_AUTHORIZED_DOMAIN,
             &[adoption.id().as_bytes(), adoption.transition_digest().as_bytes(),
                 adoption.verifier_profile_id().as_bytes(), claim.id().as_bytes(),
-                authenticated.evidence_id.as_bytes(), &expected_freshness_challenge,
-                &claim.anchored_at_unix_ms.to_le_bytes()],
+                authenticated.evidence_id.as_bytes(), &expected_freshness_challenge, &anchored_at],
         ));
         Ok(Self {
             current_id,
@@ -589,12 +577,9 @@ fn validate_currentness_progression(
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum VerifierAdoptionAuthorityError {
-    #[error(transparent)]
-    Adoption(#[from] VerifierProfileAdoptionError),
-    #[error(transparent)]
-    Verifier(#[from] VerificationAdmissionError),
-    #[error(transparent)]
-    PlatformAnchor(#[from] ExecutionJournalAnchorError),
+    #[error(transparent)] Adoption(#[from] VerifierProfileAdoptionError),
+    #[error(transparent)] Verifier(#[from] VerificationAdmissionError),
+    #[error(transparent)] PlatformAnchor(#[from] ExecutionJournalAnchorError),
     #[error("{field} must not be blank")]
     BlankText { field: &'static str },
     #[error("{field} contains control characters")]
@@ -732,7 +717,10 @@ fn put_id(h: &mut blake3::Hasher, bytes: &[u8]) {
 }
 fn put_u64(h: &mut blake3::Hasher, value: u64) { put_id(h, &value.to_le_bytes()); }
 fn put_optional_id(h: &mut blake3::Hasher, value: Option<[u8; 32]>) {
-    match value { Some(v) => { h.update(&[1]); put_id(h, &v); }, None => h.update(&[0]), }
+    match value {
+        Some(v) => { h.update(&[1]); put_id(h, &v); }
+        None => { h.update(&[0]); }
+    }
 }
 fn encode_optional_id(out: &mut Vec<u8>, value: Option<[u8; 32]>) {
     match value { Some(v) => { out.push(1); out.extend_from_slice(&v); }, None => out.push(0), }
