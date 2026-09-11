@@ -20,6 +20,8 @@ pub mod knowledge_source;
 pub mod legacy_aix;
 pub mod legacy_aix_scenarios;
 pub mod legacy_artifact_qualification;
+mod legacy_capture_ingest_v3;
+pub mod legacy_capture_ingest_v3_guard;
 pub mod legacy_computing;
 #[cfg(test)]
 mod legacy_computing_pack_tests;
@@ -103,6 +105,16 @@ pub use legacy_aix_scenarios::{
 pub use legacy_artifact_qualification::{
     assess_legacy_strong_qualification_v1, LegacyArtifactQualificationErrorV1,
     LegacyStrongQualificationAssessmentV1, LegacyStrongQualificationBlockerV1,
+};
+pub use legacy_capture_ingest_v3_guard::{
+    ingest_verified_legacy_revision_capture_v3,
+    legacy_external_revision_capture_receipt_commitment_v3,
+    legacy_revision_capture_request_commitment_v3,
+    verify_legacy_revision_capture_receipt_v3,
+    LegacyExternalRevisionCaptureReceiptV3, LegacyRevisionCaptureIngestErrorV3,
+    LegacyRevisionCaptureIngestResultV3, LegacyRevisionCaptureReceiptVerifierV3,
+    LegacyRevisionCaptureTrustEvidenceV3, VerifiedLegacyRevisionCaptureReceiptV3,
+    LEGACY_EXTERNAL_REVISION_CAPTURE_RECEIPT_SCHEMA_V3,
 };
 pub use legacy_computing::{
     seed_legacy_computing_pack_v1, LegacyComputingErrorV1, LegacyComputingPackV1,
