@@ -38,8 +38,9 @@
 //! silently rewritten as failures, [`proposal_study`] freezes the feature/target/estimator/
 //! validation contract before any model can be fitted, [`proposal_model`] separates validation
 //! gate precommitment, frozen model identity, validation receipt, and holdout-evaluation permission,
-//! and [`proposal_support`] proves the role-isolated training corpus satisfies every precommitted
-//! family-support threshold before a fit permit can exist.
+//! [`proposal_support`] proves the role-isolated training corpus satisfies every precommitted
+//! family-support threshold before a fit permit can exist, and [`proposal_validation_coverage`]
+//! separately proves the validation corpus has enough actually observed labels before scoring.
 //!
 //! # Authority boundary
 //!
@@ -76,6 +77,8 @@
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
 //! - Training support is counted only from observed labels; censored and counterfactual outcomes
 //!   remain visible but cannot satisfy label-support thresholds or mint a fit permit.
+//! - Validation coverage is independently precommitted and counted only from observed labels across
+//!   distinct validation runs; an under-observed validation slice cannot mint a score permit.
 //! - Validation acceptance threshold/scorer identity is precommitted before a model artifact can be
 //!   frozen; failed validation cannot mint even an identity-only holdout evaluation permit.
 //! - Holdout permits still expose no holdout observations and grant no search or deployment authority.
@@ -115,6 +118,7 @@ pub mod proposal_recording;
 pub mod proposal_study;
 pub mod proposal_support;
 pub mod proposal_trace;
+pub mod proposal_validation_coverage;
 pub mod sandbox;
 pub mod search;
 pub mod sequence_learning;
@@ -205,6 +209,11 @@ pub use proposal_support::{
 pub use proposal_trace::{
     ForgeRawMutationEffect, ForgeRawOpportunity, ForgeRawProposalArchive, ForgeRawProposalDecision,
     ForgeRawProposalError, ForgeRawProposalRecord, ForgeRawSelection,
+};
+pub use proposal_validation_coverage::{
+    ForgeProposalValidationCoverageError, ForgeProposalValidationCoverageReceipt,
+    ForgeProposalValidationCoverageSpec, ForgeProposalValidationFamilyCoverage,
+    ForgeProposalValidationScorePermit,
 };
 pub use search::{
     run_search, run_search_recorded, ForgeConfig, SearchFailure, SearchOutcome, SearchRecord,
