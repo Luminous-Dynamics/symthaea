@@ -15,6 +15,7 @@ pub mod diagnostics;
 pub mod federation;
 pub mod golden_binding_ledger;
 pub mod golden_bound_result;
+pub mod golden_cross_environment;
 pub mod golden_incidents;
 pub mod golden_incidents_v2;
 pub mod golden_metric_derivation;
@@ -62,6 +63,12 @@ pub use golden_bound_result::{
     bind_derived_golden_qualification_result_v1,
     record_derived_golden_qualification_result_v1, GoldenBoundQualificationResultV1,
     GoldenBoundResultErrorV1,
+};
+pub use golden_cross_environment::{
+    assess_golden_cross_environment_robustness_v1, GoldenCrossEnvironmentAssessmentV1,
+    GoldenCrossEnvironmentContextMismatchV1, GoldenCrossEnvironmentErrorV1,
+    GoldenCrossEnvironmentPolicyV1, GoldenCrossEnvironmentStatusV1,
+    GoldenEnvironmentCoverageV1,
 };
 pub use golden_incidents::{
     seed_golden_incidents_v1, DiagnosticActionRiskV1, DiagnosticAuthorityRequirementV1,
