@@ -221,6 +221,7 @@ mod tests {
             node_id: "hab-1".into(),
             kind: SuitServiceNodeKind::Habitat,
             identity_verified: true,
+            identity_confidence: 1.0,
             observation_age_s: 1.0,
             capabilities: vec![
                 SuitServiceCapability {
