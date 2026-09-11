@@ -138,9 +138,11 @@ def issue(path: str, disposition: str, reason: str | None, challenge: str) -> di
     finally:
         conn.close()
 
-def actuate(path: str, token: dict[str, Any], delta: int, operation_digest: str, crash_before_commit: bool = False) -> dict[str, Any]:
+def actuate(path: str, token: dict[str, Any], delta: int, operation_digest: str, crash_before_commit: bool = False, crash_after_commit: bool = False) -> dict[str, Any]:
     token = validate_token(token)
     hex32(operation_digest, "operation_digest")
+    if crash_before_commit and crash_after_commit:
+        deny("actuate:conflicting_failpoints")
     if not isinstance(delta, int) or isinstance(delta, bool) or delta == 0:
         deny("actuate:delta")
     conn = connect(path)
@@ -168,6 +170,8 @@ def actuate(path: str, token: dict[str, Any], delta: int, operation_digest: str,
         if crash_before_commit:
             os._exit(91)
         conn.commit()
+        if crash_after_commit:
+            os._exit(92)
         return {"status": "applied", "generation": current_generation, "value": new_value, "token_id": token["token_id"]}
     except Exception:
         if conn.in_transaction:
@@ -201,7 +205,7 @@ def main() -> int:
     p.add_argument("--reason"); p.add_argument("--challenge", required=True)
     p = sub.add_parser("actuate")
     p.add_argument("--db", required=True); p.add_argument("--token", required=True); p.add_argument("--delta", type=int, required=True)
-    p.add_argument("--operation-digest", required=True); p.add_argument("--crash-before-commit", action="store_true")
+    p.add_argument("--operation-digest", required=True); p.add_argument("--crash-before-commit", action="store_true"); p.add_argument("--crash-after-commit", action="store_true")
     p = sub.add_parser("snapshot"); p.add_argument("--db", required=True)
     args = parser.parse_args()
     try:
@@ -212,7 +216,7 @@ def main() -> int:
         elif args.cmd == "actuate":
             with open(args.token, "r", encoding="utf-8") as fh:
                 token = json.load(fh)
-            result = actuate(args.db, token, args.delta, args.operation_digest, args.crash_before_commit)
+            result = actuate(args.db, token, args.delta, args.operation_digest, args.crash_before_commit, args.crash_after_commit)
         else:
             result = snapshot(args.db)
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
