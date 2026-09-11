@@ -79,14 +79,23 @@ impl FullFrameEnvironmentConfig {
         }
     }
 
-    pub fn is_valid(&self) -> bool {
-        self.gravity.is_valid()
-            && self.suit_pressure_pa.is_finite()
-            && self.suit_pressure_pa >= 0.0
-            && self.ambient_pressure_pa.is_finite()
-            && self.ambient_pressure_pa >= 0.0
-            && self.pressure_garment.joints.len() == NUM_FULL_FRAME_JOINTS
-            && self.pressure_garment.joints.iter().all(|joint| joint.is_valid())
+    pub fn validate(&self) -> Result<(), FullFrameEnvironmentError> {
+        if !self.gravity.is_valid() {
+            return Err(FullFrameEnvironmentError::InvalidGravity);
+        }
+        if !self.suit_pressure_pa.is_finite()
+            || self.suit_pressure_pa < 0.0
+            || !self.ambient_pressure_pa.is_finite()
+            || self.ambient_pressure_pa < 0.0
+        {
+            return Err(FullFrameEnvironmentError::InvalidPressure);
+        }
+        if self.pressure_garment.joints.len() != NUM_FULL_FRAME_JOINTS
+            || !self.pressure_garment.joints.iter().all(|joint| joint.is_valid())
+        {
+            return Err(FullFrameEnvironmentError::InvalidGarmentDimensions);
+        }
+        Ok(())
     }
 }
 
@@ -105,22 +114,7 @@ pub struct FullFrameEnvironmentCoupler {
 
 impl FullFrameEnvironmentCoupler {
     pub fn new(config: FullFrameEnvironmentConfig) -> Result<Self, FullFrameEnvironmentError> {
-        if !config.gravity.is_valid() {
-            return Err(FullFrameEnvironmentError::InvalidGravity);
-        }
-        if !config.suit_pressure_pa.is_finite()
-            || config.suit_pressure_pa < 0.0
-            || !config.ambient_pressure_pa.is_finite()
-            || config.ambient_pressure_pa < 0.0
-        {
-            return Err(FullFrameEnvironmentError::InvalidPressure);
-        }
-        if config.pressure_garment.joints.len() != NUM_FULL_FRAME_JOINTS {
-            return Err(FullFrameEnvironmentError::InvalidGarmentDimensions);
-        }
-        if !config.pressure_garment.joints.iter().all(|joint| joint.is_valid()) {
-            return Err(FullFrameEnvironmentError::InvalidGarmentDimensions);
-        }
+        config.validate()?;
         Ok(Self { config })
     }
 
@@ -134,10 +128,11 @@ impl FullFrameEnvironmentCoupler {
     }
 
     /// Apply the declared gravity directly to the existing Symtropy world.
-    pub fn apply_gravity(&self, sim: &mut FullFrameSimulator) -> Result<(), FullFrameEnvironmentError> {
-        if !self.config.gravity.is_valid() {
-            return Err(FullFrameEnvironmentError::InvalidGravity);
-        }
+    pub fn apply_gravity(
+        &self,
+        sim: &mut FullFrameSimulator,
+    ) -> Result<(), FullFrameEnvironmentError> {
+        self.config.validate()?;
         sim.world.gravity = nalgebra::SVector::from([
             0.0,
             0.0,
@@ -160,9 +155,7 @@ impl FullFrameEnvironmentCoupler {
         if !dt_s.is_finite() || dt_s <= 0.0 {
             return Err(FullFrameEnvironmentError::InvalidTimeStep);
         }
-        if !self.config.is_valid() {
-            return Err(FullFrameEnvironmentError::InvalidGarmentDimensions);
-        }
+        self.config.validate()?;
 
         self.apply_gravity(sim)?;
         sim.human.update(dt_s);
@@ -251,12 +244,11 @@ fn append_chain(
         return Err(FullFrameEnvironmentError::InvalidJointState);
     }
 
-    for (((&handle, &(angle_rad, velocity_rad_s)), &plane), _) in chain
+    for ((&handle, &(angle_rad, velocity_rad_s)), &plane) in chain
         .links
         .iter()
         .zip(states.iter())
         .zip(planes.iter())
-        .zip(0..)
     {
         if !angle_rad.is_finite() || !velocity_rad_s.is_finite() {
             return Err(FullFrameEnvironmentError::InvalidJointState);
@@ -299,7 +291,10 @@ mod tests {
         let mut sim = FullFrameSimulator::new();
         let coupler = FullFrameEnvironmentCoupler::lunar_reference();
         let report = coupler.step(&mut sim, 0.001).unwrap();
-        assert_eq!(report.pressure_resistance_torque_nm.len(), NUM_FULL_FRAME_JOINTS);
+        assert_eq!(
+            report.pressure_resistance_torque_nm.len(),
+            NUM_FULL_FRAME_JOINTS
+        );
         assert!(report.pressure_resistance_power_w.is_finite());
         assert!(report.pressure_resistance_power_w >= 0.0);
         assert!(report
