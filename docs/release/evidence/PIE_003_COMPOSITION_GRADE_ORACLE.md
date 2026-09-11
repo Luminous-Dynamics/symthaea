@@ -11,20 +11,22 @@ The oracle is `scripts/pie-composition-grade-oracle.py` and imports no Symthaea 
 - composition is represented as bounded mass-fraction intervals plus an explicit unknown-fraction interval;
 - a profile is admissible only when those bounds can contain a total mass fraction of exactly 1.0;
 - duplicate constituent identifiers fail closed;
-- missing constituent information never silently satisfies a grade requirement;
+- identified constituent fractions and the unknown/uncharacterized remainder are kept distinct;
+- if a required constituent is not explicitly identified but unknown material remains, the grade is `Indeterminate` when that unknown fraction could satisfy the requirement; it is never silently upgraded to `Pass` or overconfidently forced to `Fail`;
 - grade assessment is conservative:
   - `Pass`: every admissible composition satisfies the declared constraints;
   - `Fail`: at least one declared constraint cannot be satisfied;
   - `Indeterminate`: some admissible compositions pass and some fail;
 - widening uncertainty cannot strengthen a grade conclusion;
-- exact-mass lot mixing preserves constituent masses;
+- exact-mass lot mixing preserves identified constituent masses and explicit unknown mass;
 - constituent-level balance uses the same exact/possible/impossible uncertainty discipline as PIE-001;
-- exact constituent closure is reported only when both stream masses and composition fractions are point-valued;
+- exact constituent closure is reported only when stream mass is exact **and composition is fully characterized with zero unknown remainder**;
+- an exact-sized unknown remainder still represents uncertainty about constituent identity;
 - total mass closure can coexist with constituent imbalance, and the latter remains visible.
 
 ## Executed synthetic fixtures
 
-The candidate oracle self-test was executed locally on 2026-09-11 and returned `ok` before the checked-in reference was created. The checked-in source was then fetched back from GitHub and reviewed against that candidate.
+The final oracle self-test was executed locally on 2026-09-11 and returned `ok` immediately before the final source was written to the feature branch.
 
 Fixtures cover:
 
@@ -33,13 +35,15 @@ Fixtures cover:
 3. exact grade pass;
 4. impossible grade fail;
 5. widened composition uncertainty -> `Indeterminate`, never stronger;
-6. missing required constituent -> `Fail`;
-7. exact 6 kg A + 4 kg B mixing -> 60/40 composition;
-8. exact constituent closure for a synthetic separation process;
-9. bulk mass closes while constituent A fails closure;
-10. uncertain constituent balance -> `PossibleWithUncertainty`;
-11. explicit unknown fraction can block a grade;
-12. duplicate/nonfinite/out-of-range fractions fail closed.
+6. missing required constituent with zero unknown remainder -> `Fail`;
+7. missing required constituent with sufficient unknown remainder -> `Indeterminate`;
+8. exact 6 kg A + 4 kg B mixing -> 60/40 composition;
+9. exact constituent closure for a synthetic separation process;
+10. bulk mass closes while constituent A fails closure;
+11. uncertain constituent balance -> `PossibleWithUncertainty`;
+12. exact-sized but compositionally unknown input remains uncertain for untracked constituent balance;
+13. excessive unknown fraction can block a grade;
+14. duplicate/nonfinite/out-of-range fractions fail closed.
 
 ## Important limitation
 
