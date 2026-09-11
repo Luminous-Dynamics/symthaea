@@ -16,173 +16,115 @@ simulation converged
 != physical actuation authority
 ```
 
-This oracle freezes the first narrow Engineering Trust Kernel evidence-admission contract. It decides only whether one candidate simulation artifact is structurally eligible to be admitted as `Simulation` evidence for one exact proof obligation.
-
-An `Admit` result is **not** an obligation discharge receipt. It does not establish solver correctness, physical truth, model validity outside the declared validity domain, formal verification, qualification, certification, manufacturing approval, deployment approval, or physical authority.
+This oracle decides only whether one candidate simulation artifact is structurally eligible to be admitted as `Simulation` evidence for one exact proof obligation. `Admit` is not a discharge receipt and grants no verification, qualification, certification, manufacturing, deployment, or actuation authority.
 
 ## Independence
 
-`scripts/etk-simulation-evidence-admission-oracle.py` is standard-library Python and imports no Symthaea code.
+`scripts/etk-simulation-evidence-admission-oracle.py` is standard-library Python and imports no Symthaea code. It is based directly on `main`, not on the ETK-1 Rust implementation branch. A production Rust implementation must reproduce this contract independently rather than invoking this script as its authority source.
 
-It is based directly on `main`, not on the ETK-1 Rust implementation branch. A future production Rust implementation must reproduce this contract independently rather than calling this script as its authority source.
+## Existing simulation semantics preserved
 
-The oracle deliberately reuses the existing simulation bridge vocabulary instead of defining a competing execution-evidence model:
+The oracle deliberately reuses the existing `symthaea-sim-bridge` vocabulary:
 
-- `external_solver` is the only admissible execution mode;
-- `dry_run` and unknown/untrusted execution are not engineering evidence;
-- backend, solver version, rendered-input digest, raw-output digest, and parser version are all required;
-- a non-empty normalized metric set is required;
-- run-level and metric-level epistemic/aleatoric uncertainty are bounded;
-- metric-level uncertainty overrides run-level uncertainty when present;
-- convergence is necessary but not sufficient.
+- only `external_solver` can admit;
+- `dry_run` and unknown execution cannot admit;
+- convergence is necessary but insufficient;
+- normalized metrics are required;
+- backend, solver version, rendered-input digest, raw-output digest, and parser version are required;
+- run-level and metric-level epistemic/aleatoric uncertainty are preserved;
+- metric-level uncertainty overrides run-level uncertainty when present.
 
-## V1 admission bindings
+## Exact V1 bindings
 
-A candidate can be admitted only when all of the following are true:
+Admission requires exact binding of:
 
-1. schema and closed-world field sets are exact;
-2. the obligation expects `Simulation` and the candidate is exactly `Simulation` evidence;
-3. obligation ID and obligation revision match exactly;
-4. engineering subject matches exactly;
-5. design/twin revision matches exactly;
-6. accepted requirement revision matches exactly;
-7. evidence-policy ID is explicit;
-8. simulation request ID matches exactly;
-9. validity-domain ID matches exactly;
-10. candidate currentness is exactly `Current` and a currentness-proof reference is present;
-11. execution mode is exactly `external_solver`;
-12. the solver result converged;
-13. confidence is finite and within `[0, 1]`;
-14. run uncertainty is well formed;
-15. normalized metrics are present;
-16. the required metric appears exactly once with the required unit;
-17. the declared inequality predicate and uncertainty budget are valid;
-18. the effective metric uncertainty is within that budget;
-19. the metric value lies inside its declared interval when an interval is present;
-20. the acceptance predicate holds at the conservative interval boundary when an interval is present;
-21. backend, solver version, input digest, output digest, and parser version are all present;
-22. observed input digest equals the expected rendered-input digest;
-23. candidate artifact identity and source-lineage identity are present.
+- obligation ID and obligation revision;
+- engineering subject;
+- design/twin revision;
+- accepted requirement revision;
+- evidence-policy ID;
+- simulation request ID;
+- validity-domain ID;
+- currentness state plus currentness-proof reference;
+- candidate artifact identity and source-lineage identity;
+- expected rendered-input digest;
+- one required metric, unit, scalar inequality predicate, and uncertainty budget.
 
-V1 intentionally supports only scalar inequality predicates: `<`, `<=`, `>`, and `>=`. More complex acceptance logic must receive a new version rather than being smuggled into free-form strings.
+The schema is closed-world. Unknown/shadow fields deny admission.
 
-For a `<=` or `<` obligation, an uncertainty interval is checked at its upper bound. For a `>=` or `>` obligation, it is checked at its lower bound. Therefore a mean value cannot pass while the declared interval crosses the acceptance threshold.
+## Conservative uncertainty theorem
 
-## Deterministic decision and canonical identity
+V1 supports only `<`, `<=`, `>`, and `>=` predicates. If the effective uncertainty includes an interval, `<`/`<=` are checked at the interval upper bound and `>`/`>=` at the interval lower bound.
 
-The oracle returns exactly one of:
+Therefore:
 
 ```text
-Admit { admitted_evidence_id, obligation_id, candidate_artifact_id,
-        currentness, validity_domain_id }
+passing point estimate != passing uncertainty-bounded evidence
 ```
 
-or:
+The metric point must itself lie inside its declared interval, and epistemic/aleatoric uncertainty must stay within the obligation's declared budget.
 
-```text
-Deny { ordered_reasons[] }
-```
+Every normalized metric is validated before identity construction, including metrics not used by the acceptance predicate. A malformed secondary metric therefore fails closed rather than reaching serialization or identity minting.
 
-There is no scalar trust score and no optimizer override. Multiple simultaneous failures are returned in a frozen deterministic reason order.
+## Canonical semantic identity
 
-Before hashing, the oracle projects an admitted candidate into a normalized semantic V1 identity with all authority-relevant fields explicit. Optional uncertainty intervals are normalized to explicit `null` when absent. This prevents semantically equivalent JSON spellings from producing different admitted-evidence IDs.
+Before hashing, an admitted candidate is projected into a normalized semantic V1 identity with all authority-relevant fields explicit. Optional uncertainty intervals normalize to explicit `null` when absent. Semantically equivalent JSON spellings therefore cannot fork the admitted-evidence identity.
 
-The admitted-evidence identity is SHA-256 over a domain-separated, key-sorted canonical JSON preimage containing the exact schema, obligation, candidate, uncertainty declarations, and expected-input binding. This identifier is an audit/content identity only; possession of it grants no authority.
+The admitted-evidence ID is SHA-256 over a domain-separated, key-sorted canonical JSON preimage. It is an audit/content identity only; possession of it grants no authority.
 
 ## Synthetic positive fixture
 
-The built-in positive fixture binds:
+The positive fixture binds:
 
 - obligation `O-structural-stress-42:r3`;
-- evidence policy `ETK-SIM-ADMISSION-V1`;
+- policy `ETK-SIM-ADMISSION-V1`;
 - subject `bracket-alpha`;
 - design revision `design:G17`;
 - requirement revision `REQ-STRESS:r5`;
 - request `sim-static-G17-LC9`;
 - validity domain `VD-static-G17-LC9`;
-- required metric `max_stress_mpa <= 250 MPa`;
+- stress predicate `max_stress_mpa <= 250 MPa`;
 - uncertainty budget `epistemic <= 0.2`, `aleatoric <= 0.1`;
 - observed stress `181.2 MPa` with interval `[175, 190] MPa`;
 - external CalculiX `2.22` provenance;
 - exact input/output/parser identities;
-- a currentness-proof reference and source-lineage reference.
+- currentness-proof and source-lineage references.
 
-The frozen admitted-evidence vector is:
+The frozen expected admitted-evidence vector remains:
 
 ```text
 sha256:7066c8509f0563484acc3a2d16d5b9b689606a2250389da56ad66560dbc83ff8
 ```
 
-## Adversarial self-test coverage
+The latest validation-only hardening does not change the normalized positive-fixture preimage.
 
-The built-in self-test requires fail-closed denial for:
+## Adversarial suite
 
-- dry-run execution;
-- historically valid but non-current evidence;
-- missing currentness-proof reference;
-- rendered-input digest substitution;
-- design/twin revision substitution;
-- wrong evidence kind;
-- validity-domain substitution;
-- missing parser provenance;
-- absent required metric;
-- direct acceptance-threshold failure;
-- a point estimate that passes while its uncertainty interval crosses the threshold;
-- uncertainty exceeding the obligation's epistemic budget;
-- malformed/inverted uncertainty intervals;
-- non-converged simulation;
-- request-ID substitution;
-- unknown/shadow execution fields;
-- non-finite confidence;
-- deterministic ordered reporting of simultaneous independent faults;
-- canonical-ID equivalence when an optional `interval: null` is omitted from an otherwise identical uncertainty object.
+The built-in self-test requires fail-closed denial for dry-run execution, stale evidence, missing currentness reference, rendered-input substitution, design/twin substitution, wrong evidence kind, validity-domain substitution, incomplete provenance, absent required metrics, threshold failure, interval-crossing threshold failure, excessive uncertainty, malformed intervals, non-convergence, request substitution, unknown/shadow execution fields, non-finite confidence, malformed secondary metrics, invalid secondary uncertainty, malformed required binding fields, and deterministic ordering of simultaneous independent faults.
 
-## Exact local execution evidence
+It also checks canonical-ID equivalence when an optional `interval: null` is omitted from an otherwise identical uncertainty object.
 
-After the uncertainty and canonical-identity hardening, the exact checked-in candidate bytes were executed with:
+## Evidence status
+
+The immediately preceding canonical-identity candidate was locally executed under Python 3.13.5 and passed its built-in self-test and `py_compile`, producing the same frozen expected vector above.
+
+The current head additionally hardens all-metric and missing-binding fail-closed behavior. Its checked-in script blob is:
 
 ```text
-Python 3.13.5
-python3 /tmp/etk-oracle-gh.py --self-test
+66f6d1cd70575a0d93950733f90ff68d502c5938
 ```
 
-Result:
-
-```text
-ok sha256:7066c8509f0563484acc3a2d16d5b9b689606a2250389da56ad66560dbc83ff8
-```
-
-`python3 -m py_compile /tmp/etk-oracle-gh.py` also completed successfully.
-
-Executed source SHA-256:
-
-```text
-312d364fd51ec8c3ef430923d17dbd9bf45493c87d904d8b96e696779adb0195
-```
-
-Executed source Git blob identity:
-
-```text
-5b928f95a69c1c97acad941efbd7423d6d810e9f
-```
-
-GitHub reports the checked-in script with the same Git blob identity `5b928f95a69c1c97acad941efbd7423d6d810e9f`. Therefore the locally executed candidate bytes and the checked-in oracle bytes are identical.
-
-This local execution is useful implementation evidence, but it is **not repository qualification**. Exact-head CI remains a separate evidence boundary.
+No claim of exact-head runtime qualification is made for that newest blob until repository CI or another exact-byte execution records it. This document intentionally distinguishes prior candidate execution from current-head qualification.
 
 ## Deliberate non-goals
 
-V1 does not establish multi-source evidence independence, contradiction handling, supersession, semantic-staleness graphs, authenticated currentness, formal-proof admission, telemetry/test/standard admission, discharge receipts, safety-case closure, design qualification, or transition authority.
+V1 does not establish solver correctness, physical truth, multi-source evidence independence, authenticated currentness, complete/calibrated uncertainty, contradiction handling, supersession, semantic-staleness propagation, formal-proof/test/telemetry admission, discharge receipts, safety-case closure, design qualification, certification, manufacturing approval, deployment approval, or actuation authority.
 
-In particular:
-
-- `source_lineage_id` is retained for later independence analysis, but distinct strings are not treated as proof of independence;
-- `currentness_proof_id` is a binding/reference slot, not proof that the referenced currentness mechanism is itself trustworthy;
-- the uncertainty budget is an admission constraint, not a claim that the uncertainty model is complete or calibrated.
+`source_lineage_id` and `currentness_proof_id` are binding/reference slots. Their presence does not prove independence or the trustworthiness of the referenced currentness mechanism.
 
 ## Production follow-up
 
-The next production tranche should compose this frozen reference behavior with the existing `symthaea-sim-bridge` types and `symthaea-formal-safety` obligations:
+The production path remains:
 
 ```text
 SimulationResult
@@ -192,4 +134,4 @@ SimulationResult
 -> separately constructed ObligationDischargeReceiptV1
 ```
 
-The current shortcut `converged simulation -> discharged Simulation obligation` should then be removed. Admission and discharge must remain different propositions.
+The current `converged simulation -> discharged Simulation obligation` shortcut must be removed only after typed admission and discharge-receipt primitives exist. Admission and discharge remain different propositions.
