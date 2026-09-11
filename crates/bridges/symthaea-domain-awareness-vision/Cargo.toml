@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-domain-awareness-vision"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Evidence-only bridge from Symthaea vision tracking into domain-awareness assurance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["vision", "safety", "sensor-fusion", "assurance"]
+categories = ["science", "aerospace"]
+
+[dependencies]
+symthaea-domain-awareness = { path = "../../domains/symthaea-domain-awareness" }
+symthaea-vision-manifold = { path = "../../domains/symthaea-vision-manifold" }
+uuid = { workspace = true }
