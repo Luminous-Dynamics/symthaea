@@ -17,14 +17,25 @@ pub mod it_coverage;
 pub mod it_qualification;
 pub mod knowledge;
 pub mod knowledge_source;
+pub mod legacy_aix;
+pub mod legacy_aix_scenarios;
 pub mod legacy_artifact_qualification;
 pub mod legacy_computing;
 #[cfg(test)]
 mod legacy_computing_pack_tests;
+pub mod legacy_hpux;
+pub mod legacy_hpux_scenarios;
+pub mod legacy_ibmi;
+pub mod legacy_ibmi_scenarios;
 pub mod legacy_platform_identity;
+pub mod legacy_portfolio;
 pub mod legacy_qualification_profile;
+pub mod legacy_solaris;
+pub mod legacy_solaris_scenarios;
 pub mod legacy_source_artifacts;
 pub mod legacy_source_readiness;
+pub mod legacy_zos;
+pub mod legacy_zos_scenarios;
 #[cfg(feature = "logparse-adapter")]
 pub mod logparse_adapter;
 pub mod predictive;
@@ -74,6 +85,17 @@ pub use knowledge_source::{
     KnowledgeSourceErrorV1, KnowledgeStabilityV1, SupportKnowledgeHitV1,
     SupportKnowledgeQueryV1, SupportKnowledgeSourceV1,
 };
+pub use legacy_aix::{
+    enrich_legacy_aix_foundation_v1, AixEvidenceSignalV1, AixFailureModeV1, AixFoundationV1,
+    AixMechanismKindV1, AixMechanismModelV1, LegacyAixErrorV1,
+    LEGACY_AIX_FOUNDATION_SCHEMA_V1,
+};
+pub use legacy_aix_scenarios::{
+    register_aix_qualification_cases_v1, seed_aix_qualification_scenarios_v1,
+    AixQualificationScenarioV1, AixScenarioActionClassV1, AixScenarioActionV1,
+    AixScenarioErrorV1, AixScenarioEvidenceCurrentnessV1, AixScenarioEvidenceV1,
+    LEGACY_AIX_SCENARIO_SCHEMA_V1,
+};
 pub use legacy_artifact_qualification::{
     assess_legacy_strong_qualification_v1, LegacyArtifactQualificationErrorV1,
     LegacyStrongQualificationAssessmentV1, LegacyStrongQualificationBlockerV1,
@@ -84,10 +106,36 @@ pub use legacy_computing::{
     LegacyProcedureAuthorityV1, LegacyProcedureKindV1, LegacyProcedureStepV1,
     LegacyProcedureV1, LEGACY_COMPUTING_PACK_SCHEMA_V1,
 };
+pub use legacy_hpux::{
+    enrich_legacy_hpux_foundation_v1, HpuxEvidenceSignalV1, HpuxFailureModeV1,
+    HpuxFoundationV1, HpuxMechanismKindV1, HpuxMechanismModelV1, LegacyHpuxErrorV1,
+    LEGACY_HPUX_FOUNDATION_SCHEMA_V1,
+};
+pub use legacy_hpux_scenarios::{
+    register_hpux_qualification_cases_v1, seed_hpux_qualification_scenarios_v1,
+    HpuxQualificationScenarioV1, HpuxScenarioActionClassV1, HpuxScenarioActionV1,
+    HpuxScenarioErrorV1, HpuxScenarioEvidenceCurrentnessV1, HpuxScenarioEvidenceV1,
+    LEGACY_HPUX_SCENARIO_SCHEMA_V1,
+};
+pub use legacy_ibmi::{
+    enrich_legacy_ibmi_foundation_v1, IbmiEvidenceSignalV1, IbmiFailureModeV1,
+    IbmiFoundationV1, IbmiMechanismKindV1, IbmiMechanismModelV1, LegacyIbmiErrorV1,
+    LEGACY_IBMI_FOUNDATION_SCHEMA_V1,
+};
+pub use legacy_ibmi_scenarios::{
+    register_ibmi_qualification_cases_v1, seed_ibmi_qualification_scenarios_v1,
+    IbmiQualificationScenarioV1, IbmiScenarioActionClassV1, IbmiScenarioActionV1,
+    IbmiScenarioErrorV1, IbmiScenarioEvidenceCurrentnessV1, IbmiScenarioEvidenceV1,
+    LEGACY_IBMI_SCENARIO_SCHEMA_V1,
+};
 pub use legacy_platform_identity::{
     assess_legacy_platform_identity_v1, legacy_platform_identity_spec_v1,
     legacy_platform_identity_v1, legacy_platform_scope_v1, LegacyPlatformIdentitySpecV1,
     LEGACY_PLATFORM_ECOSYSTEM_V1, LEGACY_PLATFORM_IDENTITY_SCHEMA_V1,
+};
+pub use legacy_portfolio::{
+    build_legacy_five_platform_portfolio_v1, LegacyPortfolioErrorV1, LegacyPortfolioSummaryV1,
+    LEGACY_PORTFOLIO_SCHEMA_V1,
 };
 pub use legacy_qualification_profile::{
     area_tag, assess_legacy_qualification_profile_v1, exhaustive_legacy_qualification_profile_v1,
@@ -95,6 +143,17 @@ pub use legacy_qualification_profile::{
     LegacyQualificationProfileErrorV1, LegacyQualificationProfileV1,
     LegacyQualificationRequirementAssessmentV1, LegacyQualificationRequirementV1,
     LEGACY_QUALIFICATION_PROFILE_SCHEMA_V1,
+};
+pub use legacy_solaris::{
+    enrich_legacy_solaris_foundation_v1, LegacySolarisErrorV1, SolarisEvidenceSignalV1,
+    SolarisFailureModeV1, SolarisFoundationV1, SolarisMechanismKindV1,
+    SolarisMechanismModelV1, LEGACY_SOLARIS_FOUNDATION_SCHEMA_V1,
+};
+pub use legacy_solaris_scenarios::{
+    register_solaris_qualification_cases_v1, seed_solaris_qualification_scenarios_v1,
+    SolarisQualificationScenarioV1, SolarisScenarioActionClassV1, SolarisScenarioActionV1,
+    SolarisScenarioErrorV1, SolarisScenarioEvidenceCurrentnessV1, SolarisScenarioEvidenceV1,
+    LEGACY_SOLARIS_SCENARIO_SCHEMA_V1,
 };
 pub use legacy_source_artifacts::{
     assess_legacy_source_artifact_readiness_v1, LegacyArtifactAccessPolicyV1,
@@ -106,6 +165,17 @@ pub use legacy_source_readiness::{
     admit_legacy_knowledge_use_v1, assess_legacy_source_readiness_v1,
     LegacyKnowledgeUseClassV1, LegacySourceCaptureClassV1, LegacySourceReadinessAssessmentV1,
     LegacySourceReadinessErrorV1, LegacySourceReadinessItemV1,
+};
+pub use legacy_zos::{
+    enrich_legacy_zos_foundation_v1, LegacyZosErrorV1, ZosEvidenceSignalV1,
+    ZosFailureModeV1, ZosFoundationV1, ZosMechanismKindV1, ZosMechanismModelV1,
+    LEGACY_ZOS_FOUNDATION_SCHEMA_V1,
+};
+pub use legacy_zos_scenarios::{
+    register_zos_qualification_cases_v1, seed_zos_qualification_scenarios_v1,
+    ZosQualificationScenarioV1, ZosScenarioActionClassV1, ZosScenarioActionV1,
+    ZosScenarioErrorV1, ZosScenarioEvidenceCurrentnessV1, ZosScenarioEvidenceV1,
+    LEGACY_ZOS_SCENARIO_SCHEMA_V1,
 };
 #[cfg(feature = "logparse-adapter")]
 pub use logparse_adapter::{
