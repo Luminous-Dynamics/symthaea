@@ -24,6 +24,7 @@ use std::sync::Arc;
 const SIGNED_ARTIFACT_FORMAT_VERSION: u16 = 2;
 const SIGNING_DOMAIN: &[u8] = b"symthaea.wasm-artifact.v2\0";
 const CACHE_DOMAIN: &[u8] = b"symthaea.wasm-source-cache.v2\0";
+const MAX_PLUGIN_NAME_LEN: usize = 64;
 
 /// Portable WASM artifact signed by the architect's configured local signer.
 ///
@@ -70,10 +71,11 @@ impl WasmArchitect {
         if let Ok(entries) = fs::read_dir(&artifact_dir) {
             for entry in entries.flatten() {
                 if let Some(name) = entry.file_name().to_str() {
-                    if name.ends_with(".artifact") {
-                        if let Ok(bytes) = fs::read(entry.path()) {
-                            let code_hash = name.trim_end_matches(".artifact").to_string();
-                            cache.put(code_hash, bytes);
+                    if let Some(code_hash) = name.strip_suffix(".artifact") {
+                        if Self::valid_cache_key(code_hash) {
+                            if let Ok(bytes) = fs::read(entry.path()) {
+                                cache.put(code_hash.to_string(), bytes);
+                            }
                         }
                     }
                 }
@@ -117,6 +119,7 @@ impl WasmArchitect {
     /// artifact must now be structurally valid and signed by this architect's
     /// configured signer before registration can succeed.
     pub fn register_system_extension(&self, code_hash: &str) -> Result<()> {
+        Self::validate_cache_key(code_hash)?;
         println!(
             "🚀 Wasm Architect: Registering system extension {:?}...",
             code_hash
@@ -204,6 +207,47 @@ impl WasmArchitect {
         Ok(signed)
     }
 
+    fn validate_plugin_name(plugin_name: &str) -> Result<()> {
+        if plugin_name.is_empty() || plugin_name.len() > MAX_PLUGIN_NAME_LEN {
+            return Err(anyhow::anyhow!(
+                "plugin name must contain 1..={} characters",
+                MAX_PLUGIN_NAME_LEN
+            ));
+        }
+        if !plugin_name
+            .bytes()
+            .next()
+            .is_some_and(|byte| byte.is_ascii_alphabetic())
+        {
+            return Err(anyhow::anyhow!(
+                "plugin name must start with an ASCII letter"
+            ));
+        }
+        if !plugin_name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        {
+            return Err(anyhow::anyhow!(
+                "plugin name may contain only ASCII letters, digits, '-' and '_'"
+            ));
+        }
+        Ok(())
+    }
+
+    fn valid_cache_key(code_hash: &str) -> bool {
+        code_hash.len() == 64 && code_hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+    }
+
+    fn validate_cache_key(code_hash: &str) -> Result<()> {
+        if Self::valid_cache_key(code_hash) {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "extension cache key must be exactly 64 hexadecimal characters"
+            ))
+        }
+    }
+
     /// Cryptographic cache key binding both the package name and exact source.
     fn compute_hash(code: &str, plugin_name: &str) -> String {
         let mut hasher = Sha256::new();
@@ -227,6 +271,7 @@ impl WasmArchitect {
     /// executable input. A cached artifact is reused only after signature and
     /// digest verification against this host's configured signer.
     pub fn compile_to_wasm(&self, code: &str, plugin_name: &str) -> Result<Vec<u8>> {
+        Self::validate_plugin_name(plugin_name)?;
         let code_hash = Self::compute_hash(code, plugin_name);
 
         let cached = {
@@ -474,6 +519,26 @@ mod tests {
         assert_eq!(first.len(), 64);
         assert_eq!(first, same);
         assert_ne!(first, renamed);
+    }
+
+    #[test]
+    fn invalid_plugin_names_fail_before_filesystem_or_cargo_use() {
+        for invalid in [
+            "../escape",
+            "nested/path",
+            "plugin\n[dependencies]\nevil = \"*\"",
+            "9starts-with-digit",
+            "",
+        ] {
+            assert!(WasmArchitect::validate_plugin_name(invalid).is_err());
+        }
+        assert!(WasmArchitect::validate_plugin_name("safe-plugin_2").is_ok());
+    }
+
+    #[test]
+    fn arbitrary_cache_paths_are_rejected() {
+        assert!(WasmArchitect::validate_cache_key("../outside").is_err());
+        assert!(WasmArchitect::validate_cache_key(&"a".repeat(64)).is_ok());
     }
 
     #[test]
