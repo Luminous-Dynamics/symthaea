@@ -5,14 +5,17 @@
 //!
 //! This bridge preserves `symthaea-sim-bridge` as the numerical contract while
 //! moving provider discovery/routing ahead of backend instantiation. Expensive
-//! solver adapters remain dormant until selected, and authority is supplied as
-//! fresh point-of-use [`ActiveAdmission`] values rather than cached booleans.
+//! solver adapters remain dormant until selected. Candidate authority is checked
+//! for routing, then the selected provider is rechecked around execution.
 
 #![deny(unsafe_code)]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
-use symthaea_extension_admission::ActiveAdmission;
+use symthaea_extension_admission::{ActiveAdmission, AdmissionCurrentnessSource};
+use symthaea_extension_authority::{
+    AuthorityScope, ScopedAdmissionSet, ScopedAdmissionSetError,
+};
 use symthaea_extension_core::{CapabilityId, ExtensionId, ExtensionManifest};
 use symthaea_extension_registry::{ExtensionRegistry, RegistryError};
 use symthaea_extension_router::{
@@ -110,6 +113,7 @@ pub enum LazySimulationError {
     DuplicateFactory(ExtensionId),
     ObservationForUnknownProvider(ExtensionId),
     AdmissionForUnknownProvider(ExtensionId),
+    AdmissionAuthority(ScopedAdmissionSetError),
     Route(RoutingError),
     SelectedFactoryMissing(ExtensionId),
     BackendConstruction {
@@ -128,9 +132,10 @@ pub enum LazySimulationError {
     Simulation(SimulationError),
 }
 
-/// Factories and quality telemetry may be cached. Active authority is not.
-#[derive(Default)]
+/// Factories and quality telemetry may be cached. Admission authority is bound to
+/// one process-local host scope, while scoped admission sets are supplied per use.
 pub struct LazySimulationRegistry {
+    authority_scope: AuthorityScope,
     catalog: ExtensionRegistry,
     factories: BTreeMap<ExtensionId, Box<dyn SimulationBackendFactory>>,
     observations: BTreeMap<ExtensionId, ProviderObservation>,
@@ -141,13 +146,20 @@ impl Debug for LazySimulationRegistry {
         f.debug_struct("LazySimulationRegistry")
             .field("provider_count", &self.factories.len())
             .field("observation_count", &self.observations.len())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
 impl LazySimulationRegistry {
-    pub fn new() -> Self {
-        Self::default()
+    /// Create a lazy solver registry bound to one process-local extension
+    /// authority. There is intentionally no authority-free default constructor.
+    pub fn new(authority_scope: AuthorityScope) -> Self {
+        Self {
+            authority_scope,
+            catalog: ExtensionRegistry::new(),
+            factories: BTreeMap::new(),
+            observations: BTreeMap::new(),
+        }
     }
 
     pub fn register(
@@ -155,7 +167,9 @@ impl LazySimulationRegistry {
         factory: impl SimulationBackendFactory + 'static,
     ) -> Result<(), LazySimulationError> {
         let descriptor = factory.descriptor();
-        descriptor.validate().map_err(LazySimulationError::Descriptor)?;
+        descriptor
+            .validate()
+            .map_err(LazySimulationError::Descriptor)?;
         let id = descriptor.manifest.id.clone();
         if self.factories.contains_key(&id) {
             return Err(LazySimulationError::DuplicateFactory(id));
@@ -185,18 +199,48 @@ impl LazySimulationRegistry {
         &self.catalog
     }
 
-    /// Route, instantiate only the winner, then delegate result/provenance
-    /// validation to the existing `SimulationRegistry` contract.
+    /// Route under the full candidate authority set, then execute under only the
+    /// selected provider's authority.
     ///
-    /// `admissions` must be freshly activated against current policy/trust
-    /// generations and revocation state. They are never cached here.
+    /// Candidate admissions are bracketed around routing because every admitted
+    /// candidate can affect the deterministic selection result. Once a winner is
+    /// selected, only that provider is rechecked immediately before and after
+    /// backend construction/execution. An unrelated losing provider changing
+    /// after routing therefore cannot invalidate the winner's result.
     pub fn run(
         &self,
         request: &SimulationRequest,
         constraints: RoutingConstraints,
-        admissions: &[ActiveAdmission],
+        admissions: &ScopedAdmissionSet,
+        currentness: &dyn AdmissionCurrentnessSource,
     ) -> Result<(SimulationResult, RoutingDecision), LazySimulationError> {
-        request.validate().map_err(LazySimulationError::Simulation)?;
+        request
+            .validate()
+            .map_err(LazySimulationError::Simulation)?;
+
+        let decision = self
+            .authority_scope
+            .with_rechecked_set(admissions, currentness, |checked| {
+                self.route_checked(request, constraints, checked)
+            })
+            .map_err(LazySimulationError::AdmissionAuthority)??;
+
+        let result = self
+            .authority_scope
+            .with_rechecked_member(admissions, &decision.selected, currentness, |_selected| {
+                self.execute_selected(request, &decision)
+            })
+            .map_err(LazySimulationError::AdmissionAuthority)??;
+
+        Ok((result, decision))
+    }
+
+    fn route_checked(
+        &self,
+        request: &SimulationRequest,
+        constraints: RoutingConstraints,
+        admissions: &[ActiveAdmission],
+    ) -> Result<RoutingDecision, LazySimulationError> {
         for admission in admissions {
             if !self.catalog.contains(admission.extension()) {
                 return Err(LazySimulationError::AdmissionForUnknownProvider(
@@ -210,14 +254,20 @@ impl LazySimulationRegistry {
             constraints,
         };
         let observations: Vec<_> = self.observations.values().cloned().collect();
-        let decision = ExtensionRouter::route(
+        ExtensionRouter::route(
             &self.catalog,
             &routing_request,
             admissions,
             &observations,
         )
-        .map_err(LazySimulationError::Route)?;
+        .map_err(LazySimulationError::Route)
+    }
 
+    fn execute_selected(
+        &self,
+        request: &SimulationRequest,
+        decision: &RoutingDecision,
+    ) -> Result<SimulationResult, LazySimulationError> {
         let factory = self
             .factories
             .get(&decision.selected)
@@ -246,8 +296,9 @@ impl LazySimulationRegistry {
 
         let mut legacy = SimulationRegistry::new();
         legacy.register(BoxedBackend(backend));
-        let result = legacy.run(request).map_err(LazySimulationError::Simulation)?;
-        Ok((result, decision))
+        legacy
+            .run(request)
+            .map_err(LazySimulationError::Simulation)
     }
 }
 
@@ -286,8 +337,10 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
     use std::sync::Arc;
     use symthaea_extension_admission::{
-        AdmissionContext, AdmissionCurrentnessSource, AdmissionRecord, AdmissionSubject, PrincipalId,
-        Sha256Digest, TrustLevel,
+        AdmissionContext, AdmissionRecord, AdmissionSubject, PrincipalId, Sha256Digest, TrustLevel,
+    };
+    use symthaea_extension_authority::{
+        AdmissionAuthority, AuthorityScopeError, ScopedAdmission, ScopedAdmissionSetError,
     };
     use symthaea_extension_core::{
         AbiVersion, CapabilityDescriptor, EffectClass, ExtensionKind, PermissionSet,
@@ -296,15 +349,6 @@ mod tests {
     use symthaea_extension_router::ProviderState;
     use symthaea_sim_bridge::EngineeringDomain;
 
-    #[derive(Debug, Clone, Copy)]
-    struct TestCurrentness(AdmissionContext);
-
-    impl AdmissionCurrentnessSource for TestCurrentness {
-        fn current_context(&self, _subject: AdmissionSubject<'_>) -> Option<AdmissionContext> {
-            Some(self.0)
-        }
-    }
-
     #[derive(Debug)]
     struct MockBackend {
         name: &'static str,
@@ -312,10 +356,18 @@ mod tests {
     }
 
     impl SimulationBackend for MockBackend {
-        fn name(&self) -> &'static str { self.name }
-        fn supported_solvers(&self) -> &[SolverKind] { &self.solvers }
+        fn name(&self) -> &'static str {
+            self.name
+        }
+        fn supported_solvers(&self) -> &[SolverKind] {
+            &self.solvers
+        }
         fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
-            Ok(SimulationResult::dry_run(request.id.clone(), self.name, 0.8))
+            Ok(SimulationResult::dry_run(
+                request.id.clone(),
+                self.name,
+                0.8,
+            ))
         }
     }
 
@@ -328,17 +380,41 @@ mod tests {
     }
 
     impl SimulationBackendFactory for CountingFactory {
-        fn descriptor(&self) -> &SimulationProviderDescriptor { &self.descriptor }
+        fn descriptor(&self) -> &SimulationProviderDescriptor {
+            &self.descriptor
+        }
         fn create(&self) -> Result<Box<dyn SimulationBackend>, SimulationError> {
             self.count.fetch_add(1, AtomicOrdering::SeqCst);
             Ok(Box::new(MockBackend {
                 name: self.backend_name,
-                solvers: self.backend_solvers.clone().unwrap_or_else(|| self.descriptor.supported_solvers.clone()),
+                solvers: self
+                    .backend_solvers
+                    .clone()
+                    .unwrap_or_else(|| self.descriptor.supported_solvers.clone()),
             }))
         }
     }
 
-    fn digest(byte: u8) -> Sha256Digest { Sha256Digest::new([byte; 32]) }
+    #[derive(Debug, Default)]
+    struct StaticCurrentness {
+        contexts: BTreeMap<ExtensionId, AdmissionContext>,
+    }
+
+    impl StaticCurrentness {
+        fn set(&mut self, extension: &str, context: AdmissionContext) {
+            self.contexts.insert(ExtensionId::new(extension), context);
+        }
+    }
+
+    impl AdmissionCurrentnessSource for StaticCurrentness {
+        fn current_context(&self, subject: AdmissionSubject<'_>) -> Option<AdmissionContext> {
+            self.contexts.get(subject.extension()).copied()
+        }
+    }
+
+    fn digest(byte: u8) -> Sha256Digest {
+        Sha256Digest::new([byte; 32])
+    }
 
     fn descriptor(id: &str, name: &str, solver: SolverKind) -> SimulationProviderDescriptor {
         SimulationProviderDescriptor {
@@ -364,8 +440,17 @@ mod tests {
         }
     }
 
-    fn factory(desc: SimulationProviderDescriptor, count: Arc<AtomicUsize>, name: &'static str) -> CountingFactory {
-        CountingFactory { descriptor: desc, count, backend_name: name, backend_solvers: None }
+    fn factory(
+        desc: SimulationProviderDescriptor,
+        count: Arc<AtomicUsize>,
+        name: &'static str,
+    ) -> CountingFactory {
+        CountingFactory {
+            descriptor: desc,
+            count,
+            backend_name: name,
+            backend_solvers: None,
+        }
     }
 
     fn observation(id: &str, evidence: u8, reliability: u16) -> ProviderObservation {
@@ -378,13 +463,29 @@ mod tests {
         }
     }
 
-    fn active_admission(registry: &LazySimulationRegistry, id: &str, generation: u64, seed: u8) -> ActiveAdmission {
+    fn currentness_for(entries: &[(&str, u64, u8)]) -> StaticCurrentness {
+        let mut source = StaticCurrentness::default();
+        for (id, generation, seed) in entries {
+            source.set(
+                id,
+                AdmissionContext::active(*generation, 10_000 + u64::from(*seed)),
+            );
+        }
+        source
+    }
+
+    fn scoped_admission(
+        registry: &LazySimulationRegistry,
+        authority: &AdmissionAuthority,
+        id: &str,
+        generation: u64,
+        seed: u8,
+    ) -> ScopedAdmission {
         let extension = ExtensionId::new(id);
         let manifest = registry.catalog().get(&extension).unwrap();
         let trust_generation = 10_000 + u64::from(seed);
-        let currentness = TestCurrentness(AdmissionContext::active(generation, trust_generation));
-        AdmissionRecord::issue(
-            extension,
+        let record = AdmissionRecord::issue(
+            extension.clone(),
             manifest.version.clone(),
             digest(seed),
             digest(seed.wrapping_add(1)),
@@ -392,38 +493,77 @@ mod tests {
             PrincipalId::new("local:test-authority").unwrap(),
             Some(PrincipalId::new("did:example:test-publisher").unwrap()),
             TrustLevel::Trusted,
-            manifest.provides.iter().map(|capability| capability.id.clone()).collect(),
+            manifest
+                .provides
+                .iter()
+                .map(|capability| capability.id.clone())
+                .collect(),
             PermissionSet::default(),
             generation,
             trust_generation,
         )
-        .unwrap()
-        .activate(manifest, &currentness)
-        .unwrap()
+        .unwrap();
+        let source = StaticCurrentness {
+            contexts: BTreeMap::from([(
+                extension,
+                AdmissionContext::active(generation, trust_generation),
+            )]),
+        };
+        authority.activate(&record, manifest, &source).unwrap()
     }
 
     #[test]
     fn registration_is_cold_and_only_winner_is_instantiated() {
+        let authority = AdmissionAuthority::new();
+        let scope = authority.scope();
         let solver = SolverKind::ComputationalFluidDynamics;
         let low = Arc::new(AtomicUsize::new(0));
         let high = Arc::new(AtomicUsize::new(0));
-        let mut registry = LazySimulationRegistry::new();
-        registry.register(factory(descriptor("org.example.low", "low", solver), low.clone(), "low")).unwrap();
-        registry.register(factory(descriptor("org.example.high", "high", solver), high.clone(), "high")).unwrap();
-        assert_eq!(low.load(AtomicOrdering::SeqCst), 0);
-        assert_eq!(high.load(AtomicOrdering::SeqCst), 0);
-        registry.set_observation(observation("org.example.low", 2, 8_000)).unwrap();
-        registry.set_observation(observation("org.example.high", 4, 9_900)).unwrap();
-        let admissions = vec![
-            active_admission(&registry, "org.example.low", 1, 10),
-            active_admission(&registry, "org.example.high", 1, 20),
-        ];
-        let request = SimulationRequest::new("run-1", EngineeringDomain::Mechanical, solver, "test");
-        let (result, decision) = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-        ).unwrap();
+        let mut registry = LazySimulationRegistry::new(scope.clone());
+        registry
+            .register(factory(
+                descriptor("org.example.low", "low", solver),
+                low.clone(),
+                "low",
+            ))
+            .unwrap();
+        registry
+            .register(factory(
+                descriptor("org.example.high", "high", solver),
+                high.clone(),
+                "high",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.low", 2, 8_000))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.high", 4, 9_900))
+            .unwrap();
+        let admissions = scope
+            .bundle(vec![
+                scoped_admission(&registry, &authority, "org.example.low", 1, 10),
+                scoped_admission(&registry, &authority, "org.example.high", 1, 20),
+            ])
+            .unwrap();
+        let currentness = currentness_for(&[
+            ("org.example.low", 1, 10),
+            ("org.example.high", 1, 20),
+        ]);
+        let request =
+            SimulationRequest::new("run-1", EngineeringDomain::Mechanical, solver, "test");
+        let (result, decision) = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &currentness,
+            )
+            .unwrap();
         assert_eq!(decision.selected, ExtensionId::new("org.example.high"));
         assert_eq!(result.evidence.backend.as_deref(), Some("high"));
         assert_eq!(low.load(AtomicOrdering::SeqCst), 0);
@@ -432,58 +572,279 @@ mod tests {
 
     #[test]
     fn missing_admission_prevents_instantiation() {
+        let authority = AdmissionAuthority::new();
+        let scope = authority.scope();
         let solver = SolverKind::Circuit;
         let count = Arc::new(AtomicUsize::new(0));
-        let mut registry = LazySimulationRegistry::new();
-        registry.register(factory(descriptor("org.example.circuit", "circuit", solver), count.clone(), "circuit")).unwrap();
-        registry.set_observation(observation("org.example.circuit", 5, 10_000)).unwrap();
-        let request = SimulationRequest::new("no-auth", EngineeringDomain::Electrical, solver, "test");
-        assert!(registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &[],
-        ).is_err());
+        let mut registry = LazySimulationRegistry::new(scope.clone());
+        registry
+            .register(factory(
+                descriptor("org.example.circuit", "circuit", solver),
+                count.clone(),
+                "circuit",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.circuit", 5, 10_000))
+            .unwrap();
+        let admissions = scope.bundle(Vec::new()).unwrap();
+        let request =
+            SimulationRequest::new("no-auth", EngineeringDomain::Electrical, solver, "test");
+        assert!(registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &StaticCurrentness::default(),
+            )
+            .is_err());
+        assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[test]
+    fn foreign_authority_set_prevents_instantiation() {
+        let authority = AdmissionAuthority::new();
+        let foreign = AdmissionAuthority::new();
+        let solver = SolverKind::Circuit;
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut registry = LazySimulationRegistry::new(authority.scope());
+        registry
+            .register(factory(
+                descriptor("org.example.foreign", "foreign", solver),
+                count.clone(),
+                "foreign",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.foreign", 5, 10_000))
+            .unwrap();
+        let token = scoped_admission(&registry, &foreign, "org.example.foreign", 1, 30);
+        let admissions = foreign.scope().bundle(vec![token]).unwrap();
+        let currentness = currentness_for(&[("org.example.foreign", 1, 30)]);
+        let request =
+            SimulationRequest::new("foreign", EngineeringDomain::Electrical, solver, "test");
+
+        let error = registry
+            .run(&request, RoutingConstraints::default(), &admissions, &currentness)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            LazySimulationError::AdmissionAuthority(ScopedAdmissionSetError::Scope(
+                AuthorityScopeError::ForeignAuthority
+            ))
+        ));
+        assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[test]
+    fn revoked_admission_prevents_instantiation() {
+        let authority = AdmissionAuthority::new();
+        let scope = authority.scope();
+        let solver = SolverKind::Circuit;
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut registry = LazySimulationRegistry::new(scope.clone());
+        registry
+            .register(factory(
+                descriptor("org.example.revoked", "revoked", solver),
+                count.clone(),
+                "revoked",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.revoked", 5, 10_000))
+            .unwrap();
+        let admissions = scope
+            .bundle(vec![scoped_admission(
+                &registry,
+                &authority,
+                "org.example.revoked",
+                1,
+                31,
+            )])
+            .unwrap();
+        let mut currentness = currentness_for(&[("org.example.revoked", 1, 31)]);
+        currentness.set(
+            "org.example.revoked",
+            AdmissionContext::revoked(1, 10_031),
+        );
+        let request =
+            SimulationRequest::new("revoked", EngineeringDomain::Electrical, solver, "test");
+        let error = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &currentness,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            LazySimulationError::AdmissionAuthority(ScopedAdmissionSetError::Currentness {
+                problem: symthaea_extension_admission::AdmissionProblem::Revoked,
+                ..
+            })
+        ));
+        assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[test]
+    fn stale_trust_generation_prevents_instantiation() {
+        let authority = AdmissionAuthority::new();
+        let scope = authority.scope();
+        let solver = SolverKind::Circuit;
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut registry = LazySimulationRegistry::new(scope.clone());
+        registry
+            .register(factory(
+                descriptor("org.example.stale", "stale", solver),
+                count.clone(),
+                "stale",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.stale", 5, 10_000))
+            .unwrap();
+        let admissions = scope
+            .bundle(vec![scoped_admission(
+                &registry,
+                &authority,
+                "org.example.stale",
+                1,
+                32,
+            )])
+            .unwrap();
+        let mut currentness = currentness_for(&[("org.example.stale", 1, 32)]);
+        currentness.set(
+            "org.example.stale",
+            AdmissionContext::active(1, 10_033),
+        );
+        let request =
+            SimulationRequest::new("stale", EngineeringDomain::Electrical, solver, "test");
+        let error = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &currentness,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            LazySimulationError::AdmissionAuthority(ScopedAdmissionSetError::Currentness {
+                problem: symthaea_extension_admission::AdmissionProblem::TrustGenerationMismatch {
+                    ..
+                },
+                ..
+            })
+        ));
         assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
     }
 
     #[test]
     fn backend_must_match_cheap_descriptor() {
+        let authority = AdmissionAuthority::new();
+        let scope = authority.scope();
         let solver = SolverKind::Circuit;
         let count = Arc::new(AtomicUsize::new(0));
-        let mut registry = LazySimulationRegistry::new();
-        registry.register(factory(descriptor("org.example.circuit", "declared", solver), count, "actual")).unwrap();
-        registry.set_observation(observation("org.example.circuit", 5, 10_000)).unwrap();
-        let admissions = vec![active_admission(&registry, "org.example.circuit", 1, 30)];
-        let request = SimulationRequest::new("run-2", EngineeringDomain::Electrical, solver, "test");
-        let err = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-        ).unwrap_err();
-        assert!(matches!(err, LazySimulationError::BackendNameMismatch { .. }));
+        let mut registry = LazySimulationRegistry::new(scope.clone());
+        registry
+            .register(factory(
+                descriptor("org.example.circuit", "declared", solver),
+                count,
+                "actual",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.circuit", 5, 10_000))
+            .unwrap();
+        let admissions = scope
+            .bundle(vec![scoped_admission(
+                &registry,
+                &authority,
+                "org.example.circuit",
+                1,
+                30,
+            )])
+            .unwrap();
+        let currentness = currentness_for(&[("org.example.circuit", 1, 30)]);
+        let request =
+            SimulationRequest::new("run-2", EngineeringDomain::Electrical, solver, "test");
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &currentness,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            LazySimulationError::BackendNameMismatch { .. }
+        ));
     }
 
     #[test]
     fn backend_solver_claim_must_match_descriptor() {
+        let authority = AdmissionAuthority::new();
+        let scope = authority.scope();
         let solver = SolverKind::FiniteElement;
         let count = Arc::new(AtomicUsize::new(0));
         let desc = descriptor("org.example.structure", "structure", solver);
-        let mut registry = LazySimulationRegistry::new();
-        registry.register(CountingFactory {
-            descriptor: desc,
-            count,
-            backend_name: "structure",
-            backend_solvers: Some(vec![SolverKind::Circuit]),
-        }).unwrap();
-        registry.set_observation(observation("org.example.structure", 5, 10_000)).unwrap();
-        let admissions = vec![active_admission(&registry, "org.example.structure", 1, 40)];
+        let mut registry = LazySimulationRegistry::new(scope.clone());
+        registry
+            .register(CountingFactory {
+                descriptor: desc,
+                count,
+                backend_name: "structure",
+                backend_solvers: Some(vec![SolverKind::Circuit]),
+            })
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.structure", 5, 10_000))
+            .unwrap();
+        let admissions = scope
+            .bundle(vec![scoped_admission(
+                &registry,
+                &authority,
+                "org.example.structure",
+                1,
+                40,
+            )])
+            .unwrap();
+        let currentness = currentness_for(&[("org.example.structure", 1, 40)]);
         let request = SimulationRequest::new("run-3", EngineeringDomain::Civil, solver, "test");
-        let err = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-        ).unwrap_err();
-        assert!(matches!(err, LazySimulationError::BackendSolverMismatch { .. }));
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &currentness,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            LazySimulationError::BackendSolverMismatch { .. }
+        ));
     }
 
     #[test]
@@ -491,6 +852,9 @@ mod tests {
         let solver = SolverKind::Process;
         let mut desc = descriptor("org.example.process", "process", solver);
         desc.manifest.provides.clear();
-        assert_eq!(desc.validate(), Err(DescriptorProblem::MissingSolverCapability(solver)));
+        assert_eq!(
+            desc.validate(),
+            Err(DescriptorProblem::MissingSolverCapability(solver))
+        );
     }
 }
