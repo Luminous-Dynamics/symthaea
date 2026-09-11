@@ -265,13 +265,17 @@ impl RegenerativeGenomeV1 {
             RegenerativeHorizon::IndefiniteUnderStaticModel,
             RegenerativeHorizon::FinitePeriods,
         );
-        let limiting_requirement_ids = requirements
-            .iter()
-            .filter(|requirement| {
-                requirement.essential && requirement.horizon == essential_horizon
-            })
-            .map(|requirement| requirement.requirement_id.clone())
-            .collect();
+        let limiting_requirement_ids = match essential_limit {
+            Some(limit) => requirements
+                .iter()
+                .filter(|requirement| {
+                    requirement.essential
+                        && requirement.horizon == RegenerativeHorizon::FinitePeriods(limit)
+                })
+                .map(|requirement| requirement.requirement_id.clone())
+                .collect(),
+            None => Vec::new(),
+        };
 
         Ok(RegenerativeGenomeSupportabilityReport {
             genome_id: self.genome_id.clone(),
@@ -549,5 +553,24 @@ mod tests {
             .unwrap();
         assert_eq!(electronics.qualified_substitution_count, 2);
         assert_eq!(electronics.horizon, RegenerativeHorizon::FinitePeriods(1_000));
+    }
+
+    #[test]
+    fn indefinitely_supportable_genome_has_no_finite_limiter() {
+        let mut model = model();
+        for dependency in &mut model.dependencies {
+            if dependency.governance == DependencyGovernance::Ordinary {
+                dependency.local_production_units_per_period = dependency.demand_units_per_period;
+                dependency.recycling_units_per_period = 0;
+            } else {
+                dependency.governance = DependencyGovernance::Ordinary;
+                dependency.local_production_units_per_period = dependency.demand_units_per_period;
+            }
+        }
+        let mut genome = genome();
+        genome.requirements[1].qualified_substitution_bindings.clear();
+        let report = genome.evaluate_supportability(&model).unwrap();
+        assert_eq!(report.essential_horizon, RegenerativeHorizon::IndefiniteUnderStaticModel);
+        assert!(report.limiting_requirement_ids.is_empty());
     }
 }
