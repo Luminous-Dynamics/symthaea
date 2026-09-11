@@ -1,0 +1,38 @@
+{
+  "schema_version": "ll009b.corridor-bundle-schema.v1",
+  "required_roles_for_trade_study": [
+    "terrain_pack_receipt",
+    "frame_bridge_receipt",
+    "release_state_receipt",
+    "target_track_receipt",
+    "dispersion_receipt",
+    "terminal_correction_receipt",
+    "catcher_receipt",
+    "release_policy_receipt"
+  ],
+  "allowed_evidence_classes": [
+    "synthetic",
+    "authoritative_source",
+    "derived_real_data",
+    "simulation",
+    "measured",
+    "qualified"
+  ],
+  "promotion_rules": {
+    "trade_study_ready_for_real_site_comparison": {
+      "forbid_evidence_classes": [
+        "synthetic"
+      ],
+      "require_all_roles": true,
+      "require_hash_match": true,
+      "require_common_study_id": true,
+      "require_common_epoch_contract": true,
+      "require_common_frame_contract": true
+    }
+  },
+  "non_claims": [
+    "Bundle closure does not establish operational launch safety or site selection.",
+    "Hash consistency does not establish physical model validity.",
+    "A trade-study-ready bundle remains research evidence until downstream qualification gates are earned."
+  ]
+}
