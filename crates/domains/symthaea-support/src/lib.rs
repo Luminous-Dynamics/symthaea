@@ -20,6 +20,7 @@ pub mod knowledge_source;
 pub mod legacy_computing;
 #[cfg(test)]
 mod legacy_computing_pack_tests;
+pub mod legacy_qualification_profile;
 pub mod legacy_source_readiness;
 #[cfg(feature = "logparse-adapter")]
 pub mod logparse_adapter;
@@ -75,6 +76,13 @@ pub use legacy_computing::{
     LegacyCoverageStateV1, LegacyKnowledgeAreaV1, LegacyPlatformProfileV1, LegacyPlatformV1,
     LegacyProcedureAuthorityV1, LegacyProcedureKindV1, LegacyProcedureStepV1,
     LegacyProcedureV1, LEGACY_COMPUTING_PACK_SCHEMA_V1,
+};
+pub use legacy_qualification_profile::{
+    area_tag, assess_legacy_qualification_profile_v1, exhaustive_legacy_qualification_profile_v1,
+    platform_tag, LegacyQualificationBlockerV1, LegacyQualificationProfileAssessmentV1,
+    LegacyQualificationProfileErrorV1, LegacyQualificationProfileV1,
+    LegacyQualificationRequirementAssessmentV1, LegacyQualificationRequirementV1,
+    LEGACY_QUALIFICATION_PROFILE_SCHEMA_V1,
 };
 pub use legacy_source_readiness::{
     admit_legacy_knowledge_use_v1, assess_legacy_source_readiness_v1,
