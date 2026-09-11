@@ -75,27 +75,35 @@ def main() -> int:
         assert applied3["value"] == 12
         mark("crash_recovery_preserves_fence", {"after_crash": snap_after_crash, "retry": applied3})
 
-        policy_deny = parsed(run("issue", "--db", db, "--disposition", "deny", "--reason", "policy_deny", "--challenge", hx(13)))
+        token4 = parsed(run("issue", "--db", db, "--disposition", "permit", "--challenge", hx(13)))
+        p4_commit = root / "t4-commit.json"; save(p4_commit, token4)
+        run("actuate", "--db", db, "--token", p4_commit, "--delta", 1, "--operation-digest", hx(24), "--crash-after-commit", expect=92)
+        snap_after_commit_crash = parsed(run("snapshot", "--db", db))
+        assert snap_after_commit_crash["value"] == 13 and snap_after_commit_crash["current_generation"] == 4 and len(snap_after_commit_crash["consumed_tokens"]) == 3
+        post_commit_replay = run("actuate", "--db", db, "--token", p4_commit, "--delta", 1, "--operation-digest", hx(31), expect=2)
+        require_deny(post_commit_replay, "actuate:replay")
+
+        policy_deny = parsed(run("issue", "--db", db, "--disposition", "deny", "--reason", "policy_deny", "--challenge", hx(14)))
         p4 = root / "policy-deny.json"; save(p4, policy_deny)
-        deny_attempt = run("actuate", "--db", db, "--token", p4, "--delta", 1, "--operation-digest", hx(24), expect=2)
+        deny_attempt = run("actuate", "--db", db, "--token", p4, "--delta", 1, "--operation-digest", hx(30), expect=2)
         require_deny(deny_attempt, "actuate:deny_disposition")
         mark("reject_deny_disposition", {"stderr": deny_attempt.stderr})
 
-        token5 = parsed(run("issue", "--db", db, "--disposition", "permit", "--challenge", hx(14)))
+        token5 = parsed(run("issue", "--db", db, "--disposition", "permit", "--challenge", hx(15)))
         p5 = root / "t5.json"; save(p5, token5)
-        emergency = parsed(run("issue", "--db", db, "--disposition", "deny", "--reason", "emergency_stop", "--challenge", hx(15)))
+        emergency = parsed(run("issue", "--db", db, "--disposition", "deny", "--reason", "emergency_stop", "--challenge", hx(16)))
         p6 = root / "emergency.json"; save(p6, emergency)
         stale_after_stop = run("actuate", "--db", db, "--token", p5, "--delta", 1, "--operation-digest", hx(25), expect=2)
         require_deny(stale_after_stop, "actuate:stale_generation")
         emergency_attempt = run("actuate", "--db", db, "--token", p6, "--delta", 1, "--operation-digest", hx(26), expect=2)
         require_deny(emergency_attempt, "actuate:emergency_stop")
-        sticky = run("issue", "--db", db, "--disposition", "permit", "--challenge", hx(16), expect=2)
+        sticky = run("issue", "--db", db, "--disposition", "permit", "--challenge", hx(17), expect=2)
         require_deny(sticky, "issue:emergency_stop_sticky")
         mark("emergency_stop_dominates", {"stale": stale_after_stop.stderr, "deny": emergency_attempt.stderr, "sticky": sticky.stderr})
 
         other = root / "other.sqlite"
         run("init", "--db", other, "--resource-id", hx(4), "--backend-id", bid, "--profile-id", pid)
-        parsed(run("issue", "--db", other, "--disposition", "permit", "--challenge", hx(17)))
+        parsed(run("issue", "--db", other, "--disposition", "permit", "--challenge", hx(20)))
         wrong_resource = run("actuate", "--db", other, "--token", p1, "--delta", 1, "--operation-digest", hx(27), expect=2)
         require_deny(wrong_resource, "actuate:resource_mismatch")
 
@@ -113,10 +121,10 @@ def main() -> int:
         mark("boundary_identity", {"resource_id": rid, "backend_id": bid, "profile_id": pid, "wrong_resource": wrong_resource.stderr, "wrong_backend": wrong_backend.stderr, "wrong_profile": wrong_profile.stderr})
 
         final = parsed(run("snapshot", "--db", db))
-        assert final["value"] == 12 and final["current_generation"] == 6 and final["emergency_stop"] is True
-        assert len(final["consumed_tokens"]) == 2
+        assert final["value"] == 13 and final["current_generation"] == 7 and final["emergency_stop"] is True
+        assert len(final["consumed_tokens"]) == 3
         mark("one_use_permit_consumption", {"consumed_tokens": final["consumed_tokens"]})
-        mark("durable_monotonic_fence", {"generation_2": snap2["current_generation"], "generation_3": snap_after_crash["current_generation"], "generation_6": final["current_generation"]})
+        mark("durable_monotonic_fence", {"generation_2": snap2["current_generation"], "generation_3": snap_after_crash["current_generation"], "generation_7": final["current_generation"]})
 
         campaign_end = max(now_ms(), max(ts for ts, _ in observed.values()))
         record_ids = []
@@ -133,8 +141,8 @@ def main() -> int:
         backend_impl = sha(lab_bytes)
         boundary_impl = sha(b"sqlite-begin-immediate-check-and-mutate.v1\0" + bytes.fromhex(backend_impl))
         one_use = sha(b"sqlite-consumed-token-primary-key.v1\0" + bytes.fromhex(backend_impl))
-        scenario_suite = sha_text("\n".join(f"{obligation}:{basis}" for obligation, basis in OBLIGATIONS))
-        environment = sha_text(json.dumps({"python": sys.version, "sqlite": sqlite3.sqlite_version, "platform": platform.platform()}, sort_keys=True))
+        scenario_suite = sha_text("\n".join(f"{o}:{b}" for o,b in OBLIGATIONS))
+        env = sha_text(json.dumps({"python": sys.version, "sqlite": sqlite3.sqlite_version, "platform": platform.platform()}, sort_keys=True))
         toolchain = sha_text(json.dumps({"implementation": sys.implementation.name, "version": list(sys.version_info[:3]), "cache_tag": sys.implementation.cache_tag}, sort_keys=True))
         manifest = {
             "schema": "symthaea-continuity-actuation-enforcement-campaign-manifest-v1",
@@ -150,7 +158,7 @@ def main() -> int:
             "campaign_nonce": sha_text(f"{campaign_start}:{os.getpid()}:{root}"),
             "harness_implementation_digest": sha(harness_bytes),
             "scenario_suite_manifest_digest": scenario_suite,
-            "environment_manifest_digest": environment,
+            "environment_manifest_digest": env,
             "topology_dependency_manifest_digest": sha_text("single-process-sqlite-single-resource-boundary-v1"),
             "hardware_firmware_manifest_digest": sha_text("software-simulation-no-physical-hardware-v1"),
             "toolchain_realization_digest": toolchain,
@@ -175,7 +183,7 @@ def main() -> int:
             "obligation_bases": bases,
             "properties": [
                 "stale_generation_rejected", "one_use_replay_rejected", "committed_state_survives_reopen",
-                "crash_before_commit_is_atomic", "emergency_stop_dominates", "deny_token_cannot_mutate",
+                "crash_before_commit_is_atomic", "crash_after_commit_is_durable", "emergency_stop_dominates", "deny_token_cannot_mutate",
                 "cross_resource_token_rejected", "nine_obligation_campaign_shape_accepted",
             ],
         }, sort_keys=True))
