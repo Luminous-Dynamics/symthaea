@@ -652,7 +652,7 @@ mod tests {
         let historical_metadata_snapshots = pack
             .sources
             .snapshots()
-            .filter(|snapshot| matches!(snapshot.capture, SourceCaptureV1::MetadataOnly))
+            .filter(|snapshot| matches!(&snapshot.capture, SourceCaptureV1::MetadataOnly))
             .count();
         let (_claim, selection, artifacts) = add_content_successor_for_first_claim(&mut pack);
         let mut ledger = LegacyQualificationSourceLedgerV2::new();
@@ -662,7 +662,7 @@ mod tests {
         assert_eq!(
             pack.sources
                 .snapshots()
-                .filter(|snapshot| matches!(snapshot.capture, SourceCaptureV1::MetadataOnly))
+                .filter(|snapshot| matches!(&snapshot.capture, SourceCaptureV1::MetadataOnly))
                 .count(),
             historical_metadata_snapshots
         );
