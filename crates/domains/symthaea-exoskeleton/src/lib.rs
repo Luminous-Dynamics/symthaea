@@ -32,6 +32,8 @@ pub mod fault_campaign;
 pub mod full_frame;
 #[cfg(feature = "symtropy")]
 pub mod full_frame_environment;
+pub mod glove_benchmark;
+pub mod glove_dust;
 #[cfg(feature = "hal")]
 pub mod hal_bridge;
 pub mod metabolism;
@@ -39,6 +41,7 @@ pub mod perturbations;
 pub mod plss;
 pub mod plugin;
 pub mod power;
+pub mod powered_glove;
 pub mod pressure_garment;
 pub mod radiation;
 pub mod reduced_gravity;
