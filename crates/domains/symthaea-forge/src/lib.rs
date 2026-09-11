@@ -55,9 +55,11 @@
 //! provenance through deterministic validation and the identity-only holdout boundary,
 //! [`proposal_linux_isolation`] adds a stronger Linux bubblewrap namespace/filesystem/network
 //! isolation backend while keeping seccomp, Landlock, and cgroup resource enforcement as explicit
-//! nonclaims, the crate-private deterministic scorer joins frozen predictions to labels only during
-//! scoring, and [`proposal_validation_chain`] retains the earlier blind deterministic receipt
-//! machinery for compatibility while constructor visibility is narrowed in a later follow-up.
+//! nonclaims, [`proposal_isolated_validation`] composes that isolation receipt with deterministic
+//! validation and the holdout prerequisite, the crate-private deterministic scorer joins frozen
+//! predictions to labels only during scoring, and [`proposal_validation_chain`] retains the earlier
+//! blind deterministic receipt machinery for compatibility while constructor visibility is narrowed
+//! in a later follow-up.
 //!
 //! # Authority boundary
 //!
@@ -115,9 +117,10 @@
 //!   isolated `/proc`, `/dev`, and fresh tmpfs `/tmp`; inherited environment is cleared.
 //! - Bubblewrap v1 still does not claim seccomp filtering, Landlock policy, or cgroup CPU/memory
 //!   enforcement; those properties remain `NotEstablishedV1` in the isolation receipt.
+//! - Isolation-bound validation requires that exact bubblewrap execution receipt before the
+//!   deterministic Brier result or identity-only holdout prerequisite can exist.
 //! - The earlier direct blind deterministic validation path remains a compatibility bypass in this
-//!   tranche; executable-model validation is the strongest validation proposition, while the Linux
-//!   isolation receipt is the strongest runtime-containment proposition.
+//!   tranche; isolated-model validation is the strongest Linux runtime+validation proposition.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
 //! - Training support is counted only from observed labels; censored and counterfactual outcomes
@@ -127,8 +130,8 @@
 //! - Public validation prediction generation covers every proposal row through label-blind targets;
 //!   whether a row is observed/censored/counterfactual is joined only after predictions are frozen.
 //! - Generic aggregate validation/holdout constructors remain crate-internal; the blind deterministic,
-//!   evaluator-bound, launch-bound and executable-model-bound receipt layers all reconstruct Brier
-//!   from exact row-level evidence.
+//!   evaluator-bound, launch-bound, executable-model-bound and isolation-bound receipt layers all
+//!   reconstruct Brier from exact row-level evidence.
 //! - Deterministic validation v1 rejects report-only metrics until they also have deterministic,
 //!   row-reconstructable scorers.
 //! - Validation acceptance threshold/scorer identity is precommitted before a model artifact can be
@@ -169,6 +172,7 @@ pub mod proposal_evaluator_validation;
 pub mod proposal_executable_model;
 pub mod proposal_exposure;
 pub mod proposal_history;
+pub mod proposal_isolated_validation;
 pub mod proposal_launch_validation;
 pub mod proposal_linux_isolation;
 mod proposal_model;
@@ -273,6 +277,10 @@ pub use proposal_exposure::{
 pub use proposal_history::{
     ForgeConditionedProposalObservationRow, ForgeConditionedProposalObservationTable,
     ForgeProposalGenerationState, ForgeProposalHistoryError,
+};
+pub use proposal_isolated_validation::{
+    ForgeProposalIsolatedModelHoldoutPermit, ForgeProposalIsolatedModelValidationReceipt,
+    ForgeProposalIsolatedValidationError,
 };
 pub use proposal_launch_validation::{
     validate_direct_launch_receipt, ForgeProposalLaunchValidationError,
