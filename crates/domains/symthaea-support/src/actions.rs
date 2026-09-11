@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Action Engine — propose support actions and legacy autonomy eligibility.
+//! Action Engine — propose support actions and legacy automation eligibility.
 //!
 //! IMPORTANT: `ActionEngine::can_execute` is a coarse legacy eligibility hint.
 //! It is **not** an execution authorization boundary. New governed IT execution
@@ -11,34 +11,30 @@
 use crate::types::*;
 
 #[derive(Debug)]
-pub struct ActionEngine {
-    permitted: Vec<ActionType>,
-}
+pub struct ActionEngine;
 
 impl ActionEngine {
     pub fn new() -> Self {
-        Self {
-            permitted: vec![
-                ActionType::RestartService,
-                ActionType::ClearCache,
-                ActionType::RunDiagnostic,
-            ],
-        }
+        Self
     }
 
-    /// Legacy coarse autonomy eligibility only.
+    /// Legacy automation eligibility only.
     ///
-    /// `true` means the action class was historically considered automation-
-    /// eligible at this autonomy level. It does **not** establish currentness,
-    /// blast radius, rollback readiness, operator/organizational authority, or a
-    /// live capability. Do not use this method as permission to execute a governed
-    /// IT action; require the bounded authority path in `it_authority` instead.
+    /// This method now fails closed for every mutating or active support action.
+    /// It is retained only for compatibility with callers that want to discover
+    /// whether a passive/read-only diagnostic may be automated at the coarse
+    /// legacy layer. It does **not** establish currentness, blast radius,
+    /// rollback readiness, operator/organizational authority, or a live
+    /// capability.
+    ///
+    /// Any governed mutating operation must cross `it_authority` and present an
+    /// `ItCommandAuthorityV1` at the executor boundary.
     pub fn can_execute(&self, action: &ActionType, level: &AutonomyLevel) -> bool {
-        match level {
-            AutonomyLevel::Advisory => false,
-            AutonomyLevel::SemiAutonomous => self.permitted.contains(action),
-            AutonomyLevel::FullAutonomous => true,
-        }
+        matches!(
+            (action, level),
+            (ActionType::RunDiagnostic, AutonomyLevel::SemiAutonomous)
+                | (ActionType::RunDiagnostic, AutonomyLevel::FullAutonomous)
+        )
     }
 
     /// Propose an action with rollback steps. A proposal carries no execution
@@ -89,6 +85,7 @@ mod tests {
         assert!(!engine.can_execute(&ActionType::RestartService, &AutonomyLevel::Advisory));
         assert!(!engine.can_execute(&ActionType::ClearCache, &AutonomyLevel::Advisory));
         assert!(!engine.can_execute(&ActionType::UpdateConfig, &AutonomyLevel::Advisory));
+        assert!(!engine.can_execute(&ActionType::RunDiagnostic, &AutonomyLevel::Advisory));
         assert!(!engine.can_execute(
             &ActionType::Custom("test".to_string()),
             &AutonomyLevel::Advisory
@@ -96,23 +93,26 @@ mod tests {
     }
 
     #[test]
-    fn semi_autonomous_allows_permitted_actions() {
+    fn semi_autonomous_only_allows_read_only_diagnostic_eligibility() {
         let engine = ActionEngine::new();
-        assert!(engine.can_execute(&ActionType::RestartService, &AutonomyLevel::SemiAutonomous));
-        assert!(engine.can_execute(&ActionType::ClearCache, &AutonomyLevel::SemiAutonomous));
         assert!(engine.can_execute(&ActionType::RunDiagnostic, &AutonomyLevel::SemiAutonomous));
-        // UpdateConfig is NOT in permitted list
+        assert!(!engine.can_execute(&ActionType::RestartService, &AutonomyLevel::SemiAutonomous));
+        assert!(!engine.can_execute(&ActionType::ClearCache, &AutonomyLevel::SemiAutonomous));
         assert!(!engine.can_execute(&ActionType::UpdateConfig, &AutonomyLevel::SemiAutonomous));
+        assert!(!engine.can_execute(
+            &ActionType::Custom("deploy-hotfix".to_string()),
+            &AutonomyLevel::SemiAutonomous
+        ));
     }
 
     #[test]
-    fn full_autonomous_allows_all() {
-        // Historical eligibility behavior retained for compatibility. This is not
-        // a live authorization theorem; governed execution must use it_authority.
+    fn full_autonomous_still_does_not_grant_mutation_authority() {
         let engine = ActionEngine::new();
-        assert!(engine.can_execute(&ActionType::RestartService, &AutonomyLevel::FullAutonomous));
-        assert!(engine.can_execute(&ActionType::UpdateConfig, &AutonomyLevel::FullAutonomous));
-        assert!(engine.can_execute(
+        assert!(engine.can_execute(&ActionType::RunDiagnostic, &AutonomyLevel::FullAutonomous));
+        assert!(!engine.can_execute(&ActionType::RestartService, &AutonomyLevel::FullAutonomous));
+        assert!(!engine.can_execute(&ActionType::ClearCache, &AutonomyLevel::FullAutonomous));
+        assert!(!engine.can_execute(&ActionType::UpdateConfig, &AutonomyLevel::FullAutonomous));
+        assert!(!engine.can_execute(
             &ActionType::Custom("anything".to_string()),
             &AutonomyLevel::FullAutonomous
         ));
