@@ -9,5 +9,6 @@
 
 #![deny(unsafe_code)]
 
+pub mod bundle;
 pub mod claims;
 pub mod trade;
