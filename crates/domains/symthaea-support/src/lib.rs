@@ -11,6 +11,7 @@ pub mod actions;
 pub mod change_timeline;
 pub mod dependency_impact;
 pub mod diagnostic_beliefs;
+pub mod diagnostic_utility;
 pub mod diagnostics;
 pub mod federation;
 pub mod golden_incidents;
@@ -48,6 +49,11 @@ pub use diagnostic_beliefs::{
     rank_tests_by_information_gain, CausalHypothesisV1, DiagnosticBeliefError,
     DiagnosticOutcomeId, DiagnosticTestId, DiagnosticTestModelV1, ExpectedInformationGainV1,
     HypothesisDistributionV1, HypothesisId, HypothesisStatusV1,
+};
+pub use diagnostic_utility::{
+    rank_diagnostic_tests_by_utility_v1, DiagnosticExecutionProfileV1,
+    DiagnosticExclusionReasonV1, DiagnosticInformationValueV1, DiagnosticSelectionPolicyV1,
+    DiagnosticUtilityAssessmentV1, DiagnosticUtilityErrorV1, DiagnosticUtilityWeightsV1,
 };
 pub use golden_incidents::{
     seed_golden_incidents_v1, DiagnosticActionRiskV1, DiagnosticAuthorityRequirementV1,
