@@ -486,7 +486,9 @@ fn put_permissions(out: &mut Vec<u8>, permissions: &PermissionSet) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_extension_admission::{AdmissionContext, AdmissionRecordEvidence};
+    use symthaea_extension_admission::{
+        AdmissionContext, AdmissionCurrentnessSource, AdmissionRecordEvidence, AdmissionSubject,
+    };
     use symthaea_extension_core::{
         AbiVersion, CapabilityDescriptor, EffectClass, ExtensionId, ExtensionKind, ResourceBudget,
         RuntimeKind,
@@ -550,6 +552,22 @@ mod tests {
                 trust_ceiling: self.ceiling,
                 trust_generation: self.generation,
             })
+        }
+    }
+
+    #[derive(Debug)]
+    struct Currentness;
+
+    impl AdmissionCurrentnessSource for Currentness {
+        fn current_context(&self, subject: AdmissionSubject<'_>) -> Option<AdmissionContext> {
+            assert_eq!(subject.extension().as_str(), "org.example.solver");
+            assert_eq!(subject.extension_version(), "1.0.0");
+            assert_eq!(subject.issuer().as_str(), "local:extension-authority");
+            assert_eq!(
+                subject.signer().map(PrincipalId::as_str),
+                Some("did:example:publisher")
+            );
+            Some(AdmissionContext::active(4, 11))
         }
     }
 
@@ -643,9 +661,7 @@ mod tests {
         assert_eq!(record.trust_generation(), 11);
 
         let parsed: ExtensionManifest = serde_json::from_slice(&manifest_bytes).unwrap();
-        assert!(record
-            .activate(&parsed, AdmissionContext::active(4, 11))
-            .is_ok());
+        assert!(record.activate(&parsed, &Currentness).is_ok());
 
         let stored = serde_json::to_vec(&record).unwrap();
         let evidence: AdmissionRecordEvidence = serde_json::from_slice(&stored).unwrap();
