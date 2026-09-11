@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-discovery-sim-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Strict provenance-preserving adapter from solver-backed simulation results into Symthaea discovery evidence."
+
+[dependencies]
+symthaea-discovery = { path = "../../core/symthaea-discovery" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+thiserror = { workspace = true }
