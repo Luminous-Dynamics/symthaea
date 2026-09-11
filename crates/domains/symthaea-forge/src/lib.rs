@@ -48,10 +48,11 @@
 //! stronger validation/holdout proposition to the exact evaluator request and response,
 //! [`proposal_evaluator_execution`] freezes launch/resource semantics and byte commitments while
 //! making runtime-isolation non-evidence explicit, [`proposal_evaluator_launcher`] is the first
-//! backend that actually executes that protocol through bounded direct child-process I/O, the
-//! crate-private deterministic scorer joins frozen predictions to labels only during scoring, and
-//! [`proposal_validation_chain`] retains the earlier blind deterministic receipt machinery for
-//! compatibility while constructor visibility is narrowed in a later follow-up.
+//! backend that actually executes that protocol through bounded direct child-process I/O,
+//! [`proposal_launch_validation`] binds deterministic validation/holdout evidence to that exact
+//! direct-launch receipt, the crate-private deterministic scorer joins frozen predictions to labels
+//! only during scoring, and [`proposal_validation_chain`] retains the earlier blind deterministic
+//! receipt machinery for compatibility while constructor visibility is narrowed in a later follow-up.
 //!
 //! # Authority boundary
 //!
@@ -98,10 +99,12 @@
 //! - The direct launcher checks the exact runner binary bytes, ordered argv and wire-schema IDs;
 //!   executes without a shell; clears inherited environment; uses a fresh empty CWD; bounds wall
 //!   time and captured output; and converts only complete probability coverage into a response.
+//! - Launch-bound validation revalidates the execution record, policy, runner/argv/schema identities,
+//!   request stdin commitment, launcher-evidence identity and direct-launch receipt before scoring.
 //! - The direct launcher still does not isolate filesystem or network access; no v1 receipt claims
 //!   namespace/seccomp/cgroup/VM/network/filesystem containment.
 //! - The earlier direct blind deterministic validation path remains a compatibility bypass in this
-//!   tranche; the evaluator-bound receipt is the stronger proposition, not yet the only constructible one.
+//!   tranche; the launch-bound receipt is the strongest proposition, not yet the only constructible one.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
 //! - Training support is counted only from observed labels; censored and counterfactual outcomes
@@ -110,8 +113,8 @@
 //!   distinct validation runs; an under-observed validation slice cannot mint a score permit.
 //! - Public validation prediction generation covers every proposal row through label-blind targets;
 //!   whether a row is observed/censored/counterfactual is joined only after predictions are frozen.
-//! - Generic aggregate validation/holdout constructors remain crate-internal; the blind deterministic
-//!   and evaluator-bound receipt layers both reconstruct Brier from exact row-level prediction evidence.
+//! - Generic aggregate validation/holdout constructors remain crate-internal; the blind deterministic,
+//!   evaluator-bound and launch-bound receipt layers all reconstruct Brier from exact row-level evidence.
 //! - Deterministic validation v1 rejects report-only metrics until they also have deterministic,
 //!   row-reconstructable scorers.
 //! - Validation acceptance threshold/scorer identity is precommitted before a model artifact can be
@@ -151,6 +154,7 @@ pub mod proposal_evaluator_protocol;
 pub mod proposal_evaluator_validation;
 pub mod proposal_exposure;
 pub mod proposal_history;
+pub mod proposal_launch_validation;
 mod proposal_model;
 pub mod proposal_qualification;
 pub mod proposal_recording;
@@ -248,6 +252,11 @@ pub use proposal_exposure::{
 pub use proposal_history::{
     ForgeConditionedProposalObservationRow, ForgeConditionedProposalObservationTable,
     ForgeProposalGenerationState, ForgeProposalHistoryError,
+};
+pub use proposal_launch_validation::{
+    validate_direct_launch_receipt, ForgeProposalLaunchValidationError,
+    ForgeProposalLaunchedEvaluatorHoldoutPermit,
+    ForgeProposalLaunchedEvaluatorValidationReceipt,
 };
 pub use proposal_model::{
     ForgeProposalFrozenModel, ForgeProposalMetricScore, ForgeProposalModelError,
