@@ -121,6 +121,9 @@ impl RegenerativeGenomeV1 {
         validate_binding(&self.evidence_binding)?;
         if let Some(parent) = &self.lineage_parent_binding {
             validate_binding(parent)?;
+            if parent == &self.evidence_binding {
+                return Err(RegenerativeGenomeError::SelfParentGenomeLineage);
+            }
         }
         if self.requirements.is_empty() {
             return Err(RegenerativeGenomeError::NoRequirements);
@@ -330,6 +333,8 @@ pub enum RegenerativeGenomeError {
     InvalidIdentifier { field: &'static str },
     /// Evidence/profile binding is malformed.
     InvalidBinding,
+    /// Genome points to its own evidence binding as its parent.
+    SelfParentGenomeLineage,
     /// Genome has no requirements.
     NoRequirements,
     /// Genome exceeds bounded cardinality.
@@ -498,6 +503,16 @@ mod tests {
                 capability_id: "persistent-ocean-infrastructure".into(),
                 dependency_id: "electronics".into(),
             })
+        );
+    }
+
+    #[test]
+    fn genome_cannot_name_itself_as_parent() {
+        let mut genome = genome();
+        genome.lineage_parent_binding = Some(genome.evidence_binding.clone());
+        assert_eq!(
+            genome.validate_against_model(&model()),
+            Err(RegenerativeGenomeError::SelfParentGenomeLineage)
         );
     }
 
