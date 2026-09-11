@@ -163,15 +163,25 @@ pub struct TransportEdge {
     pub origin: AssetId,
     pub destination: AssetId,
     pub supported_cargo: Vec<CargoKind>,
+    /// Conservative geometric payload envelope for the declared edge/profile.
+    pub max_dimensions_m: [f64; 3],
     pub payload_per_trip_kg: BoundedMetric,
     pub annual_capacity_kg: BoundedMetric,
     pub transit_time_s: BoundedMetric,
+    /// Worst-case positive acceleration magnitude experienced by cargo, m/s^2.
+    pub peak_acceleration_m_s2: BoundedMetric,
+    /// Vibration RMS proxy under the edge's declared test/model protocol.
+    pub vibration_rms: BoundedMetric,
+    /// Cargo environmental temperature range when known.
+    pub temperature_k: Option<BoundedMetric>,
     pub electrical_energy_kwh_per_kg: BoundedMetric,
     pub propellant_kg_per_kg: BoundedMetric,
     /// Dimensionless probability in [0,1].
     pub delivery_success_probability: BoundedMetric,
     /// Dimensionless long-run availability in [0,1].
     pub availability_fraction: BoundedMetric,
+    pub contamination_controlled: bool,
+    pub custody_tracking: bool,
     pub required_interfaces: Vec<InterfaceRef>,
     pub infrastructure_dependencies: Vec<AssetId>,
     pub evidence_refs: Vec<String>,
@@ -184,9 +194,19 @@ impl TransportEdge {
             && self.destination.is_well_formed()
             && self.origin != self.destination
             && !self.supported_cargo.is_empty()
+            && self
+                .max_dimensions_m
+                .iter()
+                .all(|value| value.is_finite() && *value > 0.0)
             && metric_is_non_negative(&self.payload_per_trip_kg)
             && metric_is_non_negative(&self.annual_capacity_kg)
             && metric_is_non_negative(&self.transit_time_s)
+            && metric_is_non_negative(&self.peak_acceleration_m_s2)
+            && metric_is_non_negative(&self.vibration_rms)
+            && self
+                .temperature_k
+                .as_ref()
+                .is_none_or(|metric| metric_is_positive(metric))
             && metric_is_non_negative(&self.electrical_energy_kwh_per_kg)
             && metric_is_non_negative(&self.propellant_kg_per_kg)
             && metric_is_probability(&self.delivery_success_probability)
@@ -201,18 +221,31 @@ impl TransportEdge {
                 .all(AssetId::is_well_formed)
     }
 
+    /// Conservative compatibility test for one edge, not a routing decision.
+    ///
+    /// Capacity uses the *lower* bound while time/acceleration/vibration use
+    /// their *upper* bounds. This prevents an optimistic uncertainty bound from
+    /// silently admitting cargo. Higher-level planners may expose less
+    /// conservative exploratory queries, but physical qualification must not be
+    /// inferred from this leaf function.
     pub fn supports(&self, cargo: &CargoProfile) -> bool {
         self.is_well_formed()
             && cargo.is_well_formed()
             && self.supported_cargo.iter().any(|kind| kind == &cargo.kind)
-            && cargo.mass_kg <= self.payload_per_trip_kg.upper
-            && self
-                .transit_time_s
-                .upper
-                .is_finite()
+            && cargo.mass_kg <= self.payload_per_trip_kg.lower
+            && cargo
+                .dimensions_m
+                .iter()
+                .zip(self.max_dimensions_m)
+                .all(|(cargo_dim, edge_dim)| *cargo_dim <= edge_dim)
             && cargo
                 .max_transit_time_s
                 .is_none_or(|limit| self.transit_time_s.upper <= limit)
+            && self.peak_acceleration_m_s2.upper <= cargo.max_acceleration_m_s2
+            && self.vibration_rms.upper <= cargo.max_vibration_rms
+            && temperature_compatible(cargo, self.temperature_k.as_ref())
+            && (!cargo.contamination_sensitive || self.contamination_controlled)
+            && (!cargo.custody_required || self.custody_tracking)
     }
 }
 
@@ -267,8 +300,27 @@ fn valid_temperature_range(min_k: Option<f64>, max_k: Option<f64>) -> bool {
     }
 }
 
+fn temperature_compatible(cargo: &CargoProfile, edge: Option<&BoundedMetric>) -> bool {
+    if cargo.temperature_min_k.is_none() && cargo.temperature_max_k.is_none() {
+        return true;
+    }
+    let Some(edge) = edge else {
+        return false;
+    };
+    cargo
+        .temperature_min_k
+        .is_none_or(|min| edge.lower >= min)
+        && cargo
+            .temperature_max_k
+            .is_none_or(|max| edge.upper <= max)
+}
+
 fn metric_is_non_negative(metric: &BoundedMetric) -> bool {
     metric.is_well_formed() && metric.lower >= 0.0
+}
+
+fn metric_is_positive(metric: &BoundedMetric) -> bool {
+    metric.is_well_formed() && metric.lower > 0.0
 }
 
 fn metric_is_probability(metric: &BoundedMetric) -> bool {
@@ -312,13 +364,19 @@ mod tests {
             origin: AssetId::new("surface"),
             destination: AssetId::new("eml1"),
             supported_cargo: vec![CargoKind::General, CargoKind::Fragile],
-            payload_per_trip_kg: metric(10.0, 100.0, 1_000.0, "kg"),
+            max_dimensions_m: [2.0, 2.0, 2.0],
+            payload_per_trip_kg: metric(100.0, 500.0, 1_000.0, "kg"),
             annual_capacity_kg: metric(1_000.0, 10_000.0, 100_000.0, "kg/year"),
             transit_time_s: metric(1_000.0, 10_000.0, 100_000.0, "s"),
+            peak_acceleration_m_s2: metric(0.1, 1.0, 5.0, "m/s^2"),
+            vibration_rms: metric(0.0, 0.2, 0.5, "protocol-rms"),
+            temperature_k: Some(metric(270.0, 290.0, 310.0, "K")),
             electrical_energy_kwh_per_kg: metric(0.0, 1.0, 10.0, "kWh/kg"),
             propellant_kg_per_kg: metric(0.0, 0.1, 1.0, "kg/kg"),
             delivery_success_probability: metric(0.90, 0.98, 0.999, "1"),
             availability_fraction: metric(0.50, 0.90, 0.99, "1"),
+            contamination_controlled: true,
+            custody_tracking: true,
             required_interfaces: vec![],
             infrastructure_dependencies: vec![],
             evidence_refs: vec![],
@@ -371,12 +429,35 @@ mod tests {
     }
 
     #[test]
-    fn edge_supports_cargo_only_inside_declared_mass_and_time_envelope() {
+    fn edge_supports_cargo_only_inside_conservative_envelope() {
         let edge = edge(TransportMode::LunarElevator);
         let mut cargo = cargo();
         assert!(edge.supports(&cargo));
-        cargo.mass_kg = 2_000.0;
+        cargo.mass_kg = 101.0;
         assert!(!edge.supports(&cargo));
+    }
+
+    #[test]
+    fn fragile_cargo_rejects_worst_case_acceleration_or_vibration() {
+        let edge = edge(TransportMode::LunarElevator);
+        let mut cargo = cargo();
+        cargo.kind = CargoKind::Fragile;
+        cargo.max_acceleration_m_s2 = 4.9;
+        assert!(!edge.supports(&cargo));
+        cargo.max_acceleration_m_s2 = 10.0;
+        cargo.max_vibration_rms = 0.49;
+        assert!(!edge.supports(&cargo));
+    }
+
+    #[test]
+    fn temperature_sensitive_cargo_requires_a_known_compatible_envelope() {
+        let mut edge = edge(TransportMode::LunarLander);
+        let mut cargo = cargo();
+        cargo.temperature_min_k = Some(280.0);
+        cargo.temperature_max_k = Some(300.0);
+        assert!(!edge.supports(&cargo));
+        edge.temperature_k = Some(metric(285.0, 290.0, 295.0, "K"));
+        assert!(edge.supports(&cargo));
     }
 
     #[test]
