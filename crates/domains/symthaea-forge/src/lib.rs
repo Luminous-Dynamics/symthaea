@@ -50,9 +50,11 @@
 //! making runtime-isolation non-evidence explicit, [`proposal_evaluator_launcher`] is the first
 //! backend that actually executes that protocol through bounded direct child-process I/O,
 //! [`proposal_launch_validation`] binds deterministic validation/holdout evidence to that exact
-//! direct-launch receipt, the crate-private deterministic scorer joins frozen predictions to labels
-//! only during scoring, and [`proposal_validation_chain`] retains the earlier blind deterministic
-//! receipt machinery for compatibility while constructor visibility is narrowed in a later follow-up.
+//! direct-launch receipt, [`proposal_executable_model`] makes v1 model payload equal the exact
+//! evaluator executable artifact, the crate-private deterministic scorer joins frozen predictions
+//! to labels only during scoring, and [`proposal_validation_chain`] retains the earlier blind
+//! deterministic receipt machinery for compatibility while constructor visibility is narrowed in a
+//! later follow-up.
 //!
 //! # Authority boundary
 //!
@@ -101,10 +103,13 @@
 //!   time and captured output; and converts only complete probability coverage into a response.
 //! - Launch-bound validation revalidates the execution record, policy, runner/argv/schema identities,
 //!   request stdin commitment, launcher-evidence identity and direct-launch receipt before scoring.
+//! - Executable-model v1 requires `model_payload_id == protocol.runner_implementation_id`; the
+//!   launcher then proves the exact executable bytes hash to that same artifact identity.
 //! - The direct launcher still does not isolate filesystem or network access; no v1 receipt claims
 //!   namespace/seccomp/cgroup/VM/network/filesystem containment.
 //! - The earlier direct blind deterministic validation path remains a compatibility bypass in this
-//!   tranche; the launch-bound receipt is the strongest proposition, not yet the only constructible one.
+//!   tranche; executable-model launch evidence is the strongest runner/model proposition, not yet
+//!   the only constructible one.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
 //! - Training support is counted only from observed labels; censored and counterfactual outcomes
@@ -152,6 +157,7 @@ pub mod proposal_evaluator_execution;
 pub mod proposal_evaluator_launcher;
 pub mod proposal_evaluator_protocol;
 pub mod proposal_evaluator_validation;
+pub mod proposal_executable_model;
 pub mod proposal_exposure;
 pub mod proposal_history;
 pub mod proposal_launch_validation;
@@ -243,6 +249,10 @@ pub use proposal_evaluator_protocol::{
 pub use proposal_evaluator_validation::{
     ForgeProposalEvaluatorHoldoutPermit, ForgeProposalEvaluatorValidationError,
     ForgeProposalEvaluatorValidationReceipt,
+};
+pub use proposal_executable_model::{
+    run_executable_model_evaluator, ForgeProposalExecutableModelBinding,
+    ForgeProposalExecutableModelError, ForgeProposalExecutableModelLaunchReceipt,
 };
 pub use proposal_exposure::{
     ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
