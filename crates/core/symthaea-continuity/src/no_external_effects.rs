@@ -414,6 +414,9 @@ impl QualifiedNoExternalEffectsCoverageV1 {
     }
     pub fn id(&self) -> QualifiedNoExternalEffectsCoverageId { self.coverage_id }
     pub fn declaration_id(&self) -> NoExternalEffectsDeclarationId { self.declaration_id }
+    pub fn coverage_profile_id(&self) -> EffectCoverageProfileId { self.coverage_profile_id }
+    pub fn verifier_profile_id(&self) -> VerifierProfileId { self.verifier_profile_id }
+    pub fn verifier_root_epoch(&self) -> u64 { self.verifier_root_epoch }
     pub fn analyzed_at_unix_ms(&self) -> u64 { self.analyzed_at_unix_ms }
     pub fn transaction_challenge(&self) -> [u8; 32] { self.transaction_challenge }
 }
