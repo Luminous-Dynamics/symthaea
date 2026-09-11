@@ -248,6 +248,7 @@ pub struct ActuationInterlockSubjectV1 {
     current_verifier_commitment_id: QualifiedCurrentVerifierExecutionCommitmentId,
     journal_anchor_id: QualifiedExecutionJournalAnchorId,
     trusted_epoch_id: QualifiedTrustedCommitEpochId,
+    decision_time_unix_ms: u64,
     enforcement_profile_id: ActuationEnforcementBoundaryProfileId,
     enforcement_boundary_digest: [u8; 32],
     one_use_mechanism_digest: [u8; 32],
@@ -322,6 +323,9 @@ impl ActuationInterlockSubjectV1 {
             || current_authority_commitment.source_realization_id() != source_realization_id
             || current_authority_commitment.target_realization_id() != target_realization_id
             || current_authority_commitment.journal_anchor_id() != journal_anchor.id()
+            || current_authority_commitment.decision_time_unix_ms()
+                != journal_anchor.anchored_at_unix_ms()
+            || journal_anchor.subject_id() != subject_id
         {
             return Err(ActuationInterlockError::ExecutionWorldMismatch);
         }
@@ -335,6 +339,7 @@ impl ActuationInterlockSubjectV1 {
         if source_realization_id == target_realization_id {
             return Err(ActuationInterlockError::SourceEqualsTarget);
         }
+        let decision_time_unix_ms = current_authority_commitment.decision_time_unix_ms();
         let subject_record_id = ActuationInterlockSubjectId(hash_subject(
             lane,
             attempt_id,
@@ -348,6 +353,7 @@ impl ActuationInterlockSubjectV1 {
             current_authority_commitment.current_verifier_commitment_id(),
             journal_anchor.id(),
             journal_anchor.trusted_epoch_id(),
+            decision_time_unix_ms,
             enforcement.id(),
             enforcement.boundary_implementation_digest(),
             enforcement.one_use_mechanism_digest(),
@@ -367,6 +373,7 @@ impl ActuationInterlockSubjectV1 {
             current_verifier_commitment_id: current_authority_commitment.current_verifier_commitment_id(),
             journal_anchor_id: journal_anchor.id(),
             trusted_epoch_id: journal_anchor.trusted_epoch_id(),
+            decision_time_unix_ms,
             enforcement_profile_id: enforcement.id(),
             enforcement_boundary_digest: enforcement.boundary_implementation_digest(),
             one_use_mechanism_digest: enforcement.one_use_mechanism_digest(),
@@ -381,7 +388,10 @@ impl ActuationInterlockSubjectV1 {
                 self.schema_version.clone(),
             ));
         }
-        if self.backend_generation == 0 || self.enforcement_profile_generation == 0 {
+        if self.backend_generation == 0
+            || self.enforcement_profile_generation == 0
+            || self.decision_time_unix_ms == 0
+        {
             return Err(ActuationInterlockError::ZeroGenerationOrTime);
         }
         if self.backend_implementation_digest == [0; 32]
@@ -406,6 +416,7 @@ impl ActuationInterlockSubjectV1 {
             self.current_verifier_commitment_id,
             self.journal_anchor_id,
             self.trusted_epoch_id,
+            self.decision_time_unix_ms,
             self.enforcement_profile_id,
             self.enforcement_boundary_digest,
             self.one_use_mechanism_digest,
@@ -432,6 +443,7 @@ impl ActuationInterlockSubjectV1 {
     }
     pub fn journal_anchor_id(&self) -> QualifiedExecutionJournalAnchorId { self.journal_anchor_id }
     pub fn trusted_epoch_id(&self) -> QualifiedTrustedCommitEpochId { self.trusted_epoch_id }
+    pub fn decision_time_unix_ms(&self) -> u64 { self.decision_time_unix_ms }
     pub fn enforcement_profile_id(&self) -> ActuationEnforcementBoundaryProfileId {
         self.enforcement_profile_id
     }
@@ -462,6 +474,9 @@ impl ActuationInterlockClaimV1 {
         raw_evidence_digest: [u8; 32],
     ) -> Result<Self, ActuationInterlockError> {
         subject.validate()?;
+        if observed_at_unix_ms < subject.decision_time_unix_ms() {
+            return Err(ActuationInterlockError::ActuationBeforeDecisionBoundary);
+        }
         Self::new_common(
             subject.id(),
             1,
@@ -491,6 +506,9 @@ impl ActuationInterlockClaimV1 {
         }
         if previous.freshness_challenge_digest == freshness_challenge_digest {
             return Err(ActuationInterlockError::ChallengeReplay);
+        }
+        if observed_at_unix_ms < subject.decision_time_unix_ms() {
+            return Err(ActuationInterlockError::ActuationBeforeDecisionBoundary);
         }
         if observed_at_unix_ms < previous.observed_at_unix_ms {
             return Err(ActuationInterlockError::ObservationTimeRollback);
@@ -650,6 +668,9 @@ impl BoundActuationInterlockDecisionV1 {
         if claim.subject_id != subject.id() {
             return Err(ActuationInterlockError::SubjectMismatch);
         }
+        if claim.observed_at_unix_ms < subject.decision_time_unix_ms() {
+            return Err(ActuationInterlockError::ActuationBeforeDecisionBoundary);
+        }
         validate_progression(previous, claim)?;
         let bound_id = BoundActuationInterlockDecisionId(domain_hash_parts(
             BOUND_DOMAIN,
@@ -723,6 +744,8 @@ pub enum ActuationInterlockError {
     FencingGenerationOverflow,
     #[error("actuation fencing generation/predecessor is not the exact successor")]
     FencingProgressionMismatch,
+    #[error("actuation observation time predates durable execution decision boundary")]
+    ActuationBeforeDecisionBoundary,
     #[error("actuation observation time rolled backward")]
     ObservationTimeRollback,
     #[error("a denied actuation attempt cannot change disposition")]
@@ -803,6 +826,7 @@ fn hash_subject(
     current_verifier_commitment_id: QualifiedCurrentVerifierExecutionCommitmentId,
     journal_anchor_id: QualifiedExecutionJournalAnchorId,
     trusted_epoch_id: QualifiedTrustedCommitEpochId,
+    decision_time_unix_ms: u64,
     enforcement_profile_id: ActuationEnforcementBoundaryProfileId,
     enforcement_boundary_digest: [u8; 32],
     one_use_mechanism_digest: [u8; 32],
@@ -822,6 +846,7 @@ fn hash_subject(
     h.update(current_verifier_commitment_id.as_bytes());
     h.update(journal_anchor_id.as_bytes());
     h.update(trusted_epoch_id.as_bytes());
+    h.update(&decision_time_unix_ms.to_le_bytes());
     h.update(enforcement_profile_id.as_bytes());
     h.update(&enforcement_boundary_digest);
     h.update(&one_use_mechanism_digest);
