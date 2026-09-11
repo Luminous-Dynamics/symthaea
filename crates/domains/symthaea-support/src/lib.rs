@@ -19,6 +19,7 @@ pub mod golden_incidents;
 pub mod golden_incidents_v2;
 pub mod golden_metric_derivation;
 pub mod golden_qualification_binding;
+pub mod golden_reproducibility;
 pub mod golden_run_protocol;
 pub mod golden_solver_view_v2;
 pub mod it_qualification;
@@ -83,6 +84,11 @@ pub use golden_qualification_binding::{
     bind_golden_qualification_result_v1, golden_qualification_metrics_digest_v1,
     golden_run_context_digest_v1, GoldenQualificationBindingErrorV1,
     GoldenQualificationBindingV1,
+};
+pub use golden_reproducibility::{
+    assess_golden_reproducibility_v1, GoldenContextMismatchV1, GoldenMetricRangesV1,
+    GoldenReproducibilityAssessmentV1, GoldenReproducibilityErrorV1,
+    GoldenReproducibilityPolicyV1, GoldenReproducibilityStatusV1, GoldenRunFailureV1,
 };
 pub use golden_run_protocol::{
     golden_grading_artifact_digest_v1, golden_solver_view_digest_v1,
