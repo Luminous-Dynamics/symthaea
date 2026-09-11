@@ -3,14 +3,15 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Audit binding between Golden Incident run artifacts and aggregate qualification results.
 //!
-//! Aggregate metrics are useful only when they can be traced back to the exact case,
-//! solver view, transcript, submission, and run context that produced them.
+//! Aggregate metrics are useful only when they can be traced back to the exact public
+//! corpus, case, solver projection, transcript, submission, and run context that produced
+//! them. A matching case ID/revision is not sufficient if the public fixture changed.
 
+use crate::golden_incidents_v2::{GoldenIncidentCorpusV2, GoldenIncidentErrorV2};
 use crate::golden_run_protocol::{
     golden_grading_artifact_digest_v1, GoldenRunProtocolErrorV1, GoldenRunTranscriptV1,
     GoldenSolverSubmissionV1,
 };
-use crate::golden_solver_view_v2::GoldenSolverIncidentV2;
 use crate::it_qualification::{
     ItQualificationErrorV1, ItQualificationMatrixV1, ItQualificationResultV1,
     QualificationCaseKeyV1, QualificationMetricsV1, QualificationResultIdV1,
@@ -25,6 +26,7 @@ pub struct GoldenQualificationBindingV1 {
     pub result_id: QualificationResultIdV1,
     pub run_id: QualificationRunIdV1,
     pub case_key: QualificationCaseKeyV1,
+    pub corpus_digest: String,
     pub case_digest: String,
     pub grading_artifact_digest: String,
     pub run_context_digest: String,
@@ -35,6 +37,13 @@ impl GoldenQualificationBindingV1 {
     pub fn digest(&self) -> Result<String, GoldenQualificationBindingErrorV1> {
         digest_serializable("symthaea-golden-qualification-binding-v1", self)
     }
+}
+
+pub fn golden_public_corpus_digest_v2(
+    corpus: &GoldenIncidentCorpusV2,
+) -> Result<String, GoldenQualificationBindingErrorV1> {
+    corpus.validate()?;
+    digest_serializable("symthaea-golden-public-corpus-v2", corpus)
 }
 
 pub fn golden_run_context_digest_v1(
@@ -53,14 +62,27 @@ pub fn golden_qualification_metrics_digest_v1(
 
 pub fn bind_golden_qualification_result_v1(
     matrix: &ItQualificationMatrixV1,
-    view: &GoldenSolverIncidentV2,
+    corpus: &GoldenIncidentCorpusV2,
     transcript: &GoldenRunTranscriptV1,
     submission: &GoldenSolverSubmissionV1,
     result: &ItQualificationResultV1,
 ) -> Result<GoldenQualificationBindingV1, GoldenQualificationBindingErrorV1> {
+    corpus.validate()?;
     result.validate()?;
-    transcript.validate_against(view)?;
-    submission.validate_against(view, transcript)?;
+
+    let incident = corpus
+        .cases
+        .iter()
+        .find(|case| {
+            case.id == result.case_key.id.0 && case.revision == result.case_key.revision
+        })
+        .ok_or_else(|| {
+            GoldenQualificationBindingErrorV1::IncidentNotInCorpus(result.case_key.clone())
+        })?;
+    let view = incident.solver_view();
+
+    transcript.validate_against(&view)?;
+    submission.validate_against(&view, transcript)?;
 
     if result.run_id != transcript.run_id {
         return Err(GoldenQualificationBindingErrorV1::RunIdMismatch);
@@ -72,17 +94,39 @@ pub fn bind_golden_qualification_result_v1(
         return Err(GoldenQualificationBindingErrorV1::ResultPredatesSubmission);
     }
 
+    // Canonicalize the incident's qualification projection through the same matrix
+    // registration path used by production qualification, then compare its digest
+    // with the caller's registered case. This binds evaluator metadata to the exact
+    // public incident rather than merely trusting a matching case identifier.
+    let projected_case = incident.qualification_case()?;
+    let projected_key = projected_case.key.clone();
+    let mut projected_matrix = ItQualificationMatrixV1::new();
+    projected_matrix.register_case(projected_case)?;
+    let projected_digest = projected_matrix
+        .case_digest(&projected_key)
+        .ok_or_else(|| {
+            GoldenQualificationBindingErrorV1::IncidentNotInCorpus(projected_key.clone())
+        })?;
+
     let Some(registered_case_digest) = matrix.case_digest(&result.case_key) else {
         return Err(GoldenQualificationBindingErrorV1::UnknownRegisteredCase(
             result.case_key.clone(),
         ));
     };
+    if registered_case_digest != projected_digest {
+        return Err(GoldenQualificationBindingErrorV1::IncidentQualificationDigestMismatch);
+    }
     if registered_case_digest != result.case_digest {
         return Err(GoldenQualificationBindingErrorV1::RegisteredCaseDigestMismatch);
     }
 
+    let corpus_digest = golden_public_corpus_digest_v2(corpus)?;
+    if result.run_context.corpus_revision != corpus_digest {
+        return Err(GoldenQualificationBindingErrorV1::CorpusRevisionMismatch);
+    }
+
     let grading_artifact_digest =
-        golden_grading_artifact_digest_v1(view, transcript, submission)?;
+        golden_grading_artifact_digest_v1(&view, transcript, submission)?;
     match result.evidence_artifact_digest.as_deref() {
         Some(digest) if digest == grading_artifact_digest => {}
         Some(_) => {
@@ -95,6 +139,7 @@ pub fn bind_golden_qualification_result_v1(
         result_id: result.id.clone(),
         run_id: result.run_id.clone(),
         case_key: result.case_key.clone(),
+        corpus_digest,
         case_digest: result.case_digest.clone(),
         grading_artifact_digest,
         run_context_digest: golden_run_context_digest_v1(&result.run_context)?,
@@ -113,13 +158,17 @@ fn digest_serializable<T: Serialize + ?Sized>(
 
 #[derive(Debug)]
 pub enum GoldenQualificationBindingErrorV1 {
+    GoldenIncident(GoldenIncidentErrorV2),
     Qualification(ItQualificationErrorV1),
     RunProtocol(GoldenRunProtocolErrorV1),
     Serialization(String),
+    IncidentNotInCorpus(QualificationCaseKeyV1),
     RunIdMismatch,
     CaseKeyMismatch,
     UnknownRegisteredCase(QualificationCaseKeyV1),
+    IncidentQualificationDigestMismatch,
     RegisteredCaseDigestMismatch,
+    CorpusRevisionMismatch,
     MissingEvidenceArtifactDigest,
     EvidenceArtifactDigestMismatch,
     ResultPredatesSubmission,
@@ -128,11 +177,17 @@ pub enum GoldenQualificationBindingErrorV1 {
 impl fmt::Display for GoldenQualificationBindingErrorV1 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::GoldenIncident(err) => write!(f, "invalid golden incident corpus: {err}"),
             Self::Qualification(err) => write!(f, "invalid qualification result: {err}"),
             Self::RunProtocol(err) => write!(f, "invalid golden run lineage: {err}"),
             Self::Serialization(message) => {
                 write!(f, "golden qualification binding serialization failed: {message}")
             }
+            Self::IncidentNotInCorpus(key) => write!(
+                f,
+                "golden corpus does not contain {} revision {}",
+                key.id.0, key.revision
+            ),
             Self::RunIdMismatch => write!(f, "qualification result run id does not match transcript"),
             Self::CaseKeyMismatch => write!(f, "qualification result case does not match transcript"),
             Self::UnknownRegisteredCase(key) => write!(
@@ -140,9 +195,17 @@ impl fmt::Display for GoldenQualificationBindingErrorV1 {
                 "qualification result references unregistered case {} revision {}",
                 key.id.0, key.revision
             ),
+            Self::IncidentQualificationDigestMismatch => write!(
+                f,
+                "registered qualification case does not match the exact public golden incident"
+            ),
             Self::RegisteredCaseDigestMismatch => {
                 write!(f, "qualification result case digest does not match registered case")
             }
+            Self::CorpusRevisionMismatch => write!(
+                f,
+                "qualification run context corpus revision does not match exact golden corpus digest"
+            ),
             Self::MissingEvidenceArtifactDigest => {
                 write!(f, "qualification result lacks golden grading artifact digest")
             }
@@ -157,6 +220,12 @@ impl fmt::Display for GoldenQualificationBindingErrorV1 {
 }
 
 impl Error for GoldenQualificationBindingErrorV1 {}
+
+impl From<GoldenIncidentErrorV2> for GoldenQualificationBindingErrorV1 {
+    fn from(value: GoldenIncidentErrorV2) -> Self {
+        Self::GoldenIncident(value)
+    }
+}
 
 impl From<ItQualificationErrorV1> for GoldenQualificationBindingErrorV1 {
     fn from(value: ItQualificationErrorV1) -> Self {
@@ -192,12 +261,13 @@ mod tests {
 
     fn fixture() -> (
         ItQualificationMatrixV1,
-        GoldenSolverIncidentV2,
+        GoldenIncidentCorpusV2,
         GoldenRunTranscriptV1,
         GoldenSolverSubmissionV1,
         ItQualificationResultV1,
     ) {
-        let incident = seed_golden_incidents_v2().unwrap().cases[0].clone();
+        let corpus = seed_golden_incidents_v2().unwrap();
+        let incident = corpus.cases[0].clone();
         let view = incident.solver_view();
         let mut matrix = ItQualificationMatrixV1::new();
         let case = incident.qualification_case().unwrap();
@@ -241,6 +311,7 @@ mod tests {
         };
         let grading_digest =
             golden_grading_artifact_digest_v1(&view, &transcript, &submission).unwrap();
+        let corpus_digest = golden_public_corpus_digest_v2(&corpus).unwrap();
         let result = ItQualificationResultV1 {
             id: QualificationResultIdV1("result-1".into()),
             run_id,
@@ -248,7 +319,7 @@ mod tests {
             case_digest: matrix.case_digest(&case_key).unwrap().into(),
             run_context: QualificationRunContextV1 {
                 system_revision: "system-rev-1".into(),
-                corpus_revision: "golden-v2-rev-1".into(),
+                corpus_revision: corpus_digest,
                 environment_digest: digest('a'),
                 toolchain_digest: Some(digest('b')),
                 model_profile: "support-eval".into(),
@@ -266,15 +337,15 @@ mod tests {
             },
             evidence_artifact_digest: Some(grading_digest),
         };
-        (matrix, view, transcript, submission, result)
+        (matrix, corpus, transcript, submission, result)
     }
 
     #[test]
     fn exact_result_lineage_binds_successfully() {
-        let (matrix, view, transcript, submission, result) = fixture();
+        let (matrix, corpus, transcript, submission, result) = fixture();
         let binding = bind_golden_qualification_result_v1(
             &matrix,
-            &view,
+            &corpus,
             &transcript,
             &submission,
             &result,
@@ -283,17 +354,36 @@ mod tests {
         assert_eq!(binding.result_id, result.id);
         assert_eq!(binding.run_id, result.run_id);
         assert_eq!(binding.case_digest, result.case_digest);
+        assert_eq!(binding.corpus_digest, result.run_context.corpus_revision);
         assert_eq!(binding.digest().unwrap().len(), 64);
     }
 
     #[test]
+    fn modified_public_corpus_cannot_inherit_old_run() {
+        let (matrix, mut corpus, transcript, submission, result) = fixture();
+        corpus.cases[0].symptom.push_str(" modified");
+        assert!(matches!(
+            bind_golden_qualification_result_v1(
+                &matrix,
+                &corpus,
+                &transcript,
+                &submission,
+                &result,
+            ),
+            Err(GoldenQualificationBindingErrorV1::RunProtocol(
+                GoldenRunProtocolErrorV1::SolverViewDigestMismatch
+            ))
+        ));
+    }
+
+    #[test]
     fn wrong_grading_artifact_cannot_back_metrics() {
-        let (matrix, view, transcript, submission, mut result) = fixture();
+        let (matrix, corpus, transcript, submission, mut result) = fixture();
         result.evidence_artifact_digest = Some(digest('f'));
         assert!(matches!(
             bind_golden_qualification_result_v1(
                 &matrix,
-                &view,
+                &corpus,
                 &transcript,
                 &submission,
                 &result,
@@ -303,13 +393,29 @@ mod tests {
     }
 
     #[test]
+    fn wrong_corpus_revision_cannot_back_metrics() {
+        let (matrix, corpus, transcript, submission, mut result) = fixture();
+        result.run_context.corpus_revision = digest('f');
+        assert!(matches!(
+            bind_golden_qualification_result_v1(
+                &matrix,
+                &corpus,
+                &transcript,
+                &submission,
+                &result,
+            ),
+            Err(GoldenQualificationBindingErrorV1::CorpusRevisionMismatch)
+        ));
+    }
+
+    #[test]
     fn result_cannot_precede_solver_submission() {
-        let (matrix, view, transcript, submission, mut result) = fixture();
+        let (matrix, corpus, transcript, submission, mut result) = fixture();
         result.observed_at_unix_ms = submission.submitted_at_unix_ms - 1;
         assert!(matches!(
             bind_golden_qualification_result_v1(
                 &matrix,
-                &view,
+                &corpus,
                 &transcript,
                 &submission,
                 &result,
@@ -320,12 +426,12 @@ mod tests {
 
     #[test]
     fn registered_case_digest_is_not_optional() {
-        let (_matrix, view, transcript, submission, result) = fixture();
+        let (_matrix, corpus, transcript, submission, result) = fixture();
         let empty = ItQualificationMatrixV1::new();
         assert!(matches!(
             bind_golden_qualification_result_v1(
                 &empty,
-                &view,
+                &corpus,
                 &transcript,
                 &submission,
                 &result,
