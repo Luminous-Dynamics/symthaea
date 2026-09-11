@@ -9,7 +9,9 @@ on:
       - "crates/core/symthaea-extension-admission/**"
       - "crates/core/symthaea-extension-admission-policy/**"
       - "crates/core/symthaea-extension-authority/**"
+      - "crates/domains/symthaea-epistemic-types/**"
       - "crates/bridges/symthaea-extension-data-host/**"
+      - "crates/bridges/symthaea-epistemic-data-pack/**"
       - ".github/workflows/extension-data-host.yml"
   workflow_dispatch:
 
@@ -71,14 +73,20 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Check data host
-        run: cargo check --locked -p symthaea-extension-data-host --all-targets
+      - name: Check declarative data path
+        run: |
+          cargo check --locked -p symthaea-extension-data-host --all-targets
+          cargo check --locked -p symthaea-epistemic-data-pack --all-targets
 
-      - name: Test data host
-        run: cargo test --locked -p symthaea-extension-data-host
+      - name: Test declarative data path
+        run: |
+          cargo test --locked -p symthaea-extension-data-host
+          cargo test --locked -p symthaea-epistemic-data-pack
 
-      - name: Clippy data host
-        run: cargo clippy --locked -p symthaea-extension-data-host --all-targets -- -D warnings
+      - name: Clippy declarative data path
+        run: |
+          cargo clippy --locked -p symthaea-extension-data-host --all-targets -- -D warnings
+          cargo clippy --locked -p symthaea-epistemic-data-pack --all-targets -- -D warnings
 
       - name: Require committed lockfile
         run: git diff --exit-code -- Cargo.lock
