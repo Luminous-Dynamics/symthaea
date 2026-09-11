@@ -51,10 +51,11 @@
 //! backend that actually executes that protocol through bounded direct child-process I/O,
 //! [`proposal_launch_validation`] binds deterministic validation/holdout evidence to that exact
 //! direct-launch receipt, [`proposal_executable_model`] makes v1 model payload equal the exact
-//! evaluator executable artifact, the crate-private deterministic scorer joins frozen predictions
-//! to labels only during scoring, and [`proposal_validation_chain`] retains the earlier blind
-//! deterministic receipt machinery for compatibility while constructor visibility is narrowed in a
-//! later follow-up.
+//! evaluator executable artifact, [`proposal_model_validation`] carries that exact executable-model
+//! provenance through deterministic validation and the identity-only holdout boundary, the
+//! crate-private deterministic scorer joins frozen predictions to labels only during scoring, and
+//! [`proposal_validation_chain`] retains the earlier blind deterministic receipt machinery for
+//! compatibility while constructor visibility is narrowed in a later follow-up.
 //!
 //! # Authority boundary
 //!
@@ -105,11 +106,13 @@
 //!   request stdin commitment, launcher-evidence identity and direct-launch receipt before scoring.
 //! - Executable-model v1 requires `model_payload_id == protocol.runner_implementation_id`; the
 //!   launcher then proves the exact executable bytes hash to that same artifact identity.
+//! - Executable-model validation composes that payload/runner equality with exact launch evidence,
+//!   label-blind predictions, deterministic Brier scoring, and the holdout prerequisite.
 //! - The direct launcher still does not isolate filesystem or network access; no v1 receipt claims
 //!   namespace/seccomp/cgroup/VM/network/filesystem containment.
 //! - The earlier direct blind deterministic validation path remains a compatibility bypass in this
-//!   tranche; executable-model launch evidence is the strongest runner/model proposition, not yet
-//!   the only constructible one.
+//!   tranche; executable-model validation is the strongest proposition, not yet the only
+//!   constructible one.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
 //! - Training support is counted only from observed labels; censored and counterfactual outcomes
@@ -119,7 +122,8 @@
 //! - Public validation prediction generation covers every proposal row through label-blind targets;
 //!   whether a row is observed/censored/counterfactual is joined only after predictions are frozen.
 //! - Generic aggregate validation/holdout constructors remain crate-internal; the blind deterministic,
-//!   evaluator-bound and launch-bound receipt layers all reconstruct Brier from exact row-level evidence.
+//!   evaluator-bound, launch-bound and executable-model-bound receipt layers all reconstruct Brier
+//!   from exact row-level evidence.
 //! - Deterministic validation v1 rejects report-only metrics until they also have deterministic,
 //!   row-reconstructable scorers.
 //! - Validation acceptance threshold/scorer identity is precommitted before a model artifact can be
@@ -162,6 +166,7 @@ pub mod proposal_exposure;
 pub mod proposal_history;
 pub mod proposal_launch_validation;
 mod proposal_model;
+pub mod proposal_model_validation;
 pub mod proposal_qualification;
 pub mod proposal_recording;
 pub mod proposal_study;
@@ -271,6 +276,10 @@ pub use proposal_launch_validation::{
 pub use proposal_model::{
     ForgeProposalFrozenModel, ForgeProposalMetricScore, ForgeProposalModelError,
     ForgeProposalValidationGateSpec,
+};
+pub use proposal_model_validation::{
+    ForgeProposalExecutableModelHoldoutPermit, ForgeProposalExecutableModelValidationReceipt,
+    ForgeProposalModelValidationError,
 };
 pub use proposal_qualification::{
     ForgeProposalQualificationError, ForgeQualifiedProposalEvidence,
