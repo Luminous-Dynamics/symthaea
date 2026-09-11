@@ -277,10 +277,10 @@ impl IntegratedEvaMission {
             );
         }
 
-        // Mobility overhead is treated as the first mobility load. Only power
-        // above that overhead can produce mechanical assistance.
+        let delivered_mobility_overhead_w =
+            allocation.mobility_delivered_w.min(segment.mobility_overhead_w);
         let electrical_for_assist_w =
-            (allocation.mobility_delivered_w - segment.mobility_overhead_w).max(0.0);
+            (allocation.mobility_delivered_w - delivered_mobility_overhead_w).max(0.0);
         let actual_assist_mechanical_w = (electrical_for_assist_w
             * segment.assist_motor_efficiency)
             .min(segment.gross_positive_mechanical_power_w);
@@ -310,14 +310,20 @@ impl IntegratedEvaMission {
 
         let o2_before = self.plss.state().primary_o2_remaining_l
             + self.plss.state().secondary_o2_remaining_l;
-        if let Err(err) = self.plss.step(PlssStepInput {
+        let plss_result = self.plss.step(PlssStepInput {
             metabolism,
             equipment_heat_w: segment.non_actuator_equipment_heat_w
-                + segment.mobility_overhead_w
+                + delivered_mobility_overhead_w
                 + actuator_waste_heat_w,
             humidity_generation_per_min: segment.humidity_generation_per_min,
             dt_s: segment.duration_s,
-        }) {
+        });
+        let o2_after = self.plss.state().primary_o2_remaining_l
+            + self.plss.state().secondary_o2_remaining_l;
+        let oxygen_consumed_l = (o2_before - o2_after).max(0.0);
+        self.totals.oxygen_consumed_l += oxygen_consumed_l;
+
+        if let Err(err) = plss_result {
             return self.abort_segment_with_details(
                 segment,
                 allocation,
@@ -325,15 +331,12 @@ impl IntegratedEvaMission {
                 actual_assist_fraction,
                 human_positive_mechanical_power_w,
                 actuator_waste_heat_w,
+                oxygen_consumed_l,
                 EvaMissionAbortReason::LifeSupportFailure(err),
             );
         }
-        let o2_after = self.plss.state().primary_o2_remaining_l
-            + self.plss.state().secondary_o2_remaining_l;
-        let oxygen_consumed_l = (o2_before - o2_after).max(0.0);
 
         let hours = segment.duration_s / 3600.0;
-        self.totals.oxygen_consumed_l += oxygen_consumed_l;
         self.totals.co2_generated_l += metabolism.co2_l_min * segment.duration_s / 60.0;
         self.totals.metabolic_energy_wh += metabolism.metabolic_power_w * hours;
         self.totals.human_positive_mechanical_energy_wh +=
@@ -426,6 +429,7 @@ impl IntegratedEvaMission {
         actual_assist_fraction: f64,
         human_positive_mechanical_power_w: f64,
         actuator_waste_heat_w: f64,
+        oxygen_consumed_l: f64,
         reason: EvaMissionAbortReason,
     ) -> EvaMissionSegmentReport {
         EvaMissionSegmentReport {
@@ -439,7 +443,7 @@ impl IntegratedEvaMission {
             actual_assist_fraction,
             human_positive_mechanical_power_w,
             actuator_waste_heat_w,
-            oxygen_consumed_l: 0.0,
+            oxygen_consumed_l,
             cumulative_radiation_msv: self.totals.cumulative_radiation_msv,
         }
     }
@@ -450,11 +454,7 @@ mod tests {
     use super::*;
 
     fn one_hour_work(assist: f64) -> EvaMissionSegment {
-        let mut s = EvaMissionSegment::lunar_reference(
-            "work",
-            EvaMissionPhase::SurfaceWork,
-            3600.0,
-        );
+        let mut s = EvaMissionSegment::lunar_reference("work", EvaMissionPhase::SurfaceWork, 3600.0);
         s.gross_positive_mechanical_power_w = 120.0;
         s.requested_assist_fraction = assist;
         s.personal_dose_rate_msv_h = 0.02;
@@ -496,11 +496,7 @@ mod tests {
     #[test]
     fn radiation_alert_forces_immediate_shelter() {
         let mut mission = IntegratedEvaMission::simulation_reference();
-        let mut s = EvaMissionSegment::lunar_reference(
-            "solar-event",
-            EvaMissionPhase::Contingency,
-            60.0,
-        );
+        let mut s = EvaMissionSegment::lunar_reference("solar-event", EvaMissionPhase::Contingency, 60.0);
         s.energetic_particle_alert = true;
         let report = mission.run(&[s]);
         assert_eq!(report.disposition, EvaMissionDisposition::ImmediateShelter);
@@ -543,5 +539,22 @@ mod tests {
         )]);
         assert_eq!(report.disposition, EvaMissionDisposition::DegradeMission);
         assert!(report.segments[0].power.unwrap().survival_satisfied);
+    }
+
+    #[test]
+    fn mobility_shortfall_pushes_work_back_to_human_and_not_into_fake_heat() {
+        let mut mission = IntegratedEvaMission::simulation_reference();
+        mission
+            .power_mut_for_fault_injection()
+            .config_mut_for_fault_injection()
+            .mobility
+            .max_discharge_w = 10.0;
+        let mut s = one_hour_work(0.75);
+        s.mobility_overhead_w = 25.0;
+        let report = mission.run(&[s]);
+        let r = &report.segments[0];
+        assert_eq!(r.actual_assist_fraction, 0.0);
+        assert!(r.human_positive_mechanical_power_w >= 120.0 - 1e-9);
+        assert_eq!(r.actuator_waste_heat_w, 0.0);
     }
 }
