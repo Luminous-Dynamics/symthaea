@@ -40,13 +40,15 @@
 //! frozen model and generic receipt internals, [`proposal_support`] proves the role-isolated training
 //! corpus satisfies every precommitted family-support threshold before a fit permit can exist,
 //! [`proposal_validation_coverage`] separately proves the validation corpus has enough actually
-//! observed labels before scoring, [`proposal_validation_blind`] exposes only label-blind
+//! observed labels before scoring, [`proposal_validation_blind`] exposes label-blind
 //! validation targets/predictions, [`proposal_validation_features`] derives exactly the frozen
 //! pre-decision feature schema including accepted-history suffixes from the bound sequence cohort,
 //! [`proposal_evaluator_protocol`] defines a serialization-safe request/response artifact boundary
-//! that carries only blind features and probabilities, the crate-private deterministic scorer joins
-//! frozen predictions to labels only during scoring, and [`proposal_validation_chain`] is the only
-//! public validation/holdout receipt path, requiring that exact blind row-reconstructable evidence.
+//! that carries only blind features and probabilities, [`proposal_evaluator_validation`] binds a
+//! stronger validation/holdout proposition to the exact evaluator request and response, the
+//! crate-private deterministic scorer joins frozen predictions to labels only during scoring, and
+//! [`proposal_validation_chain`] retains the earlier blind deterministic receipt machinery for
+//! compatibility while constructor visibility is narrowed in a later follow-up.
 //!
 //! # Authority boundary
 //!
@@ -84,8 +86,12 @@
 //! - Label-blind evaluator requests serialize only opaque gate/provenance identities plus the frozen
 //!   blind feature table; validation labels, endpoint observability, raw validation tables, and
 //!   per-family coverage counts are not request fields.
+//! - Evaluator-bound validation receipts commit the exact request, response, execution-context ID,
+//!   reconstructed blind predictions, deterministic Brier evidence, and downstream holdout permit.
 //! - The evaluator request/response protocol does not by itself prove OS/process/VM/network
 //!   isolation; a later worker execution receipt must establish those runtime properties.
+//! - The earlier direct blind deterministic validation path remains a compatibility bypass in this
+//!   tranche; the evaluator-bound receipt is the stronger proposition, not yet the only constructible one.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
 //! - Training support is counted only from observed labels; censored and counterfactual outcomes
@@ -94,8 +100,8 @@
 //!   distinct validation runs; an under-observed validation slice cannot mint a score permit.
 //! - Public validation prediction generation covers every proposal row through label-blind targets;
 //!   whether a row is observed/censored/counterfactual is joined only after predictions are frozen.
-//! - Generic aggregate validation/holdout constructors remain crate-internal; the public receipt
-//!   path requires the exact blind target set, blind prediction set, and deterministic Brier receipt.
+//! - Generic aggregate validation/holdout constructors remain crate-internal; the blind deterministic
+//!   and evaluator-bound receipt layers both reconstruct Brier from exact row-level prediction evidence.
 //! - Deterministic validation v1 rejects report-only metrics until they also have deterministic,
 //!   row-reconstructable scorers.
 //! - Validation acceptance threshold/scorer identity is precommitted before a model artifact can be
@@ -130,6 +136,7 @@ pub mod proposal_coverage;
 pub mod proposal_dataset;
 pub mod proposal_endpoints;
 pub mod proposal_evaluator_protocol;
+pub mod proposal_evaluator_validation;
 pub mod proposal_exposure;
 pub mod proposal_history;
 mod proposal_model;
@@ -204,6 +211,10 @@ pub use proposal_evaluator_protocol::{
     ForgeProposalEvaluationRequest, ForgeProposalEvaluationResponse,
     ForgeProposalEvaluatorPrediction, ForgeProposalEvaluatorProtocolError,
     ForgeProposalEvaluatorProtocolSpec,
+};
+pub use proposal_evaluator_validation::{
+    ForgeProposalEvaluatorHoldoutPermit, ForgeProposalEvaluatorValidationError,
+    ForgeProposalEvaluatorValidationReceipt,
 };
 pub use proposal_exposure::{
     ForgeFamilyOpportunity, ForgeProposalDecision, ForgeProposalExposure,
