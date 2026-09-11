@@ -121,6 +121,8 @@ pub struct DiagnosticStep {
     pub diagnostic_type: DiagnosticType,
     pub description: String,
     pub expected_info_gain: f64,
+    /// Eligible for automated proposal/planning only. This field is not a live
+    /// execution authorization. Governed execution must cross `it_authority`.
     pub autonomous_capable: bool,
 }
 
@@ -149,7 +151,7 @@ pub struct ScrubResult {
     pub redaction_types: std::collections::HashMap<String, usize>,
 }
 
-/// Proposed action from the action engine.
+/// Proposed action from the action engine. A proposal is not execution authority.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProposedAction {
     pub action_type: ActionType,
