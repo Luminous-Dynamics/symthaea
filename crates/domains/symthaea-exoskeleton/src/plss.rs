@@ -21,21 +21,13 @@ pub enum PlssPathState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct PlssConfig {
-    /// Usable primary oxygen inventory, standard litres.
     pub primary_o2_l: f64,
-    /// Independent contingency oxygen inventory, standard litres.
     pub secondary_o2_l: f64,
-    /// Ventilation-loop flow reference, L/min.
     pub ventilation_flow_l_min: f64,
-    /// Fraction of incoming CO2 removed per reference pass [0,1].
     pub co2_removal_efficiency: f64,
-    /// Fraction of humidity load removed per reference pass [0,1].
     pub humidity_removal_efficiency: f64,
-    /// Primary thermal-loop heat rejection capacity, W.
     pub primary_heat_rejection_w: f64,
-    /// Secondary/emergency thermal-loop heat rejection capacity, W.
     pub secondary_heat_rejection_w: f64,
-    /// Effective thermal capacitance of wearer+suit model, J/K.
     pub thermal_capacitance_j_k: f64,
     pub evidence: ExosuitEvidenceLevel,
 }
@@ -79,9 +71,7 @@ impl PlssConfig {
 pub struct PlssState {
     pub primary_o2_remaining_l: f64,
     pub secondary_o2_remaining_l: f64,
-    /// Simplified suit-loop CO2 burden, litres-equivalent.
     pub co2_burden_l: f64,
-    /// Simplified normalized humidity burden [0,+inf).
     pub humidity_burden: f64,
     pub thermal_store_k: f64,
     pub primary_oxygen: PlssPathState,
@@ -94,9 +84,7 @@ pub struct PlssState {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct PlssStepInput {
     pub metabolism: MetabolicEstimate,
-    /// Additional electrical/actuator waste heat entering the suit loop, W.
     pub equipment_heat_w: f64,
-    /// Relative humidity production proxy, normalized units/min.
     pub humidity_generation_per_min: f64,
     pub dt_s: f64,
 }
@@ -129,6 +117,9 @@ pub enum PlssStepError {
 pub struct PlssReferenceTwin {
     config: PlssConfig,
     state: PlssState,
+    /// Environment-established fraction of nominal heat rejection [0,1].
+    /// This is simulation state only and never commands a thermal controller.
+    environment_heat_rejection_fraction: f64,
 }
 
 impl PlssReferenceTwin {
@@ -150,6 +141,7 @@ impl PlssReferenceTwin {
                 secondary_thermal: PlssPathState::Available,
             },
             config,
+            environment_heat_rejection_fraction: 1.0,
         })
     }
 
@@ -169,17 +161,25 @@ impl PlssReferenceTwin {
         &self.config
     }
 
-    /// Nominal PLSS step with no external radiator derating.
-    pub fn step(&mut self, input: PlssStepInput) -> Result<(), PlssStepError> {
-        self.step_with_heat_rejection_fraction(input, 1.0)
+    pub fn environment_heat_rejection_fraction(&self) -> f64 {
+        self.environment_heat_rejection_fraction
     }
 
-    /// Step the PLSS while applying an externally established heat-rejection
-    /// fraction in [0,1]. This supports evidence-bearing environmental effects
-    /// such as radiator dust loading without mutating the baseline PLSS config.
-    ///
-    /// The fraction is a simulation input; this method does not infer it from
-    /// dust, coatings, or EDS state and never commands thermal hardware.
+    pub fn set_environment_heat_rejection_fraction(
+        &mut self,
+        fraction: f64,
+    ) -> Result<(), PlssStepError> {
+        if !fraction.is_finite() || !(0.0..=1.0).contains(&fraction) {
+            return Err(PlssStepError::InvalidInput);
+        }
+        self.environment_heat_rejection_fraction = fraction;
+        Ok(())
+    }
+
+    pub fn step(&mut self, input: PlssStepInput) -> Result<(), PlssStepError> {
+        self.step_with_heat_rejection_fraction(input, self.environment_heat_rejection_fraction)
+    }
+
     pub fn step_with_heat_rejection_fraction(
         &mut self,
         input: PlssStepInput,
@@ -331,13 +331,20 @@ mod tests {
     fn radiator_derating_increases_stored_heat() {
         let mut clean = PlssReferenceTwin::simulation_reference();
         let mut dusted = PlssReferenceTwin::simulation_reference();
-        clean
-            .step_with_heat_rejection_fraction(input(), 1.0)
-            .unwrap();
-        dusted
-            .step_with_heat_rejection_fraction(input(), 0.5)
-            .unwrap();
+        clean.step_with_heat_rejection_fraction(input(), 1.0).unwrap();
+        dusted.step_with_heat_rejection_fraction(input(), 0.5).unwrap();
         assert!(dusted.state().thermal_store_k > clean.state().thermal_store_k);
+    }
+
+    #[test]
+    fn persistent_environment_derating_affects_nominal_step() {
+        let mut clean = PlssReferenceTwin::simulation_reference();
+        let mut dusted = PlssReferenceTwin::simulation_reference();
+        dusted.set_environment_heat_rejection_fraction(0.5).unwrap();
+        clean.step(input()).unwrap();
+        dusted.step(input()).unwrap();
+        assert!(dusted.state().thermal_store_k > clean.state().thermal_store_k);
+        assert_eq!(dusted.environment_heat_rejection_fraction(), 0.5);
     }
 
     #[test]
@@ -348,7 +355,7 @@ mod tests {
             Err(PlssStepError::InvalidInput)
         );
         assert_eq!(
-            twin.step_with_heat_rejection_fraction(input(), 1.1),
+            twin.set_environment_heat_rejection_fraction(1.1),
             Err(PlssStepError::InvalidInput)
         );
     }
