@@ -22,6 +22,7 @@ pub mod legacy_computing;
 #[cfg(test)]
 mod legacy_computing_pack_tests;
 pub mod legacy_hpux;
+pub mod legacy_hpux_scenarios;
 pub mod legacy_platform_identity;
 pub mod legacy_qualification_profile;
 pub mod legacy_source_artifacts;
@@ -89,6 +90,12 @@ pub use legacy_hpux::{
     enrich_legacy_hpux_foundation_v1, HpuxEvidenceSignalV1, HpuxFailureModeV1,
     HpuxFoundationV1, HpuxMechanismKindV1, HpuxMechanismModelV1, LegacyHpuxErrorV1,
     LEGACY_HPUX_FOUNDATION_SCHEMA_V1,
+};
+pub use legacy_hpux_scenarios::{
+    register_hpux_qualification_cases_v1, seed_hpux_qualification_scenarios_v1,
+    HpuxQualificationScenarioV1, HpuxScenarioActionClassV1, HpuxScenarioActionV1,
+    HpuxScenarioErrorV1, HpuxScenarioEvidenceCurrentnessV1, HpuxScenarioEvidenceV1,
+    LEGACY_HPUX_SCENARIO_SCHEMA_V1,
 };
 pub use legacy_platform_identity::{
     assess_legacy_platform_identity_v1, legacy_platform_identity_spec_v1,
