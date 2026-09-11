@@ -36,8 +36,10 @@
 //! state entering each generation to every proposal row, including no-op attempts,
 //! [`proposal_endpoints`] freezes outcome observability so missing/censored labels cannot be
 //! silently rewritten as failures, [`proposal_study`] freezes the feature/target/estimator/
-//! validation contract before any model can be fitted, and [`proposal_model`] separates validation
-//! gate precommitment, frozen model identity, validation receipt, and holdout-evaluation permission.
+//! validation contract before any model can be fitted, [`proposal_model`] separates validation
+//! gate precommitment, frozen model identity, validation receipt, and holdout-evaluation permission,
+//! and [`proposal_support`] proves the role-isolated training corpus satisfies every precommitted
+//! family-support threshold before a fit permit can exist.
 //!
 //! # Authority boundary
 //!
@@ -72,6 +74,8 @@
 //!   fields are intentionally absent from the v1 feature vocabulary.
 //! - The primary validation metric, estimator implementation/configuration, training seed, support
 //!   thresholds, endpoint, exposure unit, and corpus identities are frozen before fitting.
+//! - Training support is counted only from observed labels; censored and counterfactual outcomes
+//!   remain visible but cannot satisfy label-support thresholds or mint a fit permit.
 //! - Validation acceptance threshold/scorer identity is precommitted before a model artifact can be
 //!   frozen; failed validation cannot mint even an identity-only holdout evaluation permit.
 //! - Holdout permits still expose no holdout observations and grant no search or deployment authority.
@@ -109,6 +113,7 @@ pub mod proposal_model;
 pub mod proposal_qualification;
 pub mod proposal_recording;
 pub mod proposal_study;
+pub mod proposal_support;
 pub mod proposal_trace;
 pub mod sandbox;
 pub mod search;
@@ -192,6 +197,10 @@ pub use proposal_study::{
     ForgeProposalFeature, ForgeProposalFeatureSchema, ForgeProposalMetric,
     ForgeProposalMissingnessPolicy, ForgeProposalStudyError, ForgeProposalStudySpec,
     ForgeProposalSupportSpec,
+};
+pub use proposal_support::{
+    ForgeProposalFamilySupport, ForgeProposalFitPermit, ForgeProposalSupportError,
+    ForgeProposalSupportReceipt,
 };
 pub use proposal_trace::{
     ForgeRawMutationEffect, ForgeRawOpportunity, ForgeRawProposalArchive, ForgeRawProposalDecision,
