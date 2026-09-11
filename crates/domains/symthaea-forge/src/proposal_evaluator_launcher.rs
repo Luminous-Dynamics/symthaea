@@ -101,7 +101,7 @@ pub enum ForgeProposalEvaluatorLauncherError {
 pub fn forge_direct_evaluator_launcher_implementation_id() -> ContentId {
     ContentId::derive(
         "symthaea.forge-direct-evaluator-launcher-implementation.v1",
-        [b"direct-exec;env-clear;fresh-cwd;piped-stdio;concurrent-drain;monotonic-timeout".as_slice()],
+        [b"direct-exec;env-clear;fresh-cwd;piped-stdio;concurrent-drain;monotonic-timeout;joined-terminal-io".as_slice()],
     )
 }
 
@@ -325,10 +325,21 @@ fn canonical_runner_bytes(
     Ok((canonical, bytes))
 }
 
+#[derive(Debug)]
+enum BoundedWaitOutcome {
+    Exited { status: ExitStatus, wall_time_ms: u64 },
+    TimedOut { wall_time_ms: u64 },
+}
+
+fn elapsed_millis(start: Instant) -> Result<u64, ForgeProposalEvaluatorLauncherError> {
+    u64::try_from(start.elapsed().as_millis())
+        .map_err(|_| ForgeProposalEvaluatorLauncherError::MeasurementOverflow)
+}
+
 fn wait_bounded(
     child: &mut std::process::Child,
     max_wall_time_ms: u64,
-) -> Result<(ExitStatus, u64), ForgeProposalEvaluatorLauncherError> {
+) -> Result<BoundedWaitOutcome, ForgeProposalEvaluatorLauncherError> {
     let start = Instant::now();
     let timeout = Duration::from_millis(max_wall_time_ms);
     loop {
@@ -339,14 +350,17 @@ fn wait_bounded(
                 source,
             })?
         {
-            let millis = u64::try_from(start.elapsed().as_millis())
-                .map_err(|_| ForgeProposalEvaluatorLauncherError::MeasurementOverflow)?;
-            return Ok((status, millis));
+            return Ok(BoundedWaitOutcome::Exited {
+                status,
+                wall_time_ms: elapsed_millis(start)?,
+            });
         }
         if start.elapsed() >= timeout {
             let _ = child.kill();
             let _ = child.wait();
-            return Err(ForgeProposalEvaluatorLauncherError::TimedOut);
+            return Ok(BoundedWaitOutcome::TimedOut {
+                wall_time_ms: elapsed_millis(start)?,
+            });
         }
         thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
     }
@@ -472,20 +486,35 @@ pub fn run_direct_evaluator(
     let stdout_reader = thread::spawn(move || read_capped_and_drain(stdout, stdout_cap));
     let stderr_reader = thread::spawn(move || read_capped_and_drain(stderr, stderr_cap));
 
-    let (status, wall_time_ms) = wait_bounded(&mut child, policy.max_wall_time_ms())?;
-    let writer_result = writer
-        .join()
+    let wait_outcome = wait_bounded(&mut child, policy.max_wall_time_ms())?;
+
+    // Every terminal path joins all three workers. On timeout the child has already been killed and
+    // waited, so ordinary pipe owners are closed before these joins. A deliberately detached
+    // descendant that inherited a pipe is outside the v1 isolation theorem.
+    let writer_joined = writer.join();
+    let stdout_joined = stdout_reader.join();
+    let stderr_joined = stderr_reader.join();
+
+    if let BoundedWaitOutcome::TimedOut { wall_time_ms } = wait_outcome {
+        let _ = wall_time_ms;
+        return Err(ForgeProposalEvaluatorLauncherError::TimedOut);
+    }
+
+    let (status, wall_time_ms) = match wait_outcome {
+        BoundedWaitOutcome::Exited { status, wall_time_ms } => (status, wall_time_ms),
+        BoundedWaitOutcome::TimedOut { .. } => unreachable!("timeout handled above"),
+    };
+
+    let writer_result = writer_joined
         .map_err(|_| ForgeProposalEvaluatorLauncherError::StdinWriterFailed)?;
     writer_result.map_err(|_| ForgeProposalEvaluatorLauncherError::StdinWriterFailed)?;
-    let stdout_result = stdout_reader
-        .join()
+    let stdout_result = stdout_joined
         .map_err(|_| ForgeProposalEvaluatorLauncherError::ReaderThreadPanicked)?
         .map_err(|source| ForgeProposalEvaluatorLauncherError::Io {
             path: PathBuf::from("<evaluator-stdout>"),
             source,
         })?;
-    let stderr_result = stderr_reader
-        .join()
+    let stderr_result = stderr_joined
         .map_err(|_| ForgeProposalEvaluatorLauncherError::ReaderThreadPanicked)?
         .map_err(|source| ForgeProposalEvaluatorLauncherError::Io {
             path: PathBuf::from("<evaluator-stderr>"),
