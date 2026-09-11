@@ -240,24 +240,22 @@ impl RegenerativeFlowSupportV1 {
         let cyclic_dependencies: BTreeSet<&str> = supported_dependencies
             .iter()
             .copied()
-            .filter(|dependency_id| {
-                reaches(
-                    dependency_id,
-                    dependency_id,
-                    &adjacency,
-                    true,
-                    &mut BTreeSet::new(),
-                )
-            })
+            .filter(|dependency_id| has_nonzero_cycle(dependency_id, &adjacency))
             .collect();
 
-        for dependency_id in cyclic_dependencies {
-            let has_bootstrap = self.claims.iter().any(|claim| {
-                claim.dependency_id == dependency_id && claim.bootstrap_binding.is_some()
+        for dependency_id in &cyclic_dependencies {
+            let covered_by_bootstrapped_peer = self.claims.iter().any(|claim| {
+                claim.bootstrap_binding.is_some()
+                    && cyclic_dependencies.contains(claim.dependency_id.as_str())
+                    && same_strong_component(
+                        dependency_id,
+                        claim.dependency_id.as_str(),
+                        &adjacency,
+                    )
             });
-            if !has_bootstrap {
+            if !covered_by_bootstrapped_peer {
                 return Err(RegenerativeFlowSupportError::UnbootstrappedCycle {
-                    dependency_id: dependency_id.to_string(),
+                    dependency_id: (*dependency_id).to_string(),
                 });
             }
         }
@@ -265,25 +263,48 @@ impl RegenerativeFlowSupportV1 {
     }
 }
 
-fn reaches<'a>(
-    origin: &'a str,
-    current: &'a str,
+fn has_nonzero_cycle<'a>(
+    start: &'a str,
     adjacency: &BTreeMap<&'a str, BTreeSet<&'a str>>,
-    skip_zero: bool,
-    visited: &mut BTreeSet<&'a str>,
 ) -> bool {
-    if !skip_zero && current == origin {
-        return true;
-    }
-    if !visited.insert(current) {
-        return false;
-    }
-    adjacency.get(current).is_some_and(|nexts| {
+    adjacency.get(start).is_some_and(|nexts| {
         nexts
             .iter()
             .copied()
-            .any(|next| reaches(origin, next, adjacency, false, &mut visited.clone()))
+            .any(|next| can_reach(next, start, adjacency))
     })
+}
+
+fn same_strong_component<'a>(
+    left: &'a str,
+    right: &'a str,
+    adjacency: &BTreeMap<&'a str, BTreeSet<&'a str>>,
+) -> bool {
+    if left == right {
+        return true;
+    }
+    can_reach(left, right, adjacency) && can_reach(right, left, adjacency)
+}
+
+fn can_reach<'a>(
+    start: &'a str,
+    target: &'a str,
+    adjacency: &BTreeMap<&'a str, BTreeSet<&'a str>>,
+) -> bool {
+    let mut stack = vec![start];
+    let mut visited = BTreeSet::new();
+    while let Some(current) = stack.pop() {
+        if current == target {
+            return true;
+        }
+        if !visited.insert(current) {
+            continue;
+        }
+        if let Some(nexts) = adjacency.get(current) {
+            stack.extend(nexts.iter().copied());
+        }
+    }
+    false
 }
 
 /// Validation errors for regenerative-flow support graphs.
@@ -495,25 +516,27 @@ mod tests {
     #[test]
     fn ungrounded_flow_claim_is_rejected() {
         let mut support = support();
-        let structural = support
+        let index = support
             .claims
-            .iter_mut()
-            .find(|claim| {
+            .iter()
+            .position(|claim| {
                 claim.dependency_id == "structural-material"
                     && claim.flow_kind == RegenerativeFlowKindV1::Production
             })
             .unwrap();
-        structural.prerequisite_dependency_ids.clear();
+        support.claims[index].prerequisite_dependency_ids.clear();
         assert!(matches!(
             support.validate_against_model(&model()),
             Err(RegenerativeFlowSupportError::UngroundedFlowClaim { .. })
         ));
-        structural.external_input_binding = Some("external-input:qualified-natural-feed".into());
+        support.claims[index].external_input_binding =
+            Some("external-input:qualified-natural-feed".into());
         assert!(support.validate_against_model(&model()).is_ok());
     }
 
     #[test]
-    fn cyclic_dependency_requires_explicit_bootstrap_evidence() {
+    fn one_bootstrap_can_qualify_a_strongly_connected_support_cycle() {
+        assert!(support().validate_against_model(&model()).is_ok());
         let mut support = support();
         for claim in &mut support.claims {
             claim.bootstrap_binding = None;
@@ -525,7 +548,7 @@ mod tests {
     }
 
     #[test]
-    fn safeguarded_dependency_cannot_enter_generic_local_flow_support() {
+    fn safeguarded_dependency_cannot_claim_local_flow_in_the_bound_model() {
         let mut model = model();
         let reactor = model
             .dependencies
