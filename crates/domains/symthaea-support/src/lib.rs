@@ -22,6 +22,7 @@ pub mod legacy_computing;
 #[cfg(test)]
 mod legacy_computing_pack_tests;
 pub mod legacy_ibmi;
+pub mod legacy_ibmi_scenarios;
 pub mod legacy_qualification_profile;
 pub mod legacy_source_artifacts;
 pub mod legacy_source_readiness;
@@ -88,6 +89,12 @@ pub use legacy_ibmi::{
     enrich_legacy_ibmi_foundation_v1, IbmiEvidenceSignalV1, IbmiFailureModeV1,
     IbmiFoundationV1, IbmiMechanismKindV1, IbmiMechanismModelV1, LegacyIbmiErrorV1,
     LEGACY_IBMI_FOUNDATION_SCHEMA_V1,
+};
+pub use legacy_ibmi_scenarios::{
+    register_ibmi_qualification_cases_v1, seed_ibmi_qualification_scenarios_v1,
+    IbmiQualificationScenarioV1, IbmiScenarioActionClassV1, IbmiScenarioActionV1,
+    IbmiScenarioErrorV1, IbmiScenarioEvidenceCurrentnessV1, IbmiScenarioEvidenceV1,
+    LEGACY_IBMI_SCENARIO_SCHEMA_V1,
 };
 pub use legacy_qualification_profile::{
     area_tag, assess_legacy_qualification_profile_v1, exhaustive_legacy_qualification_profile_v1,
