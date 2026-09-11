@@ -65,10 +65,28 @@ def main() -> int:
         run("init", "--db", db, "--resource-id", rid, "--backend-id", bid, "--profile-id", pid)
 
         token1 = parsed(run("issue", "--db", db, "--disposition", "permit", "--challenge", hx(10)))
+        p1 = root / "t1.json"; save(p1, token1)
+        gate = root / "resume-old-holder"
+        waiter = """import os,pathlib,sys,time
+gate=pathlib.Path(sys.argv[1])
+deadline=time.time()+10
+while not gate.exists():
+    if time.time() > deadline:
+        raise SystemExit(70)
+    time.sleep(0.01)
+os.execv(sys.executable,[sys.executable,sys.argv[2],'actuate','--db',sys.argv[3],'--token',sys.argv[4],'--delta','5','--operation-digest',sys.argv[5]])
+"""
+        paused_holder = subprocess.Popen(
+            [sys.executable, "-c", waiter, str(gate), str(LAB), str(db), str(p1), hx(20)],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
         token2 = parsed(run("issue", "--db", db, "--disposition", "permit", "--challenge", hx(11)))
-        p1, p2 = root / "t1.json", root / "t2.json"; save(p1, token1); save(p2, token2)
-        stale1 = run("actuate", "--db", db, "--token", p1, "--delta", 5, "--operation-digest", hx(20), expect=2)
-        require_deny(stale1, "actuate:stale_generation"); mark("reject_stale_generation", {"stderr": stale1.stderr})
+        p2 = root / "t2.json"; save(p2, token2)
+        gate.write_text("resume", encoding="utf-8")
+        paused_out, paused_err = paused_holder.communicate(timeout=10)
+        if paused_holder.returncode != 2 or "actuate:stale_generation" not in paused_err:
+            raise AssertionError(f"paused stale holder was not rejected: rc={paused_holder.returncode} stdout={paused_out!r} stderr={paused_err!r}")
+        mark("reject_stale_generation", {"paused_holder_stderr": paused_err})
 
         forged2 = dict(token2)
         forged2["challenge"] = hx(99)
@@ -200,7 +218,7 @@ def main() -> int:
             "campaign_oracle": oracle_summary,
             "obligation_bases": bases,
             "properties": [
-                "stale_generation_rejected", "one_use_replay_rejected", "same_generation_token_substitution_rejected", "committed_state_survives_reopen",
+                "paused_stale_holder_rejected", "one_use_replay_rejected", "same_generation_token_substitution_rejected", "committed_state_survives_reopen",
                 "crash_before_commit_is_atomic", "crash_after_commit_is_durable", "emergency_stop_dominates", "deny_token_cannot_mutate",
                 "cross_resource_token_rejected", "nine_obligation_campaign_shape_accepted",
             ],
