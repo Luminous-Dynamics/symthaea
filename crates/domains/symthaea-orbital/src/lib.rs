@@ -4,6 +4,7 @@
 #![deny(unsafe_code)]
 pub mod cislunar;
 pub mod cislunar_oracle;
+pub mod cislunar_target;
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
