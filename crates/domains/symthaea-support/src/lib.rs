@@ -15,6 +15,7 @@ pub mod diagnostics;
 pub mod federation;
 pub mod golden_incidents;
 pub mod golden_incidents_v2;
+pub mod golden_run_protocol;
 pub mod golden_solver_view_v2;
 pub mod it_qualification;
 pub mod knowledge;
@@ -57,6 +58,14 @@ pub use golden_incidents_v2::{
     seed_golden_incidents_v2, DiagnosticAuthorityRequirementV2, GoldenDiagnosticActionV2,
     GoldenEvidenceCurrentnessV2, GoldenIncidentCaseV2, GoldenIncidentCorpusV2,
     GoldenIncidentErrorV2, GoldenIncidentEvidenceV2, GOLDEN_INCIDENT_SCHEMA_V2,
+};
+pub use golden_run_protocol::{
+    golden_grading_artifact_digest_v1, golden_solver_view_digest_v1,
+    GoldenAbstentionReasonV1, GoldenDiagnosticRequestV1, GoldenFindingDispositionV1,
+    GoldenPresentedEvidenceSourceV1, GoldenPresentedEvidenceV1, GoldenRunProtocolErrorV1,
+    GoldenRunTranscriptV1, GoldenSolverAbstentionV1, GoldenSolverFindingV1,
+    GoldenSolverSubmissionV1, GOLDEN_RUN_TRANSCRIPT_SCHEMA_V1,
+    GOLDEN_SOLVER_SUBMISSION_SCHEMA_V1,
 };
 pub use golden_solver_view_v2::{GoldenSolverCorpusV2, GoldenSolverIncidentV2};
 pub use it_qualification::{
