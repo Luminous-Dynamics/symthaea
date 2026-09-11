@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-domain-awareness-model-assurance"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bridge generic model assurance into Symthaea domain-awareness ODD state"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "digital-twin", "sensor-fusion", "assurance"]
+categories = ["science", "aerospace"]
+
+[dependencies]
+symthaea-domain-awareness = { path = "../../domains/symthaea-domain-awareness" }
+symthaea-model-assurance = { path = "../../domains/symthaea-model-assurance" }

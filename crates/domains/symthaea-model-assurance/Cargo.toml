@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-model-assurance"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Generic residual-based model assurance for evidence-bearing predictive systems"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "digital-twin", "verification", "uncertainty"]
+categories = ["science", "aerospace"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
