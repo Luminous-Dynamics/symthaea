@@ -15,3 +15,4 @@ categories = ["science", "algorithms"]
 symthaea-tracking-eval = { path = "../../domains/symthaea-tracking-eval" }
 symthaea-vision-manifold = { path = "../../domains/symthaea-vision-manifold" }
 image = "0.24"
+blake3 = { workspace = true }
