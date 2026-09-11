@@ -11,9 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::durability_coupling::DurabilityMissionModifiers;
 use crate::eva_mission::{EvaMissionSegment, EvaMissionSegmentReport, IntegratedEvaMission};
-use crate::powered_glove::{
-    PoweredGloveCommand, PoweredGloveStep, NUM_GLOVE_DIGITS,
-};
+use crate::powered_glove::{PoweredGloveCommand, PoweredGloveStep, NUM_GLOVE_DIGITS};
 use crate::space_exosuit::ExosuitEvidenceLevel;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -96,11 +94,8 @@ pub fn compose_fidelity_segment(
 
     let body_assist_requested_w =
         segment.gross_positive_mechanical_power_w * segment.requested_assist_fraction;
-    let (dynamic_hand_w, isometric_hand_w) = hand_work_equivalent(
-        glove_command,
-        glove_step,
-        config,
-    );
+    let (dynamic_hand_w, isometric_hand_w) =
+        hand_work_equivalent(glove_command, glove_step, config);
     let total_hand_w = dynamic_hand_w + isometric_hand_w;
 
     let glove_actuator_mechanical_w = (0..NUM_GLOVE_DIGITS)
@@ -118,8 +113,6 @@ pub fn compose_fidelity_segment(
     } else {
         0.0
     };
-    // Glove motors are mobility/augmentation loads; their electrical demand is
-    // therefore isolated from survival and mission buses by the existing power model.
     segment.mobility_overhead_w += glove_step.electrical_power_w;
     segment.non_actuator_equipment_heat_w += glove_waste_heat_w;
     segment.evidence = segment
@@ -149,9 +142,6 @@ pub fn compose_fidelity_segment(
     })
 }
 
-/// Execute one already-composed segment with its explicit radiator derating.
-/// The PLSS environmental multiplier is restored after the step so callers do
-/// not accidentally leak one segment's dust state into the next segment.
 pub fn step_fidelity_segment(
     mission: &mut IntegratedEvaMission,
     coupled: &EvaFidelityCoupledSegment,
@@ -191,7 +181,11 @@ fn hand_work_equivalent(
         let force = step.human_required_force_n[i].max(0.0);
         let speed = command.tendon_speed_m_s[i].max(0.0);
         if speed <= config.isometric_speed_threshold_m_s {
-            isometric += force * config.isometric_hand_equivalent_w_per_n;
+            let intentionally_loaded = command.requested_contact_force_n[i] > 0.0
+                || step.exercise_resistance_force_n[i] > 0.0;
+            if intentionally_loaded {
+                isometric += force * config.isometric_hand_equivalent_w_per_n;
+            }
         } else {
             dynamic += force * speed;
         }
@@ -217,9 +211,7 @@ mod tests {
     use super::*;
     use crate::durability_coupling::DurabilityMissionModifiers;
     use crate::eva_mission::EvaMissionPhase;
-    use crate::powered_glove::{
-        PoweredGloveCommand, PoweredGloveMode, PoweredGloveTwin,
-    };
+    use crate::powered_glove::{PoweredGloveCommand, PoweredGloveMode, PoweredGloveTwin};
 
     fn base_segment() -> EvaMissionSegment {
         EvaMissionSegment::lunar_reference("coupled", EvaMissionPhase::SurfaceWork, 60.0)
@@ -248,8 +240,10 @@ mod tests {
         )
         .unwrap();
         assert!(coupled.dynamic_hand_mechanical_power_w > 0.0);
-        assert!(coupled.segment.gross_positive_mechanical_power_w > base_segment().gross_positive_mechanical_power_w);
-        // Requested body-assist mechanical power is preserved despite adding hand work.
+        assert!(
+            coupled.segment.gross_positive_mechanical_power_w
+                > base_segment().gross_positive_mechanical_power_w
+        );
         let original_assist = base_segment().gross_positive_mechanical_power_w
             * base_segment().requested_assist_fraction;
         let coupled_assist = coupled.segment.gross_positive_mechanical_power_w
@@ -316,10 +310,21 @@ mod tests {
         step_fidelity_segment(&mut clean_mission, &clean).unwrap();
         step_fidelity_segment(&mut dusty_mission, &dusty).unwrap();
 
-        let clean_store = clean_mission.plss_mut_for_fault_injection().state().thermal_store_k;
-        let dusty_store = dusty_mission.plss_mut_for_fault_injection().state().thermal_store_k;
+        let clean_store = clean_mission
+            .plss_mut_for_fault_injection()
+            .state()
+            .thermal_store_k;
+        let dusty_store = dusty_mission
+            .plss_mut_for_fault_injection()
+            .state()
+            .thermal_store_k;
         assert!(dusty_store > clean_store);
-        assert_eq!(dusty_mission.plss_mut_for_fault_injection().environment_heat_rejection_fraction(), 1.0);
+        assert_eq!(
+            dusty_mission
+                .plss_mut_for_fault_injection()
+                .environment_heat_rejection_fraction(),
+            1.0
+        );
     }
 
     #[test]
@@ -337,5 +342,67 @@ mod tests {
         .unwrap();
         assert_eq!(coupled.dynamic_hand_mechanical_power_w, 0.0);
         assert!(coupled.isometric_hand_equivalent_power_w > 0.0);
+    }
+
+    #[test]
+    fn relaxed_static_hand_does_not_incur_isometric_workload() {
+        let mut glove = PoweredGloveTwin::simulation_reference();
+        let cmd = PoweredGloveCommand {
+            mode: PoweredGloveMode::Transparent,
+            requested_contact_force_n: [0.0; NUM_GLOVE_DIGITS],
+            tendon_speed_m_s: [0.0; NUM_GLOVE_DIGITS],
+            exercise_resistance_fraction: 0.0,
+        };
+        let step = glove.step(cmd, 1.0).unwrap();
+        let coupled = compose_fidelity_segment(
+            &base_segment(),
+            DurabilityMissionModifiers::clean_reference(),
+            &cmd,
+            &step,
+            EvaFidelityCouplingConfig::simulation_reference(),
+        )
+        .unwrap();
+        assert_eq!(coupled.total_hand_equivalent_power_w, 0.0);
+    }
+
+    #[test]
+    fn hand_work_increases_actual_integrated_metabolic_estimate() {
+        let mut glove = PoweredGloveTwin::simulation_reference();
+        let active_cmd = command(PoweredGloveMode::Transparent, 0.02);
+        let active_step = glove.step(active_cmd, 1.0).unwrap();
+        let active = compose_fidelity_segment(
+            &base_segment(),
+            DurabilityMissionModifiers::clean_reference(),
+            &active_cmd,
+            &active_step,
+            EvaFidelityCouplingConfig::simulation_reference(),
+        )
+        .unwrap();
+
+        let mut idle_glove = PoweredGloveTwin::simulation_reference();
+        let idle_cmd = PoweredGloveCommand {
+            mode: PoweredGloveMode::Transparent,
+            requested_contact_force_n: [0.0; NUM_GLOVE_DIGITS],
+            tendon_speed_m_s: [0.0; NUM_GLOVE_DIGITS],
+            exercise_resistance_fraction: 0.0,
+        };
+        let idle_step = idle_glove.step(idle_cmd, 1.0).unwrap();
+        let idle = compose_fidelity_segment(
+            &base_segment(),
+            DurabilityMissionModifiers::clean_reference(),
+            &idle_cmd,
+            &idle_step,
+            EvaFidelityCouplingConfig::simulation_reference(),
+        )
+        .unwrap();
+
+        let mut active_mission = IntegratedEvaMission::simulation_reference();
+        let mut idle_mission = IntegratedEvaMission::simulation_reference();
+        let active_report = step_fidelity_segment(&mut active_mission, &active).unwrap();
+        let idle_report = step_fidelity_segment(&mut idle_mission, &idle).unwrap();
+        assert!(
+            active_report.metabolism.unwrap().metabolic_power_w
+                > idle_report.metabolism.unwrap().metabolic_power_w
+        );
     }
 }
