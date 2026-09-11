@@ -17,6 +17,7 @@ pub mod it_coverage;
 pub mod it_qualification;
 pub mod knowledge;
 pub mod knowledge_source;
+pub mod legacy_computing;
 #[cfg(feature = "logparse-adapter")]
 pub mod logparse_adapter;
 pub mod predictive;
@@ -65,6 +66,12 @@ pub use knowledge_source::{
     KnowledgeOriginV1, KnowledgeQueryPurposeV1, KnowledgeShareabilityV1,
     KnowledgeSourceErrorV1, KnowledgeStabilityV1, SupportKnowledgeHitV1,
     SupportKnowledgeQueryV1, SupportKnowledgeSourceV1,
+};
+pub use legacy_computing::{
+    seed_legacy_computing_pack_v1, LegacyComputingErrorV1, LegacyComputingPackV1,
+    LegacyCoverageStateV1, LegacyKnowledgeAreaV1, LegacyPlatformProfileV1, LegacyPlatformV1,
+    LegacyProcedureAuthorityV1, LegacyProcedureKindV1, LegacyProcedureStepV1,
+    LegacyProcedureV1, LEGACY_COMPUTING_PACK_SCHEMA_V1,
 };
 #[cfg(feature = "logparse-adapter")]
 pub use logparse_adapter::{
