@@ -35,6 +35,7 @@ pub enum SuitportFault {
     DecontaminationIncomplete,
     TransferIncomplete,
     DiagnosticsFailed,
+    HatchInterlockFailed,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -49,6 +50,7 @@ pub struct SuitportEvidence {
     pub dust_decontamination_complete: bool,
     pub resource_transfer_complete: bool,
     pub diagnostics_passed: bool,
+    pub hatch_interlock_healthy: bool,
     pub evidence: ExosuitEvidenceLevel,
 }
 
@@ -65,6 +67,7 @@ impl SuitportEvidence {
             dust_decontamination_complete: true,
             resource_transfer_complete: true,
             diagnostics_passed: true,
+            hatch_interlock_healthy: true,
             evidence: ExosuitEvidenceLevel::Simulation,
         }
     }
@@ -118,6 +121,10 @@ impl SuitportStateMachine {
 
         if !evidence.identity_verified {
             self.fail(SuitportFault::IdentityInvalid);
+            return self.transition(previous);
+        }
+        if !evidence.hatch_interlock_healthy {
+            self.fail(SuitportFault::HatchInterlockFailed);
             return self.transition(previous);
         }
 
@@ -258,6 +265,20 @@ mod tests {
         lost.mechanical_capture_locked = false;
         let transition = machine.advance(lost);
         assert_eq!(transition.fault, Some(SuitportFault::CaptureLost));
+        assert!(!transition.pressure_boundary_open_permitted);
+    }
+
+    #[test]
+    fn failed_hatch_interlock_never_permits_boundary_opening() {
+        let mut machine = SuitportStateMachine::simulation_reference();
+        let nominal = SuitportEvidence::simulation_nominal();
+        for _ in 0..7 {
+            machine.advance(nominal);
+        }
+        let mut failed = nominal;
+        failed.hatch_interlock_healthy = false;
+        let transition = machine.advance(failed);
+        assert_eq!(transition.fault, Some(SuitportFault::HatchInterlockFailed));
         assert!(!transition.pressure_boundary_open_permitted);
     }
 }
