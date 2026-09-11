@@ -23,6 +23,10 @@ use super::{
     ReadyCoverageQualifiedEffectExecutionV1, prepare_coverage_qualified_effect_execution,
 };
 use crate::backend_bound_execution::QualifiedBackendEffectCommitmentV1;
+use crate::current_verifier_execution_commitment::{
+    CurrentVerifierExecutionBindingV1, QualifiedCurrentVerifierExecutionCommitmentId,
+    QualifiedCurrentVerifierExecutionCommitmentV1,
+};
 use crate::effect_coverage::{QualifiedExternalEffectCoverageId, QualifiedExternalEffectCoverageV1};
 use crate::effect_scoped_execution::QualifiedEffectScopeCommitmentV1;
 use crate::execution_capability::{
@@ -246,11 +250,24 @@ impl PendingCurrentAuthorizedEffectExecutionV1 {
         effect_scope: &QualifiedEffectScopeCommitmentV1,
         backend_commitment: &QualifiedBackendEffectCommitmentV1,
         coverage_commitment: &QualifiedEffectCoverageCommitmentV1,
+        current_verifier_commitment: &QualifiedCurrentVerifierExecutionCommitmentV1,
     ) -> Result<ReadyCurrentAuthorizedEffectExecutionV1, CurrentAuthorizedCoverageError> {
+        let expected_binding = CurrentVerifierExecutionBindingV1::Effectful {
+            historical_commitment_id: coverage_commitment.id(),
+            historical_coverage_id: self.current_coverage.coverage().id(),
+            current_coverage_id: self.current_coverage.id(),
+        };
         if self.current_coverage.decision_time_unix_ms() != journal_anchor.anchored_at_unix_ms()
             || coverage_commitment.coverage_id() != self.current_coverage.coverage().id()
+            || current_verifier_commitment.journal_anchor_id() != journal_anchor.id()
+            || current_verifier_commitment.binding() != expected_binding
+            || current_verifier_commitment.adoption_id() != self.current_coverage.adoption_id()
+            || current_verifier_commitment.current_verifier_id()
+                != self.current_coverage.current_verifier_id()
+            || current_verifier_commitment.decision_time_unix_ms()
+                != self.current_coverage.decision_time_unix_ms()
         {
-            return Err(CurrentAuthorizedCoverageError::DurableDecisionBoundaryMismatch);
+            return Err(CurrentAuthorizedCoverageError::CurrentVerifierCommitmentMismatch);
         }
         let ready = self.inner.release_after_durable_coverage(
             journal, journal_anchor, effect_scope, backend_commitment, coverage_commitment,
@@ -263,6 +280,7 @@ impl PendingCurrentAuthorizedEffectExecutionV1 {
             current_coverage_id: self.current_coverage.id(),
             adoption_id: self.current_coverage.adoption_id(),
             current_verifier_id: self.current_coverage.current_verifier_id(),
+            current_verifier_commitment_id: current_verifier_commitment.id(),
         })
     }
 }
@@ -273,6 +291,7 @@ pub struct ReadyCurrentAuthorizedEffectExecutionV1 {
     current_coverage_id: CurrentAuthorizedExternalEffectCoverageId,
     adoption_id: QualifiedVerifierProfileAdoptionId,
     current_verifier_id: CurrentAuthorizedVerifierProfileId,
+    current_verifier_commitment_id: QualifiedCurrentVerifierExecutionCommitmentId,
 }
 
 impl ReadyCurrentAuthorizedEffectExecutionV1 {
@@ -287,6 +306,9 @@ impl ReadyCurrentAuthorizedEffectExecutionV1 {
     }
     pub fn adoption_id(&self) -> QualifiedVerifierProfileAdoptionId { self.adoption_id }
     pub fn current_verifier_id(&self) -> CurrentAuthorizedVerifierProfileId { self.current_verifier_id }
+    pub fn current_verifier_commitment_id(&self) -> QualifiedCurrentVerifierExecutionCommitmentId {
+        self.current_verifier_commitment_id
+    }
 
     pub fn finish(
         self,
@@ -314,11 +336,24 @@ impl PendingCurrentAuthorizedNoEffectsExecutionV1 {
         journal: &ReconstructedExecutionJournalV1,
         journal_anchor: &QualifiedExecutionJournalAnchorV1,
         commitment: &QualifiedNoEffectsExecutionCommitmentV1,
+        current_verifier_commitment: &QualifiedCurrentVerifierExecutionCommitmentV1,
     ) -> Result<ReadyCurrentAuthorizedNoEffectsExecutionV1, CurrentAuthorizedCoverageError> {
+        let expected_binding = CurrentVerifierExecutionBindingV1::NoEffects {
+            historical_commitment_id: commitment.id(),
+            historical_coverage_id: self.current_coverage.coverage().id(),
+            current_coverage_id: self.current_coverage.id(),
+        };
         if self.current_coverage.decision_time_unix_ms() != journal_anchor.anchored_at_unix_ms()
             || commitment.coverage_id() != self.current_coverage.coverage().id()
+            || current_verifier_commitment.journal_anchor_id() != journal_anchor.id()
+            || current_verifier_commitment.binding() != expected_binding
+            || current_verifier_commitment.adoption_id() != self.current_coverage.adoption_id()
+            || current_verifier_commitment.current_verifier_id()
+                != self.current_coverage.current_verifier_id()
+            || current_verifier_commitment.decision_time_unix_ms()
+                != self.current_coverage.decision_time_unix_ms()
         {
-            return Err(CurrentAuthorizedCoverageError::DurableDecisionBoundaryMismatch);
+            return Err(CurrentAuthorizedCoverageError::CurrentVerifierCommitmentMismatch);
         }
         let ready = self.inner.release_after_protected_no_effects(journal, journal_anchor, commitment)?;
         Ok(ReadyCurrentAuthorizedNoEffectsExecutionV1 {
@@ -326,6 +361,7 @@ impl PendingCurrentAuthorizedNoEffectsExecutionV1 {
             current_coverage_id: self.current_coverage.id(),
             adoption_id: self.current_coverage.adoption_id(),
             current_verifier_id: self.current_coverage.current_verifier_id(),
+            current_verifier_commitment_id: current_verifier_commitment.id(),
         })
     }
 }
@@ -336,6 +372,7 @@ pub struct ReadyCurrentAuthorizedNoEffectsExecutionV1 {
     current_coverage_id: CurrentAuthorizedNoExternalEffectsCoverageId,
     adoption_id: QualifiedVerifierProfileAdoptionId,
     current_verifier_id: CurrentAuthorizedVerifierProfileId,
+    current_verifier_commitment_id: QualifiedCurrentVerifierExecutionCommitmentId,
 }
 
 impl ReadyCurrentAuthorizedNoEffectsExecutionV1 {
@@ -349,6 +386,9 @@ impl ReadyCurrentAuthorizedNoEffectsExecutionV1 {
     }
     pub fn adoption_id(&self) -> QualifiedVerifierProfileAdoptionId { self.adoption_id }
     pub fn current_verifier_id(&self) -> CurrentAuthorizedVerifierProfileId { self.current_verifier_id }
+    pub fn current_verifier_commitment_id(&self) -> QualifiedCurrentVerifierExecutionCommitmentId {
+        self.current_verifier_commitment_id
+    }
 
     pub fn finish(
         self,
@@ -426,6 +466,8 @@ pub enum CurrentAuthorizedCoverageError {
     TransitionDecisionTimeMismatch,
     #[error("protected post-intent journal world differs from fresh verifier decision boundary")]
     DurableDecisionBoundaryMismatch,
+    #[error("protected current-verifier execution commitment differs from exact release world")]
+    CurrentVerifierCommitmentMismatch,
 }
 
 fn require_current_verifier_at_decision(
