@@ -115,6 +115,7 @@ pub fn capability_counterfactual_algorithm_id_v1() -> CapabilityCounterfactualAl
 /// blocked requirements, and final closure. This value adds the algorithm
 /// semantics under which that exact result was derived.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CapabilityActivationProvenanceV1 {
     schema_version: String,
     algorithm_semantics: String,
@@ -203,6 +204,7 @@ impl CapabilityActivationProvenanceV1 {
 /// configuration, search coverage, and exact options. This value adds the
 /// algorithm semantics under which that exact frontier was derived.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CapabilityCounterfactualProvenanceV1 {
     schema_version: String,
     algorithm_semantics: String,

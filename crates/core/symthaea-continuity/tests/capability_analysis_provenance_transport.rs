@@ -268,3 +268,29 @@ fn activation_and_counterfactual_algorithm_domains_are_distinct() {
         capability_counterfactual_algorithm_id_v1().as_bytes(),
     );
 }
+
+#[test]
+fn activation_transport_unknown_field_is_rejected() {
+    let closure = activation_fixture("activation-unknown-field");
+    let provenance = CapabilityActivationProvenanceV1::from_closure(&closure);
+    let mut transported = serde_json::to_value(provenance).unwrap();
+    transported["authority"] = json!("operator-approved");
+
+    assert!(
+        serde_json::from_value::<CapabilityActivationProvenanceV1>(transported).is_err(),
+        "V1 activation provenance must reject uncommitted transport fields"
+    );
+}
+
+#[test]
+fn counterfactual_transport_unknown_field_is_rejected() {
+    let frontier = counterfactual_fixture("counterfactual-unknown-field");
+    let provenance = CapabilityCounterfactualProvenanceV1::from_frontier(&frontier);
+    let mut transported = serde_json::to_value(provenance).unwrap();
+    transported["authority"] = json!("operator-approved");
+
+    assert!(
+        serde_json::from_value::<CapabilityCounterfactualProvenanceV1>(transported).is_err(),
+        "V1 counterfactual provenance must reject uncommitted transport fields"
+    );
+}
