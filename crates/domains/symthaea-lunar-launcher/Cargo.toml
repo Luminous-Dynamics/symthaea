@@ -6,6 +6,6 @@ license = "AGPL-3.0-or-later"
 description = "Evidence-oriented lunar launcher/catcher architecture and analytic reference models"
 
 [lib]
-path = "src/lib.rs"
+path = "src/root.rs"
 
 [dependencies]
