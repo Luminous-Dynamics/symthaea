@@ -30,6 +30,7 @@ pub mod legacy_ibmi_scenarios;
 pub mod legacy_platform_identity;
 pub mod legacy_portfolio;
 pub mod legacy_qualification_profile;
+pub mod legacy_qualification_profile_v3;
 pub mod legacy_qualification_source_ledger_v3;
 pub mod legacy_solaris;
 pub mod legacy_solaris_scenarios;
@@ -147,6 +148,11 @@ pub use legacy_qualification_profile::{
     LegacyQualificationProfileErrorV1, LegacyQualificationProfileV1,
     LegacyQualificationRequirementAssessmentV1, LegacyQualificationRequirementV1,
     LEGACY_QUALIFICATION_PROFILE_SCHEMA_V1,
+};
+pub use legacy_qualification_profile_v3::{
+    assess_legacy_qualification_profile_v3, LegacyQualificationProfileAssessmentV3,
+    LegacyQualificationProfileErrorV3, LegacyQualificationRequirementAssessmentV3,
+    LEGACY_QUALIFICATION_PROFILE_ASSESSMENT_SCHEMA_V3,
 };
 pub use legacy_qualification_source_ledger_v3::{
     assess_legacy_qualification_source_readiness_v3, legacy_claim_verification_binding_v3,
