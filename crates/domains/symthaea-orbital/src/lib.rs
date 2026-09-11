@@ -3,6 +3,7 @@
 //! Orbital servicing arm — zero-g dual-body dynamics, consciousness under substrate constraint.
 #![deny(unsafe_code)]
 pub mod cislunar;
+pub mod cislunar_oracle;
 pub mod controller;
 pub mod embodiment;
 pub mod encoder;
