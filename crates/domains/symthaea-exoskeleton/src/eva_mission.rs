@@ -30,19 +30,13 @@ pub struct EvaMissionSegment {
     pub name: String,
     pub phase: EvaMissionPhase,
     pub duration_s: f64,
-    /// Positive external mechanical power required by the task before assist.
     pub gross_positive_mechanical_power_w: f64,
-    /// Human eccentric/negative-work demand before any future recovery model.
     pub negative_mechanical_power_w: f64,
-    /// Requested fraction of positive task work supplied by the exoskeleton.
     pub requested_assist_fraction: f64,
-    /// Mechanical output / electrical input for the assist path.
     pub assist_motor_efficiency: f64,
-    /// Mobility electronics/controls load that is paid before assist power.
     pub mobility_overhead_w: f64,
     pub survival_power_w: f64,
     pub mission_power_w: f64,
-    /// Non-mobility equipment heat coupled into the PLSS thermal model.
     pub non_actuator_equipment_heat_w: f64,
     pub humidity_generation_per_min: f64,
     pub regenerative_power_w: f64,
@@ -248,6 +242,32 @@ impl IntegratedEvaMission {
             return self.abort_segment(segment, EvaMissionAbortReason::InvalidSegment);
         }
 
+        let preflight_radiation = self.radiation.evaluate(RadiationObservation {
+            personal_dose_rate_msv_h: segment.personal_dose_rate_msv_h,
+            eva_cumulative_dose_msv: self.totals.cumulative_radiation_msv,
+            forecast_upper_rate_msv_h: segment.forecast_upper_rate_msv_h,
+            safe_haven_time_min: segment.safe_haven_time_min,
+            energetic_particle_alert: segment.energetic_particle_alert,
+            dosimeter_healthy: segment.dosimeter_healthy,
+        });
+        let preflight_disposition = disposition_for_radiation(preflight_radiation.action);
+        if preflight_disposition != EvaMissionDisposition::Continue {
+            return EvaMissionSegmentReport {
+                name: segment.name.clone(),
+                phase: segment.phase,
+                disposition: preflight_disposition,
+                abort_reason: None,
+                power: None,
+                metabolism: None,
+                radiation: Some(preflight_radiation),
+                actual_assist_fraction: 0.0,
+                human_positive_mechanical_power_w: 0.0,
+                actuator_waste_heat_w: 0.0,
+                oxygen_consumed_l: 0.0,
+                cumulative_radiation_msv: self.totals.cumulative_radiation_msv,
+            };
+        }
+
         let requested_assist_mechanical_w =
             segment.gross_positive_mechanical_power_w * segment.requested_assist_fraction;
         let requested_assist_electrical_w =
@@ -352,14 +372,7 @@ impl IntegratedEvaMission {
             dosimeter_healthy: segment.dosimeter_healthy,
         });
 
-        let mut disposition = match radiation.action {
-            RadiationAction::Continue => EvaMissionDisposition::Continue,
-            RadiationAction::ReturnToSafeHaven
-            | RadiationAction::InstrumentFault
-            | RadiationAction::InvalidState => EvaMissionDisposition::ReturnToSafeHaven,
-            RadiationAction::ImmediateShelter => EvaMissionDisposition::ImmediateShelter,
-        };
-
+        let mut disposition = disposition_for_radiation(radiation.action);
         if !allocation.mobility_satisfied || !allocation.mission_satisfied {
             disposition = disposition.max(EvaMissionDisposition::DegradeMission);
             self.totals.degraded_segments += 1;
@@ -449,6 +462,16 @@ impl IntegratedEvaMission {
     }
 }
 
+fn disposition_for_radiation(action: RadiationAction) -> EvaMissionDisposition {
+    match action {
+        RadiationAction::Continue => EvaMissionDisposition::Continue,
+        RadiationAction::ReturnToSafeHaven
+        | RadiationAction::InstrumentFault
+        | RadiationAction::InvalidState => EvaMissionDisposition::ReturnToSafeHaven,
+        RadiationAction::ImmediateShelter => EvaMissionDisposition::ImmediateShelter,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -494,12 +517,15 @@ mod tests {
     }
 
     #[test]
-    fn radiation_alert_forces_immediate_shelter() {
+    fn radiation_alert_vetoes_task_before_resource_use() {
         let mut mission = IntegratedEvaMission::simulation_reference();
-        let mut s = EvaMissionSegment::lunar_reference("solar-event", EvaMissionPhase::Contingency, 60.0);
+        let mut s = EvaMissionSegment::lunar_reference("solar-event", EvaMissionPhase::Contingency, 600.0);
         s.energetic_particle_alert = true;
         let report = mission.run(&[s]);
         assert_eq!(report.disposition, EvaMissionDisposition::ImmediateShelter);
+        assert_eq!(report.totals.elapsed_s, 0.0);
+        assert_eq!(report.totals.oxygen_consumed_l, 0.0);
+        assert_eq!(report.totals.survival_energy_wh, 0.0);
     }
 
     #[test]
