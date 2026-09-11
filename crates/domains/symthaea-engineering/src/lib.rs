@@ -108,23 +108,29 @@ impl EngineeringAssistant {
     }
 
     /// Propose a set of engineering requirements for a goal.
+    ///
+    /// Generated language is proposal material only. This method deliberately
+    /// returns `RequirementProposal`, not `EngineeringRequirement`, so Broca
+    /// output cannot enter an accepted requirement set without an explicit
+    /// acceptance transition.
     pub fn propose_requirements(
         &mut self,
         _goal: &str,
         domain: EngineeringDomain,
-    ) -> Vec<EngineeringRequirement> {
+    ) -> Vec<RequirementProposal> {
         let mut channels = ThoughtChannels::with_intent(1); // Inform/Reason
         channels.set_consciousness(0.8, 0.4, 0.6); // High psi for detail
 
         let result = self.generator.generate(&channels);
 
         // In a real implementation, we would parse the generated text.
-        vec![EngineeringRequirement::new(
+        vec![RequirementProposal::new(
             format!("REQ-{:?}-001", domain),
             domain,
             result.text,
             RequirementCriticality::Medium,
             EvidenceKind::Simulation,
+            RequirementProposalOrigin::BrocaGenerated,
         )]
     }
 }
@@ -565,33 +571,46 @@ impl EngineeringManager {
         messages
     }
 
+    /// Generate replacement requirement proposals for failed proof renderings.
+    ///
+    /// This is intentionally proposal-only: it does not mutate accepted
+    /// requirements. A caller must review and explicitly accept any returned
+    /// proposal before it can affect the engineering concept.
     pub fn refine_requirements(
         &self,
         assistant: &mut EngineeringAssistant,
-        concept: &mut EngineeringConcept,
+        concept: &EngineeringConcept,
         proof_results: &[(String, String)],
-    ) {
+    ) -> Vec<(String, RequirementProposal)> {
+        let mut proposals = Vec::new();
         for (id, script) in proof_results {
-            if script.contains("sorry") {
-                let refined = assistant.propose_requirements("Refine", concept.domain);
-                if let Some(req) = concept.requirements.iter_mut().find(|r| r.id == *id) {
-                    if let Some(new_req) = refined.first() {
-                        req.statement = new_req.statement.clone();
-                    }
+            if script.contains("sorry")
+                && concept.requirements.iter().any(|requirement| requirement.id == *id)
+            {
+                if let Some(mut proposal) = assistant
+                    .propose_requirements("Refine", concept.domain)
+                    .into_iter()
+                    .next()
+                {
+                    proposal.id = id.clone();
+                    proposals.push((id.clone(), proposal));
                 }
             }
         }
+        proposals
     }
 
+    /// Generate counterfactual requirement refinements without silently
+    /// replacing accepted requirements.
     pub fn perform_counterfactual_refinement(
         &mut self,
         assistant: &mut EngineeringAssistant,
-        concept: &mut EngineeringConcept,
+        concept: &EngineeringConcept,
         observed_error: f64,
         thought: Option<&GeometricThought>,
-    ) {
+    ) -> Vec<RequirementProposal> {
         if observed_error < 0.05 {
-            return;
+            return Vec::new();
         }
 
         // 1. Symbolic Gating: Autonomously extract invariants from geometry
@@ -626,14 +645,12 @@ impl EngineeringManager {
             tracing::info!("🔍 Z3 Symbolic Refutation Model: {}", model_constraints);
         }
 
-        // 3. Inject Z3 constraints into Broca refinement prompt
-        let refined = assistant.propose_requirements(
+        // 3. Inject Z3 constraints into Broca refinement prompt. The result
+        // remains a proposal; this function does not self-accept its own output.
+        assistant.propose_requirements(
             &format!("Refine with Z3 Symbolic Constraints: {}", model_constraints),
             concept.domain,
-        );
-        if let Some(new_req) = refined.first() {
-            concept.requirements = vec![new_req.clone()];
-        }
+        )
     }
 
     pub fn optimize_geometry(
@@ -820,6 +837,67 @@ pub enum RequirementCriticality {
     Blocking,
 }
 
+/// Descriptive provenance for a requirement proposal.
+///
+/// This label is epistemic metadata only. It is not a signature, review receipt,
+/// qualification, approval, or other authority-bearing capability.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RequirementProposalOrigin {
+    BrocaGenerated,
+}
+
+/// A candidate engineering requirement that has not crossed the local
+/// requirement-acceptance boundary.
+#[must_use = "requirement proposals carry no acceptance authority until explicitly reviewed and accepted"]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RequirementProposal {
+    pub id: String,
+    pub domain: EngineeringDomain,
+    pub statement: String,
+    pub criticality: RequirementCriticality,
+    pub evidence: EvidenceKind,
+    pub structural_invariants: Vec<String>,
+    pub origin: RequirementProposalOrigin,
+}
+
+impl RequirementProposal {
+    pub fn new(
+        id: impl Into<String>,
+        domain: EngineeringDomain,
+        statement: impl Into<String>,
+        criticality: RequirementCriticality,
+        evidence: EvidenceKind,
+        origin: RequirementProposalOrigin,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            domain,
+            statement: statement.into(),
+            criticality,
+            evidence,
+            structural_invariants: Vec::new(),
+            origin,
+        }
+    }
+
+    /// Explicitly cross the *local design* acceptance boundary.
+    ///
+    /// This conversion only means that the caller has chosen to place the
+    /// requirement into the local engineering concept. It does **not** imply
+    /// verification, qualification, certification, organizational approval,
+    /// or operational authority. Those remain separate ETK authority states.
+    pub fn accept_for_local_design(self) -> EngineeringRequirement {
+        EngineeringRequirement {
+            id: self.id,
+            domain: self.domain,
+            statement: self.statement,
+            criticality: self.criticality,
+            evidence: self.evidence,
+            structural_invariants: self.structural_invariants,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EngineeringRequirement {
     pub id: String,
@@ -871,10 +949,20 @@ impl EngineeringConcept {
             simulation_requests: Vec::new(),
         }
     }
+
     pub fn add_requirement(&mut self, req: EngineeringRequirement) {
         self.safety_case
             .add_obligation(ProofObligation::new(req.statement.clone(), req.evidence));
         self.requirements.push(req);
+    }
+
+    /// Explicitly accept a proposal into this local design concept.
+    ///
+    /// This is a requirement-lifecycle transition only; it does not confer any
+    /// downstream verification, qualification, certification, or deployment
+    /// authority.
+    pub fn accept_requirement_proposal_for_local_design(&mut self, proposal: RequirementProposal) {
+        self.add_requirement(proposal.accept_for_local_design());
     }
 }
 
@@ -1940,41 +2028,36 @@ impl EngineeringManager {
         }
     }
 
-    /// Autonomously forage for new engineering goals based on surplus value and integration.
+    /// Autonomously forage for a new engineering requirement proposal based on
+    /// surplus value and integration.
     ///
-    /// This is the "Epistemic Foraging" loop — she seeks out the unknown when she is
-    /// wealthy (high Tend) and integrated (high Phi).
+    /// Epistemic foraging remains proposal-only: the autonomous loop may generate
+    /// a candidate requirement, but it may not place that requirement into an
+    /// accepted engineering concept by itself.
     pub fn forage_epistemic_goals(
         &mut self,
         tend_balance: f64,
         collective_phi: f64,
-    ) -> Option<EngineeringConcept> {
+    ) -> Option<RequirementProposal> {
         if tend_balance > 1000.0 && collective_phi > 0.5 {
             tracing::info!(
                 "🕵️  Epistemic Foraging Engaged: Seeking out new engineering frontiers..."
             );
 
-            // Autonomously synthesize a new goal
             let mut assistant = EngineeringAssistant::new(
                 &symthaea_core::genesis::GenesisSeed::from_phrase("Epistemic Discovery"),
             );
-            let mut concept = assistant
+            let mut proposal = assistant
                 .propose_requirements(
                     "Hypothetical multi-material structure",
                     symthaea_sim_bridge::EngineeringDomain::Aerospace,
                 )
-                .remove(0);
-            concept.statement =
+                .into_iter()
+                .next()?;
+            proposal.statement =
                 "Investigate Sovereign-Alloy performance on 100-DOF spinal morphology".into();
 
-            let mut new_concept = EngineeringConcept::new(
-                "EPI-001",
-                "Epistemic Lesson: Spinal Morphology",
-                symthaea_sim_bridge::EngineeringDomain::Aerospace,
-            );
-            new_concept.add_requirement(concept);
-
-            Some(new_concept)
+            Some(proposal)
         } else {
             None
         }
@@ -2087,6 +2170,48 @@ fn estimate_rust_source_complexity(source: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn requirement_proposal_requires_explicit_local_acceptance() {
+        let proposal = RequirementProposal::new(
+            "REQ-PROP-1",
+            EngineeringDomain::Civil,
+            "candidate bridge load requirement",
+            RequirementCriticality::Blocking,
+            EvidenceKind::Simulation,
+            RequirementProposalOrigin::BrocaGenerated,
+        );
+
+        assert_eq!(proposal.origin, RequirementProposalOrigin::BrocaGenerated);
+        let accepted = proposal.accept_for_local_design();
+        assert_eq!(accepted.id, "REQ-PROP-1");
+        assert_eq!(accepted.statement, "candidate bridge load requirement");
+        assert_eq!(accepted.criticality, RequirementCriticality::Blocking);
+    }
+
+    #[test]
+    fn concept_acceptance_transition_creates_safety_obligation() {
+        let proposal = RequirementProposal::new(
+            "REQ-PROP-2",
+            EngineeringDomain::Civil,
+            "bridge factor of safety >= 2",
+            RequirementCriticality::Blocking,
+            EvidenceKind::Simulation,
+            RequirementProposalOrigin::BrocaGenerated,
+        );
+        let mut concept = EngineeringConcept::new(
+            "bridge-proposal-test",
+            "bridge",
+            EngineeringDomain::Civil,
+        );
+
+        assert!(concept.requirements.is_empty());
+        assert!(concept.safety_case.obligations.is_empty());
+        concept.accept_requirement_proposal_for_local_design(proposal);
+        assert_eq!(concept.requirements.len(), 1);
+        assert_eq!(concept.safety_case.obligations.len(), 1);
+        assert!(!concept.safety_case.is_discharged());
+    }
 
     #[test]
     fn evaluate_structural_wires_solver_into_faculty() {

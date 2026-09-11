@@ -29,16 +29,19 @@ fn run_iteration(
         println!("   Prediction: Probability of 'safe' design is {:.2}", prob);
     }
 
-    // 1. Propose Requirements
-    let requirements = assistant.propose_requirements(goal, EngineeringDomain::Aerospace);
+    // 1. Propose Requirements. Broca output is proposal material only.
+    let proposals = assistant.propose_requirements(goal, EngineeringDomain::Aerospace);
     println!(
-        "✅ Step 1: Broca synthesized {} requirements.",
-        requirements.len()
+        "✅ Step 1: Broca synthesized {} requirement proposals.",
+        proposals.len()
     );
 
-    // 2. Create Engineering Concept
+    // 2. Create Engineering Concept and explicitly accept the proposals for
+    // this local demonstration. This is not verification/certification authority.
     let mut concept = EngineeringConcept::new("arm-v1", "Phase 1", EngineeringDomain::Aerospace);
-    concept.requirements = requirements;
+    for proposal in proposals {
+        concept.accept_requirement_proposal_for_local_design(proposal);
+    }
 
     // 3. Causal Topology Optimization
     println!("🧬 Step 3: Optimizing geometry...");
