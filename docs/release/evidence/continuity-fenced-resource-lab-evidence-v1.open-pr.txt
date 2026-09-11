@@ -1,0 +1,4 @@
+ready_for_pr=true
+frozen_code_subject=e4099ed48a4a677d69c4787761327325f9634dd7
+parent_branch=architecture/continuity-fenced-resource-lab-v1
+status=NOT_ESTABLISHED
