@@ -11,7 +11,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
+pub const MYCELIX_LATTICE_PREDICTION_PROTOCOL: &str = "mycelix-symthaea-lattice-prediction";
+pub const MYCELIX_LATTICE_PREDICTION_SCHEMA_VERSION: u16 = 1;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum PredictionMethod {
     /// Direct output of a validated lattice calculation.
     FirstPrinciplesLattice,
@@ -157,7 +161,48 @@ impl FrozenPrediction {
                 self.uncertainty,
             ));
         }
+        if self.method == PredictionMethod::ValidatedSurrogate
+            && self
+                .lineage
+                .training_data_digest
+                .as_deref()
+                .map(str::trim)
+                .filter(|digest| !digest.is_empty())
+                .is_none()
+        {
+            return Err(PredictionProtocolError::EmptyField("training_data_digest"));
+        }
         Ok(())
+    }
+
+    pub fn export_mycelix_commitment(
+        &self,
+        benchmark: &BlindBenchmarkManifest,
+        producer: &str,
+    ) -> Result<MycelixLatticePredictionCommitment, PredictionProtocolError> {
+        self.validate(benchmark)?;
+        if producer.trim().is_empty() {
+            return Err(PredictionProtocolError::EmptyField("producer"));
+        }
+        Ok(MycelixLatticePredictionCommitment {
+            protocol: MYCELIX_LATTICE_PREDICTION_PROTOCOL.into(),
+            schema_version: MYCELIX_LATTICE_PREDICTION_SCHEMA_VERSION,
+            producer: producer.into(),
+            prediction_id: self.prediction_id.clone(),
+            held_out_id: self.held_out_id.clone(),
+            observable: self.target.observable.clone(),
+            ensemble_id: self.target.ensemble_id.clone(),
+            units: self.target.units.clone(),
+            method: self.method,
+            value: self.value,
+            uncertainty: self.uncertainty,
+            code_revision: self.lineage.code_revision.clone(),
+            model_revision: self.lineage.model_revision.clone(),
+            configuration_digest: self.lineage.configuration_digest.clone(),
+            training_data_digest: self.lineage.training_data_digest.clone(),
+            evidence_lineage: self.lineage.evidence_lineage.clone(),
+            frozen_at: self.frozen_at.clone(),
+        })
     }
 }
 
@@ -168,6 +213,40 @@ pub struct PredictionReveal {
     pub observed_uncertainty: f64,
     pub source_id: String,
     pub revealed_at: String,
+}
+
+impl PredictionReveal {
+    pub fn export_mycelix_reveal(
+        &self,
+        evidence_lineage: &str,
+    ) -> Result<MycelixLatticePredictionReveal, PredictionProtocolError> {
+        for (value, name) in [
+            (&self.held_out_id, "held_out_id"),
+            (&self.source_id, "source_id"),
+            (&self.revealed_at, "revealed_at"),
+            (&evidence_lineage.to_string(), "reveal_evidence_lineage"),
+        ] {
+            if value.trim().is_empty() {
+                return Err(PredictionProtocolError::EmptyField(name));
+            }
+        }
+        if !self.observed_value.is_finite() {
+            return Err(PredictionProtocolError::NonFiniteValue);
+        }
+        if !self.observed_uncertainty.is_finite() || self.observed_uncertainty <= 0.0 {
+            return Err(PredictionProtocolError::InvalidUncertainty(
+                self.observed_uncertainty,
+            ));
+        }
+        Ok(MycelixLatticePredictionReveal {
+            held_out_id: self.held_out_id.clone(),
+            observed_value: self.observed_value,
+            observed_uncertainty: self.observed_uncertainty,
+            source_id: self.source_id.clone(),
+            evidence_lineage: evidence_lineage.into(),
+            revealed_at: self.revealed_at.clone(),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -204,6 +283,38 @@ pub fn score_prediction(
         combined_uncertainty,
         normalized_residual: absolute_error / combined_uncertainty,
     })
+}
+
+/// Exact dependency-light wire shape consumed by Mycelix-DeSci.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelixLatticePredictionCommitment {
+    pub protocol: String,
+    pub schema_version: u16,
+    pub producer: String,
+    pub prediction_id: String,
+    pub held_out_id: String,
+    pub observable: String,
+    pub ensemble_id: String,
+    pub units: String,
+    pub method: PredictionMethod,
+    pub value: f64,
+    pub uncertainty: f64,
+    pub code_revision: String,
+    pub model_revision: String,
+    pub configuration_digest: String,
+    pub training_data_digest: Option<String>,
+    pub evidence_lineage: String,
+    pub frozen_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MycelixLatticePredictionReveal {
+    pub held_out_id: String,
+    pub observed_value: f64,
+    pub observed_uncertainty: f64,
+    pub source_id: String,
+    pub evidence_lineage: String,
+    pub revealed_at: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -347,5 +458,33 @@ mod tests {
         ];
         let ranked = rank_candidate_calculations(&candidates).unwrap();
         assert_eq!(ranked[0].calculation_id, "efficient");
+    }
+
+    #[test]
+    fn mycelix_wire_matches_versioned_protocol_and_snake_case_method() {
+        let wire = prediction()
+            .export_mycelix_commitment(&manifest(), "symthaea:lqcd-lineage-1")
+            .unwrap();
+        assert_eq!(wire.protocol, MYCELIX_LATTICE_PREDICTION_PROTOCOL);
+        assert_eq!(wire.schema_version, 1);
+        let json = serde_json::to_value(&wire).unwrap();
+        assert_eq!(json["method"], "validated_surrogate");
+        assert_eq!(json["observable"], "glueball::0++::mass_ratio");
+    }
+
+    #[test]
+    fn reveal_export_requires_evidence_lineage() {
+        let reveal = PredictionReveal {
+            held_out_id: "holdout-a".into(),
+            observed_value: 1.6,
+            observed_uncertainty: 0.1,
+            source_id: "reference".into(),
+            revealed_at: "2026-09-12T00:00:00Z".into(),
+        };
+        assert!(reveal.export_mycelix_reveal("reference-lineage").is_ok());
+        assert!(matches!(
+            reveal.export_mycelix_reveal(""),
+            Err(PredictionProtocolError::EmptyField("reveal_evidence_lineage"))
+        ));
     }
 }
