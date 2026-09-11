@@ -14,6 +14,7 @@ pub mod diagnostic_beliefs;
 pub mod diagnostics;
 pub mod federation;
 pub mod golden_incidents;
+pub mod it_authority;
 pub mod it_qualification;
 pub mod knowledge;
 pub mod knowledge_source;
@@ -51,6 +52,13 @@ pub use golden_incidents::{
     GoldenDiagnosticActionV1, GoldenIncidentCaseV1, GoldenIncidentCorpusV1,
     GoldenIncidentErrorV1, GoldenIncidentEvidenceKindV1, GoldenIncidentEvidenceV1,
     GOLDEN_INCIDENT_SCHEMA_V1,
+};
+pub use it_authority::{
+    AuthorizedItActionCapabilityV1, ItActionKindV1, ItActionRequestV1,
+    ItAuthorizationDecisionRecordV1, ItAuthorizationDenialV1, ItAuthorizationOutcomeV1,
+    ItAuthorizationPolicyV1, ItAuthorityErrorV1, ItAuthorityEvidenceRequirementV1,
+    ItAuthorityManagerV1, ItCommandAuthorityV1, ItOperationalRiskV1,
+    RevalidatedItExecutionPermitV1,
 };
 pub use it_qualification::{
     case_digest_v1, qualification_failures_v1, AdversarialConditionV1,
