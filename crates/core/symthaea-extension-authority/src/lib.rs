@@ -15,7 +15,7 @@
 //!
 //! Checked access to the inner `ActiveAdmission` is closure-scoped. Public callers
 //! cannot obtain a raw active-admission borrow and carry it beyond the currentness
-//! check that authorized one operation.
+//! checks bracketing one operation.
 
 #![deny(unsafe_code)]
 
@@ -92,12 +92,15 @@ impl AuthorityScope {
         Arc::ptr_eq(&self.seal, &admission.seal)
     }
 
-    /// Verify authority-instance identity and live currentness, then run exactly
-    /// one operation with the checked admission.
+    /// Verify authority-instance identity and live currentness, run exactly one
+    /// operation with the checked admission, then recheck currentness before
+    /// releasing the operation result.
     ///
     /// The higher-ranked callback prevents the borrow supplied to `operation`
-    /// from escaping as the return value. Consumers therefore cannot turn this
-    /// API into a long-lived bearer reference after the currentness check.
+    /// from escaping as the return value. The post-use check detects authority
+    /// changes that became visible while a long-running operation was executing.
+    /// It does not make side effects transactional: [`ScopedAdmissionError::PostUseCurrentness`]
+    /// means the callback already ran, so callers must not assume retry is safe.
     ///
     /// The following attempted escape must not compile:
     ///
@@ -128,7 +131,12 @@ impl AuthorityScope {
             return Err(AuthorityScopeError::ForeignAuthority.into());
         }
         admission.admission.recheck_currentness(currentness)?;
-        Ok(operation(&admission.admission))
+        let result = operation(&admission.admission);
+        admission
+            .admission
+            .recheck_currentness(currentness)
+            .map_err(ScopedAdmissionError::PostUseCurrentness)?;
+        Ok(result)
     }
 }
 
@@ -160,8 +168,10 @@ pub enum AuthorityScopeError {
 pub enum ScopedAdmissionError {
     #[error(transparent)]
     Scope(#[from] AuthorityScopeError),
-    #[error("admission is no longer current: {0:?}")]
+    #[error("admission is not current before use: {0:?}")]
     Currentness(AdmissionProblem),
+    #[error("admission changed after the operation began; the operation may already have executed: {0:?}")]
+    PostUseCurrentness(AdmissionProblem),
 }
 
 impl From<AdmissionProblem> for ScopedAdmissionError {
@@ -173,6 +183,7 @@ impl From<AdmissionProblem> for ScopedAdmissionError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use symthaea_extension_admission::{
         AdmissionContext, AdmissionSubject, PrincipalId, Sha256Digest, TrustLevel,
     };
@@ -187,6 +198,22 @@ mod tests {
     impl AdmissionCurrentnessSource for Currentness {
         fn current_context(&self, _subject: AdmissionSubject<'_>) -> Option<AdmissionContext> {
             self.0
+        }
+    }
+
+    #[derive(Debug)]
+    struct RevokeAfterFirstCheck {
+        calls: AtomicUsize,
+    }
+
+    impl AdmissionCurrentnessSource for RevokeAfterFirstCheck {
+        fn current_context(&self, _subject: AdmissionSubject<'_>) -> Option<AdmissionContext> {
+            let call = self.calls.fetch_add(1, Ordering::SeqCst);
+            Some(if call == 0 {
+                AdmissionContext::active(7, 11)
+            } else {
+                AdmissionContext::revoked(7, 11)
+            })
         }
     }
 
@@ -295,6 +322,30 @@ mod tests {
         assert_eq!(
             scope.with_rechecked(&scoped, &revoked, |_| ()),
             Err(ScopedAdmissionError::Currentness(AdmissionProblem::Revoked))
+        );
+    }
+
+    #[test]
+    fn post_use_revocation_withholds_result_and_reports_operation_may_have_run() {
+        let host = AdmissionAuthority::new();
+        let scope = host.scope();
+        let scoped = host.activate(&record(), &manifest(), &current()).unwrap();
+        let source = RevokeAfterFirstCheck {
+            calls: AtomicUsize::new(0),
+        };
+        let operations = AtomicUsize::new(0);
+
+        let error = scope
+            .with_rechecked(&scoped, &source, |_| {
+                operations.fetch_add(1, Ordering::SeqCst);
+                42_u64
+            })
+            .unwrap_err();
+
+        assert_eq!(operations.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            error,
+            ScopedAdmissionError::PostUseCurrentness(AdmissionProblem::Revoked)
         );
     }
 
