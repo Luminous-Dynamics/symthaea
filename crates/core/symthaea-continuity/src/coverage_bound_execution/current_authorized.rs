@@ -243,7 +243,7 @@ impl PendingCurrentAuthorizedEffectExecutionV1 {
         &self.current_coverage
     }
 
-    pub fn release_after_durable_current_coverage(
+    pub(crate) fn release_after_durable_current_coverage(
         self,
         journal: &ReconstructedExecutionJournalV1,
         journal_anchor: &QualifiedExecutionJournalAnchorV1,
@@ -331,7 +331,7 @@ impl PendingCurrentAuthorizedNoEffectsExecutionV1 {
         &self.current_coverage
     }
 
-    pub fn release_after_durable_current_no_effects(
+    pub(crate) fn release_after_durable_current_no_effects(
         self,
         journal: &ReconstructedExecutionJournalV1,
         journal_anchor: &QualifiedExecutionJournalAnchorV1,
