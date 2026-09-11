@@ -5,8 +5,10 @@
 //! A frozen study declares minimum evidence requirements before fitting. This module checks those
 //! requirements against the role-isolated training corpus without imputing censored or
 //! counterfactual outcomes. Insufficient support is preserved as evidence; it is not interpreted as
-//! poor transformation quality. Only a fully supported receipt can mint a fit permit.
+//! poor transformation quality. Only a fully supported receipt can mint a fit permit, and the fit
+//! permit also binds the validation-coverage specification that must already exist before fitting.
 
+use crate::family_learning::{ForgeFamilyLearningError, ForgeTransformationFamilyId};
 use crate::proposal_corpus::{
     ForgeProposalCorpusError, ForgeProposalCorpusManifest, ForgeProposalHoldoutSeal,
     ForgeProposalTrainingSet, ForgeProposalValidationSet,
@@ -15,7 +17,9 @@ use crate::proposal_endpoints::{
     ForgeProposalEndpointError, ForgeProposalEndpointRecord, ForgeProposalEndpointValue,
 };
 use crate::proposal_study::{ForgeProposalStudyError, ForgeProposalStudySpec, ForgeProposalSupportSpec};
-use crate::family_learning::{ForgeFamilyLearningError, ForgeTransformationFamilyId};
+use crate::proposal_validation_coverage::{
+    ForgeProposalValidationCoverageError, ForgeProposalValidationCoverageSpec,
+};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use symthaea_algorithms::ContentId;
@@ -31,6 +35,8 @@ pub enum ForgeProposalSupportError {
     Endpoint(#[from] ForgeProposalEndpointError),
     #[error(transparent)]
     Family(#[from] ForgeFamilyLearningError),
+    #[error(transparent)]
+    ValidationCoverage(#[from] ForgeProposalValidationCoverageError),
     #[error("proposal support accounting overflow")]
     CountOverflow,
     #[error("proposal support receipt does not cover the study's exact family set")]
@@ -43,7 +49,7 @@ pub enum ForgeProposalSupportError {
     ReceiptScopeMismatch,
     #[error("proposal model fitting is forbidden because frozen minimum support is not satisfied")]
     InsufficientSupport,
-    #[error("proposal fit permit identity or scope does not match the supplied study/receipt")]
+    #[error("proposal fit permit identity or scope does not match the supplied study/support/validation-coverage precommitment")]
     FitPermitMismatch,
 }
 
@@ -424,7 +430,8 @@ fn endpoint_tag(endpoint: crate::proposal_endpoints::ForgeProposalEndpoint) -> &
     }
 }
 
-/// Identity-only authorization to invoke a future fitter on this exact study/training set.
+/// Identity-only authorization to invoke a future fitter on this exact study/training set under one
+/// already-precommitted validation-coverage specification.
 ///
 /// This type contains no training implementation and grants no search/runtime authority.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -433,6 +440,7 @@ pub struct ForgeProposalFitPermit {
     study_id: ContentId,
     training_set_id: ContentId,
     support_receipt_id: ContentId,
+    validation_coverage_spec_id: ContentId,
 }
 
 impl ForgeProposalFitPermit {
@@ -440,17 +448,25 @@ impl ForgeProposalFitPermit {
         study: &ForgeProposalStudySpec,
         training: &ForgeProposalTrainingSet,
         receipt: &ForgeProposalSupportReceipt,
+        validation_coverage_spec: &ForgeProposalValidationCoverageSpec,
     ) -> Result<Self, ForgeProposalSupportError> {
         receipt.validate_for(study, training)?;
+        validation_coverage_spec.validate_for(study)?;
         if !receipt.all_families_supported() {
             return Err(ForgeProposalSupportError::InsufficientSupport);
         }
-        let id = derive_fit_permit_id(study.id(), training.id(), receipt.id());
+        let id = derive_fit_permit_id(
+            study.id(),
+            training.id(),
+            receipt.id(),
+            validation_coverage_spec.id(),
+        );
         Ok(Self {
             id,
             study_id: study.id().clone(),
             training_set_id: training.id().clone(),
             support_receipt_id: receipt.id().clone(),
+            validation_coverage_spec_id: validation_coverage_spec.id().clone(),
         })
     }
 
@@ -458,20 +474,28 @@ impl ForgeProposalFitPermit {
     pub fn study_id(&self) -> &ContentId { &self.study_id }
     pub fn training_set_id(&self) -> &ContentId { &self.training_set_id }
     pub fn support_receipt_id(&self) -> &ContentId { &self.support_receipt_id }
+    pub fn validation_coverage_spec_id(&self) -> &ContentId { &self.validation_coverage_spec_id }
 
     pub fn validate_for(
         &self,
         study: &ForgeProposalStudySpec,
         training: &ForgeProposalTrainingSet,
         receipt: &ForgeProposalSupportReceipt,
+        validation_coverage_spec: &ForgeProposalValidationCoverageSpec,
     ) -> Result<(), ForgeProposalSupportError> {
         receipt.validate_for(study, training)?;
+        validation_coverage_spec.validate_for(study)?;
         if !receipt.all_families_supported()
             || self.study_id != *study.id()
             || self.training_set_id != *training.id()
             || self.support_receipt_id != *receipt.id()
-            || derive_fit_permit_id(&self.study_id, &self.training_set_id, &self.support_receipt_id)
-                != self.id
+            || self.validation_coverage_spec_id != *validation_coverage_spec.id()
+            || derive_fit_permit_id(
+                &self.study_id,
+                &self.training_set_id,
+                &self.support_receipt_id,
+                &self.validation_coverage_spec_id,
+            ) != self.id
         {
             return Err(ForgeProposalSupportError::FitPermitMismatch);
         }
@@ -483,13 +507,15 @@ fn derive_fit_permit_id(
     study_id: &ContentId,
     training_set_id: &ContentId,
     support_receipt_id: &ContentId,
+    validation_coverage_spec_id: &ContentId,
 ) -> ContentId {
     ContentId::derive(
-        "symthaea.forge-proposal-fit-permit.v1",
+        "symthaea.forge-proposal-fit-permit.v2",
         [
             study_id.as_str().as_bytes(),
             training_set_id.as_str().as_bytes(),
             support_receipt_id.as_str().as_bytes(),
+            validation_coverage_spec_id.as_str().as_bytes(),
         ],
     )
 }
