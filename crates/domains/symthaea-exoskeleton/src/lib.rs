@@ -28,6 +28,8 @@ pub mod fep_agent;
 pub mod fault_campaign;
 #[cfg(feature = "symtropy")]
 pub mod full_frame;
+#[cfg(feature = "symtropy")]
+pub mod full_frame_environment;
 #[cfg(feature = "hal")]
 pub mod hal_bridge;
 pub mod metabolism;
