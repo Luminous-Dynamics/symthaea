@@ -25,6 +25,7 @@ pub mod durability_coupling;
 pub mod dust;
 pub mod embodiment;
 pub mod encoder;
+pub mod eva_fidelity_coupling;
 pub mod eva_mission;
 pub mod fep_agent;
 pub mod fault_campaign;
