@@ -22,11 +22,11 @@ use super::{
     PendingCoverageQualifiedEffectExecutionV1, QualifiedEffectCoverageCommitmentV1,
     ReadyCoverageQualifiedEffectExecutionV1, prepare_coverage_qualified_effect_execution,
 };
-use crate::backend_bound_execution::QualifiedBackendEffectCommitmentV1;
-use crate::current_verifier_execution_commitment::{
+use super::current_verifier_commitment::{
     CurrentVerifierExecutionBindingV1, QualifiedCurrentVerifierExecutionCommitmentId,
     QualifiedCurrentVerifierExecutionCommitmentV1,
 };
+use crate::backend_bound_execution::QualifiedBackendEffectCommitmentV1;
 use crate::effect_coverage::{QualifiedExternalEffectCoverageId, QualifiedExternalEffectCoverageV1};
 use crate::effect_scoped_execution::QualifiedEffectScopeCommitmentV1;
 use crate::execution_capability::{
