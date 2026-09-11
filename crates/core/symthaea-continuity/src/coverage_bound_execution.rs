@@ -7,6 +7,7 @@
 
 pub mod current_authorized;
 pub mod current_transition_authority;
+pub mod current_transition_authority_commitment;
 pub mod current_verifier_commitment;
 
 use serde::{Deserialize, Serialize};
