@@ -18,5 +18,6 @@ symthaea-perception-crucible = { path = "../../domains/symthaea-perception-cruci
 symthaea-model-assurance = { path = "../../domains/symthaea-model-assurance" }
 symthaea-assurance-requalification = { path = "../../domains/symthaea-assurance-requalification" }
 symthaea-domain-awareness-model-assurance = { path = "../symthaea-domain-awareness-model-assurance" }
+symthaea-domain-awareness-common-cause = { path = "../symthaea-domain-awareness-common-cause" }
 serde = { workspace = true }
 uuid = { workspace = true }
