@@ -11,8 +11,9 @@
 //! - **Symmetry groups**: SU(2) Pauli matrices, SU(3) Gell-Mann matrices,
 //!   structure constants, Casimir operators
 //! - **Lattice statistics**: explicit burn-in, autocorrelation time, effective
-//!   sample size, blocking errors, acceptance diagnostics, split-R-hat and
-//!   uncertainty-aware independent-chain comparisons
+//!   sample size, blocking errors, acceptance diagnostics, classical split-R-hat,
+//!   rank-normalized/folded split-R-hat, and uncertainty-aware independent-chain
+//!   comparisons
 //!
 //! ## Natural Units
 //!
@@ -48,8 +49,8 @@ pub use decay_widths::{
     w_boson_channels, w_total_width, z_total_width,
 };
 pub use lattice_convergence::{
-    ChainMeanComparison, LatticeConvergenceError, SplitRhatDiagnostic,
-    compare_chain_means, split_r_hat,
+    ChainMeanComparison, LatticeConvergenceError, RankNormalizedRhatDiagnostic,
+    SplitRhatDiagnostic, compare_chain_means, rank_normalized_split_r_hat, split_r_hat,
 };
 pub use lattice_statistics::{
     ChainDiagnostics, LatticeStatisticsError, acceptance_rate, analyze_scalar_chain,
