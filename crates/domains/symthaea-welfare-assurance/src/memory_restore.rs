@@ -62,6 +62,12 @@ pub struct EpisodicRestoreReceipt {
     pub ledger_generation: u64,
 }
 
+struct VerifiedRestoredState {
+    after_active_count: usize,
+    after_quarantined_count: usize,
+    after_active_digest: Sha256Digest,
+}
+
 struct EpisodicRestoreExecutor<'a, Q>
 where
     Q: QuarantineLedgerPersistence,
@@ -151,13 +157,74 @@ where
 
     fn compensate_to_quarantine(
         &mut self,
-        ledger_prepared: EpisodicQuarantineStateLedger,
+        ledger_prepared: &EpisodicQuarantineStateLedger,
     ) -> Result<(), EpisodicRestoreInterventionError> {
         self.memory
             .quarantine_instance(self.instance_id)
             .map_err(EpisodicRestoreInterventionError::CompensationFailed)?;
-        *self.ledger = ledger_prepared;
+        *self.ledger = ledger_prepared.clone();
         Ok(())
+    }
+
+    /// Verify every post-activation invariant before the durable `Restored` transition.
+    ///
+    /// The caller must compensate back to quarantine on any error returned here.
+    fn verify_after_activation(
+        &self,
+        content_id: EpisodeContentId,
+        restored_instance_id: EpisodeInstanceId,
+        restored_episode_instance_id: Option<EpisodeInstanceId>,
+        restored_content_id: EpisodeContentId,
+        before_active_count: usize,
+        before_quarantined_count: usize,
+    ) -> Result<VerifiedRestoredState, EpisodicRestoreInterventionError> {
+        if restored_instance_id != self.instance_id
+            || restored_episode_instance_id != Some(self.instance_id)
+        {
+            return Err(EpisodicRestoreInterventionError::InstanceIdentityMismatch);
+        }
+        if restored_content_id != content_id {
+            return Err(EpisodicRestoreInterventionError::ContentIdentityMismatch {
+                expected: content_id,
+                actual: restored_content_id,
+            });
+        }
+
+        let after_active_count = self.memory.len();
+        let after_quarantined_count = self.memory.quarantined_len();
+        if after_active_count != before_active_count.saturating_add(1)
+            || after_quarantined_count.saturating_add(1) != before_quarantined_count
+            || self.memory.quarantined_instance(self.instance_id).is_some()
+        {
+            return Err(EpisodicRestoreInterventionError::RestorePostconditionFailed {
+                before_active: before_active_count,
+                after_active: after_active_count,
+                before_quarantined: before_quarantined_count,
+                after_quarantined: after_quarantined_count,
+            });
+        }
+
+        let active = self
+            .memory
+            .get_top_episode_instances(self.memory.len())
+            .into_iter()
+            .find(|(id, _)| *id == self.instance_id)
+            .ok_or(EpisodicRestoreInterventionError::RestorePostconditionMissing)?;
+        let active_content_id = episode_content_id(&active.1)?;
+        if active_content_id != content_id {
+            return Err(EpisodicRestoreInterventionError::ContentIdentityMismatch {
+                expected: content_id,
+                actual: active_content_id,
+            });
+        }
+        let after_active_digest = digest_episodic_memory(self.memory)
+            .map_err(|error| EpisodicRestoreInterventionError::MemoryState(error.to_string()))?;
+
+        Ok(VerifiedRestoredState {
+            after_active_count,
+            after_quarantined_count,
+            after_active_digest,
+        })
     }
 }
 
@@ -197,10 +264,10 @@ where
                 &self.execution_id,
             )
             .map_err(EpisodicRestoreInterventionError::from)?;
-        let restore_prepared_persistence_ref = match self.ledger_persistence.persist_quarantine_ledger(
-            self.ledger.events(),
-            restore_prepared_head,
-        ) {
+        let restore_prepared_persistence_ref = match self
+            .ledger_persistence
+            .persist_quarantine_ledger(self.ledger.events(), restore_prepared_head)
+        {
             Ok(reference) => reference,
             Err(error) => {
                 *self.ledger = ledger_before_prepare;
@@ -212,60 +279,36 @@ where
             return Err(EpisodicRestoreInterventionError::InvalidLedgerPersistenceReference.into());
         }
 
-        // This clone represents the exact durable state to which we can safely compensate if the
-        // final Restored ledger commit fails.
+        // This clone represents the exact durable state to which we compensate if anything after
+        // activation fails before the final Restored ledger head becomes durable.
         let ledger_prepared = self.ledger.clone();
 
         let restored = self
             .memory
             .restore_quarantined_instance(self.instance_id)
             .map_err(EpisodicRestoreInterventionError::MemoryMechanism)?;
-        if restored.instance_id != self.instance_id
-            || restored.episode.instance_id != Some(self.instance_id)
-        {
-            return Err(EpisodicRestoreInterventionError::InstanceIdentityMismatch.into());
-        }
-        let restored_content_id = episode_content_id(&restored.episode)
-            .map_err(EpisodicRestoreInterventionError::from)?;
-        if restored_content_id != content_id {
-            return Err(EpisodicRestoreInterventionError::ContentIdentityMismatch {
-                expected: content_id,
-                actual: restored_content_id,
+        let restored_content_id = match episode_content_id(&restored.episode) {
+            Ok(value) => value,
+            Err(error) => {
+                self.compensate_to_quarantine(&ledger_prepared)?;
+                return Err(EpisodicRestoreInterventionError::ContentIdentity(error).into());
             }
-            .into());
-        }
+        };
 
-        let after_active_count = self.memory.len();
-        let after_quarantined_count = self.memory.quarantined_len();
-        if after_active_count != before_active_count.saturating_add(1)
-            || after_quarantined_count.saturating_add(1) != before_quarantined_count
-            || self.memory.quarantined_instance(self.instance_id).is_some()
-        {
-            return Err(EpisodicRestoreInterventionError::RestorePostconditionFailed {
-                before_active: before_active_count,
-                after_active: after_active_count,
-                before_quarantined: before_quarantined_count,
-                after_quarantined: after_quarantined_count,
+        let verified = match self.verify_after_activation(
+            content_id,
+            restored.instance_id,
+            restored.episode.instance_id,
+            restored_content_id,
+            before_active_count,
+            before_quarantined_count,
+        ) {
+            Ok(verified) => verified,
+            Err(error) => {
+                self.compensate_to_quarantine(&ledger_prepared)?;
+                return Err(error.into());
             }
-            .into());
-        }
-        let active = self
-            .memory
-            .get_top_episode_instances(self.memory.len())
-            .into_iter()
-            .find(|(id, _)| *id == self.instance_id)
-            .ok_or(EpisodicRestoreInterventionError::RestorePostconditionMissing)?;
-        let active_content_id = episode_content_id(&active.1)
-            .map_err(EpisodicRestoreInterventionError::from)?;
-        if active_content_id != content_id {
-            return Err(EpisodicRestoreInterventionError::ContentIdentityMismatch {
-                expected: content_id,
-                actual: active_content_id,
-            }
-            .into());
-        }
-        let after_active_digest = digest_episodic_memory(self.memory)
-            .map_err(|error| EpisodicRestoreInterventionError::MemoryState(error.to_string()))?;
+        };
 
         let transition_digest = digest_restore_transition(
             &self.expected_target_id,
@@ -273,11 +316,11 @@ where
             content_id,
             &self.execution_id,
             before_active_count,
-            after_active_count,
+            verified.after_active_count,
             before_quarantined_count,
-            after_quarantined_count,
+            verified.after_quarantined_count,
             before_active_digest,
-            after_active_digest,
+            verified.after_active_digest,
             restore_prepared_head,
             &restore_prepared_persistence_ref,
         );
@@ -292,18 +335,18 @@ where
         ) {
             Ok(head) => head,
             Err(error) => {
-                self.compensate_to_quarantine(ledger_prepared)?;
+                self.compensate_to_quarantine(&ledger_prepared)?;
                 return Err(EpisodicRestoreExecutionError::Ledger(error));
             }
         };
 
-        let restored_persistence_ref = match self.ledger_persistence.persist_quarantine_ledger(
-            self.ledger.events(),
-            restored_head,
-        ) {
+        let restored_persistence_ref = match self
+            .ledger_persistence
+            .persist_quarantine_ledger(self.ledger.events(), restored_head)
+        {
             Ok(reference) => reference,
             Err(error) => {
-                if let Err(compensation) = self.compensate_to_quarantine(ledger_prepared) {
+                if let Err(compensation) = self.compensate_to_quarantine(&ledger_prepared) {
                     return Err(EpisodicRestoreExecutionError::FinalPersistenceCompensationFailed {
                         persistence: error,
                         compensation,
@@ -313,7 +356,7 @@ where
             }
         };
         if !valid_ref(&restored_persistence_ref) {
-            self.compensate_to_quarantine(ledger_prepared)?;
+            self.compensate_to_quarantine(&ledger_prepared)?;
             return Err(EpisodicRestoreInterventionError::InvalidLedgerPersistenceReference.into());
         }
 
@@ -323,11 +366,11 @@ where
             content_id,
             execution_id: self.execution_id.clone(),
             before_active_count,
-            after_active_count,
+            after_active_count: verified.after_active_count,
             before_quarantined_count,
-            after_quarantined_count,
+            after_quarantined_count: verified.after_quarantined_count,
             before_active_digest,
-            after_active_digest,
+            after_active_digest: verified.after_active_digest,
             restore_prepared_head,
             restored_head,
             restore_prepared_persistence_ref,
