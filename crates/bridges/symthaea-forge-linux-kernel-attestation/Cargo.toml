@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-forge-linux-kernel-attestation"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Parent-side Linux kernel observations for Symthaea Forge evaluator isolation"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+serde = { workspace = true }
+thiserror = { workspace = true }
