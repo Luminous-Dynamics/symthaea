@@ -23,7 +23,9 @@ use symthaea_welfare_assurance::execution_adapter::{
 };
 use symthaea_welfare_assurance::execution_recovery::InterventionExecutionJournal;
 use symthaea_welfare_assurance::memory_intervention::{
-    digest_episodic_memory, execute_governed_episodic_memory_clear,
+    EpisodicContentCheckpoint, EpisodicContentCheckpointPersistence,
+    digest_episodic_content_checkpoint, digest_episodic_memory,
+    execute_governed_episodic_memory_clear,
 };
 use symthaea_welfare_assurance::replay_recovery::{
     DurableAuthorityReplayFence, DurableAuthorityReplaySnapshot, ReplayFencePersistence,
@@ -258,8 +260,26 @@ impl ExecutionJournalPersistence for ExecutionPersistence {
     }
 }
 
+#[derive(Default)]
+struct CheckpointPersistence {
+    saved: Option<(EpisodicContentCheckpoint, Sha256Digest)>,
+}
+
+impl EpisodicContentCheckpointPersistence for CheckpointPersistence {
+    type Error = std::io::Error;
+
+    fn persist_episodic_content_checkpoint(
+        &mut self,
+        checkpoint: &EpisodicContentCheckpoint,
+        checkpoint_digest: Sha256Digest,
+    ) -> Result<String, Self::Error> {
+        self.saved = Some((checkpoint.clone(), checkpoint_digest));
+        Ok("test:episodic-content-checkpoint:1".into())
+    }
+}
+
 #[test]
-fn real_episodic_store_clear_requires_and_consumes_full_assurance_chain() {
+fn real_episodic_store_clear_requires_checkpoint_and_full_assurance_chain() {
     let profile = MoralPatientEvidenceProfile::default();
     let precaution_policy = PrecautionPolicy::default();
     let (request, context) =
@@ -319,6 +339,7 @@ fn real_episodic_store_clear_requires_and_consumes_full_assurance_chain() {
 
     let mut journal = InterventionExecutionJournal::new();
     let mut execution_persistence = ExecutionPersistence;
+    let mut checkpoint_persistence = CheckpointPersistence::default();
     let outcome = execute_governed_episodic_memory_clear(
         permit,
         "exec:episodic-clear:1",
@@ -333,8 +354,19 @@ fn real_episodic_store_clear_requires_and_consumes_full_assurance_chain() {
         120,
         &mut journal,
         &mut execution_persistence,
+        &mut checkpoint_persistence,
     )
     .unwrap();
+
+    let (saved_checkpoint, saved_checkpoint_digest) =
+        checkpoint_persistence.saved.as_ref().expect("checkpoint persisted");
+    assert_eq!(saved_checkpoint.target_id, TARGET_ID);
+    assert_eq!(saved_checkpoint.episodes.len(), 2);
+    assert_eq!(saved_checkpoint.state_digest, before_digest);
+    assert_eq!(
+        digest_episodic_content_checkpoint(saved_checkpoint).unwrap(),
+        *saved_checkpoint_digest
+    );
 
     match outcome {
         JournaledExecutionOutcome::Completed {
@@ -348,6 +380,11 @@ fn real_episodic_store_clear_requires_and_consumes_full_assurance_chain() {
             assert_eq!(output.after_count, 0);
             assert_eq!(output.before_digest, before_digest);
             assert_ne!(output.before_digest, output.after_digest);
+            assert_eq!(output.checkpoint_digest, *saved_checkpoint_digest);
+            assert_eq!(
+                output.checkpoint_persistence_ref,
+                "test:episodic-content-checkpoint:1"
+            );
             assert_eq!(prepared_persistence_ref, "test:execution-events:1");
             assert_eq!(completion_persistence_ref, "test:execution-events:2");
         }
