@@ -61,7 +61,8 @@
       "valid_from": 900,
       "valid_until": 2100,
       "lifecycle": "active",
-      "bound_snapshot_digest": "0186c4f99015dc5bf449dd57c392c306a77ebe539b06aa0ce3f6698fa8f7d653"
+      "bound_snapshot_digest": "0186c4f99015dc5bf449dd57c392c306a77ebe539b06aa0ce3f6698fa8f7d653",
+      "trust_snapshot_digest": "1111111111111111111111111111111111111111111111111111111111111111"
     },
     {
       "signer_id": "operator.beta",
@@ -72,7 +73,8 @@
       "valid_from": 900,
       "valid_until": 2100,
       "lifecycle": "active",
-      "bound_snapshot_digest": "0186c4f99015dc5bf449dd57c392c306a77ebe539b06aa0ce3f6698fa8f7d653"
+      "bound_snapshot_digest": "0186c4f99015dc5bf449dd57c392c306a77ebe539b06aa0ce3f6698fa8f7d653",
+      "trust_snapshot_digest": "1111111111111111111111111111111111111111111111111111111111111111"
     }
   ],
   "expected_state": {
