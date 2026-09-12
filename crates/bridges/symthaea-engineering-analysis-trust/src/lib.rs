@@ -19,7 +19,6 @@
 
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
 use std::fmt;
 use symthaea_formal_safety::{EvidenceKind, ProofObligation};
 use thiserror::Error;
@@ -53,6 +52,8 @@ pub enum AnalysisTrustErrorV1 {
     MethodInputMismatch,
     #[error("analytical result does not target the exact bound method/input/policy")]
     PlanBindingMismatch,
+    #[error("analytical policy is not conservative enough to discharge the accepted requirement")]
+    PolicyDoesNotDischargeRequirement,
     #[error("reported {0} is inconsistent with the bound analytical input")]
     AnalyticalEquationMismatch(&'static str),
     #[error("reported factor of safety is inconsistent with yield strength / bending stress")]
@@ -174,64 +175,46 @@ pub fn canonical_binary64_v1(value: f64) -> Result<String, AnalysisTrustErrorV1>
     Ok(format!("f64:{:016x}", normalized.to_bits()))
 }
 
-/// Exact accepted Analysis requirement semantics for the initial Civil canary.
-/// The acceptance-record digest is content-addressed but not authenticated here.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Exact accepted service-stress requirement for the initial Civil canary.
+///
+/// This constructor fixes both the content-addressed proposition and a
+/// machine-readable 250 MPa service-stress bound. The acceptance-record digest
+/// is a content-addressed premise; it is not authenticated here.
+#[derive(Debug, Clone, PartialEq)]
 pub struct AcceptedAnalysisRequirementV1 {
     revision_id: AnalysisRequirementRevisionIdV1,
-    logical_requirement_id: String,
-    statement: String,
-    structural_invariants: Vec<String>,
+    max_bending_stress_pa: f64,
     acceptance_record_digest: Sha256DigestV1,
 }
 
 impl AcceptedAnalysisRequirementV1 {
-    pub fn civil_blocking(
-        logical_requirement_id: impl Into<String>,
-        statement: impl Into<String>,
-        structural_invariants: impl IntoIterator<Item = impl Into<String>>,
-        acceptance_record_digest: Sha256DigestV1,
-    ) -> Result<Self, AnalysisTrustErrorV1> {
-        let logical_requirement_id =
-            canonical_text(logical_requirement_id.into(), "logical requirement id")?;
-        let statement = canonical_text(statement.into(), "requirement statement")?;
-        let mut seen = BTreeSet::new();
-        let mut invariants = Vec::new();
-        for invariant in structural_invariants {
-            let invariant = canonical_text(invariant.into(), "structural invariant")?;
-            if !seen.insert(invariant.clone()) {
-                return Err(AnalysisTrustErrorV1::InvalidText(
-                    "duplicate structural invariant",
-                ));
-            }
-            invariants.push(invariant);
-        }
-        invariants.sort();
-
+    pub fn civil_service_stress_250_mpa(acceptance_record_digest: Sha256DigestV1) -> Self {
         let preimage = json!({
             "acceptance_record_digest": acceptance_record_digest.as_str(),
             "criticality": "Blocking",
             "domain": "Civil",
             "expected_evidence_kind": "Analysis",
-            "logical_requirement_id": logical_requirement_id.as_str(),
+            "logical_requirement_id": "REQ-STRESS",
             "schema": "symthaea.etk-accepted-requirement.v1",
-            "statement": statement.as_str(),
-            "structural_invariants": invariants,
+            "statement": "stress remains below allowable",
+            "structural_invariants": ["stress <= 250 MPa"],
         });
-        Ok(Self {
+        Self {
             revision_id: AnalysisRequirementRevisionIdV1::from_digest(domain_hash(
                 REQUIREMENT_DOMAIN_V1,
                 &preimage,
             )),
-            logical_requirement_id,
-            statement,
-            structural_invariants: invariants,
+            max_bending_stress_pa: 250.0e6,
             acceptance_record_digest,
-        })
+        }
     }
 
     pub fn revision_id(&self) -> &AnalysisRequirementRevisionIdV1 {
         &self.revision_id
+    }
+
+    pub fn max_bending_stress_pa(&self) -> f64 {
+        self.max_bending_stress_pa
     }
 
     pub fn audit_record_v1(&self) -> Value {
@@ -241,10 +224,11 @@ impl AcceptedAnalysisRequirementV1 {
             "criticality": "Blocking",
             "domain": "Civil",
             "expected_evidence_kind": "Analysis",
-            "logical_requirement_id": self.logical_requirement_id.as_str(),
+            "logical_requirement_id": "REQ-STRESS",
+            "max_bending_stress_pa": self.max_bending_stress_pa,
             "requirement_revision_id": self.revision_id.as_str(),
-            "statement": self.statement.as_str(),
-            "structural_invariants": self.structural_invariants,
+            "statement": "stress remains below allowable",
+            "structural_invariants": ["stress <= 250 MPa"],
         })
     }
 }
@@ -454,6 +438,9 @@ impl AnalyticalAcceptancePolicyV1 {
         if !threshold.is_finite() {
             return Err(AnalysisTrustErrorV1::NonFinite("factor-of-safety threshold"));
         }
+        if threshold <= 0.0 {
+            return Err(AnalysisTrustErrorV1::NonPositive("factor-of-safety threshold"));
+        }
         if !max_model_relative_error_bound.is_finite()
             || !(0.0..=1.0).contains(&max_model_relative_error_bound)
         {
@@ -498,10 +485,11 @@ impl AnalyticalAcceptancePolicyV1 {
 }
 
 #[must_use = "an analytical plan is binding structure, not admitted evidence"]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NativeAnalyticalPlanV1 {
     plan_id: AnalyticalPlanIdV1,
     requirement_revision_id: AnalysisRequirementRevisionIdV1,
+    requirement_max_bending_stress_pa: f64,
     obligation_id: String,
     obligation_revision_id: ObligationRevisionIdV1,
     subject_revision_id: SubjectRevisionIdV1,
@@ -529,6 +517,11 @@ impl NativeAnalyticalPlanV1 {
         if input.method_revision_id() != method.revision_id() {
             return Err(AnalysisTrustErrorV1::MethodInputMismatch);
         }
+        let policy_worst_case_stress_pa = input.yield_strength_pa() / policy.threshold()
+            * (1.0 + policy.max_model_relative_error_bound());
+        if policy_worst_case_stress_pa > requirement.max_bending_stress_pa() {
+            return Err(AnalysisTrustErrorV1::PolicyDoesNotDischargeRequirement);
+        }
         let obligation_revision_id = analytical_obligation_revision_v1(obligation)?;
         let obligation_id = obligation.id.to_string();
         let preimage = json!({
@@ -547,6 +540,7 @@ impl NativeAnalyticalPlanV1 {
         Ok(Self {
             plan_id: AnalyticalPlanIdV1::from_digest(domain_hash(PLAN_DOMAIN_V1, &preimage)),
             requirement_revision_id: requirement.revision_id().clone(),
+            requirement_max_bending_stress_pa: requirement.max_bending_stress_pa(),
             obligation_id,
             obligation_revision_id,
             subject_revision_id,
@@ -577,6 +571,7 @@ impl NativeAnalyticalPlanV1 {
             "method_revision_id": self.method_revision_id.as_str(),
             "obligation_id": self.obligation_id.as_str(),
             "obligation_revision_id": self.obligation_revision_id.as_str(),
+            "requirement_max_bending_stress_pa": self.requirement_max_bending_stress_pa,
             "requirement_revision_id": self.requirement_revision_id.as_str(),
             "subject_revision_id": self.subject_revision_id.as_str(),
             "twin_revision_id": self.twin_revision_id.as_str(),
@@ -732,6 +727,11 @@ pub fn admit_native_analytical_evidence_v1(
     }
     if result.model_relative_error_bound > policy.max_model_relative_error_bound() {
         return Err(AnalysisTrustErrorV1::ModelErrorBudgetExceeded);
+    }
+    let conservative_stress_pa =
+        result.max_bending_stress_pa * (1.0 + result.model_relative_error_bound);
+    if conservative_stress_pa > plan.requirement_max_bending_stress_pa {
+        return Err(AnalysisTrustErrorV1::AcceptancePredicateFailed);
     }
     let conservative_factor_of_safety =
         result.factor_of_safety / (1.0 + result.model_relative_error_bound);
