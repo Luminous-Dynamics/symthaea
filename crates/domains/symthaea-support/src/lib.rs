@@ -24,6 +24,7 @@ pub mod legacy_blocker_matrix_v3;
 pub mod legacy_computing;
 #[cfg(test)]
 mod legacy_computing_pack_tests;
+pub mod legacy_evidence_closure_plan;
 pub mod legacy_hpux;
 pub mod legacy_hpux_scenarios;
 pub mod legacy_ibmi;
@@ -116,6 +117,12 @@ pub use legacy_computing::{
     LegacyCoverageStateV1, LegacyKnowledgeAreaV1, LegacyPlatformProfileV1, LegacyPlatformV1,
     LegacyProcedureAuthorityV1, LegacyProcedureKindV1, LegacyProcedureStepV1,
     LegacyProcedureV1, LEGACY_COMPUTING_PACK_SCHEMA_V1,
+};
+pub use legacy_evidence_closure_plan::{
+    closure_plan_from_assessment_v1, legacy_evidence_closure_plan_v1,
+    LegacyEvidenceClosureItemV1, LegacyEvidenceClosurePlanErrorV1,
+    LegacyEvidenceClosurePlanV1, LegacyEvidenceClosureStageV1,
+    LegacyEvidenceClosureTargetV1, LEGACY_EVIDENCE_CLOSURE_PLAN_SCHEMA_V1,
 };
 pub use legacy_hpux::{
     enrich_legacy_hpux_foundation_v1, HpuxEvidenceSignalV1, HpuxFailureModeV1,
