@@ -28,6 +28,8 @@
 //!   number of RNG-free microcanonical sweeps with explicit work/fallback stats
 //! - **Sampler qualification traces**: a common measurement schema and work
 //!   accounting for Metropolis and HB+OR, without automatic convergence claims
+//! - **Sampler evidence contracts**: exact kernel/environment lineage and
+//!   descriptive ESS/compute comparisons without an automatic winner rule
 //!
 //! ## Natural Units
 //!
@@ -57,6 +59,7 @@ pub mod lattice_metropolis;
 pub mod lattice_overrelaxation;
 pub mod lattice_qcd;
 pub mod lattice_rng;
+pub mod lattice_sampler_evidence;
 pub mod lattice_sampler_trace;
 pub mod lattice_subgroup_force;
 pub mod lattice_sweep;
@@ -107,6 +110,11 @@ pub use lattice_overrelaxation::{
 pub use lattice_rng::{
     LATTICE_RNG_ALGORITHM, LATTICE_RNG_IMPLEMENTATION, LATTICE_RNG_VERSION,
     LatticeChaCha8Stream, LatticeRngError, LatticeStreamCoordinates, LatticeStreamDomain,
+};
+pub use lattice_sampler_evidence::{
+    SamplerEfficiencyComparison, SamplerEfficiencyObservation, SamplerEvidenceError,
+    SamplerObservableClass, StationaryEstimateComparison, TimingEnvironmentLineage,
+    TransitionKernelLineage, compare_efficiency, compare_stationary_estimates,
 };
 pub use lattice_sampler_trace::{
     QualificationSampler, SamplerQualificationTrace, SamplerTraceError, SamplerTracePlan,
