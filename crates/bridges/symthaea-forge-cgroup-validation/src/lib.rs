@@ -17,7 +17,6 @@ use symthaea_forge::{
     ForgeProposalValidationCoverageSpec, ForgeProposalValidationGateSpec,
     ForgeProposalValidationScorePermit, ForgeProposalValidationSet, ForgeProposalValidationTargetSet,
 };
-use symthaea_forge_cgroup_validation_prelude::*;
 use symthaea_forge_kernel_validation::{
     KernelGatedModelHoldoutPermit, KernelGatedModelValidationReceipt, KernelGatedValidationError,
 };
@@ -27,18 +26,6 @@ use symthaea_forge_linux_cgroup_observed_exec::{
 };
 use symthaea_forge_linux_observed_exec::KernelGatedEvaluatorPolicy;
 use thiserror::Error;
-
-// Keep the long Forge validation import list readable without duplicating it through the API below.
-mod symthaea_forge_cgroup_validation_prelude {
-    pub use symthaea_forge::{
-        ForgeProposalCorpusManifest, ForgeProposalEvaluationRequest,
-        ForgeProposalExecutableModelBinding, ForgeProposalFitPermit, ForgeProposalFrozenModel,
-        ForgeProposalHoldoutSeal, ForgeProposalStudySpec, ForgeProposalValidationCoverageReceipt,
-        ForgeProposalValidationCoverageSpec, ForgeProposalValidationGateSpec,
-        ForgeProposalValidationScorePermit, ForgeProposalValidationSet,
-        ForgeProposalValidationTargetSet,
-    };
-}
 
 #[derive(Debug, Error)]
 pub enum CgroupGatedValidationError {
