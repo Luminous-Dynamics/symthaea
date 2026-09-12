@@ -29,8 +29,8 @@ use crate::legacy_qualification_profile_v3::{
     LegacyQualificationManifestV1,
 };
 use crate::legacy_source_continuity::{
-    LegacySourceContinuityAssessmentV1, LegacySourceContinuityItemV1,
-    LegacySourceContinuityStatusV1, LEGACY_SOURCE_CONTINUITY_SCHEMA_V1,
+    LegacySourceContinuityAssessmentV1, LegacySourceContinuityStatusV1,
+    LEGACY_SOURCE_CONTINUITY_SCHEMA_V1,
 };
 use crate::standards_registry::{SourceSnapshotIdV1, TechnicalClaimIdV1};
 use serde::{Deserialize, Serialize};
@@ -111,15 +111,18 @@ pub fn plan_legacy_rebaseline_work_v1(
     let mut procedures_requiring_replacement = BTreeSet::new();
 
     for item in &continuity.items {
-        if item.status == LegacySourceContinuityStatusV1::ExactContentMatch {
-            continue;
-        }
+        // Every continuity item must belong to the active generation, even an
+        // exact match. Historical/inactive ledger noise must not perturb a
+        // generation-specific work package or its binding digest.
         let (affected_claim_ids, affected_procedure_ids) =
             affected_active_targets(pack, manifest, &item.original_snapshot_id)?;
         if affected_claim_ids.is_empty() && affected_procedure_ids.is_empty() {
             return Err(LegacyRebaselinePlanErrorV1::ContinuitySnapshotNotActive(
                 item.original_snapshot_id.clone(),
             ));
+        }
+        if item.status == LegacySourceContinuityStatusV1::ExactContentMatch {
+            continue;
         }
 
         match item.status {
@@ -395,6 +398,7 @@ impl From<LegacyQualificationManifestErrorV1> for LegacyRebaselinePlanErrorV1 {
 mod tests {
     use super::*;
     use crate::legacy_qualification_profile_v3::initial_legacy_qualification_manifest_v1;
+    use crate::legacy_source_continuity::LegacySourceContinuityItemV1;
     use crate::build_legacy_five_platform_portfolio_v1;
 
     fn one_item_assessment(
