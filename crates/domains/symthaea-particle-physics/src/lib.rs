@@ -11,7 +11,7 @@
 //! - **Symmetry groups**: SU(2) Pauli matrices, SU(3) Gell-Mann matrices,
 //!   structure constants, Casimir operators
 //! - **Lattice evidence contracts**: reproducible ensemble planning/execution
-//!   lineage and explicit post-run scientific qualification references
+//!   lineage, proposal-selection provenance and post-run qualification references
 //!
 //! ## Natural Units
 //!
@@ -47,7 +47,7 @@ pub use decay_widths::{
 };
 pub use lattice_ensemble::{
     EnsemblePlan, EnsembleRecordError, EnsembleRunRecord, LatticeBoundaryCondition,
-    LatticeSamplerKind, RngLineage,
+    LatticeSamplerKind, ProposalParameterOrigin, RngLineage,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
