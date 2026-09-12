@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-camera-geometry"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Evidence-first calibrated camera geometry for conservative image-plane to bearing conversion"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["camera", "calibration", "geometry", "vision"]
+categories = ["science", "computer-vision"]
+
+[dependencies]
+serde = { workspace = true }
