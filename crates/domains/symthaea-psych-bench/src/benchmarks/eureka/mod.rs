@@ -20,6 +20,7 @@ mod custody_identity_tests;
 pub mod hidden_world;
 mod promotion;
 mod selection;
+mod target_contract;
 #[cfg(test)]
 mod transition_identity_tests;
 
@@ -35,3 +36,4 @@ pub use hidden_world::{
     InterventionReceipt, InterventionRequest, InterventionStatus, PublicAction, PublicObservation,
     PublicValue, RuntimeWorld, StepReceipt, PUBLIC_SCHEMA_ID,
 };
+pub use target_contract::{EurekaTargetScope, FEP_TARGET_ADAPTER_REVISION};
