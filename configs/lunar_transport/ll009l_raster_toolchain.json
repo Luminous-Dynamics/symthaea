@@ -1,0 +1,28 @@
+{
+  "schema_version": "ll009l.raster-toolchain.v1",
+  "python": {
+    "implementation": "CPython",
+    "major_minor": "3.13"
+  },
+  "rasterio": {
+    "version": "1.4.4",
+    "wheel_filename": "rasterio-1.4.4-cp313-cp313-manylinux_2_28_x86_64.whl",
+    "sha256": "c072450caa96428b1218b030500bb908fd6f09bc013a88969ff81a124b6a112a",
+    "source": "PyPI",
+    "trusted_publishing": true
+  },
+  "policy": {
+    "runtime_dependency": false,
+    "network_access_during_materialization": false,
+    "exact_source_raster_bytes_required": true,
+    "allow_resampling": false,
+    "allow_reprojection_of_source_cells": false,
+    "allow_earth_ellipsoid_defaults": false
+  },
+  "notes": [
+    "Rasterio/GDAL is offline evidence tooling only; Symthaea runtime remains GIS-dependency-free.",
+    "The first promotable lane pins Rasterio 1.4.4 because PyPI publishes an exact CPython-3.13 Linux wheel digest and trusted-publishing provenance for that artifact.",
+    "Changing Python, Rasterio, GDAL/PROJ behavior, the wheel digest, or materialization policy creates a new evidence lineage.",
+    "A newer Rasterio release may be adopted later only through a new pinned toolchain lineage and parity campaign."
+  ]
+}
