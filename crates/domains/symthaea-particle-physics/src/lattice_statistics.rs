@@ -38,6 +38,10 @@ pub struct ChainDiagnostics {
     /// Standard error of exact, non-overlapping block means.
     pub blocking_standard_error: f64,
     pub block_size: usize,
+    /// Maximum lag the caller allowed the autocorrelation estimator to inspect.
+    /// This is preserved so downstream evidence can distinguish natural IPS
+    /// termination from a still-positive correlation tail truncated by policy.
+    pub max_lag: usize,
     /// Largest positive lag included in `tau_int`.
     pub positive_lag_count: usize,
 }
@@ -178,6 +182,7 @@ pub fn analyze_scalar_chain(
         autocorrelation_adjusted_standard_error,
         blocking_standard_error,
         block_size,
+        max_lag,
         positive_lag_count,
     })
 }
@@ -232,13 +237,15 @@ mod tests {
     }
 
     #[test]
-    fn burn_in_is_explicit_and_preserved_in_diagnostics() {
+    fn burn_in_and_autocorrelation_window_are_preserved_in_diagnostics() {
         let samples = lcg_series(128);
         let diagnostics = analyze_scalar_chain(&samples, 32, 24, 8).unwrap();
         assert_eq!(diagnostics.raw_sample_count, 128);
         assert_eq!(diagnostics.burn_in, 32);
         assert_eq!(diagnostics.retained_sample_count, 96);
         assert_eq!(diagnostics.block_size, 8);
+        assert_eq!(diagnostics.max_lag, 24);
+        assert!(diagnostics.positive_lag_count <= diagnostics.max_lag);
     }
 
     #[test]
