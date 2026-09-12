@@ -17,6 +17,7 @@ use symthaea_domain_awareness_vision::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CalibratedVisionBridgeError {
     CameraGeometry(CameraGeometryError),
+    CoordinateFrameMismatch,
     VisionBridge(VisualBridgeError),
 }
 
@@ -35,7 +36,8 @@ impl From<VisualBridgeError> for CalibratedVisionBridgeError {
 /// Convert a normalized visual track into calibrated camera-frame bearing evidence.
 ///
 /// The calibration consumes already-undistorted image coordinates. All calibration
-/// provenance is propagated into the resulting `ObservationEnvelope`.
+/// provenance is propagated into the resulting `ObservationEnvelope`. The exact
+/// optical frame bound into the calibration must match the observation context.
 #[allow(clippy::too_many_arguments)]
 pub fn calibrated_bearing_observation(
     context: &VisionObservationContext,
@@ -54,6 +56,10 @@ pub fn calibrated_bearing_observation(
         one_sigma_localization_error_px,
         observed_at_ms,
     )?;
+
+    if context.coordinate_frame != bearing.camera_frame_id {
+        return Err(CalibratedVisionBridgeError::CoordinateFrameMismatch);
+    }
 
     evidence_refs.push(format!("camera-calibration-id:{}", bearing.calibration_id));
     evidence_refs.extend(bearing.evidence_refs.iter().cloned());
@@ -89,6 +95,7 @@ mod tests {
         PinholeCalibration {
             schema_version: "1".into(),
             calibration_id: "camera-1-cal".into(),
+            camera_frame_id: "camera-1-optical".into(),
             calibration_ref: "calibration:camera-1:blake3:test".into(),
             image_width_px: 1920,
             image_height_px: 1080,
@@ -187,6 +194,25 @@ mod tests {
                 CameraGeometryError::CalibrationNotActive
             )
         );
+    }
+
+    #[test]
+    fn frame_mismatch_cannot_publish_bearing() {
+        let mut wrong_context = context();
+        wrong_context.coordinate_frame = "another-camera-frame".into();
+        let error = calibrated_bearing_observation(
+            &wrong_context,
+            &visual(0.5, 0.5),
+            &calibration(),
+            0.5,
+            1_000,
+            1_005,
+            SensorHealth::Nominal,
+            0.9,
+            vec!["frame:42".into()],
+        )
+        .unwrap_err();
+        assert_eq!(error, CalibratedVisionBridgeError::CoordinateFrameMismatch);
     }
 
     #[test]
