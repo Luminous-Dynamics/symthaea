@@ -13,6 +13,7 @@ on:
       - 'crates/bridges/symthaea-forge-algorithm-evidence/**'
       - 'crates/bridges/symthaea-forge-overlay-evidence/**'
       - 'crates/bridges/symthaea-forge-linux-isolation/**'
+      - 'crates/bridges/symthaea-forge-linux-provenance/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
   push:
     branches: [ main ]
@@ -27,6 +28,7 @@ on:
       - 'crates/bridges/symthaea-forge-algorithm-evidence/**'
       - 'crates/bridges/symthaea-forge-overlay-evidence/**'
       - 'crates/bridges/symthaea-forge-linux-isolation/**'
+      - 'crates/bridges/symthaea-forge-linux-provenance/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
   workflow_dispatch:
 
@@ -64,6 +66,9 @@ jobs:
       - name: Test hardened Forge Linux isolation bridge
         run: cargo test -p symthaea-forge-linux-isolation --all-targets -- --test-threads=1
 
+      - name: Test Bubblewrap Nix provenance bridge
+        run: cargo test -p symthaea-forge-linux-provenance --all-targets -- --test-threads=1
+
       - name: Test e-graph lineage bridge
         run: cargo test -p symthaea-algorithm-egraph-bridge -- --test-threads=1
 
@@ -89,6 +94,7 @@ jobs:
           -p symthaea-algorithm-lab
           -p symthaea-forge
           -p symthaea-forge-linux-isolation
+          -p symthaea-forge-linux-provenance
           -p symthaea-algorithm-egraph-bridge
           -p symthaea-algorithm-evidence-collector
           -p symthaea-hdc-algorithm-evidence
