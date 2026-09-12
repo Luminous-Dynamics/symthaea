@@ -39,6 +39,7 @@ pub mod legacy_solaris_scenarios;
 pub mod legacy_source_artifacts;
 pub mod legacy_source_capture_plan;
 pub mod legacy_source_capture_plan_v3;
+pub mod legacy_source_continuity;
 pub mod legacy_source_lineage;
 pub mod legacy_source_readiness;
 pub mod legacy_zos;
@@ -203,6 +204,12 @@ pub use legacy_source_capture_plan_v3::{
     LegacyPotentialFetchReuseGroupV3, LegacySourceCapturePlanErrorV3,
     LegacySourceCapturePlanV3, LegacySourceRevisionCaptureRequestV3,
     LEGACY_SOURCE_CAPTURE_PLAN_SCHEMA_V3,
+};
+pub use legacy_source_continuity::{
+    assess_legacy_source_continuity_v1, require_legacy_source_continuity_v1,
+    LegacySourceContinuityAssessmentV1, LegacySourceContinuityErrorV1,
+    LegacySourceContinuityItemV1, LegacySourceContinuityStatusV1,
+    LEGACY_SOURCE_CONTINUITY_SCHEMA_V1,
 };
 pub use legacy_source_lineage::{
     assess_legacy_source_lineage_v1, summarize_legacy_claim_lineage_v1,
