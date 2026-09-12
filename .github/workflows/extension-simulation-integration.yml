@@ -1,0 +1,79 @@
+name: Extension Simulation Integration
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-extension-core/wit/**"
+      - "crates/bridges/symthaea-extension-host/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/extension-simulation-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  simulation-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-wasip2
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > extension-simulation-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the joined host graph."
+          else
+            echo "Cargo.lock requires a generated update; retaining the exact patch as qualification evidence."
+            cat extension-simulation-cargo-lock.patch
+          fi
+
+      - name: Build standalone hello-simulation component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --release \
+            --target wasm32-wasip2
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum examples/extensions/hello-simulation/manifest.json "$component"
+
+      - name: Compile typed simulation WIT host binding
+        run: cargo test -p symthaea-extension-host --test simulation_wit_bindings
+
+      - name: Prove release component satisfies empty-linker host
+        env:
+          SYMTHAEA_HELLO_SIMULATION_MANIFEST: ${{ github.workspace }}/examples/extensions/hello-simulation/manifest.json
+          SYMTHAEA_HELLO_SIMULATION_COMPONENT: ${{ github.workspace }}/examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm
+        run: |
+          cargo test \
+            -p symthaea-extension-host \
+            --test simulation_guest_integration \
+            hello_simulation_release_component_has_zero_ambient_imports \
+            -- --ignored --exact
+
+      - name: Upload generated root lockfile patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-simulation-cargo-lock-patch
+          path: extension-simulation-cargo-lock.patch
+          if-no-files-found: error
