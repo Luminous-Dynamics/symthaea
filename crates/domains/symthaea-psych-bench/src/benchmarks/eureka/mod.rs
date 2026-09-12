@@ -8,8 +8,13 @@
 //! metacognitive, or authority stack.
 
 pub mod constitution;
+pub mod hidden_world;
 
 pub use constitution::{
     EUREKA_CLAIM_SPECS, EvidenceClass, ProtocolInvariant, ScientificDisposition,
     UnderstandingClaimFamily, UnderstandingClaimSpec, UnderstandingMaturity,
+};
+pub use hidden_world::{
+    InterventionReceipt, InterventionRequest, InterventionStatus, PublicAction, PublicObservation,
+    PublicValue, RuntimeWorld, StepReceipt, PUBLIC_SCHEMA_ID,
 };
