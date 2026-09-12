@@ -17,6 +17,7 @@ mod custody;
 #[cfg(test)]
 mod custody_identity_tests;
 pub mod hidden_world;
+mod promotion;
 #[cfg(test)]
 mod transition_identity_tests;
 
