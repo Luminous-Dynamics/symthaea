@@ -1,0 +1,10 @@
+{
+  "schema_version": "ll009ad.three-way-terrain-decomposition-policy.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "near_layer_id": "site01-near-5m",
+  "far_layer_id": "south-pole-far-80m",
+  "closure_tolerance_m": 1e-9,
+  "dominance_tie_tolerance_m": 1e-6,
+  "affine_tolerance": 1e-9,
+  "interpretation": "Decompose each exact LL-009AC scale-matched SDEM-to-Product90 discrepancy into the SfS increment relative to the Site01 5 m LDEM and the Site01-5m-to-Product90-80m LOLA baseline difference. Both projected equal-weight and spherical-area-weighted identities must close algebraically on the exact AC admitted population. Component dominance and covariance are descriptive ancestry-aware diagnostics only, not causal or independent-error claims."
+}
