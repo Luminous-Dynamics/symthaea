@@ -58,9 +58,10 @@ fn run_cli() -> Result<(), String> {
                 return Err(usage(&program));
             }
             let plan = parse_plan(&fold, &min, &max, &top_k)?;
+            let plan_sha256 = plan.sha256().map_err(|error| error.to_string())?;
             let output = json!({
                 "plan": plan,
-                "plan_sha256": plan.sha256().map_err(|error| error.to_string())?,
+                "plan_sha256": plan_sha256,
                 "chronology_disclosure": PLAN_CHRONOLOGY_DISCLOSURE,
             });
             println!(
