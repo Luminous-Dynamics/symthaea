@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-domain-awareness-runtime-evidence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Candidate-evidence bindings from runtime assurance crucibles into Symthaea domain-awareness obligations"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "evidence", "verification"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-domain-awareness-evidence = { path = "../symthaea-domain-awareness-evidence" }
+symthaea-evidence-runtime-crucible = { path = "../../domains/symthaea-evidence-runtime-crucible" }
+symthaea-evidence-dependency = { path = "../../domains/symthaea-evidence-dependency" }
+symthaea-formal-safety = { path = "../../domains/symthaea-formal-safety" }
+serde = { workspace = true }
