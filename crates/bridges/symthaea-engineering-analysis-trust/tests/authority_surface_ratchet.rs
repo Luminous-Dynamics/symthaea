@@ -46,3 +46,22 @@ fn authority_ladder_remains_explicit() {
         assert!(source.contains(boundary), "missing authority boundary: {boundary}");
     }
 }
+
+#[test]
+fn exact_input_equations_and_requirement_policy_link_cannot_silently_disappear() {
+    let source = include_str!("../src/lib.rs");
+
+    for theorem in [
+        "PolicyDoesNotDischargeRequirement",
+        "requirement_max_bending_stress_pa",
+        "result.method_revision_id",
+        "result.input_revision_id",
+        "expected_max_moment_nm",
+        "expected_max_bending_stress_pa",
+        "expected_max_deflection_m",
+        "AnalyticalEquationMismatch",
+        "conservative_stress_pa",
+    ] {
+        assert!(source.contains(theorem), "missing ETK-3C theorem: {theorem}");
+    }
+}
