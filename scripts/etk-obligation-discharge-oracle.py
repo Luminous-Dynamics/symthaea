@@ -36,6 +36,21 @@ CURRENT_FACT_DOMAIN = b"symthaea.etk-current-obligation-discharge-fact.v1\x00"
 EXPECTED_CURRENT_FACT = (
     "sha256:ee766da9c94291c2c46579219d013684bdeef711ef075f9041e15d646e52397f"
 )
+CLOSURE_REQUIREMENT_REVISION = (
+    "sha256:e340c5030eebc978c41443ffd64f340dc5febad31e376080340bacfceda60faa"
+)
+CLOSURE_A_RECEIPT = (
+    "sha256:0fa40a2ce674bacc5c9dc4e077cb2cb84b6d0e7d35ada67fb4ea3eb1dc2a88c7"
+)
+CLOSURE_A_FACT = (
+    "sha256:69a686d1505b571184a1d949fe09e5db049cade06f63e6f680b273b0b5d1c21d"
+)
+CLOSURE_B_RECEIPT = (
+    "sha256:42a32bcaf8a185042a1cd9fdb3e4608ab2e456bae53c67306de5e068dd84b08b"
+)
+CLOSURE_B_FACT = (
+    "sha256:408a2c784448d1436981fe40062396ba2316fe553b62fb29d7b35d073f1a1c9f"
+)
 
 TOP = {
     "schema",
@@ -130,9 +145,7 @@ def obligation_snapshot_id(obligation: dict[str, Any]) -> str:
     )
 
 
-def receipt_preimage(
-    admitted: dict[str, Any], obligation_revision: str
-) -> dict[str, Any]:
+def receipt_preimage(admitted: dict[str, Any], obligation_revision: str) -> dict[str, Any]:
     return {
         "admitted_evidence_id": admitted["admitted_evidence_id"],
         "candidate_artifact_id": admitted["candidate_artifact_id"],
@@ -254,10 +267,7 @@ def evaluate(payload: Any) -> dict[str, Any]:
         return deny_issuance(reasons)
 
     assert issued_snapshot is not None
-    receipt_id = domain_hash(
-        RECEIPT_DOMAIN,
-        receipt_preimage(admitted, issued_snapshot),
-    )
+    receipt_id = domain_hash(RECEIPT_DOMAIN, receipt_preimage(admitted, issued_snapshot))
 
     stale: set[str] = set()
     current_snapshot = obligation_snapshot_id(current_obligation)
@@ -306,10 +316,22 @@ def evaluate(payload: Any) -> dict[str, Any]:
     }
 
 
-def fixture() -> dict[str, Any]:
+def make_fixture(
+    *,
+    obligation_id: str,
+    claim: str,
+    admitted_evidence_id: str,
+    candidate_artifact_id: str,
+    subject_id: str,
+    twin_revision: str,
+    requirement_revision: str,
+    evidence_policy_id: str,
+    validity_domain_id: str,
+    currentness_proof_id: str,
+) -> dict[str, Any]:
     obligation = {
-        "obligation_id": "11111111-2222-4333-8444-555555555555",
-        "claim": "stress remains below allowable under service load",
+        "obligation_id": obligation_id,
+        "claim": claim,
         "expected_evidence_kind": "Simulation",
     }
     revision = obligation_snapshot_id(obligation)
@@ -317,26 +339,73 @@ def fixture() -> dict[str, Any]:
         "schema": SCHEMA,
         "issued_obligation": copy.deepcopy(obligation),
         "admitted": {
-            "admitted_evidence_id": "sha256:794475a988dbecf945306f051a54e000e03fe918c886ee1cc13a6f28b7ad9b10",
-            "candidate_artifact_id": "solver-output:run-0007",
-            "obligation_id": obligation["obligation_id"],
+            "admitted_evidence_id": admitted_evidence_id,
+            "candidate_artifact_id": candidate_artifact_id,
+            "obligation_id": obligation_id,
             "obligation_revision": revision,
-            "subject_id": "bracket-alpha",
-            "twin_revision": "design:G17",
-            "requirement_revision": "REQ-STRESS:r5",
-            "evidence_policy_id": "ETK-SIM-ADMISSION-V1",
-            "validity_domain_id": "VD-static-G17-LC9",
-            "currentness_proof_id": "currentness:design-G17:attestation-1",
+            "subject_id": subject_id,
+            "twin_revision": twin_revision,
+            "requirement_revision": requirement_revision,
+            "evidence_policy_id": evidence_policy_id,
+            "validity_domain_id": validity_domain_id,
+            "currentness_proof_id": currentness_proof_id,
         },
         "current_obligation": copy.deepcopy(obligation),
         "current_context": {
-            "subject_id": "bracket-alpha",
-            "twin_revision": "design:G17",
-            "requirement_revision": "REQ-STRESS:r5",
-            "validity_domain_id": "VD-static-G17-LC9",
-            "currentness_proof_id": "currentness:design-G17:attestation-1",
+            "subject_id": subject_id,
+            "twin_revision": twin_revision,
+            "requirement_revision": requirement_revision,
+            "validity_domain_id": validity_domain_id,
+            "currentness_proof_id": currentness_proof_id,
         },
     }
+
+
+def fixture() -> dict[str, Any]:
+    return make_fixture(
+        obligation_id="11111111-2222-4333-8444-555555555555",
+        claim="stress remains below allowable under service load",
+        admitted_evidence_id=(
+            "sha256:794475a988dbecf945306f051a54e000e03fe918c886ee1cc13a6f28b7ad9b10"
+        ),
+        candidate_artifact_id="solver-output:run-0007",
+        subject_id="bracket-alpha",
+        twin_revision="design:G17",
+        requirement_revision="REQ-STRESS:r5",
+        evidence_policy_id="ETK-SIM-ADMISSION-V1",
+        validity_domain_id="VD-static-G17-LC9",
+        currentness_proof_id="currentness:design-G17:attestation-1",
+    )
+
+
+def closure_fixture_a() -> dict[str, Any]:
+    return make_fixture(
+        obligation_id="00000000-0000-4000-8000-000000000042",
+        claim="stress remains below allowable under service load",
+        admitted_evidence_id="sha256:" + "81" * 32,
+        candidate_artifact_id="solver-output:closure-A",
+        subject_id="bracket-alpha",
+        twin_revision="design:G17",
+        requirement_revision=CLOSURE_REQUIREMENT_REVISION,
+        evidence_policy_id="ETK-CLOSURE-A-POLICY",
+        validity_domain_id="VD-static-G17-A",
+        currentness_proof_id="currentness:design-G17:A",
+    )
+
+
+def closure_fixture_b() -> dict[str, Any]:
+    return make_fixture(
+        obligation_id="00000000-0000-4000-8000-000000000043",
+        claim="maximum principal stress remains below allowable under service load",
+        admitted_evidence_id="sha256:" + "82" * 32,
+        candidate_artifact_id="solver-output:closure-B",
+        subject_id="bracket-alpha",
+        twin_revision="design:G17",
+        requirement_revision=CLOSURE_REQUIREMENT_REVISION,
+        evidence_policy_id="ETK-CLOSURE-B-POLICY",
+        validity_domain_id="VD-static-G17-B",
+        currentness_proof_id="currentness:design-G17:B",
+    )
 
 
 def expect(payload: dict[str, Any], decision: str, reason: str | None = None) -> None:
@@ -346,7 +415,7 @@ def expect(payload: dict[str, Any], decision: str, reason: str | None = None) ->
         assert reason in result["reasons"], result
 
 
-def self_test() -> tuple[str, str, str]:
+def self_test() -> dict[str, str]:
     good = fixture()
     result = evaluate(good)
     assert result["decision"] == "CurrentDischarge", result
@@ -356,6 +425,21 @@ def self_test() -> tuple[str, str, str]:
     expected_receipt = result["receipt_id"]
     expected_fact = result["current_discharge_fact_id"]
     assert expected_fact == EXPECTED_CURRENT_FACT
+
+    closure_a = evaluate(closure_fixture_a())
+    closure_b = evaluate(closure_fixture_b())
+    assert closure_a["decision"] == "CurrentDischarge", closure_a
+    assert closure_b["decision"] == "CurrentDischarge", closure_b
+    assert closure_a["receipt_id"] == CLOSURE_A_RECEIPT
+    assert closure_a["current_discharge_fact_id"] == CLOSURE_A_FACT
+    assert closure_b["receipt_id"] == CLOSURE_B_RECEIPT
+    assert closure_b["current_discharge_fact_id"] == CLOSURE_B_FACT
+    assert closure_a["obligation_revision"] == (
+        "sha256:743d2c13cfcc52bdfb4cfd9a4a836ed0806ace7b2a68b4c7284b1910d8863c29"
+    )
+    assert closure_b["obligation_revision"] == (
+        "sha256:63ce87ba42de8d08ff87059322964a7609228d66a7b8f7fc67016b298c2a7c2d"
+    )
 
     cases: list[tuple[dict[str, Any], str, str]] = []
 
@@ -437,7 +521,15 @@ def self_test() -> tuple[str, str, str]:
     assert refreshed_result["decision"] == "CurrentDischarge"
     assert refreshed_result["current_discharge_fact_id"] != expected_fact
 
-    return expected_snapshot, expected_receipt, expected_fact
+    return {
+        "obligation_snapshot": expected_snapshot,
+        "discharge_receipt": expected_receipt,
+        "current_discharge_fact": expected_fact,
+        "closure_a_receipt": closure_a["receipt_id"],
+        "closure_a_fact": closure_a["current_discharge_fact_id"],
+        "closure_b_receipt": closure_b["receipt_id"],
+        "closure_b_fact": closure_b["current_discharge_fact_id"],
+    }
 
 
 def reject_constant(value: str) -> None:
@@ -450,10 +542,9 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.self_test:
-        snapshot, receipt, fact = self_test()
-        print("ok obligation_snapshot=" + snapshot)
-        print("ok discharge_receipt=" + receipt)
-        print("ok current_discharge_fact=" + fact)
+        vectors = self_test()
+        for key in sorted(vectors):
+            print(f"ok {key}={vectors[key]}")
         return 0
 
     try:
