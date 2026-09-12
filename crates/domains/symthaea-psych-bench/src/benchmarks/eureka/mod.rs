@@ -7,6 +7,7 @@
 //! cognition. It must not become a parallel reasoning, world-model, causal,
 //! metacognitive, or authority stack.
 
+mod action_execution;
 pub mod consequence;
 pub mod constitution;
 mod custody;
