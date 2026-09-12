@@ -34,13 +34,17 @@ Direct byte-for-byte comparison of the reproduced assignments with the 46 MB ups
 1. validates the compact positional fold manifest;
 2. parses only the exact pinned `matbench_expt_gap` artifact;
 3. selects one published-procedure test fold by row position;
-4. computes composition-level overlap against Symthaea's currently exposed band-gap training table;
-5. removes those overlapping compositions from evaluation truth;
-6. content-addresses the positional exclusion mask;
-7. content-addresses the retained truth slice;
-8. returns a `BandgapTruthSet` suitable for the existing measurement-only Benchmark Zero protocol.
+4. content-addresses the **complete current Symthaea band-gap training table**;
+5. computes composition-level overlap against that training table;
+6. removes overlapping compositions from evaluation truth;
+7. content-addresses the positional exclusion mask, including the training-table digest;
+8. content-addresses the retained truth slice;
+9. emits one qualification SHA-256 binding source artifact, parent row-order identity, fold manifest, training-table identity, exclusion mask, retained truth, and row counts;
+10. returns a `BandgapTruthSet` suitable for the existing measurement-only Benchmark Zero protocol.
 
 The exclusion list preserves the exact source row position, normalized candidate ID, and matching Symthaea training labels. It intentionally does not invent an upstream Matbench ID.
+
+Binding the full training table matters even when an edit produces no new overlap: the qualification identity changes whenever the leakage reference table changes.
 
 ## Important non-claims
 
