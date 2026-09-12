@@ -16,6 +16,7 @@ from typing import Any
 
 REQ_D=b"symthaea.etk-accepted-requirement.v1\0"
 OBL_D=b"symthaea.etk-proof-obligation-snapshot.v1\0"
+CURRENTNESS_D=b"symthaea.etk-currentness-assertion.v1\0"
 METHOD_D=b"symthaea.etk-native-analytical-method.v1\0"
 INPUT_D=b"symthaea.etk-native-analytical-input.v1\0"
 POLICY_D=b"symthaea.etk-native-analytical-policy.v1\0"
@@ -27,8 +28,7 @@ FACT_D=b"symthaea.etk-current-native-analytical-discharge-fact.v1\0"
 SUBJECT="sha256:38a9505d423fa3464020107b4e8abc8acc6ac6af33bcc98a2418480e1d33390e"
 TWIN="sha256:19d558d6e7579f0f44c71398c7ddac659677aca0fa0e65ed46227670e4876cd9"
 VALIDITY="sha256:90bff4adf8917f2ae071f405d5c46afb310b12a98dd2e4eec845de1261a24890"
-CURRENT="sha256:f85bd7d5129b08a3256cfdd5b3506f3cae1dbc625b097a8bf95bf1f6fe709dd9"
-REFRESHED="sha256:8afc4da94154375097adee0603968f356f3807e97be96864c5f79acf90e081d6"
+EXPECTED_CURRENT="sha256:f85bd7d5129b08a3256cfdd5b3506f3cae1dbc625b097a8bf95bf1f6fe709dd9"
 OBL_ID="00000000-0000-4000-8000-000000000042"
 CLAIM="stress remains below allowable under service load"
 
@@ -58,7 +58,13 @@ def dg(v,field):
     if h.lower()!=h or any(c not in "0123456789abcdef" for c in h): raise Denied("invalid_digest:"+field)
     return v
 
-def context(current=CURRENT):
+def currentness(attestation="4"):
+    return dh(CURRENTNESS_D,{"attestation_digest":d(attestation),"observed_at_unix_ms":1789123456000,
+       "schema":"symthaea.etk-currentness-assertion.v1","twin_revision_id":TWIN,
+       "validity_domain_revision_id":VALIDITY})
+
+def context(current=None):
+    if current is None: current=currentness("4")
     req=dh(REQ_D,{
       "acceptance_record_digest":d("a"),"criticality":"Blocking","domain":"Civil",
       "expected_evidence_kind":"Analysis","logical_requirement_id":"REQ-STRESS",
@@ -104,7 +110,7 @@ def policy():
        "model_qualification_record_digest":d("9"),"operator":">=",
        "schema":"symthaea.etk-native-analytical-policy.v1","threshold":f(2.0)})
 
-def plan(x,current=CURRENT):
+def plan(x,current=None):
     c=context(current); mid=method(); iid=input_id(x); pid=policy()
     pre={"acceptance_policy_revision_id":pid,"currentness_assertion_id":c["currentness"],
          "input_revision_id":iid,"method_revision_id":mid,"obligation_id":OBL_ID,
@@ -153,6 +159,7 @@ def current_fact(current,historical,rcpt):
 
 def self_test():
     assert f(-0.0)=="f64:0000000000000000" and f(.1)=="f64:3fb999999999999a"
+    assert currentness("4")==EXPECTED_CURRENT
     x=inputs(); p=plan(x); a=admit(p,x,result()); r=receipt(p,a); cf=current_fact(p,p,r)
     v={"requirement_revision_id":p["requirement"],"obligation_revision_id":p["obligation"],
        "method_revision_id":p["method"],"input_revision_id":p["input"],"policy_revision_id":p["policy"],
@@ -174,7 +181,7 @@ def self_test():
         try: admit(p,x,bad)
         except Denied as e: assert reason in str(e)
         else: raise AssertionError(reason)
-    refreshed=plan(x,REFRESHED)
+    refreshed=plan(x,currentness("5"))
     assert refreshed["plan"]!=p["plan"]
     try: current_fact(refreshed,p,r)
     except Denied as e: assert "historical_plan" in str(e)
