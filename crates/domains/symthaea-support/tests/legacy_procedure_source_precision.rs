@@ -31,7 +31,7 @@ fn procedures_use_nonempty_profile_scoped_non_platform_wide_sources() {
             procedure.platform
         );
         assert_ne!(
-            procedure.source_snapshots, profile.source_snapshots,
+            &procedure.source_snapshots, &profile.source_snapshots,
             "procedure {} cites the entire {:?} platform source set; add an explicit reviewed exception only if every source is materially required",
             procedure.id, procedure.platform
         );
@@ -71,7 +71,7 @@ fn capture_plan_procedure_fanout_is_exact_inverse_of_active_source_bindings() {
         let request = plan
             .requests
             .iter()
-            .find(|request| request.original_snapshot_id == *snapshot)
+            .find(|request| &request.original_snapshot_id == snapshot)
             .unwrap();
         assert_eq!(
             &request.procedure_ids, expected_procedures,
@@ -86,7 +86,7 @@ fn capture_plan_procedure_fanout_is_exact_inverse_of_active_source_bindings() {
             .cloned()
             .unwrap_or_default();
         assert_eq!(
-            request.procedure_ids, expected,
+            &request.procedure_ids, &expected,
             "capture plan contains stale or invented procedure fanout for {}",
             request.original_snapshot_id.0
         );
