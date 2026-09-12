@@ -1,0 +1,42 @@
+{
+  "schema_version": "ll009v.product90-rms-semantics-policy.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "layer_id": "south-pole-far-80m",
+  "uncertainty_source_id": "south-pole-surface-height-error-80m",
+  "required_source_role": "surface_height_error_m",
+  "semantics_class": "rms_error",
+  "quantity": "gridded_surface_height_error_m_relative_true_average_pixel_height",
+  "direction_semantics": "scalar_lunar_surface_height_not_deterministic_vector_bound",
+  "methodology_lineage": [
+    {
+      "reference": "https://pgda.gsfc.nasa.gov/products/90",
+      "statement": "Product 90 publishes LDEM_*_ADJ_ERR.TIF as LDEM surface height error in meters and cites Barker et al. 2023 for the product methodology."
+    },
+    {
+      "reference": "https://ntrs.nasa.gov/citations/20230014419",
+      "statement": "Barker et al. 2023 produced the improved large-area south-polar LDEMs and associated uncertainty estimates over multiple pixel scales."
+    },
+    {
+      "reference": "Barker et al. 2025, The Planetary Science Journal 6:83",
+      "statement": "The follow-on polar-method paper states that gridded LDEM height/slope uncertainty maps represent RMS uncertainty relative to true average pixel height/slope using uncertainty-versus-effective-resolution relations derived by Barker et al. 2023, and reports the corresponding South-Pole uncertainty behavior."
+    }
+  ],
+  "allowed_claims": [
+    "rms_error",
+    "second_moment_statistical_evidence",
+    "input_to_separate_explicit_risk_or_ensemble_model"
+  ],
+  "blocked_claims": [
+    "hard_upper_bound",
+    "deterministic_maximum_error",
+    "implicit_1sigma_gaussian",
+    "implicit_2sigma_or_3sigma_bound",
+    "independent_pixel_errors",
+    "complete_physical_horizon"
+  ],
+  "non_claims": [
+    "This policy classifies source uncertainty semantics; it does not choose a tail distribution, covariance model, confidence level or familywise risk budget.",
+    "RMS uncertainty is not a deterministic terrain displacement bound.",
+    "Spatial-support completeness remains an independent LL-009R obligation."
+  ]
+}
