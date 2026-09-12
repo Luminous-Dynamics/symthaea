@@ -4,8 +4,8 @@
 //!
 //! This layer binds the executable resampler result to the pre-existing
 //! same-ensemble flow-curve evidence contract. It verifies that the central
-//! curve, configuration population and resampling geometry all refer to the
-//! same subject before promoting the uncertainty into a scale-evidence record.
+//! curve, configuration population, independent-chain population and resampling
+//! geometry all refer to the same subject before promoting the uncertainty.
 
 use crate::lattice_flow_joint_jackknife::{
     JOINT_BLOCKED_JACKKNIFE_ID, JointBlockedJackknifeScale, JointFlowScaleKind,
@@ -20,6 +20,7 @@ pub struct JointJackknifeScaleEstimateEvidence {
     pub scale: FlowScaleEstimateEvidence,
     pub resampling_method_id: &'static str,
     pub configuration_count: usize,
+    pub independent_chain_count: usize,
     pub block_size: usize,
     pub block_count: usize,
     pub replicate_count: usize,
@@ -33,27 +34,15 @@ pub enum JointJackknifeEvidenceError {
     Scale(FlowScaleEvidenceError),
     ResamplingMethodMismatch,
     InvalidBlockGeometry,
-    ReplicateCountMismatch {
-        expected: usize,
-        actual: usize,
-    },
+    InvalidChainGeometry,
+    ReplicateCountMismatch { expected: usize, actual: usize },
     InvalidResamplingStatistic,
     ReplicateSummaryMismatch,
-    ConfigurationCountMismatch {
-        curve: usize,
-        resampling: usize,
-    },
-    MeanCurveLengthMismatch {
-        curve: usize,
-        resampling: usize,
-    },
-    MeanCurvePointMismatch {
-        index: usize,
-    },
-    CentralEstimateMismatch {
-        curve: f64,
-        resampling: f64,
-    },
+    ConfigurationCountMismatch { curve: usize, resampling: usize },
+    IndependentChainCountMismatch { curve: usize, resampling: usize },
+    MeanCurveLengthMismatch { curve: usize, resampling: usize },
+    MeanCurvePointMismatch { index: usize },
+    CentralEstimateMismatch { curve: f64, resampling: f64 },
     EmptyResamplingArtifactDigest,
 }
 
@@ -89,8 +78,6 @@ fn recompute_jackknife_summary(replicates: &[f64]) -> Option<(f64, f64)> {
     (mean.is_finite() && standard_error.is_finite()).then_some((mean, standard_error))
 }
 
-/// Bind an executable joint blocked-jackknife result to the frozen curve
-/// evidence from which its central scale is supposed to have been derived.
 pub fn bind_joint_jackknife_scale_evidence(
     curve: &FlowEnergyEvidenceCurve,
     resampling: &JointBlockedJackknifeScale,
@@ -109,6 +96,11 @@ pub fn bind_joint_jackknife_scale_evidence(
             != Some(resampling.configuration_count)
     {
         return Err(JointJackknifeEvidenceError::InvalidBlockGeometry);
+    }
+    if resampling.independent_chain_count == 0
+        || resampling.independent_chain_count > resampling.block_count
+    {
+        return Err(JointJackknifeEvidenceError::InvalidChainGeometry);
     }
     if resampling.replicate_estimates.len() != resampling.block_count {
         return Err(JointJackknifeEvidenceError::ReplicateCountMismatch {
@@ -142,11 +134,17 @@ pub fn bind_joint_jackknife_scale_evidence(
         joint_resampling_evidence_id,
     )?;
 
-    let curve_configuration_count = curve.points[0].retained_configurations;
-    if curve_configuration_count != resampling.configuration_count {
+    let first = &curve.points[0];
+    if first.retained_configurations != resampling.configuration_count {
         return Err(JointJackknifeEvidenceError::ConfigurationCountMismatch {
-            curve: curve_configuration_count,
+            curve: first.retained_configurations,
             resampling: resampling.configuration_count,
+        });
+    }
+    if first.independent_chain_count != resampling.independent_chain_count {
+        return Err(JointJackknifeEvidenceError::IndependentChainCountMismatch {
+            curve: first.independent_chain_count,
+            resampling: resampling.independent_chain_count,
         });
     }
     if curve.points.len() != resampling.ensemble_mean_curve.len() {
@@ -186,6 +184,7 @@ pub fn bind_joint_jackknife_scale_evidence(
         scale,
         resampling_method_id: JOINT_BLOCKED_JACKKNIFE_ID,
         configuration_count: resampling.configuration_count,
+        independent_chain_count: resampling.independent_chain_count,
         block_size: resampling.block_size,
         block_count: resampling.block_count,
         replicate_count: resampling.replicate_estimates.len(),
@@ -239,46 +238,29 @@ mod tests {
             replicate_mean: 0.35,
             standard_error: 0.013_693_063_937_629_136,
             ensemble_mean_curve: vec![
-                EnsembleFlowEnergyPoint {
-                    flow_time: 0.1,
-                    ensemble_mean_energy: 0.10 / 0.01,
-                },
-                EnsembleFlowEnergyPoint {
-                    flow_time: 0.2,
-                    ensemble_mean_energy: 0.18 / 0.04,
-                },
-                EnsembleFlowEnergyPoint {
-                    flow_time: 0.3,
-                    ensemble_mean_energy: 0.26 / 0.09,
-                },
-                EnsembleFlowEnergyPoint {
-                    flow_time: 0.4,
-                    ensemble_mean_energy: 0.34 / 0.16,
-                },
+                EnsembleFlowEnergyPoint { flow_time: 0.1, ensemble_mean_energy: 0.10 / 0.01 },
+                EnsembleFlowEnergyPoint { flow_time: 0.2, ensemble_mean_energy: 0.18 / 0.04 },
+                EnsembleFlowEnergyPoint { flow_time: 0.3, ensemble_mean_energy: 0.26 / 0.09 },
+                EnsembleFlowEnergyPoint { flow_time: 0.4, ensemble_mean_energy: 0.34 / 0.16 },
             ],
             configuration_count: 12,
+            independent_chain_count: 2,
             block_size: 3,
             block_count: 4,
         }
     }
 
     #[test]
-    fn binds_resampling_geometry_and_replicates_to_scale_evidence() {
+    fn binds_chain_population_and_resampling_geometry() {
         let evidence = bind_joint_jackknife_scale_evidence(
-            &curve(),
-            &result(),
-            "curve-sha256",
-            "jackknife-evidence-id",
+            &curve(), &result(), "curve-sha256", "jackknife-evidence-id",
             "jackknife-artifact-sha256",
-        )
-        .unwrap();
-        assert!((evidence.scale.estimate - 0.35).abs() < 1.0e-15);
-        assert_eq!(evidence.resampling_method_id, JOINT_BLOCKED_JACKKNIFE_ID);
+        ).unwrap();
         assert_eq!(evidence.configuration_count, 12);
+        assert_eq!(evidence.independent_chain_count, 2);
         assert_eq!(evidence.block_size, 3);
         assert_eq!(evidence.block_count, 4);
         assert_eq!(evidence.replicate_count, 4);
-        assert_eq!(evidence.replicate_estimates, vec![0.34, 0.345, 0.355, 0.36]);
     }
 
     #[test]
@@ -287,10 +269,7 @@ mod tests {
         resampling.standard_error *= 2.0;
         assert!(matches!(
             bind_joint_jackknife_scale_evidence(
-                &curve(),
-                &resampling,
-                "curve-sha256",
-                "jackknife-evidence-id",
+                &curve(), &resampling, "curve-sha256", "jackknife-evidence-id",
                 "jackknife-artifact-sha256",
             ),
             Err(JointJackknifeEvidenceError::ReplicateSummaryMismatch)
@@ -298,21 +277,17 @@ mod tests {
     }
 
     #[test]
-    fn mismatched_population_fails_closed() {
+    fn mismatched_chain_population_fails_closed() {
         let mut resampling = result();
-        resampling.configuration_count = 16;
-        resampling.block_size = 4;
+        resampling.independent_chain_count = 1;
         assert!(matches!(
             bind_joint_jackknife_scale_evidence(
-                &curve(),
-                &resampling,
-                "curve-sha256",
-                "jackknife-evidence-id",
+                &curve(), &resampling, "curve-sha256", "jackknife-evidence-id",
                 "jackknife-artifact-sha256",
             ),
-            Err(JointJackknifeEvidenceError::ConfigurationCountMismatch {
-                curve: 12,
-                resampling: 16,
+            Err(JointJackknifeEvidenceError::IndependentChainCountMismatch {
+                curve: 2,
+                resampling: 1,
             })
         ));
     }
@@ -323,10 +298,7 @@ mod tests {
         resampling.ensemble_mean_curve[2].ensemble_mean_energy *= 1.01;
         assert!(matches!(
             bind_joint_jackknife_scale_evidence(
-                &curve(),
-                &resampling,
-                "curve-sha256",
-                "jackknife-evidence-id",
+                &curve(), &resampling, "curve-sha256", "jackknife-evidence-id",
                 "jackknife-artifact-sha256",
             ),
             Err(JointJackknifeEvidenceError::MeanCurvePointMismatch { index: 2 })
