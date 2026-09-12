@@ -40,14 +40,18 @@ def require_current_rust_resource_schema(schema: dict[str, Any]) -> str:
     """Require semantics executable by the current Rust resource arithmetic TCB.
 
     The generic v2 schema is intentionally more expressive. The current Rust
-    profile is narrower: u64 quantities, additive accounting, and exact rounding.
+    profile is narrower: u64 quantities, additive accounting, exact rounding,
+    and zero-representable exhaustion for consumptive authority budgets.
     """
 
     schema_id = semantic.require_runtime_bound_resource_schema(schema)
     for dimension in schema["dimensions"]:
         semantic.require(
-            dimension["minimum"] <= CURRENT_RUST_RESOURCE_MAX
-            and dimension["maximum"] <= CURRENT_RUST_RESOURCE_MAX,
+            dimension["minimum"] == 0,
+            "current Rust consumptive budget profile requires zero-representable exhaustion",
+        )
+        semantic.require(
+            dimension["maximum"] <= CURRENT_RUST_RESOURCE_MAX,
             "resource bounds exceed current Rust u64 representation profile",
         )
         semantic.require(

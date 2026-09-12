@@ -195,6 +195,35 @@ class SemanticSchemaTests(unittest.TestCase):
                 {"budget.compute": 11, "budget.energy": 0},
             )
 
+    def test_remaining_vector_must_itself_be_valid_under_scheme(self) -> None:
+        value = resource_schema()
+        for dimension in value["dimensions"]:
+            dimension["minimum"] = 10
+        schema_id = schema.validate_resource_schema(value)
+
+        # Both inputs are individually valid, but subtraction produces 5,
+        # which is below the same scheme's representable minimum.
+        with self.assertRaises(schema.SchemaError):
+            schema.remaining_vector(
+                value,
+                schema_id,
+                {"budget.compute": 20, "budget.energy": 20},
+                {"budget.compute": 15, "budget.energy": 15},
+            )
+
+    def test_zero_remaining_is_valid_when_scheme_represents_zero(self) -> None:
+        value = resource_schema()
+        schema_id = schema.validate_resource_schema(value)
+        self.assertEqual(
+            schema.remaining_vector(
+                value,
+                schema_id,
+                {"budget.compute": 20, "budget.energy": 20},
+                {"budget.compute": 20, "budget.energy": 20},
+            ),
+            {"budget.compute": 0, "budget.energy": 0},
+        )
+
     def test_conservative_transition_envelope_cannot_be_exceeded(self) -> None:
         value = resource_schema()
         schema_id = schema.digest(value)

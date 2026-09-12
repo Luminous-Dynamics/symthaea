@@ -192,6 +192,27 @@ class SchemaAdapterTests(unittest.TestCase):
         with self.assertRaises(semantic.SchemaError):
             adapter.semantic_execution_profile(golden["capability_schema"], too_wide)
 
+    def test_current_rust_resource_profile_requires_zero_representable_exhaustion(self) -> None:
+        golden = json.loads(GOLDEN_V2.read_text())
+
+        zero_minimum = copy.deepcopy(golden["resource_schema"])
+        adapter.require_current_rust_resource_schema(zero_minimum)
+        adapter.resource_rule_table(zero_minimum)
+
+        positive_minimum = copy.deepcopy(golden["resource_schema"])
+        for dimension in positive_minimum["dimensions"]:
+            dimension["minimum"] = 10
+        semantic.validate_resource_schema(positive_minimum)
+
+        with self.assertRaises(semantic.SchemaError):
+            adapter.require_current_rust_resource_schema(positive_minimum)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.resource_rule_table(positive_minimum)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.semantic_execution_profile(
+                golden["capability_schema"], positive_minimum
+            )
+
     def test_current_rust_resource_profile_rejects_unimplemented_arithmetic(self) -> None:
         golden = json.loads(GOLDEN_V2.read_text())
 
