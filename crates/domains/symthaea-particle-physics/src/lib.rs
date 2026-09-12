@@ -20,6 +20,9 @@
 //!   campaign/replica/rank stream coordinates and endpoint-free U(0,1)
 //! - **SU(2) heat-bath sampling**: Kennedy-Pendleton scalar rejection against an
 //!   independently qualified target density, plus an exact Haar scalar fallback
+//! - **Reference SU(3) heat-bath**: five-probe local-force reconstruction,
+//!   Wilson-coupling normalization, force-direction orientation, and one-link
+//!   Cabibbo-Marinari subgroup conditional updates
 //!
 //! ## Natural Units
 //!
@@ -42,6 +45,7 @@ pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_heatbath;
+pub mod lattice_heatbath_su3;
 pub mod lattice_metropolis;
 pub mod lattice_qcd;
 pub mod lattice_rng;
@@ -68,6 +72,12 @@ pub use lattice_gauge::{
 pub use lattice_heatbath::{
     Su2HeatbathError, Su2HeatbathMethod, Su2HeatbathSample,
     draw_kennedy_pendleton_scalar, draw_su2_heatbath_quaternion,
+};
+pub use lattice_heatbath_su3::{
+    Su3SubgroupHeatbathDraw, Su3SubgroupHeatbathError, Su3SubgroupHeatbathForce,
+    Su3SubgroupHeatbathStepResult, draw_su3_subgroup_heatbath_rotation,
+    heatbath_subgroup_step_reference, heatbath_touching_trace_sum,
+    orient_heatbath_quaternion_to_force, probe_su3_subgroup_heatbath_force,
 };
 pub use lattice_metropolis::{
     LatticeMetropolisError, MetropolisStepResult, Su2Subgroup, Su2SubgroupProposal,
