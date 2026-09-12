@@ -109,11 +109,21 @@ impl CgroupV2ResourcePolicy {
         })
     }
 
-    pub fn id(&self) -> &ContentId { &self.id }
-    pub fn memory_max_bytes(&self) -> u64 { self.memory_max_bytes }
-    pub fn pids_max(&self) -> u64 { self.pids_max }
-    pub fn cpu_quota_us(&self) -> u64 { self.cpu_quota_us }
-    pub fn cpu_period_us(&self) -> u64 { self.cpu_period_us }
+    pub fn id(&self) -> &ContentId {
+        &self.id
+    }
+    pub fn memory_max_bytes(&self) -> u64 {
+        self.memory_max_bytes
+    }
+    pub fn pids_max(&self) -> u64 {
+        self.pids_max
+    }
+    pub fn cpu_quota_us(&self) -> u64 {
+        self.cpu_quota_us
+    }
+    pub fn cpu_period_us(&self) -> u64 {
+        self.cpu_period_us
+    }
 
     pub fn validate(&self) -> Result<(), CgroupV2ResourceError> {
         if Self::new(
@@ -147,32 +157,65 @@ pub struct CgroupV2ResourceReceipt {
 }
 
 impl CgroupV2ResourceReceipt {
-    pub fn id(&self) -> &ContentId { &self.id }
-    pub fn policy_id(&self) -> &ContentId { &self.policy_id }
-    pub fn delegation_root(&self) -> &str { &self.delegation_root }
-    pub fn leaf_path(&self) -> &str { &self.leaf_path }
-    pub fn host_pid(&self) -> u32 { self.host_pid }
-    pub fn available_controllers(&self) -> &[String] { &self.available_controllers }
-    pub fn delegated_controllers(&self) -> &[String] { &self.delegated_controllers }
-    pub fn memory_max_bytes(&self) -> u64 { self.memory_max_bytes }
-    pub fn pids_max(&self) -> u64 { self.pids_max }
-    pub fn cpu_quota_us(&self) -> u64 { self.cpu_quota_us }
-    pub fn cpu_period_us(&self) -> u64 { self.cpu_period_us }
-    pub fn proc_membership(&self) -> &str { &self.proc_membership }
+    pub fn id(&self) -> &ContentId {
+        &self.id
+    }
+    pub fn policy_id(&self) -> &ContentId {
+        &self.policy_id
+    }
+    pub fn delegation_root(&self) -> &str {
+        &self.delegation_root
+    }
+    pub fn leaf_path(&self) -> &str {
+        &self.leaf_path
+    }
+    pub fn host_pid(&self) -> u32 {
+        self.host_pid
+    }
+    pub fn available_controllers(&self) -> &[String] {
+        &self.available_controllers
+    }
+    pub fn delegated_controllers(&self) -> &[String] {
+        &self.delegated_controllers
+    }
+    pub fn memory_max_bytes(&self) -> u64 {
+        self.memory_max_bytes
+    }
+    pub fn pids_max(&self) -> u64 {
+        self.pids_max
+    }
+    pub fn cpu_quota_us(&self) -> u64 {
+        self.cpu_quota_us
+    }
+    pub fn cpu_period_us(&self) -> u64 {
+        self.cpu_period_us
+    }
+    pub fn proc_membership(&self) -> &str {
+        &self.proc_membership
+    }
 
-    pub fn validate_for(&self, policy: &CgroupV2ResourcePolicy) -> Result<(), CgroupV2ResourceError> {
+    pub fn validate_for(
+        &self,
+        policy: &CgroupV2ResourcePolicy,
+    ) -> Result<(), CgroupV2ResourceError> {
         policy.validate()?;
         if self.policy_id != *policy.id()
             || self.memory_max_bytes != policy.memory_max_bytes()
             || self.pids_max != policy.pids_max()
             || self.cpu_quota_us != policy.cpu_quota_us()
             || self.cpu_period_us != policy.cpu_period_us()
-            || REQUIRED_CONTROLLERS
-                .iter()
-                .any(|controller| !self.available_controllers.iter().any(|value| value == controller))
-            || REQUIRED_CONTROLLERS
-                .iter()
-                .any(|controller| !self.delegated_controllers.iter().any(|value| value == controller))
+            || REQUIRED_CONTROLLERS.iter().any(|controller| {
+                !self
+                    .available_controllers
+                    .iter()
+                    .any(|value| value == controller)
+            })
+            || REQUIRED_CONTROLLERS.iter().any(|controller| {
+                !self
+                    .delegated_controllers
+                    .iter()
+                    .any(|value| value == controller)
+            })
         {
             return Err(CgroupV2ResourceError::ReceiptIdentityMismatch);
         }
@@ -207,8 +250,12 @@ pub struct CgroupV2ResourceLease {
 }
 
 impl CgroupV2ResourceLease {
-    pub fn receipt(&self) -> &CgroupV2ResourceReceipt { &self.receipt }
-    pub fn leaf_path(&self) -> &Path { &self.leaf_path }
+    pub fn receipt(&self) -> &CgroupV2ResourceReceipt {
+        &self.receipt
+    }
+    pub fn leaf_path(&self) -> &Path {
+        &self.leaf_path
+    }
 
     pub fn cleanup(mut self) -> Result<CgroupV2ResourceReceipt, CgroupV2ResourceError> {
         ensure_unpopulated(&self.leaf_path)?;
@@ -224,11 +271,12 @@ impl CgroupV2ResourceLease {
 impl Drop for CgroupV2ResourceLease {
     fn drop(&mut self) {
         if !self.cleaned {
-            let _ = ensure_unpopulated(&self.leaf_path)
-                .and_then(|_| fs::remove_dir(&self.leaf_path).map_err(|source| CgroupV2ResourceError::Io {
+            let _ = ensure_unpopulated(&self.leaf_path).and_then(|_| {
+                fs::remove_dir(&self.leaf_path).map_err(|source| CgroupV2ResourceError::Io {
                     path: self.leaf_path.clone(),
                     source,
-                }));
+                })
+            });
         }
     }
 }
@@ -265,16 +313,17 @@ pub fn apply_cgroup_v2_resource_policy(
         source,
     })?;
 
-    let admission = configure_and_admit(policy, &root, &leaf, host_pid, &available, &delegated);
-    match admission {
+    match configure_and_admit(policy, &root, &leaf, host_pid, &available, &delegated) {
         Ok(receipt) => Ok(CgroupV2ResourceLease {
             receipt,
             leaf_path: leaf,
             cleaned: false,
         }),
         Err(error) => {
-            let _ = rollback_pid(&root, host_pid);
-            let _ = fs::remove_dir(&leaf);
+            fs::remove_dir(&leaf).map_err(|source| CgroupV2ResourceError::Io {
+                path: leaf,
+                source,
+            })?;
             Err(error)
         }
     }
@@ -307,56 +356,68 @@ fn configure_and_admit(
     }
 
     write_value(&leaf.join("cgroup.procs"), &host_pid.to_string())?;
-    let members = read_text(&leaf.join("cgroup.procs"))?;
-    let process_present = members
-        .lines()
-        .filter_map(|line| line.trim().parse::<u32>().ok())
-        .any(|pid| pid == host_pid);
-    let proc_membership = read_proc_membership(host_pid)?;
-    let expected_membership = cgroup_membership_for_leaf(leaf)?;
-    if !process_present || proc_membership != expected_membership {
-        rollback_pid(root, host_pid)?;
-        return Err(CgroupV2ResourceError::MembershipMismatch);
-    }
 
-    let delegation_root = root.to_string_lossy().into_owned();
-    let leaf_path = leaf.to_string_lossy().into_owned();
-    let id = derive_receipt_id(
-        policy.id(),
-        &delegation_root,
-        &leaf_path,
-        host_pid,
-        available,
-        delegated,
-        memory_max,
-        pids_max,
-        cpu_quota,
-        cpu_period,
-        &proc_membership,
-    );
-    let receipt = CgroupV2ResourceReceipt {
-        id,
-        policy_id: policy.id().clone(),
-        delegation_root,
-        leaf_path,
-        host_pid,
-        available_controllers: available.to_vec(),
-        delegated_controllers: delegated.to_vec(),
-        memory_max_bytes: memory_max,
-        pids_max,
-        cpu_quota_us: cpu_quota,
-        cpu_period_us: cpu_period,
-        proc_membership,
-    };
-    receipt.validate_for(policy)?;
-    Ok(receipt)
+    let post_admission = (|| {
+        let members = read_text(&leaf.join("cgroup.procs"))?;
+        let process_present = members
+            .lines()
+            .filter_map(|line| line.trim().parse::<u32>().ok())
+            .any(|pid| pid == host_pid);
+        let proc_membership = read_proc_membership(host_pid)?;
+        let expected_membership = cgroup_membership_for_leaf(leaf)?;
+        if !process_present || proc_membership != expected_membership {
+            return Err(CgroupV2ResourceError::MembershipMismatch);
+        }
+
+        let delegation_root = root.to_string_lossy().into_owned();
+        let leaf_path = leaf.to_string_lossy().into_owned();
+        let id = derive_receipt_id(
+            policy.id(),
+            &delegation_root,
+            &leaf_path,
+            host_pid,
+            available,
+            delegated,
+            memory_max,
+            pids_max,
+            cpu_quota,
+            cpu_period,
+            &proc_membership,
+        );
+        let receipt = CgroupV2ResourceReceipt {
+            id,
+            policy_id: policy.id().clone(),
+            delegation_root,
+            leaf_path,
+            host_pid,
+            available_controllers: available.to_vec(),
+            delegated_controllers: delegated.to_vec(),
+            memory_max_bytes: memory_max,
+            pids_max,
+            cpu_quota_us: cpu_quota,
+            cpu_period_us: cpu_period,
+            proc_membership,
+        };
+        receipt.validate_for(policy)?;
+        Ok(receipt)
+    })();
+
+    match post_admission {
+        Ok(receipt) => Ok(receipt),
+        Err(error) => {
+            rollback_pid(root, host_pid)?;
+            Err(error)
+        }
+    }
 }
 
 fn canonical_delegation_root(path: &Path) -> Result<PathBuf, CgroupV2ResourceError> {
-    let canonical = path.canonicalize().map_err(|source| CgroupV2ResourceError::Io {
-        path: path.to_path_buf(),
-        source,
-    })?;
+    let canonical = path
+        .canonicalize()
+        .map_err(|source| CgroupV2ResourceError::Io {
+            path: path.to_path_buf(),
+            source,
+        })?;
     let global = Path::new(CGROUP_V2_ROOT);
     if !canonical.starts_with(global) {
         return Err(CgroupV2ResourceError::OutsideCgroupRoot(canonical));
@@ -423,8 +484,7 @@ fn parse_cpu_max(text: &str) -> Result<(u64, u64), CgroupV2ResourceError> {
 fn read_proc_membership(host_pid: u32) -> Result<String, CgroupV2ResourceError> {
     let path = PathBuf::from(format!("/proc/{host_pid}/cgroup"));
     let text = read_text(&path)?;
-    parse_unified_membership(&text)
-        .ok_or(CgroupV2ResourceError::MembershipMismatch)
+    parse_unified_membership(&text).ok_or(CgroupV2ResourceError::MembershipMismatch)
 }
 
 fn parse_unified_membership(text: &str) -> Option<String> {
@@ -445,7 +505,10 @@ fn cgroup_membership_for_leaf(leaf: &Path) -> Result<String, CgroupV2ResourceErr
     let relative = leaf
         .strip_prefix(Path::new(CGROUP_V2_ROOT))
         .map_err(|_| CgroupV2ResourceError::OutsideCgroupRoot(leaf.to_path_buf()))?;
-    Ok(format!("/{}", relative.to_string_lossy().trim_start_matches('/')))
+    Ok(format!(
+        "/{}",
+        relative.to_string_lossy().trim_start_matches('/')
+    ))
 }
 
 fn rollback_pid(root: &Path, host_pid: u32) -> Result<(), CgroupV2ResourceError> {
@@ -512,9 +575,21 @@ fn derive_receipt_id(
         proc_membership.as_bytes().to_vec(),
         (available_controllers.len() as u64).to_be_bytes().to_vec(),
     ];
-    parts.extend(available_controllers.iter().map(|value| value.as_bytes().to_vec()));
-    parts.push((delegated_controllers.len() as u64).to_be_bytes().to_vec());
-    parts.extend(delegated_controllers.iter().map(|value| value.as_bytes().to_vec()));
+    parts.extend(
+        available_controllers
+            .iter()
+            .map(|value| value.as_bytes().to_vec()),
+    );
+    parts.push(
+        (delegated_controllers.len() as u64)
+            .to_be_bytes()
+            .to_vec(),
+    );
+    parts.extend(
+        delegated_controllers
+            .iter()
+            .map(|value| value.as_bytes().to_vec()),
+    );
     ContentId::derive(
         "symthaea.forge-cgroup-v2-resource-receipt.v1",
         parts.iter().map(Vec::as_slice),
@@ -535,7 +610,10 @@ mod tests {
 
     #[test]
     fn cpu_max_parser_is_closed_shape() {
-        assert_eq!(parse_cpu_max("50000 100000\n").unwrap(), (50_000, 100_000));
+        assert_eq!(
+            parse_cpu_max("50000 100000\n").unwrap(),
+            (50_000, 100_000)
+        );
         assert!(parse_cpu_max("max 100000").is_err());
         assert!(parse_cpu_max("50000 100000 extra").is_err());
     }
@@ -555,6 +633,9 @@ mod tests {
         for value in "pids cpu memory cpu".split_whitespace() {
             set.insert(value.to_string());
         }
-        assert_eq!(set.into_iter().collect::<Vec<_>>(), vec!["cpu", "memory", "pids"]);
+        assert_eq!(
+            set.into_iter().collect::<Vec<_>>(),
+            vec!["cpu", "memory", "pids"]
+        );
     }
 }
