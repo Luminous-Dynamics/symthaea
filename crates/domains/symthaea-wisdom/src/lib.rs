@@ -34,6 +34,7 @@ pub mod autopoiesis;
 pub mod harmonics;
 pub mod meta_cognition;
 pub mod ontology;
+pub mod perspective;
 pub mod practical_wisdom;
 
 pub use autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
@@ -44,6 +45,10 @@ pub use meta_cognition::{MetaCognitiveLayer, RecursiveModel, SelfModelAccuracy};
 pub use ontology::{
     ActionAuthority, AffectiveSignal, AffectiveSignalKind, EpistemicState, NormativeValue,
     ReasoningMode,
+};
+pub use perspective::{
+    PerspectiveCoverage, PerspectiveCoverageSummary, PerspectiveError, PerspectiveGraph,
+    PreferenceClaim, PreferenceProvenance, StakeholderId, StakeholderPerspective,
 };
 pub use practical_wisdom::{
     DeliberationContext, PracticalWisdomAssessment, PracticalWisdomKernel, WisdomDisposition,
