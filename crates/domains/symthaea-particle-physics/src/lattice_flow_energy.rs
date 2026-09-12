@@ -12,8 +12,6 @@ use crate::lattice_topology_flow::{LatticeTopologyFlowError, clover_field_streng
 
 pub const CLOVER_FLOW_ENERGY_ID: &str = "symthaea_clover_energy_v1";
 
-const PLANES: [(usize, usize); 6] = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)];
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EnsembleFlowEnergyPoint {
     pub flow_time: f64,
@@ -27,6 +25,7 @@ pub enum FlowEnergyError {
     TooFewPoints { required: usize, actual: usize },
     InvalidTarget(f64),
     NonFinitePoint { index: usize },
+    NonFiniteDerivedValue { index: usize },
     NonPositiveFlowTime { index: usize, value: f64 },
     NegativeMeanEnergy { index: usize, value: f64 },
     NonIncreasingFlowTime {
@@ -126,6 +125,20 @@ fn validate_points(
     Ok(())
 }
 
+fn dimensionless_values(
+    points: &[EnsembleFlowEnergyPoint],
+) -> Result<Vec<f64>, FlowEnergyError> {
+    let mut values = Vec::with_capacity(points.len());
+    for (index, point) in points.iter().enumerate() {
+        let value = point.flow_time * point.flow_time * point.ensemble_mean_energy;
+        if !value.is_finite() {
+            return Err(FlowEnergyError::NonFiniteDerivedValue { index });
+        }
+        values.push(value);
+    }
+    Ok(values)
+}
+
 fn unique_linear_crossing(xs: &[f64], ys: &[f64], target: f64) -> Result<f64, FlowEnergyError> {
     if !target.is_finite() || target <= 0.0 {
         return Err(FlowEnergyError::InvalidTarget(target));
@@ -165,14 +178,11 @@ pub fn dimensionless_flow_energy_curve(
     points: &[EnsembleFlowEnergyPoint],
 ) -> Result<Vec<(f64, f64)>, FlowEnergyError> {
     validate_points(points, 2)?;
+    let values = dimensionless_values(points)?;
     Ok(points
         .iter()
-        .map(|point| {
-            (
-                point.flow_time,
-                point.flow_time * point.flow_time * point.ensemble_mean_energy,
-            )
-        })
+        .zip(values)
+        .map(|(point, value)| (point.flow_time, value))
         .collect())
 }
 
@@ -199,17 +209,18 @@ pub fn w0_like_from_ensemble_mean(
     if !target.is_finite() || target <= 0.0 {
         return Err(FlowEnergyError::InvalidTarget(target));
     }
-    let curve = points
-        .iter()
-        .map(|point| point.flow_time * point.flow_time * point.ensemble_mean_energy)
-        .collect::<Vec<_>>();
+    let curve = dimensionless_values(points)?;
     let mut times = Vec::with_capacity(points.len() - 2);
     let mut response = Vec::with_capacity(points.len() - 2);
     for index in 1..(points.len() - 1) {
         let derivative = (curve[index + 1] - curve[index - 1])
             / (points[index + 1].flow_time - points[index - 1].flow_time);
+        let value = points[index].flow_time * derivative;
+        if !value.is_finite() {
+            return Err(FlowEnergyError::NonFiniteDerivedValue { index });
+        }
         times.push(points[index].flow_time);
-        response.push(points[index].flow_time * derivative);
+        response.push(value);
     }
     let t_cross = unique_linear_crossing(&times, &response, target)?;
     if t_cross <= 0.0 {
@@ -281,12 +292,12 @@ mod tests {
     #[test]
     fn exact_sampled_crossing_is_not_double_counted() {
         let points = [
-            EnsembleFlowEnergyPoint { flow_time: 0.1, ensemble_mean_energy: 10.0 },
-            EnsembleFlowEnergyPoint { flow_time: 0.2, ensemble_mean_energy: 5.0 },
-            EnsembleFlowEnergyPoint { flow_time: 0.3, ensemble_mean_energy: 0.4 / 0.09 },
+            EnsembleFlowEnergyPoint { flow_time: 0.25, ensemble_mean_energy: 1.6 },
+            EnsembleFlowEnergyPoint { flow_time: 0.5, ensemble_mean_energy: 0.8 },
+            EnsembleFlowEnergyPoint { flow_time: 1.0, ensemble_mean_energy: 0.4 },
         ];
-        // t^2<E> = [0.1, 0.2, 0.4].
-        assert_eq!(t0_like_from_ensemble_mean(&points, 0.2).unwrap(), 0.2);
+        // t^2<E> = [0.1, 0.2, 0.4], with the middle product bitwise equal to 0.2.
+        assert_eq!(t0_like_from_ensemble_mean(&points, 0.2).unwrap(), 0.5);
     }
 
     #[test]
@@ -321,6 +332,18 @@ mod tests {
         assert!(matches!(
             t0_like_from_ensemble_mean(&points, 0.3),
             Err(FlowEnergyError::AmbiguousCrossing { count: 2 })
+        ));
+    }
+
+    #[test]
+    fn derived_overflow_fails_closed() {
+        let points = [
+            EnsembleFlowEnergyPoint { flow_time: 1.0, ensemble_mean_energy: 1.0 },
+            EnsembleFlowEnergyPoint { flow_time: f64::MAX / 2.0, ensemble_mean_energy: 4.0 },
+        ];
+        assert!(matches!(
+            dimensionless_flow_energy_curve(&points),
+            Err(FlowEnergyError::NonFiniteDerivedValue { index: 1 })
         ));
     }
 }
