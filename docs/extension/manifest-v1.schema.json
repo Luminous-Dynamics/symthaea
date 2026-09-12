@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/symthaea-extension-manifest-v1.schema.json",
+  "title": "Symthaea Extension Manifest v1",
+  "description": "Portable structural schema for Symthaea extension manifests. Runtime semantic validation remains authoritative.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "kind", "runtime"],
+  "properties": {
+    "id": { "$ref": "#/$defs/namespacedId" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "minLength": 1 },
+    "abi": { "$ref": "#/$defs/abi" },
+    "kind": {
+      "enum": [
+        "domain",
+        "cognitive_subsystem",
+        "tool",
+        "perception",
+        "action",
+        "simulation",
+        "embodiment",
+        "bridge",
+        "model",
+        "knowledge_pack",
+        "skill_pack",
+        "visualization",
+        "other"
+      ]
+    },
+    "runtime": { "enum": ["native", "wasm", "remote", "data_only"] },
+    "description": { "type": "string" },
+    "provides": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "requires": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/namespacedId" },
+      "uniqueItems": true
+    },
+    "permissions": { "$ref": "#/$defs/permissions" },
+    "resources": { "$ref": "#/$defs/resources" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "runtime": { "const": "data_only" } },
+        "required": ["runtime"]
+      },
+      "then": {
+        "properties": {
+          "permissions": { "$ref": "#/$defs/zeroAuthorityPermissions" },
+          "provides": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/capability" },
+                {
+                  "properties": { "effect": { "const": "pure" } }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "resources": { "$ref": "#/$defs/executableResources" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "namespacedId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)+$"
+    },
+    "abi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["major", "minor"],
+      "properties": {
+        "major": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "minor": { "type": "integer", "minimum": 0, "maximum": 65535 }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "$ref": "#/$defs/namespacedId" },
+        "description": { "type": "string", "minLength": 1 },
+        "effect": {
+          "enum": ["pure", "read_only", "side_effecting", "safety_critical"]
+        }
+      }
+    },
+    "networkPermission": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": { "mode": { "const": "none" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "hosts"],
+          "properties": {
+            "mode": { "const": "allowlist" },
+            "hosts": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": { "mode": { "const": "unrestricted" } }
+        }
+      ]
+    },
+    "filesystemPermission": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": { "mode": { "const": "none" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "paths"],
+          "properties": {
+            "mode": { "const": "read_only" },
+            "paths": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "paths"],
+          "properties": {
+            "mode": { "const": "read_write" },
+            "paths": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            }
+          }
+        }
+      ]
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "network": { "$ref": "#/$defs/networkPermission" },
+        "filesystem": { "$ref": "#/$defs/filesystemPermission" },
+        "gpu": { "type": "boolean" },
+        "wall_clock": { "type": "boolean" },
+        "randomness": { "type": "boolean" },
+        "sensors": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "actuators": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "zeroAuthorityPermissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": { "mode": { "const": "none" } }
+        },
+        "filesystem": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": { "mode": { "const": "none" } }
+        },
+        "gpu": { "const": false },
+        "wall_clock": { "const": false },
+        "randomness": { "const": false },
+        "sensors": { "type": "array", "maxItems": 0 },
+        "actuators": { "type": "array", "maxItems": 0 }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_bytes",
+        "fuel",
+        "max_wall_time_ms",
+        "max_output_bytes",
+        "max_concurrency"
+      ],
+      "properties": {
+        "memory_bytes": { "type": "integer", "minimum": 0 },
+        "fuel": { "type": "integer", "minimum": 0 },
+        "max_wall_time_ms": { "type": "integer", "minimum": 0 },
+        "max_output_bytes": { "type": "integer", "minimum": 0 },
+        "max_concurrency": { "type": "integer", "minimum": 0, "maximum": 65535 }
+      }
+    },
+    "executableResources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "memory_bytes",
+        "fuel",
+        "max_wall_time_ms",
+        "max_output_bytes",
+        "max_concurrency"
+      ],
+      "properties": {
+        "memory_bytes": { "type": "integer", "minimum": 1 },
+        "fuel": { "type": "integer", "minimum": 1 },
+        "max_wall_time_ms": { "type": "integer", "minimum": 1 },
+        "max_output_bytes": { "type": "integer", "minimum": 1 },
+        "max_concurrency": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    }
+  }
+}
