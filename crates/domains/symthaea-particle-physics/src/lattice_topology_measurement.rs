@@ -141,6 +141,7 @@ pub enum FlowedTopologyMeasurementError {
     InvalidFlowStep(f64),
     InvalidGradientEpsilon(f64),
     NonFiniteFlowTime,
+    ForceEvaluationOverflow,
     ActionIncreased {
         step: usize,
         before: f64,
@@ -253,7 +254,7 @@ pub fn measure_flowed_clover_topology_rk3(
         max_determinant_error = max_determinant_error.max(stats.flow.max_determinant_error);
         force_evaluations = force_evaluations
             .checked_add(stats.force_evaluations)
-            .ok_or(FlowedTopologyMeasurementError::NonFiniteFlowTime)?;
+            .ok_or(FlowedTopologyMeasurementError::ForceEvaluationOverflow)?;
     }
 
     Ok(Rk3FlowedTopologyMeasurement {
