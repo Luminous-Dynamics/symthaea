@@ -163,6 +163,13 @@ pub fn execute_governed_episodic_memory_clear<P: ExecutionJournalPersistence>(
     >,
     GovernedEpisodicMemoryClearError<P::Error>,
 > {
+    // Deterministic configuration/scope failures happen before `Prepared` is written. They are not
+    // execution ambiguity and must not pollute crash-recovery state as "in doubt".
+    validate_target_id(expected_target_id)
+        .map_err(GovernedEpisodicMemoryClearError::Configuration)?;
+    validate_scope(permit.action(), permit.target_id(), expected_target_id)
+        .map_err(GovernedEpisodicMemoryClearError::Configuration)?;
+
     let mut executor = EpisodicMemoryClearExecutor::new(expected_target_id, memory, unix_s)
         .map_err(GovernedEpisodicMemoryClearError::Configuration)?;
 
