@@ -18,12 +18,14 @@ from typing import Any
 
 CAPABILITY_SCHEMA_TAG = "symthaea.rsk.capability-schema.v1"
 RESOURCE_SCHEMA_TAG = "symthaea.rsk.resource-accounting-schema.v1"
+RESOURCE_SCHEMA_TAG_V2 = "symthaea.rsk.resource-accounting-schema.v2"
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
+MAX_RUNTIME_DIMENSION_ID = 0xFFFF
 
 
 class SchemaError(ValueError):
-    """Raised when a semantic schema/value violates the v0.1 reference profile."""
+    """Raised when a semantic schema/value violates the reference profile."""
 
 
 def require(condition: bool, message: str) -> None:
@@ -53,7 +55,7 @@ def _validate_json_value(value: Any, path: str = "$") -> None:
 
 
 def canonical_bytes(value: Any) -> bytes:
-    """Return the frozen v0.1 canonical JSON byte profile."""
+    """Return the frozen canonical JSON byte profile."""
 
     _validate_json_value(value)
     return json.dumps(
@@ -65,7 +67,7 @@ def canonical_bytes(value: Any) -> bytes:
 
 
 def digest(value: Any) -> str:
-    """SHA-256 of the v0.1 canonical byte representation."""
+    """SHA-256 of the canonical byte representation."""
 
     return hashlib.sha256(canonical_bytes(value)).hexdigest()
 
@@ -192,14 +194,47 @@ def validate_capability_set(
     )
 
 
+def _validate_resource_dimension_common(dimension: dict[str, Any]) -> None:
+    _require_id(dimension["id"], "dimension.id")
+    _require_id(dimension["unit"], "dimension.unit")
+    for key in ("scale", "minimum", "maximum"):
+        require(
+            isinstance(dimension[key], int)
+            and not isinstance(dimension[key], bool),
+            f"dimension.{key} must be integer",
+        )
+    require(
+        dimension["minimum"] >= 0
+        and dimension["maximum"] >= dimension["minimum"],
+        "dimension bounds invalid",
+    )
+    require(
+        isinstance(dimension["required"], bool),
+        "dimension.required must be bool",
+    )
+    require(
+        dimension["rounding"] in {"exact", "floor-remaining", "ceil-consumed"},
+        "unsupported rounding policy",
+    )
+    require(
+        dimension["aggregation"] in {"sum", "max"},
+        "unsupported aggregation policy",
+    )
+
+
 def validate_resource_schema(schema: dict[str, Any]) -> str:
-    """Validate a resource-accounting scheme and return its canonical digest."""
+    """Validate v1/v2 resource accounting and return its canonical digest.
+
+    v1 is retained only so historical/reference evidence remains interpretable.
+    Production-target runtime dimension binding requires v2 via
+    `require_runtime_bound_resource_schema`.
+    """
 
     require(isinstance(schema, dict), "resource schema must be an object")
     required = {"schema", "family", "version", "dimensions"}
     require(set(schema) == required, "resource schema fields mismatch")
     require(
-        schema["schema"] == RESOURCE_SCHEMA_TAG,
+        schema["schema"] in {RESOURCE_SCHEMA_TAG, RESOURCE_SCHEMA_TAG_V2},
         "unsupported resource schema tag",
     )
     _require_id(schema["family"], "family")
@@ -216,58 +251,66 @@ def validate_resource_schema(schema: dict[str, Any]) -> str:
         "dimensions must be nonempty list",
     )
     dimension_ids: list[str] = []
+    numeric_ids: list[int] = []
+    is_v2 = schema["schema"] == RESOURCE_SCHEMA_TAG_V2
+    expected_fields = {
+        "id",
+        "unit",
+        "scale",
+        "minimum",
+        "maximum",
+        "required",
+        "rounding",
+        "aggregation",
+    }
+    if is_v2:
+        expected_fields = set(expected_fields)
+        expected_fields.add("numeric_id")
+
     for dimension in dimensions:
         require(isinstance(dimension, dict), "dimension must be object")
-        require(
-            set(dimension)
-            == {
-                "id",
-                "unit",
-                "scale",
-                "minimum",
-                "maximum",
-                "required",
-                "rounding",
-                "aggregation",
-            },
-            "dimension fields mismatch",
-        )
-        dimension_ids.append(_require_id(dimension["id"], "dimension.id"))
-        _require_id(dimension["unit"], "dimension.unit")
-        for key in ("scale", "minimum", "maximum"):
+        require(set(dimension) == expected_fields, "dimension fields mismatch")
+        _validate_resource_dimension_common(dimension)
+        dimension_ids.append(dimension["id"])
+        if is_v2:
+            numeric_id = dimension["numeric_id"]
             require(
-                isinstance(dimension[key], int)
-                and not isinstance(dimension[key], bool),
-                f"dimension.{key} must be integer",
+                isinstance(numeric_id, int)
+                and not isinstance(numeric_id, bool)
+                and 0 <= numeric_id <= MAX_RUNTIME_DIMENSION_ID,
+                "dimension.numeric_id out of u16 range",
             )
-        require(
-            dimension["minimum"] >= 0
-            and dimension["maximum"] >= dimension["minimum"],
-            "dimension bounds invalid",
-        )
-        require(
-            isinstance(dimension["required"], bool),
-            "dimension.required must be bool",
-        )
-        require(
-            dimension["rounding"]
-            in {"exact", "floor-remaining", "ceil-consumed"},
-            "unsupported rounding policy",
-        )
-        require(
-            dimension["aggregation"] in {"sum", "max"},
-            "unsupported aggregation policy",
-        )
+            numeric_ids.append(numeric_id)
 
     require(dimension_ids == sorted(dimension_ids), "dimensions must be sorted by id")
     require(len(dimension_ids) == len(set(dimension_ids)), "duplicate dimension id")
+    if is_v2:
+        require(len(numeric_ids) == len(set(numeric_ids)), "duplicate numeric dimension id")
     return digest(schema)
+
+
+def require_runtime_bound_resource_schema(schema: dict[str, Any]) -> str:
+    """Require the production-target resource profile that commits runtime IDs."""
+
+    actual = validate_resource_schema(schema)
+    require(
+        schema["schema"] == RESOURCE_SCHEMA_TAG_V2,
+        "resource schema does not commit runtime numeric dimension IDs",
+    )
+    return actual
+
+
+def resource_runtime_dimension_map(schema: dict[str, Any]) -> dict[str, int]:
+    """Return the exact semantic-id -> runtime-id mapping committed by v2 bytes."""
+
+    require_runtime_bound_resource_schema(schema)
+    return {dimension["id"]: dimension["numeric_id"] for dimension in schema["dimensions"]}
 
 
 def validate_resource_vector(
     schema: dict[str, Any], schema_id: str, amounts: dict[str, int]
 ) -> None:
-    """Validate one exact resource vector under one exact accounting scheme."""
+    """Validate one exact semantic-name resource vector under one scheme."""
 
     actual = validate_resource_schema(schema)
     require(
@@ -297,6 +340,55 @@ def validate_resource_vector(
             dimension["minimum"] <= amount <= dimension["maximum"],
             f"{key}: amount out of bounds",
         )
+
+
+def validate_numeric_resource_vector(
+    schema: dict[str, Any], schema_id: str, quantities: list[dict[str, int]]
+) -> None:
+    """Validate the numeric-ID vector shape consumed by the Rust semantic TCB."""
+
+    actual = require_runtime_bound_resource_schema(schema)
+    require(
+        isinstance(schema_id, str) and HEX64.fullmatch(schema_id) is not None,
+        "scheme_id must be lowercase SHA-256 hex",
+    )
+    require(actual == schema_id, "resource scheme digest mismatch")
+    require(isinstance(quantities, list) and quantities, "quantities must be nonempty list")
+
+    by_numeric = {dimension["numeric_id"]: dimension for dimension in schema["dimensions"]}
+    seen: list[int] = []
+    for quantity in quantities:
+        require(isinstance(quantity, dict), "quantity must be object")
+        require(set(quantity) == {"numeric_id", "amount"}, "quantity fields mismatch")
+        numeric_id = quantity["numeric_id"]
+        amount = quantity["amount"]
+        require(
+            isinstance(numeric_id, int)
+            and not isinstance(numeric_id, bool)
+            and 0 <= numeric_id <= MAX_RUNTIME_DIMENSION_ID,
+            "quantity.numeric_id out of u16 range",
+        )
+        require(numeric_id in by_numeric, "unknown runtime numeric dimension ID")
+        require(
+            isinstance(amount, int) and not isinstance(amount, bool),
+            "quantity amount must be integer",
+        )
+        dimension = by_numeric[numeric_id]
+        require(
+            dimension["minimum"] <= amount <= dimension["maximum"],
+            "quantity amount out of bounds",
+        )
+        seen.append(numeric_id)
+
+    require(seen == sorted(seen), "numeric resource vector must be sorted by numeric_id")
+    require(len(seen) == len(set(seen)), "duplicate runtime numeric dimension ID")
+    required = {
+        dimension["numeric_id"]
+        for dimension in schema["dimensions"]
+        if dimension["required"]
+    }
+    missing = required - set(seen)
+    require(not missing, f"missing required runtime numeric dimensions: {sorted(missing)}")
 
 
 def remaining_vector(
