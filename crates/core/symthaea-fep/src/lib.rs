@@ -145,6 +145,7 @@ pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
 mod motor;
+pub mod prediction_session;
 mod td_learning;
 pub mod types;
 
@@ -175,6 +176,11 @@ pub use agent::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
 pub use motor::MotorSystem;
 
 pub use bridge::{CognitiveLoopFEPBridge, EnhancedFEPBridge};
+
+pub use prediction_session::{
+    FEP_PREDICTION_SNAPSHOT_REVISION, FepEvaluationSnapshot, FepPredictionSession,
+    FepPredictionSessionError,
+};
 
 pub use markov_blanket::{
     BlanketPermeability, BlanketTelemetry, MarkovBoundaryOperator, MarkovPartition,
