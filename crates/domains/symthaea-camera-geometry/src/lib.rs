@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 pub struct PinholeCalibration {
     pub schema_version: String,
     pub calibration_id: String,
+    /// Exact optical coordinate frame to which these intrinsics apply.
+    pub camera_frame_id: String,
     /// Durable reference to the calibration manifest/evidence object.
     pub calibration_ref: String,
     pub image_width_px: u32,
@@ -36,6 +38,7 @@ impl PinholeCalibration {
     pub fn validate(&self) -> bool {
         !self.schema_version.trim().is_empty()
             && !self.calibration_id.trim().is_empty()
+            && !self.camera_frame_id.trim().is_empty()
             && !self.calibration_ref.trim().is_empty()
             && self.image_width_px > 0
             && self.image_height_px > 0
@@ -116,6 +119,7 @@ impl PinholeCalibration {
             elevation_deg: elevation_rad.to_degrees(),
             one_sigma_error_deg: angular_sigma_rad.to_degrees(),
             calibration_id: self.calibration_id.clone(),
+            camera_frame_id: self.camera_frame_id.clone(),
             calibration_ref: self.calibration_ref.clone(),
             evidence_refs: self.evidence_refs.clone(),
             observed_at_ms,
@@ -133,6 +137,7 @@ pub struct CalibratedBearing {
     pub elevation_deg: f64,
     pub one_sigma_error_deg: f64,
     pub calibration_id: String,
+    pub camera_frame_id: String,
     pub calibration_ref: String,
     pub evidence_refs: Vec<String>,
     pub observed_at_ms: u64,
@@ -147,6 +152,7 @@ impl CalibratedBearing {
             && self.one_sigma_error_deg.is_finite()
             && self.one_sigma_error_deg >= 0.0
             && !self.calibration_id.trim().is_empty()
+            && !self.camera_frame_id.trim().is_empty()
             && !self.calibration_ref.trim().is_empty()
             && !self.evidence_refs.is_empty()
             && self.evidence_refs.iter().all(|value| !value.trim().is_empty())
@@ -176,6 +182,7 @@ mod tests {
         PinholeCalibration {
             schema_version: "1".into(),
             calibration_id: "cam-a-2026-09".into(),
+            camera_frame_id: "camera-a-optical".into(),
             calibration_ref: "calibration:cam-a:blake3:example".into(),
             image_width_px: 1920,
             image_height_px: 1080,
@@ -199,6 +206,7 @@ mod tests {
         assert!(bearing.azimuth_deg.abs() < 1e-12);
         assert!(bearing.elevation_deg.abs() < 1e-12);
         assert!(bearing.one_sigma_error_deg > 0.0);
+        assert_eq!(bearing.camera_frame_id, "camera-a-optical");
         assert!(!bearing.grants_physical_authority());
     }
 
@@ -257,6 +265,13 @@ mod tests {
     fn missing_calibration_evidence_is_invalid() {
         let mut calibration = calibration();
         calibration.evidence_refs.clear();
+        assert!(!calibration.validate());
+    }
+
+    #[test]
+    fn missing_camera_frame_binding_is_invalid() {
+        let mut calibration = calibration();
+        calibration.camera_frame_id.clear();
         assert!(!calibration.validate());
     }
 }
