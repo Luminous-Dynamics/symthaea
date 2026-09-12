@@ -8,13 +8,52 @@ Lie-Euler descent step. It is not the production flow implementation.
 """
 
 import math
-import random
 
 DIMS = (2, 2, 2, 2)
 FLOW_DT = 1.0e-3
 GRAD_EPS = 2.0e-6
-FIXTURE_SEED = 140
-FIXTURE_OPS = 40
+FIXTURE_OPS = [
+    ((0, 0, 1, 0), 0, 3, -0.5819354339098058),
+    ((0, 1, 1, 1), 0, 2, -0.32393958624710995),
+    ((0, 1, 1, 1), 0, 6, -0.1250464331865352),
+    ((1, 0, 1, 0), 1, 2, 0.19161237542499698),
+    ((0, 1, 0, 1), 1, 2, 0.22983089548025992),
+    ((1, 0, 1, 1), 1, 3, 0.4032003002590304),
+    ((1, 1, 1, 1), 3, 5, 0.5114974521920254),
+    ((1, 1, 1, 1), 2, 4, -0.09168927490735845),
+    ((1, 1, 1, 0), 1, 6, -0.4726273806149346),
+    ((0, 1, 0, 0), 2, 2, 0.3411282616087933),
+    ((1, 1, 0, 0), 3, 3, -0.341627594608156),
+    ((1, 0, 1, 1), 2, 5, -0.11361497865301007),
+    ((1, 0, 1, 0), 1, 4, 0.003219526879812973),
+    ((0, 1, 1, 1), 3, 1, 0.2092875716255429),
+    ((0, 0, 1, 1), 1, 0, -0.2872940926296875),
+    ((1, 0, 1, 1), 1, 3, -0.33032520366686874),
+    ((1, 1, 1, 0), 3, 1, 0.5401678740668779),
+    ((0, 0, 1, 0), 2, 2, 0.31304313667691264),
+    ((1, 1, 0, 0), 0, 1, 0.2375215627437346),
+    ((0, 1, 0, 0), 0, 0, 0.3958604638855575),
+    ((1, 1, 0, 0), 0, 5, -0.42942950746005015),
+    ((1, 1, 1, 1), 2, 6, 0.5455840065263183),
+    ((1, 0, 0, 0), 2, 3, 0.017115673418346744),
+    ((1, 0, 0, 1), 1, 2, 0.13107989509472173),
+    ((1, 0, 1, 1), 1, 7, -0.4551702244963054),
+    ((1, 0, 0, 0), 0, 0, -0.5395094927947152),
+    ((1, 1, 1, 1), 2, 2, 0.3670444298654235),
+    ((0, 0, 0, 0), 2, 6, -0.24861863368491577),
+    ((1, 1, 1, 1), 2, 3, 0.335177509798799),
+    ((0, 1, 1, 1), 2, 5, 0.5656866202369394),
+    ((1, 1, 1, 1), 2, 2, 0.47986932117951764),
+    ((1, 0, 0, 0), 3, 4, 0.013402168869181441),
+    ((0, 0, 0, 1), 2, 4, 0.10603947222843657),
+    ((0, 1, 0, 0), 2, 0, 0.23018975518126505),
+    ((0, 0, 0, 0), 1, 0, 0.19239685997822842),
+    ((1, 0, 1, 0), 0, 6, -0.08507387388380139),
+    ((1, 1, 0, 0), 0, 2, -0.22404873035871248),
+    ((1, 0, 1, 0), 3, 0, -0.35908049548949106),
+    ((1, 1, 0, 0), 0, 6, 0.07694552778636243),
+    ((1, 0, 0, 0), 0, 5, -0.12989873801836926),
+]
 
 
 def eye3():
@@ -206,13 +245,8 @@ def clover_topological_charge(field, dims):
 
 
 def deterministic_fixture(dims):
-    rng = random.Random(FIXTURE_SEED)
     field = identity_field(dims)
-    for _ in range(FIXTURE_OPS):
-        site = tuple(rng.randrange(extent) for extent in dims)
-        mu = rng.randrange(4)
-        generator = rng.randrange(8)
-        theta = rng.uniform(-0.6, 0.6)
+    for site, mu, generator, theta in FIXTURE_OPS:
         updated = mul(su3_rotation(generator, theta), link(field, dims, site, mu))
         set_link(field, dims, site, mu, updated)
     return field
@@ -236,7 +270,6 @@ def gauge_transform(field, dims):
 
 
 def finite_difference_gradient(field, dims, epsilon=GRAD_EPS):
-    """Wilson-action gradient components along exp(i theta lambda_a) U."""
     gradient = {}
     for site in sites(dims):
         for mu in range(4):
@@ -254,7 +287,6 @@ def finite_difference_gradient(field, dims, epsilon=GRAD_EPS):
 
 
 def finite_difference_wilson_flow_step(field, dims, dt=FLOW_DT, epsilon=GRAD_EPS):
-    """One simultaneous Lie-Euler descent step of the Wilson action."""
     gradient = finite_difference_gradient(field, dims, epsilon)
     updated = field_copy(field)
     for (site, mu), components in gradient.items():
