@@ -28,6 +28,8 @@
 //!   sizes with caller-declared uncertainty-plateau tolerances
 //! - **Ensemble promotion evidence**: explicit composition of block stability,
 //!   burn-in sensitivity, rank/folded R-hat, ESS and topology diagnostics
+//! - **Qualification preregistration**: bit-exact policy manifests frozen before
+//!   analysis to prevent post-hoc threshold changes from masquerading as evidence
 //! - **Scale evidence**: same-ensemble flow curves whose derived uncertainty
 //!   must bind joint resampling across the correlated flow-time trajectory
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
@@ -60,6 +62,7 @@ pub mod lattice_flow_scale_evidence;
 pub mod lattice_flow_scale_stability;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
+pub mod lattice_qualification_preregistration;
 mod lattice_su3_lie;
 pub mod lattice_topology_flow;
 pub mod lattice_topology_flow_rk3;
@@ -115,6 +118,11 @@ pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
     su3_determinant_error, su3_diagonal, su3_identity, su3_mul, su3_trace,
     su3_unitarity_error, validate_su3,
+};
+pub use lattice_qualification_preregistration::{
+    QUALIFICATION_POLICY_MANIFEST_ID, EnsembleQualificationPolicyManifest,
+    PredeclaredQualificationBinding, QualificationPreregistrationError,
+    bind_predeclared_qualification_policy,
 };
 pub use lattice_topology_flow::{
     LatticeTopologyFlowError, ReferenceFlowStepStats, clover_field_strength, clover_sum,
