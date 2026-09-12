@@ -13,4 +13,5 @@ mod permit;
 
 pub use permit::*;
 
+pub mod authority_evidence_binding;
 pub mod evidence_context;
