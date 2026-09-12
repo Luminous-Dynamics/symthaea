@@ -2,9 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Source-level ETK-3C authority-surface non-regression ratchet.
 
+fn production_source() -> String {
+    [
+        include_str!("../src/lib.rs"),
+        include_str!("../src/canonical.rs"),
+        include_str!("../src/context.rs"),
+        include_str!("../src/analysis.rs"),
+        include_str!("../src/authority.rs"),
+    ]
+    .join("\n")
+}
+
 #[test]
 fn analytical_trust_crate_cannot_mutate_legacy_obligation_authority() {
-    let source = include_str!("../src/lib.rs");
+    let source = production_source();
 
     assert!(source.contains("EvidenceKind::Analysis"));
     assert!(!source.contains("EvidenceKind::Simulation"));
@@ -16,40 +27,51 @@ fn analytical_trust_crate_cannot_mutate_legacy_obligation_authority() {
 }
 
 #[test]
-fn authority_ids_remain_one_way_capabilities() {
-    let source = include_str!("../src/lib.rs");
-    let authority_start = source
-        .find("macro_rules! authority_id")
-        .expect("authority-id macro must remain explicit");
-    let authority_tail = &source[authority_start..];
-    let authority_end = authority_tail
-        .find("premise_id!(SubjectRevisionIdV1)")
-        .expect("premise declarations must follow authority macro");
-    let authority_macro = &authority_tail[..authority_end];
+fn authority_and_semantic_ids_remain_one_way() {
+    let canonical = include_str!("../src/canonical.rs");
+    let semantic_start = canonical
+        .find("macro_rules! semantic_id")
+        .expect("semantic-id macro must remain explicit");
+    let semantic_tail = &canonical[semantic_start..];
+    let semantic_end = semantic_tail
+        .find("premise_id!(ModelQualificationRecordDigestV1)")
+        .expect("premise declarations must follow semantic-id macro");
+    let semantic_macro = &semantic_tail[..semantic_end];
 
-    assert!(authority_macro.contains("fn from_digest"));
-    assert!(!authority_macro.contains("pub fn parse"));
-    assert!(!source.contains("Deserialize"));
+    assert!(semantic_macro.contains("pub(crate) fn from_digest"));
+    assert!(!semantic_macro.contains("pub fn parse"));
+    assert!(!canonical.contains("premise_id!(SubjectRevisionIdV1)"));
+    assert!(!canonical.contains("premise_id!(TwinRevisionIdV1)"));
+    assert!(!canonical.contains("premise_id!(ValidityDomainRevisionIdV1)"));
+    assert!(!canonical.contains("premise_id!(CurrentnessAssertionIdV1)"));
+    assert!(!production_source().contains("Deserialize"));
 }
 
 #[test]
-fn authority_ladder_remains_explicit() {
-    let source = include_str!("../src/lib.rs");
+fn context_must_be_derived_from_explicit_semantic_records() {
+    let context = include_str!("../src/context.rs");
+    let authority = include_str!("../src/authority.rs");
 
-    for boundary in [
-        "AcceptedAnalysisRequirementV1",
-        "NativeAnalyticalPlanV1",
-        "AdmittedAnalyticalEvidenceV1",
-        "NativeAnalyticalDischargeReceiptV1",
-        "CurrentNativeAnalyticalDischargeFactV1",
+    for schema in [
+        "symthaea.etk-engineering-subject.v1",
+        "symthaea.etk-twin-revision.v1",
+        "symthaea.etk-validity-domain.v1",
+        "symthaea.etk-currentness-assertion.v1",
     ] {
-        assert!(source.contains(boundary), "missing authority boundary: {boundary}");
+        assert!(context.contains(schema), "missing semantic context schema: {schema}");
     }
+
+    assert!(authority.contains("subject: &SubjectRevisionV1"));
+    assert!(authority.contains("twin: &TwinRevisionV1"));
+    assert!(authority.contains("validity_domain: &ValidityDomainRevisionV1"));
+    assert!(authority.contains("currentness: &CurrentnessAssertionV1"));
+    assert!(authority.contains("ValidityContextMismatch"));
+    assert!(authority.contains("CurrentnessContextMismatch"));
 }
 
 #[test]
 fn exact_input_equations_and_requirement_policy_link_cannot_silently_disappear() {
-    let source = include_str!("../src/lib.rs");
+    let source = production_source();
 
     for theorem in [
         "PolicyDoesNotDischargeRequirement",
@@ -61,7 +83,23 @@ fn exact_input_equations_and_requirement_policy_link_cannot_silently_disappear()
         "expected_max_deflection_m",
         "AnalyticalEquationMismatch",
         "conservative_stress_pa",
+        "conservative_factor_of_safety",
     ] {
         assert!(source.contains(theorem), "missing ETK-3C theorem: {theorem}");
+    }
+}
+
+#[test]
+fn authority_ladder_remains_explicit() {
+    let source = production_source();
+
+    for boundary in [
+        "AcceptedAnalysisRequirementV1",
+        "NativeAnalyticalPlanV1",
+        "AdmittedAnalyticalEvidenceV1",
+        "NativeAnalyticalDischargeReceiptV1",
+        "CurrentNativeAnalyticalDischargeFactV1",
+    ] {
+        assert!(source.contains(boundary), "missing authority boundary: {boundary}");
     }
 }
