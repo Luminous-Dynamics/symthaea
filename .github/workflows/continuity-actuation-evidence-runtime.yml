@@ -22,6 +22,7 @@ env:
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
   UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
   RUNTIME_SUBJECT_SHA: b1dd08e54bc111f66f197434b72bd92e8add4366
+  CARGO_TERM_COLOR: never
 
 jobs:
   qualify-continuity-runtime:
@@ -66,26 +67,41 @@ jobs:
       - name: Qualify frozen continuity runtime subject
         env:
           QUALIFIER_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          CONTINUITY_RUNTIME_RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v1.tsv
+          CONTINUITY_RUNTIME_RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v2.tsv
         run: bash scripts/qualify-continuity-actuation-evidence-runtime.sh
 
-      - name: Publish receipt digest
+      - name: Publish classified receipt digest
         if: always()
         shell: bash
         env:
-          RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v1.tsv
+          RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v2.tsv
         run: |
           set -euo pipefail
           if [[ ! -f "$RECEIPT" ]]; then
             echo 'No continuity runtime qualification receipt was produced.'
+            {
+              echo
+              echo '### Continuity runtime qualification'
+              echo '- status: `NO_RECEIPT`'
+              echo '- interpretation: qualifier did not reach its receipt boundary; inspect workflow setup as infrastructure/qualifier failure.'
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
-          echo "continuity-actuation-evidence-runtime receipt_sha256=$digest"
+          status="$(awk -F '\t' '$1 == "status" { print $2 }' "$RECEIPT")"
+          failure_class="$(awk -F '\t' '$1 == "failure_class" { print $2 }' "$RECEIPT")"
+          phase="$(awk -F '\t' '$1 == "phase" { print $2 }' "$RECEIPT")"
+          reason="$(awk -F '\t' '$1 == "reason" { sub(/^[^\t]*\t/, ""); print }' "$RECEIPT")"
+          echo "continuity-actuation-evidence-runtime receipt_sha256=$digest status=$status failure_class=$failure_class phase=$phase"
           {
             echo
-            echo "- continuity runtime receipt SHA-256: \`$digest\`"
+            echo '### Continuity runtime qualification'
+            echo "- receipt SHA-256: \`$digest\`"
             echo "- frozen runtime subject: \`$RUNTIME_SUBJECT_SHA\`"
+            echo "- status: \`$status\`"
+            echo "- failure class: \`$failure_class\`"
+            echo "- phase: \`$phase\`"
+            echo "- reason: $reason"
             echo '- receipt is workflow-witnessed and not independently signed.'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -93,7 +109,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: continuity-actuation-evidence-runtime-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v1.tsv
+          name: continuity-actuation-evidence-runtime-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v2.tsv
           if-no-files-found: warn
           retention-days: 14
