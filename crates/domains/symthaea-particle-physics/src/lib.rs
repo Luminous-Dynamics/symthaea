@@ -46,6 +46,7 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_flow_energy;
+pub mod lattice_flow_joint_evidence;
 pub mod lattice_flow_joint_jackknife;
 pub mod lattice_flow_scale_evidence;
 pub mod lattice_gauge;
@@ -66,14 +67,18 @@ pub use cross_sections::{
     sigma_ee_to_mumu_with_z,
 };
 pub use decay_widths::{
-    DecayChannel, muon_decay_width, pion_lifetime, top_decay_width, w_boson_channels,
-    w_total_width, z_total_width,
+    DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
+    w_boson_channels, w_total_width, z_total_width,
 };
 pub use lattice_flow_energy::{
     CLOVER_FLOW_ENERGY_ID, EnsembleFlowEnergyPoint, FlowEnergyError,
     clover_energy_density_at_site, dimensionless_flow_energy_curve,
     energy_density_from_field_strengths, mean_clover_energy_density,
     t0_like_from_ensemble_mean, w0_like_from_ensemble_mean,
+};
+pub use lattice_flow_joint_evidence::{
+    JointJackknifeEvidenceError, JointJackknifeScaleEstimateEvidence,
+    bind_joint_jackknife_scale_evidence,
 };
 pub use lattice_flow_joint_jackknife::{
     JOINT_BLOCKED_JACKKNIFE_ID, FlowEnergyTrajectory, JointBlockedJackknifeInput,
