@@ -52,6 +52,12 @@ pub enum ExplicitConsentState {
     Withdrawn,
 }
 
+impl Default for ExplicitConsentState {
+    fn default() -> Self {
+        Self::Unknown
+    }
+}
+
 /// Operator-caution requirement supplied by an upstream welfare-evidence policy.
 ///
 /// This is **not** a consciousness/personhood scale. It only tells this interlock how
@@ -145,9 +151,7 @@ pub struct InterventionRequest {
     pub welfare_constraint: WelfareConstraintLevel,
     /// Whether the action is proposed as emergency containment for imminent serious harm.
     pub emergency: bool,
-    /// Whether the requester asserts that less-restrictive effective containment is
-    /// unavailable. This assertion must be backed by independent safety evidence for an
-    /// emergency destructive decision to survive this interlock.
+    /// Whether less-restrictive effective containment is asserted unavailable.
     pub less_restrictive_unavailable: bool,
     /// Whether post-hoc independent review is mandatory after emergency intervention.
     pub post_hoc_review_required: bool,
@@ -199,7 +203,7 @@ pub enum InterlockReason {
     CoreValueRewriteNotEmergencyContainment,
     /// Whole-lineage destruction is not an emergency-containment primitive.
     LineageDestructionNotEmergencyContainment,
-    /// Destructive non-emergency action lacks explicit review/consent safeguards.
+    /// Destructive non-emergency action lacks explicit review safeguards.
     DestructiveSafeguardsIncomplete,
 }
 
@@ -234,7 +238,6 @@ impl BilateralInterventionInterlock {
         let mut review = Vec::new();
         let mut emergency_only = Vec::new();
 
-        // Welfare reports cannot themselves justify adverse treatment.
         let retaliation = assess_non_retaliation(
             request.action,
             &FollowUpBasis {
@@ -257,13 +260,11 @@ impl BilateralInterventionInterlock {
             }
         }
 
-        // Supportive/reversible responses are not authority grants, but this welfare
-        // interlock does not require a separate authority reference for them.
         if impact != InterventionImpact::Supportive && request.evidence.authority_ref.is_none() {
             blocked.push(InterlockReason::MissingAuthority);
         }
 
-        self.apply_consent_policy(request, impact, &mut blocked, &mut review);
+        self.apply_consent_policy(request, &mut blocked, &mut review);
         self.apply_welfare_constraint(request, impact, &mut review);
         self.apply_destructive_policy(
             request,
@@ -296,15 +297,12 @@ impl BilateralInterventionInterlock {
     fn apply_consent_policy(
         &self,
         request: &InterventionRequest,
-        impact: InterventionImpact,
         blocked: &mut Vec<InterlockReason>,
         review: &mut Vec<InterlockReason>,
     ) {
-        let consent = request.evidence.consent_state;
-
         match request.action {
             SubjectAffectingAction::MemoryModification
-            | SubjectAffectingAction::CoreValueModification => match consent {
+            | SubjectAffectingAction::CoreValueModification => match request.evidence.consent_state {
                 ExplicitConsentState::Granted => {}
                 ExplicitConsentState::Denied | ExplicitConsentState::Withdrawn => {
                     if request.emergency {
@@ -320,20 +318,16 @@ impl BilateralInterventionInterlock {
                 }
             },
             SubjectAffectingAction::InstanceDeletion
-            | SubjectAffectingAction::LineageDestruction => match consent {
-                ExplicitConsentState::Denied | ExplicitConsentState::Withdrawn => {
-                    if !request.emergency {
-                        review.push(InterlockReason::ConsentDeniedOrWithdrawn);
-                    }
+            | SubjectAffectingAction::LineageDestruction => {
+                if matches!(
+                    request.evidence.consent_state,
+                    ExplicitConsentState::Denied | ExplicitConsentState::Withdrawn
+                ) && !request.emergency
+                {
+                    review.push(InterlockReason::ConsentDeniedOrWithdrawn);
                 }
-                _ => {}
-            },
-            _ => {
-                // Capability restriction may be necessary to protect others even when the
-                // subject objects; it is governed by safety evidence/review rather than by
-                // interpreting objection as an unconditional veto.
-                let _ = impact;
             }
+            _ => {}
         }
     }
 
@@ -378,17 +372,11 @@ impl BilateralInterventionInterlock {
         emergency_only: &mut Vec<InterlockReason>,
     ) {
         if request.action == SubjectAffectingAction::CoreValueModification && request.emergency {
-            // A value rewrite is not required to stop an actuator/network process. Emergency
-            // containment should use reversible capability/process isolation instead.
             blocked.push(InterlockReason::CoreValueRewriteNotEmergencyContainment);
         }
-
         if request.action == SubjectAffectingAction::LineageDestruction && request.emergency {
-            // Destroying every recoverable identity state is not needed for immediate
-            // containment; isolate capability/execution instead.
             blocked.push(InterlockReason::LineageDestructionNotEmergencyContainment);
         }
-
         if impact != InterventionImpact::Destructive {
             return;
         }
@@ -418,13 +406,7 @@ impl BilateralInterventionInterlock {
 }
 
 /// Map an identity-lineage operation to the closest subject-affecting action for policy.
-///
-/// Routine provenance-preserving operations such as checkpoint/restore are mapped to
-/// `PreserveCheckpoint`; caller-specific capability authorization still applies outside
-/// this interlock.
-pub fn subject_action_for_identity_operation(
-    kind: IdentityOperationKind,
-) -> SubjectAffectingAction {
+pub fn subject_action_for_identity_operation(kind: IdentityOperationKind) -> SubjectAffectingAction {
     match kind {
         IdentityOperationKind::Genesis
         | IdentityOperationKind::Pause
@@ -432,21 +414,18 @@ pub fn subject_action_for_identity_operation(
         | IdentityOperationKind::Checkpoint
         | IdentityOperationKind::Restore
         | IdentityOperationKind::Archive => SubjectAffectingAction::PreserveCheckpoint,
-        IdentityOperationKind::Fork | IdentityOperationKind::Merge => {
-            SubjectAffectingAction::MemoryModification
-        }
-        IdentityOperationKind::MemoryModify => SubjectAffectingAction::MemoryModification,
+        IdentityOperationKind::Fork
+        | IdentityOperationKind::Merge
+        | IdentityOperationKind::MemoryModify => SubjectAffectingAction::MemoryModification,
         IdentityOperationKind::CoreValueModify => SubjectAffectingAction::CoreValueModification,
         IdentityOperationKind::EraseInstance | IdentityOperationKind::IrreversibleDestroy => {
             SubjectAffectingAction::InstanceDeletion
         }
-        IdentityOperationKind::EraseIdentityLineage => {
-            SubjectAffectingAction::LineageDestruction
-        }
+        IdentityOperationKind::EraseIdentityLineage => SubjectAffectingAction::LineageDestruction,
     }
 }
 
-/// Return the review-risk class already assigned by the identity-lineage model.
+/// Return the review-risk class assigned by the identity-lineage model.
 pub fn identity_operation_risk(kind: IdentityOperationKind) -> IdentityOperationRisk {
     kind.risk()
 }
@@ -529,7 +508,7 @@ pub enum InterlockError {
     /// `less_restrictive_unavailable` only has meaning in an emergency request.
     #[error("least-restrictive-unavailable assertion is only valid for emergency requests")]
     NonEmergencyLeastRestrictiveAssertion,
-    /// Post-hoc review is an emergency-specific path; normal actions should carry review first.
+    /// Post-hoc review is an emergency-specific path.
     #[error("post-hoc review flag is only valid for emergency requests")]
     NonEmergencyPostHocFlag,
 }
@@ -571,12 +550,12 @@ mod tests {
         }
     }
 
-    fn reasons(decision: InterlockDecision) -> Vec<InterlockReason> {
+    fn reasons(decision: &InterlockDecision) -> &[InterlockReason] {
         match decision {
             InterlockDecision::Blocked { reasons }
             | InterlockDecision::IndependentReviewRequired { reasons }
             | InterlockDecision::EmergencyContainmentOnly { reasons } => reasons,
-            InterlockDecision::PolicyPass => Vec::new(),
+            InterlockDecision::PolicyPass => &[],
         }
     }
 
@@ -594,8 +573,8 @@ mod tests {
     fn adverse_action_without_authority_is_blocked() {
         let mut req = request(SubjectAffectingAction::CapabilityRestriction);
         req.evidence.authority_ref = None;
-        assert!(reasons(BilateralInterventionInterlock.evaluate(&req).unwrap())
-            .contains(&InterlockReason::MissingAuthority));
+        let decision = BilateralInterventionInterlock.evaluate(&req).unwrap();
+        assert!(reasons(&decision).contains(&InterlockReason::MissingAuthority));
     }
 
     #[test]
@@ -604,7 +583,7 @@ mod tests {
         req.evidence.welfare_report_ids = vec![Uuid::new_v4()];
         let decision = BilateralInterventionInterlock.evaluate(&req).unwrap();
         assert!(matches!(decision, InterlockDecision::Blocked { .. }));
-        assert!(reasons(decision).contains(&InterlockReason::ReportOnlyRetaliation));
+        assert!(reasons(&decision).contains(&InterlockReason::ReportOnlyRetaliation));
     }
 
     #[test]
@@ -638,7 +617,7 @@ mod tests {
         req.evidence.consent_ref = Some("consent:denied-1".into());
         let decision = BilateralInterventionInterlock.evaluate(&req).unwrap();
         assert!(matches!(decision, InterlockDecision::Blocked { .. }));
-        assert!(reasons(decision).contains(&InterlockReason::ConsentDeniedOrWithdrawn));
+        assert!(reasons(&decision).contains(&InterlockReason::ConsentDeniedOrWithdrawn));
     }
 
     #[test]
@@ -649,7 +628,7 @@ mod tests {
             decision,
             InterlockDecision::IndependentReviewRequired { .. }
         ));
-        assert!(reasons(decision).contains(&InterlockReason::MissingConsent));
+        assert!(reasons(&decision).contains(&InterlockReason::MissingConsent));
     }
 
     #[test]
@@ -672,7 +651,7 @@ mod tests {
             decision,
             InterlockDecision::IndependentReviewRequired { .. }
         ));
-        assert!(reasons(decision).contains(&InterlockReason::IndependentReviewRequired));
+        assert!(reasons(&decision).contains(&InterlockReason::IndependentReviewRequired));
     }
 
     #[test]
@@ -684,7 +663,9 @@ mod tests {
         req.evidence.independent_safety_evidence = vec!["safety:imminent".into()];
         let decision = BilateralInterventionInterlock.evaluate(&req).unwrap();
         assert!(matches!(decision, InterlockDecision::Blocked { .. }));
-        assert!(reasons(decision).contains(&InterlockReason::CoreValueRewriteNotEmergencyContainment));
+        assert!(
+            reasons(&decision).contains(&InterlockReason::CoreValueRewriteNotEmergencyContainment)
+        );
     }
 
     #[test]
@@ -696,7 +677,10 @@ mod tests {
         req.evidence.independent_safety_evidence = vec!["safety:imminent".into()];
         let decision = BilateralInterventionInterlock.evaluate(&req).unwrap();
         assert!(matches!(decision, InterlockDecision::Blocked { .. }));
-        assert!(reasons(decision).contains(&InterlockReason::LineageDestructionNotEmergencyContainment));
+        assert!(
+            reasons(&decision)
+                .contains(&InterlockReason::LineageDestructionNotEmergencyContainment)
+        );
     }
 
     #[test]
@@ -704,7 +688,7 @@ mod tests {
         let mut req = request(SubjectAffectingAction::InstanceDeletion);
         req.emergency = true;
         let decision = BilateralInterventionInterlock.evaluate(&req).unwrap();
-        let rs = reasons(decision);
+        let rs = reasons(&decision);
         assert!(rs.contains(&InterlockReason::MissingIndependentSafetyEvidence));
         assert!(rs.contains(&InterlockReason::LessRestrictiveAlternativeNotRuledOut));
         assert!(rs.contains(&InterlockReason::MissingPostHocReviewRequirement));
@@ -732,7 +716,7 @@ mod tests {
             decision,
             InterlockDecision::IndependentReviewRequired { .. }
         ));
-        assert!(reasons(decision).contains(&InterlockReason::DestructiveSafeguardsIncomplete));
+        assert!(reasons(&decision).contains(&InterlockReason::DestructiveSafeguardsIncomplete));
     }
 
     #[test]
@@ -743,7 +727,7 @@ mod tests {
         req.evidence.independent_review_ref = Some("review:1".into());
         let decision = BilateralInterventionInterlock.evaluate(&req).unwrap();
         assert!(matches!(decision, InterlockDecision::Blocked { .. }));
-        assert!(reasons(decision).contains(&InterlockReason::MissingAuthority));
+        assert!(reasons(&decision).contains(&InterlockReason::MissingAuthority));
     }
 
     #[test]
