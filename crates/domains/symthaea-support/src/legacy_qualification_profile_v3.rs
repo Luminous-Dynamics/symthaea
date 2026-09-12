@@ -21,6 +21,9 @@ use crate::legacy_qualification_source_ledger_v3::{
     LegacyQualificationSourceLedgerV3, LegacyQualificationSourceReadinessV3,
 };
 use crate::legacy_source_artifacts::LegacySourceArtifactLedgerV1;
+use crate::legacy_source_continuity::{
+    require_legacy_source_continuity_v1, LegacySourceContinuityErrorV1,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -65,6 +68,10 @@ pub fn assess_legacy_qualification_profile_v3(
     let v1 = assess_legacy_qualification_profile_v1(pack, profile, matrix)?;
     let source_readiness =
         assess_legacy_qualification_source_readiness_v3(pack, artifacts, source_ledger)?;
+    // Ledger/artifact validation establishes that the selected current capture is
+    // internally coherent. Continuity is a separate predicate: a later capture
+    // must not retroactively stand in for an earlier metadata-only observation.
+    require_legacy_source_continuity_v1(pack, source_ledger)?;
 
     let requirements = v1
         .requirements
@@ -100,6 +107,7 @@ pub fn assess_legacy_qualification_profile_v3(
 pub enum LegacyQualificationProfileErrorV3 {
     Profile(LegacyQualificationProfileErrorV1),
     Source(LegacyQualificationSourceLedgerErrorV3),
+    Continuity(LegacySourceContinuityErrorV1),
 }
 
 impl fmt::Display for LegacyQualificationProfileErrorV3 {
@@ -107,6 +115,7 @@ impl fmt::Display for LegacyQualificationProfileErrorV3 {
         match self {
             Self::Profile(err) => write!(f, "legacy V3 qualification profile error: {err}"),
             Self::Source(err) => write!(f, "legacy V3 qualification source error: {err}"),
+            Self::Continuity(err) => write!(f, "legacy V3 qualification continuity error: {err}"),
         }
     }
 }
@@ -125,11 +134,24 @@ impl From<LegacyQualificationSourceLedgerErrorV3> for LegacyQualificationProfile
     }
 }
 
+impl From<LegacySourceContinuityErrorV1> for LegacyQualificationProfileErrorV3 {
+    fn from(value: LegacySourceContinuityErrorV1) -> Self {
+        Self::Continuity(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::legacy_qualification_source_ledger_v3::LegacyQualificationSourceSelectionV3;
+    use crate::legacy_source_artifacts::{
+        LegacyArtifactAccessPolicyV1, LegacyArtifactStorageClassV1,
+        LegacySourceArtifactRefV1,
+    };
+    use crate::standards_registry::{SourceCaptureV1, SourceSnapshotIdV1, TechnicalSourceSnapshotV1};
     use crate::{
         build_legacy_five_platform_portfolio_v1, exhaustive_legacy_qualification_profile_v1,
+        legacy_source_revision_commitment_v3,
     };
 
     #[test]
@@ -182,5 +204,88 @@ mod tests {
             ..assessment
         };
         assert!(ready.ready_for_evaluation());
+    }
+
+    #[test]
+    fn profile_rejects_retroactive_content_for_metadata_only_history() {
+        let (mut pack, matrix, _) =
+            build_legacy_five_platform_portfolio_v1(1_800_000_000_000).unwrap();
+        let original_id = SourceSnapshotIdV1("ibm:aix-os-management@7.3".into());
+        let original = pack.sources.snapshot(&original_id).unwrap().clone();
+        let qualifying_id = SourceSnapshotIdV1(
+            "ibm:aix-os-management@7.3:retroactive-content".into(),
+        );
+        let digest = "7".repeat(64);
+        pack.sources
+            .register_snapshot(TechnicalSourceSnapshotV1 {
+                id: qualifying_id.clone(),
+                document_id: original.document_id.clone(),
+                version: original.version.clone(),
+                lifecycle: original.lifecycle,
+                authority: original.authority,
+                stability: original.stability,
+                published_at_unix_ms: original.published_at_unix_ms,
+                source_updated_at_unix_ms: original.source_updated_at_unix_ms,
+                fetched_at_unix_ms: original.fetched_at_unix_ms + 100,
+                capture: SourceCaptureV1::ContentDigest {
+                    algorithm: "sha256".into(),
+                    digest: digest.clone(),
+                },
+                relations: original.relations.clone(),
+            })
+            .unwrap();
+
+        let mut artifacts = LegacySourceArtifactLedgerV1::new();
+        artifacts
+            .register(
+                &pack,
+                LegacySourceArtifactRefV1 {
+                    snapshot_id: qualifying_id.clone(),
+                    content_algorithm: "sha256".into(),
+                    content_digest: digest.clone(),
+                    byte_length: 1,
+                    media_type: "application/octet-stream".into(),
+                    retrieved_at_unix_ms: original.fetched_at_unix_ms + 100,
+                    artifact_locator: "evidence://continuity/profile-regression".into(),
+                    storage_class: LegacyArtifactStorageClassV1::PrivateEvidenceStore,
+                    access_policy: LegacyArtifactAccessPolicyV1::EvaluatorOnly,
+                    retention_receipt_digest: Some("8".repeat(64)),
+                },
+            )
+            .unwrap();
+
+        let document = pack.sources.document(&original.document_id).unwrap();
+        let mut source_ledger = LegacyQualificationSourceLedgerV3::new();
+        source_ledger
+            .register_selection(
+                &pack,
+                &artifacts,
+                LegacyQualificationSourceSelectionV3 {
+                    original_snapshot_id: original.id.clone(),
+                    source_revision_blake3: legacy_source_revision_commitment_v3(document, &original)
+                        .unwrap(),
+                    qualifying_snapshot_id: qualifying_id,
+                    content_algorithm: "sha256".into(),
+                    content_digest: digest,
+                    selected_at_unix_ms: original.fetched_at_unix_ms + 101,
+                },
+            )
+            .unwrap();
+
+        let profile = exhaustive_legacy_qualification_profile_v1();
+        let error = assess_legacy_qualification_profile_v3(
+            &pack,
+            &profile,
+            &matrix,
+            &artifacts,
+            &source_ledger,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            LegacyQualificationProfileErrorV3::Continuity(
+                LegacySourceContinuityErrorV1::UnsafeContinuity { .. }
+            )
+        ));
     }
 }
