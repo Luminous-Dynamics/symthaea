@@ -6,7 +6,7 @@ The central rule is simple:
 
 > one favorable sample cannot erase a prior restricted, incomplete, unsafe, or fail-closed state.
 
-Recovery requires an explicit reviewed requalification authorization plus a sustained sequence of fresh, distinct nominal evidence satisfying deployment-reviewed count, span, and gap requirements.
+Recovery requires an explicit reviewed requalification authorization plus a sustained sequence of fresh, distinct nominal evidence satisfying deployment-reviewed count, span, gap, and authorization-age requirements.
 
 ## Monotonic restriction
 
@@ -25,13 +25,18 @@ Every recovery sample requires:
 - explicit upstream assurance state
 - non-empty evidence references
 
+Structurally valid sample IDs are tombstoned before temporal admission. A sample rejected for non-monotonic timing therefore cannot later be replayed with a modified timestamp and become favorable evidence.
+
 Requalification authorization requires:
 
 - unique authorization id
 - reviewed recovery procedure reference
 - reviewer/process reference
-- authorization time after the latched failure
+- authorization time after the latched failure and latest observation
 - supporting evidence references
+- completion before the policy's maximum authorization age
+
+The authorization window must be at least as long as the required nominal evidence span; impossible recovery policies fail validation.
 
 ## Deliberate boundaries
 

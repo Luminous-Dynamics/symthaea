@@ -47,6 +47,8 @@ pub struct RequalificationPolicy {
     pub minimum_nominal_span_ms: u64,
     /// A larger gap resets recovery progress without clearing the latched restriction.
     pub maximum_nominal_sample_gap_ms: u64,
+    /// Maximum age of a reviewed recovery authorization while collecting evidence.
+    pub maximum_authorization_age_ms: u64,
 }
 
 impl RequalificationPolicy {
@@ -56,6 +58,7 @@ impl RequalificationPolicy {
             && self.minimum_consecutive_nominal_samples >= 2
             && self.minimum_nominal_span_ms > 0
             && self.maximum_nominal_sample_gap_ms > 0
+            && self.maximum_authorization_age_ms >= self.minimum_nominal_span_ms
     }
 }
 
@@ -111,6 +114,11 @@ pub enum RequalificationIssue {
         previous_observed_at_ms: u64,
     },
     RequalificationNotAuthorized,
+    AuthorizationExpired {
+        authorization_id: String,
+        age_ms: u64,
+        maximum_age_ms: u64,
+    },
     RecoveryGapExceeded {
         observed_gap_ms: u64,
         maximum_gap_ms: u64,
@@ -222,6 +230,12 @@ impl RequalificationGate {
             issues.push(RequalificationIssue::DuplicateSampleId(sample.sample_id));
             return self.report(issues);
         }
+
+        // Tombstone a structurally valid sample identity before temporal admission.
+        // A rejected non-monotonic sample id therefore cannot be replayed later with
+        // modified timing to become favorable recovery evidence.
+        self.seen_sample_ids.insert(sample.sample_id.clone());
+
         if let Some(previous) = self.last_observed_at_ms {
             if sample.observed_at_ms <= previous {
                 issues.push(RequalificationIssue::NonMonotonicObservationTime {
@@ -233,7 +247,6 @@ impl RequalificationGate {
             }
         }
 
-        self.seen_sample_ids.insert(sample.sample_id.clone());
         self.last_observed_at_ms = Some(sample.observed_at_ms);
 
         if !sample.state.is_nominal() {
@@ -246,8 +259,23 @@ impl RequalificationGate {
             return self.report(issues);
         }
 
-        if self.authorization.is_none() {
+        let Some(authorization) = self.authorization.as_ref() else {
             issues.push(RequalificationIssue::RequalificationNotAuthorized);
+            return self.report(issues);
+        };
+
+        let authorization_age_ms = sample
+            .observed_at_ms
+            .saturating_sub(authorization.authorized_at_ms);
+        if authorization_age_ms > self.policy.maximum_authorization_age_ms {
+            issues.push(RequalificationIssue::AuthorizationExpired {
+                authorization_id: authorization.authorization_id.clone(),
+                age_ms: authorization_age_ms,
+                maximum_age_ms: self.policy.maximum_authorization_age_ms,
+            });
+            self.authorization = None;
+            self.phase = RequalificationPhase::Latched;
+            self.reset_nominal_progress();
             return self.report(issues);
         }
 
@@ -341,6 +369,7 @@ mod tests {
             minimum_consecutive_nominal_samples: 3,
             minimum_nominal_span_ms: 2_000,
             maximum_nominal_sample_gap_ms: 1_500,
+            maximum_authorization_age_ms: 10_000,
         }
     }
 
@@ -417,6 +446,23 @@ mod tests {
     }
 
     #[test]
+    fn expired_authorization_cannot_advance_recovery() {
+        let mut short = policy();
+        short.maximum_authorization_age_ms = 2_000;
+        let mut gate = RequalificationGate::new(short).unwrap();
+        gate.observe(sample("fault", 1_000, AssuranceState::Unsafe));
+        gate.begin_requalification(authorization(1_001)).unwrap();
+        let report = gate.observe(sample("late-good", 4_000, AssuranceState::Nominal));
+        assert_eq!(report.effective_state, AssuranceState::Unsafe);
+        assert_eq!(report.phase, RequalificationPhase::Latched);
+        assert_eq!(report.authorization_id, None);
+        assert!(report.issues.iter().any(|issue| matches!(
+            issue,
+            RequalificationIssue::AuthorizationExpired { .. }
+        )));
+    }
+
+    #[test]
     fn long_gap_resets_progress_without_clearing_restriction() {
         let mut gate = RequalificationGate::new(policy()).unwrap();
         gate.observe(sample("fault", 1_000, AssuranceState::Restricted));
@@ -445,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_or_non_monotonic_samples_cannot_advance_recovery() {
+    fn duplicate_or_non_monotonic_samples_cannot_advance_recovery_and_ids_are_tombstoned() {
         let mut gate = RequalificationGate::new(policy()).unwrap();
         gate.observe(sample("fault", 1_000, AssuranceState::Restricted));
         gate.begin_requalification(authorization(1_001)).unwrap();
@@ -463,6 +509,22 @@ mod tests {
             issue,
             RequalificationIssue::NonMonotonicObservationTime { .. }
         )));
+
+        let replayed_with_friendlier_time = gate.observe(sample("old", 2_500, AssuranceState::Nominal));
+        assert_eq!(replayed_with_friendlier_time.consecutive_nominal_samples, 1);
+        assert!(replayed_with_friendlier_time
+            .issues
+            .contains(&RequalificationIssue::DuplicateSampleId("old".into())));
+    }
+
+    #[test]
+    fn impossible_authorization_window_is_invalid_policy() {
+        let mut invalid = policy();
+        invalid.maximum_authorization_age_ms = invalid.minimum_nominal_span_ms - 1;
+        assert!(matches!(
+            RequalificationGate::new(invalid),
+            Err(RequalificationError::InvalidPolicy)
+        ));
     }
 
     #[test]
