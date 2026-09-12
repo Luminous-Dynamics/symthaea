@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use crate::canonical::{
-    AnalysisTrustErrorV1, AnalyticalInputRevisionIdV1, AnalyticalMethodRevisionIdV1,
-    AnalyticalPolicyRevisionIdV1, ExecutionArtifactDigestV1, INPUT_DOMAIN_V1, METHOD_DOMAIN_V1,
-    ModelQualificationRecordDigestV1, POLICY_DOMAIN_V1, Sha256DigestV1, canonical_binary64_v1,
-    domain_hash,
+    AlgorithmRevisionDigestV1, AnalysisTrustErrorV1, AnalyticalInputRevisionIdV1,
+    AnalyticalMethodRevisionIdV1, AnalyticalPolicyRevisionIdV1, ExecutionArtifactDigestV1,
+    ImplementationArtifactDigestV1, INPUT_DOMAIN_V1, METHOD_DOMAIN_V1,
+    ModelQualificationRecordDigestV1, POLICY_DOMAIN_V1, canonical_binary64_v1, domain_hash,
 };
 use serde_json::{Value, json};
 
@@ -16,8 +16,8 @@ pub struct AnalyticalMethodV1 {
 
 impl AnalyticalMethodV1 {
     pub fn euler_bernoulli_beam(
-        implementation_artifact_digest: Sha256DigestV1,
-        algorithm_revision_digest: Sha256DigestV1,
+        implementation_artifact_digest: ImplementationArtifactDigestV1,
+        algorithm_revision_digest: AlgorithmRevisionDigestV1,
     ) -> Self {
         let preimage = json!({
             "algorithm_revision_digest": algorithm_revision_digest.as_str(),
