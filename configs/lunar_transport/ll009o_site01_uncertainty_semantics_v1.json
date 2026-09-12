@@ -1,0 +1,40 @@
+{
+  "schema_version": "ll009o.uncertainty-semantics-policy.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "requested_claim_class": "deterministic_upper_bound",
+  "site_vertical_uncertainty": {
+    "semantics_class": "rms_error",
+    "source_id": "site01-total-z-rms-5m",
+    "evidence_basis": "NASA PGDA product 78 labels Site01_final_adj_5mpp_toterr.tif as total Z uncertainty, formally the RMS error. A Site01 anchor uncertainty sampled from this raster therefore inherits RMS semantics rather than hard-bound semantics."
+  },
+  "layers": [
+    {
+      "layer_id": "site01-near-5m",
+      "uncertainty_source_id": "site01-total-z-rms-5m",
+      "semantics_class": "rms_error",
+      "evidence_basis": "NASA PGDA product 78 explicitly describes the total-Z uncertainty raster as RMS error; Barker et al. describe contributions from interpolation, orbital, range and sampling error."
+    },
+    {
+      "layer_id": "south-pole-far-80m",
+      "uncertainty_source_id": "south-pole-surface-height-error-80m",
+      "semantics_class": "unknown",
+      "evidence_basis": "NASA PGDA product 90 labels LDEM_80S_80MPP_ADJ_ERR.TIF as surface-height error in meters. LL-009O does not promote that label to either RMS or hard-upper-bound semantics until the source methodology is explicitly bound and reviewed."
+    }
+  ],
+  "expected_result_before_further_closure": {
+    "deterministic_upper_bound": "blocked",
+    "risk_qualified": "blocked while any admitted layer remains semantics_class=unknown",
+    "descriptive_only": "allowed if N/L/M byte and lineage bindings pass"
+  },
+  "required_follow_on": [
+    "Resolve the statistical semantics of the large-area ADJ_ERR product from source methodology.",
+    "For RMS inputs, select and hash an explicit statistical or clone-ensemble policy rather than treating 1x RMS as a hard bound.",
+    "Rescan every admitted source pixel for any multiplier/quantile rule that can change which pixel is worst; do not operate only on LL-009L top-K output.",
+    "Keep continuous/subpixel terrain-support closure separate from vertical-error magnitude semantics."
+  ],
+  "non_claims": [
+    "This policy intentionally blocks an unqualified deterministic horizon claim for the current Site01 evidence semantics.",
+    "The policy does not assign Gaussian tails or any other distribution to RMS error.",
+    "The policy does not claim the large-area surface-height-error raster has any probability interpretation until that interpretation is source-supported."
+  ]
+}
