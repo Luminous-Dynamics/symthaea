@@ -20,6 +20,8 @@
 //!   campaign/replica/rank stream coordinates and endpoint-free U(0,1)
 //! - **Tiny lattice benchmarks**: cold/disordered qualification traces without
 //!   automatic equilibrium or convergence declarations
+//! - **Proposal tuning**: separate warm-up stream with frozen post-tuning width;
+//!   no adaptation is permitted to inherit production-evidence authority
 //!
 //! ## Natural Units
 //!
@@ -45,6 +47,7 @@ pub mod lattice_metropolis;
 pub mod lattice_qcd;
 pub mod lattice_rng;
 pub mod lattice_sweep;
+pub mod lattice_tuning;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -80,6 +83,10 @@ pub use lattice_rng::{
 pub use lattice_sweep::{
     LatticeSweepError, SweepStats, SymmetricProposalConfig, Uniform01Source,
     draw_symmetric_subgroup_proposal, metropolis_sweep,
+};
+pub use lattice_tuning::{
+    ProposalTuningConfig, ProposalTuningError, ProposalTuningResult, ProposalTuningStep,
+    tune_chacha8_metropolis_proposal,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
