@@ -1,0 +1,6 @@
+ok
+energy_density=0.039850000000000003
+analytic_energy_density=0.039850000000000003
+gauge_transformed_energy_density=0.03985000000000001
+t0_like_synthetic_crossing=0.34999999999999998
+w0_like_synthetic_crossing=0.63245553203367588
