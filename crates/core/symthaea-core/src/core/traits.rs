@@ -1,54 +1,62 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # Consciousness API Traits
+//! # Consciousness-Relevant Measurement API Traits
 //!
-//! Unified trait interfaces for consciousness measurement, state management,
-//! and updates. This provides a stable abstraction layer for the 6+ Φ
-//! implementations across the codebase.
+//! Unified trait interfaces for theory-dependent consciousness-relevant measurement,
+//! state management, and updates. These interfaces expose computational proxies and
+//! experimental indicators; they do **not** establish phenomenal consciousness.
 //!
 //! ## Design Goals
 //!
-//! 1. **Unify Measurement**: Single trait for all Φ calculation methods
-//! 2. **State Abstraction**: Common interface for consciousness state
+//! 1. **Unify Measurement**: Single trait shape for multiple theory-dependent metrics
+//! 2. **State Abstraction**: Common interface for consciousness-relevant state
 //! 3. **Observable**: Built-in support for telemetry and tracing
 //! 4. **Theory-Agnostic**: Works with IIT, GWT, HOT, FEP, etc.
+//! 5. **Epistemically Honest**: Proxy thresholds are never named or documented as proof
 //!
 //! ## Usage
 //!
 //! ```rust,ignore
 //! use symthaea::core::traits::{ConsciousnessMetric, ConsciousnessState};
 //!
-//! fn measure_system<M: ConsciousnessMetric>(metric: &M, state: &[ContinuousHV]) -> f64 {
+//! fn measure_system<M: ConsciousnessMetric>(metric: &M, state: &M::Input) -> f64
+//! where
+//!     M::Input: ?Sized,
+//! {
 //!     let result = metric.measure(state);
-//!     println!("Φ = {:.4} (theory: {})", result.value, result.theory_basis);
+//!     println!("proxy = {:.4} (theory: {})", result.value, result.theory_basis);
 //!     result.value
 //! }
 //! ```
 
 use std::fmt::Debug;
 
-/// Result of a consciousness measurement
+/// Result of a consciousness-relevant measurement.
+///
+/// `value` and `confidence` characterize the measurement under the named
+/// theoretical/experimental model. They are not probabilities that the measured
+/// system is phenomenally conscious.
 #[derive(Debug, Clone)]
 pub struct MeasurementResult {
-    /// The measured value (typically Φ, but theory-dependent)
+    /// The measured proxy value (often Φ, but theory-dependent).
     pub value: f64,
 
-    /// Confidence in the measurement (0.0 to 1.0)
+    /// Confidence in the measurement procedure/result, not P(conscious).
     pub confidence: f32,
 
-    /// Theoretical basis (e.g., "IIT 3.0", "GWT", "HOT", "FEP")
+    /// Theoretical basis (e.g., "IIT 3.0", "GWT", "HOT", "FEP").
     pub theory_basis: &'static str,
 
-    /// Number of components measured
+    /// Number of components measured.
     pub n_components: usize,
 
-    /// Computation time in microseconds
+    /// Computation time in microseconds.
     pub compute_time_us: u64,
 }
 
 impl MeasurementResult {
-    /// Create a new measurement result
+    /// Create a new measurement result.
     pub fn new(value: f64, theory: &'static str, n_components: usize) -> Self {
         Self {
             value,
@@ -59,48 +67,50 @@ impl MeasurementResult {
         }
     }
 
-    /// Set confidence level
+    /// Set confidence in the measurement procedure/result.
     pub fn with_confidence(mut self, confidence: f32) -> Self {
         self.confidence = confidence;
         self
     }
 
-    /// Set computation time
+    /// Set computation time.
     pub fn with_time(mut self, time_us: u64) -> Self {
         self.compute_time_us = time_us;
         self
     }
 }
 
-/// Unified trait for consciousness measurement
+/// Unified trait for consciousness-relevant measurement.
 ///
 /// Implementations may use different theoretical frameworks:
 /// - **IIT**: Integrated Information Theory (Φ)
 /// - **GWT**: Global Workspace Theory (workspace access)
-/// - **HOT**: Higher-Order Thought (meta-awareness)
-/// - **FEP**: Free Energy Principle (prediction error)
+/// - **HOT**: Higher-Order Thought (meta-representation)
+/// - **FEP**: Free Energy Principle (prediction-related dynamics)
 ///
-/// All implementations return a standardized `MeasurementResult`.
+/// All implementations return a standardized `MeasurementResult`. Callers must
+/// preserve the theory basis and must not treat a threshold crossing as proof of
+/// phenomenal consciousness or moral-patient status.
 pub trait ConsciousnessMetric: Send + Sync {
-    /// The input type for measurement (typically hypervector collections)
+    /// The input type for measurement (typically hypervector collections).
     type Input: ?Sized;
 
-    /// Measure consciousness level for the given input
+    /// Measure the theory-dependent proxy for the given input.
     fn measure(&self, input: &Self::Input) -> MeasurementResult;
 
-    /// Get the theoretical basis for this metric
+    /// Get the theoretical basis for this metric.
     fn theory_basis(&self) -> &'static str;
 
-    /// Get the computational complexity class
+    /// Get the computational complexity class.
     fn complexity(&self) -> Complexity;
 
-    /// Whether this metric supports caching
+    /// Whether this metric supports caching.
     fn supports_caching(&self) -> bool {
         false
     }
 }
 
-/// Computational complexity classification
+/// Computational complexity classification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Complexity {
     /// O(1) - constant time
@@ -120,7 +130,7 @@ pub enum Complexity {
 }
 
 impl Complexity {
-    /// Human-readable description
+    /// Human-readable description.
     pub fn description(&self) -> &'static str {
         match self {
             Complexity::Constant => "O(1) - instant",
@@ -134,23 +144,32 @@ impl Complexity {
     }
 }
 
-/// Snapshot of consciousness state
+/// Snapshot of consciousness-relevant state.
 #[derive(Debug, Clone)]
 pub struct StateSnapshot {
-    /// Current Φ value
+    /// Current Φ proxy value.
     pub phi: f64,
 
-    /// Global workspace contents summary
+    /// Global workspace contents summary.
     pub workspace_summary: String,
 
-    /// Active attention focus
+    /// Active attention focus.
     pub attention_focus: Option<String>,
 
-    /// Meta-awareness level (0.0 to 1.0)
+    /// Meta-awareness proxy level (0.0 to 1.0).
     pub meta_awareness: f64,
 
-    /// Whether the system is considered conscious
+    /// Legacy compatibility flag indicating that the implementation's configured
+    /// consciousness proxy threshold was crossed. This is **not** an ontological
+    /// consciousness verdict and must not be used as a moral-status decision.
     pub is_conscious: bool,
+}
+
+impl StateSnapshot {
+    /// Epistemically explicit accessor for the legacy threshold flag.
+    pub fn consciousness_proxy_active(&self) -> bool {
+        self.is_conscious
+    }
 }
 
 impl Default for StateSnapshot {
@@ -165,72 +184,85 @@ impl Default for StateSnapshot {
     }
 }
 
-/// Trait for consciousness state management
+/// Trait for consciousness-relevant state management.
 ///
-/// Provides read access to the current consciousness state without
-/// exposing internal implementation details.
+/// Provides read access to theory-dependent proxy state without exposing internal
+/// implementation details. Threshold helpers report a configured proxy condition;
+/// they do not prove phenomenal consciousness.
 pub trait ConsciousnessState: Send + Sync {
-    /// Get current Φ measurement
+    /// Get current Φ proxy measurement.
     fn phi(&self) -> f64;
 
-    /// Get a snapshot of the current state
+    /// Get a snapshot of the current state.
     fn snapshot(&self) -> StateSnapshot;
 
-    /// Whether the system is currently conscious (Φ > threshold)
-    fn is_conscious(&self) -> bool {
+    /// Whether the implementation's legacy proxy threshold is crossed.
+    fn consciousness_proxy_active(&self) -> bool {
         self.phi() > 0.5
     }
 
-    /// Get the global workspace contents (if applicable)
+    /// Legacy alias retained for source compatibility.
+    ///
+    /// Do not use this method as evidence of phenomenal consciousness or moral
+    /// patienthood. New code should call `consciousness_proxy_active()` and preserve
+    /// the underlying metric/theory in evidence records.
+    #[deprecated(
+        since = "0.1.0",
+        note = "ambiguous ontological name; use consciousness_proxy_active() and preserve theory/provenance"
+    )]
+    fn is_conscious(&self) -> bool {
+        self.consciousness_proxy_active()
+    }
+
+    /// Get the global workspace contents (if applicable).
     fn workspace_contents(&self) -> Option<String> {
         None
     }
 }
 
-/// Trait for updating consciousness state
+/// Trait for updating consciousness-relevant state.
 ///
-/// Provides mutable operations for consciousness state transitions.
+/// Provides mutable operations for state transitions.
 pub trait ConsciousnessUpdater: ConsciousnessState {
-    /// Input type for updates
+    /// Input type for updates.
     type Input;
 
-    /// Output type from updates
+    /// Output type from updates.
     type Output;
 
-    /// Error type for failed updates
+    /// Error type for failed updates.
     type Error: std::error::Error;
 
-    /// Process input and update consciousness state
+    /// Process input and update consciousness-relevant state.
     fn update(&mut self, input: Self::Input) -> Result<Self::Output, Self::Error>;
 
-    /// Reset to initial state
+    /// Reset to initial state.
     fn reset(&mut self);
 
-    /// Record a state transition for learning/analysis
+    /// Record a state transition for learning/analysis.
     fn record_transition(&mut self, input: &Self::Input, output: &Self::Output) {
-        // Default: no-op (override for learning systems)
         let _ = (input, output);
     }
 }
 
-/// Trait for consciousness observability
+/// Trait for consciousness-relevant observability.
 ///
-/// Enables telemetry, tracing, and debugging of consciousness processes.
+/// Enables telemetry, tracing, and debugging of proxy measurements and state.
 pub trait ConsciousnessObserver: Send + Sync {
-    /// Called when Φ is measured
+    /// Called when Φ is measured.
     fn on_phi_measured(&self, phi: f64, method: &str);
 
-    /// Called when consciousness state changes
+    /// Called when consciousness-relevant state changes.
     fn on_state_change(&self, old_phi: f64, new_phi: f64);
 
-    /// Called when an anomaly is detected
+    /// Called when an anomaly is detected.
     fn on_anomaly(&self, description: &str, severity: f64);
 
-    /// Called when workspace contents change
+    /// Called when workspace contents change.
     fn on_workspace_update(&self, contents: &str);
 }
 
-/// Null observer that does nothing (for when observability is disabled)
+/// Null observer that does nothing (for when observability is disabled).
 pub struct NullObserver;
 
 impl ConsciousnessObserver for NullObserver {
@@ -266,7 +298,29 @@ mod tests {
     #[test]
     fn test_state_snapshot_default() {
         let snapshot = StateSnapshot::default();
-        assert!(!snapshot.is_conscious);
+        assert!(!snapshot.consciousness_proxy_active());
         assert!(snapshot.phi < 0.01);
+    }
+
+    struct ProxyState(f64);
+
+    impl ConsciousnessState for ProxyState {
+        fn phi(&self) -> f64 {
+            self.0
+        }
+
+        fn snapshot(&self) -> StateSnapshot {
+            StateSnapshot {
+                phi: self.0,
+                is_conscious: self.consciousness_proxy_active(),
+                ..StateSnapshot::default()
+            }
+        }
+    }
+
+    #[test]
+    fn proxy_threshold_is_named_as_proxy_not_ontology() {
+        assert!(!ProxyState(0.49).consciousness_proxy_active());
+        assert!(ProxyState(0.51).consciousness_proxy_active());
     }
 }
