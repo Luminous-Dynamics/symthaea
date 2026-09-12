@@ -52,11 +52,23 @@ impl CapabilitySet {
     }
 }
 
+pub const MIN_R3_INDEPENDENT_QUORUM: u16 = 1;
+pub const MIN_HIGH_CONSEQUENCE_INDEPENDENT_QUORUM: u16 = 2;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RiskClass { R0, R1, R2, R3, R4, R5 }
 impl RiskClass {
     pub const fn requires_high_consequence_quorum(self) -> bool {
         matches!(self, Self::R4 | Self::R5)
+    }
+
+    /// Kernel-owned floor that policy and requester assertions may only raise.
+    pub const fn constitutional_minimum_independent_approvals(self) -> u16 {
+        match self {
+            Self::R0 | Self::R1 | Self::R2 => 0,
+            Self::R3 => MIN_R3_INDEPENDENT_QUORUM,
+            Self::R4 | Self::R5 => MIN_HIGH_CONSEQUENCE_INDEPENDENT_QUORUM,
+        }
     }
 }
 
@@ -124,10 +136,54 @@ pub struct ContainmentStatus {
     pub current_envelope_digest: EvidenceDigest,
 }
 
+/// Reference quorum evidence.
+///
+/// `independent_approvals` is evidence-side state. The request-side
+/// `required_independent_approvals` is retained for compatibility as a
+/// self-restriction only: it may raise the effective requirement but can never
+/// lower the kernel or policy requirement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct QuorumEvidence {
     pub independent_approvals: u16,
     pub required_independent_approvals: u16,
+}
+
+/// Semantic quorum requirements supplied by the authority-policy side.
+///
+/// This is deliberately not named `Verified*`: cryptographic policy provenance,
+/// lifecycle, supersession, and trust-root verification remain production gates.
+/// These values are clamped to kernel-owned constitutional floors.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct QuorumPolicy {
+    r1: u16,
+    r2: u16,
+    r3: u16,
+    r4: u16,
+    r5: u16,
+}
+impl QuorumPolicy {
+    pub const REFERENCE_BASELINE: Self = Self::new(0, 0, 1, 2, 2);
+
+    pub const fn new(r1: u16, r2: u16, r3: u16, r4: u16, r5: u16) -> Self {
+        Self { r1, r2, r3, r4, r5 }
+    }
+
+    pub const fn configured_required_independent_approvals(self, class: RiskClass) -> u16 {
+        match class {
+            RiskClass::R0 => 0,
+            RiskClass::R1 => self.r1,
+            RiskClass::R2 => self.r2,
+            RiskClass::R3 => self.r3,
+            RiskClass::R4 => self.r4,
+            RiskClass::R5 => self.r5,
+        }
+    }
+
+    pub const fn required_independent_approvals(self, class: RiskClass) -> u16 {
+        let configured = self.configured_required_independent_approvals(class);
+        let floor = class.constitutional_minimum_independent_approvals();
+        if configured > floor { configured } else { floor }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -224,16 +280,27 @@ impl ReplicationDecision {
     }
 }
 
-pub const MIN_HIGH_CONSEQUENCE_INDEPENDENT_QUORUM: u16 = 2;
-
-/// Pure, deterministic, deny-by-default RSK decision.
-///
-/// This function evaluates an immutable snapshot. It does not mutate resource
-/// or lineage ledgers. Monotonic consumption and atomic replay resistance are
-/// intentionally left for the ledger tranche.
+/// Reference convenience wrapper using explicit baseline quorum policy.
 pub fn evaluate_replication_authority(
     request: &ReplicationAuthorityRequest,
     grant: Option<&ReplicationGrant>,
+) -> ReplicationDecision {
+    evaluate_replication_authority_with_quorum_policy(
+        request,
+        grant,
+        QuorumPolicy::REFERENCE_BASELINE,
+    )
+}
+
+/// Pure, deterministic, deny-by-default RSK decision with policy-owned quorum floors.
+///
+/// This function evaluates an immutable snapshot. It does not mutate resource
+/// or lineage ledgers. `policy` is semantic policy state only; verified policy
+/// provenance remains a separate production boundary.
+pub fn evaluate_replication_authority_with_quorum_policy(
+    request: &ReplicationAuthorityRequest,
+    grant: Option<&ReplicationGrant>,
+    policy: QuorumPolicy,
 ) -> ReplicationDecision {
     let mut reasons = Vec::new();
 
@@ -272,12 +339,8 @@ pub fn evaluate_replication_authority(
         reasons.push(DenialReason::RequestedCapabilitiesExceedParent);
     }
 
-    let required_quorum = if request.risk_class.requires_high_consequence_quorum() {
-        request.quorum.required_independent_approvals
-            .max(MIN_HIGH_CONSEQUENCE_INDEPENDENT_QUORUM)
-    } else {
-        request.quorum.required_independent_approvals
-    };
+    let policy_required = policy.required_independent_approvals(request.risk_class);
+    let required_quorum = policy_required.max(request.quorum.required_independent_approvals);
     if request.quorum.independent_approvals < required_quorum {
         reasons.push(DenialReason::InsufficientIndependentQuorum);
     }
@@ -405,6 +468,63 @@ mod tests {
             else { panic!("expected allow") };
         assert_eq!(a.subject, s);
         assert_eq!(a.effective_capabilities, A);
+    }
+
+    #[test]
+    fn requester_cannot_weaken_r3_reference_policy_floor() {
+        let s = sid(1); let l = lid(2); let g = grant(s, l); let mut r = request(s, l);
+        r.quorum.required_independent_approvals = 0;
+        r.quorum.independent_approvals = 0;
+        deny(
+            evaluate_replication_authority(&r, Some(&g)),
+            DenialReason::InsufficientIndependentQuorum,
+        );
+        r.quorum.independent_approvals = 1;
+        assert!(evaluate_replication_authority(&r, Some(&g)).is_allowed());
+    }
+
+    #[test]
+    fn policy_can_raise_requirement_and_request_can_only_self_restrict() {
+        let s = sid(1); let l = lid(2); let g = grant(s, l); let mut r = request(s, l);
+        let stronger = QuorumPolicy::new(0, 0, 2, 3, 3);
+
+        r.quorum.required_independent_approvals = 0;
+        r.quorum.independent_approvals = 1;
+        deny(
+            evaluate_replication_authority_with_quorum_policy(&r, Some(&g), stronger),
+            DenialReason::InsufficientIndependentQuorum,
+        );
+        r.quorum.independent_approvals = 2;
+        assert!(evaluate_replication_authority_with_quorum_policy(&r, Some(&g), stronger)
+            .is_allowed());
+
+        r.quorum.required_independent_approvals = 3;
+        r.quorum.independent_approvals = 2;
+        deny(
+            evaluate_replication_authority_with_quorum_policy(&r, Some(&g), stronger),
+            DenialReason::InsufficientIndependentQuorum,
+        );
+        r.quorum.independent_approvals = 3;
+        assert!(evaluate_replication_authority_with_quorum_policy(&r, Some(&g), stronger)
+            .is_allowed());
+    }
+
+    #[test]
+    fn low_policy_values_cannot_weaken_high_consequence_floor() {
+        let weak_policy = QuorumPolicy::new(0, 0, 0, 0, 0);
+        for class in [RiskClass::R4, RiskClass::R5] {
+            let s = sid(1); let l = lid(2); let g = grant(s, l); let mut r = request(s, l);
+            r.risk_class = class;
+            r.quorum.required_independent_approvals = 0;
+            r.quorum.independent_approvals = 1;
+            deny(
+                evaluate_replication_authority_with_quorum_policy(&r, Some(&g), weak_policy),
+                DenialReason::InsufficientIndependentQuorum,
+            );
+            r.quorum.independent_approvals = 2;
+            assert!(evaluate_replication_authority_with_quorum_policy(&r, Some(&g), weak_policy)
+                .is_allowed());
+        }
     }
 
     #[test]
