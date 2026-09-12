@@ -4,18 +4,21 @@
 //! A policy family varies normative maturity requirements while holding one exact
 //! physical support-qualified lineage state fixed. This module makes that causal
 //! separation explicit and fails closed if policy points are non-canonical,
-//! disagree about the physical temporal runway, or improve descendant outcomes as
-//! maturity requirements become stricter.
+//! disagree about the physical temporal runway, contain forged projection values,
+//! or improve descendant outcomes as maturity requirements become stricter.
 
 use crate::{
-    evaluate_policy_normalized_lineage_profile, RegenerativeGenerationCountV1,
-    RegenerativeGenerationPolicyProjectionV1, RegenerativeHorizon,
-    RegenerativeLineageViabilityReportV1, RegenerativePolicyNormalizedLineageError,
+    evaluate_policy_normalized_lineage_profile, project_regenerative_generation_policy,
+    RegenerativeGenerationCountV1, RegenerativeGenerationPolicyProjectionV1,
+    RegenerativeHorizon, RegenerativeLineageViabilityReportV1,
+    RegenerativePolicyNormalizedLineageError,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 const MAX_POLICY_POINTS: usize = 256;
+const MAX_ID_LEN: usize = 256;
+const MAX_BINDING_LEN: usize = 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -53,10 +56,13 @@ pub struct RegenerativePolicySensitivitySurfaceV1 {
 pub enum RegenerativePolicySensitivityError {
     TooFewPolicies,
     TooManyPolicies,
+    InvalidIdentifier,
+    InvalidEvidenceBinding,
     NonCanonicalPolicyOrder,
     DuplicatePolicyIdentity,
     DuplicatePolicyEvidenceBinding,
     PhysicalCoordinateMismatch,
+    ProjectionMismatch,
     NonMonotoneFoundedDescendants,
     NonMonotoneMaturityCompletedDescendants,
     NonMonotoneReproductionTransitions,
@@ -67,29 +73,7 @@ pub fn evaluate_regenerative_policy_sensitivity_surface(
     report: &RegenerativeLineageViabilityReportV1,
     policies: &[RegenerativeReproductionPolicySpecV1],
 ) -> Result<RegenerativePolicySensitivitySurfaceV1, RegenerativePolicySensitivityError> {
-    if policies.len() < 2 {
-        return Err(RegenerativePolicySensitivityError::TooFewPolicies);
-    }
-    if policies.len() > MAX_POLICY_POINTS {
-        return Err(RegenerativePolicySensitivityError::TooManyPolicies);
-    }
-    if policies
-        .windows(2)
-        .any(|pair| pair[0].maturity_periods >= pair[1].maturity_periods)
-    {
-        return Err(RegenerativePolicySensitivityError::NonCanonicalPolicyOrder);
-    }
-
-    let mut policy_ids = BTreeSet::new();
-    let mut evidence_bindings = BTreeSet::new();
-    for policy in policies {
-        if !policy_ids.insert(policy.reproduction_policy_id.as_str()) {
-            return Err(RegenerativePolicySensitivityError::DuplicatePolicyIdentity);
-        }
-        if !evidence_bindings.insert(policy.reproduction_policy_evidence_binding.as_str()) {
-            return Err(RegenerativePolicySensitivityError::DuplicatePolicyEvidenceBinding);
-        }
-    }
+    validate_policy_family_shape(policies)?;
 
     let mut policy_points = Vec::with_capacity(policies.len());
     let mut physical_successor_reproduction_horizon = None;
@@ -160,6 +144,16 @@ pub fn evaluate_regenerative_policy_sensitivity_surface(
 pub fn validate_regenerative_policy_sensitivity_surface(
     surface: &RegenerativePolicySensitivitySurfaceV1,
 ) -> Result<(), RegenerativePolicySensitivityError> {
+    for value in [
+        surface.source_profile_id.as_str(),
+        surface.genome_id.as_str(),
+        surface.closure_model_id.as_str(),
+        surface.flow_support_id.as_str(),
+    ] {
+        if !canonical_id(value) {
+            return Err(RegenerativePolicySensitivityError::InvalidIdentifier);
+        }
+    }
     if surface.policy_points.len() < 2 {
         return Err(RegenerativePolicySensitivityError::TooFewPolicies);
     }
@@ -173,6 +167,12 @@ pub fn validate_regenerative_policy_sensitivity_surface(
     let mut previous_counts: Option<(u64, u64, u64)> = None;
 
     for point in &surface.policy_points {
+        if !canonical_id(&point.reproduction_policy_id) {
+            return Err(RegenerativePolicySensitivityError::InvalidIdentifier);
+        }
+        if !canonical_binding(&point.reproduction_policy_evidence_binding) {
+            return Err(RegenerativePolicySensitivityError::InvalidEvidenceBinding);
+        }
         if !policy_ids.insert(point.reproduction_policy_id.as_str()) {
             return Err(RegenerativePolicySensitivityError::DuplicatePolicyIdentity);
         }
@@ -190,6 +190,15 @@ pub fn validate_regenerative_policy_sensitivity_surface(
             return Err(RegenerativePolicySensitivityError::NonCanonicalPolicyOrder);
         }
         previous_maturity = Some(projection.maturity_periods);
+
+        let expected_projection = project_regenerative_generation_policy(
+            surface.physical_successor_reproduction_horizon,
+            projection.maturity_periods,
+        )
+        .map_err(|_| RegenerativePolicySensitivityError::ProjectionMismatch)?;
+        if *projection != expected_projection {
+            return Err(RegenerativePolicySensitivityError::ProjectionMismatch);
+        }
 
         if let Some(current_counts) = finite_counts(projection) {
             if let Some((previous_founded, previous_matured, previous_transitions)) = previous_counts {
@@ -215,6 +224,41 @@ pub fn validate_regenerative_policy_sensitivity_surface(
     Ok(())
 }
 
+fn validate_policy_family_shape(
+    policies: &[RegenerativeReproductionPolicySpecV1],
+) -> Result<(), RegenerativePolicySensitivityError> {
+    if policies.len() < 2 {
+        return Err(RegenerativePolicySensitivityError::TooFewPolicies);
+    }
+    if policies.len() > MAX_POLICY_POINTS {
+        return Err(RegenerativePolicySensitivityError::TooManyPolicies);
+    }
+    if policies
+        .windows(2)
+        .any(|pair| pair[0].maturity_periods >= pair[1].maturity_periods)
+    {
+        return Err(RegenerativePolicySensitivityError::NonCanonicalPolicyOrder);
+    }
+
+    let mut policy_ids = BTreeSet::new();
+    let mut evidence_bindings = BTreeSet::new();
+    for policy in policies {
+        if !canonical_id(&policy.reproduction_policy_id) {
+            return Err(RegenerativePolicySensitivityError::InvalidIdentifier);
+        }
+        if !canonical_binding(&policy.reproduction_policy_evidence_binding) {
+            return Err(RegenerativePolicySensitivityError::InvalidEvidenceBinding);
+        }
+        if !policy_ids.insert(policy.reproduction_policy_id.as_str()) {
+            return Err(RegenerativePolicySensitivityError::DuplicatePolicyIdentity);
+        }
+        if !evidence_bindings.insert(policy.reproduction_policy_evidence_binding.as_str()) {
+            return Err(RegenerativePolicySensitivityError::DuplicatePolicyEvidenceBinding);
+        }
+    }
+    Ok(())
+}
+
 fn finite_counts(projection: &RegenerativeGenerationPolicyProjectionV1) -> Option<(u64, u64, u64)> {
     match (
         projection.founded_descendant_generations,
@@ -228,6 +272,23 @@ fn finite_counts(projection: &RegenerativeGenerationPolicyProjectionV1) -> Optio
         ) => Some((founded, matured, transitions)),
         _ => None,
     }
+}
+
+fn canonical_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_ID_LEN
+        && value.trim() == value
+        && !value.chars().any(char::is_whitespace)
+        && !value.chars().any(char::is_control)
+}
+
+fn canonical_binding(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_BINDING_LEN
+        && value.trim() == value
+        && value.contains(':')
+        && !value.chars().any(char::is_whitespace)
+        && !value.chars().any(char::is_control)
 }
 
 #[cfg(test)]
@@ -317,7 +378,7 @@ mod tests {
     }
 
     #[test]
-    fn deserialized_surface_cannot_change_physics_or_improve_under_stricter_policy() {
+    fn deserialized_surface_cannot_change_physics_or_forge_projection_counts() {
         let mut surface = evaluate_regenerative_policy_sensitivity_surface(&report(), &policies()).unwrap();
         surface.policy_points[2].generation_policy_projection.temporal_successor_horizon =
             RegenerativeHorizon::FinitePeriods(5);
@@ -332,7 +393,7 @@ mod tests {
             .founded_descendant_generations = RegenerativeGenerationCountV1::Finite(3);
         assert_eq!(
             validate_regenerative_policy_sensitivity_surface(&surface),
-            Err(RegenerativePolicySensitivityError::NonMonotoneFoundedDescendants)
+            Err(RegenerativePolicySensitivityError::ProjectionMismatch)
         );
     }
 }
