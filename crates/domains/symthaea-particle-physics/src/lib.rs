@@ -20,8 +20,10 @@
 //!   integration over the same six-staple Wilson-action gradient
 //! - **Flowed gauge energy**: clover energy density plus ensemble-mean-only
 //!   `t0`/`w0`-like crossing algebra with caller-supplied scale targets
-//! - **Joint scale resampling**: blocked delete-one resampling over complete
-//!   per-configuration flow trajectories, preserving cross-flow covariance
+//! - **Joint scale resampling**: chain-aware blocked delete-one resampling over
+//!   complete per-configuration trajectories, preserving cross-flow covariance
+//! - **Block adequacy evidence**: explicit autocorrelation coverage and
+//!   caller-declared tau/block-count policy for the resampling geometry
 //! - **Scale evidence**: same-ensemble flow curves whose derived uncertainty
 //!   must bind joint resampling across the correlated flow-time trajectory
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
@@ -45,6 +47,7 @@ pub mod cross_sections;
 pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
+pub mod lattice_flow_block_adequacy;
 pub mod lattice_flow_energy;
 pub mod lattice_flow_joint_evidence;
 pub mod lattice_flow_joint_jackknife;
@@ -60,7 +63,6 @@ pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
 
-// Re-export key items
 pub use constants::*;
 pub use cross_sections::{
     Mandelstam, alpha_em_running, alpha_s_running, r_ratio, sigma_compton, sigma_ee_to_mumu,
@@ -69,6 +71,10 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use lattice_flow_block_adequacy::{
+    FLOW_BLOCK_ADEQUACY_POLICY_ID, AutocorrelationEvidence, BlockAdequacyAssessment,
+    BlockAdequacyError, BlockAdequacyPolicy, assess_flow_block_adequacy,
 };
 pub use lattice_flow_energy::{
     CLOVER_FLOW_ENERGY_ID, EnsembleFlowEnergyPoint, FlowEnergyError,
