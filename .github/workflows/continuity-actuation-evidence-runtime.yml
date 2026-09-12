@@ -67,14 +67,14 @@ jobs:
       - name: Qualify frozen continuity runtime subject
         env:
           QUALIFIER_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          CONTINUITY_RUNTIME_RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v3.tsv
+          CONTINUITY_RUNTIME_RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v4.tsv
         run: bash scripts/qualify-continuity-actuation-evidence-runtime.sh
 
       - name: Publish classified receipt digest
         if: always()
         shell: bash
         env:
-          RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v3.tsv
+          RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v4.tsv
         run: |
           set -euo pipefail
           if [[ ! -f "$RECEIPT" ]]; then
@@ -88,21 +88,44 @@ jobs:
             exit 0
           fi
           digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
+          schema="$(awk -F '\t' '$1 == "schema" { print $2 }' "$RECEIPT")"
+          evidence_semantics="$(awk -F '\t' '$1 == "evidence_semantics" { print $2 }' "$RECEIPT")"
+          supersedes="$(awk -F '\t' '$1 == "supersedes" { print $2 }' "$RECEIPT")"
+          inheritance_mode="$(awk -F '\t' '$1 == "inheritance_mode" { print $2 }' "$RECEIPT")"
+          inheritance_eligible="$(awk -F '\t' '$1 == "inheritance_eligible" { print $2 }' "$RECEIPT")"
           status="$(awk -F '\t' '$1 == "status" { print $2 }' "$RECEIPT")"
           failure_class="$(awk -F '\t' '$1 == "failure_class" { print $2 }' "$RECEIPT")"
           phase="$(awk -F '\t' '$1 == "phase" { print $2 }' "$RECEIPT")"
           scope="$(awk -F '\t' '$1 == "qualification_scope" { print $2 }' "$RECEIPT")"
+          subject="$(awk -F '\t' '$1 == "runtime_subject_sha" { print $2 }' "$RECEIPT")"
+          qualifier="$(awk -F '\t' '$1 == "qualifier_sha" { print $2 }' "$RECEIPT")"
           reason="$(awk -F '\t' '$1 == "reason" { sub(/^[^\t]*\t/, ""); print }' "$RECEIPT")"
-          echo "continuity-actuation-evidence-runtime receipt_sha256=$digest status=$status failure_class=$failure_class phase=$phase scope=$scope"
+
+          test "$schema" = 'symthaea-continuity-actuation-evidence-runtime-qualification-v4'
+          test "$evidence_semantics" = 'append_only'
+          test "$supersedes" = 'none'
+          test "$inheritance_mode" = 'exact_identity_only'
+          if [[ "$status" == 'PASS' ]]; then
+            test "$inheritance_eligible" = 'YES'
+          else
+            test "$inheritance_eligible" = 'NO'
+          fi
+
+          echo "continuity-actuation-evidence-runtime receipt_sha256=$digest status=$status failure_class=$failure_class phase=$phase scope=$scope subject=$subject qualifier=$qualifier inheritance_eligible=$inheritance_eligible"
           {
             echo
             echo '### Continuity runtime qualification'
             echo "- receipt SHA-256: \`$digest\`"
-            echo "- frozen runtime subject: \`$RUNTIME_SUBJECT_SHA\`"
+            echo "- frozen runtime subject: \`$subject\`"
+            echo "- qualifier: \`$qualifier\`"
             echo "- qualification scope: \`$scope\`"
             echo "- status: \`$status\`"
             echo "- failure class: \`$failure_class\`"
             echo "- phase: \`$phase\`"
+            echo "- evidence semantics: \`$evidence_semantics\`"
+            echo "- supersedes: \`$supersedes\`"
+            echo "- inheritance mode: \`$inheritance_mode\`"
+            echo "- inheritance eligible: \`$inheritance_eligible\`"
             echo "- reason: $reason"
             echo '- receipt is workflow-witnessed and not independently signed.'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -111,7 +134,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: continuity-actuation-evidence-runtime-v3-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v3.tsv
+          name: continuity-actuation-evidence-runtime-v4-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v4.tsv
           if-no-files-found: warn
           retention-days: 14
