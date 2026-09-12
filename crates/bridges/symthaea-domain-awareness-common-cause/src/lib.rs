@@ -13,6 +13,11 @@ use symthaea_sensor_common_cause::CommonCauseDiversityReport;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommonCauseTrackIssue {
     CommonCauseRequiresFailClosed,
+    CommonCauseReportContainsIssues,
+    UnprofiledAcceptedSources {
+        accepted: usize,
+        profiled: usize,
+    },
     PhysicalSourceCountMismatch {
         track_report: usize,
         common_cause_report: usize,
@@ -43,8 +48,9 @@ impl CommonCauseQualifiedTrackAssurance {
 ///
 /// Levels below `Corroborated` are left unchanged because this bridge has no
 /// evidence with which to improve them. Levels at or above `Corroborated` require
-/// a non-fail-closed common-cause result and an exact physical-source-count match.
-/// Otherwise they are conservatively reduced to `Persistent`.
+/// a structurally clean, non-fail-closed common-cause result, complete profiling,
+/// and an exact physical-source-count match. Otherwise they are conservatively
+/// reduced to `Persistent`.
 pub fn qualify_track_assurance(
     track: &TrackAssuranceReport,
     common_cause: &CommonCauseDiversityReport,
@@ -52,6 +58,15 @@ pub fn qualify_track_assurance(
     let mut issues = Vec::new();
     if common_cause.requires_fail_closed {
         issues.push(CommonCauseTrackIssue::CommonCauseRequiresFailClosed);
+    }
+    if !common_cause.issues.is_empty() {
+        issues.push(CommonCauseTrackIssue::CommonCauseReportContainsIssues);
+    }
+    if common_cause.profiled_physical_sources != common_cause.accepted_physical_sources {
+        issues.push(CommonCauseTrackIssue::UnprofiledAcceptedSources {
+            accepted: common_cause.accepted_physical_sources,
+            profiled: common_cause.profiled_physical_sources,
+        });
     }
     if track.independent_physical_sources != common_cause.accepted_physical_sources {
         issues.push(CommonCauseTrackIssue::PhysicalSourceCountMismatch {
@@ -83,7 +98,9 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
     use symthaea_domain_awareness_vision::{TrackAssuranceReason, TrackAssuranceReport};
-    use symthaea_sensor_common_cause::{CommonCauseDiversityReport, FaultDomainKind};
+    use symthaea_sensor_common_cause::{
+        CommonCauseDiversityReport, CommonCauseIssue, FaultDomainKind,
+    };
 
     fn track(level: TrackAssuranceLevel, physical_sources: usize) -> TrackAssuranceReport {
         TrackAssuranceReport {
@@ -154,6 +171,37 @@ mod tests {
             &CommonCauseTrackIssue::PhysicalSourceCountMismatch {
                 track_report: 3,
                 common_cause_report: 2,
+            }
+        ));
+    }
+
+    #[test]
+    fn hidden_issues_cannot_be_laundered_by_false_fail_closed_flag() {
+        let mut malformed = diversity(2, false);
+        malformed.issues.push(CommonCauseIssue::MissingProfile("camera-b".into()));
+        let result = qualify_track_assurance(
+            &track(TrackAssuranceLevel::Corroborated, 2),
+            &malformed,
+        );
+        assert_eq!(result.qualified_level, TrackAssuranceLevel::Persistent);
+        assert!(result
+            .issues
+            .contains(&CommonCauseTrackIssue::CommonCauseReportContainsIssues));
+    }
+
+    #[test]
+    fn incomplete_profiling_downgrades_corroboration() {
+        let mut malformed = diversity(2, false);
+        malformed.profiled_physical_sources = 1;
+        let result = qualify_track_assurance(
+            &track(TrackAssuranceLevel::Corroborated, 2),
+            &malformed,
+        );
+        assert_eq!(result.qualified_level, TrackAssuranceLevel::Persistent);
+        assert!(result.issues.contains(
+            &CommonCauseTrackIssue::UnprofiledAcceptedSources {
+                accepted: 2,
+                profiled: 1,
             }
         ));
     }
