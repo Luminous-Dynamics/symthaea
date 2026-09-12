@@ -32,6 +32,8 @@
 //!   analysis to prevent post-hoc threshold changes from masquerading as evidence
 //! - **Analysis candidate authority**: exact-head CI plus immutable analysis
 //!   artifact lineage, explicitly scoped below any physical-QCD claim
+//! - **Pure-SU(3) campaign lineage**: one frozen sampler/RNG/chain/measurement/
+//!   benchmark subject plus separately authorized and validated execution records
 //! - **Scale evidence**: same-ensemble flow curves whose derived uncertainty
 //!   must bind joint resampling across the correlated flow-time trajectory
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
@@ -56,6 +58,8 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_analysis_authority;
+pub mod lattice_campaign_authority;
+pub mod lattice_campaign_manifest;
 pub mod lattice_ensemble_promotion;
 pub mod lattice_flow_block_adequacy;
 pub mod lattice_flow_energy;
@@ -88,6 +92,18 @@ pub use lattice_analysis_authority::{
     QUALIFIED_SCALE_ANALYSIS_CANDIDATE_SCOPE, AnalysisAuthorityError, ExactHeadCiConclusion,
     ExactHeadCiEvidence, QualifiedScaleAnalysisCandidate, ScaleAnalysisArtifactLineage,
     bind_qualified_scale_analysis_candidate,
+};
+pub use lattice_campaign_authority::{
+    QUALIFIED_CAMPAIGN_EXECUTION_AUTHORIZATION_SCOPE,
+    QUALIFIED_CAMPAIGN_EXECUTION_RECEIPT_SCOPE, CampaignAuthorityError,
+    CampaignExecutionAuthorization, QualifiedCampaignExecutionReceipt,
+    authorize_campaign_scientific_execution, bind_qualified_campaign_execution,
+};
+pub use lattice_campaign_manifest::{
+    PURE_SU3_CAMPAIGN_MANIFEST_ID, PURE_SU3_CAMPAIGN_RUN_ID, WILSON_PURE_GAUGE_ACTION_ID,
+    CampaignBenchmarkPlan, CampaignChainPlan, CampaignChainRunRecord, CampaignFlowPlan,
+    CampaignInitialCondition, CampaignManifestError, PureSu3CampaignManifest,
+    PureSu3CampaignRunRecord, WilsonRectangleSpec,
 };
 pub use lattice_ensemble_promotion::{
     ENSEMBLE_SCALE_PROMOTION_ASSESSMENT_ID, EnsembleScalePromotionAssessment,
