@@ -569,7 +569,7 @@ fn wait_for_kernel_gate(
 ) -> Result<(KernelSandboxObservation, KernelIsolationGate, u64), ObservedEvaluatorError> {
     let start = Instant::now();
     let deadline = start + timeout;
-    let mut last_error = "kernel observation has not completed".to_string();
+    let mut last_error: Option<String> = None;
     loop {
         if let Some(status) = child.try_wait().map_err(|source| ObservedEvaluatorError::Io {
             path: PathBuf::from("<bubblewrap-monitor>"),
@@ -584,12 +584,14 @@ fn wait_for_kernel_gate(
                         .map_err(|_| ObservedEvaluatorError::MeasurementOverflow)?;
                     return Ok((observation, gate, elapsed));
                 }
-                Err(error) => last_error = error.to_string(),
+                Err(error) => last_error = Some(error.to_string()),
             },
-            Err(error) => last_error = error.to_string(),
+            Err(error) => last_error = Some(error.to_string()),
         }
         if Instant::now() >= deadline {
-            return Err(ObservedEvaluatorError::KernelGateTimeout { last_error });
+            return Err(ObservedEvaluatorError::KernelGateTimeout {
+                last_error: last_error.unwrap_or_else(|| "no kernel observation completed".to_string()),
+            });
         }
         thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
     }
@@ -627,15 +629,14 @@ fn terminate_exact_sandbox(
     child: &mut std::process::Child,
     teardown_timeout: Duration,
 ) -> Result<(), ObservedEvaluatorError> {
-    pidfd.kill()?;
+    let signal_result = pidfd.kill();
     let _ = child.kill();
     let _ = child.wait();
-    if pidfd.wait_exited(teardown_timeout)? {
-        pidfd.disarm();
-        Ok(())
-    } else {
-        Err(ObservedEvaluatorError::TeardownUnverified)
+    if !pidfd.wait_exited(teardown_timeout)? {
+        return Err(ObservedEvaluatorError::TeardownUnverified);
     }
+    pidfd.disarm();
+    signal_result
 }
 
 fn shell_exit_code(status: &ExitStatus) -> Option<i32> {
@@ -990,9 +991,14 @@ pub fn run_kernel_gated_evaluator(
     drop(child_status);
     drop(child_block);
 
-    let mut stdin = child.stdin.take().ok_or(ObservedEvaluatorError::MissingPipe)?;
-    let stdout = child.stdout.take().ok_or(ObservedEvaluatorError::MissingPipe)?;
-    let stderr = child.stderr.take().ok_or(ObservedEvaluatorError::MissingPipe)?;
+    let (mut stdin, stdout, stderr) = match (child.stdin.take(), child.stdout.take(), child.stderr.take()) {
+        (Some(stdin), Some(stdout), Some(stderr)) => (stdin, stdout, stderr),
+        _ => {
+            kill_process_group(process_group);
+            let _ = child.wait();
+            return Err(ObservedEvaluatorError::MissingPipe);
+        }
+    };
     let stdout_cap = policy.bubblewrap_policy().max_response_bytes();
     let stderr_cap = policy.bubblewrap_policy().max_stderr_bytes();
     let stdout_reader = thread::spawn(move || read_capped_and_drain(stdout, stdout_cap));
@@ -1031,28 +1037,30 @@ pub fn run_kernel_gated_evaluator(
     ) {
         Ok(value) => value,
         Err(error) => {
-            terminate_exact_sandbox(
+            let teardown = terminate_exact_sandbox(
                 &mut pidfd,
                 &mut child,
                 Duration::from_millis(policy.teardown_timeout_ms()),
-            )?;
+            );
             let _ = stdout_reader.join();
             let _ = stderr_reader.join();
             let _ = status_reader.join();
+            teardown?;
             return Err(error);
         }
     };
 
     let mut release = File::from(block_write);
     if release.write_all(&[1]).and_then(|_| release.flush()).is_err() {
-        terminate_exact_sandbox(
+        let teardown = terminate_exact_sandbox(
             &mut pidfd,
             &mut child,
             Duration::from_millis(policy.teardown_timeout_ms()),
-        )?;
+        );
         let _ = stdout_reader.join();
         let _ = stderr_reader.join();
         let _ = status_reader.join();
+        teardown?;
         return Err(ObservedEvaluatorError::GateReleaseFailed);
     }
     drop(release);
@@ -1071,29 +1079,31 @@ pub fn run_kernel_gated_evaluator(
     ) {
         Ok(wait) => wait,
         Err(error) => {
-            terminate_exact_sandbox(
+            let teardown = terminate_exact_sandbox(
                 &mut pidfd,
                 &mut child,
                 Duration::from_millis(policy.teardown_timeout_ms()),
-            )?;
+            );
             let _ = writer.join();
             let _ = stdout_reader.join();
             let _ = stderr_reader.join();
             let _ = status_reader.join();
+            teardown?;
             return Err(error);
         }
     };
 
     if matches!(wait, WaitOutcome::TimedOut) {
-        terminate_exact_sandbox(
+        let teardown = terminate_exact_sandbox(
             &mut pidfd,
             &mut child,
             Duration::from_millis(policy.teardown_timeout_ms()),
-        )?;
+        );
         let _ = writer.join();
         let _ = stdout_reader.join();
         let _ = stderr_reader.join();
         let _ = status_reader.join();
+        teardown?;
         return Err(ObservedEvaluatorError::TimedOutAfterVerifiedTeardown);
     }
 
@@ -1272,11 +1282,11 @@ mod tests {
     #[test]
     fn status_summary_requires_both_child_and_exit() {
         assert!(matches!(
-            parse_status_summary(br#"{ "child-pid": 42 }\n"#),
+            parse_status_summary(b"{ \"child-pid\": 42 }\n"),
             Err(ObservedEvaluatorError::MissingStatusExit)
         ));
         assert_eq!(
-            parse_status_summary(br#"{ "child-pid": 42 }\n{ "exit-code": 0 }\n"#).unwrap(),
+            parse_status_summary(b"{ \"child-pid\": 42 }\n{ \"exit-code\": 0 }\n").unwrap(),
             (42, 0)
         );
     }
