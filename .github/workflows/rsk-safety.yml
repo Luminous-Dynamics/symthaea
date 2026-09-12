@@ -7,6 +7,8 @@ on:
       - 'crates/domains/symthaea-replicator-ledger/**'
       - 'docs/architecture/replicator-safety/**'
       - '.github/workflows/rsk-safety.yml'
+      - 'scripts/rsk_qualification.py'
+      - 'scripts/test_rsk_qualification.py'
       - 'scripts/check-class-a-changes.sh'
       - 'docs/compliance/GOVERNANCE_CHARTER.md'
   push:
@@ -16,6 +18,8 @@ on:
       - 'crates/domains/symthaea-replicator-ledger/**'
       - 'docs/architecture/replicator-safety/**'
       - '.github/workflows/rsk-safety.yml'
+      - 'scripts/rsk_qualification.py'
+      - 'scripts/test_rsk_qualification.py'
       - 'scripts/check-class-a-changes.sh'
       - 'docs/compliance/GOVERNANCE_CHARTER.md'
   workflow_dispatch:
@@ -49,7 +53,7 @@ jobs:
           base_sha='${{ github.event.pull_request.base.sha }}'
           changed_files="$(git diff --name-only "${base_sha}"...HEAD)"
 
-          class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-ledger/|\.github/workflows/rsk-safety\.yml$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
+          class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-ledger/|\.github/workflows/rsk-safety\.yml$|scripts/rsk_qualification\.py$|scripts/test_rsk_qualification\.py$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
 
           if ! printf '%s\n' "${changed_files}" | grep -Eq "${class_a_pattern}"; then
             echo "No RSK Class A implementation/governance surface changed."
@@ -87,6 +91,8 @@ jobs:
             'crates/domains/symthaea-replicator-safety/'
             'crates/domains/symthaea-replicator-ledger/'
             '.github/workflows/rsk-safety.yml'
+            'scripts/rsk_qualification.py'
+            'scripts/test_rsk_qualification.py'
             'scripts/check-class-a-changes.sh'
             'docs/compliance/GOVERNANCE_CHARTER.md'
           )
@@ -99,6 +105,9 @@ jobs:
           done
 
           echo "Generic Class A detector retains all required RSK/governance paths."
+
+      - name: Self-test the RSK qualification harness
+        run: python3 scripts/test_rsk_qualification.py -v
 
       - name: Keep RSK reference crates non-publishable until admission
         shell: bash
@@ -136,13 +145,25 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Format only the RSK crates
-        run: cargo fmt --check -p symthaea-replicator-safety -p symthaea-replicator-ledger
+      - name: Run format qualification capsule
+        run: >-
+          python3 scripts/rsk_qualification.py
+          --phase format
+          --output-dir "${RUNNER_TEMP}/rsk-qualification-format"
+
+      - name: Upload format qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsk-format-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rsk-qualification-format/**
+          if-no-files-found: error
+          retention-days: 30
 
   rsk-core:
     name: RSK compile + test + clippy
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -162,18 +183,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-rsk-
 
-      - name: Compile the RSK crates and all test targets
-        run: |
-          cargo check -p symthaea-replicator-safety --all-targets
-          cargo check -p symthaea-replicator-ledger --all-targets
+      - name: Run semantic qualification capsule
+        run: >-
+          python3 scripts/rsk_qualification.py
+          --phase core
+          --output-dir "${RUNNER_TEMP}/rsk-qualification-core"
 
-      - name: Run the constitutional authority tests
-        run: cargo test -p symthaea-replicator-safety --all-targets
-
-      - name: Run lineage, budget, replay-resistance, and adversarial tests
-        run: cargo test -p symthaea-replicator-ledger --all-targets
-
-      - name: Clippy the complete RSK target surface
-        run: |
-          cargo clippy -p symthaea-replicator-safety --all-targets -- -D warnings
-          cargo clippy -p symthaea-replicator-ledger --all-targets -- -D warnings
+      - name: Upload semantic qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsk-core-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rsk-qualification-core/**
+          if-no-files-found: error
+          retention-days: 30
