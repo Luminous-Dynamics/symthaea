@@ -12,6 +12,7 @@
 
 pub mod authority;
 pub mod bay;
+pub mod bootstrap_reserve;
 pub mod degraded;
 pub mod docking;
 pub mod epoch_handoff;
@@ -36,6 +37,7 @@ pub mod viability_calibration;
 
 pub use authority::*;
 pub use bay::*;
+pub use bootstrap_reserve::*;
 pub use degraded::*;
 pub use docking::*;
 pub use epoch_handoff::*;
