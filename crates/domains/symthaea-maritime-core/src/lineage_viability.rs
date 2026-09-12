@@ -14,7 +14,7 @@ use crate::{
     RegenerativeGenomeSupportedRequirementReport, RegenerativeGenomeV1, RegenerativeHorizon,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 /// Current lineage-viability profile schema version.
 pub const REGENERATIVE_LINEAGE_VIABILITY_SCHEMA_V1: u8 = 1;
@@ -245,8 +245,10 @@ pub fn evaluate_regenerative_lineage_viability(
         successor_construction.conservative_horizon,
         successor_qualification.conservative_horizon,
     );
-    let regenerative_viability_horizon =
-        min_horizon(operation.conservative_horizon, successor_reproduction_horizon);
+    let regenerative_viability_horizon = min_horizon(
+        operation.conservative_horizon,
+        successor_reproduction_horizon,
+    );
 
     let limiting_roles = match regenerative_viability_horizon {
         RegenerativeHorizon::FinitePeriods(limit) => [
@@ -289,7 +291,9 @@ pub fn validate_regenerative_lineage_successor(
     if successor.lineage_parent_binding.as_deref() != Some(parent.evidence_binding.as_str()) {
         return Err(RegenerativeLineageViabilityError::ParentBindingMismatch);
     }
-    if successor.genome_id == parent.genome_id || successor.evidence_binding == parent.evidence_binding {
+    if successor.genome_id == parent.genome_id
+        || successor.evidence_binding == parent.evidence_binding
+    {
         return Err(RegenerativeLineageViabilityError::SuccessorIdentityNotDistinct);
     }
     if successor.requirements == parent.requirements {
@@ -460,7 +464,11 @@ mod tests {
         }
     }
 
-    fn requirement(id: &str, capability: &str, dependency: &str) -> RegenerativeGenomeRequirementV1 {
+    fn requirement(
+        id: &str,
+        capability: &str,
+        dependency: &str,
+    ) -> RegenerativeGenomeRequirementV1 {
         RegenerativeGenomeRequirementV1 {
             requirement_id: id.into(),
             capability_id: capability.into(),
@@ -558,6 +566,8 @@ mod tests {
     #[test]
     fn opaque_qualification_input_remains_uncertainty_not_a_fictional_lifetime() {
         let mut model = model();
+        model.model_id = "manta-lineage-external-v1".into();
+        model.evidence_binding = "model:manta-lineage-external-v1".into();
         let metrology = model
             .dependencies
             .iter_mut()
@@ -566,7 +576,21 @@ mod tests {
         metrology.local_production_units_per_period = 1;
         metrology.stockpile_units = 0;
 
+        let mut genome = genome();
+        genome.closure_model_id = model.model_id.clone();
+        genome.closure_model_evidence_binding = model.evidence_binding.clone();
+        genome.evidence_binding = "genome:manta-v1:external-model".into();
+
+        let mut profile = profile();
+        profile.closure_model_id = model.model_id.clone();
+        profile.closure_model_evidence_binding = model.evidence_binding.clone();
+        profile.evidence_binding = "profile-evidence:manta-lineage-external-v1".into();
+
         let mut support = support();
+        support.support_id = "support:manta-lineage-external-v1".into();
+        support.closure_model_id = model.model_id.clone();
+        support.closure_model_evidence_binding = model.evidence_binding.clone();
+        support.evidence_binding = "support-evidence:manta-lineage-external-v1".into();
         support.claims.push(RegenerativeFlowSupportClaimV1 {
             dependency_id: "metrology".into(),
             flow_kind: RegenerativeFlowKindV1::Production,
@@ -578,20 +602,17 @@ mod tests {
             bootstrap_binding: None,
         });
 
-        let report = evaluate_regenerative_lineage_viability(
-            &profile(),
-            &genome(),
-            &model,
-            &support,
-        )
-        .unwrap();
+        let report =
+            evaluate_regenerative_lineage_viability(&profile, &genome, &model, &support).unwrap();
         assert_eq!(
             report.successor_qualification.conservative_horizon,
             RegenerativeHorizon::IndefiniteUnderStaticModel
         );
         assert!(!report.successor_qualification.fully_modeled_support);
         assert_eq!(
-            report.successor_qualification.externally_conditioned_requirement_ids,
+            report
+                .successor_qualification
+                .externally_conditioned_requirement_ids,
             vec!["req-qualification"]
         );
         assert_eq!(
