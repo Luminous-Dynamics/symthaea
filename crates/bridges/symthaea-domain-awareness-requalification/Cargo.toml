@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-domain-awareness-requalification"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Adapters from Symthaea domain-awareness assurance reports into hysteretic requalification"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "recovery", "sensor-fusion"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-assurance-requalification = { path = "../../domains/symthaea-assurance-requalification" }
+symthaea-model-assurance = { path = "../../domains/symthaea-model-assurance" }
+symthaea-sensor-common-cause = { path = "../../domains/symthaea-sensor-common-cause" }
+symthaea-domain-awareness-model-assurance = { path = "../symthaea-domain-awareness-model-assurance" }
+symthaea-domain-awareness-common-cause = { path = "../symthaea-domain-awareness-common-cause" }
+symthaea-domain-awareness-vision = { path = "../symthaea-domain-awareness-vision" }
