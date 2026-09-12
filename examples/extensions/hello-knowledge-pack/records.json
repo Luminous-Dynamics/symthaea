@@ -1,0 +1,13 @@
+{
+  "schema": "urn:org.example.hello-records.v1",
+  "records": [
+    {
+      "id": "hello-001",
+      "text": "This synthetic record demonstrates a declarative Symthaea extension payload."
+    },
+    {
+      "id": "hello-002",
+      "text": "No executable guest code is required to contribute this package."
+    }
+  ]
+}

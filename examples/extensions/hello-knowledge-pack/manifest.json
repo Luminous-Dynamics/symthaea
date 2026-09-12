@@ -1,0 +1,36 @@
+{
+  "id": "org.example.hello-knowledge-pack",
+  "name": "Hello Knowledge Pack",
+  "version": "0.1.0",
+  "abi": {
+    "major": 1,
+    "minor": 0
+  },
+  "kind": "knowledge_pack",
+  "runtime": "data_only",
+  "description": "Minimal declarative Symthaea extension with no executable code or ambient authority",
+  "provides": [
+    {
+      "id": "knowledge.example.hello_records",
+      "description": "Synthetic example records for exercising a data-only loader",
+      "effect": "pure"
+    }
+  ],
+  "requires": [],
+  "permissions": {
+    "network": { "mode": "none" },
+    "filesystem": { "mode": "none" },
+    "gpu": false,
+    "wall_clock": false,
+    "randomness": false,
+    "sensors": [],
+    "actuators": []
+  },
+  "resources": {
+    "memory_bytes": 0,
+    "fuel": 0,
+    "max_wall_time_ms": 0,
+    "max_output_bytes": 0,
+    "max_concurrency": 0
+  }
+}

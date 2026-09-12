@@ -1,0 +1,101 @@
+name: Extension Authoring
+
+on:
+  pull_request:
+    paths:
+      - "docs/extension/**"
+      - "docs/architecture/SYMTHAEA_EXTENSION_DISTRIBUTION.md"
+      - "examples/extensions/**"
+      - ".github/workflows/extension-authoring.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extension-authoring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate public manifest and data schemas
+        run: |
+          python3 -m pip install --disable-pip-version-check "jsonschema>=4.23,<5"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          manifest_schema_path = Path("docs/extension/manifest-v1.schema.json")
+          manifest_schema = json.loads(manifest_schema_path.read_text())
+          Draft202012Validator.check_schema(manifest_schema)
+          manifest_validator = Draft202012Validator(manifest_schema)
+
+          manifests = [
+              Path("examples/extensions/hello-control/manifest.json"),
+              Path("examples/extensions/hello-knowledge-pack/manifest.json"),
+          ]
+          for path in manifests:
+              instance = json.loads(path.read_text())
+              errors = sorted(manifest_validator.iter_errors(instance), key=lambda e: list(e.path))
+              if errors:
+                  details = "\n".join(f"{path}: {error.message}" for error in errors)
+                  raise SystemExit(details)
+              print(f"validated {path}")
+
+          payload_schema_path = Path(
+              "examples/extensions/hello-knowledge-pack/hello-records-v1.schema.json"
+          )
+          payload_path = Path("examples/extensions/hello-knowledge-pack/records.json")
+          payload_schema = json.loads(payload_schema_path.read_text())
+          Draft202012Validator.check_schema(payload_schema)
+          payload_validator = Draft202012Validator(payload_schema)
+          payload = json.loads(payload_path.read_text())
+          errors = sorted(payload_validator.iter_errors(payload), key=lambda e: list(e.path))
+          if errors:
+              details = "\n".join(f"{payload_path}: {error.message}" for error in errors)
+              raise SystemExit(details)
+          print(f"validated {payload_path}")
+          PY
+
+      - name: Install Rust guest toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+
+      - name: Cache standalone guest build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            examples/extensions/hello-control/target
+          key: ${{ runner.os }}-extension-authoring-${{ hashFiles('examples/extensions/hello-control/Cargo.toml', 'examples/extensions/hello-control/src/**', 'examples/extensions/hello-control/wit/**', 'examples/extensions/hello-control/manifest.json') }}
+          restore-keys: |
+            ${{ runner.os }}-extension-authoring-
+
+      - name: Build standalone Component Model guest
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-control/Cargo.toml \
+            --release \
+            --target wasm32-wasip2
+
+      - name: Require a non-empty component artifact
+        run: |
+          component="examples/extensions/hello-control/target/wasm32-wasip2/release/symthaea_hello_control_extension.wasm"
+          test -s "$component"
+          sha256sum "$component"
+
+      - name: Upload hello-control component fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-control-component
+          path: examples/extensions/hello-control/target/wasm32-wasip2/release/symthaea_hello_control_extension.wasm
+          if-no-files-found: error
