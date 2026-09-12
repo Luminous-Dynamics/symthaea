@@ -87,10 +87,9 @@ fn run_arm(enable_broadcasting: bool) -> ArmResult {
     ));
     let assessment = workspace.process();
 
-    let probes = Arc::try_unwrap(probes)
-        .expect("all broadcast handler references should be owned by workspace/probe only")
-        .into_inner()
-        .expect("probe mutex poisoned");
+    // Snapshot while handlers are still owned by the workspace. The experiment
+    // must not depend on handler destruction or Arc reference-count behavior.
+    let probes = probes.lock().expect("probe mutex poisoned").clone();
 
     ArmResult {
         workspace_entries: assessment.conscious_contents.len(),
