@@ -20,7 +20,11 @@ pub mod execution_recovery;
 pub mod memory_identity;
 pub mod memory_intervention;
 pub mod memory_quarantine;
+pub mod memory_quarantine_anchored;
+mod memory_quarantine_anchored_conversions;
 pub mod memory_restore;
+pub mod quarantine_intent_ledger;
+pub mod quarantine_intent_persistence;
 pub mod quarantine_ledger_persistence;
 pub mod quarantine_state_ledger;
 #[path = "replay_recovery_v2.rs"]
