@@ -1,0 +1,16 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Runtime welfare-assurance root.
+//!
+//! The established permit implementation remains isolated in `entry.rs`; this root layers the
+//! moral-patient evidence-context commitment on top without making the lower-level interlock
+//! reinterpret consciousness evidence itself.
+
+#![deny(unsafe_code)]
+
+#[path = "entry.rs"]
+mod permit;
+
+pub use permit::*;
+
+pub mod evidence_context;
