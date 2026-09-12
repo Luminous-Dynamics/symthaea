@@ -99,7 +99,6 @@ fn run() -> Result<(), String> {
 
     let output = json!({
         "schema": "symthaea.matbench-fold-audit.v0",
-        "artifact_path": artifact_path,
         "fold_receipts": receipts,
     });
     println!(
