@@ -7,9 +7,14 @@
 //! cognition. It must not become a parallel reasoning, world-model, causal,
 //! metacognitive, or authority stack.
 
+pub mod consequence;
 pub mod constitution;
 pub mod hidden_world;
 
+pub use consequence::{
+    ConsequenceMetrics, ConsequencePrediction, ConsequenceScore, ConsequenceScoringError,
+    PredictionOutcome, copy_current_state_baseline, score_consequence,
+};
 pub use constitution::{
     EUREKA_CLAIM_SPECS, EvidenceClass, ProtocolInvariant, ScientificDisposition,
     UnderstandingClaimFamily, UnderstandingClaimSpec, UnderstandingMaturity,
