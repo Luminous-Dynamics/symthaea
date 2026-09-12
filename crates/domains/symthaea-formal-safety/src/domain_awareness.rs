@@ -42,10 +42,14 @@ pub enum DomainAwarenessObligation {
     CommonCauseDiversityGatesCorroboration,
     RecoveryRequiresSustainedRequalification,
     EvidenceCannotSelfDischarge,
+    CurrentEvidenceApplicabilityRequired,
+    ConfigurationDriftInvalidatesEvidence,
+    EvidenceIntegrityHoldsPropagate,
+    TrustedTimeGatesReadiness,
 }
 
 impl DomainAwarenessObligation {
-    pub const ALL: [Self; 23] = [
+    pub const ALL: [Self; 27] = [
         Self::ObservationIsNotIdentityIntentOrAuthority,
         Self::IdentityIsNotIntentOrAuthority,
         Self::UncertaintyStatesRemainRepresentable,
@@ -69,6 +73,10 @@ impl DomainAwarenessObligation {
         Self::CommonCauseDiversityGatesCorroboration,
         Self::RecoveryRequiresSustainedRequalification,
         Self::EvidenceCannotSelfDischarge,
+        Self::CurrentEvidenceApplicabilityRequired,
+        Self::ConfigurationDriftInvalidatesEvidence,
+        Self::EvidenceIntegrityHoldsPropagate,
+        Self::TrustedTimeGatesReadiness,
     ];
 
     /// Stable human-review code. Existing codes must not be renumbered.
@@ -97,6 +105,10 @@ impl DomainAwarenessObligation {
             Self::CommonCauseDiversityGatesCorroboration => "DA-021",
             Self::RecoveryRequiresSustainedRequalification => "DA-022",
             Self::EvidenceCannotSelfDischarge => "DA-023",
+            Self::CurrentEvidenceApplicabilityRequired => "DA-024",
+            Self::ConfigurationDriftInvalidatesEvidence => "DA-025",
+            Self::EvidenceIntegrityHoldsPropagate => "DA-026",
+            Self::TrustedTimeGatesReadiness => "DA-027",
         }
     }
 
@@ -171,6 +183,18 @@ impl DomainAwarenessObligation {
             Self::EvidenceCannotSelfDischarge => {
                 "candidate evidence and verified receipts cannot by themselves discharge safety obligations or grant deployment readiness"
             }
+            Self::CurrentEvidenceApplicabilityRequired => {
+                "deployment readiness requires currently applicable evidence bound to the exact reviewed safety contract; expired, revoked, superseded, or unresolved contradicted evidence cannot satisfy readiness"
+            }
+            Self::ConfigurationDriftInvalidatesEvidence => {
+                "changes to the reviewed deployment configuration, model manifest, or calibration manifest invalidate prior evidence unless replacement evidence is explicitly qualified for the new context"
+            }
+            Self::EvidenceIntegrityHoldsPropagate => {
+                "cross-cutting evidence-integrity holds such as verifier compromise, artifact corruption, or methodology invalidation propagate to all matching evidence until reviewed resolution and any required replacement"
+            }
+            Self::TrustedTimeGatesReadiness => {
+                "time-sensitive safety evidence is accepted only under a reviewed trusted-time policy, and readiness must hold across the complete clock-uncertainty interval without rollback or replay"
+            }
         }
     }
 
@@ -195,7 +219,11 @@ impl DomainAwarenessObligation {
             | Self::NegativeOnlyStressEvidenceRequired
             | Self::CommonCauseDiversityGatesCorroboration
             | Self::RecoveryRequiresSustainedRequalification
-            | Self::EvidenceCannotSelfDischarge => EvidenceKind::Test,
+            | Self::EvidenceCannotSelfDischarge
+            | Self::CurrentEvidenceApplicabilityRequired
+            | Self::ConfigurationDriftInvalidatesEvidence
+            | Self::EvidenceIntegrityHoldsPropagate
+            | Self::TrustedTimeGatesReadiness => EvidenceKind::Test,
             Self::TimeCalibrationAndLineageRemainAuditable
             | Self::ContradictionsAndAbstentionsRemainAuditable => EvidenceKind::Telemetry,
             Self::RecoveryProcedureIsReviewed => EvidenceKind::Standard,
@@ -273,8 +301,28 @@ mod tests {
             "DA-023"
         );
         assert_eq!(
+            DomainAwarenessObligation::CurrentEvidenceApplicabilityRequired.code(),
+            "DA-024"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::ConfigurationDriftInvalidatesEvidence.code(),
+            "DA-025"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::EvidenceIntegrityHoldsPropagate.code(),
+            "DA-026"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::TrustedTimeGatesReadiness.code(),
+            "DA-027"
+        );
+        assert_eq!(
             DomainAwarenessObligation::PassiveRfSilenceIsNotSafety.expected_evidence(),
             EvidenceKind::FormalProof
+        );
+        assert_eq!(
+            DomainAwarenessObligation::TrustedTimeGatesReadiness.expected_evidence(),
+            EvidenceKind::Test
         );
     }
 }
