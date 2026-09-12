@@ -100,17 +100,14 @@ pub fn assess_legacy_qualification_generation_with_bound_verified_semantic_revie
                 legacy_qualification_manifest_commitment_v1(predecessor)
                     .map_err(|err| LegacyVerifiedGenerationAssessmentErrorV1::Manifest(err.to_string()))?;
             let successor_manifest_blake3 = generation_assessment.manifest_blake3.clone();
-            Ok::<_, LegacyVerifiedGenerationAssessmentErrorV1>(
-                LegacySemanticReviewQualificationBindingV1 {
-                    semantic_review_ledger_blake3: review_ledger_blake3,
-                    verifier_profile: verified.verifier_profile().to_string(),
-                    semantic_trust_bundle_blake3: verified.trust_bundle_blake3().to_string(),
-                    verified_at_unix_ms: verified.verified_at_unix_ms(),
-                    predecessor_manifest_blake3,
-                    successor_manifest_blake3,
-                },
-            )?
-            .into()
+            Some(LegacySemanticReviewQualificationBindingV1 {
+                semantic_review_ledger_blake3: review_ledger_blake3,
+                verifier_profile: verified.verifier_profile().to_string(),
+                semantic_trust_bundle_blake3: verified.trust_bundle_blake3().to_string(),
+                verified_at_unix_ms: verified.verified_at_unix_ms(),
+                predecessor_manifest_blake3,
+                successor_manifest_blake3,
+            })
         }
     };
 
