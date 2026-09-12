@@ -53,6 +53,8 @@ pub struct QualifiedScaleAnalysisCandidate {
     pub authority_scope: &'static str,
     pub subject_revision: String,
     pub source_tree_digest: String,
+    pub toolchain_digest: String,
+    pub build_profile: String,
     pub ensemble_manifest_digest: String,
     pub configuration_digest: String,
     pub selected_block_size: usize,
@@ -67,13 +69,14 @@ pub struct QualifiedScaleAnalysisCandidate {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnalysisAuthorityError {
     WrongPreregistrationManifest,
+    InvalidPreregistrationRecord,
     PolicyNotPredeclared,
     PredeclaredPolicyNotSatisfied,
     EmptyField(&'static str),
     InvalidCiRunId,
+    InvalidCiQualificationTimestamp,
     CiDidNotPass(ExactHeadCiConclusion),
     SubjectRevisionMismatch,
-    QualificationNotAfterAnalysis,
     EnsembleManifestMismatch,
     SelectedBlockMismatch,
     ResamplingArtifactMismatch,
@@ -87,6 +90,38 @@ fn require_nonempty(value: &str, field: &'static str) -> Result<(), AnalysisAuth
     }
 }
 
+fn validate_preregistration(
+    preregistration: &PredeclaredQualificationBinding,
+) -> Result<(), AnalysisAuthorityError> {
+    if preregistration.manifest_id != QUALIFICATION_POLICY_MANIFEST_ID {
+        return Err(AnalysisAuthorityError::WrongPreregistrationManifest);
+    }
+    if preregistration.freeze_timestamp_unix_ns == 0
+        || preregistration.analysis_started_unix_ns <= preregistration.freeze_timestamp_unix_ns
+        || preregistration.canonical_policy_material.trim().is_empty()
+        || preregistration.frozen_policy_artifact_digest.trim().is_empty()
+        || preregistration.code_revision.trim().is_empty()
+        || preregistration.configuration_digest.trim().is_empty()
+        || preregistration.ensemble_manifest_digest.trim().is_empty()
+        || preregistration.selected_block_size == 0
+    {
+        return Err(AnalysisAuthorityError::InvalidPreregistrationRecord);
+    }
+    let expected_policy_result = preregistration.block_adequacy_policy_satisfied
+        && preregistration.block_stability_policy_satisfied
+        && preregistration.promotion_policy_satisfied;
+    if preregistration.meets_predeclared_policy != expected_policy_result {
+        return Err(AnalysisAuthorityError::InvalidPreregistrationRecord);
+    }
+    if !preregistration.predeclared_before_analysis {
+        return Err(AnalysisAuthorityError::PolicyNotPredeclared);
+    }
+    if !preregistration.meets_predeclared_policy {
+        return Err(AnalysisAuthorityError::PredeclaredPolicyNotSatisfied);
+    }
+    Ok(())
+}
+
 fn validate_ci(ci: &ExactHeadCiEvidence) -> Result<(), AnalysisAuthorityError> {
     require_nonempty(&ci.subject_revision, "subject_revision")?;
     require_nonempty(&ci.source_tree_digest, "source_tree_digest")?;
@@ -95,6 +130,9 @@ fn validate_ci(ci: &ExactHeadCiEvidence) -> Result<(), AnalysisAuthorityError> {
     require_nonempty(&ci.build_profile, "build_profile")?;
     if ci.ci_run_id == 0 {
         return Err(AnalysisAuthorityError::InvalidCiRunId);
+    }
+    if ci.qualification_timestamp_unix_ns == 0 {
+        return Err(AnalysisAuthorityError::InvalidCiQualificationTimestamp);
     }
     if ci.conclusion != ExactHeadCiConclusion::Passed {
         return Err(AnalysisAuthorityError::CiDidNotPass(ci.conclusion));
@@ -126,8 +164,10 @@ fn validate_artifacts(lineage: &ScaleAnalysisArtifactLineage) -> Result<(), Anal
 }
 
 /// Bind a preregistered, policy-satisfying scale analysis to exact-head CI and
-/// immutable artifacts. Construction proves lineage consistency only; it does
-/// not elevate the result to a physical lattice-QCD claim.
+/// immutable artifacts. CI may legitimately predate the scientific analysis;
+/// the required invariant is exact subject identity, not CI/analysis ordering.
+/// Construction proves lineage consistency only and does not elevate the result
+/// to a physical lattice-QCD claim.
 pub fn bind_qualified_scale_analysis_candidate(
     preregistration: &PredeclaredQualificationBinding,
     scale: &JointJackknifeScaleEstimateEvidence,
@@ -135,24 +175,13 @@ pub fn bind_qualified_scale_analysis_candidate(
     artifacts: &ScaleAnalysisArtifactLineage,
     ci_evidence_id: &str,
 ) -> Result<QualifiedScaleAnalysisCandidate, AnalysisAuthorityError> {
-    if preregistration.manifest_id != QUALIFICATION_POLICY_MANIFEST_ID {
-        return Err(AnalysisAuthorityError::WrongPreregistrationManifest);
-    }
-    if !preregistration.predeclared_before_analysis {
-        return Err(AnalysisAuthorityError::PolicyNotPredeclared);
-    }
-    if !preregistration.meets_predeclared_policy {
-        return Err(AnalysisAuthorityError::PredeclaredPolicyNotSatisfied);
-    }
+    validate_preregistration(preregistration)?;
     require_nonempty(ci_evidence_id, "ci_evidence_id")?;
     validate_ci(ci)?;
     validate_artifacts(artifacts)?;
 
     if ci.subject_revision != preregistration.code_revision {
         return Err(AnalysisAuthorityError::SubjectRevisionMismatch);
-    }
-    if ci.qualification_timestamp_unix_ns <= preregistration.analysis_started_unix_ns {
-        return Err(AnalysisAuthorityError::QualificationNotAfterAnalysis);
     }
     if scale.scale.ensemble_manifest_digest != preregistration.ensemble_manifest_digest {
         return Err(AnalysisAuthorityError::EnsembleManifestMismatch);
@@ -174,6 +203,8 @@ pub fn bind_qualified_scale_analysis_candidate(
         authority_scope: QUALIFIED_SCALE_ANALYSIS_CANDIDATE_SCOPE,
         subject_revision: ci.subject_revision.clone(),
         source_tree_digest: ci.source_tree_digest.clone(),
+        toolchain_digest: ci.toolchain_digest.clone(),
+        build_profile: ci.build_profile.clone(),
         ensemble_manifest_digest: preregistration.ensemble_manifest_digest.clone(),
         configuration_digest: preregistration.configuration_digest.clone(),
         selected_block_size: preregistration.selected_block_size,
@@ -189,8 +220,8 @@ pub fn bind_qualified_scale_analysis_candidate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lattice_flow_scale_evidence::{FlowScaleEstimateEvidence, FlowScaleKind};
     use crate::lattice_flow_joint_jackknife::JOINT_BLOCKED_JACKKNIFE_ID;
+    use crate::lattice_flow_scale_evidence::{FlowScaleEstimateEvidence, FlowScaleKind};
 
     fn preregistration() -> PredeclaredQualificationBinding {
         PredeclaredQualificationBinding {
@@ -248,7 +279,7 @@ mod tests {
             toolchain_digest: "toolchain-sha256".into(),
             build_profile: "rust-1.96-release".into(),
             conclusion: ExactHeadCiConclusion::Passed,
-            qualification_timestamp_unix_ns: 3_000,
+            qualification_timestamp_unix_ns: 1_500,
         }
     }
 
@@ -268,9 +299,21 @@ mod tests {
     fn exact_head_passed_ci_yields_analysis_candidate_scope_only() {
         let receipt = bind_qualified_scale_analysis_candidate(
             &preregistration(), &scale(), &ci(), &artifacts(), "ci-evidence",
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(receipt.authority_scope, QUALIFIED_SCALE_ANALYSIS_CANDIDATE_SCOPE);
         assert_eq!(receipt.subject_revision, "exact-head-sha");
+        assert_eq!(receipt.toolchain_digest, "toolchain-sha256");
+    }
+
+    #[test]
+    fn ci_may_predate_analysis_when_exact_subject_identity_matches() {
+        let mut ci = ci();
+        ci.qualification_timestamp_unix_ns = 1_500;
+        assert!(bind_qualified_scale_analysis_candidate(
+            &preregistration(), &scale(), &ci, &artifacts(), "ci-evidence",
+        )
+        .is_ok());
     }
 
     #[test]
@@ -298,18 +341,6 @@ mod tests {
     }
 
     #[test]
-    fn ci_must_postdate_analysis_subject() {
-        let mut ci = ci();
-        ci.qualification_timestamp_unix_ns = 2_000;
-        assert!(matches!(
-            bind_qualified_scale_analysis_candidate(
-                &preregistration(), &scale(), &ci, &artifacts(), "ci-evidence",
-            ),
-            Err(AnalysisAuthorityError::QualificationNotAfterAnalysis)
-        ));
-    }
-
-    #[test]
     fn artifact_lineage_must_match_bound_resampling() {
         let mut artifacts = artifacts();
         artifacts.resampling_artifact_digest = "other-resampling".into();
@@ -318,6 +349,18 @@ mod tests {
                 &preregistration(), &scale(), &ci(), &artifacts, "ci-evidence",
             ),
             Err(AnalysisAuthorityError::ResamplingArtifactMismatch)
+        ));
+    }
+
+    #[test]
+    fn forged_preregistration_boolean_is_rejected() {
+        let mut prereg = preregistration();
+        prereg.block_stability_policy_satisfied = false;
+        assert!(matches!(
+            bind_qualified_scale_analysis_candidate(
+                &prereg, &scale(), &ci(), &artifacts(), "ci-evidence",
+            ),
+            Err(AnalysisAuthorityError::InvalidPreregistrationRecord)
         ));
     }
 }
