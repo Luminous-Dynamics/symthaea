@@ -6,7 +6,6 @@
 
 use std::collections::BTreeSet;
 
-use serde::{Deserialize, Serialize};
 use symthaea_evidence_atomic_coverage::{
     AtomicCoveragePolicy, AtomicCoverageReport, FacetEvidenceBinding, assess_atomic_coverage,
 };
@@ -26,7 +25,7 @@ use symthaea_evidence_verifier_diversity::{
 };
 use symthaea_formal_safety::{SafetyCase, SafetyEvidenceReceipt, StrictSafetyCaseStatus};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeepEvidenceReadinessReport {
     pub status: StrictSafetyCaseStatus,
     pub earliest_active_receipt_count: usize,
