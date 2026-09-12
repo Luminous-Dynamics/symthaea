@@ -10,6 +10,7 @@
 //! - creation never grants authority;
 //! - concurrent/stale decisions cannot double-spend the same ledger snapshot;
 //! - evaluated resource intent cannot be substituted at commit time;
+//! - commit time cannot precede the authorization evaluation time;
 //! - descendant creation consumes both subject-subtree and lineage-tree budgets;
 //! - ancestor grant ceilings remain binding on later descendants;
 //! - capability ceilings attenuate across descendant creation and cannot widen;
@@ -325,6 +326,7 @@ pub enum LedgerError {
     AncestorGrantRevoked(SubjectId),
     StaleGrantGeneration,
     AuthorityScopeMutation,
+    AuthorityTimeBeforeEvaluation { evaluated_at: u64, committed_at: u64 },
     AuthorityExpired,
     ActionResourceMismatch { authorized: u64, committed: u64 },
     AuthorityRiskMismatch,
@@ -648,12 +650,19 @@ impl ReplicationLedger {
         // the source of truth for every accounting and evidence write.
         let resource_units = authorized_resource_units;
 
-        let parent = authorization.subject();
-        let output_lineage = authorization.lineage();
-        if self.subjects.contains_key(&child) { return Err(LedgerError::DuplicateSubject(child)); }
+        if now_unix_secs < authorization.evaluated_at_unix_secs() {
+            return Err(LedgerError::AuthorityTimeBeforeEvaluation {
+                evaluated_at: authorization.evaluated_at_unix_secs(),
+                committed_at: now_unix_secs,
+            });
+        }
         if now_unix_secs >= authorization.expires_at_unix_secs() {
             return Err(LedgerError::AuthorityExpired);
         }
+
+        let parent = authorization.subject();
+        let output_lineage = authorization.lineage();
+        if self.subjects.contains_key(&child) { return Err(LedgerError::DuplicateSubject(child)); }
         self.validate_runtime_witness(authorization, runtime)?;
         self.ensure_subject_tree_active(parent)?;
         self.ensure_lineage_tree_active(output_lineage)?;
@@ -1073,6 +1082,63 @@ mod tests {
             assert_eq!(l.subject_snapshot(sid(1)).unwrap().subtree_resource_units, 10);
             assert_eq!(l.lineage_snapshot(lid(1)).unwrap().subtree_resource_units, 10);
         }
+    }
+
+    #[test]
+    fn temporal_monotonicity_rejects_pre_evaluation_without_state_mutation() {
+        let mut l = ledger();
+        let auth = authorize(&l, sid(1), lid(1), 1, 10);
+        assert_eq!(auth.evaluated_at_unix_secs(), 100);
+
+        let cursor_before = l.cursor();
+        let events_before = l.events().len();
+        let root_before = l.subject_snapshot(sid(1)).unwrap();
+        let lineage_before = l.lineage_snapshot(lid(1)).unwrap();
+
+        assert_eq!(
+            l.commit_descendant(mid(1), &auth, sid(2), 10, 99, &runtime()),
+            Err(LedgerError::AuthorityTimeBeforeEvaluation {
+                evaluated_at: 100,
+                committed_at: 99,
+            })
+        );
+
+        assert_eq!(l.cursor(), cursor_before);
+        assert_eq!(l.events().len(), events_before);
+        assert_eq!(l.subject_snapshot(sid(1)).unwrap(), root_before);
+        assert_eq!(l.lineage_snapshot(lid(1)).unwrap(), lineage_before);
+        assert_eq!(
+            l.subject_snapshot(sid(2)),
+            Err(LedgerError::UnknownSubject(sid(2)))
+        );
+
+        // Invalid time must not consume the mutation ID.
+        l.commit_descendant(mid(1), &auth, sid(2), 10, 100, &runtime())
+            .unwrap();
+    }
+
+    #[test]
+    fn authorization_time_interval_is_half_open() {
+        let mut at_evaluation = ledger();
+        let auth = authorize(&at_evaluation, sid(1), lid(1), 1, 1);
+        at_evaluation
+            .commit_descendant(mid(1), &auth, sid(2), 1, 100, &runtime())
+            .unwrap();
+
+        let mut at_expiry = ledger();
+        let auth = authorize(&at_expiry, sid(1), lid(1), 1, 1);
+        assert_eq!(
+            at_expiry.commit_descendant(mid(1), &auth, sid(2), 1, 1_000, &runtime()),
+            Err(LedgerError::AuthorityExpired)
+        );
+        assert_eq!(at_expiry.cursor().sequence, 0);
+
+        // Expiry denial must not consume the mutation ID either.
+        assert_eq!(
+            at_expiry.commit_descendant(mid(1), &auth, sid(2), 1, 1_001, &runtime()),
+            Err(LedgerError::AuthorityExpired)
+        );
+        assert_eq!(at_expiry.cursor().sequence, 0);
     }
 
     #[test]
