@@ -14,6 +14,8 @@
 //!   Polyakov loops, and local gauge transformations
 //! - **Lattice update primitives**: deterministic embedded-SU(2) Metropolis
 //!   proposal steps with local six-plaquette action deltas
+//! - **Reference overrelaxation**: orientation-agnostic finite-probe subgroup
+//!   reflections that preserve the local Wilson action microcanonically
 //!
 //! ## Natural Units
 //!
@@ -27,6 +29,7 @@
 //! - Georgi, H. (1999). *Lie Algebras in Particle Physics*.
 //! - Wilson, K. G. (1974). Phys. Rev. D 10, 2445.
 //! - Cabibbo, N. & Marinari, E. (1982). Phys. Lett. B 119, 387-390.
+//! - Brown, F. R. & Woch, T. J. (1987). Phys. Rev. Lett. 58, 2394.
 
 pub mod constants;
 pub mod cross_sections;
@@ -35,6 +38,7 @@ pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_metropolis;
+pub mod lattice_overrelaxation;
 pub mod lattice_qcd;
 pub mod relativistic_qm;
 pub mod renormalization;
@@ -59,6 +63,11 @@ pub use lattice_metropolis::{
     LatticeMetropolisError, MetropolisStepResult, Su2Subgroup, Su2SubgroupProposal,
     affected_wilson_action, embedded_su2_rotation, metropolis_acceptance_probability,
     metropolis_subgroup_step,
+};
+pub use lattice_overrelaxation::{
+    AffineSubgroupForce, LatticeOverrelaxationError, OverrelaxationStepResult,
+    equal_action_reflection, overrelax_subgroup_reference, probe_affine_subgroup_force,
+    touching_trace_sum,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
