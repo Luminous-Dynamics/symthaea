@@ -3,10 +3,10 @@
 //! Public-API parity with the independent ETK-3C native analytical oracle.
 
 use symthaea_engineering_analysis_trust::{
-    AnalysisTrustErrorV1, AnalyticalAcceptancePolicyV1, AnalyticalMethodV1,
-    CurrentnessAssertionIdV1, ExecutionArtifactDigestV1, ModelQualificationRecordDigestV1,
-    NativeAnalyticalPlanV1, NativeAnalyticalResultV1, RectangularCantileverInputV1,
-    RequirementRevisionIdV1, Sha256DigestV1, SubjectRevisionIdV1, TwinRevisionIdV1,
+    AcceptedAnalysisRequirementV1, AnalysisTrustErrorV1, AnalyticalAcceptancePolicyV1,
+    AnalyticalMethodV1, CurrentnessAssertionIdV1, ExecutionArtifactDigestV1,
+    ModelQualificationRecordDigestV1, NativeAnalyticalPlanV1, NativeAnalyticalResultV1,
+    RectangularCantileverInputV1, Sha256DigestV1, SubjectRevisionIdV1, TwinRevisionIdV1,
     ValidityDomainRevisionIdV1, admit_native_analytical_evidence_v1,
     analytical_obligation_revision_v1, canonical_binary64_v1,
     derive_current_native_analytical_discharge_fact_v1,
@@ -45,6 +45,16 @@ const CURRENT_FACT: &str =
 
 fn digest(ch: char) -> String {
     format!("sha256:{}", ch.to_string().repeat(64))
+}
+
+fn requirement() -> AcceptedAnalysisRequirementV1 {
+    AcceptedAnalysisRequirementV1::civil_blocking(
+        "REQ-STRESS",
+        "stress remains below allowable",
+        ["stress <= 250 MPa"],
+        Sha256DigestV1::parse(digest('a')).unwrap(),
+    )
+    .unwrap()
 }
 
 fn obligation() -> ProofObligation {
@@ -95,7 +105,7 @@ fn plan_with_currentness(
     currentness: &str,
 ) -> NativeAnalyticalPlanV1 {
     NativeAnalyticalPlanV1::new(
-        RequirementRevisionIdV1::parse(REQUIREMENT).unwrap(),
+        &requirement(),
         SubjectRevisionIdV1::parse(SUBJECT).unwrap(),
         TwinRevisionIdV1::parse(TWIN).unwrap(),
         ValidityDomainRevisionIdV1::parse(VALIDITY).unwrap(),
@@ -126,6 +136,7 @@ fn result(
 
 #[test]
 fn independent_vectors_compose_end_to_end() {
+    assert_eq!(requirement().revision_id().as_str(), REQUIREMENT);
     assert_eq!(
         analytical_obligation_revision_v1(&obligation())
             .unwrap()
