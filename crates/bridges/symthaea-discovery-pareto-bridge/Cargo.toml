@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-discovery-pareto-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Strict adapter from Symthaea discovery evaluations to the shared domain-neutral Pareto kernel."
+
+[dependencies]
+symthaea-discovery = { path = "../../core/symthaea-discovery" }
+symthaea-pareto = { path = "../../core/symthaea-pareto" }
+thiserror = { workspace = true }
