@@ -32,7 +32,7 @@ pub struct ProposalTuningStep {
     pub angle_used: f64,
     pub acceptance_rate: f64,
     pub mean_acceptance_probability: f64,
-    /// Additive change applied in log-angle space after this sweep.
+    /// Actual additive change applied in log-angle space after clamping to bounds.
     pub log_angle_adjustment: f64,
     pub next_angle: f64,
 }
@@ -53,6 +53,7 @@ pub enum ProposalTuningError {
     InvalidTargetAcceptance(f64),
     InvalidGain(f64),
     InvalidTuningSweeps(u64),
+    TuningSweepCountTooLarge(u64),
     Rng(LatticeRngError),
     Sweep(LatticeSweepError),
 }
@@ -97,6 +98,8 @@ impl ProposalTuningConfig {
         if self.tuning_sweeps == 0 {
             return Err(ProposalTuningError::InvalidTuningSweeps(0));
         }
+        usize::try_from(self.tuning_sweeps)
+            .map_err(|_| ProposalTuningError::TuningSweepCountTooLarge(self.tuning_sweeps))?;
         Ok(())
     }
 }
@@ -107,12 +110,13 @@ fn adapt_angle(
     config: ProposalTuningConfig,
     sweep_index: u64,
 ) -> (f64, f64) {
+    let current_log = current_angle.ln();
     let step_size = config.gain / ((sweep_index + 1) as f64).sqrt();
-    let adjustment = step_size * (observed_acceptance - config.target_acceptance);
+    let requested_adjustment = step_size * (observed_acceptance - config.target_acceptance);
     let log_min = config.min_angle.ln();
     let log_max = config.max_angle.ln();
-    let next_log = (current_angle.ln() + adjustment).clamp(log_min, log_max);
-    (next_log.exp(), adjustment)
+    let next_log = (current_log + requested_adjustment).clamp(log_min, log_max);
+    (next_log.exp(), next_log - current_log)
 }
 
 /// Adapt proposal width during a dedicated warm-up phase.
@@ -132,6 +136,8 @@ pub fn tune_chacha8_metropolis_proposal(
     rank: u16,
 ) -> Result<ProposalTuningResult, ProposalTuningError> {
     config.validate()?;
+    let history_capacity = usize::try_from(config.tuning_sweeps)
+        .map_err(|_| ProposalTuningError::TuningSweepCountTooLarge(config.tuning_sweeps))?;
     let coordinates = LatticeStreamCoordinates {
         domain: LatticeStreamDomain::GaugeTuning,
         ensemble_slot,
@@ -141,7 +147,7 @@ pub fn tune_chacha8_metropolis_proposal(
     let mut source = LatticeChaCha8Stream::new(seed, coordinates)?;
     let tuning_stream_id = source.stream_id();
     let mut angle = config.initial_angle;
-    let mut history = Vec::with_capacity(config.tuning_sweeps as usize);
+    let mut history = Vec::with_capacity(history_capacity);
 
     for sweep_index in 0..config.tuning_sweeps {
         let stats = metropolis_sweep(
@@ -197,17 +203,19 @@ mod tests {
     }
 
     #[test]
-    fn adaptation_respects_declared_bounds() {
+    fn adaptation_respects_declared_bounds_and_records_applied_step() {
         let cfg = ProposalTuningConfig {
             min_angle: 0.1,
             max_angle: 0.3,
             gain: 100.0,
             ..config()
         };
-        let (upper, _) = adapt_angle(0.2, 0.99, cfg, 0);
-        let (lower, _) = adapt_angle(0.2, 0.01, cfg, 0);
+        let (upper, upper_applied) = adapt_angle(0.2, 0.99, cfg, 0);
+        let (lower, lower_applied) = adapt_angle(0.2, 0.01, cfg, 0);
         assert!((upper - 0.3).abs() < 1e-12);
         assert!((lower - 0.1).abs() < 1e-12);
+        assert!((upper_applied - (0.3_f64 / 0.2).ln()).abs() < 1e-12);
+        assert!((lower_applied - (0.1_f64 / 0.2).ln()).abs() < 1e-12);
     }
 
     #[test]
