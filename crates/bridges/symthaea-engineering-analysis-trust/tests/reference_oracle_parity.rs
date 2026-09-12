@@ -48,13 +48,9 @@ fn digest(ch: char) -> String {
 }
 
 fn requirement() -> AcceptedAnalysisRequirementV1 {
-    AcceptedAnalysisRequirementV1::civil_blocking(
-        "REQ-STRESS",
-        "stress remains below allowable",
-        ["stress <= 250 MPa"],
+    AcceptedAnalysisRequirementV1::civil_service_stress_250_mpa(
         Sha256DigestV1::parse(digest('a')).unwrap(),
     )
-    .unwrap()
 }
 
 fn obligation() -> ProofObligation {
@@ -198,6 +194,35 @@ fn input_drift_cannot_reuse_an_old_plan() {
         admit_native_analytical_evidence_v1(&plan, &method, &changed, &policy, &result)
             .unwrap_err(),
         AnalysisTrustErrorV1::PlanBindingMismatch
+    );
+}
+
+#[test]
+fn policy_must_be_conservative_enough_for_the_accepted_requirement() {
+    let method = method();
+    let input = input(&method, 1000.0);
+    let weak_policy = AnalyticalAcceptancePolicyV1::factor_of_safety_ge(
+        0.5,
+        0.05,
+        ModelQualificationRecordDigestV1::parse(digest('9')).unwrap(),
+    )
+    .unwrap();
+
+    let plan = NativeAnalyticalPlanV1::new(
+        &requirement(),
+        SubjectRevisionIdV1::parse(SUBJECT).unwrap(),
+        TwinRevisionIdV1::parse(TWIN).unwrap(),
+        ValidityDomainRevisionIdV1::parse(VALIDITY).unwrap(),
+        CurrentnessAssertionIdV1::parse(CURRENTNESS).unwrap(),
+        &obligation(),
+        &method,
+        &input,
+        &weak_policy,
+    );
+
+    assert_eq!(
+        plan.unwrap_err(),
+        AnalysisTrustErrorV1::PolicyDoesNotDischargeRequirement
     );
 }
 
