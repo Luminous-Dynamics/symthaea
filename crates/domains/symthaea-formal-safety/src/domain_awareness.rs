@@ -52,10 +52,14 @@ pub enum DomainAwarenessObligation {
     CurrentPolicyMustBeSignedLineageTip,
     ManifestSigningAuthorityIsExternallyGoverned,
     PolicyLineageRequiresExternalRollbackAnchor,
+    CurrentPolicyAnchorRequiresMonotonicTrustRoot,
+    TrustStoreAttestationRequiresIndependentVerification,
+    TrustStoreRecoveryPreservesExactContinuity,
+    TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant,
 }
 
 impl DomainAwarenessObligation {
-    pub const ALL: [Self; 33] = [
+    pub const ALL: [Self; 37] = [
         Self::ObservationIsNotIdentityIntentOrAuthority,
         Self::IdentityIsNotIntentOrAuthority,
         Self::UncertaintyStatesRemainRepresentable,
@@ -89,6 +93,10 @@ impl DomainAwarenessObligation {
         Self::CurrentPolicyMustBeSignedLineageTip,
         Self::ManifestSigningAuthorityIsExternallyGoverned,
         Self::PolicyLineageRequiresExternalRollbackAnchor,
+        Self::CurrentPolicyAnchorRequiresMonotonicTrustRoot,
+        Self::TrustStoreAttestationRequiresIndependentVerification,
+        Self::TrustStoreRecoveryPreservesExactContinuity,
+        Self::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant,
     ];
 
     /// Stable human-review code. Existing codes must not be renumbered.
@@ -127,6 +135,10 @@ impl DomainAwarenessObligation {
             Self::CurrentPolicyMustBeSignedLineageTip => "DA-031",
             Self::ManifestSigningAuthorityIsExternallyGoverned => "DA-032",
             Self::PolicyLineageRequiresExternalRollbackAnchor => "DA-033",
+            Self::CurrentPolicyAnchorRequiresMonotonicTrustRoot => "DA-034",
+            Self::TrustStoreAttestationRequiresIndependentVerification => "DA-035",
+            Self::TrustStoreRecoveryPreservesExactContinuity => "DA-036",
+            Self::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant => "DA-037",
         }
     }
 
@@ -231,6 +243,18 @@ impl DomainAwarenessObligation {
             Self::PolicyLineageRequiresExternalRollbackAnchor => {
                 "deployment readiness requires the signed assurance-policy lineage tip to match an externally provisioned monotonic checkpoint; truncated history, old-anchor substitution, or an uncheckpointed forward revision cannot remain ready"
             }
+            Self::CurrentPolicyAnchorRequiresMonotonicTrustRoot => {
+                "deployment readiness requires the current externally anchored policy tip to be bound to a valid monotonic trust-store checkpoint whose counter, anchor, policy state, and current segment cannot roll backward"
+            }
+            Self::TrustStoreAttestationRequiresIndependentVerification => {
+                "trust-store checkpoint and recovery attestation references cannot satisfy assurance unless independently verified against the exact store, counter epoch and value, checkpoint or recovery state, and verifier identity is distinct from the store or hardware being verified"
+            }
+            Self::TrustStoreRecoveryPreservesExactContinuity => {
+                "trust-store recovery requires explicit reviewed authorization and exact continuity from the accepted pre-loss checkpoint and backup into a distinct replacement store and counter epoch; stale backups, expired authorization, or state rollback cannot restore readiness"
+            }
+            Self::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant => {
+                "accepted trust-store recoveries are one-shot and fork-resistant; authorization, recovery commit, pre-loss checkpoint, replacement counter epoch, or first replacement checkpoint cannot be reused to create competing accepted trust roots"
+            }
         }
     }
 
@@ -265,7 +289,11 @@ impl DomainAwarenessObligation {
             | Self::CompositeObligationsRequireAtomicCoverage
             | Self::CurrentPolicyMustBeSignedLineageTip
             | Self::ManifestSigningAuthorityIsExternallyGoverned
-            | Self::PolicyLineageRequiresExternalRollbackAnchor => EvidenceKind::Test,
+            | Self::PolicyLineageRequiresExternalRollbackAnchor
+            | Self::CurrentPolicyAnchorRequiresMonotonicTrustRoot
+            | Self::TrustStoreAttestationRequiresIndependentVerification
+            | Self::TrustStoreRecoveryPreservesExactContinuity
+            | Self::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant => EvidenceKind::Test,
             Self::TimeCalibrationAndLineageRemainAuditable
             | Self::ContradictionsAndAbstentionsRemainAuditable => EvidenceKind::Telemetry,
             Self::RecoveryProcedureIsReviewed => EvidenceKind::Standard,
@@ -321,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn authority_boundary_rf_silence_and_governance_guards_are_typed() {
+    fn authority_boundary_rf_silence_governance_and_trust_root_guards_are_typed() {
         assert_eq!(
             DomainAwarenessObligation::IndependentFailClosedAuthorityBoundary.code(),
             "DA-015"
@@ -383,11 +411,27 @@ mod tests {
             "DA-033"
         );
         assert_eq!(
+            DomainAwarenessObligation::CurrentPolicyAnchorRequiresMonotonicTrustRoot.code(),
+            "DA-034"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::TrustStoreAttestationRequiresIndependentVerification.code(),
+            "DA-035"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::TrustStoreRecoveryPreservesExactContinuity.code(),
+            "DA-036"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant.code(),
+            "DA-037"
+        );
+        assert_eq!(
             DomainAwarenessObligation::PassiveRfSilenceIsNotSafety.expected_evidence(),
             EvidenceKind::FormalProof
         );
         assert_eq!(
-            DomainAwarenessObligation::PolicyLineageRequiresExternalRollbackAnchor
+            DomainAwarenessObligation::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant
                 .expected_evidence(),
             EvidenceKind::Test
         );
