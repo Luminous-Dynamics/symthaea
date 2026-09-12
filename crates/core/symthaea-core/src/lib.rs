@@ -80,6 +80,8 @@ pub mod genesis;
 pub mod hdc;
 /// Fail-closed implicit equality manifolds, local projection, and tangent bases.
 pub mod implicit_manifold;
+/// Qualified local charts, overlap witnesses, and partial finite-atlas evidence.
+pub mod manifold_atlas;
 /// Shared mathematical utilities: softmax, numerical helpers.
 pub mod math;
 /// Planar SO(2)/SE(2) configuration geometry built on the shared circle factor.
