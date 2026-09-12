@@ -11,8 +11,10 @@ Core theorem:
     != present-tense satisfied requirement
 
 V1 deliberately supports only an explicit AllOf decomposition.  Every bound
-obligation must be currently discharged under the exact current requirement
-revision.  Extra discharged obligations never compensate for a missing member.
+obligation must be represented by a lower-layer present-discharge fact under
+the exact current requirement revision.  Raw historical discharge receipts
+are deliberately not accepted here.  Extra discharge facts never compensate
+for a missing member.
 """
 from __future__ import annotations
 
@@ -138,34 +140,34 @@ def evaluate_current_satisfaction(
     contract: Any,
     *,
     current_requirement_revision_id: str,
-    current_discharges: Any,
+    current_discharge_facts: Any,
     currentness_assertion_id: str,
 ) -> dict[str, Any]:
     if not isinstance(contract, dict) or "verification_contract_id" not in contract:
         raise ClosureError("contract must be a constructed verification contract")
     req = digest(current_requirement_revision_id, "current_requirement_revision_id")
     currentness = digest(currentness_assertion_id, "currentness_assertion_id")
-    if not isinstance(current_discharges, list):
-        raise ClosureError("current_discharges must be a list")
+    if not isinstance(current_discharge_facts, list):
+        raise ClosureError("current_discharge_facts must be a list")
 
-    discharges: dict[str, str] = {}
-    for i, item in enumerate(current_discharges):
+    discharge_facts: dict[str, str] = {}
+    for i, item in enumerate(current_discharge_facts):
         if not isinstance(item, dict) or set(item) != {
             "obligation_revision_id",
-            "discharge_receipt_id",
+            "current_discharge_fact_id",
         }:
-            raise ClosureError(f"current_discharges[{i}] malformed")
+            raise ClosureError(f"current_discharge_facts[{i}] malformed")
         obligation = digest(
             item["obligation_revision_id"],
-            f"current_discharges[{i}].obligation_revision_id",
+            f"current_discharge_facts[{i}].obligation_revision_id",
         )
-        receipt = digest(
-            item["discharge_receipt_id"],
-            f"current_discharges[{i}].discharge_receipt_id",
+        fact = digest(
+            item["current_discharge_fact_id"],
+            f"current_discharge_facts[{i}].current_discharge_fact_id",
         )
-        if obligation in discharges:
-            raise ClosureError("duplicate current discharge for obligation revision")
-        discharges[obligation] = receipt
+        if obligation in discharge_facts:
+            raise ClosureError("duplicate current discharge fact for obligation revision")
+        discharge_facts[obligation] = fact
 
     if req != contract["requirement_revision_id"]:
         return {
@@ -176,7 +178,7 @@ def evaluate_current_satisfaction(
         }
 
     required = [r["obligation_revision_id"] for r in contract["relationships"]]
-    missing = sorted(ob for ob in required if ob not in discharges)
+    missing = sorted(ob for ob in required if ob not in discharge_facts)
     if missing:
         return {
             "decision": "RequirementUnsatisfied",
@@ -188,13 +190,13 @@ def evaluate_current_satisfaction(
     used = [
         {
             "obligation_revision_id": ob,
-            "discharge_receipt_id": discharges[ob],
+            "current_discharge_fact_id": discharge_facts[ob],
         }
         for ob in sorted(required)
     ]
     preimage = {
         "currentness_assertion_id": currentness,
-        "discharges": used,
+        "current_discharge_facts": used,
         "requirement_revision_id": req,
         "schema": SATISFACTION_SCHEMA,
         "verification_contract_id": contract["verification_contract_id"],
@@ -248,8 +250,8 @@ def self_test() -> None:
     partial = evaluate_current_satisfaction(
         contract,
         current_requirement_revision_id=REQ_ID,
-        current_discharges=[
-            {"obligation_revision_id": OBL_A, "discharge_receipt_id": "sha256:" + "71"*32}
+        current_discharge_facts=[
+            {"obligation_revision_id": OBL_A, "current_discharge_fact_id": "sha256:" + "71"*32}
         ],
         currentness_assertion_id=CURRENTNESS_ASSERTION,
     )
@@ -260,21 +262,21 @@ def self_test() -> None:
     complete = evaluate_current_satisfaction(
         contract,
         current_requirement_revision_id=REQ_ID,
-        current_discharges=[
-            {"obligation_revision_id": OBL_B, "discharge_receipt_id": "sha256:" + "72"*32},
-            {"obligation_revision_id": "sha256:" + "73"*32, "discharge_receipt_id": "sha256:" + "74"*32},
-            {"obligation_revision_id": OBL_A, "discharge_receipt_id": "sha256:" + "71"*32},
+        current_discharge_facts=[
+            {"obligation_revision_id": OBL_B, "current_discharge_fact_id": "sha256:" + "72"*32},
+            {"obligation_revision_id": "sha256:" + "73"*32, "current_discharge_fact_id": "sha256:" + "74"*32},
+            {"obligation_revision_id": OBL_A, "current_discharge_fact_id": "sha256:" + "71"*32},
         ],
         currentness_assertion_id=CURRENTNESS_ASSERTION,
     )
     assert complete["decision"] == "CurrentRequirementSatisfied"
-    assert [x["obligation_revision_id"] for x in complete["discharges"]] == sorted([OBL_A, OBL_B])
+    assert [x["obligation_revision_id"] for x in complete["current_discharge_facts"]] == sorted([OBL_A, OBL_B])
 
     # Requirement mutation makes the exact decomposition historical.
     historical = evaluate_current_satisfaction(
         contract,
         current_requirement_revision_id="sha256:" + "75"*32,
-        current_discharges=[],
+        current_discharge_facts=[],
         currentness_assertion_id=CURRENTNESS_ASSERTION,
     )
     assert historical["decision"] == "HistoricalVerificationContract"
@@ -283,9 +285,9 @@ def self_test() -> None:
     refreshed = evaluate_current_satisfaction(
         contract,
         current_requirement_revision_id=REQ_ID,
-        current_discharges=[
-            {"obligation_revision_id": OBL_A, "discharge_receipt_id": "sha256:" + "71"*32},
-            {"obligation_revision_id": OBL_B, "discharge_receipt_id": "sha256:" + "72"*32},
+        current_discharge_facts=[
+            {"obligation_revision_id": OBL_A, "current_discharge_fact_id": "sha256:" + "71"*32},
+            {"obligation_revision_id": OBL_B, "current_discharge_fact_id": "sha256:" + "72"*32},
         ],
         currentness_assertion_id="sha256:" + "76"*32,
     )
@@ -342,7 +344,7 @@ def main() -> int:
         result = evaluate_current_satisfaction(
             contract,
             current_requirement_revision_id=payload["current_requirement_revision_id"],
-            current_discharges=payload["current_discharges"],
+            current_discharge_facts=payload["current_discharge_facts"],
             currentness_assertion_id=payload["currentness_assertion_id"],
         )
         print(json.dumps({"contract": contract, "result": result}, sort_keys=True, separators=(",", ":")))
