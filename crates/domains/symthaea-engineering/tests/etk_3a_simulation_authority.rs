@@ -33,7 +33,7 @@ impl SimulationBackend for ConvergedFiniteElementBackend {
 }
 
 #[test]
-fn converged_simulation_updates_cognition_without_discharging_obligations() {
+fn converged_simulation_updates_cognition_without_mutating_obligation_authority() {
     let mut manager = EngineeringManager::new();
     manager.registry.register(ConvergedFiniteElementBackend);
 
@@ -49,6 +49,18 @@ fn converged_simulation_updates_cognition_without_discharging_obligations() {
         RequirementCriticality::Blocking,
         EvidenceKind::Simulation,
     ));
+    concept.add_requirement(EngineeringRequirement::new(
+        "REQ-DEFLECTION",
+        EngineeringDomain::Civil,
+        "deflection remains below serviceability limit",
+        RequirementCriticality::Blocking,
+        EvidenceKind::Simulation,
+    ));
+
+    // Preserve a non-default pre-existing authority state too. The old blanket
+    // loop would overwrite both Open and InProgress simulation obligations.
+    concept.safety_case.obligations[1].status = ObligationStatus::InProgress;
+
     concept.simulation_requests.push(SimulationRequest::new(
         "sim-static-G17-LC9",
         EngineeringDomain::Civil,
@@ -56,12 +68,15 @@ fn converged_simulation_updates_cognition_without_discharging_obligations() {
         "observe bracket service stress",
     ));
 
-    assert_eq!(concept.safety_case.obligations.len(), 1);
-    assert_eq!(
-        concept.safety_case.obligations[0].status,
-        ObligationStatus::Open
-    );
-    assert!(concept.safety_case.obligations[0].evidence_refs.is_empty());
+    assert_eq!(concept.safety_case.obligations.len(), 2);
+    let before = concept
+        .safety_case
+        .obligations
+        .iter()
+        .map(|obligation| (obligation.status, obligation.evidence_refs.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(before[0].0, ObligationStatus::Open);
+    assert_eq!(before[1].0, ObligationStatus::InProgress);
     assert!(manager.last_sensation.is_none());
 
     manager.evaluate_concept(&mut concept);
@@ -72,10 +87,17 @@ fn converged_simulation_updates_cognition_without_discharging_obligations() {
         "removing authority mutation must not disable simulation sensation"
     );
 
-    // ETK-3A authority theorem: an observation is not a discharge capability.
-    let obligation = &concept.safety_case.obligations[0];
-    assert_eq!(obligation.status, ObligationStatus::Open);
-    assert!(obligation.evidence_refs.is_empty());
+    // ETK-3A authority theorem: an observation is not a discharge capability,
+    // and evaluate_concept preserves every pre-existing obligation state/ref set.
+    let after = concept
+        .safety_case
+        .obligations
+        .iter()
+        .map(|obligation| (obligation.status, obligation.evidence_refs.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(after, before);
+    assert_eq!(after[0].0, ObligationStatus::Open);
+    assert_eq!(after[1].0, ObligationStatus::InProgress);
     assert!(!concept.safety_case.is_discharged());
 }
 
