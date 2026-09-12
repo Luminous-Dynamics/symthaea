@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-forge-live-cgroup-validation"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Deterministic Forge validation bound to live pre-release cgroup verification"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge = { path = "../../domains/symthaea-forge" }
+symthaea-forge-kernel-validation = { path = "../symthaea-forge-kernel-validation" }
+symthaea-forge-linux-cgroup-control = { path = "../symthaea-forge-linux-cgroup-control" }
+symthaea-forge-linux-cgroup-live-verification = { path = "../symthaea-forge-linux-cgroup-live-verification" }
+symthaea-forge-linux-observed-exec = { path = "../symthaea-forge-linux-observed-exec" }
+serde = { workspace = true }
+thiserror = { workspace = true }
