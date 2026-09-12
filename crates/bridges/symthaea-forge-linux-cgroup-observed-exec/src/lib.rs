@@ -282,20 +282,13 @@ impl PreReleaseAdmission for CgroupAdmissionState<'_> {
             Err(error) => return self.fail(format!("base cgroup admission failed: {error}")),
         };
         let base_receipt = base.receipt().clone();
-        if base_receipt.host_pid() != sandbox_pid {
-            return self.fail("base cgroup receipt does not bind the admitted sandbox PID".into());
-        }
-        self.base_receipt = Some(base_receipt);
 
         let strict = match harden_cgroup_v2_lease(self.policy, base) {
             Ok(value) => value,
             Err(error) => return self.fail(format!("strict cgroup hardening failed: {error}")),
         };
         let strict_receipt = strict.receipt().clone();
-        let Some(base_receipt) = self.base_receipt.as_ref() else {
-            return self.fail("base cgroup receipt disappeared during strict hardening".into());
-        };
-        if let Err(error) = strict_receipt.validate_for(self.policy, base_receipt) {
+        if let Err(error) = strict_receipt.validate_for(self.policy, &base_receipt) {
             let cleanup = strict.kill_and_cleanup(30_000);
             let detail = match cleanup {
                 Ok(_) => format!("strict cgroup receipt revalidation failed: {error}"),
@@ -306,6 +299,7 @@ impl PreReleaseAdmission for CgroupAdmissionState<'_> {
             return self.fail(detail);
         }
 
+        self.base_receipt = Some(base_receipt);
         self.strict_receipt = Some(strict_receipt);
         self.lease = Some(strict);
         Ok(())
@@ -362,18 +356,24 @@ pub fn run_cgroup_resource_gated_evaluator(
         }
     };
 
-    let base_receipt = admission
-        .base_receipt
-        .take()
-        .ok_or(CgroupObservedExecError::AdmissionStateMissing)?;
-    let strict_receipt = admission
-        .strict_receipt
-        .take()
-        .ok_or(CgroupObservedExecError::AdmissionStateMissing)?;
-    let lease = admission
-        .lease
-        .take()
-        .ok_or(CgroupObservedExecError::AdmissionStateMissing)?;
+    let state = (
+        admission.base_receipt.take(),
+        admission.strict_receipt.take(),
+        admission.lease.take(),
+    );
+    let (base_receipt, strict_receipt, lease) = match state {
+        (Some(base), Some(strict), Some(lease)) => (base, strict, lease),
+        (_, _, Some(lease)) => {
+            return match lease.kill_and_cleanup(observed_policy.teardown_timeout_ms()) {
+                Ok(_) => Err(CgroupObservedExecError::AdmissionStateMissing),
+                Err(teardown_error) => Err(CgroupObservedExecError::ExecutionAndTeardownFailed {
+                    execution: "admission state missing after successful evaluator execution".into(),
+                    teardown: teardown_error.to_string(),
+                }),
+            };
+        }
+        _ => return Err(CgroupObservedExecError::AdmissionStateMissing),
+    };
     let teardown_receipt = lease.finalize_after_sandbox_exit(observed_policy.teardown_timeout_ms())?;
 
     let admission_protocol_id = pre_release_admission_protocol_id();
