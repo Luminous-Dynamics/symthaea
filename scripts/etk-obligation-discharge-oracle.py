@@ -276,7 +276,7 @@ def fixture() -> dict[str, Any]:
         "schema": SCHEMA,
         "issued_obligation": copy.deepcopy(obligation),
         "admitted": {
-            "admitted_evidence_id": "sha256:7066c8509f0563484acc3a2d16d5b9b689606a2250389da56ad66560dbc83ff8",
+            "admitted_evidence_id": "sha256:794475a988dbecf945306f051a54e000e03fe918c886ee1cc13a6f28b7ad9b10",
             "candidate_artifact_id": "solver-output:run-0007",
             "obligation_id": obligation["obligation_id"],
             "obligation_revision": revision,
