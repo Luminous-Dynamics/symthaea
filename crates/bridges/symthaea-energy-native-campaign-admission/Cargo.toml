@@ -15,3 +15,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-energy-material-candidate-version = { path = "../symthaea-energy-material-candidate-version" }
+symthaea-energy-material-dossier = { path = "../symthaea-energy-material-dossier" }
