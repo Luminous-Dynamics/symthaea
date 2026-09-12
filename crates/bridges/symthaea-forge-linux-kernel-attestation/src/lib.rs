@@ -16,7 +16,7 @@
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use symthaea_algorithms::ContentId;
 use thiserror::Error;
 
@@ -577,9 +577,8 @@ mod tests {
 
     #[test]
     fn stat_start_time_parser_handles_parenthesized_command_names() {
-        // Fields after ')' begin at field 3. This fixture supplies 20 post-command fields, with
-        // field 22/starttime as the twentieth token and therefore index 19.
-        let stat = "77 (name with spaces) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 424242 21";
+        // Fields after ')' begin at field 3. Field 22/starttime is therefore zero-based index 19.
+        let stat = "77 (name with spaces) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 424242 21";
         let close = stat.rfind(')').unwrap();
         let value = stat[close + 1..]
             .split_whitespace()
