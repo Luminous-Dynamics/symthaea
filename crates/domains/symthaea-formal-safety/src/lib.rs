@@ -12,6 +12,7 @@
 mod domain_awareness;
 pub mod evidence_receipts;
 
+pub use domain_awareness::DomainAwarenessObligation;
 pub use evidence_receipts::{
     SafetyEvidenceReceipt, StrictSafetyCaseIssue, StrictSafetyCaseReport, StrictSafetyCaseStatus,
     assess_strict_safety_case,
