@@ -1,0 +1,110 @@
+{
+  "schema": "symthaea.rsk.semantic-schema-golden.v1",
+  "capability_schema": {
+    "schema": "symthaea.rsk.capability-schema.v1",
+    "family": "rsk.test.capabilities",
+    "version": 1,
+    "bit_width": 8,
+    "entries": [
+      {
+        "bit": 0,
+        "id": "cap.alpha",
+        "status": "assignable",
+        "description": "abstract alpha"
+      },
+      {
+        "bit": 1,
+        "id": "cap.beta",
+        "status": "assignable",
+        "description": "abstract beta"
+      },
+      {
+        "bit": 3,
+        "id": "cap.retired",
+        "status": "retired",
+        "description": "retired abstract bit"
+      }
+    ],
+    "reserved_bits": [2, 7]
+  },
+  "capability_schema_sha256": "da004c77da0df512ef772aa167fd386b61d6a581a3be40ded93d056e36dbc856",
+  "capability_sets": [
+    {
+      "name": "none",
+      "bits": 0,
+      "valid": true
+    },
+    {
+      "name": "alpha-beta",
+      "bits": 3,
+      "valid": true
+    },
+    {
+      "name": "reserved-bit",
+      "bits": 4,
+      "valid": false
+    },
+    {
+      "name": "retired-bit",
+      "bits": 8,
+      "valid": false
+    }
+  ],
+  "resource_schema": {
+    "schema": "symthaea.rsk.resource-accounting-schema.v1",
+    "family": "rsk.test.resources",
+    "version": 1,
+    "dimensions": [
+      {
+        "id": "budget.compute",
+        "unit": "unit.compute",
+        "scale": 0,
+        "minimum": 0,
+        "maximum": 1000,
+        "required": true,
+        "rounding": "exact",
+        "aggregation": "sum"
+      },
+      {
+        "id": "budget.energy",
+        "unit": "unit.energy",
+        "scale": 0,
+        "minimum": 0,
+        "maximum": 1000,
+        "required": true,
+        "rounding": "exact",
+        "aggregation": "sum"
+      }
+    ]
+  },
+  "resource_schema_sha256": "d055f5e3937473800e216cfa442da2e61dd98624357ea6abed3d2e7a90c8e03a",
+  "resource_vectors": [
+    {
+      "name": "limits",
+      "amounts": {
+        "budget.compute": 100,
+        "budget.energy": 80
+      },
+      "valid": true
+    },
+    {
+      "name": "consumed",
+      "amounts": {
+        "budget.compute": 40,
+        "budget.energy": 20
+      },
+      "valid": true
+    },
+    {
+      "name": "missing-energy",
+      "amounts": {
+        "budget.compute": 10
+      },
+      "valid": false
+    }
+  ],
+  "expected_remaining": {
+    "budget.compute": 60,
+    "budget.energy": 60
+  }
+}
