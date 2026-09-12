@@ -20,6 +20,7 @@ on:
       - 'crates/bridges/symthaea-forge-linux-cgroup-control/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-strict/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-observed-exec/**'
+      - 'crates/bridges/symthaea-forge-linux-cgroup-live-verification/**'
       - 'crates/bridges/symthaea-forge-linux-observed-exec/**'
       - 'crates/bridges/symthaea-forge-kernel-validation/**'
       - 'crates/bridges/symthaea-forge-cgroup-validation/**'
@@ -44,6 +45,7 @@ on:
       - 'crates/bridges/symthaea-forge-linux-cgroup-control/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-strict/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-observed-exec/**'
+      - 'crates/bridges/symthaea-forge-linux-cgroup-live-verification/**'
       - 'crates/bridges/symthaea-forge-linux-observed-exec/**'
       - 'crates/bridges/symthaea-forge-kernel-validation/**'
       - 'crates/bridges/symthaea-forge-cgroup-validation/**'
@@ -105,6 +107,9 @@ jobs:
       - name: Test cgroup-gated observed evaluator bridge
         run: cargo test -p symthaea-forge-linux-cgroup-observed-exec --all-targets -- --test-threads=1
 
+      - name: Test live cgroup pre-release verification bridge
+        run: cargo test -p symthaea-forge-linux-cgroup-live-verification --all-targets -- --test-threads=1
+
       - name: Test kernel-gated evaluator execution bridge
         run: cargo test -p symthaea-forge-linux-observed-exec --all-targets -- --test-threads=1
 
@@ -146,6 +151,7 @@ jobs:
           -p symthaea-forge-linux-cgroup-control
           -p symthaea-forge-linux-cgroup-strict
           -p symthaea-forge-linux-cgroup-observed-exec
+          -p symthaea-forge-linux-cgroup-live-verification
           -p symthaea-forge-linux-observed-exec
           -p symthaea-forge-kernel-validation
           -p symthaea-forge-cgroup-validation
