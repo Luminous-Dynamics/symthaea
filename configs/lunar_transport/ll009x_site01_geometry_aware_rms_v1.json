@@ -1,0 +1,19 @@
+{
+  "schema_version": "ll009x.geometry-aware-rms-policy.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "layer_id": "south-pole-far-80m",
+  "risk_allocation": "proportional_to_admitted_pixel_count_by_azimuth_bin",
+  "solver": "deterministic_bisection",
+  "bisection_iterations": 80,
+  "risk_tolerance_abs": 1e-12,
+  "domination_tolerance_deg": 1e-9,
+  "distribution_assumption": "inherit_ll009w_none_beyond_rms_second_moment_model",
+  "independence_assumption": "inherit_ll009w_none",
+  "policy_role": "geometry_aware_refinement_of_exact_ll009w_risk_budget",
+  "non_claims": [
+    "LL-009X does not add Gaussian, covariance or independence assumptions.",
+    "Its envelope remains conditional on LL-009V/W RMS second-moment semantics.",
+    "The optimization covers represented admitted raster support points only; LL-009R remains authoritative for unresolved physical terrain.",
+    "The nominal observer remains the LL-009W observer; memberwise LL-009Q observer propagation is a separate downstream composition problem."
+  ]
+}
