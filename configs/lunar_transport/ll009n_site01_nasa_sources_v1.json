@@ -1,0 +1,117 @@
+{
+  "schema_version": "ll009n.nasa-acquisition-plan.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "provider": "NASA Goddard PGDA / LRO-LOLA",
+  "evidence_scope": "Exact source-byte acquisition for Site01 near-field and first bounded-size large-area far-field raster inputs to LL-009L/M/K",
+  "allowed_hosts": [
+    "pgda.gsfc.nasa.gov"
+  ],
+  "source_pages": [
+    {
+      "dataset_id": "pgda-site01-5m",
+      "url": "https://pgda.gsfc.nasa.gov/products/78",
+      "published_semantics": "5 m/pixel site GeoTIFFs; south polar stereographic X/Y meters; MOON_ME / DE421; total-Z product is RMS elevation uncertainty",
+      "caveat": "PGDA states that roughly 90% of the 5 m polar LDEM pixels are interpolated; nominal pixel spacing is not claimed as independent measurement support."
+    },
+    {
+      "dataset_id": "pgda-80s-80m",
+      "url": "https://pgda.gsfc.nasa.gov/products/90",
+      "published_semantics": "80-90 deg South large-area COGs; south polar stereographic X/Y meters; MOON_ME / DE421; elevation, surface-height-error and effective-resolution products",
+      "caveat": "Authenticating these rasters does not by itself prove that continuous terrain between raster support points is bounded by pixel-center skyline samples."
+    }
+  ],
+  "files": [
+    {
+      "source_id": "site01-elevation-5m",
+      "dataset_id": "pgda-site01-5m",
+      "role": "surface_elevation",
+      "source_url": "https://pgda.gsfc.nasa.gov/products/78/Site01_final_adj_5mpp_surf.tif",
+      "artifact_path": "nasa/pgda/product78/Site01_final_adj_5mpp_surf.tif",
+      "expected_sha256": null,
+      "required_for": [
+        "site01-near-field-source-bytes",
+        "site01-first-raster-chain-source-bytes"
+      ]
+    },
+    {
+      "source_id": "site01-total-z-rms-5m",
+      "dataset_id": "pgda-site01-5m",
+      "role": "elevation_rms_uncertainty_m",
+      "source_url": "https://pgda.gsfc.nasa.gov/products/78/Site01_final_adj_5mpp_toterr.tif",
+      "artifact_path": "nasa/pgda/product78/Site01_final_adj_5mpp_toterr.tif",
+      "expected_sha256": null,
+      "required_for": [
+        "site01-near-field-source-bytes",
+        "site01-first-raster-chain-source-bytes"
+      ]
+    },
+    {
+      "source_id": "south-pole-elevation-80m",
+      "dataset_id": "pgda-80s-80m",
+      "role": "surface_elevation",
+      "source_url": "https://pgda.gsfc.nasa.gov/products/90/LDEM_80S_80MPP_ADJ.TIF",
+      "artifact_path": "nasa/pgda/product90/LDEM_80S_80MPP_ADJ.TIF",
+      "expected_sha256": null,
+      "required_for": [
+        "site01-first-raster-chain-source-bytes"
+      ]
+    },
+    {
+      "source_id": "south-pole-surface-height-error-80m",
+      "dataset_id": "pgda-80s-80m",
+      "role": "surface_height_error_m",
+      "source_url": "https://pgda.gsfc.nasa.gov/products/90/LDEM_80S_80MPP_ADJ_ERR.TIF",
+      "artifact_path": "nasa/pgda/product90/LDEM_80S_80MPP_ADJ_ERR.TIF",
+      "expected_sha256": null,
+      "required_for": [
+        "site01-first-raster-chain-source-bytes"
+      ]
+    },
+    {
+      "source_id": "south-pole-effective-resolution-80m",
+      "dataset_id": "pgda-80s-80m",
+      "role": "effective_resolution_m",
+      "source_url": "https://pgda.gsfc.nasa.gov/products/90/LDEM_80S_80MPP_ADJ_EFFRES.TIF",
+      "artifact_path": "nasa/pgda/product90/LDEM_80S_80MPP_ADJ_EFFRES.TIF",
+      "expected_sha256": null,
+      "required_for": [
+        "site01-first-raster-chain-source-bytes"
+      ]
+    }
+  ],
+  "promotion_sets": [
+    {
+      "set_id": "site01-near-field-source-bytes",
+      "claim_scope": "Exact-byte completeness for the Site01 elevation + total-Z-RMS source pair only; not a complete terrain horizon.",
+      "required_source_ids": [
+        "site01-elevation-5m",
+        "site01-total-z-rms-5m"
+      ]
+    },
+    {
+      "set_id": "site01-first-raster-chain-source-bytes",
+      "claim_scope": "Exact-byte completeness for the first Site01 5 m + 80 m large-area L/M/K trial source set; does not establish continuous-terrain skyline closure or site viability.",
+      "required_source_ids": [
+        "site01-elevation-5m",
+        "site01-total-z-rms-5m",
+        "south-pole-elevation-80m",
+        "south-pole-surface-height-error-80m",
+        "south-pole-effective-resolution-80m"
+      ]
+    }
+  ],
+  "downstream_requirements": [
+    "Offline replay of every locked source byte",
+    "LL-009L materialization under configs/lunar_transport/ll009l_raster_toolchain.json",
+    "Observed CRS WKT hash and exact raster-alignment checks",
+    "LL-009M independent terrain-radial uncertainty scan",
+    "LL-009K conservative multi-resolution horizon reduction",
+    "Separate closure or explicit margin for continuous-terrain / subpixel skyline support before any theorem-level complete-horizon claim"
+  ],
+  "non_claims": [
+    "No SHA-256 value is known merely because a NASA filename or source page is known.",
+    "The source plan is not a source lock and is not promotable evidence.",
+    "Nominal 5 m or 80 m pixel spacing is not treated as proof of independent terrain support at that spacing.",
+    "An exact-byte-complete source set is necessary but not sufficient for scientific horizon completeness."
+  ]
+}
