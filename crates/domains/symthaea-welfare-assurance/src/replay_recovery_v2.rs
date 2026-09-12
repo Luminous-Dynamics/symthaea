@@ -19,6 +19,7 @@ use symthaea_welfare_consent::{SubjectConsentLedger, SubjectIdentityRegistry};
 
 use crate::evidence_context::EvidenceBoundInterventionPermit;
 
+#[allow(dead_code)]
 #[path = "replay_recovery.rs"]
 mod implementation;
 
