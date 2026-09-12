@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-sensor-common-cause"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Common-cause fault-domain diversity assurance for Symthaea sensor evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "sensors", "reliability", "fault-tolerance"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-domain-awareness = { path = "../symthaea-domain-awareness" }
+symthaea-sensor-trust = { path = "../symthaea-sensor-trust" }
+serde = { workspace = true }
+uuid = { workspace = true }
