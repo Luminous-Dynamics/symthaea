@@ -1,0 +1,28 @@
+{
+  "schema_version": "ll009aa.sdem-archive-policy.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "source_url": "https://zenodo.org/records/17954508/files/A3CLR22_6_Connecting_Ridge.zip?download=1",
+  "record_url": "https://zenodo.org/records/17954508",
+  "record_doi": "10.5281/zenodo.17954508",
+  "pgda_doi": "10.60903/gsfcpgda-sfs-a3clr",
+  "archive_filename": "A3CLR22_6_Connecting_Ridge.zip",
+  "allowed_hosts": ["zenodo.org"],
+  "publisher_checksum": {
+    "algorithm": "md5",
+    "value": "0ad982cf42319a300f2a2cff69d39322",
+    "semantics": "publisher_record_identity_only_not_cryptographic"
+  },
+  "limits": {
+    "max_entries": 20000,
+    "max_member_uncompressed_bytes": 10737418240,
+    "max_total_uncompressed_bytes": 32212254720,
+    "max_compression_ratio": 500
+  },
+  "blocked_nested_archive_suffixes": [".zip", ".tar", ".tgz", ".gz", ".7z", ".rar"],
+  "role_assignment": "deferred_until_exact_member_manifest_exists",
+  "non_claims": [
+    "The Zenodo MD5 is used only to match the publisher record; SHA-256 computed over acquired bytes is the cryptographic identity.",
+    "No member is assigned an SDEM/LDEM/difference/coverage scientific role by this policy.",
+    "No terrain, uncertainty-calibration, visibility, site, or architecture claim is made by LL-009AA."
+  ]
+}
