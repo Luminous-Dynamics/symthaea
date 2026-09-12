@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-perception-zero-event-assurance"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Zero-event false-alarm assurance over Symthaea perception crucible evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["perception", "statistics", "safety", "assurance"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-assurance-statistics = { path = "../symthaea-assurance-statistics" }
+symthaea-perception-crucible = { path = "../symthaea-perception-crucible" }
+serde = { workspace = true }
