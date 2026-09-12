@@ -1,0 +1,19 @@
+{
+  "schema_version": "ll009ac.scale-matched-rms-audit-policy.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "far_layer_id": "south-pole-far-80m",
+  "expected_integer_scale_ratio": 16,
+  "incomplete_support_policy": "exclude_with_count",
+  "surface_area_quadrature_orders": [3, 5],
+  "max_relative_area_quadrature_difference": 1e-12,
+  "max_abs_weighted_mean_quadrature_difference_m": 1e-8,
+  "diagnostic_block_width_coarse_cells": 8,
+  "tile_width_coarse_cells": 16,
+  "affine_tolerance": 1e-9,
+  "projection_contract": {
+    "projection": "south_polar_stereographic",
+    "reference_radius_m": 1737400.0,
+    "stereographic_scale_at_pole": 1.0
+  },
+  "interpretation": "Compare exact 16x16 SDEM support cells against the Product90 80 m elevation and ADJ_ERR RMS values on the same pixel support without resampling. Both projected equal-weight and spherical-stereographic Jacobian area-weighted SDEM means are reported. Any normalized-residual dispersion remains descriptive model-checking evidence, not a calibrated probability theorem or automatic uncertainty multiplier."
+}
