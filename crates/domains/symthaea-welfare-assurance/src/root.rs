@@ -14,6 +14,7 @@ mod permit;
 pub use permit::*;
 
 pub mod authority_evidence_binding;
+pub mod episodic_persistence_envelope;
 pub mod evidence_context;
 pub mod execution_adapter;
 pub mod execution_recovery;
