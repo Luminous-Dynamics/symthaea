@@ -18,8 +18,8 @@
 //!   source, lexicographic site/direction/subgroup composition, and sweep stats
 //! - **Lattice RNG streams**: pinned ChaCha8 implementation with injective
 //!   campaign/replica/rank stream coordinates and endpoint-free U(0,1)
-//! - **Tiny lattice benchmarks**: cold/disordered qualification traces without
-//!   automatic equilibrium or convergence declarations
+//! - **Tiny lattice benchmarks**: explicitly coupled or independent cold/disordered
+//!   qualification traces without automatic equilibrium declarations
 //! - **Proposal tuning**: separate warm-up stream with frozen post-tuning width;
 //!   no adaptation is permitted to inherit production-evidence authority
 //!
@@ -63,8 +63,9 @@ pub use decay_widths::{
     w_boson_channels, w_total_width, z_total_width,
 };
 pub use lattice_benchmark::{
-    BenchmarkSample, PairedBenchmarkTrace, QualificationStart, TinyBenchmarkError,
-    TinyBenchmarkPlan, TinyBenchmarkTrace, run_paired_tiny_benchmark, run_tiny_benchmark,
+    BenchmarkPairing, BenchmarkSample, PairedBenchmarkTrace, QualificationStart,
+    TinyBenchmarkError, TinyBenchmarkPlan, TinyBenchmarkTrace, run_coupled_tiny_benchmark,
+    run_independent_paired_tiny_benchmark, run_tiny_benchmark,
 };
 pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
