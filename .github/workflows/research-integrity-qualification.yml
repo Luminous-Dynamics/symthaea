@@ -1,0 +1,253 @@
+# Focused exact-head qualification for the generic research-integrity stack.
+#
+# This workflow proves only the software contracts of the research protocol,
+# result, and replication crates present in the qualified subject. It does not
+# replace repository-wide integration CI or establish any scientific claim.
+
+name: Research Integrity Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-research-protocol/**'
+      - 'crates/core/symthaea-research-result/**'
+      - 'crates/core/symthaea-research-replication/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.cargo/**'
+      - 'rust-toolchain*'
+  workflow_dispatch:
+    inputs:
+      subject_sha:
+        description: 'Exact commit SHA to qualify (defaults to the dispatch commit)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # Automatic runs may supersede older heads on the same PR/ref. A deliberate
+  # workflow_dispatch receives a unique group and is never cancelled by a push.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.subject_sha || github.sha }}
+
+jobs:
+  qualify:
+    name: Focused exact-head research contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          fetch-depth: 2
+
+      - name: Assert exact subject identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "expected_sha=${EXPECTED_SHA}"
+          echo "actual_sha=${actual}"
+          if [[ "${actual}" != "${EXPECTED_SHA}" ]]; then
+            echo "checkout identity mismatch" >&2
+            exit 1
+          fi
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Qualify present research-integrity packages
+        id: qualification
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          status_file="${RUNNER_TEMP}/research-integrity-status"
+          failure_file="${RUNNER_TEMP}/research-integrity-failure"
+          packages_file="${RUNNER_TEMP}/research-integrity-packages"
+          commands_file="${RUNNER_TEMP}/research-integrity-commands"
+          : > "${packages_file}"
+          : > "${commands_file}"
+          echo "NotRun" > "${status_file}"
+          : > "${failure_file}"
+
+          packages=()
+          [[ -f crates/core/symthaea-research-protocol/Cargo.toml ]] && packages+=(symthaea-research-protocol)
+          [[ -f crates/core/symthaea-research-result/Cargo.toml ]] && packages+=(symthaea-research-result)
+          [[ -f crates/core/symthaea-research-replication/Cargo.toml ]] && packages+=(symthaea-research-replication)
+
+          if [[ ${#packages[@]} -eq 0 ]]; then
+            # This can happen on a manual dispatch before the first research
+            # crate lands, or on an unrelated root dependency change. It is
+            # explicitly NOT a qualification pass.
+            echo "NotApplicableNoResearchIntegrityCrates" > "${status_file}"
+            echo "no research-integrity package exists in exact subject ${EXPECTED_SHA}" > "${failure_file}"
+            exit 0
+          fi
+
+          printf '%s\n' "${packages[@]}" > "${packages_file}"
+
+          classify_failure() {
+            local log="$1"
+            if grep -Eqi 'lock file.*needs to be updated|failed to select a version|failed to get .* dependency|failed to load source for dependency' "${log}"; then
+              echo "LockOrDependencyFailure"
+            else
+              echo "SourceOrTestFailure"
+            fi
+          }
+
+          run_cmd() {
+            local label="$1"
+            shift
+            local log="${RUNNER_TEMP}/research-integrity-${label}.log"
+            printf '%q ' "$@" >> "${commands_file}"
+            printf '\n' >> "${commands_file}"
+            "$@" 2>&1 | tee "${log}"
+            local rc=${PIPESTATUS[0]}
+            if [[ ${rc} -ne 0 ]]; then
+              classify_failure "${log}" > "${status_file}"
+              printf '%s (exit=%s)\n' "${label}" "${rc}" > "${failure_file}"
+              return "${rc}"
+            fi
+          }
+
+          for pkg in "${packages[@]}"; do
+            run_cmd "${pkg}-fmt" cargo fmt --package "${pkg}" -- --check || exit $?
+            run_cmd "${pkg}-check" cargo check --locked -p "${pkg}" --all-targets || exit $?
+            run_cmd "${pkg}-test" cargo test --locked -p "${pkg}" || exit $?
+            run_cmd "${pkg}-clippy" cargo clippy --locked -p "${pkg}" --all-targets -- -D warnings || exit $?
+          done
+
+          echo "Passed" > "${status_file}"
+
+      - name: Emit qualification receipt
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_file="${RUNNER_TEMP}/research-integrity-status"
+          failure_file="${RUNNER_TEMP}/research-integrity-failure"
+          packages_file="${RUNNER_TEMP}/research-integrity-packages"
+          commands_file="${RUNNER_TEMP}/research-integrity-commands"
+
+          status="InfrastructureUnavailable"
+          [[ -f "${status_file}" ]] && status="$(cat "${status_file}")"
+          failure="qualification step did not produce a terminal status"
+          [[ -f "${failure_file}" ]] && failure="$(cat "${failure_file}")"
+
+          cargo_lock_digest="absent"
+          [[ -f Cargo.lock ]] && cargo_lock_digest="sha256:$(sha256sum Cargo.lock | awk '{print $1}')"
+          workflow_digest="sha256:$(sha256sum .github/workflows/research-integrity-qualification.yml | awk '{print $1}')"
+          subject_sha="$(git rev-parse HEAD)"
+          subject_tree="$(git rev-parse 'HEAD^{tree}')"
+          parent_sha="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          rustc_version="$(rustc --version --verbose | tr '\n' ';')"
+          started_at="${{ github.event.repository.updated_at }}"
+          completed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+          python3 - "${status}" "${failure}" "${cargo_lock_digest}" "${workflow_digest}" "${subject_sha}" "${subject_tree}" "${parent_sha}" "${rustc_version}" "${started_at}" "${completed_at}" "${packages_file}" "${commands_file}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          (
+              status,
+              failure,
+              cargo_lock_digest,
+              workflow_digest,
+              subject_sha,
+              subject_tree,
+              parent_sha,
+              rustc_version,
+              started_at,
+              completed_at,
+              packages_path,
+              commands_path,
+          ) = sys.argv[1:]
+
+          def lines(path):
+              p = pathlib.Path(path)
+              return [line for line in p.read_text().splitlines() if line] if p.exists() else []
+
+          receipt = {
+              "schema": "symthaea-research-integrity-qualification/v1",
+              "subject_sha": subject_sha,
+              "subject_tree": subject_tree,
+              "parent_subject_sha": parent_sha or None,
+              "cargo_lock_digest": cargo_lock_digest,
+              "rust_toolchain": rustc_version,
+              "packages": lines(packages_path),
+              "commands": lines(commands_path),
+              "workflow_digest": workflow_digest,
+              "github_run_id": "${{ github.run_id }}",
+              "github_run_attempt": "${{ github.run_attempt }}",
+              "event_name": "${{ github.event_name }}",
+              "terminal_disposition": status,
+              "failure_detail": failure or None,
+              "repository_updated_at_at_dispatch": started_at,
+              "completed_at": completed_at,
+              "claims": {
+                  "focused_software_contract_qualification_only": True,
+                  "full_repository_ci": False,
+                  "scientific_claim_validated": False,
+              },
+          }
+          pathlib.Path("research-integrity-qualification-receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+          {
+            echo "### Research Integrity Qualification"
+            echo
+            echo "- Subject: \`${subject_sha}\`"
+            echo "- Tree: \`${subject_tree}\`"
+            echo "- Disposition: **${status}**"
+            echo "- This is focused software-contract evidence only; it is not whole-repository or scientific validation."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-integrity-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: research-integrity-qualification-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce terminal qualification result
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_file="${RUNNER_TEMP}/research-integrity-status"
+          if [[ ! -f "${status_file}" ]]; then
+            echo "qualification produced no terminal status" >&2
+            exit 1
+          fi
+          status="$(cat "${status_file}")"
+          case "${status}" in
+            Passed)
+              exit 0
+              ;;
+            NotApplicableNoResearchIntegrityCrates)
+              echo "No research-integrity crates exist in this exact subject; no qualification claim is made."
+              exit 0
+              ;;
+            *)
+              echo "Research-integrity qualification did not pass: ${status}" >&2
+              exit 1
+              ;;
+          esac
