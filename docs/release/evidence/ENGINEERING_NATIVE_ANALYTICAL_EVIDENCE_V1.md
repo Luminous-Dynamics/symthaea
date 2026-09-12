@@ -1,6 +1,6 @@
 # ETK-3C — Native Analytical Evidence V1 Reference Boundary
 
-Status: **independent reference theorem; production implementation not yet established**
+Status: **independent exact-byte reference theorem; production Rust source exists in #2058 but is not yet execution-qualified**
 
 This tranche defines how Symthaea should treat in-process, closed-form, algebraic, or otherwise native engineering calculations without pretending they are external-solver simulation evidence.
 
@@ -15,89 +15,89 @@ native calculation result
 != qualified design / certification / manufacturing / deployment / actuation authority
 ```
 
-The current engineering facade violates the first boundary in its explicit `discharge_*_check` helpers: a native assessment's `passes` boolean can directly mutate a matching proof obligation to `Discharged` and attach a free-form evidence string. ETK-3C is the replacement path; it does not validate those legacy mutations.
+The legacy engineering facade violates the first boundary in explicit `discharge_*_check` helpers, where native assessments can directly mutate proof-obligation authority state. ETK-3C replaces that pattern; it does not validate it.
 
 ## Distinct evidence class
 
-Native analytical evidence is **not** `EvidenceKind::Simulation`. The current formal-safety enum describes `Simulation` as a result from an external solver.
+Native analytical evidence is **not** external-solver `Simulation`. The reference vectors use the distinct semantic evidence class `Analysis`, introduced separately by #2001.
 
-The reference vectors therefore use a distinct semantic evidence class:
+Changing the evidence class therefore changes both accepted-requirement and proof-obligation identities. Existing `Simulation` revisions must never be silently reinterpreted as native analysis.
+
+## Canary semantics
+
+The reference uses the existing Euler-Bernoulli rectangular cantilever / end-point-load calculation as an authority canary. It binds:
+
+- exact method and algorithm-artifact identities;
+- explicit method assumptions and supported load cases;
+- Canonical Binary64 analytical inputs and SI units;
+- an accepted Civil/Blocking `Analysis` requirement with `stress <= 250 MPa`;
+- exact Analysis proof-obligation semantics;
+- evidence-policy identity and model-qualification-record premise;
+- subject, twin, validity-domain, and currentness identities;
+- exact execution-artifact identity.
+
+The fixed implementation, qualification, and execution digests are fixtures. They do not establish that a present Rust binary, material model, or physical design has been qualified.
+
+## Requirement-policy compatibility
+
+A syntactically valid analytical policy is not automatically adequate for the accepted requirement.
+
+For the canary, plan construction now verifies that the policy's worst-case permitted stress, including its declared maximum model-relative-error allowance, cannot exceed the accepted 250 MPa requirement:
 
 ```text
-Analysis
+(yield_strength / FoS_threshold) * (1 + max_model_error)
+    <= accepted_requirement_max_stress
 ```
 
-That changes both accepted-requirement and proof-obligation content identities. A legacy requirement that explicitly requests `Simulation` must not be silently satisfied by a native calculation.
+The frozen positive policy `FoS >= 2.0`, maximum model error `0.05`, and fixture yield strength `250 MPa` implies at most `131.25 MPa`, so it is conservative relative to the 250 MPa requirement.
 
-Production prerequisite: #2001 adds a first-class formal-safety `Analysis` variant without changing existing templates. Accepted-requirement/evidence-plan canonicalizers must recognize that variant before production analytical parity is claimed. Old `Simulation` revisions must not be reinterpreted in place.
+A deliberately weak `FoS >= 0.5` policy is rejected at plan construction even though it is otherwise syntactically valid.
 
-## Canary method
+## Exact result-to-input binding
 
-The independent oracle uses the existing `symthaea-structural` Euler-Bernoulli beam calculation as a canary because the method has explicit inputs, SI units, a documented validity envelope, and several outputs.
+A result candidate now carries the exact method and input revisions it claims to describe. Admission rejects a candidate whose method/input lineage differs from the bound plan.
 
-The method identity commits to:
+Admission also independently recomputes the canary equations from the exact bound inputs before trusting the reported outputs:
 
-- a method key;
-- implementation-artifact and algorithm-revision digests;
-- explicit assumptions;
-- supported load cases;
-- output names/units;
-- unit system.
+```text
+M = P L
+section_modulus = b h^2 / 6
+stress = M / section_modulus
+I = b h^3 / 12
+deflection = P L^3 / (3 E I)
+FoS = yield_strength / stress
+```
 
-The fixed digests in the reference vector are **fixtures**. They do not claim that the present Rust source/binary has already been reproducibly bound to those values. Production must replace fixture artifact identities with exact reproducibility/supply-chain evidence.
+The reported moment, bending stress, deflection, and FoS must agree with those independently recomputed values to relative tolerance `1e-12`.
 
-## Exact analytical inputs
+Thus:
 
-The canary input identity commits to the exact method revision and Canonical Binary64 encodings of:
-
-- beam length;
-- rectangular section dimensions;
-- Young's modulus;
-- yield strength;
-- load-case kind, value, and unit.
-
-Input ordering is non-semantic; numeric input changes are semantic. A result produced for changed inputs cannot be admitted under an old plan.
-
-## Acceptance policy
-
-The reference policy binds:
-
-- required metric `factor_of_safety`;
-- operator `>=`;
-- threshold `2.0`;
-- maximum allowed model-relative-error bound `0.05`;
-- an explicit model-qualification-record digest.
-
-The positive vector uses fixture qualification/error premises solely to test authority semantics. The oracle does **not** establish that a 5% bound is scientifically justified for Euler-Bernoulli analysis, nor that the qualification record is authentic.
-
-A production analytical evidence path must obtain such error/qualification premises from actual validation/calibration evidence rather than inventing them.
+```text
+internally consistent numbers
+!= numbers belonging to this exact analytical input
+```
 
 ## Conservative admission
 
-For the structural canary, admission checks:
+After exact plan and equation binding, admission additionally requires:
 
-1. exact method, input, and policy binding;
-2. canonical execution-artifact content identity;
-3. finite result values;
-4. factor-of-safety self-consistency with yield strength and reported bending stress;
-5. model-error bound within policy;
-6. conservative factor of safety `FoS / (1 + error_bound)` still satisfies the threshold.
+1. canonical execution-artifact SHA-256 identity;
+2. finite result values;
+3. model-relative-error within the bound policy;
+4. error-adjusted bending stress still below the accepted 250 MPa requirement;
+5. conservative `FoS / (1 + actual_error_bound)` still satisfying the FoS policy.
 
-Therefore:
-
-```text
-assessment.passes == true
-```
-
-is neither an input to authority nor sufficient for admission.
+A native faculty's convenience `passes` boolean is not an authority input.
 
 ## Present-tense applicability
 
-The historical receipt binds one exact admitted analytical evidence identity, plan, and obligation revision. A current analytical-discharge fact can be minted only for the exact current plan.
+The historical receipt binds one exact admitted analytical evidence identity, exact plan, and exact obligation revision. A current analytical-discharge fact can be derived only for that same exact plan.
 
-The stale-receipt adversarial case now derives **both** currentness identities from the same `symthaea.etk-currentness-assertion.v1` schema over the same twin and validity-domain revisions, changing only the attestation digest. Thus the negative theorem compares two structurally valid currentness assertions rather than a valid identity against arbitrary hash-shaped text.
+The stale-receipt test compares two independently schema-derived currentness assertions over the same twin/validity context, changing the attestation record. The old receipt becomes historical under the refreshed plan.
 
 ## Frozen reference vectors
+
+The strengthened gates do **not** change the positive protocol identities:
 
 ```text
 Analysis requirement revision
@@ -130,56 +130,56 @@ sha256:47e1d641da233d0d70e6084a97bbe55fbf9d0487a3b6f7978ca03790fbeb494c
 
 ## Adversarial reference cases
 
-The checked-in self-test fails closed on:
+The checked-in self-test now fails closed on:
 
 - changed analytical input under an old plan;
-- a nominal pass whose conservative margin falls below threshold;
-- a model-error bound exceeding policy;
-- inconsistent reported factor of safety vs yield/stress;
+- result-level method/input binding drift;
+- a policy too weak for the accepted stress requirement;
+- a nominal FoS pass whose conservative FoS fails;
+- excessive model-relative error;
+- inconsistent reported FoS;
+- incorrect reported beam deflection;
+- incorrect reported beam moment;
 - malformed execution-artifact digest;
-- a schema-derived currentness refresh attempting to reuse a historical receipt.
+- reuse of a historical receipt after a schema-derived currentness refresh.
 
-It also freezes signed-zero Canonical Binary64 normalization and verifies the baseline currentness vector against the previously frozen ETK context identity.
+It also freezes signed-zero Canonical Binary64 normalization and the baseline currentness identity.
 
 ## Exact-byte reference execution evidence
 
-The current checked-in `scripts/etk-native-analytical-evidence-oracle.py` bytes are Git blob:
+The strengthened checked-in oracle is exactly Git blob:
 
 ```text
-bcf57fd9afbaf91b93130456af30358a04e49a08
+deb6d11f12cd026e63eef6620643585cbacaa899
 ```
 
-The exact no-final-newline bytes corresponding to that blob were executed locally:
+Those exact bytes were executed locally before check-in:
 
 ```text
 --self-test              PASS
 python3 -m py_compile    PASS
-raw SHA-256              b2a4fc2f71e47988a37c4c6bea74e68a7257d9d1f898b541b087ece3f604347c
-Git blob SHA-1           bcf57fd9afbaf91b93130456af30358a04e49a08
-checked-in Git blob      bcf57fd9afbaf91b93130456af30358a04e49a08
+raw SHA-256              9fc125197e2b33a311ab272d18d1a7f907ce1371001d19a04a79b551ef01c5e8
+Git blob SHA-1           deb6d11f12cd026e63eef6620643585cbacaa899
+checked-in Git blob      deb6d11f12cd026e63eef6620643585cbacaa899
 ```
 
-This establishes execution of the exact reference bytes only. It does not establish production Rust parity, physical truth, model qualification, or evidence authentication.
+This is exact-byte **reference execution evidence** only. It is not Rust qualification, physical validation, model qualification, or authentication of the fixture premises.
 
 ## Production sequence
 
-The recommended migration order is:
-
 ```text
-first-class Analysis evidence class (#2001)
-    -> accepted-requirement canonicalizer support
-    -> typed analytical method/input/policy/plan
-    -> native result candidate
-    -> analytical admission capability
-    -> historical receipt
-    -> current analytical fact
-    -> replace one legacy discharge helper (structural canary)
-    -> extend discipline-by-discipline
-    -> delete shared free-form discharge mutation path
+#2001 distinct Analysis evidence kind
+    -> #1999 independent analytical authority theorem
+    -> #2058 typed production analytical boundary
+    -> qualify exact Rust vectors
+    -> compose with explicit requirement->obligation relationship/completeness
+    -> migrate structural discharge helper as first canary
+    -> migrate remaining native disciplines
+    -> delete free-form native discharge mutation path
 ```
 
-Keep the existing `evaluate_*` methods as computation seams. Replace authority-mutating `discharge_*` wrappers rather than conflating calculation with authority.
+#2058 already implements the production canary source boundary, including exact method/input result binding, independent equation recomputation, requirement-policy adequacy, immutable receipts, currentness invalidation, and one-way authority IDs. Its exact Rust execution remains pending.
 
 ## Deliberate nonclaims
 
-This reference does not establish the correctness of Euler-Bernoulli theory, applicability to a particular physical structure, material-property truth, calibration validity, the authenticity of the fixture qualification record, evidence independence, design qualification, certification, manufacturing approval, deployment approval, or physical actuation authority.
+Neither #1999 nor #2058 establishes Euler-Bernoulli applicability to a particular physical structure, material-property truth, scientific validity of the fixture 5% error bound, authenticity of acceptance/currentness/qualification records, evidence independence, requirement-derivation completeness, design qualification, certification, manufacturing approval, deployment approval, or physical actuation authority.
