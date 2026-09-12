@@ -1,0 +1,25 @@
+{
+  "schema_version": "ll009t.statistical-horizon-composition-policy.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "ensemble_layer_id": "site01-near-5m",
+  "companion_layer_ids": [
+    "south-pole-far-80m"
+  ],
+  "expected_layer_ids": [
+    "site01-near-5m",
+    "south-pole-far-80m"
+  ],
+  "statistic_mode": "empirical_ensemble_quantile",
+  "quantile": 0.99,
+  "site_observer_compatibility": "require_hard_upper_bound_site_v1",
+  "companion_vertical_semantics": "hard_upper_bound",
+  "spatial_support_margin_policy": "apply_observed_positive_excursion_if_present",
+  "require_all_q_members_per_bin": true,
+  "expected_current_site01_result": "blocked_until_same-realization_site_uncertainty_is_propagated_into_companion_far-field_geometry_and_far-field_vertical_semantics_are_qualified",
+  "non_claims": [
+    "The 0.99 nearest-rank statistic is an empirical quantile of the exact finite Site01 clone ensemble, not a population 99% confidence bound.",
+    "LL-009T V1 does not combine a Q same-realization site ensemble with a far-field K horizon built from an RMS-only site state.",
+    "LL-009R spatial-support semantics remain independent and are preserved in the composed K-compatible pack.",
+    "A bound statistical horizon is not site, visibility, architecture, or operations qualification."
+  ]
+}
