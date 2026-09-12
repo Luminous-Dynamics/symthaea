@@ -1,0 +1,83 @@
+# Focused validation for symthaea-support changes.
+#
+# This workflow is intentionally additive: the repository-wide CI remains the
+# integration authority. The purpose of this lane is to provide timely exact-head
+# compiler/test evidence for the IT-support domain without spending dozens of
+# unrelated workspace runners on every support-only iteration.
+
+name: Support Fast Lane
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-support/**'
+      - 'crates/core/symthaea-logparse/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/support-fast.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  support:
+    name: symthaea-support focused qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Preserve the repository's existing Class A/B governance boundary even
+      # when this focused lane is used for authority/security work in support.
+      - name: Governance check
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-class-a-changes.sh --ci
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache focused Cargo state
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/support-fast
+          key: ${{ runner.os }}-support-fast-${{ hashFiles('Cargo.lock', 'crates/domains/symthaea-support/Cargo.toml', 'crates/core/symthaea-logparse/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-support-fast-
+
+      - name: Format symthaea-support
+        run: cargo fmt -p symthaea-support -- --check
+
+      - name: Test symthaea-support defaults
+        env:
+          CARGO_TARGET_DIR: target/support-fast
+        run: cargo test -p symthaea-support --all-targets
+
+      - name: Clippy symthaea-support defaults
+        env:
+          CARGO_TARGET_DIR: target/support-fast
+        run: cargo clippy -p symthaea-support --all-targets -- -D warnings
+
+      - name: Test optional logparse adapter
+        env:
+          CARGO_TARGET_DIR: target/support-fast
+        run: cargo test -p symthaea-support --all-targets --features logparse-adapter
+
+      # Root-level compile check catches drift between the domain crate's public
+      # exports and Symthaea's cfg(feature = "support") integration surface.
+      - name: Check root support integration
+        env:
+          CARGO_TARGET_DIR: target/support-fast
+        run: cargo check -p symthaea --no-default-features --features support
