@@ -465,16 +465,23 @@ fn add_hpux_procedures(
     snapshots: &BTreeSet<SourceSnapshotIdV1>,
 ) -> Result<BTreeSet<String>, LegacyHpuxErrorV1> {
     let defs = [
-        ("legacy:hpux:lvm-vxfs-triage", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "HP-UX LVM/VxFS layered triage", "Map symptom through VxFS/LV/VG/PV/LUN/path layers before proposing storage changes.", &[][..]),
-        ("legacy:hpux:multipath-triage", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "HP-UX native multipath triage", "Establish WWID/persistent DSF and compare every LUN path, path state, and multipath policy before proposing path/device changes.", &[][..]),
-        ("legacy:hpux:serviceguard-triage", LegacyKnowledgeAreaV1::AvailabilityAndRecovery, LegacyProcedureKindV1::Recover, "HP-UX Serviceguard partial-failure triage", "Compare cluster/node/package/resource/dependency/fencing/storage state across members before proposing package movement or restart.", &["serviceguard"][..]),
-        ("legacy:hpux:vpars-vm-triage", LegacyKnowledgeAreaV1::VirtualizationAndPartitioning, LegacyProcedureKindV1::Diagnose, "HP-UX vPars/Integrity VM triage", "Compare VSP virtual-server definition and I/O backing with guest-visible state before proposing host/guest changes.", &["vpars-integrity-vm:6.1"][..]),
-        ("legacy:hpux:npar-triage", LegacyKnowledgeAreaV1::VirtualizationAndPartitioning, LegacyProcedureKindV1::Diagnose, "HP-UX nPartition triage", "Compare OA/complex firmware and partition topology/resources with the HP-UX guest before proposing partition or guest changes.", &["npartitions"][..]),
-        ("legacy:hpux:ignite-recovery-triage", LegacyKnowledgeAreaV1::AvailabilityAndRecovery, LegacyProcedureKindV1::Recover, "HP-UX Ignite-UX recovery verification", "Compare recovery objective, image/install state, persistent storage identity, restored customized data, and application verification before declaring recovery complete.", &["ignite-ux"][..]),
-        ("legacy:hpux:software-update-triage", LegacyKnowledgeAreaV1::SoftwareLifecycle, LegacyProcedureKindV1::Diagnose, "HP-UX software update verification", "Separate selected/installed update state from verification, activation/reboot context, configuration, and application health.", &[][..]),
+        ("legacy:hpux:lvm-vxfs-triage", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "HP-UX LVM/VxFS layered triage", "Map symptom through VxFS/LV/VG/PV/LUN/path layers before proposing storage changes.", &[][..], "hpe:hpux-alletra-lvm-vxfs@sd00003479"),
+        ("legacy:hpux:multipath-triage", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "HP-UX native multipath triage", "Establish WWID/persistent DSF and compare every LUN path, path state, and multipath policy before proposing path/device changes.", &[][..], "hpe:hpux-primera-multipath@sd00001339"),
+        ("legacy:hpux:serviceguard-triage", LegacyKnowledgeAreaV1::AvailabilityAndRecovery, LegacyProcedureKindV1::Recover, "HP-UX Serviceguard partial-failure triage", "Compare cluster/node/package/resource/dependency/fencing/storage state across members before proposing package movement or restart.", &["serviceguard"][..], "hpe:hpux-serviceguard-storage@2025-12"),
+        ("legacy:hpux:vpars-vm-triage", LegacyKnowledgeAreaV1::VirtualizationAndPartitioning, LegacyProcedureKindV1::Diagnose, "HP-UX vPars/Integrity VM triage", "Compare VSP virtual-server definition and I/O backing with guest-visible state before proposing host/guest changes.", &["vpars-integrity-vm:6.1"][..], "hpe:hpux-vpars-integrityvm@6.1"),
+        ("legacy:hpux:npar-triage", LegacyKnowledgeAreaV1::VirtualizationAndPartitioning, LegacyProcedureKindV1::Diagnose, "HP-UX nPartition triage", "Compare OA/complex firmware and partition topology/resources with the HP-UX guest before proposing partition or guest changes.", &["npartitions"][..], "hpe:hpux-superdome-partitioning@c03607734"),
+        ("legacy:hpux:ignite-recovery-triage", LegacyKnowledgeAreaV1::AvailabilityAndRecovery, LegacyProcedureKindV1::Recover, "HP-UX Ignite-UX recovery verification", "Compare recovery objective, image/install state, persistent storage identity, restored customized data, and application verification before declaring recovery complete.", &["ignite-ux"][..], "hpe:hpux-install-update@2025-05"),
+        ("legacy:hpux:software-update-triage", LegacyKnowledgeAreaV1::SoftwareLifecycle, LegacyProcedureKindV1::Diagnose, "HP-UX software update verification", "Separate selected/installed update state from verification, activation/reboot context, configuration, and application health.", &[][..], "hpe:hpux-install-update@2025-05"),
     ];
     let mut ids = BTreeSet::new();
-    for (id, area, kind, title, diagnostic, required_features) in defs {
+    for (id, area, kind, title, diagnostic, required_features, source_snapshot) in defs {
+        let source_snapshot = SourceSnapshotIdV1(source_snapshot.into());
+        if !snapshots.contains(&source_snapshot) {
+            return Err(LegacyHpuxErrorV1::InvalidField(format!(
+                "HP-UX procedure {id} references unregistered source snapshot {}",
+                source_snapshot.0
+            )));
+        }
         let procedure = LegacyProcedureV1 {
             id: id.into(),
             platform: LegacyPlatformV1::HpUx,
@@ -508,7 +515,7 @@ fn add_hpux_procedures(
                 "Re-observe the original symptom against the same host/partition/cluster/storage identity after any separately authorized intervention.".into(),
                 "Verify adjacent storage paths, cluster members, virtual resources, and unrelated workloads did not regress.".into(),
             ],
-            source_snapshots: snapshots.clone(),
+            source_snapshots: [source_snapshot].into_iter().collect(),
         };
         insert_procedure_idempotent(pack, procedure)?;
         ids.insert(id.into());
@@ -698,6 +705,28 @@ mod tests {
                 LegacyProcedureAuthorityV1::ReadOnlyObservation
                     | LegacyProcedureAuthorityV1::ChangeProposalOnly
             )));
+        }
+    }
+
+    #[test]
+    fn advisory_procedures_use_mechanism_scoped_source_snapshots() {
+        let mut pack = pack();
+        enrich_legacy_hpux_foundation_v1(&mut pack, 1_800_000_000_100).unwrap();
+        let expected = [
+            ("legacy:hpux:lvm-vxfs-triage", "hpe:hpux-alletra-lvm-vxfs@sd00003479"),
+            ("legacy:hpux:multipath-triage", "hpe:hpux-primera-multipath@sd00001339"),
+            ("legacy:hpux:serviceguard-triage", "hpe:hpux-serviceguard-storage@2025-12"),
+            ("legacy:hpux:vpars-vm-triage", "hpe:hpux-vpars-integrityvm@6.1"),
+            ("legacy:hpux:npar-triage", "hpe:hpux-superdome-partitioning@c03607734"),
+            ("legacy:hpux:ignite-recovery-triage", "hpe:hpux-install-update@2025-05"),
+            ("legacy:hpux:software-update-triage", "hpe:hpux-install-update@2025-05"),
+        ];
+        for (procedure_id, snapshot_id) in expected {
+            let procedure = pack.procedures.iter().find(|p| p.id == procedure_id).unwrap();
+            assert_eq!(procedure.source_snapshots.len(), 1);
+            assert!(procedure
+                .source_snapshots
+                .contains(&SourceSnapshotIdV1(snapshot_id.into())));
         }
     }
 }

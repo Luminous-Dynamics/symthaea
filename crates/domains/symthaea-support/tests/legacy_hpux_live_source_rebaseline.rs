@@ -68,7 +68,7 @@ fn hpux_may_2025_guide_cannot_progress_past_capture_without_exact_bytes() {
 }
 
 #[test]
-fn hpux_install_guide_current_procedure_fanout_is_visible_for_precision_followup() {
+fn hpux_install_guide_has_exact_procedure_fanout() {
     let (pack, _, _) = build_legacy_five_platform_portfolio_v1(FETCHED_AT_UNIX_MS).unwrap();
     let manifest = initial_legacy_qualification_manifest_v1(&pack).unwrap();
     let plan = plan_legacy_qualification_manifest_captures_v1(&pack, &manifest).unwrap();
@@ -79,18 +79,12 @@ fn hpux_install_guide_current_procedure_fanout_is_visible_for_precision_followup
         .find(|request| request.original_snapshot_id.0 == HPUX_INSTALL_SNAPSHOT)
         .unwrap();
 
-    // These two procedures genuinely depend on the installation/update guide
-    // and must continue to appear after procedure-source bindings are narrowed.
-    assert!(request
-        .procedure_ids
-        .contains("legacy:hpux:ignite-recovery-triage"));
-    assert!(request
-        .procedure_ids
-        .contains("legacy:hpux:software-update-triage"));
-
-    // V1 HP-UX enrichment currently binds every HP-UX procedure to every HP-UX
-    // source snapshot. Do not treat this count as semantic precision; the test
-    // intentionally records the over-broad fanout so a future source-precision
-    // tranche can narrow it without losing the two genuinely dependent paths.
-    assert!(request.procedure_ids.len() >= 2);
+    let expected = [
+        "legacy:hpux:ignite-recovery-triage",
+        "legacy:hpux:software-update-triage",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect();
+    assert_eq!(request.procedure_ids, expected);
 }
