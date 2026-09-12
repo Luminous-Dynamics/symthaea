@@ -9,8 +9,15 @@ The existing evidence adapters can keep their domain-specific payload schemas. T
 - frozen campaign-manifest SHA-256;
 - exact campaign-lane SHA-256;
 - evidence dimension;
+- exact generic `Prediction` + prediction SHA-256;
 - payload type;
 - exact payload-text SHA-256.
+
+## Exact prediction identity
+
+The generic discovery prediction promoted into the dossier is stored directly in the envelope and receives its own domain-separated SHA-256.
+
+Envelope validation revalidates the prediction and checks its metric/unit against the frozen screening contract for the bound dimension. Mutating the generic result while keeping the same adapter receipt therefore fails closed.
 
 ## Exact payload identity
 
@@ -39,19 +46,19 @@ Changing a hazard policy parameter, HHI aggregation mode, recovery-process param
 
 Older adapter receipts predate candidate/campaign digests and need #1963 compatibility review attestations.
 
-A newly generated evidence envelope carries the candidate + campaign + lane lineage natively in the source receipt itself. Downstream dossier/campaign versions can therefore verify this binding directly once they consume envelope metadata.
+A newly generated evidence envelope carries candidate + campaign + lane + generic-prediction lineage natively in the source receipt itself. Downstream dossier/campaign versions can therefore require the exact envelope prediction rather than accepting a separately supplied result.
 
 ## Important limitation
 
-The envelope proves what candidate/campaign/lane the outer receipt claims to belong to and makes later mutation detectable.
+The envelope proves what candidate/campaign/lane/result the outer receipt claims to belong to and makes later mutation detectable.
 
 It does **not** by itself prove that the inner adapter implementation actually obeyed every method parameter in the lane. That stronger theorem requires the adapter execution path to consume the frozen lane/config directly or emit separately qualified execution evidence.
 
 ## Network-free CLI
 
-`energy-evidence-envelope <manifest.json> <dimension> <payload-type> <receipt.json>`
+`energy-evidence-envelope <manifest.json> <dimension> <prediction.json> <payload-type> <receipt.json>`
 
-The CLI reads the exact receipt JSON text, validates it as JSON, creates the native campaign binding and emits the envelope plus its SHA-256. Host-local file paths are not included in output.
+The CLI reads the exact generic prediction and receipt JSON text, creates the native campaign binding and emits the envelope plus its SHA-256. Host-local file paths are not included in output.
 
 ## Authority boundary
 
