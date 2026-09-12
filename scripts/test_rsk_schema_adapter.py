@@ -45,6 +45,10 @@ class SchemaAdapterTests(unittest.TestCase):
             semantic.digest(capability),
             capability_expected["expected_rule_table_sha256"],
         )
+        self.assertEqual(
+            capability["representation_profile"],
+            adapter.CURRENT_RUST_CAPABILITY_PROFILE,
+        )
 
         resource = adapter.resource_rule_table(semantic_golden["resource_schema"])
         resource_expected = adapter_golden["resource_adapter"]
@@ -54,6 +58,29 @@ class SchemaAdapterTests(unittest.TestCase):
             semantic.digest(resource),
             resource_expected["expected_rule_table_sha256"],
         )
+
+    def test_current_rust_u64_profile_accepts_width_64_and_rejects_65(self) -> None:
+        golden = json.loads(GOLDEN_V2.read_text())
+
+        width_64 = copy.deepcopy(golden["capability_schema"])
+        width_64["bit_width"] = 64
+        semantic.validate_capability_schema(width_64)
+        table = adapter.capability_rule_table(width_64)
+        self.assertEqual(table["bit_width"], 64)
+        self.assertEqual(
+            table["representation_profile"],
+            "symthaea.rsk.capability-representation.rust-u64.v1",
+        )
+
+        width_65 = copy.deepcopy(golden["capability_schema"])
+        width_65["bit_width"] = 65
+        # Generic/future schema parsing remains valid.
+        semantic.validate_capability_schema(width_65)
+        # The current Rust u64 target must fail closed instead of truncating.
+        with self.assertRaises(semantic.SchemaError):
+            adapter.require_current_rust_capability_schema(width_65)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.capability_rule_table(width_65)
 
     def test_v1_resource_schema_cannot_produce_runtime_rule_table(self) -> None:
         golden = json.loads(GOLDEN_V1.read_text())
