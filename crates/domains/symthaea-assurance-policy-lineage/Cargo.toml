@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-assurance-policy-lineage"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Signed contiguous assurance-policy manifest lineage for Symthaea"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "policy", "provenance"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-assurance-policy-manifest = { path = "../symthaea-assurance-policy-manifest" }
+serde = { workspace = true }
