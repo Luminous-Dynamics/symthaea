@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-extension-simulation-host"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Zero-import typed WebAssembly Component simulation data-plane host for Symthaea"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-extension-core = { path = "../../core/symthaea-extension-core" }
+symthaea-extension-host = { path = "../symthaea-extension-host" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+thiserror.workspace = true
+wasmtime = { version = "=44.0.1", default-features = false, features = ["std", "runtime", "cranelift", "component-model"] }
