@@ -19,6 +19,8 @@ pub enum EvidenceKind {
     FormalProof,
     /// Simulation result from an external solver.
     Simulation,
+    /// Native analytical, closed-form, or algebraic engineering calculation.
+    Analysis,
     /// Test, inspection, calibration, or commissioning result.
     Test,
     /// Field telemetry or digital twin observation.
@@ -311,6 +313,20 @@ mod tests {
 
         safety_case.obligations[0] = safety_case.obligations[0].clone().discharge("fea-run-42");
         assert!(safety_case.is_discharged());
+    }
+
+    #[test]
+    fn analysis_evidence_is_distinct_from_external_simulation() {
+        let analysis = ProofObligation::new(
+            "closed-form beam stress remains below allowable",
+            EvidenceKind::Analysis,
+        );
+        let simulation = ProofObligation::new(
+            "external FEA stress remains below allowable",
+            EvidenceKind::Simulation,
+        );
+        assert_eq!(analysis.expected_evidence, EvidenceKind::Analysis);
+        assert_ne!(analysis.expected_evidence, simulation.expected_evidence);
     }
 
     #[test]
