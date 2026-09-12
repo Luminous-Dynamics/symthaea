@@ -26,6 +26,17 @@ pub const CAPABILITY_CLASSIFICATION: &str =
 
 const ADMISSION_DIGEST_DOMAIN: &[u8] = b"symthaea.energy-material.native-campaign-admission.v0\0";
 
+/// One admitted envelope with its evidence dimension preserved explicitly.
+///
+/// The dimension and digest are one atomic receipt fact. Keeping them together
+/// prevents a valid set of seven digests from losing the provenance mapping
+/// that says which exact receipt supplied which Tier-1 dimension.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdmittedEnvelopeBinding {
+    pub dimension: EvidenceDimension,
+    pub envelope_sha256: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NativeCampaignAdmissionReceipt {
     pub schema: String,
@@ -34,8 +45,7 @@ pub struct NativeCampaignAdmissionReceipt {
     pub native_dossier_sha256: String,
     pub candidate_sha256: String,
     pub screening_policy_sha256: String,
-    pub admitted_dimensions: Vec<EvidenceDimension>,
-    pub native_envelope_sha256s: Vec<String>,
+    pub admitted_envelopes: Vec<AdmittedEnvelopeBinding>,
     #[serde(default)]
     pub acquisition_declarations: Vec<AcquisitionDeclaration>,
     /// Human-readable disclosure that admission is independent of feasibility.
@@ -59,28 +69,29 @@ impl NativeCampaignAdmissionReceipt {
         ] {
             validate_sha256(digest, name)?;
         }
-        if self.admitted_dimensions.len() != EvidenceDimension::ALL.len() {
+        if self.admitted_envelopes.len() != EvidenceDimension::ALL.len() {
             return Err(NativeAdmissionError::InvalidAdmission(
-                "native Tier-1 admission requires all seven dimensions".into(),
+                "native Tier-1 admission requires seven dimension-bound envelopes".into(),
             ));
         }
         let mut dimensions = BTreeSet::new();
-        for dimension in &self.admitted_dimensions {
-            if !dimensions.insert(dimension_code(*dimension)) {
+        let mut envelope_digests = BTreeSet::new();
+        let mut previous_code = None;
+        for binding in &self.admitted_envelopes {
+            let code = dimension_code(binding.dimension);
+            if previous_code.is_some_and(|previous| code <= previous) {
                 return Err(NativeAdmissionError::InvalidAdmission(
-                    "admitted dimensions contain duplicates".into(),
+                    "admitted envelope bindings must be in canonical dimension order".into(),
                 ));
             }
-        }
-        if self.native_envelope_sha256s.len() != EvidenceDimension::ALL.len() {
-            return Err(NativeAdmissionError::InvalidAdmission(
-                "native Tier-1 admission requires seven envelope digests".into(),
-            ));
-        }
-        let mut envelope_digests = BTreeSet::new();
-        for digest in &self.native_envelope_sha256s {
-            validate_sha256(digest, "native envelope")?;
-            if !envelope_digests.insert(digest.as_str()) {
+            previous_code = Some(code);
+            if !dimensions.insert(code) {
+                return Err(NativeAdmissionError::InvalidAdmission(
+                    "admitted envelope dimensions contain duplicates".into(),
+                ));
+            }
+            validate_sha256(&binding.envelope_sha256, "native envelope")?;
+            if !envelope_digests.insert(binding.envelope_sha256.as_str()) {
                 return Err(NativeAdmissionError::InvalidAdmission(
                     "native envelope digest list contains duplicates".into(),
                 ));
@@ -92,6 +103,28 @@ impl NativeCampaignAdmissionReceipt {
             ));
         }
         validate_acquisition_declarations(&self.acquisition_declarations)?;
+        Ok(())
+    }
+
+    /// Recompute the complete admission decision from its frozen source inputs.
+    ///
+    /// This is stronger than structural validation: every lane/source check is
+    /// rerun and the resulting receipt must be byte-semantically identical to
+    /// this serialized receipt.
+    pub fn validate_with_inputs(
+        &self,
+        manifest: &Tier1CampaignManifest,
+        native_dossier: &NativeEnvelopeDossier,
+    ) -> Result<(), NativeAdmissionError> {
+        self.validate()?;
+        let recomputed = admit_native_campaign_result(
+            manifest,
+            native_dossier,
+            self.acquisition_declarations.clone(),
+        )?;
+        if recomputed != *self {
+            return Err(NativeAdmissionError::ReceiptReplayMismatch);
+        }
         Ok(())
     }
 
@@ -147,8 +180,7 @@ pub fn admit_native_campaign_result(
         return Err(NativeAdmissionError::IncompleteDossier);
     }
 
-    let mut admitted_dimensions = Vec::with_capacity(EvidenceDimension::ALL.len());
-    let mut envelope_sha256s = Vec::with_capacity(EvidenceDimension::ALL.len());
+    let mut admitted_envelopes = Vec::with_capacity(EvidenceDimension::ALL.len());
     let mut prospective_dimensions = BTreeSet::new();
 
     for lane in &manifest.evidence_lanes {
@@ -201,8 +233,10 @@ pub fn admit_native_campaign_result(
                 }
             }
         }
-        admitted_dimensions.push(lane.dimension);
-        envelope_sha256s.push(envelope.sha256()?);
+        admitted_envelopes.push(AdmittedEnvelopeBinding {
+            dimension: lane.dimension,
+            envelope_sha256: envelope.sha256()?,
+        });
     }
 
     for code in declarations.keys() {
@@ -211,11 +245,8 @@ pub fn admit_native_campaign_result(
         }
     }
 
-    admitted_dimensions.sort_by_key(|dimension| dimension_code(*dimension));
+    admitted_envelopes.sort_by_key(|binding| dimension_code(binding.dimension));
     acquisition_declarations.sort_by_key(|declaration| dimension_code(declaration.dimension));
-    // The envelope vector is canonicalized by NativeEnvelopeDossier, but sort
-    // digests independently to make this receipt robust to future storage layout.
-    envelope_sha256s.sort();
 
     let receipt = NativeCampaignAdmissionReceipt {
         schema: "symthaea.energy-material.native-campaign-admission.v0".into(),
@@ -224,8 +255,7 @@ pub fn admit_native_campaign_result(
         native_dossier_sha256: native_dossier.sha256(manifest)?,
         candidate_sha256: manifest.candidate_anchor.candidate_sha256.clone(),
         screening_policy_sha256: manifest.screening_policy_sha256.clone(),
-        admitted_dimensions,
-        native_envelope_sha256s: envelope_sha256s,
+        admitted_envelopes,
         acquisition_declarations,
         outcome_disclosure: "Admission records complete conformance to the frozen Tier-1 evidence campaign checks implemented by this crate. Candidate feasibility may be feasible, infeasible, or unknown; admission is not candidate promotion.".into(),
     };
@@ -279,8 +309,16 @@ fn validate_acquisition_declarations(
     declarations: &[AcquisitionDeclaration],
 ) -> Result<(), NativeAdmissionError> {
     let mut dimensions = BTreeSet::new();
+    let mut previous_code = None;
     for declaration in declarations {
-        if !dimensions.insert(dimension_code(declaration.dimension)) {
+        let code = dimension_code(declaration.dimension);
+        if previous_code.is_some_and(|previous| code <= previous) {
+            return Err(NativeAdmissionError::InvalidAdmission(
+                "acquisition declarations must be in canonical dimension order".into(),
+            ));
+        }
+        previous_code = Some(code);
+        if !dimensions.insert(code) {
             return Err(NativeAdmissionError::DuplicateAcquisitionDeclaration(
                 declaration.dimension,
             ));
@@ -332,6 +370,8 @@ fn prediction_mentions_sha256(prediction: &Prediction, sha256: &str) -> bool {
 pub enum NativeAdmissionError {
     #[error("invalid native campaign admission: {0}")]
     InvalidAdmission(String),
+    #[error("native admission receipt does not replay exactly from the supplied manifest/dossier")]
+    ReceiptReplayMismatch,
     #[error("native dossier is not complete across all Tier-1 dimensions")]
     IncompleteDossier,
     #[error("native campaign is missing dimension {0:?}")]
@@ -416,9 +456,7 @@ mod tests {
 
     #[test]
     fn prediction_digest_search_accepts_model_or_evidence_provenance() {
-        use symthaea_discovery::{
-            EvidenceRef, ModelProvenance, UncertaintyEstimate,
-        };
+        use symthaea_discovery::{EvidenceRef, ModelProvenance, UncertaintyEstimate};
         let digest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         let mut prediction = Prediction {
             metric: "fixture".into(),
@@ -444,7 +482,7 @@ mod tests {
     }
 
     #[test]
-    fn admission_receipt_requires_all_seven_dimensions() {
+    fn admission_receipt_requires_all_seven_dimension_bound_envelopes() {
         let receipt = NativeCampaignAdmissionReceipt {
             schema: "symthaea.energy-material.native-campaign-admission.v0".into(),
             capability_classification: CAPABILITY_CLASSIFICATION.into(),
@@ -456,10 +494,40 @@ mod tests {
                 "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
             screening_policy_sha256:
                 "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into(),
-            admitted_dimensions: vec![EvidenceDimension::FunctionalPerformance],
-            native_envelope_sha256s: vec![
-                "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into(),
-            ],
+            admitted_envelopes: vec![AdmittedEnvelopeBinding {
+                dimension: EvidenceDimension::FunctionalPerformance,
+                envelope_sha256:
+                    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into(),
+            }],
+            acquisition_declarations: vec![],
+            outcome_disclosure: "fixture".into(),
+        };
+        assert!(receipt.validate().is_err());
+    }
+
+    #[test]
+    fn admission_receipt_rejects_noncanonical_envelope_order() {
+        let mut bindings = EvidenceDimension::ALL
+            .into_iter()
+            .enumerate()
+            .map(|(index, dimension)| AdmittedEnvelopeBinding {
+                dimension,
+                envelope_sha256: format!("{:064x}", index + 1),
+            })
+            .collect::<Vec<_>>();
+        bindings.swap(0, 1);
+        let receipt = NativeCampaignAdmissionReceipt {
+            schema: "symthaea.energy-material.native-campaign-admission.v0".into(),
+            capability_classification: CAPABILITY_CLASSIFICATION.into(),
+            campaign_manifest_sha256:
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            native_dossier_sha256:
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+            candidate_sha256:
+                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into(),
+            screening_policy_sha256:
+                "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into(),
+            admitted_envelopes: bindings,
             acquisition_declarations: vec![],
             outcome_disclosure: "fixture".into(),
         };
