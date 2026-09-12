@@ -136,8 +136,14 @@ fn digest_episode_set(
 ) -> Result<Sha256Digest, EpisodicMemoryInterventionError> {
     let mut encoded = Vec::with_capacity(episodes.len());
     for episode in episodes {
+        // `EpisodeInstanceId` is storage-occurrence identity, not content identity. The pre-existing
+        // memory-state digest commits episode content/lifecycle state as a multiset and must remain
+        // stable when the same content is inserted in a different order/store. Exact occurrence IDs
+        // are bound separately by quarantine/restore receipts and escrow evidence.
+        let mut content_state = episode.clone();
+        content_state.instance_id = None;
         encoded.push(
-            serde_json::to_vec(episode)
+            serde_json::to_vec(&content_state)
                 .map_err(|error| EpisodicMemoryInterventionError::Encoding(error.to_string()))?,
         );
     }
