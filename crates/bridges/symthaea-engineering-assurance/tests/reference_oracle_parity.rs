@@ -1,10 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Public-API parity for the plan-bound ETK V2 assurance chain.
+//! Public-API parity for the hardened plan-bound ETK V2 assurance chain.
 //!
-//! Every expected identity below is frozen by the independent standard-library
-//! Python reference oracle. Production Rust must reproduce the vectors without
-//! invoking that oracle as an authority source.
+//! Every expected identity below is frozen by an implementation-independent
+//! standard-library Python reference theorem. Production Rust must reproduce the
+//! vectors without invoking that oracle as an authority source.
 
 use symthaea_engineering_assurance::{
     AssuranceErrorV2, PlanBoundSimulationEvidencePlanV2,
@@ -53,11 +53,11 @@ const RELATIONSHIP_A: &str =
 const PLAN_A: &str =
     "sha256:3b55051507d38ebde23b9f5b5e6ad03c1cadae81ba56abde25ff3b7213ce030b";
 const ADMITTED_A: &str =
-    "sha256:521b4d9c02dbafb2d2662a553c1ef903ba07db105241c14ad7f94042822861c5";
+    "sha256:daca55e4fdd2c173606e035b63c9721d6ed86c121d28543e3f326366881ce6ed";
 const RECEIPT_A: &str =
-    "sha256:e920117a6668d9f4d06c7dd4457a2a1626e4445dc0f23342b9ed6c85c1a5f104";
+    "sha256:391e20b8697ad72aa29de0b99b6d317d2dc704542ea88a0e081578ccf720561d";
 const FACT_A: &str =
-    "sha256:a9b14fcd1802fce7fd9da8fdf8d7742b3447937228de8924b8fba9cce275255a";
+    "sha256:a258c2988a48f27de28d9f0f712f01a3235702ae473537bbe8487f38e2f96b6e";
 
 const OBLIGATION_B: &str =
     "sha256:63ce87ba42de8d08ff87059322964a7609228d66a7b8f7fc67016b298c2a7c2d";
@@ -66,16 +66,16 @@ const RELATIONSHIP_B: &str =
 const PLAN_B: &str =
     "sha256:926d82f36922fa3e38ac369c3e841462ea9024460ceb8f83c7007908c2e010e7";
 const ADMITTED_B: &str =
-    "sha256:93bfacf05b13b08e8ce3e84193efe2526a01223af73f4354fc30528249d9ac03";
+    "sha256:7f9a4bc46a34f3d97f1fcfbbd4b3479a61de0d601545677dbbf765321d4ddc3b";
 const RECEIPT_B: &str =
-    "sha256:107f067fcbba0e7cb92b61a525dbbf0ce9fd8ca9af017ba05f236b04585ee71d";
+    "sha256:b0a2d81d49dd5bba72a6d1b885d75953768fa0e31ab97d66042a98ee4190ed18";
 const FACT_B: &str =
-    "sha256:a0d1c108b69956411bbb649da4ecd97e64eda6fcfad777a479c5401efa1c277c";
+    "sha256:36050614ef2fbe51c52c229e77d5a0616b29a4e38f24e52cfc2511a92df864d3";
 
 const VERIFICATION_CONTRACT: &str =
     "sha256:79a8a3e5cda3f89ff66c4f5954f52fb92e3b3e33418d50230b6fd7311be1d800";
 const SATISFACTION_RECEIPT: &str =
-    "sha256:b9ae737e526fc04316dcfec9a8f5a4af1b5e39cec32188580fadd221d8117acf";
+    "sha256:883d74833c424d3a5dfa0a29519fb69a5d2a2e53ecfd0c85629e399ed1b5dce8";
 
 fn digest(ch: char) -> Sha256DigestV1 {
     Sha256DigestV1::parse(format!("sha256:{}", ch.to_string().repeat(64))).unwrap()
@@ -305,7 +305,7 @@ fn independent_v2_vectors_compose_end_to_end() {
     let admitted_a = admit_plan_bound_simulation_v2(
         &plan_a,
         &obligation_a,
-        &solver_result("sha256:output-plan-v2-A"),
+        &solver_result(digest('7').as_str()),
         "solver-output:plan-v2-A",
         "calculix:2.22:plan-v2-A",
     )
@@ -313,13 +313,22 @@ fn independent_v2_vectors_compose_end_to_end() {
     let admitted_b = admit_plan_bound_simulation_v2(
         &plan_b,
         &obligation_b,
-        &solver_result("sha256:output-plan-v2-B"),
+        &solver_result(digest('8').as_str()),
         "solver-output:plan-v2-B",
         "calculix:2.22:plan-v2-B",
     )
     .unwrap();
     assert_eq!(admitted_a.admitted_evidence_id().as_str(), ADMITTED_A);
     assert_eq!(admitted_b.admitted_evidence_id().as_str(), ADMITTED_B);
+    assert_eq!(admitted_a.output_digest().as_str(), digest('7').as_str());
+    assert_eq!(
+        admitted_a.audit_record_v2()["authority"].as_str(),
+        Some("plan-bound-admitted-evidence-only")
+    );
+    assert_eq!(
+        admitted_a.audit_record_v2()["solver_output_digest"].as_str(),
+        Some(digest('7').as_str())
+    );
 
     let receipt_a =
         issue_plan_bound_discharge_receipt_v2(&plan_a, &obligation_a, &admitted_a).unwrap();
@@ -327,6 +336,11 @@ fn independent_v2_vectors_compose_end_to_end() {
         issue_plan_bound_discharge_receipt_v2(&plan_b, &obligation_b, &admitted_b).unwrap();
     assert_eq!(receipt_a.receipt_id().as_str(), RECEIPT_A);
     assert_eq!(receipt_b.receipt_id().as_str(), RECEIPT_B);
+    assert_eq!(receipt_a.admitted_evidence_id().as_str(), ADMITTED_A);
+    assert_eq!(
+        receipt_a.audit_record_v2()["plan_bound_admitted_evidence_id"].as_str(),
+        Some(ADMITTED_A)
+    );
 
     let fact_a =
         derive_current_plan_bound_discharge_fact_v2(&plan_a, &obligation_a, &receipt_a).unwrap();
@@ -334,6 +348,11 @@ fn independent_v2_vectors_compose_end_to_end() {
         derive_current_plan_bound_discharge_fact_v2(&plan_b, &obligation_b, &receipt_b).unwrap();
     assert_eq!(fact_a.fact_id().as_str(), FACT_A);
     assert_eq!(fact_b.fact_id().as_str(), FACT_B);
+    assert_eq!(fact_a.witness_receipt_id().as_str(), RECEIPT_A);
+    assert_eq!(
+        fact_a.audit_record_v2()["plan_bound_discharge_receipt_id"].as_str(),
+        Some(RECEIPT_A)
+    );
 
     let member_a = RequirementVerificationMemberV2::new(&binding_a, &plan_a).unwrap();
     let member_b = RequirementVerificationMemberV2::new(&binding_b, &plan_b).unwrap();
@@ -345,6 +364,14 @@ fn independent_v2_vectors_compose_end_to_end() {
     )
     .unwrap();
     assert_eq!(contract.contract_id().as_str(), VERIFICATION_CONTRACT);
+    assert_eq!(
+        contract.audit_record_v2()["decomposition_policy_revision_id"].as_str(),
+        Some(repeated_pair("61").as_str())
+    );
+    assert_eq!(
+        contract.audit_record_v2()["decomposition_acceptance_record_digest"].as_str(),
+        Some(repeated_pair("62").as_str())
+    );
 
     let partial = evaluate_requirement_satisfaction_v2(
         &contract,
@@ -374,9 +401,21 @@ fn independent_v2_vectors_compose_end_to_end() {
         panic!("both exact plan-bound facts should satisfy AllOf")
     };
     assert_eq!(satisfied.receipt_id().as_str(), SATISFACTION_RECEIPT);
+    let satisfaction_audit = satisfied.audit_record_v2();
     assert_eq!(
-        satisfied.audit_record_v2()["authority"],
-        "current-requirement-satisfaction-only"
+        satisfaction_audit["authority"].as_str(),
+        Some("current-requirement-satisfaction-only")
+    );
+    assert_eq!(
+        satisfaction_audit["currentness_assertion_id"].as_str(),
+        Some(repeated_pair("63").as_str())
+    );
+    assert_eq!(
+        satisfaction_audit["current_discharge_facts"]
+            .as_array()
+            .expect("used fact audit array")
+            .len(),
+        2
     );
 
     let reordered = RequirementVerificationContractV2::all_of(
@@ -426,7 +465,7 @@ fn v2_requires_exact_plan_context_not_merely_a_discharged_obligation() {
     let admitted = admit_plan_bound_simulation_v2(
         &plan,
         &obligation,
-        &solver_result("sha256:output-plan-v2-A"),
+        &solver_result(digest('7').as_str()),
         "solver-output:plan-v2-A",
         "calculix:2.22:plan-v2-A",
     )
@@ -440,7 +479,7 @@ fn v2_requires_exact_plan_context_not_merely_a_discharged_obligation() {
 }
 
 #[test]
-fn v2_canonicalization_and_warning_gates_fail_closed() {
+fn v2_canonicalization_provenance_and_warning_gates_fail_closed() {
     assert_eq!(canonical_binary64_v2(-0.0).unwrap(), "f64:0000000000000000");
     assert_eq!(canonical_binary64_v2(0.1).unwrap(), "f64:3fb999999999999a");
     assert!(canonical_binary64_v2(f64::NAN).is_err());
@@ -466,7 +505,7 @@ fn v2_canonicalization_and_warning_gates_fail_closed() {
     .unwrap();
     assert_eq!(reordered_plan.plan_id(), plan.plan_id());
 
-    let mut reordered_result = solver_result("sha256:output-plan-v2-A");
+    let mut reordered_result = solver_result(digest('7').as_str());
     reordered_result.metrics.reverse();
     let reordered_admitted = admit_plan_bound_simulation_v2(
         &plan,
@@ -478,20 +517,35 @@ fn v2_canonicalization_and_warning_gates_fail_closed() {
     .unwrap();
     assert_eq!(reordered_admitted.admitted_evidence_id().as_str(), ADMITTED_A);
 
-    let mut wrong_input = solver_result("sha256:bad-input");
+    let mut wrong_input = solver_result(digest('9').as_str());
     wrong_input.evidence.input_digest = Some(digest('7').as_str().to_string());
-    assert!(matches!(
+    assert_eq!(
         admit_plan_bound_simulation_v2(
             &plan,
             &obligation,
             &wrong_input,
             "solver-output:bad-input",
             "calculix:2.22:bad-input",
-        ),
-        Err(AssuranceErrorV2::LowerAdmissionDenied(_))
-    ));
+        )
+        .unwrap_err(),
+        AssuranceErrorV2::PlanResultBindingMismatch
+    );
 
-    let mut warning = solver_result("sha256:bad-warning");
+    let mut malformed_output = solver_result(digest('9').as_str());
+    malformed_output.evidence.output_digest = Some("sha256:not-a-digest".into());
+    assert_eq!(
+        admit_plan_bound_simulation_v2(
+            &plan,
+            &obligation,
+            &malformed_output,
+            "solver-output:malformed-output",
+            "calculix:2.22:malformed-output",
+        )
+        .unwrap_err(),
+        AssuranceErrorV2::InvalidDigest("solver output digest")
+    );
+
+    let mut warning = solver_result(digest('9').as_str());
     warning.warnings.push("mesh warning".into());
     assert_eq!(
         admit_plan_bound_simulation_v2(
@@ -503,5 +557,19 @@ fn v2_canonicalization_and_warning_gates_fail_closed() {
         )
         .unwrap_err(),
         AssuranceErrorV2::WarningDenied
+    );
+
+    let mut duplicate_warning = solver_result(digest('9').as_str());
+    duplicate_warning.warnings = vec!["mesh warning".into(), "mesh warning".into()];
+    assert_eq!(
+        admit_plan_bound_simulation_v2(
+            &plan,
+            &obligation,
+            &duplicate_warning,
+            "solver-output:duplicate-warning",
+            "calculix:2.22:duplicate-warning",
+        )
+        .unwrap_err(),
+        AssuranceErrorV2::DuplicateWarning("mesh warning".into())
     );
 }
