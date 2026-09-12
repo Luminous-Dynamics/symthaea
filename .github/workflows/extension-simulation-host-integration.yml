@@ -1,0 +1,109 @@
+name: Extension Simulation Host Integration
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/core/symthaea-extension-core/**"
+      - "crates/bridges/symthaea-extension-host/**"
+      - "crates/bridges/symthaea-extension-simulation-host/**"
+      - "crates/bridges/symthaea-sim-bridge/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/extension-simulation-host-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  production-host-guest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust with Component target
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
+
+      - name: Cache Cargo and standalone guest build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-extension-sim-integration-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-extension-simulation-host/**', 'examples/extensions/hello-simulation/**') }}
+          restore-keys: |
+            ${{ runner.os }}-extension-sim-integration-
+
+      - name: Require fixture WIT parity with canonical public ABI
+        run: |
+          cmp crates/core/symthaea-extension-core/wit/extension-control.wit \
+              examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+              examples/extensions/hello-simulation/wit/simulation-provider.wit
+
+      - name: Build standalone release Component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum "$component" examples/extensions/hello-simulation/manifest.json
+
+      - name: Reconcile root candidate lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > extension-simulation-integration-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the joined workspace graph."
+          else
+            cat extension-simulation-integration-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-simulation-integration-cargo-lock-patch
+          path: extension-simulation-integration-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Execute release guest through production simulation host
+        env:
+          SYMTHAEA_SIM_COMPONENT: examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm
+          SYMTHAEA_SIM_MANIFEST: examples/extensions/hello-simulation/manifest.json
+        run: |
+          cargo test --locked \
+            -p symthaea-extension-simulation-host \
+            --test hello_simulation \
+            -- --ignored --nocapture
+
+      - name: Record exact qualification subject
+        run: |
+          echo "head_sha=${GITHUB_SHA}"
+          sha256sum Cargo.lock \
+            examples/extensions/hello-simulation/manifest.json \
+            examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm
+          rustc --version --verbose
+          cargo --version
+
+      - name: Require committed lockfile
+        run: git diff --exit-code -- Cargo.lock

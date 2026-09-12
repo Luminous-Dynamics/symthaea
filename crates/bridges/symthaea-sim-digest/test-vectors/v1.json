@@ -1,0 +1,54 @@
+{
+  "profile": "simulation-provider-v1-canonical-v1",
+  "request": {
+    "value": {
+      "id": "req-1",
+      "domain": "systems",
+      "solver": "custom",
+      "objective": "canonical digest fixture",
+      "parameters": [
+        {
+          "name": "alpha",
+          "value": 1.5,
+          "unit": "1",
+          "provenance": "fixture",
+          "uncertainty": {
+            "epistemic": 0.25,
+            "aleatoric": 0.125,
+            "interval": { "lower": -2.0, "upper": 3.0 }
+          }
+        }
+      ],
+      "requested_metrics": ["fixture.metric"]
+    },
+    "canonical_hex": "73796d74686165612e73696d756c6174696f6e2e726571756573742e76310005000000000000007265712d310907180000000000000063616e6f6e6963616c20646967657374206669787475726501000000000000000500000000000000616c706861000000000000f83f01000000000000003107000000000000006669787475726501000000000000d03f000000000000c03f0100000000000000c0000000000000084001000000000000000e00000000000000666978747572652e6d6574726963",
+    "sha256": "86b7bf55d8c2d10f24c9ad2c923e722eb3d1431f1b20fde9cb724359dfb2cbdc"
+  },
+  "output": {
+    "value": {
+      "request_id": "req-1",
+      "converged": true,
+      "confidence": 0.7,
+      "uncertainty": {
+        "epistemic": 0.2,
+        "aleatoric": 0.1,
+        "interval": { "lower": 1.0, "upper": 2.0 }
+      },
+      "metrics": [
+        {
+          "name": "fixture.metric",
+          "value": -0.0,
+          "unit": "1",
+          "uncertainty": {
+            "epistemic": 0.05,
+            "aleatoric": 0.0,
+            "interval": null
+          }
+        }
+      ],
+      "warnings": ["not engineering evidence"]
+    },
+    "canonical_hex": "73796d74686165612e73696d756c6174696f6e2e6f75747075742e76310005000000000000007265712d3101666666666666e63f9a9999999999c93f9a9999999999b93f01000000000000f03f000000000000004001000000000000000e00000000000000666978747572652e6d65747269630000000000000080010000000000000031019a9999999999a93f000000000000000000010000000000000018000000000000006e6f7420656e67696e656572696e672065766964656e6365",
+    "sha256": "b1eccaa53d3e5876e0e0f3ead5b56820cc38a4cc9ec456e9f284755999cec481"
+  }
+}
