@@ -88,13 +88,35 @@ impl OperationalConditions {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+/// Capability-facing ODD state.
+///
+/// Safety logic must not rely on enum declaration order. The intentional
+/// restrictiveness relationship is defined by [`OperationalStatus::restrictiveness_rank`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationalStatus {
     Nominal,
     Degraded,
     Restricted,
     Unavailable,
     Incomplete,
+}
+
+impl OperationalStatus {
+    /// Explicit safety restrictiveness rank used when combining independent ODD issues.
+    ///
+    /// `Incomplete` is intentionally more restrictive than `Unavailable`: an
+    /// unavailable condition is a known inability to operate, while incomplete
+    /// evidence means the system cannot establish that the reviewed operating
+    /// assumptions hold at all. Both are fail-closed outcomes.
+    pub const fn restrictiveness_rank(self) -> u8 {
+        match self {
+            Self::Nominal => 0,
+            Self::Degraded => 1,
+            Self::Restricted => 2,
+            Self::Unavailable => 3,
+            Self::Incomplete => 4,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -155,7 +177,7 @@ pub fn assess_operational_domain(
     let mut issues = Vec::new();
 
     let mut worsen = |new_status: OperationalStatus, issue: OperationalIssue| {
-        if new_status > status {
+        if new_status.restrictiveness_rank() > status.restrictiveness_rank() {
             status = new_status;
         }
         issues.push(issue);
@@ -338,6 +360,28 @@ mod tests {
         conditions.operator_available = Some(false);
         let result = assess_operational_domain(&odd(), &conditions);
         assert_eq!(result.status, OperationalStatus::Unavailable);
+        assert!(result.issues.contains(&OperationalIssue::OperatorUnavailable));
+    }
+
+    #[test]
+    fn severity_order_is_explicit_and_not_enum_ordinal_semantics() {
+        assert_eq!(OperationalStatus::Nominal.restrictiveness_rank(), 0);
+        assert_eq!(OperationalStatus::Degraded.restrictiveness_rank(), 1);
+        assert_eq!(OperationalStatus::Restricted.restrictiveness_rank(), 2);
+        assert_eq!(OperationalStatus::Unavailable.restrictiveness_rank(), 3);
+        assert_eq!(OperationalStatus::Incomplete.restrictiveness_rank(), 4);
+    }
+
+    #[test]
+    fn incomplete_evidence_dominates_known_unavailability_when_both_exist() {
+        let mut conditions = nominal();
+        conditions.visibility_m = None;
+        conditions.operator_available = Some(false);
+        let result = assess_operational_domain(&odd(), &conditions);
+        assert_eq!(result.status, OperationalStatus::Incomplete);
+        assert!(result
+            .issues
+            .contains(&OperationalIssue::MissingVisibilityEvidence));
         assert!(result.issues.contains(&OperationalIssue::OperatorUnavailable));
     }
 }
