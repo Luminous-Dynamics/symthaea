@@ -17,6 +17,7 @@ on:
       - 'crates/bridges/symthaea-forge-linux-provenance-strict/**'
       - 'crates/bridges/symthaea-forge-linux-kernel-attestation/**'
       - 'crates/bridges/symthaea-forge-linux-observed-exec/**'
+      - 'crates/bridges/symthaea-forge-kernel-validation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
   push:
     branches: [ main ]
@@ -35,6 +36,7 @@ on:
       - 'crates/bridges/symthaea-forge-linux-provenance-strict/**'
       - 'crates/bridges/symthaea-forge-linux-kernel-attestation/**'
       - 'crates/bridges/symthaea-forge-linux-observed-exec/**'
+      - 'crates/bridges/symthaea-forge-kernel-validation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
   workflow_dispatch:
 
@@ -84,6 +86,9 @@ jobs:
       - name: Test kernel-gated evaluator execution bridge
         run: cargo test -p symthaea-forge-linux-observed-exec --all-targets -- --test-threads=1
 
+      - name: Test kernel-gated validation bridge
+        run: cargo test -p symthaea-forge-kernel-validation --all-targets -- --test-threads=1
+
       - name: Test e-graph lineage bridge
         run: cargo test -p symthaea-algorithm-egraph-bridge -- --test-threads=1
 
@@ -113,6 +118,7 @@ jobs:
           -p symthaea-forge-linux-provenance-strict
           -p symthaea-forge-linux-kernel-attestation
           -p symthaea-forge-linux-observed-exec
+          -p symthaea-forge-kernel-validation
           -p symthaea-algorithm-egraph-bridge
           -p symthaea-algorithm-evidence-collector
           -p symthaea-hdc-algorithm-evidence
