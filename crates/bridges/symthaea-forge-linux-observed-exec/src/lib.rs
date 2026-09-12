@@ -10,10 +10,16 @@
 //! dedicated process group and verify that group is empty. After the PID is known, pidfd becomes
 //! the stable kill/exit handle and remains armed until exact exit is verified.
 //!
+//! A separate admission-capable entry point may run one caller-supplied pre-release admission
+//! operation after the first kernel gate and before release. That path re-observes the exact process
+//! afterward and requires stable process-start identity before model execution. The base entry point
+//! remains admission-free and preserves the original v1 execution proposition.
+//!
 //! This is stronger than a command-line recipe receipt, but remains deliberately narrower than a
-//! full hostile-code sandbox theorem: seccomp filtering, Landlock, cgroup resource limits, VM
-//! isolation, kernel-exploit resistance, and independent Bubblewrap semantic correctness remain
-//! unestablished here.
+//! full hostile-code sandbox theorem: exact seccomp-filter semantics, Landlock, VM isolation,
+//! kernel-exploit resistance, and independent Bubblewrap semantic correctness remain unestablished
+//! here. Resource enforcement is established only by an external admission theorem that composes
+//! with the admission receipt returned by this crate.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -118,6 +124,14 @@ pub enum ObservedEvaluatorError {
     KernelGateTimeout { last_error: String },
     #[error("sandbox exited before the pre-exec kernel gate with code {code:?}")]
     SandboxExitedBeforeGate { code: Option<i32> },
+    #[error("exact sandbox process exited during pre-release admission")]
+    SandboxExitedDuringAdmission,
+    #[error("sandbox process identity changed during pre-release admission")]
+    ProcessIdentityChangedDuringAdmission,
+    #[error("pre-release admission receipt does not bind supplied evidence")]
+    AdmissionReceiptScopeMismatch,
+    #[error("pre-release admission receipt identity is non-canonical")]
+    AdmissionReceiptIdentityMismatch,
     #[error("kernel-gate release byte could not be written")]
     GateReleaseFailed,
     #[error("evaluator stdin writer failed or panicked")]
@@ -148,6 +162,122 @@ pub enum ObservedEvaluatorError {
     ReceiptScopeMismatch,
     #[error("kernel-gated execution receipt identity is non-canonical")]
     ReceiptIdentityMismatch,
+}
+
+pub fn pre_release_admission_protocol_id() -> ContentId {
+    ContentId::derive(
+        "symthaea.forge-pre-release-admission-protocol.v1",
+        [b"initial-kernel-gate+admission-while-blocked+post-admission-reobserve+stable-start-time+deadline-recheck".as_slice()],
+    )
+}
+
+pub trait PreReleaseAdmission {
+    fn admit(
+        &mut self,
+        sandbox_pid: u32,
+        observation: &KernelSandboxObservation,
+        gate: &KernelIsolationGate,
+    ) -> Result<(), ObservedEvaluatorError>;
+}
+
+impl<F> PreReleaseAdmission for F
+where
+    F: FnMut(
+        u32,
+        &KernelSandboxObservation,
+        &KernelIsolationGate,
+    ) -> Result<(), ObservedEvaluatorError>,
+{
+    fn admit(
+        &mut self,
+        sandbox_pid: u32,
+        observation: &KernelSandboxObservation,
+        gate: &KernelIsolationGate,
+    ) -> Result<(), ObservedEvaluatorError> {
+        self(sandbox_pid, observation, gate)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PreReleaseAdmissionReceipt {
+    id: ContentId,
+    protocol_id: ContentId,
+    sandbox_host_pid: u32,
+    process_start_time_ticks: u64,
+    pre_observation_id: ContentId,
+    pre_gate_id: ContentId,
+    post_observation_id: ContentId,
+    post_gate_id: ContentId,
+    admission_ms: u64,
+}
+
+impl PreReleaseAdmissionReceipt {
+    pub fn id(&self) -> &ContentId { &self.id }
+    pub fn protocol_id(&self) -> &ContentId { &self.protocol_id }
+    pub fn sandbox_host_pid(&self) -> u32 { self.sandbox_host_pid }
+    pub fn process_start_time_ticks(&self) -> u64 { self.process_start_time_ticks }
+    pub fn pre_observation_id(&self) -> &ContentId { &self.pre_observation_id }
+    pub fn pre_gate_id(&self) -> &ContentId { &self.pre_gate_id }
+    pub fn post_observation_id(&self) -> &ContentId { &self.post_observation_id }
+    pub fn post_gate_id(&self) -> &ContentId { &self.post_gate_id }
+    pub fn admission_ms(&self) -> u64 { self.admission_ms }
+
+    pub fn validate_for(
+        &self,
+        post_observation: &KernelSandboxObservation,
+        post_gate: &KernelIsolationGate,
+    ) -> Result<(), ObservedEvaluatorError> {
+        post_gate.validate_for(post_observation)?;
+        if self.protocol_id != pre_release_admission_protocol_id()
+            || self.sandbox_host_pid != post_observation.host_pid()
+            || self.process_start_time_ticks != post_observation.process_start_time_ticks()
+            || self.post_observation_id != *post_observation.id()
+            || self.post_gate_id != *post_gate.id()
+        {
+            return Err(ObservedEvaluatorError::AdmissionReceiptScopeMismatch);
+        }
+        let expected = derive_admission_receipt_id(
+            &self.protocol_id,
+            self.sandbox_host_pid,
+            self.process_start_time_ticks,
+            &self.pre_observation_id,
+            &self.pre_gate_id,
+            &self.post_observation_id,
+            &self.post_gate_id,
+            self.admission_ms,
+        );
+        if expected == self.id {
+            Ok(())
+        } else {
+            Err(ObservedEvaluatorError::AdmissionReceiptIdentityMismatch)
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn derive_admission_receipt_id(
+    protocol_id: &ContentId,
+    sandbox_host_pid: u32,
+    process_start_time_ticks: u64,
+    pre_observation_id: &ContentId,
+    pre_gate_id: &ContentId,
+    post_observation_id: &ContentId,
+    post_gate_id: &ContentId,
+    admission_ms: u64,
+) -> ContentId {
+    ContentId::derive(
+        "symthaea.forge-pre-release-admission-receipt.v1",
+        [
+            protocol_id.as_str().as_bytes(),
+            sandbox_host_pid.to_be_bytes().as_slice(),
+            process_start_time_ticks.to_be_bytes().as_slice(),
+            pre_observation_id.as_str().as_bytes(),
+            pre_gate_id.as_str().as_bytes(),
+            post_observation_id.as_str().as_bytes(),
+            post_gate_id.as_str().as_bytes(),
+            admission_ms.to_be_bytes().as_slice(),
+        ],
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -888,6 +1018,14 @@ fn teardown_after_pid(
     teardown
 }
 
+type KernelGatedRun = (
+    ForgeProposalEvaluationResponse,
+    KernelSandboxObservation,
+    KernelIsolationGate,
+    KernelGatedExecutionReceipt,
+    Option<PreReleaseAdmissionReceipt>,
+);
+
 #[allow(clippy::too_many_arguments)]
 pub fn run_kernel_gated_evaluator(
     policy: &KernelGatedEvaluatorPolicy,
@@ -903,6 +1041,64 @@ pub fn run_kernel_gated_evaluator(
     KernelIsolationGate,
     KernelGatedExecutionReceipt,
 ), ObservedEvaluatorError> {
+    let (response, observation, gate, receipt, admission) = run_kernel_gated_evaluator_inner(
+        policy,
+        binding,
+        request,
+        model,
+        bubblewrap_executable.as_ref(),
+        model_executable.as_ref(),
+        model_args,
+        None,
+    )?;
+    debug_assert!(admission.is_none());
+    Ok((response, observation, gate, receipt))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn run_kernel_gated_evaluator_with_admission(
+    policy: &KernelGatedEvaluatorPolicy,
+    binding: &ForgeProposalExecutableModelBinding,
+    request: &ForgeProposalEvaluationRequest,
+    model: &ForgeProposalFrozenModel,
+    bubblewrap_executable: impl AsRef<Path>,
+    model_executable: impl AsRef<Path>,
+    model_args: &[String],
+    admission: &mut dyn PreReleaseAdmission,
+) -> Result<(
+    ForgeProposalEvaluationResponse,
+    KernelSandboxObservation,
+    KernelIsolationGate,
+    KernelGatedExecutionReceipt,
+    PreReleaseAdmissionReceipt,
+), ObservedEvaluatorError> {
+    let (response, observation, gate, receipt, admission_receipt) = run_kernel_gated_evaluator_inner(
+        policy,
+        binding,
+        request,
+        model,
+        bubblewrap_executable.as_ref(),
+        model_executable.as_ref(),
+        model_args,
+        Some(admission),
+    )?;
+    let admission_receipt = admission_receipt
+        .ok_or(ObservedEvaluatorError::AdmissionReceiptScopeMismatch)?;
+    admission_receipt.validate_for(&observation, &gate)?;
+    Ok((response, observation, gate, receipt, admission_receipt))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_kernel_gated_evaluator_inner(
+    policy: &KernelGatedEvaluatorPolicy,
+    binding: &ForgeProposalExecutableModelBinding,
+    request: &ForgeProposalEvaluationRequest,
+    model: &ForgeProposalFrozenModel,
+    bubblewrap_executable: &Path,
+    model_executable: &Path,
+    model_args: &[String],
+    mut admission: Option<&mut dyn PreReleaseAdmission>,
+) -> Result<KernelGatedRun, ObservedEvaluatorError> {
     policy.validate()?;
     request.validate_identity()?;
     binding.validate_for(model, request.protocol())?;
@@ -913,11 +1109,11 @@ pub fn run_kernel_gated_evaluator(
         return Err(ObservedEvaluatorError::TransportSchemaMismatch);
     }
 
-    let (canonical_bwrap, bwrap_bytes) = canonical_file_bytes(bubblewrap_executable.as_ref())?;
+    let (canonical_bwrap, bwrap_bytes) = canonical_file_bytes(bubblewrap_executable)?;
     if forge_bubblewrap_artifact_id(&bwrap_bytes) != *policy.bubblewrap_policy().bubblewrap_artifact_id() {
         return Err(ObservedEvaluatorError::BubblewrapArtifactMismatch);
     }
-    let (canonical_model, model_bytes) = canonical_file_bytes(model_executable.as_ref())?;
+    let (canonical_model, model_bytes) = canonical_file_bytes(model_executable)?;
     if forge_evaluator_runner_artifact_id(&model_bytes) != *model.model_payload_id() {
         return Err(ObservedEvaluatorError::ModelArtifactMismatch);
     }
@@ -1037,7 +1233,7 @@ pub fn run_kernel_gated_evaluator(
         });
     }
 
-    let (observation, gate) = match wait_for_kernel_gate(&mut child, sandbox_pid, gate_deadline) {
+    let (mut observation, mut gate) = match wait_for_kernel_gate(&mut child, sandbox_pid, gate_deadline) {
         Ok(value) => value,
         Err(error) => {
             teardown_after_pid(
@@ -1047,19 +1243,167 @@ pub fn run_kernel_gated_evaluator(
             return Err(error);
         }
     };
-    let gate_wait_ms = u64::try_from(launch_started.elapsed().as_millis())
-        .map_err(|_| ObservedEvaluatorError::MeasurementOverflow)?;
 
-    // Critical release-boundary theorem: a slow final observation must never become a post-hoc
-    // receipt failure after model execution. Budget expiry is checked again immediately before the
-    // release byte exists, and exact pidfd teardown happens instead of release on overrun.
+    let mut admission_receipt = None;
+    if let Some(admitter) = admission.as_deref_mut() {
+        let pre_observation_id = observation.id().clone();
+        let pre_gate_id = gate.id().clone();
+        let process_start_time_ticks = observation.process_start_time_ticks();
+        let admission_started = Instant::now();
+
+        if let Err(error) = admitter.admit(sandbox_pid, &observation, &gate) {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(error);
+        }
+        if Instant::now() >= gate_deadline {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(ObservedEvaluatorError::KernelGateTimeout {
+                last_error: "pre-release admission consumed the frozen gate budget".into(),
+            });
+        }
+        match pidfd.wait_exited(Duration::ZERO) {
+            Ok(false) => {}
+            Ok(true) => {
+                teardown_after_pid(
+                    &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                    stdout_reader, stderr_reader, status_reader,
+                )?;
+                return Err(ObservedEvaluatorError::SandboxExitedDuringAdmission);
+            }
+            Err(error) => {
+                teardown_after_pid(
+                    &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                    stdout_reader, stderr_reader, status_reader,
+                )?;
+                return Err(error);
+            }
+        }
+
+        let post_observation = match observe_sandbox_process(sandbox_pid) {
+            Ok(value) => value,
+            Err(error) => {
+                teardown_after_pid(
+                    &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                    stdout_reader, stderr_reader, status_reader,
+                )?;
+                return Err(error.into());
+            }
+        };
+        if post_observation.process_start_time_ticks() != process_start_time_ticks {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(ObservedEvaluatorError::ProcessIdentityChangedDuringAdmission);
+        }
+        let post_gate = match KernelIsolationGate::issue(&post_observation) {
+            Ok(value) => value,
+            Err(error) => {
+                teardown_after_pid(
+                    &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                    stdout_reader, stderr_reader, status_reader,
+                )?;
+                return Err(error.into());
+            }
+        };
+        if Instant::now() >= gate_deadline {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(ObservedEvaluatorError::KernelGateTimeout {
+                last_error: "post-admission kernel re-observation crossed the frozen gate deadline".into(),
+            });
+        }
+        let admission_ms = match u64::try_from(admission_started.elapsed().as_millis()) {
+            Ok(value) => value,
+            Err(_) => {
+                teardown_after_pid(
+                    &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                    stdout_reader, stderr_reader, status_reader,
+                )?;
+                return Err(ObservedEvaluatorError::MeasurementOverflow);
+            }
+        };
+        let protocol_id = pre_release_admission_protocol_id();
+        let id = derive_admission_receipt_id(
+            &protocol_id,
+            sandbox_pid,
+            process_start_time_ticks,
+            &pre_observation_id,
+            &pre_gate_id,
+            post_observation.id(),
+            post_gate.id(),
+            admission_ms,
+        );
+        let receipt = PreReleaseAdmissionReceipt {
+            id,
+            protocol_id,
+            sandbox_host_pid: sandbox_pid,
+            process_start_time_ticks,
+            pre_observation_id,
+            pre_gate_id,
+            post_observation_id: post_observation.id().clone(),
+            post_gate_id: post_gate.id().clone(),
+            admission_ms,
+        };
+        if let Err(error) = receipt.validate_for(&post_observation, &post_gate) {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(error);
+        }
+        observation = post_observation;
+        gate = post_gate;
+        admission_receipt = Some(receipt);
+    }
+
+    match pidfd.wait_exited(Duration::ZERO) {
+        Ok(false) => {}
+        Ok(true) => {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(ObservedEvaluatorError::SandboxExitedBeforeGate { code: None });
+        }
+        Err(error) => {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(error);
+        }
+    }
+
+    let gate_wait_ms = match u64::try_from(launch_started.elapsed().as_millis()) {
+        Ok(value) => value,
+        Err(_) => {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(ObservedEvaluatorError::MeasurementOverflow);
+        }
+    };
+
+    // Critical release-boundary theorem: a slow final observation or admission must never become a
+    // post-hoc receipt failure after model execution. Budget expiry is checked again immediately
+    // before the release byte exists, and exact pidfd teardown happens instead of release on overrun.
     if Instant::now() >= gate_deadline || gate_wait_ms > policy.kernel_gate_timeout_ms() {
         teardown_after_pid(
             &mut pidfd, &mut child, policy.teardown_timeout_ms(),
             stdout_reader, stderr_reader, status_reader,
         )?;
         return Err(ObservedEvaluatorError::KernelGateTimeout {
-            last_error: "final kernel observation crossed the frozen pre-exec budget".into(),
+            last_error: "final pre-release theorem crossed the frozen gate budget".into(),
         });
     }
 
@@ -1204,7 +1548,7 @@ pub fn run_kernel_gated_evaluator(
         pidfd_exit_verified: true,
     };
     receipt.validate_for(policy, binding, model, request, &response, &observation, &gate)?;
-    Ok((response, observation, gate, receipt))
+    Ok((response, observation, gate, receipt, admission_receipt))
 }
 
 #[cfg(test)]
@@ -1245,5 +1589,10 @@ mod tests {
             parse_status_summary(b"{ \"child-pid\": 42 }\n{ \"child-pid\": 43 }\n{ \"exit-code\": 0 }\n"),
             Err(ObservedEvaluatorError::StatusChildPidMismatch)
         ));
+    }
+
+    #[test]
+    fn admission_protocol_identity_is_stable() {
+        assert_eq!(pre_release_admission_protocol_id(), pre_release_admission_protocol_id());
     }
 }
