@@ -400,35 +400,51 @@ fn add_zos_procedures(
             LegacyKnowledgeAreaV1::WorkloadAndJobs,
             "z/OS batch job/JES2 triage",
             "Establish whether the job failed admission, conversion, scheduling, execution, or output processing before proposing a rerun or JCL change.",
+            &["ibm:zos-jcl-reference@3.2", "ibm:zos-jes2-introduction@3.2"][..],
         ),
         (
             "legacy:zos:vsam-access-triage-v1",
             LegacyKnowledgeAreaV1::Storage,
             "z/OS VSAM access/allocation triage",
             "Distinguish catalog/definition, allocation, sharing, authorization, and application-open failures before proposing storage changes.",
+            &["ibm:zos-dfsms-vsam@3.2"][..],
         ),
         (
             "legacy:zos:racf-denial-triage-v1",
             LegacyKnowledgeAreaV1::IdentityAndSecurity,
             "z/OS RACF access-denial triage",
             "Establish the effective security context, protected resource, applicable profile, and audit evidence before proposing any authorization change.",
+            &["ibm:zos-racf-overview@3.2"][..],
         ),
         (
             "legacy:zos:sysplex-partial-failure-v1",
             LegacyKnowledgeAreaV1::AvailabilityAndRecovery,
             "z/OS sysplex partial-failure triage",
             "Separate signaling, couple-data-set, coupling-facility, serialization, and member-specific symptoms before proposing isolation or recovery action.",
+            &["ibm:zos-sysplex-characteristics@3.2"][..],
         ),
         (
             "legacy:zos:communications-path-v1",
             LegacyKnowledgeAreaV1::Networking,
             "z/OS Communications Server path triage",
             "Identify whether the affected path is TCP/IP, VTAM/SNA, application binding, stack/policy, or external network state before proposing a network change.",
+            &["ibm:zos-communications-server@3.2"][..],
         ),
     ];
 
     let mut ids = BTreeSet::new();
-    for (id, area, title, information_goal) in procedure_specs {
+    for (id, area, title, information_goal, source_ids) in procedure_specs {
+        let mut exact_sources = BTreeSet::new();
+        for source_id in source_ids {
+            let source = SourceSnapshotIdV1((*source_id).into());
+            if !snapshots.contains(&source) {
+                return Err(LegacyZosErrorV1::InvalidField(format!(
+                    "z/OS procedure {id} references unregistered source snapshot {}",
+                    source.0
+                )));
+            }
+            exact_sources.insert(source);
+        }
         let procedure = LegacyProcedureV1 {
             id: id.into(),
             platform: LegacyPlatformV1::Zos,
@@ -458,7 +474,7 @@ fn add_zos_procedures(
                 "Re-observe the original failure path using the same workload/resource identity.".into(),
                 "Confirm adjacent workloads and shared sysplex/storage/network/security state did not regress.".into(),
             ],
-            source_snapshots: snapshots.clone(),
+            source_snapshots: exact_sources,
         };
         insert_procedure(pack, procedure)?;
         ids.insert(id.into());
@@ -779,6 +795,27 @@ mod tests {
                 LegacyProcedureAuthorityV1::ReadOnlyObservation
                     | LegacyProcedureAuthorityV1::ChangeProposalOnly
             )));
+        }
+    }
+
+    #[test]
+    fn procedures_use_smallest_justified_source_sets() {
+        let mut pack = seed_legacy_computing_pack_v1(1_800_000_000_000).unwrap();
+        enrich_legacy_zos_foundation_v1(&mut pack, 1_800_000_000_100).unwrap();
+        let expected = [
+            ("legacy:zos:batch-job-triage-v1", &["ibm:zos-jcl-reference@3.2", "ibm:zos-jes2-introduction@3.2"][..]),
+            ("legacy:zos:vsam-access-triage-v1", &["ibm:zos-dfsms-vsam@3.2"][..]),
+            ("legacy:zos:racf-denial-triage-v1", &["ibm:zos-racf-overview@3.2"][..]),
+            ("legacy:zos:sysplex-partial-failure-v1", &["ibm:zos-sysplex-characteristics@3.2"][..]),
+            ("legacy:zos:communications-path-v1", &["ibm:zos-communications-server@3.2"][..]),
+        ];
+        for (procedure_id, source_ids) in expected {
+            let procedure = pack.procedures.iter().find(|p| p.id == procedure_id).unwrap();
+            let expected_sources: BTreeSet<_> = source_ids
+                .iter()
+                .map(|id| SourceSnapshotIdV1((*id).into()))
+                .collect();
+            assert_eq!(procedure.source_snapshots, expected_sources);
         }
     }
 }
