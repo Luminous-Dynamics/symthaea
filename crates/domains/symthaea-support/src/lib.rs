@@ -34,6 +34,7 @@ pub mod legacy_portfolio;
 pub mod legacy_qualification_profile;
 pub mod legacy_qualification_profile_v3;
 pub mod legacy_qualification_source_ledger_v3;
+pub mod legacy_rebaseline_plan;
 pub mod legacy_semantic_replacement;
 pub mod legacy_semantic_review_verification;
 pub mod legacy_solaris;
@@ -193,6 +194,12 @@ pub use legacy_qualification_source_ledger_v3::{
     LegacyQualificationSourceLedgerErrorV3, LegacyQualificationSourceLedgerV3,
     LegacyQualificationSourceReadinessV3, LegacyQualificationSourceSelectionV3,
     LEGACY_QUALIFICATION_SOURCE_LEDGER_SCHEMA_V3,
+};
+pub use legacy_rebaseline_plan::{
+    plan_legacy_rebaseline_work_v1, LegacyRebaselinePlanErrorV1,
+    LegacyRebaselineRecoveryKindV1, LegacyRebaselineStageV1,
+    LegacyRebaselineWorkItemV1, LegacyRebaselineWorkPackageV1,
+    LEGACY_REBASELINE_PLAN_SCHEMA_V1,
 };
 pub use legacy_semantic_replacement::{
     assess_legacy_qualification_generation_with_semantic_review_v1,
