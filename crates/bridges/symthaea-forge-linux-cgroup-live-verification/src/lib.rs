@@ -64,6 +64,8 @@ pub enum LiveCgroupVerificationError {
     VerificationIdentityMismatch,
     #[error("live cgroup admission failed: {detail}")]
     AdmissionFailed { detail: String },
+    #[error("live cgroup admission failed and descendant-wide cleanup also failed; admission={detail}; cleanup={cleanup}")]
+    AdmissionFailedAndCleanupFailed { detail: String, cleanup: String },
     #[error("live cgroup admission completed but retained state is incomplete")]
     AdmissionStateMissing,
     #[error("incomplete admission state could not be cleaned up fail-closed: {0}")]
@@ -461,6 +463,11 @@ impl PreReleaseAdmission for LiveAdmissionState<'_> {
             Err(error) => return self.fail(format!("strict cgroup hardening failed: {error}")),
         };
         let strict_receipt = strict.receipt().clone();
+
+        self.base_receipt = Some(base_receipt.clone());
+        self.strict_receipt = Some(strict_receipt.clone());
+        self.lease = Some(strict);
+
         let live_receipt = match observe_live_cgroup(
             self.policy,
             &base_receipt,
@@ -469,22 +476,9 @@ impl PreReleaseAdmission for LiveAdmissionState<'_> {
             gate,
         ) {
             Ok(value) => value,
-            Err(error) => {
-                let cleanup = strict.kill_and_cleanup(self.teardown_timeout_ms);
-                let detail = match cleanup {
-                    Ok(_) => format!("live cgroup verification failed: {error}"),
-                    Err(cleanup_error) => format!(
-                        "live cgroup verification failed: {error}; fail-closed cleanup also failed: {cleanup_error}"
-                    ),
-                };
-                return self.fail(detail);
-            }
+            Err(error) => return self.fail(format!("live cgroup verification failed: {error}")),
         };
-
-        self.base_receipt = Some(base_receipt);
-        self.strict_receipt = Some(strict_receipt);
         self.live_receipt = Some(live_receipt);
-        self.lease = Some(strict);
         Ok(())
     }
 }
@@ -522,6 +516,17 @@ pub fn run_live_cgroup_gated_evaluator(
         Ok(value) => value,
         Err(source) => {
             if let Some(detail) = admission.failure.take() {
+                if let Some(lease) = admission.lease.take() {
+                    return match lease.kill_and_cleanup(kernel_policy.teardown_timeout_ms()) {
+                        Ok(_) => Err(LiveCgroupVerificationError::AdmissionFailed { detail }),
+                        Err(cleanup_error) => {
+                            Err(LiveCgroupVerificationError::AdmissionFailedAndCleanupFailed {
+                                detail,
+                                cleanup: cleanup_error.to_string(),
+                            })
+                        }
+                    };
+                }
                 return Err(LiveCgroupVerificationError::AdmissionFailed { detail });
             }
             if let Some(lease) = admission.lease.take() {
