@@ -4,7 +4,7 @@ Preregisterable, property-blind controls for Energy Discovery Benchmark Zero.
 
 This crate answers a narrower question than the physics baseline itself:
 
-> Does the fixed composition-informed ranking perform better than a frozen set of rankings that know nothing about material properties?
+> Does the fixed composition-informed ranking perform better than a frozen set of rankings that extract no material-property features?
 
 It intentionally does **not** force a property-blind control through a fake band-gap predictor just to obtain MAE.
 
@@ -33,9 +33,10 @@ For each replicate, candidate order is produced from SHA-256 over:
 - the replicate index;
 - candidate id.
 
-The ranking function receives no:
+The benchmark candidate IDs are composition-derived. The control therefore does **not** claim that those input bytes contain no composition information. Instead, it treats every candidate ID as an opaque byte string: it does not parse element identities/fractions or derive material-property features from the ID.
 
-- composition;
+The ranking function additionally receives no:
+
 - target window;
 - predicted property;
 - experimental truth.
@@ -44,7 +45,7 @@ Target and truth are introduced only after a blind order has been frozen, when r
 
 ## Why no null MAE
 
-A truly property-blind ranking does not predict a band gap. Assigning every candidate the target midpoint or a pseudo-random gap would manufacture a prediction model that is not the control we want.
+A property-blind ranking does not predict a band gap. Assigning every candidate the target midpoint or a pseudo-random gap would manufacture a prediction model that is not the control we want.
 
 Therefore the blind ensemble is compared only on ranking-sensitive metrics:
 
@@ -98,6 +99,7 @@ This crate does not establish:
 
 - a p-value or statistical significance;
 - random/independent experimental sampling;
+- that candidate IDs contain no composition-derived information;
 - an official Matbench leaderboard result;
 - historical blindness of the composition baseline;
 - calibrated predictive uncertainty;
