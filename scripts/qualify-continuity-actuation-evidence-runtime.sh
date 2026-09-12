@@ -10,6 +10,10 @@ qualification_scope="package:${package}"
 manifest="crates/core/symthaea-continuity/Cargo.toml"
 workflow_path=".github/workflows/continuity-actuation-evidence-runtime.yml"
 qualifier_path="scripts/qualify-continuity-actuation-evidence-runtime.sh"
+evidence_semantics="append_only"
+observation_kind="exact-subject-qualification"
+supersedes="none"
+inheritance_mode="exact_identity_only"
 
 status="INDETERMINATE"
 failure_class="NONE"
@@ -17,6 +21,7 @@ phase="bootstrap"
 reason="NONE"
 failed_command="NONE"
 failed_exit_code="0"
+inheritance_eligible="NO"
 closed_world_gate="NOT_RUN"
 runtime_inputs_unchanged="NOT_RUN"
 subject_worktree_verified="NOT_RUN"
@@ -39,6 +44,13 @@ rustc_version="UNAVAILABLE"
 cargo_version="UNAVAILABLE"
 subject_root=""
 scratch_root=""
+changed_paths=()
+allowed_paths=(
+  "$workflow_path"
+  "docs/release/evidence/continuity-actuation-enforcement-campaign-v1.md"
+  "docs/release/evidence/continuity-actuation-enforcement-invalidation-v1.md"
+  "$qualifier_path"
+)
 
 sanitize() {
   printf '%s' "$1" | tr '\t\r\n' '   '
@@ -48,7 +60,12 @@ write_receipt() {
   [[ -n "$receipt" ]] || return 0
   mkdir -p "$(dirname "$receipt")" || return 0
   {
-    printf 'schema\tsymthaea-continuity-actuation-evidence-runtime-qualification-v3\n'
+    printf 'schema\tsymthaea-continuity-actuation-evidence-runtime-qualification-v4\n'
+    printf 'evidence_semantics\t%s\n' "$evidence_semantics"
+    printf 'observation_kind\t%s\n' "$observation_kind"
+    printf 'supersedes\t%s\n' "$supersedes"
+    printf 'inheritance_mode\t%s\n' "$inheritance_mode"
+    printf 'inheritance_eligible\t%s\n' "$inheritance_eligible"
     printf 'status\t%s\n' "$(sanitize "$status")"
     printf 'failure_class\t%s\n' "$(sanitize "$failure_class")"
     printf 'phase\t%s\n' "$(sanitize "$phase")"
@@ -62,6 +79,14 @@ write_receipt() {
     printf 'qualifier_tree\t%s\n' "$qualifier_tree"
     printf 'changed_paths_sha256\t%s\n' "$changed_paths_sha256"
     printf 'changed_path_count\t%s\n' "$changed_path_count"
+    printf 'expected_changed_path_count\t%s\n' "${#allowed_paths[@]}"
+    local i
+    for i in "${!changed_paths[@]}"; do
+      printf 'changed_path[%s]\t%s\n' "$i" "$(sanitize "${changed_paths[$i]}")"
+    done
+    for i in "${!allowed_paths[@]}"; do
+      printf 'expected_changed_path[%s]\t%s\n' "$i" "$(sanitize "${allowed_paths[$i]}")"
+    done
     printf 'cargo_lock_blob\t%s\n' "$lock_blob"
     printf 'crate_manifest_blob\t%s\n' "$manifest_blob"
     printf 'rust_toolchain_blob\t%s\n' "$toolchain_blob"
@@ -105,6 +130,7 @@ fail_qualification() {
   reason="$3"
   failed_exit_code="${4:-1}"
   status="FAIL"
+  inheritance_eligible="NO"
   write_receipt
   exit "$failed_exit_code"
 }
@@ -141,19 +167,11 @@ qualifier_tree="$(git show -s --format=%T "$qualifier_sha" 2>/dev/null || true)"
 
 changed_output="$(git diff --name-only "$runtime_subject" "$qualifier_sha" 2>/dev/null)" || \
   fail_qualification QUALIFIER_INVALID preflight 'unable to enumerate subject-to-qualifier path changes' 20
-changed_paths=()
 if [[ -n "$changed_output" ]]; then
   mapfile -t changed_paths <<< "$changed_output"
 fi
 changed_path_count="${#changed_paths[@]}"
 changed_paths_sha256="$(printf '%s\n' "${changed_paths[@]}" | sha256sum | awk '{print $1}')"
-
-allowed_paths=(
-  "$workflow_path"
-  "docs/release/evidence/continuity-actuation-enforcement-campaign-v1.md"
-  "docs/release/evidence/continuity-actuation-enforcement-invalidation-v1.md"
-  "$qualifier_path"
-)
 
 is_allowed_path() {
   local candidate="$1"
@@ -275,4 +293,5 @@ phase="complete"
 reason="all exact-subject package-scoped Rust qualification commands passed"
 failed_command="NONE"
 failed_exit_code="0"
+inheritance_eligible="YES"
 write_receipt
