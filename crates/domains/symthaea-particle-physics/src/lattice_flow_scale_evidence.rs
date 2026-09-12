@@ -64,6 +64,11 @@ pub enum FlowScaleEvidenceError {
     TooFewPoints { required: usize, actual: usize },
     NonFinitePoint { index: usize },
     InvalidFlowStepSize { index: usize, value: f64 },
+    FlowTimeOffStepGrid {
+        index: usize,
+        flow_time: f64,
+        flow_step_size: f64,
+    },
     InvalidPointStandardError { index: usize, value: f64 },
     InvalidEffectiveSampleSize { index: usize, value: f64 },
     InvalidRetainedConfigurations { index: usize, value: usize },
@@ -99,6 +104,7 @@ fn require_nonempty(
 
 impl FlowEnergyEvidenceCurve {
     pub fn validate(&self, required: usize) -> Result<(), FlowScaleEvidenceError> {
+        let required = required.max(1);
         if self.points.len() < required {
             return Err(FlowScaleEvidenceError::TooFewPoints {
                 required,
@@ -145,6 +151,16 @@ impl FlowEnergyEvidenceCurve {
                 return Err(FlowScaleEvidenceError::InvalidFlowStepSize {
                     index,
                     value: point.flow_step_size,
+                });
+            }
+            let step_count = point.flow_time / point.flow_step_size;
+            let nearest_step_count = step_count.round();
+            let grid_tolerance = 1.0e-10 * (1.0 + step_count.abs());
+            if nearest_step_count < 1.0 || (step_count - nearest_step_count).abs() > grid_tolerance {
+                return Err(FlowScaleEvidenceError::FlowTimeOffStepGrid {
+                    index,
+                    flow_time: point.flow_time,
+                    flow_step_size: point.flow_step_size,
                 });
             }
             if !point.standard_error.is_finite() || point.standard_error < 0.0 {
@@ -357,6 +373,18 @@ mod tests {
     }
 
     #[test]
+    fn empty_curve_fails_even_when_caller_requests_zero_points() {
+        let curve = FlowEnergyEvidenceCurve { points: vec![] };
+        assert!(matches!(
+            curve.validate(0),
+            Err(FlowScaleEvidenceError::TooFewPoints {
+                required: 1,
+                actual: 0
+            })
+        ));
+    }
+
+    #[test]
     fn mixing_ensemble_manifests_is_rejected() {
         let mut curve = t0_curve();
         curve.points[3].ensemble_manifest_digest = "different-ensemble".into();
@@ -399,6 +427,16 @@ mod tests {
         assert!(matches!(
             curve.validate(2),
             Err(FlowScaleEvidenceError::IndependentChainCountMismatch { index: 5 })
+        ));
+    }
+
+    #[test]
+    fn off_grid_flow_time_is_rejected() {
+        let mut curve = t0_curve();
+        curve.points[2].flow_time = 0.300_5;
+        assert!(matches!(
+            curve.validate(2),
+            Err(FlowScaleEvidenceError::FlowTimeOffStepGrid { index: 2, .. })
         ));
     }
 }
