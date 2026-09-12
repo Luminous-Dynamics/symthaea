@@ -1,0 +1,26 @@
+[package]
+name = "symthaea-policy-governance-crucible"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Adversarial qualification crucible for Symthaea assurance-policy governance and rollback resistance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "governance", "testing"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-evidence-anchored-governed-readiness = { path = "../symthaea-evidence-anchored-governed-readiness" }
+symthaea-assurance-policy-lineage-anchor = { path = "../symthaea-assurance-policy-lineage-anchor" }
+symthaea-assurance-policy-lineage = { path = "../symthaea-assurance-policy-lineage" }
+symthaea-assurance-policy-manifest = { path = "../symthaea-assurance-policy-manifest" }
+symthaea-assurance-signing-authority = { path = "../symthaea-assurance-signing-authority" }
+symthaea-evidence-deployment-scope = { path = "../symthaea-evidence-deployment-scope" }
+symthaea-evidence-lifecycle = { path = "../symthaea-evidence-lifecycle" }
+symthaea-evidence-time-assurance = { path = "../symthaea-evidence-time-assurance" }
+symthaea-evidence-verifier-diversity = { path = "../symthaea-evidence-verifier-diversity" }
+symthaea-evidence-atomic-coverage = { path = "../symthaea-evidence-atomic-coverage" }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
+serde = { workspace = true }
