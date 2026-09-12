@@ -20,6 +20,8 @@
 //!   integration over the same six-staple Wilson-action gradient
 //! - **Flowed gauge energy**: clover energy density plus ensemble-mean-only
 //!   `t0`/`w0`-like crossing algebra with caller-supplied scale targets
+//! - **Scale evidence**: same-ensemble flow curves whose derived uncertainty
+//!   must bind joint resampling across the correlated flow-time trajectory
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
 //!   exact step-size, probe, step-count, and smoothing-time provenance
 //!
@@ -42,6 +44,7 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_flow_energy;
+pub mod lattice_flow_scale_evidence;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
 mod lattice_su3_lie;
@@ -68,6 +71,10 @@ pub use lattice_flow_energy::{
     clover_energy_density_at_site, dimensionless_flow_energy_curve,
     energy_density_from_field_strengths, mean_clover_energy_density,
     t0_like_from_ensemble_mean, w0_like_from_ensemble_mean,
+};
+pub use lattice_flow_scale_evidence::{
+    FlowEnergyEvidenceCurve, FlowEnergyEvidencePoint, FlowScaleEstimateEvidence,
+    FlowScaleEvidenceError, FlowScaleKind, bind_flow_scale_estimate,
 };
 pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
