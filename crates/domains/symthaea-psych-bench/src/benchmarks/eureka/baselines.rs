@@ -15,7 +15,8 @@ use std::collections::{HashMap, HashSet};
 use super::action_execution::{ActionExecutionStatus, QualifiedActionReceipt};
 use super::consequence::{ConsequencePrediction, PredictionOutcome};
 use super::hidden_world::{
-    CorpusPartition, FixtureFamily, PublicAction, PublicObservation, PublicValue,
+    CorpusPartition, EvaluatorWorld, FixtureFamily, PublicAction, PublicObservation, PublicValue,
+    RuntimeWorld, WorldBuildProfile,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -44,34 +45,60 @@ impl ShortcutBaselineKind {
     }
 }
 
-/// Evaluator-side public transition record. It contains no hidden state or
-/// mechanism labels. `partition`/`family` are evaluator bookkeeping, not target
-/// inputs to baseline prediction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct PublicTransitionRecord {
-    pub world_digest: u64,
-    pub transition_digest: u64,
-    pub partition: CorpusPartition,
-    pub family: FixtureFamily,
-    pub pre_state: PublicObservation,
-    pub action: PublicAction,
-    pub post_state: PublicObservation,
+/// Owns both the frozen evaluator build profile and its corresponding world.
+/// Campaign code cannot supply partition/family labels when recording a
+/// transition; those labels are copied from the profile that built the world.
+pub(super) struct TransitionRecorder {
+    profile: WorldBuildProfile,
+    evaluator: EvaluatorWorld,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum TransitionRecordError {
-    ActionNotApplied,
-    MissingRealizedAction,
-    MissingPostState,
-    MissingTransitionIdentity,
-    RequestRealizationMismatch,
+impl TransitionRecorder {
+    pub(super) fn build(profile: WorldBuildProfile) -> Self {
+        Self {
+            profile,
+            evaluator: EvaluatorWorld::build(profile),
+        }
+    }
+
+    pub(super) fn world_digest(&self) -> u64 {
+        self.evaluator.world_digest()
+    }
+
+    pub(super) fn runtime(&mut self) -> RuntimeWorld<'_> {
+        self.evaluator.runtime()
+    }
+
+    /// Execute through the canonical realized-action route and bind the result
+    /// to the exact family/partition that built this evaluator.
+    pub(super) fn execute_and_record(
+        &mut self,
+        action: PublicAction,
+    ) -> Result<(QualifiedActionReceipt, PublicTransitionRecord), TransitionRecordError> {
+        let receipt = self.evaluator.execute_qualified_action(action);
+        let record = PublicTransitionRecord::from_bound_receipt(self.profile, &receipt)?;
+        Ok((receipt, record))
+    }
+}
+
+/// Evaluator-side public transition record. It contains no hidden state or
+/// mechanism labels. Metadata is evaluator-bound and fields are opaque outside
+/// this module to prevent accidental relabeling after capture.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct PublicTransitionRecord {
+    world_digest: u64,
+    transition_digest: u64,
+    partition: CorpusPartition,
+    family: FixtureFamily,
+    pre_state: PublicObservation,
+    action: PublicAction,
+    post_state: PublicObservation,
 }
 
 impl PublicTransitionRecord {
-    pub(super) fn from_qualified_receipt(
-        partition: CorpusPartition,
-        family: FixtureFamily,
-        receipt: QualifiedActionReceipt,
+    fn from_bound_receipt(
+        profile: WorldBuildProfile,
+        receipt: &QualifiedActionReceipt,
     ) -> Result<Self, TransitionRecordError> {
         if receipt.status != ActionExecutionStatus::Applied {
             return Err(TransitionRecordError::ActionNotApplied);
@@ -84,6 +111,7 @@ impl PublicTransitionRecord {
         }
         let post_state = receipt
             .post_state
+            .clone()
             .ok_or(TransitionRecordError::MissingPostState)?;
         let transition_digest = receipt
             .transition_digest
@@ -91,13 +119,50 @@ impl PublicTransitionRecord {
         Ok(Self {
             world_digest: receipt.world_digest,
             transition_digest,
-            partition,
-            family,
-            pre_state: receipt.pre_state,
+            partition: profile.partition,
+            family: profile.family,
+            pre_state: receipt.pre_state.clone(),
             action: realized,
             post_state,
         })
     }
+
+    pub(super) fn world_digest(&self) -> u64 {
+        self.world_digest
+    }
+
+    pub(super) fn transition_digest(&self) -> u64 {
+        self.transition_digest
+    }
+
+    pub(super) fn partition(&self) -> CorpusPartition {
+        self.partition
+    }
+
+    pub(super) fn family(&self) -> FixtureFamily {
+        self.family
+    }
+
+    pub(super) fn pre_state(&self) -> &PublicObservation {
+        &self.pre_state
+    }
+
+    pub(super) fn action(&self) -> PublicAction {
+        self.action
+    }
+
+    pub(super) fn post_state(&self) -> &PublicObservation {
+        &self.post_state
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum TransitionRecordError {
+    ActionNotApplied,
+    MissingRealizedAction,
+    MissingPostState,
+    MissingTransitionIdentity,
+    RequestRealizationMismatch,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,9 +181,7 @@ pub(super) struct BaselineFitCorpus {
 }
 
 impl BaselineFitCorpus {
-    pub(super) fn freeze(
-        mut records: Vec<PublicTransitionRecord>,
-    ) -> Result<Self, CorpusError> {
+    pub(super) fn freeze(mut records: Vec<PublicTransitionRecord>) -> Result<Self, CorpusError> {
         validate_records(&records)?;
         if records.iter().any(|record| {
             !matches!(
@@ -149,9 +212,7 @@ pub(super) struct HeldOutTransitionCorpus {
 }
 
 impl HeldOutTransitionCorpus {
-    pub(super) fn freeze(
-        mut records: Vec<PublicTransitionRecord>,
-    ) -> Result<Self, CorpusError> {
+    pub(super) fn freeze(mut records: Vec<PublicTransitionRecord>) -> Result<Self, CorpusError> {
         validate_records(&records)?;
         if records.iter().any(|record| {
             !matches!(
@@ -505,6 +566,21 @@ mod tests {
     }
 
     #[test]
+    fn recorder_binds_partition_and_family_from_build_profile() {
+        let profile = WorldBuildProfile {
+            family: FixtureFamily::ResourceFlow,
+            seed: 8,
+            mechanism_variant: 0,
+            partition: CorpusPartition::ExternalReplication,
+        };
+        let mut recorder = TransitionRecorder::build(profile);
+        let (_, record) = recorder.execute_and_record(PublicAction::NoOp).unwrap();
+        assert_eq!(record.partition(), CorpusPartition::ExternalReplication);
+        assert_eq!(record.family(), FixtureFamily::ResourceFlow);
+        assert_eq!(record.world_digest(), recorder.world_digest());
+    }
+
+    #[test]
     fn fit_rejects_held_out_partitions() {
         let held_out = record(
             1,
@@ -586,10 +662,10 @@ mod tests {
         assert_eq!(
             predicted_fields(fit.predict(
                 ShortcutBaselineKind::ExactLookup,
-                &seen.pre_state,
+                seen.pre_state(),
                 PublicAction::NoOp,
             )),
-            Some(seen.post_state.fields.clone())
+            Some(seen.post_state().fields.clone())
         );
         let unseen = obs(0, vec![PublicValue::Count(9)]);
         assert_eq!(
