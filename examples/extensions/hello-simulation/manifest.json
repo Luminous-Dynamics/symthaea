@@ -1,0 +1,36 @@
+{
+  "id": "org.example.hello-simulation",
+  "name": "Hello Simulation Extension",
+  "version": "0.1.0",
+  "abi": {
+    "major": 1,
+    "minor": 0
+  },
+  "kind": "simulation",
+  "runtime": "wasm",
+  "description": "Synthetic zero-authority custom-solver fixture for the typed simulation-provider-v1 ABI",
+  "provides": [
+    {
+      "id": "engineering.simulation.custom",
+      "description": "Synthetic custom-solver simulation fixture",
+      "effect": "pure"
+    }
+  ],
+  "requires": [],
+  "permissions": {
+    "network": { "mode": "none" },
+    "filesystem": { "mode": "none" },
+    "gpu": false,
+    "wall_clock": false,
+    "randomness": false,
+    "sensors": [],
+    "actuators": []
+  },
+  "resources": {
+    "memory_bytes": 67108864,
+    "fuel": 50000000,
+    "max_wall_time_ms": 1000,
+    "max_output_bytes": 1048576,
+    "max_concurrency": 1
+  }
+}
