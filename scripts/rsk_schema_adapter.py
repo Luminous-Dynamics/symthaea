@@ -16,6 +16,8 @@ import rsk_semantic_schema as semantic
 
 CURRENT_RUST_CAPABILITY_PROFILE = "symthaea.rsk.capability-representation.rust-u64.v1"
 CURRENT_RUST_CAPABILITY_BITS = 64
+CURRENT_RUST_RESOURCE_PROFILE = "symthaea.rsk.resource-representation.rust-u64-sum-exact.v1"
+CURRENT_RUST_RESOURCE_MAX = (1 << 64) - 1
 
 
 def require_current_rust_capability_schema(schema: dict[str, Any]) -> str:
@@ -30,6 +32,31 @@ def require_current_rust_capability_schema(schema: dict[str, Any]) -> str:
         schema["bit_width"] <= CURRENT_RUST_CAPABILITY_BITS,
         "capability schema exceeds current Rust u64 representation profile",
     )
+    return schema_id
+
+
+def require_current_rust_resource_schema(schema: dict[str, Any]) -> str:
+    """Require semantics executable by the current Rust resource arithmetic TCB.
+
+    The generic v2 schema is intentionally more expressive. The current Rust
+    profile is narrower: u64 quantities, additive accounting, and exact rounding.
+    """
+
+    schema_id = semantic.require_runtime_bound_resource_schema(schema)
+    for dimension in schema["dimensions"]:
+        semantic.require(
+            dimension["minimum"] <= CURRENT_RUST_RESOURCE_MAX
+            and dimension["maximum"] <= CURRENT_RUST_RESOURCE_MAX,
+            "resource bounds exceed current Rust u64 representation profile",
+        )
+        semantic.require(
+            dimension["aggregation"] == "sum",
+            "resource aggregation unsupported by current Rust sum profile",
+        )
+        semantic.require(
+            dimension["rounding"] == "exact",
+            "resource rounding unsupported by current Rust exact profile",
+        )
     return schema_id
 
 
@@ -57,9 +84,9 @@ def capability_rule_table(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 def resource_rule_table(schema: dict[str, Any]) -> dict[str, Any]:
-    """Derive the Rust structural resource rule table from v2 canonical bytes."""
+    """Derive the current-Rust structural resource rule table from v2 schema bytes."""
 
-    schema_id = semantic.require_runtime_bound_resource_schema(schema)
+    schema_id = require_current_rust_resource_schema(schema)
     rules = [
         {
             "numeric_id": dimension["numeric_id"],
@@ -72,5 +99,6 @@ def resource_rule_table(schema: dict[str, Any]) -> dict[str, Any]:
     rules.sort(key=lambda rule: rule["numeric_id"])
     return {
         "schema_id": schema_id,
+        "representation_profile": CURRENT_RUST_RESOURCE_PROFILE,
         "rules": rules,
     }
