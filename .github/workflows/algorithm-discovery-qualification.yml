@@ -50,10 +50,10 @@ permissions:
   contents: read
 
 concurrency:
-  # During active stacked development, only the newest automatic PR qualification is useful.
-  # Older exact heads can still be deliberately qualified before merge with workflow_dispatch,
-  # whose run_id gives each manual run a unique non-cancelling concurrency group.
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event_name == 'push' && github.ref || 'latest-pull-request' }}
+  # Keep only the newest automatic qualification for each PR/head line. Superseded commits on one
+  # PR cancel each other, but unrelated discovery PRs no longer cancel one another's evidence.
+  # Manual dispatch remains uniquely non-cancelling so an older exact head can still be qualified.
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event_name == 'push' && github.ref || github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
