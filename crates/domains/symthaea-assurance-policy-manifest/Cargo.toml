@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-assurance-policy-manifest"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Versioned policy provenance manifest for Symthaea safety assurance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "policy", "provenance"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-evidence-deployment-scope = { path = "../symthaea-evidence-deployment-scope" }
+serde = { workspace = true }
+blake3 = { workspace = true }
+
+[dev-dependencies]
+symthaea-evidence-lifecycle = { path = "../symthaea-evidence-lifecycle" }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
