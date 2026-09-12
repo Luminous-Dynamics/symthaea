@@ -1,0 +1,77 @@
+name: FEP Pure Candidate Scoring V1
+
+on:
+  pull_request:
+    paths:
+      - "docs/release/evidence/fep-pure-candidate-scoring-v1.patch"
+      - ".github/workflows/fep-pure-candidate-scoring-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/release/evidence/fep-pure-candidate-scoring-v1.patch"
+      - ".github/workflows/fep-pure-candidate-scoring-v1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Freeze patch ownership and purity theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATCH=docs/release/evidence/fep-pure-candidate-scoring-v1.patch
+
+          grep -Fq 'crates/core/symthaea-fep/src/free_energy.rs' "$PATCH"
+          grep -Fq 'crates/core/symthaea-fep/src/agent.rs' "$PATCH"
+          grep -Fq 'crates/core/symthaea-fep/tests/efe_term_variation.rs' "$PATCH"
+
+          grep -Fq '+        &self,' "$PATCH"
+          grep -Fq 'record_committed_action' "$PATCH"
+          grep -Fq 'self.efe_computer.record_committed_action(action);' "$PATCH"
+          grep -Fq 'novelty_does_not_decay_from_candidate_enumeration' "$PATCH"
+          grep -Fq 'novelty_counts_committed_actions_not_considered_actions' "$PATCH"
+          grep -Fq 'candidate_scoring_is_order_stable_without_history_mutation' "$PATCH"
+          grep -Fq 'selection_does_not_consume_novelty_until_commitment' "$PATCH"
+          grep -Fq 'committed_action_history_remains_bounded' "$PATCH"
+
+          # Candidate scoring must stop mutating novelty history directly, and
+          # selection alone must not become a history event.
+          grep -Fq -- '-        self.action_history.push_back(action);' "$PATCH"
+          ! grep -Fq 'record_committed_action(selected.action)' "$PATCH"
+
+      - name: Apply exact candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          PATCH=docs/release/evidence/fep-pure-candidate-scoring-v1.patch
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+          echo '=== APPLIED PRODUCT DIFF ==='
+          git diff -- \
+            crates/core/symthaea-fep/src/free_energy.rs \
+            crates/core/symthaea-fep/src/agent.rs \
+            crates/core/symthaea-fep/tests/efe_term_variation.rs
+
+      - name: Rustfmt candidate
+        run: cargo fmt --check -p symthaea-fep
+
+      - name: Focused EFE purity regressions
+        run: cargo test --locked -p symthaea-fep --test efe_term_variation
+
+      - name: Full FEP tests
+        run: cargo test --locked -p symthaea-fep
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-fep --all-targets -- -D warnings
