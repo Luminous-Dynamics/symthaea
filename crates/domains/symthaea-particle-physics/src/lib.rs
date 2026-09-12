@@ -12,6 +12,8 @@
 //!   structure constants, Casimir operators
 //! - **Lattice gauge primitives**: periodic SU(3) links, plaquettes, Wilson action,
 //!   Polyakov loops, and local gauge transformations
+//! - **Topology reference**: clover field strength/topological charge plus a
+//!   deliberately slow finite-difference Wilson-action gradient-flow step
 //!
 //! ## Natural Units
 //!
@@ -24,6 +26,7 @@
 //! - PDG Review of Particle Physics (2024).
 //! - Georgi, H. (1999). *Lie Algebras in Particle Physics*.
 //! - Wilson, K. G. (1974). Phys. Rev. D 10, 2445.
+//! - Lüscher, M. (2010). arXiv:1006.4518.
 
 pub mod constants;
 pub mod cross_sections;
@@ -32,6 +35,7 @@ pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
+pub mod lattice_topology_flow;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -50,6 +54,11 @@ pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
     su3_determinant_error, su3_diagonal, su3_identity, su3_mul, su3_trace,
     su3_unitarity_error, validate_su3,
+};
+pub use lattice_topology_flow::{
+    LatticeTopologyFlowError, ReferenceFlowStepStats, clover_field_strength, clover_sum,
+    clover_topological_charge, clover_topological_density,
+    finite_difference_wilson_flow_step_reference,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
