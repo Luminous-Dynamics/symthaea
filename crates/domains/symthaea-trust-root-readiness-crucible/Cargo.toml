@@ -1,0 +1,29 @@
+[package]
+name = "symthaea-trust-root-readiness-crucible"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "End-to-end adversarial qualification of Symthaea trust-root-backed readiness"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "testing", "readiness"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-evidence-trust-root-readiness = { path = "../symthaea-evidence-trust-root-readiness" }
+symthaea-assurance-policy-lineage = { path = "../symthaea-assurance-policy-lineage" }
+symthaea-assurance-policy-lineage-anchor = { path = "../symthaea-assurance-policy-lineage-anchor" }
+symthaea-assurance-policy-manifest = { path = "../symthaea-assurance-policy-manifest" }
+symthaea-assurance-signing-authority = { path = "../symthaea-assurance-signing-authority" }
+symthaea-assurance-trust-store = { path = "../symthaea-assurance-trust-store" }
+symthaea-assurance-trust-store-attestation = { path = "../symthaea-assurance-trust-store-attestation" }
+symthaea-assurance-trust-store-recovery-ledger = { path = "../symthaea-assurance-trust-store-recovery-ledger" }
+symthaea-evidence-atomic-coverage = { path = "../symthaea-evidence-atomic-coverage" }
+symthaea-evidence-deployment-scope = { path = "../symthaea-evidence-deployment-scope" }
+symthaea-evidence-lifecycle = { path = "../symthaea-evidence-lifecycle" }
+symthaea-evidence-time-assurance = { path = "../symthaea-evidence-time-assurance" }
+symthaea-evidence-verifier-diversity = { path = "../symthaea-evidence-verifier-diversity" }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
+serde = { workspace = true }
