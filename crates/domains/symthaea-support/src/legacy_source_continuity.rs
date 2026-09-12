@@ -263,6 +263,39 @@ mod tests {
     use crate::standards_registry::TechnicalSourceSnapshotV1;
     use crate::{build_legacy_five_platform_portfolio_v1, legacy_source_revision_commitment_v3};
 
+    fn register_content_bound_original(
+        pack: &mut LegacyComputingPackV1,
+        basis_id: &str,
+        original_id: &str,
+        digest: &str,
+    ) -> SourceSnapshotIdV1 {
+        let basis = pack
+            .sources
+            .snapshot(&SourceSnapshotIdV1(basis_id.into()))
+            .unwrap()
+            .clone();
+        let id = SourceSnapshotIdV1(original_id.into());
+        pack.sources
+            .register_snapshot(TechnicalSourceSnapshotV1 {
+                id: id.clone(),
+                document_id: basis.document_id.clone(),
+                version: basis.version.clone(),
+                lifecycle: basis.lifecycle,
+                authority: basis.authority,
+                stability: basis.stability,
+                published_at_unix_ms: basis.published_at_unix_ms,
+                source_updated_at_unix_ms: basis.source_updated_at_unix_ms,
+                fetched_at_unix_ms: basis.fetched_at_unix_ms + 1,
+                capture: SourceCaptureV1::ContentDigest {
+                    algorithm: "sha256".into(),
+                    digest: digest.into(),
+                },
+                relations: basis.relations.clone(),
+            })
+            .unwrap();
+        id
+    }
+
     fn register_selection(
         pack: &mut LegacyComputingPackV1,
         original_id: &str,
@@ -366,15 +399,13 @@ mod tests {
     fn content_bound_original_with_same_digest_is_exact_continuity() {
         let (mut pack, _, _) =
             build_legacy_five_platform_portfolio_v1(1_800_000_000_000).unwrap();
-        let original_id = SourceSnapshotIdV1("ibm:aix-os-management@7.3".into());
-        let original = pack.sources.snapshot(&original_id).unwrap().clone();
         let digest = "2".repeat(64);
-        let mut content_bound = original.clone();
-        content_bound.capture = SourceCaptureV1::ContentDigest {
-            algorithm: "sha256".into(),
-            digest: digest.clone(),
-        };
-        pack.sources.replace_snapshot_for_test(content_bound).unwrap();
+        let original_id = register_content_bound_original(
+            &mut pack,
+            "ibm:aix-os-management@7.3",
+            "ibm:aix-os-management@7.3:captured-original",
+            &digest,
+        );
         let (_artifacts, ledger) =
             register_selection(&mut pack, &original_id.0, "same-content", &digest);
         let assessment = require_legacy_source_continuity_v1(&pack, &ledger).unwrap();
@@ -386,14 +417,12 @@ mod tests {
     fn content_bound_original_with_different_digest_is_mismatch() {
         let (mut pack, _, _) =
             build_legacy_five_platform_portfolio_v1(1_800_000_000_000).unwrap();
-        let original_id = SourceSnapshotIdV1("ibm:aix-os-management@7.3".into());
-        let original = pack.sources.snapshot(&original_id).unwrap().clone();
-        let mut content_bound = original.clone();
-        content_bound.capture = SourceCaptureV1::ContentDigest {
-            algorithm: "sha256".into(),
-            digest: "3".repeat(64),
-        };
-        pack.sources.replace_snapshot_for_test(content_bound).unwrap();
+        let original_id = register_content_bound_original(
+            &mut pack,
+            "ibm:aix-os-management@7.3",
+            "ibm:aix-os-management@7.3:captured-original",
+            &"3".repeat(64),
+        );
         let (_artifacts, ledger) = register_selection(
             &mut pack,
             &original_id.0,
