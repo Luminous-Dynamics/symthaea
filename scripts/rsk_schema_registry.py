@@ -157,8 +157,9 @@ class AuthenticatedSignerEvidence:
 
     There is intentionally no `signature_verified` boolean here. This reference
     layer assumes a separate cryptographic boundary produced these records and
-    then checks that they bind the exact registry digest under current trust
-    metadata. Production code must use an actually opaque authenticated type.
+    then checks that they bind the exact registry digest and exact verified trust
+    snapshot under current policy. Production code must use an actually opaque
+    authenticated type.
     """
 
     signer_id: str
@@ -170,6 +171,7 @@ class AuthenticatedSignerEvidence:
     valid_until: int
     lifecycle: str
     bound_snapshot_digest: str
+    trust_snapshot_digest: str
 
 
 @dataclass(frozen=True)
@@ -238,7 +240,6 @@ class VerifiedSchemaRegistrySnapshotReference:
             _verification_marker is _VERIFICATION_MARKER,
             "verified registry reference must come from verifier",
         )
-        # JSON round-trip produces a private immutable-by-convention copy.
         self._snapshot = json.loads(json.dumps(snapshot))
         self.snapshot_digest = digest_value
         self.signer_ids = signer_ids
@@ -366,9 +367,13 @@ def _validate_and_normalize_entries(
         _require(supersedes == sorted(supersedes), "entry.supersedes must be sorted")
         _require(len(supersedes) == len(set(supersedes)), "entry.supersedes contains duplicates")
 
+        raw_schema = entry["canonical_schema_json"]
+        _require(isinstance(raw_schema, str), "canonical_schema_json must be string")
+        _require(
+            len(raw_schema.encode("utf-8")) <= policy["max_schema_bytes"],
+            "schema byte limit exceeded",
+        )
         schema_value = _parse_canonical_schema(entry)
-        raw_schema = entry["canonical_schema_json"].encode("utf-8")
-        _require(len(raw_schema) <= policy["max_schema_bytes"], "schema byte limit exceeded")
 
         if kind == "capability":
             actual_schema_id = semantic.validate_capability_schema(schema_value)
@@ -384,8 +389,6 @@ def _validate_and_normalize_entries(
                 "resource entry contains wrong schema class",
             )
             if lifecycle == "active":
-                # New positive authority under the current registry profile may
-                # only use resource schemas that commit runtime numeric IDs.
                 semantic.require_runtime_bound_resource_schema(schema_value)
 
         _require(actual_schema_id == claimed_schema_id, "entry schema digest mismatch")
@@ -454,11 +457,20 @@ def _validate_signers(
     records: Iterable[AuthenticatedSignerEvidence],
     policy: dict[str, Any],
     digest_value: str,
+    trust_snapshot_digest: str,
+    snapshot_issued_at: int,
     trusted_interval: TrustedInterval,
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     records = tuple(records)
     _require(records, "no authenticated signer evidence supplied")
-    by_signer: dict[str, AuthenticatedSignerEvidence] = {}
+
+    # First validate the structure of externally authenticated records and make
+    # contradictory key ownership/trust metadata a hard failure. Eligibility is
+    # evaluated separately so harmless extra old/ineligible signatures cannot
+    # denial-of-service an otherwise sufficient current quorum.
+    key_owner: dict[str, str] = {}
+    signer_metadata: dict[str, tuple[str, str]] = {}
+    eligible: list[AuthenticatedSignerEvidence] = []
 
     for record in records:
         _require(isinstance(record, AuthenticatedSignerEvidence), "invalid signer evidence type")
@@ -468,13 +480,7 @@ def _validate_signers(
         _require_id(record.failure_domain, "signer.failure_domain")
         _require_id(record.signature_profile, "signer.signature_profile")
         _require_digest(record.bound_snapshot_digest, "signer.bound_snapshot_digest")
-        _require(record.bound_snapshot_digest == digest_value, "signer evidence binds wrong snapshot")
-        _require(record.role in policy["allowed_roles"], "signer role not allowed")
-        _require(
-            record.signature_profile in policy["allowed_signature_profiles"],
-            "signature profile not allowed",
-        )
-        _require(record.lifecycle == "active", "signer/key lifecycle is not active")
+        _require_digest(record.trust_snapshot_digest, "signer.trust_snapshot_digest")
         _require(
             isinstance(record.valid_from, int)
             and not isinstance(record.valid_from, bool)
@@ -484,23 +490,39 @@ def _validate_signers(
             and record.valid_until >= record.valid_from,
             "signer validity interval invalid",
         )
-        _require(
-            record.valid_from <= trusted_interval.start
-            and record.valid_until >= trusted_interval.end,
-            "signer evidence not valid for full trusted interval",
-        )
 
-        prior = by_signer.get(record.signer_id)
-        if prior is not None:
-            # Multiple keys do not create multiple identities. Contradictory
-            # trusted metadata for one identity is rejected rather than guessed.
+        if record.trust_snapshot_digest == trust_snapshot_digest:
+            previous_owner = key_owner.get(record.key_id)
             _require(
-                prior.role == record.role
-                and prior.failure_domain == record.failure_domain,
+                previous_owner is None or previous_owner == record.signer_id,
+                "one key identity maps to multiple signer identities",
+            )
+            key_owner[record.key_id] = record.signer_id
+
+            previous_metadata = signer_metadata.get(record.signer_id)
+            current_metadata = (record.role, record.failure_domain)
+            _require(
+                previous_metadata is None or previous_metadata == current_metadata,
                 "one signer identity has conflicting trusted metadata",
             )
-        else:
-            by_signer[record.signer_id] = record
+            signer_metadata[record.signer_id] = current_metadata
+
+        is_eligible = (
+            record.trust_snapshot_digest == trust_snapshot_digest
+            and record.bound_snapshot_digest == digest_value
+            and record.role in policy["allowed_roles"]
+            and record.signature_profile in policy["allowed_signature_profiles"]
+            and record.lifecycle == "active"
+            and record.valid_from <= snapshot_issued_at
+            and record.valid_from <= trusted_interval.start
+            and record.valid_until >= trusted_interval.end
+        )
+        if is_eligible:
+            eligible.append(record)
+
+    by_signer: dict[str, AuthenticatedSignerEvidence] = {}
+    for record in eligible:
+        by_signer.setdefault(record.signer_id, record)
 
     signer_ids = tuple(sorted(by_signer))
     failure_domains = tuple(sorted({record.failure_domain for record in by_signer.values()}))
@@ -664,7 +686,12 @@ def evaluate_registry_snapshot(
             "snapshot is not fresh for full trusted interval",
         )
         signer_ids, failure_domains = _validate_signers(
-            authenticated_signers, policy, actual_digest, trusted_interval
+            authenticated_signers,
+            policy,
+            actual_digest,
+            trust_snapshot_digest,
+            snapshot["issued_at"],
+            trusted_interval,
         )
         transition = _validate_transition(
             prior_state, snapshot, entries, policy, actual_digest, policy_id
