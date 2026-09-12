@@ -1,0 +1,23 @@
+{
+  "schema_version": "ll009w.distribution-free-rms-policy.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "layer_id": "south-pole-far-80m",
+  "theorem": "markov_squared_error_plus_union_bound",
+  "familywise_exceedance_budget_alpha": 0.01,
+  "multiplier_rule": "derive_exactly_sqrt_admitted_pixel_count_over_alpha",
+  "multiplier_override": null,
+  "distribution_assumption": "none_beyond_rms_second_moment_model",
+  "independence_assumption": "none",
+  "height_to_geometry_mapping": "positive_scalar_height_error_along_local_lunar_radial",
+  "risk_scope": "represented_admitted_raster_support_points",
+  "require_all_azimuth_bins": true,
+  "policy_role": "diagnostic_distribution_free_baseline_not_operational_risk_acceptance",
+  "interpretation": "A 0.01 familywise exceedance budget is used as a transparent diagnostic 99% represented-support envelope. It is not an operationally accepted lunar-site risk threshold.",
+  "non_claims": [
+    "No Gaussian or other tail distribution is assumed.",
+    "No pixel independence or covariance structure is assumed.",
+    "The RMS map is not relabeled as a deterministic terrain bound.",
+    "The familywise theorem covers represented admitted raster support points only; unresolved physical terrain remains an LL-009R obligation.",
+    "The nominal observer in LL-009W does not close Site01 observer uncertainty; memberwise observer propagation remains LL-009U/its successor's responsibility."
+  ]
+}
