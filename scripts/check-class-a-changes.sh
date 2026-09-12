@@ -12,11 +12,12 @@ set -euo pipefail
 
 # Class A files: safety-critical parameters per GOVERNANCE_CHARTER.md §3.1
 #
-# RSK note (ADR-002/ADR-010/ADR-011/ADR-012/ADR-014): replication-authority and
-# lineage/budget code, normative RSK architecture contracts, qualification and
-# semantic-schema reference tooling, self-tests, workflow, detector, and
-# Governance Charter are Class A surfaces. Weakening constitution/evidence/
-# semantic/governance boundaries must not look like an ordinary change.
+# RSK note (ADR-002/ADR-010/ADR-011/ADR-012/ADR-014/ADR-015):
+# replication-authority, semantic-identity and lineage/budget code, normative
+# RSK architecture contracts, qualification and semantic-schema reference
+# tooling, self-tests, workflow, detector, and Governance Charter are Class A
+# surfaces. Weakening constitution/evidence/semantic/governance boundaries must
+# not look like an ordinary change.
 CLASS_A_FILES=(
     "symthaea/src/cognitive_loop/thresholds.rs"
     "symthaea/src/cognitive_loop/ethics_engine.rs"
@@ -24,6 +25,7 @@ CLASS_A_FILES=(
     "crates/mycelix-bridge-common/src/consciousness_profile.rs"
     "crates/mycelix-bridge-common/src/consciousness_thresholds.rs"
     "crates/domains/symthaea-replicator-safety/"
+    "crates/domains/symthaea-replicator-semantics/"
     "crates/domains/symthaea-replicator-ledger/"
     "docs/architecture/replicator-safety/"
     ".github/workflows/rsk-safety.yml"
@@ -160,7 +162,7 @@ if [ "${1:-}" = "--ci" ]; then
             echo "  Consider adding: symthaea/docs/compliance/adr/ADR-NNN-description.md"
             # Warning only in generic CI. RSK has an additional blocking ADR gate
             # in .github/workflows/rsk-safety.yml; see ADR-002, ADR-010, ADR-011,
-            # ADR-012, and ADR-014.
+            # ADR-012, ADR-014, and ADR-015.
         fi
     fi
 
