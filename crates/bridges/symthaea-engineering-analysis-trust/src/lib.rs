@@ -19,10 +19,12 @@
 
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::fmt;
 use symthaea_formal_safety::{EvidenceKind, ProofObligation};
 use thiserror::Error;
 
+const REQUIREMENT_DOMAIN_V1: &[u8] = b"symthaea.etk-accepted-requirement.v1\0";
 const OBLIGATION_DOMAIN_V1: &[u8] = b"symthaea.etk-proof-obligation-snapshot.v1\0";
 const METHOD_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-method.v1\0";
 const INPUT_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-input.v1\0";
@@ -142,7 +144,6 @@ macro_rules! authority_id {
     };
 }
 
-premise_id!(RequirementRevisionIdV1);
 premise_id!(SubjectRevisionIdV1);
 premise_id!(TwinRevisionIdV1);
 premise_id!(ValidityDomainRevisionIdV1);
@@ -150,6 +151,7 @@ premise_id!(CurrentnessAssertionIdV1);
 premise_id!(ModelQualificationRecordDigestV1);
 premise_id!(ExecutionArtifactDigestV1);
 
+authority_id!(AnalysisRequirementRevisionIdV1);
 authority_id!(ObligationRevisionIdV1);
 authority_id!(AnalyticalMethodRevisionIdV1);
 authority_id!(AnalyticalInputRevisionIdV1);
@@ -169,6 +171,85 @@ pub fn canonical_binary64_v1(value: f64) -> Result<String, AnalysisTrustErrorV1>
     }
     let normalized = if value == 0.0 { 0.0 } else { value };
     Ok(format!("f64:{:016x}", normalized.to_bits()))
+}
+
+/// Accepted Civil/Blocking requirement semantics for the initial analytical canary.
+///
+/// This constructor commits `expected_evidence_kind = "Analysis"` into the
+/// revision identity by construction. The acceptance-record digest is still an
+/// external premise; syntax/content addressing does not authenticate the accepter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcceptedAnalysisRequirementV1 {
+    revision_id: AnalysisRequirementRevisionIdV1,
+    logical_requirement_id: String,
+    statement: String,
+    structural_invariants: Vec<String>,
+    acceptance_record_digest: Sha256DigestV1,
+}
+
+impl AcceptedAnalysisRequirementV1 {
+    pub fn civil_blocking(
+        logical_requirement_id: impl Into<String>,
+        statement: impl Into<String>,
+        structural_invariants: impl IntoIterator<Item = impl Into<String>>,
+        acceptance_record_digest: Sha256DigestV1,
+    ) -> Result<Self, AnalysisTrustErrorV1> {
+        let logical_requirement_id =
+            canonical_text(logical_requirement_id.into(), "logical requirement id")?;
+        let statement = canonical_text(statement.into(), "requirement statement")?;
+        let mut seen = BTreeSet::new();
+        let mut invariants = Vec::new();
+        for invariant in structural_invariants {
+            let invariant = canonical_text(invariant.into(), "structural invariant")?;
+            if !seen.insert(invariant.clone()) {
+                return Err(AnalysisTrustErrorV1::InvalidText(
+                    "duplicate structural invariant",
+                ));
+            }
+            invariants.push(invariant);
+        }
+        invariants.sort();
+
+        let preimage = json!({
+            "acceptance_record_digest": acceptance_record_digest.as_str(),
+            "criticality": "Blocking",
+            "domain": "Civil",
+            "expected_evidence_kind": "Analysis",
+            "logical_requirement_id": logical_requirement_id.as_str(),
+            "schema": "symthaea.etk-accepted-requirement.v1",
+            "statement": statement.as_str(),
+            "structural_invariants": invariants,
+        });
+
+        Ok(Self {
+            revision_id: AnalysisRequirementRevisionIdV1::from_digest(domain_hash(
+                REQUIREMENT_DOMAIN_V1,
+                &preimage,
+            )),
+            logical_requirement_id,
+            statement,
+            structural_invariants: invariants,
+            acceptance_record_digest,
+        })
+    }
+
+    pub fn revision_id(&self) -> &AnalysisRequirementRevisionIdV1 {
+        &self.revision_id
+    }
+
+    pub fn audit_record_v1(&self) -> Value {
+        json!({
+            "acceptance_record_digest": self.acceptance_record_digest.as_str(),
+            "authority": "accepted-analysis-requirement-only",
+            "criticality": "Blocking",
+            "domain": "Civil",
+            "expected_evidence_kind": "Analysis",
+            "logical_requirement_id": self.logical_requirement_id.as_str(),
+            "requirement_revision_id": self.revision_id.as_str(),
+            "statement": self.statement.as_str(),
+            "structural_invariants": self.structural_invariants,
+        })
+    }
 }
 
 /// Content-addressed Analysis proof-obligation semantics.
@@ -417,7 +498,7 @@ impl AnalyticalAcceptancePolicyV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeAnalyticalPlanV1 {
     plan_id: AnalyticalPlanIdV1,
-    requirement_revision_id: RequirementRevisionIdV1,
+    requirement_revision_id: AnalysisRequirementRevisionIdV1,
     obligation_id: String,
     obligation_revision_id: ObligationRevisionIdV1,
     subject_revision_id: SubjectRevisionIdV1,
@@ -432,7 +513,7 @@ pub struct NativeAnalyticalPlanV1 {
 impl NativeAnalyticalPlanV1 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        requirement_revision_id: RequirementRevisionIdV1,
+        requirement: &AcceptedAnalysisRequirementV1,
         subject_revision_id: SubjectRevisionIdV1,
         twin_revision_id: TwinRevisionIdV1,
         validity_domain_revision_id: ValidityDomainRevisionIdV1,
@@ -454,7 +535,7 @@ impl NativeAnalyticalPlanV1 {
             "method_revision_id": method.revision_id().as_str(),
             "obligation_id": obligation_id.as_str(),
             "obligation_revision_id": obligation_revision_id.as_str(),
-            "requirement_revision_id": requirement_revision_id.as_str(),
+            "requirement_revision_id": requirement.revision_id().as_str(),
             "schema": "symthaea.etk-native-analytical-plan.v1",
             "subject_revision_id": subject_revision_id.as_str(),
             "twin_revision_id": twin_revision_id.as_str(),
@@ -462,7 +543,7 @@ impl NativeAnalyticalPlanV1 {
         });
         Ok(Self {
             plan_id: AnalyticalPlanIdV1::from_digest(domain_hash(PLAN_DOMAIN_V1, &preimage)),
-            requirement_revision_id,
+            requirement_revision_id: requirement.revision_id().clone(),
             obligation_id,
             obligation_revision_id,
             subject_revision_id,
@@ -725,6 +806,14 @@ pub fn derive_current_native_analytical_discharge_fact_v1(
         analytical_plan_id: current_plan.plan_id.clone(),
         witness_receipt_id: receipt.receipt_id.clone(),
     })
+}
+
+fn canonical_text(value: String, field: &'static str) -> Result<String, AnalysisTrustErrorV1> {
+    if value.is_empty() || value.trim() != value {
+        Err(AnalysisTrustErrorV1::InvalidText(field))
+    } else {
+        Ok(value)
+    }
 }
 
 fn domain_hash(domain: &[u8], value: &Value) -> Sha256DigestV1 {
