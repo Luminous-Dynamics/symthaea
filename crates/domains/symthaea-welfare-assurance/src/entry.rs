@@ -15,7 +15,7 @@ mod legacy_composition_tests;
 use std::error::Error as StdError;
 
 use symthaea_core::intervention_interlock::{
-    BilateralInterventionInterlock, InterlockDecision, InterventionRequest,
+    BilateralInterventionInterlock, ExplicitConsentState, InterlockDecision, InterventionRequest,
 };
 use symthaea_core::welfare::SubjectAffectingAction;
 use symthaea_fabrication_kernel::crypto_digest::Sha256Digest;
@@ -63,6 +63,31 @@ impl AssuredInterventionPermit {
     /// Human/machine-readable rationale that was covered by consent and authority scope.
     pub fn rationale(&self) -> &str {
         &self.request.rationale
+    }
+
+    /// Whether the signed request asserted emergency containment.
+    ///
+    /// This is read-only audit/policy context. It does not make the permit more authoritative.
+    pub fn is_emergency(&self) -> bool {
+        self.request.emergency
+    }
+
+    /// Explicit consent state that was bound into the verified request.
+    pub fn explicit_consent_state(&self) -> ExplicitConsentState {
+        self.request.evidence.consent_state
+    }
+
+    /// Whether a welfare-review reference was bound into the verified request.
+    ///
+    /// Presence is useful to stricter domain adapters; the opaque reference itself remains an
+    /// upstream evidence locator and is not reinterpreted here.
+    pub fn has_welfare_review_reference(&self) -> bool {
+        self.request.evidence.welfare_review_ref.is_some()
+    }
+
+    /// Whether an independent-review reference was bound into the verified request.
+    pub fn has_independent_review_reference(&self) -> bool {
+        self.request.evidence.independent_review_ref.is_some()
     }
 
     /// Time at which the full assurance permit was minted.
