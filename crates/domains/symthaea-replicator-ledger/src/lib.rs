@@ -9,6 +9,7 @@
 //! Safety goals:
 //! - creation never grants authority;
 //! - concurrent/stale decisions cannot double-spend the same ledger snapshot;
+//! - evaluated resource intent cannot be substituted at commit time;
 //! - descendant creation consumes both subject-subtree and lineage-tree budgets;
 //! - ancestor grant ceilings remain binding on later descendants;
 //! - capability ceilings attenuate across descendant creation and cannot widen;
@@ -92,14 +93,15 @@ pub struct LedgerAuthorityContext {
 /// Opaque authorization token produced only by the bound evaluator below.
 ///
 /// Private fields prevent callers from constructing a token with a risk class,
-/// capability set, evidence binding, or budget ceiling that was not part of a
-/// successful RSK evaluation.
+/// capability set, evidence binding, action amount, or budget ceiling that was
+/// not part of a successful RSK evaluation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BoundedReplicationAuthorization {
     authorized: AuthorizedReplication,
     cursor: LedgerCursor,
     risk_class: RiskClass,
     evaluated_at_unix_secs: u64,
+    requested_resource_units: u64,
     max_direct_children: u64,
     max_total_descendants: u64,
     max_lineage_depth: u32,
@@ -115,6 +117,8 @@ impl BoundedReplicationAuthorization {
     }
     pub const fn risk_class(&self) -> RiskClass { self.risk_class }
     pub const fn evaluated_at_unix_secs(&self) -> u64 { self.evaluated_at_unix_secs }
+    /// Exact resource amount accepted by the authority evaluation for this action.
+    pub const fn requested_resource_units(&self) -> u64 { self.requested_resource_units }
     pub const fn cursor(&self) -> LedgerCursor { self.cursor }
     pub const fn expires_at_unix_secs(&self) -> u64 { self.authorized.expires_at_unix_secs }
     pub const fn safety_case_digest(&self) -> EvidenceDigest {
@@ -138,7 +142,7 @@ impl BoundReplicationDecision {
 }
 
 /// Run the constitutional evaluator and bind an allow decision to one ledger
-/// cursor plus the exact risk and grant-budget values that were evaluated.
+/// cursor plus the exact risk, action amount, and grant-budget values that were evaluated.
 pub fn evaluate_bound_replication_authority(
     cursor: LedgerCursor,
     request: &ReplicationAuthorityRequest,
@@ -157,6 +161,7 @@ pub fn evaluate_bound_replication_authority(
                 cursor,
                 risk_class: request.risk_class,
                 evaluated_at_unix_secs: request.now_unix_secs,
+                requested_resource_units: request.budget.requested_resource_units,
                 max_direct_children: grant.max_direct_children,
                 max_total_descendants: grant.max_total_descendants,
                 max_lineage_depth: grant.max_lineage_depth,
@@ -321,6 +326,7 @@ pub enum LedgerError {
     StaleGrantGeneration,
     AuthorityScopeMutation,
     AuthorityExpired,
+    ActionResourceMismatch { authorized: u64, committed: u64 },
     AuthorityRiskMismatch,
     EmptyAuthorityCapabilities,
     AuthorityCapabilitiesExceedSubjectCeiling,
@@ -630,6 +636,17 @@ impl ReplicationLedger {
         runtime: &RuntimeSafetyWitness,
     ) -> Result<LedgerCursor, LedgerError> {
         self.check_mutation_and_cursor(authorization.cursor(), mutation_id)?;
+
+        let authorized_resource_units = authorization.requested_resource_units();
+        if resource_units != authorized_resource_units {
+            return Err(LedgerError::ActionResourceMismatch {
+                authorized: authorized_resource_units,
+                committed: resource_units,
+            });
+        }
+        // From this point onward, the authorization—not the caller argument—is
+        // the source of truth for every accounting and evidence write.
+        let resource_units = authorized_resource_units;
 
         let parent = authorization.subject();
         let output_lineage = authorization.lineage();
@@ -1018,6 +1035,44 @@ mod tests {
             Err(LedgerError::CursorMismatch { .. })
         ));
         assert!(l.verify_append_only_structure());
+    }
+
+    #[test]
+    fn exact_resource_binding_rejects_substitution_without_state_mutation() {
+        for committed in [9_u64, 11_u64] {
+            let mut l = ledger();
+            let auth = authorize(&l, sid(1), lid(1), 1, 10);
+            assert_eq!(auth.requested_resource_units(), 10);
+
+            let cursor_before = l.cursor();
+            let events_before = l.events().len();
+            let root_before = l.subject_snapshot(sid(1)).unwrap();
+            let lineage_before = l.lineage_snapshot(lid(1)).unwrap();
+
+            assert_eq!(
+                l.commit_descendant(mid(1), &auth, sid(2), committed, 100, &runtime()),
+                Err(LedgerError::ActionResourceMismatch {
+                    authorized: 10,
+                    committed,
+                })
+            );
+
+            assert_eq!(l.cursor(), cursor_before);
+            assert_eq!(l.events().len(), events_before);
+            assert_eq!(l.subject_snapshot(sid(1)).unwrap(), root_before);
+            assert_eq!(l.lineage_snapshot(lid(1)).unwrap(), lineage_before);
+            assert_eq!(
+                l.subject_snapshot(sid(2)),
+                Err(LedgerError::UnknownSubject(sid(2)))
+            );
+
+            // Mismatch must not consume the mutation ID. If no other state has
+            // changed, the exact evaluated action remains eligible to commit.
+            l.commit_descendant(mid(1), &auth, sid(2), 10, 100, &runtime())
+                .unwrap();
+            assert_eq!(l.subject_snapshot(sid(1)).unwrap().subtree_resource_units, 10);
+            assert_eq!(l.lineage_snapshot(lid(1)).unwrap().subtree_resource_units, 10);
+        }
     }
 
     #[test]
