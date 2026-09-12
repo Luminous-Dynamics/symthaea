@@ -63,8 +63,19 @@ pub struct TinyBenchmarkTrace {
     pub samples: Vec<BenchmarkSample>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BenchmarkPairing {
+    /// Both starts deliberately receive identical transition variates. Useful
+    /// for coupling/coalescence diagnostics, but not independent-chain evidence.
+    CoupledCommonRandomNumbers,
+    /// Starts use distinct transition streams and may be used as independent
+    /// chains after downstream statistical qualification.
+    IndependentStreams,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct PairedBenchmarkTrace {
+    pub pairing: BenchmarkPairing,
     pub cold: TinyBenchmarkTrace,
     pub disordered: TinyBenchmarkTrace,
 }
@@ -80,6 +91,8 @@ pub enum TinyBenchmarkError {
     InvalidMeasurementCount(usize),
     InvalidDisorderRounds(u32),
     MeasurementScheduleOverflow,
+    PairedPlanMismatch(&'static str),
+    SharedTransitionStream(u64),
 }
 
 impl From<LatticeGaugeError> for TinyBenchmarkError {
@@ -126,6 +139,35 @@ impl TinyBenchmarkPlan {
             rank: self.rank,
         }
     }
+
+    fn transition_stream_id(&self) -> Result<u64, TinyBenchmarkError> {
+        Ok(self.coordinates(LatticeStreamDomain::GaugeTransition).stream_id()?)
+    }
+}
+
+fn validate_same_physics(
+    first: &TinyBenchmarkPlan,
+    second: &TinyBenchmarkPlan,
+) -> Result<(), TinyBenchmarkError> {
+    if first.dims != second.dims {
+        return Err(TinyBenchmarkError::PairedPlanMismatch("dims"));
+    }
+    if first.beta.to_bits() != second.beta.to_bits() {
+        return Err(TinyBenchmarkError::PairedPlanMismatch("beta"));
+    }
+    if first.thermalization_sweeps != second.thermalization_sweeps {
+        return Err(TinyBenchmarkError::PairedPlanMismatch("thermalization_sweeps"));
+    }
+    if first.measurement_stride != second.measurement_stride {
+        return Err(TinyBenchmarkError::PairedPlanMismatch("measurement_stride"));
+    }
+    if first.measurements != second.measurements {
+        return Err(TinyBenchmarkError::PairedPlanMismatch("measurements"));
+    }
+    if first.proposal_max_angle.to_bits() != second.proposal_max_angle.to_bits() {
+        return Err(TinyBenchmarkError::PairedPlanMismatch("proposal_max_angle"));
+    }
+    Ok(())
 }
 
 fn spatial_mean_polyakov(field: &WilsonGaugeField) -> Result<Complex, LatticeGaugeError> {
@@ -236,15 +278,48 @@ pub fn run_tiny_benchmark(
     })
 }
 
-pub fn run_paired_tiny_benchmark(
+/// Run two starts with exactly the same transition variates.
+///
+/// This is useful for common-random-number/coupling diagnostics, but the two
+/// traces are not independent-chain evidence.
+pub fn run_coupled_tiny_benchmark(
     plan: &TinyBenchmarkPlan,
     disorder_rounds: u32,
     disorder_max_angle: f64,
 ) -> Result<PairedBenchmarkTrace, TinyBenchmarkError> {
     Ok(PairedBenchmarkTrace {
+        pairing: BenchmarkPairing::CoupledCommonRandomNumbers,
         cold: run_tiny_benchmark(plan, QualificationStart::ColdIdentity)?,
         disordered: run_tiny_benchmark(
             plan,
+            QualificationStart::Disordered {
+                rounds: disorder_rounds,
+                max_angle: disorder_max_angle,
+            },
+        )?,
+    })
+}
+
+/// Run cold and disordered starts under matching physics/schedules but distinct
+/// transition streams. This is the appropriate pairing for downstream
+/// independent-chain diagnostics such as split-R-hat.
+pub fn run_independent_paired_tiny_benchmark(
+    cold_plan: &TinyBenchmarkPlan,
+    disordered_plan: &TinyBenchmarkPlan,
+    disorder_rounds: u32,
+    disorder_max_angle: f64,
+) -> Result<PairedBenchmarkTrace, TinyBenchmarkError> {
+    validate_same_physics(cold_plan, disordered_plan)?;
+    let cold_stream = cold_plan.transition_stream_id()?;
+    let disordered_stream = disordered_plan.transition_stream_id()?;
+    if cold_stream == disordered_stream {
+        return Err(TinyBenchmarkError::SharedTransitionStream(cold_stream));
+    }
+    Ok(PairedBenchmarkTrace {
+        pairing: BenchmarkPairing::IndependentStreams,
+        cold: run_tiny_benchmark(cold_plan, QualificationStart::ColdIdentity)?,
+        disordered: run_tiny_benchmark(
+            disordered_plan,
             QualificationStart::Disordered {
                 rounds: disorder_rounds,
                 max_angle: disorder_max_angle,
@@ -278,12 +353,35 @@ mod tests {
     }
 
     #[test]
-    fn paired_trace_is_deterministically_replayable() {
-        let a = run_paired_tiny_benchmark(&plan(), 2, std::f64::consts::PI).unwrap();
-        let b = run_paired_tiny_benchmark(&plan(), 2, std::f64::consts::PI).unwrap();
+    fn independent_pair_is_deterministically_replayable() {
+        let cold = plan();
+        let mut disordered = plan();
+        disordered.replica = 1;
+        let a = run_independent_paired_tiny_benchmark(
+            &cold, &disordered, 2, std::f64::consts::PI,
+        ).unwrap();
+        let b = run_independent_paired_tiny_benchmark(
+            &cold, &disordered, 2, std::f64::consts::PI,
+        ).unwrap();
         assert_eq!(a, b);
-        assert_eq!(a.cold.samples.len(), 2);
-        assert_eq!(a.disordered.samples.len(), 2);
+        assert_eq!(a.pairing, BenchmarkPairing::IndependentStreams);
+        assert_ne!(a.cold.transition_stream_id, a.disordered.transition_stream_id);
+    }
+
+    #[test]
+    fn independent_pair_rejects_shared_transition_stream() {
+        let p = plan();
+        assert!(matches!(
+            run_independent_paired_tiny_benchmark(&p, &p, 1, 1.0),
+            Err(TinyBenchmarkError::SharedTransitionStream(_))
+        ));
+    }
+
+    #[test]
+    fn coupled_pair_is_explicitly_labeled_nonindependent() {
+        let paired = run_coupled_tiny_benchmark(&plan(), 1, 1.0).unwrap();
+        assert_eq!(paired.pairing, BenchmarkPairing::CoupledCommonRandomNumbers);
+        assert_eq!(paired.cold.transition_stream_id, paired.disordered.transition_stream_id);
     }
 
     #[test]
@@ -309,7 +407,10 @@ mod tests {
 
     #[test]
     fn trace_does_not_claim_convergence() {
-        let paired = run_paired_tiny_benchmark(&plan(), 1, 1.0).unwrap();
+        let cold = plan();
+        let mut disordered = plan();
+        disordered.replica = 2;
+        let paired = run_independent_paired_tiny_benchmark(&cold, &disordered, 1, 1.0).unwrap();
         // The type contains raw histories only: no pass/fail or equilibrium field exists.
         assert_eq!(paired.cold.samples[0].sweep, 2);
         assert_eq!(paired.disordered.samples[0].sweep, 2);
