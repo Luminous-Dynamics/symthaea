@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-domain-awareness-evidence-depth"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Candidate-evidence bindings from verifier-diversity and atomic-coverage qualification into DomainAwareness obligations"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "evidence", "verification"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-domain-awareness-evidence = { path = "../symthaea-domain-awareness-evidence" }
+symthaea-evidence-depth-crucible = { path = "../../domains/symthaea-evidence-depth-crucible" }
+symthaea-formal-safety = { path = "../../domains/symthaea-formal-safety" }
