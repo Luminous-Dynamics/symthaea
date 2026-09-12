@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Intergenerational quantity/time-basis qualification for regenerative support.
 //!
-//! A temporal runway scalar is only portable across an epoch handoff when the
-//! transferred support quantity has an explicitly equivalent unit basis and its
-//! stockpile draw rate is preserved on the common time basis. This module composes
-//! with epoch-handoff qualification; it does not replace conservation accounting,
-//! transfer admissibility, manufacturing qualification, or operating authority.
+//! `RegenerativeHorizon::FinitePeriods` is a count of model periods, not a raw
+//! duration. Therefore a scalar period-count runway is portable across an epoch
+//! handoff only when bootstrap-critical inventory uses an explicitly equivalent
+//! quantity basis, the model period duration is unchanged, and net stockpile draw
+//! per period is unchanged. A future conversion theorem may normalize unlike time
+//! or quantity bases explicitly; this V1 contract intentionally refuses to do so.
 
 use crate::{
     evaluate_regenerative_policy_sensitivity_surface, RegenerativeClosureError,
@@ -25,10 +26,9 @@ const MAX_BINDING_LEN: usize = 1024;
 pub struct RegenerativeSupportBasisRequirementV1 {
     pub source_dependency_id: String,
     pub successor_dependency_id: String,
-    /// Evidence that one source inventory unit and one successor inventory unit use
-    /// the same quantity basis. This is intentionally separate from generic transfer
-    /// admissibility: "may be transferred" is not the same claim as "one unit means
-    /// the same quantity on both sides".
+    /// Evidence that one source inventory unit and one successor inventory unit
+    /// represent the same quantity. Transfer admissibility alone does not establish
+    /// this stronger equivalence.
     pub quantity_basis_equivalence_binding: String,
 }
 
@@ -37,7 +37,7 @@ pub struct RegenerativeSupportBasisRequirementV1 {
 pub struct RegenerativeIntergenerationalSupportBasisPolicyV1 {
     pub policy_id: String,
     pub evidence_binding: String,
-    /// Bootstrap-critical transfer pairs, strictly sorted by source then successor ID.
+    /// Bootstrap-critical transfer pairs, strictly sorted by source then successor.
     pub requirements: Vec<RegenerativeSupportBasisRequirementV1>,
 }
 
@@ -52,9 +52,13 @@ pub struct RegenerativeSupportBasisAssessmentV1 {
     pub successor_stockpile_draw_units_per_period: u64,
     pub source_period_duration_ms: u64,
     pub successor_period_duration_ms: u64,
-    /// Exact rational-rate equality checked without floating point:
-    /// source_draw/source_period == successor_draw/successor_period.
+    /// Diagnostic physical-rate equivalence, checked exactly by integer cross
+    /// multiplication. This alone is NOT sufficient to port a period-count horizon.
     pub normalized_stockpile_draw_rate_preserved: bool,
+    /// Required for V1 scalar `FinitePeriods` portability.
+    pub period_duration_preserved: bool,
+    /// True only when the period-count basis itself is unchanged.
+    pub scalar_period_basis_preserved: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,8 +73,7 @@ pub struct RegenerativeIntergenerationalSupportBasisReportV1 {
     pub successor_model_id: String,
     pub successor_model_evidence_binding: String,
     pub assessments: Vec<RegenerativeSupportBasisAssessmentV1>,
-    /// True only when every bootstrap-critical mapping preserves both explicit unit
-    /// equivalence evidence and normalized stockpile draw rate.
+    /// Authorization bit for the current period-count projection theorem.
     pub scalar_runway_projection_safe: bool,
 }
 
@@ -93,12 +96,8 @@ pub enum RegenerativeSupportBasisError {
         source_dependency_id: String,
         successor_dependency_id: String,
     },
-    UnknownSourceDependency {
-        dependency_id: String,
-    },
-    UnknownSuccessorDependency {
-        dependency_id: String,
-    },
+    UnknownSourceDependency { dependency_id: String },
+    UnknownSuccessorDependency { dependency_id: String },
     QualifiedTransferSemanticDrift {
         source_dependency_id: String,
         successor_dependency_id: String,
@@ -165,8 +164,6 @@ pub fn assess_intergenerational_support_basis(
                 });
             }
         }
-        // The upstream transfer theorem must at minimum have a real qualification
-        // binding for the exact pair used here.
         validate_binding(&matching[0].transfer_qualification_binding)?;
 
         let source = source_model
@@ -184,8 +181,6 @@ pub fn assess_intergenerational_support_basis(
                 dependency_id: requirement.successor_dependency_id.clone(),
             })?;
 
-        // This layer composes with the epoch-handoff theorem, but still refuses to
-        // evaluate a pair whose model semantics drifted away from that theorem.
         if source.kind != successor.kind || source.governance != successor.governance {
             return Err(RegenerativeSupportBasisError::QualifiedTransferSemanticDrift {
                 source_dependency_id: requirement.source_dependency_id.clone(),
@@ -195,8 +190,15 @@ pub fn assess_intergenerational_support_basis(
 
         let source_draw = stockpile_draw_units_per_period(source);
         let successor_draw = stockpile_draw_units_per_period(successor);
-        let preserved = u128::from(source_draw) * u128::from(successor_model.period_duration_ms)
-            == u128::from(successor_draw) * u128::from(source_model.period_duration_ms);
+        let normalized_rate_preserved =
+            u128::from(source_draw) * u128::from(successor_model.period_duration_ms)
+                == u128::from(successor_draw) * u128::from(source_model.period_duration_ms);
+        let period_duration_preserved =
+            source_model.period_duration_ms == successor_model.period_duration_ms;
+        // With explicit one-unit quantity equivalence, unchanged period duration and
+        // unchanged normalized rate imply unchanged net units drawn per period.
+        let scalar_period_basis_preserved =
+            normalized_rate_preserved && period_duration_preserved;
 
         assessments.push(RegenerativeSupportBasisAssessmentV1 {
             source_dependency_id: requirement.source_dependency_id.clone(),
@@ -208,13 +210,15 @@ pub fn assess_intergenerational_support_basis(
             successor_stockpile_draw_units_per_period: successor_draw,
             source_period_duration_ms: source_model.period_duration_ms,
             successor_period_duration_ms: successor_model.period_duration_ms,
-            normalized_stockpile_draw_rate_preserved: preserved,
+            normalized_stockpile_draw_rate_preserved: normalized_rate_preserved,
+            period_duration_preserved,
+            scalar_period_basis_preserved,
         });
     }
 
     let scalar_runway_projection_safe = assessments
         .iter()
-        .all(|assessment| assessment.normalized_stockpile_draw_rate_preserved);
+        .all(|assessment| assessment.scalar_period_basis_preserved);
 
     Ok(RegenerativeIntergenerationalSupportBasisReportV1 {
         policy_id: policy.policy_id.clone(),
@@ -237,7 +241,7 @@ pub fn require_scalar_runway_projection_safe(
         && report
             .assessments
             .iter()
-            .all(|assessment| assessment.normalized_stockpile_draw_rate_preserved)
+            .all(|assessment| assessment.scalar_period_basis_preserved)
     {
         Ok(())
     } else {
@@ -425,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    fn changed_units_per_time_basis_blocks_scalar_runway_projection() {
+    fn changed_units_per_period_blocks_scalar_runway_projection() {
         let (evidence, handoff_report) = handoff();
         let source = model("closure-v3", 1, "tooling-v3", 2);
         let successor = model("closure-v4", 1, "tooling-v4", 1);
@@ -439,6 +443,8 @@ mod tests {
         .unwrap();
         assert!(!report.scalar_runway_projection_safe);
         assert!(!report.assessments[0].normalized_stockpile_draw_rate_preserved);
+        assert!(report.assessments[0].period_duration_preserved);
+        assert!(!report.assessments[0].scalar_period_basis_preserved);
         assert!(matches!(
             require_scalar_runway_projection_safe(&report),
             Err(RegenerativeSupportBasisError::ScalarRunwayProjectionUnsafe)
@@ -446,7 +452,7 @@ mod tests {
     }
 
     #[test]
-    fn preserved_units_per_time_basis_authorizes_scalar_projection() {
+    fn preserved_period_and_draw_basis_authorizes_scalar_projection() {
         let (evidence, handoff_report) = handoff();
         let source = model("closure-v3", 1, "tooling-v3", 2);
         let successor = model("closure-v4", 1, "tooling-v4", 2);
@@ -459,11 +465,12 @@ mod tests {
         )
         .unwrap();
         assert!(report.scalar_runway_projection_safe);
+        assert!(report.assessments[0].scalar_period_basis_preserved);
         assert!(require_scalar_runway_projection_safe(&report).is_ok());
     }
 
     #[test]
-    fn equivalent_rate_can_use_different_period_durations_without_float_math() {
+    fn equal_physical_rate_with_different_period_duration_is_not_period_count_safe() {
         let (evidence, handoff_report) = handoff();
         let source = model("closure-v3", 2, "tooling-v3", 2);
         let successor = model("closure-v4", 1, "tooling-v4", 1);
@@ -475,15 +482,10 @@ mod tests {
             &successor,
         )
         .unwrap();
-        assert!(report.scalar_runway_projection_safe);
-        assert_eq!(
-            report.assessments[0].source_stockpile_draw_units_per_period,
-            2
-        );
-        assert_eq!(
-            report.assessments[0].successor_stockpile_draw_units_per_period,
-            1
-        );
+        assert!(report.assessments[0].normalized_stockpile_draw_rate_preserved);
+        assert!(!report.assessments[0].period_duration_preserved);
+        assert!(!report.assessments[0].scalar_period_basis_preserved);
+        assert!(!report.scalar_runway_projection_safe);
     }
 
     #[test]
