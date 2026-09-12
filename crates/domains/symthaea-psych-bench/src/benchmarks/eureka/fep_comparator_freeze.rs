@@ -8,7 +8,9 @@
 //! Calibration transitions with the evaluator alone, and freezes the primary
 //! comparator before any target-held-out execution exists.
 
-use super::baselines::{PublicTransitionRecord, TransitionRecordError, TransitionRecorder};
+use super::baselines::{
+    PublicTransitionRecord, ShortcutBaselineKind, TransitionRecordError, TransitionRecorder,
+};
 use super::campaign_manifest::{
     CAMPAIGN_SCHEDULE_REVISION, CampaignScheduleError, ScheduledWorldProfile, scheduled_action,
     scheduled_profiles,
@@ -17,8 +19,7 @@ use super::fep_development::FepDevelopmentArtifact;
 use super::hidden_world::{CorpusPartition, FixtureFamily};
 use super::selection::{
     ComparatorSelectionCorpus, ComparatorSelectionError, PrimaryComparatorSelection,
-    PrimaryComparatorSelectionStatus, SelectionReadyFit, ShortcutBaselineKind,
-    select_primary_comparator_v1,
+    PrimaryComparatorSelectionStatus, SelectionReadyFit, select_primary_comparator_v1,
 };
 
 pub(super) const RESOURCE_FLOW_COMPARATOR_FREEZE_REVISION: &str =
@@ -207,9 +208,7 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::benchmarks::eureka::fep_development::{
-        run_resource_flow_development_profiles,
-    };
+    use crate::benchmarks::eureka::fep_development::run_resource_flow_development_profiles;
     use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
     fn service() -> CognitiveLoopService {
@@ -241,11 +240,8 @@ mod tests {
     #[test]
     fn comparator_freeze_consumes_zero_target_predictions() {
         let development = development_subset(9);
-        let artifact = freeze_resource_flow_comparator_profiles(
-            &development,
-            &calibration_subset(9),
-        )
-        .unwrap();
+        let artifact =
+            freeze_resource_flow_comparator_profiles(&development, &calibration_subset(9)).unwrap();
         assert_eq!(artifact.receipt.target_prediction_count, 0);
         assert_eq!(artifact.receipt.calibration_world_count, 9);
         assert_eq!(artifact.calibration_records.len(), 9);
@@ -258,7 +254,8 @@ mod tests {
     #[test]
     fn non_calibration_profiles_reject_before_selection_execution() {
         let development = development_subset(3);
-        let wrong = scheduled_profiles(CorpusPartition::HeldOutEvaluation, FixtureFamily::ResourceFlow);
+        let wrong =
+            scheduled_profiles(CorpusPartition::HeldOutEvaluation, FixtureFamily::ResourceFlow);
         assert!(matches!(
             freeze_resource_flow_comparator_profiles(&development, &wrong[..1]),
             Err(ComparatorFreezeError::WrongPartition)
@@ -283,9 +280,15 @@ mod tests {
         let a = freeze_resource_flow_comparator_profiles(&development_a, &profiles).unwrap();
         let b = freeze_resource_flow_comparator_profiles(&development_b, &profiles).unwrap();
 
-        assert_eq!(a.receipt.development_fit_corpus_digest, b.receipt.development_fit_corpus_digest);
+        assert_eq!(
+            a.receipt.development_fit_corpus_digest,
+            b.receipt.development_fit_corpus_digest
+        );
         assert_eq!(a.receipt.calibration_profile_root, b.receipt.calibration_profile_root);
-        assert_eq!(a.receipt.calibration_transition_root, b.receipt.calibration_transition_root);
+        assert_eq!(
+            a.receipt.calibration_transition_root,
+            b.receipt.calibration_transition_root
+        );
         assert_eq!(
             a.receipt.calibration_selection_corpus_digest,
             b.receipt.calibration_selection_corpus_digest
@@ -302,11 +305,8 @@ mod tests {
     #[test]
     fn selection_result_may_be_inconclusive_without_fallback() {
         let development = development_subset(1);
-        let artifact = freeze_resource_flow_comparator_profiles(
-            &development,
-            &calibration_subset(1),
-        )
-        .unwrap();
+        let artifact =
+            freeze_resource_flow_comparator_profiles(&development, &calibration_subset(1)).unwrap();
         if artifact.selection.status
             == PrimaryComparatorSelectionStatus::InconclusiveNoEligibleComparator
         {
