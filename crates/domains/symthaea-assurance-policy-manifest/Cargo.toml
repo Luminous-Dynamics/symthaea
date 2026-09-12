@@ -15,3 +15,7 @@ categories = ["science", "development-tools"]
 symthaea-evidence-deployment-scope = { path = "../symthaea-evidence-deployment-scope" }
 serde = { workspace = true }
 blake3 = { workspace = true }
+
+[dev-dependencies]
+symthaea-evidence-lifecycle = { path = "../symthaea-evidence-lifecycle" }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
