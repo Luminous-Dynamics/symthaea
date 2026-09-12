@@ -28,9 +28,17 @@ on:
       - 'crates/bridges/symthaea-forge-overlay-evidence/**'
       - 'crates/bridges/symthaea-forge-linux-isolation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  # During active stacked development, only the newest automatic PR qualification is useful.
+  # Older exact heads can still be deliberately qualified before merge with workflow_dispatch,
+  # whose run_id gives each manual run a unique non-cancelling concurrency group.
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event_name == 'push' && github.ref || 'latest-pull-request' }}
+  cancel-in-progress: true
 
 jobs:
   focused-contracts:
