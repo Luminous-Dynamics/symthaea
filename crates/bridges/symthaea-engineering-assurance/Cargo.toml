@@ -1,0 +1,25 @@
+[package]
+name = "symthaea-engineering-assurance"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Typed requirement assurance composition over current ETK discharge facts"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["engineering", "safety", "assurance", "verification"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-engineering-trust = { path = "../symthaea-engineering-trust" }
+symthaea-engineering-requirement-binding = { path = "../symthaea-engineering-requirement-binding" }
+symthaea-engineering-evidence-plan = { path = "../symthaea-engineering-evidence-plan" }
+symthaea-formal-safety = { path = "../../domains/symthaea-formal-safety" }
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
