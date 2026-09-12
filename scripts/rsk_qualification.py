@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -91,6 +92,28 @@ def tool_version(repo: Path, argv: list[str]) -> dict[str, Any]:
         "exit_code": proc.returncode,
         "output": proc.stdout.strip(),
     }
+
+
+def expected_rust_channel(repo: Path) -> str | None:
+    path = repo / "rust-toolchain.toml"
+    if not path.is_file():
+        return None
+    match = re.search(r'^\s*channel\s*=\s*"([^"]+)"\s*$', path.read_text(), re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def rustc_matches_expected_channel(
+    tools: dict[str, dict[str, Any]], expected: str | None
+) -> bool:
+    if not expected:
+        return False
+    rustc = tools.get("rustc", {})
+    if not rustc.get("available") or rustc.get("exit_code") != 0:
+        return False
+    output = rustc.get("output") or ""
+    first = output.splitlines()[0] if output.splitlines() else ""
+    parts = first.split()
+    return len(parts) >= 2 and parts[0] == "rustc" and parts[1] == expected
 
 
 def command_plan(phase: str) -> list[tuple[str, list[str]]]:
@@ -296,14 +319,19 @@ def main() -> int:
         "clippy": tool_version(repo, ["cargo", "clippy", "--version"]),
     }
 
+    expected_channel = expected_rust_channel(repo)
+    toolchain_pin_match = rustc_matches_expected_channel(tools, expected_channel)
+
     results = [run_gate(repo, output_dir, name, argv) for name, argv in command_plan(args.phase)]
     commands_pass = all(item["exit_code"] == 0 for item in results)
     clean_evidence = not dirty
 
-    if commands_pass and clean_evidence:
+    if commands_pass and toolchain_pin_match and clean_evidence:
         status = "pass-clean"
-    elif commands_pass:
+    elif commands_pass and toolchain_pin_match:
         status = "pass-dirty-diagnostic"
+    elif commands_pass:
+        status = "fail-toolchain-mismatch"
     else:
         status = "fail"
 
@@ -314,7 +342,7 @@ def main() -> int:
         "phase": args.phase,
         "production_admission": PRODUCTION_ADMISSION,
         "qualification_status": status,
-        "admissible_evidence": commands_pass and clean_evidence,
+        "admissible_evidence": commands_pass and clean_evidence and toolchain_pin_match,
         "repository": {
             "commit": git(repo, "rev-parse", "HEAD"),
             "tree": git(repo, "rev-parse", "HEAD^{tree}"),
@@ -323,6 +351,10 @@ def main() -> int:
             "dirty_paths": dirty_lines,
         },
         "inputs": tracked_input_hashes(repo),
+        "toolchain": {
+            "expected_rust_channel": expected_channel,
+            "pin_match": toolchain_pin_match,
+        },
         "tools": tools,
         "environment": {
             "platform": platform.platform(),
@@ -335,7 +367,7 @@ def main() -> int:
     print(f"RSK qualification status: {status}")
     print(f"Receipt: {path}")
     print(f"Receipt SHA-256: {receipt['receipt_sha256']}")
-    return 0 if commands_pass else 1
+    return 0 if commands_pass and toolchain_pin_match else 1
 
 
 if __name__ == "__main__":
