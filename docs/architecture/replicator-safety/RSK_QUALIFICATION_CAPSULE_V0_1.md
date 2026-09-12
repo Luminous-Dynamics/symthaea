@@ -12,11 +12,11 @@ It contains no physical replication mechanism.
 
 The qualification capsule answers a narrow question:
 
-> Did the declared RSK Rust qualification gates pass for this exact Git subject, with this recorded toolchain and input set?
+> Did the declared RSK Rust qualification gates pass for this exact Git subject, under the exact repository-pinned Rust channel, without mutating the qualified repository state?
 
 It does **not** answer whether RSK is production-admitted or physically safe.
 
-The capsule is designed so CI and local qualification execute one shared harness:
+CI and local qualification execute one shared harness:
 
 ```text
 scripts/rsk_qualification.py
@@ -63,12 +63,12 @@ cargo fmt --check \
 ### Core phase
 
 ```text
-cargo check -p symthaea-replicator-safety --all-targets
-cargo check -p symthaea-replicator-ledger --all-targets
-cargo test -p symthaea-replicator-safety --all-targets
-cargo test -p symthaea-replicator-ledger --all-targets
-cargo clippy -p symthaea-replicator-safety --all-targets -- -D warnings
-cargo clippy -p symthaea-replicator-ledger --all-targets -- -D warnings
+cargo check -p symthaea-replicator-safety --all-targets --locked
+cargo check -p symthaea-replicator-ledger --all-targets --locked
+cargo test -p symthaea-replicator-safety --all-targets --locked
+cargo test -p symthaea-replicator-ledger --all-targets --locked
+cargo clippy -p symthaea-replicator-safety --all-targets --locked -- -D warnings
+cargo clippy -p symthaea-replicator-ledger --all-targets --locked -- -D warnings
 ```
 
 ### All phase
@@ -76,6 +76,8 @@ cargo clippy -p symthaea-replicator-ledger --all-targets -- -D warnings
 The union of format and core.
 
 Commands are run sequentially and all selected commands are attempted so one run can reveal more than one independent failure.
+
+`--locked` is part of the normative semantic gate. Dependency resolution may not rewrite the qualified lockfile.
 
 ---
 
@@ -86,10 +88,11 @@ Each receipt records:
 - `git rev-parse HEAD`;
 - `git rev-parse HEAD^{tree}`;
 - branch name;
-- whether the worktree was dirty;
-- dirty path list when applicable.
+- whether the worktree was dirty before execution;
+- whether it was dirty after execution;
+- pre/post dirty path lists when applicable.
 
-A clean tree is required for `admissible_evidence = true`.
+A clean tree is required both before and after qualification for `admissible_evidence = true`.
 
 The Git tree digest is the primary content identity for tracked repository state. Additional selected file hashes make important evidence inputs human-visible without replacing the tree binding.
 
@@ -97,32 +100,50 @@ The Git tree digest is the primary content identity for tracked repository state
 
 ## 5. Selected input hashes
 
-The receipt records SHA-256 for at least:
+The receipt records SHA-256 **before and after execution** for at least:
 
 ```text
 Cargo.lock
 rust-toolchain.toml
 scripts/rsk_qualification.py
+scripts/test_rsk_qualification.py
 .github/workflows/rsk-safety.yml
 scripts/check-class-a-changes.sh
 docs/architecture/replicator-safety/RSK_PRODUCTION_ADMISSION_GATES_V0_1.md
 ```
 
+The receipt also records whether these selected inputs remained unchanged.
+
 Missing expected inputs are represented explicitly as `null`; they are not silently ignored.
+
+A change to one of these inputs during an initially clean qualification makes the receipt non-admissible even if all Rust commands exit successfully.
 
 ---
 
-## 6. Tool and executor identity
+## 6. Toolchain and executor identity
 
-The receipt records tool output for:
+The repository currently pins Rust through `rust-toolchain.toml`.
+
+The harness reads the declared channel and requires the observed `rustc --version --verbose` release version to match it exactly.
+
+A mismatch yields:
+
+```text
+qualification_status = fail-toolchain-mismatch
+admissible_evidence  = false
+```
+
+The receipt also records tool output for:
 
 - `rustc --version --verbose`;
 - `cargo --version`;
 - `rustfmt --version`;
 - `cargo clippy --version`.
 
-It also records:
+It records:
 
+- expected Rust channel;
+- toolchain pin-match result;
 - platform identity as observed by Python;
 - Python version;
 - available GitHub Actions run/job/ref/SHA context when executed in Actions.
@@ -172,7 +193,7 @@ The digest provides integrity binding for the receipt contents. It is not a digi
 
 ---
 
-## 9. Clean versus dirty evidence
+## 9. Worktree-integrity states
 
 ### Clean pass
 
@@ -180,6 +201,14 @@ The digest provides integrity binding for the receipt contents. It is not a digi
 qualification_status = pass-clean
 admissible_evidence  = true
 ```
+
+This requires:
+
+- clean initial worktree;
+- clean post-run worktree;
+- unchanged selected input hashes;
+- exact toolchain pin match;
+- every selected command passing.
 
 ### Dirty default
 
@@ -191,6 +220,17 @@ admissible_evidence  = false
 ```
 
 Exit status is nonzero.
+
+### Tool-induced mutation
+
+If an initially clean worktree becomes dirty or selected evidence inputs change during qualification:
+
+```text
+qualification_status = fail-worktree-mutated
+admissible_evidence  = false
+```
+
+This remains a failure even if every selected Rust command returned zero.
 
 ### Dirty diagnostic override
 
@@ -233,24 +273,50 @@ target/rsk-qualification
 
 ---
 
-## 11. CI usage
+## 11. Harness self-test
+
+The qualification machinery has a Rust-independent Python/Git self-test:
+
+```text
+python3 scripts/test_rsk_qualification.py -v
+```
+
+The candidate test set covers:
+
+1. clean matching toolchain with successful fake commands;
+2. wrong Rust version despite successful fake commands;
+3. dirty-start refusal;
+4. fake Cargo mutation of `Cargo.lock` during qualification;
+5. independent receipt-digest recomputation.
+
+Before this contract update, the candidate self-test passed 5/5 locally.
+
+The self-test itself is a Class A-protected file because weakening the evidence-generator tests could weaken qualification assurance.
+
+---
+
+## 12. CI usage
 
 The focused RSK workflow runs format and core independently so style failure does not mask semantic evidence.
 
-Each job invokes the same harness and uploads its output directory using `actions/upload-artifact@v4` with `if: always()`.
+Its governance job runs the qualification-harness self-test before relying on the harness for Rust evidence.
 
-This gives four useful cases:
+Each Rust job invokes the same harness and uploads its output directory using `actions/upload-artifact@v4` with `if: always()`.
+
+This gives useful distinct outcomes:
 
 1. gate passes, receipt retained;
-2. gate fails normally, failure receipt/log retained;
-3. harness detects missing tool or dirty subject, denial receipt retained;
-4. harness crashes before producing a receipt, artifact upload itself exposes the missing evidence path.
+2. Rust gate fails, failure receipt/log retained;
+3. wrong toolchain is detected and retained;
+4. dirty/mutated subject is denied and retained;
+5. missing tool is denied and retained;
+6. harness crashes before producing a receipt, artifact upload itself exposes the missing-evidence path.
 
 Queued or never-started jobs remain **no evidence**.
 
 ---
 
-## 12. Evidence hierarchy
+## 13. Evidence hierarchy
 
 A clean passing Rust receipt is one evidence class only.
 
@@ -271,28 +337,33 @@ The production-admission matrix remains authoritative.
 
 ---
 
-## 13. Anti-downgrade requirements
+## 14. Anti-downgrade requirements
 
-The qualification harness, focused workflow, and Class A classifier are themselves Class A safety-governance surfaces.
+The qualification harness, its self-test, focused workflow, and Class A classifier are themselves Class A safety-governance surfaces.
 
 A future change must not silently:
 
 - remove a required command;
+- remove `--locked` from semantic Cargo gates;
 - stop using `--all-targets` where specified;
 - remove `-D warnings` from Clippy;
+- accept the wrong Rust channel;
 - treat dirty evidence as admissible;
+- omit the post-run worktree check;
+- omit before/after input hashes;
 - omit commit/tree binding;
 - omit tool/input identities;
 - stop hashing logs;
 - change failure into success;
 - remove the production-admission denial marker;
-- stop retaining failure receipts in CI.
+- stop retaining failure receipts in CI;
+- stop self-testing the evidence generator.
 
 Such changes require a Class A ADR.
 
 ---
 
-## 14. Future strengthening
+## 15. Future strengthening
 
 Potential future work, separately reviewed:
 
