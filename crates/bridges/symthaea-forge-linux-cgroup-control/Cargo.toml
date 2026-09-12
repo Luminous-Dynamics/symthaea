@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-forge-linux-cgroup-control"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Host-side cgroup v2 resource enforcement for Symthaea Forge evaluator sandboxes"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+serde = { workspace = true }
+thiserror = { workspace = true }
