@@ -21,7 +21,13 @@ PR #1867 adds a Rust-independent canonicalization/golden-vector profile. The nex
 
 ## Decision
 
-Add a new public `semantic` module to `symthaea-replicator-safety` containing dependency-free production-target reference types:
+Create a small dependency-free crate:
+
+```text
+symthaea-replicator-semantics
+```
+
+containing production-target reference primitives:
 
 - `CapabilitySchemaId`;
 - `BoundCapabilitySet`;
@@ -30,6 +36,10 @@ Add a new public `semantic` module to `symthaea-replicator-safety` containing de
 - `ResourceQuantity`;
 - `ResourceVector`;
 - `SemanticBindingError`.
+
+The crate is `publish = false` and contains no positive-authority evaluator. Its purpose is to make semantic identity and checked arithmetic a reusable, minimal TCB boundary for later authority, ledger, evidence and runtime-admission integration.
+
+During this tranche, `symthaea-replicator-safety` references the new crate only as a **dev-dependency** so focused RSK checks can compile and exercise the API without expanding the production authority dependency graph yet.
 
 The legacy `CapabilitySet` and scalar resource fields remain in place for the existing reference evaluator during this tranche.
 
@@ -53,11 +63,11 @@ A conservative transition check may verify only that a target remaining vector d
 
 ## Golden-vector convergence
 
-The Rust crate adds dev-only `sha2` and `serde_json` dependencies and tests the committed cross-language corpus:
+The authority crate uses dev-only `sha2`, `serde_json`, `hex`, and `symthaea-replicator-semantics` dependencies to test the committed cross-language corpus:
 
 `docs/architecture/replicator-safety/golden/RSK_SEMANTIC_SCHEMA_GOLDEN_V0_1.json`
 
-The Rust tests independently canonicalize the JSON schema objects and recompute their SHA-256 identities. This tests agreement with the Rust-independent Python reference without adding serialization/hash dependencies to the runtime RSK crate.
+The integration test independently canonicalizes the JSON schema objects and recomputes their SHA-256 identities. This tests agreement with the Rust-independent Python reference without adding serialization/hash dependencies to the semantic runtime crate.
 
 ## Non-goals
 
@@ -73,7 +83,9 @@ This ADR does not:
 
 ## Safety rationale
 
-The change makes semantic mismatch representable in the Rust type system before the types are threaded through positive authority paths. That is preferable to a broad migration because it allows the schema identity and arithmetic contracts to compile and stabilize independently.
+A minimal shared semantics crate is preferable to embedding these primitives inside a larger evaluator because it reduces the future trusted code surface and gives authority, ledger, evidence and runtime admission one exact implementation of schema identity.
+
+The change makes semantic mismatch representable in the Rust type system before the types are threaded through positive authority paths.
 
 The key invariant is:
 
@@ -83,7 +95,7 @@ same numeric value under a different schema != same authority value
 
 ## Follow-up
 
-After this tranche has compiler/test evidence, a separate Class A change should bind the new schema-aware values through:
+After this tranche has compiler/test evidence, a separate Class A change should promote the crate from dev-only validation into the real authority path and bind the schema-aware values through:
 
 - lineage policy;
 - replication grants;
@@ -99,10 +111,13 @@ Cross-schema migration must remain unavailable without an opaque separately veri
 
 Before this tranche is considered evidenced:
 
-- exact-head `cargo check --all-targets --locked` passes for the RSK authority crate;
+- exact-head `cargo check --all-targets --locked` passes for the RSK authority crate and therefore compiles the semantics dev-dependency/integration target;
 - exact-head tests pass;
-- exact-head Clippy with `-D warnings` passes;
+- exact-head Clippy with `-D warnings` passes on the authority targets;
+- workspace/semantics-specific linting is obtained before production integration;
 - Rust recomputation matches the committed capability/resource golden digests;
 - mismatch, underflow, overflow, dimension-set and conservative-envelope negative tests pass.
+
+The current execution environment has no Rust/Cargo toolchain, so candidate Rust compilation remains pending an external executor.
 
 Production admission remains **DENIED / NOT YET ELIGIBLE**.
