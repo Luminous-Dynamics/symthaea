@@ -12,11 +12,11 @@ set -euo pipefail
 
 # Class A files: safety-critical parameters per GOVERNANCE_CHARTER.md §3.1
 #
-# RSK note (ADR-002/ADR-010/ADR-011): replication-authority and lineage/budget
-# code is Class A. The RSK qualification generator, independent verifier,
-# self-tests, workflow, detector, and Governance Charter are also Class A
-# surfaces so weakening the evidence/governance mechanism itself cannot look
-# like an ordinary unclassified change.
+# RSK note (ADR-002/ADR-010/ADR-011/ADR-012): replication-authority and
+# lineage/budget code, normative RSK architecture contracts, qualification
+# generator/verifier, self-tests, workflow, detector, and Governance Charter
+# are Class A surfaces. Weakening the constitution/evidence/governance boundary
+# must not look like an ordinary documentation or implementation change.
 CLASS_A_FILES=(
     "symthaea/src/cognitive_loop/thresholds.rs"
     "symthaea/src/cognitive_loop/ethics_engine.rs"
@@ -25,6 +25,7 @@ CLASS_A_FILES=(
     "crates/mycelix-bridge-common/src/consciousness_thresholds.rs"
     "crates/domains/symthaea-replicator-safety/"
     "crates/domains/symthaea-replicator-ledger/"
+    "docs/architecture/replicator-safety/"
     ".github/workflows/rsk-safety.yml"
     "scripts/rsk_qualification.py"
     "scripts/test_rsk_qualification.py"
@@ -156,7 +157,8 @@ if [ "${1:-}" = "--ci" ]; then
             echo "WARNING: No ADR found in this changeset."
             echo "  Consider adding: symthaea/docs/compliance/adr/ADR-NNN-description.md"
             # Warning only in generic CI. RSK has an additional blocking ADR gate
-            # in .github/workflows/rsk-safety.yml; see ADR-002, ADR-010, ADR-011.
+            # in .github/workflows/rsk-safety.yml; see ADR-002, ADR-010, ADR-011,
+            # and ADR-012.
         fi
     fi
 
@@ -183,7 +185,7 @@ if [ -n "${1:-}" ] && [ -f "${1:-}" ]; then
     if [ $result -eq 1 ]; then
         echo ""
         echo "================================================"
-        echo "  CLASS A Change Governance Check"
+        echo "  Class A Change Governance Check"
         echo "================================================"
         echo ""
         echo "$output"
