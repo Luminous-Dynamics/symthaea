@@ -99,9 +99,37 @@ fn solver_sort_key(solver: SolverKind) -> u8 {
     }
 }
 
-/// Cheap factory boundary. `create()` is called only after routing selects it.
+/// Unforgeable safe-Rust call capability for selected backend construction.
+///
+/// The constructor is private to this crate. A permit is minted only after the
+/// router has recovered the exact selected admission, rechecked live currentness,
+/// and validated the factory's package commitments against that admission. The
+/// permit carries no authority data itself and is intentionally neither Clone,
+/// Copy, Default, Serialize, nor Deserialize.
+#[derive(Debug)]
+pub struct SelectedExecutionPermit {
+    _private: (),
+}
+
+impl SelectedExecutionPermit {
+    fn new() -> Self {
+        Self { _private: () }
+    }
+}
+
+/// Cheap factory boundary. Construction requires a router-minted selected permit.
 pub trait SimulationBackendFactory: Debug + Send + Sync {
     fn descriptor(&self) -> &SimulationProviderDescriptor;
+
+    /// SHA-256 of the exact manifest bytes this factory will present to the
+    /// execution host.
+    ///
+    /// Wasm factories must return `Some` and compute it from the immutable raw
+    /// manifest bytes later passed to control inspection. Native built-ins may
+    /// return `None` when their deployment model has no byte-addressed manifest.
+    fn manifest_sha256(&self) -> Option<Sha256Digest> {
+        None
+    }
 
     /// SHA-256 of the exact executable payload bytes this factory will use.
     ///
@@ -112,7 +140,10 @@ pub trait SimulationBackendFactory: Debug + Send + Sync {
         None
     }
 
-    fn create(&self) -> Result<Box<dyn SimulationBackend>, SimulationError>;
+    fn create(
+        &self,
+        permit: &SelectedExecutionPermit,
+    ) -> Result<Box<dyn SimulationBackend>, SimulationError>;
 }
 
 /// Point in the selected-provider lifecycle where live authority was rechecked.
@@ -134,6 +165,12 @@ pub enum LazySimulationError {
     SelectedFactoryMissing(ExtensionId),
     SelectedAdmissionMissing(ExtensionId),
     SelectedAdmissionMismatch(ExtensionId),
+    MissingManifestDigest(ExtensionId),
+    ManifestDigestMismatch {
+        extension: ExtensionId,
+        admitted: Sha256Digest,
+        executable: Sha256Digest,
+    },
     MissingExecutablePayloadDigest(ExtensionId),
     ExecutablePayloadMismatch {
         extension: ExtensionId,
@@ -266,14 +303,15 @@ impl LazySimulationRegistry {
             .get(&decision.selected)
             .ok_or_else(|| LazySimulationError::SelectedFactoryMissing(decision.selected.clone()))?;
         let descriptor = factory.descriptor();
-        validate_executable_payload_binding(
+        validate_package_bindings(
             factory.as_ref(),
             descriptor,
             selected_admission,
             &decision.selected,
         )?;
+        let permit = SelectedExecutionPermit::new();
         let backend = factory
-            .create()
+            .create(&permit)
             .map_err(|source| LazySimulationError::BackendConstruction {
                 extension: decision.selected.clone(),
                 source,
@@ -338,12 +376,27 @@ fn selected_admission<'a>(
     Ok(admission)
 }
 
-fn validate_executable_payload_binding(
+fn validate_package_bindings(
     factory: &dyn SimulationBackendFactory,
     descriptor: &SimulationProviderDescriptor,
     admission: &ActiveAdmission,
     extension: &ExtensionId,
 ) -> Result<(), LazySimulationError> {
+    let manifest = factory.manifest_sha256();
+    if descriptor.manifest.runtime == RuntimeKind::Wasm && manifest.is_none() {
+        return Err(LazySimulationError::MissingManifestDigest(extension.clone()));
+    }
+    if let Some(executable) = manifest {
+        let admitted = admission.manifest_sha256();
+        if executable != admitted {
+            return Err(LazySimulationError::ManifestDigestMismatch {
+                extension: extension.clone(),
+                admitted,
+                executable,
+            });
+        }
+    }
+
     let executable = factory.executable_payload_sha256();
     if descriptor.manifest.runtime == RuntimeKind::Wasm && executable.is_none() {
         return Err(LazySimulationError::MissingExecutablePayloadDigest(
@@ -457,8 +510,12 @@ mod tests {
     }
 
     impl SimulationBackend for MockBackend {
-        fn name(&self) -> &'static str { self.name }
-        fn supported_solvers(&self) -> &[SolverKind] { &self.solvers }
+        fn name(&self) -> &'static str {
+            self.name
+        }
+        fn supported_solvers(&self) -> &[SolverKind] {
+            &self.solvers
+        }
         fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
             Ok(SimulationResult::dry_run(request.id.clone(), self.name, 0.8))
         }
@@ -470,24 +527,38 @@ mod tests {
         count: Arc<AtomicUsize>,
         backend_name: &'static str,
         backend_solvers: Option<Vec<SolverKind>>,
+        manifest_sha256: Option<Sha256Digest>,
         executable_payload_sha256: Option<Sha256Digest>,
     }
 
     impl SimulationBackendFactory for CountingFactory {
-        fn descriptor(&self) -> &SimulationProviderDescriptor { &self.descriptor }
+        fn descriptor(&self) -> &SimulationProviderDescriptor {
+            &self.descriptor
+        }
+        fn manifest_sha256(&self) -> Option<Sha256Digest> {
+            self.manifest_sha256
+        }
         fn executable_payload_sha256(&self) -> Option<Sha256Digest> {
             self.executable_payload_sha256
         }
-        fn create(&self) -> Result<Box<dyn SimulationBackend>, SimulationError> {
+        fn create(
+            &self,
+            _permit: &SelectedExecutionPermit,
+        ) -> Result<Box<dyn SimulationBackend>, SimulationError> {
             self.count.fetch_add(1, AtomicOrdering::SeqCst);
             Ok(Box::new(MockBackend {
                 name: self.backend_name,
-                solvers: self.backend_solvers.clone().unwrap_or_else(|| self.descriptor.supported_solvers.clone()),
+                solvers: self
+                    .backend_solvers
+                    .clone()
+                    .unwrap_or_else(|| self.descriptor.supported_solvers.clone()),
             }))
         }
     }
 
-    fn digest(byte: u8) -> Sha256Digest { Sha256Digest::new([byte; 32]) }
+    fn digest(byte: u8) -> Sha256Digest {
+        Sha256Digest::new([byte; 32])
+    }
 
     fn descriptor(id: &str, name: &str, solver: SolverKind) -> SimulationProviderDescriptor {
         SimulationProviderDescriptor {
@@ -513,12 +584,17 @@ mod tests {
         }
     }
 
-    fn factory(desc: SimulationProviderDescriptor, count: Arc<AtomicUsize>, name: &'static str) -> CountingFactory {
+    fn factory(
+        desc: SimulationProviderDescriptor,
+        count: Arc<AtomicUsize>,
+        name: &'static str,
+    ) -> CountingFactory {
         CountingFactory {
             descriptor: desc,
             count,
             backend_name: name,
             backend_solvers: None,
+            manifest_sha256: None,
             executable_payload_sha256: None,
         }
     }
@@ -533,7 +609,12 @@ mod tests {
         }
     }
 
-    fn active_admission(registry: &LazySimulationRegistry, id: &str, generation: u64, seed: u8) -> ActiveAdmission {
+    fn active_admission(
+        registry: &LazySimulationRegistry,
+        id: &str,
+        generation: u64,
+        seed: u8,
+    ) -> ActiveAdmission {
         let extension = ExtensionId::new(id);
         let manifest = registry.catalog().get(&extension).unwrap();
         let trust_generation = 10_000 + u64::from(seed);
@@ -547,7 +628,11 @@ mod tests {
             PrincipalId::new("local:test-authority").unwrap(),
             Some(PrincipalId::new("did:example:test-publisher").unwrap()),
             TrustLevel::Trusted,
-            manifest.provides.iter().map(|capability| capability.id.clone()).collect(),
+            manifest
+                .provides
+                .iter()
+                .map(|capability| capability.id.clone())
+                .collect(),
             PermissionSet::default(),
             generation,
             trust_generation,
@@ -558,7 +643,10 @@ mod tests {
     }
 
     fn currentness(generation: u64, seed: u8) -> TestCurrentness {
-        TestCurrentness(AdmissionContext::active(generation, 10_000 + u64::from(seed)))
+        TestCurrentness(AdmissionContext::active(
+            generation,
+            10_000 + u64::from(seed),
+        ))
     }
 
     #[test]
@@ -567,24 +655,51 @@ mod tests {
         let low = Arc::new(AtomicUsize::new(0));
         let high = Arc::new(AtomicUsize::new(0));
         let mut registry = LazySimulationRegistry::new();
-        registry.register(factory(descriptor("org.example.low", "low", solver), low.clone(), "low")).unwrap();
-        registry.register(factory(descriptor("org.example.high", "high", solver), high.clone(), "high")).unwrap();
+        registry
+            .register(factory(
+                descriptor("org.example.low", "low", solver),
+                low.clone(),
+                "low",
+            ))
+            .unwrap();
+        registry
+            .register(factory(
+                descriptor("org.example.high", "high", solver),
+                high.clone(),
+                "high",
+            ))
+            .unwrap();
         assert_eq!(low.load(AtomicOrdering::SeqCst), 0);
         assert_eq!(high.load(AtomicOrdering::SeqCst), 0);
-        registry.set_observation(observation("org.example.low", 2, 8_000)).unwrap();
-        registry.set_observation(observation("org.example.high", 4, 9_900)).unwrap();
+        registry
+            .set_observation(observation("org.example.low", 2, 8_000))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.high", 4, 9_900))
+            .unwrap();
         let admissions = vec![
             active_admission(&registry, "org.example.low", 1, 10),
             active_admission(&registry, "org.example.high", 1, 20),
         ];
-        let request = SimulationRequest::new("run-1", EngineeringDomain::Mechanical, solver, "test");
+        let request = SimulationRequest::new(
+            "run-1",
+            EngineeringDomain::Mechanical,
+            solver,
+            "test",
+        );
         let source = currentness(1, 20);
-        let (result, decision) = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-            &source,
-        ).unwrap();
+        let (result, decision) = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &source,
+            )
+            .unwrap();
         assert_eq!(decision.selected, ExtensionId::new("org.example.high"));
         assert_eq!(result.evidence.backend.as_deref(), Some("high"));
         assert_eq!(low.load(AtomicOrdering::SeqCst), 0);
@@ -596,16 +711,37 @@ mod tests {
         let solver = SolverKind::Circuit;
         let count = Arc::new(AtomicUsize::new(0));
         let mut registry = LazySimulationRegistry::new();
-        registry.register(factory(descriptor("org.example.circuit", "circuit", solver), count.clone(), "circuit")).unwrap();
-        registry.set_observation(observation("org.example.circuit", 5, 10_000)).unwrap();
-        let request = SimulationRequest::new("no-auth", EngineeringDomain::Electrical, solver, "test");
+        registry
+            .register(factory(
+                descriptor("org.example.circuit", "circuit", solver),
+                count.clone(),
+                "circuit",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.circuit", 5, 10_000))
+            .unwrap();
+        let request = SimulationRequest::new(
+            "no-auth",
+            EngineeringDomain::Electrical,
+            solver,
+            "test",
+        );
         let source = currentness(1, 30);
-        assert!(registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &[],
-            &source,
-        ).is_err());
+        assert!(
+            registry
+                .run(
+                    &request,
+                    RoutingConstraints {
+                        maximum_effect: EffectClass::Pure,
+                        minimum_trust: TrustLevel::Trusted,
+                        ..RoutingConstraints::default()
+                    },
+                    &[],
+                    &source,
+                )
+                .is_err()
+        );
         assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
     }
 
@@ -614,17 +750,41 @@ mod tests {
         let solver = SolverKind::Circuit;
         let count = Arc::new(AtomicUsize::new(0));
         let mut registry = LazySimulationRegistry::new();
-        registry.register(factory(descriptor("org.example.circuit", "circuit", solver), count.clone(), "circuit")).unwrap();
-        registry.set_observation(observation("org.example.circuit", 5, 10_000)).unwrap();
-        let admissions = vec![active_admission(&registry, "org.example.circuit", 1, 30)];
-        let request = SimulationRequest::new("revoked-before-create", EngineeringDomain::Electrical, solver, "test");
+        registry
+            .register(factory(
+                descriptor("org.example.circuit", "circuit", solver),
+                count.clone(),
+                "circuit",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.circuit", 5, 10_000))
+            .unwrap();
+        let admissions = vec![active_admission(
+            &registry,
+            "org.example.circuit",
+            1,
+            30,
+        )];
+        let request = SimulationRequest::new(
+            "revoked-before-create",
+            EngineeringDomain::Electrical,
+            solver,
+            "test",
+        );
         let revoked = TestCurrentness(AdmissionContext::revoked(1, 10_030));
-        let err = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-            &revoked,
-        ).unwrap_err();
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &revoked,
+            )
+            .unwrap_err();
         assert!(matches!(
             err,
             LazySimulationError::AdmissionCurrentness {
@@ -641,21 +801,45 @@ mod tests {
         let solver = SolverKind::Custom;
         let count = Arc::new(AtomicUsize::new(0));
         let mut registry = LazySimulationRegistry::new();
-        registry.register(factory(descriptor("org.example.custom", "custom", solver), count.clone(), "custom")).unwrap();
-        registry.set_observation(observation("org.example.custom", 5, 10_000)).unwrap();
-        let admissions = vec![active_admission(&registry, "org.example.custom", 7, 50)];
-        let request = SimulationRequest::new("revoked-after-run", EngineeringDomain::Systems, solver, "test");
+        registry
+            .register(factory(
+                descriptor("org.example.custom", "custom", solver),
+                count.clone(),
+                "custom",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.custom", 5, 10_000))
+            .unwrap();
+        let admissions = vec![active_admission(
+            &registry,
+            "org.example.custom",
+            7,
+            50,
+        )];
+        let request = SimulationRequest::new(
+            "revoked-after-run",
+            EngineeringDomain::Systems,
+            solver,
+            "test",
+        );
         let source = RevokeOnThirdCheck {
             checks: AtomicUsize::new(0),
             generation: 7,
             trust_generation: 10_050,
         };
-        let err = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-            &source,
-        ).unwrap_err();
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &source,
+            )
+            .unwrap_err();
         assert!(matches!(
             err,
             LazySimulationError::AdmissionCurrentness {
@@ -669,23 +853,152 @@ mod tests {
     }
 
     #[test]
+    fn wasm_factory_requires_a_manifest_digest() {
+        let solver = SolverKind::Custom;
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut desc = descriptor("org.example.wasm-manifest-missing", "wasm-manifest-missing", solver);
+        desc.manifest.runtime = RuntimeKind::Wasm;
+        let mut registry = LazySimulationRegistry::new();
+        registry
+            .register(CountingFactory {
+                descriptor: desc,
+                count: count.clone(),
+                backend_name: "wasm-manifest-missing",
+                backend_solvers: None,
+                manifest_sha256: None,
+                executable_payload_sha256: Some(digest(61)),
+            })
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.wasm-manifest-missing", 5, 10_000))
+            .unwrap();
+        let admissions = vec![active_admission(
+            &registry,
+            "org.example.wasm-manifest-missing",
+            3,
+            60,
+        )];
+        let request = SimulationRequest::new(
+            "wasm-missing-manifest-digest",
+            EngineeringDomain::Systems,
+            solver,
+            "test",
+        );
+        let source = currentness(3, 60);
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &source,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            LazySimulationError::MissingManifestDigest(extension)
+                if extension == ExtensionId::new("org.example.wasm-manifest-missing")
+        ));
+        assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[test]
+    fn wasm_factory_manifest_digest_must_match_selected_admission() {
+        let solver = SolverKind::Custom;
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut desc = descriptor("org.example.wasm-manifest-mismatch", "wasm-manifest-mismatch", solver);
+        desc.manifest.runtime = RuntimeKind::Wasm;
+        let mut registry = LazySimulationRegistry::new();
+        registry
+            .register(CountingFactory {
+                descriptor: desc,
+                count: count.clone(),
+                backend_name: "wasm-manifest-mismatch",
+                backend_solvers: None,
+                manifest_sha256: Some(digest(99)),
+                executable_payload_sha256: Some(digest(71)),
+            })
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.wasm-manifest-mismatch", 5, 10_000))
+            .unwrap();
+        let admissions = vec![active_admission(
+            &registry,
+            "org.example.wasm-manifest-mismatch",
+            4,
+            70,
+        )];
+        let request = SimulationRequest::new(
+            "wasm-manifest-mismatch-digest",
+            EngineeringDomain::Systems,
+            solver,
+            "test",
+        );
+        let source = currentness(4, 70);
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &source,
+            )
+            .unwrap_err();
+        assert!(matches!(err, LazySimulationError::ManifestDigestMismatch { .. }));
+        assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[test]
     fn wasm_factory_requires_an_executable_payload_digest() {
         let solver = SolverKind::Custom;
         let count = Arc::new(AtomicUsize::new(0));
         let mut desc = descriptor("org.example.wasm-missing", "wasm-missing", solver);
         desc.manifest.runtime = RuntimeKind::Wasm;
         let mut registry = LazySimulationRegistry::new();
-        registry.register(factory(desc, count.clone(), "wasm-missing")).unwrap();
-        registry.set_observation(observation("org.example.wasm-missing", 5, 10_000)).unwrap();
-        let admissions = vec![active_admission(&registry, "org.example.wasm-missing", 3, 60)];
-        let request = SimulationRequest::new("wasm-missing-digest", EngineeringDomain::Systems, solver, "test");
+        registry
+            .register(CountingFactory {
+                descriptor: desc,
+                count: count.clone(),
+                backend_name: "wasm-missing",
+                backend_solvers: None,
+                manifest_sha256: Some(digest(60)),
+                executable_payload_sha256: None,
+            })
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.wasm-missing", 5, 10_000))
+            .unwrap();
+        let admissions = vec![active_admission(
+            &registry,
+            "org.example.wasm-missing",
+            3,
+            60,
+        )];
+        let request = SimulationRequest::new(
+            "wasm-missing-digest",
+            EngineeringDomain::Systems,
+            solver,
+            "test",
+        );
         let source = currentness(3, 60);
-        let err = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-            &source,
-        ).unwrap_err();
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &source,
+            )
+            .unwrap_err();
         assert!(matches!(
             err,
             LazySimulationError::MissingExecutablePayloadDigest(extension)
@@ -701,51 +1014,93 @@ mod tests {
         let mut desc = descriptor("org.example.wasm-mismatch", "wasm-mismatch", solver);
         desc.manifest.runtime = RuntimeKind::Wasm;
         let mut registry = LazySimulationRegistry::new();
-        registry.register(CountingFactory {
-            descriptor: desc,
-            count: count.clone(),
-            backend_name: "wasm-mismatch",
-            backend_solvers: None,
-            executable_payload_sha256: Some(digest(99)),
-        }).unwrap();
-        registry.set_observation(observation("org.example.wasm-mismatch", 5, 10_000)).unwrap();
-        let admissions = vec![active_admission(&registry, "org.example.wasm-mismatch", 4, 70)];
-        let request = SimulationRequest::new("wasm-mismatch-digest", EngineeringDomain::Systems, solver, "test");
+        registry
+            .register(CountingFactory {
+                descriptor: desc,
+                count: count.clone(),
+                backend_name: "wasm-mismatch",
+                backend_solvers: None,
+                manifest_sha256: Some(digest(70)),
+                executable_payload_sha256: Some(digest(99)),
+            })
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.wasm-mismatch", 5, 10_000))
+            .unwrap();
+        let admissions = vec![active_admission(
+            &registry,
+            "org.example.wasm-mismatch",
+            4,
+            70,
+        )];
+        let request = SimulationRequest::new(
+            "wasm-mismatch-digest",
+            EngineeringDomain::Systems,
+            solver,
+            "test",
+        );
         let source = currentness(4, 70);
-        let err = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-            &source,
-        ).unwrap_err();
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &source,
+            )
+            .unwrap_err();
         assert!(matches!(err, LazySimulationError::ExecutablePayloadMismatch { .. }));
         assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
     }
 
     #[test]
-    fn wasm_factory_exact_payload_digest_is_allowed() {
+    fn wasm_factory_exact_manifest_and_payload_digests_are_allowed() {
         let solver = SolverKind::Custom;
         let count = Arc::new(AtomicUsize::new(0));
         let mut desc = descriptor("org.example.wasm-exact", "wasm-exact", solver);
         desc.manifest.runtime = RuntimeKind::Wasm;
         let mut registry = LazySimulationRegistry::new();
-        registry.register(CountingFactory {
-            descriptor: desc,
-            count: count.clone(),
-            backend_name: "wasm-exact",
-            backend_solvers: None,
-            executable_payload_sha256: Some(digest(81)),
-        }).unwrap();
-        registry.set_observation(observation("org.example.wasm-exact", 5, 10_000)).unwrap();
-        let admissions = vec![active_admission(&registry, "org.example.wasm-exact", 5, 80)];
-        let request = SimulationRequest::new("wasm-exact-digest", EngineeringDomain::Systems, solver, "test");
+        registry
+            .register(CountingFactory {
+                descriptor: desc,
+                count: count.clone(),
+                backend_name: "wasm-exact",
+                backend_solvers: None,
+                manifest_sha256: Some(digest(80)),
+                executable_payload_sha256: Some(digest(81)),
+            })
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.wasm-exact", 5, 10_000))
+            .unwrap();
+        let admissions = vec![active_admission(
+            &registry,
+            "org.example.wasm-exact",
+            5,
+            80,
+        )];
+        let request = SimulationRequest::new(
+            "wasm-exact-digest",
+            EngineeringDomain::Systems,
+            solver,
+            "test",
+        );
         let source = currentness(5, 80);
-        let (result, decision) = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-            &source,
-        ).unwrap();
+        let (result, decision) = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &source,
+            )
+            .unwrap();
         assert_eq!(decision.selected, ExtensionId::new("org.example.wasm-exact"));
         assert_eq!(result.evidence.backend.as_deref(), Some("wasm-exact"));
         assert_eq!(count.load(AtomicOrdering::SeqCst), 1);
@@ -756,17 +1111,41 @@ mod tests {
         let solver = SolverKind::Circuit;
         let count = Arc::new(AtomicUsize::new(0));
         let mut registry = LazySimulationRegistry::new();
-        registry.register(factory(descriptor("org.example.circuit", "declared", solver), count, "actual")).unwrap();
-        registry.set_observation(observation("org.example.circuit", 5, 10_000)).unwrap();
-        let admissions = vec![active_admission(&registry, "org.example.circuit", 1, 30)];
-        let request = SimulationRequest::new("run-2", EngineeringDomain::Electrical, solver, "test");
+        registry
+            .register(factory(
+                descriptor("org.example.circuit", "declared", solver),
+                count,
+                "actual",
+            ))
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.circuit", 5, 10_000))
+            .unwrap();
+        let admissions = vec![active_admission(
+            &registry,
+            "org.example.circuit",
+            1,
+            30,
+        )];
+        let request = SimulationRequest::new(
+            "run-2",
+            EngineeringDomain::Electrical,
+            solver,
+            "test",
+        );
         let source = currentness(1, 30);
-        let err = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-            &source,
-        ).unwrap_err();
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &source,
+            )
+            .unwrap_err();
         assert!(matches!(err, LazySimulationError::BackendNameMismatch { .. }));
     }
 
@@ -776,23 +1155,44 @@ mod tests {
         let count = Arc::new(AtomicUsize::new(0));
         let desc = descriptor("org.example.structure", "structure", solver);
         let mut registry = LazySimulationRegistry::new();
-        registry.register(CountingFactory {
-            descriptor: desc,
-            count,
-            backend_name: "structure",
-            backend_solvers: Some(vec![SolverKind::Circuit]),
-            executable_payload_sha256: None,
-        }).unwrap();
-        registry.set_observation(observation("org.example.structure", 5, 10_000)).unwrap();
-        let admissions = vec![active_admission(&registry, "org.example.structure", 1, 40)];
-        let request = SimulationRequest::new("run-3", EngineeringDomain::Civil, solver, "test");
+        registry
+            .register(CountingFactory {
+                descriptor: desc,
+                count,
+                backend_name: "structure",
+                backend_solvers: Some(vec![SolverKind::Circuit]),
+                manifest_sha256: None,
+                executable_payload_sha256: None,
+            })
+            .unwrap();
+        registry
+            .set_observation(observation("org.example.structure", 5, 10_000))
+            .unwrap();
+        let admissions = vec![active_admission(
+            &registry,
+            "org.example.structure",
+            1,
+            40,
+        )];
+        let request = SimulationRequest::new(
+            "run-3",
+            EngineeringDomain::Civil,
+            solver,
+            "test",
+        );
         let source = currentness(1, 40);
-        let err = registry.run(
-            &request,
-            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
-            &admissions,
-            &source,
-        ).unwrap_err();
+        let err = registry
+            .run(
+                &request,
+                RoutingConstraints {
+                    maximum_effect: EffectClass::Pure,
+                    minimum_trust: TrustLevel::Trusted,
+                    ..RoutingConstraints::default()
+                },
+                &admissions,
+                &source,
+            )
+            .unwrap_err();
         assert!(matches!(err, LazySimulationError::BackendSolverMismatch { .. }));
     }
 
@@ -801,6 +1201,9 @@ mod tests {
         let solver = SolverKind::Process;
         let mut desc = descriptor("org.example.process", "process", solver);
         desc.manifest.provides.clear();
-        assert_eq!(desc.validate(), Err(DescriptorProblem::MissingSolverCapability(solver)));
+        assert_eq!(
+            desc.validate(),
+            Err(DescriptorProblem::MissingSolverCapability(solver))
+        );
     }
 }

@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-sim-release"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Host-minted release receipts binding Symthaea simulation authority, routing, and evidence"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+symthaea-extension-admission = { path = "../../core/symthaea-extension-admission" }
+symthaea-extension-core = { path = "../../core/symthaea-extension-core" }
+symthaea-extension-router = { path = "../../core/symthaea-extension-router" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-sim-digest = { path = "../symthaea-sim-digest" }
+symthaea-sim-extension-routing = { path = "../symthaea-sim-extension-routing" }
+
+[dev-dependencies]
+symthaea-extension-host = { path = "../symthaea-extension-host" }
+symthaea-extension-simulation-backend = { path = "../symthaea-extension-simulation-backend" }

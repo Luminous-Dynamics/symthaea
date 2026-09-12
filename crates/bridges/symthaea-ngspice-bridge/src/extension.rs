@@ -5,7 +5,8 @@ use symthaea_extension_core::{
 };
 use symthaea_sim_bridge::{SimulationBackend, SimulationError, SolverKind};
 use symthaea_sim_extension_routing::{
-    SimulationBackendFactory, SimulationProviderDescriptor, solver_capability,
+    SelectedExecutionPermit, SimulationBackendFactory, SimulationProviderDescriptor,
+    solver_capability,
 };
 
 /// Stable extension identity for the built-in ngspice adapter.
@@ -57,7 +58,10 @@ impl SimulationBackendFactory for NgspiceExtensionFactory {
         &self.descriptor
     }
 
-    fn create(&self) -> Result<Box<dyn SimulationBackend>, SimulationError> {
+    fn create(
+        &self,
+        _permit: &SelectedExecutionPermit,
+    ) -> Result<Box<dyn SimulationBackend>, SimulationError> {
         Ok(Box::new(NgspiceBridge {
             dry_run: self.dry_run,
             solver_cmd: self.solver_cmd.clone(),
@@ -114,19 +118,21 @@ mod tests {
         assert_eq!(descriptor.manifest.id.as_str(), NGSPICE_EXTENSION_ID);
         assert_eq!(descriptor.manifest.runtime, RuntimeKind::Native);
         assert_eq!(descriptor.supported_solvers, vec![SolverKind::Circuit]);
-        assert!(descriptor
-            .manifest
-            .provides
-            .iter()
-            .any(|cap| cap.id == solver_capability(SolverKind::Circuit)));
+        assert!(
+            descriptor
+                .manifest
+                .provides
+                .iter()
+                .any(|cap| cap.id == solver_capability(SolverKind::Circuit))
+        );
     }
 
     #[test]
-    fn factory_preserves_backend_contract() {
+    fn factory_configuration_is_preserved_before_selected_construction() {
         let factory = NgspiceExtensionFactory::dry_run().with_solver_cmd("custom-ngspice");
-        let backend = factory.create().unwrap();
-        assert_eq!(backend.name(), "ngspice");
-        assert_eq!(backend.supported_solvers(), &[SolverKind::Circuit]);
+        assert!(factory.dry_run);
+        assert_eq!(factory.solver_cmd, "custom-ngspice");
+        assert_eq!(factory.descriptor.backend_name, "ngspice");
     }
 
     #[test]
