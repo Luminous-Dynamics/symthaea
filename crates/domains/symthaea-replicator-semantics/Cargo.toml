@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-replicator-semantics"
+version = "0.1.0"
+edition = "2024"
+description = "Schema-bound capability and resource identity primitives for the RSK reference model; not production-admitted"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[dependencies]

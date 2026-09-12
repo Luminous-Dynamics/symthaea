@@ -8,3 +8,9 @@ publish = false
 readme = "README.md"
 
 [dependencies]
+
+[dev-dependencies]
+symthaea-replicator-semantics = { path = "../symthaea-replicator-semantics" }
+sha2 = { workspace = true }
+serde_json = { workspace = true }
+hex = { workspace = true }
