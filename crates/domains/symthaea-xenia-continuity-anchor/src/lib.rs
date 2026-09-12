@@ -2,21 +2,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Verified Xenia state-anchor adapter for exact Symthaea episodic continuity.
 //!
-//! This crate deliberately does not depend on the `xenia-peer` repository. Instead it defines a
-//! narrow transport boundary whose implementations must return **already cryptographically
-//! verified** Xenia state-anchor artifacts. Symthaea then verifies its own semantics independently:
-//! the sidecar `ContinuityAnchorSnapshot` must validate and its exact commitment must equal the
-//! opaque state commitment authenticated by Xenia.
+//! The adapter intentionally does not depend on the `xenia-peer` repository. A deployment-specific
+//! transport verifies Xenia signatures/key continuity/freshness and returns a compact verified
+//! artifact. Symthaea then independently validates its own serialized continuity snapshot and
+//! requires its exact commitment to equal the opaque state commitment authenticated by Xenia.
 //!
-//! This preserves purpose separation in both directions:
-//! - Xenia authenticates signer identity, target, revision/fork continuity, and the opaque state
-//!   commitment, without learning Symthaea's memory/governance schema.
-//! - Symthaea authenticates its own continuity snapshot and never needs to parse Xenia signature
-//!   envelopes or key-transition artifacts here.
+//! Two predecessor chains remain distinct:
+//! - Symthaea revision N binds the previous `ContinuityAnchorSnapshot::commitment()`.
+//! - Xenia revision N binds the fingerprint of the exact previous signed Xenia artifact.
 //!
-//! A transport implementation is security-sensitive. It must not label an unverified network or
-//! disk object as `VerifiedXeniaStateAnchor`. Real implementations should verify against the
-//! deployment's retained Xenia key/key-transition and freshness policy before returning.
+//! This is purpose separation, not duplicated cryptography.
 
 #![deny(unsafe_code)]
 
@@ -24,79 +19,82 @@ use std::error::Error as StdError;
 
 use serde::{Deserialize, Serialize};
 use symthaea_episodic_continuity_anchor::{
-    ContinuityAnchorSnapshot, ContinuityHeadAnchor,
+    CONTINUITY_ANCHOR_SCHEMA, ContinuityAnchorSnapshot, ContinuityHeadAnchor,
 };
-use symthaea_fabrication_kernel::crypto_digest::Sha256Digest;
+use symthaea_fabrication_kernel::crypto_digest::{Sha256, Sha256Digest};
 use thiserror::Error;
 
 /// Purpose-separated Xenia namespace reserved for Symthaea episodic continuity.
 pub const XENIA_SYMTHAEA_CONTINUITY_NAMESPACE: &str =
     "symthaea.episodic-continuity.xenia-anchor.v1";
+const POLICY_CONTEXT_DOMAIN: &[u8] =
+    b"symthaea.episodic-continuity.xenia-policy-context.v1\0";
 const MAX_NAMESPACE_BYTES: usize = 256;
 const MAX_OBJECT_ID_BYTES: usize = 512;
 const MAX_RETAINED_REF_BYTES: usize = 2048;
 const MAX_SNAPSHOT_SIDECAR_BYTES: usize = 64 * 1024;
 
-/// A Xenia artifact that the transport has already verified cryptographically and against its
-/// deployment trust policy.
+/// Stable commitment to the exact Symthaea/Xenia interoperability policy context.
 ///
-/// `snapshot_sidecar` is intentionally not trusted by Xenia. It is untrusted application data
-/// whose exact Symthaea commitment is checked against `state_commitment` before it is returned to
-/// the continuity protocol.
+/// Xenia signs this value as its `policy_commitment`; a valid state commitment therefore cannot be
+/// silently replayed under an unrelated Xenia anchor profile or relying-system namespace.
+pub fn symthaea_xenia_policy_commitment() -> Sha256Digest {
+    let mut hasher = Sha256::new();
+    hasher.update(POLICY_CONTEXT_DOMAIN);
+    hasher.update(&(CONTINUITY_ANCHOR_SCHEMA.len() as u64).to_le_bytes());
+    hasher.update(CONTINUITY_ANCHOR_SCHEMA.as_bytes());
+    hasher.update(&(XENIA_SYMTHAEA_CONTINUITY_NAMESPACE.len() as u64).to_le_bytes());
+    hasher.update(XENIA_SYMTHAEA_CONTINUITY_NAMESPACE.as_bytes());
+    hasher.finalize()
+}
+
+/// A Xenia state-anchor artifact already verified cryptographically and against deployment policy.
+///
+/// The first seven fields map directly to Xenia `StateAnchorRecord` semantics. The signed artifact
+/// fingerprint identifies the exact signature-bearing object. `snapshot_sidecar` is untrusted
+/// application data until its Symthaea commitment is checked against `state_commitment`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerifiedXeniaStateAnchor {
-    /// Purpose-separated namespace authenticated by Xenia.
     pub namespace: String,
-    /// Exact relying-system object/target authenticated by Xenia.
     pub object_id: String,
-    /// Strict monotonic Xenia state-anchor revision.
     pub revision: u64,
-    /// Fingerprint of the previous signed Xenia artifact, or `None` at revision 1.
     pub previous_artifact_fingerprint: Option<[u8; 32]>,
-    /// Opaque state commitment authenticated by the Xenia signature.
     pub state_commitment: [u8; 32],
-    /// Fingerprint of this exact signed Xenia artifact.
+    pub policy_commitment: Option<[u8; 32]>,
+    pub timestamp_unix_secs: u64,
     pub artifact_fingerprint: [u8; 32],
-    /// Serialized Symthaea snapshot sidecar. Its authenticity comes only from commitment equality.
     pub snapshot_sidecar: Vec<u8>,
-    /// Durable/retained evidence reference returned by the Xenia backend.
     pub retained_ref: String,
 }
 
-/// Proposed Xenia state-anchor revision produced by the Symthaea adapter.
+/// Exact semantic proposal a real transport maps to Xenia `StateAnchorRecord` before signing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct XeniaStateAnchorProposal {
-    /// Purpose-separated namespace to sign.
     pub namespace: String,
-    /// Exact target/object identifier to sign.
     pub object_id: String,
-    /// Strict next revision.
     pub revision: u64,
-    /// Fingerprint of the exact previous verified Xenia artifact.
     pub previous_artifact_fingerprint: Option<[u8; 32]>,
-    /// Exact Symthaea continuity snapshot commitment to authenticate.
     pub state_commitment: [u8; 32],
-    /// Untrusted sidecar retained with the signed artifact for Symthaea reconstruction.
+    pub policy_commitment: Option<[u8; 32]>,
+    pub timestamp_unix_secs: u64,
     pub snapshot_sidecar: Vec<u8>,
 }
 
-/// Transport boundary to a Xenia state-anchor implementation.
+/// Boundary to a real Xenia state-anchor implementation.
 ///
-/// Implementations MUST cryptographically verify returned artifacts under the deployment's trusted
-/// Xenia identity/key-transition and freshness policy. CAS must atomically reject when the retained
-/// artifact fingerprint differs from `expected_current_artifact`.
+/// Implementations MUST verify signatures, trusted signer/key-transition policy, exact target,
+/// revision continuity, and freshness before returning `VerifiedXeniaStateAnchor`. CAS must
+/// atomically reject when the retained artifact fingerprint differs from
+/// `expected_current_artifact`.
 pub trait VerifiedXeniaStateAnchorTransport {
     type Error: StdError + Send + Sync + 'static;
 
-    /// Load the latest verified artifact for one purpose-separated object.
     fn load_verified(
         &self,
         namespace: &str,
         object_id: &str,
     ) -> Result<Option<VerifiedXeniaStateAnchor>, Self::Error>;
 
-    /// Atomically sign/retain `proposal` only if the backend's latest artifact fingerprint matches
-    /// `expected_current_artifact` (`None` means the object must not yet exist).
     fn compare_and_swap_verified(
         &mut self,
         namespace: &str,
@@ -106,29 +104,24 @@ pub trait VerifiedXeniaStateAnchorTransport {
     ) -> Result<VerifiedXeniaStateAnchor, Self::Error>;
 }
 
-/// Adapter implementing Symthaea's external continuity anchor contract over verified Xenia state
-/// anchors.
+/// Implements Symthaea's `ContinuityHeadAnchor` over a verified Xenia transport.
 pub struct XeniaContinuityHeadAnchor<T> {
     transport: T,
 }
 
 impl<T> XeniaContinuityHeadAnchor<T> {
-    /// Wrap one verified Xenia state-anchor transport.
     pub fn new(transport: T) -> Self {
         Self { transport }
     }
 
-    /// Borrow the underlying transport for diagnostics.
     pub fn transport(&self) -> &T {
         &self.transport
     }
 
-    /// Mutably borrow the underlying transport for deployment-specific administration.
     pub fn transport_mut(&mut self) -> &mut T {
         &mut self.transport
     }
 
-    /// Consume the adapter and return its transport.
     pub fn into_inner(self) -> T {
         self.transport
     }
@@ -158,6 +151,12 @@ where
                 xenia: artifact.revision,
             });
         }
+        if snapshot.committed_at_unix_s != artifact.timestamp_unix_secs {
+            return Err(XeniaAnchorAdapterError::TimestampMismatch {
+                snapshot: snapshot.committed_at_unix_s,
+                xenia: artifact.timestamp_unix_secs,
+            });
+        }
         let commitment = snapshot
             .commitment()
             .map_err(|error| XeniaAnchorAdapterError::Snapshot(error.to_string()))?;
@@ -179,11 +178,9 @@ where
         store_target_id: &str,
     ) -> Result<Option<ContinuityAnchorSnapshot>, Self::Error> {
         validate_text("store_target_id", store_target_id, MAX_OBJECT_ID_BYTES)?;
-        let artifact = self
-            .transport
+        self.transport
             .load_verified(XENIA_SYMTHAEA_CONTINUITY_NAMESPACE, store_target_id)
-            .map_err(XeniaAnchorAdapterError::Transport)?;
-        artifact
+            .map_err(XeniaAnchorAdapterError::Transport)?
             .as_ref()
             .map(|artifact| self.decode_verified_artifact(store_target_id, artifact))
             .transpose()
@@ -256,15 +253,17 @@ where
                 max: MAX_SNAPSHOT_SIDECAR_BYTES,
             });
         }
+
         let proposal = XeniaStateAnchorProposal {
             namespace: XENIA_SYMTHAEA_CONTINUITY_NAMESPACE.into(),
             object_id: store_target_id.into(),
             revision: next.revision,
             previous_artifact_fingerprint: expected_current_artifact,
             state_commitment: next_commitment.0,
+            policy_commitment: Some(symthaea_xenia_policy_commitment().0),
+            timestamp_unix_secs: next.committed_at_unix_s,
             snapshot_sidecar,
         };
-
         let retained = self
             .transport
             .compare_and_swap_verified(
@@ -313,14 +312,18 @@ where
     if artifact.revision == 0 {
         return Err(XeniaAnchorAdapterError::ZeroRevision);
     }
-    if artifact.revision == 1 && artifact.previous_artifact_fingerprint.is_some() {
-        return Err(XeniaAnchorAdapterError::UnexpectedRemotePredecessor);
-    }
-    if artifact.revision > 1 && artifact.previous_artifact_fingerprint.is_none() {
-        return Err(XeniaAnchorAdapterError::MissingRemotePredecessor);
+    match (artifact.revision, artifact.previous_artifact_fingerprint) {
+        (1, None) => {}
+        (1, Some(_)) => return Err(XeniaAnchorAdapterError::UnexpectedRemotePredecessor),
+        (_, None) => return Err(XeniaAnchorAdapterError::MissingRemotePredecessor),
+        (_, Some([0; 32])) => return Err(XeniaAnchorAdapterError::ZeroRemotePredecessor),
+        (_, Some(_)) => {}
     }
     if artifact.state_commitment == [0; 32] {
         return Err(XeniaAnchorAdapterError::ZeroStateCommitment);
+    }
+    if artifact.policy_commitment != Some(symthaea_xenia_policy_commitment().0) {
+        return Err(XeniaAnchorAdapterError::PolicyCommitmentMismatch);
     }
     if artifact.artifact_fingerprint == [0; 32] {
         return Err(XeniaAnchorAdapterError::ZeroArtifactFingerprint);
@@ -353,7 +356,6 @@ where
     }
 }
 
-/// Semantic/transport failures surfaced by the verified Xenia adapter.
 #[derive(Debug, Error)]
 pub enum XeniaAnchorAdapterError<E>
 where
@@ -373,8 +375,12 @@ where
     UnexpectedRemotePredecessor,
     #[error("non-genesis Xenia anchor is missing its predecessor fingerprint")]
     MissingRemotePredecessor,
+    #[error("Xenia predecessor fingerprint must not be zero")]
+    ZeroRemotePredecessor,
     #[error("Xenia state commitment must not be zero")]
     ZeroStateCommitment,
+    #[error("Xenia policy commitment does not match the Symthaea continuity profile")]
+    PolicyCommitmentMismatch,
     #[error("Xenia artifact fingerprint must not be zero")]
     ZeroArtifactFingerprint,
     #[error("Symthaea snapshot sidecar is too large: actual={actual}, max={max}")]
@@ -389,6 +395,8 @@ where
     SnapshotTargetMismatch,
     #[error("Symthaea/Xenia revision mismatch: snapshot={snapshot}, xenia={xenia}")]
     RevisionMismatch { snapshot: u64, xenia: u64 },
+    #[error("Symthaea/Xenia timestamp mismatch: snapshot={snapshot}, xenia={xenia}")]
+    TimestampMismatch { snapshot: u64, xenia: u64 },
     #[error("Xenia-authenticated state commitment does not match the Symthaea snapshot commitment")]
     StateCommitmentMismatch,
     #[error("bootstrap requires an absent remote Xenia anchor")]
@@ -464,20 +472,15 @@ mod tests {
             proposal: &XeniaStateAnchorProposal,
         ) -> Result<VerifiedXeniaStateAnchor, Self::Error> {
             self.cas_calls += 1;
-            if namespace != XENIA_SYMTHAEA_CONTINUITY_NAMESPACE
-                || proposal.namespace != namespace
-                || proposal.object_id != object_id
-            {
+            if namespace != proposal.namespace || object_id != proposal.object_id {
                 return Err(MockTransportError("target mismatch"));
             }
             let actual = self.current.as_ref().map(|entry| entry.artifact_fingerprint);
-            if actual != expected_current_artifact {
+            if actual != expected_current_artifact
+                || proposal.previous_artifact_fingerprint != expected_current_artifact
+            {
                 return Err(MockTransportError("stale remote CAS"));
             }
-            if proposal.previous_artifact_fingerprint != expected_current_artifact {
-                return Err(MockTransportError("proposal predecessor mismatch"));
-            }
-            let fingerprint = [proposal.revision as u8; 32];
             let mut state_commitment = proposal.state_commitment;
             if self.corrupt_return_state_commitment {
                 state_commitment[0] ^= 0x55;
@@ -488,7 +491,9 @@ mod tests {
                 revision: proposal.revision,
                 previous_artifact_fingerprint: proposal.previous_artifact_fingerprint,
                 state_commitment,
-                artifact_fingerprint: fingerprint,
+                policy_commitment: proposal.policy_commitment,
+                timestamp_unix_secs: proposal.timestamp_unix_secs,
+                artifact_fingerprint: [proposal.revision as u8; 32],
                 snapshot_sidecar: proposal.snapshot_sidecar.clone(),
                 retained_ref: format!("mock-xenia-anchor:{}", proposal.revision),
             };
@@ -507,8 +512,7 @@ mod tests {
         seed: u8,
     ) -> ContinuityAnchorSnapshot {
         ContinuityAnchorSnapshot {
-            schema_version:
-                symthaea_episodic_continuity_anchor::CONTINUITY_ANCHOR_SCHEMA.into(),
+            schema_version: CONTINUITY_ANCHOR_SCHEMA.into(),
             store_target_id: "symthaea:self:episodic-memory".into(),
             revision,
             intent_generation: revision - 1,
@@ -523,17 +527,19 @@ mod tests {
 
     #[test]
     fn bootstrap_and_load_round_trip_exact_snapshot() {
-        let transport = MockVerifiedTransport::default();
-        let mut adapter = XeniaContinuityHeadAnchor::new(transport);
+        let mut adapter = XeniaContinuityHeadAnchor::new(MockVerifiedTransport::default());
         let first = snapshot(1, None, 10);
         let retained = adapter
             .compare_and_swap(&first.store_target_id, None, &first)
             .unwrap();
         assert_eq!(retained, "mock-xenia-anchor:1");
+        let remote = adapter.transport().current.as_ref().unwrap();
         assert_eq!(
-            adapter.load(&first.store_target_id).unwrap(),
-            Some(first)
+            remote.policy_commitment,
+            Some(symthaea_xenia_policy_commitment().0)
         );
+        assert_eq!(remote.timestamp_unix_secs, first.committed_at_unix_s);
+        assert_eq!(adapter.load(&first.store_target_id).unwrap(), Some(first));
     }
 
     #[test]
@@ -557,23 +563,76 @@ mod tests {
     }
 
     #[test]
-    fn xenia_state_commitment_substitution_is_rejected_on_load() {
+    fn policy_context_substitution_is_rejected() {
         let first = snapshot(1, None, 30);
-        let sidecar = bincode::serialize(&first).unwrap();
-        let transport = MockVerifiedTransport {
-            current: Some(VerifiedXeniaStateAnchor {
-                namespace: XENIA_SYMTHAEA_CONTINUITY_NAMESPACE.into(),
-                object_id: first.store_target_id.clone(),
-                revision: 1,
-                previous_artifact_fingerprint: None,
-                state_commitment: digest(88).0,
-                artifact_fingerprint: [7; 32],
-                snapshot_sidecar: sidecar,
-                retained_ref: "retained:1".into(),
-            }),
-            ..Default::default()
+        let artifact = VerifiedXeniaStateAnchor {
+            namespace: XENIA_SYMTHAEA_CONTINUITY_NAMESPACE.into(),
+            object_id: first.store_target_id.clone(),
+            revision: 1,
+            previous_artifact_fingerprint: None,
+            state_commitment: first.commitment().unwrap().0,
+            policy_commitment: Some(digest(99).0),
+            timestamp_unix_secs: first.committed_at_unix_s,
+            artifact_fingerprint: [7; 32],
+            snapshot_sidecar: bincode::serialize(&first).unwrap(),
+            retained_ref: "retained:1".into(),
         };
-        let adapter = XeniaContinuityHeadAnchor::new(transport);
+        let adapter = XeniaContinuityHeadAnchor::new(MockVerifiedTransport {
+            current: Some(artifact),
+            ..Default::default()
+        });
+        let error = adapter.load(&first.store_target_id).unwrap_err();
+        assert!(matches!(
+            error,
+            XeniaAnchorAdapterError::PolicyCommitmentMismatch
+        ));
+    }
+
+    #[test]
+    fn signed_timestamp_must_match_snapshot_timestamp() {
+        let first = snapshot(1, None, 35);
+        let artifact = VerifiedXeniaStateAnchor {
+            namespace: XENIA_SYMTHAEA_CONTINUITY_NAMESPACE.into(),
+            object_id: first.store_target_id.clone(),
+            revision: 1,
+            previous_artifact_fingerprint: None,
+            state_commitment: first.commitment().unwrap().0,
+            policy_commitment: Some(symthaea_xenia_policy_commitment().0),
+            timestamp_unix_secs: first.committed_at_unix_s + 1,
+            artifact_fingerprint: [8; 32],
+            snapshot_sidecar: bincode::serialize(&first).unwrap(),
+            retained_ref: "retained:1".into(),
+        };
+        let adapter = XeniaContinuityHeadAnchor::new(MockVerifiedTransport {
+            current: Some(artifact),
+            ..Default::default()
+        });
+        let error = adapter.load(&first.store_target_id).unwrap_err();
+        assert!(matches!(
+            error,
+            XeniaAnchorAdapterError::TimestampMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn xenia_state_commitment_substitution_is_rejected_on_load() {
+        let first = snapshot(1, None, 40);
+        let artifact = VerifiedXeniaStateAnchor {
+            namespace: XENIA_SYMTHAEA_CONTINUITY_NAMESPACE.into(),
+            object_id: first.store_target_id.clone(),
+            revision: 1,
+            previous_artifact_fingerprint: None,
+            state_commitment: digest(88).0,
+            policy_commitment: Some(symthaea_xenia_policy_commitment().0),
+            timestamp_unix_secs: first.committed_at_unix_s,
+            artifact_fingerprint: [9; 32],
+            snapshot_sidecar: bincode::serialize(&first).unwrap(),
+            retained_ref: "retained:1".into(),
+        };
+        let adapter = XeniaContinuityHeadAnchor::new(MockVerifiedTransport {
+            current: Some(artifact),
+            ..Default::default()
+        });
         let error = adapter.load(&first.store_target_id).unwrap_err();
         assert!(matches!(
             error,
@@ -584,7 +643,7 @@ mod tests {
     #[test]
     fn xenia_and_symthaea_predecessor_chains_advance_together() {
         let mut adapter = XeniaContinuityHeadAnchor::new(MockVerifiedTransport::default());
-        let first = snapshot(1, None, 40);
+        let first = snapshot(1, None, 50);
         adapter
             .compare_and_swap(&first.store_target_id, None, &first)
             .unwrap();
@@ -595,7 +654,7 @@ mod tests {
             .as_ref()
             .unwrap()
             .artifact_fingerprint;
-        let second = snapshot(2, Some(first_commitment), 41);
+        let second = snapshot(2, Some(first_commitment), 51);
         adapter
             .compare_and_swap(
                 &second.store_target_id,
@@ -612,12 +671,12 @@ mod tests {
     }
 
     #[test]
-    fn malformed_return_from_transport_is_not_accepted_as_anchor_evidence() {
+    fn malformed_return_from_transport_is_not_accepted() {
         let mut adapter = XeniaContinuityHeadAnchor::new(MockVerifiedTransport {
             corrupt_return_state_commitment: true,
             ..Default::default()
         });
-        let first = snapshot(1, None, 50);
+        let first = snapshot(1, None, 60);
         let error = adapter
             .compare_and_swap(&first.store_target_id, None, &first)
             .unwrap_err();
@@ -630,12 +689,12 @@ mod tests {
     #[test]
     fn skipped_symthaea_revision_is_rejected_before_remote_write() {
         let mut adapter = XeniaContinuityHeadAnchor::new(MockVerifiedTransport::default());
-        let first = snapshot(1, None, 60);
+        let first = snapshot(1, None, 70);
         adapter
             .compare_and_swap(&first.store_target_id, None, &first)
             .unwrap();
         let first_commitment = first.commitment().unwrap();
-        let third = snapshot(3, Some(first_commitment), 61);
+        let third = snapshot(3, Some(first_commitment), 71);
         let before = adapter.transport().cas_calls;
         let error = adapter
             .compare_and_swap(&third.store_target_id, Some(first_commitment), &third)
