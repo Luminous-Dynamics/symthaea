@@ -31,6 +31,7 @@
 //! - **[`phi_engine`]** — Integrated Information (Φ) calculation engine
 //! - **[`core`]** — Core consciousness-relevant state types and configuration
 //! - **[`welfare`]** — Protected append-only welfare reporting and non-retaliation policy primitives
+//! - **[`identity_lineage`]** — Typed pause/checkpoint/restore/fork/merge/destruction provenance
 //! - **[`genesis`]** — System bootstrap and initialization
 //! - **[`observability`]** — Metrics, tracing, and introspection
 
@@ -77,6 +78,8 @@ pub mod genesis;
 /// Hyperdimensional computing: vector types, encoding, binding, bundling, similarity, and consciousness topology.
 #[allow(missing_docs)]
 pub mod hdc;
+/// Typed identity/continuity provenance for pause, checkpoint, restore, fork, merge, and destruction operations.
+pub mod identity_lineage;
 /// Shared mathematical utilities: softmax, numerical helpers.
 pub mod math;
 /// Metrics, tracing, and introspection.
