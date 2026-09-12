@@ -10,6 +10,12 @@
 #![deny(unsafe_code)]
 
 mod domain_awareness;
+pub mod evidence_receipts;
+
+pub use evidence_receipts::{
+    SafetyEvidenceReceipt, StrictSafetyCaseIssue, StrictSafetyCaseReport, StrictSafetyCaseStatus,
+    assess_strict_safety_case,
+};
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -74,7 +80,7 @@ pub enum ObligationStatus {
 /// A verifiable safety obligation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProofObligation {
-    /// Stable obligation id.
+    /// Runtime/workflow obligation id. Use [`ProofObligation::stable_key`] for reproducible evidence binding.
     pub id: Uuid,
     /// Safety claim in controlled natural language.
     pub claim: String,
@@ -82,7 +88,7 @@ pub struct ProofObligation {
     pub expected_evidence: EvidenceKind,
     /// Current status.
     pub status: ObligationStatus,
-    /// Evidence references, such as file paths, solver run ids, or proof names.
+    /// Legacy/convenience evidence references. Strict readiness additionally requires verified receipts.
     pub evidence_refs: Vec<String>,
 }
 
@@ -98,9 +104,18 @@ impl ProofObligation {
         }
     }
 
-    /// Attach evidence and discharge the obligation.
+    /// Attach a non-empty convenience evidence reference and discharge the workflow obligation.
+    ///
+    /// This method does **not** establish strict deployment readiness by itself. Use
+    /// [`assess_strict_safety_case`] with a [`SafetyEvidenceReceipt`] set for that.
+    /// Empty references fail closed to `ReviewRequired` rather than silently discharging.
     pub fn discharge(mut self, evidence_ref: impl Into<String>) -> Self {
-        self.evidence_refs.push(evidence_ref.into());
+        let evidence_ref = evidence_ref.into();
+        if evidence_ref.trim().is_empty() {
+            self.status = ObligationStatus::ReviewRequired;
+            return self;
+        }
+        self.evidence_refs.push(evidence_ref);
         self.status = ObligationStatus::Discharged;
         self
     }
@@ -109,7 +124,7 @@ impl ProofObligation {
 /// Minimal safety case container.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SafetyCase {
-    /// Stable safety case id.
+    /// Runtime safety-case identity.
     pub id: Uuid,
     /// System or concept being justified.
     pub subject: String,
@@ -141,13 +156,20 @@ impl SafetyCase {
         self.obligations.push(obligation);
     }
 
-    /// Returns true when every obligation has been discharged.
+    /// Returns true when every workflow obligation is discharged with a non-empty convenience reference.
+    ///
+    /// This remains less strict than receipt-based deployment readiness. Use
+    /// [`SafetyCase::is_strictly_ready`] when content-digested verified evidence is required.
     pub fn is_discharged(&self) -> bool {
         !self.obligations.is_empty()
-            && self
-                .obligations
-                .iter()
-                .all(|obligation| obligation.status == ObligationStatus::Discharged)
+            && self.obligations.iter().all(|obligation| {
+                obligation.status == ObligationStatus::Discharged
+                    && !obligation.evidence_refs.is_empty()
+                    && obligation
+                        .evidence_refs
+                        .iter()
+                        .all(|evidence_ref| !evidence_ref.trim().is_empty())
+            })
     }
 }
 
@@ -316,6 +338,16 @@ mod tests {
 
         safety_case.obligations[0] = safety_case.obligations[0].clone().discharge("fea-run-42");
         assert!(safety_case.is_discharged());
+    }
+
+    #[test]
+    fn blank_evidence_reference_cannot_discharge() {
+        let obligation = ProofObligation::new("claim", EvidenceKind::Test).discharge("   ");
+        assert_eq!(obligation.status, ObligationStatus::ReviewRequired);
+        assert!(obligation.evidence_refs.is_empty());
+        let mut safety_case = SafetyCase::new("subject");
+        safety_case.add_obligation(obligation);
+        assert!(!safety_case.is_discharged());
     }
 
     #[test]
