@@ -17,6 +17,8 @@ pub mod constitution;
 mod custody;
 #[cfg(test)]
 mod custody_identity_tests;
+#[cfg(feature = "symthaea-backend")]
+mod fep_development;
 pub mod hidden_world;
 mod promotion;
 mod selection;
