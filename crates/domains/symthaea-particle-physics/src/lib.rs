@@ -76,9 +76,11 @@ pub use lattice_topology_flow_staple::{
     link_staple_non_degenerate, staple_wilson_flow_step,
 };
 pub use lattice_topology_measurement::{
-    CLOVER_TOPOLOGY_OPERATOR_ID, REFERENCE_WILSON_FLOW_ID,
+    CLOVER_TOPOLOGY_OPERATOR_ID, REFERENCE_WILSON_FLOW_ID, RK3_WILSON_FLOW_ID,
     FlowedTopologyDefinition, FlowedTopologyMeasurement, FlowedTopologyMeasurementError,
-    ReferenceFlowSchedule, measure_flowed_clover_topology_reference,
+    ReferenceFlowSchedule, Rk3FlowSchedule, Rk3FlowedTopologyDefinition,
+    Rk3FlowedTopologyMeasurement, measure_flowed_clover_topology_reference,
+    measure_flowed_clover_topology_rk3,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
