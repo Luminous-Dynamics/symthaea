@@ -54,11 +54,16 @@ def energy(fields):
 def crossing(xs,ys,target):
     if len(xs)!=len(ys) or len(xs)<2 or any(xs[i+1]<=xs[i] for i in range(len(xs)-1)):
         raise ValueError("invalid curve")
+    exact=[i for i,y in enumerate(ys) if y==target]
+    if len(exact)==1:
+        return xs[exact[0]]
+    if len(exact)>1:
+        raise ValueError("crossing must be unique")
     hits=[]
     for i in range(len(xs)-1):
         a,b=ys[i]-target,ys[i+1]-target
-        if a==0.0: hits.append((i,0.0))
-        elif a*b<0.0 or b==0.0: hits.append((i,(target-ys[i])/(ys[i+1]-ys[i])))
+        if a*b<0.0:
+            hits.append((i,(target-ys[i])/(ys[i+1]-ys[i])))
     if len(hits)!=1:
         raise ValueError("crossing must be unique")
     i,f=hits[0]
@@ -104,6 +109,9 @@ def main():
     wmeans=[x/(t*t) for t,x in zip(times,wf)]
     w0=w0_like(times,wmeans,0.32)
     assert abs(w0-math.sqrt(0.4))<2e-15
+
+    exact=crossing([0.1,0.2,0.3],[0.1,0.2,0.4],0.2)
+    assert exact==0.2
 
     try:
         crossing([0.1,0.2,0.3],[0.2,0.4,0.2],0.3)
