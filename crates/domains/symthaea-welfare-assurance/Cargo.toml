@@ -6,7 +6,7 @@ description = "Typed assurance boundary for verified subject consent, scoped aut
 license = "AGPL-3.0-or-later"
 
 [lib]
-path = "src/entry.rs"
+path = "src/root.rs"
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
