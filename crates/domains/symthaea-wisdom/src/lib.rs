@@ -34,6 +34,7 @@ pub mod autopoiesis;
 pub mod harmonics;
 pub mod meta_cognition;
 pub mod ontology;
+pub mod practical_wisdom;
 
 pub use autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
 pub use harmonics::{
@@ -43,6 +44,10 @@ pub use meta_cognition::{MetaCognitiveLayer, RecursiveModel, SelfModelAccuracy};
 pub use ontology::{
     ActionAuthority, AffectiveSignal, AffectiveSignalKind, EpistemicState, NormativeValue,
     ReasoningMode,
+};
+pub use practical_wisdom::{
+    DeliberationContext, PracticalWisdomAssessment, PracticalWisdomKernel, WisdomDisposition,
+    WisdomReason,
 };
 
 /// The core question each harmony asks of any situation
