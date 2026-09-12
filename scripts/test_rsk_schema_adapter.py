@@ -27,6 +27,10 @@ ADAPTER_GOLDEN = (
     ROOT
     / "docs/architecture/replicator-safety/golden/RSK_SCHEMA_ADAPTER_GOLDEN_V0_1.json"
 )
+EXECUTION_PROFILE_GOLDEN = (
+    ROOT
+    / "docs/architecture/replicator-safety/golden/RSK_SEMANTIC_EXECUTION_PROFILE_GOLDEN_V0_1.json"
+)
 
 
 class SchemaAdapterTests(unittest.TestCase):
@@ -63,6 +67,86 @@ class SchemaAdapterTests(unittest.TestCase):
             adapter.CURRENT_RUST_RESOURCE_PROFILE,
         )
 
+    def test_semantic_execution_profile_matches_committed_golden(self) -> None:
+        semantic_golden = json.loads(GOLDEN_V2.read_text())
+        golden = json.loads(EXECUTION_PROFILE_GOLDEN.read_text())
+
+        profile = adapter.semantic_execution_profile(
+            semantic_golden["capability_schema"],
+            semantic_golden["resource_schema"],
+        )
+        self.assertEqual(
+            golden["schema"],
+            "symthaea.rsk.semantic-execution-profile-golden.v1",
+        )
+        self.assertEqual(profile, golden["expected_profile"])
+        self.assertEqual(
+            semantic.digest(profile),
+            golden["expected_profile_sha256"],
+        )
+        self.assertEqual(
+            adapter.semantic_execution_profile_id(
+                semantic_golden["capability_schema"],
+                semantic_golden["resource_schema"],
+            ),
+            golden["expected_profile_sha256"],
+        )
+        self.assertEqual(
+            adapter.verify_semantic_execution_profile(
+                profile,
+                semantic_golden["capability_schema"],
+                semantic_golden["resource_schema"],
+            ),
+            golden["expected_profile_sha256"],
+        )
+
+    def test_semantic_execution_profile_changes_with_schema_meaning(self) -> None:
+        golden = json.loads(GOLDEN_V2.read_text())
+        original_id = adapter.semantic_execution_profile_id(
+            golden["capability_schema"], golden["resource_schema"]
+        )
+
+        changed_capability = copy.deepcopy(golden["capability_schema"])
+        changed_capability["entries"][0]["description"] = "changed abstract meaning"
+        changed_id = adapter.semantic_execution_profile_id(
+            changed_capability, golden["resource_schema"]
+        )
+        self.assertNotEqual(original_id, changed_id)
+
+        remapped_resource = copy.deepcopy(golden["resource_schema"])
+        remapped_resource["dimensions"][0]["numeric_id"] = 1
+        remapped_resource["dimensions"][1]["numeric_id"] = 0
+        remapped_id = adapter.semantic_execution_profile_id(
+            golden["capability_schema"], remapped_resource
+        )
+        self.assertNotEqual(original_id, remapped_id)
+
+    def test_semantic_execution_profile_rejects_self_reported_tampering(self) -> None:
+        golden = json.loads(GOLDEN_V2.read_text())
+        profile = adapter.semantic_execution_profile(
+            golden["capability_schema"], golden["resource_schema"]
+        )
+
+        tampered_profile = copy.deepcopy(profile)
+        tampered_profile["capability"]["representation_profile"] = (
+            "symthaea.rsk.capability-representation.claimed-other.v1"
+        )
+        with self.assertRaises(semantic.SchemaError):
+            adapter.verify_semantic_execution_profile(
+                tampered_profile,
+                golden["capability_schema"],
+                golden["resource_schema"],
+            )
+
+        tampered_digest = copy.deepcopy(profile)
+        tampered_digest["resource"]["validator_rule_table_sha256"] = "0" * 64
+        with self.assertRaises(semantic.SchemaError):
+            adapter.verify_semantic_execution_profile(
+                tampered_digest,
+                golden["capability_schema"],
+                golden["resource_schema"],
+            )
+
     def test_current_rust_u64_profile_accepts_width_64_and_rejects_65(self) -> None:
         golden = json.loads(GOLDEN_V2.read_text())
 
@@ -83,6 +167,8 @@ class SchemaAdapterTests(unittest.TestCase):
             adapter.require_current_rust_capability_schema(width_65)
         with self.assertRaises(semantic.SchemaError):
             adapter.capability_rule_table(width_65)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.semantic_execution_profile(width_65, golden["resource_schema"])
 
     def test_current_rust_resource_profile_enforces_u64_bounds(self) -> None:
         golden = json.loads(GOLDEN_V2.read_text())
@@ -103,6 +189,8 @@ class SchemaAdapterTests(unittest.TestCase):
             adapter.require_current_rust_resource_schema(too_wide)
         with self.assertRaises(semantic.SchemaError):
             adapter.resource_rule_table(too_wide)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.semantic_execution_profile(golden["capability_schema"], too_wide)
 
     def test_current_rust_resource_profile_rejects_unimplemented_arithmetic(self) -> None:
         golden = json.loads(GOLDEN_V2.read_text())
@@ -112,17 +200,28 @@ class SchemaAdapterTests(unittest.TestCase):
         semantic.validate_resource_schema(max_aggregation)
         with self.assertRaises(semantic.SchemaError):
             adapter.resource_rule_table(max_aggregation)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.semantic_execution_profile(
+                golden["capability_schema"], max_aggregation
+            )
 
         rounded = copy.deepcopy(golden["resource_schema"])
         rounded["dimensions"][0]["rounding"] = "floor-remaining"
         semantic.validate_resource_schema(rounded)
         with self.assertRaises(semantic.SchemaError):
             adapter.resource_rule_table(rounded)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.semantic_execution_profile(golden["capability_schema"], rounded)
 
     def test_v1_resource_schema_cannot_produce_runtime_rule_table(self) -> None:
-        golden = json.loads(GOLDEN_V1.read_text())
+        golden_v1 = json.loads(GOLDEN_V1.read_text())
+        golden_v2 = json.loads(GOLDEN_V2.read_text())
         with self.assertRaises(semantic.SchemaError):
-            adapter.resource_rule_table(golden["resource_schema"])
+            adapter.resource_rule_table(golden_v1["resource_schema"])
+        with self.assertRaises(semantic.SchemaError):
+            adapter.semantic_execution_profile(
+                golden_v2["capability_schema"], golden_v1["resource_schema"]
+            )
 
     def test_numeric_id_remap_changes_both_scheme_id_and_rule_table(self) -> None:
         golden = json.loads(GOLDEN_V2.read_text())
@@ -151,9 +250,18 @@ class SchemaAdapterTests(unittest.TestCase):
 
     def test_adapter_golden_source_points_to_v2_semantic_corpus(self) -> None:
         adapter_golden = json.loads(ADAPTER_GOLDEN.read_text())
+        profile_golden = json.loads(EXECUTION_PROFILE_GOLDEN.read_text())
         self.assertEqual(
             adapter_golden["source_semantic_golden"],
             "RSK_SEMANTIC_SCHEMA_GOLDEN_V0_2.json",
+        )
+        self.assertEqual(
+            profile_golden["source_semantic_golden"],
+            "RSK_SEMANTIC_SCHEMA_GOLDEN_V0_2.json",
+        )
+        self.assertEqual(
+            profile_golden["source_adapter_golden"],
+            "RSK_SCHEMA_ADAPTER_GOLDEN_V0_1.json",
         )
 
 
