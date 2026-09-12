@@ -17,3 +17,4 @@ symthaea-model-assurance = { path = "../../domains/symthaea-model-assurance" }
 symthaea-sensor-common-cause = { path = "../../domains/symthaea-sensor-common-cause" }
 symthaea-domain-awareness-model-assurance = { path = "../symthaea-domain-awareness-model-assurance" }
 symthaea-domain-awareness-common-cause = { path = "../symthaea-domain-awareness-common-cause" }
+symthaea-domain-awareness-vision = { path = "../symthaea-domain-awareness-vision" }
