@@ -7,9 +7,11 @@
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
-use symthaea_assurance_trust_store::TrustStoreCheckpoint;
+use symthaea_assurance_trust_store::{
+    TrustStoreBackup, TrustStoreCheckpoint, TrustStoreProfile, TrustStoreRecoveryAuthorization,
+};
 use symthaea_assurance_trust_store_recovery::{
-    TrustStoreContinuityReport, TrustStoreContinuityStatus, TrustStoreRecoveryCommit,
+    TrustStoreContinuityStatus, TrustStoreRecoveryCommit, assess_recovery_continuity,
 };
 
 const ACCEPTANCE_DIGEST_SCHEMA: &[u8] = b"symthaea-trust-store-recovery-acceptance-v1\0";
@@ -91,41 +93,52 @@ impl RecoveryAcceptanceRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RecoveryAcceptanceError {
     ContinuityDidNotPass,
-    InvalidCommit,
-    InvalidFirstReplacementCheckpoint,
-    ContinuityDoesNotMatchCommit,
     InvalidEvidenceBinding,
+    AcceptancePredatesRecoveredCheckpoint,
+    AcceptanceIsFutureDated,
 }
 
-pub fn acceptance_record_from_continuity(
+/// Recompute the complete recovery-continuity theorem and, only if it passes,
+/// produce a durable one-shot acceptance record.
+///
+/// A caller cannot manufacture ledger authority by constructing a synthetic
+/// `TrustStoreContinuityReport`; the report is recomputed from original inputs.
+#[allow(clippy::too_many_arguments)]
+pub fn accept_recovery(
     ledger_id: impl Into<String>,
     ledger_revision: u64,
     predecessor_acceptance_digest: Option<String>,
-    report: &TrustStoreContinuityReport,
+    previous_profile: &TrustStoreProfile,
+    replacement_profile: &TrustStoreProfile,
+    previous_tip: &TrustStoreCheckpoint,
+    backup: &TrustStoreBackup,
+    authorization: &TrustStoreRecoveryAuthorization,
     commit: &TrustStoreRecoveryCommit,
     first_replacement_checkpoint: &TrustStoreCheckpoint,
+    now_ms: u64,
     continuity_evidence_ref: impl Into<String>,
     continuity_evidence_digest: impl Into<String>,
     accepted_at_ms: u64,
     evidence_refs: Vec<String>,
 ) -> Result<RecoveryAcceptanceRecord, RecoveryAcceptanceError> {
-    if report.status != TrustStoreContinuityStatus::Valid || !report.issues.is_empty() {
+    let continuity = assess_recovery_continuity(
+        previous_profile,
+        replacement_profile,
+        previous_tip,
+        backup,
+        authorization,
+        commit,
+        first_replacement_checkpoint,
+        now_ms,
+    );
+    if continuity.status != TrustStoreContinuityStatus::Valid || !continuity.issues.is_empty() {
         return Err(RecoveryAcceptanceError::ContinuityDidNotPass);
     }
-    if !commit.validate() {
-        return Err(RecoveryAcceptanceError::InvalidCommit);
+    if accepted_at_ms < first_replacement_checkpoint.recorded_at_ms {
+        return Err(RecoveryAcceptanceError::AcceptancePredatesRecoveredCheckpoint);
     }
-    if first_replacement_checkpoint.checkpoint_digest().trim().is_empty() {
-        return Err(RecoveryAcceptanceError::InvalidFirstReplacementCheckpoint);
-    }
-    if report.previous_checkpoint_digest != commit.previous_checkpoint_digest
-        || report.replacement_store_ref != commit.replacement_trust_store_ref
-        || report.replacement_counter_epoch != commit.replacement_counter_epoch
-        || report.restored_anchor_revision != commit.restored_anchor_revision
-        || report.restored_anchor_digest != commit.restored_anchor_digest
-        || report.restored_policy_tip_revision != commit.restored_policy_tip_revision
-    {
-        return Err(RecoveryAcceptanceError::ContinuityDoesNotMatchCommit);
+    if accepted_at_ms > now_ms {
+        return Err(RecoveryAcceptanceError::AcceptanceIsFutureDated);
     }
 
     let continuity_evidence_ref = continuity_evidence_ref.into();
@@ -346,6 +359,7 @@ fn valid_digest(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_assurance_trust_store::TrustStoreBackendKind;
 
     fn record(revision: u64, predecessor: Option<String>) -> RecoveryAcceptanceRecord {
         RecoveryAcceptanceRecord {
@@ -372,6 +386,175 @@ mod tests {
         let r2 = record(2, Some(r1.record_digest()));
         let r3 = record(3, Some(r2.record_digest()));
         vec![r1, r2, r3]
+    }
+
+    fn old_profile() -> TrustStoreProfile {
+        TrustStoreProfile {
+            schema_version: "1".into(),
+            store_id: "policy-root".into(),
+            trust_store_ref: "trust-store:a".into(),
+            backend_kind: TrustStoreBackendKind::HardwareMonotonicCounter,
+            hardware_instance_ref: Some("device:a".into()),
+            monotonic_counter_ref: "counter:a".into(),
+            initial_counter_epoch: "epoch:a".into(),
+            minimum_independent_recovery_approvals: 2,
+            evidence_refs: vec!["review:old".into()],
+        }
+    }
+
+    fn new_profile() -> TrustStoreProfile {
+        TrustStoreProfile {
+            schema_version: "1".into(),
+            store_id: "policy-root".into(),
+            trust_store_ref: "trust-store:b".into(),
+            backend_kind: TrustStoreBackendKind::HardwareMonotonicCounter,
+            hardware_instance_ref: Some("device:b".into()),
+            monotonic_counter_ref: "counter:b".into(),
+            initial_counter_epoch: "epoch:b".into(),
+            minimum_independent_recovery_approvals: 2,
+            evidence_refs: vec!["review:new".into()],
+        }
+    }
+
+    fn tip() -> TrustStoreCheckpoint {
+        TrustStoreCheckpoint {
+            schema_version: "1".into(),
+            checkpoint_id: "checkpoint:3".into(),
+            store_id: "policy-root".into(),
+            store_revision: 3,
+            counter_epoch: "epoch:a".into(),
+            counter_value: 9,
+            anchor_revision: 3,
+            anchor_digest: "blake3:anchor-3".into(),
+            policy_tip_revision: 3,
+            predecessor_checkpoint_digest: Some("blake3:checkpoint-2".into()),
+            recorded_at_ms: 3_000,
+            attestation_ref: "attestation:old".into(),
+            independent_verification_ref: "verification:old".into(),
+            evidence_refs: vec!["audit:old".into()],
+        }
+    }
+
+    fn accepted_fixture() -> (
+        TrustStoreProfile,
+        TrustStoreProfile,
+        TrustStoreCheckpoint,
+        TrustStoreBackup,
+        TrustStoreRecoveryAuthorization,
+        TrustStoreRecoveryCommit,
+        TrustStoreCheckpoint,
+    ) {
+        let old = old_profile();
+        let new = new_profile();
+        let tip = tip();
+        let backup = TrustStoreBackup::from_checkpoint(
+            &old,
+            &tip,
+            "backup:tip",
+            3_100,
+            vec!["audit:backup".into()],
+        )
+        .unwrap();
+        let auth = TrustStoreRecoveryAuthorization {
+            authorization_id: "authorization:1".into(),
+            store_id: "policy-root".into(),
+            incident_ref: "incident:loss".into(),
+            expected_previous_checkpoint_digest: tip.checkpoint_digest(),
+            expected_backup_digest: backup.backup_digest(),
+            minimum_counter_value: tip.counter_value,
+            minimum_policy_tip_revision: tip.policy_tip_revision,
+            replacement_trust_store_ref: "trust-store:b".into(),
+            replacement_counter_epoch: "epoch:b".into(),
+            approved_by_refs: vec!["reviewer:a".into(), "reviewer:b".into()],
+            independent_verification_ref: "verification:auth".into(),
+            authorized_at_ms: 4_000,
+            expires_at_ms: 8_000,
+            evidence_refs: vec!["audit:auth".into()],
+        };
+        let commit = TrustStoreRecoveryCommit {
+            schema_version: "1".into(),
+            commit_id: "commit:1".into(),
+            authorization_id: "authorization:1".into(),
+            logical_store_id: "policy-root".into(),
+            previous_checkpoint_digest: tip.checkpoint_digest(),
+            backup_digest: backup.backup_digest(),
+            replacement_trust_store_ref: "trust-store:b".into(),
+            replacement_counter_epoch: "epoch:b".into(),
+            first_counter_value: 1,
+            restored_anchor_revision: tip.anchor_revision,
+            restored_anchor_digest: tip.anchor_digest.clone(),
+            restored_policy_tip_revision: tip.policy_tip_revision,
+            replacement_attestation_ref: "attestation:new".into(),
+            independent_verification_ref: "verification:commit".into(),
+            committed_at_ms: 5_000,
+            evidence_refs: vec!["audit:commit".into()],
+        };
+        let first = TrustStoreCheckpoint {
+            schema_version: "1".into(),
+            checkpoint_id: "checkpoint:4".into(),
+            store_id: "policy-root".into(),
+            store_revision: 4,
+            counter_epoch: "epoch:b".into(),
+            counter_value: 1,
+            anchor_revision: tip.anchor_revision,
+            anchor_digest: tip.anchor_digest.clone(),
+            policy_tip_revision: tip.policy_tip_revision,
+            predecessor_checkpoint_digest: Some(tip.checkpoint_digest()),
+            recorded_at_ms: 5_100,
+            attestation_ref: "attestation:first".into(),
+            independent_verification_ref: "verification:first".into(),
+            evidence_refs: vec!["audit:first".into()],
+        };
+        (old, new, tip, backup, auth, commit, first)
+    }
+
+    #[test]
+    fn acceptance_recomputes_continuity() {
+        let (old, new, tip, backup, auth, commit, first) = accepted_fixture();
+        let record = accept_recovery(
+            "recovery-ledger:policy-root",
+            1,
+            None,
+            &old,
+            &new,
+            &tip,
+            &backup,
+            &auth,
+            &commit,
+            &first,
+            5_300,
+            "qualification:continuity",
+            "blake3:continuity",
+            5_200,
+            vec!["audit:acceptance".into()],
+        )
+        .unwrap();
+        assert_eq!(record.authorization_id, "authorization:1");
+        assert!(!record.grants_physical_authority());
+    }
+
+    #[test]
+    fn invalid_continuity_cannot_be_accepted() {
+        let (old, new, tip, backup, mut auth, commit, first) = accepted_fixture();
+        auth.expires_at_ms = 4_500;
+        let result = accept_recovery(
+            "recovery-ledger:policy-root",
+            1,
+            None,
+            &old,
+            &new,
+            &tip,
+            &backup,
+            &auth,
+            &commit,
+            &first,
+            5_300,
+            "qualification:continuity",
+            "blake3:continuity",
+            5_200,
+            vec!["audit:acceptance".into()],
+        );
+        assert_eq!(result, Err(RecoveryAcceptanceError::ContinuityDidNotPass));
     }
 
     #[test]
