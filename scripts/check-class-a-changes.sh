@@ -12,9 +12,10 @@ set -euo pipefail
 
 # Class A files: safety-critical parameters per GOVERNANCE_CHARTER.md §3.1
 #
-# RSK note (ADR-002): replication-authority and lineage/budget code is Class A.
-# The detector and Governance Charter are also Class A surfaces so weakening the
-# governance mechanism itself cannot look like an ordinary unclassified change.
+# RSK note (ADR-002/ADR-010): replication-authority and lineage/budget code is
+# Class A. The RSK qualification harness, workflow, detector, and Governance
+# Charter are also Class A surfaces so weakening the evidence/governance
+# mechanism itself cannot look like an ordinary unclassified change.
 CLASS_A_FILES=(
     "symthaea/src/cognitive_loop/thresholds.rs"
     "symthaea/src/cognitive_loop/ethics_engine.rs"
@@ -24,6 +25,7 @@ CLASS_A_FILES=(
     "crates/domains/symthaea-replicator-safety/"
     "crates/domains/symthaea-replicator-ledger/"
     ".github/workflows/rsk-safety.yml"
+    "scripts/rsk_qualification.py"
     "scripts/check-class-a-changes.sh"
     "docs/compliance/GOVERNANCE_CHARTER.md"
 )
@@ -155,7 +157,7 @@ if [ "${1:-}" = "--ci" ]; then
             echo "WARNING: No ADR found in this changeset."
             echo "  Consider adding: symthaea/docs/compliance/adr/ADR-NNN-description.md"
             # Warning only in generic CI. RSK has an additional blocking ADR gate
-            # in .github/workflows/rsk-safety.yml; see ADR-002.
+            # in .github/workflows/rsk-safety.yml; see ADR-002 and ADR-010.
         fi
     fi
 
