@@ -12,14 +12,18 @@ None of these operations automatically changes `ProofObligation::status` or disc
 
 ## Current bindings
 
-The first tranche supports candidate evidence for:
+The bridge supports candidate evidence for:
 
 - `DA-004` — explicit selective-classification abstention evidence from a passing perception crucible with observed OOD abstention,
 - `DA-010` — time/calibration/lineage auditability from a structurally valid `ObservationEnvelope`,
 - `DA-012` — model divergence/incompleteness restricting the ODD model-assurance state,
 - `DA-016` — a passing perception crucible with no perception-to-authority bypass,
 - `DA-017` — passing negative/background stress exposure,
-- `DA-019` — an explicitly reviewed recovery procedure referenced by a requalification authorization.
+- `DA-019` — an explicitly reviewed recovery procedure referenced by a requalification authorization,
+- `DA-021` — an actual common-cause diversity failure causing corroboration-level assurance to be withheld,
+- `DA-022` — favorable recovery evidence accumulating while a previous restriction remains latched.
+
+`DA-023` (candidate evidence/receipts cannot self-discharge obligations) is intentionally **not** bound by this crate. That property must be established by independent architecture/integration testing; allowing the binder to certify it would recreate the self-certification problem the obligation exists to prevent.
 
 Every candidate also requires a durable evidence reference and a content digest supplied by the caller's evidence pipeline.
 
