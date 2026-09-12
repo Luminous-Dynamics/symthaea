@@ -17,6 +17,8 @@ on:
       - 'crates/bridges/symthaea-forge-linux-provenance-strict/**'
       - 'crates/bridges/symthaea-forge-linux-kernel-attestation/**'
       - 'crates/bridges/symthaea-forge-linux-seccomp-attestation/**'
+      - 'crates/bridges/symthaea-forge-linux-cgroup-control/**'
+      - 'crates/bridges/symthaea-forge-linux-cgroup-strict/**'
       - 'crates/bridges/symthaea-forge-linux-observed-exec/**'
       - 'crates/bridges/symthaea-forge-kernel-validation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
@@ -37,6 +39,8 @@ on:
       - 'crates/bridges/symthaea-forge-linux-provenance-strict/**'
       - 'crates/bridges/symthaea-forge-linux-kernel-attestation/**'
       - 'crates/bridges/symthaea-forge-linux-seccomp-attestation/**'
+      - 'crates/bridges/symthaea-forge-linux-cgroup-control/**'
+      - 'crates/bridges/symthaea-forge-linux-cgroup-strict/**'
       - 'crates/bridges/symthaea-forge-linux-observed-exec/**'
       - 'crates/bridges/symthaea-forge-kernel-validation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
@@ -46,10 +50,10 @@ permissions:
   contents: read
 
 concurrency:
-  # During active stacked development, only the newest automatic PR qualification is useful.
-  # Older exact heads can still be deliberately qualified before merge with workflow_dispatch,
-  # whose run_id gives each manual run a unique non-cancelling concurrency group.
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event_name == 'push' && github.ref || 'latest-pull-request' }}
+  # Keep only the newest automatic qualification for each PR/head line. Superseded commits on one
+  # PR cancel each other, but unrelated discovery PRs no longer cancel one another's evidence.
+  # Manual dispatch remains uniquely non-cancelling so an older exact head can still be qualified.
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event_name == 'push' && github.ref || github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -88,6 +92,12 @@ jobs:
       - name: Test parent-observed seccomp state gate
         run: cargo test -p symthaea-forge-linux-seccomp-attestation --all-targets -- --test-threads=1
 
+      - name: Test cgroup v2 resource-control bridge
+        run: cargo test -p symthaea-forge-linux-cgroup-control --all-targets -- --test-threads=1
+
+      - name: Test strict cgroup v2 hardening bridge
+        run: cargo test -p symthaea-forge-linux-cgroup-strict --all-targets -- --test-threads=1
+
       - name: Test kernel-gated evaluator execution bridge
         run: cargo test -p symthaea-forge-linux-observed-exec --all-targets -- --test-threads=1
 
@@ -123,6 +133,8 @@ jobs:
           -p symthaea-forge-linux-provenance-strict
           -p symthaea-forge-linux-kernel-attestation
           -p symthaea-forge-linux-seccomp-attestation
+          -p symthaea-forge-linux-cgroup-control
+          -p symthaea-forge-linux-cgroup-strict
           -p symthaea-forge-linux-observed-exec
           -p symthaea-forge-kernel-validation
           -p symthaea-algorithm-egraph-bridge

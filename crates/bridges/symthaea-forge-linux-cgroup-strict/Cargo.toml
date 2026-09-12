@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-forge-linux-cgroup-strict"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Strict memory/swap and descendant teardown hardening for Forge cgroup v2 evaluator leases"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge-linux-cgroup-control = { path = "../symthaea-forge-linux-cgroup-control" }
+serde = { workspace = true }
+thiserror = { workspace = true }
