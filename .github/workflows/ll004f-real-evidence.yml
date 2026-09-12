@@ -8,6 +8,7 @@ on:
       - "scripts/generate_ll004f_spice_snapshots.py"
       - "scripts/verify_ll004f_kernel_locks.py"
       - "scripts/compare_ll004f_lunar_frames.py"
+      - "scripts/run_ll004f_real_evidence.py"
       - ".github/workflows/ll004f-real-evidence.yml"
 
 concurrency:
@@ -31,125 +32,20 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Verify dependency-free tooling self-tests
+      - name: Verify unified evidence runner
+        run: python3 scripts/run_ll004f_real_evidence.py --self-test
+
+      - name: Generate exact LL-004F evidence
         run: |
-          python3 scripts/generate_ll004f_spice_snapshots.py --self-test
-          python3 scripts/verify_ll004f_kernel_locks.py --self-test
-          python3 scripts/compare_ll004f_lunar_frames.py --self-test
-
-      - name: Install exact SpiceyPy 8.2.0 wheel
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p target/ll004f-bootstrap
-          wheel="target/ll004f-bootstrap/spiceypy-8.2.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
-          url="https://github.com/AndrewAnnex/SpiceyPy/releases/download/v8.2.0/spiceypy-8.2.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
-          curl --fail --location --retry 3 --output "$wheel" "$url"
-          echo "b7abbcc53320d74a1d1cf3e86f1c4bcd4bcc2e733a25c3b32fffbac677606ee1  $wheel" | sha256sum --check --strict
-          python3 -m pip install --disable-pip-version-check --no-deps "$wheel"
-          python3 - <<'PY'
-          import spiceypy
-          assert spiceypy.__version__ == "8.2.0", spiceypy.__version__
-          print("SpiceyPy", spiceypy.__version__)
-          PY
-
-      - name: Download exact configured NAIF kernels
-        run: |
-          python3 - <<'PY'
-          import json
-          import pathlib
-          import urllib.request
-
-          configs = [
-              pathlib.Path("configs/lunar_transport/ll004f_de421_pgda_bridge.json"),
-              pathlib.Path("configs/lunar_transport/ll004f_de440_reference.json"),
-          ]
-          out = pathlib.Path("target/ll004f-kernels")
-          out.mkdir(parents=True, exist_ok=True)
-          urls = {}
-          for config_path in configs:
-              config = json.loads(config_path.read_text())
-              for entry in config["kernels"]:
-                  filename = entry["filename"]
-                  url = entry["source_url"]
-                  prior = urls.setdefault(filename, url)
-                  if prior != url:
-                      raise SystemExit(f"conflicting source URLs for {filename}: {prior} vs {url}")
-          for filename, url in sorted(urls.items()):
-              destination = out / filename
-              print(f"download {filename} <- {url}")
-              request = urllib.request.Request(url, headers={"User-Agent": "symthaea-ll004f-evidence/1"})
-              with urllib.request.urlopen(request, timeout=120) as response, destination.open("wb") as handle:
-                  while chunk := response.read(1024 * 1024):
-                      handle.write(chunk)
-          PY
-
-      - name: Verify authority-published kernel locks
-        run: |
-          mkdir -p target/ll004f-evidence/verification
-          python3 scripts/verify_ll004f_kernel_locks.py \
-            --config configs/lunar_transport/ll004f_de421_pgda_bridge.json \
-            --kernel-dir target/ll004f-kernels \
-            > target/ll004f-evidence/verification/de421-kernel-lock-receipt.json
-          python3 scripts/verify_ll004f_kernel_locks.py \
-            --config configs/lunar_transport/ll004f_de440_reference.json \
-            --kernel-dir target/ll004f-kernels \
-            > target/ll004f-evidence/verification/de440-kernel-lock-receipt.json
-
-      - name: Generate DE421 and DE440 snapshots
-        run: |
-          mkdir -p target/ll004f-evidence/snapshots
-          python3 scripts/generate_ll004f_spice_snapshots.py \
-            --config configs/lunar_transport/ll004f_de421_pgda_bridge.json \
-            --kernel-dir target/ll004f-kernels \
-            --output-dir target/ll004f-evidence/snapshots
-          python3 scripts/generate_ll004f_spice_snapshots.py \
-            --config configs/lunar_transport/ll004f_de440_reference.json \
-            --kernel-dir target/ll004f-kernels \
-            --output-dir target/ll004f-evidence/snapshots
-
-      - name: Derive DE421 to DE440 frame sensitivity
-        run: |
-          mkdir -p target/ll004f-evidence/frame-sensitivity
-          python3 scripts/compare_ll004f_lunar_frames.py \
-            --source target/ll004f-evidence/snapshots/ll004f_de421_pgda_bridge_v1.json \
-            --destination target/ll004f-evidence/snapshots/ll004f_de440_reference_v1.json \
-            --output target/ll004f-evidence/frame-sensitivity/de421-to-de440-south-pole-sensitivity.json
-
-      - name: Produce evidence manifest
-        run: |
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import pathlib
-          import platform
-          import spiceypy
-
-          root = pathlib.Path("target/ll004f-evidence")
-          files = []
-          for path in sorted(p for p in root.rglob("*") if p.is_file()):
-              payload = path.read_bytes()
-              files.append({
-                  "path": path.relative_to(root).as_posix(),
-                  "bytes": len(payload),
-                  "sha256": hashlib.sha256(payload).hexdigest(),
-              })
-          manifest = {
-              "schema_version": "ll004f.real-evidence-artifact.v1",
-              "git_sha": "${{ github.sha }}",
-              "python_version": platform.python_version(),
-              "spiceypy_version": spiceypy.__version__,
-              "files": files,
-              "non_claim": "Generated SPICE evidence is Phase-0 research input, not navigation, launch, or rendezvous qualification.",
-          }
-          (root / "artifact-manifest.json").write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n")
-          print(json.dumps(manifest, sort_keys=True, indent=2))
-          PY
+          python3 scripts/run_ll004f_real_evidence.py \
+            --repo-root . \
+            --work-root target/ll004f-real-run \
+            --git-sha "${{ github.sha }}"
 
       - name: Upload LL-004F real evidence
         uses: actions/upload-artifact@v4
         with:
           name: ll004f-real-spice-evidence-${{ github.sha }}
-          path: target/ll004f-evidence/
+          path: target/ll004f-real-run/evidence/
           if-no-files-found: error
           retention-days: 30
