@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-engineering-evidence-plan"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Content-addressed semantic binding plan for the Symthaea Engineering Trust Kernel"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["engineering", "evidence", "provenance", "safety"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-engineering-trust = { path = "../symthaea-engineering-trust" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-formal-safety = { path = "../../domains/symthaea-formal-safety" }
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+uuid.workspace = true
