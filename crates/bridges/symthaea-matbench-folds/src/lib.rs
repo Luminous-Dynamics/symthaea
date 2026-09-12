@@ -45,8 +45,11 @@ pub const RESIDUAL_LEAKAGE_DISCLOSURE: &str =
     "Composition overlap with Symthaea's currently exposed band-gap training table was removed. This does not prove historical blindness: hand-written baselines or prior model choices may still reflect public semiconductor knowledge.";
 
 const MANIFEST_DIGEST_DOMAIN: &[u8] = b"symthaea.matbench-expt-gap.fold-manifest.v0\0";
+const TRAINING_DIGEST_DOMAIN: &[u8] = b"symthaea.bandgap.training-table.v0\0";
 const TRUTH_SLICE_DIGEST_DOMAIN: &[u8] = b"symthaea.matbench-expt-gap.fold-truth.v0\0";
 const OVERLAP_MASK_DIGEST_DOMAIN: &[u8] = b"symthaea.matbench-expt-gap.overlap-mask.v0\0";
+const QUALIFICATION_DIGEST_DOMAIN: &[u8] =
+    b"symthaea.matbench-expt-gap.leakage-qualification.v0\0";
 
 fn derive_fold_by_position() -> [u8; MATBENCH_EXPT_GAP_ROWS] {
     let permutation = shuffled_indices::<MATBENCH_EXPT_GAP_ROWS>(MATBENCH_V01_RANDOM_STATE);
@@ -105,9 +108,19 @@ pub struct LeakageCleanFold {
     pub canonical_test_count: usize,
     pub retained_test_count: usize,
     pub excluded_training_overlap: Vec<LeakageExclusion>,
+    /// SHA-256 of the exact official compressed source artifact accepted by the
+    /// parent adapter.
+    pub source_artifact_sha256: String,
+    /// Content identity of the complete Symthaea band-gap training table used
+    /// to decide overlap/non-overlap for this audit.
+    pub symthaea_training_table_sha256: String,
+    pub symthaea_training_entry_count: usize,
     pub fold_manifest_sha256: String,
     pub overlap_mask_sha256: String,
     pub truth_slice_sha256: String,
+    /// Single durable identity binding source, fold, training table, exclusions,
+    /// and retained truth for downstream benchmark receipts.
+    pub qualification_sha256: String,
     pub fold_derivation_disclosure: &'static str,
     pub index_identity_disclosure: &'static str,
     pub residual_leakage_disclosure: &'static str,
@@ -166,6 +179,35 @@ pub fn canonical_fold_manifest_sha256() -> String {
     hex_lower(&digest)
 }
 
+/// Content identity of the complete curated training table currently exposed by
+/// `symthaea-bandgap`.
+///
+/// This digest is intentionally broader than the overlap list. A training-table
+/// edit changes leakage qualification identity even if it happens not to add or
+/// remove an overlapping Matbench composition.
+pub fn symthaea_training_table_sha256() -> String {
+    let training = symthaea_bandgap::training_data::load_training_data();
+    let mut hasher = Sha256::new();
+    hasher.update(TRAINING_DIGEST_DOMAIN);
+    hasher.update((training.len() as u64).to_le_bytes());
+
+    for entry in training {
+        update_text(&mut hasher, entry.formula);
+        let mut composition = entry.composition;
+        composition.sort_by_key(|(atomic_number, _)| *atomic_number);
+        hasher.update((composition.len() as u64).to_le_bytes());
+        for (atomic_number, fraction) in composition {
+            hasher.update([atomic_number]);
+            hasher.update(fraction.to_bits().to_le_bytes());
+        }
+        hasher.update(entry.experimental_gap.to_bits().to_le_bytes());
+        hasher.update([entry.crystal_system.ordinal()]);
+    }
+
+    let digest = hasher.finalize();
+    hex_lower(&digest)
+}
+
 pub fn validate_canonical_manifest() -> Result<(), FoldError> {
     let counts = canonical_fold_counts();
     let expected = [921usize, 921, 921, 921, 920];
@@ -215,6 +257,12 @@ fn build_leakage_clean_test_fold(
         ));
     }
 
+    let training = symthaea_bandgap::training_data::load_training_data();
+    let training_entry_count = training.len();
+    // Re-load through the canonical digest function so both the digest and the
+    // parent's overlap detector bind to the same public training-table API.
+    let training_table_sha256 = symthaea_training_table_sha256();
+
     let overlap = dataset.symthaea_training_overlap()?;
     let mut overlap_by_candidate: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for item in overlap {
@@ -258,19 +306,30 @@ fn build_leakage_clean_test_fold(
         return Err(FoldError::EmptyLeakageCleanFold(fold.value()));
     }
 
-    let overlap_mask_sha256 = digest_overlap_mask(fold, &exclusions);
+    let overlap_mask_sha256 =
+        digest_overlap_mask(fold, &training_table_sha256, &exclusions);
     let truth_slice_sha256 = digest_truth_slice(
         fold,
         &dataset.row_order_sha256,
+        &training_table_sha256,
         &overlap_mask_sha256,
         &retained_rows,
     );
+    let retained_test_count = retained.len();
+    let qualification_sha256 = digest_qualification(
+        fold,
+        &dataset.row_order_sha256,
+        &training_table_sha256,
+        training_entry_count,
+        &overlap_mask_sha256,
+        &truth_slice_sha256,
+        canonical_test_count,
+        retained_test_count,
+    );
 
     let split_id = format!(
-        "matbench_v0.1/fold_{}/test/leakage-clean-positional@foldsha256:{}@masksha256:{}",
-        fold.value(),
-        MATBENCH_EXPT_GAP_FOLD_MANIFEST_SHA256,
-        overlap_mask_sha256,
+        "matbench_v0.1/fold_{}/test/leakage-clean-positional@qualsha256:{}",
+        fold.value(), qualification_sha256,
     );
 
     let truth = BandgapTruthSet {
@@ -287,11 +346,15 @@ fn build_leakage_clean_test_fold(
     Ok(LeakageCleanFold {
         fold,
         canonical_test_count,
-        retained_test_count: truth.experimental_gap_ev.len(),
+        retained_test_count,
         excluded_training_overlap: exclusions,
+        source_artifact_sha256: MATBENCH_EXPT_GAP_SHA256.to_owned(),
+        symthaea_training_table_sha256: training_table_sha256,
+        symthaea_training_entry_count: training_entry_count,
         fold_manifest_sha256: MATBENCH_EXPT_GAP_FOLD_MANIFEST_SHA256.to_owned(),
         overlap_mask_sha256,
         truth_slice_sha256,
+        qualification_sha256,
         fold_derivation_disclosure: FOLD_DERIVATION_DISCLOSURE,
         index_identity_disclosure: INDEX_IDENTITY_DISCLOSURE,
         residual_leakage_disclosure: RESIDUAL_LEAKAGE_DISCLOSURE,
@@ -299,11 +362,16 @@ fn build_leakage_clean_test_fold(
     })
 }
 
-fn digest_overlap_mask(fold: FoldIndex, exclusions: &[LeakageExclusion]) -> String {
+fn digest_overlap_mask(
+    fold: FoldIndex,
+    training_table_sha256: &str,
+    exclusions: &[LeakageExclusion],
+) -> String {
     let mut hasher = Sha256::new();
     hasher.update(OVERLAP_MASK_DIGEST_DOMAIN);
     hasher.update([fold.value()]);
-    hasher.update(MATBENCH_EXPT_GAP_FOLD_MANIFEST_SHA256.as_bytes());
+    update_text(&mut hasher, MATBENCH_EXPT_GAP_FOLD_MANIFEST_SHA256);
+    update_text(&mut hasher, training_table_sha256);
     hasher.update((exclusions.len() as u64).to_le_bytes());
 
     for exclusion in exclusions {
@@ -322,15 +390,17 @@ fn digest_overlap_mask(fold: FoldIndex, exclusions: &[LeakageExclusion]) -> Stri
 fn digest_truth_slice(
     fold: FoldIndex,
     parent_row_order_sha256: &str,
+    training_table_sha256: &str,
     overlap_mask_sha256: &str,
     retained_rows: &[(usize, &symthaea_matbench_gap::MatbenchGapRecord)],
 ) -> String {
     let mut hasher = Sha256::new();
     hasher.update(TRUTH_SLICE_DIGEST_DOMAIN);
     hasher.update([fold.value()]);
-    hasher.update(MATBENCH_EXPT_GAP_SHA256.as_bytes());
+    update_text(&mut hasher, MATBENCH_EXPT_GAP_SHA256);
     update_text(&mut hasher, parent_row_order_sha256);
     update_text(&mut hasher, MATBENCH_EXPT_GAP_FOLD_MANIFEST_SHA256);
+    update_text(&mut hasher, training_table_sha256);
     update_text(&mut hasher, overlap_mask_sha256);
     hasher.update((retained_rows.len() as u64).to_le_bytes());
 
@@ -340,6 +410,33 @@ fn digest_truth_slice(
         hasher.update(record.experimental_gap_ev.to_bits().to_le_bytes());
     }
 
+    let digest = hasher.finalize();
+    hex_lower(&digest)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn digest_qualification(
+    fold: FoldIndex,
+    parent_row_order_sha256: &str,
+    training_table_sha256: &str,
+    training_entry_count: usize,
+    overlap_mask_sha256: &str,
+    truth_slice_sha256: &str,
+    canonical_test_count: usize,
+    retained_test_count: usize,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(QUALIFICATION_DIGEST_DOMAIN);
+    hasher.update([fold.value()]);
+    update_text(&mut hasher, MATBENCH_EXPT_GAP_SHA256);
+    update_text(&mut hasher, parent_row_order_sha256);
+    update_text(&mut hasher, MATBENCH_EXPT_GAP_FOLD_MANIFEST_SHA256);
+    update_text(&mut hasher, training_table_sha256);
+    hasher.update((training_entry_count as u64).to_le_bytes());
+    update_text(&mut hasher, overlap_mask_sha256);
+    update_text(&mut hasher, truth_slice_sha256);
+    hasher.update((canonical_test_count as u64).to_le_bytes());
+    hasher.update((retained_test_count as u64).to_le_bytes());
     let digest = hasher.finalize();
     hex_lower(&digest)
 }
@@ -396,6 +493,15 @@ mod tests {
         assert_eq!(fold_for_row_position(1).unwrap().value(), 3);
         assert_eq!(fold_for_row_position(4).unwrap().value(), 4);
         assert!(fold_for_row_position(MATBENCH_EXPT_GAP_ROWS).is_err());
+    }
+
+    #[test]
+    fn training_table_identity_is_deterministic() {
+        let first = symthaea_training_table_sha256();
+        let second = symthaea_training_table_sha256();
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 64);
+        assert!(first.bytes().all(|byte| byte.is_ascii_hexdigit()));
     }
 
     #[test]
