@@ -19,4 +19,3 @@ symthaea-evidence-quarantine = { path = "../symthaea-evidence-quarantine" }
 symthaea-evidence-time-assurance = { path = "../symthaea-evidence-time-assurance" }
 symthaea-evidence-verifier-diversity = { path = "../symthaea-evidence-verifier-diversity" }
 symthaea-evidence-atomic-coverage = { path = "../symthaea-evidence-atomic-coverage" }
-serde = { workspace = true }
