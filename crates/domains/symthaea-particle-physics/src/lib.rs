@@ -12,6 +12,8 @@
 //!   structure constants, Casimir operators
 //! - **Lattice gauge primitives**: periodic SU(3) links, plaquettes, Wilson action,
 //!   Polyakov loops, and local gauge transformations
+//! - **Wilson observables**: explicit contractible rectangular link paths,
+//!   site/orientation averages, effective static-potential ratios and Creutz ratios
 //!
 //! ## Natural Units
 //!
@@ -32,6 +34,7 @@ pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
+pub mod lattice_wilson_observables;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -50,6 +53,11 @@ pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
     su3_determinant_error, su3_diagonal, su3_identity, su3_mul, su3_trace,
     su3_unitarity_error, validate_su3,
+};
+pub use lattice_wilson_observables::{
+    RectangularWilsonLoopSpec, WilsonObservableError, average_rectangular_wilson_loop,
+    average_spatial_temporal_wilson_loop, creutz_ratio, effective_static_potential,
+    rectangular_wilson_loop,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
