@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-hello-control-extension"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.61.1"
+
+[build-dependencies]
+sha2 = "0.10"
+
+# Keep this example independent from Symthaea's large root workspace. It is
+# intended to be copyable into a third-party repository unchanged.
+[workspace]

@@ -1,0 +1,14 @@
+{
+  "id": "org.example.hello-control",
+  "name": "Hello Control Extension",
+  "version": "0.1.0",
+  "abi": {
+    "major": 1,
+    "minor": 0
+  },
+  "kind": "tool",
+  "runtime": "wasm",
+  "description": "Minimal no-authority Symthaea extension control-plane example",
+  "provides": [],
+  "requires": []
+}
