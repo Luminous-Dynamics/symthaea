@@ -2,16 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Narrow Engineering Trust Kernel boundary for engineering evidence.
 //!
-//! This crate deliberately separates three propositions:
-//!
 //! ```text
-//! solver result != admitted engineering evidence != discharged obligation
+//! solver result
+//! != admitted engineering evidence
+//! != discharged obligation
+//! != qualified design
+//! != manufacturing or actuation authority
 //! ```
 //!
-//! It does not run solvers, mutate designs, authorize fabrication, deploy
-//! software, or grant physical actuation authority. Authority-bearing output
-//! types keep their fields private and intentionally do not implement Serde
-//! deserialization.
+//! The authority-bearing output types in this crate keep their fields private
+//! and intentionally do not implement Serde deserialization. They may expose
+//! explicit audit records because an audit record is data, not a capability.
 
 #![deny(unsafe_code)]
 
@@ -29,7 +30,7 @@ const ADMITTED_EVIDENCE_DOMAIN_V1: &[u8] = b"symthaea.etk-admitted-simulation-ev
 const OBLIGATION_SNAPSHOT_DOMAIN_V1: &[u8] = b"symthaea.etk-proof-obligation-snapshot.v1\0";
 const DISCHARGE_RECEIPT_DOMAIN_V1: &[u8] = b"symthaea.etk-obligation-discharge-receipt.v1\0";
 
-/// Scalar threshold operators supported by the v1 simulation admission policy.
+/// Scalar threshold operators supported by ETK simulation admission v1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ThresholdOperatorV1 {
     Lt,
@@ -58,7 +59,7 @@ impl ThresholdOperatorV1 {
     }
 }
 
-/// Errors at the typed ETK contract-construction boundary.
+/// Errors while constructing non-authoritative ETK contract inputs.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum ContractErrorV1 {
     #[error("{0} cannot be empty")]
@@ -71,7 +72,7 @@ pub enum ContractErrorV1 {
     NotSimulationObligation,
 }
 
-/// One exact metric acceptance predicate plus an uncertainty budget.
+/// One exact metric predicate plus an epistemic/aleatoric uncertainty budget.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MetricAcceptancePolicyV1 {
     name: String,
@@ -133,11 +134,10 @@ impl MetricAcceptancePolicyV1 {
     }
 }
 
-/// Exact policy/context against which one simulation artifact is admitted.
+/// Exact obligation/context against which one simulation artifact is admitted.
 ///
 /// The obligation revision is content-addressed from the obligation definition,
-/// not maintained by a caller-controlled counter. Mutating the obligation claim
-/// or expected evidence therefore changes the revision identity automatically.
+/// not maintained by a caller-controlled counter.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimulationAdmissionPolicyV1 {
     obligation_id: String,
@@ -229,7 +229,7 @@ impl SimulationAdmissionPolicyV1 {
     }
 }
 
-/// Whether a candidate is asserted to apply to the current engineering state.
+/// Candidate applicability at admission time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EvidenceCurrentnessV1 {
     Current,
@@ -245,10 +245,7 @@ impl EvidenceCurrentnessV1 {
     }
 }
 
-/// Typed metadata binding a solver result to one exact engineering context.
-///
-/// Constructing this value grants no authority. Only successful admission can
-/// produce `AdmittedSimulationEvidenceV1`.
+/// Non-authoritative metadata binding a solver result to an engineering context.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimulationCandidateBindingV1 {
     candidate_artifact_id: String,
@@ -328,7 +325,7 @@ impl SimulationCandidateBindingV1 {
     }
 }
 
-/// Stable, ordered semantic denial reasons for typed production admission.
+/// Stable semantic denial reasons for production admission.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AdmissionDenialReasonV1 {
     ObligationBindingMismatch,
@@ -356,7 +353,7 @@ pub enum AdmissionDenialReasonV1 {
     SimulationBridgeRejected,
 }
 
-/// Fail-closed result of the ETK admission theorem.
+/// Fail-closed result of the admission theorem.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimulationAdmissionDenialV1 {
     reasons: Vec<AdmissionDenialReasonV1>,
@@ -371,8 +368,7 @@ impl SimulationAdmissionDenialV1 {
 /// Authority-bearing proof that one exact simulation artifact passed ETK v1
 /// admission for one exact obligation/context.
 ///
-/// This type deliberately has private fields and no Serde `Deserialize` impl.
-/// It is still **not** a discharge receipt.
+/// This is still not an obligation-discharge receipt.
 #[must_use = "admitted evidence is not equivalent to an obligation discharge receipt"]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdmittedSimulationEvidenceV1 {
@@ -438,11 +434,29 @@ impl AdmittedSimulationEvidenceV1 {
     pub fn source_lineage_id(&self) -> &str {
         &self.source_lineage_id
     }
+
+    /// Explicit non-authoritative audit representation.
+    pub fn audit_record_v1(&self) -> Value {
+        json!({
+            "admitted_evidence_id": self.admitted_evidence_id.as_str(),
+            "candidate_artifact_id": self.candidate_artifact_id.as_str(),
+            "currentness_proof_id": self.currentness_proof_id.as_str(),
+            "evidence_policy_id": self.evidence_policy_id.as_str(),
+            "obligation_id": self.obligation_id.as_str(),
+            "obligation_revision": self.obligation_revision.as_str(),
+            "request_id": self.request_id.as_str(),
+            "requirement_revision": self.requirement_revision.as_str(),
+            "source_lineage_id": self.source_lineage_id.as_str(),
+            "subject_id": self.subject_id.as_str(),
+            "twin_revision": self.twin_revision.as_str(),
+            "validity_domain_id": self.validity_domain_id.as_str(),
+        })
+    }
 }
 
 /// Admit one normalized simulation result for one exact ETK v1 policy.
 ///
-/// This independently implements the production rule; it does not invoke the
+/// This is an independent production implementation and never invokes the
 /// Python reference oracle.
 pub fn admit_simulation_evidence_v1(
     policy: &SimulationAdmissionPolicyV1,
@@ -558,8 +572,8 @@ pub fn admit_simulation_evidence_v1(
         reasons.insert(AdmissionDenialReasonV1::InputDigestMismatch);
     }
 
-    // Defense in depth: if the shared simulation bridge grows stricter, ETK
-    // fails closed rather than silently admitting something the bridge rejects.
+    // Defense in depth: if the shared simulation bridge becomes stricter,
+    // ETK fails closed instead of admitting a bridge-rejected result.
     if reasons.is_empty() && !result.is_engineering_evidence() {
         reasons.insert(AdmissionDenialReasonV1::SimulationBridgeRejected);
     }
@@ -571,9 +585,8 @@ pub fn admit_simulation_evidence_v1(
     }
 
     let identity = normalized_admission_identity_v1(policy, binding, result);
-    let admitted_evidence_id = domain_hash(ADMITTED_EVIDENCE_DOMAIN_V1, &identity);
     Ok(AdmittedSimulationEvidenceV1 {
-        admitted_evidence_id,
+        admitted_evidence_id: domain_hash(ADMITTED_EVIDENCE_DOMAIN_V1, &identity),
         candidate_artifact_id: binding.candidate_artifact_id.clone(),
         obligation_id: policy.obligation_id.clone(),
         obligation_revision: policy.obligation_revision.clone(),
@@ -588,7 +601,65 @@ pub fn admit_simulation_evidence_v1(
     })
 }
 
-/// Failure to derive a discharge receipt from already-admitted evidence.
+/// Present-tense applicability context for evaluating discharge receipts.
+///
+/// Supplying the currentness-proof ID on each query is intentional: a receipt
+/// that was current when issued must not remain automatically applicable after
+/// its currentness attestation changes while all design IDs remain unchanged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DischargeContextV1 {
+    subject_id: String,
+    twin_revision: String,
+    requirement_revision: String,
+    validity_domain_id: String,
+    currentness_proof_id: String,
+}
+
+impl DischargeContextV1 {
+    pub fn new(
+        subject_id: impl Into<String>,
+        twin_revision: impl Into<String>,
+        requirement_revision: impl Into<String>,
+        validity_domain_id: impl Into<String>,
+        currentness_proof_id: impl Into<String>,
+    ) -> Result<Self, ContractErrorV1> {
+        Ok(Self {
+            subject_id: checked_string(subject_id.into(), "subject id")?,
+            twin_revision: checked_string(twin_revision.into(), "twin revision")?,
+            requirement_revision: checked_string(
+                requirement_revision.into(),
+                "requirement revision",
+            )?,
+            validity_domain_id: checked_string(validity_domain_id.into(), "validity domain id")?,
+            currentness_proof_id: checked_string(
+                currentness_proof_id.into(),
+                "currentness proof id",
+            )?,
+        })
+    }
+
+    pub fn subject_id(&self) -> &str {
+        &self.subject_id
+    }
+
+    pub fn twin_revision(&self) -> &str {
+        &self.twin_revision
+    }
+
+    pub fn requirement_revision(&self) -> &str {
+        &self.requirement_revision
+    }
+
+    pub fn validity_domain_id(&self) -> &str {
+        &self.validity_domain_id
+    }
+
+    pub fn currentness_proof_id(&self) -> &str {
+        &self.currentness_proof_id
+    }
+}
+
+/// Failure to derive a receipt from already-admitted evidence.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum DischargeReceiptErrorV1 {
     #[error("proof obligation does not expect Simulation evidence")]
@@ -599,11 +670,8 @@ pub enum DischargeReceiptErrorV1 {
     ObligationRevisionMismatch,
 }
 
-/// Immutable receipt proving that an exact admitted evidence token was applied
-/// to an exact current proof-obligation snapshot.
-///
-/// Private fields and the lack of Serde deserialization prevent callers from
-/// constructing this authority state from arbitrary strings.
+/// Immutable receipt proving that one admitted-evidence token was applied to
+/// one exact proof-obligation snapshot and engineering context.
 #[must_use = "a discharge receipt is distinct from evidence admission and downstream authority"]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObligationDischargeReceiptV1 {
@@ -637,6 +705,10 @@ impl ObligationDischargeReceiptV1 {
         &self.admitted_evidence_id
     }
 
+    pub fn candidate_artifact_id(&self) -> &str {
+        &self.candidate_artifact_id
+    }
+
     pub fn subject_id(&self) -> &str {
         &self.subject_id
     }
@@ -661,25 +733,36 @@ impl ObligationDischargeReceiptV1 {
         &self.currentness_proof_id
     }
 
-    fn applies_to(
-        &self,
-        obligation: &ProofObligation,
-        subject_id: &str,
-        twin_revision: &str,
-        requirement_revision: &str,
-        validity_domain_id: &str,
-    ) -> bool {
+    /// Explicit non-authoritative audit representation.
+    pub fn audit_record_v1(&self) -> Value {
+        json!({
+            "admitted_evidence_id": self.admitted_evidence_id.as_str(),
+            "candidate_artifact_id": self.candidate_artifact_id.as_str(),
+            "currentness_proof_id": self.currentness_proof_id.as_str(),
+            "evidence_policy_id": self.evidence_policy_id.as_str(),
+            "obligation_id": self.obligation_id.as_str(),
+            "obligation_revision": self.obligation_revision.as_str(),
+            "receipt_id": self.receipt_id.as_str(),
+            "requirement_revision": self.requirement_revision.as_str(),
+            "subject_id": self.subject_id.as_str(),
+            "twin_revision": self.twin_revision.as_str(),
+            "validity_domain_id": self.validity_domain_id.as_str(),
+        })
+    }
+
+    fn applies_to(&self, obligation: &ProofObligation, context: &DischargeContextV1) -> bool {
         obligation.expected_evidence == EvidenceKind::Simulation
             && self.obligation_id == obligation.id.to_string()
             && self.obligation_revision == proof_obligation_snapshot_id_v1(obligation)
-            && self.subject_id == subject_id
-            && self.twin_revision == twin_revision
-            && self.requirement_revision == requirement_revision
-            && self.validity_domain_id == validity_domain_id
+            && self.subject_id == context.subject_id
+            && self.twin_revision == context.twin_revision
+            && self.requirement_revision == context.requirement_revision
+            && self.validity_domain_id == context.validity_domain_id
+            && self.currentness_proof_id == context.currentness_proof_id
     }
 }
 
-/// Cross the distinct `admitted evidence -> discharged obligation` boundary.
+/// Cross the distinct `admitted evidence -> discharge receipt` boundary.
 pub fn issue_obligation_discharge_receipt_v1(
     obligation: &ProofObligation,
     admitted: &AdmittedSimulationEvidenceV1,
@@ -697,23 +780,22 @@ pub fn issue_obligation_discharge_receipt_v1(
     }
 
     let receipt_preimage = json!({
-        "admitted_evidence_id": admitted.admitted_evidence_id,
-        "candidate_artifact_id": admitted.candidate_artifact_id,
-        "currentness_proof_id": admitted.currentness_proof_id,
-        "evidence_policy_id": admitted.evidence_policy_id,
-        "obligation_id": obligation_id,
-        "obligation_revision": obligation_revision,
-        "requirement_revision": admitted.requirement_revision,
-        "subject_id": admitted.subject_id,
-        "twin_revision": admitted.twin_revision,
-        "validity_domain_id": admitted.validity_domain_id,
+        "admitted_evidence_id": admitted.admitted_evidence_id.as_str(),
+        "candidate_artifact_id": admitted.candidate_artifact_id.as_str(),
+        "currentness_proof_id": admitted.currentness_proof_id.as_str(),
+        "evidence_policy_id": admitted.evidence_policy_id.as_str(),
+        "obligation_id": obligation_id.as_str(),
+        "obligation_revision": obligation_revision.as_str(),
+        "requirement_revision": admitted.requirement_revision.as_str(),
+        "subject_id": admitted.subject_id.as_str(),
+        "twin_revision": admitted.twin_revision.as_str(),
+        "validity_domain_id": admitted.validity_domain_id.as_str(),
     });
-    let receipt_id = domain_hash(DISCHARGE_RECEIPT_DOMAIN_V1, &receipt_preimage);
 
     Ok(ObligationDischargeReceiptV1 {
-        receipt_id,
-        obligation_id: obligation.id.to_string(),
-        obligation_revision: proof_obligation_snapshot_id_v1(obligation),
+        receipt_id: domain_hash(DISCHARGE_RECEIPT_DOMAIN_V1, &receipt_preimage),
+        obligation_id,
+        obligation_revision,
         admitted_evidence_id: admitted.admitted_evidence_id.clone(),
         candidate_artifact_id: admitted.candidate_artifact_id.clone(),
         subject_id: admitted.subject_id.clone(),
@@ -725,37 +807,28 @@ pub fn issue_obligation_discharge_receipt_v1(
     })
 }
 
-/// Derive discharge for the current engineering context from immutable receipts.
+/// Derive present-tense discharge from immutable receipts.
 ///
-/// Historical receipts remain auditable but cease to apply automatically when
-/// the obligation definition, subject, twin revision, requirement revision, or
-/// validity domain changes.
+/// Historical receipts remain auditable but stop applying automatically when
+/// the obligation definition, subject, twin revision, accepted requirement,
+/// validity domain, or currentness proof changes.
 pub fn is_obligation_discharged_v1(
     obligation: &ProofObligation,
-    subject_id: &str,
-    twin_revision: &str,
-    requirement_revision: &str,
-    validity_domain_id: &str,
+    context: &DischargeContextV1,
     receipts: &[ObligationDischargeReceiptV1],
 ) -> bool {
-    receipts.iter().any(|receipt| {
-        receipt.applies_to(
-            obligation,
-            subject_id,
-            twin_revision,
-            requirement_revision,
-            validity_domain_id,
-        )
-    })
+    receipts
+        .iter()
+        .any(|receipt| receipt.applies_to(obligation, context))
 }
 
-/// Content-addressed revision identity for the definition of a proof obligation.
+/// Content-addressed revision identity for the proposition being justified.
 ///
-/// Lifecycle status and attached evidence references are deliberately excluded:
-/// they are consequences/history, not the proposition being justified.
+/// Lifecycle status and attached evidence refs are excluded: they are history
+/// and consequences, not the semantic obligation definition itself.
 pub fn proof_obligation_snapshot_id_v1(obligation: &ProofObligation) -> String {
     let preimage = json!({
-        "claim": obligation.claim,
+        "claim": obligation.claim.as_str(),
         "expected_evidence_kind": evidence_kind_name(obligation.expected_evidence),
         "obligation_id": obligation.id.to_string(),
         "schema": "symthaea.etk-proof-obligation-snapshot.v1",
@@ -846,21 +919,25 @@ fn normalized_admission_identity_v1(
         .iter()
         .map(|metric| {
             json!({
-                "name": metric.name,
-                "uncertainty": metric.uncertainty.map(uncertainty_value).unwrap_or(Value::Null),
-                "unit": metric.unit,
+                "name": metric.name.as_str(),
+                "uncertainty": metric
+                    .uncertainty
+                    .map(uncertainty_value)
+                    .unwrap_or(Value::Null),
+                "unit": metric.unit.as_str(),
                 "value": metric.value,
             })
         })
         .collect();
+
     json!({
         "candidate": {
-            "binds_obligation_id": binding.binds_obligation_id,
-            "candidate_artifact_id": binding.candidate_artifact_id,
+            "binds_obligation_id": binding.binds_obligation_id.as_str(),
+            "candidate_artifact_id": binding.candidate_artifact_id.as_str(),
             "confidence": result.confidence,
             "converged": result.converged,
             "currentness": binding.currentness.as_str(),
-            "currentness_proof_id": binding.currentness_proof_id,
+            "currentness_proof_id": binding.currentness_proof_id.as_str(),
             "evidence_kind": "Simulation",
             "execution": {
                 "backend": result.evidence.backend.as_deref().unwrap_or(""),
@@ -871,36 +948,36 @@ fn normalized_admission_identity_v1(
                 "solver_version": result.evidence.solver_version.as_deref().unwrap_or(""),
             },
             "metrics": metrics,
-            "obligation_revision": binding.obligation_revision,
-            "request_id": result.request_id,
-            "requirement_revision": binding.requirement_revision,
+            "obligation_revision": binding.obligation_revision.as_str(),
+            "request_id": result.request_id.as_str(),
+            "requirement_revision": binding.requirement_revision.as_str(),
             "run_uncertainty": uncertainty_value(result.uncertainty),
-            "source_lineage_id": binding.source_lineage_id,
-            "subject_id": binding.subject_id,
-            "twin_revision": binding.twin_revision,
-            "validity_domain_id": binding.validity_domain_id,
+            "source_lineage_id": binding.source_lineage_id.as_str(),
+            "subject_id": binding.subject_id.as_str(),
+            "twin_revision": binding.twin_revision.as_str(),
+            "validity_domain_id": binding.validity_domain_id.as_str(),
         },
         "expected": {
-            "input_digest": policy.expected_input_digest,
+            "input_digest": policy.expected_input_digest.as_str(),
         },
         "obligation": {
-            "evidence_policy_id": policy.evidence_policy_id,
+            "evidence_policy_id": policy.evidence_policy_id.as_str(),
             "expected_evidence_kind": "Simulation",
-            "obligation_id": policy.obligation_id,
-            "obligation_revision": policy.obligation_revision,
-            "request_id": policy.request_id,
+            "obligation_id": policy.obligation_id.as_str(),
+            "obligation_revision": policy.obligation_revision.as_str(),
+            "request_id": policy.request_id.as_str(),
             "required_metric": {
                 "max_aleatoric": policy.required_metric.max_aleatoric,
                 "max_epistemic": policy.required_metric.max_epistemic,
-                "name": policy.required_metric.name,
+                "name": policy.required_metric.name.as_str(),
                 "operator": policy.required_metric.operator.as_str(),
                 "threshold": policy.required_metric.threshold,
-                "unit": policy.required_metric.unit,
+                "unit": policy.required_metric.unit.as_str(),
             },
-            "requirement_revision": policy.requirement_revision,
-            "subject_id": policy.subject_id,
-            "twin_revision": policy.twin_revision,
-            "validity_domain_id": policy.validity_domain_id,
+            "requirement_revision": policy.requirement_revision.as_str(),
+            "subject_id": policy.subject_id.as_str(),
+            "twin_revision": policy.twin_revision.as_str(),
+            "validity_domain_id": policy.validity_domain_id.as_str(),
         },
         "schema": ADMISSION_SCHEMA_V1,
     })
@@ -1041,6 +1118,17 @@ mod tests {
         .unwrap()
     }
 
+    fn live_context(currentness_proof_id: &str) -> DischargeContextV1 {
+        DischargeContextV1::new(
+            "bracket-alpha",
+            "design:G17",
+            "REQ-STRESS:r5",
+            "VD-static-G17-LC9",
+            currentness_proof_id,
+        )
+        .unwrap()
+    }
+
     #[test]
     fn production_hash_matches_independent_oracle_vector() {
         let admitted = admit_simulation_evidence_v1(
@@ -1086,10 +1174,7 @@ mod tests {
         assert_eq!(obligation.status, ObligationStatus::Open);
         assert!(!is_obligation_discharged_v1(
             &obligation,
-            "bracket-alpha",
-            "design:G17",
-            "REQ-STRESS:r5",
-            "VD-static-G17-LC9",
+            &live_context("currentness:design-G17:test"),
             &[],
         ));
 
@@ -1097,10 +1182,7 @@ mod tests {
         assert_eq!(obligation.status, ObligationStatus::Open);
         assert!(is_obligation_discharged_v1(
             &obligation,
-            "bracket-alpha",
-            "design:G17",
-            "REQ-STRESS:r5",
-            "VD-static-G17-LC9",
+            &live_context("currentness:design-G17:test"),
             &[receipt],
         ));
     }
@@ -1134,16 +1216,51 @@ mod tests {
         obligation.claim = "stress <= revised allowable with fatigue margin".into();
         assert!(!is_obligation_discharged_v1(
             &obligation,
-            "bracket-alpha",
-            "design:G17",
-            "REQ-STRESS:r5",
-            "VD-static-G17-LC9",
+            &live_context("currentness:design-G17:test"),
             &[receipt],
         ));
         assert_eq!(
             issue_obligation_discharge_receipt_v1(&obligation, &admitted),
             Err(DischargeReceiptErrorV1::ObligationRevisionMismatch)
         );
+    }
+
+    #[test]
+    fn currentness_refresh_makes_old_receipt_inapplicable() {
+        let obligation = ProofObligation::new("stress <= allowable", EvidenceKind::Simulation);
+        let policy = SimulationAdmissionPolicyV1::for_obligation(
+            &obligation,
+            "bracket-alpha",
+            "design:G17",
+            "REQ-STRESS:r5",
+            "ETK-SIM-ADMISSION-V1",
+            "sim-static-G17-LC9",
+            "VD-static-G17-LC9",
+            metric_policy(),
+            "sha256:input-G17-LC9",
+        )
+        .unwrap();
+        let binding = SimulationCandidateBindingV1::for_policy(
+            &policy,
+            "solver-output:run-0007",
+            EvidenceCurrentnessV1::Current,
+            "currentness:design-G17:attestation-1",
+            "calculix:2.22:mesh-M14:material-M4",
+        )
+        .unwrap();
+        let admitted = admit_simulation_evidence_v1(&policy, &binding, &external_result()).unwrap();
+        let receipt = issue_obligation_discharge_receipt_v1(&obligation, &admitted).unwrap();
+
+        assert!(is_obligation_discharged_v1(
+            &obligation,
+            &live_context("currentness:design-G17:attestation-1"),
+            std::slice::from_ref(&receipt),
+        ));
+        assert!(!is_obligation_discharged_v1(
+            &obligation,
+            &live_context("currentness:design-G17:attestation-2"),
+            &[receipt],
+        ));
     }
 
     #[test]
@@ -1230,38 +1347,17 @@ mod tests {
     }
 
     #[test]
-    fn context_change_makes_receipt_inapplicable() {
-        let obligation = ProofObligation::new("stress <= allowable", EvidenceKind::Simulation);
-        let policy = SimulationAdmissionPolicyV1::for_obligation(
-            &obligation,
-            "bracket-alpha",
-            "design:G17",
-            "REQ-STRESS:r5",
-            "ETK-SIM-ADMISSION-V1",
-            "sim-static-G17-LC9",
-            "VD-static-G17-LC9",
-            metric_policy(),
-            "sha256:input-G17-LC9",
+    fn audit_records_do_not_mutate_or_discharge() {
+        let admitted = admit_simulation_evidence_v1(
+            &oracle_fixture_policy(),
+            &oracle_fixture_binding(),
+            &external_result(),
         )
         .unwrap();
-        let binding = SimulationCandidateBindingV1::for_policy(
-            &policy,
-            "solver-output:run-0007",
-            EvidenceCurrentnessV1::Current,
-            "currentness:design-G17:test",
-            "calculix:2.22:mesh-M14:material-M4",
-        )
-        .unwrap();
-        let admitted = admit_simulation_evidence_v1(&policy, &binding, &external_result()).unwrap();
-        let receipt = issue_obligation_discharge_receipt_v1(&obligation, &admitted).unwrap();
-
-        assert!(!is_obligation_discharged_v1(
-            &obligation,
-            "bracket-alpha",
-            "design:G18",
-            "REQ-STRESS:r5",
-            "VD-static-G17-LC9",
-            &[receipt],
-        ));
+        let record = admitted.audit_record_v1();
+        assert_eq!(
+            record["admitted_evidence_id"],
+            Value::String(admitted.admitted_evidence_id().to_string())
+        );
     }
 }
