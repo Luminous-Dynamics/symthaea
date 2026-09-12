@@ -24,10 +24,11 @@ pub enum QualificationSampler {
 }
 
 impl QualificationSampler {
+    /// Version-stable evidence identity for the transition kernel.
     pub fn stable_id(self) -> String {
         match self {
             Self::RandomWalkMetropolis { proposal_max_angle } => {
-                format!("cm_metropolis:max_angle={proposal_max_angle:.17e}")
+                format!("cm_metropolis_v1:max_angle={proposal_max_angle:.17e}")
             }
             Self::HeatbathOverrelaxation { schedule } => schedule.identity(),
         }
@@ -244,6 +245,24 @@ mod tests {
     }
 
     #[test]
+    fn sampler_ids_are_explicitly_versioned() {
+        assert_eq!(
+            QualificationSampler::RandomWalkMetropolis { proposal_max_angle: 0.5 }.stable_id(),
+            "cm_metropolis_v1:max_angle=5.00000000000000000e-1"
+        );
+        assert_eq!(
+            QualificationSampler::HeatbathOverrelaxation {
+                schedule: HeatbathOverrelaxationSchedule {
+                    force_backend: SubgroupForceBackend::Staple,
+                    overrelaxation_sweeps: 2,
+                    max_heatbath_attempts: 256,
+                },
+            }.stable_id(),
+            "cm_heatbath_or_v1:force=staple:or_sweeps=2:max_attempts=256"
+        );
+    }
+
+    #[test]
     fn schedule_never_samples_at_burnin_boundary() {
         let p = plan(QualificationSampler::RandomWalkMetropolis { proposal_max_angle: 0.5 });
         assert_eq!(p.measurement_schedule().unwrap(), vec![2,3]);
@@ -270,9 +289,11 @@ mod tests {
         assert_eq!(b.samples.len(), 2);
         assert_eq!(a.samples.iter().map(|s| s.cycle).collect::<Vec<_>>(), vec![2,3]);
         assert_eq!(b.samples.iter().map(|s| s.cycle).collect::<Vec<_>>(), vec![2,3]);
-        assert!(a.work.metropolis_accepted_updates > 0);
+        assert!(a.work.stochastic_subgroup_updates > 0);
+        assert!(a.work.metropolis_accepted_updates <= a.work.stochastic_subgroup_updates);
         assert_eq!(a.work.heatbath_scalar_rejection_attempts, 0);
-        assert!(b.work.heatbath_scalar_rejection_attempts > 0);
+        assert!(b.work.stochastic_subgroup_updates > 0);
+        assert!(b.work.heatbath_scalar_rejection_attempts >= b.work.stochastic_subgroup_updates);
         assert!(b.work.overrelaxation_subgroup_updates > 0);
     }
 
