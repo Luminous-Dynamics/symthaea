@@ -119,7 +119,7 @@ mod tests {
         RequalificationAuthorization, RequalificationGate, RequalificationPhase,
         RequalificationPolicy,
     };
-    use symthaea_domain_awareness_vision::{TrackAssuranceLevel, TrackAssuranceReason};
+    use symthaea_domain_awareness_vision::TrackAssuranceLevel;
     use symthaea_model_assurance::ModelAssuranceIssue;
     use symthaea_sensor_common_cause::{CommonCauseDiversityReport, FaultDomainKind};
 
@@ -141,6 +141,7 @@ mod tests {
             minimum_consecutive_nominal_samples: 3,
             minimum_nominal_span_ms: 2_000,
             maximum_nominal_sample_gap_ms: 1_500,
+            maximum_authorization_age_ms: 10_000,
         }
     }
 
@@ -242,6 +243,5 @@ mod tests {
         };
         let sample = sample_from_qualified_track(&report, 1_000, "evidence:track-1").unwrap();
         assert_eq!(sample.state, AssuranceState::Nominal);
-        let _ = Vec::<TrackAssuranceReason>::new();
     }
 }
