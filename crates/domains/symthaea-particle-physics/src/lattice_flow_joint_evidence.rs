@@ -1,0 +1,307 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Evidence wrapper for production joint blocked-jackknife scale estimates.
+//!
+//! This layer binds the executable resampler result to the pre-existing
+//! same-ensemble flow-curve evidence contract. It verifies that the central
+//! curve, configuration population, independent-chain population and resampling
+//! geometry all refer to the same subject before promoting the uncertainty.
+
+use crate::lattice_flow_joint_jackknife::{
+    JOINT_BLOCKED_JACKKNIFE_ID, JointBlockedJackknifeScale, JointFlowScaleKind,
+};
+use crate::lattice_flow_scale_evidence::{
+    FlowEnergyEvidenceCurve, FlowScaleEstimateEvidence, FlowScaleEvidenceError,
+    FlowScaleKind, bind_flow_scale_estimate,
+};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct JointJackknifeScaleEstimateEvidence {
+    pub scale: FlowScaleEstimateEvidence,
+    pub resampling_method_id: &'static str,
+    pub configuration_count: usize,
+    pub independent_chain_count: usize,
+    pub block_size: usize,
+    pub block_count: usize,
+    pub replicate_count: usize,
+    pub replicate_mean: f64,
+    pub replicate_estimates: Vec<f64>,
+    pub resampling_artifact_digest: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum JointJackknifeEvidenceError {
+    Scale(FlowScaleEvidenceError),
+    ResamplingMethodMismatch,
+    InvalidBlockGeometry,
+    InvalidChainGeometry,
+    ReplicateCountMismatch { expected: usize, actual: usize },
+    InvalidResamplingStatistic,
+    ReplicateSummaryMismatch,
+    ConfigurationCountMismatch { curve: usize, resampling: usize },
+    IndependentChainCountMismatch { curve: usize, resampling: usize },
+    MeanCurveLengthMismatch { curve: usize, resampling: usize },
+    MeanCurvePointMismatch { index: usize },
+    CentralEstimateMismatch { curve: f64, resampling: f64 },
+    EmptyResamplingArtifactDigest,
+}
+
+impl From<FlowScaleEvidenceError> for JointJackknifeEvidenceError {
+    fn from(value: FlowScaleEvidenceError) -> Self {
+        Self::Scale(value)
+    }
+}
+
+fn scale_kind(kind: JointFlowScaleKind) -> FlowScaleKind {
+    match kind {
+        JointFlowScaleKind::T0Like => FlowScaleKind::T0Like,
+        JointFlowScaleKind::W0Like => FlowScaleKind::W0Like,
+    }
+}
+
+fn approximately_equal(left: f64, right: f64) -> bool {
+    let tolerance = 1.0e-12 * (1.0 + left.abs().max(right.abs()));
+    (left - right).abs() <= tolerance
+}
+
+fn recompute_jackknife_summary(replicates: &[f64]) -> Option<(f64, f64)> {
+    if replicates.len() < 2 || replicates.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+    let mean = replicates.iter().sum::<f64>() / replicates.len() as f64;
+    let square_sum = replicates
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>();
+    let variance = (replicates.len() - 1) as f64 / replicates.len() as f64 * square_sum;
+    let standard_error = variance.sqrt();
+    (mean.is_finite() && standard_error.is_finite()).then_some((mean, standard_error))
+}
+
+pub fn bind_joint_jackknife_scale_evidence(
+    curve: &FlowEnergyEvidenceCurve,
+    resampling: &JointBlockedJackknifeScale,
+    curve_artifact_digest: impl Into<String>,
+    joint_resampling_evidence_id: impl Into<String>,
+    resampling_artifact_digest: impl Into<String>,
+) -> Result<JointJackknifeScaleEstimateEvidence, JointJackknifeEvidenceError> {
+    if resampling.method_id != JOINT_BLOCKED_JACKKNIFE_ID {
+        return Err(JointJackknifeEvidenceError::ResamplingMethodMismatch);
+    }
+    if resampling.block_size == 0
+        || resampling.block_count < 2
+        || resampling
+            .block_size
+            .checked_mul(resampling.block_count)
+            != Some(resampling.configuration_count)
+    {
+        return Err(JointJackknifeEvidenceError::InvalidBlockGeometry);
+    }
+    if resampling.independent_chain_count == 0
+        || resampling.independent_chain_count > resampling.block_count
+    {
+        return Err(JointJackknifeEvidenceError::InvalidChainGeometry);
+    }
+    if resampling.replicate_estimates.len() != resampling.block_count {
+        return Err(JointJackknifeEvidenceError::ReplicateCountMismatch {
+            expected: resampling.block_count,
+            actual: resampling.replicate_estimates.len(),
+        });
+    }
+    if !resampling.central_estimate.is_finite()
+        || !resampling.replicate_mean.is_finite()
+        || !resampling.standard_error.is_finite()
+        || resampling.standard_error < 0.0
+    {
+        return Err(JointJackknifeEvidenceError::InvalidResamplingStatistic);
+    }
+    let (recomputed_mean, recomputed_standard_error) =
+        recompute_jackknife_summary(&resampling.replicate_estimates)
+            .ok_or(JointJackknifeEvidenceError::InvalidResamplingStatistic)?;
+    if !approximately_equal(recomputed_mean, resampling.replicate_mean)
+        || !approximately_equal(recomputed_standard_error, resampling.standard_error)
+    {
+        return Err(JointJackknifeEvidenceError::ReplicateSummaryMismatch);
+    }
+
+    let kind = scale_kind(resampling.kind);
+    let scale = bind_flow_scale_estimate(
+        curve,
+        kind,
+        resampling.target,
+        resampling.standard_error,
+        curve_artifact_digest,
+        joint_resampling_evidence_id,
+    )?;
+
+    let first = &curve.points[0];
+    if first.retained_configurations != resampling.configuration_count {
+        return Err(JointJackknifeEvidenceError::ConfigurationCountMismatch {
+            curve: first.retained_configurations,
+            resampling: resampling.configuration_count,
+        });
+    }
+    if first.independent_chain_count != resampling.independent_chain_count {
+        return Err(JointJackknifeEvidenceError::IndependentChainCountMismatch {
+            curve: first.independent_chain_count,
+            resampling: resampling.independent_chain_count,
+        });
+    }
+    if curve.points.len() != resampling.ensemble_mean_curve.len() {
+        return Err(JointJackknifeEvidenceError::MeanCurveLengthMismatch {
+            curve: curve.points.len(),
+            resampling: resampling.ensemble_mean_curve.len(),
+        });
+    }
+    for (index, (curve_point, resampled_point)) in curve
+        .points
+        .iter()
+        .zip(&resampling.ensemble_mean_curve)
+        .enumerate()
+    {
+        if !approximately_equal(curve_point.flow_time, resampled_point.flow_time)
+            || !approximately_equal(
+                curve_point.ensemble_mean_energy,
+                resampled_point.ensemble_mean_energy,
+            )
+        {
+            return Err(JointJackknifeEvidenceError::MeanCurvePointMismatch { index });
+        }
+    }
+    if !approximately_equal(scale.estimate, resampling.central_estimate) {
+        return Err(JointJackknifeEvidenceError::CentralEstimateMismatch {
+            curve: scale.estimate,
+            resampling: resampling.central_estimate,
+        });
+    }
+
+    let resampling_artifact_digest = resampling_artifact_digest.into();
+    if resampling_artifact_digest.trim().is_empty() {
+        return Err(JointJackknifeEvidenceError::EmptyResamplingArtifactDigest);
+    }
+
+    Ok(JointJackknifeScaleEstimateEvidence {
+        scale,
+        resampling_method_id: JOINT_BLOCKED_JACKKNIFE_ID,
+        configuration_count: resampling.configuration_count,
+        independent_chain_count: resampling.independent_chain_count,
+        block_size: resampling.block_size,
+        block_count: resampling.block_count,
+        replicate_count: resampling.replicate_estimates.len(),
+        replicate_mean: resampling.replicate_mean,
+        replicate_estimates: resampling.replicate_estimates.clone(),
+        resampling_artifact_digest,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lattice_flow_energy::{CLOVER_FLOW_ENERGY_ID, EnsembleFlowEnergyPoint};
+    use crate::lattice_flow_scale_evidence::FlowEnergyEvidencePoint;
+
+    fn point(flow_time: f64, dimensionless: f64) -> FlowEnergyEvidencePoint {
+        FlowEnergyEvidencePoint {
+            flow_time,
+            ensemble_mean_energy: dimensionless / (flow_time * flow_time),
+            standard_error: 0.01,
+            effective_sample_size: 10.0,
+            retained_configurations: 12,
+            independent_chain_count: 2,
+            energy_operator_id: CLOVER_FLOW_ENERGY_ID.into(),
+            flow_implementation_id: "wilson_action_staple_rk3_v1".into(),
+            flow_step_size: 0.1,
+            ensemble_manifest_digest: "ensemble-sha256".into(),
+            statistics_evidence_id: format!("stats-{flow_time}"),
+            output_artifact_digest: format!("artifact-{flow_time}"),
+        }
+    }
+
+    fn curve() -> FlowEnergyEvidenceCurve {
+        FlowEnergyEvidenceCurve {
+            points: vec![
+                point(0.1, 0.10),
+                point(0.2, 0.18),
+                point(0.3, 0.26),
+                point(0.4, 0.34),
+            ],
+        }
+    }
+
+    fn result() -> JointBlockedJackknifeScale {
+        JointBlockedJackknifeScale {
+            method_id: JOINT_BLOCKED_JACKKNIFE_ID,
+            kind: JointFlowScaleKind::T0Like,
+            target: 0.30,
+            central_estimate: 0.35,
+            replicate_estimates: vec![0.34, 0.345, 0.355, 0.36],
+            replicate_mean: 0.35,
+            standard_error: 0.013_693_063_937_629_136,
+            ensemble_mean_curve: vec![
+                EnsembleFlowEnergyPoint { flow_time: 0.1, ensemble_mean_energy: 0.10 / 0.01 },
+                EnsembleFlowEnergyPoint { flow_time: 0.2, ensemble_mean_energy: 0.18 / 0.04 },
+                EnsembleFlowEnergyPoint { flow_time: 0.3, ensemble_mean_energy: 0.26 / 0.09 },
+                EnsembleFlowEnergyPoint { flow_time: 0.4, ensemble_mean_energy: 0.34 / 0.16 },
+            ],
+            configuration_count: 12,
+            independent_chain_count: 2,
+            block_size: 3,
+            block_count: 4,
+        }
+    }
+
+    #[test]
+    fn binds_chain_population_and_resampling_geometry() {
+        let evidence = bind_joint_jackknife_scale_evidence(
+            &curve(), &result(), "curve-sha256", "jackknife-evidence-id",
+            "jackknife-artifact-sha256",
+        ).unwrap();
+        assert_eq!(evidence.configuration_count, 12);
+        assert_eq!(evidence.independent_chain_count, 2);
+        assert_eq!(evidence.block_size, 3);
+        assert_eq!(evidence.block_count, 4);
+        assert_eq!(evidence.replicate_count, 4);
+    }
+
+    #[test]
+    fn forged_summary_fails_closed() {
+        let mut resampling = result();
+        resampling.standard_error *= 2.0;
+        assert!(matches!(
+            bind_joint_jackknife_scale_evidence(
+                &curve(), &resampling, "curve-sha256", "jackknife-evidence-id",
+                "jackknife-artifact-sha256",
+            ),
+            Err(JointJackknifeEvidenceError::ReplicateSummaryMismatch)
+        ));
+    }
+
+    #[test]
+    fn mismatched_chain_population_fails_closed() {
+        let mut resampling = result();
+        resampling.independent_chain_count = 1;
+        assert!(matches!(
+            bind_joint_jackknife_scale_evidence(
+                &curve(), &resampling, "curve-sha256", "jackknife-evidence-id",
+                "jackknife-artifact-sha256",
+            ),
+            Err(JointJackknifeEvidenceError::IndependentChainCountMismatch {
+                curve: 2,
+                resampling: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn mismatched_mean_curve_fails_closed() {
+        let mut resampling = result();
+        resampling.ensemble_mean_curve[2].ensemble_mean_energy *= 1.01;
+        assert!(matches!(
+            bind_joint_jackknife_scale_evidence(
+                &curve(), &resampling, "curve-sha256", "jackknife-evidence-id",
+                "jackknife-artifact-sha256",
+            ),
+            Err(JointJackknifeEvidenceError::MeanCurvePointMismatch { index: 2 })
+        ));
+    }
+}
