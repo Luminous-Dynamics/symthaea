@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-domain-awareness-common-cause"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Monotonic common-cause diversity gate for Symthaea domain-awareness track assurance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "sensor-fusion", "fault-tolerance", "assurance"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-domain-awareness-vision = { path = "../symthaea-domain-awareness-vision" }
+symthaea-sensor-common-cause = { path = "../../domains/symthaea-sensor-common-cause" }
