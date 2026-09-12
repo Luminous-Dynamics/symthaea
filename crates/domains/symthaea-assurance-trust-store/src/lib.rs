@@ -85,8 +85,8 @@ impl TrustStoreCheckpoint {
             && self.anchor_revision > 0
             && valid_digest(&self.anchor_digest)
             && self.policy_tip_revision > 0
-            && self.attestation_ref.trim().is_empty().not()
-            && self.independent_verification_ref.trim().is_empty().not()
+            && !self.attestation_ref.trim().is_empty()
+            && !self.independent_verification_ref.trim().is_empty()
             && !self.evidence_refs.is_empty()
             && self.evidence_refs.iter().all(|value| !value.trim().is_empty())
             && match self.store_revision {
@@ -133,15 +133,6 @@ impl TrustStoreCheckpoint {
 
     pub const fn grants_physical_authority(&self) -> bool {
         false
-    }
-}
-
-trait BoolNot {
-    fn not(self) -> bool;
-}
-impl BoolNot for bool {
-    fn not(self) -> bool {
-        !self
     }
 }
 
@@ -253,9 +244,8 @@ pub fn assess_checkpoint_chain(
                 revision: current.store_revision,
             });
         }
-        if current.predecessor_checkpoint_digest.as_deref()
-            != Some(previous.checkpoint_digest().as_str())
-        {
+        let previous_digest = previous.checkpoint_digest();
+        if current.predecessor_checkpoint_digest.as_deref() != Some(previous_digest.as_str()) {
             issues.push(TrustStoreChainIssue::PredecessorDigestMismatch {
                 revision: current.store_revision,
             });
@@ -320,7 +310,10 @@ impl TrustStoreBackup {
         created_at_ms: u64,
         evidence_refs: Vec<String>,
     ) -> Option<Self> {
-        if !checkpoint.validate(profile) || evidence_refs.is_empty() {
+        if !checkpoint.validate(profile)
+            || evidence_refs.is_empty()
+            || created_at_ms < checkpoint.recorded_at_ms
+        {
             return None;
         }
         Some(Self {
@@ -417,11 +410,14 @@ pub enum TrustStoreRecoveryIssue {
     InvalidAuthorization,
     AuthorizationExpired,
     BackupIsNotCurrentTip,
+    BackupSnapshotMismatch,
+    BackupPredatesCheckpoint,
     BackupCounterBelowFloor,
     BackupPolicyRevisionBelowFloor,
     PreviousTipMismatch,
     BackupDigestMismatch,
     ReplacementStoreDidNotChange,
+    ReplacementCounterEpochDidNotChange,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -469,6 +465,16 @@ pub fn assess_recovery(
     if backup.source_checkpoint_digest != current_digest {
         issues.push(TrustStoreRecoveryIssue::BackupIsNotCurrentTip);
     }
+    if backup.counter_epoch != current_tip.counter_epoch
+        || backup.counter_value != current_tip.counter_value
+        || backup.anchor_digest != current_tip.anchor_digest
+        || backup.policy_tip_revision != current_tip.policy_tip_revision
+    {
+        issues.push(TrustStoreRecoveryIssue::BackupSnapshotMismatch);
+    }
+    if backup.created_at_ms < current_tip.recorded_at_ms {
+        issues.push(TrustStoreRecoveryIssue::BackupPredatesCheckpoint);
+    }
     if backup.counter_value < current_tip.counter_value
         || backup.counter_value < authorization.minimum_counter_value
     {
@@ -487,6 +493,9 @@ pub fn assess_recovery(
     }
     if authorization.replacement_trust_store_ref == profile.trust_store_ref {
         issues.push(TrustStoreRecoveryIssue::ReplacementStoreDidNotChange);
+    }
+    if authorization.replacement_counter_epoch == current_tip.counter_epoch {
+        issues.push(TrustStoreRecoveryIssue::ReplacementCounterEpochDidNotChange);
     }
 
     let invalid = issues.iter().any(|issue| {
@@ -591,7 +600,10 @@ mod tests {
         .unwrap()
     }
 
-    fn authorization(tip: &TrustStoreCheckpoint, backup: &TrustStoreBackup) -> TrustStoreRecoveryAuthorization {
+    fn authorization(
+        tip: &TrustStoreCheckpoint,
+        backup: &TrustStoreBackup,
+    ) -> TrustStoreRecoveryAuthorization {
         TrustStoreRecoveryAuthorization {
             authorization_id: "recovery:1".into(),
             store_id: "policy-root".into(),
@@ -664,9 +676,24 @@ mod tests {
         assert!(report.issues.iter().any(|issue| matches!(
             issue,
             TrustStoreRecoveryIssue::BackupIsNotCurrentTip
+                | TrustStoreRecoveryIssue::BackupSnapshotMismatch
                 | TrustStoreRecoveryIssue::BackupCounterBelowFloor
                 | TrustStoreRecoveryIssue::BackupPolicyRevisionBelowFloor
         )));
+    }
+
+    #[test]
+    fn forged_backup_snapshot_cannot_claim_current_tip() {
+        let values = chain();
+        let tip = values.last().unwrap();
+        let mut backup = backup(tip);
+        backup.anchor_digest = "blake3:other-anchor".into();
+        let auth = authorization(tip, &backup);
+        let report = assess_recovery(&profile(), tip, &backup, &auth, 5_000);
+        assert_eq!(report.status, TrustStoreRecoveryStatus::Blocked);
+        assert!(report
+            .issues
+            .contains(&TrustStoreRecoveryIssue::BackupSnapshotMismatch));
     }
 
     #[test]
@@ -682,16 +709,20 @@ mod tests {
     }
 
     #[test]
-    fn replacement_store_must_actually_change() {
+    fn replacement_store_and_counter_epoch_must_change() {
         let values = chain();
         let tip = values.last().unwrap();
         let backup = backup(tip);
         let mut auth = authorization(tip, &backup);
         auth.replacement_trust_store_ref = profile().trust_store_ref;
+        auth.replacement_counter_epoch = tip.counter_epoch.clone();
         let report = assess_recovery(&profile(), tip, &backup, &auth, 5_000);
         assert_eq!(report.status, TrustStoreRecoveryStatus::Blocked);
         assert!(report
             .issues
             .contains(&TrustStoreRecoveryIssue::ReplacementStoreDidNotChange));
+        assert!(report
+            .issues
+            .contains(&TrustStoreRecoveryIssue::ReplacementCounterEpochDidNotChange));
     }
 }
