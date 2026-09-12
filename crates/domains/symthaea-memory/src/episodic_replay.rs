@@ -45,7 +45,6 @@
 //! │              └──────────────────────┘                               │
 //! └─────────────────────────────────────────────────────────────────────┘
 //! ```
-//!
 //! ## Usage
 //!
 //! ```rust,ignore
@@ -71,7 +70,9 @@
 use ndarray::Array1;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::fmt;
+use uuid::Uuid;
 
 use crate::TrainableNetwork;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
@@ -79,6 +80,35 @@ use symthaea_core::hdc::unified_hv::ContinuousHV;
 // ═══════════════════════════════════════════════════════════════════════════════
 // EPISODE: A Single High-Phi Moment
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Storage-occurrence identity assigned by the canonical episodic store.
+///
+/// This is deliberately different from semantic/content identity: two byte-identical
+/// experiences stored twice receive different instance IDs. The ID follows one stored
+/// occurrence through replay, reconsolidation, quarantine, restoration, cloning, and
+/// serialization. Fresh ordinary insertion always overwrites any caller-provided value.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
+#[serde(transparent)]
+pub struct EpisodeInstanceId(Uuid);
+
+impl EpisodeInstanceId {
+    fn fresh() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    /// Return the underlying UUID for durable/audit representations.
+    pub fn as_uuid(self) -> Uuid {
+        self.0
+    }
+}
+
+impl fmt::Display for EpisodeInstanceId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 /// An episode representing a single high-consciousness moment in the cognitive loop.
 ///
@@ -136,6 +166,15 @@ pub struct Episode {
     /// Semantic embedding from neural encoder (for embedding-based retrieval).
     #[serde(default)]
     pub semantic_embedding: Option<Vec<f32>>,
+
+    /// Canonical storage-occurrence identity.
+    ///
+    /// `None` means the episode has not yet been accepted by an `EpisodicMemory`, or it was
+    /// deserialized from legacy data. Normal insertion assigns a fresh ID only after the Psi
+    /// threshold passes. This field is lifecycle metadata and must not be interpreted as part of
+    /// the episode's semantic/content identity.
+    #[serde(default)]
+    pub instance_id: Option<EpisodeInstanceId>,
 }
 
 impl Episode {
@@ -155,6 +194,7 @@ impl Episode {
             dopamine_at_encoding: None,
             bath_state_at_encoding: None,
             semantic_embedding: None,
+            instance_id: None,
         }
     }
 
@@ -182,6 +222,7 @@ impl Episode {
             dopamine_at_encoding: None,
             bath_state_at_encoding: None,
             semantic_embedding: None,
+            instance_id: None,
         }
     }
 
@@ -310,6 +351,41 @@ impl Ord for PrioritizedEpisode {
     }
 }
 
+/// Reversible inactive storage for one exact episodic occurrence.
+///
+/// Quarantine removes an episode from active sampling/replay/retrieval without destroying it.
+/// Governance, consent, justification, and durable audit evidence are intentionally handled by
+/// higher assurance layers; this type is the canonical memory mechanism only.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuarantinedEpisode {
+    pub instance_id: EpisodeInstanceId,
+    pub episode: Episode,
+    pub score_at_quarantine: f64,
+    pub quarantined_at_cycle: u64,
+}
+
+/// Mechanism-level quarantine error. This is not an authorization decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EpisodicQuarantineError {
+    InstanceNotFound(EpisodeInstanceId),
+    AlreadyQuarantined(EpisodeInstanceId),
+    ActiveInstanceCollision(EpisodeInstanceId),
+}
+
+impl fmt::Display for EpisodicQuarantineError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InstanceNotFound(id) => write!(f, "episodic instance not found: {id}"),
+            Self::AlreadyQuarantined(id) => write!(f, "episodic instance already quarantined: {id}"),
+            Self::ActiveInstanceCollision(id) => {
+                write!(f, "episodic instance is already active: {id}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for EpisodicQuarantineError {}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -353,15 +429,15 @@ impl Default for EpisodicReplayConfig {
     fn default() -> Self {
         Self {
             capacity: 1000,
-            psi_threshold: 0.3,   // Only store episodes with Psi > 0.3
-            replay_interval: 100, // Replay every 100 cycles
-            batch_size: 8,        // 8 episodes per replay session
-            recency_weight: 0.2,  // Moderate recency preference
-            replay_learning_rate_multiplier: 0.5, // Half the normal learning rate
-            replay_dt: 0.02,      // Same as cognitive loop default
-            psi_weighted_sampling: true, // Sample high-Psi episodes more often
-            sampling_temperature: 1.0, // Normal temperature
-            min_episodes_for_replay: 10, // Need at least 10 episodes
+            psi_threshold: 0.3,
+            replay_interval: 100,
+            batch_size: 8,
+            recency_weight: 0.2,
+            replay_learning_rate_multiplier: 0.5,
+            replay_dt: 0.02,
+            psi_weighted_sampling: true,
+            sampling_temperature: 1.0,
+            min_episodes_for_replay: 10,
         }
     }
 }
@@ -374,7 +450,7 @@ impl EpisodicReplayConfig {
             batch_size: 4,
             replay_learning_rate_multiplier: 0.3,
             psi_weighted_sampling: true,
-            sampling_temperature: 0.5, // More focused on top episodes
+            sampling_temperature: 0.5,
             ..Default::default()
         }
     }
@@ -398,9 +474,6 @@ impl EpisodicReplayConfig {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Cosine similarity between two 9-dimensional bath state vectors.
-///
-/// Returns 1.0 for identical states, 0.0 for orthogonal, -1.0 for opposite.
-/// Used for state-dependent memory retrieval (Godden & Baddeley, 1975).
 pub fn bath_cosine_similarity(a: &[f32; 9], b: &[f32; 9]) -> f32 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let mag_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -416,72 +489,39 @@ pub fn bath_cosine_similarity(a: &[f32; 9], b: &[f32; 9]) -> f32 {
 /// Episodic memory system for storing and replaying high-Phi moments
 ///
 /// Uses a priority buffer (max-heap by Phi) with configurable capacity.
-/// When capacity is reached, lowest-Phi episodes are evicted.
-///
-/// **This is the sole canonical production episodic store for the autonomous cognitive loop**
-/// (Symthaea Cognitive Core Reconciliation Plan, Phase 3, 2026-07-28). It is constructed at
-/// `symthaea::cognitive_loop::constructor.rs:445`, wrapped in `EpisodicPersistenceManager`, and
-/// genuinely load-bearing: `run_episodic_replay_and_memory_phase` writes to it every cycle and
-/// its replay sessions retrain the live `TemporalNetwork::CfC`. A second, unrelated,
-/// `Vec<f32>`-typed type previously also named `EpisodicMemory`
-/// (`symthaea::experience::memory`) has been renamed to `ExperienceRecord` to end that name
-/// collision (Audit Overlap #1) — it was never wired into any read path and is not a competing
-/// implementation of this role.
+/// Quarantined episodes remain owned by this store but are excluded from every active read,
+/// replay, and retrieval path until explicitly restored.
 #[derive(Debug, Clone)]
 pub struct EpisodicMemory {
-    /// Configuration
     pub(crate) config: EpisodicReplayConfig,
-
-    /// Episode storage (priority queue by Phi)
     episodes: BinaryHeap<PrioritizedEpisode>,
-
-    /// Current cycle count (for recency calculation)
+    quarantined: HashMap<EpisodeInstanceId, QuarantinedEpisode>,
     current_cycle: u64,
-
-    /// Cycles since last replay
     cycles_since_replay: usize,
-
-    /// Total episodes ever stored
     total_stored: u64,
-
-    /// Total episodes evicted due to capacity
     total_evicted: u64,
-
-    /// Total replay training steps performed
     total_replay_steps: u64,
-
-    /// Average Psi of stored episodes
     average_psi: f64,
-
-    /// Minimum Psi in buffer (for eviction tracking)
     min_psi_in_buffer: f64,
-
-    /// Sum of replay losses (for tracking)
     sum_replay_loss: f64,
-
-    /// Demand-driven replay trigger flag (cleared after replay session)
     demand_replay_triggered: bool,
-
-    /// Number of demand-driven replays performed
     demand_replay_count: u64,
 }
 
 impl EpisodicMemory {
-    /// Get the current replay batch size.
     pub fn batch_size(&self) -> usize {
         self.config.batch_size
     }
 
-    /// Set the replay batch size (e.g., for surprise-boosted sessions).
     pub fn set_batch_size(&mut self, batch_size: usize) {
         self.config.batch_size = batch_size;
     }
 
-    /// Create a new episodic memory system
     pub fn new(config: EpisodicReplayConfig) -> Self {
         Self {
             config,
             episodes: BinaryHeap::new(),
+            quarantined: HashMap::new(),
             current_cycle: 0,
             cycles_since_replay: 0,
             total_stored: 0,
@@ -495,73 +535,63 @@ impl EpisodicMemory {
         }
     }
 
-    /// Store an episode if its Phi exceeds the threshold
+    /// Store an episode if its Psi exceeds the threshold.
     ///
-    /// Returns true if the episode was stored, false if it was below threshold.
+    /// Compatibility wrapper over [`Self::store_if_significant_with_id`].
     pub fn store_if_significant(&mut self, episode: Episode) -> bool {
+        self.store_if_significant_with_id(episode).is_some()
+    }
+
+    /// Store an episode and return the exact occurrence identity assigned by this store.
+    ///
+    /// A new successful insertion always receives a fresh UUID, even if the caller supplied an
+    /// `instance_id` by cloning or deserializing an older episode. This prevents duplicate content
+    /// or caller-controlled IDs from collapsing two stored occurrences into one identity.
+    pub fn store_if_significant_with_id(
+        &mut self,
+        mut episode: Episode,
+    ) -> Option<EpisodeInstanceId> {
         self.current_cycle = episode.timestamp;
         self.cycles_since_replay += 1;
 
-        // Check Phi threshold
         if episode.psi < self.config.psi_threshold {
-            return false;
+            return None;
         }
 
-        // Calculate priority score
+        let instance_id = EpisodeInstanceId::fresh();
+        episode.instance_id = Some(instance_id);
         let score = episode.priority_score(self.current_cycle, self.config.recency_weight);
 
-        // Update statistics
         let n = self.episodes.len() as f64;
         self.average_psi = (self.average_psi * n + episode.psi) / (n + 1.0);
         if episode.psi < self.min_psi_in_buffer {
             self.min_psi_in_buffer = episode.psi;
         }
 
-        // Store the episode
         self.episodes.push(PrioritizedEpisode { episode, score });
         self.total_stored += 1;
 
-        // Evict if over capacity
         if self.episodes.len() > self.config.capacity {
-            // Remove lowest priority (we need to rebuild to get min)
-            // For efficiency, we'll let it grow slightly over capacity
-            // Real eviction happens during sampling
             self.total_evicted += 1;
         }
 
-        true
+        Some(instance_id)
     }
 
     /// Check if we should perform a replay session this cycle.
-    ///
-    /// Returns true when enough cycles have passed since the last replay
-    /// or when an on-demand trigger has been set (e.g., prediction error spike).
     pub fn should_replay(&self) -> bool {
         let periodic = self.cycles_since_replay >= self.config.replay_interval;
         let triggered = self.demand_replay_triggered;
         (periodic || triggered) && self.episodes.len() >= self.config.min_episodes_for_replay
     }
 
-    /// Trigger an immediate consolidation replay.
-    ///
-    /// Called by the cognitive loop when a demand-driven condition is detected
-    /// (e.g., prediction error spike > 2x average, or semantic retrieval miss).
     pub fn trigger_demand_replay(&mut self) {
         self.demand_replay_triggered = true;
         self.demand_replay_count += 1;
     }
 
-    /// Adapt replay interval based on environmental volatility.
-    ///
-    /// High error variance → shorter interval (more frequent replay to track changes).
-    /// Low error variance → longer interval (stable environment, conserve resources).
-    /// Bounded to [25, 200] cycles.
-    ///
-    /// Science: McClelland et al. (1995) — complementary learning systems theory:
-    /// fast-changing environments require more frequent hippocampal replay.
     pub fn adapt_replay_interval(&mut self, error_variance: f32) {
         let base = 100.0f32;
-        // High variance (>0.1) → halve interval; low variance (<0.01) → double it
         let factor = if error_variance > 0.1 {
             0.5
         } else if error_variance > 0.05 {
@@ -574,43 +604,31 @@ impl EpisodicMemory {
         self.config.replay_interval = (base * factor).clamp(25.0, 200.0) as usize;
     }
 
-    /// Sample a batch of episodes for replay, prioritized by Phi
-    ///
-    /// Uses either Phi-weighted sampling or uniform sampling based on config.
+    /// Sample a batch of active episodes for replay, prioritized by Psi.
     pub fn sample_replay_batch(&mut self, batch_size: usize) -> Vec<Episode> {
         let batch_size = batch_size.min(self.episodes.len());
         if batch_size == 0 {
             return Vec::new();
         }
 
-        // Collect all episodes for sampling
         let all_episodes: Vec<PrioritizedEpisode> = self.episodes.iter().cloned().collect();
-
         let mut batch = Vec::with_capacity(batch_size);
 
         if self.config.psi_weighted_sampling {
-            // Phi-weighted sampling using softmax probabilities
             let temp = self.config.sampling_temperature.max(1e-10);
             let scores: Vec<f64> = all_episodes.iter().map(|pe| pe.score / temp).collect();
-
-            // Compute softmax
             let max_score = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
             let exp_scores: Vec<f64> = scores.iter().map(|s| (s - max_score).exp()).collect();
             let sum_exp: f64 = exp_scores.iter().sum();
             let probabilities: Vec<f64> = exp_scores.iter().map(|e| e / sum_exp).collect();
-
-            // Sample without replacement
-            let mut used_indices = std::collections::HashSet::new();
+            let mut used_indices = HashSet::new();
             let mut rng_state = self.current_cycle;
 
             for _ in 0..batch_size {
-                // Generate random number
                 rng_state ^= rng_state << 13;
                 rng_state ^= rng_state >> 7;
                 rng_state ^= rng_state << 17;
                 let rand_val = (rng_state as f64) / (u64::MAX as f64);
-
-                // Find index using cumulative distribution
                 let mut cumsum = 0.0;
                 let mut selected_idx = 0;
                 for (idx, &prob) in probabilities.iter().enumerate() {
@@ -623,17 +641,13 @@ impl EpisodicMemory {
                         break;
                     }
                 }
-
                 if !used_indices.contains(&selected_idx) {
                     used_indices.insert(selected_idx);
                     batch.push(all_episodes[selected_idx].episode.clone());
                 }
             }
         } else {
-            // Uniform sampling (still from high-Phi buffer)
             let mut indices: Vec<usize> = (0..all_episodes.len()).collect();
-
-            // Fisher-Yates shuffle with deterministic seed
             let mut rng_state = self.current_cycle;
             for i in (1..indices.len()).rev() {
                 rng_state ^= rng_state << 13;
@@ -642,7 +656,6 @@ impl EpisodicMemory {
                 let j = (rng_state as usize) % (i + 1);
                 indices.swap(i, j);
             }
-
             for idx in indices.into_iter().take(batch_size) {
                 batch.push(all_episodes[idx].episode.clone());
             }
@@ -651,19 +664,12 @@ impl EpisodicMemory {
         batch
     }
 
-    /// Sample a batch of episodes conditioned on current neuromodulator bath state.
-    ///
-    /// Episodes encoded in a similar bath state get a priority bonus via cosine
-    /// similarity, implementing state-dependent memory retrieval.
-    ///
-    /// Science: Godden & Baddeley (1975) — state-dependent memory.
-    /// Eich (1980) — mood-dependent retrieval.
+    /// Sample a batch of active episodes conditioned on current neuromodulator bath state.
     pub fn sample_replay_batch_conditioned(
         &mut self,
         batch_size: usize,
         current_bath: Option<[f32; 9]>,
     ) -> Vec<Episode> {
-        // Fall back to standard sampling if no bath state provided
         let current_bath = match current_bath {
             Some(b) => b,
             None => return self.sample_replay_batch(batch_size),
@@ -673,10 +679,7 @@ impl EpisodicMemory {
         if batch_size == 0 {
             return Vec::new();
         }
-
         let all_episodes: Vec<PrioritizedEpisode> = self.episodes.iter().cloned().collect();
-
-        // Compute conditioned scores: base priority + cosine similarity bonus
         let scores: Vec<f64> = all_episodes
             .iter()
             .map(|pe| {
@@ -690,15 +693,12 @@ impl EpisodicMemory {
                 base + similarity_bonus
             })
             .collect();
-
-        // Softmax sampling
         let max_score = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         let exp_scores: Vec<f64> = scores.iter().map(|s| (s - max_score).exp()).collect();
         let sum_exp: f64 = exp_scores.iter().sum();
         let probabilities: Vec<f64> = exp_scores.iter().map(|e| e / sum_exp).collect();
-
         let mut batch = Vec::with_capacity(batch_size);
-        let mut used_indices = std::collections::HashSet::new();
+        let mut used_indices = HashSet::new();
         let mut rng_state = self.current_cycle;
 
         for _ in 0..batch_size {
@@ -706,7 +706,6 @@ impl EpisodicMemory {
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
             let rand_val = (rng_state as f64) / (u64::MAX as f64);
-
             let mut cumsum = 0.0;
             let mut selected_idx = 0;
             for (idx, &prob) in probabilities.iter().enumerate() {
@@ -719,7 +718,6 @@ impl EpisodicMemory {
                     break;
                 }
             }
-
             if !used_indices.contains(&selected_idx) {
                 used_indices.insert(selected_idx);
                 batch.push(all_episodes[selected_idx].episode.clone());
@@ -729,10 +727,6 @@ impl EpisodicMemory {
         batch
     }
 
-    /// Perform a single replay training step on a CfC network
-    ///
-    /// This reinforces the pattern stored in the episode.
-    /// The network learns to predict the output given the input.
     pub fn replay_training_step(
         &mut self,
         network: &mut impl TrainableNetwork,
@@ -740,34 +734,22 @@ impl EpisodicMemory {
         base_learning_rate: f32,
         dt: f32,
     ) -> f32 {
-        // DA-modulated replay LR: high-DA episodes get stronger replay training
-        // Science: Schafer & Bhatt (2017) — reward reactivation amplifies replay
         let da_replay_scale = episode
             .dopamine_at_encoding
-            .map(|d| 0.7 + d * 0.6) // [0.7, 1.3]
+            .map(|d| 0.7 + d * 0.6)
             .unwrap_or(1.0);
         let learning_rate =
             base_learning_rate * self.config.replay_learning_rate_multiplier * da_replay_scale;
-
-        // Convert episode to arrays
         let input = episode.input_as_array();
         let target = episode.output_as_array();
-
-        // Perform training step
         let loss = network
             .train_step(&input, &target, dt, learning_rate)
             .unwrap_or(f32::MAX);
-
-        // Update statistics
         self.total_replay_steps += 1;
         self.sum_replay_loss += loss as f64;
-
         loss
     }
 
-    /// Perform a full replay session (sample batch + train)
-    ///
-    /// Returns average loss over the batch.
     pub fn replay_session(
         &mut self,
         network: &mut impl TrainableNetwork,
@@ -794,7 +776,6 @@ impl EpisodicMemory {
 
         let mut total_loss = 0.0;
         let mut total_psi = 0.0;
-
         for episode in &batch {
             let loss = self.replay_training_step(
                 network,
@@ -806,25 +787,30 @@ impl EpisodicMemory {
             total_psi += episode.psi;
         }
 
-        // Reset replay counter and demand trigger
         self.cycles_since_replay = 0;
         self.demand_replay_triggered = false;
-
-        // Increment replay counts and reconsolidate sampled episodes
-        // (This requires mutable access to episodes, which we'll handle by rebuilding)
-        // Reconsolidation: retrieval makes memories labile, then re-stores them
-        // with updated consolidation strength (biological reconsolidation model).
         let current_psi = total_psi / batch.len().max(1) as f64;
+        let sampled_ids: HashSet<EpisodeInstanceId> =
+            batch.iter().filter_map(|episode| episode.instance_id).collect();
+        let legacy_batch: Vec<&Episode> = batch
+            .iter()
+            .filter(|episode| episode.instance_id.is_none())
+            .collect();
+
         let mut new_episodes = BinaryHeap::new();
         for mut pe in self.episodes.drain() {
-            // Check if this episode was in the batch
-            // Simple approximation: increment if Phi matches any batch episode
-            for be in &batch {
-                if (pe.episode.psi - be.psi).abs() < 0.001 && pe.episode.timestamp == be.timestamp {
-                    pe.episode.replay_count += 1;
-                    pe.episode.reconsolidate(current_psi);
-                    break;
-                }
+            let exact_match = pe
+                .episode
+                .instance_id
+                .is_some_and(|id| sampled_ids.contains(&id));
+            let legacy_match = pe.episode.instance_id.is_none()
+                && legacy_batch.iter().any(|be| {
+                    (pe.episode.psi - be.psi).abs() < 0.001
+                        && pe.episode.timestamp == be.timestamp
+                });
+            if exact_match || legacy_match {
+                pe.episode.replay_count += 1;
+                pe.episode.reconsolidate(current_psi);
             }
             new_episodes.push(pe);
         }
@@ -839,10 +825,6 @@ impl EpisodicMemory {
         }
     }
 
-    /// Perform a conditioned replay session using bath state similarity.
-    ///
-    /// Like `replay_session` but uses `sample_replay_batch_conditioned` for
-    /// state-dependent retrieval (Godden & Baddeley, 1975).
     pub fn replay_session_conditioned(
         &mut self,
         network: &mut impl TrainableNetwork,
@@ -870,7 +852,6 @@ impl EpisodicMemory {
 
         let mut total_loss = 0.0;
         let mut total_psi = 0.0;
-
         for episode in &batch {
             let loss = self.replay_training_step(
                 network,
@@ -884,16 +865,28 @@ impl EpisodicMemory {
 
         self.cycles_since_replay = 0;
         self.demand_replay_triggered = false;
-
         let current_psi = total_psi / batch.len().max(1) as f64;
+        let sampled_ids: HashSet<EpisodeInstanceId> =
+            batch.iter().filter_map(|episode| episode.instance_id).collect();
+        let legacy_batch: Vec<&Episode> = batch
+            .iter()
+            .filter(|episode| episode.instance_id.is_none())
+            .collect();
+
         let mut new_episodes = BinaryHeap::new();
         for mut pe in self.episodes.drain() {
-            for be in &batch {
-                if (pe.episode.psi - be.psi).abs() < 0.001 && pe.episode.timestamp == be.timestamp {
-                    pe.episode.replay_count += 1;
-                    pe.episode.reconsolidate(current_psi);
-                    break;
-                }
+            let exact_match = pe
+                .episode
+                .instance_id
+                .is_some_and(|id| sampled_ids.contains(&id));
+            let legacy_match = pe.episode.instance_id.is_none()
+                && legacy_batch.iter().any(|be| {
+                    (pe.episode.psi - be.psi).abs() < 0.001
+                        && pe.episode.timestamp == be.timestamp
+                });
+            if exact_match || legacy_match {
+                pe.episode.replay_count += 1;
+                pe.episode.reconsolidate(current_psi);
             }
             new_episodes.push(pe);
         }
@@ -908,7 +901,6 @@ impl EpisodicMemory {
         }
     }
 
-    /// Get statistics about the episodic memory
     pub fn stats(&self) -> EpisodicMemoryStats {
         EpisodicMemoryStats {
             total_stored: self.total_stored,
@@ -934,31 +926,144 @@ impl EpisodicMemory {
         }
     }
 
-    /// Clear all stored episodes
+    /// Clear all *active* stored episodes.
+    ///
+    /// Quarantined episodes are deliberately preserved. A generic active-memory reset must not
+    /// become an implicit destruction path for content that was isolated specifically to remain
+    /// reversible. Destruction of quarantined content requires a separate future governed path.
     pub fn clear(&mut self) {
         self.episodes.clear();
         self.min_psi_in_buffer = f64::MAX;
         self.average_psi = 0.0;
     }
 
-    /// Get the current number of stored episodes
     pub fn len(&self) -> usize {
         self.episodes.len()
     }
 
-    /// Check if the memory is empty
     pub fn is_empty(&self) -> bool {
         self.episodes.is_empty()
     }
 
-    /// Boost consolidation strength for episodes whose timestamps match causal chain cycle numbers.
+    /// Number of reversibly quarantined episode instances.
+    pub fn quarantined_len(&self) -> usize {
+        self.quarantined.len()
+    }
+
+    /// Whether both active and quarantined storage are empty.
+    pub fn is_fully_empty(&self) -> bool {
+        self.episodes.is_empty() && self.quarantined.is_empty()
+    }
+
+    /// Snapshot all quarantined instances in deterministic ID order.
+    pub fn quarantined_instances(&self) -> Vec<QuarantinedEpisode> {
+        let mut values: Vec<_> = self.quarantined.values().cloned().collect();
+        values.sort_by_key(|entry| entry.instance_id);
+        values
+    }
+
+    /// Read one quarantined instance without activating it.
+    pub fn quarantined_instance(&self, id: EpisodeInstanceId) -> Option<QuarantinedEpisode> {
+        self.quarantined.get(&id).cloned()
+    }
+
+    /// Reversibly remove one exact occurrence from all active memory behavior.
     ///
-    /// When the temporal analyzer detects genuine causal chains, the cycle numbers involved
-    /// represent moments of real causal structure. Boosting their consolidation strength
-    /// in episodic memory makes them more resistant to eviction and more likely to be
-    /// replayed, reinforcing the causal patterns the system discovered.
+    /// This is a mechanism-only primitive. Production exogenous callers must still cross the
+    /// welfare/authority assurance boundary. Quarantine does not increment `total_evicted` and
+    /// does not rewrite the episode or its lifecycle counters.
+    pub fn quarantine_instance(
+        &mut self,
+        id: EpisodeInstanceId,
+    ) -> Result<QuarantinedEpisode, EpisodicQuarantineError> {
+        if self.quarantined.contains_key(&id) {
+            return Err(EpisodicQuarantineError::AlreadyQuarantined(id));
+        }
+
+        let mut retained = BinaryHeap::new();
+        let mut selected = None;
+        while let Some(pe) = self.episodes.pop() {
+            if pe.episode.instance_id == Some(id) && selected.is_none() {
+                selected = Some(pe);
+            } else {
+                retained.push(pe);
+            }
+        }
+        self.episodes = retained;
+
+        let selected = selected.ok_or(EpisodicQuarantineError::InstanceNotFound(id))?;
+        let quarantined = QuarantinedEpisode {
+            instance_id: id,
+            episode: selected.episode,
+            score_at_quarantine: selected.score,
+            quarantined_at_cycle: self.current_cycle,
+        };
+        self.quarantined.insert(id, quarantined.clone());
+        self.recompute_active_psi_stats();
+        Ok(quarantined)
+    }
+
+    /// Restore one quarantined occurrence with the same instance ID and episode state.
     ///
-    /// Drains the heap into a vec, applies boosts, then rebuilds. O(episodes × cycle_numbers).
+    /// Priority is recomputed at the current cycle because recency is dynamic; the identity and
+    /// episode lifecycle state are not rewritten and restoration is not counted as a new store.
+    pub fn restore_quarantined_instance(
+        &mut self,
+        id: EpisodeInstanceId,
+    ) -> Result<QuarantinedEpisode, EpisodicQuarantineError> {
+        if self
+            .episodes
+            .iter()
+            .any(|pe| pe.episode.instance_id == Some(id))
+        {
+            return Err(EpisodicQuarantineError::ActiveInstanceCollision(id));
+        }
+        let quarantined = self
+            .quarantined
+            .remove(&id)
+            .ok_or(EpisodicQuarantineError::InstanceNotFound(id))?;
+        let episode = quarantined.episode.clone();
+        let score = episode.priority_score(self.current_cycle, self.config.recency_weight);
+        self.episodes.push(PrioritizedEpisode { episode, score });
+        self.recompute_active_psi_stats();
+        Ok(quarantined)
+    }
+
+    /// Active episodes sorted by Psi, paired with their exact occurrence identity.
+    pub fn get_top_episode_instances(
+        &self,
+        n: usize,
+    ) -> Vec<(EpisodeInstanceId, Episode)> {
+        let mut sorted: Vec<_> = self.episodes.iter().collect();
+        sorted.sort_by(|a, b| {
+            b.episode
+                .psi
+                .partial_cmp(&a.episode.psi)
+                .unwrap_or(Ordering::Equal)
+        });
+        sorted
+            .into_iter()
+            .take(n)
+            .filter_map(|pe| pe.episode.instance_id.map(|id| (id, pe.episode.clone())))
+            .collect()
+    }
+
+    fn recompute_active_psi_stats(&mut self) {
+        if self.episodes.is_empty() {
+            self.average_psi = 0.0;
+            self.min_psi_in_buffer = f64::MAX;
+            return;
+        }
+        let mut total = 0.0;
+        let mut minimum = f64::MAX;
+        for pe in &self.episodes {
+            total += pe.episode.psi;
+            minimum = minimum.min(pe.episode.psi);
+        }
+        self.average_psi = total / self.episodes.len() as f64;
+        self.min_psi_in_buffer = minimum;
+    }
+
     pub fn boost_causal_consolidation(&mut self, cycle_numbers: &[u64], boost: f64) {
         if cycle_numbers.is_empty() {
             return;
@@ -968,7 +1073,6 @@ impl EpisodicMemory {
             if cycle_numbers.contains(&pe.episode.timestamp) {
                 pe.episode.consolidation_strength =
                     (pe.episode.consolidation_strength + boost).min(5.0);
-                // Recalculate priority score with updated consolidation
                 pe.score = pe
                     .episode
                     .priority_score(self.current_cycle, self.config.recency_weight);
@@ -977,17 +1081,11 @@ impl EpisodicMemory {
         self.episodes.extend(all);
     }
 
-    /// Boost consolidation strength of the most recent episodes.
-    ///
-    /// Called when consciousness score is high — conscious moments are
-    /// preferentially consolidated (Dehaene 2014, GWT predicts conscious
-    /// access correlates with memory formation).
     pub fn boost_recent_consolidation(&mut self, boost: f64) {
         if boost <= 0.0 || self.episodes.is_empty() {
             return;
         }
         let mut all: Vec<PrioritizedEpisode> = self.episodes.drain().collect();
-        // Boost the 3 most recent episodes (by timestamp)
         all.sort_by_key(|a| std::cmp::Reverse(a.episode.timestamp));
         for pe in all.iter_mut().take(3) {
             pe.episode.consolidation_strength =
@@ -999,7 +1097,6 @@ impl EpisodicMemory {
         self.episodes.extend(all);
     }
 
-    /// Get all episodes sorted by Phi (highest first)
     pub fn get_top_episodes(&self, n: usize) -> Vec<Episode> {
         let mut sorted: Vec<_> = self.episodes.iter().collect();
         sorted.sort_by(|a, b| {
@@ -1015,12 +1112,6 @@ impl EpisodicMemory {
             .collect()
     }
 
-    /// Retrieve episodes most similar to a given semantic embedding.
-    ///
-    /// Returns up to `top_k` `(Episode, f32)` pairs sorted by descending
-    /// cosine similarity.  Only episodes that carry a semantic embedding are
-    /// considered.  Returns an empty `Vec` when the store is empty or no
-    /// episodes have embeddings.
     pub fn retrieve_by_embedding_similarity(
         &self,
         query: &[f32],
@@ -1033,7 +1124,6 @@ impl EpisodicMemory {
         if query_norm < 1e-12 {
             return Vec::new();
         }
-
         let mut scored: Vec<(Episode, f32)> = self
             .episodes
             .iter()
@@ -1051,32 +1141,11 @@ impl EpisodicMemory {
                 Some((pe.episode.clone(), sim))
             })
             .collect();
-
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         scored.truncate(top_k);
         scored
     }
 
-    /// Retrieve episodes by similarity of their stored `input` vector.
-    ///
-    /// CORRECTION (2026-07-25, caught by C3's own purity test —
-    /// `recall_prediction_flag_on_eventually_diverges_from_off` panicked
-    /// "256 vs 16384" on first run): `Episode.input`/`.output` are NOT
-    /// full 16,384-D HDC vectors despite the `ContinuousHV` type — they
-    /// wrap the COMPRESSED CfC input/output (`compressed_state`/`output`,
-    /// same dimension as `prediction`; see `cycle_phases_memory.rs:356-358`).
-    /// Takes a plain `&[f32]` query in that compressed space, not a
-    /// `ContinuousHV`, to make the dimension honest at the call site.
-    ///
-    /// Unlike [`retrieve_by_embedding_similarity`], this needs no optional
-    /// `semantic_embedding` field (gated behind the non-default
-    /// `semantic-encoder` feature), so it works on any default build.
-    ///
-    /// Used by the Predictive Compression Program's C3 experiment
-    /// (docs/PREDICTIVE_COMPRESSION_PROGRAM_2026-07-17.md §7) to test
-    /// whether explicit content-based recall can supply predictive
-    /// information plain state carryover didn't (C1's P1 finding).
-    /// Read-only — does not affect consolidation/reconsolidation state.
     pub fn retrieve_by_input_similarity(&self, query: &[f32], top_k: usize) -> Vec<(Episode, f32)> {
         if query.is_empty() {
             return Vec::new();
@@ -1106,27 +1175,20 @@ impl EpisodicMemory {
         scored
     }
 
-    /// The Art of Forgetting: Causal Pruning.
-    ///
-    /// Removes episodes whose survival value falls below the threshold.
-    /// This keeps the memory engine lean and focused on high-Phi insight.
     pub fn prune(&mut self, threshold: f64) -> usize {
         let initial_len = self.episodes.len();
         let current_ts = self.current_cycle;
         let recency_w = self.config.recency_weight;
-
-        // Extract all episodes, filter by survival value, and rebuild heap
         let episodes: Vec<PrioritizedEpisode> = self.episodes.drain().collect();
         let filtered: Vec<PrioritizedEpisode> = episodes
             .into_iter()
             .filter(|pe| pe.episode.survival_value(current_ts, recency_w) >= threshold)
             .collect();
-
         let pruned_count = initial_len - filtered.len();
         self.total_evicted += pruned_count as u64;
         self.episodes.extend(filtered);
-
         if pruned_count > 0 {
+            self.recompute_active_psi_stats();
             tracing::info!(
                 target: "symthaea::memory::episodic",
                 pruned = pruned_count,
@@ -1135,7 +1197,6 @@ impl EpisodicMemory {
                 "Causal pruning complete (The Art of Forgetting)"
             );
         }
-
         pruned_count
     }
 }
@@ -1144,59 +1205,27 @@ impl EpisodicMemory {
 // RESULT TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Result of a replay session
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReplaySessionResult {
-    /// Number of episodes replayed
     pub episodes_replayed: usize,
-
-    /// Average loss over the batch
     pub average_loss: f32,
-
-    /// Average Psi of replayed episodes
     pub average_psi: f64,
-
-    /// Whether the session was skipped (not enough cycles or episodes)
     pub skipped: bool,
 }
 
-/// Statistics about the episodic memory
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpisodicMemoryStats {
-    /// Total episodes ever stored
     pub total_stored: u64,
-
-    /// Total episodes evicted due to capacity
     pub total_evicted: u64,
-
-    /// Current number of stored episodes
     pub current_count: usize,
-
-    /// Maximum capacity
     pub capacity: usize,
-
-    /// Average Psi of stored episodes
     pub average_psi: f64,
-
-    /// Minimum Psi in buffer
     pub min_psi_in_buffer: f64,
-
-    /// Psi threshold for storage
     pub psi_threshold: f64,
-
-    /// Total replay training steps
     pub total_replay_steps: u64,
-
-    /// Average loss during replay
     pub average_replay_loss: f64,
-
-    /// Cycles since last replay
     pub cycles_since_replay: usize,
-
-    /// Replay interval setting
     pub replay_interval: usize,
-
-    /// Number of demand-driven (non-periodic) replays performed
     pub demand_replay_count: u64,
 }
 
@@ -1220,6 +1249,7 @@ mod tests {
         assert_eq!(episode.psi, 0.5);
         assert_eq!(episode.timestamp, 100);
         assert_eq!(episode.replay_count, 0);
+        assert!(episode.instance_id.is_none());
     }
 
     #[test]
@@ -1229,16 +1259,108 @@ mod tests {
             ..Default::default()
         };
         let mut memory = EpisodicMemory::new(config);
-
-        // Below threshold - should not be stored
         let low_phi = make_test_episode(0.3, 1);
         assert!(!memory.store_if_significant(low_phi));
         assert_eq!(memory.len(), 0);
-
-        // Above threshold - should be stored
         let high_phi = make_test_episode(0.5, 2);
         assert!(memory.store_if_significant(high_phi));
         assert_eq!(memory.len(), 1);
+    }
+
+    #[test]
+    fn test_identical_content_gets_distinct_instance_ids() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig::broad_capture());
+        let episode = make_test_episode(0.8, 10);
+        let first = memory
+            .store_if_significant_with_id(episode.clone())
+            .expect("first insert");
+        let second = memory
+            .store_if_significant_with_id(episode)
+            .expect("second insert");
+        assert_ne!(first, second);
+        let instances = memory.get_top_episode_instances(10);
+        assert_eq!(instances.len(), 2);
+        assert!(instances.iter().any(|(id, _)| *id == first));
+        assert!(instances.iter().any(|(id, _)| *id == second));
+    }
+
+    #[test]
+    fn test_quarantine_is_instance_exact_and_reversible() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig::broad_capture());
+        let episode = make_test_episode(0.8, 10);
+        let first = memory
+            .store_if_significant_with_id(episode.clone())
+            .unwrap();
+        let second = memory.store_if_significant_with_id(episode).unwrap();
+
+        let quarantined = memory.quarantine_instance(first).unwrap();
+        assert_eq!(quarantined.instance_id, first);
+        assert_eq!(memory.len(), 1);
+        assert_eq!(memory.quarantined_len(), 1);
+        assert_eq!(memory.get_top_episode_instances(10)[0].0, second);
+        assert!(memory.quarantined_instance(first).is_some());
+
+        let restored = memory.restore_quarantined_instance(first).unwrap();
+        assert_eq!(restored.instance_id, first);
+        assert_eq!(memory.len(), 2);
+        assert_eq!(memory.quarantined_len(), 0);
+        let active_ids: HashSet<_> = memory
+            .get_top_episode_instances(10)
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        assert_eq!(active_ids, HashSet::from([first, second]));
+    }
+
+    #[test]
+    fn test_active_clear_preserves_quarantine() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig::broad_capture());
+        let id = memory
+            .store_if_significant_with_id(make_test_episode(0.8, 10))
+            .unwrap();
+        memory.quarantine_instance(id).unwrap();
+        memory.store_if_significant(make_test_episode(0.9, 11));
+        memory.clear();
+        assert!(memory.is_empty());
+        assert_eq!(memory.quarantined_len(), 1);
+        assert!(!memory.is_fully_empty());
+        assert_eq!(memory.quarantined_instance(id).unwrap().instance_id, id);
+    }
+
+    #[test]
+    fn test_replay_updates_only_sampled_duplicate_instance() {
+        let config = EpisodicReplayConfig {
+            psi_threshold: 0.0,
+            replay_interval: 1,
+            batch_size: 1,
+            min_episodes_for_replay: 1,
+            psi_weighted_sampling: false,
+            ..Default::default()
+        };
+        let mut memory = EpisodicMemory::new(config);
+        let duplicate = make_test_episode(0.8, 10);
+        let first = memory
+            .store_if_significant_with_id(duplicate.clone())
+            .unwrap();
+        let second = memory.store_if_significant_with_id(duplicate).unwrap();
+        let predicted_sample = memory.sample_replay_batch(1);
+        let sampled_id = predicted_sample[0].instance_id.unwrap();
+        assert!(sampled_id == first || sampled_id == second);
+
+        let mut net = MockTrainableNetwork::new();
+        let result = memory.replay_session(&mut net, 0.01);
+        assert!(!result.skipped);
+        let instances = memory.get_top_episode_instances(10);
+        let sampled = instances
+            .iter()
+            .find(|(id, _)| *id == sampled_id)
+            .unwrap();
+        let unsampled = instances
+            .iter()
+            .find(|(id, _)| *id != sampled_id)
+            .unwrap();
+        assert_eq!(sampled.1.replay_count, 1);
+        assert_eq!(unsampled.1.replay_count, 0);
     }
 
     #[test]
@@ -1249,19 +1371,12 @@ mod tests {
             ..Default::default()
         };
         let mut memory = EpisodicMemory::new(config);
-
-        // Store episodes with varying Phi
         for i in 0..10 {
-            let phi = 0.1 + (i as f64 * 0.1); // 0.1, 0.2, ..., 1.0
-            let episode = make_test_episode(phi, i as u64);
-            memory.store_if_significant(episode);
+            let phi = 0.1 + (i as f64 * 0.1);
+            memory.store_if_significant(make_test_episode(phi, i as u64));
         }
-
-        // High-Phi episodes should be retained
         let top = memory.get_top_episodes(3);
         assert!(top.len() >= 3);
-
-        // Top episodes should have highest Phi values
         for (i, ep) in top.iter().enumerate() {
             if i > 0 {
                 assert!(ep.psi <= top[i - 1].psi);
@@ -1274,27 +1389,19 @@ mod tests {
         let config = EpisodicReplayConfig {
             psi_threshold: 0.1,
             min_episodes_for_replay: 5,
-            // Use uniform sampling for deterministic batch size behavior.
-            // Phi-weighted sampling has a separate test.
             psi_weighted_sampling: false,
             ..Default::default()
         };
         let mut memory = EpisodicMemory::new(config);
-
-        // Store some episodes
         for i in 0..20 {
             let phi = 0.3 + (i as f64 * 0.03);
-            let episode = make_test_episode(phi, i as u64);
-            memory.store_if_significant(episode);
+            memory.store_if_significant(make_test_episode(phi, i as u64));
         }
-
-        // Sample a batch
         let batch = memory.sample_replay_batch(5);
         assert_eq!(batch.len(), 5);
-
-        // All sampled episodes should have been above threshold
         for ep in &batch {
             assert!(ep.psi >= 0.3);
+            assert!(ep.instance_id.is_some());
         }
     }
 
@@ -1303,23 +1410,17 @@ mod tests {
         let config = EpisodicReplayConfig {
             psi_threshold: 0.1,
             psi_weighted_sampling: true,
-            sampling_temperature: 0.5, // Lower temp = more focused on high Phi
+            sampling_temperature: 0.5,
             min_episodes_for_replay: 5,
             ..Default::default()
         };
         let mut memory = EpisodicMemory::new(config);
-
-        // Store episodes with varying Phi
         for i in 0..100 {
-            let phi = 0.2 + (i as f64 * 0.008); // 0.2 to 1.0
-            let episode = make_test_episode(phi, i as u64);
-            memory.store_if_significant(episode);
+            let phi = 0.2 + (i as f64 * 0.008);
+            memory.store_if_significant(make_test_episode(phi, i as u64));
         }
-
-        // Sample multiple batches and check that high-Phi episodes appear more often
         let mut high_phi_count = 0;
         let mut total_count = 0;
-
         for _ in 0..10 {
             let batch = memory.sample_replay_batch(10);
             for ep in &batch {
@@ -1329,17 +1430,9 @@ mod tests {
                 }
             }
         }
-
-        // High-Phi episodes should appear more than their proportion (top 30%)
         let high_phi_ratio = high_phi_count as f64 / total_count as f64;
-        assert!(
-            high_phi_ratio > 0.3,
-            "High-Phi ratio {} should be > 0.3",
-            high_phi_ratio
-        );
+        assert!(high_phi_ratio > 0.3);
     }
-
-    // test_replay_improves_retention moved to main crate (requires CfCNetwork)
 
     #[test]
     fn test_statistics_tracking() {
@@ -1349,17 +1442,11 @@ mod tests {
             ..Default::default()
         };
         let mut memory = EpisodicMemory::new(config);
-
-        // Store some episodes
         for i in 0..30 {
             let phi = 0.2 + (i as f64 * 0.02);
-            let episode = make_test_episode(phi, i as u64);
-            memory.store_if_significant(episode);
+            memory.store_if_significant(make_test_episode(phi, i as u64));
         }
-
         let stats = memory.stats();
-
-        // Should have stored only episodes above threshold
         assert!(stats.total_stored > 0);
         assert!(stats.current_count <= stats.capacity);
         assert!(stats.average_psi >= stats.psi_threshold);
@@ -1371,43 +1458,29 @@ mod tests {
         let episode = Episode::with_metadata(
             ContinuousHV::random(256, 42),
             ContinuousHV::random(256, 43),
-            0.8, // High Phi
-            100, // Timestamp
-            0.5, // High prediction error
-            0.9, // Positive valence
-            0.7, // Good coherence
+            0.8,
+            100,
+            0.5,
+            0.9,
+            0.7,
         );
-
         let score1 = episode.priority_score(100, 0.2);
-        let score2 = episode.priority_score(1000, 0.2); // Much later
-
-        // More recent should have slightly higher score
+        let score2 = episode.priority_score(1000, 0.2);
         assert!(score1 >= score2);
-
-        // High-Phi episode should have high score
         assert!(score1 > 0.5);
     }
 
     #[test]
     fn test_clear_memory() {
-        let config = EpisodicReplayConfig::default();
-        let mut memory = EpisodicMemory::new(config);
-
-        // Store some episodes
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig::default());
         for i in 0..10 {
-            let episode = make_test_episode(0.5, i as u64);
-            memory.store_if_significant(episode);
+            memory.store_if_significant(make_test_episode(0.5, i as u64));
         }
-
         assert!(!memory.is_empty());
-
         memory.clear();
-
         assert!(memory.is_empty());
         assert_eq!(memory.len(), 0);
     }
-
-    // ── DA-Tagged Replay Prioritization (Phase 3) ────────────────────
 
     #[test]
     fn test_da_tagged_episode_higher_priority() {
@@ -1415,44 +1488,29 @@ mod tests {
         ep_high.dopamine_at_encoding = Some(0.8);
         let mut ep_low = make_test_episode(0.5, 100);
         ep_low.dopamine_at_encoding = Some(0.2);
-        // Same Phi, same timestamp — DA tag should make the difference
         let high_score = ep_high.priority_score(200, 0.5);
         let low_score = ep_low.priority_score(200, 0.5);
-        assert!(
-            high_score > low_score,
-            "DA=0.8 should have higher priority than DA=0.2: {high_score} vs {low_score}"
-        );
+        assert!(high_score > low_score);
     }
 
     #[test]
     fn test_da_replay_lr_scaling() {
         let config = EpisodicReplayConfig::default();
         let base_lr = 0.01_f32;
-        let da_high_scale = 0.7 + 0.8 * 0.6; // DA=0.8 → 1.18
-        let da_low_scale = 0.7 + 0.2 * 0.6; // DA=0.2 → 0.82
+        let da_high_scale = 0.7 + 0.8 * 0.6;
+        let da_low_scale = 0.7 + 0.2 * 0.6;
         let lr_high = base_lr * config.replay_learning_rate_multiplier * da_high_scale;
         let lr_low = base_lr * config.replay_learning_rate_multiplier * da_low_scale;
-        assert!(
-            lr_high > lr_low,
-            "High DA should produce higher replay LR: {lr_high} vs {lr_low}"
-        );
+        assert!(lr_high > lr_low);
     }
 
     #[test]
     fn test_da_tag_backwards_compat() {
-        // Episode without DA tag should have unchanged priority
         let ep = make_test_episode(0.5, 100);
         assert!(ep.dopamine_at_encoding.is_none());
         let score = ep.priority_score(200, 0.5);
-        assert!(
-            score.is_finite(),
-            "Score should be finite without DA tag: {score}"
-        );
+        assert!(score.is_finite());
     }
-
-    // ═══════════════════════════════════════════════════════════════════
-    // Phase 5: Neuromod-Conditioned Replay (#4)
-    // ═══════════════════════════════════════════════════════════════════
 
     #[test]
     fn test_episode_with_bath_state() {
@@ -1460,7 +1518,6 @@ mod tests {
         let output = ContinuousHV::from_vec(vec![0.0; 128]);
         let bath = [0.5, 0.4, 0.6, 0.3, 0.4, 0.3, 0.3, 0.2, 0.3];
         let ep = Episode::new(input, output, 0.8, 100).with_bath_state(bath);
-        assert!(ep.bath_state_at_encoding.is_some());
         assert_eq!(ep.bath_state_at_encoding.unwrap(), bath);
     }
 
@@ -1469,35 +1526,28 @@ mod tests {
         let input = ContinuousHV::from_vec(vec![0.0; 128]);
         let output = ContinuousHV::from_vec(vec![0.0; 128]);
         let ep = Episode::new(input, output, 0.8, 100);
-        assert!(
-            ep.bath_state_at_encoding.is_none(),
-            "Default episodes should have no bath state"
-        );
+        assert!(ep.bath_state_at_encoding.is_none());
     }
 
     #[test]
     fn test_bath_cosine_identical() {
         let a = [0.5, 0.4, 0.6, 0.3, 0.4, 0.3, 0.3, 0.2, 0.3];
         let sim = bath_cosine_similarity(&a, &a);
-        assert!(
-            (sim - 1.0).abs() < 0.001,
-            "Identical vectors should have cosine = 1.0, got {sim}"
-        );
+        assert!((sim - 1.0).abs() < 0.001);
     }
 
     #[test]
     fn test_bath_cosine_zero_magnitude() {
         let a = [0.0; 9];
         let b = [0.5; 9];
-        let sim = bath_cosine_similarity(&a, &b);
-        assert_eq!(sim, 0.0, "Zero-magnitude vector should give 0.0 similarity");
+        assert_eq!(bath_cosine_similarity(&a, &b), 0.0);
     }
 
     #[test]
     fn test_conditioned_replay_prefers_similar() {
         let mut memory = EpisodicMemory::new(EpisodicReplayConfig {
             capacity: 100,
-            psi_threshold: 0.0, // Store everything
+            psi_threshold: 0.0,
             replay_interval: 1,
             batch_size: 5,
             min_episodes_for_replay: 1,
@@ -1505,11 +1555,8 @@ mod tests {
             ..EpisodicReplayConfig::default()
         });
         memory.current_cycle = 42;
-
-        // Store episodes with different bath states
         let similar_bath = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3];
         let different_bath = [0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.3];
-
         for i in 0..20 {
             let input = ContinuousHV::from_vec(vec![i as f32 / 20.0; 128]);
             let output = ContinuousHV::from_vec(vec![0.0; 128]);
@@ -1517,10 +1564,8 @@ mod tests {
             let ep = Episode::new(input, output, 0.5, i as u64).with_bath_state(bath);
             memory.store_if_significant(ep);
         }
-
-        // Sample conditioned on similar_bath
         let batch = memory.sample_replay_batch_conditioned(5, Some(similar_bath));
-        assert!(!batch.is_empty(), "Should sample at least some episodes");
+        assert!(!batch.is_empty());
     }
 
     #[test]
@@ -1535,29 +1580,15 @@ mod tests {
             ..EpisodicReplayConfig::default()
         });
         memory.current_cycle = 10;
-
-        // Store episodes WITHOUT bath state
         for i in 0..10 {
             let input = ContinuousHV::from_vec(vec![i as f32 / 10.0; 128]);
             let output = ContinuousHV::from_vec(vec![0.0; 128]);
-            let ep = Episode::new(input, output, 0.5, i as u64);
-            memory.store_if_significant(ep);
+            memory.store_if_significant(Episode::new(input, output, 0.5, i as u64));
         }
-
-        // Should still work with conditioned sampling (falls back gracefully)
-        let current = [0.5; 9];
-        let batch = memory.sample_replay_batch_conditioned(3, Some(current));
-        assert!(
-            !batch.is_empty(),
-            "Should work even when episodes have no bath state"
-        );
+        let batch = memory.sample_replay_batch_conditioned(3, Some([0.5; 9]));
+        assert!(!batch.is_empty());
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // Phase 6: Mock TrainableNetwork & Replay Integration Tests
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// A lightweight mock for testing replay methods without heavy CfCNetwork.
     struct MockTrainableNetwork {
         train_calls: usize,
         should_fail: bool,
@@ -1600,18 +1631,13 @@ mod tests {
         }
     }
 
-    // ── 1A: Mock TrainableNetwork tests ──
-
     #[test]
     fn test_mock_trainable_basic() {
         let mut net = MockTrainableNetwork::new();
         let input = ndarray::Array1::zeros(128);
         let target = ndarray::Array1::ones(128);
         let loss = net.train_step(&input, &target, 0.02, 0.001).unwrap();
-        assert!(
-            (loss - 0.01).abs() < 1e-6,
-            "Mock should return stable 0.01 loss"
-        );
+        assert!((loss - 0.01).abs() < 1e-6);
         assert_eq!(net.train_calls, 1);
     }
 
@@ -1623,7 +1649,7 @@ mod tests {
         for _ in 0..10 {
             let _ = net.train_step(&input, &target, 0.02, 0.001);
         }
-        assert_eq!(net.train_calls, 10, "Should track all invocations");
+        assert_eq!(net.train_calls, 10);
     }
 
     #[test]
@@ -1632,11 +1658,8 @@ mod tests {
         let input = ndarray::Array1::zeros(64);
         let target = ndarray::Array1::ones(64);
         let result = net.train_step(&input, &target, 0.02, 0.001);
-        assert!(result.is_err(), "Failing mock should return Err");
-        assert_eq!(
-            net.train_calls, 1,
-            "Call count still incremented on failure"
-        );
+        assert!(result.is_err());
+        assert_eq!(net.train_calls, 1);
     }
 
     #[test]
@@ -1645,15 +1668,10 @@ mod tests {
         let input = ndarray::Array1::zeros(64);
         let target = ndarray::Array1::ones(64);
         let loss = net.train_step(&input, &target, 0.02, 0.0).unwrap();
-        assert!(
-            (loss - 0.01).abs() < 1e-6,
-            "Mock returns loss even with lr=0"
-        );
+        assert!((loss - 0.01).abs() < 1e-6);
         assert_eq!(net.last_lr, 0.0);
         assert_eq!(net.train_calls, 1);
     }
-
-    // ── 1B: Episodic Replay Integration Tests ──
 
     fn replay_config_immediate() -> EpisodicReplayConfig {
         EpisodicReplayConfig {
@@ -1671,41 +1689,27 @@ mod tests {
     fn test_replay_training_step_single() {
         let mut memory = EpisodicMemory::new(replay_config_immediate());
         let mut net = MockTrainableNetwork::new();
-
         let ep = make_test_episode(0.8, 1);
         memory.store_if_significant(ep.clone());
-
         let loss = memory.replay_training_step(&mut net, &ep, 0.01, 0.02);
-        assert!(loss.is_finite(), "Loss should be finite");
-        assert_eq!(
-            net.train_calls, 1,
-            "Network train_step should be called once"
-        );
-        assert!(net.last_lr > 0.0, "LR should be positive");
+        assert!(loss.is_finite());
+        assert_eq!(net.train_calls, 1);
+        assert!(net.last_lr > 0.0);
     }
 
     #[test]
     fn test_replay_training_step_phi_weighted_lr() {
         let mut memory = EpisodicMemory::new(replay_config_immediate());
         let mut net = MockTrainableNetwork::new();
-
-        // High-DA episode should get higher replay LR
         let mut ep_high_da = make_test_episode(0.8, 1);
         ep_high_da.dopamine_at_encoding = Some(0.9);
-
         let mut ep_low_da = make_test_episode(0.8, 2);
         ep_low_da.dopamine_at_encoding = Some(0.1);
-
         memory.replay_training_step(&mut net, &ep_high_da, 0.01, 0.02);
         let lr_high = net.last_lr;
-
         memory.replay_training_step(&mut net, &ep_low_da, 0.01, 0.02);
         let lr_low = net.last_lr;
-
-        assert!(
-            lr_high > lr_low,
-            "High-DA episode should produce higher replay LR: {lr_high} vs {lr_low}"
-        );
+        assert!(lr_high > lr_low);
     }
 
     #[test]
@@ -1716,20 +1720,13 @@ mod tests {
         };
         let mut memory = EpisodicMemory::new(config);
         let mut net = MockTrainableNetwork::new();
-
-        // Store 10 episodes
         for i in 0..10 {
-            let ep = make_test_episode(0.5 + (i as f64 * 0.05), i as u64);
-            memory.store_if_significant(ep);
+            memory.store_if_significant(make_test_episode(0.5 + (i as f64 * 0.05), i as u64));
         }
-
         let result = memory.replay_session(&mut net, 0.01);
-        assert!(!result.skipped, "Session should not be skipped");
-        assert_eq!(
-            result.episodes_replayed, 5,
-            "Should replay batch_size episodes"
-        );
-        assert_eq!(net.train_calls, 5, "Network should be trained 5 times");
+        assert!(!result.skipped);
+        assert_eq!(result.episodes_replayed, 5);
+        assert_eq!(net.train_calls, 5);
         assert!(result.average_loss.is_finite());
         assert!(result.average_psi > 0.0);
     }
@@ -1738,15 +1735,12 @@ mod tests {
     fn test_replay_empty_buffer() {
         let mut memory = EpisodicMemory::new(replay_config_immediate());
         let mut net = MockTrainableNetwork::new();
-
-        // Force should_replay to true
         memory.current_cycle = 200;
         memory.cycles_since_replay = 200;
-
         let result = memory.replay_session(&mut net, 0.01);
-        assert!(result.skipped, "Empty buffer should skip");
+        assert!(result.skipped);
         assert_eq!(result.episodes_replayed, 0);
-        assert_eq!(net.train_calls, 0, "No training on empty buffer");
+        assert_eq!(net.train_calls, 0);
     }
 
     #[test]
@@ -1761,25 +1755,12 @@ mod tests {
             ..EpisodicReplayConfig::default()
         };
         let mut memory = EpisodicMemory::new(config);
-
-        // Store well beyond capacity
         for i in 0..20 {
-            let ep = make_test_episode(0.3 + (i as f64 * 0.03), i as u64);
-            memory.store_if_significant(ep);
+            memory.store_if_significant(make_test_episode(0.3 + (i as f64 * 0.03), i as u64));
         }
-
         let stats = memory.stats();
-        assert!(
-            stats.total_stored == 20,
-            "All 20 should be counted as stored"
-        );
-        assert!(
-            stats.total_evicted > 0,
-            "Some should have been evicted: {}",
-            stats.total_evicted
-        );
-
-        // Replay should still work on remaining episodes
+        assert_eq!(stats.total_stored, 20);
+        assert!(stats.total_evicted > 0);
         let mut net = MockTrainableNetwork::new();
         let result = memory.replay_session(&mut net, 0.01);
         assert!(!result.skipped);
