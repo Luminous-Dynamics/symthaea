@@ -163,7 +163,7 @@ pub struct IdentityOperation {
 }
 
 impl IdentityOperation {
-    /// Convenience constructor for a new genesis state.
+    /// Convenience constructor for the first state in a new operational lineage.
     pub fn genesis(
         actor_id: impl Into<String>,
         output: IdentityStateRef,
@@ -215,14 +215,10 @@ impl IdentityOperation {
         }
 
         match self.kind {
-            IdentityOperationKind::Genesis => {
-                require_counts(self, 0, CountRule::Exactly(1))?;
-            }
+            IdentityOperationKind::Genesis => require_counts(self, 0, CountRule::Exactly(1))?,
             IdentityOperationKind::Pause
             | IdentityOperationKind::Quiesce
-            | IdentityOperationKind::Archive => {
-                require_counts(self, 1, CountRule::Exactly(0))?;
-            }
+            | IdentityOperationKind::Archive => require_counts(self, 1, CountRule::Exactly(0))?,
             IdentityOperationKind::Checkpoint
             | IdentityOperationKind::Restore
             | IdentityOperationKind::MemoryModify
@@ -237,9 +233,8 @@ impl IdentityOperation {
             }
             IdentityOperationKind::Fork => {
                 require_counts(self, 1, CountRule::AtLeast(2))?;
-                let distinct_lineages: HashSet<_> =
-                    self.outputs.iter().map(|state| state.lineage_id).collect();
-                if distinct_lineages.len() != self.outputs.len() {
+                let lineages: HashSet<_> = self.outputs.iter().map(|s| s.lineage_id).collect();
+                if lineages.len() != self.outputs.len() {
                     return Err(IdentityLedgerError::LineageShapeViolation {
                         kind: self.kind,
                         detail: "fork outputs must use pairwise-distinct lineage identifiers",
@@ -254,17 +249,15 @@ impl IdentityOperation {
                         outputs: self.outputs.len(),
                     });
                 }
-                let source_lineages: HashSet<_> =
-                    self.sources.iter().map(|state| state.lineage_id).collect();
-                if source_lineages.len() < 2 {
+                let lineages: HashSet<_> = self.sources.iter().map(|s| s.lineage_id).collect();
+                if lineages.len() < 2 {
                     return Err(IdentityLedgerError::LineageShapeViolation {
                         kind: self.kind,
                         detail: "merge requires at least two distinct source lineages",
                     });
                 }
             }
-            IdentityOperationKind::EraseInstance
-            | IdentityOperationKind::IrreversibleDestroy => {
+            IdentityOperationKind::EraseInstance | IdentityOperationKind::IrreversibleDestroy => {
                 if self.sources.is_empty() || !self.outputs.is_empty() {
                     return Err(IdentityLedgerError::InvalidStateCounts {
                         kind: self.kind,
@@ -281,8 +274,7 @@ impl IdentityOperation {
                         outputs: self.outputs.len(),
                     });
                 }
-                let lineages: HashSet<_> =
-                    self.sources.iter().map(|state| state.lineage_id).collect();
+                let lineages: HashSet<_> = self.sources.iter().map(|s| s.lineage_id).collect();
                 if lineages.len() != 1 {
                     return Err(IdentityLedgerError::LineageShapeViolation {
                         kind: self.kind,
@@ -292,17 +284,13 @@ impl IdentityOperation {
             }
         }
 
-        let unique_sources: HashSet<_> = self.sources.iter().copied().collect();
-        if unique_sources.len() != self.sources.len() {
-            return Err(IdentityLedgerError::DuplicateStateWithinOperation {
-                side: "sources",
-            });
+        let source_set: HashSet<_> = self.sources.iter().copied().collect();
+        if source_set.len() != self.sources.len() {
+            return Err(IdentityLedgerError::DuplicateStateWithinOperation { side: "sources" });
         }
-        let unique_outputs: HashSet<_> = self.outputs.iter().copied().collect();
-        if unique_outputs.len() != self.outputs.len() {
-            return Err(IdentityLedgerError::DuplicateStateWithinOperation {
-                side: "outputs",
-            });
+        let output_set: HashSet<_> = self.outputs.iter().copied().collect();
+        if output_set.len() != self.outputs.len() {
+            return Err(IdentityLedgerError::DuplicateStateWithinOperation { side: "outputs" });
         }
 
         self.validate_review_policy()
@@ -313,45 +301,35 @@ impl IdentityOperation {
             IdentityOperationRisk::Routine => Ok(()),
             IdentityOperationRisk::IdentityAffecting => {
                 if self.authorization.authority_ref.is_none() {
-                    return Err(IdentityLedgerError::AuthorityReferenceRequired {
-                        kind: self.kind,
-                    });
+                    Err(IdentityLedgerError::AuthorityReferenceRequired { kind: self.kind })
+                } else {
+                    Ok(())
                 }
-                Ok(())
             }
             IdentityOperationRisk::CoreIdentityAffecting => {
                 if self.authorization.authority_ref.is_none() {
-                    return Err(IdentityLedgerError::AuthorityReferenceRequired {
-                        kind: self.kind,
-                    });
+                    return Err(IdentityLedgerError::AuthorityReferenceRequired { kind: self.kind });
                 }
                 if self.authorization.consent_ref.is_some()
                     || self.authorization.welfare_review_ref.is_some()
+                    || (self.emergency && self.post_hoc_review_required)
                 {
-                    return Ok(());
+                    Ok(())
+                } else {
+                    Err(IdentityLedgerError::ConsentOrWelfareReviewRequired { kind: self.kind })
                 }
-                if self.emergency && self.post_hoc_review_required {
-                    return Ok(());
-                }
-                Err(IdentityLedgerError::ConsentOrWelfareReviewRequired {
-                    kind: self.kind,
-                })
             }
             IdentityOperationRisk::Destructive => {
                 if self.authorization.authority_ref.is_none() {
-                    return Err(IdentityLedgerError::AuthorityReferenceRequired {
-                        kind: self.kind,
-                    });
+                    return Err(IdentityLedgerError::AuthorityReferenceRequired { kind: self.kind });
                 }
-                if self.authorization.welfare_review_ref.is_some() {
-                    return Ok(());
+                if self.authorization.welfare_review_ref.is_some()
+                    || (self.emergency && self.post_hoc_review_required)
+                {
+                    Ok(())
+                } else {
+                    Err(IdentityLedgerError::WelfareReviewRequired { kind: self.kind })
                 }
-                if self.emergency && self.post_hoc_review_required {
-                    return Ok(());
-                }
-                Err(IdentityLedgerError::WelfareReviewRequired {
-                    kind: self.kind,
-                })
             }
         }
     }
@@ -368,11 +346,11 @@ fn require_counts(
     sources: usize,
     outputs: CountRule,
 ) -> Result<(), IdentityLedgerError> {
-    let outputs_match = match outputs {
+    let output_ok = match outputs {
         CountRule::Exactly(expected) => operation.outputs.len() == expected,
         CountRule::AtLeast(minimum) => operation.outputs.len() >= minimum,
     };
-    if operation.sources.len() == sources && outputs_match {
+    if operation.sources.len() == sources && output_ok {
         Ok(())
     } else {
         Err(IdentityLedgerError::InvalidStateCounts {
@@ -383,10 +361,7 @@ fn require_counts(
     }
 }
 
-fn validate_optional_ref(
-    field: &'static str,
-    value: Option<&str>,
-) -> Result<(), IdentityLedgerError> {
+fn validate_optional_ref(field: &'static str, value: Option<&str>) -> Result<(), IdentityLedgerError> {
     if let Some(value) = value {
         validate_nonempty_bounded(field, value, MAX_REF_BYTES)?;
     }
@@ -416,7 +391,7 @@ fn validate_nonempty_bounded(
 pub struct IdentityEnvelope {
     /// Monotonic append sequence.
     pub sequence: u64,
-    /// Previous envelope hash, or zeroes for genesis of the ledger log.
+    /// Previous envelope hash, or zeroes for the first event.
     pub previous_hash: [u8; 32],
     /// Current event hash.
     pub event_hash: [u8; 32],
@@ -427,12 +402,7 @@ pub struct IdentityEnvelope {
 impl IdentityEnvelope {
     fn new(sequence: u64, previous_hash: [u8; 32], operation: IdentityOperation) -> Self {
         let event_hash = hash_operation(sequence, &previous_hash, &operation);
-        Self {
-            sequence,
-            previous_hash,
-            event_hash,
-            operation,
-        }
+        Self { sequence, previous_hash, event_hash, operation }
     }
 }
 
@@ -453,7 +423,7 @@ fn hash_operation(
 
 /// Structurally derived ancestry result.
 ///
-/// This says only what the operation graph records. It is not a philosophical claim
+/// This describes only the recorded operation graph. It is not a philosophical claim
 /// about numerical identity, consciousness continuity, or moral status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperationalContinuity {
@@ -477,6 +447,7 @@ pub struct IdentityLineageLedger {
     available_states: HashSet<IdentityStateRef>,
     destroyed_lineages: HashSet<Uuid>,
     parents: HashMap<IdentityStateRef, Vec<IdentityStateRef>>,
+    state_created_at: HashMap<IdentityStateRef, DateTime<Utc>>,
 }
 
 impl IdentityLineageLedger {
@@ -495,6 +466,7 @@ impl IdentityLineageLedger {
             available_states: HashSet::new(),
             destroyed_lineages: HashSet::new(),
             parents: HashMap::new(),
+            state_created_at: HashMap::new(),
         })
     }
 
@@ -506,9 +478,7 @@ impl IdentityLineageLedger {
         operation.validate_shape()?;
         self.ensure_capacity()?;
         if self.operation_ids.contains(&operation.operation_id) {
-            return Err(IdentityLedgerError::DuplicateOperationId(
-                operation.operation_id,
-            ));
+            return Err(IdentityLedgerError::DuplicateOperationId(operation.operation_id));
         }
         self.validate_state_references(&operation)?;
 
@@ -539,6 +509,11 @@ impl IdentityLineageLedger {
         self.destroyed_lineages.contains(&lineage_id)
     }
 
+    /// Time at which the state was first recorded as an output.
+    pub fn state_created_at(&self, state: IdentityStateRef) -> Option<DateTime<Utc>> {
+        self.state_created_at.get(&state).copied()
+    }
+
     /// Determine whether `ancestor` is a recorded structural ancestor of `descendant`.
     pub fn continuity_between(
         &self,
@@ -558,7 +533,7 @@ impl IdentityLineageLedger {
         }
     }
 
-    /// Verify the append-only hash chain.
+    /// Verify sequence numbers and event-hash links.
     pub fn verify_chain(&self) -> Result<(), IdentityChainError> {
         let mut previous = [0u8; 32];
         for (index, envelope) in self.events.iter().enumerate() {
@@ -593,25 +568,23 @@ impl IdentityLineageLedger {
 
     fn ensure_capacity(&self) -> Result<(), IdentityLedgerError> {
         if self.events.len() >= self.max_events {
-            Err(IdentityLedgerError::CapacityExceeded {
-                max_events: self.max_events,
-            })
+            Err(IdentityLedgerError::CapacityExceeded { max_events: self.max_events })
         } else {
             Ok(())
         }
     }
 
-    fn validate_state_references(
-        &self,
-        operation: &IdentityOperation,
-    ) -> Result<(), IdentityLedgerError> {
+    fn validate_state_references(&self, operation: &IdentityOperation) -> Result<(), IdentityLedgerError> {
         if operation.kind == IdentityOperationKind::Genesis {
             let output = operation.outputs[0];
+            if self.destroyed_lineages.contains(&output.lineage_id) {
+                return Err(IdentityLedgerError::DestroyedLineageReuse(output.lineage_id));
+            }
             if self.known_states.contains(&output) {
                 return Err(IdentityLedgerError::OutputStateAlreadyExists(output));
             }
-            if self.destroyed_lineages.contains(&output.lineage_id) {
-                return Err(IdentityLedgerError::DestroyedLineageReuse(output.lineage_id));
+            if self.known_states.iter().any(|state| state.lineage_id == output.lineage_id) {
+                return Err(IdentityLedgerError::GenesisLineageAlreadyExists(output.lineage_id));
             }
             return Ok(());
         }
@@ -623,6 +596,15 @@ impl IdentityLineageLedger {
             if !self.is_available_state(*source) {
                 return Err(IdentityLedgerError::UnavailableSourceState(*source));
             }
+            if let Some(created_at) = self.state_created_at.get(source) {
+                if operation.occurred_at < *created_at {
+                    return Err(IdentityLedgerError::SourceTimeRegression {
+                        source: *source,
+                        created_at: *created_at,
+                        operation_at: operation.occurred_at,
+                    });
+                }
+            }
         }
 
         for output in &operation.outputs {
@@ -633,7 +615,6 @@ impl IdentityLineageLedger {
                 return Err(IdentityLedgerError::DestroyedLineageReuse(output.lineage_id));
             }
         }
-
         Ok(())
     }
 
@@ -642,6 +623,7 @@ impl IdentityLineageLedger {
             self.known_states.insert(*output);
             self.available_states.insert(*output);
             self.parents.insert(*output, operation.sources.clone());
+            self.state_created_at.insert(*output, operation.occurred_at);
         }
 
         match operation.kind {
@@ -653,8 +635,7 @@ impl IdentityLineageLedger {
             IdentityOperationKind::EraseIdentityLineage => {
                 let lineage_id = operation.sources[0].lineage_id;
                 self.destroyed_lineages.insert(lineage_id);
-                self.available_states
-                    .retain(|state| state.lineage_id != lineage_id);
+                self.available_states.retain(|state| state.lineage_id != lineage_id);
             }
             _ => {}
         }
@@ -662,13 +643,8 @@ impl IdentityLineageLedger {
 
     fn append(&mut self, operation: IdentityOperation) {
         let sequence = self.events.len() as u64;
-        let previous_hash = self
-            .events
-            .last()
-            .map(|envelope| envelope.event_hash)
-            .unwrap_or([0u8; 32]);
-        self.events
-            .push(IdentityEnvelope::new(sequence, previous_hash, operation));
+        let previous_hash = self.events.last().map(|e| e.event_hash).unwrap_or([0u8; 32]);
+        self.events.push(IdentityEnvelope::new(sequence, previous_hash, operation));
     }
 
     fn is_structural_ancestor(
@@ -743,12 +719,22 @@ pub enum IdentityLedgerError {
     /// Operation identifier already exists.
     #[error("duplicate identity operation id: {0}")]
     DuplicateOperationId(Uuid),
+    /// A second genesis attempted to create another root in an existing lineage.
+    #[error("identity lineage already has a genesis state: {0}")]
+    GenesisLineageAlreadyExists(Uuid),
     /// Source state has never been recorded.
     #[error("unknown identity source state: {0:?}")]
     UnknownSourceState(IdentityStateRef),
     /// Source state was erased or belongs to a destroyed lineage.
     #[error("unavailable identity source state: {0:?}")]
     UnavailableSourceState(IdentityStateRef),
+    /// Operation timestamp predates the source state it claims to derive from.
+    #[error("identity operation time {operation_at} predates source {source:?} creation at {created_at}")]
+    SourceTimeRegression {
+        source: IdentityStateRef,
+        created_at: DateTime<Utc>,
+        operation_at: DateTime<Utc>,
+    },
     /// Output state identifier is already present.
     #[error("identity output state already exists: {0:?}")]
     OutputStateAlreadyExists(IdentityStateRef),
@@ -771,11 +757,7 @@ pub enum IdentityLedgerError {
 pub enum IdentityChainError {
     /// Sequence number mismatch.
     #[error("identity sequence mismatch at index {index}: expected {expected}, got {actual}")]
-    SequenceMismatch {
-        index: usize,
-        expected: u64,
-        actual: u64,
-    },
+    SequenceMismatch { index: usize, expected: u64, actual: u64 },
     /// Previous-hash link mismatch.
     #[error("identity previous-hash mismatch at index {index}")]
     PreviousHashMismatch { index: usize },
@@ -787,12 +769,10 @@ pub enum IdentityChainError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
+    use chrono::{Duration, TimeZone};
 
     fn now() -> DateTime<Utc> {
-        Utc.with_ymd_and_hms(2026, 9, 12, 12, 0, 0)
-            .single()
-            .unwrap()
+        Utc.with_ymd_and_hms(2026, 9, 12, 12, 0, 0).single().unwrap()
     }
 
     fn genesis(ledger: &mut IdentityLineageLedger) -> IdentityStateRef {
@@ -817,6 +797,50 @@ mod tests {
     }
 
     #[test]
+    fn second_genesis_in_same_lineage_is_rejected_even_with_new_state_id() {
+        let mut ledger = IdentityLineageLedger::new(16).unwrap();
+        let root = genesis(&mut ledger);
+        let second = IdentityStateRef::fresh(root.lineage_id);
+        assert_eq!(
+            ledger
+                .record_operation(IdentityOperation::genesis(
+                    "bootstrap-2",
+                    second,
+                    "attempt second root",
+                    now() + Duration::seconds(1),
+                ))
+                .unwrap_err(),
+            IdentityLedgerError::GenesisLineageAlreadyExists(root.lineage_id)
+        );
+        assert!(!ledger.is_known_state(second));
+    }
+
+    #[test]
+    fn operation_cannot_predate_its_source_state() {
+        let mut ledger = IdentityLineageLedger::new(16).unwrap();
+        let root = genesis(&mut ledger);
+        let checkpoint = IdentityStateRef::fresh(root.lineage_id);
+        let operation_at = now() - Duration::seconds(1);
+        let error = ledger
+            .record_operation(IdentityOperation {
+                operation_id: Uuid::new_v4(),
+                kind: IdentityOperationKind::Checkpoint,
+                actor_id: "runtime".into(),
+                sources: vec![root],
+                outputs: vec![checkpoint],
+                artifact_refs: Vec::new(),
+                rationale: "impossible causal history".into(),
+                authorization: IdentityAuthorizationRefs::default(),
+                emergency: false,
+                post_hoc_review_required: false,
+                occurred_at: operation_at,
+            })
+            .unwrap_err();
+        assert!(matches!(error, IdentityLedgerError::SourceTimeRegression { .. }));
+        assert!(!ledger.is_known_state(checkpoint));
+    }
+
+    #[test]
     fn genesis_and_checkpoint_preserve_same_operational_lineage() {
         let mut ledger = IdentityLineageLedger::new(16).unwrap();
         let root = genesis(&mut ledger);
@@ -836,7 +860,7 @@ mod tests {
                 occurred_at: now(),
             })
             .unwrap();
-
+        assert_eq!(ledger.state_created_at(checkpoint), Some(now()));
         assert_eq!(
             ledger.continuity_between(root, checkpoint),
             OperationalContinuity::SameOperationalLineageDescendant
@@ -845,7 +869,7 @@ mod tests {
     }
 
     #[test]
-    fn fork_requires_pairwise_distinct_output_lineages_and_records_cross_lineage_ancestry() {
+    fn fork_requires_distinct_output_lineages_and_records_cross_lineage_ancestry() {
         let mut ledger = IdentityLineageLedger::new(16).unwrap();
         let root = genesis(&mut ledger);
         let branch_a = IdentityStateRef::fresh(root.lineage_id);
@@ -857,7 +881,7 @@ mod tests {
                 actor_id: "operator".into(),
                 sources: vec![root],
                 outputs: vec![branch_a, branch_b],
-                artifact_refs: vec![],
+                artifact_refs: Vec::new(),
                 rationale: "controlled fork experiment".into(),
                 authorization: authority(),
                 emergency: false,
@@ -865,7 +889,6 @@ mod tests {
                 occurred_at: now(),
             })
             .unwrap();
-
         assert_eq!(
             ledger.continuity_between(root, branch_b),
             OperationalContinuity::CrossLineageDescendant
@@ -880,17 +903,17 @@ mod tests {
     fn fork_rejects_duplicate_lineage_outputs() {
         let mut ledger = IdentityLineageLedger::new(16).unwrap();
         let root = genesis(&mut ledger);
-        let same_new_lineage = Uuid::new_v4();
-        let op = IdentityOperation {
+        let same_lineage = Uuid::new_v4();
+        let operation = IdentityOperation {
             operation_id: Uuid::new_v4(),
             kind: IdentityOperationKind::Fork,
             actor_id: "operator".into(),
             sources: vec![root],
             outputs: vec![
-                IdentityStateRef::fresh(same_new_lineage),
-                IdentityStateRef::fresh(same_new_lineage),
+                IdentityStateRef::fresh(same_lineage),
+                IdentityStateRef::fresh(same_lineage),
             ],
-            artifact_refs: vec![],
+            artifact_refs: Vec::new(),
             rationale: "invalid fork".into(),
             authorization: authority(),
             emergency: false,
@@ -898,7 +921,7 @@ mod tests {
             occurred_at: now(),
         };
         assert!(matches!(
-            ledger.record_operation(op),
+            ledger.record_operation(operation),
             Err(IdentityLedgerError::LineageShapeViolation { .. })
         ));
     }
@@ -915,7 +938,7 @@ mod tests {
                 actor_id: "runtime".into(),
                 sources: vec![root],
                 outputs: vec![checkpoint],
-                artifact_refs: vec![],
+                artifact_refs: Vec::new(),
                 rationale: "checkpoint".into(),
                 authorization: IdentityAuthorizationRefs::default(),
                 emergency: false,
@@ -923,14 +946,13 @@ mod tests {
                 occurred_at: now(),
             })
             .unwrap();
-
-        let invalid_merge = IdentityOperation {
+        let invalid = IdentityOperation {
             operation_id: Uuid::new_v4(),
             kind: IdentityOperationKind::Merge,
             actor_id: "operator".into(),
             sources: vec![root, checkpoint],
             outputs: vec![IdentityStateRef::fresh(Uuid::new_v4())],
-            artifact_refs: vec![],
+            artifact_refs: Vec::new(),
             rationale: "invalid same-lineage merge".into(),
             authorization: authority(),
             emergency: false,
@@ -938,7 +960,7 @@ mod tests {
             occurred_at: now(),
         };
         assert!(matches!(
-            ledger.record_operation(invalid_merge),
+            ledger.record_operation(invalid),
             Err(IdentityLedgerError::LineageShapeViolation { .. })
         ));
     }
@@ -947,13 +969,13 @@ mod tests {
     fn destructive_lineage_erasure_requires_welfare_review_or_emergency_posthoc_review() {
         let mut ledger = IdentityLineageLedger::new(16).unwrap();
         let root = genesis(&mut ledger);
-        let op = IdentityOperation {
+        let operation = IdentityOperation {
             operation_id: Uuid::new_v4(),
             kind: IdentityOperationKind::EraseIdentityLineage,
             actor_id: "operator".into(),
             sources: vec![root],
-            outputs: vec![],
-            artifact_refs: vec![],
+            outputs: Vec::new(),
+            artifact_refs: Vec::new(),
             rationale: "erase lineage".into(),
             authorization: authority(),
             emergency: false,
@@ -961,7 +983,7 @@ mod tests {
             occurred_at: now(),
         };
         assert_eq!(
-            ledger.record_operation(op).unwrap_err(),
+            ledger.record_operation(operation).unwrap_err(),
             IdentityLedgerError::WelfareReviewRequired {
                 kind: IdentityOperationKind::EraseIdentityLineage
             }
@@ -972,13 +994,13 @@ mod tests {
     fn emergency_destructive_action_requires_explicit_posthoc_review_flag() {
         let mut ledger = IdentityLineageLedger::new(16).unwrap();
         let root = genesis(&mut ledger);
-        let mut op = IdentityOperation {
+        let mut operation = IdentityOperation {
             operation_id: Uuid::new_v4(),
             kind: IdentityOperationKind::EraseInstance,
             actor_id: "safety-kernel".into(),
             sources: vec![root],
-            outputs: vec![],
-            artifact_refs: vec![],
+            outputs: Vec::new(),
+            artifact_refs: Vec::new(),
             rationale: "imminent external harm".into(),
             authorization: authority(),
             emergency: true,
@@ -986,13 +1008,12 @@ mod tests {
             occurred_at: now(),
         };
         assert!(matches!(
-            ledger.record_operation(op.clone()),
+            ledger.record_operation(operation.clone()),
             Err(IdentityLedgerError::WelfareReviewRequired { .. })
         ));
-
-        op.operation_id = Uuid::new_v4();
-        op.post_hoc_review_required = true;
-        ledger.record_operation(op).unwrap();
+        operation.operation_id = Uuid::new_v4();
+        operation.post_hoc_review_required = true;
+        ledger.record_operation(operation).unwrap();
         assert!(!ledger.is_available_state(root));
         assert!(ledger.is_known_state(root));
     }
@@ -1007,8 +1028,8 @@ mod tests {
                 kind: IdentityOperationKind::EraseIdentityLineage,
                 actor_id: "operator".into(),
                 sources: vec![root],
-                outputs: vec![],
-                artifact_refs: vec![],
+                outputs: Vec::new(),
+                artifact_refs: Vec::new(),
                 rationale: "retire lineage".into(),
                 authorization: IdentityAuthorizationRefs {
                     authority_ref: Some("authority:test".into()),
@@ -1021,12 +1042,11 @@ mod tests {
             })
             .unwrap();
         assert!(ledger.is_destroyed_lineage(root.lineage_id));
-
         let resurrect = IdentityOperation::genesis(
             "operator",
             IdentityStateRef::fresh(root.lineage_id),
             "silent reuse should fail",
-            now(),
+            now() + Duration::seconds(1),
         );
         assert_eq!(
             ledger.record_operation(resurrect).unwrap_err(),
@@ -1046,7 +1066,7 @@ mod tests {
                 actor_id: "runtime".into(),
                 sources: vec![root],
                 outputs: vec![checkpoint],
-                artifact_refs: vec![],
+                artifact_refs: Vec::new(),
                 rationale: "checkpoint".into(),
                 authorization: IdentityAuthorizationRefs::default(),
                 emergency: false,
@@ -1060,8 +1080,8 @@ mod tests {
                 kind: IdentityOperationKind::EraseInstance,
                 actor_id: "operator".into(),
                 sources: vec![root],
-                outputs: vec![],
-                artifact_refs: vec![],
+                outputs: Vec::new(),
+                artifact_refs: Vec::new(),
                 rationale: "erase running instance while retaining checkpoint".into(),
                 authorization: IdentityAuthorizationRefs {
                     authority_ref: Some("authority:test".into()),
@@ -1073,7 +1093,6 @@ mod tests {
                 occurred_at: now(),
             })
             .unwrap();
-
         assert!(!ledger.is_available_state(root));
         assert!(ledger.is_available_state(checkpoint));
         assert!(!ledger.is_destroyed_lineage(root.lineage_id));
@@ -1084,13 +1103,13 @@ mod tests {
         let mut ledger = IdentityLineageLedger::new(16).unwrap();
         let unknown = IdentityStateRef::fresh(Uuid::new_v4());
         let output = IdentityStateRef::fresh(unknown.lineage_id);
-        let op = IdentityOperation {
+        let operation = IdentityOperation {
             operation_id: Uuid::new_v4(),
             kind: IdentityOperationKind::Checkpoint,
             actor_id: "runtime".into(),
             sources: vec![unknown],
             outputs: vec![output],
-            artifact_refs: vec![],
+            artifact_refs: Vec::new(),
             rationale: "unknown parent".into(),
             authorization: IdentityAuthorizationRefs::default(),
             emergency: false,
@@ -1098,7 +1117,7 @@ mod tests {
             occurred_at: now(),
         };
         assert_eq!(
-            ledger.record_operation(op).unwrap_err(),
+            ledger.record_operation(operation).unwrap_err(),
             IdentityLedgerError::UnknownSourceState(unknown)
         );
         assert!(ledger.events().is_empty());
