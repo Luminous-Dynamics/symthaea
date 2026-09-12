@@ -158,6 +158,25 @@ jobs:
 
           echo "RSK reference crates remain non-publishable and admission remains explicitly denied."
 
+      - name: Require RSK workspace packages in committed Cargo.lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=false
+          for package in \
+            symthaea-replicator-safety \
+            symthaea-replicator-semantics \
+            symthaea-replicator-ledger; do
+            if ! grep -Fq "name = \"${package}\"" Cargo.lock; then
+              echo "ERROR: Cargo.lock is missing RSK workspace package: ${package}"
+              missing=true
+            fi
+          done
+          if ${missing}; then
+            echo "ERROR: regenerate and review Cargo.lock per RSK Class A blocker #1926."
+            exit 1
+          fi
+
   rsk-format:
     name: RSK format check
     runs-on: ubuntu-latest
@@ -196,8 +215,8 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  rsk-semantic-types:
-    name: RSK semantic types compile + test + clippy
+  rsk-semantic-types-diagnostic:
+    name: RSK semantic types diagnostic (non-admissible until #1926)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -211,19 +230,50 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: State diagnostic evidence boundary
+        run: |
+          echo 'This job intentionally permits ephemeral Cargo.lock refresh to expose compiler/test findings.'
+          echo 'It is NOT admissible RSK qualification evidence while #1926 remains unresolved.'
+
       - name: Format semantic identity crate
         run: cargo fmt --check -p symthaea-replicator-semantics
 
-      - name: Check semantic identity crate
-        run: cargo check -p symthaea-replicator-semantics --all-targets --locked
+      - name: Check semantic identity crate with ephemeral lock refresh allowed
+        run: cargo check -p symthaea-replicator-semantics --all-targets
 
       - name: Test semantic identity crate and authority golden vectors
         run: |
-          cargo test -p symthaea-replicator-semantics --all-targets --locked
-          cargo test -p symthaea-replicator-safety --test semantic_schema --locked
+          cargo test -p symthaea-replicator-semantics --all-targets
+          cargo test -p symthaea-replicator-safety --test semantic_schema
 
       - name: Clippy semantic identity crate
-        run: cargo clippy -p symthaea-replicator-semantics --all-targets --locked -- -D warnings
+        run: cargo clippy -p symthaea-replicator-semantics --all-targets -- -D warnings
+
+      - name: Capture diagnostic Cargo.lock drift
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/rsk-lock-diagnostic"
+          if git diff --quiet -- Cargo.lock; then
+            echo 'Cargo.lock did not change in the diagnostic job.' \
+              > "${RUNNER_TEMP}/rsk-lock-diagnostic/README.txt"
+          else
+            git diff -- Cargo.lock > "${RUNNER_TEMP}/rsk-lock-diagnostic/Cargo.lock.patch"
+            printf '%s\n' \
+              'NON-ADMISSIBLE DIAGNOSTIC ONLY.' \
+              'Generate and commit the lockfile under controlled Class A review; do not apply this artifact blindly.' \
+              > "${RUNNER_TEMP}/rsk-lock-diagnostic/README.txt"
+          fi
+
+      - name: Upload diagnostic lock drift
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsk-lock-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rsk-lock-diagnostic/**
+          if-no-files-found: error
+          retention-days: 14
 
   rsk-core:
     name: RSK compile + test + clippy
