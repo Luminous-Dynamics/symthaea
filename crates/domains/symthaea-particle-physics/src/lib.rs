@@ -18,6 +18,8 @@
 //!   source, lexicographic site/direction/subgroup composition, and sweep stats
 //! - **Lattice RNG streams**: pinned ChaCha8 implementation with injective
 //!   campaign/replica/rank stream coordinates and endpoint-free U(0,1)
+//! - **SU(2) heat-bath sampling**: Kennedy-Pendleton scalar rejection against an
+//!   independently qualified target density, plus an exact Haar scalar fallback
 //!
 //! ## Natural Units
 //!
@@ -31,6 +33,7 @@
 //! - Georgi, H. (1999). *Lie Algebras in Particle Physics*.
 //! - Wilson, K. G. (1974). Phys. Rev. D 10, 2445.
 //! - Cabibbo, N. & Marinari, E. (1982). Phys. Lett. B 119, 387-390.
+//! - Kennedy, A. D. & Pendleton, B. J. (1985). Phys. Lett. B 156, 393-399.
 
 pub mod constants;
 pub mod cross_sections;
@@ -38,6 +41,7 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
+pub mod lattice_heatbath;
 pub mod lattice_metropolis;
 pub mod lattice_qcd;
 pub mod lattice_rng;
@@ -60,6 +64,10 @@ pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
     su3_determinant_error, su3_diagonal, su3_identity, su3_mul, su3_trace,
     su3_unitarity_error, validate_su3,
+};
+pub use lattice_heatbath::{
+    Su2HeatbathError, Su2HeatbathMethod, Su2HeatbathSample,
+    draw_kennedy_pendleton_scalar, draw_su2_heatbath_quaternion,
 };
 pub use lattice_metropolis::{
     LatticeMetropolisError, MetropolisStepResult, Su2Subgroup, Su2SubgroupProposal,
