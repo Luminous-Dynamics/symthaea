@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-energy-benchmark-zero-suite"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Five-fold evidence suite for leakage-qualified Symthaea Energy Benchmark Zero."
+
+[dependencies]
+symthaea-energy-benchmark-zero = { path = "../../domains/symthaea-energy-benchmark-zero" }
+symthaea-energy-benchmark-zero-baseline = { path = "../symthaea-energy-benchmark-zero-baseline" }
+symthaea-energy-benchmark-zero-controls = { path = "../symthaea-energy-benchmark-zero-controls" }
+symthaea-matbench-folds = { path = "../symthaea-matbench-folds" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
