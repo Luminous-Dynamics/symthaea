@@ -442,6 +442,9 @@ impl PreReleaseAdmission for LiveAdmissionState<'_> {
         observation: &KernelSandboxObservation,
         gate: &KernelIsolationGate,
     ) -> Result<(), ObservedEvaluatorError> {
+        if self.teardown_timeout_ms == 0 {
+            return self.fail("admission state carries an invalid zero teardown timeout".into());
+        }
         if observation.host_pid() != sandbox_pid {
             return self.fail("kernel observation PID differs from admission PID".into());
         }
