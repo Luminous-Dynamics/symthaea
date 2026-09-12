@@ -119,11 +119,15 @@ fn plan_with_currentness(
 }
 
 fn result(
+    method: &AnalyticalMethodV1,
+    input: &RectangularCantileverInputV1,
     factor_of_safety: f64,
     max_bending_stress_pa: f64,
     model_relative_error_bound: f64,
 ) -> NativeAnalyticalResultV1 {
-    NativeAnalyticalResultV1::new(
+    NativeAnalyticalResultV1::for_input(
+        method,
+        input,
         ExecutionArtifactDigestV1::parse(digest('8')).unwrap(),
         factor_of_safety,
         max_bending_stress_pa,
@@ -157,7 +161,7 @@ fn independent_vectors_compose_end_to_end() {
     assert_eq!(plan.plan_id().as_str(), PLAN);
     assert_eq!(plan.obligation_revision_id().as_str(), OBLIGATION);
 
-    let result = result(10.416666666666666, 24.0e6, 0.02);
+    let result = result(&method, &input, 10.416666666666666, 24.0e6, 0.02);
     let admitted =
         admit_native_analytical_evidence_v1(&plan, &method, &input, &policy, &result).unwrap();
     assert_eq!(admitted.admitted_evidence_id().as_str(), ADMITTED);
@@ -189,7 +193,7 @@ fn input_drift_cannot_reuse_an_old_plan() {
     let plan = plan_with_currentness(&method, &original, &policy, CURRENTNESS);
     assert_ne!(original.revision_id(), changed.revision_id());
 
-    let result = result(10.416666666666666, 24.0e6, 0.02);
+    let result = result(&method, &changed, 10.416666666666666, 24.0e6, 0.02);
     assert_eq!(
         admit_native_analytical_evidence_v1(&plan, &method, &changed, &policy, &result)
             .unwrap_err(),
@@ -201,19 +205,32 @@ fn input_drift_cannot_reuse_an_old_plan() {
 fn conservative_margin_and_model_error_fail_closed() {
     let method = method();
     let input = input(&method, 1000.0);
-    let policy = policy();
-    let plan = plan_with_currentness(&method, &input, &policy, CURRENTNESS);
 
-    let low_fos = 2.01;
-    let low_stress = 250.0e6 / low_fos;
-    let low = result(low_fos, low_stress, 0.02);
+    // Nominal FoS passes 10.3, but the conservative value after a 2% model
+    // error allowance is ~10.212, so authority must fail closed.
+    let strict_policy = AnalyticalAcceptancePolicyV1::factor_of_safety_ge(
+        10.3,
+        0.05,
+        ModelQualificationRecordDigestV1::parse(digest('9')).unwrap(),
+    )
+    .unwrap();
+    let strict_plan = plan_with_currentness(&method, &input, &strict_policy, CURRENTNESS);
+    let nominal = result(&method, &input, 10.416666666666666, 24.0e6, 0.02);
     assert_eq!(
-        admit_native_analytical_evidence_v1(&plan, &method, &input, &policy, &low)
-            .unwrap_err(),
+        admit_native_analytical_evidence_v1(
+            &strict_plan,
+            &method,
+            &input,
+            &strict_policy,
+            &nominal,
+        )
+        .unwrap_err(),
         AnalysisTrustErrorV1::AcceptancePredicateFailed
     );
 
-    let excessive_error = result(10.416666666666666, 24.0e6, 0.06);
+    let policy = policy();
+    let plan = plan_with_currentness(&method, &input, &policy, CURRENTNESS);
+    let excessive_error = result(&method, &input, 10.416666666666666, 24.0e6, 0.06);
     assert_eq!(
         admit_native_analytical_evidence_v1(
             &plan,
@@ -233,7 +250,7 @@ fn inconsistent_factor_of_safety_fails_closed() {
     let input = input(&method, 1000.0);
     let policy = policy();
     let plan = plan_with_currentness(&method, &input, &policy, CURRENTNESS);
-    let inconsistent = result(10.416666666666666, 25.0e6, 0.02);
+    let inconsistent = result(&method, &input, 10.0, 24.0e6, 0.02);
     assert_eq!(
         admit_native_analytical_evidence_v1(
             &plan,
@@ -248,6 +265,60 @@ fn inconsistent_factor_of_safety_fails_closed() {
 }
 
 #[test]
+fn analytical_equations_must_match_the_bound_input() {
+    let method = method();
+    let input = input(&method, 1000.0);
+    let policy = policy();
+    let plan = plan_with_currentness(&method, &input, &policy, CURRENTNESS);
+
+    let wrong_deflection = NativeAnalyticalResultV1::for_input(
+        &method,
+        &input,
+        ExecutionArtifactDigestV1::parse(digest('8')).unwrap(),
+        10.416666666666666,
+        24.0e6,
+        0.004,
+        2000.0,
+        0.02,
+    )
+    .unwrap();
+    assert_eq!(
+        admit_native_analytical_evidence_v1(
+            &plan,
+            &method,
+            &input,
+            &policy,
+            &wrong_deflection,
+        )
+        .unwrap_err(),
+        AnalysisTrustErrorV1::AnalyticalEquationMismatch("maximum deflection")
+    );
+
+    let wrong_moment = NativeAnalyticalResultV1::for_input(
+        &method,
+        &input,
+        ExecutionArtifactDigestV1::parse(digest('8')).unwrap(),
+        10.416666666666666,
+        24.0e6,
+        0.0032,
+        1999.0,
+        0.02,
+    )
+    .unwrap();
+    assert_eq!(
+        admit_native_analytical_evidence_v1(
+            &plan,
+            &method,
+            &input,
+            &policy,
+            &wrong_moment,
+        )
+        .unwrap_err(),
+        AnalysisTrustErrorV1::AnalyticalEquationMismatch("maximum moment")
+    );
+}
+
+#[test]
 fn currentness_refresh_makes_old_receipt_historical() {
     let method = method();
     let input = input(&method, 1000.0);
@@ -256,7 +327,7 @@ fn currentness_refresh_makes_old_receipt_historical() {
     let refreshed = plan_with_currentness(&method, &input, &policy, REFRESHED_CURRENTNESS);
     assert_ne!(historical.plan_id(), refreshed.plan_id());
 
-    let result = result(10.416666666666666, 24.0e6, 0.02);
+    let result = result(&method, &input, 10.416666666666666, 24.0e6, 0.02);
     let admitted = admit_native_analytical_evidence_v1(
         &historical,
         &method,
@@ -265,8 +336,7 @@ fn currentness_refresh_makes_old_receipt_historical() {
         &result,
     )
     .unwrap();
-    let receipt =
-        issue_native_analytical_discharge_receipt_v1(&historical, &admitted).unwrap();
+    let receipt = issue_native_analytical_discharge_receipt_v1(&historical, &admitted).unwrap();
 
     assert_eq!(
         derive_current_native_analytical_discharge_fact_v1(&refreshed, &receipt).unwrap_err(),
