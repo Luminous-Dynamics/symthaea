@@ -3,11 +3,14 @@
 //! Public-API parity with the independent ETK-3C native analytical oracle.
 
 use symthaea_engineering_analysis_trust::{
+    AcceptanceRecordDigestV1, AlgorithmRevisionDigestV1, AnalysisConfigurationDigestV1,
     AcceptedAnalysisRequirementV1, AnalysisTrustErrorV1, AnalyticalAcceptancePolicyV1,
-    AnalyticalMethodV1, CurrentnessAssertionV1, ExecutionArtifactDigestV1,
-    ModelQualificationRecordDigestV1, NativeAnalyticalPlanV1, NativeAnalyticalResultV1,
-    RectangularCantileverInputV1, Sha256DigestV1, SubjectRevisionV1, TwinKindV1,
-    TwinRevisionV1, ValidityDomainRevisionV1, admit_native_analytical_evidence_v1,
+    AnalyticalMethodV1, CurrentnessAssertionV1, CurrentnessAttestationDigestV1,
+    ExecutionArtifactDigestV1, ImplementationArtifactDigestV1, ModelQualificationRecordDigestV1,
+    ModelRevisionDigestV1, NativeAnalyticalPlanV1, NativeAnalyticalResultV1,
+    RectangularCantileverInputV1, Sha256DigestV1, SubjectRevisionV1, SubjectStateDigestV1,
+    TwinKindV1, TwinRevisionV1, TwinSchemaDigestV1, TwinStateDigestV1,
+    ValidityDimensionDigestV1, ValidityDomainRevisionV1, admit_native_analytical_evidence_v1,
     analytical_obligation_revision_v1, canonical_binary64_v1,
     derive_current_native_analytical_discharge_fact_v1,
     issue_native_analytical_discharge_receipt_v1,
@@ -47,12 +50,21 @@ fn digest(ch: char) -> String {
     format!("sha256:{}", ch.to_string().repeat(64))
 }
 
-fn raw_digest(ch: char) -> Sha256DigestV1 {
+fn raw(ch: char) -> Sha256DigestV1 {
     Sha256DigestV1::parse(digest(ch)).unwrap()
 }
 
+macro_rules! premise {
+    ($ty:ty, $ch:expr) => {
+        <$ty>::from_digest(raw($ch))
+    };
+}
+
 fn requirement() -> AcceptedAnalysisRequirementV1 {
-    AcceptedAnalysisRequirementV1::civil_service_stress_250_mpa(raw_digest('a'))
+    AcceptedAnalysisRequirementV1::civil_service_stress_250_mpa(premise!(
+        AcceptanceRecordDigestV1,
+        'a'
+    ))
 }
 
 fn obligation() -> ProofObligation {
@@ -75,31 +87,42 @@ struct ContextFixture {
 }
 
 fn context(attestation: char) -> ContextFixture {
-    let subject = SubjectRevisionV1::new("design", "bracket-alpha", raw_digest('b')).unwrap();
+    let subject = SubjectRevisionV1::new(
+        "design",
+        "bracket-alpha",
+        premise!(SubjectStateDigestV1, 'b'),
+    )
+    .unwrap();
     let twin = TwinRevisionV1::new(
         &subject,
         TwinKindV1::Design,
-        raw_digest('c'),
-        raw_digest('d'),
+        premise!(TwinStateDigestV1, 'c'),
+        premise!(TwinSchemaDigestV1, 'd'),
         None,
     )
     .unwrap();
     let validity = ValidityDomainRevisionV1::new(
         &subject,
         &twin,
-        raw_digest('e'),
-        raw_digest('f'),
+        premise!(ModelRevisionDigestV1, 'e'),
+        premise!(AnalysisConfigurationDigestV1, 'f'),
         vec![
-            ("load_case".into(), raw_digest('1')),
-            ("material_state".into(), raw_digest('2')),
-            ("boundary_conditions".into(), raw_digest('3')),
+            ("load_case".into(), premise!(ValidityDimensionDigestV1, '1')),
+            (
+                "material_state".into(),
+                premise!(ValidityDimensionDigestV1, '2'),
+            ),
+            (
+                "boundary_conditions".into(),
+                premise!(ValidityDimensionDigestV1, '3'),
+            ),
         ],
     )
     .unwrap();
     let currentness = CurrentnessAssertionV1::new(
         &twin,
         &validity,
-        raw_digest(attestation),
+        premise!(CurrentnessAttestationDigestV1, attestation),
         1_789_123_456_000,
     )
     .unwrap();
@@ -112,7 +135,10 @@ fn context(attestation: char) -> ContextFixture {
 }
 
 fn method() -> AnalyticalMethodV1 {
-    AnalyticalMethodV1::euler_bernoulli_beam(raw_digest('a'), raw_digest('b'))
+    AnalyticalMethodV1::euler_bernoulli_beam(
+        premise!(ImplementationArtifactDigestV1, 'a'),
+        premise!(AlgorithmRevisionDigestV1, 'b'),
+    )
 }
 
 fn input(method: &AnalyticalMethodV1, load_n: f64) -> RectangularCantileverInputV1 {
@@ -128,16 +154,16 @@ fn input(method: &AnalyticalMethodV1, load_n: f64) -> RectangularCantileverInput
     .unwrap()
 }
 
-fn policy() -> AnalyticalAcceptancePolicyV1 {
+fn policy(threshold: f64, max_error: f64) -> AnalyticalAcceptancePolicyV1 {
     AnalyticalAcceptancePolicyV1::factor_of_safety_ge(
-        2.0,
-        0.05,
-        ModelQualificationRecordDigestV1::parse(digest('9')).unwrap(),
+        threshold,
+        max_error,
+        premise!(ModelQualificationRecordDigestV1, '9'),
     )
     .unwrap()
 }
 
-fn plan_with_context(
+fn plan(
     method: &AnalyticalMethodV1,
     input: &RectangularCantileverInputV1,
     policy: &AnalyticalAcceptancePolicyV1,
@@ -160,19 +186,21 @@ fn plan_with_context(
 fn result(
     method: &AnalyticalMethodV1,
     input: &RectangularCantileverInputV1,
-    factor_of_safety: f64,
-    max_bending_stress_pa: f64,
-    model_relative_error_bound: f64,
+    fos: f64,
+    stress_pa: f64,
+    deflection_m: f64,
+    moment_nm: f64,
+    error: f64,
 ) -> NativeAnalyticalResultV1 {
     NativeAnalyticalResultV1::for_input(
         method,
         input,
-        ExecutionArtifactDigestV1::parse(digest('8')).unwrap(),
-        factor_of_safety,
-        max_bending_stress_pa,
-        0.0032,
-        2000.0,
-        model_relative_error_bound,
+        premise!(ExecutionArtifactDigestV1, '8'),
+        fos,
+        stress_pa,
+        deflection_m,
+        moment_nm,
+        error,
     )
     .unwrap()
 }
@@ -197,23 +225,31 @@ fn independent_vectors_compose_end_to_end() {
 
     let method = method();
     let input = input(&method, 1000.0);
-    let policy = policy();
+    let policy = policy(2.0, 0.05);
     assert_eq!(method.revision_id().as_str(), METHOD);
     assert_eq!(input.revision_id().as_str(), INPUT);
     assert_eq!(policy.revision_id().as_str(), POLICY);
 
-    let plan = plan_with_context(&method, &input, &policy, &context);
+    let plan = plan(&method, &input, &policy, &context);
     assert_eq!(plan.plan_id().as_str(), PLAN);
-    assert_eq!(plan.obligation_revision_id().as_str(), OBLIGATION);
     assert_eq!(plan.requirement_revision_id().as_str(), REQUIREMENT);
+    assert_eq!(plan.obligation_revision_id().as_str(), OBLIGATION);
     assert_eq!(plan.subject_revision_id().as_str(), SUBJECT);
     assert_eq!(plan.twin_revision_id().as_str(), TWIN);
     assert_eq!(plan.validity_domain_revision_id().as_str(), VALIDITY);
     assert_eq!(plan.currentness_assertion_id().as_str(), CURRENTNESS);
 
-    let result = result(&method, &input, 10.416666666666666, 24.0e6, 0.02);
+    let candidate = result(
+        &method,
+        &input,
+        10.416666666666666,
+        24.0e6,
+        0.0032,
+        2000.0,
+        0.02,
+    );
     let admitted =
-        admit_native_analytical_evidence_v1(&plan, &method, &input, &policy, &result).unwrap();
+        admit_native_analytical_evidence_v1(&plan, &method, &input, &policy, &candidate).unwrap();
     assert_eq!(admitted.admitted_evidence_id().as_str(), ADMITTED);
 
     let receipt = issue_native_analytical_discharge_receipt_v1(&plan, &admitted).unwrap();
@@ -227,6 +263,17 @@ fn independent_vectors_compose_end_to_end() {
 }
 
 #[test]
+fn role_safe_premises_preserve_vector_bytes_but_not_type_interchangeability() {
+    let raw_a = raw('a');
+    assert_eq!(
+        AcceptanceRecordDigestV1::from_digest(raw_a.clone()).as_str(),
+        ImplementationArtifactDigestV1::from_digest(raw_a).as_str()
+    );
+    // Equal bytes are intentionally distinct Rust types; call sites must name
+    // which authority premise role they are supplying.
+}
+
+#[test]
 fn analysis_is_not_external_simulation_semantics() {
     let mut wrong = obligation();
     wrong.expected_evidence = EvidenceKind::Simulation;
@@ -237,14 +284,24 @@ fn analysis_is_not_external_simulation_semantics() {
 }
 
 #[test]
-fn semantic_context_is_not_arbitrary_hash_shaped_input() {
-    let subject_a = SubjectRevisionV1::new("design", "bracket-alpha", raw_digest('b')).unwrap();
-    let subject_b = SubjectRevisionV1::new("design", "bracket-beta", raw_digest('b')).unwrap();
+fn semantic_context_rejects_cross_subject_and_cross_twin_composition() {
+    let subject_a = SubjectRevisionV1::new(
+        "design",
+        "bracket-alpha",
+        premise!(SubjectStateDigestV1, 'b'),
+    )
+    .unwrap();
+    let subject_b = SubjectRevisionV1::new(
+        "design",
+        "bracket-beta",
+        premise!(SubjectStateDigestV1, 'b'),
+    )
+    .unwrap();
     let twin_a = TwinRevisionV1::new(
         &subject_a,
         TwinKindV1::Design,
-        raw_digest('c'),
-        raw_digest('d'),
+        premise!(TwinStateDigestV1, 'c'),
+        premise!(TwinSchemaDigestV1, 'd'),
         None,
     )
     .unwrap();
@@ -253,9 +310,9 @@ fn semantic_context_is_not_arbitrary_hash_shaped_input() {
         ValidityDomainRevisionV1::new(
             &subject_b,
             &twin_a,
-            raw_digest('e'),
-            raw_digest('f'),
-            Vec::<(String, Sha256DigestV1)>::new(),
+            premise!(ModelRevisionDigestV1, 'e'),
+            premise!(AnalysisConfigurationDigestV1, 'f'),
+            Vec::<(String, ValidityDimensionDigestV1)>::new(),
         )
         .unwrap_err(),
         AnalysisTrustErrorV1::TwinSubjectMismatch
@@ -265,8 +322,8 @@ fn semantic_context_is_not_arbitrary_hash_shaped_input() {
     let twin_b = TwinRevisionV1::new(
         &subject_b,
         TwinKindV1::Design,
-        raw_digest('c'),
-        raw_digest('d'),
+        premise!(TwinStateDigestV1, 'c'),
+        premise!(TwinSchemaDigestV1, 'd'),
         None,
     )
     .unwrap();
@@ -274,7 +331,7 @@ fn semantic_context_is_not_arbitrary_hash_shaped_input() {
         CurrentnessAssertionV1::new(
             &twin_b,
             &context_a.validity,
-            raw_digest('4'),
+            premise!(CurrentnessAttestationDigestV1, '4'),
             1_789_123_456_000,
         )
         .unwrap_err(),
@@ -283,82 +340,114 @@ fn semantic_context_is_not_arbitrary_hash_shaped_input() {
 }
 
 #[test]
-fn input_drift_cannot_reuse_an_old_plan() {
+fn input_drift_and_weak_policy_fail_before_authority() {
     let method = method();
     let original = input(&method, 1000.0);
     let changed = input(&method, 1000.0000000000001);
-    let policy = policy();
     let context = context('4');
-    let plan = plan_with_context(&method, &original, &policy, &context);
+    let policy = policy(2.0, 0.05);
+    let plan = plan(&method, &original, &policy, &context);
     assert_ne!(original.revision_id(), changed.revision_id());
 
-    let result = result(&method, &changed, 10.416666666666666, 24.0e6, 0.02);
+    let changed_result = result(
+        &method,
+        &changed,
+        10.416666666666666,
+        24.0e6,
+        0.0032,
+        2000.0,
+        0.02,
+    );
     assert_eq!(
-        admit_native_analytical_evidence_v1(&plan, &method, &changed, &policy, &result)
-            .unwrap_err(),
+        admit_native_analytical_evidence_v1(
+            &plan,
+            &method,
+            &changed,
+            &policy,
+            &changed_result,
+        )
+        .unwrap_err(),
         AnalysisTrustErrorV1::PlanBindingMismatch
     );
-}
 
-#[test]
-fn policy_must_be_conservative_enough_for_the_accepted_requirement() {
-    let method = method();
-    let input = input(&method, 1000.0);
-    let context = context('4');
-    let weak_policy = AnalyticalAcceptancePolicyV1::factor_of_safety_ge(
-        0.5,
-        0.05,
-        ModelQualificationRecordDigestV1::parse(digest('9')).unwrap(),
-    )
-    .unwrap();
-
-    let plan = NativeAnalyticalPlanV1::new(
-        &requirement(),
-        &context.subject,
-        &context.twin,
-        &context.validity,
-        &context.currentness,
-        &obligation(),
-        &method,
-        &input,
-        &weak_policy,
-    );
-
+    let weak = policy(0.5, 0.05);
     assert_eq!(
-        plan.unwrap_err(),
+        NativeAnalyticalPlanV1::new(
+            &requirement(),
+            &context.subject,
+            &context.twin,
+            &context.validity,
+            &context.currentness,
+            &obligation(),
+            &method,
+            &original,
+            &weak,
+        )
+        .unwrap_err(),
         AnalysisTrustErrorV1::PolicyDoesNotDischargeRequirement
     );
 }
 
 #[test]
-fn conservative_margin_and_model_error_fail_closed() {
+fn analytical_equations_and_conservative_acceptance_fail_closed() {
     let method = method();
     let input = input(&method, 1000.0);
     let context = context('4');
+    let policy = policy(2.0, 0.05);
+    let plan = plan(&method, &input, &policy, &context);
 
-    let strict_policy = AnalyticalAcceptancePolicyV1::factor_of_safety_ge(
-        10.3,
-        0.05,
-        ModelQualificationRecordDigestV1::parse(digest('9')).unwrap(),
-    )
-    .unwrap();
-    let strict_plan = plan_with_context(&method, &input, &strict_policy, &context);
-    let nominal = result(&method, &input, 10.416666666666666, 24.0e6, 0.02);
-    assert_eq!(
-        admit_native_analytical_evidence_v1(
-            &strict_plan,
-            &method,
-            &input,
-            &strict_policy,
-            &nominal,
-        )
-        .unwrap_err(),
-        AnalysisTrustErrorV1::AcceptancePredicateFailed
+    for (candidate, expected) in [
+        (
+            result(
+                &method,
+                &input,
+                10.416666666666666,
+                24.0e6,
+                0.004,
+                2000.0,
+                0.02,
+            ),
+            AnalysisTrustErrorV1::AnalyticalEquationMismatch("maximum deflection"),
+        ),
+        (
+            result(
+                &method,
+                &input,
+                10.416666666666666,
+                24.0e6,
+                0.0032,
+                1999.0,
+                0.02,
+            ),
+            AnalysisTrustErrorV1::AnalyticalEquationMismatch("maximum moment"),
+        ),
+        (
+            result(&method, &input, 10.0, 24.0e6, 0.0032, 2000.0, 0.02),
+            AnalysisTrustErrorV1::InconsistentFactorOfSafety,
+        ),
+    ] {
+        assert_eq!(
+            admit_native_analytical_evidence_v1(
+                &plan,
+                &method,
+                &input,
+                &policy,
+                &candidate,
+            )
+            .unwrap_err(),
+            expected
+        );
+    }
+
+    let excessive_error = result(
+        &method,
+        &input,
+        10.416666666666666,
+        24.0e6,
+        0.0032,
+        2000.0,
+        0.06,
     );
-
-    let policy = policy();
-    let plan = plan_with_context(&method, &input, &policy, &context);
-    let excessive_error = result(&method, &input, 10.416666666666666, 24.0e6, 0.06);
     assert_eq!(
         admit_native_analytical_evidence_v1(
             &plan,
@@ -370,81 +459,28 @@ fn conservative_margin_and_model_error_fail_closed() {
         .unwrap_err(),
         AnalysisTrustErrorV1::ModelErrorBudgetExceeded
     );
-}
 
-#[test]
-fn inconsistent_factor_of_safety_fails_closed() {
-    let method = method();
-    let input = input(&method, 1000.0);
-    let policy = policy();
-    let context = context('4');
-    let plan = plan_with_context(&method, &input, &policy, &context);
-    let inconsistent = result(&method, &input, 10.0, 24.0e6, 0.02);
-    assert_eq!(
-        admit_native_analytical_evidence_v1(
-            &plan,
-            &method,
-            &input,
-            &policy,
-            &inconsistent,
-        )
-        .unwrap_err(),
-        AnalysisTrustErrorV1::InconsistentFactorOfSafety
-    );
-}
-
-#[test]
-fn analytical_equations_must_match_the_bound_input() {
-    let method = method();
-    let input = input(&method, 1000.0);
-    let policy = policy();
-    let context = context('4');
-    let plan = plan_with_context(&method, &input, &policy, &context);
-
-    let wrong_deflection = NativeAnalyticalResultV1::for_input(
+    let strict = policy(10.3, 0.05);
+    let strict_plan = plan(&method, &input, &strict, &context);
+    let nominal = result(
         &method,
         &input,
-        ExecutionArtifactDigestV1::parse(digest('8')).unwrap(),
-        10.416666666666666,
-        24.0e6,
-        0.004,
-        2000.0,
-        0.02,
-    )
-    .unwrap();
-    assert_eq!(
-        admit_native_analytical_evidence_v1(
-            &plan,
-            &method,
-            &input,
-            &policy,
-            &wrong_deflection,
-        )
-        .unwrap_err(),
-        AnalysisTrustErrorV1::AnalyticalEquationMismatch("maximum deflection")
-    );
-
-    let wrong_moment = NativeAnalyticalResultV1::for_input(
-        &method,
-        &input,
-        ExecutionArtifactDigestV1::parse(digest('8')).unwrap(),
         10.416666666666666,
         24.0e6,
         0.0032,
-        1999.0,
+        2000.0,
         0.02,
-    )
-    .unwrap();
+    );
     assert_eq!(
         admit_native_analytical_evidence_v1(
-            &plan,
+            &strict_plan,
             &method,
             &input,
-            &policy,
-            &wrong_moment,
+            &strict,
+            &nominal,
         )
         .unwrap_err(),
-        AnalysisTrustErrorV1::AnalyticalEquationMismatch("maximum moment")
+        AnalysisTrustErrorV1::AcceptancePredicateFailed
     );
 }
 
@@ -452,39 +488,42 @@ fn analytical_equations_must_match_the_bound_input() {
 fn currentness_refresh_makes_old_receipt_historical() {
     let method = method();
     let input = input(&method, 1000.0);
-    let policy = policy();
-    let historical_context = context('4');
-    let refreshed_context = context('5');
-    assert_eq!(historical_context.subject.revision_id(), refreshed_context.subject.revision_id());
-    assert_eq!(historical_context.twin.revision_id(), refreshed_context.twin.revision_id());
-    assert_eq!(historical_context.validity.revision_id(), refreshed_context.validity.revision_id());
-    assert_eq!(historical_context.currentness.assertion_id().as_str(), CURRENTNESS);
-    assert_eq!(refreshed_context.currentness.assertion_id().as_str(), REFRESHED_CURRENTNESS);
+    let policy = policy(2.0, 0.05);
+    let old_context = context('4');
+    let new_context = context('5');
+    assert_eq!(old_context.currentness.assertion_id().as_str(), CURRENTNESS);
+    assert_eq!(new_context.currentness.assertion_id().as_str(), REFRESHED_CURRENTNESS);
 
-    let historical = plan_with_context(&method, &input, &policy, &historical_context);
-    let refreshed = plan_with_context(&method, &input, &policy, &refreshed_context);
-    assert_ne!(historical.plan_id(), refreshed.plan_id());
-
-    let result = result(&method, &input, 10.416666666666666, 24.0e6, 0.02);
+    let old_plan = plan(&method, &input, &policy, &old_context);
+    let new_plan = plan(&method, &input, &policy, &new_context);
+    let candidate = result(
+        &method,
+        &input,
+        10.416666666666666,
+        24.0e6,
+        0.0032,
+        2000.0,
+        0.02,
+    );
     let admitted = admit_native_analytical_evidence_v1(
-        &historical,
+        &old_plan,
         &method,
         &input,
         &policy,
-        &result,
+        &candidate,
     )
     .unwrap();
-    let receipt = issue_native_analytical_discharge_receipt_v1(&historical, &admitted).unwrap();
+    let receipt = issue_native_analytical_discharge_receipt_v1(&old_plan, &admitted).unwrap();
 
     assert_eq!(
-        derive_current_native_analytical_discharge_fact_v1(&refreshed, &receipt).unwrap_err(),
+        derive_current_native_analytical_discharge_fact_v1(&new_plan, &receipt).unwrap_err(),
         AnalysisTrustErrorV1::HistoricalPlan
     );
 }
 
 #[test]
-fn malformed_content_identity_is_rejected_before_authority() {
+fn malformed_content_identity_and_non_finite_numbers_are_rejected() {
     assert!(ExecutionArtifactDigestV1::parse("sha256:not-a-digest").is_err());
-    assert!(Sha256DigestV1::parse(format!("sha256:{}", "A".repeat(64))).is_err());
+    assert!(AcceptanceRecordDigestV1::parse(format!("sha256:{}", "A".repeat(64))).is_err());
     assert!(canonical_binary64_v1(f64::NAN).is_err());
 }
