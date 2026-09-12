@@ -135,6 +135,114 @@ impl Default for BandgapPredictor {
     }
 }
 
+/// Crystal-ablated residual RF for composition-only inference.
+///
+/// This predictor intentionally uses the same [`RandomForest`] machinery and
+/// the same curated experimental training labels as [`BandgapPredictor`], but
+/// feature 16 (crystal-system ordinal) is fixed to [`CrystalSystem::Unknown`]
+/// for **every training and inference example**. The sentinel is therefore a
+/// constant ablation feature, not an inference-time guess about an unseen
+/// crystal structure.
+///
+/// The public prediction API accepts composition only, preventing benchmark
+/// callers from accidentally injecting structure information.
+pub struct CompositionBandgapPredictor {
+    forest: RandomForest,
+}
+
+impl CompositionBandgapPredictor {
+    /// Train on the full curated band-gap table with crystal-system information
+    /// deliberately ablated to one constant feature value.
+    pub fn new() -> Self {
+        let data = load_training_data();
+        let mut features = Vec::with_capacity(data.len());
+        let mut residuals = Vec::with_capacity(data.len());
+
+        for d in &data {
+            let baseline = electronegativity_bandgap(&d.composition);
+            let residual = d.bandgap_exp() - baseline;
+            features.push(extract_features(
+                &d.composition,
+                &CrystalSystem::Unknown,
+            ));
+            residuals.push(residual);
+        }
+
+        let forest = RandomForest::train(&features, &residuals, 50, 8, 3);
+        Self { forest }
+    }
+
+    /// Predict from composition alone using the same crystal-ablation policy
+    /// used during training.
+    pub fn predict(&self, composition: &[(u8, f64)]) -> BandgapPrediction {
+        let features = extract_features(composition, &CrystalSystem::Unknown);
+        let baseline = electronegativity_bandgap(composition);
+        let (correction, uncertainty) = self.forest.predict(&features);
+
+        BandgapPrediction {
+            bandgap: (baseline + correction).max(0.0),
+            baseline,
+            ml_correction: correction,
+            uncertainty,
+        }
+    }
+
+    /// Internal-table five-fold cross-validation using the same composition-only
+    /// feature policy in both train and test folds.
+    ///
+    /// This is a development sanity metric only; it is not external Benchmark
+    /// Zero evidence and it does not make the folds independent replications.
+    pub fn cross_validate() -> (f64, f64) {
+        let data = load_training_data();
+        let n = data.len();
+        let fold_size = n / 5;
+        let mut total_abs_error = 0.0;
+        let mut total_sq_error = 0.0;
+        let mut total_count = 0;
+
+        for fold in 0..5 {
+            let test_start = fold * fold_size;
+            let test_end = if fold == 4 { n } else { (fold + 1) * fold_size };
+            let mut train_features = Vec::new();
+            let mut train_targets = Vec::new();
+
+            for (i, d) in data.iter().enumerate() {
+                if i >= test_start && i < test_end {
+                    continue;
+                }
+                let baseline = electronegativity_bandgap(&d.composition);
+                train_features.push(extract_features(
+                    &d.composition,
+                    &CrystalSystem::Unknown,
+                ));
+                train_targets.push(d.bandgap_exp() - baseline);
+            }
+
+            let forest = RandomForest::train(&train_features, &train_targets, 50, 8, 3);
+            for d in &data[test_start..test_end] {
+                let features = extract_features(&d.composition, &CrystalSystem::Unknown);
+                let baseline = electronegativity_bandgap(&d.composition);
+                let (correction, _) = forest.predict(&features);
+                let predicted = (baseline + correction).max(0.0);
+                let error = predicted - d.bandgap_exp();
+                total_abs_error += error.abs();
+                total_sq_error += error * error;
+                total_count += 1;
+            }
+        }
+
+        let mae = total_abs_error / total_count as f64;
+        let rmse = (total_sq_error / total_count as f64).sqrt();
+        (mae, rmse)
+    }
+}
+
+impl Default for CompositionBandgapPredictor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Random Forest implementation (inline, same pattern as nuclear crate)
 // ---------------------------------------------------------------------------
@@ -445,6 +553,46 @@ mod tests {
                 d.name(),
                 pred.bandgap
             );
+        }
+    }
+
+    #[test]
+    fn composition_only_predictor_trains_without_crystal_input() {
+        let predictor = CompositionBandgapPredictor::new();
+        let pred = predictor.predict(&[(14, 1.0)]);
+        assert!(pred.bandgap.is_finite());
+        assert!(pred.bandgap >= 0.0);
+        assert!(pred.uncertainty.is_finite());
+        assert!(pred.uncertainty >= 0.0);
+    }
+
+    #[test]
+    fn composition_only_feature_policy_keeps_crystal_feature_constant() {
+        let si = extract_features(&[(14, 1.0)], &CrystalSystem::Unknown);
+        let gaas = extract_features(&[(31, 0.5), (33, 0.5)], &CrystalSystem::Unknown);
+        assert_eq!(si[16], CrystalSystem::Unknown.ordinal() as f64);
+        assert_eq!(gaas[16], CrystalSystem::Unknown.ordinal() as f64);
+        assert_eq!(si[16], gaas[16]);
+    }
+
+    #[test]
+    fn composition_only_cross_validation_is_finite() {
+        let (mae, rmse) = CompositionBandgapPredictor::cross_validate();
+        eprintln!(
+            "Composition-only 5-fold CV: MAE = {:.3} eV, RMSE = {:.3} eV",
+            mae, rmse
+        );
+        assert!(mae.is_finite() && mae > 0.0);
+        assert!(rmse.is_finite() && rmse > 0.0);
+        assert!(rmse < 5.0, "composition-only CV RMSE = {rmse} is unreasonably high");
+    }
+
+    #[test]
+    fn composition_only_predictions_are_nonnegative_on_training_compositions() {
+        let predictor = CompositionBandgapPredictor::new();
+        for d in load_training_data() {
+            let pred = predictor.predict(&d.composition);
+            assert!(pred.bandgap >= 0.0, "{}: negative prediction", d.name());
         }
     }
 }
