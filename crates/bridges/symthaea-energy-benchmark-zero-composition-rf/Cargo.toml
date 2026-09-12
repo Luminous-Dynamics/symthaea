@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-energy-benchmark-zero-composition-rf"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Leakage-qualified composition-only RF adapter for Symthaea Energy Benchmark Zero."
+
+[dependencies]
+symthaea-bandgap = { path = "../../domains/symthaea-bandgap" }
+symthaea-energy-benchmark-zero = { path = "../../domains/symthaea-energy-benchmark-zero" }
+symthaea-matbench-gap = { path = "../symthaea-matbench-gap" }
+symthaea-matbench-folds = { path = "../symthaea-matbench-folds" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
