@@ -14,6 +14,7 @@ symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default
 symthaea-psych-bench = { path = "../symthaea-psych-bench" }
 symthaea-welfare-authority = { path = "../symthaea-welfare-authority" }
 symthaea-welfare-consent = { path = "../symthaea-welfare-consent" }
+serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 
