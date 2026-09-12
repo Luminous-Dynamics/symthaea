@@ -59,7 +59,7 @@ jobs:
           base_sha='${{ github.event.pull_request.base.sha }}'
           changed_files="$(git diff --name-only "${base_sha}"...HEAD)"
 
-          class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-ledger/|\.github/workflows/rsk-safety\.yml$|scripts/rsk_qualification\.py$|scripts/test_rsk_qualification\.py$|scripts/verify_rsk_qualification\.py$|scripts/test_verify_rsk_qualification\.py$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
+          class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-ledger/|docs/architecture/replicator-safety/|\.github/workflows/rsk-safety\.yml$|scripts/rsk_qualification\.py$|scripts/test_rsk_qualification\.py$|scripts/verify_rsk_qualification\.py$|scripts/test_verify_rsk_qualification\.py$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
 
           if ! printf '%s\n' "${changed_files}" | grep -Eq "${class_a_pattern}"; then
             echo "No RSK Class A implementation/governance surface changed."
@@ -96,6 +96,7 @@ jobs:
           required_paths=(
             'crates/domains/symthaea-replicator-safety/'
             'crates/domains/symthaea-replicator-ledger/'
+            'docs/architecture/replicator-safety/'
             '.github/workflows/rsk-safety.yml'
             'scripts/rsk_qualification.py'
             'scripts/test_rsk_qualification.py'
