@@ -1,0 +1,110 @@
+{
+  "schema": "symthaea.rsk.semantic-schema-golden.v2",
+  "capability_schema": {
+    "schema": "symthaea.rsk.capability-schema.v1",
+    "family": "rsk.test.capabilities",
+    "version": 1,
+    "bit_width": 8,
+    "entries": [
+      {
+        "bit": 0,
+        "id": "cap.alpha",
+        "status": "assignable",
+        "description": "abstract alpha"
+      },
+      {
+        "bit": 1,
+        "id": "cap.beta",
+        "status": "assignable",
+        "description": "abstract beta"
+      },
+      {
+        "bit": 3,
+        "id": "cap.retired",
+        "status": "retired",
+        "description": "retired abstract bit"
+      }
+    ],
+    "reserved_bits": [2, 7]
+  },
+  "capability_schema_sha256": "da004c77da0df512ef772aa167fd386b61d6a581a3be40ded93d056e36dbc856",
+  "resource_schema": {
+    "schema": "symthaea.rsk.resource-accounting-schema.v2",
+    "family": "rsk.test.resources",
+    "version": 2,
+    "dimensions": [
+      {
+        "id": "budget.compute",
+        "numeric_id": 0,
+        "unit": "unit.compute",
+        "scale": 0,
+        "minimum": 0,
+        "maximum": 1000,
+        "required": true,
+        "rounding": "exact",
+        "aggregation": "sum"
+      },
+      {
+        "id": "budget.energy",
+        "numeric_id": 1,
+        "unit": "unit.energy",
+        "scale": 0,
+        "minimum": 0,
+        "maximum": 1000,
+        "required": true,
+        "rounding": "exact",
+        "aggregation": "sum"
+      }
+    ]
+  },
+  "resource_schema_sha256": "8386b56b11818273612cc9f15e6c6fa8cd19bbf9aa2c7a3476022d2f7ef0f1e1",
+  "runtime_dimension_map": {
+    "budget.compute": 0,
+    "budget.energy": 1
+  },
+  "numeric_id_remap_schema_sha256": "04f5f4cce1d7f819becf84fdff236ff6db695e0590c37c665994487d2b5ff024",
+  "resource_vectors": [
+    {
+      "name": "limits",
+      "amounts": {
+        "budget.compute": 100,
+        "budget.energy": 80
+      },
+      "numeric_quantities": [
+        {"numeric_id": 0, "amount": 100},
+        {"numeric_id": 1, "amount": 80}
+      ],
+      "valid": true
+    },
+    {
+      "name": "consumed",
+      "amounts": {
+        "budget.compute": 40,
+        "budget.energy": 20
+      },
+      "numeric_quantities": [
+        {"numeric_id": 0, "amount": 40},
+        {"numeric_id": 1, "amount": 20}
+      ],
+      "valid": true
+    },
+    {
+      "name": "missing-energy",
+      "amounts": {
+        "budget.compute": 10
+      },
+      "numeric_quantities": [
+        {"numeric_id": 0, "amount": 10}
+      ],
+      "valid": false
+    }
+  ],
+  "expected_remaining": {
+    "budget.compute": 60,
+    "budget.energy": 60
+  },
+  "expected_numeric_remaining": [
+    {"numeric_id": 0, "amount": 60},
+    {"numeric_id": 1, "amount": 60}
+  ]
+}

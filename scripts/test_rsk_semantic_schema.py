@@ -18,6 +18,10 @@ GOLDEN = (
     ROOT
     / "docs/architecture/replicator-safety/golden/RSK_SEMANTIC_SCHEMA_GOLDEN_V0_1.json"
 )
+GOLDEN_V2 = (
+    ROOT
+    / "docs/architecture/replicator-safety/golden/RSK_SEMANTIC_SCHEMA_GOLDEN_V0_2.json"
+)
 
 
 def capability_schema() -> dict:
@@ -68,6 +72,38 @@ def resource_schema() -> dict:
             },
             {
                 "id": "budget.energy",
+                "unit": "unit.energy",
+                "scale": 0,
+                "minimum": 0,
+                "maximum": 1000,
+                "required": True,
+                "rounding": "exact",
+                "aggregation": "sum",
+            },
+        ],
+    }
+
+
+def resource_schema_v2() -> dict:
+    return {
+        "schema": schema.RESOURCE_SCHEMA_TAG_V2,
+        "family": "rsk.test.resources",
+        "version": 2,
+        "dimensions": [
+            {
+                "id": "budget.compute",
+                "numeric_id": 0,
+                "unit": "unit.compute",
+                "scale": 0,
+                "minimum": 0,
+                "maximum": 1000,
+                "required": True,
+                "rounding": "exact",
+                "aggregation": "sum",
+            },
+            {
+                "id": "budget.energy",
+                "numeric_id": 1,
                 "unit": "unit.energy",
                 "scale": 0,
                 "minimum": 0,
@@ -249,6 +285,116 @@ class SemanticSchemaTests(unittest.TestCase):
                         resource,
                         resource_id,
                         vector["amounts"],
+                    )
+
+        self.assertEqual(
+            schema.remaining_vector(
+                resource,
+                resource_id,
+                vectors["limits"]["amounts"],
+                vectors["consumed"]["amounts"],
+            ),
+            golden["expected_remaining"],
+        )
+
+    def test_v1_is_historical_but_not_runtime_id_bound(self) -> None:
+        value = resource_schema()
+        schema.validate_resource_schema(value)
+        with self.assertRaises(schema.SchemaError):
+            schema.require_runtime_bound_resource_schema(value)
+        with self.assertRaises(schema.SchemaError):
+            schema.resource_runtime_dimension_map(value)
+
+    def test_v2_runtime_ids_are_part_of_schema_digest(self) -> None:
+        value = resource_schema_v2()
+        value_id = schema.require_runtime_bound_resource_schema(value)
+        self.assertEqual(
+            value_id,
+            "8386b56b11818273612cc9f15e6c6fa8cd19bbf9aa2c7a3476022d2f7ef0f1e1",
+        )
+        remapped = copy.deepcopy(value)
+        remapped["dimensions"][0]["numeric_id"] = 1
+        remapped["dimensions"][1]["numeric_id"] = 0
+        self.assertEqual(
+            schema.require_runtime_bound_resource_schema(remapped),
+            "04f5f4cce1d7f819becf84fdff236ff6db695e0590c37c665994487d2b5ff024",
+        )
+        self.assertNotEqual(schema.digest(value), schema.digest(remapped))
+
+    def test_v2_rejects_duplicate_or_out_of_range_runtime_ids(self) -> None:
+        duplicate = resource_schema_v2()
+        duplicate["dimensions"][1]["numeric_id"] = 0
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_resource_schema(duplicate)
+
+        oversized = resource_schema_v2()
+        oversized["dimensions"][1]["numeric_id"] = 65536
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_resource_schema(oversized)
+
+    def test_v2_numeric_vector_is_checked_against_committed_mapping(self) -> None:
+        value = resource_schema_v2()
+        value_id = schema.require_runtime_bound_resource_schema(value)
+        self.assertEqual(
+            schema.resource_runtime_dimension_map(value),
+            {"budget.compute": 0, "budget.energy": 1},
+        )
+        schema.validate_numeric_resource_vector(
+            value,
+            value_id,
+            [
+                {"numeric_id": 0, "amount": 100},
+                {"numeric_id": 1, "amount": 80},
+            ],
+        )
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_numeric_resource_vector(
+                value,
+                value_id,
+                [{"numeric_id": 0, "amount": 100}],
+            )
+        with self.assertRaises(schema.SchemaError):
+            schema.validate_numeric_resource_vector(
+                value,
+                value_id,
+                [
+                    {"numeric_id": 0, "amount": 100},
+                    {"numeric_id": 2, "amount": 80},
+                ],
+            )
+
+    def test_committed_v2_golden_vectors_bind_runtime_ids(self) -> None:
+        golden = json.loads(GOLDEN_V2.read_text())
+        self.assertEqual(golden["schema"], "symthaea.rsk.semantic-schema-golden.v2")
+        resource = golden["resource_schema"]
+        resource_id = schema.require_runtime_bound_resource_schema(resource)
+        self.assertEqual(resource_id, golden["resource_schema_sha256"])
+        self.assertEqual(
+            schema.resource_runtime_dimension_map(resource),
+            golden["runtime_dimension_map"],
+        )
+
+        remapped = copy.deepcopy(resource)
+        remapped["dimensions"][0]["numeric_id"] = 1
+        remapped["dimensions"][1]["numeric_id"] = 0
+        self.assertEqual(
+            schema.require_runtime_bound_resource_schema(remapped),
+            golden["numeric_id_remap_schema_sha256"],
+        )
+
+        vectors = {vector["name"]: vector for vector in golden["resource_vectors"]}
+        for vector in vectors.values():
+            if vector["valid"]:
+                schema.validate_resource_vector(resource, resource_id, vector["amounts"])
+                schema.validate_numeric_resource_vector(
+                    resource, resource_id, vector["numeric_quantities"]
+                )
+            else:
+                with self.assertRaises(schema.SchemaError):
+                    schema.validate_resource_vector(resource, resource_id, vector["amounts"])
+                with self.assertRaises(schema.SchemaError):
+                    schema.validate_numeric_resource_vector(
+                        resource, resource_id, vector["numeric_quantities"]
                     )
 
         self.assertEqual(
