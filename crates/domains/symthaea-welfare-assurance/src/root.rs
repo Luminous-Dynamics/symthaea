@@ -17,5 +17,6 @@ pub mod authority_evidence_binding;
 pub mod evidence_context;
 pub mod execution_adapter;
 pub mod execution_recovery;
+pub mod memory_intervention;
 #[path = "replay_recovery_v2.rs"]
 pub mod replay_recovery;
