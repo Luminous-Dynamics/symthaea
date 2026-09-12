@@ -6,13 +6,13 @@
 Authority ladder:
   native calculation != admitted analytical evidence
   != historical discharge receipt != current analytical discharge fact
+  != requirement satisfaction / qualification / actuation authority
 
-The canary uses Euler-Bernoulli beam outputs only to freeze admission semantics.
-It does not establish physical correctness, calibration, or model qualification.
+This is a stdlib-only reference implementation. It freezes authority semantics,
+not Euler-Bernoulli physical applicability or model qualification.
 """
 from __future__ import annotations
 import argparse, copy, hashlib, json, math, struct
-from typing import Any
 
 REQ_D=b"symthaea.etk-accepted-requirement.v1\0"
 OBL_D=b"symthaea.etk-proof-obligation-snapshot.v1\0"
@@ -31,6 +31,8 @@ VALIDITY="sha256:90bff4adf8917f2ae071f405d5c46afb310b12a98dd2e4eec845de1261a2489
 EXPECTED_CURRENT="sha256:f85bd7d5129b08a3256cfdd5b3506f3cae1dbc625b097a8bf95bf1f6fe709dd9"
 OBL_ID="00000000-0000-4000-8000-000000000042"
 CLAIM="stress remains below allowable under service load"
+REQUIREMENT_MAX_STRESS_PA=250e6
+REL_TOL=1e-12
 
 EXPECTED={
  "requirement_revision_id":"sha256:10891514f6551c85b10674a3df04ab2c6d19f74f014adeacc671fa31deecd419",
@@ -45,18 +47,27 @@ EXPECTED={
 }
 
 class Denied(ValueError): pass
+
 def cj(v): return json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False)
-def dh(d,v): return "sha256:"+hashlib.sha256(d+cj(v).encode()).hexdigest()
-def d(c): return "sha256:"+c*64
+def dh(domain,v): return "sha256:"+hashlib.sha256(domain+cj(v).encode()).hexdigest()
+def d(ch): return "sha256:"+ch*64
+
 def f(v):
-    if isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(float(v)): raise Denied("non_finite")
-    v=0.0 if float(v)==0.0 else float(v)
-    return "f64:"+struct.pack(">d",v).hex()
+    if isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(float(v)):
+        raise Denied("non_finite")
+    value=0.0 if float(v)==0.0 else float(v)
+    return "f64:"+struct.pack(">d",value).hex()
+
 def dg(v,field):
-    if not isinstance(v,str) or len(v)!=71 or not v.startswith("sha256:"): raise Denied("invalid_digest:"+field)
+    if not isinstance(v,str) or len(v)!=71 or not v.startswith("sha256:"):
+        raise Denied("invalid_digest:"+field)
     h=v[7:]
-    if h.lower()!=h or any(c not in "0123456789abcdef" for c in h): raise Denied("invalid_digest:"+field)
+    if h.lower()!=h or any(c not in "0123456789abcdef" for c in h):
+        raise Denied("invalid_digest:"+field)
     return v
+
+def close(actual,expected):
+    return abs(float(actual)-float(expected))/max(abs(float(expected)),1.0)<=REL_TOL
 
 def currentness(attestation="4"):
     return dh(CURRENTNESS_D,{"attestation_digest":d(attestation),"observed_at_unix_ms":1789123456000,
@@ -65,29 +76,25 @@ def currentness(attestation="4"):
 
 def context(current=None):
     if current is None: current=currentness("4")
-    req=dh(REQ_D,{
-      "acceptance_record_digest":d("a"),"criticality":"Blocking","domain":"Civil",
-      "expected_evidence_kind":"Analysis","logical_requirement_id":"REQ-STRESS",
-      "schema":"symthaea.etk-accepted-requirement.v1","statement":"stress remains below allowable",
-      "structural_invariants":["stress <= 250 MPa"]})
-    obl=dh(OBL_D,{"claim":CLAIM,"expected_evidence_kind":"Analysis",
-                  "obligation_id":OBL_ID,"schema":"symthaea.etk-proof-obligation-snapshot.v1"})
-    return {"requirement":req,"obligation":obl,"subject":SUBJECT,"twin":TWIN,
-            "validity":VALIDITY,"currentness":current}
+    req=dh(REQ_D,{"acceptance_record_digest":d("a"),"criticality":"Blocking","domain":"Civil",
+       "expected_evidence_kind":"Analysis","logical_requirement_id":"REQ-STRESS",
+       "schema":"symthaea.etk-accepted-requirement.v1","statement":"stress remains below allowable",
+       "structural_invariants":["stress <= 250 MPa"]})
+    obl=dh(OBL_D,{"claim":CLAIM,"expected_evidence_kind":"Analysis","obligation_id":OBL_ID,
+                  "schema":"symthaea.etk-proof-obligation-snapshot.v1"})
+    return {"requirement":req,"requirement_max_stress_pa":REQUIREMENT_MAX_STRESS_PA,
+            "obligation":obl,"subject":SUBJECT,"twin":TWIN,"validity":VALIDITY,"currentness":current}
 
 def method():
-    return dh(METHOD_D,{
-      "algorithm_revision_digest":d("b"),
-      "assumptions":sorted(["euler_bernoulli_kinematics","linear_elastic_material","prismatic_beam",
-                            "single_span","small_deflection","statically_determinate"]),
-      "implementation_artifact_digest":d("a"),
-      "method_key":"symthaea-structural/euler-bernoulli-beam",
+    return dh(METHOD_D,{"algorithm_revision_digest":d("b"),
+      "assumptions":["euler_bernoulli_kinematics","linear_elastic_material","prismatic_beam",
+                     "single_span","small_deflection","statically_determinate"],
+      "implementation_artifact_digest":d("a"),"method_key":"symthaea-structural/euler-bernoulli-beam",
       "outputs":[{"name":"factor_of_safety","unit":"1"},{"name":"max_bending_stress","unit":"Pa"},
                  {"name":"max_deflection","unit":"m"},{"name":"max_moment","unit":"N*m"}],
       "schema":"symthaea.etk-native-analytical-method.v1",
-      "supported_load_cases":sorted(["cantilever_end_point","cantilever_udl",
-                                     "simply_supported_center_point","simply_supported_udl"]),
-      "unit_system":"SI"})
+      "supported_load_cases":["cantilever_end_point","cantilever_udl",
+                              "simply_supported_center_point","simply_supported_udl"],"unit_system":"SI"})
 
 def inputs(load=1000.0):
     return {"beam":{"length_m":2.0,"material":{"youngs_modulus_pa":200e9,"yield_strength_pa":250e6},
@@ -95,48 +102,73 @@ def inputs(load=1000.0):
             "load":{"kind":"cantilever_end_point","unit":"N","value":load}}
 
 def input_id(x):
-    b=x["beam"]; s=b["section"]; m=b["material"]; l=x["load"]
-    vals=[b["length_m"],s["width_m"],s["height_m"],m["youngs_modulus_pa"],m["yield_strength_pa"],l["value"]]
-    if s["kind"]!="rectangular" or l["kind"]!="cantilever_end_point" or l["unit"]!="N" or any(float(v)<=0 for v in vals):
+    b=x["beam"]; sec=b["section"]; mat=b["material"]; load=x["load"]
+    vals=[b["length_m"],sec["width_m"],sec["height_m"],mat["youngs_modulus_pa"],mat["yield_strength_pa"],load["value"]]
+    if sec["kind"]!="rectangular" or load["kind"]!="cantilever_end_point" or load["unit"]!="N" or any(float(v)<=0 for v in vals):
         raise Denied("unsupported_or_invalid_input")
     return dh(INPUT_D,{"beam":{"length_m":f(b["length_m"]),
-       "material":{"youngs_modulus_pa":f(m["youngs_modulus_pa"]),"yield_strength_pa":f(m["yield_strength_pa"])},
-       "section":{"height_m":f(s["height_m"]),"kind":"rectangular","width_m":f(s["width_m"])}},
-       "load":{"kind":l["kind"],"unit":"N","value":f(l["value"])},
+       "material":{"youngs_modulus_pa":f(mat["youngs_modulus_pa"]),"yield_strength_pa":f(mat["yield_strength_pa"])},
+       "section":{"height_m":f(sec["height_m"]),"kind":"rectangular","width_m":f(sec["width_m"])}},
+       "load":{"kind":load["kind"],"unit":"N","value":f(load["value"])},
        "method_revision_id":method(),"schema":"symthaea.etk-native-analytical-input.v1"})
 
-def policy():
-    return dh(POLICY_D,{"max_model_relative_error_bound":f(.05),"metric":"factor_of_safety",
+def policy(threshold=2.0,max_error=.05):
+    if not math.isfinite(float(threshold)) or float(threshold)<=0: raise Denied("invalid_policy_threshold")
+    if not math.isfinite(float(max_error)) or not 0<=float(max_error)<=1: raise Denied("invalid_policy_error")
+    return {"id":dh(POLICY_D,{"max_model_relative_error_bound":f(max_error),"metric":"factor_of_safety",
        "model_qualification_record_digest":d("9"),"operator":">=",
-       "schema":"symthaea.etk-native-analytical-policy.v1","threshold":f(2.0)})
+       "schema":"symthaea.etk-native-analytical-policy.v1","threshold":f(threshold)}),
+       "threshold":float(threshold),"max_error":float(max_error)}
 
-def plan(x,current=None):
-    c=context(current); mid=method(); iid=input_id(x); pid=policy()
-    pre={"acceptance_policy_revision_id":pid,"currentness_assertion_id":c["currentness"],
+def plan(x,current=None,pol=None):
+    c=context(current); pol=policy() if pol is None else pol; mat=x["beam"]["material"]
+    worst=float(mat["yield_strength_pa"])/pol["threshold"]*(1.0+pol["max_error"])
+    if worst>c["requirement_max_stress_pa"]: raise Denied("policy_requirement_mismatch")
+    mid=method(); iid=input_id(x)
+    pre={"acceptance_policy_revision_id":pol["id"],"currentness_assertion_id":c["currentness"],
          "input_revision_id":iid,"method_revision_id":mid,"obligation_id":OBL_ID,
          "obligation_revision_id":c["obligation"],"requirement_revision_id":c["requirement"],
          "schema":"symthaea.etk-native-analytical-plan.v1","subject_revision_id":c["subject"],
          "twin_revision_id":c["twin"],"validity_domain_revision_id":c["validity"]}
-    return {**c,"method":mid,"input":iid,"policy":pid,"plan":dh(PLAN_D,pre)}
+    return {**c,"method":mid,"input":iid,"policy":pol["id"],"policy_spec":pol,"plan":dh(PLAN_D,pre)}
 
-def result(fos=10.416666666666666,err=.02,artifact=None):
-    return {"execution_artifact_digest":d("8") if artifact is None else artifact,
-            "factor_of_safety":fos,"max_bending_stress_pa":24e6,
-            "max_deflection_m":.0032,"max_moment_nm":2000.0,"model_relative_error_bound":err}
+def expected_outputs(x):
+    b=x["beam"]; sec=b["section"]; mat=b["material"]; load=x["load"]
+    moment=float(load["value"])*float(b["length_m"])
+    section_modulus=float(sec["width_m"])*float(sec["height_m"])**2/6.0
+    stress=moment/section_modulus
+    inertia=float(sec["width_m"])*float(sec["height_m"])**3/12.0
+    deflection=float(load["value"])*float(b["length_m"])**3/(3.0*float(mat["youngs_modulus_pa"])*inertia)
+    return moment,stress,deflection,float(mat["yield_strength_pa"])/stress
+
+def result(x=None,fos=None,err=.02,artifact=None,deflection=None,moment=None):
+    x=inputs() if x is None else x
+    expected_moment,stress,expected_deflection,expected_fos=expected_outputs(x)
+    return {"method_revision_id":method(),"input_revision_id":input_id(x),
+            "execution_artifact_digest":d("8") if artifact is None else artifact,
+            "factor_of_safety":expected_fos if fos is None else fos,"max_bending_stress_pa":stress,
+            "max_deflection_m":expected_deflection if deflection is None else deflection,
+            "max_moment_nm":expected_moment if moment is None else moment,"model_relative_error_bound":err}
 
 def admit(p,x,r):
-    if method()!=p["method"] or input_id(x)!=p["input"] or policy()!=p["policy"]: raise Denied("plan_binding_mismatch")
+    pol=p["policy_spec"]
+    if method()!=p["method"] or input_id(x)!=p["input"] or r.get("method_revision_id")!=p["method"] or r.get("input_revision_id")!=p["input"]:
+        raise Denied("plan_binding_mismatch")
     dg(r["execution_artifact_digest"],"execution_artifact_digest")
-    fos=float(r["factor_of_safety"]); stress=float(r["max_bending_stress_pa"]); err=float(r["model_relative_error_bound"])
-    if not all(math.isfinite(float(r[k])) for k in ["factor_of_safety","max_bending_stress_pa","max_deflection_m","max_moment_nm","model_relative_error_bound"]):
-        raise Denied("invalid_result")
-    derived=float(x["beam"]["material"]["yield_strength_pa"])/stress
-    if abs(derived-fos)/max(abs(derived),1.0)>1e-12: raise Denied("inconsistent_factor_of_safety")
-    if not 0<=err<=.05: raise Denied("model_error_budget")
-    conservative=fos/(1.0+err)
-    if conservative<2.0: raise Denied("acceptance_predicate")
-    norm={"execution_artifact_digest":r["execution_artifact_digest"],"factor_of_safety":f(fos),
-          "max_bending_stress_pa":f(stress),"max_deflection_m":f(r["max_deflection_m"]),
+    keys=["factor_of_safety","max_bending_stress_pa","max_deflection_m","max_moment_nm","model_relative_error_bound"]
+    if not all(math.isfinite(float(r[k])) for k in keys): raise Denied("invalid_result")
+    expected_moment,expected_stress,expected_deflection,expected_fos=expected_outputs(x)
+    if not close(r["max_moment_nm"],expected_moment): raise Denied("equation_mismatch:max_moment")
+    if not close(r["max_bending_stress_pa"],expected_stress): raise Denied("equation_mismatch:max_stress")
+    if not close(r["max_deflection_m"],expected_deflection): raise Denied("equation_mismatch:max_deflection")
+    if not close(r["factor_of_safety"],expected_fos): raise Denied("inconsistent_factor_of_safety")
+    err=float(r["model_relative_error_bound"])
+    if not 0<=err<=pol["max_error"]: raise Denied("model_error_budget")
+    if float(r["max_bending_stress_pa"])*(1.0+err)>p["requirement_max_stress_pa"]: raise Denied("requirement_stress_predicate")
+    conservative=float(r["factor_of_safety"])/(1.0+err)
+    if conservative<pol["threshold"]: raise Denied("acceptance_predicate")
+    norm={"execution_artifact_digest":r["execution_artifact_digest"],"factor_of_safety":f(r["factor_of_safety"]),
+          "max_bending_stress_pa":f(r["max_bending_stress_pa"]),"max_deflection_m":f(r["max_deflection_m"]),
           "max_moment_nm":f(r["max_moment_nm"]),"model_relative_error_bound":f(err)}
     return dh(ADMIT_D,{"analytical_plan_id":p["plan"],"conservative_factor_of_safety":f(conservative),
                        "normalized_result":norm,"schema":"symthaea.etk-native-analytical-admitted-evidence.v1"})
@@ -157,10 +189,16 @@ def current_fact(current,historical,rcpt):
        "subject_revision_id":current["subject"],"twin_revision_id":current["twin"],
        "validity_domain_revision_id":current["validity"]})
 
+def expect_denied(fn,reason):
+    try: fn()
+    except Denied as e:
+        assert reason in str(e),(reason,str(e)); return
+    raise AssertionError(reason)
+
 def self_test():
     assert f(-0.0)=="f64:0000000000000000" and f(.1)=="f64:3fb999999999999a"
     assert currentness("4")==EXPECTED_CURRENT
-    x=inputs(); p=plan(x); a=admit(p,x,result()); r=receipt(p,a); cf=current_fact(p,p,r)
+    x=inputs(); p=plan(x); candidate=result(x,fos=10.416666666666666); candidate.update(max_bending_stress_pa=24e6,max_deflection_m=.0032,max_moment_nm=2000.0); a=admit(p,x,candidate); r=receipt(p,a); cf=current_fact(p,p,r)
     v={"requirement_revision_id":p["requirement"],"obligation_revision_id":p["obligation"],
        "method_revision_id":p["method"],"input_revision_id":p["input"],"policy_revision_id":p["policy"],
        "analytical_plan_id":p["plan"],"admitted_evidence_id":a,"historical_receipt_id":r,
@@ -168,35 +206,36 @@ def self_test():
     assert v==EXPECTED,(EXPECTED,v)
     y=copy.deepcopy(x); y["beam"]={"section":y["beam"]["section"],"material":y["beam"]["material"],"length_m":y["beam"]["length_m"]}
     assert input_id(y)==p["input"]
-    try: admit(p,inputs(1000.0000000000001),result())
-    except Denied as e: assert "plan_binding_mismatch" in str(e)
-    else: raise AssertionError("input drift")
-    low=result(2.01,.02); low["max_bending_stress_pa"]=250e6/2.01
-    try: admit(p,x,low)
-    except Denied as e: assert "acceptance_predicate" in str(e)
-    else: raise AssertionError("conservative margin")
-    for bad,reason in [(result(err=.06),"model_error_budget"),
-                       ({**result(),"max_bending_stress_pa":25e6},"inconsistent_factor_of_safety"),
-                       (result(artifact="sha256:not-a-digest"),"invalid_digest")]:
-        try: admit(p,x,bad)
-        except Denied as e: assert reason in str(e)
-        else: raise AssertionError(reason)
+
+    changed=inputs(1000.0000000000001)
+    expect_denied(lambda: admit(p,changed,result(changed)),"plan_binding_mismatch")
+    expect_denied(lambda: plan(x,pol=policy(.5,.05)),"policy_requirement_mismatch")
+
+    strict=plan(x,pol=policy(10.3,.05))
+    expect_denied(lambda: admit(strict,x,result(x,err=.02)),"acceptance_predicate")
+    expect_denied(lambda: admit(p,x,result(x,err=.06)),"model_error_budget")
+    expect_denied(lambda: admit(p,x,result(x,fos=10.0)),"inconsistent_factor_of_safety")
+    expect_denied(lambda: admit(p,x,result(x,deflection=.004)),"equation_mismatch:max_deflection")
+    expect_denied(lambda: admit(p,x,result(x,moment=1999.0)),"equation_mismatch:max_moment")
+    expect_denied(lambda: admit(p,x,result(x,artifact="sha256:not-a-digest")),"invalid_digest")
+    wrong_binding=result(x); wrong_binding["input_revision_id"]=d("0")
+    expect_denied(lambda: admit(p,x,wrong_binding),"plan_binding_mismatch")
+
     refreshed=plan(x,currentness("5"))
     assert refreshed["plan"]!=p["plan"]
-    try: current_fact(refreshed,p,r)
-    except Denied as e: assert "historical_plan" in str(e)
-    else: raise AssertionError("stale receipt")
+    expect_denied(lambda: current_fact(refreshed,p,r),"historical_plan")
     return v
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument("--self-test",action="store_true"); ap.add_argument("--vectors",action="store_true"); a=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument("--self-test",action="store_true"); ap.add_argument("--vectors",action="store_true"); args=ap.parse_args()
     try:
         v=self_test()
-        if a.vectors: print(cj(v))
-        elif a.self_test:
+        if args.vectors: print(cj(v))
+        elif args.self_test:
             for k in sorted(v): print(f"ok {k}={v[k]}")
         else: print(cj({"decision":"SelfTest","vectors":v}))
         return 0
     except (Denied,AssertionError,KeyError,TypeError,ValueError) as e:
         print(cj({"decision":"Deny","reason":str(e)})); return 2
+
 if __name__=="__main__": raise SystemExit(main())
