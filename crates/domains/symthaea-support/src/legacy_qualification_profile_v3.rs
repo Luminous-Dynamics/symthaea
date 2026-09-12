@@ -11,6 +11,7 @@
 //! ```text
 //! historical registry != active qualification manifest
 //! manifest transition != deletion
+//! historical evidence != active-generation evidence
 //! current capture != historical byte proof
 //! source provenance ready != competence
 //! ```
@@ -235,6 +236,46 @@ pub fn legacy_qualification_manifest_commitment_v1(
     Ok(hasher.finalize().to_hex().to_string())
 }
 
+/// Build the normal successor shape for a rebaseline. New replacement targets
+/// must already exist in the append-only pack. The returned manifest is fully
+/// transition-validated before use.
+pub fn build_legacy_qualification_successor_manifest_v1(
+    pack: &LegacyComputingPackV1,
+    predecessor: &LegacyQualificationManifestV1,
+    claim_replacements: BTreeMap<TechnicalClaimIdV1, TechnicalClaimIdV1>,
+    procedure_replacements: BTreeMap<String, String>,
+) -> Result<LegacyQualificationManifestV1, LegacyQualificationManifestErrorV1> {
+    predecessor.validate_basic(pack)?;
+    let generation = predecessor
+        .generation
+        .checked_add(1)
+        .ok_or(LegacyQualificationManifestErrorV1::GenerationOverflow)?;
+    let mut claim_ids = predecessor.claim_ids.clone();
+    for old_id in claim_replacements.keys() {
+        claim_ids.remove(old_id);
+    }
+    claim_ids.extend(claim_replacements.values().cloned());
+    let mut procedure_ids = predecessor.procedure_ids.clone();
+    for old_id in procedure_replacements.keys() {
+        procedure_ids.remove(old_id);
+    }
+    procedure_ids.extend(procedure_replacements.values().cloned());
+
+    let successor = LegacyQualificationManifestV1 {
+        schema_version: LEGACY_QUALIFICATION_MANIFEST_SCHEMA_V1.into(),
+        generation,
+        predecessor_manifest_blake3: Some(
+            legacy_qualification_manifest_commitment_v1(predecessor)?,
+        ),
+        claim_ids,
+        procedure_ids,
+        claim_replacements,
+        procedure_replacements,
+    };
+    validate_legacy_qualification_manifest_transition_v1(pack, predecessor, &successor)?;
+    Ok(successor)
+}
+
 pub fn validate_legacy_qualification_manifest_transition_v1(
     pack: &LegacyComputingPackV1,
     predecessor: &LegacyQualificationManifestV1,
@@ -362,24 +403,23 @@ pub fn assess_legacy_qualification_manifest_source_readiness_v1(
     manifest: &LegacyQualificationManifestV1,
 ) -> Result<LegacyQualificationSourceReadinessV3, LegacyQualificationProfileErrorV3> {
     manifest.validate_basic(pack)?;
-    source_ledger.validate_against_pack(pack, artifacts)?;
-
+    let active_ledger = filtered_manifest_ledger(pack, artifacts, source_ledger, manifest)?;
     let required_source_revisions = manifest.required_source_revisions(pack)?;
     let missing_source_selections = required_source_revisions
         .iter()
-        .filter(|snapshot_id| source_ledger.selection(snapshot_id).is_none())
+        .filter(|snapshot_id| active_ledger.selection(snapshot_id).is_none())
         .cloned()
         .collect::<BTreeSet<_>>();
     let missing_claim_receipts = manifest
         .claim_ids
         .iter()
-        .filter(|claim_id| source_ledger.claim_receipt(claim_id).is_none())
+        .filter(|claim_id| active_ledger.claim_receipt(claim_id).is_none())
         .cloned()
         .collect::<BTreeSet<_>>();
     let missing_procedure_receipts = manifest
         .procedure_ids
         .iter()
-        .filter(|procedure_id| source_ledger.procedure_receipt(procedure_id).is_none())
+        .filter(|procedure_id| active_ledger.procedure_receipt(procedure_id).is_none())
         .cloned()
         .collect::<BTreeSet<_>>();
 
@@ -446,24 +486,14 @@ pub fn assess_legacy_qualification_generation_v1(
         }
     }
 
+    let active_ledger = filtered_manifest_ledger(pack, artifacts, source_ledger, manifest)?;
     let source_readiness = assess_legacy_qualification_manifest_source_readiness_v1(
         pack,
         artifacts,
         source_ledger,
         manifest,
     )?;
-
-    // Continuity is checked only for active source revisions. Historical ledger
-    // selections outside this manifest remain provenance but cannot block or
-    // satisfy the new generation.
-    let required_source_revisions = manifest.required_source_revisions(pack)?;
-    let mut active_selections = LegacyQualificationSourceLedgerV3::new();
-    for snapshot_id in &required_source_revisions {
-        if let Some(selection) = source_ledger.selection(snapshot_id) {
-            active_selections.register_selection(pack, artifacts, selection.clone())?;
-        }
-    }
-    let continuity = require_legacy_source_continuity_v1(pack, &active_selections)?;
+    let continuity = require_legacy_source_continuity_v1(pack, &active_ledger)?;
 
     let v1 = assess_legacy_qualification_profile_v1(pack, profile, matrix)?;
     let requirements = project_requirements(v1.requirements, source_readiness.source_evidence_ready);
@@ -482,6 +512,34 @@ pub fn assess_legacy_qualification_generation_v1(
         continuity,
         requirements,
     })
+}
+
+fn filtered_manifest_ledger(
+    pack: &LegacyComputingPackV1,
+    artifacts: &LegacySourceArtifactLedgerV1,
+    source_ledger: &LegacyQualificationSourceLedgerV3,
+    manifest: &LegacyQualificationManifestV1,
+) -> Result<LegacyQualificationSourceLedgerV3, LegacyQualificationProfileErrorV3> {
+    manifest.validate_basic(pack)?;
+    let required_source_revisions = manifest.required_source_revisions(pack)?;
+    let mut active = LegacyQualificationSourceLedgerV3::new();
+
+    for snapshot_id in &required_source_revisions {
+        if let Some(selection) = source_ledger.selection(snapshot_id) {
+            active.register_selection(pack, artifacts, selection.clone())?;
+        }
+    }
+    for claim_id in &manifest.claim_ids {
+        if let Some(receipt) = source_ledger.claim_receipt(claim_id) {
+            active.register_claim_receipt(pack, artifacts, receipt.clone())?;
+        }
+    }
+    for procedure_id in &manifest.procedure_ids {
+        if let Some(receipt) = source_ledger.procedure_receipt(procedure_id) {
+            active.register_procedure_receipt(pack, artifacts, receipt.clone())?;
+        }
+    }
+    Ok(active)
 }
 
 fn project_requirements(
@@ -524,7 +582,7 @@ fn claim_lineage_preserved(
         .sources
         .snapshot(&new.source_snapshot)
         .ok_or_else(|| LegacyQualificationManifestErrorV1::UnknownSnapshot(new.source_snapshot.clone()))?;
-    Ok(snapshot_lineage_preserved(old_snapshot.document_id.clone(), new_snapshot))
+    Ok(snapshot_lineage_preserved(&old_snapshot.document_id, new_snapshot))
 }
 
 fn procedure_scope_preserved(old: &LegacyProcedureV1, new: &LegacyProcedureV1) -> bool {
@@ -561,7 +619,7 @@ fn procedure_lineage_preserved(
             let new_snapshot = pack.sources.snapshot(new_snapshot_id).ok_or_else(|| {
                 LegacyQualificationManifestErrorV1::UnknownSnapshot(new_snapshot_id.clone())
             })?;
-            if snapshot_lineage_preserved(old_snapshot.document_id.clone(), new_snapshot) {
+            if snapshot_lineage_preserved(&old_snapshot.document_id, new_snapshot) {
                 covered = true;
                 break;
             }
@@ -574,16 +632,16 @@ fn procedure_lineage_preserved(
 }
 
 fn snapshot_lineage_preserved(
-    old_document: crate::standards_registry::SourceDocumentIdV1,
+    old_document: &crate::standards_registry::SourceDocumentIdV1,
     new_snapshot: &crate::standards_registry::TechnicalSourceSnapshotV1,
 ) -> bool {
-    if new_snapshot.document_id == old_document {
+    if &new_snapshot.document_id == old_document {
         return true;
     }
     new_snapshot.relations.iter().any(|relation| {
-        relation.target == old_document
+        &relation.target == old_document
             && matches!(
-                relation.kind,
+                &relation.kind,
                 SourceRelationKindV1::Updates
                     | SourceRelationKindV1::Obsoletes
                     | SourceRelationKindV1::Supersedes
@@ -824,7 +882,10 @@ mod tests {
             build_legacy_five_platform_portfolio_v1(1_800_000_000_000).unwrap();
         let manifest = initial_legacy_qualification_manifest_v1(&pack).unwrap();
         let plan = plan_legacy_qualification_manifest_captures_v1(&pack, &manifest).unwrap();
-        assert_eq!(plan.required_source_revisions, manifest.required_source_revisions(&pack).unwrap().len());
+        assert_eq!(
+            plan.required_source_revisions,
+            manifest.required_source_revisions(&pack).unwrap().len()
+        );
     }
 
     #[test]
