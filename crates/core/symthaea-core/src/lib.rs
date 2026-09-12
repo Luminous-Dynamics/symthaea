@@ -64,6 +64,8 @@
 /// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;
+/// Lie-group and articulated configuration-space geometry for planning substrates.
+pub mod configuration_space;
 /// Core consciousness state types and configuration.
 #[allow(missing_docs)]
 pub mod core;
@@ -78,6 +80,8 @@ pub mod genesis;
 pub mod hdc;
 /// Shared mathematical utilities: softmax, numerical helpers.
 pub mod math;
+/// Planar SO(2)/SE(2) configuration geometry built on the shared circle factor.
+pub mod planar_configuration;
 /// Optional smooth-manifold refinement over planner-neutral metric spaces.
 pub mod smooth_manifold;
 /// Planner-neutral state-space, metric-space, product-space, and trajectory primitives.
