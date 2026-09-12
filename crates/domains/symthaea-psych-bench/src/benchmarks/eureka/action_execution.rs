@@ -75,7 +75,9 @@ fn digest_transition(
     action: PublicAction,
 ) -> u64 {
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"eureka.realized-action-transition.v1\0");
+    // Keep this byte-for-byte identical to the transition identity used by
+    // prospective custody. One public synthetic transition has one identity.
+    bytes.extend_from_slice(b"eureka.transition.v1\0");
     bytes.extend_from_slice(&world_digest.to_le_bytes());
     encode_observation(&mut bytes, pre);
     encode_action(&mut bytes, action);
