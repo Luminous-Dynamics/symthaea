@@ -34,6 +34,7 @@ pub mod autopoiesis;
 pub mod harmonics;
 pub mod meta_cognition;
 pub mod ontology;
+pub mod perspective;
 pub mod practical_wisdom;
 
 pub use autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
@@ -44,6 +45,10 @@ pub use meta_cognition::{MetaCognitiveLayer, RecursiveModel, SelfModelAccuracy};
 pub use ontology::{
     ActionAuthority, AffectiveSignal, AffectiveSignalKind, EpistemicState, NormativeValue,
     ReasoningMode,
+};
+pub use perspective::{
+    PerspectiveCoverage, PerspectiveCoverageSummary, PerspectiveError, PerspectiveGraph,
+    PreferenceClaim, PreferenceProvenance, StakeholderId, StakeholderPerspective,
 };
 pub use practical_wisdom::{
     DeliberationContext, PracticalWisdomAssessment, PracticalWisdomKernel, WisdomDisposition,
@@ -229,7 +234,7 @@ mod tests {
 
         wisdom.update_from_experience(0.3, 0.8, 0.7); // High uncertainty
 
-        let final_play = wisdom.harmonics.get(ActiveHarmonic::Play);
+        let final_play = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
         assert!(final_play > initial_play);
     }
 
