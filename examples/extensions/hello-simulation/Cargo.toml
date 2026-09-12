@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-hello-simulation-extension"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.61.1"
+
+[build-dependencies]
+sha2 = "0.10"
+
+# Keep this example independent from Symthaea's root workspace so it models a
+# real third-party Component Model provider.
+[workspace]
