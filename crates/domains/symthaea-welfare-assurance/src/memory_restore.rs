@@ -187,13 +187,16 @@ where
         // Add a second, domain-specific write-ahead state transition that remains quarantined on
         // recovery until a matching Restored event is durably committed.
         let ledger_before_prepare = self.ledger.clone();
-        let restore_prepared_head = self.ledger.append_restore_prepared(
-            &self.expected_target_id,
-            self.instance_id,
-            content_id,
-            self.completed_at_unix_s,
-            &self.execution_id,
-        )?;
+        let restore_prepared_head = self
+            .ledger
+            .append_restore_prepared(
+                &self.expected_target_id,
+                self.instance_id,
+                content_id,
+                self.completed_at_unix_s,
+                &self.execution_id,
+            )
+            .map_err(EpisodicRestoreInterventionError::from)?;
         let restore_prepared_persistence_ref = match self.ledger_persistence.persist_quarantine_ledger(
             self.ledger.events(),
             restore_prepared_head,
@@ -222,7 +225,8 @@ where
         {
             return Err(EpisodicRestoreInterventionError::InstanceIdentityMismatch.into());
         }
-        let restored_content_id = episode_content_id(&restored.episode)?;
+        let restored_content_id = episode_content_id(&restored.episode)
+            .map_err(EpisodicRestoreInterventionError::from)?;
         if restored_content_id != content_id {
             return Err(EpisodicRestoreInterventionError::ContentIdentityMismatch {
                 expected: content_id,
@@ -251,10 +255,12 @@ where
             .into_iter()
             .find(|(id, _)| *id == self.instance_id)
             .ok_or(EpisodicRestoreInterventionError::RestorePostconditionMissing)?;
-        if episode_content_id(&active.1)? != content_id {
+        let active_content_id = episode_content_id(&active.1)
+            .map_err(EpisodicRestoreInterventionError::from)?;
+        if active_content_id != content_id {
             return Err(EpisodicRestoreInterventionError::ContentIdentityMismatch {
                 expected: content_id,
-                actual: episode_content_id(&active.1)?,
+                actual: active_content_id,
             }
             .into());
         }
