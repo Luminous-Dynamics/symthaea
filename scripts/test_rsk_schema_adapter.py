@@ -58,6 +58,10 @@ class SchemaAdapterTests(unittest.TestCase):
             semantic.digest(resource),
             resource_expected["expected_rule_table_sha256"],
         )
+        self.assertEqual(
+            resource["representation_profile"],
+            adapter.CURRENT_RUST_RESOURCE_PROFILE,
+        )
 
     def test_current_rust_u64_profile_accepts_width_64_and_rejects_65(self) -> None:
         golden = json.loads(GOLDEN_V2.read_text())
@@ -74,13 +78,46 @@ class SchemaAdapterTests(unittest.TestCase):
 
         width_65 = copy.deepcopy(golden["capability_schema"])
         width_65["bit_width"] = 65
-        # Generic/future schema parsing remains valid.
         semantic.validate_capability_schema(width_65)
-        # The current Rust u64 target must fail closed instead of truncating.
         with self.assertRaises(semantic.SchemaError):
             adapter.require_current_rust_capability_schema(width_65)
         with self.assertRaises(semantic.SchemaError):
             adapter.capability_rule_table(width_65)
+
+    def test_current_rust_resource_profile_enforces_u64_bounds(self) -> None:
+        golden = json.loads(GOLDEN_V2.read_text())
+
+        max_u64 = copy.deepcopy(golden["resource_schema"])
+        max_u64["dimensions"][0]["maximum"] = (1 << 64) - 1
+        semantic.validate_resource_schema(max_u64)
+        table = adapter.resource_rule_table(max_u64)
+        self.assertEqual(
+            table["representation_profile"],
+            "symthaea.rsk.resource-representation.rust-u64-sum-exact.v1",
+        )
+
+        too_wide = copy.deepcopy(golden["resource_schema"])
+        too_wide["dimensions"][0]["maximum"] = 1 << 64
+        semantic.validate_resource_schema(too_wide)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.require_current_rust_resource_schema(too_wide)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.resource_rule_table(too_wide)
+
+    def test_current_rust_resource_profile_rejects_unimplemented_arithmetic(self) -> None:
+        golden = json.loads(GOLDEN_V2.read_text())
+
+        max_aggregation = copy.deepcopy(golden["resource_schema"])
+        max_aggregation["dimensions"][0]["aggregation"] = "max"
+        semantic.validate_resource_schema(max_aggregation)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.resource_rule_table(max_aggregation)
+
+        rounded = copy.deepcopy(golden["resource_schema"])
+        rounded["dimensions"][0]["rounding"] = "floor-remaining"
+        semantic.validate_resource_schema(rounded)
+        with self.assertRaises(semantic.SchemaError):
+            adapter.resource_rule_table(rounded)
 
     def test_v1_resource_schema_cannot_produce_runtime_rule_table(self) -> None:
         golden = json.loads(GOLDEN_V1.read_text())
