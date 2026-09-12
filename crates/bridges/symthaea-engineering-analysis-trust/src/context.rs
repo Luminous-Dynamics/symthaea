@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use crate::canonical::{
-    AnalysisRequirementRevisionIdV1, AnalysisTrustErrorV1, CurrentnessAssertionIdV1,
-    ObligationRevisionIdV1, Sha256DigestV1, SubjectRevisionIdV1, TwinRevisionIdV1,
-    ValidityDomainRevisionIdV1, CURRENTNESS_DOMAIN_V1, OBLIGATION_DOMAIN_V1,
-    REQUIREMENT_DOMAIN_V1, SUBJECT_DOMAIN_V1, TWIN_DOMAIN_V1, VALIDITY_DOMAIN_V1,
-    canonical_text, domain_hash,
+    AcceptanceRecordDigestV1, AnalysisConfigurationDigestV1, AnalysisRequirementRevisionIdV1,
+    AnalysisTrustErrorV1, CurrentnessAssertionIdV1, CurrentnessAttestationDigestV1,
+    ModelRevisionDigestV1, ObligationRevisionIdV1, Sha256DigestV1, SubjectRevisionIdV1,
+    SubjectStateDigestV1, TwinRevisionIdV1, TwinSchemaDigestV1, TwinStateDigestV1,
+    ValidityDimensionDigestV1, ValidityDomainRevisionIdV1, CURRENTNESS_DOMAIN_V1,
+    OBLIGATION_DOMAIN_V1, REQUIREMENT_DOMAIN_V1, SUBJECT_DOMAIN_V1, TWIN_DOMAIN_V1,
+    VALIDITY_DOMAIN_V1, canonical_text, domain_hash,
 };
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -21,11 +23,13 @@ use symthaea_formal_safety::{EvidenceKind, ProofObligation};
 pub struct AcceptedAnalysisRequirementV1 {
     revision_id: AnalysisRequirementRevisionIdV1,
     max_bending_stress_pa: f64,
-    acceptance_record_digest: Sha256DigestV1,
+    acceptance_record_digest: AcceptanceRecordDigestV1,
 }
 
 impl AcceptedAnalysisRequirementV1 {
-    pub fn civil_service_stress_250_mpa(acceptance_record_digest: Sha256DigestV1) -> Self {
+    pub fn civil_service_stress_250_mpa(
+        acceptance_record_digest: AcceptanceRecordDigestV1,
+    ) -> Self {
         let structural_invariants = canonical_invariants(["stress <= 250 MPa".to_string()])
             .expect("static canary invariant must be canonical");
         let preimage = json!({
@@ -79,14 +83,14 @@ pub struct SubjectRevisionV1 {
     revision_id: SubjectRevisionIdV1,
     namespace: String,
     subject_key: String,
-    state_digest: Sha256DigestV1,
+    state_digest: SubjectStateDigestV1,
 }
 
 impl SubjectRevisionV1 {
     pub fn new(
         namespace: impl Into<String>,
         subject_key: impl Into<String>,
-        state_digest: Sha256DigestV1,
+        state_digest: SubjectStateDigestV1,
     ) -> Result<Self, AnalysisTrustErrorV1> {
         let namespace = canonical_text(namespace.into(), "subject namespace")?;
         let subject_key = canonical_text(subject_key.into(), "subject key")?;
@@ -141,8 +145,8 @@ pub struct TwinRevisionV1 {
     revision_id: TwinRevisionIdV1,
     subject_revision_id: SubjectRevisionIdV1,
     kind: TwinKindV1,
-    state_digest: Sha256DigestV1,
-    schema_digest: Sha256DigestV1,
+    state_digest: TwinStateDigestV1,
+    schema_digest: TwinSchemaDigestV1,
     parent_revision_id: Option<TwinRevisionIdV1>,
 }
 
@@ -150,8 +154,8 @@ impl TwinRevisionV1 {
     pub fn new(
         subject: &SubjectRevisionV1,
         kind: TwinKindV1,
-        state_digest: Sha256DigestV1,
-        schema_digest: Sha256DigestV1,
+        state_digest: TwinStateDigestV1,
+        schema_digest: TwinSchemaDigestV1,
         parent: Option<&TwinRevisionV1>,
     ) -> Result<Self, AnalysisTrustErrorV1> {
         if let Some(parent) = parent
@@ -204,18 +208,18 @@ pub struct ValidityDomainRevisionV1 {
     revision_id: ValidityDomainRevisionIdV1,
     subject_revision_id: SubjectRevisionIdV1,
     twin_revision_id: TwinRevisionIdV1,
-    model_revision_digest: Sha256DigestV1,
-    solver_configuration_digest: Sha256DigestV1,
-    dimensions: BTreeMap<String, Sha256DigestV1>,
+    model_revision_digest: ModelRevisionDigestV1,
+    analysis_configuration_digest: AnalysisConfigurationDigestV1,
+    dimensions: BTreeMap<String, ValidityDimensionDigestV1>,
 }
 
 impl ValidityDomainRevisionV1 {
     pub fn new(
         subject: &SubjectRevisionV1,
         twin: &TwinRevisionV1,
-        model_revision_digest: Sha256DigestV1,
-        solver_configuration_digest: Sha256DigestV1,
-        dimensions: impl IntoIterator<Item = (String, Sha256DigestV1)>,
+        model_revision_digest: ModelRevisionDigestV1,
+        analysis_configuration_digest: AnalysisConfigurationDigestV1,
+        dimensions: impl IntoIterator<Item = (String, ValidityDimensionDigestV1)>,
     ) -> Result<Self, AnalysisTrustErrorV1> {
         if twin.subject_revision_id() != subject.revision_id() {
             return Err(AnalysisTrustErrorV1::TwinSubjectMismatch);
@@ -231,11 +235,14 @@ impl ValidityDomainRevisionV1 {
         for (name, digest) in &normalized {
             dimension_object.insert(name.clone(), Value::String(digest.as_str().to_string()));
         }
+        // Preserve the frozen ETK-3B schema field name. The value is a generic
+        // analysis-configuration digest here; renaming the wire field would be
+        // a protocol version change rather than a type-safety improvement.
         let preimage = json!({
             "dimensions": Value::Object(dimension_object),
             "model_revision_digest": model_revision_digest.as_str(),
             "schema": "symthaea.etk-validity-domain.v1",
-            "solver_configuration_digest": solver_configuration_digest.as_str(),
+            "solver_configuration_digest": analysis_configuration_digest.as_str(),
             "subject_revision_id": subject.revision_id().as_str(),
             "twin_revision_id": twin.revision_id().as_str(),
         });
@@ -247,7 +254,7 @@ impl ValidityDomainRevisionV1 {
             subject_revision_id: subject.revision_id().clone(),
             twin_revision_id: twin.revision_id().clone(),
             model_revision_digest,
-            solver_configuration_digest,
+            analysis_configuration_digest,
             dimensions: normalized,
         })
     }
@@ -271,10 +278,10 @@ impl ValidityDomainRevisionV1 {
             .map(|(name, digest)| (name.clone(), digest.as_str().to_string()))
             .collect::<BTreeMap<_, _>>();
         json!({
+            "analysis_configuration_digest": self.analysis_configuration_digest.as_str(),
             "authority": "validity-binding-only",
             "dimensions": dimensions,
             "model_revision_digest": self.model_revision_digest.as_str(),
-            "solver_configuration_digest": self.solver_configuration_digest.as_str(),
             "subject_revision_id": self.subject_revision_id.as_str(),
             "twin_revision_id": self.twin_revision_id.as_str(),
             "validity_domain_revision_id": self.revision_id.as_str(),
@@ -287,7 +294,7 @@ pub struct CurrentnessAssertionV1 {
     assertion_id: CurrentnessAssertionIdV1,
     twin_revision_id: TwinRevisionIdV1,
     validity_domain_revision_id: ValidityDomainRevisionIdV1,
-    attestation_digest: Sha256DigestV1,
+    attestation_digest: CurrentnessAttestationDigestV1,
     observed_at_unix_ms: u64,
 }
 
@@ -295,7 +302,7 @@ impl CurrentnessAssertionV1 {
     pub fn new(
         twin: &TwinRevisionV1,
         validity_domain: &ValidityDomainRevisionV1,
-        attestation_digest: Sha256DigestV1,
+        attestation_digest: CurrentnessAttestationDigestV1,
         observed_at_unix_ms: u64,
     ) -> Result<Self, AnalysisTrustErrorV1> {
         if validity_domain.twin_revision_id() != twin.revision_id() {
