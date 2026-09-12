@@ -1,0 +1,132 @@
+name: Simulation Compilation Policy
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-execution-policy/**"
+      - "crates/bridges/symthaea-sim-release/**"
+      - "crates/bridges/symthaea-sim-extension-routing/**"
+      - "crates/bridges/symthaea-extension-simulation-backend/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/simulation-compilation-policy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  simulation-compilation-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
+
+      - name: Cache Cargo and Component builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-simulation-compilation-policy-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-execution-policy/**', 'crates/bridges/symthaea-sim-release/**', 'examples/extensions/hello-simulation/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-compilation-policy-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-compilation-policy-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the execution-policy workspace graph."
+          else
+            echo "Cargo.lock requires the following generated update:"
+            cat simulation-compilation-policy-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-compilation-policy-cargo-lock-patch
+          path: simulation-compilation-policy-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Require standalone guest WIT parity
+        run: |
+          cmp crates/core/symthaea-extension-core/wit/extension-control.wit \
+              examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+              examples/extensions/hello-simulation/wit/simulation-provider.wit
+
+      - name: Build exact standalone simulation Component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum "$component" examples/extensions/hello-simulation/manifest.json
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check execution policy
+        run: cargo check --locked -p symthaea-sim-execution-policy
+
+      - name: Test execution policy
+        run: cargo test --locked -p symthaea-sim-execution-policy
+
+      - name: Strict Clippy execution policy
+        run: |
+          cargo clippy --locked \
+            -p symthaea-sim-execution-policy \
+            --all-targets -- -D warnings
+
+      - name: Execute real Component policy corpus
+        run: |
+          cargo test --locked \
+            -p symthaea-sim-execution-policy \
+            --test hello_policy \
+            -- --ignored --test-threads=1
+
+      - name: Record exact qualification subject
+        run: |
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "manifest_sha256=$(sha256sum examples/extensions/hello-simulation/manifest.json | cut -d' ' -f1)"
+            echo "component_sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+            echo "execution_policy_profile=symthaea.simulation.execution-policy.v1"
+            echo "default_wasm_policy=reject_in_process"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-compilation-policy-receipt.txt
+
+      - name: Upload qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-compilation-policy-receipt
+          path: simulation-compilation-policy-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
