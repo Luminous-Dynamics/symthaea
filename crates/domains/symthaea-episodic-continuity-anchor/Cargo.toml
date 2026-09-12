@@ -12,3 +12,7 @@ symthaea-episodic-continuity = { path = "../symthaea-episodic-continuity" }
 symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
 symthaea-welfare-assurance = { path = "../symthaea-welfare-assurance" }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-memory = { path = "../symthaea-memory" }
