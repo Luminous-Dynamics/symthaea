@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-energy-material-candidate-version"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Version-bound candidate identity for Symthaea energy-material evidence dossiers."
+
+[dependencies]
+symthaea-discovery = { path = "../../core/symthaea-discovery" }
+symthaea-energy-material-screening = { path = "../../domains/symthaea-energy-material-screening" }
+symthaea-energy-material-dossier = { path = "../symthaea-energy-material-dossier" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
