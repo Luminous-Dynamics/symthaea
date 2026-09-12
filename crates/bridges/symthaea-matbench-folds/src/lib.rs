@@ -1,12 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Matbench v0.1 fold binding for the experimental-gap Benchmark Zero truth.
+//! Matbench v0.1 positional fold binding for experimental-gap Benchmark Zero.
 //!
 //! This crate accepts only the exact compressed `matbench_expt_gap` artifact
 //! pinned by `symthaea-matbench-gap`, reproduces Matbench v0.1's published
-//! regression split procedure, and removes compositions present in Symthaea's
-//! currently exposed band-gap training table before producing a Benchmark Zero
-//! truth slice.
+//! regression split procedure over dataframe row positions, and removes
+//! compositions present in Symthaea's currently exposed band-gap training table
+//! before producing a Benchmark Zero truth slice.
 //!
 //! A leakage-clean slice is not an official Matbench leaderboard test set.
 
@@ -36,7 +36,10 @@ pub const MATBENCH_EXPT_GAP_FOLD_MANIFEST_SHA256: &str =
     "03a37eb4876e836878507c09559fefc55b1ff5f08db0c2229ac7dd80c0bffd7c";
 
 pub const FOLD_DERIVATION_DISCLOSURE: &str =
-    "Fold assignments are reproduced from the published Matbench v0.1 KFold procedure and pinned to the upstream validation commit/blob identity. Direct byte-for-byte extraction from the 46 MB validation JSON is a separate audit gate.";
+    "Fold assignments are reproduced over dataframe row positions from the published Matbench v0.1 regression KFold procedure and pinned to the upstream validation commit/blob identity. Direct byte-for-byte extraction from the 46 MB validation JSON is a separate audit gate.";
+
+pub const INDEX_IDENTITY_DISCLOSURE: &str =
+    "This crate deliberately does not synthesize official mb-expt-gap-* IDs. Matbench derives those labels from the dataframe source index, while KFold partitions by row position. Exact source-index-to-Matbench-ID parity remains a separate artifact audit.";
 
 pub const RESIDUAL_LEAKAGE_DISCLOSURE: &str =
     "Composition overlap with Symthaea's currently exposed band-gap training table was removed. This does not prove historical blindness: hand-written baselines or prior model choices may still reflect public semiconductor knowledge.";
@@ -45,10 +48,10 @@ const MANIFEST_DIGEST_DOMAIN: &[u8] = b"symthaea.matbench-expt-gap.fold-manifest
 const TRUTH_SLICE_DIGEST_DOMAIN: &[u8] = b"symthaea.matbench-expt-gap.fold-truth.v0\0";
 const OVERLAP_MASK_DIGEST_DOMAIN: &[u8] = b"symthaea.matbench-expt-gap.overlap-mask.v0\0";
 
-fn derive_fold_by_row() -> [u8; MATBENCH_EXPT_GAP_ROWS] {
+fn derive_fold_by_position() -> [u8; MATBENCH_EXPT_GAP_ROWS] {
     let permutation = shuffled_indices::<MATBENCH_EXPT_GAP_ROWS>(MATBENCH_V01_RANDOM_STATE);
 
-    let mut fold_by_row = [u8::MAX; MATBENCH_EXPT_GAP_ROWS];
+    let mut fold_by_position = [u8::MAX; MATBENCH_EXPT_GAP_ROWS];
     let base_size = MATBENCH_EXPT_GAP_ROWS / usize::from(MATBENCH_V01_N_SPLITS);
     let larger_fold_count = MATBENCH_EXPT_GAP_ROWS % usize::from(MATBENCH_V01_N_SPLITS);
     let mut cursor = 0usize;
@@ -56,19 +59,19 @@ fn derive_fold_by_row() -> [u8; MATBENCH_EXPT_GAP_ROWS] {
     for fold in 0..MATBENCH_V01_N_SPLITS {
         let fold_size = base_size + usize::from(usize::from(fold) < larger_fold_count);
         let stop = cursor + fold_size;
-        for &row in &permutation[cursor..stop] {
-            fold_by_row[row] = fold;
+        for &row_position in &permutation[cursor..stop] {
+            fold_by_position[row_position] = fold;
         }
         cursor = stop;
     }
 
     debug_assert_eq!(cursor, MATBENCH_EXPT_GAP_ROWS);
     debug_assert!(
-        fold_by_row
+        fold_by_position
             .iter()
             .all(|&fold| fold < MATBENCH_V01_N_SPLITS)
     );
-    fold_by_row
+    fold_by_position
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -90,8 +93,8 @@ impl FoldIndex {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LeakageExclusion {
-    pub row_index: usize,
-    pub matbench_id: String,
+    /// Zero-based position in the exact pinned dataframe artifact.
+    pub row_position: usize,
     pub candidate_id: String,
     pub symthaea_training_labels: Vec<String>,
 }
@@ -106,6 +109,7 @@ pub struct LeakageCleanFold {
     pub overlap_mask_sha256: String,
     pub truth_slice_sha256: String,
     pub fold_derivation_disclosure: &'static str,
+    pub index_identity_disclosure: &'static str,
     pub residual_leakage_disclosure: &'static str,
     pub truth: BandgapTruthSet,
 }
@@ -114,10 +118,8 @@ pub struct LeakageCleanFold {
 pub enum FoldError {
     #[error("fold index {0} is outside canonical Matbench v0.1 range 0..4")]
     InvalidFold(u8),
-    #[error("row index {0} is outside matbench_expt_gap range")]
-    RowOutOfRange(usize),
-    #[error("invalid Matbench experimental-gap id {0:?}")]
-    InvalidMatbenchId(String),
+    #[error("row position {0} is outside matbench_expt_gap range")]
+    RowPositionOutOfRange(usize),
     #[error("fold manifest invariant failed: {0}")]
     ManifestInvariant(String),
     #[error("leakage cleaning removed every candidate from fold {0}")]
@@ -128,51 +130,26 @@ pub enum FoldError {
     Benchmark(#[from] symthaea_energy_benchmark_zero::BenchmarkError),
 }
 
-pub fn matbench_id_for_row(row_index: usize) -> Result<String, FoldError> {
-    if row_index >= MATBENCH_EXPT_GAP_ROWS {
-        return Err(FoldError::RowOutOfRange(row_index));
+/// Return the published-procedure test fold for one zero-based dataframe row
+/// position. This is intentionally positional and does not claim an official
+/// Matbench ID for the row.
+pub fn fold_for_row_position(row_position: usize) -> Result<FoldIndex, FoldError> {
+    if row_position >= MATBENCH_EXPT_GAP_ROWS {
+        return Err(FoldError::RowPositionOutOfRange(row_position));
     }
-    Ok(format!("mb-expt-gap-{:04}", row_index + 1))
-}
-
-pub fn row_for_matbench_id(matbench_id: &str) -> Result<usize, FoldError> {
-    let digits = matbench_id
-        .strip_prefix("mb-expt-gap-")
-        .ok_or_else(|| FoldError::InvalidMatbenchId(matbench_id.to_owned()))?;
-    if digits.len() != 4 || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
-        return Err(FoldError::InvalidMatbenchId(matbench_id.to_owned()));
-    }
-
-    let one_based = digits
-        .parse::<usize>()
-        .map_err(|_| FoldError::InvalidMatbenchId(matbench_id.to_owned()))?;
-    if one_based == 0 || one_based > MATBENCH_EXPT_GAP_ROWS {
-        return Err(FoldError::InvalidMatbenchId(matbench_id.to_owned()));
-    }
-    Ok(one_based - 1)
-}
-
-pub fn fold_for_row(row_index: usize) -> Result<FoldIndex, FoldError> {
-    if row_index >= MATBENCH_EXPT_GAP_ROWS {
-        return Err(FoldError::RowOutOfRange(row_index));
-    }
-    FoldIndex::new(derive_fold_by_row()[row_index])
-}
-
-pub fn fold_for_matbench_id(matbench_id: &str) -> Result<FoldIndex, FoldError> {
-    fold_for_row(row_for_matbench_id(matbench_id)?)
+    FoldIndex::new(derive_fold_by_position()[row_position])
 }
 
 pub fn canonical_fold_counts() -> [usize; MATBENCH_V01_N_SPLITS as usize] {
     let mut counts = [0usize; MATBENCH_V01_N_SPLITS as usize];
-    for fold in derive_fold_by_row() {
+    for fold in derive_fold_by_position() {
         counts[usize::from(fold)] += 1;
     }
     counts
 }
 
 pub fn canonical_fold_manifest_sha256() -> String {
-    let folds = derive_fold_by_row();
+    let folds = derive_fold_by_position();
     let mut hasher = Sha256::new();
     hasher.update(MANIFEST_DIGEST_DOMAIN);
     hasher.update(MATBENCH_EXPT_GAP_DATASET_ID.as_bytes());
@@ -208,9 +185,10 @@ pub fn validate_canonical_manifest() -> Result<(), FoldError> {
     Ok(())
 }
 
-/// Parse the exact pinned truth artifact, select one Matbench v0.1 test fold,
-/// remove compositions overlapping Symthaea's currently exposed band-gap
-/// training table, and return a content-addressed Benchmark Zero truth slice.
+/// Parse the exact pinned truth artifact, select one published-procedure test
+/// fold by dataframe row position, remove compositions overlapping Symthaea's
+/// currently exposed band-gap training table, and return a content-addressed
+/// Benchmark Zero truth slice.
 ///
 /// No Matbench train-fold rows are used for fitting here.
 pub fn build_leakage_clean_test_fold_from_official_bytes(
@@ -243,23 +221,21 @@ fn build_leakage_clean_test_fold(
         overlap_by_candidate.insert(item.candidate_id, item.symthaea_training_labels);
     }
 
-    let fold_by_row = derive_fold_by_row();
+    let fold_by_position = derive_fold_by_position();
     let mut retained = BTreeMap::new();
     let mut retained_rows = Vec::new();
     let mut exclusions = Vec::new();
     let mut canonical_test_count = 0usize;
 
-    for (row_index, record) in dataset.ordered_records.iter().enumerate() {
-        if fold_by_row[row_index] != fold.value() {
+    for (row_position, record) in dataset.ordered_records.iter().enumerate() {
+        if fold_by_position[row_position] != fold.value() {
             continue;
         }
         canonical_test_count += 1;
-        let matbench_id = matbench_id_for_row(row_index)?;
 
         if let Some(labels) = overlap_by_candidate.get(&record.candidate_id) {
             exclusions.push(LeakageExclusion {
-                row_index,
-                matbench_id,
+                row_position,
                 candidate_id: record.candidate_id.clone(),
                 symthaea_training_labels: labels.clone(),
             });
@@ -275,7 +251,7 @@ fn build_leakage_clean_test_fold(
                 record.candidate_id
             )));
         }
-        retained_rows.push((row_index, matbench_id, record));
+        retained_rows.push((row_position, record));
     }
 
     if retained.is_empty() {
@@ -291,7 +267,7 @@ fn build_leakage_clean_test_fold(
     );
 
     let split_id = format!(
-        "matbench_v0.1/fold_{}/test/leakage-clean@foldsha256:{}@masksha256:{}",
+        "matbench_v0.1/fold_{}/test/leakage-clean-positional@foldsha256:{}@masksha256:{}",
         fold.value(),
         MATBENCH_EXPT_GAP_FOLD_MANIFEST_SHA256,
         overlap_mask_sha256,
@@ -317,6 +293,7 @@ fn build_leakage_clean_test_fold(
         overlap_mask_sha256,
         truth_slice_sha256,
         fold_derivation_disclosure: FOLD_DERIVATION_DISCLOSURE,
+        index_identity_disclosure: INDEX_IDENTITY_DISCLOSURE,
         residual_leakage_disclosure: RESIDUAL_LEAKAGE_DISCLOSURE,
         truth,
     })
@@ -330,8 +307,7 @@ fn digest_overlap_mask(fold: FoldIndex, exclusions: &[LeakageExclusion]) -> Stri
     hasher.update((exclusions.len() as u64).to_le_bytes());
 
     for exclusion in exclusions {
-        hasher.update((exclusion.row_index as u64).to_le_bytes());
-        update_text(&mut hasher, &exclusion.matbench_id);
+        hasher.update((exclusion.row_position as u64).to_le_bytes());
         update_text(&mut hasher, &exclusion.candidate_id);
         hasher.update((exclusion.symthaea_training_labels.len() as u64).to_le_bytes());
         for label in &exclusion.symthaea_training_labels {
@@ -347,7 +323,7 @@ fn digest_truth_slice(
     fold: FoldIndex,
     parent_row_order_sha256: &str,
     overlap_mask_sha256: &str,
-    retained_rows: &[(usize, String, &symthaea_matbench_gap::MatbenchGapRecord)],
+    retained_rows: &[(usize, &symthaea_matbench_gap::MatbenchGapRecord)],
 ) -> String {
     let mut hasher = Sha256::new();
     hasher.update(TRUTH_SLICE_DIGEST_DOMAIN);
@@ -358,9 +334,8 @@ fn digest_truth_slice(
     update_text(&mut hasher, overlap_mask_sha256);
     hasher.update((retained_rows.len() as u64).to_le_bytes());
 
-    for (row_index, matbench_id, record) in retained_rows {
-        hasher.update((*row_index as u64).to_le_bytes());
-        update_text(&mut hasher, matbench_id);
+    for (row_position, record) in retained_rows {
+        hasher.update((*row_position as u64).to_le_bytes());
         update_text(&mut hasher, &record.candidate_id);
         hasher.update(record.experimental_gap_ev.to_bits().to_le_bytes());
     }
@@ -414,44 +389,18 @@ mod tests {
     }
 
     #[test]
-    fn matbench_id_mapping_is_exact_and_one_based() {
-        assert_eq!(matbench_id_for_row(0).unwrap(), "mb-expt-gap-0001");
-        assert_eq!(matbench_id_for_row(4603).unwrap(), "mb-expt-gap-4604");
-        assert_eq!(row_for_matbench_id("mb-expt-gap-0001").unwrap(), 0);
-        assert_eq!(row_for_matbench_id("mb-expt-gap-4604").unwrap(), 4603);
-
-        for invalid in [
-            "mb-expt-gap-0000",
-            "mb-expt-gap-4605",
-            "mb-expt-gap-8",
-            "mb-expt-gap-00001",
-            "matbench-expt-gap-0001",
-        ] {
-            assert!(row_for_matbench_id(invalid).is_err(), "{invalid}");
-        }
+    fn positional_fold_anchors_are_stable() {
+        assert_eq!(fold_for_row_position(7).unwrap().value(), 0);
+        assert_eq!(fold_for_row_position(2).unwrap().value(), 1);
+        assert_eq!(fold_for_row_position(0).unwrap().value(), 2);
+        assert_eq!(fold_for_row_position(1).unwrap().value(), 3);
+        assert_eq!(fold_for_row_position(4).unwrap().value(), 4);
+        assert!(fold_for_row_position(MATBENCH_EXPT_GAP_ROWS).is_err());
     }
 
     #[test]
-    fn split_anchor_rows_are_stable() {
-        assert_eq!(
-            fold_for_matbench_id("mb-expt-gap-0008").unwrap().value(),
-            0
-        );
-        assert_eq!(
-            fold_for_matbench_id("mb-expt-gap-0003").unwrap().value(),
-            1
-        );
-        assert_eq!(
-            fold_for_matbench_id("mb-expt-gap-0001").unwrap().value(),
-            2
-        );
-        assert_eq!(
-            fold_for_matbench_id("mb-expt-gap-0002").unwrap().value(),
-            3
-        );
-        assert_eq!(
-            fold_for_matbench_id("mb-expt-gap-0005").unwrap().value(),
-            4
-        );
+    fn official_id_synthesis_is_intentionally_absent() {
+        assert!(INDEX_IDENTITY_DISCLOSURE.contains("does not synthesize official"));
+        assert!(INDEX_IDENTITY_DISCLOSURE.contains("source index"));
     }
 }
