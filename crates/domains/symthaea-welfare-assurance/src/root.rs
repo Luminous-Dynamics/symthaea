@@ -23,6 +23,7 @@ pub mod memory_quarantine;
 pub mod memory_quarantine_anchored;
 mod memory_quarantine_anchored_conversions;
 pub mod memory_restore;
+pub mod persisted_episode_envelope;
 pub mod quarantine_intent_ledger;
 pub mod quarantine_intent_persistence;
 pub mod quarantine_ledger_persistence;
