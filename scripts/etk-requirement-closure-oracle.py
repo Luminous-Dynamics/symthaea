@@ -18,7 +18,8 @@ stale, unrelated, or cross-context facts never compensate for a missing member.
 
 Both relationship edges are frozen outputs of the independent relationship
 oracle. Both current-discharge fact IDs are frozen outputs of the independent
-discharge/currentness oracle for the same subject, twin, and requirement.
+discharge/currentness oracle and are reproducible from production ETK admission
+through receipt issuance for the same subject, twin, and requirement.
 """
 from __future__ import annotations
 
@@ -37,10 +38,10 @@ SATISFACTION_DOMAIN = b"symthaea.etk-requirement-satisfaction-receipt.v1\x00"
 REQ_ID = "sha256:e340c5030eebc978c41443ffd64f340dc5febad31e376080340bacfceda60faa"
 OBL_A = "sha256:743d2c13cfcc52bdfb4cfd9a4a836ed0806ace7b2a68b4c7284b1910d8863c29"
 REL_A = "sha256:1cc54ee11ff9b7e99279d4c9a9d43f751809f7f30a43469cff8e18fe70eee408"
-FACT_A = "sha256:69a686d1505b571184a1d949fe09e5db049cade06f63e6f680b273b0b5d1c21d"
+FACT_A = "sha256:327d8e535d83105aad0f92c164350fd3181d6eda02d92e515f5604ee23299d3a"
 OBL_B = "sha256:63ce87ba42de8d08ff87059322964a7609228d66a7b8f7fc67016b298c2a7c2d"
 REL_B = "sha256:a4a96e57f7c41c8d20660288e6372882d34c632157d4e9d8234ad7f36c94b5bd"
-FACT_B = "sha256:408a2c784448d1436981fe40062396ba2316fe553b62fb29d7b35d073f1a1c9f"
+FACT_B = "sha256:82e0a59a2972240512c9911b7ca1aa93641f2c81ab691ca5d695a9fc1592705c"
 
 SUBJECT_ID = "bracket-alpha"
 TWIN_REVISION = "design:G17"
@@ -52,7 +53,7 @@ EXPECTED_VERIFICATION_CONTRACT_ID = (
     "sha256:99f9d8f4e0608e7745b78308f5210b10a08280804bf2820997090c38a6d3a5d7"
 )
 EXPECTED_REQUIREMENT_SATISFACTION_RECEIPT_ID = (
-    "sha256:62b01b819b161b98a490a58f8971954e272bac3c42780db88a868c37c8f20eb9"
+    "sha256:b519dfb7188194648894c18f03636551ad0f2e51f7aee5934acab1c1d28d8457"
 )
 
 
@@ -226,10 +227,6 @@ def evaluate_current_satisfaction(
             "reasons": ["RequirementRevisionChanged"],
         }
 
-    # Lower-layer facts are opaque capabilities here. We only select facts that
-    # explicitly match the one current design context being closed. Multiple
-    # matching facts for one obligation are harmless; choose the lexical minimum
-    # fact ID so input ordering/redundancy cannot perturb the satisfaction receipt.
     applicable: dict[str, str] = {}
     for i, raw in enumerate(current_discharge_facts):
         fact = current_fact(raw, f"current_discharge_facts[{i}]")
@@ -306,7 +303,14 @@ def fixture_contract() -> dict[str, Any]:
     )
 
 
-def fact(obligation: str, fact_id: str, *, subject: str = SUBJECT_ID, twin: str = TWIN_REVISION, requirement: str = REQ_ID) -> dict[str, str]:
+def fact(
+    obligation: str,
+    fact_id: str,
+    *,
+    subject: str = SUBJECT_ID,
+    twin: str = TWIN_REVISION,
+    requirement: str = REQ_ID,
+) -> dict[str, str]:
     return {
         "obligation_revision_id": obligation,
         "current_discharge_fact_id": fact_id,
@@ -316,7 +320,15 @@ def fact(obligation: str, fact_id: str, *, subject: str = SUBJECT_ID, twin: str 
     }
 
 
-def evaluate_fixture(contract: dict[str, Any], facts: list[dict[str, str]], *, subject: str = SUBJECT_ID, twin: str = TWIN_REVISION, requirement: str = REQ_ID, currentness: str = CURRENTNESS_ASSERTION) -> dict[str, Any]:
+def evaluate_fixture(
+    contract: dict[str, Any],
+    facts: list[dict[str, str]],
+    *,
+    subject: str = SUBJECT_ID,
+    twin: str = TWIN_REVISION,
+    requirement: str = REQ_ID,
+    currentness: str = CURRENTNESS_ASSERTION,
+) -> dict[str, Any]:
     return evaluate_current_satisfaction(
         contract,
         current_subject_id=subject,
@@ -347,7 +359,6 @@ def self_test() -> dict[str, str]:
     assert partial["decision"] == "RequirementUnsatisfied"
     assert partial["missing_obligation_revision_ids"] == [OBL_B]
 
-    # A fact for the right obligation but a different twin cannot satisfy it.
     cross_twin = evaluate_fixture(
         contract,
         [fact(OBL_A, FACT_A), fact(OBL_B, FACT_B, twin="design:G18")],
@@ -355,7 +366,6 @@ def self_test() -> dict[str, str]:
     assert cross_twin["decision"] == "RequirementUnsatisfied"
     assert cross_twin["missing_obligation_revision_ids"] == [OBL_B]
 
-    # Same for cross-subject and cross-requirement facts.
     cross_subject = evaluate_fixture(
         contract,
         [fact(OBL_A, FACT_A), fact(OBL_B, FACT_B, subject="bracket-beta")],
@@ -370,7 +380,6 @@ def self_test() -> dict[str, str]:
     )
     assert cross_requirement["decision"] == "RequirementUnsatisfied"
 
-    # Extra unrelated/stale facts do not compensate and do not enter the receipt.
     complete = evaluate_fixture(
         contract,
         [
@@ -388,7 +397,6 @@ def self_test() -> dict[str, str]:
         [OBL_A, OBL_B]
     )
 
-    # Duplicate applicable facts are order-independent and select lexical minimum.
     duplicate_a = fact(OBL_A, "sha256:" + "ff" * 32)
     duplicate_b = fact(OBL_A, FACT_A)
     with_duplicates = evaluate_fixture(
