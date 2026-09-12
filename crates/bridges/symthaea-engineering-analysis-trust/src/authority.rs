@@ -6,19 +6,17 @@ use crate::analysis::{
     RectangularCantileverInputV1,
 };
 use crate::canonical::{
-    ADMITTED_DOMAIN_V1, AdmittedAnalyticalEvidenceIdV1, AnalysisTrustErrorV1,
-    AnalyticalPlanIdV1, CurrentNativeAnalyticalDischargeFactIdV1, EQUATION_RELATIVE_TOLERANCE,
-    FACT_DOMAIN_V1, NativeAnalyticalDischargeReceiptIdV1, PLAN_DOMAIN_V1, RECEIPT_DOMAIN_V1,
+    ADMITTED_DOMAIN_V1, AdmittedAnalyticalEvidenceIdV1, AnalysisRequirementRevisionIdV1,
+    AnalysisTrustErrorV1, AnalyticalInputRevisionIdV1, AnalyticalMethodRevisionIdV1,
+    AnalyticalPlanIdV1, AnalyticalPolicyRevisionIdV1, CurrentNativeAnalyticalDischargeFactIdV1,
+    CurrentnessAssertionIdV1, EQUATION_RELATIVE_TOLERANCE, FACT_DOMAIN_V1,
+    NativeAnalyticalDischargeReceiptIdV1, ObligationRevisionIdV1, PLAN_DOMAIN_V1,
+    RECEIPT_DOMAIN_V1, SubjectRevisionIdV1, TwinRevisionIdV1, ValidityDomainRevisionIdV1,
     canonical_binary64_v1, domain_hash,
 };
 use crate::context::{
     AcceptedAnalysisRequirementV1, CurrentnessAssertionV1, SubjectRevisionV1, TwinRevisionV1,
     ValidityDomainRevisionV1, analytical_obligation_revision_v1,
-};
-use crate::{
-    AnalysisRequirementRevisionIdV1, AnalyticalInputRevisionIdV1, AnalyticalMethodRevisionIdV1,
-    AnalyticalPolicyRevisionIdV1, CurrentnessAssertionIdV1, ObligationRevisionIdV1,
-    SubjectRevisionIdV1, TwinRevisionIdV1, ValidityDomainRevisionIdV1,
 };
 use serde_json::{Value, json};
 use symthaea_formal_safety::ProofObligation;
