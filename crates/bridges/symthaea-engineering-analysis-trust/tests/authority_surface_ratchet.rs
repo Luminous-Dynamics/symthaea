@@ -34,7 +34,7 @@ fn authority_and_semantic_ids_remain_one_way() {
         .expect("semantic-id macro must remain explicit");
     let semantic_tail = &canonical[semantic_start..];
     let semantic_end = semantic_tail
-        .find("premise_id!(ModelQualificationRecordDigestV1)")
+        .find("premise_id!(AcceptanceRecordDigestV1)")
         .expect("premise declarations must follow semantic-id macro");
     let semantic_macro = &semantic_tail[..semantic_end];
 
@@ -45,6 +45,30 @@ fn authority_and_semantic_ids_remain_one_way() {
     assert!(!canonical.contains("premise_id!(ValidityDomainRevisionIdV1)"));
     assert!(!canonical.contains("premise_id!(CurrentnessAssertionIdV1)"));
     assert!(!production_source().contains("Deserialize"));
+}
+
+#[test]
+fn authority_critical_external_premises_remain_role_safe() {
+    let canonical = include_str!("../src/canonical.rs");
+    for role in [
+        "AcceptanceRecordDigestV1",
+        "SubjectStateDigestV1",
+        "TwinStateDigestV1",
+        "TwinSchemaDigestV1",
+        "ModelRevisionDigestV1",
+        "AnalysisConfigurationDigestV1",
+        "ValidityDimensionDigestV1",
+        "CurrentnessAttestationDigestV1",
+        "ImplementationArtifactDigestV1",
+        "AlgorithmRevisionDigestV1",
+        "ModelQualificationRecordDigestV1",
+        "ExecutionArtifactDigestV1",
+    ] {
+        assert!(
+            canonical.contains(&format!("premise_id!({role})")),
+            "missing role-safe premise type: {role}"
+        );
+    }
 }
 
 #[test]
