@@ -12,11 +12,11 @@ set -euo pipefail
 
 # Class A files: safety-critical parameters per GOVERNANCE_CHARTER.md §3.1
 #
-# RSK note (ADR-002/ADR-010/ADR-011/ADR-012): replication-authority and
-# lineage/budget code, normative RSK architecture contracts, qualification
-# generator/verifier, self-tests, workflow, detector, and Governance Charter
-# are Class A surfaces. Weakening the constitution/evidence/governance boundary
-# must not look like an ordinary documentation or implementation change.
+# RSK note (ADR-002/ADR-010/ADR-011/ADR-012/ADR-014): replication-authority and
+# lineage/budget code, normative RSK architecture contracts, qualification and
+# semantic-schema reference tooling, self-tests, workflow, detector, and
+# Governance Charter are Class A surfaces. Weakening constitution/evidence/
+# semantic/governance boundaries must not look like an ordinary change.
 CLASS_A_FILES=(
     "symthaea/src/cognitive_loop/thresholds.rs"
     "symthaea/src/cognitive_loop/ethics_engine.rs"
@@ -31,6 +31,8 @@ CLASS_A_FILES=(
     "scripts/test_rsk_qualification.py"
     "scripts/verify_rsk_qualification.py"
     "scripts/test_verify_rsk_qualification.py"
+    "scripts/rsk_semantic_schema.py"
+    "scripts/test_rsk_semantic_schema.py"
     "scripts/check-class-a-changes.sh"
     "docs/compliance/GOVERNANCE_CHARTER.md"
 )
@@ -158,7 +160,7 @@ if [ "${1:-}" = "--ci" ]; then
             echo "  Consider adding: symthaea/docs/compliance/adr/ADR-NNN-description.md"
             # Warning only in generic CI. RSK has an additional blocking ADR gate
             # in .github/workflows/rsk-safety.yml; see ADR-002, ADR-010, ADR-011,
-            # and ADR-012.
+            # ADR-012, and ADR-014.
         fi
     fi
 
