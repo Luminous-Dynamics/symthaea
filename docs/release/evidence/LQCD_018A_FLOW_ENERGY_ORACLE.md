@@ -6,7 +6,7 @@
 
 Exact executed-subject SHA-256:
 
-`265bf09f7fa91ef48bab6d9412921dade588c0e73c77935eb4ccab8485217b29`
+`35fd8a3c87244077a6e77e316e97848a57f9e444c6fd9040976ec11d1297a1fd`
 
 The subject is Python-standard-library only and imports no Symthaea/Rust implementation code.
 
@@ -53,7 +53,9 @@ For an externally supplied **ensemble-mean** energy curve it forms
 
 `F(t)=t^2 <E(t)>`.
 
-A `t0`-like estimator finds one unique bracketed crossing of a caller-supplied target and linearly interpolates in `F(t)`. A `w0`-like estimator uses the centered finite-difference response
+A `t0`-like estimator finds one unique crossing of a caller-supplied target and linearly interpolates across a strict sign-changing bracket. An exact target hit at exactly one sampled flow time is returned directly rather than being double-counted through its two neighboring intervals. Repeated exact hits or multiple strict brackets fail closed as ambiguous.
+
+A `w0`-like estimator uses the centered finite-difference response
 
 `t d/dt [t^2 <E(t)>]`
 
@@ -63,6 +65,7 @@ The synthetic tests are algebra fixtures only:
 
 - a constructed ensemble-mean curve gives `t0_like=0.35`;
 - a constructed linear `F(t)=0.02+0.8t` curve with target `0.32` gives `w0_like=sqrt(0.4)`;
+- an exact sampled crossing is accepted once;
 - a curve with multiple target crossings fails closed instead of silently choosing one branch.
 
 No conventional target such as `0.3` is encoded as universal authority by the implementation.
@@ -83,4 +86,4 @@ Physical scale setting requires qualified equilibrium ensembles, a declared ener
 
 ## Literature boundary
 
-At positive flow time the Wilson/gradient flow provides a smooth gauge field on which local gauge-invariant observables such as the action/energy density are well defined. Standard reference scales are constructed from the ensemble mean `t^2<E(t)>` and, for `w0`, its logarithmic flow-time response. This oracle qualifies the algebraic contract only; literature conventions remain external scientific inputs rather than hard-coded verdicts.
+At positive flow time the Wilson/gradient flow provides a smooth gauge field on which local gauge-invariant observables such as the action/energy density are well defined. Standard reference scales are constructed from the ensemble mean `t^2<E(t)>` and, for `w0`, its flow-time derivative. This oracle qualifies the algebraic contract only; literature conventions remain external scientific inputs rather than hard-coded verdicts.
