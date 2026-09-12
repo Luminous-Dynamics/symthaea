@@ -112,6 +112,13 @@ impl CommonCausePolicy {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CommonCauseIssue {
     InvalidPolicy,
+    /// Upstream admission already determined that the batch must fail closed.
+    AdmissionRequiresFailClosed,
+    /// The admission report's physical-source count does not match its accepted IDs.
+    AdmissionPhysicalSourceCountMismatch {
+        reported: usize,
+        derived: usize,
+    },
     NoAcceptedPhysicalSources,
     AcceptedObservationMissing(String),
     InvalidProfile(String),
@@ -149,7 +156,8 @@ impl CommonCauseDiversityReport {
 /// `symthaea-sensor-trust`.
 ///
 /// No topology is inferred. Every common-cause domain must come from an explicit,
-/// evidence-backed source profile.
+/// evidence-backed source profile. An upstream fail-closed admission decision can
+/// never be converted back into a usable result by this downstream assessment.
 pub fn assess_common_cause_diversity(
     observations: &[ObservationEnvelope],
     admission: &ObservationAdmissionReport,
@@ -178,6 +186,10 @@ pub fn assess_common_cause_diversity(
         .collect::<HashMap<_, _>>();
 
     let mut issues = Vec::new();
+    if admission.requires_fail_closed {
+        issues.push(CommonCauseIssue::AdmissionRequiresFailClosed);
+    }
+
     let mut accepted_sources = BTreeSet::<String>::new();
     for observation_id in &accepted_ids {
         match by_id.get(observation_id) {
@@ -191,6 +203,12 @@ pub fn assess_common_cause_diversity(
     }
     if accepted_sources.is_empty() {
         issues.push(CommonCauseIssue::NoAcceptedPhysicalSources);
+    }
+    if admission.independent_physical_sources != accepted_sources.len() {
+        issues.push(CommonCauseIssue::AdmissionPhysicalSourceCountMismatch {
+            reported: admission.independent_physical_sources,
+            derived: accepted_sources.len(),
+        });
     }
 
     let mut profile_map = BTreeMap::<String, &PhysicalSourceFaultProfile>::new();
@@ -258,7 +276,7 @@ pub fn assess_common_cause_diversity(
         accepted_physical_sources: accepted_sources.len(),
         profiled_physical_sources: profiled_sources,
         distinct_domains: distinct_counts,
-        requires_fail_closed: !issues.is_empty(),
+        requires_fail_closed: admission.requires_fail_closed || !issues.is_empty(),
         issues,
     }
 }
@@ -273,7 +291,11 @@ mod tests {
     use symthaea_sensor_trust::ObservationAdmissionReport;
     use uuid::Uuid;
 
-    fn observation(source_id: &str, physical_source_id: &str, modality: Modality) -> ObservationEnvelope {
+    fn observation(
+        source_id: &str,
+        physical_source_id: &str,
+        modality: Modality,
+    ) -> ObservationEnvelope {
         ObservationEnvelope {
             observation_id: Uuid::new_v4(),
             source_id: source_id.into(),
@@ -382,6 +404,55 @@ mod tests {
         assert_eq!(report.distinct_domains[&FaultDomainKind::Power], 2);
         assert_eq!(report.distinct_domains[&FaultDomainKind::Network], 2);
         assert!(!report.grants_physical_authority());
+    }
+
+    #[test]
+    fn upstream_fail_closed_cannot_be_laundered_by_diverse_profiles() {
+        let observations = vec![
+            observation("eo-a", "camera-a", Modality::ElectroOptical),
+            observation("ir-b", "camera-b", Modality::Infrared),
+        ];
+        let mut upstream = admission(&observations);
+        upstream.requires_fail_closed = true;
+        let report = assess_common_cause_diversity(
+            &observations,
+            &upstream,
+            &[
+                profile("camera-a", "power-a", "network-a"),
+                profile("camera-b", "power-b", "network-b"),
+            ],
+            &policy(),
+        );
+        assert!(report.requires_fail_closed);
+        assert!(report
+            .issues
+            .contains(&CommonCauseIssue::AdmissionRequiresFailClosed));
+    }
+
+    #[test]
+    fn inconsistent_admission_physical_source_count_fails_closed() {
+        let observations = vec![
+            observation("eo-a", "camera-a", Modality::ElectroOptical),
+            observation("ir-b", "camera-b", Modality::Infrared),
+        ];
+        let mut upstream = admission(&observations);
+        upstream.independent_physical_sources = 3;
+        let report = assess_common_cause_diversity(
+            &observations,
+            &upstream,
+            &[
+                profile("camera-a", "power-a", "network-a"),
+                profile("camera-b", "power-b", "network-b"),
+            ],
+            &policy(),
+        );
+        assert!(report.requires_fail_closed);
+        assert!(report.issues.contains(
+            &CommonCauseIssue::AdmissionPhysicalSourceCountMismatch {
+                reported: 3,
+                derived: 2,
+            }
+        ));
     }
 
     #[test]
