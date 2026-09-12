@@ -4,24 +4,25 @@
 //!
 //! Existing adapter receipts can be wrapped without rewriting their payload
 //! schema. The outer receipt cryptographically commits to the exact candidate
-//! version, frozen campaign, evidence lane, dimension, payload type, and exact
-//! UTF-8 JSON receipt text. This does not prove the adapter obeyed the lane's
-//! method parameters, but it makes the new receipt's claimed lineage immutable
-//! and machine-checkable.
+//! version, frozen campaign, evidence lane, dimension, generic prediction,
+//! payload type, and exact UTF-8 JSON receipt text. This does not prove the
+//! adapter obeyed the lane's method parameters, but it makes the new receipt's
+//! claimed lineage and normalized discovery result immutable and machine-checkable.
 
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use symthaea_discovery::{CandidateId, EvidenceKind};
+use symthaea_discovery::{CandidateId, EvidenceKind, Prediction};
 use symthaea_energy_material_campaign::{EvidenceLanePlan, Tier1CampaignManifest};
 use symthaea_energy_material_screening::EvidenceDimension;
 use thiserror::Error;
 
 pub const CAPABILITY_CLASSIFICATION: &str =
-    "ENERGY EVIDENCE LINEAGE ENVELOPE ONLY -- content-addressed candidate/campaign binding is not proof of method adherence, scientific validation, certification, or deployment authority.";
+    "ENERGY EVIDENCE LINEAGE ENVELOPE ONLY -- content-addressed candidate/campaign/prediction binding is not proof of method adherence, scientific validation, certification, or deployment authority.";
 
 const LANE_DIGEST_DOMAIN: &[u8] = b"symthaea.energy-material.campaign-lane.v0\0";
+const PREDICTION_DIGEST_DOMAIN: &[u8] = b"symthaea.energy-material.generic-prediction.v0\0";
 const PAYLOAD_DIGEST_DOMAIN: &[u8] = b"symthaea.energy-material.evidence-payload.v0\0";
 const ENVELOPE_DIGEST_DOMAIN: &[u8] = b"symthaea.energy-material.evidence-envelope.v0\0";
 
@@ -47,14 +48,17 @@ impl NativeCampaignBinding {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnergyEvidenceEnvelope {
     pub schema: String,
     pub capability_classification: String,
     pub binding: NativeCampaignBinding,
+    /// Exact generic discovery prediction promoted into the dossier layer.
+    pub prediction: Prediction,
+    pub prediction_sha256: String,
     pub payload_type: String,
-    /// Exact UTF-8 JSON receipt text. Whitespace and key order are intentionally
-    /// evidence-bearing in this native outer envelope.
+    /// Exact UTF-8 JSON adapter receipt text. Whitespace and key order are
+    /// intentionally evidence-bearing in this native outer envelope.
     pub payload_json: String,
     pub payload_sha256: String,
 }
@@ -69,6 +73,15 @@ impl EnergyEvidenceEnvelope {
             ));
         }
         self.binding.validate()?;
+        self.prediction.validate()?;
+        validate_sha256(&self.prediction_sha256, "prediction SHA-256")?;
+        let expected_prediction = prediction_sha256(&self.prediction)?;
+        if self.prediction_sha256 != expected_prediction {
+            return Err(EnvelopeError::PredictionDigestMismatch {
+                expected: expected_prediction,
+                actual: self.prediction_sha256.clone(),
+            });
+        }
         if self.payload_type.trim().is_empty() {
             return Err(EnvelopeError::InvalidEnvelope(
                 "payload_type cannot be empty".into(),
@@ -86,10 +99,10 @@ impl EnergyEvidenceEnvelope {
             ));
         }
         validate_sha256(&self.payload_sha256, "payload SHA-256")?;
-        let expected = payload_sha256(self.payload_json.as_bytes());
-        if self.payload_sha256 != expected {
+        let expected_payload = payload_sha256(self.payload_json.as_bytes());
+        if self.payload_sha256 != expected_payload {
             return Err(EnvelopeError::PayloadDigestMismatch {
-                expected,
+                expected: expected_payload,
                 actual: self.payload_sha256.clone(),
             });
         }
@@ -112,6 +125,17 @@ impl EnergyEvidenceEnvelope {
                 self.binding.dimension,
             ));
         }
+        let contract = manifest
+            .screening_policy
+            .contracts
+            .iter()
+            .find(|contract| contract.dimension == self.binding.dimension)
+            .ok_or(EnvelopeError::MissingCampaignLane(self.binding.dimension))?;
+        if self.prediction.metric != contract.metric || self.prediction.unit != contract.unit {
+            return Err(EnvelopeError::PredictionContractMismatch(
+                self.binding.dimension,
+            ));
+        }
         Ok(())
     }
 
@@ -128,10 +152,12 @@ impl EnergyEvidenceEnvelope {
 pub fn wrap_evidence_payload_json(
     manifest: &Tier1CampaignManifest,
     dimension: EvidenceDimension,
+    prediction: Prediction,
     payload_type: impl Into<String>,
     payload_json: impl Into<String>,
 ) -> Result<EnergyEvidenceEnvelope, EnvelopeError> {
     manifest.validate()?;
+    prediction.validate()?;
     let payload_type = payload_type.into();
     if payload_type.trim().is_empty() {
         return Err(EnvelopeError::InvalidEnvelope(
@@ -151,11 +177,14 @@ pub fn wrap_evidence_payload_json(
         ));
     }
     let binding = binding_from_manifest(manifest, dimension)?;
+    let prediction_sha256 = prediction_sha256(&prediction)?;
     let payload_sha256 = payload_sha256(payload_json.as_bytes());
     let envelope = EnergyEvidenceEnvelope {
         schema: "symthaea.energy-material.evidence-envelope.v0".into(),
         capability_classification: CAPABILITY_CLASSIFICATION.into(),
         binding,
+        prediction,
+        prediction_sha256,
         payload_type,
         payload_json,
         payload_sha256,
@@ -228,6 +257,15 @@ pub fn campaign_lane_sha256(lane: &EvidenceLanePlan) -> Result<String, EnvelopeE
     Ok(hex_lower(&hasher.finalize()))
 }
 
+pub fn prediction_sha256(prediction: &Prediction) -> Result<String, EnvelopeError> {
+    prediction.validate()?;
+    let encoded = serde_json::to_vec(prediction)?;
+    let mut hasher = Sha256::new();
+    hasher.update(PREDICTION_DIGEST_DOMAIN);
+    hasher.update(encoded);
+    Ok(hex_lower(&hasher.finalize()))
+}
+
 pub fn payload_sha256(payload_json: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(PAYLOAD_DIGEST_DOMAIN);
@@ -243,10 +281,14 @@ pub enum EnvelopeError {
     InvalidLane(String),
     #[error("campaign has no lane for dimension {0:?}")]
     MissingCampaignLane(EvidenceDimension),
+    #[error("prediction SHA-256 mismatch: expected {expected}, got {actual}")]
+    PredictionDigestMismatch { expected: String, actual: String },
     #[error("payload SHA-256 mismatch: expected {expected}, got {actual}")]
     PayloadDigestMismatch { expected: String, actual: String },
     #[error("envelope binding differs from frozen campaign for dimension {0:?}")]
     CampaignBindingMismatch(EvidenceDimension),
+    #[error("generic prediction metric/unit differs from frozen policy for dimension {0:?}")]
+    PredictionContractMismatch(EvidenceDimension),
     #[error(transparent)]
     Discovery(#[from] symthaea_discovery::DiscoveryError),
     #[error(transparent)]
@@ -295,7 +337,8 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
     use symthaea_discovery::{
-        Candidate, CandidateId, CandidateOrigin, FidelityLevel, ObjectiveDirection,
+        Candidate, CandidateId, CandidateOrigin, EvidenceRef, FidelityLevel, ModelProvenance,
+        ObjectiveDirection, UncertaintyEstimate,
     };
     use symthaea_energy_material_campaign::{
         freeze_campaign_manifest, EvidenceLanePlan, SourceCommitment,
@@ -354,13 +397,47 @@ mod tests {
         .unwrap()
     }
 
+    fn prediction(dimension: EvidenceDimension) -> Prediction {
+        Prediction {
+            metric: format!("metric-{dimension:?}"),
+            value: 1.0,
+            unit: "score".into(),
+            uncertainty: UncertaintyEstimate::new(1.0, 0.0).unwrap(),
+            fidelity: FidelityLevel::Surrogate,
+            model: ModelProvenance {
+                name: format!("model-{dimension:?}"),
+                version: Some("v0".into()),
+                implementation_digest: None,
+                input_digest: Some(
+                    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        .into(),
+                ),
+                output_digest: None,
+            },
+            assumptions: vec![],
+            evidence: vec![EvidenceRef {
+                id: "fixture-dataset".into(),
+                kind: EvidenceKind::Dataset,
+                uri: None,
+                digest: Some(
+                    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        .into(),
+                ),
+                note: None,
+            }],
+        }
+    }
+
     #[test]
-    fn envelope_binds_candidate_campaign_lane_and_exact_payload_text() {
+    fn envelope_binds_candidate_campaign_lane_prediction_and_exact_payload_text() {
         let manifest = manifest();
+        let dimension = EvidenceDimension::FunctionalPerformance;
+        let prediction = prediction(dimension);
         let payload = "{\"value\":42,\"unit\":\"fixture\"}";
         let envelope = wrap_evidence_payload_json(
             &manifest,
-            EvidenceDimension::FunctionalPerformance,
+            dimension,
+            prediction.clone(),
             "fixture-receipt-v0",
             payload,
         )
@@ -371,6 +448,8 @@ mod tests {
             manifest.candidate_anchor.candidate_sha256
         );
         assert_eq!(envelope.binding.campaign_manifest_sha256, manifest.sha256().unwrap());
+        assert_eq!(envelope.prediction, prediction);
+        assert_eq!(envelope.prediction_sha256, prediction_sha256(&envelope.prediction).unwrap());
         assert_eq!(envelope.payload_json, payload);
         assert!(!envelope.binding.campaign_lane_sha256.is_empty());
         assert!(!envelope.sha256().unwrap().is_empty());
@@ -396,16 +475,19 @@ mod tests {
     #[test]
     fn exact_json_text_is_evidence_bearing() {
         let manifest = manifest();
+        let dimension = EvidenceDimension::FunctionalPerformance;
         let compact = wrap_evidence_payload_json(
             &manifest,
-            EvidenceDimension::FunctionalPerformance,
+            dimension,
+            prediction(dimension),
             "fixture-receipt-v0",
             "{\"a\":1,\"b\":2}",
         )
         .unwrap();
         let reordered = wrap_evidence_payload_json(
             &manifest,
-            EvidenceDimension::FunctionalPerformance,
+            dimension,
+            prediction(dimension),
             "fixture-receipt-v0",
             "{\"b\":2,\"a\":1}",
         )
@@ -415,11 +497,32 @@ mod tests {
     }
 
     #[test]
-    fn payload_mutation_breaks_validation() {
+    fn prediction_mutation_breaks_validation() {
         let manifest = manifest();
+        let dimension = EvidenceDimension::FunctionalPerformance;
         let mut envelope = wrap_evidence_payload_json(
             &manifest,
-            EvidenceDimension::FunctionalPerformance,
+            dimension,
+            prediction(dimension),
+            "fixture-receipt-v0",
+            "{\"value\":1}",
+        )
+        .unwrap();
+        envelope.prediction.value = 2.0;
+        assert!(matches!(
+            envelope.validate(),
+            Err(EnvelopeError::PredictionDigestMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn payload_mutation_breaks_validation() {
+        let manifest = manifest();
+        let dimension = EvidenceDimension::FunctionalPerformance;
+        let mut envelope = wrap_evidence_payload_json(
+            &manifest,
+            dimension,
+            prediction(dimension),
             "fixture-receipt-v0",
             "{\"value\":1}",
         )
@@ -434,9 +537,11 @@ mod tests {
     #[test]
     fn different_campaign_cannot_validate_same_envelope() {
         let manifest = manifest();
+        let dimension = EvidenceDimension::FunctionalPerformance;
         let envelope = wrap_evidence_payload_json(
             &manifest,
-            EvidenceDimension::FunctionalPerformance,
+            dimension,
+            prediction(dimension),
             "fixture-receipt-v0",
             "{\"value\":1}",
         )
