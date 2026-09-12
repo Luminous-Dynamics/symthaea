@@ -26,6 +26,8 @@
 //!   force semantics as the stochastic heat-bath path
 //! - **HB+OR cycle**: one stochastic heat-bath pass followed by a declared
 //!   number of RNG-free microcanonical sweeps with explicit work/fallback stats
+//! - **Sampler qualification traces**: a common measurement schema and work
+//!   accounting for Metropolis and HB+OR, without automatic convergence claims
 //!
 //! ## Natural Units
 //!
@@ -55,6 +57,7 @@ pub mod lattice_metropolis;
 pub mod lattice_overrelaxation;
 pub mod lattice_qcd;
 pub mod lattice_rng;
+pub mod lattice_sampler_trace;
 pub mod lattice_subgroup_force;
 pub mod lattice_sweep;
 pub mod relativistic_qm;
@@ -104,6 +107,10 @@ pub use lattice_overrelaxation::{
 pub use lattice_rng::{
     LATTICE_RNG_ALGORITHM, LATTICE_RNG_IMPLEMENTATION, LATTICE_RNG_VERSION,
     LatticeChaCha8Stream, LatticeRngError, LatticeStreamCoordinates, LatticeStreamDomain,
+};
+pub use lattice_sampler_trace::{
+    QualificationSampler, SamplerQualificationTrace, SamplerTraceError, SamplerTracePlan,
+    SamplerTraceSample, SamplerWorkCounters, run_sampler_qualification_trace,
 };
 pub use lattice_subgroup_force::{
     AffineSubgroupForce, SubgroupForceBackend, SubgroupForceError, SubgroupForceEvaluation,
