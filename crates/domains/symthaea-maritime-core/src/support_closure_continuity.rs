@@ -74,6 +74,7 @@ pub enum RegenerativeSupportClosureContinuityError {
     NoMappings,
     TooManyMappings,
     NonCanonicalMappingOrder,
+    DuplicateSourceMapping { dependency_id: String },
     DuplicateSuccessorMapping { dependency_id: String },
     SourceProfileInvalid,
     SuccessorProfileInvalid,
@@ -155,10 +156,17 @@ pub fn qualify_regenerative_role_support_closure_continuity(
     let mut mapping_by_source = BTreeMap::new();
     let mut mapped_successor_ids = BTreeSet::new();
     for mapping in &policy.mappings {
-        mapping_by_source.insert(
-            mapping.source_dependency_id.as_str(),
-            mapping.successor_dependency_id.as_str(),
-        );
+        if mapping_by_source
+            .insert(
+                mapping.source_dependency_id.as_str(),
+                mapping.successor_dependency_id.as_str(),
+            )
+            .is_some()
+        {
+            return Err(RegenerativeSupportClosureContinuityError::DuplicateSourceMapping {
+                dependency_id: mapping.source_dependency_id.clone(),
+            });
+        }
         if !mapped_successor_ids.insert(mapping.successor_dependency_id.as_str()) {
             return Err(RegenerativeSupportClosureContinuityError::DuplicateSuccessorMapping {
                 dependency_id: mapping.successor_dependency_id.clone(),
@@ -255,7 +263,7 @@ pub fn qualify_regenerative_role_support_closure_continuity(
                         flow_kind: source_claim.flow_kind,
                     }
                 })?;
-            let mapped_prerequisites: Vec<String> = source_claim
+            let mapped_prerequisites: BTreeSet<String> = source_claim
                 .prerequisite_dependency_ids
                 .iter()
                 .map(|source_id| {
@@ -263,12 +271,17 @@ pub fn qualify_regenerative_role_support_closure_continuity(
                         .get(source_id.as_str())
                         .copied()
                         .map(str::to_string)
-                        .ok_or_else(|| {
-                            RegenerativeSupportClosureContinuityError::SourceClosureMappingCoverageMismatch
-                        })
+                        .ok_or(
+                            RegenerativeSupportClosureContinuityError::SourceClosureMappingCoverageMismatch,
+                        )
                 })
                 .collect::<Result<_, _>>()?;
-            if mapped_prerequisites != successor_claim.prerequisite_dependency_ids
+            let successor_prerequisites: BTreeSet<String> = successor_claim
+                .prerequisite_dependency_ids
+                .iter()
+                .cloned()
+                .collect();
+            if mapped_prerequisites != successor_prerequisites
                 || source_claim.external_input_binding.is_some()
                     != successor_claim.external_input_binding.is_some()
                 || source_claim.bootstrap_binding.is_some()
