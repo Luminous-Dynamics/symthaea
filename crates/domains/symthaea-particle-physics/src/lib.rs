@@ -39,6 +39,7 @@ pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
+mod lattice_su3_lie;
 pub mod lattice_topology_flow;
 pub mod lattice_topology_flow_staple;
 pub mod lattice_topology_measurement;
