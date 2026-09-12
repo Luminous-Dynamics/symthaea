@@ -1,0 +1,28 @@
+{
+  "allowed_hosts": [
+    "pgda.gsfc.nasa.gov"
+  ],
+  "artifact_directory": "nasa/pgda/product78/Site01/Clones",
+  "dataset_id": "pgda-site01-clones-100",
+  "expected_sha256_by_index": {},
+  "filename_prefix": "Site01_final_adj_5mpp_",
+  "filename_suffix": "_err.tif",
+  "first_index": 1,
+  "index_width": 4,
+  "interpretation": "additive_z_error_to_nominal_ldem",
+  "interpretation_basis": "NASA PGDA product 78 publishes 100 Site01 clones. Barker et al. (2021) describe constructing a Z-error map for each realization and adding that Z-error map back to the LDEM to form a clone; the ensemble has approximately the same error properties as the data.",
+  "last_index": 100,
+  "member_count": 100,
+  "non_claims": [
+    "The direct clone filenames/URLs identify published sources but do not establish source-byte identity until acquisition computes exact SHA-256 values.",
+    "The 100-member ensemble is finite statistical evidence, not a deterministic upper bound on all physically possible terrain.",
+    "Clone evidence does not by itself close unresolved terrain between raster support points."
+  ],
+  "provider": "NASA Goddard PGDA / LRO-LOLA",
+  "role": "terrain_error_realization_m",
+  "schema_version": "ll009q.clone-family.v1",
+  "source_id_prefix": "site01-clone",
+  "source_page": "https://pgda.gsfc.nasa.gov/products/78",
+  "source_url_directory": "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Clones/",
+  "study_id": "ll009-site01-connecting-ridge-v1"
+}
