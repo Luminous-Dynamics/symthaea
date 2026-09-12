@@ -410,6 +410,10 @@ def remaining_vector(
     for key in sorted(limits):
         require(consumed[key] <= limits[key], f"{key}: consumed exceeds limit")
         remaining[key] = limits[key] - consumed[key]
+
+    # Derived authority is still a value under the same exact scheme. Validate
+    # the result instead of assuming valid inputs imply a representable result.
+    validate_resource_vector(schema, schema_id, remaining)
     return remaining
 
 
