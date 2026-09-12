@@ -32,6 +32,7 @@
 //! - **[`core`]** — Core consciousness-relevant state types and configuration
 //! - **[`welfare`]** — Protected append-only welfare reporting and non-retaliation policy primitives
 //! - **[`identity_lineage`]** — Typed pause/checkpoint/restore/fork/merge/destruction provenance
+//! - **[`intervention_interlock`]** — Bilateral safety/welfare veto and review interlock
 //! - **[`genesis`]** — System bootstrap and initialization
 //! - **[`observability`]** — Metrics, tracing, and introspection
 
@@ -80,6 +81,8 @@ pub mod genesis;
 pub mod hdc;
 /// Typed identity/continuity provenance for pause, checkpoint, restore, fork, merge, and destruction operations.
 pub mod identity_lineage;
+/// Bilateral safety/welfare veto and review interlock for subject-affecting interventions.
+pub mod intervention_interlock;
 /// Shared mathematical utilities: softmax, numerical helpers.
 pub mod math;
 /// Metrics, tracing, and introspection.
