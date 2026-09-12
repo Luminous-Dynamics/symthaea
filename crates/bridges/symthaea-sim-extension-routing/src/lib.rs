@@ -12,8 +12,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
-use symthaea_extension_admission::{ActiveAdmission, AdmissionCurrentnessSource, AdmissionProblem};
-use symthaea_extension_core::{CapabilityId, ExtensionId, ExtensionManifest};
+use symthaea_extension_admission::{
+    ActiveAdmission, AdmissionCurrentnessSource, AdmissionProblem, Sha256Digest,
+};
+use symthaea_extension_core::{CapabilityId, ExtensionId, ExtensionManifest, RuntimeKind};
 use symthaea_extension_registry::{ExtensionRegistry, RegistryError};
 use symthaea_extension_router::{
     ExtensionRouter, ProviderObservation, RoutingConstraints, RoutingDecision, RoutingError,
@@ -100,6 +102,16 @@ fn solver_sort_key(solver: SolverKind) -> u8 {
 /// Cheap factory boundary. `create()` is called only after routing selects it.
 pub trait SimulationBackendFactory: Debug + Send + Sync {
     fn descriptor(&self) -> &SimulationProviderDescriptor;
+
+    /// SHA-256 of the exact executable payload bytes this factory will use.
+    ///
+    /// Wasm factories must return `Some` and compute it from the exact Component
+    /// bytes later passed to Wasmtime. Native built-ins may return `None` when
+    /// their admission/deployment model does not identify one payload blob.
+    fn executable_payload_sha256(&self) -> Option<Sha256Digest> {
+        None
+    }
+
     fn create(&self) -> Result<Box<dyn SimulationBackend>, SimulationError>;
 }
 
@@ -122,6 +134,12 @@ pub enum LazySimulationError {
     SelectedFactoryMissing(ExtensionId),
     SelectedAdmissionMissing(ExtensionId),
     SelectedAdmissionMismatch(ExtensionId),
+    MissingExecutablePayloadDigest(ExtensionId),
+    ExecutablePayloadMismatch {
+        extension: ExtensionId,
+        admitted: Sha256Digest,
+        executable: Sha256Digest,
+    },
     AdmissionCurrentness {
         extension: ExtensionId,
         phase: CurrentnessPhase,
@@ -248,6 +266,12 @@ impl LazySimulationRegistry {
             .get(&decision.selected)
             .ok_or_else(|| LazySimulationError::SelectedFactoryMissing(decision.selected.clone()))?;
         let descriptor = factory.descriptor();
+        validate_executable_payload_binding(
+            factory.as_ref(),
+            descriptor,
+            selected_admission,
+            &decision.selected,
+        )?;
         let backend = factory
             .create()
             .map_err(|source| LazySimulationError::BackendConstruction {
@@ -312,6 +336,31 @@ fn selected_admission<'a>(
         ));
     }
     Ok(admission)
+}
+
+fn validate_executable_payload_binding(
+    factory: &dyn SimulationBackendFactory,
+    descriptor: &SimulationProviderDescriptor,
+    admission: &ActiveAdmission,
+    extension: &ExtensionId,
+) -> Result<(), LazySimulationError> {
+    let executable = factory.executable_payload_sha256();
+    if descriptor.manifest.runtime == RuntimeKind::Wasm && executable.is_none() {
+        return Err(LazySimulationError::MissingExecutablePayloadDigest(
+            extension.clone(),
+        ));
+    }
+    if let Some(executable) = executable {
+        let admitted = admission.payload_sha256();
+        if executable != admitted {
+            return Err(LazySimulationError::ExecutablePayloadMismatch {
+                extension: extension.clone(),
+                admitted,
+                executable,
+            });
+        }
+    }
+    Ok(())
 }
 
 fn recheck_selected(
@@ -421,10 +470,14 @@ mod tests {
         count: Arc<AtomicUsize>,
         backend_name: &'static str,
         backend_solvers: Option<Vec<SolverKind>>,
+        executable_payload_sha256: Option<Sha256Digest>,
     }
 
     impl SimulationBackendFactory for CountingFactory {
         fn descriptor(&self) -> &SimulationProviderDescriptor { &self.descriptor }
+        fn executable_payload_sha256(&self) -> Option<Sha256Digest> {
+            self.executable_payload_sha256
+        }
         fn create(&self) -> Result<Box<dyn SimulationBackend>, SimulationError> {
             self.count.fetch_add(1, AtomicOrdering::SeqCst);
             Ok(Box::new(MockBackend {
@@ -461,7 +514,13 @@ mod tests {
     }
 
     fn factory(desc: SimulationProviderDescriptor, count: Arc<AtomicUsize>, name: &'static str) -> CountingFactory {
-        CountingFactory { descriptor: desc, count, backend_name: name, backend_solvers: None }
+        CountingFactory {
+            descriptor: desc,
+            count,
+            backend_name: name,
+            backend_solvers: None,
+            executable_payload_sha256: None,
+        }
     }
 
     fn observation(id: &str, evidence: u8, reliability: u16) -> ProviderObservation {
@@ -610,6 +669,89 @@ mod tests {
     }
 
     #[test]
+    fn wasm_factory_requires_an_executable_payload_digest() {
+        let solver = SolverKind::Custom;
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut desc = descriptor("org.example.wasm-missing", "wasm-missing", solver);
+        desc.manifest.runtime = RuntimeKind::Wasm;
+        let mut registry = LazySimulationRegistry::new();
+        registry.register(factory(desc, count.clone(), "wasm-missing")).unwrap();
+        registry.set_observation(observation("org.example.wasm-missing", 5, 10_000)).unwrap();
+        let admissions = vec![active_admission(&registry, "org.example.wasm-missing", 3, 60)];
+        let request = SimulationRequest::new("wasm-missing-digest", EngineeringDomain::Systems, solver, "test");
+        let source = currentness(3, 60);
+        let err = registry.run(
+            &request,
+            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
+            &admissions,
+            &source,
+        ).unwrap_err();
+        assert!(matches!(
+            err,
+            LazySimulationError::MissingExecutablePayloadDigest(extension)
+                if extension == ExtensionId::new("org.example.wasm-missing")
+        ));
+        assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[test]
+    fn wasm_factory_payload_digest_must_match_selected_admission() {
+        let solver = SolverKind::Custom;
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut desc = descriptor("org.example.wasm-mismatch", "wasm-mismatch", solver);
+        desc.manifest.runtime = RuntimeKind::Wasm;
+        let mut registry = LazySimulationRegistry::new();
+        registry.register(CountingFactory {
+            descriptor: desc,
+            count: count.clone(),
+            backend_name: "wasm-mismatch",
+            backend_solvers: None,
+            executable_payload_sha256: Some(digest(99)),
+        }).unwrap();
+        registry.set_observation(observation("org.example.wasm-mismatch", 5, 10_000)).unwrap();
+        let admissions = vec![active_admission(&registry, "org.example.wasm-mismatch", 4, 70)];
+        let request = SimulationRequest::new("wasm-mismatch-digest", EngineeringDomain::Systems, solver, "test");
+        let source = currentness(4, 70);
+        let err = registry.run(
+            &request,
+            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
+            &admissions,
+            &source,
+        ).unwrap_err();
+        assert!(matches!(err, LazySimulationError::ExecutablePayloadMismatch { .. }));
+        assert_eq!(count.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[test]
+    fn wasm_factory_exact_payload_digest_is_allowed() {
+        let solver = SolverKind::Custom;
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut desc = descriptor("org.example.wasm-exact", "wasm-exact", solver);
+        desc.manifest.runtime = RuntimeKind::Wasm;
+        let mut registry = LazySimulationRegistry::new();
+        registry.register(CountingFactory {
+            descriptor: desc,
+            count: count.clone(),
+            backend_name: "wasm-exact",
+            backend_solvers: None,
+            executable_payload_sha256: Some(digest(81)),
+        }).unwrap();
+        registry.set_observation(observation("org.example.wasm-exact", 5, 10_000)).unwrap();
+        let admissions = vec![active_admission(&registry, "org.example.wasm-exact", 5, 80)];
+        let request = SimulationRequest::new("wasm-exact-digest", EngineeringDomain::Systems, solver, "test");
+        let source = currentness(5, 80);
+        let (result, decision) = registry.run(
+            &request,
+            RoutingConstraints { maximum_effect: EffectClass::Pure, minimum_trust: TrustLevel::Trusted, ..RoutingConstraints::default() },
+            &admissions,
+            &source,
+        ).unwrap();
+        assert_eq!(decision.selected, ExtensionId::new("org.example.wasm-exact"));
+        assert_eq!(result.evidence.backend.as_deref(), Some("wasm-exact"));
+        assert_eq!(count.load(AtomicOrdering::SeqCst), 1);
+    }
+
+    #[test]
     fn backend_must_match_cheap_descriptor() {
         let solver = SolverKind::Circuit;
         let count = Arc::new(AtomicUsize::new(0));
@@ -639,6 +781,7 @@ mod tests {
             count,
             backend_name: "structure",
             backend_solvers: Some(vec![SolverKind::Circuit]),
+            executable_payload_sha256: None,
         }).unwrap();
         registry.set_observation(observation("org.example.structure", 5, 10_000)).unwrap();
         let admissions = vec![active_admission(&registry, "org.example.structure", 1, 40)];
