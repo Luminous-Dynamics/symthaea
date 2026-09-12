@@ -8,4 +8,5 @@
 
 pub mod autopoietic_consciousness;
 pub mod embodied_cognition;
+pub mod external_contingency;
 pub mod interoception;
