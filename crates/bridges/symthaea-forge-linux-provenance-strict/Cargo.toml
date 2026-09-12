@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-forge-linux-provenance-strict"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Strict Nix provenance gate for Symthaea Forge Bubblewrap isolation"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge-linux-provenance = { path = "../symthaea-forge-linux-provenance" }
+serde = { workspace = true }
+thiserror = { workspace = true }

@@ -14,6 +14,7 @@ on:
       - 'crates/bridges/symthaea-forge-overlay-evidence/**'
       - 'crates/bridges/symthaea-forge-linux-isolation/**'
       - 'crates/bridges/symthaea-forge-linux-provenance/**'
+      - 'crates/bridges/symthaea-forge-linux-provenance-strict/**'
       - 'crates/bridges/symthaea-forge-linux-kernel-attestation/**'
       - 'crates/bridges/symthaea-forge-linux-observed-exec/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
@@ -31,6 +32,7 @@ on:
       - 'crates/bridges/symthaea-forge-overlay-evidence/**'
       - 'crates/bridges/symthaea-forge-linux-isolation/**'
       - 'crates/bridges/symthaea-forge-linux-provenance/**'
+      - 'crates/bridges/symthaea-forge-linux-provenance-strict/**'
       - 'crates/bridges/symthaea-forge-linux-kernel-attestation/**'
       - 'crates/bridges/symthaea-forge-linux-observed-exec/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
@@ -73,6 +75,9 @@ jobs:
       - name: Test Bubblewrap Nix provenance bridge
         run: cargo test -p symthaea-forge-linux-provenance --all-targets -- --test-threads=1
 
+      - name: Test strict Bubblewrap Nix provenance gate
+        run: cargo test -p symthaea-forge-linux-provenance-strict --all-targets -- --test-threads=1
+
       - name: Test parent-side kernel attestation bridge
         run: cargo test -p symthaea-forge-linux-kernel-attestation --all-targets -- --test-threads=1
 
@@ -105,6 +110,7 @@ jobs:
           -p symthaea-forge
           -p symthaea-forge-linux-isolation
           -p symthaea-forge-linux-provenance
+          -p symthaea-forge-linux-provenance-strict
           -p symthaea-forge-linux-kernel-attestation
           -p symthaea-forge-linux-observed-exec
           -p symthaea-algorithm-egraph-bridge
