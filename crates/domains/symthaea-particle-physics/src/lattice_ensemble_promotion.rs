@@ -96,6 +96,7 @@ pub struct EnsembleScalePromotionAssessment {
 pub enum EnsembleScalePromotionError {
     WrongResamplingMethod,
     InvalidScaleEvidenceGeometry,
+    InvalidScaleEvidenceStatistic,
     WrongBlockStabilityAssessment,
     InvalidBlockStabilityRecord,
     EmptyBlockStabilityEvidenceId,
@@ -133,6 +134,25 @@ fn require_nonempty(
     } else {
         Ok(())
     }
+}
+
+fn approximately_equal(left: f64, right: f64) -> bool {
+    let tolerance = 1.0e-12 * (1.0 + left.abs().max(right.abs()));
+    (left - right).abs() <= tolerance
+}
+
+fn recompute_jackknife_summary(replicates: &[f64]) -> Option<(f64, f64)> {
+    if replicates.len() < 2 || replicates.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+    let mean = replicates.iter().sum::<f64>() / replicates.len() as f64;
+    let square_sum = replicates
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>();
+    let variance = (replicates.len() - 1) as f64 / replicates.len() as f64 * square_sum;
+    let standard_error = variance.sqrt();
+    (mean.is_finite() && standard_error.is_finite()).then_some((mean, standard_error))
 }
 
 fn validate_policy(
@@ -204,24 +224,61 @@ fn validate_scale_subject(
     if scale.scale.ensemble_manifest_digest.trim().is_empty() {
         return Err(EnsembleScalePromotionError::EmptyEnsembleManifestDigest);
     }
+    if !scale.scale.estimate.is_finite()
+        || !scale.scale.standard_error.is_finite()
+        || scale.scale.standard_error < 0.0
+        || !scale.replicate_mean.is_finite()
+    {
+        return Err(EnsembleScalePromotionError::InvalidScaleEvidenceStatistic);
+    }
+    let (mean, standard_error) = recompute_jackknife_summary(&scale.replicate_estimates)
+        .ok_or(EnsembleScalePromotionError::InvalidScaleEvidenceStatistic)?;
+    if !approximately_equal(mean, scale.replicate_mean)
+        || !approximately_equal(standard_error, scale.scale.standard_error)
+    {
+        return Err(EnsembleScalePromotionError::InvalidScaleEvidenceStatistic);
+    }
     Ok(())
 }
 
 fn validate_block_stability(
     stability: &FlowScaleBlockStabilityAssessment,
 ) -> Result<(), EnsembleScalePromotionError> {
-    let consistent = stability.assessment_id == FLOW_SCALE_BLOCK_STABILITY_ID
-        && stability.plateau_point_count >= 2
-        && stability.meets_declared_policy
-            == (stability.enough_admissible_points
-                && stability.meets_uncertainty_plateau
-                && stability.meets_central_estimate_stability)
-        && (!stability.enough_admissible_points
-            || stability.plateau_block_sizes.len() == stability.plateau_point_count);
     if stability.assessment_id != FLOW_SCALE_BLOCK_STABILITY_ID {
         return Err(EnsembleScalePromotionError::WrongBlockStabilityAssessment);
     }
-    if !consistent {
+    if stability.plateau_point_count < 2
+        || !stability.maximum_relative_standard_error_change.is_finite()
+        || stability.maximum_relative_standard_error_change < 0.0
+        || !stability.maximum_relative_central_estimate_change.is_finite()
+        || stability.maximum_relative_central_estimate_change < 0.0
+    {
+        return Err(EnsembleScalePromotionError::InvalidBlockStabilityRecord);
+    }
+    let expected_uncertainty = stability.enough_admissible_points
+        && stability.maximum_observed_relative_standard_error_change.is_some_and(|change| {
+            change <= stability.maximum_relative_standard_error_change
+        });
+    let expected_central = stability.enough_admissible_points
+        && stability.maximum_observed_relative_central_estimate_change.is_some_and(|change| {
+            change <= stability.maximum_relative_central_estimate_change
+        });
+    let expected_overall = expected_uncertainty && expected_central;
+    let plateau_shape_valid = if stability.enough_admissible_points {
+        stability.plateau_block_sizes.len() == stability.plateau_point_count
+    } else {
+        stability.plateau_block_sizes.len() == stability.admissible_block_sizes.len()
+    };
+    let plateau_is_subset = stability
+        .plateau_block_sizes
+        .iter()
+        .all(|block| stability.admissible_block_sizes.contains(block));
+    if stability.meets_uncertainty_plateau != expected_uncertainty
+        || stability.meets_central_estimate_stability != expected_central
+        || stability.meets_declared_policy != expected_overall
+        || !plateau_shape_valid
+        || !plateau_is_subset
+    {
         return Err(EnsembleScalePromotionError::InvalidBlockStabilityRecord);
     }
     Ok(())
@@ -422,7 +479,7 @@ mod tests {
                 kind: FlowScaleKind::T0Like,
                 target: 0.30,
                 estimate: 0.35,
-                standard_error: 0.01,
+                standard_error: 0.013_693_063_937_629_136,
                 energy_operator_id: "symthaea_clover_energy_v1".into(),
                 flow_implementation_id: "wilson_action_staple_rk3_v1".into(),
                 flow_step_size: 0.001,
@@ -450,7 +507,7 @@ mod tests {
             maximum_relative_central_estimate_change: 0.01,
             admissible_block_sizes: vec![4, 6, 8],
             plateau_block_sizes: vec![4, 6, 8],
-            maximum_observed_relative_standard_error_change: Some(0.1),
+            maximum_observed_relative_standard_error_change: Some(if pass { 0.1 } else { 0.3 }),
             maximum_observed_relative_central_estimate_change: Some(0.0),
             enough_admissible_points: true,
             meets_uncertainty_plateau: pass,
@@ -556,6 +613,7 @@ mod tests {
         ];
         let mut block = stability(true);
         block.plateau_block_sizes = vec![4, 8, 12];
+        block.admissible_block_sizes = vec![4, 8, 12];
         let assessment = assess_ensemble_scale_promotion(
             &scale(), &block, "block-stability-evidence", &evidence, &topology(), &policy(),
         ).unwrap();
@@ -576,6 +634,22 @@ mod tests {
                 &scale(), &stability(true), "block-stability-evidence", &evidence, &topology(), &policy(),
             ),
             Err(EnsembleScalePromotionError::ObservablePopulationMismatch { index: 0 })
+        ));
+    }
+
+    #[test]
+    fn forged_scale_summary_fails_closed() {
+        let evidence = [
+            observable("plaquette", 0.2, 1.01, 150.0),
+            observable("flow-energy", 0.3, 1.02, 120.0),
+        ];
+        let mut forged = scale();
+        forged.scale.standard_error *= 2.0;
+        assert!(matches!(
+            assess_ensemble_scale_promotion(
+                &forged, &stability(true), "block-stability-evidence", &evidence, &topology(), &policy(),
+            ),
+            Err(EnsembleScalePromotionError::InvalidScaleEvidenceStatistic)
         ));
     }
 }
