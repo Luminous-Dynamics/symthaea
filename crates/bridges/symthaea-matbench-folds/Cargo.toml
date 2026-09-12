@@ -9,5 +9,6 @@ description = "Published-procedure Matbench v0.1 positional folds and leakage-ma
 symthaea-bandgap = { path = "../../domains/symthaea-bandgap" }
 symthaea-matbench-gap = { path = "../symthaea-matbench-gap" }
 symthaea-energy-benchmark-zero = { path = "../../domains/symthaea-energy-benchmark-zero" }
+serde_json = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
