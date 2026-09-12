@@ -86,6 +86,7 @@ pub enum EpisodeContentIdError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_memory::episodic_replay::{EpisodicMemory, EpisodicReplayConfig};
 
     fn episode(seed: f32) -> Episode {
         Episode::with_metadata(
@@ -113,6 +114,26 @@ mod tests {
         episode.reconsolidate(0.95);
 
         assert_eq!(before, episode_content_id(&episode).unwrap());
+    }
+
+    #[test]
+    fn storage_occurrence_identity_does_not_change_content_identity() {
+        let source = episode(1.5);
+        let before = episode_content_id(&source).unwrap();
+        assert!(source.instance_id.is_none());
+
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig::broad_capture());
+        let instance_id = memory
+            .store_if_significant_with_id(source)
+            .expect("episode should be stored");
+        let (_, stored) = memory
+            .get_top_episode_instances(1)
+            .into_iter()
+            .next()
+            .expect("stored episode should be visible");
+
+        assert_eq!(stored.instance_id, Some(instance_id));
+        assert_eq!(before, episode_content_id(&stored).unwrap());
     }
 
     #[test]
