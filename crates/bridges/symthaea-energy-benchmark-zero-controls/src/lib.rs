@@ -4,8 +4,9 @@
 //!
 //! This crate compares the fixed composition-only physics baseline to a frozen
 //! ensemble of deterministic SHA-256 candidate permutations. Blind rankings use
-//! candidate identity only: no composition, predicted property, target, or truth
-//! value enters ranking construction.
+//! candidate identity only. In this benchmark those ids are composition-derived,
+//! but the control treats them as opaque bytes and never parses element/fraction
+//! structure, predicted property, target, or truth into ranking construction.
 //!
 //! The resulting fractions are deterministic reference-ensemble comparisons,
 //! not p-values, confidence levels, or claims that SHA-256 replicates are
@@ -35,7 +36,7 @@ pub const BLIND_CONTROL_METHOD_VERSION: &str =
 pub const BLIND_CONTROL_REPLICATES: u16 = 256;
 
 pub const BLIND_CONTROL_DISCLOSURE: &str =
-    "The control ensemble is a fixed deterministic set of SHA-256 permutations over candidate ids. Ranking receives no composition, target, prediction, or truth value. Fractions against the 256 controls are descriptive reference-ensemble comparisons, not p-values, confidence intervals, or proof of random/independent sampling.";
+    "The control ensemble is a fixed deterministic set of SHA-256 permutations over candidate ids. Those ids are composition-derived in this benchmark, but the control treats each id as an opaque byte string and extracts no parsed composition or material-property features. Ranking receives no target, prediction, or truth value. Fractions against the 256 controls are descriptive reference-ensemble comparisons, not p-values, confidence intervals, or proof of random/independent sampling.";
 
 pub const PLAN_CHRONOLOGY_DISCLOSURE: &str =
     "The benchmark-plan SHA-256 is a content identity, not proof that the plan existed before results were observed. A chronology claim requires a separately immutable/timestamped registration evidence reference created before execution.";
@@ -600,7 +601,7 @@ mod tests {
 
     #[test]
     fn control_is_ranking_only_and_does_not_claim_significance() {
-        assert!(BLIND_CONTROL_DISCLOSURE.contains("no composition"));
+        assert!(BLIND_CONTROL_DISCLOSURE.contains("opaque byte string"));
         assert!(BLIND_CONTROL_DISCLOSURE.contains("not p-values"));
     }
 
