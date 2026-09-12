@@ -29,7 +29,7 @@ Analysis
 
 That changes both accepted-requirement and proof-obligation content identities. A legacy requirement that explicitly requests `Simulation` must not be silently satisfied by a native calculation.
 
-Production prerequisite: add a first-class formal-safety analytical evidence variant in a separately reviewable compatibility change, then update the accepted-requirement/evidence-plan canonicalizers to recognize it. Do not reinterpret old `Simulation` revisions in place.
+Production prerequisite: #2001 adds a first-class formal-safety `Analysis` variant without changing existing templates. Accepted-requirement/evidence-plan canonicalizers must recognize that variant before production analytical parity is claimed. Old `Simulation` revisions must not be reinterpreted in place.
 
 ## Canary method
 
@@ -93,7 +93,9 @@ is neither an input to authority nor sufficient for admission.
 
 ## Present-tense applicability
 
-The historical receipt binds one exact admitted analytical evidence identity, plan, and obligation revision. A current analytical-discharge fact can be minted only for the exact current plan. A currentness refresh changes the plan and makes the old receipt historical.
+The historical receipt binds one exact admitted analytical evidence identity, plan, and obligation revision. A current analytical-discharge fact can be minted only for the exact current plan.
+
+The stale-receipt adversarial case now derives **both** currentness identities from the same `symthaea.etk-currentness-assertion.v1` schema over the same twin and validity-domain revisions, changing only the attestation digest. Thus the negative theorem compares two structurally valid currentness assertions rather than a valid identity against arbitrary hash-shaped text.
 
 ## Frozen reference vectors
 
@@ -135,20 +137,26 @@ The checked-in self-test fails closed on:
 - a model-error bound exceeding policy;
 - inconsistent reported factor of safety vs yield/stress;
 - malformed execution-artifact digest;
-- currentness refresh attempting to reuse a historical receipt.
+- a schema-derived currentness refresh attempting to reuse a historical receipt.
 
-It also freezes signed-zero Canonical Binary64 normalization.
+It also freezes signed-zero Canonical Binary64 normalization and verifies the baseline currentness vector against the previously frozen ETK context identity.
 
 ## Exact-byte reference execution evidence
 
-The checked-in `scripts/etk-native-analytical-evidence-oracle.py` bytes were executed locally after accounting for the repository file's no-final-newline representation:
+The current checked-in `scripts/etk-native-analytical-evidence-oracle.py` bytes are Git blob:
+
+```text
+bcf57fd9afbaf91b93130456af30358a04e49a08
+```
+
+The exact no-final-newline bytes corresponding to that blob were executed locally:
 
 ```text
 --self-test              PASS
 python3 -m py_compile    PASS
-raw SHA-256              68351dc9133a942fbe3210a51af39562656bd1b7e94d1b1b64f48b84f1602034
-Git blob SHA-1           4214dad1bd63694220aaf535c569bf57dc9bf6af
-checked-in Git blob      4214dad1bd63694220aaf535c569bf57dc9bf6af
+raw SHA-256              b2a4fc2f71e47988a37c4c6bea74e68a7257d9d1f898b541b087ece3f604347c
+Git blob SHA-1           bcf57fd9afbaf91b93130456af30358a04e49a08
+checked-in Git blob      bcf57fd9afbaf91b93130456af30358a04e49a08
 ```
 
 This establishes execution of the exact reference bytes only. It does not establish production Rust parity, physical truth, model qualification, or evidence authentication.
@@ -158,7 +166,8 @@ This establishes execution of the exact reference bytes only. It does not establ
 The recommended migration order is:
 
 ```text
-first-class Analysis evidence class
+first-class Analysis evidence class (#2001)
+    -> accepted-requirement canonicalizer support
     -> typed analytical method/input/policy/plan
     -> native result candidate
     -> analytical admission capability
