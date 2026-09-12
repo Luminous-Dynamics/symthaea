@@ -24,6 +24,10 @@
 //!   complete per-configuration trajectories, preserving cross-flow covariance
 //! - **Block adequacy evidence**: explicit autocorrelation coverage and
 //!   caller-declared tau/block-count policy for the resampling geometry
+//! - **Scale stability evidence**: recomputation across several adequate block
+//!   sizes with caller-declared uncertainty-plateau tolerances
+//! - **Ensemble promotion evidence**: explicit composition of block stability,
+//!   burn-in sensitivity, rank/folded R-hat, ESS and topology diagnostics
 //! - **Scale evidence**: same-ensemble flow curves whose derived uncertainty
 //!   must bind joint resampling across the correlated flow-time trajectory
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
@@ -47,11 +51,13 @@ pub mod cross_sections;
 pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
+pub mod lattice_ensemble_promotion;
 pub mod lattice_flow_block_adequacy;
 pub mod lattice_flow_energy;
 pub mod lattice_flow_joint_evidence;
 pub mod lattice_flow_joint_jackknife;
 pub mod lattice_flow_scale_evidence;
+pub mod lattice_flow_scale_stability;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
 mod lattice_su3_lie;
@@ -71,6 +77,11 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use lattice_ensemble_promotion::{
+    ENSEMBLE_SCALE_PROMOTION_ASSESSMENT_ID, EnsembleScalePromotionAssessment,
+    EnsembleScalePromotionError, EnsembleScalePromotionPolicy, ObservableEquilibriumEvidence,
+    TopologyPromotionEvidence, assess_ensemble_scale_promotion,
 };
 pub use lattice_flow_block_adequacy::{
     FLOW_BLOCK_ADEQUACY_POLICY_ID, AutocorrelationEvidence, BlockAdequacyAssessment,
@@ -94,6 +105,11 @@ pub use lattice_flow_joint_jackknife::{
 pub use lattice_flow_scale_evidence::{
     FlowEnergyEvidenceCurve, FlowEnergyEvidencePoint, FlowScaleEstimateEvidence,
     FlowScaleEvidenceError, FlowScaleKind, bind_flow_scale_estimate,
+};
+pub use lattice_flow_scale_stability::{
+    FLOW_SCALE_BLOCK_STABILITY_ID, FlowScaleBlockScan, FlowScaleBlockStabilityAssessment,
+    FlowScaleBlockStabilityError, FlowScaleBlockStabilityPolicy,
+    assess_flow_scale_block_stability, joint_jackknife_block_size_scan,
 };
 pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
