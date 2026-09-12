@@ -77,6 +77,13 @@ impl StrictBubblewrapNixProvenanceBindingV2 {
         receipt: &BubblewrapNixProvenanceReceipt,
     ) -> Result<Self, StrictNixProvenanceError> {
         receipt.validate_for(policy)?;
+        if receipt.bubblewrap_semantic_correctness()
+            != SemanticCorrectnessStatus::NotEstablishedV1
+            || receipt.nix_tool_semantic_correctness()
+                != SemanticCorrectnessStatus::NotEstablishedV1
+        {
+            return Err(StrictNixProvenanceError::ScopeMismatch);
+        }
         require_success("nix --version", receipt.nix_version())?;
         require_success("nix-store --version", receipt.nix_store_version())?;
         require_success("nix store verify", receipt.store_verify())?;
