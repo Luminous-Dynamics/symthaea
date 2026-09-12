@@ -15,5 +15,6 @@ pub use permit::*;
 
 pub mod authority_evidence_binding;
 pub mod evidence_context;
+pub mod execution_recovery;
 #[path = "replay_recovery_v2.rs"]
 pub mod replay_recovery;
