@@ -1,0 +1,45 @@
+{
+  "schema_version": "ll009r.spatial-support-policy.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "requested_claim_class": "continuous_hard_bound",
+  "layers": [
+    {
+      "layer_id": "site01-near-5m",
+      "support_class": "sample_points_only",
+      "evidence_basis": "NASA PGDA product 78 provides a nominal 5 m raster but states that roughly 90% of the polar LDEM pixels are interpolated. LL-009Q can quantify the published clone ensemble at raster support points, but neither nominal 5 m spacing nor the clone ensemble is a theorem that continuous terrain between support points is bounded."
+    },
+    {
+      "layer_id": "south-pole-far-80m",
+      "support_class": "resolution_qualified",
+      "evidence_basis": "NASA PGDA product 90 provides an 80 m elevation COG and a colocated effective-resolution raster. Effective-resolution evidence can qualify which samples are admitted, but it is not by itself a deterministic upper bound on unresolved terrain between samples."
+    }
+  ],
+  "expected_result_before_further_closure": {
+    "continuous_hard_bound": "blocked",
+    "risk_qualified_horizon": "blocked while any admitted layer is sample_points_only or unknown",
+    "empirical_sampled_horizon": "allowed only with explicit sample-support disclosure and no unknown layer",
+    "descriptive_only": "allowed with explicit per-layer support classes"
+  },
+  "nested_resolution_policy": {
+    "purpose": "Measure observed positive skyline excursions that appear in finer exact terrain but are absent from a coarser exact terrain layer over the same configured overlap.",
+    "upgrade_ceiling": "empirical_multiscale_bound",
+    "never_implies": [
+      "continuous_hard_bound",
+      "unresolved_peak_impossibility",
+      "distributional_tail_bound"
+    ]
+  },
+  "candidate_follow_on_evidence": [
+    "Exact nested 5 m/20 m/40 m/80 m elevation comparisons where coverage overlaps",
+    "PGDA effective-resolution maps as admission/qualification evidence",
+    "PGDA multi-baseline RMSD/roughness/Hurst products as empirical spatial-structure evidence after source-methodology review",
+    "A source-supported deterministic gradient/Lipschitz theorem, if one can actually be established",
+    "Independent higher-resolution terrain such as validated SfS products where licensing/provenance permits evidence use"
+  ],
+  "non_claims": [
+    "Nominal pixel spacing is not a continuous-terrain upper bound.",
+    "Effective resolution is not relabeled as a Lipschitz or interpolation theorem.",
+    "Sampled slope, RMS roughness and Hurst exponent are not deterministic local gradient bounds unless their source methodology explicitly supports that interpretation.",
+    "Spatial-support semantics are independent of LL-009O/Q vertical-error and ensemble uncertainty semantics."
+  ]
+}
