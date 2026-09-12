@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use symthaea_assurance_trust_store::{
     TrustStoreBackup, TrustStoreCheckpoint, TrustStoreProfile, TrustStoreRecoveryAuthorization,
-    TrustStoreRecoveryReport, TrustStoreRecoveryStatus,
+    TrustStoreRecoveryStatus, assess_recovery,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -21,6 +21,7 @@ pub struct TrustStoreRecoveryCommit {
     pub replacement_trust_store_ref: String,
     pub replacement_counter_epoch: String,
     pub first_counter_value: u64,
+    pub restored_anchor_revision: u64,
     pub restored_anchor_digest: String,
     pub restored_policy_tip_revision: u64,
     pub replacement_attestation_ref: String,
@@ -40,6 +41,7 @@ impl TrustStoreRecoveryCommit {
             && !self.replacement_trust_store_ref.trim().is_empty()
             && !self.replacement_counter_epoch.trim().is_empty()
             && self.first_counter_value > 0
+            && self.restored_anchor_revision > 0
             && valid_digest(&self.restored_anchor_digest)
             && self.restored_policy_tip_revision > 0
             && !self.replacement_attestation_ref.trim().is_empty()
@@ -74,16 +76,17 @@ pub enum TrustStoreContinuityIssue {
     PreviousCheckpointMismatch,
     BackupMismatch,
     RestoredAnchorMismatch,
-    RestoredPolicyRevisionRollback,
+    RestoredPolicyRevisionMismatch,
     RecoveryCommittedBeforeAuthorization,
     RecoveryCommittedAfterAuthorizationExpiry,
+    RecoveryCommitIsFutureDated,
     FirstReplacementCheckpointInvalid,
     FirstReplacementCheckpointRevisionMismatch,
     FirstReplacementCheckpointPredecessorMismatch,
     FirstReplacementCheckpointEpochMismatch,
-    FirstReplacementCheckpointCounterBelowCommit,
+    FirstReplacementCheckpointCounterMismatch,
     FirstReplacementCheckpointAnchorMismatch,
-    FirstReplacementCheckpointPolicyRollback,
+    FirstReplacementCheckpointPolicyMismatch,
     FirstReplacementCheckpointPredatesCommit,
 }
 
@@ -93,6 +96,7 @@ pub struct TrustStoreContinuityReport {
     pub previous_checkpoint_digest: String,
     pub replacement_store_ref: String,
     pub replacement_counter_epoch: String,
+    pub restored_anchor_revision: u64,
     pub restored_anchor_digest: String,
     pub restored_policy_tip_revision: u64,
     pub issues: Vec<TrustStoreContinuityIssue>,
@@ -104,34 +108,49 @@ impl TrustStoreContinuityReport {
     }
 }
 
-/// Verify that an eligible recovery was actually completed by a replacement
-/// trust store without rolling back the accepted anchor/policy state.
+/// Verify that an authorized recovery was actually completed by a replacement
+/// trust store without changing or rolling back the last accepted anchor/policy
+/// state.
 ///
-/// `first_replacement_checkpoint` is the first checkpoint recorded after the
-/// replacement. Its logical store revision continues from the old segment while
-/// its counter epoch changes to the explicitly authorized replacement epoch.
+/// Recovery eligibility is recomputed at the recorded recovery-commit time. A
+/// caller-supplied `Eligible` flag is therefore never accepted as authority.
+/// The first replacement checkpoint must represent the exact restored state;
+/// subsequent policy advancement belongs in later checkpoints.
 pub fn assess_recovery_continuity(
     previous_profile: &TrustStoreProfile,
     replacement_profile: &TrustStoreProfile,
     previous_tip: &TrustStoreCheckpoint,
     backup: &TrustStoreBackup,
     authorization: &TrustStoreRecoveryAuthorization,
-    recovery_report: &TrustStoreRecoveryReport,
     commit: &TrustStoreRecoveryCommit,
     first_replacement_checkpoint: &TrustStoreCheckpoint,
     now_ms: u64,
 ) -> TrustStoreContinuityReport {
     let mut issues = Vec::new();
 
-    if recovery_report.status != TrustStoreRecoveryStatus::Eligible || !recovery_report.issues.is_empty() {
-        issues.push(TrustStoreContinuityIssue::RecoveryWasNotEligible);
-    }
     if !previous_profile.validate() {
         issues.push(TrustStoreContinuityIssue::InvalidPreviousProfile);
     }
     if !replacement_profile.validate() {
         issues.push(TrustStoreContinuityIssue::InvalidReplacementProfile);
     }
+    if !commit.validate() {
+        issues.push(TrustStoreContinuityIssue::InvalidRecoveryCommit);
+    }
+
+    let recomputed_recovery = assess_recovery(
+        previous_profile,
+        previous_tip,
+        backup,
+        authorization,
+        commit.committed_at_ms,
+    );
+    if recomputed_recovery.status != TrustStoreRecoveryStatus::Eligible
+        || !recomputed_recovery.issues.is_empty()
+    {
+        issues.push(TrustStoreContinuityIssue::RecoveryWasNotEligible);
+    }
+
     if previous_profile.store_id != replacement_profile.store_id
         || commit.logical_store_id != previous_profile.store_id
     {
@@ -150,39 +169,38 @@ pub fn assess_recovery_continuity(
     if replacement_profile.trust_store_ref == previous_profile.trust_store_ref {
         issues.push(TrustStoreContinuityIssue::ReplacementProfileDidNotChangeStore);
     }
-    if !commit.validate() {
-        issues.push(TrustStoreContinuityIssue::InvalidRecoveryCommit);
-    }
     if commit.authorization_id != authorization.authorization_id {
         issues.push(TrustStoreContinuityIssue::AuthorizationMismatch);
     }
 
     let previous_digest = previous_tip.checkpoint_digest();
     let backup_digest = backup.backup_digest();
-    if commit.previous_checkpoint_digest != previous_digest
-        || recovery_report.previous_checkpoint_digest != previous_digest
-    {
+    if commit.previous_checkpoint_digest != previous_digest {
         issues.push(TrustStoreContinuityIssue::PreviousCheckpointMismatch);
     }
-    if commit.backup_digest != backup_digest || recovery_report.backup_digest != backup_digest {
+    if commit.backup_digest != backup_digest {
         issues.push(TrustStoreContinuityIssue::BackupMismatch);
     }
-    if commit.restored_anchor_digest != previous_tip.anchor_digest
+    if commit.restored_anchor_revision != previous_tip.anchor_revision
+        || commit.restored_anchor_digest != previous_tip.anchor_digest
         || commit.restored_anchor_digest != backup.anchor_digest
     {
         issues.push(TrustStoreContinuityIssue::RestoredAnchorMismatch);
     }
-    if commit.restored_policy_tip_revision < previous_tip.policy_tip_revision
-        || commit.restored_policy_tip_revision < backup.policy_tip_revision
+    if commit.restored_policy_tip_revision != previous_tip.policy_tip_revision
+        || commit.restored_policy_tip_revision != backup.policy_tip_revision
         || commit.restored_policy_tip_revision < authorization.minimum_policy_tip_revision
     {
-        issues.push(TrustStoreContinuityIssue::RestoredPolicyRevisionRollback);
+        issues.push(TrustStoreContinuityIssue::RestoredPolicyRevisionMismatch);
     }
     if commit.committed_at_ms < authorization.authorized_at_ms {
         issues.push(TrustStoreContinuityIssue::RecoveryCommittedBeforeAuthorization);
     }
-    if commit.committed_at_ms > authorization.expires_at_ms || now_ms < commit.committed_at_ms {
+    if commit.committed_at_ms > authorization.expires_at_ms {
         issues.push(TrustStoreContinuityIssue::RecoveryCommittedAfterAuthorizationExpiry);
+    }
+    if now_ms < commit.committed_at_ms {
+        issues.push(TrustStoreContinuityIssue::RecoveryCommitIsFutureDated);
     }
 
     if !first_replacement_checkpoint.validate(replacement_profile) {
@@ -199,14 +217,16 @@ pub fn assess_recovery_continuity(
     if first_replacement_checkpoint.counter_epoch != authorization.replacement_counter_epoch {
         issues.push(TrustStoreContinuityIssue::FirstReplacementCheckpointEpochMismatch);
     }
-    if first_replacement_checkpoint.counter_value < commit.first_counter_value {
-        issues.push(TrustStoreContinuityIssue::FirstReplacementCheckpointCounterBelowCommit);
+    if first_replacement_checkpoint.counter_value != commit.first_counter_value {
+        issues.push(TrustStoreContinuityIssue::FirstReplacementCheckpointCounterMismatch);
     }
-    if first_replacement_checkpoint.anchor_digest != commit.restored_anchor_digest {
+    if first_replacement_checkpoint.anchor_revision != commit.restored_anchor_revision
+        || first_replacement_checkpoint.anchor_digest != commit.restored_anchor_digest
+    {
         issues.push(TrustStoreContinuityIssue::FirstReplacementCheckpointAnchorMismatch);
     }
-    if first_replacement_checkpoint.policy_tip_revision < commit.restored_policy_tip_revision {
-        issues.push(TrustStoreContinuityIssue::FirstReplacementCheckpointPolicyRollback);
+    if first_replacement_checkpoint.policy_tip_revision != commit.restored_policy_tip_revision {
+        issues.push(TrustStoreContinuityIssue::FirstReplacementCheckpointPolicyMismatch);
     }
     if first_replacement_checkpoint.recorded_at_ms < commit.committed_at_ms {
         issues.push(TrustStoreContinuityIssue::FirstReplacementCheckpointPredatesCommit);
@@ -237,6 +257,7 @@ pub fn assess_recovery_continuity(
         previous_checkpoint_digest: previous_digest,
         replacement_store_ref: replacement_profile.trust_store_ref.clone(),
         replacement_counter_epoch: replacement_profile.initial_counter_epoch.clone(),
+        restored_anchor_revision: commit.restored_anchor_revision,
         restored_anchor_digest: commit.restored_anchor_digest.clone(),
         restored_policy_tip_revision: commit.restored_policy_tip_revision,
         issues,
@@ -253,9 +274,7 @@ fn valid_digest(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_assurance_trust_store::{
-        TrustStoreBackendKind, TrustStoreRecoveryStatus, assess_recovery,
-    };
+    use symthaea_assurance_trust_store::TrustStoreBackendKind;
 
     fn previous_profile() -> TrustStoreProfile {
         TrustStoreProfile {
@@ -345,6 +364,7 @@ mod tests {
             replacement_trust_store_ref: "trust-store:hardware-b".into(),
             replacement_counter_epoch: "epoch:b".into(),
             first_counter_value: 1,
+            restored_anchor_revision: tip.anchor_revision,
             restored_anchor_digest: tip.anchor_digest.clone(),
             restored_policy_tip_revision: tip.policy_tip_revision,
             replacement_attestation_ref: "attestation:new-hardware".into(),
@@ -379,7 +399,6 @@ mod tests {
         TrustStoreCheckpoint,
         TrustStoreBackup,
         TrustStoreRecoveryAuthorization,
-        TrustStoreRecoveryReport,
         TrustStoreRecoveryCommit,
         TrustStoreCheckpoint,
     ) {
@@ -388,23 +407,20 @@ mod tests {
         let tip = previous_tip();
         let backup = backup(&tip);
         let auth = authorization(&tip, &backup);
-        let report = assess_recovery(&old_profile, &tip, &backup, &auth, 4_500);
-        assert_eq!(report.status, TrustStoreRecoveryStatus::Eligible);
         let commit = commit(&tip, &backup);
         let first = first_replacement_checkpoint(&tip);
-        (old_profile, new_profile, tip, backup, auth, report, commit, first)
+        (old_profile, new_profile, tip, backup, auth, commit, first)
     }
 
     #[test]
-    fn reviewed_replacement_preserves_continuity() {
-        let (old_profile, new_profile, tip, backup, auth, report, commit, first) = fixture();
+    fn reviewed_replacement_preserves_exact_continuity() {
+        let (old_profile, new_profile, tip, backup, auth, commit, first) = fixture();
         let continuity = assess_recovery_continuity(
             &old_profile,
             &new_profile,
             &tip,
             &backup,
             &auth,
-            &report,
             &commit,
             &first,
             5_200,
@@ -414,24 +430,38 @@ mod tests {
     }
 
     #[test]
-    fn restored_policy_state_cannot_roll_back() {
-        let (old_profile, new_profile, tip, backup, auth, report, mut commit, first) = fixture();
+    fn restored_policy_state_must_match_exact_pre_loss_tip() {
+        let (old_profile, new_profile, tip, backup, auth, mut commit, first) = fixture();
         commit.restored_policy_tip_revision = 2;
         let continuity = assess_recovery_continuity(
-            &old_profile, &new_profile, &tip, &backup, &auth, &report, &commit, &first, 5_200,
+            &old_profile, &new_profile, &tip, &backup, &auth, &commit, &first, 5_200,
         );
         assert_eq!(continuity.status, TrustStoreContinuityStatus::Blocked);
         assert!(continuity
             .issues
-            .contains(&TrustStoreContinuityIssue::RestoredPolicyRevisionRollback));
+            .contains(&TrustStoreContinuityIssue::RestoredPolicyRevisionMismatch));
+    }
+
+    #[test]
+    fn caller_cannot_forge_eligible_recovery_after_expiry() {
+        let (old_profile, new_profile, tip, backup, mut auth, mut commit, first) = fixture();
+        auth.expires_at_ms = 4_500;
+        commit.committed_at_ms = 5_000;
+        let continuity = assess_recovery_continuity(
+            &old_profile, &new_profile, &tip, &backup, &auth, &commit, &first, 5_200,
+        );
+        assert_eq!(continuity.status, TrustStoreContinuityStatus::Blocked);
+        assert!(continuity
+            .issues
+            .contains(&TrustStoreContinuityIssue::RecoveryWasNotEligible));
     }
 
     #[test]
     fn replacement_checkpoint_must_link_to_exact_old_tip() {
-        let (old_profile, new_profile, tip, backup, auth, report, commit, mut first) = fixture();
+        let (old_profile, new_profile, tip, backup, auth, commit, mut first) = fixture();
         first.predecessor_checkpoint_digest = Some("blake3:other-tip".into());
         let continuity = assess_recovery_continuity(
-            &old_profile, &new_profile, &tip, &backup, &auth, &report, &commit, &first, 5_200,
+            &old_profile, &new_profile, &tip, &backup, &auth, &commit, &first, 5_200,
         );
         assert_eq!(continuity.status, TrustStoreContinuityStatus::Blocked);
         assert!(continuity.issues.contains(
@@ -441,10 +471,10 @@ mod tests {
 
     #[test]
     fn replacement_profile_cannot_substitute_another_store() {
-        let (old_profile, mut new_profile, tip, backup, auth, report, commit, first) = fixture();
+        let (old_profile, mut new_profile, tip, backup, auth, commit, first) = fixture();
         new_profile.trust_store_ref = "trust-store:unreviewed".into();
         let continuity = assess_recovery_continuity(
-            &old_profile, &new_profile, &tip, &backup, &auth, &report, &commit, &first, 5_200,
+            &old_profile, &new_profile, &tip, &backup, &auth, &commit, &first, 5_200,
         );
         assert_eq!(continuity.status, TrustStoreContinuityStatus::Blocked);
         assert!(continuity
@@ -453,18 +483,19 @@ mod tests {
     }
 
     #[test]
-    fn expired_authorization_cannot_be_completed_late() {
-        let (old_profile, new_profile, tip, backup, mut auth, mut report, mut commit, first) = fixture();
-        auth.expires_at_ms = 4_500;
-        report.status = TrustStoreRecoveryStatus::Eligible;
-        report.issues.clear();
-        commit.committed_at_ms = 5_000;
+    fn first_replacement_checkpoint_cannot_skip_restored_state() {
+        let (old_profile, new_profile, tip, backup, auth, commit, mut first) = fixture();
+        first.policy_tip_revision = 4;
+        first.counter_value = 2;
         let continuity = assess_recovery_continuity(
-            &old_profile, &new_profile, &tip, &backup, &auth, &report, &commit, &first, 5_200,
+            &old_profile, &new_profile, &tip, &backup, &auth, &commit, &first, 5_200,
         );
         assert_eq!(continuity.status, TrustStoreContinuityStatus::Blocked);
-        assert!(continuity.issues.contains(
-            &TrustStoreContinuityIssue::RecoveryCommittedAfterAuthorizationExpiry
-        ));
+        assert!(continuity
+            .issues
+            .contains(&TrustStoreContinuityIssue::FirstReplacementCheckpointCounterMismatch));
+        assert!(continuity
+            .issues
+            .contains(&TrustStoreContinuityIssue::FirstReplacementCheckpointPolicyMismatch));
     }
 }
