@@ -320,6 +320,10 @@ pub fn apply_cgroup_v2_resource_policy(
             cleaned: false,
         }),
         Err(error) => {
+            if matches!(error, CgroupV2ResourceError::RollbackFailed) {
+                let _ = fs::remove_dir(&leaf);
+                return Err(CgroupV2ResourceError::RollbackFailed);
+            }
             fs::remove_dir(&leaf).map_err(|source| CgroupV2ResourceError::Io {
                 path: leaf,
                 source,
