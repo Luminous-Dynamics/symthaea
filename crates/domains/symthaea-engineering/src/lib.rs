@@ -357,6 +357,11 @@ impl EngineeringManager {
         }
     }
 
+    /// Execute requested simulations as observations for cognition and memory.
+    ///
+    /// ETK authority boundary: solver convergence is not evidence admission and
+    /// cannot directly discharge proof obligations. Admission/discharge must pass
+    /// through the Engineering Trust Kernel's explicit evidence path.
     pub fn evaluate_concept(&mut self, concept: &mut EngineeringConcept) {
         let encoder = MetricEncoder::new(16384);
         for request in &concept.simulation_requests {
@@ -377,11 +382,6 @@ impl EngineeringManager {
                         self.episodic_memory.store_if_significant(episode);
                     }
                     self.last_sensation = Some(sensation);
-                    for obligation in concept.safety_case.obligations.iter_mut() {
-                        if obligation.expected_evidence == EvidenceKind::Simulation {
-                            obligation.status = formal_safety::ObligationStatus::Discharged;
-                        }
-                    }
                 }
             }
         }
@@ -489,16 +489,14 @@ impl EngineeringManager {
     ///
     /// Despite the name, this does **not** perform formal verification of
     /// the obligation's actual content, and does not invoke a Lean checker
-    /// on the output. `obligation.status` is set to `Discharged` elsewhere
-    /// (`evaluate_concept`, purely from `EvidenceKind::Simulation`
-    /// convergence, not from `EvidenceKind::FormalProof`), so by the time an
-    /// obligation reaches this function it has already been discharged by
-    /// non-formal means. The `goal`/`result` fed to `LeanProofGenerator`
-    /// here are placeholders -- `id implies id` and a hardcoded
-    /// `valid: true` -- used purely to produce a readable rendered artifact
-    /// carrying the obligation's id, not a real proof obligation derived
-    /// from the obligation's content. Do not treat this output as formal
-    /// verification evidence.
+    /// on the output. Legacy explicit `discharge_*_check` helpers elsewhere
+    /// may still set `obligation.status` to `Discharged` from native solver
+    /// results; those paths remain separate ETK migration work. The
+    /// `goal`/`result` fed to `LeanProofGenerator` here are placeholders --
+    /// `id implies id` and a hardcoded `valid: true` -- used purely to produce
+    /// a readable rendered artifact carrying the obligation's id, not a real
+    /// proof obligation derived from the obligation's content. Do not treat
+    /// this output as formal verification evidence.
     pub fn formally_verify(&self, concept: &EngineeringConcept) -> Vec<(String, String)> {
         let mut proofs = Vec::new();
         for obligation in &concept.safety_case.obligations {
