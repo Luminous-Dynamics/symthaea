@@ -45,7 +45,7 @@ impl CheckpointAttestationVerificationReceipt {
             && profile
                 .hardware_instance_ref
                 .as_ref()
-                .is_none_or(|hardware| self.verified_by_ref != *hardware)
+                .is_none_or(|hardware| self.verified_by_ref.as_str() != hardware.as_str())
             && !self.verification_ref.trim().is_empty()
             && self.verified_at_ms >= checkpoint.recorded_at_ms
             && !self.evidence_refs.is_empty()
@@ -93,7 +93,7 @@ impl RecoveryAttestationVerificationReceipt {
             && replacement_profile
                 .hardware_instance_ref
                 .as_ref()
-                .is_none_or(|hardware| self.verified_by_ref != *hardware)
+                .is_none_or(|hardware| self.verified_by_ref.as_str() != hardware.as_str())
             && !self.verification_ref.trim().is_empty()
             && self.verified_at_ms >= commit.committed_at_ms
             && !self.evidence_refs.is_empty()
