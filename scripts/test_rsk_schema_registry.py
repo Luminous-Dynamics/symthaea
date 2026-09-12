@@ -109,8 +109,14 @@ class SchemaRegistryTests(unittest.TestCase):
             2,
             "8386b56b11818273612cc9f15e6c6fa8cd19bbf9aa2c7a3476022d2f7ef0f1e1",
         )
-        self.assertEqual(semantic.validate_capability_schema(capability), capability["schema"] and data["snapshot"]["entries"][0]["schema_id"])
-        self.assertEqual(semantic.require_runtime_bound_resource_schema(resource), data["snapshot"]["entries"][1]["schema_id"])
+        self.assertEqual(
+            semantic.validate_capability_schema(capability),
+            data["snapshot"]["entries"][0]["schema_id"],
+        )
+        self.assertEqual(
+            semantic.require_runtime_bound_resource_schema(resource),
+            data["snapshot"]["entries"][1]["schema_id"],
+        )
         self.assertFalse(hasattr(decision.verified, "grant_replication_authority"))
 
     def test_duplicate_signer_identity_does_not_inflate_quorum(self) -> None:
@@ -138,11 +144,46 @@ class SchemaRegistryTests(unittest.TestCase):
         wrong_digest = [replace(records[0], bound_snapshot_digest="2" * 64), records[1]]
         self.assertEqual(evaluate(data, records=wrong_digest).status, "denied")
 
+        wrong_trust = [replace(records[0], trust_snapshot_digest="2" * 64), records[1]]
+        self.assertEqual(evaluate(data, records=wrong_trust).status, "denied")
+
         revoked = [replace(records[0], lifecycle="revoked"), records[1]]
         self.assertEqual(evaluate(data, records=revoked).status, "denied")
 
         wrong_role = [replace(records[0], role="other-role"), records[1]]
         self.assertEqual(evaluate(data, records=wrong_role).status, "denied")
+
+        not_yet_valid_at_issuance = [replace(records[0], valid_from=1050), records[1]]
+        decision = evaluate(data, records=not_yet_valid_at_issuance)
+        self.assertEqual(decision.status, "denied")
+        self.assertIn("signer identities", decision.reason)
+
+    def test_one_key_cannot_authenticate_two_signer_identities(self) -> None:
+        data = golden()
+        records = signer_records(data)
+        conflicting = [records[0], replace(records[1], key_id=records[0].key_id)]
+        decision = evaluate(data, records=conflicting)
+        self.assertEqual(decision.status, "denied")
+        self.assertIn("key identity maps to multiple signer identities", decision.reason)
+
+    def test_extra_ineligible_signature_does_not_poison_valid_quorum(self) -> None:
+        data = golden()
+        records = signer_records(data)
+        extra = registry.AuthenticatedSignerEvidence(
+            signer_id="operator.gamma",
+            key_id="key.gamma",
+            role="schema-registry-signer",
+            failure_domain="domain.gamma",
+            signature_profile="ed25519-test",
+            valid_from=900,
+            valid_until=2100,
+            lifecycle="revoked",
+            bound_snapshot_digest=data["snapshot_sha256"],
+            trust_snapshot_digest=data["trust_snapshot_sha256"],
+        )
+        decision = evaluate(data, records=[*records, extra])
+        self.assertEqual(decision.status, "accepted")
+        self.assertEqual(decision.verified.signer_ids, ("operator.alpha", "operator.beta"))
 
     def test_stale_snapshot_does_not_gain_time_from_replay(self) -> None:
         data = golden()
@@ -164,7 +205,6 @@ class SchemaRegistryTests(unittest.TestCase):
         cap = json.loads(cap_entry["canonical_schema_json"])
         cap["entries"][0]["description"] = "tampered meaning"
         cap_entry["canonical_schema_json"] = semantic.canonical_bytes(cap).decode("utf-8")
-        # Claimed schema ID deliberately remains unchanged.
         decision = evaluate(data, snapshot)
         self.assertEqual(decision.status, "denied")
         self.assertIn("schema digest mismatch", decision.reason)
@@ -350,7 +390,6 @@ class SchemaRegistryTests(unittest.TestCase):
         )
         self.assertEqual(resolved["version"], 2)
 
-        # A later attempt to reactivate the superseded v1 is non-monotonic.
         seq3 = copy.deepcopy(seq2)
         seq3["sequence"] = 3
         seq3["issued_at"] = 1600
