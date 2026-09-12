@@ -68,6 +68,15 @@ def embedded_su2(pair, axis, angle):
     return out
 
 
+def diagonal(theta, phi):
+    phases = (theta, phi, -(theta + phi))
+    out = identity()
+    for i, phase in enumerate(phases):
+        out[i][i] = complex(math.cos(phase), math.sin(phase))
+    validate_su3(out)
+    return out
+
+
 def shift(site, mu, step, dims):
     out = list(site)
     out[mu] = (out[mu] + step) % dims[mu]
@@ -119,20 +128,33 @@ def wilson_action(field, dims, beta):
 
 
 def affected_action(field, dims, site, mu, beta):
-    total = 0.0
+    canonical = set()
     for nu in range(4):
         if nu == mu:
             continue
         a, b = sorted((mu, nu))
-        for base in (site, shift(site, nu, -1, dims)):
-            total += beta * (1.0 - trace(plaquette(field, dims, base, a, b)).real / 3.0)
-    return total
+        canonical.add((site, a, b))
+        canonical.add((shift(site, nu, -1, dims), a, b))
+    return sum(
+        beta * (1.0 - trace(plaquette(field, dims, base, a, b)).real / 3.0)
+        for base, a, b in canonical
+    )
 
 
 def metropolis_acceptance(delta_action):
     if not math.isfinite(delta_action):
         raise ValueError("non-finite action difference")
     return 1.0 if delta_action <= 0.0 else math.exp(-delta_action)
+
+
+def local_parity_fixture(field, dims, site, mu, beta, proposal):
+    before_full = wilson_action(field, dims, beta)
+    before_local = affected_action(field, dims, site, mu, beta)
+    original = link(field, dims, site, mu)
+    set_link(field, dims, site, mu, mul(proposal, original))
+    after_full = wilson_action(field, dims, beta)
+    after_local = affected_action(field, dims, site, mu, beta)
+    return after_full - before_full, after_local - before_local
 
 
 def self_test():
@@ -149,14 +171,9 @@ def self_test():
 
     dims, beta, site, mu = (2, 2, 1, 1), 6.0, (0, 0, 0, 0), 0
     field = identity_field(dims)
-    before_full = wilson_action(field, dims, beta)
-    before_local = affected_action(field, dims, site, mu, beta)
     proposal = embedded_su2((0, 1), axis, angle)
     original = link(field, dims, site, mu)
-    set_link(field, dims, site, mu, mul(proposal, original))
-    after_full = wilson_action(field, dims, beta)
-    after_local = affected_action(field, dims, site, mu, beta)
-    delta_full, delta_local = after_full - before_full, after_local - before_local
+    delta_full, delta_local = local_parity_fixture(field, dims, site, mu, beta, proposal)
     parity_error = abs(delta_full - delta_local)
     acceptance = metropolis_acceptance(delta_full)
     if abs(delta_full - 0.159467377270067) > TOL or parity_error > TOL:
@@ -165,10 +182,21 @@ def self_test():
         raise AssertionError(acceptance)
     reverse = embedded_su2((0, 1), axis, -angle)
     set_link(field, dims, site, mu, mul(reverse, link(field, dims, site, mu)))
-    restoration_action_error = abs(wilson_action(field, dims, beta) - before_full)
+    restoration_action_error = abs(wilson_action(field, dims, beta))
     restoration_link_error = max_matrix_error(link(field, dims, site, mu), original)
     if restoration_action_error > TOL or restoration_link_error > TOL:
         raise AssertionError((restoration_action_error, restoration_link_error))
+
+    dims2, beta2, site2, mu2 = (2, 2, 2, 2), 5.7, (0, 1, 0, 1), 2
+    field2 = identity_field(dims2)
+    set_link(field2, dims2, (0, 0, 0, 0), 1, diagonal(0.13, -0.04))
+    set_link(field2, dims2, (1, 0, 0, 1), 3, diagonal(-0.17, 0.06))
+    proposal2 = embedded_su2((0, 2), (0.2, 0.4, 0.7), -0.11)
+    delta2_full, delta2_local = local_parity_fixture(field2, dims2, site2, mu2, beta2, proposal2)
+    nontrivial_parity_error = abs(delta2_full - delta2_local)
+    if nontrivial_parity_error > TOL:
+        raise AssertionError((delta2_full, delta2_local))
+
     print("ok")
     print(f"max_unitarity_error={max_unitarity:.17g}")
     print(f"max_determinant_error={max_det:.17g}")
@@ -179,6 +207,9 @@ def self_test():
     print(f"forward_acceptance={acceptance:.17g}")
     print(f"restoration_action_error={restoration_action_error:.17g}")
     print(f"restoration_link_error={restoration_link_error:.17g}")
+    print(f"nontrivial_delta_full={delta2_full:.17g}")
+    print(f"nontrivial_delta_local={delta2_local:.17g}")
+    print(f"nontrivial_parity_error={nontrivial_parity_error:.17g}")
 
 
 def main():
