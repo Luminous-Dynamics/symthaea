@@ -238,7 +238,7 @@ fn aix_scope() -> ApplicabilityScopeV1 {
     ApplicabilityScopeV1 {
         ecosystem: StringSelectorV1::Exact("legacy-enterprise-os".into()),
         vendor: StringSelectorV1::Exact("IBM".into()),
-        product: StringSelectorV1::Exact("AIX".into()),
+        product: "AIX".into(),
         version: StringSelectorV1::Prefix("7.3".into()),
         ..ApplicabilityScopeV1::default()
     }
@@ -287,18 +287,25 @@ fn register_procedures(
     snapshots: &BTreeSet<SourceSnapshotIdV1>,
 ) -> Result<BTreeSet<String>, LegacyAixErrorV1> {
     let definitions = [
-        ("legacy:aix:triage-device-odm", LegacyKnowledgeAreaV1::SystemLifecycle, LegacyProcedureKindV1::Diagnose, "Triage AIX device/ODM state", "Compare ODM identity/attributes/parentage with current device/path and partition evidence before proposing reconfiguration."),
-        ("legacy:aix:triage-lvm-storage", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "Triage AIX LVM storage", "Map filesystem through LV/VG/PV/path state and distinguish logical allocation from device/path failure before proposing storage changes."),
-        ("legacy:aix:triage-src-subsystem", LegacyKnowledgeAreaV1::WorkloadAndJobs, LegacyProcedureKindV1::Diagnose, "Triage AIX SRC subsystem", "Compare SRC registration/status, process state, dependencies and functional service health before proposing start/stop/refresh actions."),
-        ("legacy:aix:triage-error-log", LegacyKnowledgeAreaV1::ObservabilityAndProblemManagement, LegacyProcedureKindV1::Diagnose, "Correlate AIX error-log evidence", "Correlate current error-log identifiers/resources/timestamps with the failure window and independent subsystem evidence before proposing repair."),
-        ("legacy:aix:triage-nim", LegacyKnowledgeAreaV1::SoftwareLifecycle, LegacyProcedureKindV1::Diagnose, "Triage AIX NIM operation", "Separate NIM object/resource/control state from firmware/SMS boot, network transport, installation, and running-client state before proposing NIM changes."),
-        ("legacy:aix:triage-lpar", LegacyKnowledgeAreaV1::VirtualizationAndPartitioning, LegacyProcedureKindV1::Diagnose, "Triage AIX LPAR resource boundary", "Compare saved/current partition allocation, VIOS-backed resources, and AIX guest observations before proposing DLPAR/profile changes."),
-        ("legacy:aix:triage-powerha", LegacyKnowledgeAreaV1::AvailabilityAndRecovery, LegacyProcedureKindV1::Recover, "Triage AIX PowerHA partial failure", "Bind AIX/PowerHA levels and inspect cluster/node/resource-group/network/storage state across members before proposing movement or restart."),
+        ("legacy:aix:triage-device-odm", LegacyKnowledgeAreaV1::SystemLifecycle, LegacyProcedureKindV1::Diagnose, "Triage AIX device/ODM state", "Compare ODM identity/attributes/parentage with current device/path and partition evidence before proposing reconfiguration.", "ibm:aix-odm-device-config@7.3"),
+        ("legacy:aix:triage-lvm-storage", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "Triage AIX LVM storage", "Map filesystem through LV/VG/PV/path state and distinguish logical allocation from device/path failure before proposing storage changes.", "ibm:aix-lvm-storage@7.3"),
+        ("legacy:aix:triage-src-subsystem", LegacyKnowledgeAreaV1::WorkloadAndJobs, LegacyProcedureKindV1::Diagnose, "Triage AIX SRC subsystem", "Compare SRC registration/status, process state, dependencies and functional service health before proposing start/stop/refresh actions.", "ibm:aix-src@7.3"),
+        ("legacy:aix:triage-error-log", LegacyKnowledgeAreaV1::ObservabilityAndProblemManagement, LegacyProcedureKindV1::Diagnose, "Correlate AIX error-log evidence", "Correlate current error-log identifiers/resources/timestamps with the failure window and independent subsystem evidence before proposing repair.", "ibm:aix-error-log@7.3"),
+        ("legacy:aix:triage-nim", LegacyKnowledgeAreaV1::SoftwareLifecycle, LegacyProcedureKindV1::Diagnose, "Triage AIX NIM operation", "Separate NIM object/resource/control state from firmware/SMS boot, network transport, installation, and running-client state before proposing NIM changes.", "ibm:aix-nim@7.3"),
+        ("legacy:aix:triage-lpar", LegacyKnowledgeAreaV1::VirtualizationAndPartitioning, LegacyProcedureKindV1::Diagnose, "Triage AIX LPAR resource boundary", "Compare saved/current partition allocation, VIOS-backed resources, and AIX guest observations before proposing DLPAR/profile changes.", "ibm:aix-lpar@7.3"),
+        ("legacy:aix:triage-powerha", LegacyKnowledgeAreaV1::AvailabilityAndRecovery, LegacyProcedureKindV1::Recover, "Triage AIX PowerHA partial failure", "Bind AIX/PowerHA levels and inspect cluster/node/resource-group/network/storage state across members before proposing movement or restart.", "ibm:powerha-aix-7210sp1@2026-04"),
     ];
     let mut ids = BTreeSet::new();
-    for (id, area, kind, title, diagnostic) in definitions {
+    for (id, area, kind, title, diagnostic, source_snapshot) in definitions {
+        let source_snapshot = SourceSnapshotIdV1(source_snapshot.into());
+        if !snapshots.contains(&source_snapshot) {
+            return Err(LegacyAixErrorV1::InvalidField(format!(
+                "AIX procedure {id} references unregistered source snapshot {}",
+                source_snapshot.0
+            )));
+        }
         let mut procedure = procedure(id, area, kind, title, diagnostic);
-        procedure.source_snapshots = snapshots.clone();
+        procedure.source_snapshots = [source_snapshot].into_iter().collect();
         if let Some(existing) = pack.procedures.iter().find(|p| p.id == procedure.id) {
             if existing != &procedure {
                 return Err(LegacyAixErrorV1::ProcedureIdentityConflict(procedure.id));
@@ -546,6 +553,28 @@ mod tests {
                 LegacyProcedureAuthorityV1::ReadOnlyObservation
                     | LegacyProcedureAuthorityV1::ChangeProposalOnly
             )));
+        }
+    }
+
+    #[test]
+    fn procedures_use_mechanism_scoped_source_snapshots() {
+        let mut pack = seed_legacy_computing_pack_v1(1_800_000_000_000).unwrap();
+        enrich_legacy_aix_foundation_v1(&mut pack, 1_800_000_000_100).unwrap();
+        let expected = [
+            ("legacy:aix:triage-device-odm", "ibm:aix-odm-device-config@7.3"),
+            ("legacy:aix:triage-lvm-storage", "ibm:aix-lvm-storage@7.3"),
+            ("legacy:aix:triage-src-subsystem", "ibm:aix-src@7.3"),
+            ("legacy:aix:triage-error-log", "ibm:aix-error-log@7.3"),
+            ("legacy:aix:triage-nim", "ibm:aix-nim@7.3"),
+            ("legacy:aix:triage-lpar", "ibm:aix-lpar@7.3"),
+            ("legacy:aix:triage-powerha", "ibm:powerha-aix-7210sp1@2026-04"),
+        ];
+        for (procedure_id, snapshot_id) in expected {
+            let procedure = pack.procedures.iter().find(|p| p.id == procedure_id).unwrap();
+            assert_eq!(procedure.source_snapshots.len(), 1);
+            assert!(procedure
+                .source_snapshots
+                .contains(&SourceSnapshotIdV1(snapshot_id.into())));
         }
     }
 
