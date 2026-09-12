@@ -6,6 +6,9 @@
 //! `symthaea-memory`. This module is deliberately narrower: it adapts an explicitly operator-
 //! directed destructive memory intervention to the strongest welfare-assurance execution path.
 
+use std::error::Error as StdError;
+
+use serde::{Deserialize, Serialize};
 use symthaea_core::welfare::SubjectAffectingAction;
 use symthaea_fabrication_kernel::crypto_digest::{Sha256, Sha256Digest};
 use symthaea_fabrication_kernel::trust::TrustSnapshot;
@@ -24,11 +27,73 @@ use crate::execution_adapter::{
 use crate::execution_recovery::InterventionExecutionJournal;
 use crate::replay_recovery::DurableEvidenceBoundInterventionPermit;
 
+pub const EPISODIC_CONTENT_CHECKPOINT_SCHEMA: &str =
+    "symthaea.welfare.episodic-content-checkpoint.v1";
 const MEMORY_DIGEST_DOMAIN: &[u8] = b"symthaea.welfare.episodic-memory-state.v1\0";
+const CHECKPOINT_DIGEST_DOMAIN: &[u8] = b"symthaea.welfare.episodic-content-checkpoint-digest.v1\0";
 const CLEAR_RESULT_DOMAIN: &[u8] = b"symthaea.welfare.episodic-memory-clear-result.v1\0";
 const MAX_TARGET_ID_BYTES: usize = 256;
+const MAX_CHECKPOINT_REF_BYTES: usize = 2048;
 
-/// Evidence emitted by the first concrete governed memory intervention.
+/// Durable content-level checkpoint captured before an exogenous destructive clear.
+///
+/// This intentionally does **not** claim to be a full `EpisodicMemory` engine checkpoint. It
+/// preserves every active episode and the exact content-state digest, but does not yet preserve
+/// private replay counters/configuration/statistics. A later canonical memory checkpoint should
+/// move into `symthaea-memory` and cover that complete internal state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EpisodicContentCheckpoint {
+    pub schema_version: String,
+    pub target_id: String,
+    pub captured_at_unix_s: u64,
+    pub state_digest: Sha256Digest,
+    pub episodes: Vec<Episode>,
+}
+
+impl EpisodicContentCheckpoint {
+    pub fn capture(
+        target_id: &str,
+        memory: &EpisodicMemory,
+        captured_at_unix_s: u64,
+    ) -> Result<Self, EpisodicMemoryInterventionError> {
+        validate_target_id(target_id)?;
+        let episodes = memory.get_top_episodes(memory.len());
+        let state_digest = digest_episode_set(&episodes)?;
+        Ok(Self {
+            schema_version: EPISODIC_CONTENT_CHECKPOINT_SCHEMA.into(),
+            target_id: target_id.to_string(),
+            captured_at_unix_s,
+            state_digest,
+            episodes,
+        })
+    }
+
+    pub fn validate(&self) -> Result<(), EpisodicMemoryInterventionError> {
+        if self.schema_version != EPISODIC_CONTENT_CHECKPOINT_SCHEMA {
+            return Err(EpisodicMemoryInterventionError::UnsupportedCheckpointSchema);
+        }
+        validate_target_id(&self.target_id)?;
+        let actual = digest_episode_set(&self.episodes)?;
+        if actual != self.state_digest {
+            return Err(EpisodicMemoryInterventionError::CheckpointStateDigestMismatch);
+        }
+        Ok(())
+    }
+}
+
+/// Persistence boundary for the pre-intervention content checkpoint.
+pub trait EpisodicContentCheckpointPersistence {
+    type Error: StdError + Send + Sync + 'static;
+
+    /// Durably persist the exact checkpoint and its canonical digest before destructive mutation.
+    fn persist_episodic_content_checkpoint(
+        &mut self,
+        checkpoint: &EpisodicContentCheckpoint,
+        checkpoint_digest: Sha256Digest,
+    ) -> Result<String, Self::Error>;
+}
+
+/// Evidence emitted by the governed destructive memory intervention.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EpisodicMemoryClearReceipt {
     pub target_id: String,
@@ -36,20 +101,42 @@ pub struct EpisodicMemoryClearReceipt {
     pub after_count: usize,
     pub before_digest: Sha256Digest,
     pub after_digest: Sha256Digest,
+    pub checkpoint_digest: Sha256Digest,
+    pub checkpoint_persistence_ref: String,
 }
 
-/// Compute an order-independent digest of the complete current episodic store.
-///
-/// Episodes are individually serialized then byte-sorted before hashing. This commits the exact
-/// set/multiset of episode contents without depending on `BinaryHeap` iteration order.
+/// Compute an order-independent digest of the complete current episodic content set.
 pub fn digest_episodic_memory(
     memory: &EpisodicMemory,
 ) -> Result<Sha256Digest, EpisodicMemoryInterventionError> {
-    let episodes: Vec<Episode> = memory.get_top_episodes(memory.len());
+    digest_episode_set(&memory.get_top_episodes(memory.len()))
+}
+
+/// Canonical digest of a content checkpoint. Episode order is intentionally ignored while target,
+/// capture time, content count, and the exact content-state digest remain committed.
+pub fn digest_episodic_content_checkpoint(
+    checkpoint: &EpisodicContentCheckpoint,
+) -> Result<Sha256Digest, EpisodicMemoryInterventionError> {
+    checkpoint.validate()?;
+    let mut hasher = Sha256::new();
+    hasher.update(CHECKPOINT_DIGEST_DOMAIN);
+    hasher.update(&(checkpoint.schema_version.len() as u64).to_le_bytes());
+    hasher.update(checkpoint.schema_version.as_bytes());
+    hasher.update(&(checkpoint.target_id.len() as u64).to_le_bytes());
+    hasher.update(checkpoint.target_id.as_bytes());
+    hasher.update(&checkpoint.captured_at_unix_s.to_le_bytes());
+    hasher.update(&(checkpoint.episodes.len() as u64).to_le_bytes());
+    hasher.update(&checkpoint.state_digest.0);
+    Ok(hasher.finalize())
+}
+
+fn digest_episode_set(
+    episodes: &[Episode],
+) -> Result<Sha256Digest, EpisodicMemoryInterventionError> {
     let mut encoded = Vec::with_capacity(episodes.len());
     for episode in episodes {
         encoded.push(
-            serde_json::to_vec(&episode)
+            serde_json::to_vec(episode)
                 .map_err(|error| EpisodicMemoryInterventionError::Encoding(error.to_string()))?,
         );
     }
@@ -67,49 +154,86 @@ pub fn digest_episodic_memory(
 
 /// Private concrete mutator for an operator-directed clear of the canonical episodic store.
 ///
-/// Keeping this type private prevents callers that somehow possess only the weaker
-/// `AssuredInterventionPermit` from bypassing the durable replay and execution-journal layers.
-struct EpisodicMemoryClearExecutor<'a> {
+/// Keeping this type private prevents callers that possess only the weaker
+/// `AssuredInterventionPermit` from bypassing durable replay/checkpoint/journal layers.
+struct EpisodicMemoryClearExecutor<'a, C>
+where
+    C: EpisodicContentCheckpointPersistence,
+{
     expected_target_id: &'a str,
     memory: &'a mut EpisodicMemory,
+    checkpoint_persistence: &'a mut C,
     completed_at_unix_s: u64,
 }
 
-impl<'a> EpisodicMemoryClearExecutor<'a> {
+impl<'a, C> EpisodicMemoryClearExecutor<'a, C>
+where
+    C: EpisodicContentCheckpointPersistence,
+{
     fn new(
         expected_target_id: &'a str,
         memory: &'a mut EpisodicMemory,
+        checkpoint_persistence: &'a mut C,
         completed_at_unix_s: u64,
     ) -> Result<Self, EpisodicMemoryInterventionError> {
         validate_target_id(expected_target_id)?;
         Ok(Self {
             expected_target_id,
             memory,
+            checkpoint_persistence,
             completed_at_unix_s,
         })
     }
 }
 
-impl ReceiptedInterventionExecutor for EpisodicMemoryClearExecutor<'_> {
+impl<C> ReceiptedInterventionExecutor for EpisodicMemoryClearExecutor<'_, C>
+where
+    C: EpisodicContentCheckpointPersistence,
+{
     type Output = EpisodicMemoryClearReceipt;
-    type Error = EpisodicMemoryInterventionError;
+    type Error = EpisodicMemoryClearExecutionError<C::Error>;
 
     fn execute_receipted(
         &mut self,
         permit: &AssuredInterventionPermit,
     ) -> Result<ReceiptedExecution<Self::Output>, Self::Error> {
-        validate_scope(permit.action(), permit.target_id(), self.expected_target_id)?;
+        validate_scope(permit.action(), permit.target_id(), self.expected_target_id)
+            .map_err(EpisodicMemoryClearExecutionError::Intervention)?;
+
+        let checkpoint = EpisodicContentCheckpoint::capture(
+            permit.target_id(),
+            self.memory,
+            self.completed_at_unix_s,
+        )
+        .map_err(EpisodicMemoryClearExecutionError::Intervention)?;
+        let checkpoint_digest = digest_episodic_content_checkpoint(&checkpoint)
+            .map_err(EpisodicMemoryClearExecutionError::Intervention)?;
+        let checkpoint_persistence_ref = self
+            .checkpoint_persistence
+            .persist_episodic_content_checkpoint(&checkpoint, checkpoint_digest)
+            .map_err(EpisodicMemoryClearExecutionError::CheckpointPersistence)?;
+        validate_checkpoint_ref(&checkpoint_persistence_ref)
+            .map_err(EpisodicMemoryClearExecutionError::Intervention)?;
 
         let before_count = self.memory.len();
-        let before_digest = digest_episodic_memory(self.memory)?;
+        let before_digest = digest_episodic_memory(self.memory)
+            .map_err(EpisodicMemoryClearExecutionError::Intervention)?;
+        if checkpoint.state_digest != before_digest || checkpoint.episodes.len() != before_count {
+            return Err(EpisodicMemoryClearExecutionError::Intervention(
+                EpisodicMemoryInterventionError::CheckpointDoesNotMatchPreState,
+            ));
+        }
+
         self.memory.clear();
         let after_count = self.memory.len();
-        let after_digest = digest_episodic_memory(self.memory)?;
-
+        let after_digest = digest_episodic_memory(self.memory)
+            .map_err(EpisodicMemoryClearExecutionError::Intervention)?;
         if after_count != 0 {
-            return Err(EpisodicMemoryInterventionError::ClearPostconditionFailed {
-                remaining: after_count,
-            });
+            return Err(EpisodicMemoryClearExecutionError::Intervention(
+                EpisodicMemoryInterventionError::ClearPostconditionFailed {
+                    remaining: after_count,
+                },
+            ));
         }
 
         let receipt = EpisodicMemoryClearReceipt {
@@ -118,10 +242,12 @@ impl ReceiptedInterventionExecutor for EpisodicMemoryClearExecutor<'_> {
             after_count,
             before_digest,
             after_digest,
+            checkpoint_digest,
+            checkpoint_persistence_ref,
         };
         let result_digest = digest_clear_result(&receipt, permit.rationale());
         let evidence_ref = format!(
-            "symthaea-memory:episodic-clear:v1:sha256:{}",
+            "symthaea-memory:episodic-clear:v2:sha256:{}",
             hex_digest(result_digest)
         );
 
@@ -131,17 +257,16 @@ impl ReceiptedInterventionExecutor for EpisodicMemoryClearExecutor<'_> {
             result_digest,
             evidence_ref,
         )
-        .map_err(EpisodicMemoryInterventionError::Observation)
+        .map_err(EpisodicMemoryClearExecutionError::Observation)
     }
 }
 
-/// First end-to-end production-style vertical slice for a welfare-sensitive state mutation.
+/// Governed destructive clear with mandatory durable pre-intervention content checkpoint.
 ///
-/// Normal endogenous memory operations never call this function. An exogenous clear must carry a
-/// durable evidence-bound permit, survive live revalidation, durably write `Prepared`, execute the
-/// canonical store mutation, and durably write terminal evidence before it is considered complete.
+/// Ordering is fail-closed:
+/// live revalidation -> durable Prepared -> durable content checkpoint -> clear -> terminal journal.
 #[allow(clippy::too_many_arguments)]
-pub fn execute_governed_episodic_memory_clear<P: ExecutionJournalPersistence>(
+pub fn execute_governed_episodic_memory_clear<P, C>(
     permit: DurableEvidenceBoundInterventionPermit,
     execution_id: impl Into<String>,
     expected_target_id: &str,
@@ -154,24 +279,33 @@ pub fn execute_governed_episodic_memory_clear<P: ExecutionJournalPersistence>(
     current_trust_snapshot: &TrustSnapshot,
     unix_s: u64,
     journal: &mut InterventionExecutionJournal,
-    persistence: &mut P,
+    execution_persistence: &mut P,
+    checkpoint_persistence: &mut C,
 ) -> Result<
     JournaledExecutionOutcome<
         EpisodicMemoryClearReceipt,
-        EpisodicMemoryInterventionError,
+        EpisodicMemoryClearExecutionError<C::Error>,
         P::Error,
     >,
     GovernedEpisodicMemoryClearError<P::Error>,
-> {
-    // Deterministic configuration/scope failures happen before `Prepared` is written. They are not
-    // execution ambiguity and must not pollute crash-recovery state as "in doubt".
+>
+where
+    P: ExecutionJournalPersistence,
+    C: EpisodicContentCheckpointPersistence,
+{
+    // Deterministic configuration/scope failures happen before `Prepared` is written.
     validate_target_id(expected_target_id)
         .map_err(GovernedEpisodicMemoryClearError::Configuration)?;
     validate_scope(permit.action(), permit.target_id(), expected_target_id)
         .map_err(GovernedEpisodicMemoryClearError::Configuration)?;
 
-    let mut executor = EpisodicMemoryClearExecutor::new(expected_target_id, memory, unix_s)
-        .map_err(GovernedEpisodicMemoryClearError::Configuration)?;
+    let mut executor = EpisodicMemoryClearExecutor::new(
+        expected_target_id,
+        memory,
+        checkpoint_persistence,
+        unix_s,
+    )
+    .map_err(GovernedEpisodicMemoryClearError::Configuration)?;
 
     execute_durable_intervention_journaled(
         permit,
@@ -184,7 +318,7 @@ pub fn execute_governed_episodic_memory_clear<P: ExecutionJournalPersistence>(
         current_trust_snapshot,
         unix_s,
         journal,
-        persistence,
+        execution_persistence,
         &mut executor,
     )
     .map_err(GovernedEpisodicMemoryClearError::Gate)
@@ -218,6 +352,17 @@ fn validate_target_id(value: &str) -> Result<(), EpisodicMemoryInterventionError
     Ok(())
 }
 
+fn validate_checkpoint_ref(value: &str) -> Result<(), EpisodicMemoryInterventionError> {
+    if value.trim().is_empty()
+        || value != value.trim()
+        || value.len() > MAX_CHECKPOINT_REF_BYTES
+        || value.chars().any(char::is_control)
+    {
+        return Err(EpisodicMemoryInterventionError::InvalidCheckpointReference);
+    }
+    Ok(())
+}
+
 fn digest_clear_result(receipt: &EpisodicMemoryClearReceipt, rationale: &str) -> Sha256Digest {
     let mut hasher = Sha256::new();
     hasher.update(CLEAR_RESULT_DOMAIN);
@@ -227,6 +372,9 @@ fn digest_clear_result(receipt: &EpisodicMemoryClearReceipt, rationale: &str) ->
     hasher.update(&(receipt.after_count as u64).to_le_bytes());
     hasher.update(&receipt.before_digest.0);
     hasher.update(&receipt.after_digest.0);
+    hasher.update(&receipt.checkpoint_digest.0);
+    hasher.update(&(receipt.checkpoint_persistence_ref.len() as u64).to_le_bytes());
+    hasher.update(receipt.checkpoint_persistence_ref.as_bytes());
     hasher.update(&(rationale.len() as u64).to_le_bytes());
     hasher.update(rationale.as_bytes());
     hasher.finalize()
@@ -249,10 +397,29 @@ pub enum EpisodicMemoryInterventionError {
     WrongAction { actual: SubjectAffectingAction },
     #[error("episodic-memory intervention target mismatch: expected={expected:?}, actual={actual:?}")]
     WrongTarget { expected: String, actual: String },
+    #[error("unsupported episodic-content checkpoint schema")]
+    UnsupportedCheckpointSchema,
+    #[error("episodic-content checkpoint state digest does not match its episodes")]
+    CheckpointStateDigestMismatch,
+    #[error("durable episodic-content checkpoint does not match the immediate pre-clear state")]
+    CheckpointDoesNotMatchPreState,
+    #[error("checkpoint persistence returned an invalid durable reference")]
+    InvalidCheckpointReference,
     #[error("episodic-memory state encoding failed: {0}")]
     Encoding(String),
     #[error("episodic-memory clear postcondition failed; {remaining} episodes remain")]
     ClearPostconditionFailed { remaining: usize },
+}
+
+#[derive(Debug, Error)]
+pub enum EpisodicMemoryClearExecutionError<E>
+where
+    E: StdError + Send + Sync + 'static,
+{
+    #[error("governed episodic-memory intervention failed before/after mutation: {0}")]
+    Intervention(#[source] EpisodicMemoryInterventionError),
+    #[error("could not durably persist pre-intervention episodic-content checkpoint: {0}")]
+    CheckpointPersistence(#[source] E),
     #[error(transparent)]
     Observation(#[from] ExecutionObservationError),
 }
@@ -260,7 +427,7 @@ pub enum EpisodicMemoryInterventionError {
 #[derive(Debug, Error)]
 pub enum GovernedEpisodicMemoryClearError<E>
 where
-    E: std::error::Error + Send + Sync + 'static,
+    E: StdError + Send + Sync + 'static,
 {
     #[error("governed episodic-memory intervention is misconfigured: {0}")]
     Configuration(#[source] EpisodicMemoryInterventionError),
@@ -297,6 +464,22 @@ mod tests {
             digest_episodic_memory(&left).unwrap(),
             digest_episodic_memory(&right).unwrap()
         );
+    }
+
+    #[test]
+    fn checkpoint_commits_exact_content_state() {
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig::broad_capture());
+        assert!(memory.store_if_significant(episode(1.0, 0.8, 10)));
+        assert!(memory.store_if_significant(episode(5.0, 0.9, 11)));
+        let checkpoint = EpisodicContentCheckpoint::capture(
+            "symthaea:self:episodic-memory",
+            &memory,
+            120,
+        )
+        .unwrap();
+        assert_eq!(checkpoint.episodes.len(), 2);
+        assert_eq!(checkpoint.state_digest, digest_episodic_memory(&memory).unwrap());
+        assert_ne!(digest_episodic_content_checkpoint(&checkpoint).unwrap().0, [0; 32]);
     }
 
     #[test]
