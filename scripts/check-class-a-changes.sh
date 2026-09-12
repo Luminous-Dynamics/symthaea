@@ -12,10 +12,11 @@ set -euo pipefail
 
 # Class A files: safety-critical parameters per GOVERNANCE_CHARTER.md §3.1
 #
-# RSK note (ADR-002/ADR-010): replication-authority and lineage/budget code is
-# Class A. The RSK qualification harness, self-tests, workflow, detector, and
-# Governance Charter are also Class A surfaces so weakening the evidence/
-# governance mechanism itself cannot look like an ordinary unclassified change.
+# RSK note (ADR-002/ADR-010/ADR-011): replication-authority and lineage/budget
+# code is Class A. The RSK qualification generator, independent verifier,
+# self-tests, workflow, detector, and Governance Charter are also Class A
+# surfaces so weakening the evidence/governance mechanism itself cannot look
+# like an ordinary unclassified change.
 CLASS_A_FILES=(
     "symthaea/src/cognitive_loop/thresholds.rs"
     "symthaea/src/cognitive_loop/ethics_engine.rs"
@@ -27,6 +28,8 @@ CLASS_A_FILES=(
     ".github/workflows/rsk-safety.yml"
     "scripts/rsk_qualification.py"
     "scripts/test_rsk_qualification.py"
+    "scripts/verify_rsk_qualification.py"
+    "scripts/test_verify_rsk_qualification.py"
     "scripts/check-class-a-changes.sh"
     "docs/compliance/GOVERNANCE_CHARTER.md"
 )
@@ -48,7 +51,6 @@ check_staged_files() {
     local class_a_changed=()
     local class_b_changed=()
 
-    # Get staged files
     local staged_files
     staged_files=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || echo "")
 
@@ -93,7 +95,6 @@ check_commit_message() {
     local msg
     msg=$(cat "$msg_file")
 
-    # Check for approved prefix
     if echo "$msg" | head -1 | grep -qE "^($CLASS_A_PREFIXES)"; then
         return 0
     fi
@@ -101,11 +102,9 @@ check_commit_message() {
     return 1
 }
 
-# --- CI mode ---
 if [ "${1:-}" = "--ci" ]; then
     echo "Checking for Class A/B changes in PR..."
 
-    # Compare against base branch
     base="${GITHUB_BASE_REF:-main}"
     changed_files=$(git diff --name-only "origin/$base"...HEAD 2>/dev/null || git diff --name-only HEAD~1 2>/dev/null || echo "")
 
@@ -145,7 +144,6 @@ if [ "${1:-}" = "--ci" ]; then
         echo "  4. Commit prefix: safety: | ethics: | emergency-safety: | governance:"
         echo ""
 
-        # Check if any ADR was added or modified
         adr_changed=false
         for file in $changed_files; do
             if [[ "$file" == *"compliance/adr/"* && "$file" == *.md ]]; then
@@ -158,7 +156,7 @@ if [ "${1:-}" = "--ci" ]; then
             echo "WARNING: No ADR found in this changeset."
             echo "  Consider adding: symthaea/docs/compliance/adr/ADR-NNN-description.md"
             # Warning only in generic CI. RSK has an additional blocking ADR gate
-            # in .github/workflows/rsk-safety.yml; see ADR-002 and ADR-010.
+            # in .github/workflows/rsk-safety.yml; see ADR-002, ADR-010, ADR-011.
         fi
     fi
 
@@ -178,14 +176,11 @@ if [ "${1:-}" = "--ci" ]; then
     exit $exit_code
 fi
 
-# --- Commit-msg hook mode ---
 if [ -n "${1:-}" ] && [ -f "${1:-}" ]; then
-    # Check if Class A files are staged
     result=0
     output=$(check_staged_files) || result=$?
 
     if [ $result -eq 1 ]; then
-        # Class A change detected — check commit message
         echo ""
         echo "================================================"
         echo "  CLASS A Change Governance Check"
@@ -214,7 +209,7 @@ if [ -n "${1:-}" ] && [ -f "${1:-}" ]; then
         echo ""
     fi
 
-    exit 0  # Don't block commits — inform only
+    exit 0
 fi
 
 echo "Usage: $0 <commit-msg-file> | --ci"
