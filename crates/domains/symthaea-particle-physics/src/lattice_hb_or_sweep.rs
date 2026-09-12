@@ -71,13 +71,17 @@ impl HeatbathOverrelaxationSchedule {
         Ok(())
     }
 
+    /// Version-stable evidence identity. Do not derive this from Rust Debug output.
     pub fn identity(self) -> String {
+        let backend = match self.force_backend {
+            SubgroupForceBackend::FiniteProbe => "finite_probe",
+            SubgroupForceBackend::Staple => "staple",
+        };
         format!(
-            "cabibbo_marinari_heatbath+{}or:{:?}",
+            "cm_heatbath_or_v1:force={backend}:or_sweeps={}:max_attempts={}",
             self.overrelaxation_sweeps,
-            self.force_backend,
+            self.max_heatbath_attempts,
         )
-        .to_ascii_lowercase()
     }
 }
 
@@ -216,6 +220,14 @@ mod tests {
             overrelaxation_sweeps,
             max_heatbath_attempts: 256,
         }
+    }
+
+    #[test]
+    fn sampler_identity_is_explicit_and_complete() {
+        assert_eq!(
+            schedule(2).identity(),
+            "cm_heatbath_or_v1:force=staple:or_sweeps=2:max_attempts=256"
+        );
     }
 
     #[test]
