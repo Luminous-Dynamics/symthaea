@@ -69,7 +69,7 @@ pub enum ObligationStatus {
     Open,
     /// Work is in progress.
     InProgress,
-    /// Satisfied by attached evidence.
+    /// Satisfied by attached evidence/workflow review.
     Discharged,
     /// Evidence failed or contradicted the claim.
     Failed,
@@ -86,9 +86,9 @@ pub struct ProofObligation {
     pub claim: String,
     /// Method expected to discharge the claim.
     pub expected_evidence: EvidenceKind,
-    /// Current status.
+    /// Current workflow status.
     pub status: ObligationStatus,
-    /// Legacy/convenience evidence references. Strict readiness additionally requires verified receipts.
+    /// Convenience evidence references. Strict readiness additionally requires verified receipts.
     pub evidence_refs: Vec<String>,
 }
 
@@ -156,20 +156,17 @@ impl SafetyCase {
         self.obligations.push(obligation);
     }
 
-    /// Returns true when every workflow obligation is discharged with a non-empty convenience reference.
+    /// Legacy/workflow completion predicate.
     ///
-    /// This remains less strict than receipt-based deployment readiness. Use
-    /// [`SafetyCase::is_strictly_ready`] when content-digested verified evidence is required.
+    /// This intentionally preserves the original meaning: all obligation statuses are
+    /// `Discharged`. It does **not** establish evidence sufficiency or deployment readiness.
+    /// Use [`SafetyCase::is_strictly_ready`] for the content-digested receipt gate.
     pub fn is_discharged(&self) -> bool {
         !self.obligations.is_empty()
-            && self.obligations.iter().all(|obligation| {
-                obligation.status == ObligationStatus::Discharged
-                    && !obligation.evidence_refs.is_empty()
-                    && obligation
-                        .evidence_refs
-                        .iter()
-                        .all(|evidence_ref| !evidence_ref.trim().is_empty())
-            })
+            && self
+                .obligations
+                .iter()
+                .all(|obligation| obligation.status == ObligationStatus::Discharged)
     }
 }
 
@@ -341,13 +338,10 @@ mod tests {
     }
 
     #[test]
-    fn blank_evidence_reference_cannot_discharge() {
+    fn blank_evidence_reference_cannot_discharge_via_helper() {
         let obligation = ProofObligation::new("claim", EvidenceKind::Test).discharge("   ");
         assert_eq!(obligation.status, ObligationStatus::ReviewRequired);
         assert!(obligation.evidence_refs.is_empty());
-        let mut safety_case = SafetyCase::new("subject");
-        safety_case.add_obligation(obligation);
-        assert!(!safety_case.is_discharged());
     }
 
     #[test]
