@@ -1,0 +1,45 @@
+{
+  "schema_version": "ll009p.site-anchor-config.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "anchor_id": "nasa-r01-site01-reference-v1",
+  "site_ref": "study-region-site01",
+  "native_frame": "MOON_ME_DE421",
+  "published_reference": {
+    "label": "R01 / Site01 / Connecting Ridge",
+    "latitude_deg": -89.4632,
+    "longitude_deg": -137.49,
+    "source_reference": "NASA Lunar Surface Data Book, Table A2-2, ACD-50044 Rev A",
+    "source_url": "https://ntrs.nasa.gov/citations/20230007818",
+    "expected_projected_x_m_approx": -10999.145,
+    "expected_projected_y_m_approx": -11999.255,
+    "approximation_non_authoritative": true
+  },
+  "projection_contract": {
+    "projection": "south_polar_stereographic",
+    "reference_radius_m": 1737400.0,
+    "latitude_of_origin_deg": -90.0,
+    "latitude_true_scale_deg": -90.0,
+    "central_meridian_deg": 0.0,
+    "horizontal_units": "m",
+    "source_frame": "MOON_ME_DE421"
+  },
+  "sources": {
+    "elevation_source_id": "site01-elevation-5m",
+    "uncertainty_source_id": "site01-total-z-rms-5m"
+  },
+  "expected_pixel_size_m": 5.0,
+  "max_reference_to_pixel_center_m": 4.0,
+  "sampling_policy": "containing_pixel_center_no_interpolation",
+  "output_policy": {
+    "site_xy": "selected_source_pixel_center",
+    "site_elevation": "selected_source_pixel_elevation",
+    "site_vertical_uncertainty": "selected_source_pixel_uncertainty",
+    "emit_ll009l_site_block": true,
+    "emit_observed_crs_wkt_hash": true
+  },
+  "non_claims": [
+    "The R01 coordinate is a reproducible published reference anchor, not an optimized launcher or infrastructure location.",
+    "Elevation and uncertainty are not specified in this config and must be read from exact LL-009N-locked source rasters.",
+    "The total-Z uncertainty source retains RMS semantics and is not a hard bound; LL-009O remains authoritative for claim classification."
+  ]
+}
