@@ -8,6 +8,7 @@
 //! and the exact latest committed digest.
 
 use symthaea_core::intervention_interlock::InterventionRequest;
+use symthaea_core::welfare::SubjectAffectingAction;
 use symthaea_fabrication_kernel::crypto_digest::Sha256Digest;
 use symthaea_fabrication_kernel::trust::TrustSnapshot;
 use symthaea_psych_bench::moral_patient::{MoralPatientEvidenceProfile, PrecautionPolicy};
@@ -17,7 +18,11 @@ use symthaea_welfare_authority::{
 };
 use symthaea_welfare_consent::{SubjectConsentLedger, SubjectIdentityRegistry};
 
-use crate::evidence_context::EvidenceBoundInterventionPermit;
+use crate::AssuredInterventionExecutor;
+use crate::evidence_context::{
+    EvidenceBoundExecutionError, EvidenceBoundInterventionPermit, WelfareEvidenceContext,
+    execute_evidence_bound_permit_once,
+};
 
 #[allow(dead_code)]
 #[path = "replay_recovery.rs"]
@@ -69,8 +74,56 @@ impl DurableAuthorityReplayFence {
     }
 }
 
+/// Strongest positive capability currently emitted by the welfare-assurance stack.
+///
+/// The private fields ensure callers cannot discard the durable replay reservation and retain only
+/// the weaker evidence-bound permit. This type is intentionally non-Clone and non-serializable.
+#[derive(Debug)]
+pub struct DurableEvidenceBoundInterventionPermit {
+    permit: EvidenceBoundInterventionPermit,
+    replay_reservation: DurableReplayReservation,
+}
+
+impl DurableEvidenceBoundInterventionPermit {
+    pub fn target_id(&self) -> &str {
+        self.permit.target_id()
+    }
+
+    pub fn action(&self) -> SubjectAffectingAction {
+        self.permit.action()
+    }
+
+    pub fn rationale(&self) -> &str {
+        self.permit.rationale()
+    }
+
+    pub fn welfare_evidence_context(&self) -> WelfareEvidenceContext {
+        self.permit.evidence_context()
+    }
+
+    pub fn not_after_unix_s(&self) -> u64 {
+        self.permit.not_after_unix_s()
+    }
+
+    pub fn replay_generation(&self) -> u64 {
+        self.replay_reservation.generation()
+    }
+
+    pub fn replay_snapshot_digest(&self) -> Sha256Digest {
+        self.replay_reservation.snapshot_digest()
+    }
+
+    pub fn replay_persistence_ref(&self) -> &str {
+        self.replay_reservation.persistence_ref()
+    }
+
+    pub fn authority_id(&self) -> &str {
+        self.replay_reservation.authority_id()
+    }
+}
+
 /// Verify evidence-bound authority, durably reserve its replay identity, then run the normal
-/// hardened authorization path. The reservation is persisted before permit minting continues.
+/// hardened authorization path. The replay reservation is retained inside the returned capability.
 #[allow(clippy::too_many_arguments)]
 pub fn authorize_evidence_bound_intervention_durable<P: ReplayFencePersistence>(
     base_nonce: &str,
@@ -88,25 +141,57 @@ pub fn authorize_evidence_bound_intervention_durable<P: ReplayFencePersistence>(
     replay_persistence: &mut P,
     request: &InterventionRequest,
     unix_s: u64,
-) -> Result<
-    (EvidenceBoundInterventionPermit, DurableReplayReservation),
-    DurableAuthorizationError<P::Error>,
-> {
-    implementation::authorize_evidence_bound_intervention_durable(
-        base_nonce,
-        profile,
-        precaution_policy,
-        subject_id,
+) -> Result<DurableEvidenceBoundInterventionPermit, DurableAuthorizationError<P::Error>> {
+    let (permit, replay_reservation) =
+        implementation::authorize_evidence_bound_intervention_durable(
+            base_nonce,
+            profile,
+            precaution_policy,
+            subject_id,
+            consent_ledger,
+            subject_registry,
+            signed_authority,
+            authority_manifest,
+            authority_trust_snapshot,
+            authority_verifier,
+            volatile_authority_tracker,
+            &mut durable_replay_fence.inner,
+            replay_persistence,
+            request,
+            unix_s,
+        )?;
+
+    Ok(DurableEvidenceBoundInterventionPermit {
+        permit,
+        replay_reservation,
+    })
+}
+
+/// Consume the strongest durable/evidence-bound capability through the existing live-use checks.
+///
+/// Downstream production mutators can require this type so textual authority refs, bare
+/// `PolicyPass`, non-durable permits, or evidence-unbound permits cannot satisfy their API.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_durable_evidence_bound_intervention_once<E: AssuredInterventionExecutor>(
+    permit: DurableEvidenceBoundInterventionPermit,
+    current_profile: &MoralPatientEvidenceProfile,
+    current_precaution_policy: &PrecautionPolicy,
+    consent_ledger: &SubjectConsentLedger,
+    subject_registry: &SubjectIdentityRegistry,
+    current_authority_manifest: &WelfareAuthorityPolicyManifest,
+    current_trust_snapshot: &TrustSnapshot,
+    unix_s: u64,
+    executor: &mut E,
+) -> Result<E::Output, EvidenceBoundExecutionError<E::Error>> {
+    execute_evidence_bound_permit_once(
+        permit.permit,
+        current_profile,
+        current_precaution_policy,
         consent_ledger,
         subject_registry,
-        signed_authority,
-        authority_manifest,
-        authority_trust_snapshot,
-        authority_verifier,
-        volatile_authority_tracker,
-        &mut durable_replay_fence.inner,
-        replay_persistence,
-        request,
+        current_authority_manifest,
+        current_trust_snapshot,
         unix_s,
+        executor,
     )
 }
