@@ -22,6 +22,7 @@ pub enum Rk3FlowError {
     Staple(StapleFlowError),
     InvalidFlowStep(f64),
     DegenerateExtent([usize; 4]),
+    GradientLayoutMismatch,
 }
 
 impl From<LatticeGaugeError> for Rk3FlowError {
@@ -93,9 +94,7 @@ fn combine_two(
     cb: f64,
 ) -> Result<Vec<LinkGradient>, Rk3FlowError> {
     if !same_layout(a, b) {
-        return Err(Rk3FlowError::Gauge(LatticeGaugeError::InvalidExtent([
-            0, 0, 0, 0,
-        ])));
+        return Err(Rk3FlowError::GradientLayoutMismatch);
     }
     Ok(a.iter()
         .zip(b)
@@ -118,9 +117,7 @@ fn combine_three(
     cc: f64,
 ) -> Result<Vec<LinkGradient>, Rk3FlowError> {
     if !same_layout(a, b) || !same_layout(a, c) {
-        return Err(Rk3FlowError::Gauge(LatticeGaugeError::InvalidExtent([
-            0, 0, 0, 0,
-        ])));
+        return Err(Rk3FlowError::GradientLayoutMismatch);
     }
     Ok(a.iter()
         .zip(b)
