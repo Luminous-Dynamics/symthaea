@@ -10,6 +10,11 @@
 //!
 //! Hash chaining provides integrity. Rollback resistance requires recovery against an externally
 //! retained trusted head hash; a self-hashed local file alone is not a rollback-resistant anchor.
+//!
+//! Restore is explicitly two phase at this layer: `RestorePrepared` remains unresolved quarantine
+//! and is safe to recover after a crash. Only a later matching `Restored` event releases the
+//! occurrence from quarantine. A reconciler may instead append `RestoreAborted` and leave the
+//! occurrence quarantined.
 
 #![deny(unsafe_code)]
 
@@ -27,6 +32,7 @@ pub const EPISODIC_QUARANTINE_LEDGER_SCHEMA: &str =
 const GENESIS_DOMAIN: &[u8] = b"symthaea.welfare.episodic-quarantine-ledger.genesis.v1\0";
 const EVENT_DOMAIN: &[u8] = b"symthaea.welfare.episodic-quarantine-ledger.event.v1\0";
 const MAX_TARGET_ID_BYTES: usize = 256;
+const MAX_EXECUTION_ID_BYTES: usize = 256;
 const MAX_REF_BYTES: usize = 2048;
 
 /// One state transition committed by the quarantine ledger.
@@ -41,34 +47,64 @@ pub enum QuarantineLedgerEventKind {
         escrow_digest: Sha256Digest,
         escrow_persistence_ref: String,
     },
-    /// A previously quarantined exact occurrence returned to the active set.
+    /// Write-ahead intent to restore one exact quarantined occurrence.
+    ///
+    /// This event does not release quarantine. A restart that sees this as the latest transition
+    /// must keep the occurrence inactive and require reconciliation.
+    RestorePrepared {
+        target_id: String,
+        instance_id: EpisodeInstanceId,
+        content_id: EpisodeContentId,
+        prepared_at_unix_s: u64,
+        execution_id: String,
+    },
+    /// Successful restoration of the exact prepared occurrence.
     Restored {
         target_id: String,
         instance_id: EpisodeInstanceId,
         content_id: EpisodeContentId,
         restored_at_unix_s: u64,
+        execution_id: String,
         restore_result_digest: Sha256Digest,
+    },
+    /// Explicit reconciliation of a prepared restore that did not complete.
+    ///
+    /// The occurrence remains quarantined.
+    RestoreAborted {
+        target_id: String,
+        instance_id: EpisodeInstanceId,
+        content_id: EpisodeContentId,
+        aborted_at_unix_s: u64,
+        execution_id: String,
+        reason_digest: Sha256Digest,
     },
 }
 
 impl QuarantineLedgerEventKind {
     pub fn instance_id(&self) -> EpisodeInstanceId {
         match self {
-            Self::Quarantined { instance_id, .. } | Self::Restored { instance_id, .. } => {
-                *instance_id
-            }
+            Self::Quarantined { instance_id, .. }
+            | Self::RestorePrepared { instance_id, .. }
+            | Self::Restored { instance_id, .. }
+            | Self::RestoreAborted { instance_id, .. } => *instance_id,
         }
     }
 
     pub fn content_id(&self) -> EpisodeContentId {
         match self {
-            Self::Quarantined { content_id, .. } | Self::Restored { content_id, .. } => *content_id,
+            Self::Quarantined { content_id, .. }
+            | Self::RestorePrepared { content_id, .. }
+            | Self::Restored { content_id, .. }
+            | Self::RestoreAborted { content_id, .. } => *content_id,
         }
     }
 
     pub fn target_id(&self) -> &str {
         match self {
-            Self::Quarantined { target_id, .. } | Self::Restored { target_id, .. } => target_id,
+            Self::Quarantined { target_id, .. }
+            | Self::RestorePrepared { target_id, .. }
+            | Self::Restored { target_id, .. }
+            | Self::RestoreAborted { target_id, .. } => target_id,
         }
     }
 }
@@ -83,6 +119,14 @@ pub struct QuarantineLedgerEnvelope {
     pub event_hash: Sha256Digest,
 }
 
+/// Unresolved write-ahead restore intent. The occurrence is still quarantined.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RestorePendingState {
+    pub execution_id: String,
+    pub prepared_at_unix_s: u64,
+    pub generation: u64,
+}
+
 /// Current unresolved quarantine state for one exact occurrence.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QuarantineLedgerState {
@@ -92,7 +136,8 @@ pub struct QuarantineLedgerState {
     pub quarantined_at_unix_s: u64,
     pub escrow_digest: Sha256Digest,
     pub escrow_persistence_ref: String,
-    pub generation: u64,
+    pub quarantine_generation: u64,
+    pub restore_pending: Option<RestorePendingState>,
 }
 
 /// Append-only state machine for exact episodic quarantine.
@@ -176,57 +221,121 @@ impl EpisodicQuarantineStateLedger {
         )?;
         validate_nonzero_digest("escrow_digest", escrow_digest)?;
 
-        let event = QuarantineLedgerEventKind::Quarantined {
+        self.append_event(QuarantineLedgerEventKind::Quarantined {
             target_id,
             instance_id,
             content_id,
             quarantined_at_unix_s,
             escrow_digest,
             escrow_persistence_ref,
-        };
-        self.append_event(event)
+        })
     }
 
-    /// Commit restoration of the same occurrence/content lineage.
+    /// Persist write-ahead restore intent while keeping the occurrence quarantined.
+    pub fn append_restore_prepared(
+        &mut self,
+        target_id: impl Into<String>,
+        instance_id: EpisodeInstanceId,
+        content_id: EpisodeContentId,
+        prepared_at_unix_s: u64,
+        execution_id: impl Into<String>,
+    ) -> Result<Sha256Digest, QuarantineLedgerError> {
+        let target_id = target_id.into();
+        let execution_id = execution_id.into();
+        validate_text("target_id", &target_id, MAX_TARGET_ID_BYTES)?;
+        validate_text("execution_id", &execution_id, MAX_EXECUTION_ID_BYTES)?;
+        let current = self.validate_matching_unresolved(instance_id, content_id, &target_id)?;
+        if let Some(pending) = &current.restore_pending {
+            return Err(QuarantineLedgerError::RestoreAlreadyPrepared {
+                instance_id,
+                execution_id: pending.execution_id.clone(),
+            });
+        }
+        self.append_event(QuarantineLedgerEventKind::RestorePrepared {
+            target_id,
+            instance_id,
+            content_id,
+            prepared_at_unix_s,
+            execution_id,
+        })
+    }
+
+    /// Commit successful restoration of the exact previously prepared occurrence.
+    #[allow(clippy::too_many_arguments)]
     pub fn append_restored(
         &mut self,
         target_id: impl Into<String>,
         instance_id: EpisodeInstanceId,
         content_id: EpisodeContentId,
         restored_at_unix_s: u64,
+        execution_id: impl Into<String>,
         restore_result_digest: Sha256Digest,
     ) -> Result<Sha256Digest, QuarantineLedgerError> {
         let target_id = target_id.into();
+        let execution_id = execution_id.into();
         validate_text("target_id", &target_id, MAX_TARGET_ID_BYTES)?;
+        validate_text("execution_id", &execution_id, MAX_EXECUTION_ID_BYTES)?;
         validate_nonzero_digest("restore_result_digest", restore_result_digest)?;
-
-        let current = self
-            .unresolved
-            .get(&instance_id)
-            .ok_or(QuarantineLedgerError::NotQuarantined(instance_id))?;
-        if current.content_id != content_id {
-            return Err(QuarantineLedgerError::ContentIdentityMismatch {
+        let current = self.validate_matching_unresolved(instance_id, content_id, &target_id)?;
+        let pending = current
+            .restore_pending
+            .as_ref()
+            .ok_or(QuarantineLedgerError::RestoreNotPrepared(instance_id))?;
+        if pending.execution_id != execution_id {
+            return Err(QuarantineLedgerError::RestoreExecutionMismatch {
                 instance_id,
-                expected: current.content_id,
-                actual: content_id,
-            });
-        }
-        if current.target_id != target_id {
-            return Err(QuarantineLedgerError::TargetMismatch {
-                instance_id,
-                expected: current.target_id.clone(),
-                actual: target_id,
+                expected: pending.execution_id.clone(),
+                actual: execution_id,
             });
         }
 
-        let event = QuarantineLedgerEventKind::Restored {
+        self.append_event(QuarantineLedgerEventKind::Restored {
             target_id,
             instance_id,
             content_id,
             restored_at_unix_s,
+            execution_id: pending.execution_id.clone(),
             restore_result_digest,
-        };
-        self.append_event(event)
+        })
+    }
+
+    /// Reconcile a prepared restore as aborted; quarantine remains in force.
+    #[allow(clippy::too_many_arguments)]
+    pub fn append_restore_aborted(
+        &mut self,
+        target_id: impl Into<String>,
+        instance_id: EpisodeInstanceId,
+        content_id: EpisodeContentId,
+        aborted_at_unix_s: u64,
+        execution_id: impl Into<String>,
+        reason_digest: Sha256Digest,
+    ) -> Result<Sha256Digest, QuarantineLedgerError> {
+        let target_id = target_id.into();
+        let execution_id = execution_id.into();
+        validate_text("target_id", &target_id, MAX_TARGET_ID_BYTES)?;
+        validate_text("execution_id", &execution_id, MAX_EXECUTION_ID_BYTES)?;
+        validate_nonzero_digest("reason_digest", reason_digest)?;
+        let current = self.validate_matching_unresolved(instance_id, content_id, &target_id)?;
+        let pending = current
+            .restore_pending
+            .as_ref()
+            .ok_or(QuarantineLedgerError::RestoreNotPrepared(instance_id))?;
+        if pending.execution_id != execution_id {
+            return Err(QuarantineLedgerError::RestoreExecutionMismatch {
+                instance_id,
+                expected: pending.execution_id.clone(),
+                actual: execution_id,
+            });
+        }
+
+        self.append_event(QuarantineLedgerEventKind::RestoreAborted {
+            target_id,
+            instance_id,
+            content_id,
+            aborted_at_unix_s,
+            execution_id: pending.execution_id.clone(),
+            reason_digest,
+        })
     }
 
     /// Reconstruct and validate the complete ledger against an externally retained head hash.
@@ -282,6 +391,33 @@ impl EpisodicQuarantineStateLedger {
         Ok(recovered)
     }
 
+    fn validate_matching_unresolved(
+        &self,
+        instance_id: EpisodeInstanceId,
+        content_id: EpisodeContentId,
+        target_id: &str,
+    ) -> Result<&QuarantineLedgerState, QuarantineLedgerError> {
+        let current = self
+            .unresolved
+            .get(&instance_id)
+            .ok_or(QuarantineLedgerError::NotQuarantined(instance_id))?;
+        if current.content_id != content_id {
+            return Err(QuarantineLedgerError::ContentIdentityMismatch {
+                instance_id,
+                expected: current.content_id,
+                actual: content_id,
+            });
+        }
+        if current.target_id != target_id {
+            return Err(QuarantineLedgerError::TargetMismatch {
+                instance_id,
+                expected: current.target_id.clone(),
+                actual: target_id.to_string(),
+            });
+        }
+        Ok(current)
+    }
+
     fn append_event(
         &mut self,
         event: QuarantineLedgerEventKind,
@@ -332,35 +468,74 @@ impl EpisodicQuarantineStateLedger {
                         quarantined_at_unix_s: *quarantined_at_unix_s,
                         escrow_digest: *escrow_digest,
                         escrow_persistence_ref: escrow_persistence_ref.clone(),
-                        generation,
+                        quarantine_generation: generation,
+                        restore_pending: None,
                     },
                 );
+            }
+            QuarantineLedgerEventKind::RestorePrepared {
+                target_id,
+                instance_id,
+                content_id,
+                prepared_at_unix_s,
+                execution_id,
+            } => {
+                let current = self.validate_matching_unresolved(*instance_id, *content_id, target_id)?;
+                if let Some(pending) = &current.restore_pending {
+                    return Err(QuarantineLedgerError::RestoreAlreadyPrepared {
+                        instance_id: *instance_id,
+                        execution_id: pending.execution_id.clone(),
+                    });
+                }
+                let current = self.unresolved.get_mut(instance_id).expect("validated above");
+                current.restore_pending = Some(RestorePendingState {
+                    execution_id: execution_id.clone(),
+                    prepared_at_unix_s: *prepared_at_unix_s,
+                    generation,
+                });
             }
             QuarantineLedgerEventKind::Restored {
                 target_id,
                 instance_id,
                 content_id,
+                execution_id,
                 ..
             } => {
-                let current = self
-                    .unresolved
-                    .get(instance_id)
-                    .ok_or(QuarantineLedgerError::NotQuarantined(*instance_id))?;
-                if current.content_id != *content_id {
-                    return Err(QuarantineLedgerError::ContentIdentityMismatch {
+                let current = self.validate_matching_unresolved(*instance_id, *content_id, target_id)?;
+                let pending = current
+                    .restore_pending
+                    .as_ref()
+                    .ok_or(QuarantineLedgerError::RestoreNotPrepared(*instance_id))?;
+                if pending.execution_id != *execution_id {
+                    return Err(QuarantineLedgerError::RestoreExecutionMismatch {
                         instance_id: *instance_id,
-                        expected: current.content_id,
-                        actual: *content_id,
-                    });
-                }
-                if current.target_id != *target_id {
-                    return Err(QuarantineLedgerError::TargetMismatch {
-                        instance_id: *instance_id,
-                        expected: current.target_id.clone(),
-                        actual: target_id.clone(),
+                        expected: pending.execution_id.clone(),
+                        actual: execution_id.clone(),
                     });
                 }
                 self.unresolved.remove(instance_id);
+            }
+            QuarantineLedgerEventKind::RestoreAborted {
+                target_id,
+                instance_id,
+                content_id,
+                execution_id,
+                ..
+            } => {
+                let current = self.validate_matching_unresolved(*instance_id, *content_id, target_id)?;
+                let pending = current
+                    .restore_pending
+                    .as_ref()
+                    .ok_or(QuarantineLedgerError::RestoreNotPrepared(*instance_id))?;
+                if pending.execution_id != *execution_id {
+                    return Err(QuarantineLedgerError::RestoreExecutionMismatch {
+                        instance_id: *instance_id,
+                        expected: pending.execution_id.clone(),
+                        actual: execution_id.clone(),
+                    });
+                }
+                let current = self.unresolved.get_mut(instance_id).expect("validated above");
+                current.restore_pending = None;
             }
         }
         Ok(())
@@ -404,10 +579,25 @@ fn validate_event(event: &QuarantineLedgerEventKind) -> Result<(), QuarantineLed
                 MAX_REF_BYTES,
             )?;
         }
+        QuarantineLedgerEventKind::RestorePrepared { execution_id, .. } => {
+            validate_text("execution_id", execution_id, MAX_EXECUTION_ID_BYTES)?;
+        }
         QuarantineLedgerEventKind::Restored {
+            execution_id,
             restore_result_digest,
             ..
-        } => validate_nonzero_digest("restore_result_digest", *restore_result_digest)?,
+        } => {
+            validate_text("execution_id", execution_id, MAX_EXECUTION_ID_BYTES)?;
+            validate_nonzero_digest("restore_result_digest", *restore_result_digest)?;
+        }
+        QuarantineLedgerEventKind::RestoreAborted {
+            execution_id,
+            reason_digest,
+            ..
+        } => {
+            validate_text("execution_id", execution_id, MAX_EXECUTION_ID_BYTES)?;
+            validate_nonzero_digest("reason_digest", *reason_digest)?;
+        }
     }
     Ok(())
 }
@@ -447,6 +637,19 @@ pub enum QuarantineLedgerError {
     AlreadyQuarantined(EpisodeInstanceId),
     #[error("episodic occurrence is not quarantined: {0}")]
     NotQuarantined(EpisodeInstanceId),
+    #[error("restore already prepared for {instance_id} by execution {execution_id:?}")]
+    RestoreAlreadyPrepared {
+        instance_id: EpisodeInstanceId,
+        execution_id: String,
+    },
+    #[error("restore is not prepared for episodic occurrence {0}")]
+    RestoreNotPrepared(EpisodeInstanceId),
+    #[error("restore execution mismatch for {instance_id}: expected={expected:?}, actual={actual:?}")]
+    RestoreExecutionMismatch {
+        instance_id: EpisodeInstanceId,
+        expected: String,
+        actual: String,
+    },
     #[error("quarantine content identity mismatch for {instance_id}: expected={expected:?}, actual={actual:?}")]
     ContentIdentityMismatch {
         instance_id: EpisodeInstanceId,
@@ -479,33 +682,42 @@ pub enum QuarantineLedgerError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::Serialize;
+    use symthaea_core::hdc::unified_hv::ContinuousHV;
+    use symthaea_memory::episodic_replay::{Episode, EpisodicMemory, EpisodicReplayConfig};
+
+    use crate::memory_identity::episode_content_id;
 
     fn digest(seed: u8) -> Sha256Digest {
         Sha256Digest([seed; 32])
     }
 
-    fn instance(seed: u128) -> EpisodeInstanceId {
-        // `EpisodeInstanceId` intentionally has no public arbitrary-ID constructor. Persistence
-        // tests obtain IDs through serde, the same representation used by durable envelopes.
-        serde_json::from_str(&format!("\"{:032x}\"", seed)).unwrap()
-    }
-
-    fn content(seed: u8) -> EpisodeContentId {
-        // EpisodeContentId is likewise opaque; deserialize its transparent digest representation.
-        // Build the JSON using the type's derived serde representation rather than exposing a
-        // public forgeable constructor in production code.
-        #[derive(Serialize)]
-        struct Wrapper([u8; 32]);
-        let json = serde_json::to_string(&Wrapper([seed; 32])).unwrap();
-        serde_json::from_str(&json).unwrap()
+    fn identity(seed: u64) -> (EpisodeInstanceId, EpisodeContentId) {
+        let episode = Episode::new(
+            ContinuousHV::from_values(vec![seed as f32, seed as f32 + 1.0]),
+            ContinuousHV::from_values(vec![seed as f32 + 2.0, seed as f32 + 3.0]),
+            0.8,
+            seed,
+        );
+        let content_id = episode_content_id(&episode).unwrap();
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig::broad_capture());
+        let instance_id = memory.store_if_significant_with_id(episode).unwrap();
+        (instance_id, content_id)
     }
 
     #[test]
     fn duplicate_content_instances_have_independent_quarantine_state() {
-        let first = instance(1);
-        let second = instance(2);
-        let same_content = content(7);
+        let episode = Episode::new(
+            ContinuousHV::from_values(vec![1.0, 2.0]),
+            ContinuousHV::from_values(vec![3.0, 4.0]),
+            0.8,
+            10,
+        );
+        let same_content = episode_content_id(&episode).unwrap();
+        let mut memory = EpisodicMemory::new(EpisodicReplayConfig::broad_capture());
+        let first = memory.store_if_significant_with_id(episode.clone()).unwrap();
+        let second = memory.store_if_significant_with_id(episode).unwrap();
+        assert_ne!(first, second);
+
         let mut ledger = EpisodicQuarantineStateLedger::new();
         ledger
             .append_quarantined(
@@ -517,9 +729,9 @@ mod tests {
                 "escrow:first",
             )
             .unwrap();
-
         assert!(ledger.unresolved_state(first).is_some());
         assert!(ledger.unresolved_state(second).is_none());
+
         ledger
             .append_quarantined(
                 format!("symthaea:self:episodic-memory:instance:{second}"),
@@ -534,9 +746,8 @@ mod tests {
     }
 
     #[test]
-    fn restore_requires_same_target_and_content_lineage() {
-        let id = instance(3);
-        let content_id = content(8);
+    fn restore_is_write_ahead_and_execution_bound() {
+        let (id, content_id) = identity(3);
         let target = format!("symthaea:self:episodic-memory:instance:{id}");
         let mut ledger = EpisodicQuarantineStateLedger::new();
         ledger
@@ -544,32 +755,64 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            ledger.append_restored(&target, id, content(9), 120, digest(4)),
-            Err(QuarantineLedgerError::ContentIdentityMismatch { .. })
+            ledger.append_restored(&target, id, content_id, 120, "restore:1", digest(4)),
+            Err(QuarantineLedgerError::RestoreNotPrepared(_))
         ));
+
+        ledger
+            .append_restore_prepared(&target, id, content_id, 110, "restore:1")
+            .unwrap();
+        let pending = ledger
+            .unresolved_state(id)
+            .unwrap()
+            .restore_pending
+            .as_ref()
+            .unwrap();
+        assert_eq!(pending.execution_id, "restore:1");
+
         assert!(matches!(
-            ledger.append_restored("other-target", id, content_id, 120, digest(4)),
-            Err(QuarantineLedgerError::TargetMismatch { .. })
+            ledger.append_restored(&target, id, content_id, 120, "restore:2", digest(4)),
+            Err(QuarantineLedgerError::RestoreExecutionMismatch { .. })
         ));
         ledger
-            .append_restored(&target, id, content_id, 120, digest(4))
+            .append_restored(&target, id, content_id, 120, "restore:1", digest(4))
             .unwrap();
         assert!(ledger.unresolved_state(id).is_none());
-        assert_eq!(ledger.generation(), 2);
+        assert_eq!(ledger.generation(), 3);
     }
 
     #[test]
-    fn anchored_recovery_detects_valid_suffix_rollback() {
-        let id = instance(4);
-        let content_id = content(10);
+    fn aborted_restore_remains_quarantined_but_clears_pending_intent() {
+        let (id, content_id) = identity(4);
         let target = format!("symthaea:self:episodic-memory:instance:{id}");
         let mut ledger = EpisodicQuarantineStateLedger::new();
         ledger
             .append_quarantined(&target, id, content_id, 100, digest(5), "escrow:4")
             .unwrap();
+        ledger
+            .append_restore_prepared(&target, id, content_id, 110, "restore:4")
+            .unwrap();
+        ledger
+            .append_restore_aborted(&target, id, content_id, 115, "restore:4", digest(6))
+            .unwrap();
+
+        let state = ledger.unresolved_state(id).unwrap();
+        assert!(state.restore_pending.is_none());
+        assert_eq!(state.content_id, content_id);
+        assert_eq!(ledger.generation(), 3);
+    }
+
+    #[test]
+    fn anchored_recovery_detects_valid_suffix_rollback() {
+        let (id, content_id) = identity(5);
+        let target = format!("symthaea:self:episodic-memory:instance:{id}");
+        let mut ledger = EpisodicQuarantineStateLedger::new();
+        ledger
+            .append_quarantined(&target, id, content_id, 100, digest(7), "escrow:5")
+            .unwrap();
         let one_event_head = ledger.head_hash();
         ledger
-            .append_restored(&target, id, content_id, 120, digest(6))
+            .append_restore_prepared(&target, id, content_id, 110, "restore:5")
             .unwrap();
         let trusted_two_event_head = ledger.head_hash();
 
@@ -590,12 +833,11 @@ mod tests {
 
     #[test]
     fn recovery_detects_event_tampering() {
-        let id = instance(5);
-        let content_id = content(11);
+        let (id, content_id) = identity(6);
         let target = format!("symthaea:self:episodic-memory:instance:{id}");
         let mut ledger = EpisodicQuarantineStateLedger::new();
         ledger
-            .append_quarantined(&target, id, content_id, 100, digest(7), "escrow:5")
+            .append_quarantined(&target, id, content_id, 100, digest(8), "escrow:6")
             .unwrap();
         let trusted_head = ledger.head_hash();
         let mut tampered = ledger.events().to_vec();
@@ -613,13 +855,12 @@ mod tests {
     }
 
     #[test]
-    fn recovery_rejects_illegal_duplicate_quarantine_even_with_rehashed_event() {
-        let id = instance(6);
-        let content_id = content(12);
+    fn recovery_rejects_illegal_duplicate_quarantine_even_if_rehashed() {
+        let (id, content_id) = identity(7);
         let target = format!("symthaea:self:episodic-memory:instance:{id}");
         let mut ledger = EpisodicQuarantineStateLedger::new();
         ledger
-            .append_quarantined(&target, id, content_id, 100, digest(8), "escrow:6")
+            .append_quarantined(&target, id, content_id, 100, digest(9), "escrow:7")
             .unwrap();
 
         let first = ledger.events()[0].clone();
