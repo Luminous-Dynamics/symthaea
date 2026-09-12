@@ -521,10 +521,10 @@ mod tests {
     fn impossible_authorization_window_is_invalid_policy() {
         let mut invalid = policy();
         invalid.maximum_authorization_age_ms = invalid.minimum_nominal_span_ms - 1;
-        assert_eq!(
+        assert!(matches!(
             RequalificationGate::new(invalid),
             Err(RequalificationError::InvalidPolicy)
-        );
+        ));
     }
 
     #[test]
