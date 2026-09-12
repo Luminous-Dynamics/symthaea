@@ -18,6 +18,8 @@
 //!   parity against the finite-difference reference and degenerate fallback
 //! - **Third-order topology flow**: independently qualified Lie-group RK3
 //!   integration over the same six-staple Wilson-action gradient
+//! - **Flowed gauge energy**: clover energy density plus ensemble-mean-only
+//!   `t0`/`w0`-like crossing algebra with caller-supplied scale targets
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
 //!   exact step-size, probe, step-count, and smoothing-time provenance
 //!
@@ -39,6 +41,7 @@ pub mod cross_sections;
 pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
+pub mod lattice_flow_energy;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
 mod lattice_su3_lie;
@@ -59,6 +62,12 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use lattice_flow_energy::{
+    CLOVER_FLOW_ENERGY_ID, EnsembleFlowEnergyPoint, FlowEnergyError,
+    clover_energy_density_at_site, dimensionless_flow_energy_curve,
+    energy_density_from_field_strengths, mean_clover_energy_density,
+    t0_like_from_ensemble_mean, w0_like_from_ensemble_mean,
 };
 pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
