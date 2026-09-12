@@ -35,6 +35,22 @@ For prospective acquisition, the declaration must bind:
 
 The acquired artifact digest must be present in the generic prediction provenance.
 
+Caller declaration order is not evidence. The admission API canonicalizes prospective acquisition declarations by evidence dimension before validating and emitting the receipt. Serialized receipts require that canonical order.
+
+## Dimension-bound envelope lineage
+
+The final receipt stores seven `AdmittedEnvelopeBinding` records rather than separate dimension and digest arrays.
+
+Each record binds one exact evidence dimension to one exact native-envelope SHA-256. Bindings are required to be in canonical dimension order, with no duplicate dimensions or envelope digests.
+
+This preserves the actual provenance map in the admission receipt: it is not enough to know that seven envelopes were admitted; the receipt records which envelope supplied functional performance, stability, critical-material burden, supply resilience, hazard, circularity, and manufacturability.
+
+## Replay verification
+
+`NativeCampaignAdmissionReceipt::validate_with_inputs(...)` reruns the complete admission process from the frozen campaign manifest, native dossier, and recorded acquisition declarations.
+
+The recomputed receipt must exactly equal the serialized receipt. This rechecks the lane/model/fidelity/evidence/source rules rather than merely validating receipt syntax.
+
 ## Negative results remain first-class
 
 Admission deliberately does **not** require the candidate to be feasible.
