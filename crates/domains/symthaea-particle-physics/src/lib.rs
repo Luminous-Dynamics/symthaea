@@ -53,7 +53,7 @@ pub use cross_sections::{
     sigma_ee_to_mumu_with_z,
 };
 pub use decay_widths::{
-    DecayChannel, muon_decay_width, pion_lifetime, top_decay_width,
+    DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
 };
 pub use lattice_gauge::{
