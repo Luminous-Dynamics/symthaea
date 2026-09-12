@@ -38,6 +38,23 @@ pub struct RngLineage {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ProposalParameterOrigin {
+    /// The proposal width was fixed before any tuning run was inspected.
+    FixedPredeclared,
+    /// The proposal width was selected during a separate, non-production warm-up.
+    TunedBeforeProduction {
+        evidence_id: String,
+        tuning_stream_id: String,
+        tuning_config_digest: String,
+        target_acceptance: f64,
+        tuning_sweeps: u64,
+    },
+    /// Sampler does not use the current random-walk proposal-width parameter.
+    NotApplicable,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnsemblePlan {
     pub ensemble_id: String,
     pub dims: [usize; 4],
@@ -47,7 +64,10 @@ pub struct EnsemblePlan {
     pub sampler: LatticeSamplerKind,
     /// Required for the current Cabibbo-Marinari Metropolis proposal family.
     pub proposal_max_angle: Option<f64>,
-    /// Number of complete sweeps discarded before any scheduled measurement.
+    /// Provenance for how `proposal_max_angle` was selected.
+    pub proposal_origin: ProposalParameterOrigin,
+    /// Number of complete production sweeps discarded before any scheduled measurement.
+    /// Proposal-tuning sweeps are not counted here.
     pub thermalization_sweeps: u64,
     /// Complete sweeps between retained measurements.
     pub measurement_stride: u64,
@@ -92,6 +112,11 @@ pub enum EnsembleRecordError {
     InvalidExtent([usize; 4]),
     InvalidBeta(f64),
     InvalidProposalMaxAngle(Option<f64>),
+    UnexpectedProposalMaxAngle(Option<f64>),
+    InvalidProposalOrigin,
+    InvalidTuningTarget(f64),
+    InvalidTuningSweeps(u64),
+    TuningSharesProductionStream(String),
     InvalidMeasurementStride(u64),
     InvalidMeasurementCount(usize),
     InvalidSha256Digest { field: &'static str, value: String },
@@ -127,6 +152,65 @@ fn require_sha256(value: &str, field: &'static str) -> Result<(), EnsembleRecord
 }
 
 impl EnsemblePlan {
+    fn validate_proposal_origin(&self) -> Result<(), EnsembleRecordError> {
+        match self.sampler {
+            LatticeSamplerKind::CabibboMarinariMetropolis => {
+                match self.proposal_max_angle {
+                    Some(angle) if angle.is_finite() && angle > 0.0 && angle <= PI => {}
+                    value => return Err(EnsembleRecordError::InvalidProposalMaxAngle(value)),
+                }
+                match &self.proposal_origin {
+                    ProposalParameterOrigin::FixedPredeclared => Ok(()),
+                    ProposalParameterOrigin::TunedBeforeProduction {
+                        evidence_id,
+                        tuning_stream_id,
+                        tuning_config_digest,
+                        target_acceptance,
+                        tuning_sweeps,
+                    } => {
+                        require_nonempty(evidence_id, "proposal_origin.evidence_id")?;
+                        require_nonempty(tuning_stream_id, "proposal_origin.tuning_stream_id")?;
+                        require_sha256(
+                            tuning_config_digest,
+                            "proposal_origin.tuning_config_digest",
+                        )?;
+                        if !target_acceptance.is_finite()
+                            || *target_acceptance <= 0.0
+                            || *target_acceptance >= 1.0
+                        {
+                            return Err(EnsembleRecordError::InvalidTuningTarget(
+                                *target_acceptance,
+                            ));
+                        }
+                        if *tuning_sweeps == 0 {
+                            return Err(EnsembleRecordError::InvalidTuningSweeps(0));
+                        }
+                        if tuning_stream_id == &self.rng.stream_id {
+                            return Err(EnsembleRecordError::TuningSharesProductionStream(
+                                tuning_stream_id.clone(),
+                            ));
+                        }
+                        Ok(())
+                    }
+                    ProposalParameterOrigin::NotApplicable => {
+                        Err(EnsembleRecordError::InvalidProposalOrigin)
+                    }
+                }
+            }
+            _ => {
+                if self.proposal_max_angle.is_some() {
+                    return Err(EnsembleRecordError::UnexpectedProposalMaxAngle(
+                        self.proposal_max_angle,
+                    ));
+                }
+                if !matches!(self.proposal_origin, ProposalParameterOrigin::NotApplicable) {
+                    return Err(EnsembleRecordError::InvalidProposalOrigin);
+                }
+                Ok(())
+            }
+        }
+    }
+
     pub fn validate(&self) -> Result<(), EnsembleRecordError> {
         require_nonempty(&self.ensemble_id, "ensemble_id")?;
         require_nonempty(&self.action_definition, "action_definition")?;
@@ -151,12 +235,7 @@ impl EnsemblePlan {
         if self.planned_measurements == 0 {
             return Err(EnsembleRecordError::InvalidMeasurementCount(0));
         }
-        if self.sampler == LatticeSamplerKind::CabibboMarinariMetropolis {
-            match self.proposal_max_angle {
-                Some(angle) if angle.is_finite() && angle > 0.0 && angle <= PI => {}
-                value => return Err(EnsembleRecordError::InvalidProposalMaxAngle(value)),
-            }
-        }
+        self.validate_proposal_origin()?;
         self.measurement_schedule()?;
         Ok(())
     }
@@ -164,8 +243,9 @@ impl EnsemblePlan {
     /// Predeclared retained-measurement sweeps.
     ///
     /// The first retained sample occurs one full `measurement_stride` after the
-    /// end of the thermalization region; there is no measurement exactly at the
-    /// burn-in boundary.
+    /// end of the production thermalization region; there is no measurement
+    /// exactly at the burn-in boundary. Proposal-tuning sweeps are not part of
+    /// this schedule.
     pub fn measurement_schedule(&self) -> Result<Vec<u64>, EnsembleRecordError> {
         let mut out = Vec::with_capacity(self.planned_measurements);
         for i in 1..=self.planned_measurements {
@@ -275,6 +355,7 @@ mod tests {
             boundary_conditions: [LatticeBoundaryCondition::Periodic; 4],
             sampler: LatticeSamplerKind::CabibboMarinariMetropolis,
             proposal_max_angle: Some(0.18),
+            proposal_origin: ProposalParameterOrigin::FixedPredeclared,
             thermalization_sweeps: 1_000,
             measurement_stride: 100,
             planned_measurements: 4,
@@ -282,7 +363,7 @@ mod tests {
                 algorithm: "qualification-rng".into(),
                 implementation: "external".into(),
                 version: "v1".into(),
-                stream_id: "stream-0".into(),
+                stream_id: "stream-production".into(),
                 seed_commitment: digest('a'),
             },
             code_revision: "0123456789abcdef0123456789abcdef01234567".into(),
@@ -306,6 +387,49 @@ mod tests {
             p.validate(),
             Err(EnsembleRecordError::InvalidProposalMaxAngle(None))
         ));
+    }
+
+    #[test]
+    fn tuned_proposal_binds_separate_warmup_lineage() {
+        let mut p = plan();
+        p.proposal_max_angle = Some(0.5);
+        p.proposal_origin = ProposalParameterOrigin::TunedBeforeProduction {
+            evidence_id: "LQCD-016A:run-1".into(),
+            tuning_stream_id: "stream-tuning".into(),
+            tuning_config_digest: digest('e'),
+            target_acceptance: 0.7,
+            tuning_sweeps: 100,
+        };
+        assert!(p.validate().is_ok());
+    }
+
+    #[test]
+    fn tuned_proposal_cannot_share_production_stream() {
+        let mut p = plan();
+        p.proposal_origin = ProposalParameterOrigin::TunedBeforeProduction {
+            evidence_id: "LQCD-016A:run-1".into(),
+            tuning_stream_id: "stream-production".into(),
+            tuning_config_digest: digest('e'),
+            target_acceptance: 0.7,
+            tuning_sweeps: 100,
+        };
+        assert!(matches!(
+            p.validate(),
+            Err(EnsembleRecordError::TuningSharesProductionStream(_))
+        ));
+    }
+
+    #[test]
+    fn non_metropolis_sampler_rejects_random_walk_parameter() {
+        let mut p = plan();
+        p.sampler = LatticeSamplerKind::CabibboMarinariHeatbath;
+        p.proposal_origin = ProposalParameterOrigin::NotApplicable;
+        assert!(matches!(
+            p.validate(),
+            Err(EnsembleRecordError::UnexpectedProposalMaxAngle(Some(_)))
+        ));
+        p.proposal_max_angle = None;
+        assert!(p.validate().is_ok());
     }
 
     #[test]
