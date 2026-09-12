@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-substance-hazard"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Content-addressed exact-substance hazard evidence for Symthaea."
+
+[dependencies]
+symthaea-discovery = { path = "../../core/symthaea-discovery" }
+symthaea-energy-material-screening = { path = "../../domains/symthaea-energy-material-screening" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
