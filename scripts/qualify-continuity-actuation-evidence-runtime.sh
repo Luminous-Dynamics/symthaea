@@ -48,7 +48,7 @@ write_receipt() {
   [[ -n "$receipt" ]] || return 0
   mkdir -p "$(dirname "$receipt")" || return 0
   {
-    printf 'schema\tsymthaea-continuity-actuation-evidence-runtime-qualification-v2\n'
+    printf 'schema\tsymthaea-continuity-actuation-evidence-runtime-qualification-v3\n'
     printf 'status\t%s\n' "$(sanitize "$status")"
     printf 'failure_class\t%s\n' "$(sanitize "$failure_class")"
     printf 'phase\t%s\n' "$(sanitize "$phase")"
