@@ -81,20 +81,54 @@ pub struct LegacySourceCapturePlanV3 {
     pub requests: Vec<LegacySourceRevisionCaptureRequestV3>,
 }
 
+/// Backward-compatible full-registry plan. Historical callers keep the original
+/// behavior; generation-aware qualification should use the explicit-target form.
 pub fn plan_legacy_qualification_source_captures_v3(
     pack: &LegacyComputingPackV1,
+) -> Result<LegacySourceCapturePlanV3, LegacySourceCapturePlanErrorV3> {
+    let claim_ids = pack.sources.claims().map(|claim| claim.id.clone()).collect();
+    let procedure_ids = pack
+        .procedures
+        .iter()
+        .map(|procedure| procedure.id.clone())
+        .collect();
+    plan_legacy_qualification_source_captures_for_targets_v3(
+        pack,
+        &claim_ids,
+        &procedure_ids,
+    )
+}
+
+/// Plan captures for one explicit active qualification target set. This is what
+/// lets a versioned qualification manifest move forward while the historical
+/// registry remains append-only.
+pub fn plan_legacy_qualification_source_captures_for_targets_v3(
+    pack: &LegacyComputingPackV1,
+    claim_ids: &BTreeSet<TechnicalClaimIdV1>,
+    procedure_ids: &BTreeSet<String>,
 ) -> Result<LegacySourceCapturePlanV3, LegacySourceCapturePlanErrorV3> {
     pack.validate()?;
 
     let mut required = BTreeMap::<SourceSnapshotIdV1, RequiredUse>::new();
-    for claim in pack.sources.claims() {
+    for claim_id in claim_ids {
+        let claim = pack
+            .sources
+            .claim(claim_id)
+            .ok_or_else(|| LegacySourceCapturePlanErrorV3::UnknownClaim(claim_id.clone()))?;
         required
             .entry(claim.source_snapshot.clone())
             .or_default()
             .claim_ids
             .insert(claim.id.clone());
     }
-    for procedure in &pack.procedures {
+    for procedure_id in procedure_ids {
+        let procedure = pack
+            .procedures
+            .iter()
+            .find(|procedure| &procedure.id == procedure_id)
+            .ok_or_else(|| {
+                LegacySourceCapturePlanErrorV3::UnknownProcedure(procedure_id.clone())
+            })?;
         for snapshot_id in &procedure.source_snapshots {
             required
                 .entry(snapshot_id.clone())
@@ -259,6 +293,8 @@ pub enum LegacySourceCapturePlanErrorV3 {
     Serialization(String),
     UnknownDocument(SourceDocumentIdV1),
     UnknownSnapshot(SourceSnapshotIdV1),
+    UnknownClaim(TechnicalClaimIdV1),
+    UnknownProcedure(String),
     DocumentSnapshotMismatch {
         document: SourceDocumentIdV1,
         snapshot: SourceSnapshotIdV1,
@@ -277,6 +313,12 @@ impl fmt::Display for LegacySourceCapturePlanErrorV3 {
             }
             Self::UnknownSnapshot(id) => {
                 write!(f, "legacy capture V3 references unknown snapshot {}", id.0)
+            }
+            Self::UnknownClaim(id) => {
+                write!(f, "legacy capture V3 references unknown claim {}", id.0)
+            }
+            Self::UnknownProcedure(id) => {
+                write!(f, "legacy capture V3 references unknown procedure {id}")
             }
             Self::DocumentSnapshotMismatch { document, snapshot } => write!(
                 f,
@@ -319,6 +361,23 @@ mod tests {
             plan.capture_needed_revisions + plan.already_content_bound_revisions,
             plan.required_source_revisions
         );
+    }
+
+    #[test]
+    fn explicit_target_plan_does_not_pull_unselected_registry_entries() {
+        let pack = portfolio();
+        let claim_id = pack.sources.claims().next().unwrap().id.clone();
+        let claim_ids = BTreeSet::from([claim_id.clone()]);
+        let plan = plan_legacy_qualification_source_captures_for_targets_v3(
+            &pack,
+            &claim_ids,
+            &BTreeSet::new(),
+        )
+        .unwrap();
+        assert_eq!(plan.required_source_revisions, 1);
+        assert_eq!(plan.requests.len(), 1);
+        assert_eq!(plan.requests[0].claim_ids, claim_ids);
+        assert!(plan.requests[0].procedure_ids.is_empty());
     }
 
     #[test]
@@ -412,14 +471,13 @@ mod tests {
                 lifecycle: basis.lifecycle,
                 authority: basis.authority,
                 stability: basis.stability,
-                published_at_unix_ms: None,
-                source_updated_at_unix_ms: None,
-                fetched_at_unix_ms: 1_800_000_100_000,
+                published_at_unix_ms: basis.published_at_unix_ms,
+                source_updated_at_unix_ms: basis.source_updated_at_unix_ms,
+                fetched_at_unix_ms: basis.fetched_at_unix_ms + 1,
                 capture: SourceCaptureV1::MetadataOnly,
                 relations: basis.relations.clone(),
             })
             .unwrap();
-        pack.validate().unwrap();
         let plan = plan_legacy_qualification_source_captures_v3(&pack).unwrap();
         assert!(!plan
             .requests
