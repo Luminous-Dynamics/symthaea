@@ -1,22 +1,21 @@
-//! Characterization tests for `ExpectedFreeEnergyComputer`'s term behaviour.
+//! Characterization and regression tests for `ExpectedFreeEnergyComputer`'s term behaviour.
 //!
-//! These assert what the code CURRENTLY does, and what it currently does is a
-//! defect. They exist so that the defect is measured rather than argued, and so
-//! that fixing it fails loudly here with a pointer to the write-up.
+//! The epistemic-term characterization still records a known defect. Novelty-history
+//! tests below instead freeze the repaired rule that candidate evaluation and
+//! selection are pure and only an explicit action commitment consumes novelty.
 //!
 //! Context: `docs/EFE_DISPATCH_GATE_2026-07-31.md`. A planned 18-day fleet-dispatch
-//! experiment was halted because the two terms that distinguish expected free
-//! energy from a weighted greedy heuristic — epistemic and novelty — cannot vary
-//! across candidate actions. The finding was originally derived statically by
-//! composing three functions; these tests turn it into a measurement.
+//! experiment was halted after defects were found in both epistemic and novelty
+//! semantics. These tests preserve the still-open epistemic finding while preventing
+//! regression of the repaired considered-vs-committed novelty boundary.
 //!
-//! **If a test here fails, that is probably good news.** It means someone made the
-//! term action-dependent. Delete the characterization test, promote the matching
-//! `aspirational_*` test, and update the write-up.
+//! If the epistemic characterization fails because that term becomes genuinely
+//! action-dependent, promote the matching `aspirational_*` test and update the audit.
 
 use symthaea_fep::free_energy::ExpectedFreeEnergyComputer;
 use symthaea_fep::generative_model::GenerativeModel;
 use symthaea_fep::types::HiddenState;
+use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
 
 const STATE_DIM: usize = 8;
 const OBS_DIM: usize = 8;
@@ -31,7 +30,7 @@ fn fixture() -> (ExpectedFreeEnergyComputer, GenerativeModel, HiddenState) {
 
 /// Scores every action once against one fixed state, in order.
 fn score_all(
-    efe: &mut ExpectedFreeEnergyComputer,
+    efe: &ExpectedFreeEnergyComputer,
     model: &GenerativeModel,
     state: &HiddenState,
     order: impl Iterator<Item = usize>,
@@ -52,8 +51,8 @@ fn score_all(
 /// `compute_epistemic_value = predicted_entropy - current_entropy` cannot move.
 #[test]
 fn characterize_epistemic_term_is_action_invariant() {
-    let (mut efe, model, state) = fixture();
-    let scored = score_all(&mut efe, &model, &state, 0..NUM_ACTIONS);
+    let (efe, model, state) = fixture();
+    let scored = score_all(&efe, &model, &state, 0..NUM_ACTIONS);
 
     let first = scored[0].1;
     for (action, epistemic, _, _) in &scored {
@@ -73,8 +72,8 @@ fn characterize_epistemic_term_is_action_invariant() {
 /// the epistemic term, and vice versa.
 #[test]
 fn characterize_pragmatic_term_varies_only_by_action_parity() {
-    let (mut efe, model, state) = fixture();
-    let scored = score_all(&mut efe, &model, &state, 0..NUM_ACTIONS);
+    let (efe, model, state) = fixture();
+    let scored = score_all(&efe, &model, &state, 0..NUM_ACTIONS);
 
     let distinct: std::collections::BTreeSet<u64> =
         scored.iter().map(|(_, _, _, p)| p.to_bits()).collect();
@@ -100,61 +99,32 @@ fn characterize_pragmatic_term_varies_only_by_action_parity() {
     }
 }
 
-/// DEFECT. Scoring a candidate set flattens the novelty term.
-///
-/// `compute` takes `&mut self` and pushes EVERY action it scores into
-/// `action_history`. Selection is argmin over all candidates, so all candidates are
-/// scored and pushed each epoch, leaving counts near-identical. `compute_novelty`
-/// is `1/(1+count)`, so it cannot discriminate.
+/// Candidate scoring is pure: enumerating actions cannot make them less novel.
 #[test]
-fn characterize_novelty_term_flattens_after_one_enumeration() {
-    let (mut efe, model, state) = fixture();
+fn novelty_does_not_decay_from_candidate_enumeration() {
+    let (efe, model, state) = fixture();
 
-    // Epoch 1: every candidate is unseen, so novelty is uniform at 1/(1+0).
-    let epoch1 = score_all(&mut efe, &model, &state, 0..NUM_ACTIONS);
+    let epoch1 = score_all(&efe, &model, &state, 0..NUM_ACTIONS);
     for (action, _, novelty, _) in &epoch1 {
         assert_eq!(*novelty, 1.0, "action {action} should start unseen");
     }
+    assert!(efe.action_history.is_empty());
 
-    // Epoch 2: every candidate has been seen exactly once, so novelty is uniform again.
-    let epoch2 = score_all(&mut efe, &model, &state, 0..NUM_ACTIONS);
-    let first = epoch2[0].2;
+    let epoch2 = score_all(&efe, &model, &state, 0..NUM_ACTIONS);
     for (action, _, novelty, _) in &epoch2 {
         assert_eq!(
-            *novelty, first,
-            "action {action} novelty differs — enumeration no longer flattens the term, \
-             which would be a real improvement. See docs/EFE_DISPATCH_GATE_2026-07-31.md."
+            *novelty, 1.0,
+            "merely reconsidering action {action} must not consume novelty"
         );
     }
-    assert!(
-        first < 1.0,
-        "novelty should have decayed after one full enumeration"
-    );
+    assert!(efe.action_history.is_empty());
 }
 
-/// DEFECT. `compute` is impure: novelty counts actions CONSIDERED, not actions TAKEN.
-///
-/// `compute` takes `&mut self` and pushes into `action_history` while merely
-/// *scoring* a candidate. So an action that is evaluated and rejected — every
-/// epoch, forever — becomes progressively less "novel" despite never being
-/// executed. That inverts the term's purpose: it is supposed to encourage
-/// exploring actions you have not tried.
-///
-/// This is the same defect class as the standing rule that
-/// `HdcLtcBridge::train_step` / `predict_forward` must stay pure w.r.t. live state
-/// (MASTER_ROADMAP, Signal integrity). That rule should extend to this type.
-///
-/// Note on scope, recorded because the first version of this test got it wrong:
-/// this is NOT enumeration-order dependence within one epoch. `compute_novelty`
-/// counts only occurrences of the queried action, and scoring *other* actions does
-/// not change that count, so a single-pass enumeration is order-independent.
-/// The defect is considered-vs-taken, plus eviction from the 100-entry buffer once
-/// enumeration exceeds it (~8.3 epochs at 12 candidates).
+/// Repeated rejected-candidate scoring never enters committed-action history.
 #[test]
-fn characterize_novelty_counts_considered_not_taken() {
+fn novelty_counts_committed_actions_not_considered_actions() {
     let (mut efe, model, state) = fixture();
 
-    // Score action 3 repeatedly without ever "taking" it — a rejected candidate.
     let first = efe.compute(3, &state, &model).novelty;
     for _ in 0..4 {
         let _ = efe.compute(3, &state, &model);
@@ -162,19 +132,78 @@ fn characterize_novelty_counts_considered_not_taken() {
     let after_rejection = efe.compute(3, &state, &model).novelty;
 
     assert_eq!(first, 1.0, "action 3 should start maximally novel");
+    assert_eq!(
+        after_rejection, first,
+        "a never-committed action must not lose novelty merely from scoring"
+    );
+    assert!(efe.action_history.is_empty());
+
+    efe.record_committed_action(3);
+    assert_eq!(
+        efe.compute(3, &state, &model).novelty,
+        0.5,
+        "one explicit commitment should contribute exactly one novelty-history entry"
+    );
+    assert_eq!(
+        efe.action_history.iter().copied().collect::<Vec<_>>(),
+        vec![3]
+    );
+}
+
+/// Scoring the same candidate set in either order is stable and side-effect free.
+#[test]
+fn candidate_scoring_is_order_stable_without_history_mutation() {
+    let (mut efe, model, state) = fixture();
+    efe.record_committed_action(2);
+    efe.record_committed_action(2);
+    efe.record_committed_action(7);
+    let history_before = efe.action_history.clone();
+
+    let mut forward = score_all(&efe, &model, &state, 0..NUM_ACTIONS);
+    let mut reverse = score_all(&efe, &model, &state, (0..NUM_ACTIONS).rev());
+    forward.sort_by_key(|row| row.0);
+    reverse.sort_by_key(|row| row.0);
+
+    assert_eq!(forward, reverse);
+    assert_eq!(efe.action_history, history_before);
+}
+
+/// Selection alone is not commitment; current compatibility `act()` is.
+#[test]
+fn selection_does_not_consume_novelty_until_commitment() {
+    let config = ActiveInferenceAgentConfig {
+        state_dim: STATE_DIM,
+        obs_dim: OBS_DIM,
+        num_actions: NUM_ACTIONS,
+        ..Default::default()
+    };
+    let mut agent = ActiveInferenceAgent::new(config);
+
+    assert!(agent.efe_computer.action_history.is_empty());
+    let selection = agent.select_action();
     assert!(
-        after_rejection < first,
-        "novelty for a never-taken action should have decayed under the current \
-         (defective) implementation: {after_rejection} !< {first}. If it did not, \
-         `compute` may have been made pure — see docs/EFE_DISPATCH_GATE_2026-07-31.md."
+        agent.efe_computer.action_history.is_empty(),
+        "selection must not consume novelty before commitment"
     );
 
-    // Quantify it, so a fix that only partially addresses this is still visible.
+    let _ = agent.act(selection.action);
+    assert_eq!(agent.efe_computer.action_history.len(), 1);
     assert_eq!(
-        after_rejection,
-        1.0 / 6.0,
-        "expected 1/(1+5) after five prior scorings of the same rejected action"
+        agent.efe_computer.action_history.back().copied(),
+        Some(selection.action)
     );
+}
+
+/// Novelty history retains the existing bounded 100-entry policy.
+#[test]
+fn committed_action_history_remains_bounded() {
+    let (mut efe, _, _) = fixture();
+    for action in 0..105 {
+        efe.record_committed_action(action);
+    }
+    assert_eq!(efe.action_history.len(), 100);
+    assert_eq!(efe.action_history.front().copied(), Some(5));
+    assert_eq!(efe.action_history.back().copied(), Some(104));
 }
 
 // ---------------------------------------------------------------------------
@@ -190,8 +219,8 @@ fn characterize_novelty_counts_considered_not_taken() {
 #[test]
 #[ignore = "known defect: epistemic term is action-invariant. See docs/EFE_DISPATCH_GATE_2026-07-31.md"]
 fn aspirational_epistemic_term_varies_across_actions() {
-    let (mut efe, model, state) = fixture();
-    let scored = score_all(&mut efe, &model, &state, 0..NUM_ACTIONS);
+    let (efe, model, state) = fixture();
+    let scored = score_all(&efe, &model, &state, 0..NUM_ACTIONS);
 
     let epistemic: Vec<f64> = scored.iter().map(|(_, e, _, _)| *e).collect();
     let pragmatic: Vec<f64> = scored.iter().map(|(_, _, _, p)| *p).collect();
