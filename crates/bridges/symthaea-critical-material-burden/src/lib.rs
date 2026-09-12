@@ -3,8 +3,9 @@
 //! Content-addressed critical-material mass-fraction evidence.
 //!
 //! The changing definition of "critical" lives in an external, versioned list.
-//! This crate only validates that list, parses a simple chemical formula, and
-//! computes the transparent mass fraction contributed by designated elements.
+//! This crate validates that normalized list against the exact source document
+//! bytes, parses a simple chemical formula, and computes the transparent mass
+//! fraction contributed by designated elements.
 
 #![forbid(unsafe_code)]
 
@@ -113,6 +114,18 @@ impl CriticalElementList {
         Ok(())
     }
 
+    pub fn verify_source_document(&self, source_document: &[u8]) -> Result<(), CriticalBurdenError> {
+        self.validate()?;
+        let actual = sha256_bytes(source_document);
+        if !actual.eq_ignore_ascii_case(&self.source_document_sha256) {
+            return Err(CriticalBurdenError::SourceDocumentDigestMismatch {
+                expected: self.source_document_sha256.clone(),
+                actual,
+            });
+        }
+        Ok(())
+    }
+
     pub fn sha256(&self) -> Result<String, CriticalBurdenError> {
         self.validate()?;
         let mut canonical = self.clone();
@@ -163,9 +176,10 @@ pub fn calculate_critical_material_burden(
     candidate_id: CandidateId,
     formula: &str,
     list: &CriticalElementList,
+    source_document: &[u8],
 ) -> Result<CriticalBurdenReceipt, CriticalBurdenError> {
     CandidateId::new(candidate_id.0.clone())?;
-    list.validate()?;
+    list.verify_source_document(source_document)?;
     if formula.trim().is_empty() {
         return Err(CriticalBurdenError::InvalidFormula(
             "formula cannot be empty".into(),
@@ -181,6 +195,11 @@ pub fn calculate_critical_material_burden(
     let mut raw = Vec::with_capacity(parsed.len());
     let mut total_mass = 0.0f64;
     for (symbol, atom_count) in parsed {
+        if atom_count == 0 {
+            return Err(CriticalBurdenError::InvalidFormula(format!(
+                "element {symbol:?} has zero stoichiometric count"
+            )));
+        }
         let element = by_symbol(&symbol)
             .ok_or_else(|| CriticalBurdenError::UnknownElement(symbol.clone()))?;
         if !element.atomic_mass.is_finite() || element.atomic_mass <= 0.0 {
@@ -240,6 +259,7 @@ pub fn calculate_critical_material_burden(
         model,
         assumptions: vec![
             "Criticality is defined exclusively by the exact externally supplied designation list; this adapter does not define which elements should be considered critical.".into(),
+            "The normalized designation list was verified against the exact source-document SHA-256 before calculation.".into(),
             "The formula is treated as exact stoichiometry and mass fraction uses the repository's standard atomic masses.".into(),
             "A zero critical mass fraction means no formula element appears on this exact designation list; it is not a claim of zero supply, geopolitical, environmental, or economic risk.".into(),
             "The simple formula parser does not support parentheses, hydrates, fractional occupancy, disorder, isotopic notation, or non-stoichiometry; unsupported formulas fail closed.".into(),
@@ -276,6 +296,8 @@ pub fn calculate_critical_material_burden(
 pub enum CriticalBurdenError {
     #[error("invalid critical-element list: {0}")]
     InvalidList(String),
+    #[error("critical-list source document SHA-256 mismatch: expected {expected}, got {actual}")]
+    SourceDocumentDigestMismatch { expected: String, actual: String },
     #[error("invalid candidate formula: {0}")]
     InvalidFormula(String),
     #[error("unknown/unsupported element symbol {0:?}")]
@@ -306,12 +328,14 @@ fn hex_lower(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
+    const SOURCE_DOCUMENT: &[u8] = b"fixture authoritative critical-elements source document";
+
     fn list_json(elements: &[&str]) -> Vec<u8> {
         serde_json::to_vec(&serde_json::json!({
             "source_title": "Fixture Critical Elements",
             "source_version": "2026-fixture",
             "source_uri": "https://example.invalid/critical-list",
-            "source_document_sha256": "1".repeat(64),
+            "source_document_sha256": sha256_bytes(SOURCE_DOCUMENT),
             "normalized_at_utc": "2026-09-12T00:00:00Z",
             "extraction_note": "test fixture only",
             "elements": elements,
@@ -326,6 +350,7 @@ mod tests {
             CandidateId::new("LiFePO4").unwrap(),
             "LiFePO4",
             &list,
+            SOURCE_DOCUMENT,
         )
         .unwrap();
 
@@ -341,12 +366,27 @@ mod tests {
     }
 
     #[test]
+    fn wrong_source_document_bytes_fail_before_evidence() {
+        let list = CriticalElementList::from_json_bytes(&list_json(&["Li"])).unwrap();
+        assert!(matches!(
+            calculate_critical_material_burden(
+                CandidateId::new("LiFePO4").unwrap(),
+                "LiFePO4",
+                &list,
+                b"different bytes",
+            ),
+            Err(CriticalBurdenError::SourceDocumentDigestMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn zero_is_valid_only_relative_to_the_exact_designation_list() {
         let list = CriticalElementList::from_json_bytes(&list_json(&["Li"])).unwrap();
         let receipt = calculate_critical_material_burden(
             CandidateId::new("FePO4").unwrap(),
             "FePO4",
             &list,
+            SOURCE_DOCUMENT,
         )
         .unwrap();
         assert_eq!(receipt.critical_mass_fraction, 0.0);
@@ -358,14 +398,12 @@ mod tests {
     }
 
     #[test]
-    fn designation_list_order_does_not_change_semantic_identity() {
+    fn list_element_order_normalizes_but_capture_identity_remains_evidence_bearing() {
         let a = CriticalElementList::from_json_bytes(&list_json(&["Li", "Co"])).unwrap();
         let b = CriticalElementList::from_json_bytes(&list_json(&["Co", "Li"])).unwrap();
-        // Raw normalized-capture identity differs, but semantic list identity is
-        // canonicalized except for that explicitly retained source-capture hash.
+        assert_eq!(a.elements, b.elements);
         assert_ne!(a.normalized_capture_sha256, b.normalized_capture_sha256);
         assert_ne!(a.sha256().unwrap(), b.sha256().unwrap());
-        assert_eq!(a.elements, b.elements);
     }
 
     #[test]
@@ -375,12 +413,20 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_formula_syntax_fails_closed() {
+    fn unsupported_or_zero_count_formula_syntax_fails_closed() {
         let list = CriticalElementList::from_json_bytes(&list_json(&["Li"])).unwrap();
         assert!(calculate_critical_material_burden(
-            CandidateId::new("candidate").unwrap(),
+            CandidateId::new("candidate-a").unwrap(),
             "Ca(OH)2",
             &list,
+            SOURCE_DOCUMENT,
+        )
+        .is_err());
+        assert!(calculate_critical_material_burden(
+            CandidateId::new("candidate-b").unwrap(),
+            "Li0Fe",
+            &list,
+            SOURCE_DOCUMENT,
         )
         .is_err());
     }
