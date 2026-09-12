@@ -30,6 +30,7 @@ pub mod resources;
 pub mod state;
 pub mod substitution;
 pub mod supported_closure;
+pub mod viability_calibration;
 
 pub use authority::*;
 pub use bay::*;
@@ -50,3 +51,4 @@ pub use resources::*;
 pub use state::*;
 pub use substitution::*;
 pub use supported_closure::*;
+pub use viability_calibration::*;
