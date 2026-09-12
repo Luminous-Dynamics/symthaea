@@ -13,9 +13,9 @@ set -euo pipefail
 # Class A files: safety-critical parameters per GOVERNANCE_CHARTER.md §3.1
 #
 # RSK note (ADR-002/ADR-010): replication-authority and lineage/budget code is
-# Class A. The RSK qualification harness, workflow, detector, and Governance
-# Charter are also Class A surfaces so weakening the evidence/governance
-# mechanism itself cannot look like an ordinary unclassified change.
+# Class A. The RSK qualification harness, self-tests, workflow, detector, and
+# Governance Charter are also Class A surfaces so weakening the evidence/
+# governance mechanism itself cannot look like an ordinary unclassified change.
 CLASS_A_FILES=(
     "symthaea/src/cognitive_loop/thresholds.rs"
     "symthaea/src/cognitive_loop/ethics_engine.rs"
@@ -26,6 +26,7 @@ CLASS_A_FILES=(
     "crates/domains/symthaea-replicator-ledger/"
     ".github/workflows/rsk-safety.yml"
     "scripts/rsk_qualification.py"
+    "scripts/test_rsk_qualification.py"
     "scripts/check-class-a-changes.sh"
     "docs/compliance/GOVERNANCE_CHARTER.md"
 )
