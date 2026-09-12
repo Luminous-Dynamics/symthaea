@@ -11,6 +11,9 @@ use super::super::CognitiveLoopService;
 use super::super::temporal_network::TemporalNetwork;
 use super::cycle_phases::{EpisodicReplayResult, ResonatorCodebookResult};
 
+#[path = "episodic_sqlite_projection.rs"]
+mod episodic_sqlite_projection;
+
 impl CognitiveLoopService {
     /// Resonator codebook growth, high-Phi episode promotion, diversity computation,
     /// utilization tracking, and diversity-driven exploration governor.
@@ -726,75 +729,72 @@ impl CognitiveLoopService {
                 if let Some(ref replay) = self.memory.episodic_persistence.replay {
                     let top_episodes = replay.get_top_episodes(16);
                     if !top_episodes.is_empty() {
-                        let storage_runtime =
-                            self.memory.episodic_persistence.storage_runtime.clone();
-                        let db = self.memory.episodic_persistence.db.clone();
-                        let flush_guard =
-                            self.memory.episodic_persistence.flush_in_progress.clone();
-                        flush_guard.store(true, Ordering::Relaxed);
-
                         let records: Vec<crate::databases::MemoryRecord> = top_episodes
                             .iter()
-                            .enumerate()
-                            .map(|(i, ep)| {
-                                // Threshold continuous HV to binary: positive → 1
-                                let mut bytes = [0u8; 2048];
-                                for (j, &val) in ep.input.values.iter().enumerate() {
-                                    if j / 8 < 2048 && val > 0.0 {
-                                        bytes[j / 8] |= 1 << (j % 8);
+                            .filter_map(|episode| {
+                                match episodic_sqlite_projection::project_episode_to_memory_record(
+                                    episode,
+                                ) {
+                                    Ok(record) => Some(record),
+                                    Err(error) => {
+                                        tracing::warn!(
+                                            error = %error,
+                                            timestamp = episode.timestamp,
+                                            "Skipping episodic SQLite projection that lacks exact canonical state"
+                                        );
+                                        None
                                     }
-                                }
-                                let encoding = symthaea_core::hdc::binary_hv::BinaryHV(bytes);
-                                crate::databases::MemoryRecord {
-                                    id: format!("ep_{}_{}", ep.timestamp, i),
-                                    memory_type: crate::databases::MemoryType::Episodic,
-                                    encoding,
-                                    content: String::new(),
-                                    timestamp_ms: ep.timestamp as u64 * 20, // ~20ms per cycle at 50Hz
-                                    valence: ep.valence.unwrap_or(0.0),
-                                    arousal: 0.5,
-                                    psi: ep.psi,
-                                    topics: Vec::new(),
-                                    metadata: "{}".to_string(),
-                                    consolidation_strength: ep.psi,
-                                    retrieval_count: 0,
                                 }
                             })
                             .collect();
 
-                        memory_db_flushed = true;
-                        if let Some(runtime) = storage_runtime {
-                            match runtime
-                                .try_store_memory_batch_guarded(records, flush_guard.clone())
-                            {
-                                Ok(()) => {
-                                    tracing::debug!(
-                                        "Memory flush: episodes queued to storage runtime"
-                                    );
-                                }
-                                Err(e) => {
-                                    memory_db_flushed = false;
-                                    tracing::warn!(error = %e, "Memory flush queue failed");
-                                }
-                            }
-                        } else if let Some(db) = db {
-                            std::thread::spawn(move || {
-                                match db.store_batch_sync(&records) {
-                                    Ok(n) => {
+                        if !records.is_empty() {
+                            let storage_runtime =
+                                self.memory.episodic_persistence.storage_runtime.clone();
+                            let db = self.memory.episodic_persistence.db.clone();
+                            let flush_guard =
+                                self.memory.episodic_persistence.flush_in_progress.clone();
+                            flush_guard.store(true, Ordering::Relaxed);
+
+                            memory_db_flushed = true;
+                            if let Some(runtime) = storage_runtime {
+                                match runtime
+                                    .try_store_memory_batch_guarded(records, flush_guard.clone())
+                                {
+                                    Ok(()) => {
                                         tracing::debug!(
-                                            stored = n,
-                                            "Memory flush: episodes persisted to SQLite"
+                                            "Memory flush: exact UUID episodes queued to storage runtime"
                                         );
                                     }
                                     Err(e) => {
-                                        tracing::warn!(error = %e, "Memory flush failed");
+                                        memory_db_flushed = false;
+                                        tracing::warn!(error = %e, "Memory flush queue failed");
                                     }
                                 }
+                            } else if let Some(db) = db {
+                                std::thread::spawn(move || {
+                                    match db.store_batch_sync(&records) {
+                                        Ok(n) => {
+                                            tracing::debug!(
+                                                stored = n,
+                                                "Memory flush: exact UUID episodes persisted to SQLite"
+                                            );
+                                        }
+                                        Err(e) => {
+                                            tracing::warn!(error = %e, "Memory flush failed");
+                                        }
+                                    }
+                                    flush_guard.store(false, Ordering::Relaxed);
+                                });
+                            } else {
+                                memory_db_flushed = false;
                                 flush_guard.store(false, Ordering::Relaxed);
-                            });
+                            }
                         } else {
-                            memory_db_flushed = false;
-                            flush_guard.store(false, Ordering::Relaxed);
+                            tracing::warn!(
+                                candidates = top_episodes.len(),
+                                "Memory flush produced no exact canonical episodic records"
+                            );
                         }
                     }
                 }
