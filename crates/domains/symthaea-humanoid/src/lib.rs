@@ -3,6 +3,7 @@
 
 pub mod actuation;
 pub mod centroidal;
+pub mod configuration_space;
 pub mod contact;
 pub mod contact_inverse_dynamics;
 pub mod control;
@@ -58,6 +59,7 @@ pub mod vision_terrain;
 pub mod whole_body;
 pub use actuation::*;
 pub use centroidal::*;
+pub use configuration_space::*;
 pub use contact_inverse_dynamics::*;
 pub use control_budget::*;
 pub use control_release::*;
