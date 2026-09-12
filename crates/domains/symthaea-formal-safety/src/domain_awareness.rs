@@ -47,10 +47,12 @@ pub enum DomainAwarenessObligation {
     EvidenceIntegrityHoldsPropagate,
     TrustedTimeGatesReadiness,
     EvidenceDependenciesAreAcyclicAndNonCircular,
+    VerifierCommonCauseDiversityRequired,
+    CompositeObligationsRequireAtomicCoverage,
 }
 
 impl DomainAwarenessObligation {
-    pub const ALL: [Self; 28] = [
+    pub const ALL: [Self; 30] = [
         Self::ObservationIsNotIdentityIntentOrAuthority,
         Self::IdentityIsNotIntentOrAuthority,
         Self::UncertaintyStatesRemainRepresentable,
@@ -79,6 +81,8 @@ impl DomainAwarenessObligation {
         Self::EvidenceIntegrityHoldsPropagate,
         Self::TrustedTimeGatesReadiness,
         Self::EvidenceDependenciesAreAcyclicAndNonCircular,
+        Self::VerifierCommonCauseDiversityRequired,
+        Self::CompositeObligationsRequireAtomicCoverage,
     ];
 
     /// Stable human-review code. Existing codes must not be renumbered.
@@ -112,6 +116,8 @@ impl DomainAwarenessObligation {
             Self::EvidenceIntegrityHoldsPropagate => "DA-026",
             Self::TrustedTimeGatesReadiness => "DA-027",
             Self::EvidenceDependenciesAreAcyclicAndNonCircular => "DA-028",
+            Self::VerifierCommonCauseDiversityRequired => "DA-029",
+            Self::CompositeObligationsRequireAtomicCoverage => "DA-030",
         }
     }
 
@@ -201,6 +207,12 @@ impl DomainAwarenessObligation {
             Self::EvidenceDependenciesAreAcyclicAndNonCircular => {
                 "safety-evidence dependency graphs are acyclic, and evidence used to justify a safety contract cannot transitively depend on a readiness decision for that same contract"
             }
+            Self::VerifierCommonCauseDiversityRequired => {
+                "when reviewed safety policy requires independent verification, multiple receipts satisfy that requirement only when verifier common-cause fault-domain diversity meets the reviewed thresholds"
+            }
+            Self::CompositeObligationsRequireAtomicCoverage => {
+                "when a reviewed safety obligation is decomposed into atomic evidence facets, parent receipts do not implicitly satisfy those facets and every required facet has explicit qualifying evidence coverage"
+            }
         }
     }
 
@@ -230,7 +242,9 @@ impl DomainAwarenessObligation {
             | Self::ConfigurationDriftInvalidatesEvidence
             | Self::EvidenceIntegrityHoldsPropagate
             | Self::TrustedTimeGatesReadiness
-            | Self::EvidenceDependenciesAreAcyclicAndNonCircular => EvidenceKind::Test,
+            | Self::EvidenceDependenciesAreAcyclicAndNonCircular
+            | Self::VerifierCommonCauseDiversityRequired
+            | Self::CompositeObligationsRequireAtomicCoverage => EvidenceKind::Test,
             Self::TimeCalibrationAndLineageRemainAuditable
             | Self::ContradictionsAndAbstentionsRemainAuditable => EvidenceKind::Telemetry,
             Self::RecoveryProcedureIsReviewed => EvidenceKind::Standard,
@@ -328,12 +342,19 @@ mod tests {
             "DA-028"
         );
         assert_eq!(
+            DomainAwarenessObligation::VerifierCommonCauseDiversityRequired.code(),
+            "DA-029"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::CompositeObligationsRequireAtomicCoverage.code(),
+            "DA-030"
+        );
+        assert_eq!(
             DomainAwarenessObligation::PassiveRfSilenceIsNotSafety.expected_evidence(),
             EvidenceKind::FormalProof
         );
         assert_eq!(
-            DomainAwarenessObligation::EvidenceDependenciesAreAcyclicAndNonCircular
-                .expected_evidence(),
+            DomainAwarenessObligation::CompositeObligationsRequireAtomicCoverage.expected_evidence(),
             EvidenceKind::Test
         );
     }
