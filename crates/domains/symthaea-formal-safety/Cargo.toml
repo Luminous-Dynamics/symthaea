@@ -17,3 +17,4 @@ chumsky.workspace = true
 symthaea-core = { path = "../../core/symthaea-core" }
 serde = { workspace = true }
 uuid = { workspace = true }
+blake3 = { workspace = true }
