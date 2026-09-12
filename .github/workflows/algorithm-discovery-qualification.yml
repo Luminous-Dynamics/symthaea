@@ -12,6 +12,7 @@ on:
       - 'crates/bridges/symthaea-hdc-algorithm-evidence/**'
       - 'crates/bridges/symthaea-forge-algorithm-evidence/**'
       - 'crates/bridges/symthaea-forge-overlay-evidence/**'
+      - 'crates/bridges/symthaea-forge-linux-isolation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
   push:
     branches: [ main ]
@@ -25,6 +26,7 @@ on:
       - 'crates/bridges/symthaea-hdc-algorithm-evidence/**'
       - 'crates/bridges/symthaea-forge-algorithm-evidence/**'
       - 'crates/bridges/symthaea-forge-overlay-evidence/**'
+      - 'crates/bridges/symthaea-forge-linux-isolation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
 
 permissions:
@@ -51,6 +53,9 @@ jobs:
       - name: Test Forge search safety
         run: cargo test -p symthaea-forge --all-targets -- --test-threads=1
 
+      - name: Test hardened Forge Linux isolation bridge
+        run: cargo test -p symthaea-forge-linux-isolation --all-targets -- --test-threads=1
+
       - name: Test e-graph lineage bridge
         run: cargo test -p symthaea-algorithm-egraph-bridge -- --test-threads=1
 
@@ -75,6 +80,7 @@ jobs:
           -p symthaea-algorithms
           -p symthaea-algorithm-lab
           -p symthaea-forge
+          -p symthaea-forge-linux-isolation
           -p symthaea-algorithm-egraph-bridge
           -p symthaea-algorithm-evidence-collector
           -p symthaea-hdc-algorithm-evidence
