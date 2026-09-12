@@ -11,6 +11,7 @@ mod action_execution;
 mod analysis_plan;
 mod baselines;
 mod campaign;
+mod campaign_manifest;
 pub mod consequence;
 pub mod constitution;
 mod custody;
