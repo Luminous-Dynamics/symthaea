@@ -36,7 +36,7 @@ pub mod exact_distributed_health;
 pub mod exact_local_health;
 pub mod exact_policy;
 pub mod execution_capability;
-pub mod execution_coordinator;
+mod execution_coordinator;
 pub mod execution_journal;
 pub mod execution_journal_anchor;
 pub mod execution_result;
@@ -44,6 +44,8 @@ pub mod external_effect_authority;
 pub mod external_effects;
 pub mod failure_domain;
 pub mod known_good;
+pub mod no_effects_execution;
+pub mod no_external_effects;
 pub mod observation;
 pub mod post_execution_health;
 pub mod post_execution_observation;
@@ -210,7 +212,7 @@ pub use execution_capability::{
 };
 pub use execution_coordinator::{
     KnownGoodExecutionCoordinatorError, PendingAnchoredKnownGoodExecutionV1,
-    ReadyKnownGoodExecutionAttemptV1, prepare_known_good_execution,
+    ReadyKnownGoodExecutionAttemptV1,
 };
 pub use execution_journal::{
     ExecutionJournalDigest, ExecutionJournalError, JournalAttemptDispositionV1,
