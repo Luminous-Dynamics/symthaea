@@ -8,6 +8,7 @@
 //! metacognitive, or authority stack.
 
 mod action_execution;
+mod analysis_plan;
 mod baselines;
 mod campaign;
 pub mod consequence;
@@ -16,6 +17,7 @@ mod custody;
 #[cfg(test)]
 mod custody_identity_tests;
 pub mod hidden_world;
+mod promotion;
 #[cfg(test)]
 mod transition_identity_tests;
 
