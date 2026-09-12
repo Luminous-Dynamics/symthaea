@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-forge-linux-isolation"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Hardened Linux Bubblewrap v2 evaluator isolation for Symthaea Forge"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge = { path = "../../domains/symthaea-forge" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
