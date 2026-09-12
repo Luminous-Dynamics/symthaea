@@ -3,6 +3,7 @@
 
 use serde::Serialize;
 use std::{env, fs, process};
+use symthaea_discovery::Prediction;
 use symthaea_energy_evidence_envelope::{
     wrap_evidence_payload_json, EnergyEvidenceEnvelope,
 };
@@ -25,32 +26,25 @@ fn main() {
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args_os();
     let _program = args.next();
-    let manifest_path = args.next().ok_or(
-        "usage: energy-evidence-envelope <manifest.json> <dimension> <payload-type> <receipt.json>",
-    )?;
-    let dimension = args.next().ok_or(
-        "usage: energy-evidence-envelope <manifest.json> <dimension> <payload-type> <receipt.json>",
-    )?;
-    let payload_type = args.next().ok_or(
-        "usage: energy-evidence-envelope <manifest.json> <dimension> <payload-type> <receipt.json>",
-    )?;
-    let receipt_path = args.next().ok_or(
-        "usage: energy-evidence-envelope <manifest.json> <dimension> <payload-type> <receipt.json>",
-    )?;
+    let usage = "usage: energy-evidence-envelope <manifest.json> <dimension> <prediction.json> <payload-type> <receipt.json>";
+    let manifest_path = args.next().ok_or(usage)?;
+    let dimension = args.next().ok_or(usage)?;
+    let prediction_path = args.next().ok_or(usage)?;
+    let payload_type = args.next().ok_or(usage)?;
+    let receipt_path = args.next().ok_or(usage)?;
     if args.next().is_some() {
-        return Err(
-            "usage: energy-evidence-envelope <manifest.json> <dimension> <payload-type> <receipt.json>"
-                .into(),
-        );
+        return Err(usage.into());
     }
 
     let manifest: Tier1CampaignManifest =
         serde_json::from_slice(&fs::read(manifest_path)?)?;
+    let prediction: Prediction = serde_json::from_slice(&fs::read(prediction_path)?)?;
     let payload_json = fs::read_to_string(receipt_path)?;
     let dimension = parse_dimension(&dimension.to_string_lossy())?;
     let envelope = wrap_evidence_payload_json(
         &manifest,
         dimension,
+        prediction,
         payload_type.to_string_lossy().into_owned(),
         payload_json,
     )?;
