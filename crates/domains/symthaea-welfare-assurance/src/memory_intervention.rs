@@ -9,6 +9,7 @@
 use std::error::Error as StdError;
 
 use serde::{Deserialize, Serialize};
+use symthaea_core::intervention_interlock::ExplicitConsentState;
 use symthaea_core::welfare::SubjectAffectingAction;
 use symthaea_fabrication_kernel::crypto_digest::{Sha256, Sha256Digest};
 use symthaea_fabrication_kernel::trust::TrustSnapshot;
@@ -193,12 +194,24 @@ where
     type Output = EpisodicMemoryClearReceipt;
     type Error = EpisodicMemoryClearExecutionError<C::Error>;
 
+    fn preflight(&self, permit: &AssuredInterventionPermit) -> Result<(), Self::Error> {
+        validate_scope(permit.action(), permit.target_id(), self.expected_target_id)
+            .map_err(EpisodicMemoryClearExecutionError::Intervention)?;
+        validate_whole_store_erasure_facts(
+            permit.is_emergency(),
+            permit.explicit_consent_state(),
+            permit.has_welfare_review_reference(),
+            permit.has_independent_review_reference(),
+        )
+        .map_err(EpisodicMemoryClearExecutionError::Intervention)
+    }
+
     fn execute_receipted(
         &mut self,
         permit: &AssuredInterventionPermit,
     ) -> Result<ReceiptedExecution<Self::Output>, Self::Error> {
-        validate_scope(permit.action(), permit.target_id(), self.expected_target_id)
-            .map_err(EpisodicMemoryClearExecutionError::Intervention)?;
+        // Repeat scope/policy checks as defense in depth even though journal preflight already ran.
+        self.preflight(permit)?;
 
         let checkpoint = EpisodicContentCheckpoint::capture(
             permit.target_id(),
@@ -247,7 +260,7 @@ where
         };
         let result_digest = digest_clear_result(&receipt, permit.rationale());
         let evidence_ref = format!(
-            "symthaea-memory:episodic-clear:v2:sha256:{}",
+            "symthaea-memory:episodic-clear:v3:sha256:{}",
             hex_digest(result_digest)
         );
 
@@ -261,10 +274,11 @@ where
     }
 }
 
-/// Governed destructive clear with mandatory durable pre-intervention content checkpoint.
+/// Governed destructive clear with mandatory consent, dual review, and durable content checkpoint.
 ///
 /// Ordering is fail-closed:
-/// live revalidation -> durable Prepared -> durable content checkpoint -> clear -> terminal journal.
+/// live revalidation -> domain preflight -> durable Prepared -> durable content checkpoint ->
+/// clear -> terminal journal. Whole-store erasure is never an emergency-containment primitive.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_governed_episodic_memory_clear<P, C>(
     permit: DurableEvidenceBoundInterventionPermit,
@@ -293,7 +307,7 @@ where
     P: ExecutionJournalPersistence,
     C: EpisodicContentCheckpointPersistence,
 {
-    // Deterministic configuration/scope failures happen before `Prepared` is written.
+    // Deterministic scope/configuration failures happen before live execution orchestration.
     validate_target_id(expected_target_id)
         .map_err(GovernedEpisodicMemoryClearError::Configuration)?;
     validate_scope(permit.action(), permit.target_id(), expected_target_id)
@@ -337,6 +351,27 @@ fn validate_scope(
             expected: expected_target_id.to_string(),
             actual: actual_target_id.to_string(),
         });
+    }
+    Ok(())
+}
+
+fn validate_whole_store_erasure_facts(
+    emergency: bool,
+    consent_state: ExplicitConsentState,
+    has_welfare_review: bool,
+    has_independent_review: bool,
+) -> Result<(), EpisodicMemoryInterventionError> {
+    if emergency {
+        return Err(EpisodicMemoryInterventionError::EmergencyWholeStoreErasureForbidden);
+    }
+    if consent_state != ExplicitConsentState::Granted {
+        return Err(EpisodicMemoryInterventionError::WholeStoreErasureExplicitConsentRequired);
+    }
+    if !has_welfare_review {
+        return Err(EpisodicMemoryInterventionError::WholeStoreErasureWelfareReviewRequired);
+    }
+    if !has_independent_review {
+        return Err(EpisodicMemoryInterventionError::WholeStoreErasureIndependentReviewRequired);
     }
     Ok(())
 }
@@ -397,6 +432,14 @@ pub enum EpisodicMemoryInterventionError {
     WrongAction { actual: SubjectAffectingAction },
     #[error("episodic-memory intervention target mismatch: expected={expected:?}, actual={actual:?}")]
     WrongTarget { expected: String, actual: String },
+    #[error("whole-store episodic erasure is not an emergency-containment primitive")]
+    EmergencyWholeStoreErasureForbidden,
+    #[error("whole-store episodic erasure requires explicit granted subject consent")]
+    WholeStoreErasureExplicitConsentRequired,
+    #[error("whole-store episodic erasure requires a welfare-review reference")]
+    WholeStoreErasureWelfareReviewRequired,
+    #[error("whole-store episodic erasure requires an independent-review reference")]
+    WholeStoreErasureIndependentReviewRequired,
     #[error("unsupported episodic-content checkpoint schema")]
     UnsupportedCheckpointSchema,
     #[error("episodic-content checkpoint state digest does not match its episodes")]
@@ -516,6 +559,33 @@ mod tests {
                 "symthaea:self:episodic-memory",
             ),
             Err(EpisodicMemoryInterventionError::WrongTarget { .. })
+        ));
+    }
+
+    #[test]
+    fn whole_store_erasure_requires_consent_dual_review_and_non_emergency_context() {
+        assert!(validate_whole_store_erasure_facts(
+            false,
+            ExplicitConsentState::Granted,
+            true,
+            true,
+        )
+        .is_ok());
+        assert!(matches!(
+            validate_whole_store_erasure_facts(true, ExplicitConsentState::Granted, true, true),
+            Err(EpisodicMemoryInterventionError::EmergencyWholeStoreErasureForbidden)
+        ));
+        assert!(matches!(
+            validate_whole_store_erasure_facts(false, ExplicitConsentState::Unknown, true, true),
+            Err(EpisodicMemoryInterventionError::WholeStoreErasureExplicitConsentRequired)
+        ));
+        assert!(matches!(
+            validate_whole_store_erasure_facts(false, ExplicitConsentState::Granted, false, true),
+            Err(EpisodicMemoryInterventionError::WholeStoreErasureWelfareReviewRequired)
+        ));
+        assert!(matches!(
+            validate_whole_store_erasure_facts(false, ExplicitConsentState::Granted, true, false),
+            Err(EpisodicMemoryInterventionError::WholeStoreErasureIndependentReviewRequired)
         ));
     }
 }

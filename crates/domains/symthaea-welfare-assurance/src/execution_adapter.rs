@@ -3,7 +3,8 @@
 //! Two-phase journal adapter for welfare-sensitive mutation execution.
 //!
 //! The adapter is invoked only after the durable evidence-bound permit has passed all live
-//! revalidation. It persists a `Prepared` journal state before calling the downstream mutator.
+//! revalidation. A concrete mutator may apply a read-only domain preflight before any `Prepared`
+//! event is written. Only then does the adapter persist write-ahead state and call the mutator.
 //! A successful mutation whose completion journal cannot be persisted is returned as an explicit
 //! in-doubt outcome rather than a generic retryable error.
 
@@ -74,11 +75,21 @@ impl<O> ReceiptedExecution<O> {
 
 /// Mutator contract used by the journal adapter.
 ///
-/// Ordinary executor errors are conservatively treated as in-doubt because this layer cannot know
-/// whether a downstream system partially committed before returning the error.
+/// `preflight` runs after the full permit has been live-revalidated but before a write-ahead
+/// `Prepared` record exists. It is intended for deterministic domain constraints that are stricter
+/// than the generic bilateral interlock. A preflight rejection is therefore not an in-doubt
+/// execution and creates no mutation journal state.
+///
+/// Ordinary `execute_receipted` errors happen after durable `Prepared` and are conservatively
+/// treated as in doubt because this layer cannot know whether a downstream system partially
+/// committed before returning the error.
 pub trait ReceiptedInterventionExecutor {
     type Output;
     type Error: StdError + Send + Sync + 'static;
+
+    fn preflight(&self, _permit: &AssuredInterventionPermit) -> Result<(), Self::Error> {
+        Ok(())
+    }
 
     fn execute_receipted(
         &mut self,
@@ -86,12 +97,16 @@ pub trait ReceiptedInterventionExecutor {
     ) -> Result<ReceiptedExecution<Self::Output>, Self::Error>;
 }
 
-/// Outcomes after the write-ahead record has been durably persisted and mutation was attempted.
+/// Outcomes from the journaled mutator boundary.
 ///
-/// Only `Completed` has durable terminal evidence. Every other variant requires reconciliation
-/// and must not be converted into an automatic retry.
+/// `PreflightRejected` occurs before any write-ahead state or mutation. Once `Prepared` is durable,
+/// only `Completed` has durable terminal evidence; every other post-prepare variant requires
+/// reconciliation and must not be converted into an automatic retry.
 #[derive(Debug)]
 pub enum JournaledExecutionOutcome<O, EE, PE> {
+    PreflightRejected {
+        error: EE,
+    },
     Completed {
         output: O,
         prepared_digest: Sha256Digest,
@@ -129,6 +144,10 @@ impl<O, EE, PE> JournaledExecutionOutcome<O, EE, PE> {
     pub fn has_durable_terminal_evidence(&self) -> bool {
         matches!(self, Self::Completed { .. })
     }
+
+    pub fn mutation_was_attempted(&self) -> bool {
+        !matches!(self, Self::PreflightRejected { .. })
+    }
 }
 
 struct JournaledExecutorAdapter<'a, X, P>
@@ -154,13 +173,17 @@ where
         &mut self,
         permit: &AssuredInterventionPermit,
     ) -> Result<Self::Output, Self::Error> {
+        if let Err(error) = self.executor.preflight(permit) {
+            return Ok(JournaledExecutionOutcome::PreflightRejected { error });
+        }
+
         let prepared_digest = self
             .journal
             .append_prepared(self.prepared.clone())
             .map_err(PreExecutionJournalError::Journal)?;
 
-        // This persistence occurs inside the executor boundary: all live permit checks have passed,
-        // but the downstream mutator has not yet been called.
+        // This persistence occurs inside the executor boundary: all live permit and domain
+        // preflight checks have passed, but the downstream mutator has not yet been called.
         let prepared_persistence_ref = self
             .persistence
             .persist_execution_journal(self.journal.events(), self.journal.head_hash())
@@ -250,9 +273,9 @@ where
     }
 }
 
-/// Consume the strongest permit through live revalidation and a two-phase durable execution
-/// journal. The write-ahead `Prepared` record is persisted only after live checks pass and before
-/// the downstream mutator is invoked.
+/// Consume the strongest permit through live revalidation, domain preflight, and a two-phase
+/// durable execution journal. The write-ahead `Prepared` record is persisted only after both the
+/// generic live checks and the concrete mutator's read-only preflight pass.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_durable_intervention_journaled<X, P>(
     permit: DurableEvidenceBoundInterventionPermit,
@@ -373,6 +396,12 @@ mod tests {
                 journal_head_hash: Sha256Digest([2; 32]),
             };
         assert!(completed.has_durable_terminal_evidence());
+        assert!(completed.mutation_was_attempted());
+
+        let rejected: JournaledExecutionOutcome<(), (), ()> =
+            JournaledExecutionOutcome::PreflightRejected { error: () };
+        assert!(!rejected.has_durable_terminal_evidence());
+        assert!(!rejected.mutation_was_attempted());
 
         let in_doubt: JournaledExecutionOutcome<(), (), ()> =
             JournaledExecutionOutcome::CompletionPersistenceReferenceInDoubt {
@@ -389,5 +418,6 @@ mod tests {
                 prepared_persistence_ref: "prepared:1".into(),
             };
         assert!(!in_doubt.has_durable_terminal_evidence());
+        assert!(in_doubt.mutation_was_attempted());
     }
 }
