@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-xenia-continuity-anchor"
+version = "0.1.0"
+edition = "2024"
+description = "Verified Xenia state-anchor adapter for Symthaea episodic continuity"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+bincode = { workspace = true }
+serde = { workspace = true }
+symthaea-episodic-continuity-anchor = { path = "../symthaea-episodic-continuity-anchor" }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
+thiserror = { workspace = true }
