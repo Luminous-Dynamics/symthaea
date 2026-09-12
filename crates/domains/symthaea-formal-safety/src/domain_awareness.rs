@@ -46,10 +46,11 @@ pub enum DomainAwarenessObligation {
     ConfigurationDriftInvalidatesEvidence,
     EvidenceIntegrityHoldsPropagate,
     TrustedTimeGatesReadiness,
+    EvidenceDependenciesAreAcyclicAndNonCircular,
 }
 
 impl DomainAwarenessObligation {
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 28] = [
         Self::ObservationIsNotIdentityIntentOrAuthority,
         Self::IdentityIsNotIntentOrAuthority,
         Self::UncertaintyStatesRemainRepresentable,
@@ -77,6 +78,7 @@ impl DomainAwarenessObligation {
         Self::ConfigurationDriftInvalidatesEvidence,
         Self::EvidenceIntegrityHoldsPropagate,
         Self::TrustedTimeGatesReadiness,
+        Self::EvidenceDependenciesAreAcyclicAndNonCircular,
     ];
 
     /// Stable human-review code. Existing codes must not be renumbered.
@@ -109,6 +111,7 @@ impl DomainAwarenessObligation {
             Self::ConfigurationDriftInvalidatesEvidence => "DA-025",
             Self::EvidenceIntegrityHoldsPropagate => "DA-026",
             Self::TrustedTimeGatesReadiness => "DA-027",
+            Self::EvidenceDependenciesAreAcyclicAndNonCircular => "DA-028",
         }
     }
 
@@ -195,6 +198,9 @@ impl DomainAwarenessObligation {
             Self::TrustedTimeGatesReadiness => {
                 "time-sensitive safety evidence is accepted only under a reviewed trusted-time policy, and readiness must hold across the complete clock-uncertainty interval without rollback or replay"
             }
+            Self::EvidenceDependenciesAreAcyclicAndNonCircular => {
+                "safety-evidence dependency graphs are acyclic, and evidence used to justify a safety contract cannot transitively depend on a readiness decision for that same contract"
+            }
         }
     }
 
@@ -223,7 +229,8 @@ impl DomainAwarenessObligation {
             | Self::CurrentEvidenceApplicabilityRequired
             | Self::ConfigurationDriftInvalidatesEvidence
             | Self::EvidenceIntegrityHoldsPropagate
-            | Self::TrustedTimeGatesReadiness => EvidenceKind::Test,
+            | Self::TrustedTimeGatesReadiness
+            | Self::EvidenceDependenciesAreAcyclicAndNonCircular => EvidenceKind::Test,
             Self::TimeCalibrationAndLineageRemainAuditable
             | Self::ContradictionsAndAbstentionsRemainAuditable => EvidenceKind::Telemetry,
             Self::RecoveryProcedureIsReviewed => EvidenceKind::Standard,
@@ -317,11 +324,16 @@ mod tests {
             "DA-027"
         );
         assert_eq!(
+            DomainAwarenessObligation::EvidenceDependenciesAreAcyclicAndNonCircular.code(),
+            "DA-028"
+        );
+        assert_eq!(
             DomainAwarenessObligation::PassiveRfSilenceIsNotSafety.expected_evidence(),
             EvidenceKind::FormalProof
         );
         assert_eq!(
-            DomainAwarenessObligation::TrustedTimeGatesReadiness.expected_evidence(),
+            DomainAwarenessObligation::EvidenceDependenciesAreAcyclicAndNonCircular
+                .expected_evidence(),
             EvidenceKind::Test
         );
     }
