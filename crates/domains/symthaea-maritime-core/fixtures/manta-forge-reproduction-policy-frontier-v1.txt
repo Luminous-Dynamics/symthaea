@@ -1,0 +1,7 @@
+schema=manta-forge-reproduction-policy-frontier-v1
+parent_successor_depth_fixture=git-blob:1e143e30acc9d0d89af97a4c07e31d7c8563c2bb
+policy_dimension=minimum_complete_descendant_periods_before_reproduction
+policy=maturity_periods:1|depth1_cases:6|depth2_cases:5|depth3_cases:4|depth4_cases:3|expected_total_handoffs:40
+policy=maturity_periods:2|depth1_cases:11|depth2_cases:7|depth3_cases:0|depth4_cases:0|expected_total_handoffs:25
+policy=maturity_periods:3|depth1_cases:15|depth2_cases:3|depth3_cases:0|depth4_cases:0|expected_total_handoffs:21
+policy=maturity_periods:4|depth1_cases:18|depth2_cases:0|depth3_cases:0|depth4_cases:0|expected_total_handoffs:18
