@@ -9,6 +9,8 @@
 
 #![deny(unsafe_code)]
 
+mod domain_awareness;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -48,6 +50,8 @@ pub enum SafetyCaseTemplate {
     Materials,
     /// Environmental/sustainability case.
     EnvironmentalSystem,
+    /// Evidence-first sensing, tracking, classification, and risk-awareness system.
+    DomainAwareness,
     /// Cross-domain system-of-systems case.
     SystemOfSystems,
 }
@@ -279,6 +283,7 @@ fn template_obligations(template: SafetyCaseTemplate) -> Vec<(&'static str, Evid
                 EvidenceKind::Telemetry,
             ),
         ],
+        SafetyCaseTemplate::DomainAwareness => domain_awareness::obligations(),
         SafetyCaseTemplate::SystemOfSystems => vec![
             (
                 "interfaces, authorities, and cross-domain assumptions are documented",
@@ -319,5 +324,19 @@ mod tests {
             SafetyCase::from_template("pedestrian bridge", SafetyCaseTemplate::CivilStructure);
         assert!(safety_case.obligations.len() >= 3);
         assert!(!safety_case.is_discharged());
+    }
+
+    #[test]
+    fn domain_awareness_template_is_substantial_and_fail_closed() {
+        let safety_case =
+            SafetyCase::from_template("harbor-awareness", SafetyCaseTemplate::DomainAwareness);
+        assert!(safety_case.obligations.len() >= 18);
+        assert!(!safety_case.is_discharged());
+        assert!(safety_case.obligations.iter().any(|obligation| {
+            obligation.claim.contains("perception-to-authority boundary bypass")
+        }));
+        assert!(safety_case.obligations.iter().any(|obligation| {
+            obligation.claim.contains("passive radio silence")
+        }));
     }
 }
