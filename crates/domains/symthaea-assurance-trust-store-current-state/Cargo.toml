@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-assurance-trust-store-current-state"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Current trust-store segment resolution across reviewed recoveries"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "rollback", "recovery"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-assurance-trust-store = { path = "../symthaea-assurance-trust-store" }
+symthaea-assurance-trust-store-recovery-ledger = { path = "../symthaea-assurance-trust-store-recovery-ledger" }
+serde = { workspace = true }
