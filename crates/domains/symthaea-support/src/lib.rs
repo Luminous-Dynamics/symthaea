@@ -20,6 +20,7 @@ pub mod knowledge_source;
 pub mod legacy_aix;
 pub mod legacy_aix_scenarios;
 pub mod legacy_artifact_qualification;
+pub mod legacy_blocker_matrix_v3;
 pub mod legacy_computing;
 #[cfg(test)]
 mod legacy_computing_pack_tests;
@@ -104,6 +105,11 @@ pub use legacy_aix_scenarios::{
 pub use legacy_artifact_qualification::{
     assess_legacy_strong_qualification_v1, LegacyArtifactQualificationErrorV1,
     LegacyStrongQualificationAssessmentV1, LegacyStrongQualificationBlockerV1,
+};
+pub use legacy_blocker_matrix_v3::{
+    blocker_matrix_from_assessment_v3, legacy_blocker_matrix_v3, LegacyBlockerCellV3,
+    LegacyBlockerClassV3, LegacyBlockerMatrixErrorV3, LegacyBlockerMatrixV3,
+    LEGACY_BLOCKER_MATRIX_SCHEMA_V3,
 };
 pub use legacy_computing::{
     seed_legacy_computing_pack_v1, LegacyComputingErrorV1, LegacyComputingPackV1,
