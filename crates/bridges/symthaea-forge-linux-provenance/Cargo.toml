@@ -7,6 +7,7 @@ description = "Nix provenance observations for Symthaea Forge Linux evaluator is
 
 [dependencies]
 symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge = { path = "../../domains/symthaea-forge" }
 symthaea-forge-linux-isolation = { path = "../symthaea-forge-linux-isolation" }
 serde = { workspace = true }
 thiserror = { workspace = true }
