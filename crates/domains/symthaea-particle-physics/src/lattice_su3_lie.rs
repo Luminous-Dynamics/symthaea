@@ -4,10 +4,10 @@
 //!
 //! This is deliberately tiny and dependency-free. It is not a general linear
 //! algebra layer; it only centralizes the scaling/squaring exponential convention
-//! needed by optimized flow code and its deterministic Gell-Mann fixtures.
+//! needed by optimized flow code and its deterministic qualification fixtures.
 
 use crate::lattice_gauge::{Su3Matrix, su3_identity, su3_mul};
-use crate::symmetry_groups::{Complex, gell_mann_matrix};
+use crate::symmetry_groups::Complex;
 
 const MATRIX_EXP_TERMS: usize = 50;
 
@@ -91,7 +91,10 @@ pub(crate) fn matrix_exp(a: &Su3Matrix) -> Su3Matrix {
     out
 }
 
+#[cfg(test)]
 pub(crate) fn generator_rotation(generator: usize, theta: f64) -> Su3Matrix {
+    use crate::symmetry_groups::gell_mann_matrix;
+
     matrix_exp(&matrix_scale(
         &gell_mann_matrix(generator),
         Complex::new(0.0, theta),
