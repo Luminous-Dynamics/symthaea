@@ -196,6 +196,41 @@ impl StrictCgroupV2Lease {
         ))
     }
 
+    /// Terminal path after the exact sandbox process has exited. If no descendants remain, this is
+    /// the graceful path. If the leaf is still populated, it automatically upgrades to
+    /// descendant-wide `cgroup.kill`, verifies `populated 0`, and records that fact in the receipt.
+    pub fn finalize_after_sandbox_exit(
+        mut self,
+        timeout_ms: u64,
+    ) -> Result<StrictCgroupV2TeardownReceipt, StrictCgroupV2Error> {
+        if timeout_ms == 0 || timeout_ms > MAX_TEARDOWN_TIMEOUT_MS {
+            return Err(StrictCgroupV2Error::InvalidTeardownTimeout);
+        }
+        let leaf = self
+            .base
+            .as_ref()
+            .ok_or(StrictCgroupV2Error::LeaseConsumed)?
+            .leaf_path()
+            .to_path_buf();
+        let started = Instant::now();
+        let descendant_kill_requested = if read_populated(&leaf)? == 0 {
+            false
+        } else {
+            write_exact(&leaf.join("cgroup.kill"), "1\n")?;
+            wait_populated_zero(&leaf, Duration::from_millis(timeout_ms))?;
+            true
+        };
+        let base = self.base.take().ok_or(StrictCgroupV2Error::LeaseConsumed)?;
+        let base_receipt = base.cleanup()?;
+        let wait_ms = elapsed_ms(started)?;
+        Ok(build_teardown_receipt(
+            &self.receipt,
+            &base_receipt,
+            descendant_kill_requested,
+            wait_ms,
+        ))
+    }
+
     /// Fail-closed terminal path for timeout/error handling. `cgroup.kill` targets every process in
     /// the leaf, including descendants that are no longer safely enumerable by PID from userspace.
     pub fn kill_and_cleanup(
