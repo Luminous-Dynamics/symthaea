@@ -33,6 +33,7 @@ const PLAN_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-plan.v1\0";
 const ADMITTED_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-admitted-evidence.v1\0";
 const RECEIPT_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-discharge-receipt.v1\0";
 const FACT_DOMAIN_V1: &[u8] = b"symthaea.etk-current-native-analytical-discharge-fact.v1\0";
+const EQUATION_RELATIVE_TOLERANCE: f64 = 1e-12;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum AnalysisTrustErrorV1 {
@@ -52,6 +53,8 @@ pub enum AnalysisTrustErrorV1 {
     MethodInputMismatch,
     #[error("analytical result does not target the exact bound method/input/policy")]
     PlanBindingMismatch,
+    #[error("reported {0} is inconsistent with the bound analytical input")]
+    AnalyticalEquationMismatch(&'static str),
     #[error("reported factor of safety is inconsistent with yield strength / bending stress")]
     InconsistentFactorOfSafety,
     #[error("model-relative-error bound exceeds the admission policy")]
@@ -162,9 +165,7 @@ authority_id!(NativeAnalyticalDischargeReceiptIdV1);
 authority_id!(CurrentNativeAnalyticalDischargeFactIdV1);
 
 /// Cross-language identity encoding for one finite IEEE-754 binary64 value.
-///
-/// Signed zero is normalized because it is not an engineering semantic
-/// distinction in this protocol.
+/// Signed zero is intentionally normalized.
 pub fn canonical_binary64_v1(value: f64) -> Result<String, AnalysisTrustErrorV1> {
     if !value.is_finite() {
         return Err(AnalysisTrustErrorV1::NonFinite("binary64"));
@@ -173,11 +174,8 @@ pub fn canonical_binary64_v1(value: f64) -> Result<String, AnalysisTrustErrorV1>
     Ok(format!("f64:{:016x}", normalized.to_bits()))
 }
 
-/// Accepted Civil/Blocking requirement semantics for the initial analytical canary.
-///
-/// This constructor commits `expected_evidence_kind = "Analysis"` into the
-/// revision identity by construction. The acceptance-record digest is still an
-/// external premise; syntax/content addressing does not authenticate the accepter.
+/// Exact accepted Analysis requirement semantics for the initial Civil canary.
+/// The acceptance-record digest is content-addressed but not authenticated here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AcceptedAnalysisRequirementV1 {
     revision_id: AnalysisRequirementRevisionIdV1,
@@ -220,7 +218,6 @@ impl AcceptedAnalysisRequirementV1 {
             "statement": statement.as_str(),
             "structural_invariants": invariants,
         });
-
         Ok(Self {
             revision_id: AnalysisRequirementRevisionIdV1::from_digest(domain_hash(
                 REQUIREMENT_DOMAIN_V1,
@@ -252,9 +249,8 @@ impl AcceptedAnalysisRequirementV1 {
     }
 }
 
-/// Content-addressed Analysis proof-obligation semantics.
-///
-/// Status and evidence refs are lifecycle state and therefore excluded.
+/// Content-addressed Analysis proof-obligation semantics. Lifecycle state and
+/// evidence refs are intentionally excluded from the semantic snapshot.
 pub fn analytical_obligation_revision_v1(
     obligation: &ProofObligation,
 ) -> Result<ObligationRevisionIdV1, AnalysisTrustErrorV1> {
@@ -279,42 +275,36 @@ pub struct AnalyticalMethodV1 {
 }
 
 impl AnalyticalMethodV1 {
-    /// Initial ETK-3C canary: the existing Euler-Bernoulli beam faculty.
-    ///
-    /// The two digests are premises. Their syntax is validated here, but their
-    /// reproducibility/qualification/authentication must be established elsewhere.
+    /// Initial ETK-3C canary: Euler-Bernoulli rectangular-beam analysis.
     pub fn euler_bernoulli_beam(
         implementation_artifact_digest: Sha256DigestV1,
         algorithm_revision_digest: Sha256DigestV1,
     ) -> Self {
-        let assumptions = vec![
-            "euler_bernoulli_kinematics",
-            "linear_elastic_material",
-            "prismatic_beam",
-            "single_span",
-            "small_deflection",
-            "statically_determinate",
-        ];
-        let outputs = vec![
-            json!({"name": "factor_of_safety", "unit": "1"}),
-            json!({"name": "max_bending_stress", "unit": "Pa"}),
-            json!({"name": "max_deflection", "unit": "m"}),
-            json!({"name": "max_moment", "unit": "N*m"}),
-        ];
-        let supported_load_cases = vec![
-            "cantilever_end_point",
-            "cantilever_udl",
-            "simply_supported_center_point",
-            "simply_supported_udl",
-        ];
         let preimage = json!({
             "algorithm_revision_digest": algorithm_revision_digest.as_str(),
-            "assumptions": assumptions,
+            "assumptions": [
+                "euler_bernoulli_kinematics",
+                "linear_elastic_material",
+                "prismatic_beam",
+                "single_span",
+                "small_deflection",
+                "statically_determinate",
+            ],
             "implementation_artifact_digest": implementation_artifact_digest.as_str(),
             "method_key": "symthaea-structural/euler-bernoulli-beam",
-            "outputs": outputs,
+            "outputs": [
+                {"name": "factor_of_safety", "unit": "1"},
+                {"name": "max_bending_stress", "unit": "Pa"},
+                {"name": "max_deflection", "unit": "m"},
+                {"name": "max_moment", "unit": "N*m"},
+            ],
             "schema": "symthaea.etk-native-analytical-method.v1",
-            "supported_load_cases": supported_load_cases,
+            "supported_load_cases": [
+                "cantilever_end_point",
+                "cantilever_udl",
+                "simply_supported_center_point",
+                "simply_supported_udl",
+            ],
             "unit_system": "SI",
         });
         Self {
@@ -330,7 +320,7 @@ impl AnalyticalMethodV1 {
     }
 }
 
-/// Exact canary inputs for a rectangular cantilever with an end point load.
+/// Exact canary input: rectangular cantilever with an end point load.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RectangularCantileverInputV1 {
     revision_id: AnalyticalInputRevisionIdV1,
@@ -369,7 +359,6 @@ impl RectangularCantileverInputV1 {
                 return Err(AnalysisTrustErrorV1::NonPositive(field));
             }
         }
-
         let preimage = json!({
             "beam": {
                 "length_m": canonical_binary64_v1(length_m)?,
@@ -391,7 +380,6 @@ impl RectangularCantileverInputV1 {
             "method_revision_id": method.revision_id().as_str(),
             "schema": "symthaea.etk-native-analytical-input.v1",
         });
-
         Ok(Self {
             revision_id: AnalyticalInputRevisionIdV1::from_digest(domain_hash(
                 INPUT_DOMAIN_V1,
@@ -417,6 +405,21 @@ impl RectangularCantileverInputV1 {
 
     pub fn yield_strength_pa(&self) -> f64 {
         self.yield_strength_pa
+    }
+
+    fn expected_max_moment_nm(&self) -> f64 {
+        self.load_n * self.length_m
+    }
+
+    fn expected_max_bending_stress_pa(&self) -> f64 {
+        let section_modulus = self.width_m * self.height_m.powi(2) / 6.0;
+        self.expected_max_moment_nm() / section_modulus
+    }
+
+    fn expected_max_deflection_m(&self) -> f64 {
+        let moment_of_inertia = self.width_m * self.height_m.powi(3) / 12.0;
+        self.load_n * self.length_m.powi(3)
+            / (3.0 * self.youngs_modulus_pa * moment_of_inertia)
     }
 
     pub fn audit_record_v1(&self) -> Value {
@@ -582,8 +585,13 @@ impl NativeAnalyticalPlanV1 {
     }
 }
 
+/// Data-only candidate result. Construction binds it to one exact method/input
+/// pair; it still has no authority until admission independently rechecks the
+/// plan, equations, model-error budget, and acceptance predicate.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NativeAnalyticalResultV1 {
+    method_revision_id: AnalyticalMethodRevisionIdV1,
+    input_revision_id: AnalyticalInputRevisionIdV1,
     execution_artifact_digest: ExecutionArtifactDigestV1,
     factor_of_safety: f64,
     max_bending_stress_pa: f64,
@@ -594,7 +602,9 @@ pub struct NativeAnalyticalResultV1 {
 
 impl NativeAnalyticalResultV1 {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn for_input(
+        method: &AnalyticalMethodV1,
+        input: &RectangularCantileverInputV1,
         execution_artifact_digest: ExecutionArtifactDigestV1,
         factor_of_safety: f64,
         max_bending_stress_pa: f64,
@@ -602,6 +612,9 @@ impl NativeAnalyticalResultV1 {
         max_moment_nm: f64,
         model_relative_error_bound: f64,
     ) -> Result<Self, AnalysisTrustErrorV1> {
+        if input.method_revision_id() != method.revision_id() {
+            return Err(AnalysisTrustErrorV1::MethodInputMismatch);
+        }
         for (field, value) in [
             ("factor of safety", factor_of_safety),
             ("maximum bending stress", max_bending_stress_pa),
@@ -625,6 +638,8 @@ impl NativeAnalyticalResultV1 {
             ));
         }
         Ok(Self {
+            method_revision_id: method.revision_id().clone(),
+            input_revision_id: input.revision_id().clone(),
             execution_artifact_digest,
             factor_of_safety,
             max_bending_stress_pa,
@@ -650,6 +665,14 @@ impl AdmittedAnalyticalEvidenceV1 {
     pub fn analytical_plan_id(&self) -> &AnalyticalPlanIdV1 {
         &self.analytical_plan_id
     }
+
+    pub fn audit_record_v1(&self) -> Value {
+        json!({
+            "admitted_analytical_evidence_id": self.admitted_evidence_id.as_str(),
+            "analytical_plan_id": self.analytical_plan_id.as_str(),
+            "authority": "admitted-analytical-evidence-only",
+        })
+    }
 }
 
 pub fn admit_native_analytical_evidence_v1(
@@ -662,21 +685,54 @@ pub fn admit_native_analytical_evidence_v1(
     if method.revision_id() != &plan.method_revision_id
         || input.revision_id() != &plan.input_revision_id
         || policy.revision_id() != &plan.policy_revision_id
+        || result.method_revision_id != plan.method_revision_id
+        || result.input_revision_id != plan.input_revision_id
     {
         return Err(AnalysisTrustErrorV1::PlanBindingMismatch);
     }
 
-    let derived_fos = input.yield_strength_pa() / result.max_bending_stress_pa;
-    let relative_difference =
-        (derived_fos - result.factor_of_safety).abs() / derived_fos.abs().max(1.0);
-    if relative_difference > 1e-12 {
-        return Err(AnalysisTrustErrorV1::InconsistentFactorOfSafety);
+    let expected_moment = input.expected_max_moment_nm();
+    if !relative_close(
+        result.max_moment_nm,
+        expected_moment,
+        EQUATION_RELATIVE_TOLERANCE,
+    ) {
+        return Err(AnalysisTrustErrorV1::AnalyticalEquationMismatch(
+            "maximum moment",
+        ));
+    }
+    let expected_stress = input.expected_max_bending_stress_pa();
+    if !relative_close(
+        result.max_bending_stress_pa,
+        expected_stress,
+        EQUATION_RELATIVE_TOLERANCE,
+    ) {
+        return Err(AnalysisTrustErrorV1::AnalyticalEquationMismatch(
+            "maximum bending stress",
+        ));
+    }
+    let expected_deflection = input.expected_max_deflection_m();
+    if !relative_close(
+        result.max_deflection_m,
+        expected_deflection,
+        EQUATION_RELATIVE_TOLERANCE,
+    ) {
+        return Err(AnalysisTrustErrorV1::AnalyticalEquationMismatch(
+            "maximum deflection",
+        ));
     }
 
+    let derived_fos = input.yield_strength_pa() / result.max_bending_stress_pa;
+    if !relative_close(
+        result.factor_of_safety,
+        derived_fos,
+        EQUATION_RELATIVE_TOLERANCE,
+    ) {
+        return Err(AnalysisTrustErrorV1::InconsistentFactorOfSafety);
+    }
     if result.model_relative_error_bound > policy.max_model_relative_error_bound() {
         return Err(AnalysisTrustErrorV1::ModelErrorBudgetExceeded);
     }
-
     let conservative_factor_of_safety =
         result.factor_of_safety / (1.0 + result.model_relative_error_bound);
     if conservative_factor_of_safety < policy.threshold() {
@@ -697,7 +753,6 @@ pub fn admit_native_analytical_evidence_v1(
         "normalized_result": normalized_result,
         "schema": "symthaea.etk-native-analytical-admitted-evidence.v1",
     });
-
     Ok(AdmittedAnalyticalEvidenceV1 {
         admitted_evidence_id: AdmittedAnalyticalEvidenceIdV1::from_digest(domain_hash(
             ADMITTED_DOMAIN_V1,
@@ -723,6 +778,16 @@ impl NativeAnalyticalDischargeReceiptV1 {
 
     pub fn analytical_plan_id(&self) -> &AnalyticalPlanIdV1 {
         &self.analytical_plan_id
+    }
+
+    pub fn audit_record_v1(&self) -> Value {
+        json!({
+            "analytical_plan_id": self.analytical_plan_id.as_str(),
+            "authority": "historical-analytical-discharge-only",
+            "obligation_id": self.obligation_id.as_str(),
+            "obligation_revision_id": self.obligation_revision_id.as_str(),
+            "receipt_id": self.receipt_id.as_str(),
+        })
     }
 }
 
@@ -771,6 +836,15 @@ impl CurrentNativeAnalyticalDischargeFactV1 {
     pub fn witness_receipt_id(&self) -> &NativeAnalyticalDischargeReceiptIdV1 {
         &self.witness_receipt_id
     }
+
+    pub fn audit_record_v1(&self) -> Value {
+        json!({
+            "analytical_plan_id": self.analytical_plan_id.as_str(),
+            "authority": "current-analytical-discharge-only",
+            "current_analytical_discharge_fact_id": self.fact_id.as_str(),
+            "witness_receipt_id": self.witness_receipt_id.as_str(),
+        })
+    }
 }
 
 pub fn derive_current_native_analytical_discharge_fact_v1(
@@ -806,6 +880,10 @@ pub fn derive_current_native_analytical_discharge_fact_v1(
         analytical_plan_id: current_plan.plan_id.clone(),
         witness_receipt_id: receipt.receipt_id.clone(),
     })
+}
+
+fn relative_close(actual: f64, expected: f64, tolerance: f64) -> bool {
+    (actual - expected).abs() / expected.abs().max(1.0) <= tolerance
 }
 
 fn canonical_text(value: String, field: &'static str) -> Result<String, AnalysisTrustErrorV1> {
