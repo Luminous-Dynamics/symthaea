@@ -415,6 +415,64 @@ pub enum ExecutionMode {
     DryRun,
     /// Parsed output from an external solver invocation.
     ExternalSolver,
+    /// Host-normalized output from an extension Component invocation.
+    /// Successful execution does not make the result engineering evidence.
+    ExtensionComponent,
+}
+
+/// Host-owned lineage for a result returned by a third-party Component.
+///
+/// Signer trust, capability admission, routing authority, and currentness are
+/// intentionally not represented here. Those are point-of-use authorization
+/// decisions made outside the numerical result itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ExtensionComponentEvidence {
+    /// Stable extension identity reported through the admitted control ABI.
+    pub extension_id: String,
+    /// Extension version bound to the admitted manifest/control identity.
+    pub extension_version: String,
+    /// SHA-256 of the exact manifest bytes presented to the host.
+    pub manifest_sha256: String,
+    /// SHA-256 of the exact Component bytes instantiated by the host.
+    pub component_sha256: String,
+    /// Host/runtime profile, such as the Wasmtime version and import policy.
+    pub runtime_profile: String,
+    /// Versioned profile defining the canonical bytes covered by request/output hashes.
+    pub digest_profile: String,
+    /// SHA-256 of the host-canonicalized simulation request.
+    pub request_sha256: String,
+    /// SHA-256 of the host-canonicalized typed Component output before normalization.
+    pub output_sha256: String,
+    /// Public simulation-provider WIT/ABI version used for invocation.
+    pub wit_version: String,
+    /// Version of the host adapter that converted between native and WIT types.
+    pub adapter_version: String,
+}
+
+impl ExtensionComponentEvidence {
+    fn has_complete_provenance(&self) -> bool {
+        [
+            &self.extension_id,
+            &self.extension_version,
+            &self.runtime_profile,
+            &self.digest_profile,
+            &self.wit_version,
+            &self.adapter_version,
+        ]
+        .into_iter()
+        .all(|value| !value.trim().is_empty())
+            && is_canonical_sha256(&self.manifest_sha256)
+            && is_canonical_sha256(&self.component_sha256)
+            && is_canonical_sha256(&self.request_sha256)
+            && is_canonical_sha256(&self.output_sha256)
+    }
+}
+
+fn is_canonical_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 /// Provenance needed to distinguish fixtures from solver-backed evidence.
@@ -438,10 +496,13 @@ pub struct SimulationEvidence {
     /// Version of the adapter/parser that normalized the result.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parser_version: Option<String>,
+    /// Host-owned lineage for an extension Component result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension: Option<ExtensionComponentEvidence>,
 }
 
 impl SimulationEvidence {
-    fn has_complete_provenance(&self) -> bool {
+    fn has_complete_external_provenance(&self) -> bool {
         self.backend
             .as_deref()
             .is_some_and(|value| !value.trim().is_empty())
@@ -461,6 +522,23 @@ impl SimulationEvidence {
                 .parser_version
                 .as_deref()
                 .is_some_and(|value| !value.trim().is_empty())
+    }
+
+    fn has_complete_extension_provenance(&self) -> bool {
+        self.backend
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+            && self
+                .extension
+                .as_ref()
+                .is_some_and(ExtensionComponentEvidence::has_complete_provenance)
+    }
+
+    fn has_external_solver_fields(&self) -> bool {
+        self.solver_version.is_some()
+            || self.input_digest.is_some()
+            || self.output_digest.is_some()
+            || self.parser_version.is_some()
     }
 }
 
@@ -529,13 +607,35 @@ impl SimulationResult {
         self
     }
 
+    /// Attach host-owned provenance for an extension Component result.
+    ///
+    /// This records execution lineage only. It does not grant engineering-
+    /// evidence status, signer trust, capability authority, or currentness.
+    pub fn with_extension_component_evidence(
+        mut self,
+        backend: impl Into<String>,
+        evidence: ExtensionComponentEvidence,
+    ) -> Self {
+        self.evidence = SimulationEvidence {
+            mode: ExecutionMode::ExtensionComponent,
+            backend: Some(backend.into()),
+            extension: Some(evidence),
+            ..SimulationEvidence::default()
+        };
+        self.warnings.push(
+            "extension-component result: successful execution is not engineering evidence"
+                .into(),
+        );
+        self
+    }
+
     /// True only for a parsed external-solver result with complete provenance.
     pub fn is_engineering_evidence(&self) -> bool {
         self.validate().is_ok()
             && self.converged
             && !self.metrics.is_empty()
             && self.evidence.mode == ExecutionMode::ExternalSolver
-            && self.evidence.has_complete_provenance()
+            && self.evidence.has_complete_external_provenance()
     }
 
     /// Add a metric with no explicit uncertainty.
@@ -677,17 +777,53 @@ impl SimulationRegistry {
                 request.id
             )));
         }
-        if result.evidence.mode == ExecutionMode::ExternalSolver {
-            if result.evidence.backend.as_deref() != Some(backend.name()) {
-                return Err(SimulationError::Adapter(format!(
-                    "external evidence backend does not match dispatched backend {:?}",
-                    backend.name()
-                )));
+        match result.evidence.mode {
+            ExecutionMode::ExternalSolver => {
+                if result.evidence.backend.as_deref() != Some(backend.name()) {
+                    return Err(SimulationError::Adapter(format!(
+                        "external evidence backend does not match dispatched backend {:?}",
+                        backend.name()
+                    )));
+                }
+                if result.evidence.extension.is_some() {
+                    return Err(SimulationError::Adapter(
+                        "external solver result must not carry extension Component provenance"
+                            .into(),
+                    ));
+                }
+                if !result.evidence.has_complete_external_provenance() {
+                    return Err(SimulationError::Adapter(
+                        "external solver result has incomplete provenance".into(),
+                    ));
+                }
             }
-            if !result.evidence.has_complete_provenance() {
-                return Err(SimulationError::Adapter(
-                    "external solver result has incomplete provenance".into(),
-                ));
+            ExecutionMode::ExtensionComponent => {
+                if result.evidence.backend.as_deref() != Some(backend.name()) {
+                    return Err(SimulationError::Adapter(format!(
+                        "extension evidence backend does not match dispatched backend {:?}",
+                        backend.name()
+                    )));
+                }
+                if result.evidence.has_external_solver_fields() {
+                    return Err(SimulationError::Adapter(
+                        "extension Component result must not populate external-solver provenance fields"
+                            .into(),
+                    ));
+                }
+                if !result.evidence.has_complete_extension_provenance() {
+                    return Err(SimulationError::Adapter(
+                        "extension Component result has incomplete or non-canonical provenance"
+                            .into(),
+                    ));
+                }
+            }
+            ExecutionMode::Unknown | ExecutionMode::DryRun => {
+                if result.evidence.extension.is_some() {
+                    return Err(SimulationError::Adapter(
+                        "extension Component provenance requires extension_component execution mode"
+                            .into(),
+                    ));
+                }
             }
         }
         Ok(result)
@@ -1226,6 +1362,43 @@ mod tests {
         }
     }
 
+    fn complete_extension_evidence() -> ExtensionComponentEvidence {
+        ExtensionComponentEvidence {
+            extension_id: "hello-simulation".into(),
+            extension_version: "0.1.0".into(),
+            manifest_sha256: "a".repeat(64),
+            component_sha256: "b".repeat(64),
+            runtime_profile: "wasmtime-44.0.1/component-model/empty-linker".into(),
+            digest_profile: "simulation-provider-v1-canonical-v1".into(),
+            request_sha256: "c".repeat(64),
+            output_sha256: "d".repeat(64),
+            wit_version: "simulation-provider-v1".into(),
+            adapter_version: "extension-component-adapter-v1".into(),
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct ExtensionBackend {
+        evidence: ExtensionComponentEvidence,
+    }
+
+    impl SimulationBackend for ExtensionBackend {
+        fn name(&self) -> &'static str {
+            "extension-component"
+        }
+
+        fn supported_solvers(&self) -> &[SolverKind] {
+            &[SolverKind::Custom]
+        }
+
+        fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
+            Ok(SimulationResult::converged(&request.id, 0.0)
+                .with_metric("synthetic_parameter_sum", 3.0, "1")
+                .with_uncertainty(UncertaintyEstimate::new(1.0, 0.0))
+                .with_extension_component_evidence(self.name(), self.evidence.clone()))
+        }
+    }
+
     #[test]
     fn registry_dispatches_to_matching_backend() {
         let mut registry = SimulationRegistry::new();
@@ -1355,6 +1528,7 @@ mod tests {
             input_digest: Some("input-digest".into()),
             output_digest: Some("output-digest".into()),
             parser_version: Some("parser-1".into()),
+            extension: None,
         };
         let valid = SimulationResult::converged("run-1", 0.9)
             .with_metric("stress", 12.0, "MPa")
@@ -1365,6 +1539,72 @@ mod tests {
         invalid.metrics[0].value = f64::NAN;
         assert!(!invalid.is_engineering_evidence());
         assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn extension_component_result_is_explicitly_not_engineering_evidence() {
+        let result = SimulationResult::converged("extension-1", 0.0)
+            .with_metric("synthetic_parameter_sum", 3.0, "1")
+            .with_extension_component_evidence(
+                "extension-component",
+                complete_extension_evidence(),
+            );
+
+        assert_eq!(result.evidence.mode, ExecutionMode::ExtensionComponent);
+        assert!(result.validate().is_ok());
+        assert!(!result.is_engineering_evidence());
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("not engineering evidence"))
+        );
+    }
+
+    #[test]
+    fn registry_accepts_complete_extension_lineage_without_promoting_it() {
+        let mut registry = SimulationRegistry::new();
+        registry.register(ExtensionBackend {
+            evidence: complete_extension_evidence(),
+        });
+        let request = SimulationRequest::new(
+            "extension-accepted",
+            EngineeringDomain::Systems,
+            SolverKind::Custom,
+            "synthetic extension conformance result",
+        );
+
+        let result = registry.run(&request).unwrap();
+        assert_eq!(result.evidence.mode, ExecutionMode::ExtensionComponent);
+        assert!(!result.is_engineering_evidence());
+    }
+
+    #[test]
+    fn registry_rejects_noncanonical_extension_lineage() {
+        let mut evidence = complete_extension_evidence();
+        evidence.request_sha256 = "ABCDEF".repeat(10);
+
+        let mut registry = SimulationRegistry::new();
+        registry.register(ExtensionBackend { evidence });
+        let request = SimulationRequest::new(
+            "extension-rejected",
+            EngineeringDomain::Systems,
+            SolverKind::Custom,
+            "synthetic extension conformance result",
+        );
+
+        assert!(matches!(
+            registry.run(&request),
+            Err(SimulationError::Adapter(_))
+        ));
+    }
+
+    #[test]
+    fn legacy_simulation_evidence_deserializes_without_extension_lineage() {
+        let evidence: SimulationEvidence =
+            serde_json::from_str(r#"{"mode":"dry_run","backend":"mock"}"#).unwrap();
+        assert_eq!(evidence.mode, ExecutionMode::DryRun);
+        assert!(evidence.extension.is_none());
     }
 
     #[test]
