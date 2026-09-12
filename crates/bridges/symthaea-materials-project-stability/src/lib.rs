@@ -141,8 +141,8 @@ impl StabilityRecord {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StabilityCapture {
-    pub schema: &'static str,
-    pub capability_classification: &'static str,
+    pub schema: String,
+    pub capability_classification: String,
     pub metadata: CaptureMetadata,
     pub raw_json_sha256: String,
     pub records: Vec<StabilityRecord>,
@@ -241,8 +241,8 @@ pub fn parse_summary_docs_json(
     records.sort_by(|left, right| left.material_id.cmp(&right.material_id));
 
     let capture = StabilityCapture {
-        schema: CAPTURE_SCHEMA,
-        capability_classification: CAPABILITY_CLASSIFICATION,
+        schema: CAPTURE_SCHEMA.to_owned(),
+        capability_classification: CAPABILITY_CLASSIFICATION.to_owned(),
         metadata,
         raw_json_sha256,
         records,
@@ -299,8 +299,8 @@ impl StabilityBinding {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StabilityEvidenceReceipt {
-    pub schema: &'static str,
-    pub capability_classification: &'static str,
+    pub schema: String,
+    pub capability_classification: String,
     pub capture_sha256: String,
     pub raw_json_sha256: String,
     pub binding: StabilityBinding,
@@ -357,10 +357,6 @@ pub fn bind_stability_evidence(
         metric: metric::ENERGY_ABOVE_HULL.to_owned(),
         value: record.energy_above_hull_ev_per_atom,
         unit: unit::EV_PER_ATOM.to_owned(),
-        // SummaryDoc supplies no calibrated predictive interval for this
-        // adapter. Epistemic=1.0 uses the generic contract's documented
-        // 'unknown' endpoint; aleatoric=0.0 means this captured computed value
-        // has no stochastic noise model attached, not that nature is noiseless.
         uncertainty: UncertaintyEstimate::new(1.0, 0.0)?,
         fidelity: FidelityLevel::FirstPrinciples,
         model,
@@ -387,8 +383,8 @@ pub fn bind_stability_evidence(
     prediction.validate()?;
 
     Ok(StabilityEvidenceReceipt {
-        schema: "symthaea.materials-project.stability-evidence.v0",
-        capability_classification: CAPABILITY_CLASSIFICATION,
+        schema: "symthaea.materials-project.stability-evidence.v0".to_owned(),
+        capability_classification: CAPABILITY_CLASSIFICATION.to_owned(),
         capture_sha256,
         raw_json_sha256: capture.raw_json_sha256.clone(),
         binding,
@@ -504,6 +500,11 @@ mod tests {
         assert_ne!(first.sha256().unwrap(), changed.sha256().unwrap());
         assert_eq!(first.records[0].material_id, "mp-149");
         assert_eq!(first.records[1].material_id, "mp-2");
+
+        let serialized = serde_json::to_vec(&first).unwrap();
+        let roundtrip: StabilityCapture = serde_json::from_slice(&serialized).unwrap();
+        assert_eq!(first, roundtrip);
+        roundtrip.validate().unwrap();
     }
 
     #[test]
