@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-forge-linux-seccomp-filter"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Content-addressed compiled seccomp cBPF artifacts for Symthaea Forge"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+serde = { workspace = true }
+thiserror = { workspace = true }

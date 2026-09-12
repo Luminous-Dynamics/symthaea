@@ -17,6 +17,7 @@ on:
       - 'crates/bridges/symthaea-forge-linux-provenance-strict/**'
       - 'crates/bridges/symthaea-forge-linux-kernel-attestation/**'
       - 'crates/bridges/symthaea-forge-linux-seccomp-attestation/**'
+      - 'crates/bridges/symthaea-forge-linux-seccomp-filter/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-control/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-strict/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-observed-exec/**'
@@ -43,6 +44,7 @@ on:
       - 'crates/bridges/symthaea-forge-linux-provenance-strict/**'
       - 'crates/bridges/symthaea-forge-linux-kernel-attestation/**'
       - 'crates/bridges/symthaea-forge-linux-seccomp-attestation/**'
+      - 'crates/bridges/symthaea-forge-linux-seccomp-filter/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-control/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-strict/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-observed-exec/**'
@@ -100,6 +102,9 @@ jobs:
       - name: Test parent-observed seccomp state gate
         run: cargo test -p symthaea-forge-linux-seccomp-attestation --all-targets -- --test-threads=1
 
+      - name: Test compiled seccomp filter artifact gate
+        run: cargo test -p symthaea-forge-linux-seccomp-filter --all-targets -- --test-threads=1
+
       - name: Test cgroup v2 resource-control bridge
         run: cargo test -p symthaea-forge-linux-cgroup-control --all-targets -- --test-threads=1
 
@@ -153,6 +158,7 @@ jobs:
           -p symthaea-forge-linux-provenance-strict
           -p symthaea-forge-linux-kernel-attestation
           -p symthaea-forge-linux-seccomp-attestation
+          -p symthaea-forge-linux-seccomp-filter
           -p symthaea-forge-linux-cgroup-control
           -p symthaea-forge-linux-cgroup-strict
           -p symthaea-forge-linux-cgroup-observed-exec
