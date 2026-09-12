@@ -18,6 +18,8 @@
 //!   source, lexicographic site/direction/subgroup composition, and sweep stats
 //! - **Lattice RNG streams**: pinned ChaCha8 implementation with injective
 //!   campaign/replica/rank stream coordinates and endpoint-free U(0,1)
+//! - **Tiny lattice benchmarks**: cold/disordered qualification traces without
+//!   automatic equilibrium or convergence declarations
 //!
 //! ## Natural Units
 //!
@@ -37,6 +39,7 @@ pub mod cross_sections;
 pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
+pub mod lattice_benchmark;
 pub mod lattice_gauge;
 pub mod lattice_metropolis;
 pub mod lattice_qcd;
@@ -55,6 +58,10 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use lattice_benchmark::{
+    BenchmarkSample, PairedBenchmarkTrace, QualificationStart, TinyBenchmarkError,
+    TinyBenchmarkPlan, TinyBenchmarkTrace, run_paired_tiny_benchmark, run_tiny_benchmark,
 };
 pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
