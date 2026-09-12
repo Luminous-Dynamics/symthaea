@@ -1052,7 +1052,7 @@ impl CognitiveLoopService {
         moral_score: f32,
         is_surprised: bool,
     ) -> (&'static str, f32) {
-        let mut moral_steering_category: &'static str = "";
+        let mut moral_steering_category: &str = "";
         if moral_concern_detected {
             self.scale_exploration_pri(
                 "moral_concern",
