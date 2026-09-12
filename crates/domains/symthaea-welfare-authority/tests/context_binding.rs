@@ -169,7 +169,7 @@ fn policy_change_cannot_retroactively_activate_old_signature() {
 
     let mut changed = original.clone();
     changed.maximum_statement_age_s += 1;
-    assert_eq!(
+    assert!(matches!(
         verify_context_bound_welfare_authority(
             "nonce-1",
             &signed,
@@ -179,7 +179,7 @@ fn policy_change_cannot_retroactively_activate_old_signature() {
             &TestVerifier,
         ),
         Err(WelfareAuthorityContextError::VerificationContextMismatch)
-    );
+    ));
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn trust_snapshot_rollover_requires_fresh_authority_signature() {
     let signed = signed(&manifest, &original_trust);
     let rolled = trust(8);
 
-    assert_eq!(
+    assert!(matches!(
         verify_context_bound_welfare_authority(
             "nonce-1",
             &signed,
@@ -199,7 +199,7 @@ fn trust_snapshot_rollover_requires_fresh_authority_signature() {
             &TestVerifier,
         ),
         Err(WelfareAuthorityContextError::VerificationContextMismatch)
-    );
+    ));
 }
 
 #[test]
