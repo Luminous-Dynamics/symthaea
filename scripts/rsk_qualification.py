@@ -132,19 +132,19 @@ def command_plan(phase: str) -> list[tuple[str, list[str]]]:
     core = [
         (
             "check-authority",
-            ["cargo", "check", "-p", RSK_PACKAGES[0], "--all-targets"],
+            ["cargo", "check", "-p", RSK_PACKAGES[0], "--all-targets", "--locked"],
         ),
         (
             "check-ledger",
-            ["cargo", "check", "-p", RSK_PACKAGES[1], "--all-targets"],
+            ["cargo", "check", "-p", RSK_PACKAGES[1], "--all-targets", "--locked"],
         ),
         (
             "test-authority",
-            ["cargo", "test", "-p", RSK_PACKAGES[0], "--all-targets"],
+            ["cargo", "test", "-p", RSK_PACKAGES[0], "--all-targets", "--locked"],
         ),
         (
             "test-ledger",
-            ["cargo", "test", "-p", RSK_PACKAGES[1], "--all-targets"],
+            ["cargo", "test", "-p", RSK_PACKAGES[1], "--all-targets", "--locked"],
         ),
         (
             "clippy-authority",
@@ -154,6 +154,7 @@ def command_plan(phase: str) -> list[tuple[str, list[str]]]:
                 "-p",
                 RSK_PACKAGES[0],
                 "--all-targets",
+                "--locked",
                 "--",
                 "-D",
                 "warnings",
@@ -167,6 +168,7 @@ def command_plan(phase: str) -> list[tuple[str, list[str]]]:
                 "-p",
                 RSK_PACKAGES[1],
                 "--all-targets",
+                "--locked",
                 "--",
                 "-D",
                 "warnings",
@@ -227,6 +229,7 @@ def tracked_input_hashes(repo: Path) -> dict[str, str | None]:
         "Cargo.lock",
         "rust-toolchain.toml",
         "scripts/rsk_qualification.py",
+        "scripts/test_rsk_qualification.py",
         ".github/workflows/rsk-safety.yml",
         "scripts/check-class-a-changes.sh",
         "docs/architecture/replicator-safety/RSK_PRODUCTION_ADMISSION_GATES_V0_1.md",
@@ -289,6 +292,7 @@ def main() -> int:
 
     dirty_lines = git(repo, "status", "--porcelain", "--untracked-files=all", check=True).splitlines()
     dirty = bool(dirty_lines)
+    inputs_before = tracked_input_hashes(repo)
     if dirty and not args.allow_dirty:
         receipt = {
             "schema": SCHEMA,
@@ -305,7 +309,11 @@ def main() -> int:
                 "dirty": True,
                 "dirty_paths": dirty_lines,
             },
-            "inputs": tracked_input_hashes(repo),
+            "inputs": {
+                "before": inputs_before,
+                "after": inputs_before,
+                "unchanged": True,
+            },
             "commands": [],
         }
         path = write_receipt(output_dir, receipt)
@@ -324,10 +332,18 @@ def main() -> int:
 
     results = [run_gate(repo, output_dir, name, argv) for name, argv in command_plan(args.phase)]
     commands_pass = all(item["exit_code"] == 0 for item in results)
-    clean_evidence = not dirty
+    post_dirty_lines = git(
+        repo, "status", "--porcelain", "--untracked-files=all", check=True
+    ).splitlines()
+    inputs_after = tracked_input_hashes(repo)
+    inputs_unchanged = inputs_before == inputs_after
+    mutation_detected = not dirty and bool(post_dirty_lines)
+    clean_evidence = not dirty and not post_dirty_lines and inputs_unchanged
 
     if commands_pass and toolchain_pin_match and clean_evidence:
         status = "pass-clean"
+    elif mutation_detected or (not dirty and not inputs_unchanged):
+        status = "fail-worktree-mutated"
     elif commands_pass and toolchain_pin_match:
         status = "pass-dirty-diagnostic"
     elif commands_pass:
@@ -349,8 +365,14 @@ def main() -> int:
             "branch": git(repo, "rev-parse", "--abbrev-ref", "HEAD"),
             "dirty": dirty,
             "dirty_paths": dirty_lines,
+            "post_run_dirty": bool(post_dirty_lines),
+            "post_run_dirty_paths": post_dirty_lines,
         },
-        "inputs": tracked_input_hashes(repo),
+        "inputs": {
+            "before": inputs_before,
+            "after": inputs_after,
+            "unchanged": inputs_unchanged,
+        },
         "toolchain": {
             "expected_rust_channel": expected_channel,
             "pin_match": toolchain_pin_match,
@@ -367,7 +389,8 @@ def main() -> int:
     print(f"RSK qualification status: {status}")
     print(f"Receipt: {path}")
     print(f"Receipt SHA-256: {receipt['receipt_sha256']}")
-    return 0 if commands_pass and toolchain_pin_match else 1
+    qualification_ok = commands_pass and toolchain_pin_match and not mutation_detected
+    return 0 if qualification_ok else 1
 
 
 if __name__ == "__main__":
