@@ -39,17 +39,23 @@ EXPECTED_CURRENT_FACT = (
 CLOSURE_REQUIREMENT_REVISION = (
     "sha256:e340c5030eebc978c41443ffd64f340dc5febad31e376080340bacfceda60faa"
 )
+CLOSURE_A_ADMITTED = (
+    "sha256:61dfe4e6a0c9b69deebbeb6c8089d4bbb6cf608003a4458c4b36b7b4c6a07faa"
+)
 CLOSURE_A_RECEIPT = (
-    "sha256:0fa40a2ce674bacc5c9dc4e077cb2cb84b6d0e7d35ada67fb4ea3eb1dc2a88c7"
+    "sha256:6d399cadb3c19f920028a439f8d2ee76328d0a2e72b0aca874a30a2434593134"
 )
 CLOSURE_A_FACT = (
-    "sha256:69a686d1505b571184a1d949fe09e5db049cade06f63e6f680b273b0b5d1c21d"
+    "sha256:327d8e535d83105aad0f92c164350fd3181d6eda02d92e515f5604ee23299d3a"
+)
+CLOSURE_B_ADMITTED = (
+    "sha256:d4f25205a91d4c634047bbe0983aa7a527b1cc26f11d0214b23d3df924494ecd"
 )
 CLOSURE_B_RECEIPT = (
-    "sha256:42a32bcaf8a185042a1cd9fdb3e4608ab2e456bae53c67306de5e068dd84b08b"
+    "sha256:de8f08d9f6a994c35b1d7d3bb8398ad174e2cd49c56b1e5e7790d5c9800eb9af"
 )
 CLOSURE_B_FACT = (
-    "sha256:408a2c784448d1436981fe40062396ba2316fe553b62fb29d7b35d073f1a1c9f"
+    "sha256:82e0a59a2972240512c9911b7ca1aa93641f2c81ab691ca5d695a9fc1592705c"
 )
 
 TOP = {
@@ -382,7 +388,7 @@ def closure_fixture_a() -> dict[str, Any]:
     return make_fixture(
         obligation_id="00000000-0000-4000-8000-000000000042",
         claim="stress remains below allowable under service load",
-        admitted_evidence_id="sha256:" + "81" * 32,
+        admitted_evidence_id=CLOSURE_A_ADMITTED,
         candidate_artifact_id="solver-output:closure-A",
         subject_id="bracket-alpha",
         twin_revision="design:G17",
@@ -397,7 +403,7 @@ def closure_fixture_b() -> dict[str, Any]:
     return make_fixture(
         obligation_id="00000000-0000-4000-8000-000000000043",
         claim="maximum principal stress remains below allowable under service load",
-        admitted_evidence_id="sha256:" + "82" * 32,
+        admitted_evidence_id=CLOSURE_B_ADMITTED,
         candidate_artifact_id="solver-output:closure-B",
         subject_id="bracket-alpha",
         twin_revision="design:G17",
@@ -430,8 +436,10 @@ def self_test() -> dict[str, str]:
     closure_b = evaluate(closure_fixture_b())
     assert closure_a["decision"] == "CurrentDischarge", closure_a
     assert closure_b["decision"] == "CurrentDischarge", closure_b
+    assert closure_a["admitted_evidence_id"] == CLOSURE_A_ADMITTED
     assert closure_a["receipt_id"] == CLOSURE_A_RECEIPT
     assert closure_a["current_discharge_fact_id"] == CLOSURE_A_FACT
+    assert closure_b["admitted_evidence_id"] == CLOSURE_B_ADMITTED
     assert closure_b["receipt_id"] == CLOSURE_B_RECEIPT
     assert closure_b["current_discharge_fact_id"] == CLOSURE_B_FACT
     assert closure_a["obligation_revision"] == (
@@ -525,8 +533,10 @@ def self_test() -> dict[str, str]:
         "obligation_snapshot": expected_snapshot,
         "discharge_receipt": expected_receipt,
         "current_discharge_fact": expected_fact,
+        "closure_a_admitted": closure_a["admitted_evidence_id"],
         "closure_a_receipt": closure_a["receipt_id"],
         "closure_a_fact": closure_a["current_discharge_fact_id"],
+        "closure_b_admitted": closure_b["admitted_evidence_id"],
         "closure_b_receipt": closure_b["receipt_id"],
         "closure_b_fact": closure_b["current_discharge_fact_id"],
     }
