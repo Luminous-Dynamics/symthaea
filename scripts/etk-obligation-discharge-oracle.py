@@ -6,11 +6,16 @@
 Standard-library-only; imports no Symthaea code.
 
 Core theorem:
-    admitted evidence != discharge receipt != present-tense discharged obligation
+    admitted evidence
+    != discharge receipt
+    != present-tense discharged obligation
+    != typed current-discharge fact
 
 A receipt records a historical authority transition against an issuance-time
 obligation snapshot. Whether it still discharges an obligation is separately
-derived from the current obligation and current engineering context.
+derived from the current obligation and current engineering context. A typed
+current-discharge fact is minted only for that positive present-tense theorem
+and binds the exact historical receipt that witnesses it.
 """
 from __future__ import annotations
 
@@ -25,6 +30,12 @@ SCHEMA = "symthaea.etk-obligation-discharge-reference.v1"
 OBLIGATION_SCHEMA = "symthaea.etk-proof-obligation-snapshot.v1"
 OBLIGATION_DOMAIN = b"symthaea.etk-proof-obligation-snapshot.v1\x00"
 RECEIPT_DOMAIN = b"symthaea.etk-obligation-discharge-receipt.v1\x00"
+CURRENT_FACT_SCHEMA = "symthaea.etk-current-obligation-discharge-fact.v1"
+CURRENT_FACT_DOMAIN = b"symthaea.etk-current-obligation-discharge-fact.v1\x00"
+
+EXPECTED_CURRENT_FACT = (
+    "sha256:ee766da9c94291c2c46579219d013684bdeef711ef075f9041e15d646e52397f"
+)
 
 TOP = {
     "schema",
@@ -136,6 +147,25 @@ def receipt_preimage(
     }
 
 
+def current_fact_preimage(
+    current_obligation: dict[str, Any],
+    current_context: dict[str, Any],
+    obligation_revision: str,
+    witness_receipt_id: str,
+) -> dict[str, Any]:
+    return {
+        "currentness_proof_id": current_context["currentness_proof_id"],
+        "obligation_id": current_obligation["obligation_id"],
+        "obligation_revision": obligation_revision,
+        "requirement_revision": current_context["requirement_revision"],
+        "schema": CURRENT_FACT_SCHEMA,
+        "subject_id": current_context["subject_id"],
+        "twin_revision": current_context["twin_revision"],
+        "validity_domain_id": current_context["validity_domain_id"],
+        "witness_receipt_id": witness_receipt_id,
+    }
+
+
 def deny_issuance(reasons: set[str]) -> dict[str, Any]:
     return {
         "decision": "DenyReceiptIssuance",
@@ -230,8 +260,8 @@ def evaluate(payload: Any) -> dict[str, Any]:
     )
 
     stale: set[str] = set()
+    current_snapshot = obligation_snapshot_id(current_obligation)
     if current_obligation_ok:
-        current_snapshot = obligation_snapshot_id(current_obligation)
         if current_obligation["obligation_id"] != issued_obligation["obligation_id"]:
             stale.add("obligation_id_changed")
         if current_snapshot != issued_snapshot:
@@ -262,7 +292,18 @@ def evaluate(payload: Any) -> dict[str, Any]:
             **common,
             "reasons": sorted(stale, key=CURRENTNESS_RANK.__getitem__),
         }
-    return {"decision": "CurrentDischarge", **common}
+
+    fact_preimage = current_fact_preimage(
+        current_obligation,
+        current_context,
+        current_snapshot,
+        receipt_id,
+    )
+    return {
+        "decision": "CurrentDischarge",
+        **common,
+        "current_discharge_fact_id": domain_hash(CURRENT_FACT_DOMAIN, fact_preimage),
+    }
 
 
 def fixture() -> dict[str, Any]:
@@ -305,7 +346,7 @@ def expect(payload: dict[str, Any], decision: str, reason: str | None = None) ->
         assert reason in result["reasons"], result
 
 
-def self_test() -> tuple[str, str]:
+def self_test() -> tuple[str, str, str]:
     good = fixture()
     result = evaluate(good)
     assert result["decision"] == "CurrentDischarge", result
@@ -313,6 +354,8 @@ def self_test() -> tuple[str, str]:
 
     expected_snapshot = good["admitted"]["obligation_revision"]
     expected_receipt = result["receipt_id"]
+    expected_fact = result["current_discharge_fact_id"]
+    assert expected_fact == EXPECTED_CURRENT_FACT
 
     cases: list[tuple[dict[str, Any], str, str]] = []
 
@@ -370,6 +413,7 @@ def self_test() -> tuple[str, str]:
         "twin_revision_changed",
         "currentness_proof_changed",
     ], result
+    assert "current_discharge_fact_id" not in result
 
     historical = copy.deepcopy(good)
     historical["current_obligation"]["claim"] += " with fatigue margin"
@@ -379,8 +423,21 @@ def self_test() -> tuple[str, str]:
     historical_result = evaluate(historical)
     assert historical_result["decision"] == "HistoricalReceipt"
     assert historical_result["receipt_id"] == expected_receipt
+    assert "current_discharge_fact_id" not in historical_result
 
-    return expected_snapshot, expected_receipt
+    refreshed = copy.deepcopy(good)
+    refreshed["admitted"]["currentness_proof_id"] = (
+        "currentness:design-G17:attestation-2"
+    )
+    refreshed["current_context"]["currentness_proof_id"] = (
+        "currentness:design-G17:attestation-2"
+    )
+    refreshed["admitted"]["admitted_evidence_id"] = "sha256:" + "ab" * 32
+    refreshed_result = evaluate(refreshed)
+    assert refreshed_result["decision"] == "CurrentDischarge"
+    assert refreshed_result["current_discharge_fact_id"] != expected_fact
+
+    return expected_snapshot, expected_receipt, expected_fact
 
 
 def reject_constant(value: str) -> None:
@@ -393,9 +450,10 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.self_test:
-        snapshot, receipt = self_test()
+        snapshot, receipt, fact = self_test()
         print("ok obligation_snapshot=" + snapshot)
         print("ok discharge_receipt=" + receipt)
+        print("ok current_discharge_fact=" + fact)
         return 0
 
     try:
