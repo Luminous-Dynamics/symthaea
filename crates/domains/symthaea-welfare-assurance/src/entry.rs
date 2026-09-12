@@ -12,12 +12,14 @@
 #[path = "lib.rs"]
 mod legacy_composition_tests;
 
+use std::error::Error as StdError;
+
 use symthaea_core::intervention_interlock::{
     BilateralInterventionInterlock, InterlockDecision, InterventionRequest,
 };
 use symthaea_core::welfare::SubjectAffectingAction;
 use symthaea_fabrication_kernel::crypto_digest::Sha256Digest;
-use symthaea_fabrication_kernel::trust::TrustSnapshot;
+use symthaea_fabrication_kernel::trust::{TrustSnapshot, digest_trust_snapshot};
 use symthaea_welfare_authority::{
     SignedWelfareInterventionAuthority, WelfareAuthorityContextError,
     WelfareAuthorityPolicyManifest, WelfareAuthoritySignatureVerifier, WelfareAuthorityTracker,
@@ -25,7 +27,8 @@ use symthaea_welfare_authority::{
     verify_context_bound_welfare_authority,
 };
 use symthaea_welfare_consent::{
-    LiveSubjectConsentUseError, SubjectConsentLedger, SubjectIdentityRegistry, bind_latest_live,
+    LiveSubjectConsentUseError, SubjectConsentLedger, SubjectIdentityRegistry,
+    SubjectIdentityStatus, bind_latest_live,
 };
 use thiserror::Error;
 
@@ -36,6 +39,9 @@ use thiserror::Error;
 #[derive(Debug)]
 pub struct AssuredInterventionPermit {
     request: InterventionRequest,
+    subject_id: String,
+    minted_at_unix_s: u64,
+    not_after_unix_s: u64,
     consent_statement_digest: Option<Sha256Digest>,
     consent_identity_epoch: Option<u64>,
     authority_statement_digest: Sha256Digest,
@@ -57,6 +63,16 @@ impl AssuredInterventionPermit {
     /// Human/machine-readable rationale that was covered by consent and authority scope.
     pub fn rationale(&self) -> &str {
         &self.request.rationale
+    }
+
+    /// Time at which the full assurance permit was minted.
+    pub fn minted_at_unix_s(&self) -> u64 {
+        self.minted_at_unix_s
+    }
+
+    /// Earliest expiry across authority, trust, live consent and subject identity windows.
+    pub fn not_after_unix_s(&self) -> u64 {
+        self.not_after_unix_s
     }
 
     /// Digest of the active consent statement, when this intervention used explicit consent.
@@ -149,18 +165,124 @@ pub fn authorize_intervention_once(
     } else {
         None
     };
+    let active_identity = active_consent.and_then(|_| subject_registry.binding(subject_id));
 
     let authority_policy_manifest_digest =
         digest_welfare_authority_policy_manifest(authority_manifest)?;
 
+    let mut not_after_unix_s = verified_authority
+        .statement()
+        .expires_at_unix_s
+        .min(authority_trust_snapshot.expires_at_unix_s);
+    if let Some(consent) = active_consent {
+        not_after_unix_s = not_after_unix_s.min(consent.statement().expires_at_unix_s);
+    }
+    if let Some(identity_expiry) = active_identity.and_then(|identity| identity.not_after_unix_s) {
+        not_after_unix_s = not_after_unix_s.min(identity_expiry);
+    }
+    if not_after_unix_s <= unix_s {
+        return Err(AssuranceGateError::NoLivePermitWindow);
+    }
+
     Ok(AssuredInterventionPermit {
         request: fully_bound,
+        subject_id: subject_id.to_string(),
+        minted_at_unix_s: unix_s,
+        not_after_unix_s,
         consent_statement_digest: active_consent.map(|consent| consent.statement_digest()),
         consent_identity_epoch: active_consent.map(|consent| consent.statement().identity_epoch),
         authority_statement_digest: verified_authority.statement_digest(),
         authority_policy_manifest_digest,
         authority_trust_snapshot_digest: verified_authority.trust_snapshot_digest(),
     })
+}
+
+/// Executor called only after the permit's live mutable contexts have been revalidated.
+///
+/// The permit is consumed by `execute_permit_once`, and the executor receives only a borrowed
+/// capability during that call. This makes the intended safe integration path validate-and-act
+/// rather than validate-now / actuate-arbitrarily-later.
+pub trait AssuredInterventionExecutor {
+    type Output;
+    type Error: StdError + Send + Sync + 'static;
+
+    fn execute(
+        &mut self,
+        permit: &AssuredInterventionPermit,
+    ) -> Result<Self::Output, Self::Error>;
+}
+
+/// Revalidate all mutable contexts and immediately consume the permit through an executor.
+///
+/// This prevents a held permit from silently surviving later consent withdrawal, subject-key
+/// rotation/revocation, authority-policy mutation, trust-snapshot rollover/revocation, or expiry.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_permit_once<E: AssuredInterventionExecutor>(
+    permit: AssuredInterventionPermit,
+    consent_ledger: &SubjectConsentLedger,
+    subject_registry: &SubjectIdentityRegistry,
+    current_authority_manifest: &WelfareAuthorityPolicyManifest,
+    current_trust_snapshot: &TrustSnapshot,
+    unix_s: u64,
+    executor: &mut E,
+) -> Result<E::Output, PermitExecutionError<E::Error>> {
+    if unix_s < permit.minted_at_unix_s {
+        return Err(PermitExecutionError::TimeRegression {
+            minted_at: permit.minted_at_unix_s,
+            proposed: unix_s,
+        });
+    }
+    if unix_s >= permit.not_after_unix_s {
+        return Err(PermitExecutionError::Expired {
+            not_after: permit.not_after_unix_s,
+            proposed: unix_s,
+        });
+    }
+
+    let current_policy_digest =
+        digest_welfare_authority_policy_manifest(current_authority_manifest)?;
+    if current_policy_digest != permit.authority_policy_manifest_digest {
+        return Err(PermitExecutionError::AuthorityPolicyChanged);
+    }
+
+    let current_trust_digest = digest_trust_snapshot(current_trust_snapshot)
+        .map_err(|error| PermitExecutionError::TrustSnapshotInvalid(format!("{error:?}")))?;
+    if current_trust_digest != permit.authority_trust_snapshot_digest {
+        return Err(PermitExecutionError::AuthorityTrustContextChanged);
+    }
+    if !current_trust_snapshot.is_fresh_at(unix_s) {
+        return Err(PermitExecutionError::AuthorityTrustSnapshotStale);
+    }
+
+    if let Some(expected_consent_digest) = permit.consent_statement_digest {
+        let consent = consent_ledger
+            .latest_for(&permit.subject_id, &permit.request.target_id, permit.request.action)
+            .ok_or(PermitExecutionError::ConsentChangedOrMissing)?;
+        if consent.statement_digest() != expected_consent_digest {
+            return Err(PermitExecutionError::ConsentChangedOrMissing);
+        }
+        let statement = consent.statement();
+        if unix_s < statement.issued_at_unix_s || unix_s >= statement.expires_at_unix_s {
+            return Err(PermitExecutionError::ConsentExpired);
+        }
+
+        let identity = subject_registry
+            .binding(&permit.subject_id)
+            .ok_or(PermitExecutionError::SubjectIdentityChanged)?;
+        let (signer_algorithm, signer_key_id) = consent.signer();
+        if identity.status != SubjectIdentityStatus::Active
+            || identity.identity_epoch != statement.identity_epoch
+            || !identity.active_at(unix_s)
+            || &identity.algorithm != signer_algorithm
+            || identity.key_id.as_str() != signer_key_id
+        {
+            return Err(PermitExecutionError::SubjectIdentityChanged);
+        }
+    }
+
+    executor
+        .execute(&permit)
+        .map_err(PermitExecutionError::Executor)
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -180,4 +302,36 @@ pub enum AssuranceGateError {
     /// The authority was valid, but bilateral consent/welfare policy did not pass.
     #[error("bilateral intervention policy rejected the request: {decision:?}")]
     PolicyRejected { decision: InterlockDecision },
+    /// All assurance inputs passed individually but had no positive shared lifetime remaining.
+    #[error("assurance inputs have no live permit window")]
+    NoLivePermitWindow,
+}
+
+#[derive(Debug, Error)]
+pub enum PermitExecutionError<E>
+where
+    E: StdError + Send + Sync + 'static,
+{
+    #[error("permit use time regressed before mint time: minted={minted_at}, proposed={proposed}")]
+    TimeRegression { minted_at: u64, proposed: u64 },
+    #[error("permit expired at {not_after}; proposed use={proposed}")]
+    Expired { not_after: u64, proposed: u64 },
+    #[error("authority policy changed after permit mint")]
+    AuthorityPolicyChanged,
+    #[error("authority trust snapshot changed after permit mint")]
+    AuthorityTrustContextChanged,
+    #[error("authority trust snapshot is no longer fresh")]
+    AuthorityTrustSnapshotStale,
+    #[error("trust snapshot invalid: {0}")]
+    TrustSnapshotInvalid(String),
+    #[error("consent was withdrawn, replaced, or removed after permit mint")]
+    ConsentChangedOrMissing,
+    #[error("consent expired after permit mint")]
+    ConsentExpired,
+    #[error("subject identity/key/epoch changed after permit mint")]
+    SubjectIdentityChanged,
+    #[error(transparent)]
+    AuthorityContext(#[from] WelfareAuthorityContextError),
+    #[error("assured intervention executor failed: {0}")]
+    Executor(#[source] E),
 }
