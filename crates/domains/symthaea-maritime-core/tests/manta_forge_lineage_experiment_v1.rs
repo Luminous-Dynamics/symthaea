@@ -1,14 +1,15 @@
 use std::collections::BTreeSet;
 use symthaea_maritime_core::{
-    calibrate_regenerative_viability_role, calibrate_regenerative_viability_roles,
+    assess_regenerative_role_assumption_changes, calibrate_regenerative_viability_role,
+    calibrate_regenerative_viability_roles, derive_regenerative_role_assumption_scopes,
     evaluate_regenerative_lineage_viability, evaluate_supported_closure, DependencyGovernance,
-    RegenerativeCapability, RegenerativeClosureModel, RegenerativeDependency,
-    RegenerativeDependencyKind, RegenerativeFlowKindV1, RegenerativeFlowSupportClaimV1,
-    RegenerativeFlowSupportV1, RegenerativeGenomeRequirementV1, RegenerativeGenomeV1,
-    RegenerativeHorizon, RegenerativeLineageViabilityProfileV1,
-    RegenerativeViabilityCalibrationClassV1, RegenerativeViabilityDynamicObservationV1,
-    REGENERATIVE_FLOW_SUPPORT_SCHEMA_V1, REGENERATIVE_GENOME_SCHEMA_V1,
-    REGENERATIVE_LINEAGE_VIABILITY_SCHEMA_V1,
+    RegenerativeAssumptionChangeSetV1, RegenerativeCapability, RegenerativeClosureModel,
+    RegenerativeDependency, RegenerativeDependencyKind, RegenerativeFlowKindV1,
+    RegenerativeFlowSupportClaimV1, RegenerativeFlowSupportV1, RegenerativeGenomeRequirementV1,
+    RegenerativeGenomeV1, RegenerativeHorizon, RegenerativeLineageRoleV1,
+    RegenerativeLineageViabilityProfileV1, RegenerativeViabilityCalibrationClassV1,
+    RegenerativeViabilityDynamicObservationV1, REGENERATIVE_FLOW_SUPPORT_SCHEMA_V1,
+    REGENERATIVE_GENOME_SCHEMA_V1, REGENERATIVE_LINEAGE_VIABILITY_SCHEMA_V1,
 };
 
 const SYMTROPY_EXPERIMENT_HEAD: &str = "10e2bb188d7cb043b0ae74d11b8718db103268dd";
@@ -260,9 +261,7 @@ fn observation(
         first_unavailable_tick,
         observed_through_tick: 9,
         static_assumptions_held,
-        observation_binding: format!(
-            "symtropy-run:{SYMTROPY_EXPERIMENT_HEAD}:{role_id}"
-        ),
+        observation_binding: format!("symtropy-run:{SYMTROPY_EXPERIMENT_HEAD}:{role_id}"),
     }
 }
 
@@ -304,40 +303,111 @@ fn static_v2_lineage_horizons_are_support_qualified_not_failure_forecasts() {
     assert_eq!(
         report.limiting_roles,
         vec![
-            symthaea_maritime_core::RegenerativeLineageRoleV1::Operation,
-            symthaea_maritime_core::RegenerativeLineageRoleV1::SuccessorConstruction,
+            RegenerativeLineageRoleV1::Operation,
+            RegenerativeLineageRoleV1::SuccessorConstruction,
         ]
     );
     assert!(report.fully_modeled_regenerative_viability);
 }
 
 #[test]
-fn dynamic_v2_history_calibrates_without_false_static_model_conflict() {
+fn metrology_shock_scope_is_derived_from_the_exact_support_graph() {
+    let scopes =
+        derive_regenerative_role_assumption_scopes(&profile(), &genome(), &model(), &support())
+            .unwrap();
+    let changes = RegenerativeAssumptionChangeSetV1 {
+        change_set_id: "change:metrology-production-shock".into(),
+        changed_dependency_ids: vec!["metrology-v2".into()],
+        changed_external_input_bindings: Vec::new(),
+        evidence_binding: format!("symtropy-run:{SYMTROPY_EXPERIMENT_HEAD}:metrology-shock"),
+    };
+    let assessments = assess_regenerative_role_assumption_changes(&scopes, &changes).unwrap();
+
+    let operation = assessments
+        .iter()
+        .find(|assessment| assessment.role == RegenerativeLineageRoleV1::Operation)
+        .unwrap();
+    let construction = assessments
+        .iter()
+        .find(|assessment| {
+            assessment.role == RegenerativeLineageRoleV1::SuccessorConstruction
+        })
+        .unwrap();
+    let qualification = assessments
+        .iter()
+        .find(|assessment| {
+            assessment.role == RegenerativeLineageRoleV1::SuccessorQualification
+        })
+        .unwrap();
+
+    assert!(operation.static_assumptions_held);
+    assert!(operation.intersecting_changed_dependency_ids.is_empty());
+    assert!(!construction.static_assumptions_held);
+    assert_eq!(
+        construction.intersecting_changed_dependency_ids,
+        vec!["metrology-v2"]
+    );
+    assert!(!qualification.static_assumptions_held);
+    assert_eq!(
+        qualification.intersecting_changed_dependency_ids,
+        vec!["metrology-v2"]
+    );
+
+    let operation_scope = scopes
+        .iter()
+        .find(|scope| scope.role == RegenerativeLineageRoleV1::Operation)
+        .unwrap();
+    assert_eq!(
+        operation_scope.dependency_ids,
+        vec![
+            "forge-tooling-v2",
+            "reactor-service-v2",
+            "structural-stock-v2",
+        ]
+    );
+}
+
+#[test]
+fn dynamic_v2_history_calibrates_without_manual_assumption_assertions() {
     let model = model();
     let support = support();
     let static_report =
         evaluate_regenerative_lineage_viability(&profile(), &genome(), &model, &support).unwrap();
+    let scopes = derive_regenerative_role_assumption_scopes(&profile(), &genome(), &model, &support)
+        .unwrap();
+    let changes = RegenerativeAssumptionChangeSetV1 {
+        change_set_id: "change:metrology-production-shock".into(),
+        changed_dependency_ids: vec!["metrology-v2".into()],
+        changed_external_input_bindings: Vec::new(),
+        evidence_binding: format!("symtropy-run:{SYMTROPY_EXPERIMENT_HEAD}:metrology-shock"),
+    };
+    let assumptions = assess_regenerative_role_assumption_changes(&scopes, &changes).unwrap();
+    let held = |role| {
+        assumptions
+            .iter()
+            .find(|assessment| assessment.role == role)
+            .unwrap()
+            .static_assumptions_held
+    };
 
-    // #766 changes metrology production relative to the static model, so early
-    // construction/qualification loss must not masquerade as a static theorem failure.
     let observations = vec![
         observation(
             "operation",
             static_report.operation.conservative_horizon,
             Some(9),
-            true,
+            held(RegenerativeLineageRoleV1::Operation),
         ),
         observation(
             "successor_construction",
             static_report.successor_construction.conservative_horizon,
             Some(6),
-            false,
+            held(RegenerativeLineageRoleV1::SuccessorConstruction),
         ),
         observation(
             "successor_qualification",
             static_report.successor_qualification.conservative_horizon,
             Some(5),
-            false,
+            held(RegenerativeLineageRoleV1::SuccessorQualification),
         ),
     ];
     let calibration = calibrate_regenerative_viability_roles(&observations).unwrap();
@@ -358,9 +428,6 @@ fn dynamic_v2_history_calibrates_without_false_static_model_conflict() {
         RegenerativeViabilityCalibrationClassV1::AssumptionsChanged
     );
 
-    // Underlying unshocked support boundaries still match the dynamic experiment:
-    // forge tooling has six complete periods and first becomes short on tick 7;
-    // safeguarded reactor service has eight complete periods and becomes short on tick 9.
     let supported = evaluate_supported_closure(&model, &support).unwrap();
     let forge = supported
         .dependencies
