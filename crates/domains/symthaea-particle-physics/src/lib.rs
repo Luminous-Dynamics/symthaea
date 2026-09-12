@@ -14,6 +14,8 @@
 //!   Polyakov loops, and local gauge transformations
 //! - **Topology reference**: clover field strength/topological charge plus a
 //!   deliberately slow finite-difference Wilson-action gradient-flow step
+//! - **Optimized topology flow**: analytic six-staple Wilson gradient with
+//!   parity against the finite-difference reference and degenerate fallback
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
 //!   exact step-size, probe, step-count, and smoothing-time provenance
 //!
@@ -37,7 +39,9 @@ pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
+mod lattice_su3_lie;
 pub mod lattice_topology_flow;
+pub mod lattice_topology_flow_staple;
 pub mod lattice_topology_measurement;
 pub mod relativistic_qm;
 pub mod renormalization;
@@ -62,6 +66,10 @@ pub use lattice_topology_flow::{
     LatticeTopologyFlowError, ReferenceFlowStepStats, clover_field_strength, clover_sum,
     clover_topological_charge, clover_topological_density,
     finite_difference_wilson_flow_step_reference,
+};
+pub use lattice_topology_flow_staple::{
+    StapleFlowError, StapleFlowStepStats, analytic_link_gradient,
+    link_staple_non_degenerate, staple_wilson_flow_step,
 };
 pub use lattice_topology_measurement::{
     CLOVER_TOPOLOGY_OPERATOR_ID, REFERENCE_WILSON_FLOW_ID,
