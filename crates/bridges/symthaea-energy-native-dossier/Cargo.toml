@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-energy-native-dossier"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Assemble Tier-1 material dossiers directly from native evidence envelopes."
+
+[dependencies]
+symthaea-energy-evidence-envelope = { path = "../symthaea-energy-evidence-envelope" }
+symthaea-energy-material-campaign = { path = "../symthaea-energy-material-campaign" }
+symthaea-energy-material-dossier = { path = "../symthaea-energy-material-dossier" }
+symthaea-energy-material-screening = { path = "../../domains/symthaea-energy-material-screening" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-discovery = { path = "../../core/symthaea-discovery" }
+symthaea-energy-material-candidate-version = { path = "../symthaea-energy-material-candidate-version" }
