@@ -35,6 +35,7 @@ pub mod legacy_qualification_profile;
 pub mod legacy_qualification_profile_v3;
 pub mod legacy_qualification_source_ledger_v3;
 pub mod legacy_semantic_replacement;
+pub mod legacy_semantic_review_verification;
 pub mod legacy_solaris;
 pub mod legacy_solaris_scenarios;
 pub mod legacy_source_artifacts;
@@ -43,6 +44,7 @@ pub mod legacy_source_capture_plan_v3;
 pub mod legacy_source_continuity;
 pub mod legacy_source_lineage;
 pub mod legacy_source_readiness;
+pub mod legacy_verified_generation_assessment;
 pub mod legacy_zos;
 pub mod legacy_zos_scenarios;
 #[cfg(feature = "logparse-adapter")]
@@ -208,6 +210,17 @@ pub use legacy_semantic_replacement::{
     LegacySemanticReviewMethodV1,
     LEGACY_SEMANTIC_REPLACEMENT_LEDGER_SCHEMA_V1,
 };
+pub use legacy_semantic_review_verification::{
+    assess_legacy_qualification_generation_with_verified_semantic_review_v1,
+    legacy_semantic_replacement_review_ledger_commitment_v1,
+    validate_verified_legacy_semantic_replacement_reviews_v1,
+    verify_legacy_semantic_replacement_reviews_v1,
+    LegacySemanticReviewTrustEvidenceV1,
+    LegacySemanticReviewVerificationErrorV1,
+    LegacySemanticReviewVerifierV1,
+    VerifiedLegacySemanticReplacementReviewsV1,
+    LEGACY_SEMANTIC_REVIEW_VERIFICATION_SCHEMA_V1,
+};
 pub use legacy_solaris::{
     enrich_legacy_solaris_foundation_v1, LegacySolarisErrorV1, SolarisEvidenceSignalV1,
     SolarisFailureModeV1, SolarisFoundationV1, SolarisMechanismKindV1,
@@ -253,6 +266,14 @@ pub use legacy_source_readiness::{
     admit_legacy_knowledge_use_v1, assess_legacy_source_readiness_v1,
     LegacyKnowledgeUseClassV1, LegacySourceCaptureClassV1, LegacySourceReadinessAssessmentV1,
     LegacySourceReadinessErrorV1, LegacySourceReadinessItemV1,
+};
+pub use legacy_verified_generation_assessment::{
+    assess_legacy_qualification_generation_with_bound_verified_semantic_review_v1,
+    legacy_verified_generation_assessment_binding_v1,
+    LegacySemanticReviewQualificationBindingV1,
+    LegacyVerifiedGenerationAssessmentErrorV1,
+    LegacyVerifiedQualificationGenerationAssessmentV1,
+    LEGACY_VERIFIED_GENERATION_ASSESSMENT_SCHEMA_V1,
 };
 pub use legacy_zos::{
     enrich_legacy_zos_foundation_v1, LegacyZosErrorV1, ZosEvidenceSignalV1,
