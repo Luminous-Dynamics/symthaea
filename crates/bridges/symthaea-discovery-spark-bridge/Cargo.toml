@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-discovery-spark-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "One-shot adapter from Spark Bayesian expected-information-gain experiment planning into Symthaea discovery proposals."
+
+[dependencies]
+symthaea-discovery = { path = "../../core/symthaea-discovery" }
+spark-engine = { path = "../../domains/spark-engine" }
