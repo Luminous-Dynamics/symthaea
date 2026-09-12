@@ -160,6 +160,10 @@ pub fn admit_native_campaign_result(
         return Err(NativeAdmissionError::IncompleteDossier);
     }
 
+    // Caller ordering is not scientific evidence. Canonicalize first so the
+    // public admission API accepts equivalent declaration sets while serialized
+    // receipts still have exactly one deterministic ordering.
+    acquisition_declarations.sort_by_key(|declaration| dimension_code(declaration.dimension));
     validate_acquisition_declarations(&acquisition_declarations)?;
     let mut declarations = BTreeMap::new();
     for declaration in &acquisition_declarations {
@@ -246,7 +250,6 @@ pub fn admit_native_campaign_result(
     }
 
     admitted_envelopes.sort_by_key(|binding| dimension_code(binding.dimension));
-    acquisition_declarations.sort_by_key(|declaration| dimension_code(declaration.dimension));
 
     let receipt = NativeCampaignAdmissionReceipt {
         schema: "symthaea.energy-material.native-campaign-admission.v0".into(),
