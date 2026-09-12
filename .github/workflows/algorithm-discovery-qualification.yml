@@ -12,6 +12,9 @@ on:
       - 'crates/bridges/symthaea-hdc-algorithm-evidence/**'
       - 'crates/bridges/symthaea-forge-algorithm-evidence/**'
       - 'crates/bridges/symthaea-forge-overlay-evidence/**'
+      - 'crates/bridges/symthaea-forge-linux-isolation/**'
+      - 'crates/bridges/symthaea-forge-linux-provenance/**'
+      - 'crates/bridges/symthaea-forge-linux-kernel-attestation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
   push:
     branches: [ main ]
@@ -25,10 +28,21 @@ on:
       - 'crates/bridges/symthaea-hdc-algorithm-evidence/**'
       - 'crates/bridges/symthaea-forge-algorithm-evidence/**'
       - 'crates/bridges/symthaea-forge-overlay-evidence/**'
+      - 'crates/bridges/symthaea-forge-linux-isolation/**'
+      - 'crates/bridges/symthaea-forge-linux-provenance/**'
+      - 'crates/bridges/symthaea-forge-linux-kernel-attestation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  # During active stacked development, only the newest automatic PR qualification is useful.
+  # Older exact heads can still be deliberately qualified before merge with workflow_dispatch,
+  # whose run_id gives each manual run a unique non-cancelling concurrency group.
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event_name == 'push' && github.ref || 'latest-pull-request' }}
+  cancel-in-progress: true
 
 jobs:
   focused-contracts:
@@ -50,6 +64,15 @@ jobs:
 
       - name: Test Forge search safety
         run: cargo test -p symthaea-forge --all-targets -- --test-threads=1
+
+      - name: Test hardened Forge Linux isolation bridge
+        run: cargo test -p symthaea-forge-linux-isolation --all-targets -- --test-threads=1
+
+      - name: Test Bubblewrap Nix provenance bridge
+        run: cargo test -p symthaea-forge-linux-provenance --all-targets -- --test-threads=1
+
+      - name: Test parent-side kernel attestation bridge
+        run: cargo test -p symthaea-forge-linux-kernel-attestation --all-targets -- --test-threads=1
 
       - name: Test e-graph lineage bridge
         run: cargo test -p symthaea-algorithm-egraph-bridge -- --test-threads=1
@@ -75,6 +98,9 @@ jobs:
           -p symthaea-algorithms
           -p symthaea-algorithm-lab
           -p symthaea-forge
+          -p symthaea-forge-linux-isolation
+          -p symthaea-forge-linux-provenance
+          -p symthaea-forge-linux-kernel-attestation
           -p symthaea-algorithm-egraph-bridge
           -p symthaea-algorithm-evidence-collector
           -p symthaea-hdc-algorithm-evidence
