@@ -1,5 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#![cfg(target_os = "linux")]
 //! Kernel-gated Bubblewrap execution for Forge's label-blind evaluator.
 //!
 //! This bridge strengthens the Bubblewrap v2 theorem without changing its existing receipt. The
@@ -8,9 +9,11 @@
 //! repeatedly observes that exact process through the kernel-attestation bridge and releases one
 //! byte to the block FD only after `KernelIsolationGate` succeeds.
 //!
-//! A Linux pidfd is opened for the reported sandbox process before the gate is attempted. Normal
-//! completion and timeout cleanup both require that pidfd to report process exit. On timeout the
-//! pidfd is used to deliver SIGKILL to the exact sandbox-init process, avoiding PID-reuse races.
+//! Before a sandbox PID is known, Bubblewrap and its setup child are placed in a dedicated parent-
+//! controlled process group so an early status failure cannot accidentally release a survivor when
+//! the block pipe closes. Once `child-pid` is known, a Linux pidfd becomes the exact process handle.
+//! It is armed kill-on-drop until verified sandbox exit, so every post-status error path remains
+//! fail-closed even if future code introduces another early return.
 //!
 //! This establishes a stronger *observed process isolation* proposition. It still does not claim
 //! seccomp filtering, Landlock, cgroup CPU/memory limits, VM isolation, kernel-exploit resistance,
@@ -21,7 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
-use std::os::unix::process::CommandExt;
+use std::os::unix::process::{CommandExt, ExitStatusExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -65,8 +68,6 @@ pub enum ObservedEvaluatorError {
     ExecutableModel(#[from] ForgeProposalExecutableModelError),
     #[error(transparent)]
     Kernel(#[from] KernelAttestationError),
-    #[error("kernel-gated evaluator execution is supported only on Linux")]
-    UnsupportedPlatform,
     #[error("observed evaluator IO error at {path:?}: {source}")]
     Io {
         path: PathBuf,
@@ -93,8 +94,6 @@ pub enum ObservedEvaluatorError {
     RequestTooLarge,
     #[error("could not create or duplicate a Linux control pipe: {0}")]
     ControlPipe(std::io::Error),
-    #[error("Bubblewrap child FD setup failed")]
-    ChildFdSetup,
     #[error("Bubblewrap process did not expose required stdio")]
     MissingPipe,
     #[error("Bubblewrap JSON status stream timed out before reporting child-pid")]
@@ -103,6 +102,8 @@ pub enum ObservedEvaluatorError {
     StatusTooLarge,
     #[error("Bubblewrap JSON status line is invalid: {0}")]
     InvalidStatusJson(serde_json::Error),
+    #[error("Bubblewrap JSON status transcript is not UTF-8")]
+    StatusNotUtf8,
     #[error("Bubblewrap JSON status stream ended without reporting child-pid")]
     MissingChildPid,
     #[error("could not open a pidfd for the exact sandbox process: {0}")]
@@ -111,6 +112,8 @@ pub enum ObservedEvaluatorError {
     PidfdSignal(std::io::Error),
     #[error("kernel isolation gate did not become true before the pre-exec deadline; last observation error: {last_error}")]
     KernelGateTimeout { last_error: String },
+    #[error("sandbox exited before the pre-exec kernel gate was established with code {code:?}")]
+    SandboxExitedBeforeGate { code: Option<i32> },
     #[error("kernel gate release byte could not be written")]
     GateReleaseFailed,
     #[error("evaluator stdin writer failed or panicked")]
@@ -129,6 +132,8 @@ pub enum ObservedEvaluatorError {
     RunnerFailed { code: Option<i32> },
     #[error("Bubblewrap status stream did not report the final exit code")]
     MissingStatusExit,
+    #[error("Bubblewrap status transcript does not bind the reported sandbox PID")]
+    StatusChildPidMismatch,
     #[error("Bubblewrap status exit code does not match the wrapper exit status")]
     StatusExitMismatch,
     #[error("evaluator stdout is not valid response JSON: {0}")]
@@ -162,7 +167,9 @@ impl KernelGatedEvaluatorPolicy {
         kernel_gate_timeout_ms: u64,
         teardown_timeout_ms: u64,
     ) -> Result<Self, ObservedEvaluatorError> {
-        bubblewrap_policy.validate().map_err(|_| ObservedEvaluatorError::ReceiptScopeMismatch)?;
+        bubblewrap_policy
+            .validate()
+            .map_err(|_| ObservedEvaluatorError::ReceiptScopeMismatch)?;
         if kernel_gate_timeout_ms == 0
             || teardown_timeout_ms == 0
             || kernel_gate_timeout_ms > MAX_GATE_TIMEOUT_MS
@@ -210,7 +217,7 @@ fn derive_policy_id(base: &ContentId, gate_timeout_ms: u64, teardown_timeout_ms:
             base.as_str().as_bytes(),
             gate_timeout_ms.to_be_bytes().as_slice(),
             teardown_timeout_ms.to_be_bytes().as_slice(),
-            b"json-status-fd+block-fd+procfs-kernel-gate+pidfd-teardown",
+            b"json-status-fd+block-fd+kernel-gate+process-group-pre-gate+pidfd-teardown",
         ],
     )
 }
@@ -350,13 +357,21 @@ fn pipe_cloexec() -> Result<(OwnedFd, OwnedFd), ObservedEvaluatorError> {
 }
 
 fn duplicate_high(fd: RawFd) -> Result<OwnedFd, ObservedEvaluatorError> {
-    // SAFETY: `fd` is an open descriptor owned by this process; fcntl returns a fresh descriptor.
+    // SAFETY: `fd` is open and fcntl returns a fresh descriptor on success.
     let duplicated = unsafe { libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, HIGH_FD_MIN) };
     if duplicated < 0 {
         return Err(ObservedEvaluatorError::ControlPipe(std::io::Error::last_os_error()));
     }
     // SAFETY: `duplicated` is a fresh descriptor returned by fcntl.
     Ok(unsafe { OwnedFd::from_raw_fd(duplicated) })
+}
+
+fn kill_process_group(pgid: u32) {
+    if let Ok(pgid) = i32::try_from(pgid) {
+        // SAFETY: a negative pid addresses the process group. Errors are intentionally best-effort
+        // here because this is an early fail-closed cleanup path with no semantic receipt.
+        let _ = unsafe { libc::kill(-pgid, libc::SIGKILL) };
+    }
 }
 
 fn hardened_observed_args(
@@ -482,6 +497,7 @@ fn read_status_until_child_pid(
 
 struct PidFd {
     fd: OwnedFd,
+    armed: bool,
 }
 
 impl PidFd {
@@ -493,11 +509,11 @@ impl PidFd {
         }
         // SAFETY: positive syscall return is a fresh pidfd owned by the caller.
         let fd = unsafe { OwnedFd::from_raw_fd(result as RawFd) };
-        Ok(Self { fd })
+        Ok(Self { fd, armed: true })
     }
 
     fn kill(&self) -> Result<(), ObservedEvaluatorError> {
-        // SAFETY: pidfd identifies the exact process; a null siginfo and flags=0 are permitted.
+        // SAFETY: pidfd identifies the exact process; null siginfo and flags=0 are permitted.
         let result = unsafe {
             libc::syscall(
                 libc::SYS_pidfd_send_signal,
@@ -520,6 +536,30 @@ impl PidFd {
     fn wait_exited(&self, timeout: Duration) -> Result<bool, ObservedEvaluatorError> {
         poll_readable(self.fd.as_raw_fd(), timeout)
     }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for PidFd {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        // SAFETY: best-effort fail-closed cleanup for the exact process handle during unwinding or
+        // an unexpected early return. We cannot surface a Drop error, so verification remains the
+        // responsibility of explicit terminal paths.
+        let _ = unsafe {
+            libc::syscall(
+                libc::SYS_pidfd_send_signal,
+                self.fd.as_raw_fd(),
+                libc::SIGKILL,
+                std::ptr::null::<libc::siginfo_t>(),
+                0,
+            )
+        };
+    }
 }
 
 fn wait_for_kernel_gate(
@@ -535,7 +575,7 @@ fn wait_for_kernel_gate(
             path: PathBuf::from("<bubblewrap-monitor>"),
             source,
         })? {
-            return Err(ObservedEvaluatorError::RunnerFailed { code: status.code() });
+            return Err(ObservedEvaluatorError::SandboxExitedBeforeGate { code: status.code() });
         }
         match observe_sandbox_process(sandbox_pid) {
             Ok(observation) => match KernelIsolationGate::issue(&observation) {
@@ -583,7 +623,7 @@ fn wait_bounded_from(
 }
 
 fn terminate_exact_sandbox(
-    pidfd: &PidFd,
+    pidfd: &mut PidFd,
     child: &mut std::process::Child,
     teardown_timeout: Duration,
 ) -> Result<(), ObservedEvaluatorError> {
@@ -591,28 +631,35 @@ fn terminate_exact_sandbox(
     let _ = child.kill();
     let _ = child.wait();
     if pidfd.wait_exited(teardown_timeout)? {
+        pidfd.disarm();
         Ok(())
     } else {
         Err(ObservedEvaluatorError::TeardownUnverified)
     }
 }
 
-fn parse_status_exit(transcript: &[u8]) -> Result<i32, ObservedEvaluatorError> {
-    let text = std::str::from_utf8(transcript).map_err(|_| {
-        ObservedEvaluatorError::InvalidStatusJson(serde_json::Error::io(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "status transcript is not UTF-8",
-        )))
-    })?;
-    let mut exit = None;
+fn shell_exit_code(status: &ExitStatus) -> Option<i32> {
+    status.code().or_else(|| status.signal().map(|signal| 128 + signal))
+}
+
+fn parse_status_summary(transcript: &[u8]) -> Result<(u32, i32), ObservedEvaluatorError> {
+    let text = std::str::from_utf8(transcript).map_err(|_| ObservedEvaluatorError::StatusNotUtf8)?;
+    let mut child_pid = None;
+    let mut exit_code = None;
     for line in text.lines().filter(|line| !line.trim().is_empty()) {
         let event: StatusEvent = serde_json::from_str(line)
             .map_err(ObservedEvaluatorError::InvalidStatusJson)?;
+        if let Some(pid) = event.child_pid {
+            child_pid = Some(pid);
+        }
         if let Some(code) = event.exit_code {
-            exit = Some(code);
+            exit_code = Some(code);
         }
     }
-    exit.ok_or(ObservedEvaluatorError::MissingStatusExit)
+    Ok((
+        child_pid.ok_or(ObservedEvaluatorError::MissingChildPid)?,
+        exit_code.ok_or(ObservedEvaluatorError::MissingStatusExit)?,
+    ))
 }
 
 fn parse_wire_response(
@@ -757,9 +804,11 @@ impl KernelGatedExecutionReceipt {
             "symthaea.forge-kernel-gated-status-transcript.v1",
             [self.status_transcript.as_bytes()],
         );
+        let (status_pid, status_exit) = parse_status_summary(self.status_transcript.as_bytes())?;
         if self.request_wire_id != expected_request_wire_id
             || self.status_transcript_id != expected_status_id
-            || parse_status_exit(self.status_transcript.as_bytes())? != 0
+            || status_pid != self.sandbox_host_pid
+            || status_exit != 0
         {
             return Err(ObservedEvaluatorError::ReceiptScopeMismatch);
         }
@@ -862,9 +911,6 @@ pub fn run_kernel_gated_evaluator(
     KernelIsolationGate,
     KernelGatedExecutionReceipt,
 ), ObservedEvaluatorError> {
-    if !cfg!(target_os = "linux") {
-        return Err(ObservedEvaluatorError::UnsupportedPlatform);
-    }
     policy.validate()?;
     request.validate_identity()?;
     binding.validate_for(model, request.protocol())?;
@@ -918,9 +964,12 @@ pub fn run_kernel_gated_evaluator(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    // SAFETY: the closure performs only async-signal-safe dup2/close operations between fork and exec.
+    // SAFETY: the closure performs only setpgid/dup2/close operations between fork and exec.
     unsafe {
         command.pre_exec(move || {
+            if libc::setpgid(0, 0) < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
             if libc::dup2(status_src, STATUS_FD) < 0 || libc::dup2(block_src, BLOCK_FD) < 0 {
                 return Err(std::io::Error::last_os_error());
             }
@@ -937,6 +986,7 @@ pub fn run_kernel_gated_evaluator(
         path: canonical_bwrap.clone(),
         source,
     })?;
+    let process_group = child.id();
     drop(child_status);
     drop(child_block);
 
@@ -955,12 +1005,23 @@ pub fn run_kernel_gated_evaluator(
     ) {
         Ok(value) => value,
         Err(error) => {
-            let _ = child.kill();
+            kill_process_group(process_group);
             let _ = child.wait();
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
             return Err(error);
         }
     };
-    let pidfd = PidFd::open(sandbox_pid)?;
+    let mut pidfd = match PidFd::open(sandbox_pid) {
+        Ok(pidfd) => pidfd,
+        Err(error) => {
+            kill_process_group(process_group);
+            let _ = child.wait();
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
+            return Err(error);
+        }
+    };
     let status_reader = thread::spawn(move || read_capped_and_drain(status_file, MAX_STATUS_BYTES));
 
     let (observation, gate, gate_wait_ms) = match wait_for_kernel_gate(
@@ -971,7 +1032,7 @@ pub fn run_kernel_gated_evaluator(
         Ok(value) => value,
         Err(error) => {
             terminate_exact_sandbox(
-                &pidfd,
+                &mut pidfd,
                 &mut child,
                 Duration::from_millis(policy.teardown_timeout_ms()),
             )?;
@@ -983,10 +1044,17 @@ pub fn run_kernel_gated_evaluator(
     };
 
     let mut release = File::from(block_write);
-    release
-        .write_all(&[1])
-        .and_then(|_| release.flush())
-        .map_err(|_| ObservedEvaluatorError::GateReleaseFailed)?;
+    if release.write_all(&[1]).and_then(|_| release.flush()).is_err() {
+        terminate_exact_sandbox(
+            &mut pidfd,
+            &mut child,
+            Duration::from_millis(policy.teardown_timeout_ms()),
+        )?;
+        let _ = stdout_reader.join();
+        let _ = stderr_reader.join();
+        let _ = status_reader.join();
+        return Err(ObservedEvaluatorError::GateReleaseFailed);
+    }
     drop(release);
 
     let stdin_bytes = request_wire.clone();
@@ -996,18 +1064,45 @@ pub fn run_kernel_gated_evaluator(
         Ok(())
     });
 
-    let wait = wait_bounded_from(
+    let wait = match wait_bounded_from(
         &mut child,
         launch_started,
         policy.bubblewrap_policy().max_wall_time_ms(),
-    )?;
+    ) {
+        Ok(wait) => wait,
+        Err(error) => {
+            terminate_exact_sandbox(
+                &mut pidfd,
+                &mut child,
+                Duration::from_millis(policy.teardown_timeout_ms()),
+            )?;
+            let _ = writer.join();
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
+            let _ = status_reader.join();
+            return Err(error);
+        }
+    };
+
     if matches!(wait, WaitOutcome::TimedOut) {
         terminate_exact_sandbox(
-            &pidfd,
+            &mut pidfd,
             &mut child,
             Duration::from_millis(policy.teardown_timeout_ms()),
         )?;
+        let _ = writer.join();
+        let _ = stdout_reader.join();
+        let _ = stderr_reader.join();
+        let _ = status_reader.join();
+        return Err(ObservedEvaluatorError::TimedOutAfterVerifiedTeardown);
     }
+
+    // The monitor has exited. Before interpreting any protocol/output errors, prove that the exact
+    // sandbox-init process identified before release has also exited, then disarm kill-on-drop.
+    if !pidfd.wait_exited(Duration::from_millis(policy.teardown_timeout_ms()))? {
+        return Err(ObservedEvaluatorError::TeardownUnverified);
+    }
+    pidfd.disarm();
 
     let writer_result = writer.join().map_err(|_| ObservedEvaluatorError::StdinWriterFailed)?;
     writer_result.map_err(|_| ObservedEvaluatorError::StdinWriterFailed)?;
@@ -1033,12 +1128,9 @@ pub fn run_kernel_gated_evaluator(
             source,
         })?;
 
-    if matches!(wait, WaitOutcome::TimedOut) {
-        return Err(ObservedEvaluatorError::TimedOutAfterVerifiedTeardown);
-    }
     let (status, wall_time_ms) = match wait {
         WaitOutcome::Exited(status, wall_time_ms) => (status, wall_time_ms),
-        WaitOutcome::TimedOut => unreachable!("timeout handled above"),
+        WaitOutcome::TimedOut => unreachable!("timeout returned before output interpretation"),
     };
     if stdout_result.exceeded {
         return Err(ObservedEvaluatorError::StdoutLimitExceeded);
@@ -1049,21 +1141,21 @@ pub fn run_kernel_gated_evaluator(
     if status_suffix.exceeded {
         return Err(ObservedEvaluatorError::StatusTooLarge);
     }
-    if !status.success() {
-        return Err(ObservedEvaluatorError::RunnerFailed { code: status.code() });
-    }
-    if !pidfd.wait_exited(Duration::from_millis(policy.teardown_timeout_ms()))? {
-        return Err(ObservedEvaluatorError::TeardownUnverified);
-    }
 
     let mut status_transcript_bytes = status_prefix;
     status_transcript_bytes.extend_from_slice(&status_suffix.bytes);
     if status_transcript_bytes.len() as u64 > MAX_STATUS_BYTES {
         return Err(ObservedEvaluatorError::StatusTooLarge);
     }
-    let status_exit = parse_status_exit(&status_transcript_bytes)?;
-    if status_exit != status.code().unwrap_or_default() {
+    let (status_pid, status_exit) = parse_status_summary(&status_transcript_bytes)?;
+    if status_pid != sandbox_pid {
+        return Err(ObservedEvaluatorError::StatusChildPidMismatch);
+    }
+    if Some(status_exit) != shell_exit_code(&status) {
         return Err(ObservedEvaluatorError::StatusExitMismatch);
+    }
+    if !status.success() {
+        return Err(ObservedEvaluatorError::RunnerFailed { code: status.code() });
     }
 
     let (execution_context_id, predictions) = parse_wire_response(request, &stdout_result.bytes)?;
@@ -1080,12 +1172,8 @@ pub fn run_kernel_gated_evaluator(
         "symthaea.forge-kernel-gated-stderr.v1",
         [stderr_result.bytes.as_slice()],
     );
-    let status_transcript = String::from_utf8(status_transcript_bytes).map_err(|error| {
-        ObservedEvaluatorError::InvalidStatusJson(serde_json::Error::io(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            error,
-        )))
-    })?;
+    let status_transcript = String::from_utf8(status_transcript_bytes)
+        .map_err(|_| ObservedEvaluatorError::StatusNotUtf8)?;
     let status_transcript_id = ContentId::derive(
         "symthaea.forge-kernel-gated-status-transcript.v1",
         [status_transcript.as_bytes()],
@@ -1150,27 +1238,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn observed_recipe_contains_status_and_block_before_command() {
+    fn observed_recipe_contains_status_block_and_strict_isolation_before_command() {
         let args = hardened_observed_args(Path::new("/nix/store/example-runner/bin/runner"), &[]).unwrap();
         let status = args.iter().position(|value| value == "--json-status-fd").unwrap();
         let block = args.iter().position(|value| value == "--block-fd").unwrap();
+        let cap_drop = args.iter().position(|value| value == "--cap-drop").unwrap();
         let command = args.iter().position(|value| value == "--").unwrap();
         assert!(status < command);
         assert!(block < command);
+        assert!(cap_drop < command);
         assert_eq!(args[status + 1], STATUS_FD.to_string());
         assert_eq!(args[block + 1], BLOCK_FD.to_string());
+        assert_eq!(args[cap_drop + 1], "ALL");
     }
 
     #[test]
     fn observed_argv_identity_is_order_sensitive() {
-        let a = ordered_argv_id(&["--json-status-fd".into(), "3".into(), "--block-fd".into(), "4".into()]);
-        let b = ordered_argv_id(&["--block-fd".into(), "4".into(), "--json-status-fd".into(), "3".into()]);
+        let a = ordered_argv_id(&[
+            "--json-status-fd".into(),
+            "3".into(),
+            "--block-fd".into(),
+            "4".into(),
+        ]);
+        let b = ordered_argv_id(&[
+            "--block-fd".into(),
+            "4".into(),
+            "--json-status-fd".into(),
+            "3".into(),
+        ]);
         assert_ne!(a, b);
     }
 
     #[test]
-    fn status_parser_requires_exit_event() {
-        let error = parse_status_exit(br#"{ "child-pid": 42 }\n"#).unwrap_err();
-        assert!(matches!(error, ObservedEvaluatorError::MissingStatusExit));
+    fn status_summary_requires_both_child_and_exit() {
+        assert!(matches!(
+            parse_status_summary(br#"{ "child-pid": 42 }\n"#),
+            Err(ObservedEvaluatorError::MissingStatusExit)
+        ));
+        assert_eq!(
+            parse_status_summary(br#"{ "child-pid": 42 }\n{ "exit-code": 0 }\n"#).unwrap(),
+            (42, 0)
+        );
     }
 }
