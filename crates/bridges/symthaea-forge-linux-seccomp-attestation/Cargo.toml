@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-forge-linux-seccomp-attestation"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Parent-observed seccomp state gate for Symthaea Forge evaluator sandboxes"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge-linux-kernel-attestation = { path = "../symthaea-forge-linux-kernel-attestation" }
+serde = { workspace = true }
+thiserror = { workspace = true }
