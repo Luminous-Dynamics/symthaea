@@ -551,7 +551,7 @@ mod tests {
             metric: metric.into(),
             unit: unit.into(),
             direction,
-            minimum_fidelity: FidelityLevel::Dataset,
+            minimum_fidelity: FidelityLevel::Surrogate,
             accepted_evidence_kinds: vec![EvidenceKind::Dataset, EvidenceKind::Experiment],
         }
     }
