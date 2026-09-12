@@ -78,6 +78,8 @@ pub mod genesis;
 /// Hyperdimensional computing: vector types, encoding, binding, bundling, similarity, and consciousness topology.
 #[allow(missing_docs)]
 pub mod hdc;
+/// Fail-closed implicit equality manifolds, local projection, and tangent bases.
+pub mod implicit_manifold;
 /// Shared mathematical utilities: softmax, numerical helpers.
 pub mod math;
 /// Planar SO(2)/SE(2) configuration geometry built on the shared circle factor.
