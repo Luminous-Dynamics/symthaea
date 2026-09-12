@@ -35,6 +35,7 @@ pub mod resources;
 pub mod role_assumption_scope;
 pub mod state;
 pub mod substitution;
+pub mod support_basis;
 pub mod supported_closure;
 pub mod viability_calibration;
 
@@ -62,5 +63,6 @@ pub use resources::*;
 pub use role_assumption_scope::*;
 pub use state::*;
 pub use substitution::*;
+pub use support_basis::*;
 pub use supported_closure::*;
 pub use viability_calibration::*;
