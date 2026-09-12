@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-evidence-quarantine"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Cross-cutting quarantine and reviewed release of Symthaea safety evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "evidence", "quarantine", "assurance"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-evidence-deployment-scope = { path = "../symthaea-evidence-deployment-scope" }
+symthaea-evidence-lifecycle = { path = "../symthaea-evidence-lifecycle" }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
+serde = { workspace = true }
