@@ -21,6 +21,8 @@ pub enum LatticeStreamDomain {
     Bootstrap = 2,
     Qualification = 3,
     GaugeInitialization = 4,
+    /// Pre-production proposal adaptation. Must never share the retained-chain stream.
+    GaugeTuning = 5,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,9 +114,15 @@ mod tests {
             domain: LatticeStreamDomain::GaugeInitialization,
             ..a
         };
+        let tuning = LatticeStreamCoordinates {
+            domain: LatticeStreamDomain::GaugeTuning,
+            ..a
+        };
         assert_eq!(a.stream_id().unwrap(), 0x0112_3456_789a_bcde);
         assert_ne!(a.stream_id().unwrap(), b.stream_id().unwrap());
         assert_ne!(a.stream_id().unwrap(), init.stream_id().unwrap());
+        assert_ne!(a.stream_id().unwrap(), tuning.stream_id().unwrap());
+        assert_ne!(init.stream_id().unwrap(), tuning.stream_id().unwrap());
     }
 
     #[test]
