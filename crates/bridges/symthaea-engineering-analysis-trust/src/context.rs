@@ -26,6 +26,8 @@ pub struct AcceptedAnalysisRequirementV1 {
 
 impl AcceptedAnalysisRequirementV1 {
     pub fn civil_service_stress_250_mpa(acceptance_record_digest: Sha256DigestV1) -> Self {
+        let structural_invariants = canonical_invariants(["stress <= 250 MPa".to_string()])
+            .expect("static canary invariant must be canonical");
         let preimage = json!({
             "acceptance_record_digest": acceptance_record_digest.as_str(),
             "criticality": "Blocking",
@@ -34,7 +36,7 @@ impl AcceptedAnalysisRequirementV1 {
             "logical_requirement_id": "REQ-STRESS",
             "schema": "symthaea.etk-accepted-requirement.v1",
             "statement": "stress remains below allowable",
-            "structural_invariants": ["stress <= 250 MPa"],
+            "structural_invariants": structural_invariants,
         });
         Self {
             revision_id: AnalysisRequirementRevisionIdV1::from_digest(domain_hash(
@@ -362,9 +364,7 @@ pub fn analytical_obligation_revision_v1(
     )))
 }
 
-/// Canonical invariant normalization helper used by future generalized
-/// analytical requirements. The canary requirement is intentionally fixed.
-pub(crate) fn canonical_invariants(
+fn canonical_invariants(
     invariants: impl IntoIterator<Item = String>,
 ) -> Result<Vec<String>, AnalysisTrustErrorV1> {
     let mut seen = BTreeSet::new();
