@@ -67,14 +67,14 @@ jobs:
       - name: Qualify frozen continuity runtime subject
         env:
           QUALIFIER_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          CONTINUITY_RUNTIME_RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v2.tsv
+          CONTINUITY_RUNTIME_RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v3.tsv
         run: bash scripts/qualify-continuity-actuation-evidence-runtime.sh
 
       - name: Publish classified receipt digest
         if: always()
         shell: bash
         env:
-          RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v2.tsv
+          RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v3.tsv
         run: |
           set -euo pipefail
           if [[ ! -f "$RECEIPT" ]]; then
@@ -111,7 +111,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: continuity-actuation-evidence-runtime-v2-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v2.tsv
+          name: continuity-actuation-evidence-runtime-v3-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v3.tsv
           if-no-files-found: warn
           retention-days: 14
