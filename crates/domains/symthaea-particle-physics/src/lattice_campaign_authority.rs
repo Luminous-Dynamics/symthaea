@@ -10,8 +10,10 @@
 
 use std::collections::BTreeSet;
 
+use crate::lattice_analysis_authority::{ExactHeadCiConclusion, ExactHeadCiEvidence};
 use crate::lattice_campaign_manifest::{
-    CampaignManifestError, PureSu3CampaignManifest, PureSu3CampaignRunRecord,
+    CampaignInitialCondition, CampaignManifestError, PureSu3CampaignManifest,
+    PureSu3CampaignRunRecord,
 };
 
 pub const QUALIFIED_CAMPAIGN_EXECUTION_AUTHORIZATION_SCOPE: &str =
@@ -25,9 +27,14 @@ pub struct CampaignExecutionAuthorization {
     pub campaign_id: String,
     pub campaign_manifest_artifact_digest: String,
     pub campaign_code_revision: String,
-    pub campaign_exact_head_ci_evidence_id: String,
-    pub sampler_exact_head_ci_evidence_id: String,
-    pub flow_exact_head_ci_evidence_id: String,
+    pub campaign_ci_run_id: u64,
+    pub campaign_ci_receipt_digest: String,
+    pub sampler_revision: String,
+    pub sampler_ci_run_id: u64,
+    pub sampler_ci_receipt_digest: String,
+    pub flow_revision: String,
+    pub flow_ci_run_id: u64,
+    pub flow_ci_receipt_digest: String,
     pub qualification_policy_artifact_digest: String,
     pub measured_observable_ids: Vec<String>,
     pub benchmark_required_observable_ids: Vec<String>,
@@ -54,6 +61,14 @@ pub enum CampaignAuthorityError {
     EmptyField(&'static str),
     InvalidSha256Digest { field: &'static str, value: String },
     AuthorizationNotAfterCampaignFreeze,
+    UnexpectedColdInitializationEvidence { chain_id: String },
+    InvalidCiEvidence { subject: &'static str },
+    CiDidNotPass { subject: &'static str, conclusion: ExactHeadCiConclusion },
+    CiSubjectRevisionMismatch {
+        subject: &'static str,
+        expected: String,
+        actual: String,
+    },
     MissingBenchmarkObservable { observable_id: String },
     WrongAuthorizationScope,
     AuthorizationCampaignMismatch,
@@ -92,6 +107,37 @@ fn require_sha256(value: &str, field: &'static str) -> Result<(), CampaignAuthor
     Ok(())
 }
 
+fn validate_exact_head_ci(
+    subject: &'static str,
+    ci: &ExactHeadCiEvidence,
+    expected_revision: &str,
+) -> Result<(), CampaignAuthorityError> {
+    let structurally_valid = !ci.subject_revision.trim().is_empty()
+        && !ci.source_tree_digest.trim().is_empty()
+        && ci.ci_run_id != 0
+        && !ci.ci_receipt_digest.trim().is_empty()
+        && !ci.toolchain_digest.trim().is_empty()
+        && !ci.build_profile.trim().is_empty()
+        && ci.qualification_timestamp_unix_ns != 0;
+    if !structurally_valid {
+        return Err(CampaignAuthorityError::InvalidCiEvidence { subject });
+    }
+    if ci.conclusion != ExactHeadCiConclusion::Passed {
+        return Err(CampaignAuthorityError::CiDidNotPass {
+            subject,
+            conclusion: ci.conclusion,
+        });
+    }
+    if ci.subject_revision != expected_revision {
+        return Err(CampaignAuthorityError::CiSubjectRevisionMismatch {
+            subject,
+            expected: expected_revision.to_string(),
+            actual: ci.subject_revision.clone(),
+        });
+    }
+    Ok(())
+}
+
 fn measured_observable_ids(manifest: &PureSu3CampaignManifest) -> Vec<String> {
     let mut ids = BTreeSet::new();
     if manifest.measure_plaquette {
@@ -108,8 +154,6 @@ fn measured_observable_ids(manifest: &PureSu3CampaignManifest) -> Vec<String> {
             rectangle.spatial_direction,
             rectangle.temporal_direction
         ));
-        // Family alias is useful for benchmark contracts that compare an
-        // orientation-averaged or otherwise aggregated R×T observable.
         ids.insert(format!(
             "wilson-loop-{}x{}",
             rectangle.spatial_extent, rectangle.temporal_extent
@@ -124,29 +168,52 @@ fn measured_observable_ids(manifest: &PureSu3CampaignManifest) -> Vec<String> {
 
 /// Authorize production execution of an already-frozen campaign.
 ///
-/// The campaign manifest itself remains immutable. This function supplies the
-/// orchestration exact-head CI evidence produced after freezing and requires the
-/// authorization to precede every production chain.
+/// Three exact subjects must be independently green: campaign orchestration,
+/// sampler kernel and flow/measurement implementation. CI can run before or
+/// after the campaign freeze, but authorization itself must occur after freeze
+/// and before the first production cycle.
 pub fn authorize_campaign_scientific_execution(
     manifest: &PureSu3CampaignManifest,
     campaign_manifest_artifact_digest: impl Into<String>,
-    campaign_exact_head_ci_evidence_id: impl Into<String>,
+    campaign_ci: &ExactHeadCiEvidence,
+    sampler_ci: &ExactHeadCiEvidence,
+    flow_ci: &ExactHeadCiEvidence,
     authorized_at_unix_ns: u128,
 ) -> Result<CampaignExecutionAuthorization, CampaignAuthorityError> {
     manifest.validate_for_scientific_execution()?;
     let campaign_manifest_artifact_digest = campaign_manifest_artifact_digest.into();
-    let campaign_exact_head_ci_evidence_id = campaign_exact_head_ci_evidence_id.into();
     require_sha256(
         &campaign_manifest_artifact_digest,
         "campaign_manifest_artifact_digest",
     )?;
-    require_nonempty(
-        &campaign_exact_head_ci_evidence_id,
-        "campaign_exact_head_ci_evidence_id",
-    )?;
     if authorized_at_unix_ns <= manifest.campaign_frozen_at_unix_ns {
         return Err(CampaignAuthorityError::AuthorizationNotAfterCampaignFreeze);
     }
+
+    // A cold identity start has no external initialization subject. Reject even
+    // `Some("")`, which the lower-level draft validator intentionally treats as
+    // semantically empty rather than authoritative evidence.
+    for chain in &manifest.chains {
+        if matches!(chain.initial_condition, CampaignInitialCondition::ColdIdentity)
+            && chain.initialization_evidence_id.is_some()
+        {
+            return Err(CampaignAuthorityError::UnexpectedColdInitializationEvidence {
+                chain_id: chain.chain_id.clone(),
+            });
+        }
+    }
+
+    validate_exact_head_ci("campaign", campaign_ci, &manifest.campaign_code_revision)?;
+    validate_exact_head_ci(
+        "sampler",
+        sampler_ci,
+        &manifest.sampler_implementation_revision,
+    )?;
+    validate_exact_head_ci(
+        "flow",
+        flow_ci,
+        &manifest.flow.flow_implementation_revision,
+    )?;
 
     let measured = measured_observable_ids(manifest);
     let measured_set = measured.iter().map(String::as_str).collect::<BTreeSet<_>>();
@@ -166,9 +233,14 @@ pub fn authorize_campaign_scientific_execution(
         campaign_id: manifest.campaign_id.clone(),
         campaign_manifest_artifact_digest,
         campaign_code_revision: manifest.campaign_code_revision.clone(),
-        campaign_exact_head_ci_evidence_id,
-        sampler_exact_head_ci_evidence_id: manifest.sampler_exact_head_ci_evidence_id.clone(),
-        flow_exact_head_ci_evidence_id: manifest.flow.flow_exact_head_ci_evidence_id.clone(),
+        campaign_ci_run_id: campaign_ci.ci_run_id,
+        campaign_ci_receipt_digest: campaign_ci.ci_receipt_digest.clone(),
+        sampler_revision: manifest.sampler_implementation_revision.clone(),
+        sampler_ci_run_id: sampler_ci.ci_run_id,
+        sampler_ci_receipt_digest: sampler_ci.ci_receipt_digest.clone(),
+        flow_revision: manifest.flow.flow_implementation_revision.clone(),
+        flow_ci_run_id: flow_ci.ci_run_id,
+        flow_ci_receipt_digest: flow_ci.ci_receipt_digest.clone(),
         qualification_policy_artifact_digest: manifest.qualification_policy_artifact_digest.clone(),
         measured_observable_ids: measured,
         benchmark_required_observable_ids,
@@ -239,6 +311,19 @@ mod tests {
 
     fn digest(ch: char) -> String {
         format!("sha256:{}", ch.to_string().repeat(64))
+    }
+
+    fn ci(revision: &str, run_id: u64) -> ExactHeadCiEvidence {
+        ExactHeadCiEvidence {
+            subject_revision: revision.into(),
+            source_tree_digest: digest('8'),
+            ci_run_id: run_id,
+            ci_receipt_digest: digest('7'),
+            toolchain_digest: digest('6'),
+            build_profile: "rust-1.96-release".into(),
+            conclusion: ExactHeadCiConclusion::Passed,
+            qualification_timestamp_unix_ns: 2_500,
+        }
     }
 
     fn manifest() -> PureSu3CampaignManifest {
@@ -314,6 +399,18 @@ mod tests {
         }
     }
 
+    fn authorization(manifest: &PureSu3CampaignManifest, authorized_at: u128) -> CampaignExecutionAuthorization {
+        authorize_campaign_scientific_execution(
+            manifest,
+            digest('9'),
+            &ci(&manifest.campaign_code_revision, 101),
+            &ci(&manifest.sampler_implementation_revision, 102),
+            &ci(&manifest.flow.flow_implementation_revision, 103),
+            authorized_at,
+        )
+        .unwrap()
+    }
+
     fn run(manifest: &PureSu3CampaignManifest, manifest_digest: &str) -> PureSu3CampaignRunRecord {
         let schedule = manifest.retained_measurement_cycles().unwrap();
         PureSu3CampaignRunRecord {
@@ -341,25 +438,47 @@ mod tests {
     }
 
     #[test]
-    fn authorization_proves_benchmark_observables_are_measured() {
+    fn authorization_proves_exact_ci_subjects_and_benchmark_measurements() {
         let manifest = manifest();
-        let authorization = authorize_campaign_scientific_execution(
-            &manifest,
-            digest('9'),
-            "campaign-ci",
-            3_000,
-        )
-        .unwrap();
+        let authorization = authorization(&manifest, 3_000);
+        assert_eq!(authorization.campaign_ci_run_id, 101);
+        assert_eq!(authorization.sampler_ci_run_id, 102);
+        assert_eq!(authorization.flow_ci_run_id, 103);
         assert!(authorization.measured_observable_ids.contains(&"plaquette".into()));
         assert!(authorization.measured_observable_ids.contains(&"wilson-loop-1x1".into()));
+    }
+
+    #[test]
+    fn green_ci_for_neighboring_sampler_commit_is_rejected() {
+        let manifest = manifest();
+        let result = authorize_campaign_scientific_execution(
+            &manifest,
+            digest('9'),
+            &ci("campaign-head", 101),
+            &ci("different-sampler-head", 102),
+            &ci("flow-head", 103),
+            3_000,
+        );
+        assert!(matches!(
+            result,
+            Err(CampaignAuthorityError::CiSubjectRevisionMismatch { subject: "sampler", .. })
+        ));
     }
 
     #[test]
     fn missing_benchmark_measurement_fails_before_execution() {
         let mut manifest = manifest();
         manifest.wilson_rectangles.clear();
+        let result = authorize_campaign_scientific_execution(
+            &manifest,
+            digest('9'),
+            &ci("campaign-head", 101),
+            &ci("sampler-head", 102),
+            &ci("flow-head", 103),
+            3_000,
+        );
         assert!(matches!(
-            authorize_campaign_scientific_execution(&manifest, digest('9'), "campaign-ci", 3_000),
+            result,
             Err(CampaignAuthorityError::MissingBenchmarkObservable { observable_id })
                 if observable_id == "wilson-loop-1x1"
         ));
@@ -368,13 +487,7 @@ mod tests {
     #[test]
     fn run_must_begin_after_authorization() {
         let manifest = manifest();
-        let authorization = authorize_campaign_scientific_execution(
-            &manifest,
-            digest('9'),
-            "campaign-ci",
-            4_000,
-        )
-        .unwrap();
+        let authorization = authorization(&manifest, 4_000);
         let record = run(&manifest, &digest('9'));
         assert!(matches!(
             bind_qualified_campaign_execution(&authorization, &manifest, &record),
@@ -385,13 +498,7 @@ mod tests {
     #[test]
     fn seed_reveal_must_match_pre_run_commitment() {
         let manifest = manifest();
-        let authorization = authorize_campaign_scientific_execution(
-            &manifest,
-            digest('9'),
-            "campaign-ci",
-            3_000,
-        )
-        .unwrap();
+        let authorization = authorization(&manifest, 3_000);
         let mut record = run(&manifest, &digest('9'));
         record.chains[0].seed_reveal_digest = digest('8');
         assert!(matches!(
@@ -404,13 +511,7 @@ mod tests {
     fn qualified_execution_receipt_stays_below_statistical_promotion() {
         let manifest = manifest();
         let manifest_digest = digest('9');
-        let authorization = authorize_campaign_scientific_execution(
-            &manifest,
-            manifest_digest.clone(),
-            "campaign-ci",
-            3_000,
-        )
-        .unwrap();
+        let authorization = authorization(&manifest, 3_000);
         let record = run(&manifest, &manifest_digest);
         let receipt = bind_qualified_campaign_execution(&authorization, &manifest, &record).unwrap();
         assert_eq!(
