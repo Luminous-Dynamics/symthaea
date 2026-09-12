@@ -3,7 +3,7 @@ name = "symthaea-matbench-folds"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Canonical Matbench v0.1 fold and leakage-mask binding for Symthaea Benchmark Zero."
+description = "Published-procedure Matbench v0.1 positional folds and leakage-mask binding for Symthaea Benchmark Zero."
 
 [dependencies]
 symthaea-matbench-gap = { path = "../symthaea-matbench-gap" }
