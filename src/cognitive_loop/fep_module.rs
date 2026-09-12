@@ -179,7 +179,7 @@ pub struct TrajectoryPlanningConfig {
     pub ode_tolerance: f64,
     /// Maximum ODE steps per trajectory.
     pub max_steps: usize,
-    /// Time constant for continuous dynamics.
+    /// Time constant controlling relaxation rate.
     pub tau: f64,
     /// Cycle interval: run planning every N cycles.
     pub planning_interval: u64,
@@ -673,9 +673,11 @@ mod internal_regulation_action_tests {
 
     #[test]
     fn internal_regulation_action_names_are_unique() {
-        let mut names = InternalRegulationAction::ALL.map(InternalRegulationAction::as_str);
-        names.sort_unstable();
-        names.dedup();
-        assert_eq!(names.len(), InternalRegulationAction::ALL.len());
+        let names = InternalRegulationAction::ALL.map(InternalRegulationAction::as_str);
+        for (i, name) in names.iter().enumerate() {
+            for other in names.iter().skip(i + 1) {
+                assert_ne!(name, other);
+            }
+        }
     }
 }
