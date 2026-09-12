@@ -63,6 +63,7 @@ pub enum FlowScaleEvidenceError {
     Energy(FlowEnergyError),
     TooFewPoints { required: usize, actual: usize },
     NonFinitePoint { index: usize },
+    InvalidFlowStepSize { index: usize, value: f64 },
     InvalidPointStandardError { index: usize, value: f64 },
     InvalidEffectiveSampleSize { index: usize, value: f64 },
     InvalidRetainedConfigurations { index: usize, value: usize },
@@ -71,6 +72,8 @@ pub enum FlowScaleEvidenceError {
     EnergyOperatorMismatch { index: usize },
     FlowImplementationMismatch { index: usize },
     FlowStepSizeMismatch { index: usize },
+    RetainedConfigurationsMismatch { index: usize },
+    IndependentChainCountMismatch { index: usize },
     EnsembleManifestMismatch { index: usize },
     NonIncreasingFlowTime { previous: f64, current: f64 },
     InvalidScaleStandardError(f64),
@@ -111,6 +114,9 @@ impl FlowEnergyEvidenceCurve {
             Some(0),
             "ensemble_manifest_digest",
         )?;
+        if first.energy_operator_id != CLOVER_FLOW_ENERGY_ID {
+            return Err(FlowScaleEvidenceError::EnergyOperatorMismatch { index: 0 });
+        }
 
         for (index, point) in self.points.iter().enumerate() {
             if !point.flow_time.is_finite()
@@ -118,6 +124,28 @@ impl FlowEnergyEvidenceCurve {
                 || !point.flow_step_size.is_finite()
             {
                 return Err(FlowScaleEvidenceError::NonFinitePoint { index });
+            }
+            if point.flow_time <= 0.0 {
+                return Err(FlowScaleEvidenceError::Energy(
+                    FlowEnergyError::NonPositiveFlowTime {
+                        index,
+                        value: point.flow_time,
+                    },
+                ));
+            }
+            if point.ensemble_mean_energy < 0.0 {
+                return Err(FlowScaleEvidenceError::Energy(
+                    FlowEnergyError::NegativeMeanEnergy {
+                        index,
+                        value: point.ensemble_mean_energy,
+                    },
+                ));
+            }
+            if point.flow_step_size <= 0.0 {
+                return Err(FlowScaleEvidenceError::InvalidFlowStepSize {
+                    index,
+                    value: point.flow_step_size,
+                });
             }
             if !point.standard_error.is_finite() || point.standard_error < 0.0 {
                 return Err(FlowScaleEvidenceError::InvalidPointStandardError {
@@ -170,6 +198,12 @@ impl FlowEnergyEvidenceCurve {
             }
             if point.flow_step_size.to_bits() != first.flow_step_size.to_bits() {
                 return Err(FlowScaleEvidenceError::FlowStepSizeMismatch { index });
+            }
+            if point.retained_configurations != first.retained_configurations {
+                return Err(FlowScaleEvidenceError::RetainedConfigurationsMismatch { index });
+            }
+            if point.independent_chain_count != first.independent_chain_count {
+                return Err(FlowScaleEvidenceError::IndependentChainCountMismatch { index });
             }
             if point.ensemble_manifest_digest != first.ensemble_manifest_digest {
                 return Err(FlowScaleEvidenceError::EnsembleManifestMismatch { index });
@@ -349,6 +383,22 @@ mod tests {
         assert!(matches!(
             curve.validate(2),
             Err(FlowScaleEvidenceError::FlowStepSizeMismatch { index: 4 })
+        ));
+    }
+
+    #[test]
+    fn mixing_retained_population_is_rejected() {
+        let mut curve = t0_curve();
+        curve.points[1].retained_configurations = 63;
+        assert!(matches!(
+            curve.validate(2),
+            Err(FlowScaleEvidenceError::RetainedConfigurationsMismatch { index: 1 })
+        ));
+        let mut curve = t0_curve();
+        curve.points[5].independent_chain_count = 3;
+        assert!(matches!(
+            curve.validate(2),
+            Err(FlowScaleEvidenceError::IndependentChainCountMismatch { index: 5 })
         ));
     }
 }
