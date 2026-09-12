@@ -19,6 +19,7 @@ on:
       - 'crates/bridges/symthaea-forge-linux-seccomp-attestation/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-control/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-strict/**'
+      - 'crates/bridges/symthaea-forge-linux-cgroup-observed-exec/**'
       - 'crates/bridges/symthaea-forge-linux-observed-exec/**'
       - 'crates/bridges/symthaea-forge-kernel-validation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
@@ -41,6 +42,7 @@ on:
       - 'crates/bridges/symthaea-forge-linux-seccomp-attestation/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-control/**'
       - 'crates/bridges/symthaea-forge-linux-cgroup-strict/**'
+      - 'crates/bridges/symthaea-forge-linux-cgroup-observed-exec/**'
       - 'crates/bridges/symthaea-forge-linux-observed-exec/**'
       - 'crates/bridges/symthaea-forge-kernel-validation/**'
       - '.github/workflows/algorithm-discovery-qualification.yml'
@@ -98,6 +100,9 @@ jobs:
       - name: Test strict cgroup v2 hardening bridge
         run: cargo test -p symthaea-forge-linux-cgroup-strict --all-targets -- --test-threads=1
 
+      - name: Test cgroup-gated observed evaluator bridge
+        run: cargo test -p symthaea-forge-linux-cgroup-observed-exec --all-targets -- --test-threads=1
+
       - name: Test kernel-gated evaluator execution bridge
         run: cargo test -p symthaea-forge-linux-observed-exec --all-targets -- --test-threads=1
 
@@ -135,6 +140,7 @@ jobs:
           -p symthaea-forge-linux-seccomp-attestation
           -p symthaea-forge-linux-cgroup-control
           -p symthaea-forge-linux-cgroup-strict
+          -p symthaea-forge-linux-cgroup-observed-exec
           -p symthaea-forge-linux-observed-exec
           -p symthaea-forge-kernel-validation
           -p symthaea-algorithm-egraph-bridge

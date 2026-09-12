@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-forge-linux-cgroup-observed-exec"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Pre-release cgroup v2 resource admission for Symthaea Forge kernel-observed evaluators"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge = { path = "../../domains/symthaea-forge" }
+symthaea-forge-linux-observed-exec = { path = "../symthaea-forge-linux-observed-exec" }
+symthaea-forge-linux-kernel-attestation = { path = "../symthaea-forge-linux-kernel-attestation" }
+symthaea-forge-linux-cgroup-control = { path = "../symthaea-forge-linux-cgroup-control" }
+symthaea-forge-linux-cgroup-strict = { path = "../symthaea-forge-linux-cgroup-strict" }
+serde = { workspace = true }
+thiserror = { workspace = true }
