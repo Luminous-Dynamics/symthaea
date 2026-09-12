@@ -1,0 +1,42 @@
+{
+  "claim_semantics": {
+    "allowed": [
+      "empirical_ensemble",
+      "finite_ensemble_quantile",
+      "finite_ensemble_observed_max",
+      "risk_qualified_after_downstream_policy"
+    ],
+    "blocked": [
+      "deterministic_upper_bound",
+      "complete_physical_horizon",
+      "distribution_tail_bound_without_additional_model"
+    ]
+  },
+  "clone_interpretation": "additive_z_error_to_nominal_ldem",
+  "ensemble_layer_id": "site01-near-5m",
+  "nominal_elevation_source_id": "site01-elevation-5m",
+  "non_claims": [
+    "Nearest-rank empirical quantiles describe only the finite 100-member published ensemble.",
+    "The per-bin ensemble maximum is not a theorem that all possible terrain realizations lie below it.",
+    "Spatial support remains sample-points-only until LL-009R closes unresolved/subpixel terrain."
+  ],
+  "observer_policy": "same_realization_site_pixel",
+  "quantile_estimator": "empirical_cdf_nearest_rank",
+  "quantiles": [
+    0.05,
+    0.5,
+    0.95,
+    0.99,
+    1.0
+  ],
+  "require_all_azimuth_bins": true,
+  "required_member_count": 100,
+  "schema_version": "ll009q.ensemble-policy.v1",
+  "scientific_basis": [
+    "Barker et al. construct clone realizations by adding realization-specific Z-error fields back to the nominal LDEM.",
+    "The observer height is therefore reconstructed from the same clone realization at the LL-009P site pixel rather than holding the observer fixed while perturbing surrounding terrain.",
+    "Every clone horizon scans every admitted source raster cell; LL-009L top-K candidates are not reused for ensemble statistics."
+  ],
+  "spatial_support_class": "sample_points_only",
+  "study_id": "ll009-site01-connecting-ridge-v1"
+}
