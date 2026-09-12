@@ -16,6 +16,8 @@
 //!   proposal steps with local six-plaquette action deltas
 //! - **Reference overrelaxation**: orientation-agnostic finite-probe subgroup
 //!   reflections that preserve the local Wilson action microcanonically
+//! - **Optimized overrelaxation**: direct six-staple quaternion projection pinned
+//!   to the finite-probe reference, with reference fallback on degenerate extents
 //!
 //! ## Natural Units
 //!
@@ -39,6 +41,7 @@ pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_metropolis;
 pub mod lattice_overrelaxation;
+pub mod lattice_overrelaxation_staple;
 pub mod lattice_qcd;
 pub mod relativistic_qm;
 pub mod renormalization;
@@ -68,6 +71,10 @@ pub use lattice_overrelaxation::{
     AffineSubgroupForce, LatticeOverrelaxationError, OverrelaxationStepResult,
     equal_action_reflection, overrelax_subgroup_reference, probe_affine_subgroup_force,
     touching_trace_sum,
+};
+pub use lattice_overrelaxation_staple::{
+    OverrelaxationSweepStats, analytic_affine_subgroup_force, link_staple_non_degenerate,
+    overrelax_subgroup_staple, overrelax_sweep_staple,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
