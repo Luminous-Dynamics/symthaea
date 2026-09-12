@@ -6,7 +6,6 @@
 //! `symthaea-memory`. This module is deliberately narrower: it adapts an explicitly operator-
 //! directed destructive memory intervention to the strongest welfare-assurance execution path.
 
-use serde_json;
 use symthaea_core::welfare::SubjectAffectingAction;
 use symthaea_fabrication_kernel::crypto_digest::{Sha256, Sha256Digest};
 use symthaea_fabrication_kernel::trust::TrustSnapshot;
@@ -43,7 +42,9 @@ pub struct EpisodicMemoryClearReceipt {
 ///
 /// Episodes are individually serialized then byte-sorted before hashing. This commits the exact
 /// set/multiset of episode contents without depending on `BinaryHeap` iteration order.
-pub fn digest_episodic_memory(memory: &EpisodicMemory) -> Result<Sha256Digest, EpisodicMemoryInterventionError> {
+pub fn digest_episodic_memory(
+    memory: &EpisodicMemory,
+) -> Result<Sha256Digest, EpisodicMemoryInterventionError> {
     let episodes: Vec<Episode> = memory.get_top_episodes(memory.len());
     let mut encoded = Vec::with_capacity(episodes.len());
     for episode in episodes {
@@ -64,19 +65,18 @@ pub fn digest_episodic_memory(memory: &EpisodicMemory) -> Result<Sha256Digest, E
     Ok(hasher.finalize())
 }
 
-/// Concrete mutator for an operator-directed clear of the canonical episodic store.
+/// Private concrete mutator for an operator-directed clear of the canonical episodic store.
 ///
-/// This type is intentionally usable only behind `ReceiptedInterventionExecutor`; production
-/// callers should invoke `execute_governed_episodic_memory_clear`, which requires the strongest
-/// durable/evidence-bound permit and the two-phase execution journal.
-pub struct EpisodicMemoryClearExecutor<'a> {
+/// Keeping this type private prevents callers that somehow possess only the weaker
+/// `AssuredInterventionPermit` from bypassing the durable replay and execution-journal layers.
+struct EpisodicMemoryClearExecutor<'a> {
     expected_target_id: &'a str,
     memory: &'a mut EpisodicMemory,
     completed_at_unix_s: u64,
 }
 
 impl<'a> EpisodicMemoryClearExecutor<'a> {
-    pub fn new(
+    fn new(
         expected_target_id: &'a str,
         memory: &'a mut EpisodicMemory,
         completed_at_unix_s: u64,
@@ -102,11 +102,10 @@ impl ReceiptedInterventionExecutor for EpisodicMemoryClearExecutor<'_> {
 
         let before_count = self.memory.len();
         let before_digest = digest_episodic_memory(self.memory)?;
-
         self.memory.clear();
-
         let after_count = self.memory.len();
         let after_digest = digest_episodic_memory(self.memory)?;
+
         if after_count != 0 {
             return Err(EpisodicMemoryInterventionError::ClearPostconditionFailed {
                 remaining: after_count,
@@ -162,14 +161,10 @@ pub fn execute_governed_episodic_memory_clear<P: ExecutionJournalPersistence>(
         EpisodicMemoryInterventionError,
         P::Error,
     >,
-    JournaledExecutionGateError<P::Error>,
+    GovernedEpisodicMemoryClearError<P::Error>,
 > {
     let mut executor = EpisodicMemoryClearExecutor::new(expected_target_id, memory, unix_s)
-        .map_err(|error| JournaledExecutionGateError::Prepare(
-            crate::execution_recovery::ExecutionJournalError::InvalidPreparedEvidence(
-                error.to_string(),
-            ),
-        ))?;
+        .map_err(GovernedEpisodicMemoryClearError::Configuration)?;
 
     execute_durable_intervention_journaled(
         permit,
@@ -185,6 +180,7 @@ pub fn execute_governed_episodic_memory_clear<P: ExecutionJournalPersistence>(
         persistence,
         &mut executor,
     )
+    .map_err(GovernedEpisodicMemoryClearError::Gate)
 }
 
 fn validate_scope(
@@ -252,6 +248,17 @@ pub enum EpisodicMemoryInterventionError {
     ClearPostconditionFailed { remaining: usize },
     #[error(transparent)]
     Observation(#[from] ExecutionObservationError),
+}
+
+#[derive(Debug, Error)]
+pub enum GovernedEpisodicMemoryClearError<E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    #[error("governed episodic-memory intervention is misconfigured: {0}")]
+    Configuration(#[source] EpisodicMemoryInterventionError),
+    #[error(transparent)]
+    Gate(#[from] JournaledExecutionGateError<E>),
 }
 
 #[cfg(test)]
