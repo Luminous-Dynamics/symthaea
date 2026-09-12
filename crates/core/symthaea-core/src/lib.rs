@@ -24,12 +24,13 @@
 //!
 //! - **[`hdc`]** — Hyperdimensional computing: vector types, encoding, binding, bundling,
 //!   similarity search, attention, memory, and consciousness topology
-//! - **[`consciousness_metrics`]** — True IIT consciousness metrics: entropy estimation,
+//! - **[`consciousness_metrics`]** — IIT/consciousness-relevant metrics: entropy estimation,
 //!   MIP search, Phi* computation, temporal/causal analysis
 //! - **[`physics`]** — Physics-grounded modeling: periodic table, emergence chains,
-//!   chemical kinetics, and thermodynamic consciousness
+//!   chemical kinetics, and thermodynamic consciousness modeling
 //! - **[`phi_engine`]** — Integrated Information (Φ) calculation engine
-//! - **[`core`]** — Core consciousness state types and configuration
+//! - **[`core`]** — Core consciousness-relevant state types and configuration
+//! - **[`welfare`]** — Protected append-only welfare reporting and non-retaliation policy primitives
 //! - **[`genesis`]** — System bootstrap and initialization
 //! - **[`observability`]** — Metrics, tracing, and introspection
 
@@ -61,10 +62,10 @@
 // at crate level which cannot be suppressed locally.
 #![cfg_attr(test, allow(deprecated))]
 
-/// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
+/// IIT and related consciousness-relevant metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;
-/// Core consciousness state types and configuration.
+/// Core consciousness-relevant state types and configuration.
 #[allow(missing_docs)]
 pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
@@ -96,6 +97,8 @@ pub mod physics;
 pub mod synthesis_trait;
 /// Shared temporal prediction trait for O(1) CfC-based forecasting.
 pub mod temporal;
+/// Protected welfare-reporting and non-retaliation primitives.
+pub mod welfare;
 
 /// Runtime configuration and workspace execution primitives for the conscious engine.
 pub mod rt;
