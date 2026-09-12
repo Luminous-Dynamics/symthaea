@@ -78,9 +78,9 @@ The existing `QuorumEvidence.required_independent_approvals` field is retained i
 
 The existing two-argument `evaluate_replication_authority(request, grant)` remains as a reference convenience wrapper. It delegates to the policy-aware evaluator with `QuorumPolicy::REFERENCE_BASELINE`.
 
-A new policy-aware evaluator allows a future verified policy adapter to supply stronger requirements without changing request semantics.
+A new pure policy-aware evaluator allows a future verified policy adapter to supply stronger requirements without changing request semantics.
 
-The ledger's bound evaluator follows the same pattern: the existing wrapper uses the reference baseline, while a policy-aware entry point is available for a trusted/verified policy layer.
+The existing ledger-bound evaluator continues through the reference-baseline wrapper, so its minimum requirement is no longer requester-controlled. This tranche deliberately does **not** expose an unverified caller-supplied `QuorumPolicy` through the bound ledger. A policy-aware bound-ledger entry point belongs with the future trusted/verified policy adapter, where policy provenance can be established before it becomes authority-bearing input.
 
 ## Fail-closed properties
 
@@ -88,11 +88,11 @@ The implementation must establish:
 
 1. requester `required = 0` cannot reduce an R3 policy requirement below one;
 2. requester `required = 0` cannot reduce the R4/R5 constitutional floor below two;
-3. a supplied policy requiring more approvals dominates a weaker requester value;
+3. a supplied pure policy requiring more approvals dominates a weaker requester value;
 4. a requester may self-restrict by asking for more than policy requires;
 5. lower supplied policy values cannot weaken constitutional floors;
 6. missing grant, negative containment, stale evidence, and all other independent denial facts remain unaffected;
-7. the policy-aware bound evaluator produces the same opaque authorization shape only after the policy-aware pure evaluator allows.
+7. the default bound-ledger path inherits the reference baseline rather than a requester-selected minimum.
 
 ## Important non-claim: policy is not yet cryptographically verified
 
@@ -123,6 +123,10 @@ Deferred. Removing it would create a wider migration across the current stacked 
 
 Rejected. Deployments need to be able to require more than constitutional/reference floors without changing code.
 
+### Expose unverified policy directly through the bound ledger now
+
+Rejected for this tranche. The pure semantic object is useful for testing policy dominance, but the authority-bearing ledger path should not imply that an arbitrary caller-constructed policy is trusted. That integration belongs with verified policy provenance.
+
 ## Evidence discipline
 
 Authored tests and static review are design evidence. This ADR remains `Proposed` until the focused Rust 1.96 lane executes the exact candidate commit. A queued workflow is not a pass.
@@ -133,8 +137,9 @@ Authored tests and static review are design evidence. This ADR remains `Proposed
 
 - requesters can no longer weaken their own R3/R4/R5 quorum requirement;
 - policy requirements become a distinct input rather than a property of the requested action;
-- stronger deployment policy can be introduced without widening the request type;
-- creates a clean seam for future `VerifiedRiskPolicy` and verified quorum evidence.
+- stronger deployment policy has a semantic representation without widening the request type;
+- creates a clean seam for future `VerifiedRiskPolicy` and verified quorum evidence;
+- avoids prematurely treating a caller-constructed semantic policy object as production authority.
 
 ### Residual risk
 
