@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-domain-awareness-evidence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Typed candidate-evidence bindings from Symthaea assurance reports into formal domain-awareness obligations"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "evidence", "assurance", "verification"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-formal-safety = { path = "../../domains/symthaea-formal-safety" }
+symthaea-domain-awareness = { path = "../../domains/symthaea-domain-awareness" }
+symthaea-perception-crucible = { path = "../../domains/symthaea-perception-crucible" }
+symthaea-model-assurance = { path = "../../domains/symthaea-model-assurance" }
+symthaea-assurance-requalification = { path = "../../domains/symthaea-assurance-requalification" }
+symthaea-domain-awareness-model-assurance = { path = "../symthaea-domain-awareness-model-assurance" }
+serde = { workspace = true }
