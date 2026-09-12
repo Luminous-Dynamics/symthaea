@@ -44,6 +44,7 @@ pub mod legacy_source_capture_plan_v3;
 pub mod legacy_source_continuity;
 pub mod legacy_source_lineage;
 pub mod legacy_source_readiness;
+pub mod legacy_verified_generation_assessment;
 pub mod legacy_zos;
 pub mod legacy_zos_scenarios;
 #[cfg(feature = "logparse-adapter")]
@@ -265,6 +266,14 @@ pub use legacy_source_readiness::{
     admit_legacy_knowledge_use_v1, assess_legacy_source_readiness_v1,
     LegacyKnowledgeUseClassV1, LegacySourceCaptureClassV1, LegacySourceReadinessAssessmentV1,
     LegacySourceReadinessErrorV1, LegacySourceReadinessItemV1,
+};
+pub use legacy_verified_generation_assessment::{
+    assess_legacy_qualification_generation_with_bound_verified_semantic_review_v1,
+    legacy_verified_generation_assessment_binding_v1,
+    LegacySemanticReviewQualificationBindingV1,
+    LegacyVerifiedGenerationAssessmentErrorV1,
+    LegacyVerifiedQualificationGenerationAssessmentV1,
+    LEGACY_VERIFIED_GENERATION_ASSESSMENT_SCHEMA_V1,
 };
 pub use legacy_zos::{
     enrich_legacy_zos_foundation_v1, LegacyZosErrorV1, ZosEvidenceSignalV1,
