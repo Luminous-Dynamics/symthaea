@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'crates/domains/symthaea-replicator-safety/**'
+      - 'crates/domains/symthaea-replicator-semantics/**'
       - 'crates/domains/symthaea-replicator-ledger/**'
       - 'docs/architecture/replicator-safety/**'
       - '.github/workflows/rsk-safety.yml'
@@ -19,6 +20,7 @@ on:
     branches: [main]
     paths:
       - 'crates/domains/symthaea-replicator-safety/**'
+      - 'crates/domains/symthaea-replicator-semantics/**'
       - 'crates/domains/symthaea-replicator-ledger/**'
       - 'docs/architecture/replicator-safety/**'
       - '.github/workflows/rsk-safety.yml'
@@ -63,7 +65,7 @@ jobs:
           base_sha='${{ github.event.pull_request.base.sha }}'
           changed_files="$(git diff --name-only "${base_sha}"...HEAD)"
 
-          class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-ledger/|docs/architecture/replicator-safety/|\.github/workflows/rsk-safety\.yml$|scripts/rsk_qualification\.py$|scripts/test_rsk_qualification\.py$|scripts/verify_rsk_qualification\.py$|scripts/test_verify_rsk_qualification\.py$|scripts/rsk_semantic_schema\.py$|scripts/test_rsk_semantic_schema\.py$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
+          class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-semantics/|crates/domains/symthaea-replicator-ledger/|docs/architecture/replicator-safety/|\.github/workflows/rsk-safety\.yml$|scripts/rsk_qualification\.py$|scripts/test_rsk_qualification\.py$|scripts/verify_rsk_qualification\.py$|scripts/test_verify_rsk_qualification\.py$|scripts/rsk_semantic_schema\.py$|scripts/test_rsk_semantic_schema\.py$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
 
           if ! printf '%s\n' "${changed_files}" | grep -Eq "${class_a_pattern}"; then
             echo "No RSK Class A implementation/governance surface changed."
@@ -99,6 +101,7 @@ jobs:
           set -euo pipefail
           required_paths=(
             'crates/domains/symthaea-replicator-safety/'
+            'crates/domains/symthaea-replicator-semantics/'
             'crates/domains/symthaea-replicator-ledger/'
             'docs/architecture/replicator-safety/'
             '.github/workflows/rsk-safety.yml'
@@ -136,6 +139,7 @@ jobs:
           set -euo pipefail
           manifests=(
             crates/domains/symthaea-replicator-safety/Cargo.toml
+            crates/domains/symthaea-replicator-semantics/Cargo.toml
             crates/domains/symthaea-replicator-ledger/Cargo.toml
           )
 
@@ -191,6 +195,35 @@ jobs:
           path: ${{ runner.temp }}/rsk-qualification-format/**
           if-no-files-found: error
           retention-days: 30
+
+  rsk-semantic-types:
+    name: RSK semantic types compile + test + clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format semantic identity crate
+        run: cargo fmt --check -p symthaea-replicator-semantics
+
+      - name: Check semantic identity crate
+        run: cargo check -p symthaea-replicator-semantics --all-targets --locked
+
+      - name: Test semantic identity crate and authority golden vectors
+        run: |
+          cargo test -p symthaea-replicator-semantics --all-targets --locked
+          cargo test -p symthaea-replicator-safety --test semantic_schema --locked
+
+      - name: Clippy semantic identity crate
+        run: cargo clippy -p symthaea-replicator-semantics --all-targets --locked -- -D warnings
 
   rsk-core:
     name: RSK compile + test + clippy
