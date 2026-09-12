@@ -570,3 +570,74 @@ impl FepModule {
         self.enhanced_bridge.blanket.permeability().effective
     }
 }
+
+impl super::CognitiveLoopService {
+    /// Create a detached prescribed-action prediction session from the exact
+    /// production FEP agent currently owned by this cognitive loop.
+    ///
+    /// The returned object is a clone/sandbox. It exposes no motor system,
+    /// cannot mutate this service, and grants no external action authority.
+    pub fn fep_prediction_session(&self) -> symthaea_fep::FepPredictionSession {
+        symthaea_fep::FepPredictionSession::from_agent(&self.fep.agent)
+    }
+}
+
+#[cfg(test)]
+mod prediction_session_tests {
+    use super::super::{CognitiveLoopConfig, CognitiveLoopService};
+
+    fn service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    #[test]
+    fn production_service_exposes_only_detached_fep_session() {
+        let service = service();
+        let session = service.fep_prediction_session();
+        assert_eq!(session.state_dim(), 8);
+        assert_eq!(session.observation_dim(), 4);
+        assert_eq!(session.action_count(), 4);
+    }
+
+    #[test]
+    fn detached_session_learning_cannot_mutate_live_service() {
+        let service = service();
+        let before = service
+            .fep_prediction_session()
+            .freeze_for_evaluation()
+            .unwrap()
+            .replay_digest();
+
+        let mut detached = service.fep_prediction_session();
+        detached
+            .observe(&[0.1, 0.2, 0.3, 0.4], 1.0, "development")
+            .unwrap();
+        detached.predict(1).unwrap();
+        detached
+            .learn_from_actual(1, &[0.9, 0.8, 0.7, 0.6], 1.0, "development")
+            .unwrap();
+
+        let after = service
+            .fep_prediction_session()
+            .freeze_for_evaluation()
+            .unwrap()
+            .replay_digest();
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn unchanged_service_mints_replay_equivalent_sessions() {
+        let service = service();
+        let mut a = service.fep_prediction_session();
+        let mut b = service.fep_prediction_session();
+        a.observe(&[0.2, 0.4, 0.6, 0.8], 1.0, "probe").unwrap();
+        b.observe(&[0.2, 0.4, 0.6, 0.8], 1.0, "probe").unwrap();
+        let a_outcome = a.predict(2).unwrap();
+        let b_outcome = b.predict(2).unwrap();
+        assert_eq!(a_outcome.expected_observation, b_outcome.expected_observation);
+        assert_eq!(
+            a_outcome.predicted_next_state.mean,
+            b_outcome.predicted_next_state.mean
+        );
+    }
+}
