@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-trust-root-crucible"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Adversarial qualification crucible for Symthaea assurance trust roots"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "testing", "trust-root"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-assurance-trust-store = { path = "../symthaea-assurance-trust-store" }
+symthaea-assurance-trust-store-attestation = { path = "../symthaea-assurance-trust-store-attestation" }
+symthaea-assurance-trust-store-current-state = { path = "../symthaea-assurance-trust-store-current-state" }
+symthaea-assurance-trust-store-recovery = { path = "../symthaea-assurance-trust-store-recovery" }
+symthaea-assurance-trust-store-recovery-ledger = { path = "../symthaea-assurance-trust-store-recovery-ledger" }
+serde = { workspace = true }
