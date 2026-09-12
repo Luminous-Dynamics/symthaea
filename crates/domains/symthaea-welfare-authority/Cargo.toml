@@ -5,6 +5,9 @@ edition = "2024"
 description = "Verified, scoped, quorum-aware authority binding for Symthaea welfare-sensitive interventions"
 license = "AGPL-3.0-or-later"
 
+[lib]
+path = "src/entry.rs"
+
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
