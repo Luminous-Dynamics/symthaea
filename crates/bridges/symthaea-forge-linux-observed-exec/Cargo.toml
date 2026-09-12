@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-forge-linux-observed-exec"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Kernel-gated Bubblewrap evaluator execution for Symthaea Forge"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge = { path = "../../domains/symthaea-forge" }
+symthaea-forge-linux-isolation = { path = "../symthaea-forge-linux-isolation" }
+symthaea-forge-linux-kernel-attestation = { path = "../symthaea-forge-linux-kernel-attestation" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+libc = { workspace = true }
