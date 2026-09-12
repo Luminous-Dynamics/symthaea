@@ -35,6 +35,7 @@ pub mod legacy_qualification_profile;
 pub mod legacy_qualification_profile_v3;
 pub mod legacy_qualification_source_ledger_v3;
 pub mod legacy_semantic_replacement;
+pub mod legacy_semantic_review_verification;
 pub mod legacy_solaris;
 pub mod legacy_solaris_scenarios;
 pub mod legacy_source_artifacts;
@@ -207,6 +208,17 @@ pub use legacy_semantic_replacement::{
     LegacySemanticReplacementReviewLedgerV1,
     LegacySemanticReviewMethodV1,
     LEGACY_SEMANTIC_REPLACEMENT_LEDGER_SCHEMA_V1,
+};
+pub use legacy_semantic_review_verification::{
+    assess_legacy_qualification_generation_with_verified_semantic_review_v1,
+    legacy_semantic_replacement_review_ledger_commitment_v1,
+    validate_verified_legacy_semantic_replacement_reviews_v1,
+    verify_legacy_semantic_replacement_reviews_v1,
+    LegacySemanticReviewTrustEvidenceV1,
+    LegacySemanticReviewVerificationErrorV1,
+    LegacySemanticReviewVerifierV1,
+    VerifiedLegacySemanticReplacementReviewsV1,
+    LEGACY_SEMANTIC_REVIEW_VERIFICATION_SCHEMA_V1,
 };
 pub use legacy_solaris::{
     enrich_legacy_solaris_foundation_v1, LegacySolarisErrorV1, SolarisEvidenceSignalV1,
