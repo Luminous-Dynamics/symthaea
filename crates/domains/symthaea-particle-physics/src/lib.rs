@@ -16,6 +16,8 @@
 //!   proposal steps with local touching-plaquette action deltas
 //! - **Lattice sweep contract**: symmetric proposal transform, pluggable uniform
 //!   source, lexicographic site/direction/subgroup composition, and sweep stats
+//! - **Lattice RNG streams**: pinned ChaCha8 implementation with injective
+//!   campaign/replica/rank stream coordinates and endpoint-free U(0,1)
 //!
 //! ## Natural Units
 //!
@@ -38,6 +40,7 @@ pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_metropolis;
 pub mod lattice_qcd;
+pub mod lattice_rng;
 pub mod lattice_sweep;
 pub mod relativistic_qm;
 pub mod renormalization;
@@ -62,6 +65,10 @@ pub use lattice_metropolis::{
     LatticeMetropolisError, MetropolisStepResult, Su2Subgroup, Su2SubgroupProposal,
     affected_wilson_action, embedded_su2_rotation, metropolis_acceptance_probability,
     metropolis_subgroup_step,
+};
+pub use lattice_rng::{
+    LATTICE_RNG_ALGORITHM, LATTICE_RNG_IMPLEMENTATION, LATTICE_RNG_VERSION,
+    LatticeChaCha8Stream, LatticeRngError, LatticeStreamCoordinates, LatticeStreamDomain,
 };
 pub use lattice_sweep::{
     LatticeSweepError, SweepStats, SymmetricProposalConfig, Uniform01Source,
