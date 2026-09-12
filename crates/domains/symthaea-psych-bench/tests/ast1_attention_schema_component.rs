@@ -11,9 +11,7 @@
 //! Full `CognitiveLoopService` integration, behavioral consequence, sham at the
 //! system level, replication, and consciousness claims remain out of scope.
 
-use symthaea::consciousness::attention_schema::{
-    AttentionMode, AttentionSchema,
-};
+use symthaea::consciousness::attention_schema::{AttentionMode, AttentionSchema};
 use symthaea::hdc::binary_hv::BinaryHV;
 
 fn prepared_schema() -> (AttentionSchema, BinaryHV) {
@@ -124,22 +122,32 @@ fn schema_prospectively_predicts_shift_after_attention_decay() {
     let mut schema = AttentionSchema::new();
 
     schema.update(target, 0.70);
+    schema
+        .sustain_focus()
+        .expect("test precondition should establish focused attention");
+    assert_eq!(schema.current().mode, AttentionMode::Focused);
 
-    // Maintain the same target until the schema's own forward model predicts
-    // a future scanning/shift state due to decaying intensity.
+    // Maintain the same target until the schema's forward model adds a
+    // *distinct future Scanning branch*. Requiring the current mode to remain
+    // non-Scanning prevents persistence of an existing Scanning state from
+    // masquerading as a prospective shift prediction.
     let mut predicted_shift = false;
-    for _ in 0..16 {
+    for _ in 0..20 {
         let update = schema.update(target, 0.70);
-        predicted_shift = update
-            .predictions
-            .iter()
-            .any(|state| state.mode == AttentionMode::Scanning);
+        predicted_shift = update.new_mode != AttentionMode::Scanning
+            && update
+                .predictions
+                .iter()
+                .any(|state| state.mode == AttentionMode::Scanning);
         if predicted_shift {
             break;
         }
     }
 
-    assert!(predicted_shift, "schema never generated a prospective shift prediction");
+    assert!(
+        predicted_shift,
+        "schema never generated a distinct prospective shift branch after decay"
+    );
 
     let correct_before = schema.stats().predictions_correct;
     let validated_before = schema.stats().predictions_validated;
@@ -151,7 +159,7 @@ fn schema_prospectively_predicts_shift_after_attention_decay() {
     assert_eq!(
         schema.stats().predictions_correct,
         correct_before + 1,
-        "the prospective scanning prediction was not validated as correct",
+        "the distinct prospective scanning prediction was not validated as correct",
     );
 }
 
