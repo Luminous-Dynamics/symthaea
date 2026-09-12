@@ -7,6 +7,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod validation;
+
 /// Frozen identity of one capability vocabulary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CapabilitySchemaId([u8; 32]);
