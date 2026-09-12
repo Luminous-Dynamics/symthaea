@@ -3,9 +3,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Independently verify an RSK qualification receipt and retained command logs.
 
-The verifier does not trust `admissible_evidence` merely because the receipt says
-it is true. It recomputes receipt/log digests, validates the exact command plan,
-checks status invariants, and can bind the receipt to a local Git checkout.
+The verifier does not trust summary booleans or status strings merely because the
+receipt contains them. It recomputes receipt/log digests, validates the exact
+qualification command plan, derives toolchain/input/status consistency, and can
+bind the receipt to a local Git checkout.
 """
 
 from __future__ import annotations
@@ -33,8 +34,10 @@ KNOWN_STATUSES = {
 }
 MAX_RECEIPT_BYTES = 2 * 1024 * 1024
 MAX_LOG_BYTES = 64 * 1024 * 1024
+MAX_INPUT_BYTES = 64 * 1024 * 1024
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
+RUST_CHANNEL = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?$")
 
 TOP_LEVEL_ALLOWED = {
     "schema",
@@ -52,7 +55,16 @@ TOP_LEVEL_ALLOWED = {
     "commands",
     "receipt_sha256",
 }
-
+EXPECTED_INPUT_PATHS = {
+    "Cargo.lock",
+    "rust-toolchain.toml",
+    "scripts/rsk_qualification.py",
+    "scripts/test_rsk_qualification.py",
+    ".github/workflows/rsk-safety.yml",
+    "scripts/check-class-a-changes.sh",
+    "docs/architecture/replicator-safety/RSK_PRODUCTION_ADMISSION_GATES_V0_1.md",
+}
+EXPECTED_TOOL_KEYS = {"rustc", "cargo", "rustfmt", "clippy"}
 RSK_PACKAGES = ("symthaea-replicator-safety", "symthaea-replicator-ledger")
 
 
@@ -74,6 +86,12 @@ def require(condition: bool, message: str) -> None:
         raise VerificationError(message)
 
 
+def require_bool(obj: dict[str, Any], key: str, context: str) -> bool:
+    value = obj.get(key)
+    require(isinstance(value, bool), f"{context}.{key} must be boolean")
+    return value
+
+
 def sha256_file(path: Path, maximum_bytes: int) -> str:
     require(path.is_file(), f"missing file: {path}")
     size = path.stat().st_size
@@ -93,7 +111,7 @@ def load_receipt(path: Path) -> dict[str, Any]:
         value = json.loads(raw, object_pairs_hook=no_duplicate_keys)
     except VerificationError:
         raise
-    except Exception as exc:  # pragma: no cover - exact decoder errors vary
+    except Exception as exc:  # pragma: no cover - exact decoder text varies
         raise VerificationError(f"invalid receipt JSON: {exc}") from exc
     require(isinstance(value, dict), "receipt root must be an object")
     return value
@@ -170,121 +188,212 @@ def expected_plan(phase: str) -> list[tuple[str, list[str]]]:
 def canonical_receipt_digest(receipt: dict[str, Any]) -> str:
     unsigned = dict(receipt)
     claimed = unsigned.pop("receipt_sha256", None)
-    require(isinstance(claimed, str) and HEX64.fullmatch(claimed) is not None,
-            "receipt_sha256 must be a lowercase SHA-256 hex digest")
+    require(
+        isinstance(claimed, str) and HEX64.fullmatch(claimed) is not None,
+        "receipt_sha256 must be lowercase SHA-256 hex",
+    )
     canonical = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(canonical).hexdigest()
 
 
-def safe_log_path(root: Path, relative: str) -> Path:
-    require(isinstance(relative, str) and relative, "command log_path must be non-empty")
+def safe_relative_path(root: Path, relative: str, kind: str) -> Path:
+    require(isinstance(relative, str) and relative, f"{kind} path must be non-empty")
     rel = Path(relative)
-    require(not rel.is_absolute(), f"absolute log path is forbidden: {relative}")
-    require(".." not in rel.parts, f"parent traversal is forbidden in log path: {relative}")
+    require(not rel.is_absolute(), f"absolute {kind} path forbidden: {relative}")
+    require(".." not in rel.parts, f"parent traversal forbidden in {kind} path: {relative}")
     resolved_root = root.resolve()
     resolved = (root / rel).resolve()
     try:
         resolved.relative_to(resolved_root)
     except ValueError as exc:
-        raise VerificationError(f"log path escapes capsule root: {relative}") from exc
-    require(resolved.is_file(), f"missing command log: {relative}")
+        raise VerificationError(f"{kind} path escapes root: {relative}") from exc
     return resolved
 
 
 def validate_command_shape(command: Any, name: str, argv: list[str]) -> None:
     require(isinstance(command, dict), f"command {name} must be an object")
+    allowed = {
+        "name",
+        "argv",
+        "started_at_utc",
+        "finished_at_utc",
+        "duration_ms",
+        "exit_code",
+        "log_path",
+        "log_sha256",
+    }
+    require(not (set(command) - allowed), f"unknown fields in command {name}")
     require(command.get("name") == name, f"unexpected command name/order: expected {name}")
     require(command.get("argv") == argv, f"command argv mismatch for {name}")
     exit_code = command.get("exit_code")
-    require(isinstance(exit_code, int) and not isinstance(exit_code, bool),
-            f"command exit_code must be integer: {name}")
+    require(
+        isinstance(exit_code, int) and not isinstance(exit_code, bool),
+        f"command exit_code must be integer: {name}",
+    )
     digest = command.get("log_sha256")
-    require(isinstance(digest, str) and HEX64.fullmatch(digest) is not None,
-            f"invalid log SHA-256 for {name}")
+    require(
+        isinstance(digest, str) and HEX64.fullmatch(digest) is not None,
+        f"invalid log SHA-256 for {name}",
+    )
     require(isinstance(command.get("started_at_utc"), str), f"missing start time: {name}")
     require(isinstance(command.get("finished_at_utc"), str), f"missing finish time: {name}")
     duration = command.get("duration_ms")
-    require(isinstance(duration, int) and not isinstance(duration, bool) and duration >= 0,
-            f"invalid duration for {name}")
+    require(
+        isinstance(duration, int) and not isinstance(duration, bool) and duration >= 0,
+        f"invalid duration for {name}",
+    )
 
 
 def validate_commands(receipt: dict[str, Any], capsule_root: Path) -> list[int]:
     phase = receipt["phase"]
     commands = receipt.get("commands")
     require(isinstance(commands, list), "commands must be an array")
-    status = receipt["qualification_status"]
-    if status == "blocked-dirty-worktree":
+    if receipt["qualification_status"] == "blocked-dirty-worktree":
         require(commands == [], "blocked dirty-worktree receipt must contain no commands")
         return []
 
     plan = expected_plan(phase)
-    require(len(commands) == len(plan),
-            f"command count mismatch: expected {len(plan)}, got {len(commands)}")
+    require(
+        len(commands) == len(plan),
+        f"command count mismatch: expected {len(plan)}, got {len(commands)}",
+    )
     exits: list[int] = []
     for command, (name, argv) in zip(commands, plan, strict=True):
         validate_command_shape(command, name, argv)
-        log = safe_log_path(capsule_root, command["log_path"])
+        log = safe_relative_path(capsule_root, command["log_path"], "log")
+        require(log.is_file(), f"missing command log: {command['log_path']}")
         actual = sha256_file(log, MAX_LOG_BYTES)
         require(actual == command["log_sha256"], f"command log digest mismatch: {name}")
         exits.append(command["exit_code"])
     return exits
 
 
-def require_bool(obj: dict[str, Any], key: str, context: str) -> bool:
-    value = obj.get(key)
-    require(isinstance(value, bool), f"{context}.{key} must be boolean")
+def validate_hash_map(value: Any, label: str) -> dict[str, str | None]:
+    require(isinstance(value, dict), f"{label} must be an object")
+    require(set(value) == EXPECTED_INPUT_PATHS, f"{label} input path set mismatch")
+    for path, digest in value.items():
+        require(isinstance(path, str), f"{label} contains non-string path")
+        require(
+            digest is None or (isinstance(digest, str) and HEX64.fullmatch(digest) is not None),
+            f"invalid digest for {label}.{path}",
+        )
     return value
 
 
-def validate_status_invariants(receipt: dict[str, Any], exits: list[int]) -> None:
-    status = receipt["qualification_status"]
-    admissible = receipt["admissible_evidence"]
-    repo = receipt.get("repository")
-    inputs = receipt.get("inputs")
-    require(isinstance(repo, dict), "repository must be an object")
-    require(isinstance(inputs, dict), "inputs must be an object")
-
-    dirty = require_bool(repo, "dirty", "repository")
-    inputs_unchanged = require_bool(inputs, "unchanged", "inputs")
-
-    if status == "blocked-dirty-worktree":
-        require(not admissible, "blocked dirty receipt cannot be admissible")
-        require(dirty, "blocked dirty receipt must record dirty=true")
-        return
-
-    post_dirty = require_bool(repo, "post_run_dirty", "repository")
+def derive_pin_match(receipt: dict[str, Any]) -> bool:
     toolchain = receipt.get("toolchain")
     require(isinstance(toolchain, dict), "non-blocked receipt requires toolchain object")
-    pin_match = require_bool(toolchain, "pin_match", "toolchain")
-    all_commands_pass = bool(exits) and all(code == 0 for code in exits)
-    any_command_failed = any(code != 0 for code in exits)
+    expected = toolchain.get("expected_rust_channel")
+    require(
+        isinstance(expected, str) and RUST_CHANNEL.fullmatch(expected) is not None,
+        "invalid expected_rust_channel",
+    )
+    tools = receipt.get("tools")
+    require(isinstance(tools, dict) and set(tools) == EXPECTED_TOOL_KEYS, "tools set mismatch")
+    rustc = tools["rustc"]
+    require(isinstance(rustc, dict), "tools.rustc must be an object")
+    available = rustc.get("available")
+    exit_code = rustc.get("exit_code")
+    output = rustc.get("output")
+    require(isinstance(available, bool), "tools.rustc.available must be boolean")
+    require(exit_code is None or (isinstance(exit_code, int) and not isinstance(exit_code, bool)),
+            "tools.rustc.exit_code invalid")
+    require(output is None or isinstance(output, str), "tools.rustc.output invalid")
+    if not available or exit_code != 0 or not output:
+        derived = False
+    else:
+        first = output.splitlines()[0] if output.splitlines() else ""
+        parts = first.split()
+        derived = len(parts) >= 2 and parts[0] == "rustc" and parts[1] == expected
+    recorded = require_bool(toolchain, "pin_match", "toolchain")
+    require(recorded == derived, "toolchain.pin_match disagrees with rustc evidence")
+    return derived
 
-    if admissible:
-        require(status == "pass-clean", "admissible receipt must have pass-clean status")
-        require(not dirty and not post_dirty, "admissible receipt must remain clean")
-        require(inputs_unchanged, "admissible receipt inputs must remain unchanged")
-        require(pin_match, "admissible receipt must match pinned toolchain")
-        require(all_commands_pass, "admissible receipt requires every command to pass")
 
-    if status == "pass-clean":
-        require(admissible, "pass-clean must be admissible")
-    elif status == "pass-dirty-diagnostic":
-        require(not admissible, "dirty diagnostic cannot be admissible")
-        require(dirty, "dirty diagnostic must start dirty")
-        require(pin_match and all_commands_pass,
-                "dirty diagnostic requires matching toolchain and successful commands")
-    elif status == "fail-toolchain-mismatch":
-        require(not admissible, "toolchain mismatch cannot be admissible")
-        require(not pin_match, "toolchain mismatch status requires pin_match=false")
-        require(all_commands_pass, "toolchain mismatch status requires command success")
-    elif status == "fail-worktree-mutated":
-        require(not admissible, "mutated worktree cannot be admissible")
-        require(not dirty, "worktree-mutated status requires a clean starting worktree")
-        require(post_dirty or not inputs_unchanged,
-                "worktree-mutated status requires observed post-run mutation")
-    elif status == "fail":
-        require(not admissible, "failed receipt cannot be admissible")
-        require(any_command_failed, "generic fail status requires a failed command")
+def validate_repository_and_inputs(receipt: dict[str, Any]) -> tuple[bool, bool, bool, bool]:
+    repo = receipt.get("repository")
+    require(isinstance(repo, dict), "repository must be an object")
+    commit = repo.get("commit")
+    tree = repo.get("tree")
+    require(
+        isinstance(commit, str) and HEX40.fullmatch(commit) is not None,
+        "repository.commit must be lowercase 40-hex Git object id",
+    )
+    require(
+        isinstance(tree, str) and HEX40.fullmatch(tree) is not None,
+        "repository.tree must be lowercase 40-hex Git object id",
+    )
+    require(isinstance(repo.get("branch"), str) and repo["branch"], "repository.branch missing")
+    dirty = require_bool(repo, "dirty", "repository")
+    dirty_paths = repo.get("dirty_paths")
+    require(isinstance(dirty_paths, list) and all(isinstance(x, str) for x in dirty_paths),
+            "repository.dirty_paths must be a string array")
+    require(dirty == bool(dirty_paths), "repository.dirty disagrees with dirty_paths")
+
+    inputs = receipt.get("inputs")
+    require(isinstance(inputs, dict), "inputs must be an object")
+    require(set(inputs) == {"before", "after", "unchanged"}, "inputs field set mismatch")
+    before = validate_hash_map(inputs.get("before"), "inputs.before")
+    after = validate_hash_map(inputs.get("after"), "inputs.after")
+    recorded_unchanged = require_bool(inputs, "unchanged", "inputs")
+    derived_unchanged = before == after
+    require(recorded_unchanged == derived_unchanged, "inputs.unchanged disagrees with hashes")
+
+    status = receipt["qualification_status"]
+    if status == "blocked-dirty-worktree":
+        require("post_run_dirty" not in repo and "post_run_dirty_paths" not in repo,
+                "blocked dirty receipt must not claim post-run state")
+        return dirty, False, derived_unchanged, False
+
+    post_dirty = require_bool(repo, "post_run_dirty", "repository")
+    post_paths = repo.get("post_run_dirty_paths")
+    require(isinstance(post_paths, list) and all(isinstance(x, str) for x in post_paths),
+            "repository.post_run_dirty_paths must be a string array")
+    require(post_dirty == bool(post_paths),
+            "repository.post_run_dirty disagrees with post_run_dirty_paths")
+    return dirty, post_dirty, derived_unchanged, True
+
+
+def expected_status(receipt: dict[str, Any], exits: list[int], dirty: bool,
+                    post_dirty: bool, inputs_unchanged: bool, pin_match: bool) -> tuple[str, bool]:
+    if receipt["qualification_status"] == "blocked-dirty-worktree":
+        return "blocked-dirty-worktree", False
+    commands_pass = bool(exits) and all(code == 0 for code in exits)
+    clean_evidence = not dirty and not post_dirty and inputs_unchanged
+    mutation_detected = not dirty and post_dirty
+    if commands_pass and pin_match and clean_evidence:
+        status = "pass-clean"
+    elif mutation_detected or (not dirty and not inputs_unchanged):
+        status = "fail-worktree-mutated"
+    elif commands_pass and pin_match:
+        status = "pass-dirty-diagnostic"
+    elif commands_pass:
+        status = "fail-toolchain-mismatch"
+    else:
+        status = "fail"
+    admissible = commands_pass and clean_evidence and pin_match
+    return status, admissible
+
+
+def validate_status_invariants(receipt: dict[str, Any], exits: list[int]) -> None:
+    dirty, post_dirty, inputs_unchanged, has_runtime_fields = validate_repository_and_inputs(receipt)
+    claimed_status = receipt["qualification_status"]
+    claimed_admissible = receipt["admissible_evidence"]
+
+    if claimed_status == "blocked-dirty-worktree":
+        require(dirty, "blocked dirty receipt must record a dirty starting worktree")
+        require(not claimed_admissible, "blocked dirty receipt cannot be admissible")
+        require(not has_runtime_fields, "blocked dirty receipt has unexpected runtime fields")
+        return
+
+    pin_match = derive_pin_match(receipt)
+    derived_status, derived_admissible = expected_status(
+        receipt, exits, dirty, post_dirty, inputs_unchanged, pin_match
+    )
+    require(claimed_status == derived_status,
+            f"qualification_status inconsistent: expected {derived_status}")
+    require(claimed_admissible == derived_admissible,
+            f"admissible_evidence inconsistent: expected {derived_admissible}")
 
 
 def validate_receipt_structure(receipt: dict[str, Any]) -> None:
@@ -294,28 +403,25 @@ def validate_receipt_structure(receipt: dict[str, Any]) -> None:
     require(receipt.get("qualification_scope") == SCOPE, "unexpected qualification scope")
     phase = receipt.get("phase")
     require(phase in KNOWN_PHASES, f"invalid qualification phase: {phase}")
-    require(receipt.get("production_admission") == PRODUCTION_ADMISSION,
-            "production-admission denial marker missing or changed")
+    require(
+        receipt.get("production_admission") == PRODUCTION_ADMISSION,
+        "production-admission denial marker missing or changed",
+    )
     status = receipt.get("qualification_status")
     require(status in KNOWN_STATUSES, f"unknown qualification status: {status}")
-    require(isinstance(receipt.get("admissible_evidence"), bool),
-            "admissible_evidence must be boolean")
+    require(
+        isinstance(receipt.get("admissible_evidence"), bool),
+        "admissible_evidence must be boolean",
+    )
     require(isinstance(receipt.get("generated_at_utc"), str), "generated_at_utc missing")
 
-    repo = receipt.get("repository")
-    require(isinstance(repo, dict), "repository must be an object")
-    commit = repo.get("commit")
-    tree = repo.get("tree")
-    require(isinstance(commit, str) and HEX40.fullmatch(commit) is not None,
-            "repository.commit must be lowercase 40-hex Git object id")
-    require(isinstance(tree, str) and HEX40.fullmatch(tree) is not None,
-            "repository.tree must be lowercase 40-hex Git object id")
-    require(isinstance(repo.get("branch"), str) and repo["branch"], "repository.branch missing")
-
-    inputs = receipt.get("inputs")
-    require(isinstance(inputs, dict), "inputs must be an object")
-    require(isinstance(inputs.get("before"), dict), "inputs.before must be an object")
-    require(isinstance(inputs.get("after"), dict), "inputs.after must be an object")
+    if status == "blocked-dirty-worktree":
+        require("toolchain" not in receipt and "tools" not in receipt and "environment" not in receipt,
+                "blocked dirty receipt must not contain unexecuted tool/environment claims")
+    else:
+        require(isinstance(receipt.get("toolchain"), dict), "toolchain missing")
+        require(isinstance(receipt.get("tools"), dict), "tools missing")
+        require(isinstance(receipt.get("environment"), dict), "environment missing")
 
 
 def verify_sidecar(receipt_path: Path, claimed_digest: str) -> None:
@@ -323,14 +429,19 @@ def verify_sidecar(receipt_path: Path, claimed_digest: str) -> None:
     if not sidecar.exists():
         return
     require(sidecar.is_file(), "receipt.sha256 exists but is not a file")
+    require(sidecar.stat().st_size <= 1024, "receipt.sha256 sidecar too large")
     text = sidecar.read_text().strip()
     require(text == claimed_digest, "receipt.sha256 sidecar does not match receipt")
 
 
 def git(repo: Path, *args: str) -> str:
     proc = subprocess.run(
-        ["git", *args], cwd=repo, text=True, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, check=False
+        ["git", *args],
+        cwd=repo,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
     )
     if proc.returncode != 0:
         raise VerificationError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
@@ -340,33 +451,39 @@ def git(repo: Path, *args: str) -> str:
 def hash_if_file(path: Path) -> str | None:
     if not path.is_file():
         return None
-    return sha256_file(path, MAX_LOG_BYTES)
+    return sha256_file(path, MAX_INPUT_BYTES)
 
 
 def verify_against_repo(receipt: dict[str, Any], repo: Path, require_current_subject: bool) -> None:
     require((repo / ".git").exists(), f"not a Git worktree: {repo}")
     recorded = receipt["repository"]
     if require_current_subject:
-        require(git(repo, "rev-parse", "HEAD") == recorded["commit"],
-                "receipt commit does not match current checkout")
-        require(git(repo, "rev-parse", "HEAD^{tree}") == recorded["tree"],
-                "receipt tree does not match current checkout")
+        require(
+            git(repo, "rev-parse", "HEAD") == recorded["commit"],
+            "receipt commit does not match current checkout",
+        )
+        require(
+            git(repo, "rev-parse", "HEAD^{tree}") == recorded["tree"],
+            "receipt tree does not match current checkout",
+        )
 
     after = receipt["inputs"]["after"]
     for relative, expected in after.items():
-        require(isinstance(relative, str) and relative and not Path(relative).is_absolute(),
-                f"invalid input path in receipt: {relative!r}")
-        require(".." not in Path(relative).parts, f"input path traversal: {relative}")
-        actual = hash_if_file(repo / relative)
+        path = safe_relative_path(repo, relative, "input")
+        actual = hash_if_file(path)
         require(actual == expected, f"current input hash mismatch: {relative}")
 
     toolchain = receipt.get("toolchain")
     if isinstance(toolchain, dict):
         expected = toolchain.get("expected_rust_channel")
-        text = (repo / "rust-toolchain.toml").read_text()
+        path = repo / "rust-toolchain.toml"
+        require(path.is_file(), "current rust-toolchain.toml is missing")
+        text = path.read_text()
         match = re.search(r'^\s*channel\s*=\s*"([^"]+)"\s*$', text, re.MULTILINE)
-        require(match is not None and match.group(1) == expected,
-                "current rust-toolchain channel differs from receipt")
+        require(
+            match is not None and match.group(1) == expected,
+            "current rust-toolchain channel differs from receipt",
+        )
 
 
 def verify(receipt_path: Path, capsule_root: Path, repo: Path | None,
@@ -391,9 +508,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("receipt", help="path to receipt.json")
     parser.add_argument(
         "--capsule-root",
-        help="root containing receipt/logs; defaults to the receipt's directory",
+        help="root containing receipt/logs; defaults to the receipt directory",
     )
-    parser.add_argument("--repo", help="optional Git worktree to verify input hashes against")
+    parser.add_argument("--repo", help="optional Git worktree to verify selected inputs against")
     parser.add_argument(
         "--require-current-subject",
         action="store_true",
