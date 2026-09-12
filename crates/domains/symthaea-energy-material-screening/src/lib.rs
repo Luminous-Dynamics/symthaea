@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeSet, HashSet};
 use symthaea_discovery::{
-    CandidateId, Constraint, DiscoveryError, Evaluation, EvidenceKind, Feasibility, FidelityLevel,
-    Objective, ObjectiveDirection, Prediction,
+    CandidateId, Constraint, ConstraintBound, DiscoveryError, Evaluation, EvidenceKind,
+    Feasibility, FidelityLevel, Objective, ObjectiveDirection, Prediction,
 };
 use thiserror::Error;
 
@@ -201,17 +201,27 @@ impl EnergyMaterialScreeningPolicy {
         Ok(())
     }
 
-    pub fn sha256(&self) -> Result<String, ScreeningError> {
-        self.validate()?;
+    fn canonical_contracts(&self) -> Vec<&MetricContract> {
         let mut contracts: Vec<&MetricContract> = self.contracts.iter().collect();
         contracts.sort_by_key(|contract| contract.dimension.code());
-        let mut constraints: Vec<&Constraint> = self.constraints.iter().collect();
+        contracts
+    }
+
+    fn canonical_constraints(&self) -> Vec<Constraint> {
+        let mut constraints = self.constraints.clone();
         constraints.sort_by(|left, right| {
             left.metric
                 .cmp(&right.metric)
                 .then_with(|| left.unit.cmp(&right.unit))
-                .then_with(|| format!("{:?}", left.bound).cmp(&format!("{:?}", right.bound)))
+                .then_with(|| constraint_bound_key(left.bound).cmp(&constraint_bound_key(right.bound)))
         });
+        constraints
+    }
+
+    pub fn sha256(&self) -> Result<String, ScreeningError> {
+        self.validate()?;
+        let contracts = self.canonical_contracts();
+        let constraints = self.canonical_constraints();
 
         let mut hasher = Sha256::new();
         hasher.update(POLICY_DIGEST_DOMAIN);
@@ -229,10 +239,10 @@ impl EnergyMaterialScreeningPolicy {
             }
             hasher.update([0xff]);
         }
-        for constraint in constraints {
+        for constraint in &constraints {
             update_text(&mut hasher, &constraint.metric);
             update_text(&mut hasher, &constraint.unit);
-            update_text(&mut hasher, &format!("{:?}", constraint.bound));
+            hash_constraint_bound(&mut hasher, constraint.bound);
         }
         Ok(hex_lower(&hasher.finalize()))
     }
@@ -308,8 +318,10 @@ impl EnergyMaterialEvidenceBundle {
             prediction.validate()?;
         }
 
-        let mut contracts: Vec<&MetricContract> = policy.contracts.iter().collect();
-        contracts.sort_by_key(|contract| contract.dimension.code());
+        let contracts = policy.canonical_contracts();
+        let canonical_objectives: Vec<Objective> =
+            contracts.iter().map(|contract| contract.objective()).collect();
+        let canonical_constraints = policy.canonical_constraints();
         let mut dimensions = Vec::with_capacity(contracts.len());
         let mut selected_predictions = Vec::with_capacity(contracts.len());
 
@@ -327,8 +339,8 @@ impl EnergyMaterialEvidenceBundle {
         let evaluation = if complete {
             let evaluation = Evaluation {
                 candidate_id: self.candidate_id.clone(),
-                objectives: policy.contracts.iter().map(MetricContract::objective).collect(),
-                constraints: policy.constraints.clone(),
+                objectives: canonical_objectives,
+                constraints: canonical_constraints,
                 predictions: selected_predictions,
                 pareto_rank: None,
             };
@@ -506,6 +518,32 @@ fn evidence_kind_code(kind: EvidenceKind) -> u8 {
     }
 }
 
+fn constraint_bound_key(bound: ConstraintBound) -> (u8, u64, u64) {
+    match bound {
+        ConstraintBound::AtLeast(value) => (0, value.to_bits(), 0),
+        ConstraintBound::AtMost(value) => (1, value.to_bits(), 0),
+        ConstraintBound::Between { min, max } => (2, min.to_bits(), max.to_bits()),
+    }
+}
+
+fn hash_constraint_bound(hasher: &mut Sha256, bound: ConstraintBound) {
+    match bound {
+        ConstraintBound::AtLeast(value) => {
+            hasher.update([0]);
+            hasher.update(value.to_bits().to_le_bytes());
+        }
+        ConstraintBound::AtMost(value) => {
+            hasher.update([1]);
+            hasher.update(value.to_bits().to_le_bytes());
+        }
+        ConstraintBound::Between { min, max } => {
+            hasher.update([2]);
+            hasher.update(min.to_bits().to_le_bytes());
+            hasher.update(max.to_bits().to_le_bytes());
+        }
+    }
+}
+
 fn hash_direction(hasher: &mut Sha256, direction: ObjectiveDirection) {
     match direction {
         ObjectiveDirection::Maximize => hasher.update([0]),
@@ -536,9 +574,7 @@ fn hex_lower(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_discovery::{
-        ConstraintBound, EvidenceRef, ModelProvenance, UncertaintyEstimate,
-    };
+    use symthaea_discovery::{EvidenceRef, ModelProvenance, UncertaintyEstimate};
 
     fn contract(
         dimension: EvidenceDimension,
@@ -745,10 +781,44 @@ mod tests {
     }
 
     #[test]
-    fn policy_digest_is_order_independent_for_dimension_contracts() {
+    fn policy_and_evaluation_are_order_independent() {
         let first = policy();
         let mut second = first.clone();
         second.contracts.reverse();
+        second.constraints.reverse();
+
         assert_eq!(first.sha256().unwrap(), second.sha256().unwrap());
+
+        let first_assessment = complete_bundle().assess(&first).unwrap();
+        let second_assessment = complete_bundle().assess(&second).unwrap();
+        assert_eq!(first_assessment.dimensions, second_assessment.dimensions);
+        assert_eq!(
+            first_assessment.evaluation.unwrap().objectives,
+            second_assessment.evaluation.unwrap().objectives
+        );
+    }
+
+    #[test]
+    fn constraint_bound_identity_is_typed_not_debug_formatted() {
+        let mut first = policy();
+        first.constraints = vec![
+            Constraint {
+                metric: "stability".into(),
+                unit: "eV/atom".into(),
+                bound: ConstraintBound::AtMost(0.2),
+            },
+            Constraint {
+                metric: "functional".into(),
+                unit: "score".into(),
+                bound: ConstraintBound::AtLeast(0.5),
+            },
+        ];
+        let mut second = first.clone();
+        second.constraints.reverse();
+        assert_eq!(first.sha256().unwrap(), second.sha256().unwrap());
+
+        let mut changed = first.clone();
+        changed.constraints[0].bound = ConstraintBound::AtMost(0.21);
+        assert_ne!(first.sha256().unwrap(), changed.sha256().unwrap());
     }
 }
