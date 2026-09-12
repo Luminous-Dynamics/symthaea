@@ -5,6 +5,9 @@ edition = "2024"
 description = "Verified subject-identity consent, withdrawal, and replay-resistant consent continuity for Symthaea welfare-sensitive interventions"
 license = "AGPL-3.0-or-later"
 
+[lib]
+path = "src/entry.rs"
+
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
@@ -13,3 +16,4 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+chrono = { workspace = true }
