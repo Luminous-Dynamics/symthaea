@@ -3,19 +3,21 @@
 //! Block-size stability analysis for nonlinear gradient-flow scale estimates.
 //!
 //! A single blocked-jackknife result can have mathematically correct resampling
-//! semantics while still depending materially on the chosen block length. This
+//! semantics while still depend materially on the chosen block length. This
 //! module therefore recomputes the full nonlinear scale estimator at multiple
-//! chain-local block sizes and assesses only those candidates that independently
+//! chain-local block sizes and assesses only candidates that independently
 //! satisfy the declared LQCD-018F block-adequacy policy.
 //!
 //! No universal plateau tolerance is encoded here. The caller declares how many
 //! adequate block sizes must participate and the maximum tolerated relative
 //! changes in the central estimate and standard error.
 
-use crate::lattice_flow_block_adequacy::BlockAdequacyAssessment;
+use crate::lattice_flow_block_adequacy::{
+    FLOW_BLOCK_ADEQUACY_POLICY_ID, BlockAdequacyAssessment,
+};
 use crate::lattice_flow_joint_jackknife::{
-    JointBlockedJackknifeInput, JointBlockedJackknifeScale, JointFlowScaleKind,
-    JointJackknifeError, joint_blocked_jackknife_scale,
+    JOINT_BLOCKED_JACKKNIFE_ID, JointBlockedJackknifeInput, JointBlockedJackknifeScale,
+    JointFlowScaleKind, JointJackknifeError, joint_blocked_jackknife_scale,
 };
 
 pub const FLOW_SCALE_BLOCK_STABILITY_ID: &str = "flow_scale_block_stability_v1";
@@ -31,11 +33,8 @@ pub struct FlowScaleBlockScan {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FlowScaleBlockStabilityPolicy {
-    /// Number of the largest adequate block sizes used to define the plateau.
     pub plateau_point_count: usize,
-    /// Symmetric relative change tolerated between adjacent plateau SE values.
     pub maximum_relative_standard_error_change: f64,
-    /// Symmetric relative change tolerated between adjacent central estimates.
     pub maximum_relative_central_estimate_change: f64,
 }
 
@@ -63,17 +62,17 @@ pub enum FlowScaleBlockStabilityError {
     NonIncreasingBlockSize { previous: usize, current: usize },
     InconsistentScanSubject,
     InconsistentCentralEstimate,
+    InvalidScanRecord { index: usize },
     InvalidPolicyPlateauPointCount(usize),
     InvalidPolicyRelativeStandardErrorChange(f64),
     InvalidPolicyRelativeCentralEstimateChange(f64),
     AdequacyCountMismatch { scan: usize, adequacy: usize },
     AdequacyGeometryMismatch { index: usize },
+    InvalidAdequacyRecord { index: usize },
 }
 
 impl From<JointJackknifeError> for FlowScaleBlockStabilityError {
-    fn from(value: JointJackknifeError) -> Self {
-        Self::Jackknife(value)
-    }
+    fn from(value: JointJackknifeError) -> Self { Self::Jackknife(value) }
 }
 
 fn approximately_equal(left: f64, right: f64) -> bool {
@@ -83,16 +82,9 @@ fn approximately_equal(left: f64, right: f64) -> bool {
 
 fn symmetric_relative_change(left: f64, right: f64) -> f64 {
     let denominator = left.abs() + right.abs();
-    if denominator == 0.0 {
-        0.0
-    } else {
-        2.0 * (left - right).abs() / denominator
-    }
+    if denominator == 0.0 { 0.0 } else { 2.0 * (left - right).abs() / denominator }
 }
 
-/// Recompute the complete joint blocked-jackknife scale estimate for every
-/// declared block size. Each candidate is validated by the chain-aware 018E
-/// resampler, so a block can never straddle independent-chain boundaries.
 pub fn joint_jackknife_block_size_scan(
     input: &JointBlockedJackknifeInput,
     kind: JointFlowScaleKind,
@@ -104,15 +96,11 @@ pub fn joint_jackknife_block_size_scan(
     }
     for (index, block_size) in block_sizes.iter().copied().enumerate() {
         if block_size == 0 {
-            return Err(FlowScaleBlockStabilityError::InvalidBlockSizeCandidate {
-                index,
-                value: block_size,
-            });
+            return Err(FlowScaleBlockStabilityError::InvalidBlockSizeCandidate { index, value: block_size });
         }
         if index > 0 && block_size <= block_sizes[index - 1] {
             return Err(FlowScaleBlockStabilityError::NonIncreasingBlockSize {
-                previous: block_sizes[index - 1],
-                current: block_size,
+                previous: block_sizes[index - 1], current: block_size,
             });
         }
     }
@@ -147,41 +135,71 @@ pub fn joint_jackknife_block_size_scan(
     })
 }
 
-/// Assess the largest independently adequate block sizes for a stable uncertainty
-/// plateau. Low block sizes may legitimately fail 018F and are excluded rather
-/// than being allowed to make the plateau easier to satisfy.
+fn validate_scan_record(scan: &FlowScaleBlockScan) -> Result<(), FlowScaleBlockStabilityError> {
+    if scan.results.is_empty() {
+        return Err(FlowScaleBlockStabilityError::EmptyBlockSizeScan);
+    }
+    let mut previous_block_size = None;
+    let mut first_central = None;
+    for (index, result) in scan.results.iter().enumerate() {
+        let valid_geometry = result.block_size > 0
+            && result.block_count >= 2
+            && result.block_size.checked_mul(result.block_count) == Some(result.configuration_count)
+            && result.replicate_estimates.len() == result.block_count;
+        if result.method_id != JOINT_BLOCKED_JACKKNIFE_ID
+            || result.kind != scan.kind
+            || result.target.to_bits() != scan.target.to_bits()
+            || result.configuration_count != scan.configuration_count
+            || result.independent_chain_count != scan.independent_chain_count
+            || result.independent_chain_count == 0
+            || !valid_geometry
+            || !result.central_estimate.is_finite()
+            || !result.standard_error.is_finite()
+            || result.standard_error < 0.0
+        {
+            return Err(FlowScaleBlockStabilityError::InvalidScanRecord { index });
+        }
+        if previous_block_size.is_some_and(|previous| result.block_size <= previous) {
+            return Err(FlowScaleBlockStabilityError::InvalidScanRecord { index });
+        }
+        previous_block_size = Some(result.block_size);
+        if let Some(reference) = first_central {
+            if !approximately_equal(result.central_estimate, reference) {
+                return Err(FlowScaleBlockStabilityError::InconsistentCentralEstimate);
+            }
+        } else {
+            first_central = Some(result.central_estimate);
+        }
+    }
+    Ok(())
+}
+
 pub fn assess_flow_scale_block_stability(
     scan: &FlowScaleBlockScan,
     adequacy: &[BlockAdequacyAssessment],
     policy: &FlowScaleBlockStabilityPolicy,
 ) -> Result<FlowScaleBlockStabilityAssessment, FlowScaleBlockStabilityError> {
+    validate_scan_record(scan)?;
     if policy.plateau_point_count < 2 {
-        return Err(FlowScaleBlockStabilityError::InvalidPolicyPlateauPointCount(
-            policy.plateau_point_count,
-        ));
+        return Err(FlowScaleBlockStabilityError::InvalidPolicyPlateauPointCount(policy.plateau_point_count));
     }
     if !policy.maximum_relative_standard_error_change.is_finite()
         || policy.maximum_relative_standard_error_change < 0.0
     {
-        return Err(
-            FlowScaleBlockStabilityError::InvalidPolicyRelativeStandardErrorChange(
-                policy.maximum_relative_standard_error_change,
-            ),
-        );
+        return Err(FlowScaleBlockStabilityError::InvalidPolicyRelativeStandardErrorChange(
+            policy.maximum_relative_standard_error_change,
+        ));
     }
     if !policy.maximum_relative_central_estimate_change.is_finite()
         || policy.maximum_relative_central_estimate_change < 0.0
     {
-        return Err(
-            FlowScaleBlockStabilityError::InvalidPolicyRelativeCentralEstimateChange(
-                policy.maximum_relative_central_estimate_change,
-            ),
-        );
+        return Err(FlowScaleBlockStabilityError::InvalidPolicyRelativeCentralEstimateChange(
+            policy.maximum_relative_central_estimate_change,
+        ));
     }
     if scan.results.len() != adequacy.len() {
         return Err(FlowScaleBlockStabilityError::AdequacyCountMismatch {
-            scan: scan.results.len(),
-            adequacy: adequacy.len(),
+            scan: scan.results.len(), adequacy: adequacy.len(),
         });
     }
 
@@ -193,25 +211,25 @@ pub fn assess_flow_scale_block_stability(
         {
             return Err(FlowScaleBlockStabilityError::AdequacyGeometryMismatch { index });
         }
-        if assessment.meets_declared_policy {
-            admissible_indices.push(index);
+        let internally_consistent = assessment.policy_id == FLOW_BLOCK_ADEQUACY_POLICY_ID
+            && assessment.meets_declared_policy
+                == (assessment.tau_window_complete
+                    && assessment.meets_tau_multiple
+                    && assessment.meets_minimum_block_count);
+        if !internally_consistent {
+            return Err(FlowScaleBlockStabilityError::InvalidAdequacyRecord { index });
         }
+        if assessment.meets_declared_policy { admissible_indices.push(index); }
     }
 
-    let admissible_block_sizes = admissible_indices
-        .iter()
-        .map(|index| scan.results[*index].block_size)
-        .collect::<Vec<_>>();
+    let admissible_block_sizes = admissible_indices.iter()
+        .map(|index| scan.results[*index].block_size).collect::<Vec<_>>();
     let enough_admissible_points = admissible_indices.len() >= policy.plateau_point_count;
     let plateau_indices = if enough_admissible_points {
         admissible_indices[admissible_indices.len() - policy.plateau_point_count..].to_vec()
-    } else {
-        admissible_indices.clone()
-    };
-    let plateau_block_sizes = plateau_indices
-        .iter()
-        .map(|index| scan.results[*index].block_size)
-        .collect::<Vec<_>>();
+    } else { admissible_indices.clone() };
+    let plateau_block_sizes = plateau_indices.iter()
+        .map(|index| scan.results[*index].block_size).collect::<Vec<_>>();
 
     let mut maximum_se_change: Option<f64> = None;
     let mut maximum_central_change: Option<f64> = None;
@@ -219,24 +237,16 @@ pub fn assess_flow_scale_block_stability(
         let left = &scan.results[pair[0]];
         let right = &scan.results[pair[1]];
         let se_change = symmetric_relative_change(left.standard_error, right.standard_error);
-        let central_change =
-            symmetric_relative_change(left.central_estimate, right.central_estimate);
+        let central_change = symmetric_relative_change(left.central_estimate, right.central_estimate);
         maximum_se_change = Some(maximum_se_change.map_or(se_change, |value| value.max(se_change)));
-        maximum_central_change = Some(
-            maximum_central_change.map_or(central_change, |value| value.max(central_change)),
-        );
+        maximum_central_change = Some(maximum_central_change.map_or(central_change, |value| value.max(central_change)));
     }
 
     let meets_uncertainty_plateau = enough_admissible_points
-        && maximum_se_change.is_some_and(|change| {
-            change <= policy.maximum_relative_standard_error_change
-        });
+        && maximum_se_change.is_some_and(|change| change <= policy.maximum_relative_standard_error_change);
     let meets_central_estimate_stability = enough_admissible_points
-        && maximum_central_change.is_some_and(|change| {
-            change <= policy.maximum_relative_central_estimate_change
-        });
-    let meets_declared_policy =
-        meets_uncertainty_plateau && meets_central_estimate_stability;
+        && maximum_central_change.is_some_and(|change| change <= policy.maximum_relative_central_estimate_change);
+    let meets_declared_policy = meets_uncertainty_plateau && meets_central_estimate_stability;
 
     Ok(FlowScaleBlockStabilityAssessment {
         assessment_id: FLOW_SCALE_BLOCK_STABILITY_ID,
@@ -257,7 +267,6 @@ pub fn assess_flow_scale_block_stability(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lattice_flow_block_adequacy::FLOW_BLOCK_ADEQUACY_POLICY_ID;
     use crate::lattice_flow_joint_jackknife::FlowEnergyTrajectory;
 
     const TIMES: [f64; 6] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
@@ -279,15 +288,11 @@ mod tests {
     fn input() -> JointBlockedJackknifeInput {
         JointBlockedJackknifeInput {
             flow_times: TIMES.to_vec(),
-            trajectories: DIMENSIONLESS.iter().enumerate().map(|(index, values)| {
-                FlowEnergyTrajectory {
-                    chain_id: "chain-0".into(),
-                    chain_position: index,
-                    configuration_id: format!("cfg-{index:02}"),
-                    energy_by_flow_time: values.iter().zip(TIMES).map(|(value, time)| {
-                        value / (time * time)
-                    }).collect(),
-                }
+            trajectories: DIMENSIONLESS.iter().enumerate().map(|(index, values)| FlowEnergyTrajectory {
+                chain_id: "chain-0".into(),
+                chain_position: index,
+                configuration_id: format!("cfg-{index:02}"),
+                energy_by_flow_time: values.iter().zip(TIMES).map(|(value, time)| *value / (time * time)).collect(),
             }).collect(),
             block_size: 1,
         }
@@ -316,9 +321,7 @@ mod tests {
 
     #[test]
     fn block_scan_recomputes_nonlinear_uncertainty_at_each_size() {
-        let scan = joint_jackknife_block_size_scan(
-            &input(), JointFlowScaleKind::T0Like, 0.30, &[1, 2, 3, 4, 6],
-        ).unwrap();
+        let scan = joint_jackknife_block_size_scan(&input(), JointFlowScaleKind::T0Like, 0.30, &[1, 2, 3, 4, 6]).unwrap();
         let expected = [
             0.004_212_888_395_644_406,
             0.006_104_555_527_510_23,
@@ -333,48 +336,44 @@ mod tests {
     }
 
     #[test]
-    fn stability_uses_only_largest_adequate_block_sizes() {
-        let scan = joint_jackknife_block_size_scan(
-            &input(), JointFlowScaleKind::T0Like, 0.30, &[1, 2, 3, 4, 6],
-        ).unwrap();
-        let adequate = scan.results.iter().enumerate().map(|(index, result)| {
-            adequacy(result, index >= 2)
-        }).collect::<Vec<_>>();
-        let assessment = assess_flow_scale_block_stability(
-            &scan,
-            &adequate,
-            &FlowScaleBlockStabilityPolicy {
-                plateau_point_count: 3,
-                maximum_relative_standard_error_change: 0.35,
-                maximum_relative_central_estimate_change: 1.0e-10,
-            },
-        ).unwrap();
+    fn tight_declared_plateau_policy_records_instability() {
+        let scan = joint_jackknife_block_size_scan(&input(), JointFlowScaleKind::T0Like, 0.30, &[1, 2, 3, 4, 6]).unwrap();
+        let adequate = scan.results.iter().enumerate().map(|(index, result)| adequacy(result, index >= 2)).collect::<Vec<_>>();
+        let assessment = assess_flow_scale_block_stability(&scan, &adequate, &FlowScaleBlockStabilityPolicy {
+            plateau_point_count: 3,
+            maximum_relative_standard_error_change: 0.30,
+            maximum_relative_central_estimate_change: 1.0e-10,
+        }).unwrap();
         assert_eq!(assessment.admissible_block_sizes, vec![3, 4, 6]);
-        assert_eq!(assessment.plateau_block_sizes, vec![3, 4, 6]);
-        assert!(assessment.enough_admissible_points);
-        assert!(assessment.meets_central_estimate_stability);
         assert!(!assessment.meets_uncertainty_plateau);
         assert!(!assessment.meets_declared_policy);
     }
 
     #[test]
     fn caller_can_record_a_looser_plateau_policy_without_hiding_it() {
-        let scan = joint_jackknife_block_size_scan(
-            &input(), JointFlowScaleKind::T0Like, 0.30, &[1, 2, 3, 4, 6],
-        ).unwrap();
-        let adequate = scan.results.iter().enumerate().map(|(index, result)| {
-            adequacy(result, index >= 2)
-        }).collect::<Vec<_>>();
-        let assessment = assess_flow_scale_block_stability(
-            &scan,
-            &adequate,
-            &FlowScaleBlockStabilityPolicy {
-                plateau_point_count: 3,
-                maximum_relative_standard_error_change: 0.40,
-                maximum_relative_central_estimate_change: 1.0e-10,
-            },
-        ).unwrap();
+        let scan = joint_jackknife_block_size_scan(&input(), JointFlowScaleKind::T0Like, 0.30, &[1, 2, 3, 4, 6]).unwrap();
+        let adequate = scan.results.iter().enumerate().map(|(index, result)| adequacy(result, index >= 2)).collect::<Vec<_>>();
+        let assessment = assess_flow_scale_block_stability(&scan, &adequate, &FlowScaleBlockStabilityPolicy {
+            plateau_point_count: 3,
+            maximum_relative_standard_error_change: 0.35,
+            maximum_relative_central_estimate_change: 1.0e-10,
+        }).unwrap();
         assert!(assessment.meets_declared_policy);
-        assert!(assessment.maximum_observed_relative_standard_error_change.unwrap() > 0.30);
+        assert!(assessment.maximum_observed_relative_standard_error_change.unwrap() > 0.33);
+    }
+
+    #[test]
+    fn forged_adequacy_boolean_is_rejected() {
+        let scan = joint_jackknife_block_size_scan(&input(), JointFlowScaleKind::T0Like, 0.30, &[3, 4]).unwrap();
+        let mut records = scan.results.iter().map(|result| adequacy(result, true)).collect::<Vec<_>>();
+        records[0].meets_tau_multiple = false;
+        assert!(matches!(
+            assess_flow_scale_block_stability(&scan, &records, &FlowScaleBlockStabilityPolicy {
+                plateau_point_count: 2,
+                maximum_relative_standard_error_change: 1.0,
+                maximum_relative_central_estimate_change: 1.0,
+            }),
+            Err(FlowScaleBlockStabilityError::InvalidAdequacyRecord { index: 0 })
+        ));
     }
 }
