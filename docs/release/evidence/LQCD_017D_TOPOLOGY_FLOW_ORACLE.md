@@ -6,9 +6,9 @@
 
 SHA-256 of the executed subject before check-in:
 
-`9233b58aa359061823606d1891fe63b7f2c525ebbbd091f2338c3d9ed6f03f02`
+`79100d5ac1c497fe80345ff95cc985143f6a5597d534b4c9e1be975e007c3fa9`
 
-The subject is Python-standard-library only and imports no Symthaea or Rust implementation code.
+The subject is Python-standard-library only and imports no Symthaea or Rust implementation code. The nontrivial gauge-field fixture is now frozen as **40 explicit `(site, direction, Gell-Mann generator, angle)` rotations**, so the production Rust tests can reproduce the exact field without reimplementing Python RNG behavior.
 
 ## Scope
 
@@ -27,7 +27,7 @@ The finite-difference flow is a semantic reference, not the intended production-
 
 ## Executed result
 
-The exact subject executed successfully:
+The exact explicit-fixture subject executed successfully:
 
 ```text
 ok
@@ -44,7 +44,7 @@ flowed_max_unitarity_error=8.8817841970012523e-16
 ## Invariants established by this oracle
 
 1. Identity gauge field has exactly zero clover topological charge within the frozen tolerance.
-2. The nontrivial deterministic fixture has a nonzero clover charge, preventing a trivial always-zero implementation from passing.
+2. The explicit nontrivial fixture has a nonzero clover charge, preventing a trivial always-zero implementation from passing.
 3. The Wilson action and clover charge are invariant under a deterministic non-Abelian local gauge transformation.
 4. One finite-difference Wilson-action gradient-flow step lowers the Wilson action on the frozen fixture.
 5. Flow commutes with the same gauge transformation to the declared numerical tolerance.
