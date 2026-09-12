@@ -49,10 +49,13 @@ pub enum DomainAwarenessObligation {
     EvidenceDependenciesAreAcyclicAndNonCircular,
     VerifierCommonCauseDiversityRequired,
     CompositeObligationsRequireAtomicCoverage,
+    CurrentPolicyMustBeSignedLineageTip,
+    ManifestSigningAuthorityIsExternallyGoverned,
+    PolicyLineageRequiresExternalRollbackAnchor,
 }
 
 impl DomainAwarenessObligation {
-    pub const ALL: [Self; 30] = [
+    pub const ALL: [Self; 33] = [
         Self::ObservationIsNotIdentityIntentOrAuthority,
         Self::IdentityIsNotIntentOrAuthority,
         Self::UncertaintyStatesRemainRepresentable,
@@ -83,6 +86,9 @@ impl DomainAwarenessObligation {
         Self::EvidenceDependenciesAreAcyclicAndNonCircular,
         Self::VerifierCommonCauseDiversityRequired,
         Self::CompositeObligationsRequireAtomicCoverage,
+        Self::CurrentPolicyMustBeSignedLineageTip,
+        Self::ManifestSigningAuthorityIsExternallyGoverned,
+        Self::PolicyLineageRequiresExternalRollbackAnchor,
     ];
 
     /// Stable human-review code. Existing codes must not be renumbered.
@@ -118,6 +124,9 @@ impl DomainAwarenessObligation {
             Self::EvidenceDependenciesAreAcyclicAndNonCircular => "DA-028",
             Self::VerifierCommonCauseDiversityRequired => "DA-029",
             Self::CompositeObligationsRequireAtomicCoverage => "DA-030",
+            Self::CurrentPolicyMustBeSignedLineageTip => "DA-031",
+            Self::ManifestSigningAuthorityIsExternallyGoverned => "DA-032",
+            Self::PolicyLineageRequiresExternalRollbackAnchor => "DA-033",
         }
     }
 
@@ -213,6 +222,15 @@ impl DomainAwarenessObligation {
             Self::CompositeObligationsRequireAtomicCoverage => {
                 "when a reviewed safety obligation is decomposed into atomic evidence facets, parent receipts do not implicitly satisfy those facets and every required facet has explicit qualifying evidence coverage"
             }
+            Self::CurrentPolicyMustBeSignedLineageTip => {
+                "deployment readiness requires the current assurance-policy manifest to be present as the exact signed tip of a valid contiguous policy lineage; rollback, truncation, manifest substitution, or signature-record splicing cannot preserve readiness"
+            }
+            Self::ManifestSigningAuthorityIsExternallyGoverned => {
+                "assurance-policy manifest signer and key authority is governed by an independent provisioned trust root with explicit reviewed transitions; a manifest cannot self-authorize signer or key replacement"
+            }
+            Self::PolicyLineageRequiresExternalRollbackAnchor => {
+                "deployment readiness requires the signed assurance-policy lineage tip to match an externally provisioned monotonic checkpoint; truncated history, old-anchor substitution, or an uncheckpointed forward revision cannot remain ready"
+            }
         }
     }
 
@@ -244,7 +262,10 @@ impl DomainAwarenessObligation {
             | Self::TrustedTimeGatesReadiness
             | Self::EvidenceDependenciesAreAcyclicAndNonCircular
             | Self::VerifierCommonCauseDiversityRequired
-            | Self::CompositeObligationsRequireAtomicCoverage => EvidenceKind::Test,
+            | Self::CompositeObligationsRequireAtomicCoverage
+            | Self::CurrentPolicyMustBeSignedLineageTip
+            | Self::ManifestSigningAuthorityIsExternallyGoverned
+            | Self::PolicyLineageRequiresExternalRollbackAnchor => EvidenceKind::Test,
             Self::TimeCalibrationAndLineageRemainAuditable
             | Self::ContradictionsAndAbstentionsRemainAuditable => EvidenceKind::Telemetry,
             Self::RecoveryProcedureIsReviewed => EvidenceKind::Standard,
@@ -300,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn authority_boundary_rf_silence_and_lifecycle_guards_are_typed() {
+    fn authority_boundary_rf_silence_and_governance_guards_are_typed() {
         assert_eq!(
             DomainAwarenessObligation::IndependentFailClosedAuthorityBoundary.code(),
             "DA-015"
@@ -350,11 +371,24 @@ mod tests {
             "DA-030"
         );
         assert_eq!(
+            DomainAwarenessObligation::CurrentPolicyMustBeSignedLineageTip.code(),
+            "DA-031"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::ManifestSigningAuthorityIsExternallyGoverned.code(),
+            "DA-032"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::PolicyLineageRequiresExternalRollbackAnchor.code(),
+            "DA-033"
+        );
+        assert_eq!(
             DomainAwarenessObligation::PassiveRfSilenceIsNotSafety.expected_evidence(),
             EvidenceKind::FormalProof
         );
         assert_eq!(
-            DomainAwarenessObligation::CompositeObligationsRequireAtomicCoverage.expected_evidence(),
+            DomainAwarenessObligation::PolicyLineageRequiresExternalRollbackAnchor
+                .expected_evidence(),
             EvidenceKind::Test
         );
     }
