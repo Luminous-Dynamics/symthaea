@@ -32,10 +32,6 @@ use crate::quarantine_state_ledger::{
 const MAX_REF_BYTES: usize = 2048;
 const MAX_TARGET_BYTES: usize = 256;
 
-/// One canonical persisted active-record projection available at restart.
-///
-/// `record_ref` is an opaque durable locator, not authority. `content_id` must be recomputed from
-/// the persisted episode envelope before constructing this descriptor.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PersistedOccurrenceDescriptor {
     pub instance_id: EpisodeInstanceId,
@@ -59,7 +55,6 @@ impl PersistedOccurrenceDescriptor {
     }
 }
 
-/// Exact reversible escrow evidence available at restart.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PersistedQuarantineEscrowDescriptor {
     pub instance_id: EpisodeInstanceId,
@@ -93,17 +88,12 @@ impl PersistedQuarantineEscrowDescriptor {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InactiveRestartReason {
-    /// A durable write-ahead quarantine intent exists but final state may not yet be committed.
     PendingQuarantineIntent,
-    /// The quarantine lifecycle ledger independently requires this UUID to remain inactive.
     Quarantined,
-    /// Both the write-ahead intent and lifecycle ledger require inactivity.
     PendingIntentAndQuarantined,
-    /// A restore was prepared but never durably completed; quarantine remains authoritative.
     RestorePendingReconciliation,
 }
 
-/// An exact occurrence that may be inserted into the active replay heap.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlannedActiveOccurrence {
     pub instance_id: EpisodeInstanceId,
@@ -111,22 +101,15 @@ pub struct PlannedActiveOccurrence {
     pub record_ref: String,
 }
 
-/// An exact occurrence that must remain outside replay/retrieval/training after restart.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlannedInactiveOccurrence {
     pub instance_id: EpisodeInstanceId,
     pub content_id: EpisodeContentId,
     pub escrow_persistence_ref: String,
     pub reason: InactiveRestartReason,
-    /// True when an operator/reconciler must resolve an incomplete transition rather than treating
-    /// the state as an ordinary stable quarantine.
     pub reconciliation_required: bool,
 }
 
-/// Historical escrow with no current quarantine or pending intent.
-///
-/// Escrow is durable audit/recovery evidence and may legitimately outlive a completed restore. It
-/// must not, by itself, reactivate or re-quarantine an occurrence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HistoricalEscrowOccurrence {
     pub instance_id: EpisodeInstanceId,
@@ -149,11 +132,6 @@ impl EpisodicRestartActivationPlan {
     }
 }
 
-/// Build a deterministic fail-closed activation plan.
-///
-/// The supplied ledgers are assumed to have already passed their own `recover_anchored(...)`
-/// checks. This function cross-validates their *semantic agreement* with persisted occurrence and
-/// escrow material before any UUID may become active.
 pub fn build_episodic_restart_activation_plan(
     store_target_id: &str,
     persisted_occurrences: &[PersistedOccurrenceDescriptor],
@@ -264,8 +242,6 @@ pub fn build_episodic_restart_activation_plan(
             (Some(_), None, pending, quarantined)
                 if pending.is_some() || quarantined.is_some() =>
             {
-                // An unresolved lifecycle restriction without its reversible escrow is not safe to
-                // activate and not sufficiently complete to reconstruct quarantine state.
                 return Err(RestartActivationError::MissingRequiredEscrow(instance_id));
             }
             (None, None, pending, quarantined)
@@ -274,17 +250,6 @@ pub fn build_episodic_restart_activation_plan(
                 return Err(RestartActivationError::MissingOccurrenceAndEscrow(instance_id));
             }
             (None, None, None, None) => unreachable!("ID came from union"),
-            (Some(_), Some(escrow), None, None) => {
-                // A historical escrow can coexist with a currently active restored record. The
-                // current lifecycle ledgers, not escrow existence alone, decide activation.
-                let record = record.expect("matched Some above");
-                active.push(PlannedActiveOccurrence {
-                    instance_id,
-                    content_id: record.content_id,
-                    record_ref: record.record_ref.clone(),
-                });
-                let _ = escrow;
-            }
         }
     }
 
