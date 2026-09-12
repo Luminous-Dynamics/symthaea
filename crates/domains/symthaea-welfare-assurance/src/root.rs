@@ -27,5 +27,6 @@ pub mod quarantine_intent_ledger;
 pub mod quarantine_intent_persistence;
 pub mod quarantine_ledger_persistence;
 pub mod quarantine_state_ledger;
+pub mod restart_activation_gate;
 #[path = "replay_recovery_v2.rs"]
 pub mod replay_recovery;
