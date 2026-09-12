@@ -4,14 +4,14 @@
 //!
 //! Existing adapter receipts can be wrapped without rewriting their payload
 //! schema. The outer receipt cryptographically commits to the exact candidate
-//! version, frozen campaign, evidence lane, dimension, payload type, and payload
-//! bytes. This does not prove the adapter obeyed the lane's method parameters,
-//! but it makes the new receipt's claimed lineage immutable and machine-checkable.
+//! version, frozen campaign, evidence lane, dimension, payload type, and exact
+//! UTF-8 JSON receipt text. This does not prove the adapter obeyed the lane's
+//! method parameters, but it makes the new receipt's claimed lineage immutable
+//! and machine-checkable.
 
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use symthaea_discovery::{CandidateId, EvidenceKind};
 use symthaea_energy_material_campaign::{EvidenceLanePlan, Tier1CampaignManifest};
@@ -47,14 +47,16 @@ impl NativeCampaignBinding {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnergyEvidenceEnvelope {
     pub schema: String,
     pub capability_classification: String,
     pub binding: NativeCampaignBinding,
     pub payload_type: String,
+    /// Exact UTF-8 JSON receipt text. Whitespace and key order are intentionally
+    /// evidence-bearing in this native outer envelope.
+    pub payload_json: String,
     pub payload_sha256: String,
-    pub payload: Value,
 }
 
 impl EnergyEvidenceEnvelope {
@@ -72,13 +74,19 @@ impl EnergyEvidenceEnvelope {
                 "payload_type cannot be empty".into(),
             ));
         }
-        if self.payload.is_null() {
+        if self.payload_json.is_empty() {
+            return Err(EnvelopeError::InvalidEnvelope(
+                "payload JSON cannot be empty".into(),
+            ));
+        }
+        let parsed: serde_json::Value = serde_json::from_str(&self.payload_json)?;
+        if parsed.is_null() {
             return Err(EnvelopeError::InvalidEnvelope(
                 "payload cannot be JSON null".into(),
             ));
         }
         validate_sha256(&self.payload_sha256, "payload SHA-256")?;
-        let expected = payload_sha256(&self.payload)?;
+        let expected = payload_sha256(self.payload_json.as_bytes());
         if self.payload_sha256 != expected {
             return Err(EnvelopeError::PayloadDigestMismatch {
                 expected,
@@ -86,6 +94,11 @@ impl EnergyEvidenceEnvelope {
             });
         }
         Ok(())
+    }
+
+    pub fn payload_value(&self) -> Result<serde_json::Value, EnvelopeError> {
+        self.validate()?;
+        serde_json::from_str(&self.payload_json).map_err(EnvelopeError::Json)
     }
 
     pub fn validate_with_manifest(
@@ -112,33 +125,40 @@ impl EnergyEvidenceEnvelope {
     }
 }
 
-pub fn wrap_evidence_payload(
+pub fn wrap_evidence_payload_json(
     manifest: &Tier1CampaignManifest,
     dimension: EvidenceDimension,
     payload_type: impl Into<String>,
-    payload: Value,
+    payload_json: impl Into<String>,
 ) -> Result<EnergyEvidenceEnvelope, EnvelopeError> {
     manifest.validate()?;
-    if payload.is_null() {
-        return Err(EnvelopeError::InvalidEnvelope(
-            "payload cannot be JSON null".into(),
-        ));
-    }
     let payload_type = payload_type.into();
     if payload_type.trim().is_empty() {
         return Err(EnvelopeError::InvalidEnvelope(
             "payload_type cannot be empty".into(),
         ));
     }
+    let payload_json = payload_json.into();
+    if payload_json.is_empty() {
+        return Err(EnvelopeError::InvalidEnvelope(
+            "payload JSON cannot be empty".into(),
+        ));
+    }
+    let parsed: serde_json::Value = serde_json::from_str(&payload_json)?;
+    if parsed.is_null() {
+        return Err(EnvelopeError::InvalidEnvelope(
+            "payload cannot be JSON null".into(),
+        ));
+    }
     let binding = binding_from_manifest(manifest, dimension)?;
-    let payload_sha256 = payload_sha256(&payload)?;
+    let payload_sha256 = payload_sha256(payload_json.as_bytes());
     let envelope = EnergyEvidenceEnvelope {
         schema: "symthaea.energy-material.evidence-envelope.v0".into(),
         capability_classification: CAPABILITY_CLASSIFICATION.into(),
         binding,
         payload_type,
+        payload_json,
         payload_sha256,
-        payload,
     };
     envelope.validate_with_manifest(manifest)?;
     Ok(envelope)
@@ -164,14 +184,15 @@ pub fn binding_from_manifest(
 }
 
 pub fn campaign_lane_sha256(lane: &EvidenceLanePlan) -> Result<String, EnvelopeError> {
-    // The campaign crate performs full manifest validation. This local check
-    // keeps standalone lane hashing fail-closed on obviously malformed fields.
+    // Full campaign construction validates source commitment and screening-policy
+    // compatibility. This standalone hash keeps lane identity canonical while
+    // remaining usable by adapter receipt builders.
     if lane.adapter_name.trim().is_empty()
         || lane.adapter_version.trim().is_empty()
         || lane.expected_model_name.trim().is_empty()
     {
         return Err(EnvelopeError::InvalidLane(
-            "adapter/model names and version must be non-empty".into(),
+            "adapter/model names and adapter version must be non-empty".into(),
         ));
     }
     if lane
@@ -207,17 +228,11 @@ pub fn campaign_lane_sha256(lane: &EvidenceLanePlan) -> Result<String, EnvelopeE
     Ok(hex_lower(&hasher.finalize()))
 }
 
-pub fn payload_sha256(payload: &Value) -> Result<String, EnvelopeError> {
-    if payload.is_null() {
-        return Err(EnvelopeError::InvalidEnvelope(
-            "payload cannot be JSON null".into(),
-        ));
-    }
-    let encoded = serde_json::to_vec(payload)?;
+pub fn payload_sha256(payload_json: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(PAYLOAD_DIGEST_DOMAIN);
-    hasher.update(encoded);
-    Ok(hex_lower(&hasher.finalize()))
+    hasher.update(payload_json);
+    hex_lower(&hasher.finalize())
 }
 
 #[derive(Debug, Error)]
@@ -340,10 +355,10 @@ mod tests {
     }
 
     #[test]
-    fn envelope_binds_candidate_campaign_lane_and_payload() {
+    fn envelope_binds_candidate_campaign_lane_and_exact_payload_text() {
         let manifest = manifest();
-        let payload = serde_json::json!({"value": 42, "unit": "fixture"});
-        let envelope = wrap_evidence_payload(
+        let payload = "{\"value\":42,\"unit\":\"fixture\"}";
+        let envelope = wrap_evidence_payload_json(
             &manifest,
             EvidenceDimension::FunctionalPerformance,
             "fixture-receipt-v0",
@@ -356,6 +371,7 @@ mod tests {
             manifest.candidate_anchor.candidate_sha256
         );
         assert_eq!(envelope.binding.campaign_manifest_sha256, manifest.sha256().unwrap());
+        assert_eq!(envelope.payload_json, payload);
         assert!(!envelope.binding.campaign_lane_sha256.is_empty());
         assert!(!envelope.sha256().unwrap().is_empty());
     }
@@ -378,16 +394,37 @@ mod tests {
     }
 
     #[test]
-    fn payload_mutation_breaks_validation() {
+    fn exact_json_text_is_evidence_bearing() {
         let manifest = manifest();
-        let mut envelope = wrap_evidence_payload(
+        let compact = wrap_evidence_payload_json(
             &manifest,
             EvidenceDimension::FunctionalPerformance,
             "fixture-receipt-v0",
-            serde_json::json!({"value": 1}),
+            "{\"a\":1,\"b\":2}",
         )
         .unwrap();
-        envelope.payload = serde_json::json!({"value": 2});
+        let reordered = wrap_evidence_payload_json(
+            &manifest,
+            EvidenceDimension::FunctionalPerformance,
+            "fixture-receipt-v0",
+            "{\"b\":2,\"a\":1}",
+        )
+        .unwrap();
+        assert_ne!(compact.payload_sha256, reordered.payload_sha256);
+        assert_ne!(compact.sha256().unwrap(), reordered.sha256().unwrap());
+    }
+
+    #[test]
+    fn payload_mutation_breaks_validation() {
+        let manifest = manifest();
+        let mut envelope = wrap_evidence_payload_json(
+            &manifest,
+            EvidenceDimension::FunctionalPerformance,
+            "fixture-receipt-v0",
+            "{\"value\":1}",
+        )
+        .unwrap();
+        envelope.payload_json = "{\"value\":2}".into();
         assert!(matches!(
             envelope.validate(),
             Err(EnvelopeError::PayloadDigestMismatch { .. })
@@ -397,11 +434,11 @@ mod tests {
     #[test]
     fn different_campaign_cannot_validate_same_envelope() {
         let manifest = manifest();
-        let envelope = wrap_evidence_payload(
+        let envelope = wrap_evidence_payload_json(
             &manifest,
             EvidenceDimension::FunctionalPerformance,
             "fixture-receipt-v0",
-            serde_json::json!({"value": 1}),
+            "{\"value\":1}",
         )
         .unwrap();
         let mut changed = manifest.clone();
