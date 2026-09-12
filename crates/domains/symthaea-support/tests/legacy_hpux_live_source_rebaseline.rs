@@ -45,7 +45,7 @@ fn hpux_may_2025_guide_cannot_progress_past_capture_without_exact_bytes() {
     // The seeded historical observation remains metadata-only. Live metadata or
     // a failed raw-byte fetch must not be converted into a content identity.
     let snapshot = pack.sources.snapshot(&snapshot_id).unwrap();
-    assert!(matches!(snapshot.capture, SourceCaptureV1::MetadataOnly));
+    assert!(matches!(&snapshot.capture, SourceCaptureV1::MetadataOnly));
 
     let artifacts = LegacySourceArtifactLedgerV1::new();
     let source_ledger = LegacyQualificationSourceLedgerV3::new();
