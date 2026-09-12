@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-domain-awareness-camera-geometry"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bridge from calibrated camera geometry into Symthaea domain-awareness bearing evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["camera", "calibration", "vision", "safety"]
+categories = ["science", "computer-vision"]
+
+[dependencies]
+symthaea-camera-geometry = { path = "../../domains/symthaea-camera-geometry" }
+symthaea-domain-awareness = { path = "../../domains/symthaea-domain-awareness" }
+symthaea-domain-awareness-vision = { path = "../symthaea-domain-awareness-vision" }
