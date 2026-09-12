@@ -5,7 +5,7 @@
 //!
 //! This module exposes the prediction/learning semantics already implemented by
 //! [`ActiveInferenceAgent`] without exposing motor execution or a mutable handle
-//! to a live cognitive-loop service.  It is intentionally domain-agnostic: the
+//! to a live cognitive-loop service. It is intentionally domain-agnostic: the
 //! caller owns the meaning of observation channels and action indices.
 
 use super::agent::ActiveInferenceAgent;
@@ -31,7 +31,7 @@ pub enum FepPredictionSessionError {
 /// prescribed-action prediction and optional learning.
 ///
 /// The session has no motor system and therefore grants no physical or external
-/// action authority.  Creating or training a session cannot mutate the source
+/// action authority. Creating or training a session cannot mutate the source
 /// agent from which it was cloned.
 #[derive(Debug, Clone)]
 pub struct FepPredictionSession {
@@ -63,7 +63,7 @@ impl FepPredictionSession {
     }
 
     /// Incorporate one exact observation through the production perception
-    /// path.  Dimensions are strict: this API never pads or truncates data.
+    /// path. Dimensions are strict: this API never pads or truncates data.
     pub fn observe(
         &mut self,
         values: &[f64],
@@ -129,12 +129,12 @@ impl FepPredictionSession {
         Ok(())
     }
 
-    /// End an episode while preserving the learned generative model.
+    /// Reset transient inference/episode state while preserving the learned
+    /// generative model.
     ///
-    /// `ActiveInferenceAgent::reset()` resets transient belief, precision,
-    /// eligibility and action-selection state but deliberately leaves the
-    /// learned `GenerativeModel` in place.  This makes episode boundaries
-    /// suitable for independent world trials.
+    /// `ActiveInferenceAgent::reset()` deliberately leaves the learned
+    /// `GenerativeModel` in place. This makes the operation suitable for
+    /// independent world trials after a Development learning phase.
     pub fn reset_transient_state_preserving_model(&mut self) {
         self.agent.reset();
         self.has_observation = false;
@@ -143,7 +143,7 @@ impl FepPredictionSession {
 
     /// Freeze the learned prescribed-action predictor for held-out evaluation.
     ///
-    /// The returned snapshot has standardized transient state.  Each held-out
+    /// The returned snapshot has standardized transient state. Each held-out
     /// world should create a fresh session from the snapshot so held-out
     /// outcomes cannot train later held-out trials.
     pub fn freeze_for_evaluation(
@@ -217,7 +217,7 @@ impl FepEvaluationSnapshot {
     }
 
     /// Deterministic replay identity for the prediction-relevant model/config
-    /// state.  This is a fixture/replay digest, not cryptographic attestation.
+    /// state. This is a fixture/replay digest, not cryptographic attestation.
     pub fn replay_digest(&self) -> u64 {
         self.replay_digest
     }
@@ -250,7 +250,6 @@ fn prediction_replay_digest(agent: &ActiveInferenceAgent) -> u64 {
     push_f64(&mut bytes, model.observation_precision);
     push_f64(&mut bytes, model.transition_precision);
     push_f64(&mut bytes, model.learning_rate);
-
     push_matrix(&mut bytes, &model.likelihood_matrix);
     push_tensor3(&mut bytes, &model.transition_matrices);
     push_matrix(&mut bytes, &model.transition_bias);
@@ -258,8 +257,7 @@ fn prediction_replay_digest(agent: &ActiveInferenceAgent) -> u64 {
     push_f64_slice(&mut bytes, &model.prior_precision);
 
     // The evaluation snapshot has standardized transient state, but include it
-    // in the replay identity so a future reset-semantics change cannot silently
-    // reuse the same evidence identity.
+    // so future reset-semantics changes cannot silently reuse the same identity.
     push_f64_slice(&mut bytes, &agent.belief.mean);
     push_f64_slice(&mut bytes, &agent.belief.precision);
     push_f64_slice(&mut bytes, &agent.belief.mode_probs);
@@ -325,7 +323,6 @@ mod tests {
     fn session_prediction_matches_direct_production_agent_path() {
         let source = agent();
         let values = [0.2, 0.4, 0.8];
-
         let mut direct = source.clone();
         let _ = direct.perceive(&Observation::new(values.to_vec(), 1.0, "test"));
         let direct_outcome = direct.act(1);
@@ -333,7 +330,6 @@ mod tests {
         let mut session = FepPredictionSession::from_agent(&source);
         let _ = session.observe(&values, 1.0, "test").unwrap();
         let session_outcome = session.predict(1).unwrap();
-
         assert_eq!(session_outcome.action, direct_outcome.action);
         assert_eq!(
             session_outcome.predicted_next_state.mean,
@@ -349,13 +345,13 @@ mod tests {
     fn observation_dimension_mismatch_fails_closed() {
         let source = agent();
         let mut session = FepPredictionSession::from_agent(&source);
-        assert_eq!(
+        assert!(matches!(
             session.observe(&[0.1, 0.2], 1.0, "test"),
             Err(FepPredictionSessionError::ObservationDimensionMismatch {
                 expected: 3,
-                actual: 2,
+                actual: 2
             })
-        );
+        ));
     }
 
     #[test]
@@ -363,29 +359,29 @@ mod tests {
         let source = agent();
         let mut session = FepPredictionSession::from_agent(&source);
         session.observe(&[0.1, 0.2, 0.3], 1.0, "test").unwrap();
-        assert_eq!(
+        assert!(matches!(
             session.predict(3),
             Err(FepPredictionSessionError::ActionOutOfRange {
                 action: 3,
-                action_count: 3,
+                action_count: 3
             })
-        );
+        ));
     }
 
     #[test]
     fn prediction_requires_observation_and_single_pending_outcome() {
         let source = agent();
         let mut session = FepPredictionSession::from_agent(&source);
-        assert_eq!(
+        assert!(matches!(
             session.predict(0),
             Err(FepPredictionSessionError::ObservationRequired)
-        );
+        ));
         session.observe(&[0.1, 0.2, 0.3], 1.0, "test").unwrap();
         session.predict(0).unwrap();
-        assert_eq!(
+        assert!(matches!(
             session.predict(1),
             Err(FepPredictionSessionError::PredictionAlreadyPending)
-        );
+        ));
     }
 
     #[test]
@@ -393,14 +389,14 @@ mod tests {
         let source = agent();
         let source_transitions = source.model.transition_matrices.clone();
         let source_likelihood = source.model.likelihood_matrix.clone();
-
         let mut session = FepPredictionSession::from_agent(&source);
-        session.observe(&[0.1, 0.2, 0.3], 1.0, "development").unwrap();
+        session
+            .observe(&[0.1, 0.2, 0.3], 1.0, "development")
+            .unwrap();
         session.predict(1).unwrap();
         session
             .learn_from_actual(1, &[0.9, 0.8, 0.7], 1.0, "development")
             .unwrap();
-
         assert_eq!(source.model.transition_matrices, source_transitions);
         assert_eq!(source.model.likelihood_matrix, source_likelihood);
     }
@@ -411,20 +407,22 @@ mod tests {
         let mut session = FepPredictionSession::from_agent(&source);
         session.observe(&[0.1, 0.2, 0.3], 1.0, "test").unwrap();
         session.predict(1).unwrap();
-        assert_eq!(
+        assert!(matches!(
             session.learn_from_actual(2, &[0.2, 0.3, 0.4], 1.0, "test"),
             Err(FepPredictionSessionError::OutcomeActionMismatch {
                 expected: 1,
-                actual: 2,
+                actual: 2
             })
-        );
+        ));
     }
 
     #[test]
     fn frozen_snapshot_standardizes_transient_state_and_replays() {
         let source = agent();
         let mut session = FepPredictionSession::from_agent(&source);
-        session.observe(&[0.7, 0.2, 0.4], 1.0, "development").unwrap();
+        session
+            .observe(&[0.7, 0.2, 0.4], 1.0, "development")
+            .unwrap();
         let snapshot = session.freeze_for_evaluation().unwrap();
 
         let mut a = snapshot.session();
@@ -442,7 +440,6 @@ mod tests {
         let a = agent();
         let mut b = a.clone();
         b.model.transition_matrices[0][0][0] += 0.01;
-
         let snapshot_a = FepPredictionSession::from_agent(&a)
             .freeze_for_evaluation()
             .unwrap();
@@ -456,13 +453,13 @@ mod tests {
     fn invalid_numeric_observation_is_rejected() {
         let source = agent();
         let mut session = FepPredictionSession::from_agent(&source);
-        assert_eq!(
+        assert!(matches!(
             session.observe(&[0.1, f64::NAN, 0.3], 1.0, "test"),
             Err(FepPredictionSessionError::NonFiniteObservation { index: 1 })
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             session.observe(&[0.1, 0.2, 0.3], 0.0, "test"),
             Err(FepPredictionSessionError::InvalidPrecision)
-        );
+        ));
     }
 }
