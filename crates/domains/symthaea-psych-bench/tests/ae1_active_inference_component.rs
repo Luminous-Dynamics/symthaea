@@ -33,6 +33,14 @@ fn selected_action(engine: &mut ActiveInferenceEngine, state: &BinaryHV) -> u32 
         .id
 }
 
+fn alternate_action(action: u32) -> u32 {
+    match action {
+        0 => 1,
+        1 => 0,
+        other => panic!("two-action experiment returned unexpected action id {other}"),
+    }
+}
+
 fn two_action_engine(goal: BinaryHV) -> ActiveInferenceEngine {
     let mut engine = ActiveInferenceEngine::new();
     engine.add_goal(goal, 1.0, 1);
@@ -96,32 +104,34 @@ fn negative_feedback_changes_policy_and_positive_feedback_rescues_it() {
 
     engine.add_goal(target, 1.0, 1);
     // Identical expected outcomes make the initial pragmatic and action-cost
-    // terms equal. With equal prior success rates the stable tie resolves to
-    // action 0; subsequent policy movement is therefore attributable to
-    // feedback-updated success history rather than changed goals/outcomes.
+    // terms equal. The experiment deliberately does not assume how an exact
+    // EFE tie is broken: whichever action the production policy chooses first
+    // becomes the targeted feedback subject.
     engine.add_action(motor_a(), target);
     engine.add_action(motor_b(), target);
 
-    assert_eq!(selected_action(&mut engine, &neutral_state), 0);
+    let initially_selected = selected_action(&mut engine, &neutral_state);
+    let alternate = alternate_action(initially_selected);
 
-    // Repeated failure increases action 0's epistemic/uncertainty cost.
+    // Repeated failure increases the initially selected action's
+    // epistemic/uncertainty cost while goal, state and outcome model stay fixed.
     for _ in 0..12 {
-        engine.learn_outcome(0, &target, false);
+        engine.learn_outcome(initially_selected, &target, false);
     }
     assert_eq!(
         selected_action(&mut engine, &neutral_state),
-        1,
+        alternate,
         "negative feedback did not shift policy away from the failing action",
     );
 
     // Rescue the original policy using feedback only; goal, current state and
     // expected outcome remain unchanged.
     for _ in 0..16 {
-        engine.learn_outcome(0, &target, true);
+        engine.learn_outcome(initially_selected, &target, true);
     }
     assert_eq!(
         selected_action(&mut engine, &neutral_state),
-        0,
+        initially_selected,
         "positive feedback did not restore preference for the rehabilitated action",
     );
 }
@@ -136,13 +146,20 @@ fn feedback_for_one_action_does_not_require_mutating_the_other_action() {
     engine.add_action(motor_a(), target);
     engine.add_action(motor_b(), target);
 
+    let initially_selected = selected_action(&mut engine, &neutral_state);
+    let untouched_alternate = alternate_action(initially_selected);
+
     for _ in 0..12 {
-        engine.learn_outcome(0, &target, false);
+        engine.learn_outcome(initially_selected, &target, false);
     }
 
-    // Action 1 receives no fabricated success feedback. It becomes preferable
-    // only because action 0's learned reliability falls.
-    assert_eq!(selected_action(&mut engine, &neutral_state), 1);
+    // The alternate receives no fabricated success feedback. It becomes
+    // preferable only because the initially selected action's learned
+    // reliability falls.
+    assert_eq!(
+        selected_action(&mut engine, &neutral_state),
+        untouched_alternate,
+    );
 }
 
 #[test]
