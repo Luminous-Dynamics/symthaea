@@ -249,6 +249,8 @@ impl PolicyScopedSafetyReceipt {
         self.validate()
             && manifest.validate_complete()
             && self.assurance_manifest_digest == manifest.manifest_digest()
+            && self.deployment_receipt.scoped_receipt.contract_digest
+                == manifest.safety_contract_digest
             && self.deployment_receipt.deployment_id == manifest.deployment_id
             && self.deployment_receipt.configuration_digest == manifest.configuration_digest
             && self.deployment_receipt.model_manifest_digest == manifest.model_manifest_digest
@@ -281,7 +283,8 @@ pub fn bind_receipt_to_assurance_manifest(
     if !signature_receipt.validate_for(manifest) {
         return Err(PolicyScopeError::InvalidSignatureVerification);
     }
-    if deployment_receipt.deployment_id != manifest.deployment_id
+    if deployment_receipt.scoped_receipt.contract_digest != manifest.safety_contract_digest
+        || deployment_receipt.deployment_id != manifest.deployment_id
         || deployment_receipt.configuration_digest != manifest.configuration_digest
         || deployment_receipt.model_manifest_digest != manifest.model_manifest_digest
         || deployment_receipt.calibration_manifest_digest != manifest.calibration_manifest_digest
@@ -453,6 +456,22 @@ mod tests {
         receipt.manifest_digest = "blake3:other".into();
         assert!(!receipt.validate_for(&value));
         assert!(!signature(&value).grants_physical_authority());
+    }
+
+    #[test]
+    fn wrong_safety_contract_cannot_be_policy_scoped() {
+        let value = manifest();
+        let mut receipt = deployment_receipt(&value);
+        receipt.scoped_receipt.contract_digest = "blake3:other-contract".into();
+        assert_eq!(
+            bind_receipt_to_assurance_manifest(
+                receipt,
+                &value,
+                &signature(&value),
+                "policy-scope:r1",
+            ),
+            Err(PolicyScopeError::DeploymentScopeMismatch)
+        );
     }
 
     #[test]
