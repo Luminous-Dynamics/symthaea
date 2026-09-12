@@ -238,7 +238,7 @@ fn aix_scope() -> ApplicabilityScopeV1 {
     ApplicabilityScopeV1 {
         ecosystem: StringSelectorV1::Exact("legacy-enterprise-os".into()),
         vendor: StringSelectorV1::Exact("IBM".into()),
-        product: "AIX".into(),
+        product: StringSelectorV1::Exact("AIX".into()),
         version: StringSelectorV1::Prefix("7.3".into()),
         ..ApplicabilityScopeV1::default()
     }
