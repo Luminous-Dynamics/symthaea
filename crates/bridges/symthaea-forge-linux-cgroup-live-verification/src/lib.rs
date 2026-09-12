@@ -29,7 +29,9 @@ use symthaea_forge_linux_cgroup_strict::{
     harden_cgroup_v2_lease, StrictCgroupV2Error, StrictCgroupV2Lease, StrictCgroupV2Receipt,
     StrictCgroupV2TeardownReceipt,
 };
-use symthaea_forge_linux_kernel_attestation::{KernelIsolationGate, KernelSandboxObservation};
+use symthaea_forge_linux_kernel_attestation::{
+    KernelAttestationError, KernelIsolationGate, KernelSandboxObservation,
+};
 use symthaea_forge_linux_observed_exec::{
     pre_release_admission_protocol_id, run_kernel_gated_evaluator_with_admission,
     KernelGatedEvaluatorPolicy, KernelGatedExecutionReceipt, ObservedEvaluatorError,
@@ -48,6 +50,8 @@ pub enum LiveCgroupVerificationError {
     Resource(#[from] CgroupV2ResourceError),
     #[error(transparent)]
     Strict(#[from] StrictCgroupV2Error),
+    #[error(transparent)]
+    Kernel(#[from] KernelAttestationError),
     #[error("live cgroup verification IO error at {path:?}: {source}")]
     Io {
         path: PathBuf,
