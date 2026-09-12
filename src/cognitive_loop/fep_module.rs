@@ -179,7 +179,7 @@ pub struct TrajectoryPlanningConfig {
     pub ode_tolerance: f64,
     /// Maximum ODE steps per trajectory.
     pub max_steps: usize,
-    /// Time constant controlling relaxation rate.
+    /// Time constant for continuous dynamics.
     pub tau: f64,
     /// Cycle interval: run planning every N cycles.
     pub planning_interval: u64,
