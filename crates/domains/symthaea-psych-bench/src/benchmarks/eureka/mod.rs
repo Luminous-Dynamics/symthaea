@@ -21,6 +21,7 @@ pub mod hidden_world;
 mod promotion;
 mod selection;
 mod target_contract;
+mod target_lineage;
 #[cfg(test)]
 mod transition_identity_tests;
 
