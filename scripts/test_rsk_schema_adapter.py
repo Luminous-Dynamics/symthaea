@@ -23,45 +23,36 @@ GOLDEN_V2 = (
     ROOT
     / "docs/architecture/replicator-safety/golden/RSK_SEMANTIC_SCHEMA_GOLDEN_V0_2.json"
 )
+ADAPTER_GOLDEN = (
+    ROOT
+    / "docs/architecture/replicator-safety/golden/RSK_SCHEMA_ADAPTER_GOLDEN_V0_1.json"
+)
 
 
 class SchemaAdapterTests(unittest.TestCase):
-    def test_capability_rules_are_derived_from_schema_only(self) -> None:
-        golden = json.loads(GOLDEN_V2.read_text())
-        table = adapter.capability_rule_table(golden["capability_schema"])
-        self.assertEqual(table["schema_id"], golden["capability_schema_sha256"])
-        self.assertEqual(table["bit_width"], 8)
+    def test_committed_adapter_golden_outputs_match_schema_derivation(self) -> None:
+        semantic_golden = json.loads(GOLDEN_V2.read_text())
+        adapter_golden = json.loads(ADAPTER_GOLDEN.read_text())
+        self.assertEqual(adapter_golden["schema"], "symthaea.rsk.schema-adapter-golden.v1")
+
+        capability = adapter.capability_rule_table(semantic_golden["capability_schema"])
+        capability_expected = adapter_golden["capability_adapter"]
         self.assertEqual(
-            table["rules"],
-            [
-                {"bit": 0, "class": "assignable"},
-                {"bit": 1, "class": "assignable"},
-                {"bit": 2, "class": "reserved"},
-                {"bit": 3, "class": "retired"},
-                {"bit": 7, "class": "reserved"},
-            ],
+            capability["schema_id"], capability_expected["source_schema_sha256"]
+        )
+        self.assertEqual(capability, capability_expected["expected_rule_table"])
+        self.assertEqual(
+            semantic.digest(capability),
+            capability_expected["expected_rule_table_sha256"],
         )
 
-    def test_resource_rules_match_v2_committed_runtime_ids(self) -> None:
-        golden = json.loads(GOLDEN_V2.read_text())
-        table = adapter.resource_rule_table(golden["resource_schema"])
-        self.assertEqual(table["schema_id"], golden["resource_schema_sha256"])
+        resource = adapter.resource_rule_table(semantic_golden["resource_schema"])
+        resource_expected = adapter_golden["resource_adapter"]
+        self.assertEqual(resource["schema_id"], resource_expected["source_schema_sha256"])
+        self.assertEqual(resource, resource_expected["expected_rule_table"])
         self.assertEqual(
-            table["rules"],
-            [
-                {
-                    "numeric_id": 0,
-                    "required": True,
-                    "minimum": 0,
-                    "maximum": 1000,
-                },
-                {
-                    "numeric_id": 1,
-                    "required": True,
-                    "minimum": 0,
-                    "maximum": 1000,
-                },
-            ],
+            semantic.digest(resource),
+            resource_expected["expected_rule_table_sha256"],
         )
 
     def test_v1_resource_schema_cannot_produce_runtime_rule_table(self) -> None:
@@ -84,6 +75,7 @@ class SchemaAdapterTests(unittest.TestCase):
             golden["numeric_id_remap_schema_sha256"],
         )
         self.assertNotEqual(original_table["rules"], remapped_table["rules"])
+        self.assertNotEqual(semantic.digest(original_table), semantic.digest(remapped_table))
 
     def test_resource_rule_output_is_sorted_by_runtime_numeric_id(self) -> None:
         golden = json.loads(GOLDEN_V2.read_text())
@@ -92,6 +84,13 @@ class SchemaAdapterTests(unittest.TestCase):
         remapped["dimensions"][1]["numeric_id"] = 3
         table = adapter.resource_rule_table(remapped)
         self.assertEqual([rule["numeric_id"] for rule in table["rules"]], [3, 9])
+
+    def test_adapter_golden_source_points_to_v2_semantic_corpus(self) -> None:
+        adapter_golden = json.loads(ADAPTER_GOLDEN.read_text())
+        self.assertEqual(
+            adapter_golden["source_semantic_golden"],
+            "RSK_SEMANTIC_SCHEMA_GOLDEN_V0_2.json",
+        )
 
 
 if __name__ == "__main__":
