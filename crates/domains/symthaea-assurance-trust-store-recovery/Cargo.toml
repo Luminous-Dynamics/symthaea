@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-assurance-trust-store-recovery"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Recovery continuity assurance for Symthaea monotonic trust stores"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "recovery", "rollback"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-assurance-trust-store = { path = "../symthaea-assurance-trust-store" }
+serde = { workspace = true }
