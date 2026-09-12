@@ -39,10 +39,13 @@ pub enum DomainAwarenessObligation {
     ContradictionsAndAbstentionsRemainAuditable,
     RecoveryProcedureIsReviewed,
     DeploymentBlockedUntilCriticalObligationsDischarged,
+    CommonCauseDiversityGatesCorroboration,
+    RecoveryRequiresSustainedRequalification,
+    EvidenceCannotSelfDischarge,
 }
 
 impl DomainAwarenessObligation {
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 23] = [
         Self::ObservationIsNotIdentityIntentOrAuthority,
         Self::IdentityIsNotIntentOrAuthority,
         Self::UncertaintyStatesRemainRepresentable,
@@ -63,6 +66,9 @@ impl DomainAwarenessObligation {
         Self::ContradictionsAndAbstentionsRemainAuditable,
         Self::RecoveryProcedureIsReviewed,
         Self::DeploymentBlockedUntilCriticalObligationsDischarged,
+        Self::CommonCauseDiversityGatesCorroboration,
+        Self::RecoveryRequiresSustainedRequalification,
+        Self::EvidenceCannotSelfDischarge,
     ];
 
     /// Stable human-review code. Existing codes must not be renumbered.
@@ -88,6 +94,9 @@ impl DomainAwarenessObligation {
             Self::ContradictionsAndAbstentionsRemainAuditable => "DA-018",
             Self::RecoveryProcedureIsReviewed => "DA-019",
             Self::DeploymentBlockedUntilCriticalObligationsDischarged => "DA-020",
+            Self::CommonCauseDiversityGatesCorroboration => "DA-021",
+            Self::RecoveryRequiresSustainedRequalification => "DA-022",
+            Self::EvidenceCannotSelfDischarge => "DA-023",
         }
     }
 
@@ -153,6 +162,15 @@ impl DomainAwarenessObligation {
             Self::DeploymentBlockedUntilCriticalObligationsDischarged => {
                 "deployment is blocked until all safety-critical domain-awareness obligations required by the deployment safety case are discharged"
             }
+            Self::CommonCauseDiversityGatesCorroboration => {
+                "corroboration requiring independent physical witnesses is withheld when reviewed common-cause fault-domain diversity is missing, incomplete, or insufficient"
+            }
+            Self::RecoveryRequiresSustainedRequalification => {
+                "recovery from restricted, incomplete, unsafe, or fail-closed assurance states requires explicit requalification and sustained qualified evidence; a single favorable sample cannot restore nominal status"
+            }
+            Self::EvidenceCannotSelfDischarge => {
+                "candidate evidence and verified receipts cannot by themselves discharge safety obligations or grant deployment readiness"
+            }
         }
     }
 
@@ -174,7 +192,10 @@ impl DomainAwarenessObligation {
             | Self::InvalidEvidenceCannotSatisfyAssurance
             | Self::ModelDivergenceRestrictsCapability
             | Self::BoundaryBypassBlocksRelease
-            | Self::NegativeOnlyStressEvidenceRequired => EvidenceKind::Test,
+            | Self::NegativeOnlyStressEvidenceRequired
+            | Self::CommonCauseDiversityGatesCorroboration
+            | Self::RecoveryRequiresSustainedRequalification
+            | Self::EvidenceCannotSelfDischarge => EvidenceKind::Test,
             Self::TimeCalibrationAndLineageRemainAuditable
             | Self::ContradictionsAndAbstentionsRemainAuditable => EvidenceKind::Telemetry,
             Self::RecoveryProcedureIsReviewed => EvidenceKind::Standard,
@@ -230,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn authority_boundary_and_rf_silence_are_typed() {
+    fn authority_boundary_rf_silence_and_lifecycle_guards_are_typed() {
         assert_eq!(
             DomainAwarenessObligation::IndependentFailClosedAuthorityBoundary.code(),
             "DA-015"
@@ -238,6 +259,18 @@ mod tests {
         assert_eq!(
             DomainAwarenessObligation::PassiveRfSilenceIsNotSafety.code(),
             "DA-007"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::CommonCauseDiversityGatesCorroboration.code(),
+            "DA-021"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::RecoveryRequiresSustainedRequalification.code(),
+            "DA-022"
+        );
+        assert_eq!(
+            DomainAwarenessObligation::EvidenceCannotSelfDischarge.code(),
+            "DA-023"
         );
         assert_eq!(
             DomainAwarenessObligation::PassiveRfSilenceIsNotSafety.expected_evidence(),

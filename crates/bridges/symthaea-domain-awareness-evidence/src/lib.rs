@@ -8,8 +8,11 @@
 #![deny(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
-use symthaea_assurance_requalification::RequalificationAuthorization;
+use symthaea_assurance_requalification::{
+    AssuranceState, RequalificationAuthorization, RequalificationPhase, RequalificationReport,
+};
 use symthaea_domain_awareness::ObservationEnvelope;
+use symthaea_domain_awareness_common_cause::CommonCauseQualifiedTrackAssurance;
 use symthaea_domain_awareness_model_assurance::{OddModelAssuranceEvidence, map_status};
 use symthaea_formal_safety::{
     DomainAwarenessObligation, EvidenceKind, SafetyEvidenceReceipt,
@@ -257,6 +260,62 @@ pub fn recovery_procedure_candidate(
     )
 }
 
+/// Candidate test evidence that common-cause assurance actually withheld a
+/// corroboration-level claim.
+///
+/// A synthetic downgrade with no recorded issue is not accepted; the report must
+/// both be downgraded and explain why.
+pub fn common_cause_corroboration_candidate(
+    report: &CommonCauseQualifiedTrackAssurance,
+    binding: &ArtifactBinding,
+    observed_at_ms: u64,
+) -> Result<CandidateEvidence, EvidenceBindingError> {
+    if !report.was_downgraded() || report.issues.is_empty() {
+        return Err(EvidenceBindingError::ArtifactNotEligible);
+    }
+    candidate(
+        DomainAwarenessObligation::CommonCauseDiversityGatesCorroboration,
+        binding,
+        observed_at_ms,
+        "common-cause-track-gate",
+        format!(
+            "track assurance was withheld from {:?} to {:?} under recorded common-cause issues",
+            report.original_level, report.qualified_level
+        ),
+    )
+}
+
+/// Candidate test evidence that favorable samples are being accumulated without
+/// immediately clearing a latched restriction.
+///
+/// This intentionally binds an *in-progress* recovery report. A fully reset nominal
+/// report has already cleared its progress counters and cannot be used to pretend the
+/// intermediate hysteresis existed.
+pub fn sustained_requalification_candidate(
+    report: &RequalificationReport,
+    binding: &ArtifactBinding,
+) -> Result<CandidateEvidence, EvidenceBindingError> {
+    if report.phase != RequalificationPhase::Requalifying
+        || report.effective_state == AssuranceState::Nominal
+        || report.consecutive_nominal_samples == 0
+    {
+        return Err(EvidenceBindingError::ArtifactNotEligible);
+    }
+    let observed_at_ms = report
+        .last_observed_at_ms
+        .ok_or(EvidenceBindingError::ArtifactNotEligible)?;
+    candidate(
+        DomainAwarenessObligation::RecoveryRequiresSustainedRequalification,
+        binding,
+        observed_at_ms,
+        &report.policy_id,
+        format!(
+            "{} favorable nominal sample(s) accumulated while {:?} remained latched",
+            report.consecutive_nominal_samples, report.effective_state
+        ),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,6 +478,39 @@ mod tests {
         assert_eq!(
             recovery_procedure_candidate(&authorization, &binding("procedure:other")),
             Err(EvidenceBindingError::RecoveryProcedureReferenceMismatch)
+        );
+    }
+
+    #[test]
+    fn sustained_requalification_report_can_bind_da022_but_not_nominal_report() {
+        let requalifying = RequalificationReport {
+            policy_id: "requal-v1".into(),
+            effective_state: AssuranceState::Unsafe,
+            phase: RequalificationPhase::Requalifying,
+            latched_since_ms: Some(1_000),
+            authorization_id: Some("auth-1".into()),
+            consecutive_nominal_samples: 1,
+            nominal_span_ms: 0,
+            last_observed_at_ms: Some(2_000),
+            issues: Vec::new(),
+        };
+        let candidate = sustained_requalification_candidate(
+            &requalifying,
+            &binding("evidence:requal-step"),
+        )
+        .unwrap();
+        assert_eq!(
+            candidate.obligation,
+            DomainAwarenessObligation::RecoveryRequiresSustainedRequalification
+        );
+
+        let mut nominal = requalifying;
+        nominal.effective_state = AssuranceState::Nominal;
+        nominal.phase = RequalificationPhase::Nominal;
+        nominal.consecutive_nominal_samples = 0;
+        assert_eq!(
+            sustained_requalification_candidate(&nominal, &binding("evidence:nominal")),
+            Err(EvidenceBindingError::ArtifactNotEligible)
         );
     }
 
