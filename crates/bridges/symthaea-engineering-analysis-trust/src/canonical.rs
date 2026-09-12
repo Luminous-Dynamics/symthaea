@@ -145,6 +145,19 @@ macro_rules! semantic_id {
     };
 }
 
+// Role-safe external premises. These are parseable because parsing establishes
+// syntax only, never authority. Keeping roles distinct prevents accidental
+// interchange of unrelated content identities at call sites.
+premise_id!(AcceptanceRecordDigestV1);
+premise_id!(SubjectStateDigestV1);
+premise_id!(TwinStateDigestV1);
+premise_id!(TwinSchemaDigestV1);
+premise_id!(ModelRevisionDigestV1);
+premise_id!(AnalysisConfigurationDigestV1);
+premise_id!(ValidityDimensionDigestV1);
+premise_id!(CurrentnessAttestationDigestV1);
+premise_id!(ImplementationArtifactDigestV1);
+premise_id!(AlgorithmRevisionDigestV1);
 premise_id!(ModelQualificationRecordDigestV1);
 premise_id!(ExecutionArtifactDigestV1);
 
