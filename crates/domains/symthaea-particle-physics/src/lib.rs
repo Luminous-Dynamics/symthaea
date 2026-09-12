@@ -30,6 +30,8 @@
 //!   burn-in sensitivity, rank/folded R-hat, ESS and topology diagnostics
 //! - **Qualification preregistration**: bit-exact policy manifests frozen before
 //!   analysis to prevent post-hoc threshold changes from masquerading as evidence
+//! - **Analysis candidate authority**: exact-head CI plus immutable analysis
+//!   artifact lineage, explicitly scoped below any physical-QCD claim
 //! - **Scale evidence**: same-ensemble flow curves whose derived uncertainty
 //!   must bind joint resampling across the correlated flow-time trajectory
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
@@ -53,6 +55,7 @@ pub mod cross_sections;
 pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
+pub mod lattice_analysis_authority;
 pub mod lattice_ensemble_promotion;
 pub mod lattice_flow_block_adequacy;
 pub mod lattice_flow_energy;
@@ -80,6 +83,11 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use lattice_analysis_authority::{
+    QUALIFIED_SCALE_ANALYSIS_CANDIDATE_SCOPE, AnalysisAuthorityError, ExactHeadCiConclusion,
+    ExactHeadCiEvidence, QualifiedScaleAnalysisCandidate, ScaleAnalysisArtifactLineage,
+    bind_qualified_scale_analysis_candidate,
 };
 pub use lattice_ensemble_promotion::{
     ENSEMBLE_SCALE_PROMOTION_ASSESSMENT_ID, EnsembleScalePromotionAssessment,
