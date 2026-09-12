@@ -1,0 +1,118 @@
+package luminous:symthaea-extension@1.0.0;
+
+/// Canonical wire types for the public pure-simulation capability.
+interface simulation-types {
+    /// Engineering domain corresponding to the host's normalized simulation model.
+    enum simulation-domain {
+        civil,
+        mechanical,
+        electrical,
+        aerospace,
+        chemical-process,
+        robotics,
+        nuclear,
+        materials,
+        environmental,
+        systems,
+    }
+
+    /// Solver family requested by Symthaea.
+    enum solver-kind {
+        finite-element,
+        computational-fluid-dynamics,
+        multibody-dynamics,
+        circuit,
+        process,
+        cad-geometry,
+        multi-physics,
+        custom,
+    }
+
+    /// Closed interval for a bounded quantity.
+    record interval {
+        lower: f64,
+        upper: f64,
+    }
+
+    /// Normalized uncertainty decomposition.
+    record uncertainty {
+        epistemic: f64,
+        aleatoric: f64,
+        interval: option<interval>,
+    }
+
+    /// One scalar model parameter supplied to a provider.
+    record model-parameter {
+        name: string,
+        value: f64,
+        unit: string,
+        provenance: string,
+        uncertainty: option<uncertainty>,
+    }
+
+    /// Typed request passed to a pure simulation provider.
+    record simulation-request {
+        id: string,
+        domain: simulation-domain,
+        solver: solver-kind,
+        objective: string,
+        parameters: list<model-parameter>,
+        requested-metrics: list<string>,
+    }
+
+    /// One normalized metric returned by the provider.
+    record simulation-metric {
+        name: string,
+        value: f64,
+        unit: string,
+        uncertainty: option<uncertainty>,
+    }
+
+    /// Provider-owned numerical output only.
+    ///
+    /// Execution provenance is intentionally absent. The Symthaea host constructs
+    /// provenance from the admitted component identity, exact request/output digests,
+    /// host adapter version, and runtime execution path rather than trusting a guest
+    /// to attest to itself.
+    record simulation-output {
+        request-id: string,
+        converged: bool,
+        confidence: f64,
+        uncertainty: uncertainty,
+        metrics: list<simulation-metric>,
+        warnings: list<string>,
+    }
+
+    /// Typed provider failure. These values describe guest computation only;
+    /// sandbox, fuel, deadline, authority, and host-validation failures remain
+    /// host-side errors and cannot be forged by the guest.
+    variant simulation-provider-error {
+        invalid-request(string),
+        unsupported-solver,
+        domain-failure(string),
+        resource-exhausted,
+        internal(string),
+    }
+}
+
+/// Pure simulation data-plane interface.
+///
+/// This interface imports no filesystem, network, clock, randomness, sensor, or
+/// actuator authority. Its only type dependency is `simulation-types`, which the
+/// world explicitly exports so it does not become a transitive component import.
+interface simulation-provider {
+    use simulation-types.{simulation-request, simulation-output, simulation-provider-error};
+
+    simulate: func(request: simulation-request) -> result<simulation-output, simulation-provider-error>;
+}
+
+/// First typed public data-plane world.
+///
+/// Every provider still exports the v1 control interface for identity/health.
+/// `simulation-types` is explicitly exported because WIT otherwise treats an
+/// exported interface's `use`d interface as a transitive component import.
+world simulation-provider-v1 {
+    export control;
+    export simulation-types;
+    export simulation-provider;
+}

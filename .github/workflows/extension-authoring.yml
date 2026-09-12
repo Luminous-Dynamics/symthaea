@@ -6,6 +6,7 @@ on:
       - "docs/extension/**"
       - "docs/architecture/SYMTHAEA_EXTENSION_DISTRIBUTION.md"
       - "examples/extensions/**"
+      - "crates/core/symthaea-extension-core/wit/**"
       - ".github/workflows/extension-authoring.yml"
   workflow_dispatch:
 
@@ -39,6 +40,7 @@ jobs:
 
           manifests = [
               Path("examples/extensions/hello-control/manifest.json"),
+              Path("examples/extensions/hello-simulation/manifest.json"),
               Path("examples/extensions/hello-knowledge-pack/manifest.json"),
           ]
           for path in manifests:
@@ -64,38 +66,61 @@ jobs:
           print(f"validated {payload_path}")
           PY
 
+      - name: Require simulation fixture WIT parity
+        run: |
+          cmp \
+            crates/core/symthaea-extension-core/wit/extension-control.wit \
+            examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp \
+            crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+            examples/extensions/hello-simulation/wit/simulation-provider.wit
+
       - name: Install Rust guest toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           targets: wasm32-wasip2
 
-      - name: Cache standalone guest build
+      - name: Cache standalone guest builds
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             examples/extensions/hello-control/target
-          key: ${{ runner.os }}-extension-authoring-${{ hashFiles('examples/extensions/hello-control/Cargo.toml', 'examples/extensions/hello-control/src/**', 'examples/extensions/hello-control/wit/**', 'examples/extensions/hello-control/manifest.json') }}
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-extension-authoring-${{ hashFiles('examples/extensions/hello-control/Cargo.toml', 'examples/extensions/hello-control/src/**', 'examples/extensions/hello-control/wit/**', 'examples/extensions/hello-control/manifest.json', 'examples/extensions/hello-simulation/Cargo.toml', 'examples/extensions/hello-simulation/src/**', 'examples/extensions/hello-simulation/wit/**', 'examples/extensions/hello-simulation/manifest.json') }}
           restore-keys: |
             ${{ runner.os }}-extension-authoring-
 
-      - name: Build standalone Component Model guest
+      - name: Build standalone Component Model guests
         run: |
           cargo build \
             --manifest-path examples/extensions/hello-control/Cargo.toml \
             --release \
             --target wasm32-wasip2
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --release \
+            --target wasm32-wasip2
 
-      - name: Require a non-empty component artifact
+      - name: Require non-empty component artifacts
         run: |
-          component="examples/extensions/hello-control/target/wasm32-wasip2/release/symthaea_hello_control_extension.wasm"
-          test -s "$component"
-          sha256sum "$component"
+          control_component="examples/extensions/hello-control/target/wasm32-wasip2/release/symthaea_hello_control_extension.wasm"
+          simulation_component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$control_component"
+          test -s "$simulation_component"
+          sha256sum "$control_component" "$simulation_component"
 
       - name: Upload hello-control component fixture
         uses: actions/upload-artifact@v4
         with:
           name: hello-control-component
           path: examples/extensions/hello-control/target/wasm32-wasip2/release/symthaea_hello_control_extension.wasm
+          if-no-files-found: error
+
+      - name: Upload hello-simulation component fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-simulation-component
+          path: examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm
           if-no-files-found: error
