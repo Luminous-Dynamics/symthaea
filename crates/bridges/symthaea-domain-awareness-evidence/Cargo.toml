@@ -19,3 +19,4 @@ symthaea-model-assurance = { path = "../../domains/symthaea-model-assurance" }
 symthaea-assurance-requalification = { path = "../../domains/symthaea-assurance-requalification" }
 symthaea-domain-awareness-model-assurance = { path = "../symthaea-domain-awareness-model-assurance" }
 serde = { workspace = true }
+uuid = { workspace = true }
