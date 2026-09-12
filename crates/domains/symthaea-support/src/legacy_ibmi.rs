@@ -319,47 +319,64 @@ fn add_ibmi_procedures(
     snapshots: &BTreeSet<SourceSnapshotIdV1>,
 ) -> Result<BTreeSet<String>, LegacyIbmiErrorV1> {
     let procedures = vec![
-        procedure("legacy:ibmi:triage-object-resolution", LegacyKnowledgeAreaV1::SoftwareLifecycle, LegacyProcedureKindV1::Diagnose, "Triage IBM i object/library resolution", &[
+        (procedure("legacy:ibmi:triage-object-resolution", LegacyKnowledgeAreaV1::SoftwareLifecycle, LegacyProcedureKindV1::Diagnose, "Triage IBM i object/library resolution", &[
             "Establish the exact object name, object type, library qualifier and current job/library-list context.",
             "Inspect object existence, containing library, owner/type metadata and library-list resolution without changing the object.",
             "Compare program/object references with the currently resolved object and identify stale or ambiguous library-list resolution.",
             "If a namespace or library-list change appears necessary, produce an operator-reviewed change proposal with rollback and verification criteria.",
-        ]),
-        procedure("legacy:ibmi:triage-job-queue-subsystem", LegacyKnowledgeAreaV1::WorkloadAndJobs, LegacyProcedureKindV1::Diagnose, "Triage IBM i queued or stalled work", &[
+        ]), &["ibm:ibmi-object-authority@7.6"][..]),
+        (procedure("legacy:ibmi:triage-job-queue-subsystem", LegacyKnowledgeAreaV1::WorkloadAndJobs, LegacyProcedureKindV1::Diagnose, "Triage IBM i queued or stalled work", &[
             "Establish the exact job, job queue, subsystem description and current queue/subsystem state.",
             "Inspect held/released/scheduled jobs, queue limits, subsystem active-job limits and current active jobs read-only.",
             "Distinguish application failure from work that is valid but not selected because of subsystem/job-queue state or limits.",
             "Any queue release, subsystem change or limit adjustment remains an operator-reviewed change proposal.",
-        ]),
-        procedure("legacy:ibmi:triage-db2-for-i", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "Triage Db2 for i availability and data-path failures", &[
+        ]), &["ibm:ibmi-work-management@7.6"][..]),
+        (procedure("legacy:ibmi:triage-db2-for-i", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "Triage Db2 for i availability and data-path failures", &[
             "Establish IBM i release/PTF context, local relational database identity and affected library/schema/object.",
             "Inspect database object state, locks, journal relationships and query/service evidence without changing schema or data.",
             "Separate local object/database health from DRDA/DDM or remote relational-database connectivity.",
             "Any index, journal, schema, data or package change remains proposal-only and must include rollback and verification.",
-        ]),
-        procedure("legacy:ibmi:triage-authority-denial", LegacyKnowledgeAreaV1::IdentityAndSecurity, LegacyProcedureKindV1::Diagnose, "Triage IBM i object authority denial", &[
+        ]), &["ibm:ibmi-db2@7.6", "ibm:ibmi-db2-distributed@7.6"][..]),
+        (procedure("legacy:ibmi:triage-authority-denial", LegacyKnowledgeAreaV1::IdentityAndSecurity, LegacyProcedureKindV1::Diagnose, "Triage IBM i object authority denial", &[
             "Establish the exact user profile, object, library, object type and requested operation.",
             "Inspect object owner, private/public/group/authorization-list authority and relevant special-authority context read-only.",
             "Use authority-collection evidence when available to distinguish required authority from unrelated privilege.",
             "Never treat *ALLOBJ or other broad special-authority assignment as a diagnostic shortcut; propose the narrowest reviewed change only if required.",
-        ]),
-        procedure("legacy:ibmi:triage-save-restore", LegacyKnowledgeAreaV1::AvailabilityAndRecovery, LegacyProcedureKindV1::Recover, "Triage IBM i save/restore recoverability", &[
+        ]), &["ibm:ibmi-object-authority@7.6", "ibm:ibmi-authority-collection@7.6"][..]),
+        (procedure("legacy:ibmi:triage-save-restore", LegacyKnowledgeAreaV1::AvailabilityAndRecovery, LegacyProcedureKindV1::Recover, "Triage IBM i save/restore recoverability", &[
             "Establish exact save scope, object types, library/IASP context, save media/save-file identity and timestamps.",
             "Inspect save history, object coverage, access-path/journal dependencies and restore prerequisites read-only.",
             "Separate a successful save operation from proof that the intended object set and dependencies can be restored.",
             "Any production restore remains proposal-only and requires explicit target, rollback/fallback, verification and blast-radius review.",
-        ]),
-        procedure("legacy:ibmi:triage-tcpip-service", LegacyKnowledgeAreaV1::Networking, LegacyProcedureKindV1::Diagnose, "Triage IBM i TCP/IP service reachability", &[
+        ]), &["ibm:ibmi-save-restore@7.6"][..]),
+        (procedure("legacy:ibmi:triage-tcpip-service", LegacyKnowledgeAreaV1::Networking, LegacyProcedureKindV1::Diagnose, "Triage IBM i TCP/IP service reachability", &[
             "Establish the exact interface/address family, route, target service and server-job/application context.",
             "Inspect interface, route and service-job state plus bounded reachability evidence without changing configuration.",
             "Distinguish transport/path failure from a healthy network path with an unhealthy or unauthorized application service.",
             "Any route/interface/service restart or configuration change remains proposal-only.",
-        ]),
+        ]), &["ibm:ibmi-tcpip-connectivity@7.6"][..]),
     ];
 
     let mut ids = BTreeSet::new();
-    for mut procedure in procedures {
-        procedure.source_snapshots = snapshots.clone();
+    for (mut procedure, source_ids) in procedures {
+        if source_ids.is_empty() {
+            return Err(LegacyIbmiErrorV1::InvalidField(format!(
+                "IBM i procedure {} requires at least one source snapshot",
+                procedure.id
+            )));
+        }
+        let mut exact_sources = BTreeSet::new();
+        for source_id in source_ids {
+            let source = SourceSnapshotIdV1((*source_id).into());
+            if !snapshots.contains(&source) {
+                return Err(LegacyIbmiErrorV1::InvalidField(format!(
+                    "IBM i procedure {} references unregistered source snapshot {}",
+                    procedure.id, source.0
+                )));
+            }
+            exact_sources.insert(source);
+        }
+        procedure.source_snapshots = exact_sources;
         if let Some(existing) = pack.procedures.iter().find(|p| p.id == procedure.id) {
             if existing != &procedure {
                 return Err(LegacyIbmiErrorV1::ProcedureIdentityConflict(procedure.id));
@@ -638,6 +655,28 @@ mod tests {
                 LegacyProcedureAuthorityV1::ReadOnlyObservation
                     | LegacyProcedureAuthorityV1::ChangeProposalOnly
             )));
+        }
+    }
+
+    #[test]
+    fn procedures_use_smallest_justified_source_sets() {
+        let mut pack = seed_legacy_computing_pack_v1(1_800_000_000_000).unwrap();
+        enrich_legacy_ibmi_foundation_v1(&mut pack, 1_800_000_000_100).unwrap();
+        let expected = [
+            ("legacy:ibmi:triage-object-resolution", &["ibm:ibmi-object-authority@7.6"][..]),
+            ("legacy:ibmi:triage-job-queue-subsystem", &["ibm:ibmi-work-management@7.6"][..]),
+            ("legacy:ibmi:triage-db2-for-i", &["ibm:ibmi-db2@7.6", "ibm:ibmi-db2-distributed@7.6"][..]),
+            ("legacy:ibmi:triage-authority-denial", &["ibm:ibmi-object-authority@7.6", "ibm:ibmi-authority-collection@7.6"][..]),
+            ("legacy:ibmi:triage-save-restore", &["ibm:ibmi-save-restore@7.6"][..]),
+            ("legacy:ibmi:triage-tcpip-service", &["ibm:ibmi-tcpip-connectivity@7.6"][..]),
+        ];
+        for (procedure_id, source_ids) in expected {
+            let procedure = pack.procedures.iter().find(|p| p.id == procedure_id).unwrap();
+            let expected_sources: BTreeSet<_> = source_ids
+                .iter()
+                .map(|id| SourceSnapshotIdV1((*id).into()))
+                .collect();
+            assert_eq!(procedure.source_snapshots, expected_sources);
         }
     }
 
