@@ -318,6 +318,9 @@ pub mod information_theory;
 /// Frechet mean, Riemannian gradient, and Principal Geodesic Analysis.
 pub mod geometric_ops;
 
+/// Strict state-space/manifold adapter over the existing hyperspherical HDC geometry.
+pub mod manifold_adapter;
+
 /// Probabilistic HDC: extends hypervectors with explicit uncertainty (mean + variance).
 /// Enables Bayesian belief updating, confidence-weighted similarity, and
 /// information-theoretic introspection --- the mathematical substrate for

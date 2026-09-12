@@ -78,6 +78,8 @@ pub mod genesis;
 pub mod hdc;
 /// Shared mathematical utilities: softmax, numerical helpers.
 pub mod math;
+/// Optional smooth-manifold refinement over planner-neutral metric spaces.
+pub mod smooth_manifold;
 /// Planner-neutral state-space, metric-space, product-space, and trajectory primitives.
 pub mod state_space;
 /// Metrics, tracing, and introspection.
