@@ -6,6 +6,7 @@ license = "AGPL-3.0-or-later"
 description = "Published-procedure Matbench v0.1 positional folds and leakage-mask binding for Symthaea Benchmark Zero."
 
 [dependencies]
+symthaea-bandgap = { path = "../../domains/symthaea-bandgap" }
 symthaea-matbench-gap = { path = "../symthaea-matbench-gap" }
 symthaea-energy-benchmark-zero = { path = "../../domains/symthaea-energy-benchmark-zero" }
 sha2 = { workspace = true }
