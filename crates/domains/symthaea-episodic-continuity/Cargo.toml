@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-episodic-continuity"
+version = "0.1.0"
+edition = "2024"
+description = "Exact restart continuity storage for canonical episodic occurrences and quarantine state"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+bincode = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
+symthaea-welfare-assurance = { path = "../symthaea-welfare-assurance" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-memory = { path = "../symthaea-memory" }
+tempfile = "3.8"
