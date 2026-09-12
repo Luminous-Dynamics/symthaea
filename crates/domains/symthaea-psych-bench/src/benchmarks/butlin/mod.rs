@@ -21,6 +21,8 @@ pub mod ae2_empirical_runner;
 pub mod experiment_protocol;
 pub mod hot2_calibration_task;
 pub mod hot2_confidence_protocol;
+#[cfg(feature = "symthaea-backend")]
+pub mod hot2_metacognitive_component;
 pub mod indicators;
 pub mod qualification_design;
 pub mod qualification_runtime;
