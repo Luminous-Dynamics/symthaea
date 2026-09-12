@@ -460,17 +460,24 @@ fn add_solaris_procedures(
     snapshots: &BTreeSet<SourceSnapshotIdV1>,
 ) -> Result<BTreeSet<String>, LegacySolarisErrorV1> {
     let defs = [
-        ("legacy:solaris:zfs-triage", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "Solaris ZFS layered triage", "Establish pool/vdev and dataset state separately before proposing storage changes."),
-        ("legacy:solaris:smf-triage", LegacyKnowledgeAreaV1::WorkloadAndJobs, LegacyProcedureKindV1::Diagnose, "Solaris SMF dependency triage", "Inspect service state, dependencies, restarter, logs, and configuration before proposing state changes."),
-        ("legacy:solaris:zones-triage", LegacyKnowledgeAreaV1::VirtualizationAndPartitioning, LegacyProcedureKindV1::Diagnose, "Solaris Zones scoped triage", "Separate global-zone health from affected-zone configuration, runtime, resources, networking, and in-zone service state."),
-        ("legacy:solaris:fma-triage", LegacyKnowledgeAreaV1::ObservabilityAndProblemManagement, LegacyProcedureKindV1::Diagnose, "Solaris FMA evidence triage", "Correlate current FMA diagnoses and lifecycle with the incident window before proposing component repair/replacement."),
-        ("legacy:solaris:dtrace-plan", LegacyKnowledgeAreaV1::ObservabilityAndProblemManagement, LegacyProcedureKindV1::Diagnose, "Solaris DTrace bounded diagnostic plan", "Define provider/probe, process/path, duration, and information goal before separately authorizing dynamic instrumentation."),
-        ("legacy:solaris:ipmp-triage", LegacyKnowledgeAreaV1::Networking, LegacyProcedureKindV1::Diagnose, "Solaris IPMP/network triage", "Compare IPMP group/member, datalink, address, route, and zone-visible path state before proposing network changes."),
-        ("legacy:solaris:ips-be-triage", LegacyKnowledgeAreaV1::SoftwareLifecycle, LegacyProcedureKindV1::Diagnose, "Solaris IPS/boot-environment triage", "Establish active boot environment, image, publisher, package, dependency, and update state before proposing package changes."),
+        ("legacy:solaris:zfs-triage", LegacyKnowledgeAreaV1::Storage, LegacyProcedureKindV1::Diagnose, "Solaris ZFS layered triage", "Establish pool/vdev and dataset state separately before proposing storage changes.", "oracle:solaris-zfs@11.4"),
+        ("legacy:solaris:smf-triage", LegacyKnowledgeAreaV1::WorkloadAndJobs, LegacyProcedureKindV1::Diagnose, "Solaris SMF dependency triage", "Inspect service state, dependencies, restarter, logs, and configuration before proposing state changes.", "oracle:solaris-smf@11.4"),
+        ("legacy:solaris:zones-triage", LegacyKnowledgeAreaV1::VirtualizationAndPartitioning, LegacyProcedureKindV1::Diagnose, "Solaris Zones scoped triage", "Separate global-zone health from affected-zone configuration, runtime, resources, networking, and in-zone service state.", "oracle:solaris-zones@11.4"),
+        ("legacy:solaris:fma-triage", LegacyKnowledgeAreaV1::ObservabilityAndProblemManagement, LegacyProcedureKindV1::Diagnose, "Solaris FMA evidence triage", "Correlate current FMA diagnoses and lifecycle with the incident window before proposing component repair/replacement.", "oracle:solaris-fma@11.4"),
+        ("legacy:solaris:dtrace-plan", LegacyKnowledgeAreaV1::ObservabilityAndProblemManagement, LegacyProcedureKindV1::Diagnose, "Solaris DTrace bounded diagnostic plan", "Define provider/probe, process/path, duration, and information goal before separately authorizing dynamic instrumentation.", "oracle:solaris-dtrace@11.4"),
+        ("legacy:solaris:ipmp-triage", LegacyKnowledgeAreaV1::Networking, LegacyProcedureKindV1::Diagnose, "Solaris IPMP/network triage", "Compare IPMP group/member, datalink, address, route, and zone-visible path state before proposing network changes.", "oracle:solaris-network-ipmp@11.4"),
+        ("legacy:solaris:ips-be-triage", LegacyKnowledgeAreaV1::SoftwareLifecycle, LegacyProcedureKindV1::Diagnose, "Solaris IPS/boot-environment triage", "Establish active boot environment, image, publisher, package, dependency, and update state before proposing package changes.", "oracle:solaris-ips-be@11.4"),
     ];
 
     let mut ids = BTreeSet::new();
-    for (id, area, kind, title, goal) in defs {
+    for (id, area, kind, title, goal, source_snapshot) in defs {
+        let source_snapshot = SourceSnapshotIdV1(source_snapshot.into());
+        if !snapshots.contains(&source_snapshot) {
+            return Err(LegacySolarisErrorV1::InvalidField(format!(
+                "Solaris procedure {id} references unregistered source snapshot {}",
+                source_snapshot.0
+            )));
+        }
         let procedure = LegacyProcedureV1 {
             id: id.into(),
             platform: LegacyPlatformV1::Solaris,
@@ -500,7 +507,7 @@ fn add_solaris_procedures(
                 "Re-observe the original symptom and directly affected Solaris mechanism after any separately authorized intervention.".into(),
                 "Verify adjacent ZFS/SMF/zone/FMA/network/boot-environment state did not regress.".into(),
             ],
-            source_snapshots: snapshots.clone(),
+            source_snapshots: [source_snapshot].into_iter().collect(),
         };
         insert_procedure_idempotent(pack, procedure)?;
         ids.insert(id.into());
@@ -686,6 +693,28 @@ mod tests {
                 LegacyProcedureAuthorityV1::ReadOnlyObservation
                     | LegacyProcedureAuthorityV1::ChangeProposalOnly
             )));
+        }
+    }
+
+    #[test]
+    fn procedures_use_mechanism_scoped_source_snapshots() {
+        let mut pack = pack();
+        enrich_legacy_solaris_foundation_v1(&mut pack, 1_800_000_000_100).unwrap();
+        let expected = [
+            ("legacy:solaris:zfs-triage", "oracle:solaris-zfs@11.4"),
+            ("legacy:solaris:smf-triage", "oracle:solaris-smf@11.4"),
+            ("legacy:solaris:zones-triage", "oracle:solaris-zones@11.4"),
+            ("legacy:solaris:fma-triage", "oracle:solaris-fma@11.4"),
+            ("legacy:solaris:dtrace-plan", "oracle:solaris-dtrace@11.4"),
+            ("legacy:solaris:ipmp-triage", "oracle:solaris-network-ipmp@11.4"),
+            ("legacy:solaris:ips-be-triage", "oracle:solaris-ips-be@11.4"),
+        ];
+        for (procedure_id, snapshot_id) in expected {
+            let procedure = pack.procedures.iter().find(|p| p.id == procedure_id).unwrap();
+            assert_eq!(procedure.source_snapshots.len(), 1);
+            assert!(procedure
+                .source_snapshots
+                .contains(&SourceSnapshotIdV1(snapshot_id.into())));
         }
     }
 
