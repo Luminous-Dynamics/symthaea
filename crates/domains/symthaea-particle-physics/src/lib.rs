@@ -13,7 +13,9 @@
 //! - **Lattice gauge primitives**: periodic SU(3) links, plaquettes, Wilson action,
 //!   Polyakov loops, and local gauge transformations
 //! - **Lattice update primitives**: deterministic embedded-SU(2) Metropolis
-//!   proposal steps with local six-plaquette action deltas
+//!   proposal steps with local touching-plaquette action deltas
+//! - **Lattice sweep contract**: symmetric proposal transform, pluggable uniform
+//!   source, lexicographic site/direction/subgroup composition, and sweep stats
 //!
 //! ## Natural Units
 //!
@@ -36,6 +38,7 @@ pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_metropolis;
 pub mod lattice_qcd;
+pub mod lattice_sweep;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -59,6 +62,10 @@ pub use lattice_metropolis::{
     LatticeMetropolisError, MetropolisStepResult, Su2Subgroup, Su2SubgroupProposal,
     affected_wilson_action, embedded_su2_rotation, metropolis_acceptance_probability,
     metropolis_subgroup_step,
+};
+pub use lattice_sweep::{
+    LatticeSweepError, SweepStats, SymmetricProposalConfig, Uniform01Source,
+    draw_symmetric_subgroup_proposal, metropolis_sweep,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
