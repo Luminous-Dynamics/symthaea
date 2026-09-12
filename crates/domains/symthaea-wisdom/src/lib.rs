@@ -33,12 +33,17 @@
 pub mod autopoiesis;
 pub mod harmonics;
 pub mod meta_cognition;
+pub mod ontology;
 
 pub use autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
 pub use harmonics::{
     ActiveHarmonic, HarmonicMode, HarmonicProfile, HarmonicQuestion, ReasoningBias,
 };
 pub use meta_cognition::{MetaCognitiveLayer, RecursiveModel, SelfModelAccuracy};
+pub use ontology::{
+    ActionAuthority, AffectiveSignal, AffectiveSignalKind, EpistemicState, NormativeValue,
+    ReasoningMode,
+};
 
 /// The core question each harmony asks of any situation
 pub const HARMONIC_QUESTIONS: [&str; 7] = [
