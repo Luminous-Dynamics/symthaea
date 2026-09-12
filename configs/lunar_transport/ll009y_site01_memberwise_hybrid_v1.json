@@ -1,0 +1,22 @@
+{
+  "schema_version": "ll009y.memberwise-hybrid-horizon-policy.v1",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "near_layer_id": "site01-near-5m",
+  "far_layer_id": "south-pole-far-80m",
+  "quantile_estimator": "empirical_cdf_nearest_rank",
+  "quantile": 0.99,
+  "full_horizon_composition": "memberwise_max_then_empirical_quantile",
+  "far_envelope_mode": "geometry_aware_distribution_free_rms_for_each_q_observer_scenario",
+  "spatial_support_margin_policy": "apply_exact_r_observed_positive_excursion_if_present",
+  "member_batch_size": 8,
+  "pixel_chunk_size": 100000,
+  "require_all_members_all_bins": true,
+  "semantic_statement": "The selected horizon is the finite empirical Q quantile across exact published Site01 members of memberwise near/far maxima. For each fixed Q observer/near-terrain scenario, the Product 90 marginal RMS model is re-evaluated geometrically under the exact W/X alpha budgets; no joint Q×far probability coupling is asserted.",
+  "non_claims": [
+    "The Q quantile is not promoted to a parent-population confidence guarantee.",
+    "The far alpha theorem is a marginal Product 90 RMS statement evaluated at each fixed Q observer scenario; Y does not establish a conditional far-error distribution given a Q clone state.",
+    "No independence, correlation model, or other joint Q×Product90 probability coupling is assumed, and the Q empirical quantile and far 1-alpha are not multiplied into a synthetic confidence percentage.",
+    "LL-009R spatial-support classes remain authoritative; unresolved physical terrain can still block stronger visibility claims.",
+    "This policy does not qualify Site01, a communications link, a power system, launch operations, or an architecture."
+  ]
+}
