@@ -8,12 +8,16 @@
 //! metacognitive, or authority stack.
 
 mod action_execution;
+mod baselines;
+mod campaign;
 pub mod consequence;
 pub mod constitution;
 mod custody;
 #[cfg(test)]
 mod custody_identity_tests;
 pub mod hidden_world;
+#[cfg(test)]
+mod transition_identity_tests;
 
 pub use consequence::{
     ConsequenceMetrics, ConsequencePrediction, ConsequenceScore, ConsequenceScoringError,
