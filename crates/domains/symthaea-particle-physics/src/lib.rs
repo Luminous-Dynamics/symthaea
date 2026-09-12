@@ -14,8 +14,6 @@
 //!   Polyakov loops, and local gauge transformations
 //! - **Lattice update primitives**: deterministic embedded-SU(2) Metropolis
 //!   proposal steps with local touching-plaquette action deltas
-//! - **Lattice sweep contract**: symmetric proposal transform, pluggable uniform
-//!   source, lexicographic site/direction/subgroup composition, and sweep stats
 //! - **Lattice RNG streams**: pinned ChaCha8 implementation with injective
 //!   campaign/replica/rank stream coordinates and endpoint-free U(0,1)
 //! - **Shared subgroup force**: one finite-probe semantic reference and one
@@ -26,6 +24,8 @@
 //!   updates with explicit reference/optimized force provenance
 //! - **Overrelaxation**: equal-action subgroup reflections using the same local
 //!   force semantics as the stochastic heat-bath path
+//! - **HB+OR cycle**: one stochastic heat-bath pass followed by a declared
+//!   number of RNG-free microcanonical sweeps with explicit work/fallback stats
 //!
 //! ## Natural Units
 //!
@@ -48,6 +48,7 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
+pub mod lattice_hb_or_sweep;
 pub mod lattice_heatbath;
 pub mod lattice_heatbath_su3;
 pub mod lattice_metropolis;
@@ -60,7 +61,6 @@ pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
 
-// Re-export key items
 pub use constants::*;
 pub use cross_sections::{
     Mandelstam, alpha_em_running, alpha_s_running, r_ratio, sigma_compton, sigma_ee_to_mumu,
@@ -74,6 +74,11 @@ pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
     su3_determinant_error, su3_diagonal, su3_identity, su3_mul, su3_trace,
     su3_unitarity_error, validate_su3,
+};
+pub use lattice_hb_or_sweep::{
+    HeatbathOverrelaxationError, HeatbathOverrelaxationSchedule,
+    HeatbathOverrelaxationStats, HeatbathSweepStats, heatbath_overrelaxation_cycle,
+    heatbath_sweep_with_backend,
 };
 pub use lattice_heatbath::{
     Su2HeatbathError, Su2HeatbathMethod, Su2HeatbathSample,
