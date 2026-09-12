@@ -234,7 +234,7 @@ mod tests {
 
         wisdom.update_from_experience(0.3, 0.8, 0.7); // High uncertainty
 
-        let final_play = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
+        let final_play = wisdom.harmonics.get(ActiveHarmonic::Play);
         assert!(final_play > initial_play);
     }
 
