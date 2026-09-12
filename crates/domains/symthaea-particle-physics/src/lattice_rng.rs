@@ -20,6 +20,7 @@ pub enum LatticeStreamDomain {
     GaugeTransition = 1,
     Bootstrap = 2,
     Qualification = 3,
+    GaugeInitialization = 4,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,7 +100,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn stream_coordinates_pack_injectively_for_neighbors() {
+    fn stream_coordinates_pack_injectively_for_neighbors_and_domains() {
         let a = LatticeStreamCoordinates {
             domain: LatticeStreamDomain::GaugeTransition,
             ensemble_slot: 0x123456,
@@ -107,8 +108,13 @@ mod tests {
             rank: 0xbcde,
         };
         let b = LatticeStreamCoordinates { rank: 0xbcdf, ..a };
+        let init = LatticeStreamCoordinates {
+            domain: LatticeStreamDomain::GaugeInitialization,
+            ..a
+        };
         assert_eq!(a.stream_id().unwrap(), 0x0112_3456_789a_bcde);
         assert_ne!(a.stream_id().unwrap(), b.stream_id().unwrap());
+        assert_ne!(a.stream_id().unwrap(), init.stream_id().unwrap());
     }
 
     #[test]
