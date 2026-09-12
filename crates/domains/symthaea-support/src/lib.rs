@@ -34,6 +34,7 @@ pub mod legacy_portfolio;
 pub mod legacy_qualification_profile;
 pub mod legacy_qualification_profile_v3;
 pub mod legacy_qualification_source_ledger_v3;
+pub mod legacy_semantic_replacement;
 pub mod legacy_solaris;
 pub mod legacy_solaris_scenarios;
 pub mod legacy_source_artifacts;
@@ -164,8 +165,22 @@ pub use legacy_qualification_profile::{
     LEGACY_QUALIFICATION_PROFILE_SCHEMA_V1,
 };
 pub use legacy_qualification_profile_v3::{
-    assess_legacy_qualification_profile_v3, LegacyQualificationProfileAssessmentV3,
-    LegacyQualificationProfileErrorV3, LegacyQualificationRequirementAssessmentV3,
+    assess_legacy_qualification_generation_v1,
+    assess_legacy_qualification_manifest_source_readiness_v1,
+    assess_legacy_qualification_profile_v3,
+    build_legacy_qualification_successor_manifest_v1,
+    initial_legacy_qualification_manifest_v1,
+    legacy_qualification_manifest_commitment_v1,
+    plan_legacy_qualification_manifest_captures_v1,
+    validate_legacy_qualification_manifest_transition_v1,
+    LegacyQualificationGenerationAssessmentV1,
+    LegacyQualificationManifestErrorV1,
+    LegacyQualificationManifestV1,
+    LegacyQualificationProfileAssessmentV3,
+    LegacyQualificationProfileErrorV3,
+    LegacyQualificationRequirementAssessmentV3,
+    LEGACY_QUALIFICATION_GENERATION_ASSESSMENT_SCHEMA_V1,
+    LEGACY_QUALIFICATION_MANIFEST_SCHEMA_V1,
     LEGACY_QUALIFICATION_PROFILE_ASSESSMENT_SCHEMA_V3,
 };
 pub use legacy_qualification_source_ledger_v3::{
@@ -176,6 +191,22 @@ pub use legacy_qualification_source_ledger_v3::{
     LegacyQualificationSourceLedgerErrorV3, LegacyQualificationSourceLedgerV3,
     LegacyQualificationSourceReadinessV3, LegacyQualificationSourceSelectionV3,
     LEGACY_QUALIFICATION_SOURCE_LEDGER_SCHEMA_V3,
+};
+pub use legacy_semantic_replacement::{
+    assess_legacy_qualification_generation_with_semantic_review_v1,
+    legacy_claim_replacement_review_binding_v1,
+    legacy_procedure_replacement_review_binding_v1,
+    require_legacy_semantic_replacement_equivalence_v1,
+    validate_legacy_claim_replacement_review_receipt_v1,
+    validate_legacy_procedure_replacement_review_receipt_v1,
+    LegacyClaimReplacementReviewReceiptV1,
+    LegacyProcedureReplacementReviewReceiptV1,
+    LegacySemanticReplacementAssessmentV1,
+    LegacySemanticReplacementErrorV1,
+    LegacySemanticReplacementJudgmentV1,
+    LegacySemanticReplacementReviewLedgerV1,
+    LegacySemanticReviewMethodV1,
+    LEGACY_SEMANTIC_REPLACEMENT_LEDGER_SCHEMA_V1,
 };
 pub use legacy_solaris::{
     enrich_legacy_solaris_foundation_v1, LegacySolarisErrorV1, SolarisEvidenceSignalV1,
@@ -200,7 +231,9 @@ pub use legacy_source_capture_plan::{
     LegacySourceCaptureRequestV2, LEGACY_SOURCE_CAPTURE_PLAN_SCHEMA_V2,
 };
 pub use legacy_source_capture_plan_v3::{
-    legacy_source_revision_commitment_v3, plan_legacy_qualification_source_captures_v3,
+    legacy_source_revision_commitment_v3,
+    plan_legacy_qualification_source_captures_for_targets_v3,
+    plan_legacy_qualification_source_captures_v3,
     LegacyPotentialFetchReuseGroupV3, LegacySourceCapturePlanErrorV3,
     LegacySourceCapturePlanV3, LegacySourceRevisionCaptureRequestV3,
     LEGACY_SOURCE_CAPTURE_PLAN_SCHEMA_V3,
