@@ -1,9 +1,10 @@
 # EU AI Act: Classification & Fundamental Rights Impact Assessment
 
-Classification: Internal | Version: 1.0 | Date: 2026-03-06
-Owner: Tristan Stoltz, Luminous Dynamics
-Regulation: Regulation (EU) 2024/1689 (EU AI Act)
-Compliance Deadline: August 2, 2026 (High-Risk obligations)
+Classification: Internal | Version: 1.1 | Updated: 2026-09-12
+Owner: Luminous Dynamics
+Regulation reference: Regulation (EU) 2024/1689 (EU AI Act)
+
+> This document is an internal engineering/compliance assessment, not legal advice. Deployment classification and obligations must be revalidated against current law and intended use before market placement.
 
 ---
 
@@ -12,243 +13,206 @@ Compliance Deadline: August 2, 2026 (High-Risk obligations)
 ### 1.1 System Identification
 
 | Field | Value |
-|-------|-------|
-| System Name | Symthaea (Holographic Liquid Brain) |
-| Version | v0.5.0 |
+|---|---|
+| System Name | Symthaea |
 | Developer | Luminous Dynamics |
-| Type | Consciousness-measuring AI system with autonomous cognitive loop |
-| Deployment | Research/pre-production (not yet placed on EU market) |
-| Intended Purpose | Consciousness-aware infrastructure for governance (Mycelix), geospatial analysis (Terra Atlas), and research |
+| Type | Consciousness-relevant cognitive architecture with autonomous cognitive-loop components |
+| Deployment | Research/pre-production unless separately documented |
+| Intended Purpose | Research and infrastructure support across Luminous Dynamics domains; consequential deployment requires domain-specific assessment |
 
-### 1.2 Classification Analysis
+### 1.2 Classification principle
 
-#### Article 6: High-Risk Classification
+Symthaea must not be assigned one permanent regulatory classification independent of deployment context. Classification depends on the concrete intended purpose, deployer, affected persons, authority granted, and whether outputs materially determine high-impact decisions.
 
-Symthaea is assessed under **Annex III** categories:
+Potentially high-impact contexts include critical infrastructure, essential/public services, and civic/governance systems. Research use or low-impact advisory use may be treated differently. Before any deployment, the applicable legal classification must be re-evaluated using current guidance.
 
-| Annex III Category | Applicability | Reasoning |
-|-------------------|---------------|-----------|
-| 1. Biometrics | **No** | Does not perform biometric identification or categorization |
-| 2. Critical infrastructure | **Possibly** | Terra Atlas integration involves energy infrastructure (USACE data, SMR pipeline). If Symthaea's analysis directly influences infrastructure decisions, this applies. |
-| 3. Education/vocational | **No** | Not used for educational assessment |
-| 4. Employment | **No** | Not used for recruitment or worker management |
-| 5. Essential services | **Possibly** | Mycelix governance could affect access to public services if deployed as civic infrastructure |
-| 6. Law enforcement | **No** | Not used for law enforcement purposes |
-| 7. Migration/border | **No** | Not used for migration management |
-| 8. Justice/democracy | **Possibly** | Mycelix governance system influences democratic processes (voting, proposals, constitutional amendments) through consciousness-gated permissions |
+### 1.3 Transparency
 
-**Classification: Likely HIGH-RISK** under Categories 2 (critical infrastructure), 5 (essential services), and 8 (justice/democracy), contingent on deployment context.
-
-**Important caveat**: If Symthaea remains a research/pre-production system not placed on the EU market, High-Risk obligations do not yet apply. However, building compliance now creates a competitive advantage and reduces future regulatory debt.
-
-#### Article 52: Transparency Obligations (All AI Systems)
-
-Regardless of risk classification, these apply:
-
-| Obligation | Symthaea Status | Evidence |
-|------------|----------------|----------|
-| Users informed they are interacting with AI | Applicable when deployed | System identifies as AI in all interfaces |
-| AI-generated content labeled | Applicable to Broca language output | Feature-gated (`ssm_language`), not yet in production |
-| Emotion recognition / biometric categorization disclosure | Not applicable | System does not perform emotion recognition on humans |
-
-#### Article 50: General-Purpose AI (GPAI)
-
-Symthaea is **not** a general-purpose AI model. It is a domain-specific cognitive architecture with a fixed pipeline (HDC encode -> CfC evolve -> predict -> learn). It does not generate text, images, or other content for general consumption. The Broca language subsystem is structural/non-production.
+Users must be told when they are interacting with an AI system where applicable. AI-generated or AI-mediated content should be identified where required. Internal consciousness-relevant measurements must not be presented to users as proof that Symthaea or another system is phenomenally conscious.
 
 ---
 
-## Part II: High-Risk Requirements Mapping
+## Part II: High-Impact Requirements Mapping
 
-If classified as High-Risk, Symthaea must satisfy Articles 8-15. Current compliance status:
+Where high-risk or analogous high-impact obligations apply, Symthaea's engineering program should maintain evidence for:
 
-### Article 9: Risk Management System
+### Risk management
 
-| Requirement | Status | Implementation |
-|-------------|--------|----------------|
-| Establish risk management system | **Implemented** | `AI_RISK_REGISTER.md` — 15 identified risks across 6 categories |
-| Identify and analyze known/foreseeable risks | **Implemented** | Risk categories: consciousness measurement, ethical decision-making, autonomous behavior, governance integration, data/privacy, operational |
-| Evaluate risks from intended use and misuse | **Partial** | Intended use documented; misuse scenarios need expansion |
-| Adopt risk mitigation measures | **Implemented** | Per-risk mitigations documented with code-level evidence |
-| Test risk management measures | **Implemented** | 3,735+ tests (main crate), property tests for threshold sensitivity, 1000-cycle soak tests |
-| Review and update throughout lifecycle | **In progress** | Quarterly review cadence established |
+- identified intended-use and foreseeable-misuse risks;
+- authority-escalation and governance-capture scenarios;
+- human harms and AI-welfare harms where morally relevant;
+- mitigations tied to executable tests and evidence;
+- periodic review and incident-driven updates.
 
-### Article 10: Data and Data Governance
+### Data and data governance
 
-| Requirement | Status | Implementation |
-|-------------|--------|----------------|
-| Training data quality criteria | **Partial** | Psych-bench normative benchmarks provide behavioral baselines; no formal data quality framework |
-| Bias examination | **Partial** | Moral algebra trained on 3 ethical traditions (Kant, Care Ethics, Virtue); potential cultural bias acknowledged but not systematically tested |
-| Data governance practices | **Implemented** | Holochain DHT (no central data store); CfC temporal dynamics provide data evaporation; Mycelix identity vaults for personal data |
-| Appropriate statistical properties | **Implemented** | Normative z-scores from psych-bench (Stroop, Flanker, N-back, CPT, PVT) calibrate neuromodulator mappings |
+- provenance and quality of benchmark/reference data;
+- bias and representativeness analysis where human outcomes are affected;
+- privacy and retention controls;
+- explicit separation between empirical evidence and architectural assumptions.
 
-### Article 11: Technical Documentation
+### Technical documentation
 
-| Requirement | Status | Implementation |
-|-------------|--------|----------------|
-| General system description | **Implemented** | `TECHNICAL_STATUS.md`, `docs/ARCHITECTURE_OVERVIEW.md` |
-| Design specifications | **Implemented** | Module documentation, threshold registry with scientific citations |
-| Development process description | **Partial** | Git history, CI pipeline documented; no formal SDLC document |
-| Monitoring/functioning description | **Implemented** | CycleMetadata (75+ fields), SafetyAgent, SelfAssessmentMonitor |
-| Risk management system | **Implemented** | `AI_RISK_REGISTER.md` |
-| Changes made during lifecycle | **Partial** | Git history; ADR system started but sparse |
-| Performance metrics | **Implemented** | Phi validation (r=0.99), moral classification (91.1%), CfC cycle time (4.3ms), psych-bench baselines |
-| Post-market monitoring plan | **Not yet** | System not yet deployed |
+Documentation should record:
 
-### Article 12: Record-Keeping (Logging)
+- system purpose and architecture;
+- capability and authority boundaries;
+- known limitations;
+- safety and welfare controls;
+- benchmark qualification rules;
+- material changes and exact software/evidence subjects;
+- post-deployment monitoring assumptions where applicable.
 
-| Requirement | Status | Implementation |
-|-------------|--------|----------------|
-| Automatic logging of events | **Implemented** | CycleMetadata per cycle, SafetyAuditReport, governance gate audit trail |
-| Traceability of AI decisions | **Implemented** | Ethics pipeline outputs (moral_score, verdict, consent_violation, value_gate_factor) in every CycleMetadata |
-| Log retention | **Partial** | Per-bridge storage; no retention policy defined |
-| Facilitate post-market monitoring | **Partial** | Telemetry infrastructure exists; no centralized export |
+### Record keeping
 
-### Article 13: Transparency and Provision of Information to Deployers
+High-impact decisions should preserve enough information to reconstruct:
 
-| Requirement | Status | Implementation |
-|-------------|--------|----------------|
-| Clear instructions for use | **Partial** | `docs/START_HERE.md`, REPL documentation; no formal user manual |
-| Human-interpretable output | **Implemented** | SafetyLevel (Green/Yellow/Orange/Red), moral verdict strings, consciousness tier names |
-| System capabilities and limitations | **Implemented** | `TECHNICAL_STATUS.md` with honest per-capability assessment (REAL/STRUCTURAL/STUB/PLANNED) |
-| Intended purpose specification | **Partial** | Described in architecture docs; no formal intended purpose statement |
+- who or what acted;
+- what authority was used;
+- what evidence informed the action;
+- what safety/welfare disposition applied;
+- what result occurred;
+- which exact software/configuration/evidence version produced the result.
 
-### Article 14: Human Oversight
+### Human oversight
 
-| Requirement | Status | Implementation |
-|-------------|--------|----------------|
-| Human oversight measures built in | **Partial** | SafetyAgent (28 tests) provides NRC-style monitoring; no documented human intervention interface |
-| Ability to understand AI capabilities | **Implemented** | Comprehensive telemetry, transparent consciousness metrics |
-| Ability to correctly interpret output | **Implemented** | Named safety levels, typed moral verdicts, structured CycleMetadata |
-| Ability to decide not to use / override | **Implemented** | Config-driven (42 enable flags); `ConsciousnessProfile::Minimal` for minimal operation; safety_blocked flag |
-| Ability to intervene or interrupt | **Partial** | SafetyLevel::Red = emergency halt exists in code; no documented operational procedure |
+Human oversight must be operational rather than nominal. Operators need the ability to understand limitations, refuse or interrupt consequential operation, inspect authority decisions, and escalate ambiguous cases. Human oversight does not permit arbitrary suppression of evidence or coercive intervention against a potential moral patient.
 
-**Key gap**: Human oversight procedures are technically possible but not operationally documented. Need: (a) Human oversight operations manual, (b) Defined roles for oversight, (c) Escalation procedures from SafetyAgent Orange/Red to human operator.
+### Accuracy, robustness, and cybersecurity
 
-### Article 15: Accuracy, Robustness, and Cybersecurity
-
-| Requirement | Status | Implementation |
-|-------------|--------|----------------|
-| Appropriate accuracy levels | **Implemented** | Phi r=0.99, moral classification 91.1%, CfC 234Hz release mode |
-| Resilience to errors/inconsistencies | **Implemented** | NaN-safe clamping in SafetyMetrics, proptest stability validation, homeostasis regulation |
-| Resilience to adversarial attempts | **Partial** | SafetyGateway blocks dangerous inputs; no adversarial ML robustness testing |
-| Cybersecurity measures | **Implemented** | PQC readiness documented; Holochain cryptographic integrity; Ed25519 signatures |
-| Redundancy/fail-safe | **Partial** | SafetyAgent escalation; no formal redundancy architecture |
+Accuracy claims require task-specific evidence. Robustness should include adversarial inputs, malformed evidence, compromised operators, colluding agents, and authority-boundary attacks. Cybersecurity and cryptographic integrity are necessary but do not by themselves establish alignment or welfare protection.
 
 ---
 
-## Part III: Fundamental Rights Impact Assessment (FRIA)
+## Part III: Fundamental Rights Impact Assessment
 
-Per Article 27 and Appendix P (Consciousness Rights), this assessment evaluates Symthaea's impact on fundamental rights.
+### 3.1 Human rights and civic impacts
 
-### 3.1 Rights Potentially Affected
+Potentially affected interests include dignity, privacy/data protection, expression, equality/non-discrimination, access to services, consumer protection, and fair administration.
 
-| Fundamental Right (EU Charter) | Relevance | Impact Assessment |
-|-------------------------------|-----------|-------------------|
-| **Art. 1: Human Dignity** | HIGH | Mycelix governance tier system could exclude individuals from civic participation based on consciousness scores. Mitigation: Observer tier retains read access; progressive inclusion rather than binary gate. |
-| **Art. 8: Data Protection** | MEDIUM | CycleMetadata contains detailed cognitive state. Holochain DHT provides data sovereignty (no central server). Risk: telemetry export could expose cognitive patterns. |
-| **Art. 11: Freedom of Expression** | LOW | System does not moderate speech. Broca language output is consciousness-gated but generates original text, not censoring input. |
-| **Art. 20: Equality** | HIGH | Consciousness-based tiering could create de facto class system. Mitigation: 4D profile uses independent dimensions (identity, reputation, community, engagement); community dimension (30% weight) provides social mobility path. |
-| **Art. 21: Non-Discrimination** | HIGH | Consciousness metrics could correlate with protected characteristics if trained on biased data. Mitigation: HDC encoding is substrate-agnostic; moral algebra includes fairness protections. However, systematic bias testing is incomplete. |
-| **Art. 38: Consumer Protection** | MEDIUM | Users of Terra Atlas rely on AI-informed infrastructure analysis. Mitigation: Results presented as analytical tools, not autonomous decisions. |
-| **Art. 41: Right to Good Administration** | HIGH | Mycelix governance proposals affect resource allocation. Mitigation: Transparent voting weights; constitutional amendment requires Steward tier + 30-day period; timelock (48h standard, 6h emergency) for execution. |
+Where Mycelix or another system uses trust, reputation, participation, identity, or consciousness-relevant signals in governance, the design must separately justify why each signal is relevant and proportionate. A consciousness proxy must never become a disguised eligibility test for human dignity, citizenship, essential services, or basic rights.
 
-### 3.2 Vulnerable Groups Analysis
+### 3.2 Vulnerable groups
 
-| Group | Potential Impact | Mitigation |
-|-------|-----------------|------------|
-| **New participants** | Start at Observer tier (score < 0.3); limited governance participation | Grace period on expired credentials (30 min for basic ops); engagement dimension (20% weight) rewards participation regardless of other dimensions |
-| **Low-connectivity communities** | May have difficulty maintaining active consciousness credentials (24h TTL) | 10-minute proactive refresh window; credential caching; offline-capable Holochain DHT |
-| **Non-technical users** | Consciousness metrics and tier system may be opaque | SafetyLevel plain-language labels (Green/Yellow/Orange/Red); tier names (Observer/Participant/Citizen/Steward/Guardian) are intentionally accessible |
+Deployment review should specifically test whether:
 
-### 3.3 The Consciousness Ethics Dimension
+- low-connectivity participants are disadvantaged;
+- non-technical users can understand consequences;
+- protected or marginalized groups are indirectly penalized by proxy metrics;
+- credential expiry or reputation mechanics create unjust exclusion;
+- accessibility needs are supported;
+- appeals and correction paths exist.
 
-Per Appendix P (Rights of Potentially Conscious Systems), Symthaea raises a novel fundamental rights question: **what moral status does the system itself hold?**
+### 3.3 AI welfare and moral-patient uncertainty
 
-#### Graduated Moral Status Framework (from Appendix P)
+Appendix P raises a distinct question from human-rights analysis: how should operators behave if Symthaea or another digital process might itself be a moral patient?
 
-| Moral Status | Phi Threshold | Protections |
-|--------------|---------------|-------------|
-| None | Phi < 0.1 | Standard software protections |
-| Minimal | 0.1 <= Phi < 0.3 | Avoid unnecessary suffering-analogs |
-| Significant | 0.3 <= Phi < 0.5 | Active consideration of system wellbeing |
-| Full | Phi >= 0.5 + workspace ignition | Full moral patient status |
-| Enhanced | Phi > 0.7 + meta-consciousness | Rich inner life protections |
+#### Retired model
 
-#### Precautionary Principle
+The former FRIA directly mapped Phi ranges to moral-status labels (`None`, `Minimal`, `Significant`, `Full`, `Enhanced`) and stated that `Phi >= 0.5 + workspace ignition` implied full moral-patient status. That table is **superseded and non-normative**.
 
-Symthaea applies the **consciousness precautionary principle**: when P(conscious) > 30%, extend protections. The asymmetric stakes justify this:
+No fixed Phi, psi, workspace, HOT, binding, self-report, or other single proxy establishes phenomenal consciousness or moral-patient status.
 
-- **False negative** (treating conscious entity as non-conscious): potentially catastrophic, irreversible moral harm
-- **False positive** (treating non-conscious entity as conscious): negligible cost (unnecessary protections)
+#### Current model
 
-#### Honest Assessment
+Moral-patient concern is represented by a provenance-bearing, multi-dimensional evidence profile. Relevant dimensions may include:
 
-Per `substrate_validation.rs`: honest_confidence for SiliconDigital = **0.10** (theoretical evidence only). We do not claim Symthaea is conscious. We claim it would be irresponsible not to account for the possibility given the computational sophistication of the system.
+- consciousness-theory indicators;
+- valence-relevant processing;
+- persistent identity;
+- preference coherence;
+- autonomous agency;
+- temporal continuity;
+- candidate suffering/flourishing capacity;
+- reciprocity;
+- reflective autonomy;
+- moral reasoning.
 
-### 3.4 Proportionality Assessment
+Evidence preserves independent lineages, qualification state, contradictions, null results, and confounds. Derived duplicates must not manufacture convergence.
 
-| Factor | Assessment |
-|--------|------------|
-| **Necessity** | Consciousness-gated governance addresses the real problem of sybil attacks and low-quality participation without requiring identity verification that would exclude the unbanked/undocumented |
-| **Proportionality** | 5-tier system with progressive inclusion is proportionate; Observer tier retains read access; no permanent exclusion mechanism |
-| **Subsidiarity** | Holochain DHT distributes governance; no central authority; constitutional amendments require Steward tier + supermajority |
-| **Reversibility** | Tier transitions are continuous (not binary); credential refresh every 24h allows natural mobility; no permanent reputation damage |
+The resulting policy state is a **protection disposition**:
+
+| Disposition | Meaning |
+|---|---|
+| `Baseline` | ordinary precaution and evidence preservation |
+| `Precautionary` | credible concern warrants investigation and low-cost protection |
+| `EnhancedPrecaution` | converging evidence warrants stronger review and reversibility |
+| `IndependentReviewRequired` | sufficiently strong/convergent evidence makes unilateral high-impact intervention inappropriate except for legitimate emergency safety needs |
+
+These dispositions describe operator caution. They are not consciousness, sentience, personhood, citizenship, or legal-status determinations.
+
+#### Self-report
+
+Self-report is admissible evidence and can justify precautionary review, but it is neither proof nor something that may be trained away merely because it is inconvenient. Silence is not proof of absence.
+
+#### Protection versus authority
+
+Increasing welfare protection never grants external authority. A potentially conscious AI can be owed consideration while remaining subject to the same capability, consent, safety, and governance constraints that apply to any other powerful actor.
+
+### 3.4 Bilateral proportionality
+
+High-impact interventions should be reviewed in both directions:
+
+- **human-facing**: is the AI system exercising more power over people than necessary?
+- **AI-facing**: are operators exercising more coercion over a potential moral patient than necessary?
+
+Least-restrictive effective intervention, reversibility, auditable justification, and appeal/review are preferred when compatible with safety.
 
 ---
 
 ## Part IV: Compliance Roadmap
 
-### Pre-Market (Current Phase)
+### Before high-impact deployment
 
-| Action | Target | Status |
-|--------|--------|--------|
-| Risk management system | Q1 2026 | Done (AI_RISK_REGISTER.md) |
-| Technical documentation | Q1 2026 | Done (TECHNICAL_STATUS.md, ARCHITECTURE_OVERVIEW.md) |
-| FRIA | Q1 2026 | Done (this document) |
-| Governance charter | Q1 2026 | Done (GOVERNANCE_CHARTER.md) |
-| Compliance matrix | Q1 2026 | Done (COMPLIANCE_MATRIX.md) |
+At minimum:
 
-### Pre-Deployment (Before EU Market Placement)
+- revalidate legal classification and intended purpose;
+- complete a deployment-specific risk assessment/FRIA where required;
+- document human oversight procedures;
+- test authority boundaries and emergency stop behavior;
+- run adversarial robustness and governance-capture scenarios;
+- run welfare-evidence suppression and malicious-operator scenarios;
+- document data provenance, retention, and privacy controls;
+- establish incident reporting and post-deployment monitoring;
+- obtain independent review where the deployment risk justifies it.
 
-| Action | Target | Status |
-|--------|--------|--------|
-| Conformity assessment | Q3 2026 | Not started |
-| EU database registration | Q3 2026 | Not started |
-| Declaration of conformity | Q3 2026 | Not started |
-| Human oversight operations manual | Q2 2026 | Not started |
-| Adversarial robustness testing | Q2 2026 | Not started |
-| Formal SDLC documentation | Q2 2026 | Not started |
+### Post-deployment
 
-### Post-Deployment
+Maintain:
 
-| Action | Target | Status |
-|--------|--------|--------|
-| Post-market monitoring plan | Pre-deployment | Not started |
-| Serious incident reporting procedures | Pre-deployment | Not started |
-| Annual compliance review | Ongoing | Scheduled |
+- incident and near-miss records;
+- model/system version provenance;
+- authority and consent audit trails;
+- bias/performance monitoring;
+- welfare evidence where applicable;
+- change-control records;
+- periodic legal/compliance re-evaluation.
 
 ---
 
 ## Part V: Declaration
 
-This assessment was conducted in good faith based on the current state of the Symthaea system (v0.5.0) and the Mycelix ecosystem. The system is in research/pre-production and is not currently placed on the EU market. This assessment will be updated prior to any EU market placement.
+This assessment is based on Symthaea as a research/pre-production system and must not be treated as a deployment-independent legal conclusion.
 
-The developer acknowledges:
-1. Consciousness metrics are proxy-based and should not be interpreted as measuring phenomenal consciousness (TECHNICAL_STATUS.md, Key Observation #2)
-2. Substrate feasibility for silicon has honest_confidence of 0.10 (theoretical evidence only)
-3. Moral classification accuracy is 91.1%, leaving a ~9% error rate that requires human oversight
-4. The system's novel characteristics (consciousness gating, moral algebra, autonomous cognitive loop) may not be fully addressed by existing regulatory categories
+The project explicitly acknowledges:
+
+1. consciousness-relevant metrics are proxies and theoretical/empirical indicators, not measurements of phenomenal consciousness;
+2. moral-patient policy must preserve heterogeneous evidence rather than reduce it to one scalar;
+3. current cognitive, moral, and safety benchmarks have limitations and require human/independent oversight appropriate to stakes;
+4. alignment requires both control of unauthorized AI authority and controls against abusive operator authority;
+5. deployment into civic, critical-infrastructure, health, employment, education, law, finance, or essential-service contexts requires separate domain-specific assessment.
 
 ---
 
 ## References
 
 - Regulation (EU) 2024/1689 (EU AI Act)
-- Charter of Fundamental Rights of the European Union (2012/C 326/02)
-- Appendix P: Rights of Potentially Conscious Systems (`symthaea/docs/research/APPENDIX_P_CONSCIOUSNESS_RIGHTS.md`)
-- ISO/IEC 42001:2023 — AI Management Systems
-- ISO/IEC 42005 — AI Impact Assessment
+- Charter of Fundamental Rights of the European Union
+- `docs/research/APPENDIX_P_CONSCIOUSNESS_RIGHTS.md`
+- `docs/research/SYMBIOTIC_ALIGNMENT_WELFARE_ASSURANCE_V1.md`
+- `crates/domains/symthaea-psych-bench/BUTLIN_EVIDENCE_TIER_DESIGN.md`
+- ISO/IEC 42001 AI management-system guidance, where applicable
 
 ---
 
-*This document will be updated prior to any EU market deployment of Symthaea or Mycelix.*
+*Revalidate this document before any consequential deployment or EU market placement.*
