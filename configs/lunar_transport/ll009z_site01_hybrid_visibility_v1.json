@@ -1,0 +1,18 @@
+{
+  "schema_version": "ll009z.hybrid-visibility-policy.v1",
+  "target_evidence_class": "hybrid_scenario_sampled_visibility",
+  "required_y_binding_mode": "empirical_q_of_scenario_parameterized_distribution_free_far_envelopes",
+  "numeric_mutation_policy": "forbidden_copy_exact_s_metrics_and_targets",
+  "joint_probability_policy": "prohibited_without_joint_coupling_theorem",
+  "blocked_stronger_classes": [
+    "risk_qualified_visibility",
+    "deterministic_visibility_bound",
+    "joint_probability_visibility"
+  ],
+  "non_claims": [
+    "The finite Q empirical quantile is not a population confidence guarantee.",
+    "The far-field alpha theorem remains separate from the Q ensemble statistic and is not multiplied into a joint confidence level.",
+    "Spatial-support limitations remain exactly those of LL-009R and the bound Y K-pack.",
+    "Visibility geometry is not an RF link budget, delivered solar power model, site qualification, mission-safety determination, or operations authority."
+  ]
+}
