@@ -12,6 +12,7 @@ use std::time::Instant;
 
 use crate::consciousness::cross_modal_binding::{ModalRepresentation, Modality};
 use crate::consciousness::fep_active_inference::Observation;
+use crate::cognitive_loop::fep_module::InternalRegulationAction;
 
 use super::super::{CognitiveLoopService, CycleResult, MoralJudgmentSummary, ResponseStrategy};
 use crate::cognitive_loop::feedback_state::Priority;
@@ -745,14 +746,33 @@ impl CognitiveLoopService {
         );
         let _perception = self.fep.agent.perceive(&fep_obs);
         let action_result = self.fep.agent.select_action();
-        let _outcome = self.fep.agent.act(action_result.action);
 
         let fep_action_idx = action_result.action;
         let fep_action_probs = action_result.action_probabilities.clone();
 
+        let regulation_action = match InternalRegulationAction::try_from(fep_action_idx) {
+            Ok(action) => action,
+            Err(_) => {
+                tracing::error!(
+                    action_index = fep_action_idx,
+                    configured_actions = self.fep.agent.config.num_actions,
+                    "FEP selected action outside typed internal-regulation domain; refusing commitment"
+                );
+                return (
+                    fep_action_idx,
+                    fep_action_probs,
+                    self.fep.agent.is_surprised(),
+                    action_result.pragmatic_value,
+                );
+            }
+        };
+
+        // Commit only after the raw index has a declared cognitive-loop meaning.
+        let _outcome = self.fep.agent.act(fep_action_idx);
         let is_surprised = self.fep.agent.is_surprised();
-        match action_result.action {
-            0 => {
+
+        match regulation_action {
+            InternalRegulationAction::AdaptLearning => {
                 // Boost learning rate when free energy is high
                 if let Some(ref fe) = self.fep.agent.last_fe_components {
                     let fe_boost = (fe.total.abs() as f32 / FEP_ACTION_FE_DIVISOR).clamp(0.0, 1.5);
@@ -763,14 +783,14 @@ impl CognitiveLoopService {
                     );
                 }
             }
-            1 => {
+            InternalRegulationAction::RefreshSensoryPrecision => {
                 // Reset sensory precision toward 1.0 to trust new observations after shift
                 let current = self.fep.agent.precision.sensory_precision;
                 self.fep.agent.precision.sensory_precision = current
                     * (1.0 - FEP_SENSORY_PRECISION_BLEND as f64)
                     + FEP_SENSORY_PRECISION_BLEND as f64;
             }
-            2 => {
+            InternalRegulationAction::Explore => {
                 // Boost exploration -- stronger nudge when surprised
                 let nudge = if is_surprised {
                     FEP_EXPLORATION_NUDGE_SURPRISED
@@ -779,7 +799,7 @@ impl CognitiveLoopService {
                 };
                 self.adjust_exploration_pri("perturbation", nudge, Priority::Homeostatic);
             }
-            3 => {
+            InternalRegulationAction::TightenTrust => {
                 // Tighten trust via precision
                 if let Some(ref fe) = self.fep.agent.last_fe_components {
                     let precision_mod = (1.0 - fe.prediction_error).clamp(0.0, 1.0) as f32;
@@ -796,7 +816,6 @@ impl CognitiveLoopService {
                         .clamp(0.1, 0.9);
                 }
             }
-            _ => {}
         }
 
         (
