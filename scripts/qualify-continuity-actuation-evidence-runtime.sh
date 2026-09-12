@@ -5,6 +5,8 @@ repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 runtime_subject="${RUNTIME_SUBJECT_SHA:-}"
 qualifier_sha="${QUALIFIER_SHA:-}"
 receipt="${CONTINUITY_RUNTIME_RECEIPT:-}"
+package="symthaea-continuity"
+qualification_scope="package:${package}"
 manifest="crates/core/symthaea-continuity/Cargo.toml"
 workflow_path=".github/workflows/continuity-actuation-evidence-runtime.yml"
 qualifier_path="scripts/qualify-continuity-actuation-evidence-runtime.sh"
@@ -53,6 +55,7 @@ write_receipt() {
     printf 'reason\t%s\n' "$(sanitize "$reason")"
     printf 'failed_command\t%s\n' "$(sanitize "$failed_command")"
     printf 'failed_exit_code\t%s\n' "$failed_exit_code"
+    printf 'qualification_scope\t%s\n' "$(sanitize "$qualification_scope")"
     printf 'runtime_subject_sha\t%s\n' "$(sanitize "$runtime_subject")"
     printf 'runtime_subject_tree\t%s\n' "$runtime_tree"
     printf 'qualifier_sha\t%s\n' "$(sanitize "$qualifier_sha")"
@@ -249,27 +252,27 @@ run_subject() {
 }
 
 run_subject cargo_fmt FAIL_SUBJECT cargo_fmt \
-  cargo fmt --manifest-path "$manifest" -- --check
+  cargo fmt --package "$package" --manifest-path "$manifest" -- --check
 
 run_subject dependency_fetch INFRASTRUCTURE_INDETERMINATE dependency_fetch \
   cargo fetch --locked --manifest-path "$manifest"
 
 run_subject cargo_check_all_targets FAIL_SUBJECT cargo_check_all_targets \
-  cargo check --offline --locked --manifest-path "$manifest" --all-targets
+  cargo check --offline --locked --package "$package" --manifest-path "$manifest" --all-targets
 
 run_subject cargo_test_lib FAIL_SUBJECT cargo_test_lib \
-  cargo test --offline --locked --manifest-path "$manifest" --lib
+  cargo test --offline --locked --package "$package" --manifest-path "$manifest" --lib
 
 run_subject cargo_test_doc FAIL_SUBJECT cargo_test_doc \
-  cargo test --offline --locked --manifest-path "$manifest" --doc
+  cargo test --offline --locked --package "$package" --manifest-path "$manifest" --doc
 
 run_subject cargo_clippy_all_targets_deny_warnings FAIL_SUBJECT cargo_clippy_all_targets_deny_warnings \
-  cargo clippy --offline --locked --manifest-path "$manifest" --all-targets -- -D warnings
+  cargo clippy --offline --locked --package "$package" --manifest-path "$manifest" --all-targets -- -D warnings
 
 status="PASS"
 failure_class="NONE"
 phase="complete"
-reason="all exact-subject Rust qualification commands passed"
+reason="all exact-subject package-scoped Rust qualification commands passed"
 failed_command="NONE"
 failed_exit_code="0"
 write_receipt
