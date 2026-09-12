@@ -1,0 +1,27 @@
+[package]
+name = "symthaea-sim-worker"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "One-shot supervised simulation Component worker protocol for Symthaea"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+libc.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+symthaea-extension-core = { path = "../../core/symthaea-extension-core" }
+symthaea-extension-host = { path = "../symthaea-extension-host" }
+symthaea-extension-simulation-host = { path = "../symthaea-extension-simulation-host" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-sim-digest = { path = "../symthaea-sim-digest" }
+
+[[bin]]
+name = "symthaea-sim-worker"
+path = "src/bin/symthaea-sim-worker.rs"
+
+[[bin]]
+name = "symthaea-sim-stall-worker"
+path = "src/bin/symthaea-sim-stall-worker.rs"

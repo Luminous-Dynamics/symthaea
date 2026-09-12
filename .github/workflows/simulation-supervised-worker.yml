@@ -1,0 +1,144 @@
+name: Simulation Supervised Worker
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-worker/**"
+      - "crates/bridges/symthaea-extension-host/**"
+      - "crates/bridges/symthaea-extension-simulation-host/**"
+      - "crates/bridges/symthaea-sim-bridge/**"
+      - "crates/bridges/symthaea-sim-digest/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/simulation-supervised-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  simulation-supervised-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
+
+      - name: Cache Cargo and Component builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-simulation-worker-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-worker/**', 'crates/bridges/symthaea-extension-simulation-host/**', 'examples/extensions/hello-simulation/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-worker-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-supervised-worker-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the supervised-worker graph."
+          else
+            echo "Cargo.lock requires the following generated update:"
+            cat simulation-supervised-worker-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-supervised-worker-cargo-lock-patch
+          path: simulation-supervised-worker-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Require standalone guest WIT parity
+        run: |
+          cmp crates/core/symthaea-extension-core/wit/extension-control.wit \
+              examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+              examples/extensions/hello-simulation/wit/simulation-provider.wit
+
+      - name: Build exact standalone simulation Component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum "$component" examples/extensions/hello-simulation/manifest.json
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Build worker binaries
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-worker \
+            --bin symthaea-sim-worker \
+            --bin symthaea-sim-stall-worker
+          test -x target/debug/symthaea-sim-worker
+          test -x target/debug/symthaea-sim-stall-worker
+          sha256sum target/debug/symthaea-sim-worker target/debug/symthaea-sim-stall-worker
+
+      - name: Check worker crate
+        run: cargo check --locked -p symthaea-sim-worker --all-targets
+
+      - name: Test protocol and supervisor unit corpus
+        run: cargo test --locked -p symthaea-sim-worker
+
+      - name: Strict Clippy worker crate
+        run: cargo clippy --locked -p symthaea-sim-worker --all-targets -- -D warnings
+
+      - name: Execute real Component and timeout corpus
+        run: |
+          cargo test --locked \
+            -p symthaea-sim-worker \
+            --test hello_worker \
+            -- --ignored --test-threads=1
+
+      - name: Record exact worker qualification subject
+        run: |
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "manifest_sha256=$(sha256sum examples/extensions/hello-simulation/manifest.json | cut -d' ' -f1)"
+            echo "component_sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+            echo "worker_sha256=$(sha256sum target/debug/symthaea-sim-worker | cut -d' ' -f1)"
+            echo "worker_protocol=symthaea.simulation.worker.v1"
+            echo "supervisor_profile=symthaea.simulation.worker-supervisor.linux-rlimit-v1"
+            echo "no_new_privs=required"
+            echo "seccomp=not_established"
+            echo "network_namespace=not_established"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-supervised-worker-receipt.txt
+
+      - name: Upload worker qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-supervised-worker-receipt
+          path: simulation-supervised-worker-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
