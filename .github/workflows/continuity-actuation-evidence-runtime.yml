@@ -91,13 +91,15 @@ jobs:
           status="$(awk -F '\t' '$1 == "status" { print $2 }' "$RECEIPT")"
           failure_class="$(awk -F '\t' '$1 == "failure_class" { print $2 }' "$RECEIPT")"
           phase="$(awk -F '\t' '$1 == "phase" { print $2 }' "$RECEIPT")"
+          scope="$(awk -F '\t' '$1 == "qualification_scope" { print $2 }' "$RECEIPT")"
           reason="$(awk -F '\t' '$1 == "reason" { sub(/^[^\t]*\t/, ""); print }' "$RECEIPT")"
-          echo "continuity-actuation-evidence-runtime receipt_sha256=$digest status=$status failure_class=$failure_class phase=$phase"
+          echo "continuity-actuation-evidence-runtime receipt_sha256=$digest status=$status failure_class=$failure_class phase=$phase scope=$scope"
           {
             echo
             echo '### Continuity runtime qualification'
             echo "- receipt SHA-256: \`$digest\`"
             echo "- frozen runtime subject: \`$RUNTIME_SUBJECT_SHA\`"
+            echo "- qualification scope: \`$scope\`"
             echo "- status: \`$status\`"
             echo "- failure class: \`$failure_class\`"
             echo "- phase: \`$phase\`"
