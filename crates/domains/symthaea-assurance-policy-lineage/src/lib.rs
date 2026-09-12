@@ -76,9 +76,10 @@ impl AssurancePolicyLineageReport {
     }
 
     pub fn contains_tip(&self, manifest: &AssurancePolicyManifest) -> bool {
+        let digest = manifest.manifest_digest();
         self.status == AssurancePolicyLineageStatus::Valid
             && self.tip_revision == Some(manifest.revision)
-            && self.tip_manifest_digest.as_deref() == Some(manifest.manifest_digest().as_str())
+            && self.tip_manifest_digest.as_deref() == Some(digest.as_str())
     }
 }
 
