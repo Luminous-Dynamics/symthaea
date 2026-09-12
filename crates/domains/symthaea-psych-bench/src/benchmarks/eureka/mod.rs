@@ -8,6 +8,7 @@
 //! metacognitive, or authority stack.
 
 mod action_execution;
+mod analysis_plan;
 mod baselines;
 mod campaign;
 pub mod consequence;
