@@ -16,6 +16,11 @@ const EARLY_WINDOW: usize = 8;
 const LATE_WINDOW: usize = 8;
 const LOW_ERROR: f32 = 0.20;
 const HIGH_ERROR: f32 = 0.80;
+/// Independently specified before any outcome is revealed. Do not substitute
+/// `actual_error` here: `predict_own_error` currently ignores complexity, but a
+/// future implementation may use it, and leaking the eventual outcome through
+/// this argument would turn a prospective test into hindsight.
+const PRE_OUTCOME_INPUT_COMPLEXITY: f32 = 0.50;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetacognitiveTrial {
@@ -89,9 +94,10 @@ fn run_regime(
     let mut out = Vec::with_capacity(trials);
     for _ in 0..trials {
         // Critically, this is read BEFORE actual_error is supplied to
-        // update_self_model below. It is therefore a prospective estimate,
-        // not a post-hoc reconstruction.
-        let predicted_error = meta.predict_own_error(actual_error);
+        // update_self_model below. The complexity value is fixed independently
+        // of the eventual outcome, so a future complexity-sensitive predictor
+        // cannot acquire the answer through its input argument.
+        let predicted_error = meta.predict_own_error(PRE_OUTCOME_INPUT_COMPLEXITY);
         out.push(MetacognitiveTrial {
             predicted_error,
             actual_error,
@@ -149,6 +155,12 @@ mod tests {
             run.reversal_late_mean_meta_error,
             run.frozen_control_reversal_error
         );
+    }
+
+    #[test]
+    fn prospective_input_cannot_encode_eventual_error_regime() {
+        assert_ne!(PRE_OUTCOME_INPUT_COMPLEXITY, LOW_ERROR);
+        assert_ne!(PRE_OUTCOME_INPUT_COMPLEXITY, HIGH_ERROR);
     }
 
     #[test]
