@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-episodic-continuity-anchor"
+version = "0.1.0"
+edition = "2024"
+description = "External monotonic anchor protocol for exact episodic restart continuity"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+bincode = { workspace = true }
+serde = { workspace = true }
+symthaea-episodic-continuity = { path = "../symthaea-episodic-continuity" }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
+symthaea-welfare-assurance = { path = "../symthaea-welfare-assurance" }
+thiserror = { workspace = true }
