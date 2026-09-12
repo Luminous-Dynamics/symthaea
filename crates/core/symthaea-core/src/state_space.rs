@@ -5,7 +5,7 @@
 //! Planner-neutral state-space primitives.
 //!
 //! This module intentionally separates mathematical state-space feasibility from
-//! physical-world claims.  A valid state or interpolated trajectory is not, by
+//! physical-world claims. A valid state or interpolated trajectory is not, by
 //! itself, evidence of collision clearance, dynamic realizability, safety, or
 //! actuation authority.
 
@@ -64,7 +64,7 @@ pub enum StateSpaceError {
 /// Identity-bearing description of one exact state-space/metric profile.
 ///
 /// `identity()` is deterministic over the fields below and recursively binds
-/// component profiles.  The profile deliberately contains opaque parameter
+/// component profiles. The profile deliberately contains opaque parameter
 /// bytes so future spaces can bind exact numerical policies without widening
 /// this common type for every new manifold.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -77,7 +77,13 @@ pub struct StateSpaceProfile {
 }
 
 impl StateSpaceProfile {
-    fn new(
+    /// Construct an exact state-space profile for a core or downstream space.
+    ///
+    /// `kind` and `metric_profile` should be stable/versioned identifiers.
+    /// `parameters` are opaque canonical bytes for any numerical or policy
+    /// choices that affect semantics, while `components` preserve ordered
+    /// identities for compound spaces.
+    pub fn new(
         kind: impl Into<String>,
         intrinsic_dimension: Option<usize>,
         metric_profile: impl Into<String>,
@@ -259,7 +265,6 @@ impl StateSpace for EuclideanSpace {
         self.require_valid("from", from)?;
         self.require_valid("to", to)?;
 
-        // Preserve exact endpoint representations where the contract permits it.
         if t <= 0.0 {
             return Ok(from.clone());
         }
@@ -290,8 +295,6 @@ impl MetricSpace for EuclideanSpace {
         self.require_valid("a", a)?;
         self.require_valid("b", b)?;
 
-        // Repeated hypot is substantially more overflow-resistant than summing
-        // squared coordinate deltas directly.
         let mut distance = 0.0_f64;
         for (&left, &right) in a.iter().zip(b) {
             let delta = left - right;
@@ -471,7 +474,7 @@ where
 /// Neutral waypoint trajectory.
 ///
 /// This type intentionally carries no `collision_free`, `dynamically_reachable`,
-/// or `safe` flag.  Those stronger claims require independent downstream evidence.
+/// or `safe` flag. Those stronger claims require independent downstream evidence.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Trajectory<S> {
     states: Vec<S>,
@@ -529,7 +532,10 @@ mod tests {
             let space = EuclideanSpace::new(dimension);
             let origin = vec![0.0; dimension];
             let point = vec![1.0; dimension];
-            assert_close(space.distance(&origin, &point).unwrap(), (dimension as f64).sqrt());
+            assert_close(
+                space.distance(&origin, &point).unwrap(),
+                (dimension as f64).sqrt(),
+            );
         }
     }
 
@@ -604,12 +610,17 @@ mod tests {
         .unwrap();
         let a = (vec![0.0, 0.0], vec![0.0]);
         let b = (vec![3.0, 4.0], vec![2.0]);
-        // sqrt(4 * 5^2 + 9 * 2^2) = sqrt(136)
         assert_close(space.distance(&a, &b).unwrap(), 136.0_f64.sqrt());
         assert_eq!(space.intrinsic_dimension(), Some(3));
         assert_eq!(space.profile().components().len(), 2);
-        assert_eq!(space.profile().components()[0].intrinsic_dimension(), Some(2));
-        assert_eq!(space.profile().components()[1].intrinsic_dimension(), Some(1));
+        assert_eq!(
+            space.profile().components()[0].intrinsic_dimension(),
+            Some(2)
+        );
+        assert_eq!(
+            space.profile().components()[1].intrinsic_dimension(),
+            Some(1)
+        );
     }
 
     #[test]
@@ -637,6 +648,25 @@ mod tests {
         .unwrap();
         assert_ne!(a.profile().identity(), changed_weight.profile().identity());
         assert_ne!(a.profile().identity(), swapped.profile().identity());
+    }
+
+    #[test]
+    fn public_profile_constructor_binds_extension_parameters() {
+        let a = StateSpaceProfile::new(
+            "test-extension",
+            Some(2),
+            "test-metric-v1",
+            vec![1, 2, 3],
+            Vec::new(),
+        );
+        let b = StateSpaceProfile::new(
+            "test-extension",
+            Some(2),
+            "test-metric-v1",
+            vec![1, 2, 4],
+            Vec::new(),
+        );
+        assert_ne!(a.identity(), b.identity());
     }
 
     #[test]
