@@ -228,7 +228,7 @@ impl EnsembleRunRecord {
     /// evaluate whether their scientific conclusions are adequate.
     pub fn validate_for_scientific_use(&self) -> Result<(), EnsembleRecordError> {
         self.validate_execution()?;
-        if self.sampler != LatticeSamplerKind::ExternalReference && self.attempted_updates == 0 {
+        if self.plan.sampler != LatticeSamplerKind::ExternalReference && self.attempted_updates == 0 {
             return Err(EnsembleRecordError::MissingScientificQualification(
                 "nonzero sampler update count",
             ));
