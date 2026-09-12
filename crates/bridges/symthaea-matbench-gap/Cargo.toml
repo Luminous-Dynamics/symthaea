@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-matbench-gap"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Pinned, network-free Matbench experimental-gap truth adapter for Symthaea energy discovery benchmarks."
+
+[dependencies]
+symthaea-bandgap = { path = "../../domains/symthaea-bandgap" }
+symthaea-energy-benchmark-zero = { path = "../../domains/symthaea-energy-benchmark-zero" }
+symthaea-process-discovery = { path = "../../domains/symthaea-process-discovery" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+flate2 = "1"
