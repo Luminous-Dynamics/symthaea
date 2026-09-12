@@ -1,5 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#![cfg(target_os = "linux")]
 //! Deterministic Forge validation bound to pre-release cgroup resource containment.
 //!
 //! This bridge does not implement another scorer or another sandbox. It composes the existing
