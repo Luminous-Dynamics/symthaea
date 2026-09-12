@@ -46,6 +46,18 @@ The exclusion list preserves the exact source row position, normalized candidate
 
 Binding the full training table matters even when an edit produces no new overlap: the qualification identity changes whenever the leakage reference table changes.
 
+## Network-free audit command
+
+Once the exact pinned `matbench_expt_gap.json.gz` artifact is available locally, the crate provides:
+
+`cargo run -p symthaea-matbench-folds --bin matbench-fold-audit -- /path/to/matbench_expt_gap.json.gz`
+
+An optional final argument `0` through `4` audits only one fold. With no fold argument, all five are audited.
+
+The CLI performs no network access. It emits path-independent JSON receipts containing the source/fold/training/mask/truth/qualification identities, counts, exact exclusions, and all epistemic disclosures. The local filesystem path is deliberately omitted from the receipt so the same source bytes yield shareable machine-independent output.
+
+The command still does not run the screening model or compute Benchmark Zero performance metrics; it only qualifies leakage-clean truth slices.
+
 ## Important non-claims
 
 A leakage-clean fold is **not an official Matbench leaderboard test set** because rows have been removed. It is a derived audit slice for Symthaea Benchmark Zero.
