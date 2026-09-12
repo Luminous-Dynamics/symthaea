@@ -348,18 +348,18 @@ mod tests {
 
     #[test]
     fn observation_rejects_zero_result_digest() {
-        assert_eq!(
+        assert!(matches!(
             ReceiptedExecution::new((), 100, Sha256Digest([0; 32]), "executor:evidence"),
             Err(ExecutionObservationError::ZeroResultDigest)
-        );
+        ));
     }
 
     #[test]
     fn observation_rejects_noncanonical_evidence_reference() {
-        assert_eq!(
+        assert!(matches!(
             ReceiptedExecution::new((), 100, Sha256Digest([7; 32]), " bad "),
             Err(ExecutionObservationError::InvalidExecutorEvidenceReference)
-        );
+        ));
     }
 
     #[test]
