@@ -15,6 +15,7 @@ symthaea-memory = { path = "../symthaea-memory" }
 symthaea-psych-bench = { path = "../symthaea-psych-bench" }
 symthaea-welfare-authority = { path = "../symthaea-welfare-authority" }
 symthaea-welfare-consent = { path = "../symthaea-welfare-consent" }
+bincode = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
