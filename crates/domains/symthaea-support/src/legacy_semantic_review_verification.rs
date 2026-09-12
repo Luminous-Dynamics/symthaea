@@ -30,7 +30,6 @@ use crate::legacy_semantic_replacement::{
 };
 use crate::legacy_source_artifacts::LegacySourceArtifactLedgerV1;
 use crate::standards_registry::TechnicalClaimIdV1;
-use serde::Serialize;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
@@ -135,11 +134,13 @@ pub fn verify_legacy_semantic_replacement_reviews_v1<V: LegacySemanticReviewVeri
         reviews,
     )?;
 
+    let mut latest_reviewed_at_unix_ms = 0u64;
     let mut claim_trust_evidence = BTreeMap::new();
     for old_id in successor.claim_replacements.keys() {
         let receipt = reviews.claim_receipt(old_id).ok_or_else(|| {
             LegacySemanticReviewVerificationErrorV1::MissingClaimReceipt(old_id.clone())
         })?;
+        latest_reviewed_at_unix_ms = latest_reviewed_at_unix_ms.max(receipt.reviewed_at_unix_ms);
         let evidence = verifier
             .verify_claim_receipt(receipt)
             .map_err(|message| LegacySemanticReviewVerificationErrorV1::VerifierRejected {
@@ -158,6 +159,7 @@ pub fn verify_legacy_semantic_replacement_reviews_v1<V: LegacySemanticReviewVeri
         let receipt = reviews.procedure_receipt(old_id).ok_or_else(|| {
             LegacySemanticReviewVerificationErrorV1::MissingProcedureReceipt(old_id.clone())
         })?;
+        latest_reviewed_at_unix_ms = latest_reviewed_at_unix_ms.max(receipt.reviewed_at_unix_ms);
         let evidence = verifier
             .verify_procedure_receipt(receipt)
             .map_err(|message| LegacySemanticReviewVerificationErrorV1::VerifierRejected {
@@ -171,6 +173,15 @@ pub fn verify_legacy_semantic_replacement_reviews_v1<V: LegacySemanticReviewVeri
         procedure_trust_evidence.insert(
             old_id.clone(),
             evidence.trust_evidence_blake3.trim().to_ascii_lowercase(),
+        );
+    }
+
+    if verified_at_unix_ms < latest_reviewed_at_unix_ms {
+        return Err(
+            LegacySemanticReviewVerificationErrorV1::VerificationPredatesSemanticReview {
+                latest_reviewed_at_unix_ms,
+                verified_at_unix_ms,
+            },
         );
     }
 
@@ -369,6 +380,10 @@ pub enum LegacySemanticReviewVerificationErrorV1 {
     MissingClaimReceipt(TechnicalClaimIdV1),
     MissingProcedureReceipt(String),
     VerifierRejected { subject: String, message: String },
+    VerificationPredatesSemanticReview {
+        latest_reviewed_at_unix_ms: u64,
+        verified_at_unix_ms: u64,
+    },
     VerifiedLedgerMismatch,
     VerifiedPredecessorManifestMismatch,
     VerifiedSuccessorManifestMismatch,
@@ -387,6 +402,7 @@ impl fmt::Display for LegacySemanticReviewVerificationErrorV1 {
             Self::MissingClaimReceipt(id) => write!(f, "missing semantic claim review receipt {}", id.0),
             Self::MissingProcedureReceipt(id) => write!(f, "missing semantic procedure review receipt {id}"),
             Self::VerifierRejected { subject, message } => write!(f, "external semantic verifier rejected {subject}: {message}"),
+            Self::VerificationPredatesSemanticReview { latest_reviewed_at_unix_ms, verified_at_unix_ms } => write!(f, "semantic verification timestamp {verified_at_unix_ms} predates latest review {latest_reviewed_at_unix_ms}"),
             Self::VerifiedLedgerMismatch => write!(f, "verified semantic review wrapper does not match current review ledger"),
             Self::VerifiedPredecessorManifestMismatch => write!(f, "verified semantic review wrapper predecessor manifest changed"),
             Self::VerifiedSuccessorManifestMismatch => write!(f, "verified semantic review wrapper successor manifest changed"),
@@ -545,7 +561,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(verified.verifier_profile(), "test-external-semantic-verifier-v1");
-        assert_eq!(verified.ledger_blake3(), legacy_semantic_replacement_review_ledger_commitment_v1(&reviews).unwrap());
+        assert_eq!(
+            verified.ledger_blake3(),
+            legacy_semantic_replacement_review_ledger_commitment_v1(&reviews).unwrap()
+        );
         validate_verified_legacy_semantic_replacement_reviews_v1(
             &pack,
             &predecessor,
@@ -569,6 +588,26 @@ mod tests {
                 1_800_000_000_400,
             ),
             Err(LegacySemanticReviewVerificationErrorV1::VerifierRejected { .. })
+        ));
+    }
+
+    #[test]
+    fn verification_cannot_predate_semantic_review() {
+        let (pack, predecessor, successor, reviews) = claim_review_fixture();
+        assert!(matches!(
+            verify_legacy_semantic_replacement_reviews_v1(
+                &pack,
+                &predecessor,
+                &successor,
+                &reviews,
+                &AllowVerifier,
+                1_800_000_000_299,
+            ),
+            Err(
+                LegacySemanticReviewVerificationErrorV1::VerificationPredatesSemanticReview {
+                    ..
+                }
+            )
         ));
     }
 }
