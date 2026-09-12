@@ -51,6 +51,8 @@ pub enum StrictCgroupV2Error {
     TeardownIdentityMismatch,
     #[error("strict cgroup lease was already consumed")]
     LeaseConsumed,
+    #[error("failed strict hardening could not be cleaned up fail-closed")]
+    HardeningCleanupFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -63,11 +65,21 @@ pub struct StrictCgroupV2Receipt {
 }
 
 impl StrictCgroupV2Receipt {
-    pub fn id(&self) -> &ContentId { &self.id }
-    pub fn base_receipt_id(&self) -> &ContentId { &self.base_receipt_id }
-    pub fn leaf_path(&self) -> &str { &self.leaf_path }
-    pub fn swap_max_bytes(&self) -> u64 { self.swap_max_bytes }
-    pub fn oom_group(&self) -> bool { self.oom_group }
+    pub fn id(&self) -> &ContentId {
+        &self.id
+    }
+    pub fn base_receipt_id(&self) -> &ContentId {
+        &self.base_receipt_id
+    }
+    pub fn leaf_path(&self) -> &str {
+        &self.leaf_path
+    }
+    pub fn swap_max_bytes(&self) -> u64 {
+        self.swap_max_bytes
+    }
+    pub fn oom_group(&self) -> bool {
+        self.oom_group
+    }
 
     pub fn validate_for(
         &self,
@@ -107,12 +119,24 @@ pub struct StrictCgroupV2TeardownReceipt {
 }
 
 impl StrictCgroupV2TeardownReceipt {
-    pub fn id(&self) -> &ContentId { &self.id }
-    pub fn strict_receipt_id(&self) -> &ContentId { &self.strict_receipt_id }
-    pub fn base_receipt_id(&self) -> &ContentId { &self.base_receipt_id }
-    pub fn descendant_kill_requested(&self) -> bool { self.descendant_kill_requested }
-    pub fn populated_zero_verified(&self) -> bool { self.populated_zero_verified }
-    pub fn wait_ms(&self) -> u64 { self.wait_ms }
+    pub fn id(&self) -> &ContentId {
+        &self.id
+    }
+    pub fn strict_receipt_id(&self) -> &ContentId {
+        &self.strict_receipt_id
+    }
+    pub fn base_receipt_id(&self) -> &ContentId {
+        &self.base_receipt_id
+    }
+    pub fn descendant_kill_requested(&self) -> bool {
+        self.descendant_kill_requested
+    }
+    pub fn populated_zero_verified(&self) -> bool {
+        self.populated_zero_verified
+    }
+    pub fn wait_ms(&self) -> u64 {
+        self.wait_ms
+    }
 
     pub fn validate_for(
         &self,
@@ -150,8 +174,12 @@ pub struct StrictCgroupV2Lease {
 }
 
 impl StrictCgroupV2Lease {
-    pub fn receipt(&self) -> &StrictCgroupV2Receipt { &self.receipt }
-    pub fn leaf_path(&self) -> Option<&Path> { self.base.as_ref().map(CgroupV2ResourceLease::leaf_path) }
+    pub fn receipt(&self) -> &StrictCgroupV2Receipt {
+        &self.receipt
+    }
+    pub fn leaf_path(&self) -> Option<&Path> {
+        self.base.as_ref().map(CgroupV2ResourceLease::leaf_path)
+    }
 
     /// Normal terminal path after the evaluator is already known to have exited.
     pub fn cleanup(mut self) -> Result<StrictCgroupV2TeardownReceipt, StrictCgroupV2Error> {
@@ -203,36 +231,63 @@ impl Drop for StrictCgroupV2Lease {
 }
 
 /// Upgrade one live base lease before evaluator release.
+///
+/// Any hardening failure is fail-closed: the entire evaluator leaf is killed, `populated 0` is
+/// verified, and the base leaf is removed before the original hardening error is returned. If that
+/// cleanup cannot itself be verified, `HardeningCleanupFailed` becomes the primary error.
 pub fn harden_cgroup_v2_lease(
     base_policy: &CgroupV2ResourcePolicy,
     base: CgroupV2ResourceLease,
 ) -> Result<StrictCgroupV2Lease, StrictCgroupV2Error> {
-    base.receipt().validate_for(base_policy)?;
-    let leaf = base.leaf_path().to_path_buf();
-    write_exact(&leaf.join("memory.swap.max"), "0\n")?;
-    write_exact(&leaf.join("memory.oom.group"), "1\n")?;
+    let hardening = (|| {
+        base.receipt().validate_for(base_policy)?;
+        let leaf = base.leaf_path().to_path_buf();
+        write_exact(&leaf.join("memory.swap.max"), "0\n")?;
+        write_exact(&leaf.join("memory.oom.group"), "1\n")?;
 
-    let swap = read_trimmed(&leaf.join("memory.swap.max"))?;
-    let oom = read_trimmed(&leaf.join("memory.oom.group"))?;
-    if swap != "0" || oom != "1" {
-        return Err(StrictCgroupV2Error::ReadbackMismatch);
+        let swap = read_trimmed(&leaf.join("memory.swap.max"))?;
+        let oom = read_trimmed(&leaf.join("memory.oom.group"))?;
+        if swap != "0" || oom != "1" {
+            return Err(StrictCgroupV2Error::ReadbackMismatch);
+        }
+
+        let base_receipt = base.receipt();
+        let leaf_path = base_receipt.leaf_path().to_string();
+        let id = derive_strict_receipt_id(base_receipt.id(), &leaf_path, 0, true);
+        let receipt = StrictCgroupV2Receipt {
+            id,
+            base_receipt_id: base_receipt.id().clone(),
+            leaf_path,
+            swap_max_bytes: 0,
+            oom_group: true,
+        };
+        receipt.validate_for(base_policy, base_receipt)?;
+        Ok(receipt)
+    })();
+
+    match hardening {
+        Ok(receipt) => Ok(StrictCgroupV2Lease {
+            base: Some(base),
+            receipt,
+        }),
+        Err(error) => {
+            if cleanup_failed_hardening(base).is_err() {
+                return Err(StrictCgroupV2Error::HardeningCleanupFailed);
+            }
+            Err(error)
+        }
     }
+}
 
-    let base_receipt = base.receipt();
-    let leaf_path = base_receipt.leaf_path().to_string();
-    let id = derive_strict_receipt_id(base_receipt.id(), &leaf_path, 0, true);
-    let receipt = StrictCgroupV2Receipt {
-        id,
-        base_receipt_id: base_receipt.id().clone(),
-        leaf_path,
-        swap_max_bytes: 0,
-        oom_group: true,
-    };
-    receipt.validate_for(base_policy, base_receipt)?;
-    Ok(StrictCgroupV2Lease {
-        base: Some(base),
-        receipt,
-    })
+fn cleanup_failed_hardening(base: CgroupV2ResourceLease) -> Result<(), StrictCgroupV2Error> {
+    let leaf = base.leaf_path().to_path_buf();
+    fs::write(leaf.join("cgroup.kill"), b"1\n").map_err(|source| StrictCgroupV2Error::Io {
+        path: leaf.join("cgroup.kill"),
+        source,
+    })?;
+    wait_populated_zero(&leaf, Duration::from_millis(MAX_TEARDOWN_TIMEOUT_MS))?;
+    base.cleanup()?;
+    Ok(())
 }
 
 fn build_teardown_receipt(
