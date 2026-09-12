@@ -8,6 +8,7 @@
   "observer_policy": "same_realization_site_pixel",
   "site_statistical_closure": "q_member_site_elevation_is_authoritative_for_each_realization",
   "companion_vertical_semantics": "hard_upper_bound",
+  "companion_uncertainty_direction": "terrain_radial",
   "full_horizon_composition": "max_components_per_member_then_summarize_members",
   "spatial_support_margin_policy": "apply_observed_positive_excursion_if_present",
   "require_all_members_all_bins": true,
@@ -15,6 +16,7 @@
   "non_claims": [
     "The finite 0.99 clone quantile is not a population 99% confidence guarantee.",
     "Memberwise composition closes observer/site correlation but does not by itself qualify Product 90 ADJ_ERR semantics.",
+    "A hard companion vertical bound is interpreted only as an explicitly terrain-radial height magnitude in U V1; direction semantics are not inferred from the word error.",
     "Spatial-support classes and empirical margins remain exactly those supplied by LL-009R.",
     "A passing full-horizon ensemble would remain statistical terrain evidence, not site or operations authority."
   ]
