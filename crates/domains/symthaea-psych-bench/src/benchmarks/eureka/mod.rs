@@ -9,6 +9,9 @@
 
 pub mod consequence;
 pub mod constitution;
+mod custody;
+#[cfg(test)]
+mod custody_identity_tests;
 pub mod hidden_world;
 
 pub use consequence::{
