@@ -18,11 +18,14 @@
 //!   source, lexicographic site/direction/subgroup composition, and sweep stats
 //! - **Lattice RNG streams**: pinned ChaCha8 implementation with injective
 //!   campaign/replica/rank stream coordinates and endpoint-free U(0,1)
+//! - **Shared subgroup force**: one finite-probe semantic reference and one
+//!   direct six-staple backend used by both heat-bath and overrelaxation
 //! - **SU(2) heat-bath sampling**: Kennedy-Pendleton scalar rejection against an
 //!   independently qualified target density, plus an exact Haar scalar fallback
-//! - **Reference SU(3) heat-bath**: five-probe local-force reconstruction,
-//!   Wilson-coupling normalization, force-direction orientation, and one-link
-//!   Cabibbo-Marinari subgroup conditional updates
+//! - **SU(3) heat-bath**: force-normalized Cabibbo-Marinari subgroup conditional
+//!   updates with explicit reference/optimized force provenance
+//! - **Overrelaxation**: equal-action subgroup reflections using the same local
+//!   force semantics as the stochastic heat-bath path
 //!
 //! ## Natural Units
 //!
@@ -37,6 +40,7 @@
 //! - Wilson, K. G. (1974). Phys. Rev. D 10, 2445.
 //! - Cabibbo, N. & Marinari, E. (1982). Phys. Lett. B 119, 387-390.
 //! - Kennedy, A. D. & Pendleton, B. J. (1985). Phys. Lett. B 156, 393-399.
+//! - Brown, F. R. & Woch, T. J. (1987). Phys. Rev. Lett. 58, 2394.
 
 pub mod constants;
 pub mod cross_sections;
@@ -47,8 +51,10 @@ pub mod lattice_gauge;
 pub mod lattice_heatbath;
 pub mod lattice_heatbath_su3;
 pub mod lattice_metropolis;
+pub mod lattice_overrelaxation;
 pub mod lattice_qcd;
 pub mod lattice_rng;
+pub mod lattice_subgroup_force;
 pub mod lattice_sweep;
 pub mod relativistic_qm;
 pub mod renormalization;
@@ -76,7 +82,8 @@ pub use lattice_heatbath::{
 pub use lattice_heatbath_su3::{
     Su3SubgroupHeatbathDraw, Su3SubgroupHeatbathError, Su3SubgroupHeatbathForce,
     Su3SubgroupHeatbathStepResult, draw_su3_subgroup_heatbath_rotation,
-    heatbath_subgroup_step_reference, heatbath_touching_trace_sum,
+    draw_su3_subgroup_heatbath_rotation_with_backend, evaluate_su3_subgroup_heatbath_force,
+    heatbath_subgroup_step_reference, heatbath_subgroup_step_with_backend,
     orient_heatbath_quaternion_to_force, probe_su3_subgroup_heatbath_force,
 };
 pub use lattice_metropolis::{
@@ -84,9 +91,20 @@ pub use lattice_metropolis::{
     affected_wilson_action, embedded_su2_rotation, metropolis_acceptance_probability,
     metropolis_subgroup_step,
 };
+pub use lattice_overrelaxation::{
+    LatticeOverrelaxationError, OverrelaxationStepResult, OverrelaxationSweepStats,
+    equal_action_reflection, overrelax_subgroup_reference, overrelax_subgroup_with_backend,
+    overrelax_sweep_with_backend,
+};
 pub use lattice_rng::{
     LATTICE_RNG_ALGORITHM, LATTICE_RNG_IMPLEMENTATION, LATTICE_RNG_VERSION,
     LatticeChaCha8Stream, LatticeRngError, LatticeStreamCoordinates, LatticeStreamDomain,
+};
+pub use lattice_subgroup_force::{
+    AffineSubgroupForce, SubgroupForceBackend, SubgroupForceError, SubgroupForceEvaluation,
+    embedded_subgroup_quaternion, evaluate_subgroup_force, link_staple_non_degenerate,
+    probe_affine_subgroup_force, quaternion_from_embedded_subgroup,
+    staple_affine_subgroup_force, touching_trace_sum,
 };
 pub use lattice_sweep::{
     LatticeSweepError, SweepStats, SymmetricProposalConfig, Uniform01Source,
