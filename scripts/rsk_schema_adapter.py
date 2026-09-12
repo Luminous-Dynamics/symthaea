@@ -18,6 +18,7 @@ CURRENT_RUST_CAPABILITY_PROFILE = "symthaea.rsk.capability-representation.rust-u
 CURRENT_RUST_CAPABILITY_BITS = 64
 CURRENT_RUST_RESOURCE_PROFILE = "symthaea.rsk.resource-representation.rust-u64-sum-exact.v1"
 CURRENT_RUST_RESOURCE_MAX = (1 << 64) - 1
+SEMANTIC_EXECUTION_PROFILE_SCHEMA = "symthaea.rsk.semantic-execution-profile.v1"
 
 
 def require_current_rust_capability_schema(schema: dict[str, Any]) -> str:
@@ -102,3 +103,58 @@ def resource_rule_table(schema: dict[str, Any]) -> dict[str, Any]:
         "representation_profile": CURRENT_RUST_RESOURCE_PROFILE,
         "rules": rules,
     }
+
+
+def semantic_execution_profile(
+    capability_schema: dict[str, Any], resource_schema: dict[str, Any]
+) -> dict[str, Any]:
+    """Derive the compact semantic execution identity from exact schema bytes.
+
+    The profile is not caller-declared. It is the deterministic image of the
+    current-Rust capability/resource adapters and therefore commits both source
+    semantic identity and the exact representation/arithmetic interpretation.
+    """
+
+    capability = capability_rule_table(capability_schema)
+    resource = resource_rule_table(resource_schema)
+    return {
+        "schema": SEMANTIC_EXECUTION_PROFILE_SCHEMA,
+        "capability": {
+            "schema_id": capability["schema_id"],
+            "representation_profile": capability["representation_profile"],
+            "validator_rule_table_sha256": semantic.digest(capability),
+        },
+        "resource": {
+            "schema_id": resource["schema_id"],
+            "representation_profile": resource["representation_profile"],
+            "validator_rule_table_sha256": semantic.digest(resource),
+        },
+    }
+
+
+def semantic_execution_profile_id(
+    capability_schema: dict[str, Any], resource_schema: dict[str, Any]
+) -> str:
+    """Return the canonical digest of the derived semantic execution profile."""
+
+    return semantic.digest(semantic_execution_profile(capability_schema, resource_schema))
+
+
+def verify_semantic_execution_profile(
+    profile: dict[str, Any],
+    capability_schema: dict[str, Any],
+    resource_schema: dict[str, Any],
+) -> str:
+    """Verify a supplied profile against independent derivation from schema bytes.
+
+    A matching self-reported profile identifier is insufficient. Callers must
+    supply the exact verified schemas so the expected profile can be rebuilt.
+    """
+
+    semantic.require(isinstance(profile, dict), "semantic execution profile must be object")
+    expected = semantic_execution_profile(capability_schema, resource_schema)
+    semantic.require(
+        profile == expected,
+        "semantic execution profile does not match schema-derived runtime semantics",
+    )
+    return semantic.digest(expected)
