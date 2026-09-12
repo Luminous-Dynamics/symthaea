@@ -97,6 +97,11 @@ def validate_config(config: dict) -> None:
             raise PError(f"projection {key} required")
     if float(projection["reference_radius_m"]) <= 0:
         raise PError("reference radius invalid")
+    if (
+        abs(float(projection["latitude_of_origin_deg"]) + 90.0) > 1e-12
+        or abs(float(projection["latitude_true_scale_deg"]) + 90.0) > 1e-12
+    ):
+        raise PError("V1 requires south-pole origin/true-scale at -90 deg")
 
     sources = config.get("sources")
     if not isinstance(sources, dict):
@@ -238,6 +243,18 @@ def materialize(
         geographic_crs = rasterio.crs.CRS.from_proj4(
             f"+proj=longlat +R={radius:.12f} +no_defs +type=crs"
         )
+        expected_native_crs = rasterio.crs.CRS.from_proj4(
+            f"+proj=stere "
+            f"+lat_0={float(projection['latitude_of_origin_deg']):.12f} "
+            f"+lat_ts={float(projection['latitude_true_scale_deg']):.12f} "
+            f"+lon_0={float(projection['central_meridian_deg']):.12f} "
+            f"+R={radius:.12f} +units=m +no_defs"
+        )
+        if elevation.crs != expected_native_crs:
+            raise PError(
+                "observed raster CRS does not match declared lunar projection contract"
+            )
+
         reference = config["published_reference"]
         longitude = float(reference["longitude_deg"])
         latitude = float(reference["latitude_deg"])
