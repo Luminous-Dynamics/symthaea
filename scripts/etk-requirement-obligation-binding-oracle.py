@@ -170,17 +170,21 @@ def d(ch: str) -> str:
     return "sha256:" + ch * 64
 
 
+def base_requirement() -> dict[str, Any]:
+    return {
+        "logical_requirement_id": "REQ-STRESS",
+        "domain": "Civil",
+        "statement": "stress remains below allowable",
+        "criticality": "Blocking",
+        "expected_evidence_kind": "Simulation",
+        "structural_invariants": ["stress <= 250 MPa"],
+        "acceptance_record_digest": d("a"),
+    }
+
+
 def derived_fixture() -> dict[str, Any]:
     return {
-        "requirement": {
-            "logical_requirement_id": "REQ-STRESS",
-            "domain": "Civil",
-            "statement": "stress remains below allowable",
-            "criticality": "Blocking",
-            "expected_evidence_kind": "Simulation",
-            "structural_invariants": ["stress <= 250 MPa"],
-            "acceptance_record_digest": d("a"),
-        },
+        "requirement": base_requirement(),
         "obligation": {
             "obligation_id": "00000000-0000-4000-8000-000000000042",
             "claim": "stress remains below allowable under service load",
@@ -195,6 +199,30 @@ def derived_fixture() -> dict[str, Any]:
     }
 
 
+def second_derived_fixture() -> dict[str, Any]:
+    """Second independently derived edge for the same accepted requirement.
+
+    This is intentionally a different proposition with a different logical
+    obligation identity and distinct derivation / policy / acceptance records.
+    It exists so higher AllOf closure tests use two genuine traceability edges,
+    not one real edge plus a fabricated endpoint hash.
+    """
+    return {
+        "requirement": base_requirement(),
+        "obligation": {
+            "obligation_id": "00000000-0000-4000-8000-000000000043",
+            "claim": "maximum principal stress remains below allowable under service load",
+            "expected_evidence_kind": "Simulation",
+        },
+        "relation": {
+            "kind": "derived_safety_obligation",
+            "derivation_record_digest": d("6"),
+            "derivation_policy_revision_digest": d("5"),
+            "binding_acceptance_record_digest": d("4"),
+        },
+    }
+
+
 def expect_denied(payload: dict[str, Any], reason: str) -> None:
     try:
         bind(payload)
@@ -205,12 +233,19 @@ def expect_denied(payload: dict[str, Any], reason: str) -> None:
     raise AssertionError(f"expected denial: {reason}")
 
 
-def self_test() -> dict[str, str]:
+def self_test() -> dict[str, dict[str, str]]:
     payload = derived_fixture()
     ids = bind(payload)
     assert ids["requirement_revision_id"] == "sha256:e340c5030eebc978c41443ffd64f340dc5febad31e376080340bacfceda60faa"
     assert ids["obligation_revision_id"] == "sha256:743d2c13cfcc52bdfb4cfd9a4a836ed0806ace7b2a68b4c7284b1910d8863c29"
     assert ids["requirement_obligation_binding_id"] == "sha256:1cc54ee11ff9b7e99279d4c9a9d43f751809f7f30a43469cff8e18fe70eee408"
+
+    second = bind(second_derived_fixture())
+    assert second["requirement_revision_id"] == ids["requirement_revision_id"]
+    assert second["obligation_revision_id"] == "sha256:63ce87ba42de8d08ff87059322964a7609228d66a7b8f7fc67016b298c2a7c2d"
+    assert second["requirement_obligation_binding_id"] == "sha256:a4a96e57f7c41c8d20660288e6372882d34c632157d4e9d8234ad7f36c94b5bd"
+    assert second["obligation_revision_id"] != ids["obligation_revision_id"]
+    assert second["requirement_obligation_binding_id"] != ids["requirement_obligation_binding_id"]
 
     exact_mismatch = copy.deepcopy(payload)
     exact_mismatch["relation"] = {"kind": "exact_restatement"}
@@ -237,21 +272,26 @@ def self_test() -> dict[str, str]:
     shadow["relation"]["confidence"] = 1.0
     expect_denied(shadow, "derived_relation_fields")
 
-    return ids
+    return {"edge_a": ids, "edge_b": second}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--fixture", action="store_true")
+    parser.add_argument("--fixture-b", action="store_true")
     args = parser.parse_args()
     if args.fixture:
         print(json.dumps(derived_fixture(), indent=2, sort_keys=True))
         return 0
+    if args.fixture_b:
+        print(json.dumps(second_derived_fixture(), indent=2, sort_keys=True))
+        return 0
     if args.self_test:
-        ids = self_test()
-        for key in sorted(ids):
-            print(f"{key}={ids[key]}")
+        edge_ids = self_test()
+        for edge_name in sorted(edge_ids):
+            for key in sorted(edge_ids[edge_name]):
+                print(f"{edge_name}.{key}={edge_ids[edge_name][key]}")
         return 0
     payload = json.load(sys.stdin)
     try:
