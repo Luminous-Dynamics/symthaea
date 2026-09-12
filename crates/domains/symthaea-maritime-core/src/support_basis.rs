@@ -93,8 +93,12 @@ pub enum RegenerativeSupportBasisError {
         source_dependency_id: String,
         successor_dependency_id: String,
     },
-    UnknownSourceDependency { dependency_id: String },
-    UnknownSuccessorDependency { dependency_id: String },
+    UnknownSourceDependency {
+        dependency_id: String,
+    },
+    UnknownSuccessorDependency {
+        dependency_id: String,
+    },
     QualifiedTransferSemanticDrift {
         source_dependency_id: String,
         successor_dependency_id: String,
@@ -151,14 +155,14 @@ pub fn assess_intergenerational_support_basis(
                 return Err(RegenerativeSupportBasisError::MissingQualifiedTransfer {
                     source_dependency_id: requirement.source_dependency_id.clone(),
                     successor_dependency_id: requirement.successor_dependency_id.clone(),
-                })
+                });
             }
             1 => {}
             _ => {
                 return Err(RegenerativeSupportBasisError::AmbiguousQualifiedTransfer {
                     source_dependency_id: requirement.source_dependency_id.clone(),
                     successor_dependency_id: requirement.successor_dependency_id.clone(),
-                })
+                });
             }
         }
         // The upstream transfer theorem must at minimum have a real qualification
@@ -349,7 +353,12 @@ mod tests {
         }
     }
 
-    fn model(id: &str, period_ms: u64, dependency_id: &str, demand: u64) -> RegenerativeClosureModel {
+    fn model(
+        id: &str,
+        period_ms: u64,
+        dependency_id: &str,
+        demand: u64,
+    ) -> RegenerativeClosureModel {
         RegenerativeClosureModel {
             model_id: id.into(),
             period_duration_ms: period_ms,
@@ -450,7 +459,7 @@ mod tests {
         )
         .unwrap();
         assert!(report.scalar_runway_projection_safe);
-        assert_eq!(require_scalar_runway_projection_safe(&report), Ok(()));
+        assert!(require_scalar_runway_projection_safe(&report).is_ok());
     }
 
     #[test]
@@ -467,8 +476,14 @@ mod tests {
         )
         .unwrap();
         assert!(report.scalar_runway_projection_safe);
-        assert_eq!(report.assessments[0].source_stockpile_draw_units_per_period, 2);
-        assert_eq!(report.assessments[0].successor_stockpile_draw_units_per_period, 1);
+        assert_eq!(
+            report.assessments[0].source_stockpile_draw_units_per_period,
+            2
+        );
+        assert_eq!(
+            report.assessments[0].successor_stockpile_draw_units_per_period,
+            1
+        );
     }
 
     #[test]
