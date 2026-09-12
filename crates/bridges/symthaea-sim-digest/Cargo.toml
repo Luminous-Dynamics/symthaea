@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-sim-digest"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Canonical language-neutral SHA-256 commitments for Symthaea simulation requests and provider outputs"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }

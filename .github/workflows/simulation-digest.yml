@@ -1,0 +1,84 @@
+name: Simulation Digest
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/bridges/symthaea-sim-bridge/**"
+      - "crates/bridges/symthaea-sim-digest/**"
+      - ".github/workflows/simulation-digest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  canonical-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-simulation-digest-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-digest-
+
+      - name: Reconcile candidate lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-digest-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the simulation digest workspace graph."
+          else
+            echo "Cargo.lock requires the following generated update:"
+            cat simulation-digest-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-digest-cargo-lock-patch
+          path: simulation-digest-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check canonical digest crate
+        run: cargo check --locked -p symthaea-sim-digest --all-targets
+
+      - name: Test canonical digest crate
+        run: cargo test --locked -p symthaea-sim-digest
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-sim-digest --all-targets -- -D warnings
+
+      - name: Independently verify frozen v1 vectors
+        run: python3 crates/bridges/symthaea-sim-digest/test-vectors/verify_v1.py
+
+      - name: Require committed lockfile
+        run: git diff --exit-code -- Cargo.lock
