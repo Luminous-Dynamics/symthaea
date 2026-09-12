@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-evidence-atomic-coverage"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Atomic sub-claim coverage assurance for safety-evidence receipts"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "evidence", "verification"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
+serde = { workspace = true }
