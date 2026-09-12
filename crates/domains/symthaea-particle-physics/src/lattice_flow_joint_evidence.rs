@@ -37,6 +37,8 @@ pub enum JointJackknifeEvidenceError {
         expected: usize,
         actual: usize,
     },
+    InvalidResamplingStatistic,
+    ReplicateSummaryMismatch,
     ConfigurationCountMismatch {
         curve: usize,
         resampling: usize,
@@ -73,6 +75,20 @@ fn approximately_equal(left: f64, right: f64) -> bool {
     (left - right).abs() <= tolerance
 }
 
+fn recompute_jackknife_summary(replicates: &[f64]) -> Option<(f64, f64)> {
+    if replicates.len() < 2 || replicates.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+    let mean = replicates.iter().sum::<f64>() / replicates.len() as f64;
+    let square_sum = replicates
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>();
+    let variance = (replicates.len() - 1) as f64 / replicates.len() as f64 * square_sum;
+    let standard_error = variance.sqrt();
+    (mean.is_finite() && standard_error.is_finite()).then_some((mean, standard_error))
+}
+
 /// Bind an executable joint blocked-jackknife result to the frozen curve
 /// evidence from which its central scale is supposed to have been derived.
 pub fn bind_joint_jackknife_scale_evidence(
@@ -99,6 +115,21 @@ pub fn bind_joint_jackknife_scale_evidence(
             expected: resampling.block_count,
             actual: resampling.replicate_estimates.len(),
         });
+    }
+    if !resampling.central_estimate.is_finite()
+        || !resampling.replicate_mean.is_finite()
+        || !resampling.standard_error.is_finite()
+        || resampling.standard_error < 0.0
+    {
+        return Err(JointJackknifeEvidenceError::InvalidResamplingStatistic);
+    }
+    let (recomputed_mean, recomputed_standard_error) =
+        recompute_jackknife_summary(&resampling.replicate_estimates)
+            .ok_or(JointJackknifeEvidenceError::InvalidResamplingStatistic)?;
+    if !approximately_equal(recomputed_mean, resampling.replicate_mean)
+        || !approximately_equal(recomputed_standard_error, resampling.standard_error)
+    {
+        return Err(JointJackknifeEvidenceError::ReplicateSummaryMismatch);
     }
 
     let kind = scale_kind(resampling.kind);
@@ -206,7 +237,7 @@ mod tests {
             central_estimate: 0.35,
             replicate_estimates: vec![0.34, 0.345, 0.355, 0.36],
             replicate_mean: 0.35,
-            standard_error: 0.019_364_916_731_037_084,
+            standard_error: 0.013_693_063_937_629_136,
             ensemble_mean_curve: vec![
                 EnsembleFlowEnergyPoint {
                     flow_time: 0.1,
@@ -251,10 +282,26 @@ mod tests {
     }
 
     #[test]
+    fn forged_summary_fails_closed() {
+        let mut resampling = result();
+        resampling.standard_error *= 2.0;
+        assert!(matches!(
+            bind_joint_jackknife_scale_evidence(
+                &curve(),
+                &resampling,
+                "curve-sha256",
+                "jackknife-evidence-id",
+                "jackknife-artifact-sha256",
+            ),
+            Err(JointJackknifeEvidenceError::ReplicateSummaryMismatch)
+        ));
+    }
+
+    #[test]
     fn mismatched_population_fails_closed() {
         let mut resampling = result();
-        resampling.configuration_count = 15;
-        resampling.block_size = 5;
+        resampling.configuration_count = 16;
+        resampling.block_size = 4;
         assert!(matches!(
             bind_joint_jackknife_scale_evidence(
                 &curve(),
@@ -265,7 +312,7 @@ mod tests {
             ),
             Err(JointJackknifeEvidenceError::ConfigurationCountMismatch {
                 curve: 12,
-                resampling: 15,
+                resampling: 16,
             })
         ));
     }
