@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-evidence-deployment-scope"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Exact deployment/configuration scope binding for Symthaea safety evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "evidence", "configuration", "assurance"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-evidence-lifecycle = { path = "../symthaea-evidence-lifecycle" }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
+serde = { workspace = true }
