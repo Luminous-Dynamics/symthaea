@@ -11,10 +11,10 @@
 //! != qualified design / certification / manufacturing / deployment / actuation
 //! ```
 //!
-//! Native analytical evidence remains distinct from external-solver
-//! `EvidenceKind::Simulation`. Authority-bearing IDs are one-way capabilities;
-//! semantic context identities are derived from explicit records rather than
-//! caller-supplied hash-shaped strings.
+//! Native analytical evidence remains distinct from external-solver `Simulation`
+//! evidence. Authority-bearing IDs are one-way capabilities; semantic context
+//! identities are derived from explicit records rather than caller-supplied
+//! hash-shaped strings.
 
 #![deny(unsafe_code)]
 
