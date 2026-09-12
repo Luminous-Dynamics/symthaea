@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-simulation-host-conformance"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+sha2 = "0.10"
+wasmtime = { version = "=44.0.1", default-features = false, features = ["std", "runtime", "cranelift", "component-model"] }
+
+# Keep this harness outside Symthaea's root workspace. It models an independent
+# host consuming the public WIT contract rather than a privileged internal crate.
+[workspace]

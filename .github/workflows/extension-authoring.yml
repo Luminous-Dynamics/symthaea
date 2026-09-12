@@ -20,7 +20,7 @@ concurrency:
 jobs:
   extension-authoring:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +80,7 @@ jobs:
         with:
           targets: wasm32-wasip2
 
-      - name: Cache standalone guest builds
+      - name: Cache standalone guest and conformance builds
         uses: actions/cache@v4
         with:
           path: |
@@ -88,7 +88,8 @@ jobs:
             ~/.cargo/git
             examples/extensions/hello-control/target
             examples/extensions/hello-simulation/target
-          key: ${{ runner.os }}-extension-authoring-${{ hashFiles('examples/extensions/hello-control/Cargo.toml', 'examples/extensions/hello-control/src/**', 'examples/extensions/hello-control/wit/**', 'examples/extensions/hello-control/manifest.json', 'examples/extensions/hello-simulation/Cargo.toml', 'examples/extensions/hello-simulation/src/**', 'examples/extensions/hello-simulation/wit/**', 'examples/extensions/hello-simulation/manifest.json') }}
+            examples/extensions/simulation-host-conformance/target
+          key: ${{ runner.os }}-extension-authoring-${{ hashFiles('examples/extensions/hello-control/Cargo.toml', 'examples/extensions/hello-control/src/**', 'examples/extensions/hello-control/wit/**', 'examples/extensions/hello-control/manifest.json', 'examples/extensions/hello-simulation/Cargo.toml', 'examples/extensions/hello-simulation/src/**', 'examples/extensions/hello-simulation/wit/**', 'examples/extensions/hello-simulation/manifest.json', 'examples/extensions/simulation-host-conformance/Cargo.toml', 'examples/extensions/simulation-host-conformance/src/**', 'crates/core/symthaea-extension-core/wit/**') }}
           restore-keys: |
             ${{ runner.os }}-extension-authoring-
 
@@ -110,6 +111,16 @@ jobs:
           test -s "$control_component"
           test -s "$simulation_component"
           sha256sum "$control_component" "$simulation_component"
+
+      - name: Execute typed simulation through empty-linker conformance host
+        run: |
+          simulation_component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          cargo run \
+            --manifest-path examples/extensions/simulation-host-conformance/Cargo.toml \
+            --release \
+            -- \
+            "$simulation_component" \
+            examples/extensions/hello-simulation/manifest.json
 
       - name: Upload hello-control component fixture
         uses: actions/upload-artifact@v4
