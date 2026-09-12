@@ -10,6 +10,13 @@
 //! Actions are externally prescribed on a balanced schedule. Therefore this
 //! result says nothing yet about autonomous action selection, global cognitive
 //! integration, or consciousness. It cannot mint `FunctionallySupported`.
+//!
+//! The current production `SensorimotorEngine::learn` adapts visual, tactile,
+//! and proprioceptive outcome channels but not `auditory_expected`. This task
+//! therefore holds the auditory channel constant and decodes consequences only
+//! from the three channels the production learner actually updates. That keeps
+//! the experiment about demonstrated learning rather than an unrelated frozen
+//! feature.
 
 use super::ae2_contingency_task::{
     score_adaptation, Action, AdaptationMetrics, Consequence, ContingencyWorld, TrialObservation,
@@ -23,6 +30,7 @@ use symthaea::hdc::binary_hv::BinaryHV;
 const ACQUISITION_TRIALS: usize = 64;
 const REVERSAL_TRIALS: usize = 64;
 const RECOVERY_WINDOW: usize = 6;
+const NEUTRAL_AUDITORY_CHANNEL: f64 = 0.50;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ComponentArmResult {
@@ -112,22 +120,22 @@ fn consequence_sensation(consequence: Consequence) -> SensoryPrediction {
             visual_change: 0.15,
             tactile_expected: 0.85,
             proprioceptive_change: 0.20,
-            auditory_expected: 0.10,
+            auditory_expected: NEUTRAL_AUDITORY_CHANNEL,
             encoding: BinaryHV::random(0xAE20_0),
         },
         Consequence::Y => SensoryPrediction {
             visual_change: 0.85,
             tactile_expected: 0.15,
             proprioceptive_change: 0.80,
-            auditory_expected: 0.90,
+            auditory_expected: NEUTRAL_AUDITORY_CHANNEL,
             encoding: BinaryHV::random(0xAE20_1),
         },
     }
 }
 
 fn decode_consequence(prediction: &SensoryPrediction) -> Consequence {
-    let dx = sensory_distance(prediction, &consequence_sensation(Consequence::X));
-    let dy = sensory_distance(prediction, &consequence_sensation(Consequence::Y));
+    let dx = learned_channel_distance(prediction, &consequence_sensation(Consequence::X));
+    let dy = learned_channel_distance(prediction, &consequence_sensation(Consequence::Y));
     if dx <= dy {
         Consequence::X
     } else {
@@ -135,11 +143,13 @@ fn decode_consequence(prediction: &SensoryPrediction) -> Consequence {
     }
 }
 
-fn sensory_distance(a: &SensoryPrediction, b: &SensoryPrediction) -> f64 {
+/// Distance over exactly the channels `SensorimotorEngine::learn` currently
+/// updates. Auditory output is intentionally excluded until production
+/// learning adapts that channel too.
+fn learned_channel_distance(a: &SensoryPrediction, b: &SensoryPrediction) -> f64 {
     ((a.visual_change - b.visual_change).powi(2)
         + (a.tactile_expected - b.tactile_expected).powi(2)
-        + (a.proprioceptive_change - b.proprioceptive_change).powi(2)
-        + (a.auditory_expected - b.auditory_expected).powi(2))
+        + (a.proprioceptive_change - b.proprioceptive_change).powi(2))
     .sqrt()
 }
 
@@ -165,6 +175,14 @@ mod tests {
         assert_eq!(run.embodiment_disabled.metrics.acquisition_prediction_accuracy, 0.0);
         assert_eq!(run.embodiment_disabled.metrics.reversal_prediction_accuracy, 0.0);
         assert_eq!(run.embodiment_disabled.metrics.reversal_recovery_trial, None);
+    }
+
+    #[test]
+    fn task_does_not_discriminate_on_unlearned_auditory_channel() {
+        let x = consequence_sensation(Consequence::X);
+        let y = consequence_sensation(Consequence::Y);
+        assert_eq!(x.auditory_expected, y.auditory_expected);
+        assert!(learned_channel_distance(&x, &y) > 0.0);
     }
 
     #[test]
