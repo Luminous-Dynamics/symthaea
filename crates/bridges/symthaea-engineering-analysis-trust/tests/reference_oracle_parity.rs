@@ -4,10 +4,10 @@
 
 use symthaea_engineering_analysis_trust::{
     AcceptedAnalysisRequirementV1, AnalysisTrustErrorV1, AnalyticalAcceptancePolicyV1,
-    AnalyticalMethodV1, CurrentnessAssertionIdV1, ExecutionArtifactDigestV1,
+    AnalyticalMethodV1, CurrentnessAssertionV1, ExecutionArtifactDigestV1,
     ModelQualificationRecordDigestV1, NativeAnalyticalPlanV1, NativeAnalyticalResultV1,
-    RectangularCantileverInputV1, Sha256DigestV1, SubjectRevisionIdV1, TwinRevisionIdV1,
-    ValidityDomainRevisionIdV1, admit_native_analytical_evidence_v1,
+    RectangularCantileverInputV1, Sha256DigestV1, SubjectRevisionV1, TwinKindV1,
+    TwinRevisionV1, ValidityDomainRevisionV1, admit_native_analytical_evidence_v1,
     analytical_obligation_revision_v1, canonical_binary64_v1,
     derive_current_native_analytical_discharge_fact_v1,
     issue_native_analytical_discharge_receipt_v1,
@@ -47,10 +47,12 @@ fn digest(ch: char) -> String {
     format!("sha256:{}", ch.to_string().repeat(64))
 }
 
+fn raw_digest(ch: char) -> Sha256DigestV1 {
+    Sha256DigestV1::parse(digest(ch)).unwrap()
+}
+
 fn requirement() -> AcceptedAnalysisRequirementV1 {
-    AcceptedAnalysisRequirementV1::civil_service_stress_250_mpa(
-        Sha256DigestV1::parse(digest('a')).unwrap(),
-    )
+    AcceptedAnalysisRequirementV1::civil_service_stress_250_mpa(raw_digest('a'))
 }
 
 fn obligation() -> ProofObligation {
@@ -65,11 +67,52 @@ fn obligation() -> ProofObligation {
     }
 }
 
-fn method() -> AnalyticalMethodV1 {
-    AnalyticalMethodV1::euler_bernoulli_beam(
-        Sha256DigestV1::parse(digest('a')).unwrap(),
-        Sha256DigestV1::parse(digest('b')).unwrap(),
+struct ContextFixture {
+    subject: SubjectRevisionV1,
+    twin: TwinRevisionV1,
+    validity: ValidityDomainRevisionV1,
+    currentness: CurrentnessAssertionV1,
+}
+
+fn context(attestation: char) -> ContextFixture {
+    let subject = SubjectRevisionV1::new("design", "bracket-alpha", raw_digest('b')).unwrap();
+    let twin = TwinRevisionV1::new(
+        &subject,
+        TwinKindV1::Design,
+        raw_digest('c'),
+        raw_digest('d'),
+        None,
     )
+    .unwrap();
+    let validity = ValidityDomainRevisionV1::new(
+        &subject,
+        &twin,
+        raw_digest('e'),
+        raw_digest('f'),
+        vec![
+            ("load_case".into(), raw_digest('1')),
+            ("material_state".into(), raw_digest('2')),
+            ("boundary_conditions".into(), raw_digest('3')),
+        ],
+    )
+    .unwrap();
+    let currentness = CurrentnessAssertionV1::new(
+        &twin,
+        &validity,
+        raw_digest(attestation),
+        1_789_123_456_000,
+    )
+    .unwrap();
+    ContextFixture {
+        subject,
+        twin,
+        validity,
+        currentness,
+    }
+}
+
+fn method() -> AnalyticalMethodV1 {
+    AnalyticalMethodV1::euler_bernoulli_beam(raw_digest('a'), raw_digest('b'))
 }
 
 fn input(method: &AnalyticalMethodV1, load_n: f64) -> RectangularCantileverInputV1 {
@@ -94,18 +137,18 @@ fn policy() -> AnalyticalAcceptancePolicyV1 {
     .unwrap()
 }
 
-fn plan_with_currentness(
+fn plan_with_context(
     method: &AnalyticalMethodV1,
     input: &RectangularCantileverInputV1,
     policy: &AnalyticalAcceptancePolicyV1,
-    currentness: &str,
+    context: &ContextFixture,
 ) -> NativeAnalyticalPlanV1 {
     NativeAnalyticalPlanV1::new(
         &requirement(),
-        SubjectRevisionIdV1::parse(SUBJECT).unwrap(),
-        TwinRevisionIdV1::parse(TWIN).unwrap(),
-        ValidityDomainRevisionIdV1::parse(VALIDITY).unwrap(),
-        CurrentnessAssertionIdV1::parse(currentness).unwrap(),
+        &context.subject,
+        &context.twin,
+        &context.validity,
+        &context.currentness,
         &obligation(),
         method,
         input,
@@ -146,6 +189,12 @@ fn independent_vectors_compose_end_to_end() {
     assert_eq!(canonical_binary64_v1(-0.0).unwrap(), "f64:0000000000000000");
     assert_eq!(canonical_binary64_v1(0.1).unwrap(), "f64:3fb999999999999a");
 
+    let context = context('4');
+    assert_eq!(context.subject.revision_id().as_str(), SUBJECT);
+    assert_eq!(context.twin.revision_id().as_str(), TWIN);
+    assert_eq!(context.validity.revision_id().as_str(), VALIDITY);
+    assert_eq!(context.currentness.assertion_id().as_str(), CURRENTNESS);
+
     let method = method();
     let input = input(&method, 1000.0);
     let policy = policy();
@@ -153,9 +202,14 @@ fn independent_vectors_compose_end_to_end() {
     assert_eq!(input.revision_id().as_str(), INPUT);
     assert_eq!(policy.revision_id().as_str(), POLICY);
 
-    let plan = plan_with_currentness(&method, &input, &policy, CURRENTNESS);
+    let plan = plan_with_context(&method, &input, &policy, &context);
     assert_eq!(plan.plan_id().as_str(), PLAN);
     assert_eq!(plan.obligation_revision_id().as_str(), OBLIGATION);
+    assert_eq!(plan.requirement_revision_id().as_str(), REQUIREMENT);
+    assert_eq!(plan.subject_revision_id().as_str(), SUBJECT);
+    assert_eq!(plan.twin_revision_id().as_str(), TWIN);
+    assert_eq!(plan.validity_domain_revision_id().as_str(), VALIDITY);
+    assert_eq!(plan.currentness_assertion_id().as_str(), CURRENTNESS);
 
     let result = result(&method, &input, 10.416666666666666, 24.0e6, 0.02);
     let admitted =
@@ -168,6 +222,8 @@ fn independent_vectors_compose_end_to_end() {
     let current = derive_current_native_analytical_discharge_fact_v1(&plan, &receipt).unwrap();
     assert_eq!(current.fact_id().as_str(), CURRENT_FACT);
     assert_eq!(current.witness_receipt_id().as_str(), RECEIPT);
+    assert_eq!(current.requirement_revision_id().as_str(), REQUIREMENT);
+    assert_eq!(current.obligation_revision_id().as_str(), OBLIGATION);
 }
 
 #[test]
@@ -181,12 +237,59 @@ fn analysis_is_not_external_simulation_semantics() {
 }
 
 #[test]
+fn semantic_context_is_not_arbitrary_hash_shaped_input() {
+    let subject_a = SubjectRevisionV1::new("design", "bracket-alpha", raw_digest('b')).unwrap();
+    let subject_b = SubjectRevisionV1::new("design", "bracket-beta", raw_digest('b')).unwrap();
+    let twin_a = TwinRevisionV1::new(
+        &subject_a,
+        TwinKindV1::Design,
+        raw_digest('c'),
+        raw_digest('d'),
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(
+        ValidityDomainRevisionV1::new(
+            &subject_b,
+            &twin_a,
+            raw_digest('e'),
+            raw_digest('f'),
+            Vec::<(String, Sha256DigestV1)>::new(),
+        )
+        .unwrap_err(),
+        AnalysisTrustErrorV1::TwinSubjectMismatch
+    );
+
+    let context_a = context('4');
+    let twin_b = TwinRevisionV1::new(
+        &subject_b,
+        TwinKindV1::Design,
+        raw_digest('c'),
+        raw_digest('d'),
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        CurrentnessAssertionV1::new(
+            &twin_b,
+            &context_a.validity,
+            raw_digest('4'),
+            1_789_123_456_000,
+        )
+        .unwrap_err(),
+        AnalysisTrustErrorV1::ValidityContextMismatch
+    );
+}
+
+#[test]
 fn input_drift_cannot_reuse_an_old_plan() {
     let method = method();
     let original = input(&method, 1000.0);
     let changed = input(&method, 1000.0000000000001);
     let policy = policy();
-    let plan = plan_with_currentness(&method, &original, &policy, CURRENTNESS);
+    let context = context('4');
+    let plan = plan_with_context(&method, &original, &policy, &context);
     assert_ne!(original.revision_id(), changed.revision_id());
 
     let result = result(&method, &changed, 10.416666666666666, 24.0e6, 0.02);
@@ -201,6 +304,7 @@ fn input_drift_cannot_reuse_an_old_plan() {
 fn policy_must_be_conservative_enough_for_the_accepted_requirement() {
     let method = method();
     let input = input(&method, 1000.0);
+    let context = context('4');
     let weak_policy = AnalyticalAcceptancePolicyV1::factor_of_safety_ge(
         0.5,
         0.05,
@@ -210,10 +314,10 @@ fn policy_must_be_conservative_enough_for_the_accepted_requirement() {
 
     let plan = NativeAnalyticalPlanV1::new(
         &requirement(),
-        SubjectRevisionIdV1::parse(SUBJECT).unwrap(),
-        TwinRevisionIdV1::parse(TWIN).unwrap(),
-        ValidityDomainRevisionIdV1::parse(VALIDITY).unwrap(),
-        CurrentnessAssertionIdV1::parse(CURRENTNESS).unwrap(),
+        &context.subject,
+        &context.twin,
+        &context.validity,
+        &context.currentness,
         &obligation(),
         &method,
         &input,
@@ -230,16 +334,15 @@ fn policy_must_be_conservative_enough_for_the_accepted_requirement() {
 fn conservative_margin_and_model_error_fail_closed() {
     let method = method();
     let input = input(&method, 1000.0);
+    let context = context('4');
 
-    // Nominal FoS passes 10.3, but the conservative value after a 2% model
-    // error allowance is ~10.212, so authority must fail closed.
     let strict_policy = AnalyticalAcceptancePolicyV1::factor_of_safety_ge(
         10.3,
         0.05,
         ModelQualificationRecordDigestV1::parse(digest('9')).unwrap(),
     )
     .unwrap();
-    let strict_plan = plan_with_currentness(&method, &input, &strict_policy, CURRENTNESS);
+    let strict_plan = plan_with_context(&method, &input, &strict_policy, &context);
     let nominal = result(&method, &input, 10.416666666666666, 24.0e6, 0.02);
     assert_eq!(
         admit_native_analytical_evidence_v1(
@@ -254,7 +357,7 @@ fn conservative_margin_and_model_error_fail_closed() {
     );
 
     let policy = policy();
-    let plan = plan_with_currentness(&method, &input, &policy, CURRENTNESS);
+    let plan = plan_with_context(&method, &input, &policy, &context);
     let excessive_error = result(&method, &input, 10.416666666666666, 24.0e6, 0.06);
     assert_eq!(
         admit_native_analytical_evidence_v1(
@@ -274,7 +377,8 @@ fn inconsistent_factor_of_safety_fails_closed() {
     let method = method();
     let input = input(&method, 1000.0);
     let policy = policy();
-    let plan = plan_with_currentness(&method, &input, &policy, CURRENTNESS);
+    let context = context('4');
+    let plan = plan_with_context(&method, &input, &policy, &context);
     let inconsistent = result(&method, &input, 10.0, 24.0e6, 0.02);
     assert_eq!(
         admit_native_analytical_evidence_v1(
@@ -294,7 +398,8 @@ fn analytical_equations_must_match_the_bound_input() {
     let method = method();
     let input = input(&method, 1000.0);
     let policy = policy();
-    let plan = plan_with_currentness(&method, &input, &policy, CURRENTNESS);
+    let context = context('4');
+    let plan = plan_with_context(&method, &input, &policy, &context);
 
     let wrong_deflection = NativeAnalyticalResultV1::for_input(
         &method,
@@ -348,8 +453,16 @@ fn currentness_refresh_makes_old_receipt_historical() {
     let method = method();
     let input = input(&method, 1000.0);
     let policy = policy();
-    let historical = plan_with_currentness(&method, &input, &policy, CURRENTNESS);
-    let refreshed = plan_with_currentness(&method, &input, &policy, REFRESHED_CURRENTNESS);
+    let historical_context = context('4');
+    let refreshed_context = context('5');
+    assert_eq!(historical_context.subject.revision_id(), refreshed_context.subject.revision_id());
+    assert_eq!(historical_context.twin.revision_id(), refreshed_context.twin.revision_id());
+    assert_eq!(historical_context.validity.revision_id(), refreshed_context.validity.revision_id());
+    assert_eq!(historical_context.currentness.assertion_id().as_str(), CURRENTNESS);
+    assert_eq!(refreshed_context.currentness.assertion_id().as_str(), REFRESHED_CURRENTNESS);
+
+    let historical = plan_with_context(&method, &input, &policy, &historical_context);
+    let refreshed = plan_with_context(&method, &input, &policy, &refreshed_context);
     assert_ne!(historical.plan_id(), refreshed.plan_id());
 
     let result = result(&method, &input, 10.416666666666666, 24.0e6, 0.02);
