@@ -14,6 +14,8 @@
 //!   Polyakov loops, and local gauge transformations
 //! - **Topology reference**: clover field strength/topological charge plus a
 //!   deliberately slow finite-difference Wilson-action gradient-flow step
+//! - **Flowed-topology lineage**: version-stable operator/flow identities with
+//!   exact step-size, probe, step-count, and smoothing-time provenance
 //!
 //! ## Natural Units
 //!
@@ -36,6 +38,7 @@ pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
 pub mod lattice_topology_flow;
+pub mod lattice_topology_measurement;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -59,6 +62,11 @@ pub use lattice_topology_flow::{
     LatticeTopologyFlowError, ReferenceFlowStepStats, clover_field_strength, clover_sum,
     clover_topological_charge, clover_topological_density,
     finite_difference_wilson_flow_step_reference,
+};
+pub use lattice_topology_measurement::{
+    CLOVER_TOPOLOGY_OPERATOR_ID, REFERENCE_WILSON_FLOW_ID,
+    FlowedTopologyDefinition, FlowedTopologyMeasurement, FlowedTopologyMeasurementError,
+    ReferenceFlowSchedule, measure_flowed_clover_topology_reference,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
