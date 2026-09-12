@@ -12,6 +12,8 @@
 //!   structure constants, Casimir operators
 //! - **Lattice gauge primitives**: periodic SU(3) links, plaquettes, Wilson action,
 //!   Polyakov loops, and local gauge transformations
+//! - **Lattice update primitives**: deterministic embedded-SU(2) Metropolis
+//!   proposal steps with local six-plaquette action deltas
 //!
 //! ## Natural Units
 //!
@@ -24,6 +26,7 @@
 //! - PDG Review of Particle Physics (2024).
 //! - Georgi, H. (1999). *Lie Algebras in Particle Physics*.
 //! - Wilson, K. G. (1974). Phys. Rev. D 10, 2445.
+//! - Cabibbo, N. & Marinari, E. (1982). Phys. Lett. B 119, 387-390.
 
 pub mod constants;
 pub mod cross_sections;
@@ -31,6 +34,7 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
+pub mod lattice_metropolis;
 pub mod lattice_qcd;
 pub mod relativistic_qm;
 pub mod renormalization;
@@ -50,6 +54,11 @@ pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
     su3_determinant_error, su3_diagonal, su3_identity, su3_mul, su3_trace,
     su3_unitarity_error, validate_su3,
+};
+pub use lattice_metropolis::{
+    LatticeMetropolisError, MetropolisStepResult, Su2Subgroup, Su2SubgroupProposal,
+    affected_wilson_action, embedded_su2_rotation, metropolis_acceptance_probability,
+    metropolis_subgroup_step,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
