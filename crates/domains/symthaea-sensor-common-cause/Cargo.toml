@@ -15,3 +15,4 @@ categories = ["science", "algorithms"]
 symthaea-domain-awareness = { path = "../symthaea-domain-awareness" }
 symthaea-sensor-trust = { path = "../symthaea-sensor-trust" }
 serde = { workspace = true }
+uuid = { workspace = true }
