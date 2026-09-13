@@ -19,6 +19,8 @@
 //! - [`HlsEligibilityTrace`] and [`step_with_eligibility`] expose exact online
 //!   forward sensitivities for the diagonal recurrence when the global norm
 //!   limiter does not activate.
+//! - [`associative_query`] is a fixed, parameter-free HDC decoder that supplies
+//!   an exact current-state learning signal for those eligibility traces.
 //! - [`InvariantContextMixer`] supplies O(KD) cross-dimensional magnitude
 //!   context without violating the full bipolar role symmetry.
 //! - [`ContextualHolographicLiquidCell`] composes invariant context with the
@@ -41,6 +43,7 @@ pub mod holographic_liquid;
 pub mod invariant_context;
 pub mod network;
 pub mod neuron;
+pub mod state_tracking_associative;
 pub mod state_tracking_benchmark;
 pub mod state_tracking_codec;
 pub mod state_tracking_eval;
@@ -56,6 +59,9 @@ pub use holographic_liquid::{
 pub use invariant_context::{ContextMixerError, InvariantContextMixer};
 pub use network::{HdcLtcUnifiedNetwork, StepTimingConfig};
 pub use neuron::HdcLtcUnifiedNeuron;
+pub use state_tracking_associative::{
+    AssociativeQueryResult, AssociativeReadoutError, associative_query,
+};
 pub use state_tracking_benchmark::{
     EntityId, LocationId, ObjectId, StateTrackingBenchmark, StateTrackingBenchmarkConfig,
     StateTrackingBenchmarkError, TrackingAnswer, TrackingEvent, TrackingEventKind, TrackingQuery,
