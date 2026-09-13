@@ -3,20 +3,21 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Deterministic, benchmark-agnostic evaluation for reasoning episodes.
 //!
-//! Benchmark adapters decide task semantics and produce an [`EpisodeJudgment`]. This module
-//! turns that judgment plus the immutable subject episode into common qualification metrics.
-//! It intentionally preserves the metric vector rather than collapsing reasoning into one
-//! opaque "intelligence score".
+//! Benchmark adapters own task semantics and produce [`EpisodeJudgment`] values. This module
+//! converts those judgments plus immutable subject episodes into common qualification metrics.
+//! Metrics remain decomposed rather than being collapsed into an opaque intelligence scalar.
 
 use super::reasoning_qualification::{
     QualificationMetric, QualificationValidationError, ReasoningEpisode, ReasoningOutcome,
     ReasoningQualificationReceipt,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fmt;
 
 /// Initial evaluator contract. Increment whenever metric semantics change.
 pub const REASONING_EVALUATOR_VERSION: &str = "rq-evaluator-v1";
+pub const REASONING_EVALUATOR_ID: &str = "symthaea-reasoning-evaluator";
 
 const LOG_LOSS_EPSILON: f64 = 1.0e-15;
 const WILSON_Z_95: f64 = 1.959_963_984_540_054;
@@ -30,9 +31,6 @@ pub struct TaskScore {
 }
 
 /// Ground-truth judgment supplied by a benchmark-specific adapter.
-///
-/// `exact_correct` is independent of confidence. The evaluator derives calibration metrics
-/// from the episode's asserted confidence when exact correctness is known.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct EpisodeJudgment {
     pub exact_correct: Option<bool>,
@@ -44,6 +42,15 @@ pub enum ReasoningEvaluatorError {
     EmptyEvaluationLineage,
     EmptyTaskScoreName,
     NonFiniteTaskScore,
+    DuplicateEpisode(String),
+    MixedEvaluator {
+        expected: String,
+        found: String,
+    },
+    MixedEvaluatorVersion {
+        expected: String,
+        found: String,
+    },
     Validation(QualificationValidationError),
 }
 
@@ -53,6 +60,17 @@ impl fmt::Display for ReasoningEvaluatorError {
             Self::EmptyEvaluationLineage => write!(f, "evaluation lineage hash must not be empty"),
             Self::EmptyTaskScoreName => write!(f, "task score name must not be empty"),
             Self::NonFiniteTaskScore => write!(f, "task score must be finite"),
+            Self::DuplicateEpisode(id) => {
+                write!(f, "episode `{id}` appears more than once in one aggregate")
+            }
+            Self::MixedEvaluator { expected, found } => write!(
+                f,
+                "aggregate mixes evaluator identities: expected `{expected}`, found `{found}`"
+            ),
+            Self::MixedEvaluatorVersion { expected, found } => write!(
+                f,
+                "aggregate mixes evaluator versions: expected `{expected}`, found `{found}`"
+            ),
             Self::Validation(err) => write!(f, "qualification validation failed: {err}"),
         }
     }
@@ -94,8 +112,6 @@ pub fn evaluate_episode(
     }];
 
     if let Some(correct) = judgment.exact_correct {
-        // Overall exact accuracy counts abstention as unsolved. Selective accuracy is emitted
-        // only for answered episodes and therefore measures correctness conditional on coverage.
         metrics.push(QualificationMetric {
             name: "exact_accuracy".into(),
             value: if asserted && correct { 1.0 } else { 0.0 },
@@ -103,8 +119,8 @@ pub fn evaluate_episode(
         });
 
         if let ReasoningOutcome::Asserted { confidence, .. } = &episode.outcome {
-            let y = if correct { 1.0 } else { 0.0 };
-            let brier = (confidence - y).powi(2);
+            let target = if correct { 1.0 } else { 0.0 };
+            let brier = (*confidence - target).powi(2);
             let probability_correct = if correct {
                 *confidence
             } else {
@@ -140,7 +156,7 @@ pub fn evaluate_episode(
 
     Ok(ReasoningQualificationReceipt::new(
         episode,
-        "symthaea-reasoning-evaluator",
+        REASONING_EVALUATOR_ID,
         REASONING_EVALUATOR_VERSION,
         evaluation_lineage_hash,
         metrics,
@@ -175,13 +191,18 @@ pub struct CapabilitySlice {
     pub mean_log_loss: Option<f64>,
 }
 
-/// Aggregate common metrics from evaluator receipts.
+/// Aggregate common metrics from validated evaluator receipts.
 ///
-/// Missing metrics remain missing; they are never silently replaced with zero. Receipts from
-/// benchmark adapters that lack exact ground truth can therefore coexist with exact-task lanes
-/// without fabricating accuracy/calibration claims.
-pub fn aggregate_receipts(receipts: &[ReasoningQualificationReceipt]) -> CapabilitySlice {
-    let episodes = receipts.len();
+/// The aggregate fails closed if any receipt identity is invalid, an episode is counted twice,
+/// or evaluator identities/versions are mixed. Evaluation-lineage hashes may differ because a
+/// benchmark can bind each individual problem to a distinct immutable lineage.
+pub fn aggregate_receipts(
+    receipts: &[ReasoningQualificationReceipt],
+) -> Result<CapabilitySlice, ReasoningEvaluatorError> {
+    let mut episode_ids = HashSet::with_capacity(receipts.len());
+    let mut expected_evaluator: Option<&str> = None;
+    let mut expected_version: Option<&str> = None;
+
     let mut covered = 0usize;
     let mut exact_judged = 0usize;
     let mut exact_correct = 0usize;
@@ -193,6 +214,36 @@ pub fn aggregate_receipts(receipts: &[ReasoningQualificationReceipt]) -> Capabil
     let mut log_loss_n = 0usize;
 
     for receipt in receipts {
+        receipt.validate()?;
+
+        if !episode_ids.insert(receipt.episode_id.0.as_str()) {
+            return Err(ReasoningEvaluatorError::DuplicateEpisode(
+                receipt.episode_id.0.clone(),
+            ));
+        }
+
+        if let Some(expected) = expected_evaluator {
+            if receipt.evaluator != expected {
+                return Err(ReasoningEvaluatorError::MixedEvaluator {
+                    expected: expected.into(),
+                    found: receipt.evaluator.clone(),
+                });
+            }
+        } else {
+            expected_evaluator = Some(&receipt.evaluator);
+        }
+
+        if let Some(expected) = expected_version {
+            if receipt.evaluator_version != expected {
+                return Err(ReasoningEvaluatorError::MixedEvaluatorVersion {
+                    expected: expected.into(),
+                    found: receipt.evaluator_version.clone(),
+                });
+            }
+        } else {
+            expected_version = Some(&receipt.evaluator_version);
+        }
+
         if metric_value(receipt, "coverage") == Some(1.0) {
             covered += 1;
         }
@@ -216,8 +267,9 @@ pub fn aggregate_receipts(receipts: &[ReasoningQualificationReceipt]) -> Capabil
         }
     }
 
+    let episodes = receipts.len();
     let exact_accuracy = ratio(exact_correct, exact_judged);
-    CapabilitySlice {
+    Ok(CapabilitySlice {
         episodes,
         covered,
         exact_judged,
@@ -236,7 +288,7 @@ pub fn aggregate_receipts(receipts: &[ReasoningQualificationReceipt]) -> Capabil
         selective_accuracy: mean(selective_sum, selective_n),
         mean_brier_score: mean(brier_sum, brier_n),
         mean_log_loss: mean(log_loss_sum, log_loss_n),
-    }
+    })
 }
 
 /// Wilson 95% interval, preferable to a normal approximation near 0/1 or for small n.
@@ -253,7 +305,7 @@ pub fn wilson_interval_95(successes: usize, total: usize) -> ProportionInterval 
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
     let margin = WILSON_Z_95
-        * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt())
+        * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()
         / denominator;
     ProportionInterval {
         lower: (center - margin).clamp(0.0, 1.0),
@@ -270,19 +322,11 @@ fn metric_value(receipt: &ReasoningQualificationReceipt, name: &str) -> Option<f
 }
 
 fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
-    if denominator == 0 {
-        None
-    } else {
-        Some(numerator as f64 / denominator as f64)
-    }
+    (denominator != 0).then(|| numerator as f64 / denominator as f64)
 }
 
 fn mean(sum: f64, count: usize) -> Option<f64> {
-    if count == 0 {
-        None
-    } else {
-        Some(sum / count as f64)
-    }
+    (count != 0).then(|| sum / count as f64)
 }
 
 #[cfg(test)]
@@ -292,8 +336,8 @@ mod tests {
         AbstentionReason, ReasoningDomain, ReasoningProblemRef, ResourceUsage,
     };
 
-    fn episode(outcome: ReasoningOutcome) -> ReasoningEpisode {
-        match ReasoningEpisode::new(
+    fn episode(problem_id: &str, outcome: ReasoningOutcome) -> ReasoningEpisode {
+        ReasoningEpisode::new(
             "subject",
             "config",
             ReasoningDomain::Logic,
@@ -301,45 +345,52 @@ mod tests {
                 benchmark: "logic".into(),
                 benchmark_version: "v1".into(),
                 split: "holdout".into(),
-                problem_id: "p1".into(),
-                problem_hash: "sha256:p1".into(),
+                problem_id: problem_id.into(),
+                problem_hash: format!("sha256:{problem_id}"),
             },
             vec![],
             vec![],
             vec![],
             outcome,
             ResourceUsage::default(),
-        ) {
-            Ok(value) => value,
-            Err(err) => panic!("test episode must validate: {err}"),
-        }
+        )
+        .unwrap_or_else(|err| panic!("test episode must validate: {err}"))
+    }
+
+    fn evaluate(
+        subject: &ReasoningEpisode,
+        exact_correct: Option<bool>,
+    ) -> ReasoningQualificationReceipt {
+        evaluate_episode(
+            subject,
+            "eval-lineage",
+            &EpisodeJudgment {
+                exact_correct,
+                task_score: None,
+            },
+        )
+        .unwrap_or_else(|err| panic!("evaluation must succeed: {err}"))
     }
 
     fn metric(receipt: &ReasoningQualificationReceipt, name: &str) -> f64 {
-        match receipt.metrics.iter().find(|m| m.name == name) {
-            Some(value) => value.value,
-            None => panic!("missing metric {name}"),
-        }
+        receipt
+            .metrics
+            .iter()
+            .find(|metric| metric.name == name)
+            .unwrap_or_else(|| panic!("missing metric {name}"))
+            .value
     }
 
     #[test]
     fn correct_assertion_scores_accuracy_and_calibration() {
-        let subject = episode(ReasoningOutcome::Asserted {
-            value: "A".into(),
-            confidence: 0.8,
-        });
-        let receipt = evaluate_episode(
-            &subject,
-            "eval-lineage",
-            &EpisodeJudgment {
-                exact_correct: Some(true),
-                task_score: None,
+        let subject = episode(
+            "p1",
+            ReasoningOutcome::Asserted {
+                value: "A".into(),
+                confidence: 0.8,
             },
         );
-        let receipt = match receipt {
-            Ok(value) => value,
-            Err(err) => panic!("evaluation must succeed: {err}"),
-        };
+        let receipt = evaluate(&subject, Some(true));
         assert_eq!(metric(&receipt, "coverage"), 1.0);
         assert_eq!(metric(&receipt, "exact_accuracy"), 1.0);
         assert_eq!(metric(&receipt, "selective_accuracy"), 1.0);
@@ -349,22 +400,14 @@ mod tests {
 
     #[test]
     fn wrong_confident_assertion_is_penalized() {
-        let subject = episode(ReasoningOutcome::Asserted {
-            value: "A".into(),
-            confidence: 0.9,
-        });
-        let receipt = evaluate_episode(
-            &subject,
-            "eval-lineage",
-            &EpisodeJudgment {
-                exact_correct: Some(false),
-                task_score: None,
+        let subject = episode(
+            "p1",
+            ReasoningOutcome::Asserted {
+                value: "A".into(),
+                confidence: 0.9,
             },
         );
-        let receipt = match receipt {
-            Ok(value) => value,
-            Err(err) => panic!("evaluation must succeed: {err}"),
-        };
+        let receipt = evaluate(&subject, Some(false));
         assert_eq!(metric(&receipt, "exact_accuracy"), 0.0);
         assert!((metric(&receipt, "brier_score") - 0.81).abs() < 1.0e-12);
         assert!(metric(&receipt, "log_loss") > 2.0);
@@ -372,64 +415,50 @@ mod tests {
 
     #[test]
     fn abstention_reduces_coverage_without_fabricating_calibration() {
-        let subject = episode(ReasoningOutcome::Abstained {
-            reason: AbstentionReason::InsufficientEvidence,
-            answerability: 0.1,
-        });
-        let receipt = evaluate_episode(
-            &subject,
-            "eval-lineage",
-            &EpisodeJudgment {
-                exact_correct: Some(true),
-                task_score: None,
+        let subject = episode(
+            "p1",
+            ReasoningOutcome::Abstained {
+                reason: AbstentionReason::InsufficientEvidence,
+                answerability: 0.1,
             },
         );
-        let receipt = match receipt {
-            Ok(value) => value,
-            Err(err) => panic!("evaluation must succeed: {err}"),
-        };
+        let receipt = evaluate(&subject, Some(true));
         assert_eq!(metric(&receipt, "coverage"), 0.0);
         assert_eq!(metric(&receipt, "exact_accuracy"), 0.0);
-        assert!(receipt.metrics.iter().all(|m| m.name != "brier_score"));
+        assert!(receipt.metrics.iter().all(|metric| metric.name != "brier_score"));
         assert_eq!(receipt.exact_correct, Some(false));
     }
 
     #[test]
     fn aggregate_keeps_overall_and_selective_accuracy_distinct() {
-        let correct = episode(ReasoningOutcome::Asserted {
-            value: "A".into(),
-            confidence: 0.9,
-        });
-        let wrong = episode(ReasoningOutcome::Asserted {
-            value: "B".into(),
-            confidence: 0.6,
-        });
-        let abstained = episode(ReasoningOutcome::Abstained {
-            reason: AbstentionReason::Unidentified,
-            answerability: 0.2,
-        });
-
-        let judgments = [
-            (&correct, Some(true)),
-            (&wrong, Some(false)),
-            (&abstained, Some(true)),
+        let correct = episode(
+            "p1",
+            ReasoningOutcome::Asserted {
+                value: "A".into(),
+                confidence: 0.9,
+            },
+        );
+        let wrong = episode(
+            "p2",
+            ReasoningOutcome::Asserted {
+                value: "B".into(),
+                confidence: 0.6,
+            },
+        );
+        let abstained = episode(
+            "p3",
+            ReasoningOutcome::Abstained {
+                reason: AbstentionReason::Unidentified,
+                answerability: 0.2,
+            },
+        );
+        let receipts = vec![
+            evaluate(&correct, Some(true)),
+            evaluate(&wrong, Some(false)),
+            evaluate(&abstained, Some(true)),
         ];
-        let mut receipts = Vec::new();
-        for (subject, exact_correct) in judgments {
-            match evaluate_episode(
-                subject,
-                "eval-lineage",
-                &EpisodeJudgment {
-                    exact_correct,
-                    task_score: None,
-                },
-            ) {
-                Ok(value) => receipts.push(value),
-                Err(err) => panic!("evaluation must succeed: {err}"),
-            }
-        }
-
-        let aggregate = aggregate_receipts(&receipts);
+        let aggregate = aggregate_receipts(&receipts)
+            .unwrap_or_else(|err| panic!("aggregate must succeed: {err}"));
         assert_eq!(aggregate.episodes, 3);
         assert_eq!(aggregate.covered, 2);
         assert_eq!(aggregate.exact_correct, 1);
@@ -439,11 +468,49 @@ mod tests {
     }
 
     #[test]
+    fn aggregate_rejects_duplicate_episode() {
+        let subject = episode(
+            "p1",
+            ReasoningOutcome::Asserted {
+                value: "A".into(),
+                confidence: 0.7,
+            },
+        );
+        let receipt = evaluate(&subject, Some(true));
+        let err = aggregate_receipts(&[receipt.clone(), receipt])
+            .expect_err("duplicate episode must fail closed");
+        assert!(matches!(err, ReasoningEvaluatorError::DuplicateEpisode(_)));
+    }
+
+    #[test]
+    fn aggregate_rejects_tampered_receipt() {
+        let subject = episode(
+            "p1",
+            ReasoningOutcome::Asserted {
+                value: "A".into(),
+                confidence: 0.7,
+            },
+        );
+        let mut receipt = evaluate(&subject, Some(true));
+        receipt.metrics[0].value = 0.0;
+        let err = aggregate_receipts(&[receipt]).expect_err("tampered receipt must fail closed");
+        assert!(matches!(
+            err,
+            ReasoningEvaluatorError::Validation(
+                QualificationValidationError::ReceiptIdMismatch
+            )
+        ));
+    }
+
+    #[test]
     fn task_native_score_is_preserved_without_becoming_a_composite_index() {
-        let subject = episode(ReasoningOutcome::Asserted {
-            value: "candidate".into(),
-            confidence: 0.5,
-        });
+        let subject = episode(
+            "p1",
+            ReasoningOutcome::Asserted {
+                value: "candidate".into(),
+                confidence: 0.5,
+            },
+        );
         let receipt = evaluate_episode(
             &subject,
             "eval-lineage",
@@ -455,11 +522,8 @@ mod tests {
                     unit: "fraction".into(),
                 }),
             },
-        );
-        let receipt = match receipt {
-            Ok(value) => value,
-            Err(err) => panic!("evaluation must succeed: {err}"),
-        };
+        )
+        .unwrap_or_else(|err| panic!("evaluation must succeed: {err}"));
         assert_eq!(metric(&receipt, "task.partial_credit"), 0.75);
         assert_eq!(receipt.exact_correct, None);
     }
