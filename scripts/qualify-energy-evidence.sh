@@ -31,6 +31,7 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 ACTUAL_HEAD="$(git rev-parse HEAD)"
+GIT_TREE_SHA="$(git rev-parse 'HEAD^{tree}')"
 EXPECTED_HEAD="${QUALIFICATION_HEAD_SHA:-$ACTUAL_HEAD}"
 BASE_SHA="${QUALIFICATION_BASE_SHA:-}"
 EVENT_SHA="${EVENT_SHA:-$ACTUAL_HEAD}"
@@ -58,6 +59,7 @@ rm -f \
   "$EVIDENCE_DIR/tests.tsv" \
   "$EVIDENCE_DIR/clippy.tsv" \
   "$EVIDENCE_DIR/Cargo.lock.patch" \
+  "$EVIDENCE_DIR/Cargo.lock.resolved" \
   "$EVIDENCE_DIR/locked.err" \
   "$EVIDENCE_DIR/qualification-receipt.json" \
   "$EVIDENCE_DIR/qualification-receipt.sha256"
@@ -76,6 +78,7 @@ restore_lock() {
 trap restore_lock EXIT
 
 printf 'Qualification head: %s\n' "$ACTUAL_HEAD"
+printf 'Qualification tree: %s\n' "$GIT_TREE_SHA"
 printf 'Qualification base: %s\n' "${BASE_SHA:-n/a}"
 printf 'Rust: %s\nCargo: %s\n' "$RUSTC_VERSION" "$CARGO_VERSION"
 
@@ -141,7 +144,12 @@ if [[ "$LOCKED_OK" == true ]]; then
 else
   run_matrix tests test_one_unlocked || TEST_OK=false
   run_matrix clippy clippy_one_unlocked || CLIPPY_OK=false
+
+  # Preserve both representations of Cargo's pinned-toolchain resolution:
+  # a patch against the committed lock and the complete resolved candidate.
+  # Neither is qualification evidence while the committed lock was stale.
   git diff -- Cargo.lock > "$EVIDENCE_DIR/Cargo.lock.patch" || true
+  cp Cargo.lock "$EVIDENCE_DIR/Cargo.lock.resolved"
 fi
 
 restore_lock
@@ -151,13 +159,18 @@ if [[ "$(git rev-parse HEAD)" != "$EXPECTED_HEAD" ]]; then
   echo "ERROR: qualification subject moved during execution" >&2
   exit 2
 fi
+if [[ "$(git rev-parse 'HEAD^{tree}')" != "$GIT_TREE_SHA" ]]; then
+  echo "ERROR: qualification tree identity moved during execution" >&2
+  exit 2
+fi
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "ERROR: tracked checkout differs after qualification/restoration" >&2
   git status --short >&2
   exit 2
 fi
 
-export ACTUAL_HEAD BASE_SHA EVENT_SHA RUSTC_VERSION CARGO_VERSION LOCKED_OK FMT_OK TEST_OK CLIPPY_OK EVIDENCE_DIR
+export ACTUAL_HEAD GIT_TREE_SHA BASE_SHA EVENT_SHA RUSTC_VERSION CARGO_VERSION
+export LOCKED_OK FMT_OK TEST_OK CLIPPY_OK EVIDENCE_DIR ROOT
 export PACKAGES_JOINED="${PACKAGES[*]}"
 python3 - <<'PY'
 import hashlib
@@ -165,10 +178,28 @@ import json
 import os
 from pathlib import Path
 
-root = Path(os.environ["EVIDENCE_DIR"])
+root = Path(os.environ["ROOT"])
+evidence = Path(os.environ["EVIDENCE_DIR"])
+
+manifest_paths = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "scripts/qualify-energy-evidence.sh",
+    "crates/core/symthaea-discovery/Cargo.toml",
+    "crates/domains/symthaea-energy-material-screening/Cargo.toml",
+    "crates/bridges/symthaea-energy-material-dossier/Cargo.toml",
+    "crates/bridges/symthaea-energy-material-candidate-version/Cargo.toml",
+    "crates/bridges/symthaea-energy-material-campaign/Cargo.toml",
+    "crates/bridges/symthaea-energy-evidence-envelope/Cargo.toml",
+    "crates/bridges/symthaea-energy-native-dossier/Cargo.toml",
+    "crates/bridges/symthaea-energy-native-campaign-admission/Cargo.toml",
+]
+
+def sha(path: Path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def read_matrix(name):
-    path = root / f"{name}.tsv"
+    path = evidence / f"{name}.tsv"
     out = {}
     if path.exists():
         for line in path.read_text().splitlines():
@@ -178,11 +209,23 @@ def read_matrix(name):
             out[package] = status
     return out
 
-patch = root / "Cargo.lock.patch"
-patch_sha = hashlib.sha256(patch.read_bytes()).hexdigest() if patch.exists() else None
+input_sha256 = {path: sha(root / path) for path in manifest_paths}
+set_hash = hashlib.sha256()
+set_hash.update(b"symthaea.energy-evidence-fast-lane.input-set.v1\0")
+for path in sorted(input_sha256):
+    set_hash.update(path.encode())
+    set_hash.update(b"\0")
+    set_hash.update(bytes.fromhex(input_sha256[path]))
+
+patch = evidence / "Cargo.lock.patch"
+resolved = evidence / "Cargo.lock.resolved"
+patch_sha = sha(patch) if patch.exists() else None
+resolved_sha = sha(resolved) if resolved.exists() else None
+
 receipt = {
-    "schema": "symthaea.energy-evidence-fast-lane.receipt.v1",
+    "schema": "symthaea.energy-evidence-fast-lane.receipt.v2",
     "head_sha": os.environ["ACTUAL_HEAD"],
+    "git_tree_sha": os.environ["GIT_TREE_SHA"],
     "base_sha": os.environ.get("BASE_SHA") or None,
     "event_sha": os.environ["EVENT_SHA"],
     "subject_class": "raw_git_head_package_focused",
@@ -190,6 +233,10 @@ receipt = {
     "rustc_version": os.environ["RUSTC_VERSION"],
     "cargo_version": os.environ["CARGO_VERSION"],
     "cargo_lock_fresh": os.environ["LOCKED_OK"] == "true",
+    "committed_cargo_lock_sha256": input_sha256["Cargo.lock"],
+    "harness_sha256": input_sha256["scripts/qualify-energy-evidence.sh"],
+    "qualification_input_file_sha256": input_sha256,
+    "qualification_input_set_sha256": set_hash.hexdigest(),
     "diagnostic_unlocked_execution": os.environ["LOCKED_OK"] != "true",
     "packages": os.environ["PACKAGES_JOINED"].split(),
     "fmt": read_matrix("fmt"),
@@ -199,6 +246,7 @@ receipt = {
     "all_tests_passed": os.environ["TEST_OK"] == "true",
     "all_clippy_passed": os.environ["CLIPPY_OK"] == "true",
     "diagnostic_lock_patch_sha256": patch_sha,
+    "diagnostic_resolved_lock_sha256": resolved_sha,
     "qualification_eligible": all([
         os.environ["LOCKED_OK"] == "true",
         os.environ["FMT_OK"] == "true",
@@ -212,10 +260,12 @@ receipt = {
     ),
 }
 body = json.dumps(receipt, sort_keys=True, indent=2) + "\n"
-out = root / "qualification-receipt.json"
+out = evidence / "qualification-receipt.json"
 out.write_text(body)
 digest = hashlib.sha256(body.encode()).hexdigest()
-(root / "qualification-receipt.sha256").write_text(digest + "  qualification-receipt.json\n")
+(evidence / "qualification-receipt.sha256").write_text(
+    digest + "  qualification-receipt.json\n"
+)
 print(body, end="")
 print(f"qualification receipt sha256: {digest}")
 PY
