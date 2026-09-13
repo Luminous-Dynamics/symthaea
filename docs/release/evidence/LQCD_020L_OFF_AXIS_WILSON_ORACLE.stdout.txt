@@ -1,0 +1,3 @@
+ok
+result_sha256=20458685d99bcd4d67d373dae12cded11665aa2784a1a8dd9965787628030906
+{"alpha":0.7,"axis_unique_path_collapse_error":0.0,"convention_id":"shortest_path_symmetrized_ape_spatial_unsmeared_temporal_wilson_v1","dims":[3,3,3,2],"gauge_invariance_max_error":1.1102230246251565e-16,"identity_values":{"r100":1.0,"r110":1.0,"r111":1.0,"r200":1.0,"r210":1.0},"loop_means":{"r100":0.9993772194252611,"r110":0.9988687110881265,"r111":0.9986193091927639,"r200":0.9990068485378498,"r210":0.9984136341025711},"path_counts":{"r100":1,"r110":2,"r111":6,"r200":1,"r210":3},"temporal_operator_tamper_error":0.0}
