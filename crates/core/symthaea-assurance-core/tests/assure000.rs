@@ -226,7 +226,7 @@ fn negative_finding_remains_orthogonal_to_positive_support() {
 }
 
 #[test]
-fn independent_reproduction_requires_distinct_verifier() {
+fn reproduction_requires_distinct_verifier_identity() {
     let subject = subject(true);
     let claim = claim(&subject);
     let mut artifacts = functional_set(&subject, &claim);
@@ -234,23 +234,23 @@ fn independent_reproduction_requires_distinct_verifier() {
         "reproduction",
         &subject,
         &claim,
-        EvidenceKind::IndependentReproduction,
+        EvidenceKind::Reproduction,
         None,
         'e',
     ));
     let error = QualificationResult::resolve(
         &claim,
         &subject,
-        &plan(&claim, SupportTier::IndependentlyReproduced),
+        &plan(&claim, SupportTier::Reproduced),
         &artifacts,
-        QualificationOutcome::Supported(SupportTier::IndependentlyReproduced),
+        QualificationOutcome::Supported(SupportTier::Reproduced),
     )
     .unwrap_err();
-    assert_eq!(error, AssuranceError::MissingIndependentVerifier);
+    assert_eq!(error, AssuranceError::MissingDistinctVerifier);
 }
 
 #[test]
-fn independent_reproduction_accepts_distinct_verifier() {
+fn reproduction_accepts_distinct_verifier_identity_without_claiming_independence() {
     let subject = subject(true);
     let claim = claim(&subject);
     let mut artifacts = functional_set(&subject, &claim);
@@ -258,22 +258,19 @@ fn independent_reproduction_accepts_distinct_verifier() {
         "reproduction",
         &subject,
         &claim,
-        EvidenceKind::IndependentReproduction,
-        Some("independent-verifier"),
+        EvidenceKind::Reproduction,
+        Some("second-verifier-identity"),
         'e',
     ));
     let result = QualificationResult::resolve(
         &claim,
         &subject,
-        &plan(&claim, SupportTier::IndependentlyReproduced),
+        &plan(&claim, SupportTier::Reproduced),
         &artifacts,
-        QualificationOutcome::Supported(SupportTier::IndependentlyReproduced),
+        QualificationOutcome::Supported(SupportTier::Reproduced),
     )
     .unwrap();
-    assert_eq!(
-        result.outcome().support_tier(),
-        Some(SupportTier::IndependentlyReproduced)
-    );
+    assert_eq!(result.outcome().support_tier(), Some(SupportTier::Reproduced));
 }
 
 #[test]
@@ -285,8 +282,8 @@ fn deployment_qualification_requires_explicit_envelope() {
         "reproduction",
         &subject,
         &claim,
-        EvidenceKind::IndependentReproduction,
-        Some("independent-verifier"),
+        EvidenceKind::Reproduction,
+        Some("second-verifier-identity"),
         'e',
     ));
     artifacts.push(artifact(
