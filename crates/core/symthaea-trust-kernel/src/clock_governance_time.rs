@@ -37,6 +37,7 @@ pub enum ClockGovernanceTimeError {
     InvalidEnvelope,
     InvalidValidityWindow,
     NotValidAcrossEnvelope,
+    EventMayAlreadyBeEffective,
     ActivationMayBeInPast,
     ActivationMayBeTooLate,
     TimeScaleOverflow,
@@ -128,6 +129,22 @@ impl ClockGovernanceEvaluationEnvelopeV1 {
             if not_after_ms <= self.upper_unix_ms {
                 return Err(ClockGovernanceTimeError::NotValidAcrossEnvelope);
             }
+        }
+        Ok(())
+    }
+
+    /// Require a second-granularity event to remain strictly in the future for
+    /// every possible true time in the trusted envelope.
+    ///
+    /// Equality with the upper bound is not sufficient: if true time equals the
+    /// upper bound, an event effective at that instant may already apply.
+    pub fn require_effective_time_after_envelope_seconds(
+        &self,
+        effective_at_unix_s: u64,
+    ) -> Result<(), ClockGovernanceTimeError> {
+        let effective_at_ms = seconds_to_millis(effective_at_unix_s)?;
+        if effective_at_ms <= self.upper_unix_ms {
+            return Err(ClockGovernanceTimeError::EventMayAlreadyBeEffective);
         }
         Ok(())
     }
