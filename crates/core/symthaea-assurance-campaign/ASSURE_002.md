@@ -14,6 +14,10 @@ registration receipt exists
 
 post-registration evidence
     != evidence bound to that exact registration
+
+same ordering source
+    + different validation profile
+    != comparable ordering lineage
 ```
 
 ASSURE-002 adds campaign identity, preregistration ordering, registration currentness, and preregistered evidence admission above ASSURE-000/001 without modifying either qualified parent.
@@ -34,7 +38,7 @@ ASSURE-002 adds campaign identity, preregistration ordering, registration curren
 - registered controls;
 - explicit failure, contradiction, inconclusive, and invalidation conditions.
 
-Ordering of set-like inputs has no authority. Duplicate semantic entries fail closed.
+Ordering of set-like inputs has no authority. Evidence kinds use lexicographic UTF-8 ordering of canonical wire names rather than Rust enum declaration order. Duplicate semantic entries fail closed.
 
 `CampaignPlanV1::core_plan()` derives the ASSURE-000 qualification plan from the richer ASSURE-002 plan instead of maintaining two independently editable plan authorities.
 
@@ -59,12 +63,15 @@ PreregistrationReceiptV1
 `OrderingReceiptV1` binds:
 
 - ordering source identity;
+- ordering-validation profile identity;
 - non-zero epoch;
 - non-zero monotonic sequence;
 - exact statement digest;
 - exact external receipt/attestation digest.
 
-ASSURE-002 verifies statement binding and relative ordering. It does **not** authenticate the external ordering authority or prove that the external receipt is genuine. That trust must be established by the adapter/verifier supplying the receipt.
+Two receipts are order-comparable only when source, validation profile, and epoch all match. This prevents the same external receipt bytes from being interpreted under different validation rules while silently retaining one ordering meaning.
+
+ASSURE-002 verifies statement binding and relative ordering. It does **not** authenticate the external ordering authority or prove that the external receipt is genuine. The validation-profile identifier records which external verification contract is intended; the adapter/verifier is still responsible for actually enforcing that contract before supplying an accepted receipt.
 
 A local wall clock is not used as preregistration authority.
 
@@ -94,7 +101,7 @@ It fails closed on:
 - multiple distinct successors of one predecessor;
 - disconnected registrations;
 - cross-campaign lineage;
-- non-increasing or incomparable ordering lineage;
+- non-increasing or incomparable source/profile/epoch ordering lineage;
 - conflicting withdrawals;
 - successor registration after withdrawal of its predecessor;
 - withdrawal of the unique leaf, which leaves no current registration.
@@ -105,15 +112,18 @@ A registration with a valid successor is superseded automatically. Only the uniq
 
 ## Evidence production is distinct from evidence admission
 
-ASSURE-002 separates:
+ASSURE-002 separates one monotonic campaign event chain:
 
 ```text
 registration
-    < evidence production
-    < evidence admission
+    < production[1]
+    < admission[1]
+    < production[2]
+    < admission[2]
+    < ...
 ```
 
-under one exact ordering source + epoch.
+All ordered events in one ledger use the same source + validation profile + epoch lineage.
 
 The production ordering statement binds:
 
@@ -122,25 +132,27 @@ The production ordering statement binds:
 - current plan digest;
 - exact ASSURE-000 evidence-artifact digest.
 
-Evidence produced before or at the registration sequence is classified `ProducedBeforeOrAtRegistration`. Evidence from another source/epoch is `IncomparableOrderingLineage`. Neither can enter the preregistered ledger.
+Evidence produced before or at the registration sequence is classified `ProducedBeforeOrAtRegistration`. Evidence from another source/profile/epoch is `IncomparableOrderingLineage`. Neither can enter the preregistered ledger.
+
+After the first admission, later production must also be strictly later than the ledger's previous admission ordering. It is therefore impossible for append-only ledger position to move forward while the external ordering lineage moves backward.
 
 These records may still be retained elsewhere as post-hoc evidence; ASSURE-002 merely refuses to label them preregistered.
 
 ## Append-only evidence admission
 
-`CampaignEvidenceLedgerV1` begins from the exact empty root bound into the current registration.
+`CampaignEvidenceLedgerV1` begins from the exact empty root bound into the current registration and from the registration's exact ordering receipt as its initial ordering head.
 
 Each admitted item requires:
 
 1. the exact current registration;
 2. the exact current campaign plan;
 3. an evidence kind registered by the plan;
-4. a production statement ordered after registration;
-5. an admission statement binding the current evidence root, next ordinal, exact evidence digest, and production-ordering receipt;
-6. admission ordering strictly later than production ordering;
-7. no duplicate evidence digest.
+4. no duplicate evidence ID or exact evidence digest;
+5. a production statement ordered after registration and after the ledger's previous ordering head;
+6. an admission statement binding the current evidence root, next ordinal, exact evidence digest, previous ordering head, and production-ordering receipt;
+7. admission ordering strictly later than production ordering.
 
-Successful admission produces a new content-addressed root that commits the previous root, ordinal, evidence digest, production-ordering digest, and admission-ordering digest.
+Successful admission produces a new content-addressed root that commits the previous root, ordinal, evidence digest, production-ordering digest, and admission-ordering digest. The admission ordering then becomes the ledger's new ordering head.
 
 An evidence ledger created under a superseded registration cannot be reused with a successor registration.
 
@@ -167,6 +179,7 @@ A preregistered plan does not make an experiment well-designed. A distinct-verif
 ASSURE-002 does not establish:
 
 - authenticity or trustworthiness of an external ordering authority;
+- that a validation profile was actually enforced merely because its identifier is bound;
 - trusted wall-clock time;
 - quality or adequacy of the experimental design;
 - claim support from evidence;
