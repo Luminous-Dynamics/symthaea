@@ -24,6 +24,8 @@
 //! - [`train_exact_episode`] accumulates those exact query gradients while
 //!   parameters remain frozen for a complete world, then applies one bounded
 //!   episode-end recurrent update.
+//! - [`run_exact_learning_ablation`] executes a fixed-seed paired learned-vs-
+//!   frozen held-out experiment without best-seed selection.
 //! - [`InvariantContextMixer`] supplies O(KD) cross-dimensional magnitude
 //!   context without violating the full bipolar role symmetry.
 //! - [`ContextualHolographicLiquidCell`] composes invariant context with the
@@ -51,6 +53,7 @@ pub mod state_tracking_benchmark;
 pub mod state_tracking_codec;
 pub mod state_tracking_eval;
 pub mod state_tracking_exact_training;
+pub mod state_tracking_learning_ablation;
 pub mod state_tracking_readout;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
@@ -79,5 +82,10 @@ pub use state_tracking_eval::{
 pub use state_tracking_exact_training::{
     AssociativeEpisodeMetrics, ExactEpisodeTrainingConfig, ExactEpisodeTrainingError,
     ExactEpisodeTrainingReport, evaluate_associative_episode, train_exact_episode,
+};
+pub use state_tracking_learning_ablation::{
+    ExactLearningAblationError, ExactLearningAblationPlan, ExactLearningAblationResult,
+    HeldOutWorldComparison, PairedEffectSummary, TrainingWorldResult,
+    run_exact_learning_ablation,
 };
 pub use state_tracking_readout::{TrackingPrototypeReadout, TrackingReadoutError};
