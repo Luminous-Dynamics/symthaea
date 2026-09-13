@@ -3,7 +3,9 @@
 //! Neutral, evidence-bearing ontology for planetary industrial ecology.
 //!
 //! PIE-000 models what an industrial process graph contains. PIE-001 adds
-//! interval-aware bulk-mass conservation. Chemistry, detailed thermodynamics,
+//! interval-aware bulk-mass conservation. PIE-002 adds first-order electrical
+//! and thermal utility accounting while keeping gross/current-cycle supply
+//! separate from steady-cycle recovery. Chemistry, detailed thermodynamics,
 //! equipment reproduction, optimization, and control authority belong to later
 //! layers.
 
@@ -14,11 +16,13 @@ mod graph;
 mod mass_balance;
 mod process;
 mod types;
+mod utility_accounting;
 
 pub use graph::*;
 pub use mass_balance::*;
 pub use process::*;
 pub use types::*;
+pub use utility_accounting::*;
 
 #[cfg(test)]
 mod tests {
