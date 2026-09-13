@@ -27,6 +27,7 @@ mod fep_development;
 mod heldout_seal;
 pub mod hidden_world;
 mod promotion;
+mod relay_triad;
 mod selection;
 mod target_contract;
 mod target_lineage;
