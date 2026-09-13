@@ -62,7 +62,11 @@ impl PreferenceClaim {
         Ok(Self {
             summary,
             provenance,
-            confidence: confidence.clamp(0.0, 1.0),
+            confidence: if confidence.is_finite() {
+                confidence.clamp(0.0, 1.0)
+            } else {
+                0.0
+            },
         })
     }
 
@@ -237,6 +241,13 @@ mod tests {
         let claim = PreferenceClaim::new("option A", PreferenceProvenance::Inferred, 4.0)
             .expect("claim should be valid");
         assert_eq!(claim.confidence, 1.0);
+    }
+
+    #[test]
+    fn non_finite_confidence_is_untrusted() {
+        let claim = PreferenceClaim::new("option A", PreferenceProvenance::Inferred, f32::NAN)
+            .expect("claim should be valid");
+        assert_eq!(claim.confidence, 0.0);
     }
 
     #[test]

@@ -30,6 +30,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod authority_envelope;
 pub mod autopoiesis;
 pub mod care;
 pub mod consent;
@@ -40,6 +41,10 @@ pub mod ontology;
 pub mod perspective;
 pub mod practical_wisdom;
 
+pub use authority_envelope::{
+    AuthorityEnvelopeError, AuthorityEnvelopePolicy, AuthorityRestrictionReason,
+    RelationalAuthorityAssessment, RelationalAuthorityEnvelope, RelationalAuthorityInput,
+};
 pub use autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
 pub use care::{
     AttentivenessRecord, CareCase, CareCaseId, CareError, CareGap, CareOption, CareOptionId,
