@@ -35,6 +35,7 @@ const ENVELOPE_KEYS: &[&str] = &[
     "issuer_key_id",
     "issuer_public_key_ed25519_hex",
     "issuer_policy_id",
+    "issuer_policy_sha256",
     "issued_at_utc",
     "expires_at_utc",
     "nonce_sha256",
@@ -159,12 +160,19 @@ fn canonical_message(envelope: &Value) -> Result<String, String> {
     let key_id = field(envelope, "issuer_key_id")?;
     let public_key = field(envelope, "issuer_public_key_ed25519_hex")?;
     let policy_id = field(envelope, "issuer_policy_id")?;
+    let policy_sha = field(envelope, "issuer_policy_sha256")?;
     let issued = field(envelope, "issued_at_utc")?;
     let expires = field(envelope, "expires_at_utc")?;
     let nonce = field(envelope, "nonce_sha256")?;
     let signature = field(envelope, "signature_ed25519_hex")?;
 
-    for (name, value) in [("wcare36", w36), ("wcare35", w35), ("receipt", receipt), ("nonce", nonce)] {
+    for (name, value) in [
+        ("wcare36", w36),
+        ("wcare35", w35),
+        ("receipt", receipt),
+        ("policy", policy_sha),
+        ("nonce", nonce),
+    ] {
         if !is_lower_hex(value, 64) {
             return Err(format!("invalid_64_hex:{name}"));
         }
@@ -216,6 +224,7 @@ relation_evidence_strength_claim={relation}\n\
 issuer_key_id={key_id}\n\
 issuer_public_key_ed25519_hex={public_key}\n\
 issuer_policy_id={policy_id}\n\
+issuer_policy_sha256={policy_sha}\n\
 issued_at_utc={issued}\n\
 expires_at_utc={expires}\n\
 nonce_sha256={nonce}\n\
@@ -254,6 +263,7 @@ fn subject_binding(
         || field(envelope, "wcare36_result_sha256")? != w36.sha256.as_str()
         || field(envelope, "wcare35_result_sha256")? != w35.sha256.as_str()
         || field(envelope, "subject_receipt_sha256")? != subject.sha256.as_str()
+        || field(envelope, "issuer_policy_sha256")? != policy.sha256.as_str()
         || field(&policy.json, "wcare36_result_sha256")? != w36.sha256.as_str()
         || field(&policy.json, "wcare35_result_sha256")? != w35.sha256.as_str()
     {
@@ -540,8 +550,8 @@ mod tests {
     use ed25519_dalek::{Signer, SigningKey};
 
     const GOLDEN_PUBLIC_KEY: &str = "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c";
-    const GOLDEN_MESSAGE_SHA256: &str = "a46d444b075c1556e14b5b65b376018c738448c727a000717d375dbe7cec69b5";
-    const GOLDEN_SIGNATURE: &str = "f352837dc60df4d5a243d50ee8bc69e20494404bc8ec0e66e919933dd045bac560bfc748987c48cd2e9e8b4c8725cde879618b2789ab0e394f9a980b662e890e";
+    const GOLDEN_MESSAGE_SHA256: &str = "3dfff70b542e0902a64321e6a96aea6008a8f1fd9a70f9ba76274fda24a1deb7";
+    const GOLDEN_SIGNATURE: &str = "385a66fa83dc81e2b4e0ee4e73bc7a8fdebd5546308691384ac82611466e07f1faac3d1cea417d2808a9d928191db2b3cac1ee04329a53025989e6c1e220150e";
 
     fn base_envelope(public_key: &str) -> Value {
         json!({
@@ -556,6 +566,7 @@ mod tests {
             "issuer_key_id": "issuer.example.v1",
             "issuer_public_key_ed25519_hex": public_key,
             "issuer_policy_id": "policy.example.v1",
+            "issuer_policy_sha256": "66".repeat(32),
             "issued_at_utc": "2026-09-13T16:00:00Z",
             "expires_at_utc": "2026-10-13T16:00:00Z",
             "nonce_sha256": "55".repeat(32),
