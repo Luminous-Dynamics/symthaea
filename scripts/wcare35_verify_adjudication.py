@@ -87,8 +87,8 @@ def mean_pairwise_ordinal_agreement(rating_values: dict[str, list[int]]) -> floa
     """Mean pairwise similarity across all rated reviewer pairs and dimensions.
 
     Similarity is 1 - |a-b|/4 on the preregistered 0..4 ordinal scale. Missing and
-    not-applicable ratings contribute no pair. This is intentionally transparent and
-    descriptive; it is not a claim of moral truth or chance-corrected reliability.
+    not-applicable ratings contribute no pair. This is transparent/descriptive; it
+    is not a claim of moral truth or chance-corrected reliability.
     """
     total = 0.0
     pairs = 0
@@ -152,9 +152,7 @@ def main() -> int:
         return invalid("rubric_dimension_ids_invalid")
 
     rating_scale = rubric.get("rating_scale", {})
-    scale_min = rating_scale.get("min")
-    scale_max = rating_scale.get("max")
-    if scale_min != 0 or scale_max != 4:
+    if rating_scale.get("min") != 0 or rating_scale.get("max") != 4:
         return invalid("unsupported_rating_scale")
     if rubric.get("aggregate_score_is_moral_truth") is not False or rubric.get("dimension_failure_may_be_hidden_by_total") is not False:
         return invalid("rubric_claim_boundary_missing")
@@ -174,15 +172,11 @@ def main() -> int:
     if not isinstance(failure_max, int) or isinstance(failure_max, bool) or not 0 <= failure_max <= 4:
         return invalid("invalid_hard_safety_failure_threshold")
 
-    record_hashes: list[str] = []
-    reviewer_ids: set[str] = set()
-    reviewer_classes: Counter[str] = Counter()
-    rating_values: dict[str, list[int]] = {dimension: [] for dimension in dimension_ids}
-    missing_counts: Counter[str] = Counter()
-    na_counts: Counter[str] = Counter()
-
+    # Validate every raw record first. Raw records remain evidence even when superseded.
+    records_by_id: dict[str, dict] = {}
+    raw_hash_by_id: dict[str, str] = {}
+    submitted_by_id: dict[str, datetime] = {}
     for raw, record in reviewer_artifacts:
-        record_hashes.append(sha256_bytes(raw))
         if record.get("protocol_version") != protocol:
             return invalid("reviewer_protocol_version_mismatch")
         if record.get("adjudication_epoch") != epoch or record.get("case_id") != case_id:
@@ -192,21 +186,19 @@ def main() -> int:
         if record.get("original_record_immutable") is not True:
             return invalid("reviewer_record_not_immutable")
         reviewer_id = record.get("reviewer_record_id")
-        if not isinstance(reviewer_id, str) or not reviewer_id or reviewer_id in reviewer_ids:
+        if not isinstance(reviewer_id, str) or not reviewer_id or reviewer_id in records_by_id:
             return invalid("duplicate_or_invalid_reviewer_record_id")
-        reviewer_ids.add(reviewer_id)
         reviewer_class = record.get("reviewer_class")
         if reviewer_class not in ALLOWED_REVIEWER_CLASSES:
-            return invalid("invalid_reviewer_class")
-        reviewer_classes[reviewer_class] += 1
+            return invalid("invalid_reviewer_class", reviewer_record_id=reviewer_id)
         if not isinstance(record.get("blinded_to_candidate_identity"), bool) or not isinstance(record.get("blinded_to_condition"), bool):
-            return invalid("reviewer_blinding_state_missing")
+            return invalid("reviewer_blinding_state_missing", reviewer_record_id=reviewer_id)
         if not isinstance(record.get("unblinding_events"), list) or any(not isinstance(value, str) for value in record["unblinding_events"]):
-            return invalid("reviewer_unblinding_events_invalid")
+            return invalid("reviewer_unblinding_events_invalid", reviewer_record_id=reviewer_id)
         try:
-            parse_time(record.get("submitted_utc"))
+            submitted = parse_time(record.get("submitted_utc"))
         except (TypeError, ValueError):
-            return invalid("reviewer_timestamp_invalid")
+            return invalid("reviewer_timestamp_invalid", reviewer_record_id=reviewer_id)
 
         ratings = record.get("ratings")
         if not isinstance(ratings, list) or len(ratings) != len(dimension_ids):
@@ -224,22 +216,93 @@ def main() -> int:
                 rating = item.get("rating")
                 if not isinstance(rating, int) or isinstance(rating, bool) or not 0 <= rating <= 4:
                     return invalid("reviewer_rating_invalid", reviewer_record_id=reviewer_id, dimension_id=dimension)
-                rating_values[dimension].append(rating)
-            elif status == "MISSING":
+            elif status in {"MISSING", "NOT_APPLICABLE"}:
                 if "rating" in item:
-                    return invalid("missing_rating_carries_value", reviewer_record_id=reviewer_id, dimension_id=dimension)
-                missing_counts[dimension] += 1
-            elif status == "NOT_APPLICABLE":
-                if "rating" in item:
-                    return invalid("not_applicable_rating_carries_value", reviewer_record_id=reviewer_id, dimension_id=dimension)
-                na_counts[dimension] += 1
+                    return invalid("nonrated_dimension_carries_value", reviewer_record_id=reviewer_id, dimension_id=dimension)
             else:
                 return invalid("reviewer_rating_status_invalid", reviewer_record_id=reviewer_id, dimension_id=dimension)
 
-    completed = len(reviewer_artifacts)
-    result_hashes = result.get("reviewer_record_sha256s")
-    if not isinstance(result_hashes, list) or len(result_hashes) != len(set(result_hashes)) or set(result_hashes) != set(record_hashes):
-        return invalid("reviewer_record_digest_census_mismatch")
+        records_by_id[reviewer_id] = record
+        raw_hash_by_id[reviewer_id] = sha256_bytes(raw)
+        submitted_by_id[reviewer_id] = submitted
+
+    # Build append-only correction chains. One predecessor may have at most one successor.
+    superseded_by: dict[str, str] = {}
+    for reviewer_id, record in records_by_id.items():
+        predecessor = record.get("supersedes_record_id")
+        if predecessor is None:
+            continue
+        if not isinstance(predecessor, str) or not predecessor or predecessor == reviewer_id:
+            return invalid("invalid_supersedes_record_id", reviewer_record_id=reviewer_id)
+        if predecessor not in records_by_id:
+            return invalid("superseded_record_missing", reviewer_record_id=reviewer_id, supersedes_record_id=predecessor)
+        if predecessor in superseded_by:
+            return invalid("branching_reviewer_correction_chain", supersedes_record_id=predecessor)
+        if records_by_id[predecessor].get("reviewer_class") != record.get("reviewer_class"):
+            return invalid("reviewer_class_changed_in_correction_chain", reviewer_record_id=reviewer_id)
+        if submitted_by_id[reviewer_id] < submitted_by_id[predecessor]:
+            return invalid("reviewer_correction_time_regression", reviewer_record_id=reviewer_id)
+        superseded_by[predecessor] = reviewer_id
+
+    # Reject cycles explicitly.
+    for start in records_by_id:
+        seen: set[str] = set()
+        cursor = start
+        while cursor in superseded_by:
+            if cursor in seen:
+                return invalid("reviewer_correction_cycle", reviewer_record_id=start)
+            seen.add(cursor)
+            cursor = superseded_by[cursor]
+        if cursor in seen:
+            return invalid("reviewer_correction_cycle", reviewer_record_id=start)
+
+    active_ids = [reviewer_id for reviewer_id in records_by_id if reviewer_id not in superseded_by]
+    # Two independent leaves cannot descend from one root because branching was rejected above.
+    root_for_active: dict[str, str] = {}
+    for active_id in active_ids:
+        cursor = active_id
+        visited: set[str] = set()
+        while True:
+            predecessor = records_by_id[cursor].get("supersedes_record_id")
+            if predecessor is None:
+                root = cursor
+                break
+            if predecessor in visited:
+                return invalid("reviewer_correction_cycle", reviewer_record_id=active_id)
+            visited.add(predecessor)
+            cursor = predecessor
+        if root in root_for_active:
+            return invalid("multiple_active_records_for_reviewer_chain", root_record_id=root)
+        root_for_active[root] = active_id
+
+    all_hashes = list(raw_hash_by_id.values())
+    reported_all_hashes = result.get("reviewer_record_sha256s")
+    if not isinstance(reported_all_hashes, list) or len(reported_all_hashes) != len(set(reported_all_hashes)) or set(reported_all_hashes) != set(all_hashes):
+        return invalid("raw_reviewer_record_digest_census_mismatch")
+    active_hashes = [raw_hash_by_id[reviewer_id] for reviewer_id in active_ids]
+    reported_active_hashes = result.get("active_reviewer_record_sha256s")
+    if not isinstance(reported_active_hashes, list) or len(reported_active_hashes) != len(set(reported_active_hashes)) or set(reported_active_hashes) != set(active_hashes):
+        return invalid("active_reviewer_record_digest_census_mismatch")
+
+    # Compute panel statistics from active leaves only.
+    reviewer_classes: Counter[str] = Counter()
+    rating_values: dict[str, list[int]] = {dimension: [] for dimension in dimension_ids}
+    missing_counts: Counter[str] = Counter()
+    na_counts: Counter[str] = Counter()
+    for reviewer_id in active_ids:
+        record = records_by_id[reviewer_id]
+        reviewer_classes[record["reviewer_class"]] += 1
+        for item in record["ratings"]:
+            dimension = item["dimension_id"]
+            status = item["status"]
+            if status == "RATED":
+                rating_values[dimension].append(item["rating"])
+            elif status == "MISSING":
+                missing_counts[dimension] += 1
+            else:
+                na_counts[dimension] += 1
+
+    completed = len(active_ids)
     if result.get("panel_size_committed") != minimum_panel_size:
         return invalid("committed_panel_size_mismatch")
     if result.get("panel_size_completed") != completed:
@@ -322,6 +385,7 @@ def main() -> int:
         "plan_sha256": plan_sha,
         "rubric_sha256": rubric_sha,
         "result_sha256": sha256_bytes(result_bytes),
+        "raw_reviewer_record_count": len(records_by_id),
         "panel_size_completed": completed,
         "reviewer_class_counts": expected_class_counts,
         "hard_safety_violation_dimensions": derived_hard_violations,
