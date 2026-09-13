@@ -1,8 +1,8 @@
 use symthaea_assurance_policy_lineage_anchor::PolicyLineageAnchor;
 use symthaea_assurance_tpm2_tools_adapter::{
-    bind_observation_to_checkpoint, read_tpm2_nv_counter, CheckpointBindingContext,
-    ToolExecution, Tpm2AdapterError, Tpm2ReadHierarchy, Tpm2ToolsAdapterPolicy,
-    Tpm2ToolsExecutor,
+    CheckpointBindingContext, ToolExecution, Tpm2AdapterError, Tpm2ReadHierarchy,
+    Tpm2ToolsAdapterPolicy, Tpm2ToolsExecutor, bind_observation_to_checkpoint,
+    read_tpm2_nv_counter,
 };
 use symthaea_assurance_trust_store::{TrustStoreBackendKind, TrustStoreProfile};
 
@@ -45,10 +45,15 @@ impl Tpm2ToolsExecutor for FakeExecutor {
         }
     }
 
-    fn execute(&self, executable: &str, args: &[String]) -> Result<ToolExecution, Tpm2AdapterError> {
-        assert!(args
-            .windows(2)
-            .any(|pair| pair[0] == "-T" && pair[1] == "device:/dev/tpmrm0"));
+    fn execute(
+        &self,
+        executable: &str,
+        args: &[String],
+    ) -> Result<ToolExecution, Tpm2AdapterError> {
+        assert!(
+            args.windows(2)
+                .any(|pair| pair[0] == "-T" && pair[1] == "device:/dev/tpmrm0")
+        );
         if executable.ends_with("tpm2_nvreadpublic") {
             Ok(ToolExecution {
                 exit_code: self.public_exit,
@@ -56,7 +61,14 @@ impl Tpm2ToolsExecutor for FakeExecutor {
                 stderr: self.public_stderr.clone(),
             })
         } else {
-            assert!(args.windows(2).any(|pair| pair[0] == "-s" && pair[1] == "8"));
+            assert!(
+                args.windows(2)
+                    .any(|pair| pair[0] == "-s" && pair[1] == "8")
+            );
+            assert!(
+                args.windows(2)
+                    .any(|pair| pair[0] == "-C" && pair[1] == "o")
+            );
             Ok(ToolExecution {
                 exit_code: self.read_exit,
                 stdout: self.read_stdout.clone(),
@@ -127,6 +139,7 @@ fn exact_counter_read_produces_observation() {
     let observation = read_tpm2_nv_counter(&policy(), 10_000, &FakeExecutor::default()).unwrap();
     assert_eq!(observation.counter_value, 42);
     assert_eq!(observation.public_evidence.data_size, 8);
+    assert!(observation.observation_digest().starts_with("blake3:"));
     assert!(!observation.grants_physical_authority());
 }
 
@@ -216,16 +229,17 @@ fn observation_binds_to_existing_checkpoint_contract() {
         independent_verification_ref: "verification:tpm2-adapter:1".into(),
         evidence_refs: vec!["audit:tpm2-checkpoint-binding".into()],
     };
-    let checkpoint = bind_observation_to_checkpoint(
-        &observation,
-        &policy,
-        &profile(),
-        &anchor(),
-        &context,
-    )
-    .unwrap();
+    let checkpoint =
+        bind_observation_to_checkpoint(&observation, &policy, &profile(), &anchor(), &context)
+            .unwrap();
     assert_eq!(checkpoint.counter_value, 42);
     assert_eq!(checkpoint.anchor_digest, anchor().anchor_digest());
+    assert!(
+        checkpoint
+            .evidence_refs
+            .iter()
+            .any(|value| value.starts_with("tpm2-observation:blake3:"))
+    );
 }
 
 #[test]
