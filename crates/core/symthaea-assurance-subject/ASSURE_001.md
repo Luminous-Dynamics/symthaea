@@ -18,6 +18,10 @@ unknown surface
     != unavailable surface
     != not-applicable surface
     != omitted surface
+
+known commitment
+    != retrievable artifact
+    != replayable system
 ```
 
 ASSURE-001 defines the system-under-test identity used by later external AI/agent qualification campaigns. It is deliberately separate from ASSURE-000 so richer subject semantics cannot destabilize the qualified generic claim/evidence kernel.
@@ -56,15 +60,15 @@ NotApplicable
 
 These states are identity-distinct.
 
-`Known` means only that an exact SHA-256 commitment is available for the material identity being represented. It does **not** prove that a provider's description of those bytes/revision is truthful, that two different commitment schemes are semantically equivalent, or that the upstream provider cannot equivocate. Those are evidence/attestation questions for later assurance layers.
+`Known` means only that an exact SHA-256 commitment is available for the material identity being represented. It does **not** prove that a provider's description of those bytes/revision is truthful, that two different commitment schemes are semantically equivalent, that the committed artifact is retrievable, or that the upstream provider cannot equivocate. Those are evidence/attestation/availability questions for later assurance layers.
 
 `Unknown` means the surface applies but the exact material identity is not known.
 
-`Unavailable` means the surface applies but cannot currently be obtained for a declared reason such as provider non-disclosure, access denial, or missing measurement.
+`Unavailable` means the surface applies but the exact identity cannot currently be obtained for a declared reason such as provider non-disclosure, access denial, or missing measurement.
 
 `NotApplicable` means the registered surface genuinely does not apply to this subject. It is not a substitute for missing information.
 
-A manifest is exactly replayable only when every applicable registered surface is `Known`; `Unknown` and `Unavailable` prevent exact replayability.
+`CompletenessSummary::has_complete_material_identity()` is true only when every applicable registered surface is `Known`. This is an identity-completeness predicate, **not replayability**. Replayability additionally requires evidence that the committed artifacts/configuration can actually be obtained and executed under the relevant environment.
 
 ## Provider aliases are not revisions
 
@@ -129,6 +133,7 @@ A declared deployment envelope may be part of the subject profile. Its presence 
 ASSURE-001 does not establish:
 
 - provider truthfulness;
+- artifact retrievability or system replayability;
 - remote-service immutability when no immutable revision is available;
 - prompt secrecy;
 - credential safety beyond excluding raw-secret representation from the intended model;
@@ -138,4 +143,4 @@ ASSURE-001 does not establish:
 - common-cause verifier independence;
 - certification, compliance, or deployment authority.
 
-Those claims require later evidence, campaign, policy, or standards layers.
+Those claims require later evidence, campaign, availability, policy, or standards layers.
