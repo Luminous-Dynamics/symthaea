@@ -11,16 +11,27 @@ evidence exists
 
 ASSURE-000 defines a domain-neutral vocabulary for exact subject identity, claims, evidence provenance, support strength, negative findings, claim ceilings, and invalidation conditions.
 
+## Deterministic identities
+
+The kernel content-addresses:
+
+- `SubjectManifest` — canonical component order + optional deployment envelope;
+- `Claim` — exact subject, claim ID, statement, and scope;
+- `QualificationPlan` — exact claim, maximum support ceiling, and invalidation set;
+- `QualificationResult` — exact subject/claim/plan identity, evidence IDs, outcome, ceiling, and invalidation set.
+
+Evidence cannot be rebound to a different subject or claim. Duplicate evidence IDs fail closed rather than being silently deduplicated.
+
 ## Positive support ladder
 
-- `Structural`
-- `Observed`
-- `CausallySupported`
-- `FunctionallySupported`
-- `IndependentlyReproduced`
-- `DeploymentQualified`
+- `Structural` requires architecture-inspection evidence;
+- `Observed` requires observation evidence;
+- `CausallySupported` requires controlled-intervention evidence;
+- `FunctionallySupported` requires controlled-intervention plus functional-benchmark evidence;
+- `IndependentlyReproduced` additionally requires independent-reproduction evidence with a verifier distinct from producer and executor;
+- `DeploymentQualified` additionally requires runtime-receipt evidence and an explicit deployment envelope.
 
-The ladder is not a generic score. Each successor tier requires explicit predicates. `DeploymentQualified` additionally requires an explicit deployment envelope. `IndependentlyReproduced` and stronger support require evidence with a verifier distinct from producer and executor.
+The ladder is not a generic score. Each successor tier has explicit predicates, and `QualificationPlan::maximum_support` is a hard claim ceiling.
 
 ## Negative and orthogonal findings
 
@@ -32,19 +43,9 @@ The ladder is not a generic score. Each successor tier requires explicit predica
 
 These are intentionally not placed below `Structural` on one ordinal scale. A contradiction is not a weak positive result, and inconclusive evidence is not a scientific refutation.
 
-## Exact identity
-
-`SubjectManifest` canonicalizes its component order and content-addresses the result with SHA-256. `Claim` separately binds the exact subject identity, claim ID, textual proposition, and declared scope.
-
-Evidence artifacts bind both subject and claim identities. Rebinding evidence to another subject or claim fails closed.
-
-## Claim ceiling
-
-`QualificationPlan::maximum_support` is a hard upper bound. A proposed result above that ceiling is rejected rather than silently promoted.
-
 ## Invalidation
 
-Qualification results retain explicit invalidation conditions. Matching a declared condition converts a positive result to `Negative(Invalidated { ... })` rather than preserving stale qualification.
+Qualification results retain an explicit invalidation set. Matching a declared condition changes the result to `Negative(Invalidated { ... })` and therefore changes the result identity. ASSURE-004 will later add predecessor/requalification lineage; ASSURE-000 deliberately does not imply that a mutated result preserves historical qualification authority.
 
 ## Deliberate nonclaims
 
