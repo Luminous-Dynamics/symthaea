@@ -17,7 +17,7 @@ fn main() {
 
 #[cfg(feature = "symthaea-backend")]
 fn qualified_main() -> Result<(), Box<dyn std::error::Error>> {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::env;
     use std::fs;
     use std::io;
@@ -91,8 +91,8 @@ fn qualified_main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect::<Result<_, _>>()?;
 
-    let observed_ids: Vec<_> = specialist_blob_shas.keys().cloned().collect();
-    let expected_ids: Vec<_> = GWT1_SPECIALISTS_V1
+    let observed_ids: BTreeSet<_> = specialist_blob_shas.keys().cloned().collect();
+    let expected_ids: BTreeSet<_> = GWT1_SPECIALISTS_V1
         .iter()
         .map(|id| (*id).to_string())
         .collect();
