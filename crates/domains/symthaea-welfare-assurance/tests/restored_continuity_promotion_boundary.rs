@@ -12,7 +12,7 @@ const APPROVED_IMPL: &str =
 fn production_restored_continuity_barrier_has_one_purpose_separated_implementation() {
     let root = repository_root();
     let mut implementations = Vec::new();
-    visit_rust_sources(&root.join("crates"), &mut |path, source| {
+    visit_rust_sources(&root, &mut |path, source| {
         if is_test_source(path) {
             return;
         }
@@ -48,6 +48,15 @@ fn is_test_source(path: &Path) -> bool {
             .is_some_and(|name| name.ends_with("_test.rs") || name.ends_with("_tests.rs"))
 }
 
+fn should_skip_directory(path: &Path) -> bool {
+    path.file_name().is_some_and(|name| {
+        matches!(
+            name.to_str(),
+            Some("target" | ".git" | ".direnv" | "node_modules" | "vendor")
+        )
+    })
+}
+
 fn visit_rust_sources(root: &Path, visitor: &mut impl FnMut(&Path, &str)) {
     let Ok(entries) = fs::read_dir(root) else {
         return;
@@ -55,12 +64,12 @@ fn visit_rust_sources(root: &Path, visitor: &mut impl FnMut(&Path, &str)) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            if path.file_name().is_some_and(|name| name == "target") {
+            if should_skip_directory(&path) {
                 continue;
             }
             visit_rust_sources(&path, visitor);
         } else if path.extension().is_some_and(|extension| extension == "rs") {
-            let source = fs::read_to_string(&path).expect("workspace Rust source must be readable");
+            let source = fs::read_to_string(&path).expect("repository Rust source must be readable");
             visitor(&path, &source);
         }
     }
