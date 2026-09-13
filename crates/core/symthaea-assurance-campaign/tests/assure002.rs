@@ -86,6 +86,25 @@ fn revised_plan(subject: &AiSubjectManifest, campaign_nonce: &str) -> CampaignPl
     .unwrap()
 }
 
+fn ordering_with_profile(
+    source: &str,
+    validation_profile: &str,
+    epoch: u64,
+    sequence: u64,
+    statement: DigestSha256,
+    receipt_byte: char,
+) -> OrderingReceiptV1 {
+    OrderingReceiptV1::new(
+        id(source),
+        id(validation_profile),
+        epoch,
+        sequence,
+        statement,
+        digest(receipt_byte),
+    )
+    .unwrap()
+}
+
 fn ordering(
     source: &str,
     epoch: u64,
@@ -93,7 +112,14 @@ fn ordering(
     statement: DigestSha256,
     receipt_byte: char,
 ) -> OrderingReceiptV1 {
-    OrderingReceiptV1::new(id(source), epoch, sequence, statement, digest(receipt_byte)).unwrap()
+    ordering_with_profile(
+        source,
+        "monotonic-ordering-profile-v1",
+        epoch,
+        sequence,
+        statement,
+        receipt_byte,
+    )
 }
 
 fn root_registration(plan: &CampaignPlanV1, sequence: u64) -> PreregistrationReceiptV1 {
@@ -375,6 +401,28 @@ fn evidence_from_another_ordering_lineage_is_incomparable() {
 }
 
 #[test]
+fn evidence_under_different_validation_profile_is_incomparable() {
+    let subject = subject('a');
+    let plan = plan(&subject, "campaign-a");
+    let root = root_registration(&plan, 5);
+    let current = resolve_current_registration(&[root], &[]).unwrap();
+    let evidence = evidence(&subject, EvidenceKind::Observation, "evidence-a");
+    let statement = evidence_production_statement_digest(&current, &evidence);
+    let foreign_profile = ordering_with_profile(
+        "transparency-log-a",
+        "different-validation-profile-v1",
+        1,
+        6,
+        statement,
+        'b',
+    );
+    assert_eq!(
+        classify_evidence_timing(&current, &evidence, &foreign_profile).unwrap(),
+        EvidenceTimingClass::IncomparableOrderingLineage
+    );
+}
+
+#[test]
 fn preregistered_admission_advances_append_only_evidence_root() {
     let subject = subject('a');
     let plan = plan(&subject, "campaign-a");
@@ -397,6 +445,58 @@ fn preregistered_admission_advances_append_only_evidence_root() {
     assert_eq!(ledger.admitted_count(), 1);
     assert_ne!(ledger.evidence_root(), &initial_root);
     assert_eq!(admitted.evidence_root(), ledger.evidence_root());
+}
+
+#[test]
+fn later_ledger_entry_cannot_time_travel_before_previous_admission() {
+    let subject = subject('a');
+    let plan = plan(&subject, "campaign-a");
+    let root = root_registration(&plan, 5);
+    let current = resolve_current_registration(&[root], &[]).unwrap();
+    let mut ledger = CampaignEvidenceLedgerV1::new(&current);
+
+    let first = evidence(&subject, EvidenceKind::Observation, "evidence-a");
+    let first_production = ordering(
+        "transparency-log-a",
+        1,
+        6,
+        evidence_production_statement_digest(&current, &first),
+        'b',
+    );
+    let first_admission_statement = ledger
+        .admission_statement_digest(&current, &first, &first_production)
+        .unwrap();
+    let first_admission = ordering(
+        "transparency-log-a",
+        1,
+        7,
+        first_admission_statement,
+        'c',
+    );
+    ledger
+        .admit_preregistered(
+            &plan,
+            &current,
+            &first,
+            &first_production,
+            &first_admission,
+        )
+        .unwrap();
+
+    let second = evidence(&subject, EvidenceKind::Observation, "evidence-b");
+    let stale_production = ordering(
+        "transparency-log-a",
+        1,
+        6,
+        evidence_production_statement_digest(&current, &second),
+        'd',
+    );
+    assert_eq!(
+        ledger
+            .admission_statement_digest(&current, &second, &stale_production)
+            .unwrap_err(),
+        CampaignError::EvidenceProductionNotAfterLedgerHead
+    );
 }
 
 #[test]
