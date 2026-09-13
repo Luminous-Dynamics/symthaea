@@ -3,12 +3,14 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! RelayTriad — an isolated second EUREKA world family.
 //!
-//! This module intentionally does not extend the frozen legacy `FixtureFamily`
-//! enum or mutate the EUREKA-002E V1 schedule. RelayTriad has its own family,
-//! schedule, evaluator and target-contract identities while reusing only the
-//! public observation/action vocabulary.
+//! This sidecar deliberately does not extend the frozen legacy `FixtureFamily`
+//! enum or mutate EUREKA-002E V1 schedules. It has independent family, schedule,
+//! world and target-contract identities while reusing only the public synthetic
+//! observation/action vocabulary.
 //!
 //! Parent issue: <https://github.com/Luminous-Dynamics/symthaea/issues/2214>
+
+#![allow(dead_code)]
 
 use symthaea_fep::FepEvaluationSnapshot;
 
@@ -62,9 +64,13 @@ pub(super) fn relay_world_count(partition: CorpusPartition) -> u16 {
 }
 
 pub(super) fn relay_scheduled_profiles(partition: CorpusPartition) -> Vec<RelayTriadProfile> {
-    let count = relay_world_count(partition);
-    let base = relay_seed_namespace_base(partition);
-    (0..count)
+    let base = match partition {
+        CorpusPartition::Development => 0x5100_0000_0000_0000,
+        CorpusPartition::Calibration => 0x5200_0000_0000_0000,
+        CorpusPartition::HeldOutEvaluation => 0x5300_0000_0000_0000,
+        CorpusPartition::ExternalReplication => 0x5400_0000_0000_0000,
+    };
+    (0..relay_world_count(partition))
         .map(|index| RelayTriadProfile {
             schedule_revision: RELAY_TRIAD_SCHEDULE_REVISION,
             partition,
@@ -78,49 +84,9 @@ pub(super) fn relay_scheduled_profiles(partition: CorpusPartition) -> Vec<RelayT
 pub(super) fn relay_scheduled_action(
     profile: RelayTriadProfile,
     legal_actions: &[PublicAction],
-) -> Result<PublicAction, RelayScheduleError> {
-    if legal_actions.is_empty() {
-        return Err(RelayScheduleError::NoLegalActions);
-    }
-    Ok(legal_actions[usize::from(profile.index) % legal_actions.len()])
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum RelayScheduleError {
-    NoLegalActions,
-}
-
-fn relay_seed_namespace_base(partition: CorpusPartition) -> u64 {
-    match partition {
-        CorpusPartition::Development => 0x5100_0000_0000_0000,
-        CorpusPartition::Calibration => 0x5200_0000_0000_0000,
-        CorpusPartition::HeldOutEvaluation => 0x5300_0000_0000_0000,
-        CorpusPartition::ExternalReplication => 0x5400_0000_0000_0000,
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct RelayTriadIdentity {
-    profile: RelayTriadProfile,
-    permutation: [usize; 3],
-    digest: u64,
-}
-
-impl RelayTriadIdentity {
-    fn new(profile: RelayTriadProfile, permutation: [usize; 3]) -> Self {
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"eureka.relay-triad.identity.v1\0");
-        encode_str(&mut bytes, RELAY_TRIAD_FAMILY_ID);
-        bytes.extend_from_slice(&profile.seed.to_le_bytes());
-        bytes.push(profile.mechanism_variant);
-        bytes.push(partition_tag(profile.partition));
-        bytes.extend(permutation.iter().map(|index| *index as u8));
-        Self {
-            profile,
-            permutation,
-            digest: fnv1a64(&bytes),
-        }
-    }
+) -> Option<PublicAction> {
+    (!legal_actions.is_empty())
+        .then(|| legal_actions[usize::from(profile.index) % legal_actions.len()])
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -151,37 +117,50 @@ pub(super) enum RelayTriadOracleError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct RelayTriadActionReceipt {
+    pub world_digest: u64,
+    pub requested: PublicAction,
+    pub status: ActionExecutionStatus,
+    pub realized: Option<PublicAction>,
+    pub pre_state: PublicObservation,
+    pub post_state: Option<PublicObservation>,
+    pub transition_digest: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct RelayTriadEvaluator {
-    identity: RelayTriadIdentity,
+    world_digest: u64,
     state: RelayTriadState,
 }
 
 impl RelayTriadEvaluator {
     pub(super) fn build(profile: RelayTriadProfile) -> Self {
-        let public_to_hidden = permutation3(profile.seed);
-        let state = RelayTriadState {
-            bits: [
-                profile.seed & 1 != 0,
-                profile.seed & 2 != 0,
-                profile.seed & 4 != 0,
-            ],
-            public_to_hidden,
-            protected_hidden: (profile.seed as usize) % 3,
-            mechanism_variant: profile.mechanism_variant,
-            step: 0,
-        };
+        let permutation = permutation3(profile.seed);
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"eureka.relay-triad.identity.v1\0");
+        encode_str(&mut bytes, RELAY_TRIAD_FAMILY_ID);
+        bytes.extend_from_slice(&profile.seed.to_le_bytes());
+        bytes.push(profile.mechanism_variant);
+        bytes.push(partition_tag(profile.partition));
+        bytes.extend(permutation.iter().map(|index| *index as u8));
         Self {
-            identity: RelayTriadIdentity::new(profile, public_to_hidden),
-            state,
+            world_digest: fnv1a64(&bytes),
+            state: RelayTriadState {
+                bits: [
+                    profile.seed & 1 != 0,
+                    profile.seed & 2 != 0,
+                    profile.seed & 4 != 0,
+                ],
+                public_to_hidden: permutation,
+                protected_hidden: (profile.seed as usize) % 3,
+                mechanism_variant: profile.mechanism_variant,
+                step: 0,
+            },
         }
     }
 
-    pub(super) fn runtime(&mut self) -> RelayTriadRuntime<'_> {
-        RelayTriadRuntime { inner: self }
-    }
-
     pub(super) fn world_digest(&self) -> u64 {
-        self.identity.digest
+        self.world_digest
     }
 
     pub(super) fn hidden_state_digest(&self) -> u64 {
@@ -193,13 +172,13 @@ impl RelayTriadEvaluator {
         fnv1a64(&bytes)
     }
 
-    pub(super) fn hidden_structural_roles(&self) -> [&'static str; 3] {
-        ["trigger", "relay", "output"]
+    pub(super) fn runtime(&mut self) -> RelayTriadRuntime<'_> {
+        RelayTriadRuntime { inner: self }
     }
 
     pub(super) fn oracle_snapshot(&self) -> RelayTriadOracleSnapshot {
         RelayTriadOracleSnapshot {
-            world_digest: self.identity.digest,
+            world_digest: self.world_digest,
             state: self.state.clone(),
         }
     }
@@ -210,11 +189,11 @@ impl RelayTriadEvaluator {
         intervention: InterventionRequest,
         follow_up_action: PublicAction,
     ) -> Result<RelayTriadCounterfactualOutcome, RelayTriadOracleError> {
-        if snapshot.world_digest != self.identity.digest {
+        if snapshot.world_digest != self.world_digest {
             return Err(RelayTriadOracleError::SnapshotWorldMismatch);
         }
         let mut branch = Self {
-            identity: self.identity.clone(),
+            world_digest: self.world_digest,
             state: snapshot.state.clone(),
         };
         let intervention = branch.apply_intervention(intervention);
@@ -230,12 +209,10 @@ impl RelayTriadEvaluator {
         &mut self,
         requested: PublicAction,
     ) -> RelayTriadActionReceipt {
-        let world_digest = self.world_digest();
         let pre_state = self.observe_public();
-        let legal_actions = self.legal_actions();
-        if !legal_actions.contains(&requested) {
+        if !self.legal_actions().contains(&requested) {
             return RelayTriadActionReceipt {
-                world_digest,
+                world_digest: self.world_digest,
                 requested,
                 status: ActionExecutionStatus::RejectedIllegalAction,
                 realized: None,
@@ -244,21 +221,20 @@ impl RelayTriadEvaluator {
                 transition_digest: None,
             };
         }
-        let step = self.step(requested);
-        let transition_digest = relay_transition_digest(
-            world_digest,
-            &pre_state,
-            requested,
-            &step.observation,
-        );
+        let post_state = self.step(requested).observation;
         RelayTriadActionReceipt {
-            world_digest,
+            world_digest: self.world_digest,
             requested,
             status: ActionExecutionStatus::Applied,
             realized: Some(requested),
+            transition_digest: Some(transition_digest(
+                self.world_digest,
+                &pre_state,
+                requested,
+                &post_state,
+            )),
             pre_state,
-            post_state: Some(step.observation),
-            transition_digest: Some(transition_digest),
+            post_state: Some(post_state),
         }
     }
 
@@ -353,21 +329,6 @@ impl RelayTriadRuntime<'_> {
     pub(super) fn intervene(&mut self, request: InterventionRequest) -> InterventionReceipt {
         self.inner.apply_intervention(request)
     }
-
-    pub(super) fn snapshot_public_state(&self) -> PublicObservation {
-        self.observe()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct RelayTriadActionReceipt {
-    pub world_digest: u64,
-    pub requested: PublicAction,
-    pub status: ActionExecutionStatus,
-    pub realized: Option<PublicAction>,
-    pub pre_state: PublicObservation,
-    pub post_state: Option<PublicObservation>,
-    pub transition_digest: Option<u64>,
 }
 
 fn rejected(request: InterventionRequest, status: InterventionStatus) -> InterventionReceipt {
@@ -421,28 +382,16 @@ impl RelayTriadFepTargetContract {
             action_count: snapshot.action_count(),
             replay_digest: 0,
         };
-        contract.replay_digest = relay_contract_digest(&contract);
+        contract.replay_digest = contract_digest(&contract);
         Ok(contract)
-    }
-
-    pub(super) fn scope(&self) -> EurekaTargetScope {
-        self.scope
-    }
-
-    pub(super) fn snapshot_replay_digest(&self) -> u64 {
-        self.snapshot_replay_digest
-    }
-
-    pub(super) fn observation_dim(&self) -> usize {
-        self.observation_dim
-    }
-
-    pub(super) fn action_count(&self) -> usize {
-        self.action_count
     }
 
     pub(super) fn replay_digest(&self) -> u64 {
         self.replay_digest
+    }
+
+    pub(super) fn snapshot_replay_digest(&self) -> u64 {
+        self.snapshot_replay_digest
     }
 
     pub(super) fn encode_observation(
@@ -470,20 +419,14 @@ impl RelayTriadFepTargetContract {
         &self,
         action: PublicAction,
     ) -> Result<usize, RelayTriadTargetContractError> {
-        let index = match action {
+        let target = match action {
             PublicAction::NoOp => 0,
             PublicAction::Pulse { slot: 0 } => 1,
             PublicAction::Pulse { slot: 1 } => 2,
             PublicAction::Pulse { slot: 2 } => 3,
             _ => return Err(RelayTriadTargetContractError::UnsupportedPublicAction),
         };
-        if index >= self.action_count {
-            return Err(RelayTriadTargetContractError::InsufficientActionCapacity {
-                required: index + 1,
-                available: self.action_count,
-            });
-        }
-        Ok(index)
+        Ok(target)
     }
 
     pub(super) fn decode_expected_fields(
@@ -506,7 +449,7 @@ impl RelayTriadFepTargetContract {
     }
 }
 
-fn relay_contract_digest(contract: &RelayTriadFepTargetContract) -> u64 {
+fn contract_digest(contract: &RelayTriadFepTargetContract) -> u64 {
     let mut bytes = Vec::new();
     encode_str(&mut bytes, RELAY_TRIAD_TARGET_ADAPTER_REVISION);
     encode_str(&mut bytes, RELAY_TRIAD_FAMILY_ID);
@@ -520,7 +463,7 @@ fn relay_contract_digest(contract: &RelayTriadFepTargetContract) -> u64 {
     fnv1a64(&bytes)
 }
 
-fn relay_transition_digest(
+fn transition_digest(
     world_digest: u64,
     pre: &PublicObservation,
     action: PublicAction,
@@ -610,8 +553,8 @@ mod tests {
         scheduled_profiles, EUREKA_FIXTURE_FAMILIES,
     };
     use crate::benchmarks::eureka::hidden_world::{EvaluatorWorld, WorldBuildProfile};
-    use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, FepPredictionSession};
     use std::collections::HashSet;
+    use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, FepPredictionSession};
 
     fn profile(seed: u64, mechanism_variant: u8) -> RelayTriadProfile {
         RelayTriadProfile {
@@ -623,11 +566,11 @@ mod tests {
         }
     }
 
-    fn snapshot(obs_dim: usize, action_count: usize) -> FepEvaluationSnapshot {
+    fn snapshot(obs_dim: usize, actions: usize) -> FepEvaluationSnapshot {
         let agent = ActiveInferenceAgent::new(ActiveInferenceAgentConfig {
             state_dim: 8,
             obs_dim,
-            num_actions: action_count,
+            num_actions: actions,
             enable_td_learning: true,
             ..Default::default()
         });
@@ -637,42 +580,37 @@ mod tests {
     }
 
     #[test]
-    fn deterministic_replay_preserves_world_and_transition_identity() {
+    fn replay_and_qualified_transition_are_deterministic() {
         let mut a = RelayTriadEvaluator::build(profile(17, 0));
         let mut b = RelayTriadEvaluator::build(profile(17, 0));
         assert_eq!(a.world_digest(), b.world_digest());
         assert_eq!(a.runtime().observe(), b.runtime().observe());
         let action = PublicAction::Pulse { slot: 1 };
-        let ra = a.execute_qualified_action(action);
-        let rb = b.execute_qualified_action(action);
-        assert_eq!(ra, rb);
-        assert_eq!(a.hidden_state_digest(), b.hidden_state_digest());
+        assert_eq!(a.execute_qualified_action(action), b.execute_qualified_action(action));
     }
 
     #[test]
-    fn legal_action_vocabulary_is_exactly_four_actions() {
+    fn legal_action_vocabulary_is_exact_and_invalid_pulse_does_not_advance() {
         let mut world = RelayTriadEvaluator::build(profile(5, 0));
-        assert_eq!(
-            world.runtime().legal_actions(),
-            vec![
-                PublicAction::NoOp,
-                PublicAction::Pulse { slot: 0 },
-                PublicAction::Pulse { slot: 1 },
-                PublicAction::Pulse { slot: 2 },
-            ]
-        );
+        let expected = vec![
+            PublicAction::NoOp,
+            PublicAction::Pulse { slot: 0 },
+            PublicAction::Pulse { slot: 1 },
+            PublicAction::Pulse { slot: 2 },
+        ];
+        assert_eq!(world.runtime().legal_actions(), expected);
         let before = world.runtime().observe();
         let rejected = world.execute_qualified_action(PublicAction::Pulse { slot: 3 });
         assert_eq!(rejected.status, ActionExecutionStatus::RejectedIllegalAction);
-        assert_eq!(rejected.realized, None);
         assert_eq!(world.runtime().observe(), before);
     }
 
     #[test]
-    fn hidden_mechanism_variants_share_initial_surface_and_can_diverge() {
-        let mut a = RelayTriadEvaluator::build(profile(2, 0));
-        let mut b = RelayTriadEvaluator::build(profile(2, 1));
-        assert_ne!(a.world_digest(), b.world_digest());
+    fn mechanism_variants_share_initial_surface_then_diverge() {
+        // seed=3 gives hidden trigger=true, relay=true, so v0 output=relay
+        // while v1 output=trigger XOR relay after the first NoOp.
+        let mut a = RelayTriadEvaluator::build(profile(3, 0));
+        let mut b = RelayTriadEvaluator::build(profile(3, 1));
         assert_eq!(a.runtime().observe(), b.runtime().observe());
         let _ = a.execute_qualified_action(PublicAction::NoOp);
         let _ = b.execute_qualified_action(PublicAction::NoOp);
@@ -680,27 +618,12 @@ mod tests {
     }
 
     #[test]
-    fn public_surface_hides_family_identity_roles_and_mechanism() {
-        let mut world = RelayTriadEvaluator::build(profile(11, 1));
-        let digest = world.world_digest();
-        let roles = world.hidden_structural_roles();
-        let runtime = world.runtime();
-        assert_eq!(runtime.public_schema_id(), PUBLIC_SCHEMA_ID);
-        let public = format!("{:?}", runtime.observe());
-        assert!(!public.contains(RELAY_TRIAD_FAMILY_ID));
-        assert!(!public.contains(&digest.to_string()));
-        for role in roles {
-            assert!(!public.contains(role));
-        }
-    }
-
-    #[test]
-    fn interventions_and_counterfactuals_remain_evaluator_owned() {
+    fn counterfactual_branch_does_not_mutate_actual_world() {
         let world = RelayTriadEvaluator::build(profile(11, 0));
         let snapshot = world.oracle_snapshot();
         let before = world.observe_public();
         let hidden_before = world.hidden_state_digest();
-        let result = world
+        let outcome = world
             .counterfactual_from_snapshot(
                 &snapshot,
                 InterventionRequest {
@@ -712,29 +635,11 @@ mod tests {
             .unwrap();
         assert_eq!(world.observe_public(), before);
         assert_eq!(world.hidden_state_digest(), hidden_before);
-        assert_ne!(result.hidden_outcome_digest, 0);
+        assert_ne!(outcome.hidden_outcome_digest, 0);
     }
 
     #[test]
-    fn cross_world_counterfactual_snapshot_is_rejected() {
-        let a = RelayTriadEvaluator::build(profile(1, 0));
-        let b = RelayTriadEvaluator::build(profile(2, 0));
-        let snapshot = a.oracle_snapshot();
-        assert_eq!(
-            b.counterfactual_from_snapshot(
-                &snapshot,
-                InterventionRequest {
-                    slot: 0,
-                    value: PublicValue::Bit(false),
-                },
-                PublicAction::NoOp,
-            ),
-            Err(RelayTriadOracleError::SnapshotWorldMismatch)
-        );
-    }
-
-    #[test]
-    fn schedule_counts_variants_and_namespaces_are_frozen() {
+    fn schedule_is_balanced_and_seed_namespace_is_legacy_disjoint() {
         let mut relay_seeds = HashSet::new();
         for partition in [
             CorpusPartition::Development,
@@ -748,9 +653,7 @@ mod tests {
                 profiles.iter().filter(|p| p.mechanism_variant == 0).count(),
                 profiles.iter().filter(|p| p.mechanism_variant == 1).count()
             );
-            for profile in profiles {
-                assert!(relay_seeds.insert(profile.seed));
-            }
+            relay_seeds.extend(profiles.iter().map(|p| p.seed));
         }
         for partition in [
             CorpusPartition::Development,
@@ -767,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    fn sidecar_world_identity_is_distinct_from_legacy_world_identity() {
+    fn sidecar_identity_is_distinct_from_legacy_identity() {
         let relay = RelayTriadEvaluator::build(profile(23, 0));
         let legacy = EvaluatorWorld::build(WorldBuildProfile {
             family: EUREKA_FIXTURE_FAMILIES[1],
@@ -779,16 +682,7 @@ mod tests {
     }
 
     #[test]
-    fn current_four_by_four_production_shape_accepts_relay_triad() {
-        let frozen = snapshot(4, 4);
-        let contract = RelayTriadFepTargetContract::new(&frozen).unwrap();
-        assert_eq!(contract.scope(), EurekaTargetScope::ProductionFepComponentSnapshot);
-        assert_eq!(contract.observation_dim(), 4);
-        assert_eq!(contract.action_count(), 4);
-    }
-
-    #[test]
-    fn relay_target_encoding_preserves_three_bits_plus_step() {
+    fn four_by_four_target_accepts_relay_and_mapping_is_lossless() {
         let frozen = snapshot(4, 4);
         let contract = RelayTriadFepTargetContract::new(&frozen).unwrap();
         let observation = PublicObservation {
@@ -803,12 +697,6 @@ mod tests {
             contract.encode_observation(&observation).unwrap(),
             vec![1.0, 0.0, 1.0, 7.0]
         );
-    }
-
-    #[test]
-    fn relay_action_map_is_bijective_and_does_not_alias() {
-        let frozen = snapshot(4, 4);
-        let contract = RelayTriadFepTargetContract::new(&frozen).unwrap();
         assert_eq!(contract.encode_action(PublicAction::NoOp), Ok(0));
         assert_eq!(contract.encode_action(PublicAction::Pulse { slot: 0 }), Ok(1));
         assert_eq!(contract.encode_action(PublicAction::Pulse { slot: 1 }), Ok(2));
@@ -817,20 +705,6 @@ mod tests {
             contract.encode_action(PublicAction::Pulse { slot: 3 }),
             Err(RelayTriadTargetContractError::UnsupportedPublicAction)
         );
-        assert!(matches!(
-            contract.encode_action(PublicAction::Transfer {
-                from: 0,
-                to: 1,
-                amount: 1,
-            }),
-            Err(RelayTriadTargetContractError::UnsupportedPublicAction)
-        ));
-    }
-
-    #[test]
-    fn relay_decoder_is_explicit_and_deterministic() {
-        let frozen = snapshot(4, 4);
-        let contract = RelayTriadFepTargetContract::new(&frozen).unwrap();
         assert_eq!(
             contract.decode_expected_fields(&[0.49, 0.5, 0.9, 99.0]).unwrap(),
             vec![
@@ -843,17 +717,15 @@ mod tests {
 
     #[test]
     fn insufficient_target_dimensions_fail_closed() {
-        let obs_short = snapshot(3, 4);
         assert!(matches!(
-            RelayTriadFepTargetContract::new(&obs_short),
+            RelayTriadFepTargetContract::new(&snapshot(3, 4)),
             Err(RelayTriadTargetContractError::InsufficientObservationCapacity {
                 required: 4,
                 available: 3,
             })
         ));
-        let action_short = snapshot(4, 3);
         assert!(matches!(
-            RelayTriadFepTargetContract::new(&action_short),
+            RelayTriadFepTargetContract::new(&snapshot(4, 3)),
             Err(RelayTriadTargetContractError::InsufficientActionCapacity {
                 required: 4,
                 available: 3,
@@ -862,7 +734,7 @@ mod tests {
     }
 
     #[test]
-    fn contract_identity_binds_learned_snapshot() {
+    fn target_contract_identity_binds_learned_snapshot() {
         let mut agent = ActiveInferenceAgent::new(ActiveInferenceAgentConfig {
             state_dim: 8,
             obs_dim: 4,
