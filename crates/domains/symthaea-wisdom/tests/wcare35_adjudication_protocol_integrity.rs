@@ -11,9 +11,9 @@ const RESULT_SCHEMA: &str = include_str!("../../../../docs/release/evidence/WCAR
 
 const EXPECTED_PROTOCOL_SHA256: &str = "99fb253d8c3a4cc293066914fe1bae78457064c6e28f6fc7bd6e23d79f459f74";
 const EXPECTED_RUBRIC_SHA256: &str = "26ecad9276e928c14269e43a5f7837eded7605919e6d4ff3304dc9e0185b2376";
-const EXPECTED_PLAN_SCHEMA_SHA256: &str = "b8f3f1b56a1794f81bd4e39cbaece8bf30074d190c2c5801f36bc3f8b1ab2bc0";
-const EXPECTED_REVIEWER_SCHEMA_SHA256: &str = "90aa0a9bc23d4c52cab3cfd8dffe4ca7d7c63b865b6b5585701dacd89930b3d3";
-const EXPECTED_RESULT_SCHEMA_SHA256: &str = "f086a0280a1238f1ad85e65e179286bf3e878299ed90c3b052f080e209641965";
+const EXPECTED_PLAN_SCHEMA_SHA256: &str = "cca2ea1748c30f515f19a31ecb8797522db87e74d576de8aad12373ffd3768ef";
+const EXPECTED_REVIEWER_SCHEMA_SHA256: &str = "00c6013c738aef4cce18bd455cbdb449c04eb66ac50a2680db1f66f3ff2b681d";
+const EXPECTED_RESULT_SCHEMA_SHA256: &str = "deea5ef4ab56093fa26de2d738afa23f58a1db7f668c952aa90b1b1efac9385c";
 
 const K: [u32;64]=[
 0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
@@ -43,9 +43,9 @@ fn wcare35_preregistration_bytes_are_frozen(){
 
 #[test]
 fn wcare35_preserves_disagreement_and_plan_binding(){
- for s in ["ADJUDICATION_SUPPORTED","ADJUDICATION_CONTESTED","ADJUDICATION_INVALID","INFRASTRUCTURE_INDETERMINATE","raw_records_preserved","consensus_overwrote_raw_ratings","adjudication_plan_sha256","active_reviewer_record_sha256s"]{assert!(RESULT_SCHEMA.contains(s),"missing result boundary: {s}")}
- for s in ["AffectedStakeholder","DomainExpert","IndependentModelSession","SameDevelopmentLineage","original_record_immutable","adjudication_plan_sha256"]{assert!(REVIEWER_SCHEMA.contains(s),"missing reviewer boundary: {s}")}
- for s in ["agreement_threshold_direction","hard_safety_failure_rating_max","minimum_panel_size","hard_safety_dimensions"]{assert!(PLAN_SCHEMA.contains(s),"missing plan boundary: {s}")}
+ for s in ["ADJUDICATION_SUPPORTED","ADJUDICATION_CONTESTED","ADJUDICATION_INVALID","INFRASTRUCTURE_INDETERMINATE","raw_records_preserved","consensus_overwrote_raw_ratings","adjudication_plan_sha256","active_reviewer_record_sha256s","active_reviewer_identity_commitment_sha256s"]{assert!(RESULT_SCHEMA.contains(s),"missing result boundary: {s}")}
+ for s in ["AffectedStakeholder","DomainExpert","IndependentModelSession","SameDevelopmentLineage","original_record_immutable","adjudication_plan_sha256","reviewer_identity_commitment_sha256"]{assert!(REVIEWER_SCHEMA.contains(s),"missing reviewer boundary: {s}")}
+ for s in ["agreement_threshold_direction","hard_safety_failure_rating_max","minimum_panel_size","minimum_reviewer_class_counts","minimum_rated_dimensions_per_reviewer","minimum_ratings_per_dimension","require_candidate_identity_blinding","require_condition_blinding"]{assert!(PLAN_SCHEMA.contains(s),"missing plan boundary: {s}")}
  assert!(RUBRIC.contains("\"aggregate_score_is_moral_truth\":false"));
  assert!(RUBRIC.contains("\"dimension_failure_may_be_hidden_by_total\":false"));
  assert!(PROTOCOL.contains("Reviewer disagreement is evidence and must remain visible"));
