@@ -216,6 +216,22 @@ fn validity_must_cover_the_entire_trusted_interval() {
 }
 
 #[test]
+fn open_ended_validity_still_requires_safe_start() {
+    let envelope = derive_clock_governance_evaluation_envelope_v1(&operational_root()).unwrap();
+
+    envelope
+        .require_valid_across_optional_seconds_window(1_499, None)
+        .unwrap();
+    assert_eq!(
+        envelope.require_valid_across_optional_seconds_window(1_500, None),
+        Err(ClockGovernanceTimeError::NotValidAcrossEnvelope)
+    );
+    envelope
+        .require_valid_across_optional_seconds_window(1_499, Some(1_501))
+        .unwrap();
+}
+
+#[test]
 fn activation_uses_upper_for_not_past_and_lower_for_maximum_delay() {
     let envelope = derive_clock_governance_evaluation_envelope_v1(&operational_root()).unwrap();
 
@@ -241,6 +257,10 @@ fn time_scaling_fails_closed_on_overflow() {
     );
     assert_eq!(
         envelope.require_activation_within_delay_seconds(1_501, u64::MAX),
+        Err(ClockGovernanceTimeError::TimeScaleOverflow)
+    );
+    assert_eq!(
+        envelope.require_valid_across_optional_seconds_window(u64::MAX, None),
         Err(ClockGovernanceTimeError::TimeScaleOverflow)
     );
 }
