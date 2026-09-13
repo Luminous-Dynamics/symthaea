@@ -68,6 +68,8 @@ pub mod bounded_topology;
 pub mod consciousness_metrics;
 /// Lie-group and articulated configuration-space geometry for planning substrates.
 pub mod configuration_space;
+/// Tri-state continuous validity, analytic synthetic oracles, and path replay.
+pub mod continuous_reachability;
 /// Core consciousness state types and configuration.
 #[allow(missing_docs)]
 pub mod core;
