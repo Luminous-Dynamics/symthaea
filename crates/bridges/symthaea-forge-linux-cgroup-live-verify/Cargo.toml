@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-forge-linux-cgroup-live-verify"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Read-only live verification of Forge evaluator cgroup v2 resource containment"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge-linux-cgroup-control = { path = "../symthaea-forge-linux-cgroup-control" }
+symthaea-forge-linux-cgroup-strict = { path = "../symthaea-forge-linux-cgroup-strict" }
+serde = { workspace = true }
+thiserror = { workspace = true }

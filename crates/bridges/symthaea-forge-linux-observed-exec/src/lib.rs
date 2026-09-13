@@ -12,8 +12,9 @@
 //!
 //! A separate admission-capable entry point may run one caller-supplied pre-release admission
 //! operation after the first kernel gate and before release. That path re-observes the exact process
-//! afterward and requires stable process-start identity before model execution. The base entry point
-//! remains admission-free and preserves the original v1 execution proposition.
+//! afterward, requires stable process-start identity, then invokes a second verification phase and
+//! binds its optional evidence identity before the final pidfd/deadline checks and model release.
+//! The base entry point remains admission-free and preserves the original v1 execution proposition.
 //!
 //! This is stronger than a command-line recipe receipt, but remains deliberately narrower than a
 //! full hostile-code sandbox theorem: exact seccomp-filter semantics, Landlock, VM isolation,
@@ -166,8 +167,8 @@ pub enum ObservedEvaluatorError {
 
 pub fn pre_release_admission_protocol_id() -> ContentId {
     ContentId::derive(
-        "symthaea.forge-pre-release-admission-protocol.v1",
-        [b"initial-kernel-gate+admission-while-blocked+post-admission-reobserve+stable-start-time+deadline-recheck".as_slice()],
+        "symthaea.forge-pre-release-admission-protocol.v2",
+        [b"initial-kernel-gate+admission-while-blocked+post-admission-reobserve+stable-start-time+post-admission-verify+verification-evidence+deadline-recheck".as_slice()],
     )
 }
 
@@ -178,6 +179,15 @@ pub trait PreReleaseAdmission {
         observation: &KernelSandboxObservation,
         gate: &KernelIsolationGate,
     ) -> Result<(), ObservedEvaluatorError>;
+
+    fn verify(
+        &mut self,
+        _sandbox_pid: u32,
+        _observation: &KernelSandboxObservation,
+        _gate: &KernelIsolationGate,
+    ) -> Result<Option<ContentId>, ObservedEvaluatorError> {
+        Ok(None)
+    }
 }
 
 impl<F> PreReleaseAdmission for F
@@ -208,6 +218,7 @@ pub struct PreReleaseAdmissionReceipt {
     pre_gate_id: ContentId,
     post_observation_id: ContentId,
     post_gate_id: ContentId,
+    verification_evidence_id: Option<ContentId>,
     admission_ms: u64,
 }
 
@@ -220,6 +231,9 @@ impl PreReleaseAdmissionReceipt {
     pub fn pre_gate_id(&self) -> &ContentId { &self.pre_gate_id }
     pub fn post_observation_id(&self) -> &ContentId { &self.post_observation_id }
     pub fn post_gate_id(&self) -> &ContentId { &self.post_gate_id }
+    pub fn verification_evidence_id(&self) -> Option<&ContentId> {
+        self.verification_evidence_id.as_ref()
+    }
     pub fn admission_ms(&self) -> u64 { self.admission_ms }
 
     pub fn validate_for(
@@ -244,6 +258,7 @@ impl PreReleaseAdmissionReceipt {
             &self.pre_gate_id,
             &self.post_observation_id,
             &self.post_gate_id,
+            self.verification_evidence_id.as_ref(),
             self.admission_ms,
         );
         if expected == self.id {
@@ -263,20 +278,29 @@ fn derive_admission_receipt_id(
     pre_gate_id: &ContentId,
     post_observation_id: &ContentId,
     post_gate_id: &ContentId,
+    verification_evidence_id: Option<&ContentId>,
     admission_ms: u64,
 ) -> ContentId {
+    let mut parts = vec![
+        protocol_id.as_str().as_bytes().to_vec(),
+        sandbox_host_pid.to_be_bytes().to_vec(),
+        process_start_time_ticks.to_be_bytes().to_vec(),
+        pre_observation_id.as_str().as_bytes().to_vec(),
+        pre_gate_id.as_str().as_bytes().to_vec(),
+        post_observation_id.as_str().as_bytes().to_vec(),
+        post_gate_id.as_str().as_bytes().to_vec(),
+    ];
+    match verification_evidence_id {
+        Some(id) => {
+            parts.push(b"verification:some".to_vec());
+            parts.push(id.as_str().as_bytes().to_vec());
+        }
+        None => parts.push(b"verification:none".to_vec()),
+    }
+    parts.push(admission_ms.to_be_bytes().to_vec());
     ContentId::derive(
-        "symthaea.forge-pre-release-admission-receipt.v1",
-        [
-            protocol_id.as_str().as_bytes(),
-            sandbox_host_pid.to_be_bytes().as_slice(),
-            process_start_time_ticks.to_be_bytes().as_slice(),
-            pre_observation_id.as_str().as_bytes(),
-            pre_gate_id.as_str().as_bytes(),
-            post_observation_id.as_str().as_bytes(),
-            post_gate_id.as_str().as_bytes(),
-            admission_ms.to_be_bytes().as_slice(),
-        ],
+        "symthaea.forge-pre-release-admission-receipt.v2",
+        parts.iter().map(Vec::as_slice),
     )
 }
 
@@ -1321,6 +1345,27 @@ fn run_kernel_gated_evaluator_inner(
                 last_error: "post-admission kernel re-observation crossed the frozen gate deadline".into(),
             });
         }
+
+        let verification_evidence_id = match admitter.verify(sandbox_pid, &post_observation, &post_gate) {
+            Ok(value) => value,
+            Err(error) => {
+                teardown_after_pid(
+                    &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                    stdout_reader, stderr_reader, status_reader,
+                )?;
+                return Err(error);
+            }
+        };
+        if Instant::now() >= gate_deadline {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(ObservedEvaluatorError::KernelGateTimeout {
+                last_error: "post-admission verification crossed the frozen gate deadline".into(),
+            });
+        }
+
         let admission_ms = match u64::try_from(admission_started.elapsed().as_millis()) {
             Ok(value) => value,
             Err(_) => {
@@ -1340,6 +1385,7 @@ fn run_kernel_gated_evaluator_inner(
             &pre_gate_id,
             post_observation.id(),
             post_gate.id(),
+            verification_evidence_id.as_ref(),
             admission_ms,
         );
         let receipt = PreReleaseAdmissionReceipt {
@@ -1351,6 +1397,7 @@ fn run_kernel_gated_evaluator_inner(
             pre_gate_id,
             post_observation_id: post_observation.id().clone(),
             post_gate_id: post_gate.id().clone(),
+            verification_evidence_id,
             admission_ms,
         };
         if let Err(error) = receipt.validate_for(&post_observation, &post_gate) {
@@ -1394,9 +1441,9 @@ fn run_kernel_gated_evaluator_inner(
         }
     };
 
-    // Critical release-boundary theorem: a slow final observation or admission must never become a
-    // post-hoc receipt failure after model execution. Budget expiry is checked again immediately
-    // before the release byte exists, and exact pidfd teardown happens instead of release on overrun.
+    // Critical release-boundary theorem: a slow final observation, admission, or verification must
+    // never become a post-hoc receipt failure after model execution. Budget expiry is checked again
+    // immediately before the release byte exists, and exact pidfd teardown happens instead.
     if Instant::now() >= gate_deadline || gate_wait_ms > policy.kernel_gate_timeout_ms() {
         teardown_after_pid(
             &mut pidfd, &mut child, policy.teardown_timeout_ms(),
@@ -1594,5 +1641,23 @@ mod tests {
     #[test]
     fn admission_protocol_identity_is_stable() {
         assert_eq!(pre_release_admission_protocol_id(), pre_release_admission_protocol_id());
+    }
+
+    #[test]
+    fn admission_receipt_identity_distinguishes_verification_evidence() {
+        let protocol = pre_release_admission_protocol_id();
+        let pre_observation = ContentId::derive("test", [b"pre-observation".as_slice()]);
+        let pre_gate = ContentId::derive("test", [b"pre-gate".as_slice()]);
+        let post_observation = ContentId::derive("test", [b"post-observation".as_slice()]);
+        let post_gate = ContentId::derive("test", [b"post-gate".as_slice()]);
+        let evidence = ContentId::derive("test", [b"evidence".as_slice()]);
+        let none = derive_admission_receipt_id(
+            &protocol, 42, 7, &pre_observation, &pre_gate, &post_observation, &post_gate, None, 11,
+        );
+        let some = derive_admission_receipt_id(
+            &protocol, 42, 7, &pre_observation, &pre_gate, &post_observation, &post_gate,
+            Some(&evidence), 11,
+        );
+        assert_ne!(none, some);
     }
 }

@@ -12,5 +12,6 @@ symthaea-forge-linux-observed-exec = { path = "../symthaea-forge-linux-observed-
 symthaea-forge-linux-kernel-attestation = { path = "../symthaea-forge-linux-kernel-attestation" }
 symthaea-forge-linux-cgroup-control = { path = "../symthaea-forge-linux-cgroup-control" }
 symthaea-forge-linux-cgroup-strict = { path = "../symthaea-forge-linux-cgroup-strict" }
+symthaea-forge-linux-cgroup-live-verify = { path = "../symthaea-forge-linux-cgroup-live-verify" }
 serde = { workspace = true }
 thiserror = { workspace = true }
