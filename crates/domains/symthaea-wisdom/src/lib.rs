@@ -30,6 +30,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod accountability;
 pub mod authority_envelope;
 pub mod autopoiesis;
 pub mod care;
@@ -42,6 +43,12 @@ pub mod perspective;
 pub mod practical_wisdom;
 pub mod relationship_safety;
 
+pub use accountability::{
+    AccountabilityAssessment, AccountabilityCase, AccountabilityCaseId, AccountabilityError,
+    AccountabilityTrigger, AuthorityBasisSnapshot, ConsequenceDirection, ConsequenceDomain,
+    ObservedConsequence, PredictedConsequence, RepairAction, RepairActionId, RepairKind,
+    RepairStatus,
+};
 pub use authority_envelope::{
     AuthorityEnvelopeError, AuthorityEnvelopePolicy, AuthorityRestrictionReason,
     RelationalAuthorityAssessment, RelationalAuthorityEnvelope, RelationalAuthorityInput,
