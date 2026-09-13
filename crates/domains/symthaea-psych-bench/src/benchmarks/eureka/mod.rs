@@ -78,6 +78,8 @@ mod v2_shadow_campaign;
 mod v2_selected_comparator;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_preheldout_custody;
+#[cfg(all(test, feature = "symthaea-backend"))]
+mod v2_real_subject_adapters;
 #[cfg(test)]
 mod v2_preheldout_reachability_tests;
 #[cfg(test)]
