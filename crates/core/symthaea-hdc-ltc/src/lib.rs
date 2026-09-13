@@ -6,41 +6,26 @@
 //!
 //! Hyperdimensional recurrent state with solver-free liquid-time evolution.
 //!
-//! The crate deliberately separates two kinds of distributed object:
+//! The crate deliberately separates three research surfaces:
 //!
-//! - [`ContinuousHV`] carries arbitrary continuous state and learned/modulatory
-//!   fields.
+//! - [`ContinuousHV`] carries arbitrary continuous distributed state.
 //! - [`UnitaryRole`] carries reversible real HDC roles with components in
-//!   `{ -1, +1 }`, so role binding is norm- and inner-product-preserving.
+//!   `{ -1, +1 }`, so role binding is an isometry.
+//! - [`HolographicLiquidCell`] is a theorem-bearing research cell whose temporal
+//!   update is constructed to commute with `UnitaryRole` binding when state and
+//!   input are transformed by the same role.
 //!
-//! A neuron update is O(D) in the hypervector dimension and independent of the
-//! number of numerical ODE substeps associated with the elapsed `dt`.
-//!
-//! ## Quick Start
-//!
-//! ```rust
-//! use symthaea_hdc_ltc::{
-//!     ContinuousHV, HdcLtcUnifiedNeuron, NeuronConfig, UnitaryRole,
-//! };
-//!
-//! let config = NeuronConfig { dim: 1024, ..NeuronConfig::default() };
-//! let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
-//! let input = ContinuousHV::new_random(1024, 123);
-//!
-//! neuron.evolve_closed_form(0.1, &input);
-//!
-//! let role = UnitaryRole::new(1024, 7);
-//! let bound = role.bind(neuron.state());
-//! let recovered = role.unbind(&bound);
-//! assert_eq!(&recovered, neuron.state());
-//! ```
+//! The legacy [`HdcLtcUnifiedNeuron`] remains available so the algebraic research
+//! path can be qualified without silently changing production behavior.
 
 pub mod config;
 pub mod continuous_hv;
+pub mod holographic_liquid;
 pub mod network;
 pub mod neuron;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use continuous_hv::{ContinuousHV, HDC_DIMENSION, UnitaryRole};
+pub use holographic_liquid::{HlsActivation, HlsConfig, HlsError, HolographicLiquidCell};
 pub use network::{HdcLtcUnifiedNetwork, StepTimingConfig};
 pub use neuron::HdcLtcUnifiedNeuron;
