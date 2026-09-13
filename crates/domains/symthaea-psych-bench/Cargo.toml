@@ -13,7 +13,7 @@ categories = ["science", "algorithms"]
 
 [features]
 default = []
-symthaea-backend = ["symthaea-core/ctc_wiring", "dep:symthaea"]
+symthaea-backend = ["symthaea-core/ctc_wiring", "dep:symthaea", "symthaea/benchmarks"]
 neuroevolution = ["dep:symthaea-neuroevolution"]
 neural_validation = ["symthaea-core/neural_validation"]  # TRIBE v2 fMRI comparison benchmark
 nuclear-benchmarks = ["dep:symthaea-nuclear"]            # Nuclear physics science benchmarks
