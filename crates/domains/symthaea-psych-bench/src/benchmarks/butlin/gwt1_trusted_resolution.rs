@@ -16,7 +16,6 @@
 //! constructor crate-internal while avoiding a second, parallel resolution path.
 
 use std::fs;
-use std::io;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -90,7 +89,9 @@ impl std::fmt::Display for Gwt1TrustedResolutionCandidateErrorV1 {
                 f,
                 "canonical GWT-1 base must be ArchitecturalOnly, observed {observed:?}"
             ),
-            Self::PromotionVerification(error) => write!(f, "promotion verification failed: {error}"),
+            Self::PromotionVerification(error) => {
+                write!(f, "promotion verification failed: {error}")
+            }
             Self::Resolution(error) => write!(f, "V2 resolution failed: {error}"),
             Self::Disposition(error) => write!(f, "disposition classification failed: {error}"),
         }
@@ -154,10 +155,13 @@ fn load_direct_evidence(
     })
 }
 
-fn canonical_base_report(
-) -> Result<ButlinIndicatorReport, Gwt1TrustedResolutionCandidateErrorV1> {
+fn canonical_base_report()
+-> Result<ButlinIndicatorReport, Gwt1TrustedResolutionCandidateErrorV1> {
     let report = ButlinIndicatorSuite::evaluate(&BenchmarkConfig::default());
-    let mut gwt1 = report.indicators.iter().filter(|indicator| indicator.id == "GWT-1");
+    let mut gwt1 = report
+        .indicators
+        .iter()
+        .filter(|indicator| indicator.id == "GWT-1");
     let observed = gwt1
         .next()
         .ok_or(Gwt1TrustedResolutionCandidateErrorV1::CanonicalBaseMissingGwt1)?
