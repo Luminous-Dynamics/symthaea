@@ -36,9 +36,9 @@ fn trusted_main() -> Result<(), Box<dyn std::error::Error>> {
     use symthaea_psych_bench::benchmarks::butlin::generate_gwt1_trusted_resolution_candidate_v1;
 
     fn required_path(name: &str) -> Result<PathBuf, io::Error> {
-        env::var_os(name)
-            .map(PathBuf::from)
-            .ok_or_else(|| io::Error::other(format!("missing required environment variable {name}")))
+        env::var_os(name).map(PathBuf::from).ok_or_else(|| {
+            io::Error::other(format!("missing required environment variable {name}"))
+        })
     }
 
     fn write_json<T: serde::Serialize>(
@@ -52,8 +52,7 @@ fn trusted_main() -> Result<(), Box<dyn std::error::Error>> {
 
     let direct_evidence_dir = required_path("SYMTHAEA_GWT1_DIRECT_EVIDENCE_DIR")?;
     let promotion_capsule = required_path("GWT1_CAUSAL_PROMOTION_CAPSULE")?;
-    let promotion_attestation_bundle =
-        required_path("GWT1_CAUSAL_PROMOTION_ATTESTATION_BUNDLE")?;
+    let promotion_attestation_bundle = required_path("GWT1_CAUSAL_PROMOTION_ATTESTATION_BUNDLE")?;
     let gh_executable = required_path("GWT1_TRUSTED_GH_PATH")?;
     let sha256sum_executable = required_path("GWT1_TRUSTED_SHA256SUM_PATH")?;
     let gh_config_dir = required_path("GWT1_TRUSTED_GH_CONFIG_DIR")?;
