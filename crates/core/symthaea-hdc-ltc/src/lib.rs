@@ -15,6 +15,12 @@
 //! - [`TemporalAxis`] and [`TemporalPhasor`] expose a continuous unitary time
 //!   algebra in the Fourier/phasor domain; [`TemporalInterval`] analytically
 //!   encodes continuous validity regions without claiming historical recall yet.
+//! - [`ValidityIntervalMemory`] uses that axis as discrete causal/version time,
+//!   storing closed key/value validity spans in O(D) per span regardless of the
+//!   number of checkpoints covered.
+//! - [`StateTrackingValidityArchive`] bridges the standalone validity memory to
+//!   the model-agnostic benchmark and evaluates historical two-hop recall without
+//!   changing HLS recurrence.
 //! - [`HolographicLiquidCell`] is a theorem-bearing diagonal research cell whose
 //!   temporal update commutes with `UnitaryRole` binding.
 //! - [`HlsParameters`] exposes the complete theorem-compatible trainable surface
@@ -62,7 +68,9 @@ pub mod state_tracking_eval;
 pub mod state_tracking_exact_training;
 pub mod state_tracking_learning_ablation;
 pub mod state_tracking_readout;
+pub mod state_tracking_validity_archive;
 pub mod temporal_phasor;
+pub mod validity_interval_memory;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use contextual_holographic_liquid::{ContextualHlsError, ContextualHolographicLiquidCell};
@@ -101,6 +109,13 @@ pub use state_tracking_learning_ablation::{
     run_exact_learning_ablation,
 };
 pub use state_tracking_readout::{TrackingPrototypeReadout, TrackingReadoutError};
+pub use state_tracking_validity_archive::{
+    HistoricalArchiveAnswer, HistoricalArchiveEvaluation, StateTrackingValidityArchive,
+    StateTrackingValidityArchiveError,
+};
 pub use temporal_phasor::{
     TemporalAlgebraError, TemporalAxis, TemporalInterval, TemporalPhasor,
+};
+pub use validity_interval_memory::{
+    ValidityCleanupResult, ValidityIntervalMemory, ValidityMemoryError,
 };
