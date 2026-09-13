@@ -71,6 +71,15 @@ def vp(v:Any)->dict[str,Any]:
  if not isinstance(v,dict) or v.get('schema_version')!=P:raise CE(f'policy schema must be {P}')
  req(v.get('study_id'),'study_id');prof=v.get('required_environment_profiles')
  if prof!=['acquisition','gis','analysis']:raise CE('environment profiles must be exactly acquisition,gis,analysis')
+ ec=v.get('environment_contracts')
+ if not isinstance(ec,dict) or set(ec)!=set(prof):raise CE('environment_contracts must exactly cover required profiles')
+ for k in prof:
+  c=ec[k]
+  if not isinstance(c,dict):raise CE(f'invalid environment contract {k}')
+  for field in ('required_packages','required_libraries','required_environment_variables'):
+   z=c.get(field)
+   if not isinstance(z,list) or len(z)!=len(set(z)):raise CE(f'{k} {field} must be unique list')
+   [req(x,f'{k} {field}') for x in z]
  pf=v.get('protected_files')
  if not isinstance(pf,list) or len(pf)!=len(set(pf)):raise CE('protected_files must be unique list')
  [rel(x,'protected file') for x in pf]
@@ -86,9 +95,9 @@ def vp(v:Any)->dict[str,Any]:
  order=v.get('classification_order');ceil=v.get('classification_ceiling');rules=v.get('semantic_rules')
  if not isinstance(order,list) or not order or len(order)!=len(set(order)) or ceil not in order or not isinstance(rules,dict) or set(rules)!=set(order):raise CE('invalid classification policy')
  for c in order:
-  r=rules[c]
-  if not isinstance(r,dict) or not isinstance(r.get('enabled'),bool) or not isinstance(r.get('requires_all_artifact_ids'),list):raise CE(f'invalid semantic rule {c}')
-  z=[req(x,f'{c} required artifact') for x in r['requires_all_artifact_ids']]
+  rr=rules[c]
+  if not isinstance(rr,dict) or not isinstance(rr.get('enabled'),bool) or not isinstance(rr.get('requires_all_artifact_ids'),list):raise CE(f'invalid semantic rule {c}')
+  z=[req(x,f'{c} required artifact') for x in rr['requires_all_artifact_ids']]
   if len(z)!=len(set(z)):raise CE(f'duplicate required artifact in {c}')
  for c in order[order.index(ceil)+1:]:
   if rules[c]['enabled']:raise CE(f'class above ceiling enabled: {c}')
@@ -101,13 +110,29 @@ def envmap(vals:list[str])->dict[str,str]:
   if k in out:raise CE(f'duplicate environment profile {k}')
   out[k]=p
  return out
+def _env_capsule(v:Any,profile:str,contract:dict[str,Any])->dict[str,Any]:
+ if not isinstance(v,dict) or v.get('schema_version')!=E or v.get('profile')!=profile:raise CE(f'invalid {profile} environment capsule identity')
+ r=v.get('runtime')
+ if not isinstance(r,dict) or set(r)!=set(('python','platform','packages','libraries','environment')):raise CE(f'invalid {profile} runtime surface')
+ py=r['python'];plat=r['platform'];packages=r['packages'];libraries=r['libraries'];env=r['environment']
+ if not isinstance(py,dict) or not isinstance(plat,dict) or not isinstance(packages,dict) or not isinstance(libraries,dict) or not isinstance(env,dict):raise CE(f'invalid {profile} runtime sections')
+ req(py.get('implementation'),f'{profile} python implementation');req(py.get('version'),f'{profile} python version');sha(py.get('executable_sha256'),f'{profile} python executable sha256')
+ req(plat.get('system'),f'{profile} platform system');req(plat.get('machine'),f'{profile} platform machine')
+ for name,value in packages.items():req(name,f'{profile} package name');req(value,f'{profile} package version')
+ for name,value in libraries.items():req(name,f'{profile} library name');req(value,f'{profile} library version')
+ for name,value in env.items():
+  req(name,f'{profile} environment variable name')
+  if value is not None and not isinstance(value,str):raise CE(f'{profile} environment variable {name} must be string or null')
+ missing_packages=set(contract['required_packages'])-set(packages);missing_libraries=set(contract['required_libraries'])-set(libraries);missing_env=set(contract['required_environment_variables'])-set(env)
+ if missing_packages or missing_libraries or missing_env:raise CE(f'{profile} environment capsule incomplete packages={sorted(missing_packages)} libraries={sorted(missing_libraries)} env={sorted(missing_env)}')
+ return v
+
 def envbind(policy:dict[str,Any],root:Path,m:dict[str,str])->list[dict[str,Any]]:
- r=policy['required_environment_profiles']
- if set(m)!=set(r):raise CE(f'environment bindings must exactly be {r}')
+ rr=policy['required_environment_profiles']
+ if set(m)!=set(rr):raise CE(f'environment bindings must exactly be {rr}')
  out=[]
- for k in r:
-  p=file(root,m[k],f'{k} environment');v=lj(p)
-  if not isinstance(v,dict) or v.get('schema_version')!=E or v.get('profile')!=k or not isinstance(v.get('runtime'),dict) or not v['runtime']:raise CE(f'invalid {k} environment capsule')
+ for k in rr:
+  p=file(root,m[k],f'{k} environment');v=_env_capsule(lj(p),k,policy['environment_contracts'][k])
   out.append({'profile':k,'path':m[k],'sha256':hf(p),'byte_count':p.stat().st_size,'canonical_payload_sha256':hb(cb(v))})
  return out
 def pbind(policy:dict[str,Any],root:Path)->list[dict[str,Any]]:
