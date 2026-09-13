@@ -108,6 +108,18 @@ fn code(dimension: EvidenceDimension) -> u8 {
     }
 }
 
+fn dimension_from_code(code: u8) -> EvidenceDimension {
+    match code % 7 {
+        0 => EvidenceDimension::FunctionalPerformance,
+        1 => EvidenceDimension::ThermodynamicStability,
+        2 => EvidenceDimension::CriticalMaterialBurden,
+        3 => EvidenceDimension::SupplyResilience,
+        4 => EvidenceDimension::HumanEnvironmentalHazard,
+        5 => EvidenceDimension::Circularity,
+        _ => EvidenceDimension::Manufacturability,
+    }
+}
+
 fn candidate() -> Candidate {
     Candidate {
         id: CandidateId::new("prospective-parity-candidate").unwrap(),
@@ -135,7 +147,7 @@ fn policy() -> EnergyMaterialScreeningPolicy {
     }
 }
 
-fn manifest() -> Tier1CampaignManifest {
+fn manifest(prospective_dimension: EvidenceDimension) -> Tier1CampaignManifest {
     let lanes = EvidenceDimension::ALL
         .into_iter()
         .map(|dimension| EvidenceLanePlan {
@@ -145,7 +157,7 @@ fn manifest() -> Tier1CampaignManifest {
             expected_model_name: format!("model-{}", code(dimension)),
             expected_model_version: Some("v0".into()),
             method_parameters: BTreeMap::new(),
-            source_commitment: if dimension == EvidenceDimension::FunctionalPerformance {
+            source_commitment: if dimension == prospective_dimension {
                 SourceCommitment::ProspectiveAcquisition {
                     source_name: "fixture-source".into(),
                     source_version: "2026-09".into(),
@@ -172,8 +184,12 @@ fn manifest() -> Tier1CampaignManifest {
     .unwrap()
 }
 
-fn prediction(dimension: EvidenceDimension, mutation: Mutation) -> Prediction {
-    let prospective = dimension == EvidenceDimension::FunctionalPerformance;
+fn prediction(
+    dimension: EvidenceDimension,
+    prospective_dimension: EvidenceDimension,
+    mutation: Mutation,
+) -> Prediction {
+    let prospective = dimension == prospective_dimension;
     let digest = if prospective {
         if matches!(mutation, Mutation::MissingArtifactProvenance) {
             WRONG_SHA
@@ -213,9 +229,13 @@ fn compatibility_receipt_sha(dimension: EvidenceDimension) -> String {
     std::iter::repeat(nibble).take(64).collect()
 }
 
-fn declaration(source_receipt_sha256: String, mutation: Mutation) -> AcquisitionDeclaration {
+fn declaration(
+    prospective_dimension: EvidenceDimension,
+    source_receipt_sha256: String,
+    mutation: Mutation,
+) -> AcquisitionDeclaration {
     AcquisitionDeclaration {
-        dimension: EvidenceDimension::FunctionalPerformance,
+        dimension: prospective_dimension,
         acquisition_query_sha256: if matches!(mutation, Mutation::WrongQuery) {
             WRONG_SHA.into()
         } else {
@@ -232,9 +252,10 @@ fn declaration(source_receipt_sha256: String, mutation: Mutation) -> Acquisition
     }
 }
 
-fn unexpected_declaration() -> AcquisitionDeclaration {
+fn unexpected_declaration(prospective_dimension: EvidenceDimension) -> AcquisitionDeclaration {
+    let unexpected_dimension = dimension_from_code(code(prospective_dimension) + 1);
     AcquisitionDeclaration {
-        dimension: EvidenceDimension::ThermodynamicStability,
+        dimension: unexpected_dimension,
         acquisition_query_sha256: QUERY_SHA.into(),
         acquired_artifact_sha256: ARTIFACT_SHA.into(),
         source_receipt_sha256: WRONG_SHA.into(),
@@ -244,9 +265,10 @@ fn unexpected_declaration() -> AcquisitionDeclaration {
 }
 
 fn run_compatibility(
+    prospective_dimension: EvidenceDimension,
     mutation: Mutation,
 ) -> Result<CampaignAdmissionReceipt, FailureClass> {
-    let manifest = manifest();
+    let manifest = manifest(prospective_dimension);
     let candidate = candidate();
     let candidate_sha = manifest.candidate_anchor.candidate_sha256.clone();
     let mut assertions = Vec::new();
@@ -269,7 +291,7 @@ fn run_compatibility(
             candidate_id: candidate.id.clone(),
             identity_assertion_id: assertion_id,
             source_receipt_sha256: receipt_sha.clone(),
-            prediction: prediction(dimension, mutation),
+            prediction: prediction(dimension, prospective_dimension, mutation),
         });
         attestations.push(ReceiptVersionAttestation {
             attestation_id: format!("compat-attestation-{}", code(dimension)),
@@ -292,11 +314,12 @@ fn run_compatibility(
         .map_err(|_| FailureClass::Setup)?;
 
     let mut declarations = vec![declaration(
-        compatibility_receipt_sha(EvidenceDimension::FunctionalPerformance),
+        prospective_dimension,
+        compatibility_receipt_sha(prospective_dimension),
         mutation,
     )];
     if matches!(mutation, Mutation::UnexpectedDeclaration) {
-        declarations.push(unexpected_declaration());
+        declarations.push(unexpected_declaration(prospective_dimension));
     }
 
     admit_campaign_result(&manifest, &bound, declarations)
@@ -304,26 +327,27 @@ fn run_compatibility(
 }
 
 fn run_native(
+    prospective_dimension: EvidenceDimension,
     mutation: Mutation,
 ) -> Result<NativeCampaignAdmissionReceipt, FailureClass> {
-    let manifest = manifest();
+    let manifest = manifest(prospective_dimension);
     let candidate_id = manifest.candidate_anchor.candidate.id.clone();
     let mut assertions = Vec::new();
     let mut envelopes = Vec::new();
-    let mut functional_receipt = None;
+    let mut prospective_receipt = None;
 
     for dimension in EvidenceDimension::ALL {
         let envelope = wrap_evidence_payload_json(
             &manifest,
             dimension,
-            prediction(dimension, mutation),
+            prediction(dimension, prospective_dimension, mutation),
             "prospective-admission-parity-fixture-v0",
             format!("{{\"dimension\":{}}}", code(dimension)),
         )
         .map_err(|_| FailureClass::Setup)?;
         let receipt_sha = envelope.sha256().map_err(|_| FailureClass::Setup)?;
-        if dimension == EvidenceDimension::FunctionalPerformance {
-            functional_receipt = Some(receipt_sha.clone());
+        if dimension == prospective_dimension {
+            prospective_receipt = Some(receipt_sha.clone());
         }
         assertions.push(IdentityAssertion {
             assertion_id: format!("native-identity-{}", code(dimension)),
@@ -339,11 +363,12 @@ fn run_native(
     let dossier = assemble_native_envelope_dossier(&manifest, assertions, envelopes)
         .map_err(|_| FailureClass::Setup)?;
     let mut declarations = vec![declaration(
-        functional_receipt.expect("functional-performance envelope is mandatory"),
+        prospective_dimension,
+        prospective_receipt.expect("prospective envelope is mandatory"),
         mutation,
     )];
     if matches!(mutation, Mutation::UnexpectedDeclaration) {
-        declarations.push(unexpected_declaration());
+        declarations.push(unexpected_declaration(prospective_dimension));
     }
 
     admit_native_campaign_result(&manifest, &dossier, declarations)
@@ -352,8 +377,9 @@ fn run_native(
 
 #[test]
 fn clean_prospective_acquisition_is_accepted_by_both_paths() {
-    let compatibility = run_compatibility(Mutation::Clean).unwrap();
-    let native = run_native(Mutation::Clean).unwrap();
+    let prospective_dimension = EvidenceDimension::FunctionalPerformance;
+    let compatibility = run_compatibility(prospective_dimension, Mutation::Clean).unwrap();
+    let native = run_native(prospective_dimension, Mutation::Clean).unwrap();
     assert_eq!(
         compatibility.campaign_manifest_sha256,
         native.campaign_manifest_sha256
@@ -366,25 +392,27 @@ fn clean_prospective_acquisition_is_accepted_by_both_paths() {
 }
 
 #[test]
-fn prospective_acquisition_failures_have_semantic_class_parity() {
-    for mutation in [
-        Mutation::WrongQuery,
-        Mutation::MissingArtifactProvenance,
-        Mutation::WrongReceipt,
-        Mutation::UnexpectedDeclaration,
-    ] {
-        let expected = mutation.expected_failure().unwrap();
-        let compatibility = run_compatibility(mutation);
-        let native = run_native(mutation);
-        assert_eq!(
-            compatibility,
-            Err(expected),
-            "compatibility prospective path failed in the wrong semantic class for {mutation:?}"
-        );
-        assert_eq!(
-            native,
-            Err(expected),
-            "native prospective path failed in the wrong semantic class for {mutation:?}"
-        );
+fn every_dimension_has_prospective_failure_class_parity() {
+    for prospective_dimension in EvidenceDimension::ALL {
+        for mutation in [
+            Mutation::WrongQuery,
+            Mutation::MissingArtifactProvenance,
+            Mutation::WrongReceipt,
+            Mutation::UnexpectedDeclaration,
+        ] {
+            let expected = mutation.expected_failure().unwrap();
+            let compatibility = run_compatibility(prospective_dimension, mutation);
+            let native = run_native(prospective_dimension, mutation);
+            assert_eq!(
+                compatibility,
+                Err(expected),
+                "compatibility prospective path failed in the wrong semantic class for dimension={prospective_dimension:?}, mutation={mutation:?}"
+            );
+            assert_eq!(
+                native,
+                Err(expected),
+                "native prospective path failed in the wrong semantic class for dimension={prospective_dimension:?}, mutation={mutation:?}"
+            );
+        }
     }
 }
