@@ -118,7 +118,7 @@ fn spatial_edge(
     direction: i8,
 ) -> Result<(Su3Matrix, Site4), OffAxisWilsonError> {
     if direction > 0 {
-        let edge = field.link(site, axis)?.clone();
+        let edge = *field.link(site, axis)?;
         let next = field.shift(site, axis, 1)?;
         Ok((edge, next))
     } else {
