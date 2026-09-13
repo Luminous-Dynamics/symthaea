@@ -61,6 +61,8 @@
 // at crate level which cannot be suppressed locally.
 #![cfg_attr(test, allow(deprecated))]
 
+/// Bounded winding/path-class witnesses for explicitly supported S1 and T2 spaces.
+pub mod bounded_topology;
 /// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;
