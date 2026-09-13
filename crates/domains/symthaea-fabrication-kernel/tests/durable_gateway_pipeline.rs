@@ -114,6 +114,10 @@ fn all_usages() -> BTreeSet<KeyUsage> {
         KeyUsage::TrustRotation,
         KeyUsage::RecoveryAuthorization,
         KeyUsage::AuditAnchor,
+        KeyUsage::ThresholdCeremony,
+        KeyUsage::GatewayMembership,
+        KeyUsage::TransparencyLog,
+        KeyUsage::ReleasePromotion,
     ])
 }
 
