@@ -9,60 +9,27 @@
   ],
   "environment_contracts": {
     "acquisition": {
-      "required_environment_variables": [
-        "PYTHONHASHSEED",
-        "TZ",
-        "LANG",
-        "LC_ALL"
-      ],
-      "required_libraries": [
-        "openssl"
-      ],
+      "required_environment_variables": ["PYTHONHASHSEED", "TZ", "LANG", "LC_ALL"],
+      "required_libraries": ["openssl"],
       "required_packages": []
     },
     "analysis": {
-      "required_environment_variables": [
-        "PYTHONHASHSEED",
-        "TZ",
-        "LANG",
-        "LC_ALL",
-        "OMP_NUM_THREADS",
-        "OPENBLAS_NUM_THREADS",
-        "MKL_NUM_THREADS",
-        "NUMEXPR_NUM_THREADS"
-      ],
+      "required_environment_variables": ["PYTHONHASHSEED", "TZ", "LANG", "LC_ALL", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"],
       "required_libraries": [],
-      "required_packages": [
-        "numpy"
-      ]
+      "required_packages": ["numpy"]
     },
     "gis": {
-      "required_environment_variables": [
-        "PYTHONHASHSEED",
-        "TZ",
-        "LANG",
-        "LC_ALL",
-        "GDAL_DATA",
-        "PROJ_DATA",
-        "PROJ_LIB"
-      ],
-      "required_libraries": [
-        "gdal",
-        "proj"
-      ],
-      "required_packages": [
-        "numpy",
-        "rasterio"
-      ]
+      "required_environment_variables": ["PYTHONHASHSEED", "TZ", "LANG", "LC_ALL", "GDAL_DATA", "PROJ_DATA", "PROJ_LIB"],
+      "required_libraries": ["gdal", "proj"],
+      "required_packages": ["numpy", "rasterio"]
     }
   },
-  "network_authorized_stage_ids": [
-    "source_acquisition"
-  ],
+  "network_authorized_stage_ids": ["source_acquisition"],
   "protected_files": [
     "scripts/ll009ag_common.py",
     "scripts/ll009ag_campaign.py",
     "scripts/freeze_ll009ag_site01_campaign.py",
+    "scripts/capture_ll009ag_environment.py",
     "scripts/compose_ll009k_horizon_pack.py",
     "configs/lunar_transport/ll009l_raster_toolchain.json",
     "scripts/materialize_ll009l_lola_cog.py",
@@ -105,71 +72,22 @@
     "scripts/ll009af_engine.py",
     "scripts/materialize_ll009af_single_scan_rms_stress.py"
   ],
-  "required_environment_profiles": [
-    "acquisition",
-    "gis",
-    "analysis"
-  ],
+  "required_environment_profiles": ["acquisition", "gis", "analysis"],
   "schema_version": "ll009ag.site01-campaign-policy.v1",
   "semantic_rules": {
-    "descriptive_geometry": {
-      "enabled": true,
-      "requires_all_artifact_ids": [
-        "ll009k_numeric_horizon"
-      ]
-    },
-    "deterministic_visibility": {
-      "enabled": false,
-      "requires_all_artifact_ids": []
-    },
-    "empirical_sampled_visibility": {
-      "enabled": true,
-      "requires_all_artifact_ids": [
-        "ll009q_clone_ensemble"
-      ]
-    },
-    "hybrid_scenario_sampled_visibility": {
-      "enabled": true,
-      "requires_all_artifact_ids": [
-        "ll009z_visibility_reconciliation"
-      ]
-    },
-    "risk_qualified_visibility": {
-      "enabled": false,
-      "requires_all_artifact_ids": []
-    }
+    "descriptive_geometry": {"enabled": true, "requires_all_artifact_ids": ["ll009k_numeric_horizon"]},
+    "deterministic_visibility": {"enabled": false, "requires_all_artifact_ids": []},
+    "empirical_sampled_visibility": {"enabled": true, "requires_all_artifact_ids": ["ll009q_clone_ensemble"]},
+    "hybrid_scenario_sampled_visibility": {"enabled": true, "requires_all_artifact_ids": ["ll009z_visibility_reconciliation"]},
+    "risk_qualified_visibility": {"enabled": false, "requires_all_artifact_ids": []}
   },
   "stage_plan": [
-    {
-      "environment_profile": "acquisition",
-      "id": "source_acquisition",
-      "may_access_network": true
-    },
-    {
-      "environment_profile": "gis",
-      "id": "exact_extraction_and_role_binding",
-      "may_access_network": false
-    },
-    {
-      "environment_profile": "gis",
-      "id": "terrain_and_calibration_audit",
-      "may_access_network": false
-    },
-    {
-      "environment_profile": "analysis",
-      "id": "horizon_and_visibility_analysis",
-      "may_access_network": false
-    },
-    {
-      "environment_profile": "analysis",
-      "id": "semantic_reconciliation",
-      "may_access_network": false
-    },
-    {
-      "environment_profile": "analysis",
-      "id": "campaign_finalization",
-      "may_access_network": false
-    }
+    {"environment_profile": "acquisition", "id": "source_acquisition", "may_access_network": true},
+    {"environment_profile": "gis", "id": "exact_extraction_and_role_binding", "may_access_network": false},
+    {"environment_profile": "gis", "id": "terrain_and_calibration_audit", "may_access_network": false},
+    {"environment_profile": "analysis", "id": "horizon_and_visibility_analysis", "may_access_network": false},
+    {"environment_profile": "analysis", "id": "semantic_reconciliation", "may_access_network": false},
+    {"environment_profile": "analysis", "id": "campaign_finalization", "may_access_network": false}
   ],
   "study_id": "ll009-site01-connecting-ridge-v1"
 }
