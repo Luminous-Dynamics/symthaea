@@ -82,6 +82,8 @@ pub mod genesis;
 /// Hyperdimensional computing: vector types, encoding, binding, bundling, similarity, and consciousness topology.
 #[allow(missing_docs)]
 pub mod hdc;
+/// Analytic R3/R4 finite-w shell evaluator for HYPERSPACE-001.
+pub mod hyperspace_benchmark;
 /// Fail-closed implicit equality manifolds, local projection, and tangent bases.
 pub mod implicit_manifold;
 /// Qualified local charts, overlap witnesses, and partial finite-atlas evidence.
