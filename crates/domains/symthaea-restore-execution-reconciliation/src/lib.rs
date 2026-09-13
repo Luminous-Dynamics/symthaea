@@ -8,6 +8,8 @@
 
 #![deny(unsafe_code)]
 
+pub mod v2;
+
 use std::error::Error as StdError;
 
 use symthaea_core::welfare::SubjectAffectingAction;
