@@ -31,6 +31,7 @@ pub mod prepared_execution_context_v2;
 pub mod quarantine_intent_ledger;
 pub mod quarantine_intent_persistence;
 pub mod quarantine_ledger_persistence;
+pub mod quarantine_restore_binding_v2;
 pub mod quarantine_state_ledger;
 pub mod restart_activation_gate;
 pub mod restored_continuity_promotion;
