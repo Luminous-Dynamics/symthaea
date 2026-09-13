@@ -32,6 +32,8 @@ mod relay_triad;
 mod relay_triad_comparator;
 #[cfg(feature = "symthaea-backend")]
 mod relay_triad_development;
+#[cfg(feature = "symthaea-backend")]
+mod relay_triad_heldout_seal;
 mod selection;
 mod target_contract;
 mod target_lineage;
