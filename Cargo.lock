@@ -20040,10 +20040,13 @@ dependencies = [
 name = "symthaea-support"
 version = "0.1.0"
 dependencies = [
+ "blake3",
+ "chrono",
  "libc",
  "regex",
  "serde",
  "serde_json",
+ "symthaea-logparse",
 ]
 
 [[package]]
