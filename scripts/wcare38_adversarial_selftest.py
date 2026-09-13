@@ -37,7 +37,13 @@ def main() -> int:
     )
     require("result" not in " ".join(entry_properties).lower(), "manifest_accepts_precomputed_result")
 
-    result_properties = result["properties"]
+    branches = result.get("oneOf")
+    require(isinstance(branches, list) and len(branches) == 2, "result_schema_not_two_shape_union")
+    full = branches[0]
+    failure = branches[1]
+    require(full.get("additionalProperties") is False, "full_result_allows_unknown_fields")
+    require(failure.get("additionalProperties") is True, "failure_status_cannot_carry_diagnostics")
+    result_properties = full["properties"]
     require(
         result_properties["supplemental_packages_contribute_weight"].get("const") is False,
         "supplemental_packages_can_contribute_weight",
@@ -50,6 +56,13 @@ def main() -> int:
         result_properties["relation_authentication_partition_complete"].get("const") is True,
         "relation_partition_not_required_complete",
     )
+    failure_properties = failure["properties"]
+    require(
+        set(failure_properties["disposition"]["enum"])
+        == {"AUTHENTICATION_INVALID", "INFRASTRUCTURE_INDETERMINATE"},
+        "failure_receipt_disposition_surface_changed",
+    )
+    require("detail" in failure.get("required", []), "failure_receipt_does_not_require_detail")
 
     for sentinel in (
         "duplicate_attestation_package_for_receipt",
@@ -66,6 +79,8 @@ def main() -> int:
     require("supplemental_packages_contribute_weight" in frontdoor, "frontdoor_missing_supplemental_zero_weight")
     require("manifest_subject_duplicate" in frontdoor, "frontdoor_missing_duplicate_manifest_guard")
     require("wcare38_monotonicity_selftest.py" in frontdoor, "frontdoor_missing_monotonicity_gate")
+    require("wcare38_frontdoor_sha256" in frontdoor, "frontdoor_not_self_bound")
+    require("wcare38_overlay_sha256" in frontdoor, "overlay_not_plan_bound")
 
     payload = {
         "authority": "MeasurementOnly",
@@ -74,6 +89,7 @@ def main() -> int:
         "duplicate_package_can_amplify_weight": False,
         "supplemental_package_can_amplify_weight": False,
         "required_partition_may_be_incomplete": False,
+        "failure_receipt_must_fabricate_full_census": False,
         "runtime_authority_granted": False,
     }
     sys.stdout.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
