@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -42,9 +41,10 @@ MAX_CAPTURE_FILE_BYTES = 8 * 1024 * 1024 * 1024
 NON_CLAIMS = sorted([
     "does not authenticate the capture or execution provider",
     "does not establish externally anchored chronology",
+    "does not prove a PASS qualification result",
+    "does not prove captured reference sets were derived from NAR bytes",
     "does not prove scientific validity",
     "does not prove the qualification recipe executed",
-    "does not prove a PASS qualification result",
     "does not provide merge deployment or action authority",
 ])
 
@@ -255,6 +255,25 @@ def _environment_fields(value: dict[str, Any]) -> list[tuple[str, bytes]]:
     ]
 
 
+def _reachable_store_paths(
+    roots: list[str], store_objects: list[dict[str, Any]]
+) -> set[str]:
+    refs_by_path = {item["store_path"]: item["references"] for item in store_objects}
+    reachable: set[str] = set()
+    stack = list(roots)
+    while stack:
+        path = stack.pop()
+        if path in reachable:
+            continue
+        if path not in refs_by_path:
+            raise train.TrainManifestError(
+                f"environment realization capture: reachable path absent from captured closure: {path}"
+            )
+        reachable.add(path)
+        stack.extend(refs_by_path[path])
+    return reachable
+
+
 def verify_realization_capture(
     *,
     resolution: Any,
@@ -268,7 +287,6 @@ def verify_realization_capture(
     capture: Any,
     capture_root: Path,
 ) -> dict[str, Any]:
-    # Re-establish the exact source/selector chain before trusting a resolution artifact.
     selection_verifier.verify_selection_git_binding(selection, subject, closure, repo)
     normalized_resolution = resolution_mod.validate_against_context(
         resolution, selection, subject, closure
@@ -291,20 +309,33 @@ def verify_realization_capture(
         raise train.TrainManifestError(
             f"environment realization capture: selected output roots absent from captured closure: {missing_roots}"
         )
-
-    semantic_store_objects: list[dict[str, Any]] = []
     for item in normalized_capture["store_objects"]:
         missing_refs = sorted(set(item["references"]) - captured_paths)
         if missing_refs:
             raise train.TrainManifestError(
                 f"environment realization capture: {item['store_path']} references objects absent from captured closure: {missing_refs}"
             )
+    reachable = _reachable_store_paths(
+        normalized_resolution["output_paths"], normalized_capture["store_objects"]
+    )
+    if reachable != captured_paths:
+        extras = sorted(captured_paths - reachable)
+        raise train.TrainManifestError(
+            f"environment realization capture: captured closure contains unreachable extra store objects: {extras}"
+        )
+
+    semantic_store_objects: list[dict[str, Any]] = []
+    for item in normalized_capture["store_objects"]:
         nar_path = _capture_path(
             capture_root,
             item["nar_file"],
             where=f"environment realization capture nar_file for {item['store_path']}",
         )
         nar_sha256, nar_size = _sha256_file(nar_path)
+        if nar_size == 0:
+            raise train.TrainManifestError(
+                f"environment realization capture: NAR preimage is empty for {item['store_path']}"
+            )
         semantic_store_objects.append(
             {
                 "store_path": item["store_path"],
@@ -359,6 +390,10 @@ def verify_realization_capture(
         )
         executable_sha256, executable_size = _sha256_file(executable_file)
         version_output_sha256, version_output_size = _sha256_file(version_output_file)
+        if executable_size == 0:
+            raise train.TrainManifestError(
+                f"environment realization capture: tool {tool_name} executable preimage is empty"
+            )
         if version_output_size == 0:
             raise train.TrainManifestError(
                 f"environment realization capture: tool {tool_name} version output is empty"
