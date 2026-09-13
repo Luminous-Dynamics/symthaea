@@ -4,6 +4,12 @@
 
 //! Preregistered learned-vs-frozen diagonal-HLS state-tracking ablation.
 //!
+//! This first learning experiment is deliberately **current-state only**. The
+//! fixed associative decoder has a justified algebra for current one-hop queries
+//! and current two-hop object-location composition, but no justified temporal
+//! addressing mechanism yet. Historical recall is therefore excluded from the
+//! preregistration rather than approximated with an arbitrary lag key.
+//!
 //! The runner creates one initial HLS cell, preserves an untouched frozen clone,
 //! trains a second clone on an ordered, predeclared set of world seeds, and then
 //! evaluates both clones on the exact same held-out worlds. Results are paired by
@@ -12,9 +18,11 @@
 use crate::holographic_liquid::{HlsActivation, HlsConfig, HolographicLiquidCell};
 use crate::state_tracking_benchmark::{StateTrackingBenchmark, StateTrackingBenchmarkConfig};
 use crate::state_tracking_codec::StateTrackingCodec;
+use crate::state_tracking_current_only::{
+    CurrentOnlyTrainingError, evaluate_current_only_episode, train_current_only_episode,
+};
 use crate::state_tracking_exact_training::{
-    AssociativeEpisodeMetrics, ExactEpisodeTrainingConfig, ExactEpisodeTrainingError,
-    ExactEpisodeTrainingReport, evaluate_associative_episode, train_exact_episode,
+    AssociativeEpisodeMetrics, ExactEpisodeTrainingConfig, ExactEpisodeTrainingReport,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -51,7 +59,7 @@ impl ExactLearningAblationPlan {
                 locations: 3,
                 events: 40,
                 query_every: 4,
-                historical_query_rate: 0.5,
+                historical_query_rate: 0.0,
                 ..StateTrackingBenchmarkConfig::default()
             },
             training: ExactEpisodeTrainingConfig {
@@ -67,8 +75,10 @@ impl ExactLearningAblationPlan {
 
     /// First fixed research plan. This is intentionally exposed as code so any
     /// later change to scale/seeds/hyperparameters is reviewable in Git history.
-    /// It should be treated as an exploratory preregistration until executed and
-    /// qualified; a confirmatory plan should be frozen separately after pilot work.
+    ///
+    /// `research_v0` is a current-state-only exploratory preregistration. A
+    /// historical-memory experiment requires a separate version after an explicit
+    /// temporal-addressing algebra is implemented and qualified.
     pub fn research_v0() -> Self {
         Self {
             hls_config: HlsConfig {
@@ -87,7 +97,7 @@ impl ExactLearningAblationPlan {
                 query_every: 10,
                 min_dt: 1e-3,
                 max_dt: 1e2,
-                historical_query_rate: 0.5,
+                historical_query_rate: 0.0,
                 ..StateTrackingBenchmarkConfig::default()
             },
             training: ExactEpisodeTrainingConfig {
@@ -118,7 +128,6 @@ pub struct HeldOutWorldComparison {
     /// Trained minus frozen. Positive is better for accuracy metrics.
     pub accuracy_delta: f64,
     pub compositional_accuracy_delta: f64,
-    pub historical_accuracy_delta: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -140,7 +149,6 @@ pub struct ExactLearningAblationResult {
     pub loss_effect: PairedEffectSummary,
     pub accuracy_effect: PairedEffectSummary,
     pub compositional_accuracy_effect: PairedEffectSummary,
-    pub historical_accuracy_effect: PairedEffectSummary,
     pub initial_parameter_norm: f32,
     pub trained_parameter_norm: f32,
 }
@@ -153,7 +161,9 @@ pub enum ExactLearningAblationError {
     DuplicateTestSeed(u64),
     TrainTestSeedOverlap(u64),
     FiniteStateNormLimit,
-    Training(ExactEpisodeTrainingError),
+    HistoricalQueriesEnabled(f64),
+    Training(CurrentOnlyTrainingError),
+    Cell(String),
     Codec(String),
     Benchmark(String),
 }
@@ -167,7 +177,12 @@ impl fmt::Display for ExactLearningAblationError {
             Self::DuplicateTestSeed(seed) => write!(f, "duplicate test seed {seed}"),
             Self::TrainTestSeedOverlap(seed) => write!(f, "seed {seed} appears in both training and held-out sets"),
             Self::FiniteStateNormLimit => write!(f, "exact-learning ablation requires state_norm_limit = infinity"),
+            Self::HistoricalQueriesEnabled(rate) => write!(
+                f,
+                "research_v0 is current-state-only; historical_query_rate must be exactly 0.0, got {rate}"
+            ),
             Self::Training(error) => write!(f, "learning ablation training error: {error}"),
+            Self::Cell(error) => write!(f, "learning ablation cell error: {error}"),
             Self::Codec(error) => write!(f, "learning ablation codec error: {error}"),
             Self::Benchmark(error) => write!(f, "learning ablation benchmark error: {error}"),
         }
@@ -176,8 +191,8 @@ impl fmt::Display for ExactLearningAblationError {
 
 impl std::error::Error for ExactLearningAblationError {}
 
-impl From<ExactEpisodeTrainingError> for ExactLearningAblationError {
-    fn from(value: ExactEpisodeTrainingError) -> Self {
+impl From<CurrentOnlyTrainingError> for ExactLearningAblationError {
+    fn from(value: CurrentOnlyTrainingError) -> Self {
         Self::Training(value)
     }
 }
@@ -186,10 +201,12 @@ impl From<ExactEpisodeTrainingError> for ExactLearningAblationError {
 pub fn run_exact_learning_ablation(
     plan: &ExactLearningAblationPlan,
 ) -> Result<ExactLearningAblationResult, ExactLearningAblationError> {
+    // Validate the full experiment scope before constructing or mutating any HLS
+    // state. In particular, historical-query drift fails here.
     validate_plan(plan)?;
 
     let initial = HolographicLiquidCell::try_new(plan.hls_config.clone(), plan.cell_seed)
-        .map_err(|error| ExactLearningAblationError::Training(ExactEpisodeTrainingError::Cell(error)))?;
+        .map_err(|error| ExactLearningAblationError::Cell(error.to_string()))?;
     let frozen = initial.clone();
     let initial_parameter_norm = initial.parameters().l2_norm();
     let mut trained = initial;
@@ -203,7 +220,7 @@ pub fn run_exact_learning_ablation(
             plan.codec_seed,
         )
         .map_err(|error| ExactLearningAblationError::Codec(error.to_string()))?;
-        let report = train_exact_episode(&mut trained, &benchmark, &codec, &plan.training)?;
+        let report = train_current_only_episode(&mut trained, &benchmark, &codec, &plan.training)?;
         training_worlds.push(TrainingWorldResult { seed, report });
     }
 
@@ -217,13 +234,13 @@ pub fn run_exact_learning_ablation(
             plan.codec_seed,
         )
         .map_err(|error| ExactLearningAblationError::Codec(error.to_string()))?;
-        let frozen_metrics = evaluate_associative_episode(
+        let frozen_metrics = evaluate_current_only_episode(
             &frozen,
             &benchmark,
             &codec,
             plan.training.loss_epsilon,
         )?;
-        let trained_metrics = evaluate_associative_episode(
+        let trained_metrics = evaluate_current_only_episode(
             &trained,
             &benchmark,
             &codec,
@@ -235,8 +252,6 @@ pub fn run_exact_learning_ablation(
             accuracy_delta: trained_metrics.score.accuracy() - frozen_metrics.score.accuracy(),
             compositional_accuracy_delta: trained_metrics.score.compositional_accuracy()
                 - frozen_metrics.score.compositional_accuracy(),
-            historical_accuracy_delta: trained_metrics.score.historical_accuracy()
-                - frozen_metrics.score.historical_accuracy(),
             frozen: frozen_metrics,
             trained: trained_metrics,
         });
@@ -249,11 +264,6 @@ pub fn run_exact_learning_ablation(
             .iter()
             .map(|row| row.compositional_accuracy_delta),
     );
-    let historical_accuracy_effect = summarize(
-        held_out_worlds
-            .iter()
-            .map(|row| row.historical_accuracy_delta),
-    );
 
     Ok(ExactLearningAblationResult {
         training_worlds,
@@ -261,7 +271,6 @@ pub fn run_exact_learning_ablation(
         loss_effect,
         accuracy_effect,
         compositional_accuracy_effect,
-        historical_accuracy_effect,
         initial_parameter_norm,
         trained_parameter_norm,
     })
@@ -286,6 +295,13 @@ fn validate_plan(plan: &ExactLearningAblationPlan) -> Result<(), ExactLearningAb
     }
     if plan.hls_config.state_norm_limit.is_finite() {
         return Err(ExactLearningAblationError::FiniteStateNormLimit);
+    }
+    if !plan.benchmark_template.historical_query_rate.is_finite()
+        || plan.benchmark_template.historical_query_rate != 0.0
+    {
+        return Err(ExactLearningAblationError::HistoricalQueriesEnabled(
+            plan.benchmark_template.historical_query_rate,
+        ));
     }
 
     let mut train = HashSet::new();
@@ -360,6 +376,16 @@ mod tests {
         assert!(matches!(
             run_exact_learning_ablation(&plan),
             Err(ExactLearningAblationError::TrainTestSeedOverlap(_))
+        ));
+    }
+
+    #[test]
+    fn historical_scope_drift_is_rejected_before_execution() {
+        let mut plan = ExactLearningAblationPlan::smoke();
+        plan.benchmark_template.historical_query_rate = 0.5;
+        assert!(matches!(
+            run_exact_learning_ablation(&plan),
+            Err(ExactLearningAblationError::HistoricalQueriesEnabled(rate)) if rate == 0.5
         ));
     }
 
