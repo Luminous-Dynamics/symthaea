@@ -22,14 +22,17 @@ The hypothesis is not that `rho` alone determines performance. Candidate cleanup
 
 A value valid over `[start, end)` is archived with one analytic O(D) span write regardless of interval length.
 
-Changing span length therefore changes:
+Changing span length therefore changes the number of closed archive writes while **not changing** `key_count * horizon`, the number of represented key-checkpoint facts.
 
-- number of archive writes;
-- mutation density;
+If retrieval accuracy changes strongly with span length at fixed `key_count`, `horizon`, and `dimension`, that is evidence that write segmentation/numerics matter beyond the simple fact-load hypothesis.
 
-but **does not change** `key_count * horizon`, the number of represented key-checkpoint facts.
+### Pre-execution limitation: segmentation is not guaranteed semantic mutation
 
-If retrieval accuracy changes strongly with span length at fixed `key_count`, `horizon`, and `dimension`, that is evidence that segmentation/numerics matter beyond the simple fact-load hypothesis.
+Source audit found that `research_v0` assigns each span's candidate independently from the deterministic pseudo-random schedule. Adjacent spans can therefore occasionally select the same candidate. Under the intended approximately uniform assignment, the repeat probability is roughly `1 / candidate_count`.
+
+Consequently, the span-length axis in `research_v0` must be interpreted as a **span-segmentation / write-density axis**, not as a guaranteed semantic-mutation-density axis.
+
+This limitation was identified before result interpretation. The frozen cases and seeds are intentionally left unchanged rather than silently editing the preregistered schedule. A later confirmatory version may add a separate forced-change mutation axis in which every adjacent span is required to choose a different value.
 
 ## Fixed replicate seeds
 
@@ -91,7 +94,7 @@ Horizons:
 
 `32, 64, 128, 256, 512`.
 
-## Axis E — span length / mutation density
+## Axis E — span length / archive segmentation
 
 Fixed:
 
@@ -103,6 +106,8 @@ Fixed:
 Span lengths:
 
 `1, 2, 4, 8, 16, 32, 64`.
+
+This axis controls scheduled span segmentation and write count. It does not guarantee that every boundary changes the semantic candidate value.
 
 ## Total study
 
@@ -147,7 +152,7 @@ Payload figures deliberately remain separate. They are not presented as a single
 2. The first dimension or horizon that fails is not to be hidden by averaging only successful cases.
 3. Accuracy and cleanup margin must both be examined; high accuracy with near-zero margin is fragile.
 4. Candidate-count effects must not be attributed to temporal capacity without comparison to the fixed-load candidate axis.
-5. Span-length effects must not be described as memory-capacity effects unless represented fact load also changes.
+5. Span-length effects in `research_v0` are segmentation/write-density effects, not pure semantic-mutation effects.
 6. `research_v0` is descriptive/exploratory. Any confirmatory threshold must be frozen later on untouched seeds.
 7. Wall-clock throughput is not part of this first deterministic core result; operation counts are reported instead. A dedicated benchmark can measure timing later.
 
