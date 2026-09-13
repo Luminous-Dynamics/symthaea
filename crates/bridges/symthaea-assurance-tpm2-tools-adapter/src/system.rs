@@ -4,8 +4,9 @@ use crate::{blake3_digest, ToolExecution, Tpm2AdapterError, Tpm2ToolsExecutor};
 
 /// Shell-free Linux executor for an explicitly pinned `tpm2-tools` binary path.
 ///
-/// `TPM2TOOLS_TCTI` is removed from the child environment because the adapter
-/// always supplies an explicit reviewed `-T device:...` argument.
+/// The reviewed command line supplies an explicit device TCTI. Environment
+/// variables that could replace that TCTI or alter dynamic-library loading are
+/// removed before execution so the pinned executable digest remains meaningful.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SystemTpm2ToolsExecutor;
 
@@ -20,6 +21,8 @@ impl Tpm2ToolsExecutor for SystemTpm2ToolsExecutor {
         let output = Command::new(executable)
             .args(args)
             .env_remove("TPM2TOOLS_TCTI")
+            .env_remove("LD_PRELOAD")
+            .env_remove("LD_LIBRARY_PATH")
             .stdin(Stdio::null())
             .output()
             .map_err(|error| Tpm2AdapterError::Io(error.to_string()))?;
