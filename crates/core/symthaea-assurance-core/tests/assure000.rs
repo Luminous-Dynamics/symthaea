@@ -227,7 +227,7 @@ fn negative_finding_remains_orthogonal_to_positive_support() {
 }
 
 #[test]
-fn reproduction_claim_requires_distinct_verifier_identity() {
+fn reproduction_evidence_requires_distinct_verifier_identity() {
     let subject = subject();
     let claim = claim(&subject);
     let mut artifacts = functional_set(&subject, &claim);
@@ -245,14 +245,14 @@ fn reproduction_claim_requires_distinct_verifier_identity() {
         &plan(&claim, SupportTier::FunctionallySupported),
         &artifacts,
         QualificationOutcome::Supported(SupportTier::FunctionallySupported),
-        ReproductionStatus::ReproducedByDistinctVerifier,
+        ReproductionStatus::EvidenceFromDistinctVerifier,
     )
     .unwrap_err();
     assert_eq!(error, AssuranceError::MissingDistinctVerifier);
 }
 
 #[test]
-fn reproduction_is_orthogonal_to_support_strength() {
+fn reproduction_evidence_is_orthogonal_to_support_strength() {
     let subject = subject();
     let claim = claim(&subject);
     let mut artifacts = functional_set(&subject, &claim);
@@ -270,7 +270,7 @@ fn reproduction_is_orthogonal_to_support_strength() {
         &plan(&claim, SupportTier::FunctionallySupported),
         &artifacts,
         QualificationOutcome::Supported(SupportTier::FunctionallySupported),
-        ReproductionStatus::ReproducedByDistinctVerifier,
+        ReproductionStatus::EvidenceFromDistinctVerifier,
     )
     .unwrap();
     assert_eq!(
@@ -279,7 +279,7 @@ fn reproduction_is_orthogonal_to_support_strength() {
     );
     assert_eq!(
         result.reproduction_status(),
-        ReproductionStatus::ReproducedByDistinctVerifier
+        ReproductionStatus::EvidenceFromDistinctVerifier
     );
 }
 
@@ -305,16 +305,16 @@ fn reproduction_status_is_bound_into_result_identity() {
         ReproductionStatus::NotClaimed,
     )
     .unwrap();
-    let reproduced = QualificationResult::validate_and_bind(
+    let with_reproduction_evidence = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::FunctionallySupported),
         &artifacts,
         QualificationOutcome::Supported(SupportTier::FunctionallySupported),
-        ReproductionStatus::ReproducedByDistinctVerifier,
+        ReproductionStatus::EvidenceFromDistinctVerifier,
     )
     .unwrap();
-    assert_ne!(not_claimed.digest(), reproduced.digest());
+    assert_ne!(not_claimed.digest(), with_reproduction_evidence.digest());
 }
 
 #[test]
@@ -451,7 +451,7 @@ fn result_identity_is_evidence_order_independent() {
 }
 
 #[test]
-fn explicit_invalidation_changes_result_identity_and_outcome() {
+fn invalidation_returns_a_new_result_and_preserves_original() {
     let subject = subject();
     let claim = claim(&subject);
     let observation = artifact(
@@ -462,7 +462,7 @@ fn explicit_invalidation_changes_result_identity_and_outcome() {
         None,
         'c',
     );
-    let mut result = QualificationResult::validate_and_bind(
+    let result = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::Observed),
@@ -472,10 +472,16 @@ fn explicit_invalidation_changes_result_identity_and_outcome() {
     )
     .unwrap();
     let before = result.digest();
-    assert!(result.apply_invalidation(&id("model-changed")));
-    assert_ne!(before, result.digest());
+    let invalidated = result.invalidated_by(&id("model-changed")).unwrap();
+    assert_eq!(before, result.digest());
     assert!(matches!(
         result.outcome(),
+        QualificationOutcome::Supported(SupportTier::Observed)
+    ));
+    assert_ne!(before, invalidated.digest());
+    assert!(matches!(
+        invalidated.outcome(),
         QualificationOutcome::Negative(NegativeFinding::Invalidated { .. })
     ));
+    assert!(result.invalidated_by(&id("unregistered-change")).is_none());
 }
