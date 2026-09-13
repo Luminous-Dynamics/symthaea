@@ -160,15 +160,15 @@ mod tests {
     #[test]
     fn invalid_precision_and_empty_modality_fail_closed() {
         let frozen = snapshot(4, 4);
-        assert_eq!(
+        assert!(matches!(
             FepEvaluationTrial::from_snapshot(&frozen)
                 .predict_once(&[1.0, 2.0, 3.0, 4.0], 0.0, "evaluation", 0),
             Err(FepPredictionSessionError::InvalidPrecision)
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             FepEvaluationTrial::from_snapshot(&frozen)
                 .predict_once(&[1.0, 2.0, 3.0, 4.0], 1.0, "", 0),
             Err(FepPredictionSessionError::EmptyModality)
-        );
+        ));
     }
 }
