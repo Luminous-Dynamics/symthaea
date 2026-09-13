@@ -484,32 +484,29 @@ impl StaticPotentialAnalysisPlan {
         Ok(())
     }
 
+    /// Canonical text for external hashing/signing of the full preregistered
+    /// scientific and evidentiary subject. Evidence IDs are deliberately part
+    /// of this material so changing the oracle lineage changes the plan hash.
     pub fn canonical_material(&self) -> String {
-        let mut material = String::new();
-        material.push_str(self.plan_schema_id);
-        material.push('|');
-        material.push_str(&self.campaign_id);
-        material.push('|');
-        material.push_str(&self.campaign_manifest_artifact_digest);
-        material.push('|');
-        material.push_str(&self.smearing_convention_id);
-        material.push('|');
-        material.push_str(&self.smearing_config_digest);
-        material.push('|');
-        material.push_str(&self.smearing_implementation_revision);
-        material.push('|');
-        material.push_str(&self.wilson_measurement_convention_id);
-        material.push('|');
-        material.push_str(&self.wilson_measurement_implementation_revision);
-        material.push('|');
-        material.push_str(&self.effective_potential_convention_id);
-        material.push('|');
-        material.push_str(&self.effective_potential_implementation_revision);
-        material.push('|');
-        material.push_str(&self.block_policy_artifact_digest);
+        let mut fields = vec![
+            self.plan_schema_id.to_owned(),
+            self.campaign_id.clone(),
+            self.campaign_manifest_artifact_digest.clone(),
+            self.campaign_qualification_policy_artifact_digest.clone(),
+            self.smearing_convention_id.clone(),
+            self.smearing_config_digest.clone(),
+            self.smearing_implementation_revision.clone(),
+            self.smearing_oracle_evidence_id.clone(),
+            self.wilson_measurement_convention_id.clone(),
+            self.wilson_measurement_implementation_revision.clone(),
+            self.wilson_measurement_oracle_evidence_id.clone(),
+            self.effective_potential_convention_id.clone(),
+            self.effective_potential_implementation_revision.clone(),
+            self.effective_potential_oracle_evidence_id.clone(),
+            self.block_policy_artifact_digest.clone(),
+        ];
         for separation in &self.separations {
-            material.push('|');
-            material.push_str(&format!(
+            let mut encoded = format!(
                 "r={},{},{};paths={};tmax={};primary={}-{}",
                 separation.displacement[0],
                 separation.displacement[1],
@@ -518,37 +515,34 @@ impl StaticPotentialAnalysisPlan {
                 separation.measured_t_max,
                 separation.primary_plateau.start_t,
                 separation.primary_plateau.end_t,
-            ));
+            );
             for window in &separation.diagnostic_plateaus {
-                material.push_str(&format!(";diag={}-{}", window.start_t, window.end_t));
+                encoded.push_str(&format!(";diag={}-{}", window.start_t, window.end_t));
             }
+            fields.push(encoded);
         }
-        material.push('|');
-        material.push_str(&self.lattice_coulomb_convention_id);
-        material.push('|');
-        material.push_str(&self.lattice_coulomb_implementation_revision);
-        material.push('|');
-        material.push_str(&self.lattice_coulomb_config_digest);
-        material.push('|');
-        material.push_str(&self.lattice_coulomb_table_artifact_digest);
-        material.push('|');
-        material.push_str(&self.cornell_convention_id);
-        material.push('|');
-        material.push_str(&self.cornell_implementation_revision);
+        fields.extend([
+            self.lattice_coulomb_convention_id.clone(),
+            self.lattice_coulomb_implementation_revision.clone(),
+            self.lattice_coulomb_config_digest.clone(),
+            self.lattice_coulomb_oracle_evidence_id.clone(),
+            self.lattice_coulomb_table_artifact_digest.clone(),
+            self.cornell_convention_id.clone(),
+            self.cornell_implementation_revision.clone(),
+            self.cornell_oracle_evidence_id.clone(),
+        ]);
         for vector in &self.cornell_fit_vectors {
-            material.push_str(&format!("|fit={},{},{}", vector[0], vector[1], vector[2]));
+            fields.push(format!("fit={},{},{}", vector[0], vector[1], vector[2]));
         }
-        material.push('|');
-        material.push_str(&self.benchmark_source_digest);
-        material.push('|');
-        material.push_str(&self.benchmark_contract_digest);
-        material.push('|');
-        material.push_str(&self.analysis_plan_revision);
-        material.push('|');
-        material.push_str(&self.analysis_plan_configuration_digest);
-        material.push('|');
-        material.push_str(&self.analysis_plan_frozen_at_unix_ns.to_string());
-        material
+        fields.extend([
+            self.benchmark_source_digest.clone(),
+            self.benchmark_contract_digest.clone(),
+            self.analysis_plan_revision.clone(),
+            self.analysis_plan_configuration_digest.clone(),
+            self.analysis_plan_freeze_evidence_id.clone(),
+            self.analysis_plan_frozen_at_unix_ns.to_string(),
+        ]);
+        fields.join("|")
     }
 }
 
