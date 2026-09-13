@@ -15,8 +15,12 @@ The crate content-addresses exact subjects, claims, qualification plans, evidenc
 
 Positive support is an evidence ladder, not a numeric grade:
 
-`Structural -> Observed -> CausallySupported -> FunctionallySupported -> Reproduced -> DeploymentQualified`
+`Structural -> Observed -> CausallySupported -> FunctionallySupported -> Reproduced`
 
-Higher tiers require explicit evidence classes. `Reproduced` requires reproduction evidence with a verifier identity distinct from producer and executor. That establishes identity separation only; it does **not** establish common-cause independence across organization, review process, verification toolchain, or evidence source. Symthaea's stronger verifier-diversity work models those dimensions separately. Deployment qualification additionally requires runtime evidence and an explicit deployment envelope. Negative outcomes (`NotDemonstrated`, `Contradicted`, `Inconclusive`, `Expired`, `Invalidated`) remain orthogonal to the positive ladder.
+Higher tiers require explicit evidence classes. `Reproduced` requires reproduction evidence with a verifier identity distinct from producer and executor. That establishes identity separation only; it does **not** establish common-cause independence across organization, review process, verification toolchain, or evidence source. Symthaea's stronger verifier-diversity work models those dimensions separately.
+
+Deployment is intentionally not another support tier. Runtime evidence may be admitted, but evidence strength does not itself establish deployment eligibility or authority. A richer subject/deployment envelope belongs to later assurance tranches.
+
+Negative outcomes (`NotDemonstrated`, `Contradicted`, `Inconclusive`, `Expired`, `Invalidated`) remain orthogonal to the positive ladder.
 
 ASSURE-000 is not a certification engine, red-team runner, deployment authorizer, compliance mapper, logging proxy, runtime sandbox, or independent-audit authority. Later assurance tranches may consume external evidence and execute qualification campaigns on top of this kernel.
