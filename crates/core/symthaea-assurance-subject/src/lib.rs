@@ -338,7 +338,7 @@ impl AiSubjectManifest {
             not_applicable: 0,
         };
         for binding in &self.bindings {
-            match binding.state {
+            match &binding.state {
                 SurfaceState::Known(_) => summary.known += 1,
                 SurfaceState::Unknown => summary.unknown += 1,
                 SurfaceState::Unavailable(_) => summary.unavailable += 1,
