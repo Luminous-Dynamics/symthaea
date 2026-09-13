@@ -68,12 +68,7 @@ fn artifact(
         claim.digest(),
         kind,
         digest(digest_char),
-        EvidenceProvenance::new(
-            id("campaign-owner"),
-            id("runner"),
-            verifier.map(id),
-            None,
-        ),
+        EvidenceProvenance::new(id("campaign-owner"), id("runner"), verifier.map(id), None),
     )
 }
 
