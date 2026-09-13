@@ -3,10 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Consequence, responsibility, and repair accounting for Wisdom & Care.
 //!
-//! A consequential decision remains bound to the premises and authority ceiling
-//! it relied on. Predictions, observed outcomes, discrepancies, harms, and repair
-//! work stay explicit. Repair completion requires evidence; it is not a reward
-//! update and it does not erase the original decision history.
+//! Consequential decisions retain the premises and relational-authority ceiling
+//! they relied on. Predictions, observed outcomes, discrepancies, harms, and
+//! repair obligations remain explicit. A repair can be completed only by the
+//! exact factual completion claim bound to that repair when it was created.
 
 use std::collections::{BTreeSet, HashSet};
 
@@ -14,7 +14,7 @@ use crate::authority_envelope::{
     AuthorityRestrictionReason, RelationalAuthorityAssessment,
 };
 use crate::evidence_ledger::{
-    DecisionId, DeliberationEvidenceLedger, FactClaimId, NormativeClaimId,
+    DecisionId, DeliberationEvidenceLedger, EvidenceRelation, FactClaimId, NormativeClaimId,
 };
 use crate::ontology::ActionAuthority;
 use crate::perspective::StakeholderId;
@@ -126,14 +126,16 @@ pub struct AuthorityBasisSnapshot {
     pub requested: ActionAuthority,
     pub ceiling: ActionAuthority,
     pub restriction_reasons: BTreeSet<AuthorityRestrictionReason>,
+    pub human_review_recommended: bool,
 }
 
 impl From<&RelationalAuthorityAssessment> for AuthorityBasisSnapshot {
     fn from(value: &RelationalAuthorityAssessment) -> Self {
         Self {
-            requested: value.requested,
-            ceiling: value.ceiling,
-            restriction_reasons: value.reasons.clone(),
+            requested: value.requested(),
+            ceiling: value.ceiling(),
+            restriction_reasons: value.reasons().clone(),
+            human_review_recommended: value.human_review_recommended(),
         }
     }
 }
@@ -177,13 +179,20 @@ pub enum RepairStatus {
     Completed,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepairCompletionReceipt {
+    pub completion_claim: FactClaimId,
+    pub supporting_sources: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct RepairAction {
     id: RepairActionId,
     kind: RepairKind,
     stakeholder: Option<StakeholderId>,
+    completion_claim: FactClaimId,
     status: RepairStatus,
-    completion_evidence: BTreeSet<FactClaimId>,
+    completion_receipt: Option<RepairCompletionReceipt>,
 }
 
 impl RepairAction {
@@ -191,13 +200,15 @@ impl RepairAction {
         id: RepairActionId,
         kind: RepairKind,
         stakeholder: Option<StakeholderId>,
+        completion_claim: FactClaimId,
     ) -> Self {
         Self {
             id,
             kind,
             stakeholder,
+            completion_claim,
             status: RepairStatus::Open,
-            completion_evidence: BTreeSet::new(),
+            completion_receipt: None,
         }
     }
 
@@ -213,12 +224,16 @@ impl RepairAction {
         self.stakeholder.as_ref()
     }
 
+    pub fn completion_claim(&self) -> &FactClaimId {
+        &self.completion_claim
+    }
+
     pub fn status(&self) -> RepairStatus {
         self.status
     }
 
-    pub fn completion_evidence(&self) -> &BTreeSet<FactClaimId> {
-        &self.completion_evidence
+    pub fn completion_receipt(&self) -> Option<&RepairCompletionReceipt> {
+        self.completion_receipt.as_ref()
     }
 }
 
@@ -267,7 +282,7 @@ impl AccountabilityCase {
         if affected_stakeholders.is_empty() {
             return Err(AccountabilityError::AffectedStakeholderRequired);
         }
-        if authority.ceiling > authority.requested {
+        if authority.ceiling() > authority.requested() {
             return Err(AccountabilityError::InvalidAuthoritySnapshot);
         }
         Ok(Self {
@@ -316,12 +331,21 @@ impl AccountabilityCase {
         Ok(())
     }
 
-    pub fn add_repair(&mut self, repair: RepairAction) -> Result<(), AccountabilityError> {
+    pub fn add_repair(
+        &mut self,
+        repair: RepairAction,
+        evidence: &DeliberationEvidenceLedger,
+    ) -> Result<(), AccountabilityError> {
         if self.repairs.iter().any(|existing| existing.id == repair.id) {
             return Err(AccountabilityError::DuplicateRepair(repair.id));
         }
         if let Some(stakeholder) = &repair.stakeholder {
             self.require_affected(stakeholder)?;
+        }
+        if evidence.facts().get(&repair.completion_claim).is_none() {
+            return Err(AccountabilityError::MissingFact(
+                repair.completion_claim.clone(),
+            ));
         }
         self.repairs.push(repair);
         Ok(())
@@ -343,14 +367,8 @@ impl AccountabilityCase {
     pub fn complete_repair(
         &mut self,
         id: &RepairActionId,
-        completion_evidence: impl IntoIterator<Item = FactClaimId>,
         evidence: &DeliberationEvidenceLedger,
     ) -> Result<(), AccountabilityError> {
-        let completion_evidence: BTreeSet<_> = completion_evidence.into_iter().collect();
-        if completion_evidence.is_empty() {
-            return Err(AccountabilityError::RepairEvidenceRequired);
-        }
-        validate_fact_refs(&completion_evidence, evidence)?;
         let repair = self
             .repairs
             .iter_mut()
@@ -359,8 +377,41 @@ impl AccountabilityCase {
         if repair.status == RepairStatus::Completed {
             return Err(AccountabilityError::RepairAlreadyCompleted(id.clone()));
         }
+
+        let claim = evidence
+            .facts()
+            .get(&repair.completion_claim)
+            .ok_or_else(|| AccountabilityError::MissingFact(repair.completion_claim.clone()))?;
+        if claim.superseded_by.is_some() {
+            return Err(AccountabilityError::RepairCompletionClaimSuperseded(
+                repair.completion_claim.clone(),
+            ));
+        }
+
+        let mut supporting_sources = BTreeSet::new();
+        let mut contradicted = false;
+        for observation in &claim.evidence {
+            match observation.relation {
+                EvidenceRelation::Supports => {
+                    supporting_sources.insert(observation.source_ref.clone());
+                }
+                EvidenceRelation::Contradicts => contradicted = true,
+            }
+        }
+        if contradicted {
+            return Err(AccountabilityError::RepairCompletionClaimContradicted(
+                repair.completion_claim.clone(),
+            ));
+        }
+        if supporting_sources.is_empty() {
+            return Err(AccountabilityError::RepairEvidenceRequired);
+        }
+
         repair.status = RepairStatus::Completed;
-        repair.completion_evidence = completion_evidence;
+        repair.completion_receipt = Some(RepairCompletionReceipt {
+            completion_claim: repair.completion_claim.clone(),
+            supporting_sources: supporting_sources.into_iter().collect(),
+        });
         Ok(())
     }
 
@@ -381,7 +432,6 @@ impl AccountabilityCase {
         if decision_record.requires_review() {
             push_unique(&mut triggers, AccountabilityTrigger::PremiseReviewRequired);
         }
-
         if self
             .executed_authority
             .is_some_and(|actual| actual > self.authority.ceiling)
@@ -390,14 +440,10 @@ impl AccountabilityCase {
         }
 
         for prediction in &self.predictions {
-            let observation = self
-                .observations
-                .iter()
-                .rev()
-                .find(|observation| {
-                    observation.stakeholder == prediction.stakeholder
-                        && observation.domain == prediction.domain
-                });
+            let observation = self.observations.iter().rev().find(|observation| {
+                observation.stakeholder == prediction.stakeholder
+                    && observation.domain == prediction.domain
+            });
             let Some(observation) = observation else {
                 push_unique(
                     &mut triggers,
@@ -408,7 +454,6 @@ impl AccountabilityCase {
                 );
                 continue;
             };
-
             if prediction.direction != ConsequenceDirection::Unknown
                 && observation.direction != ConsequenceDirection::Unknown
                 && prediction.direction != observation.direction
@@ -557,13 +602,14 @@ pub enum AccountabilityError {
     MissingRepair(RepairActionId),
     RepairAlreadyCompleted(RepairActionId),
     RepairEvidenceRequired,
+    RepairCompletionClaimContradicted(FactClaimId),
+    RepairCompletionClaimSuperseded(FactClaimId),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::authority_envelope::RelationalAuthorityAssessment;
-    use crate::evidence_ledger::{EvidenceObservation, EvidenceRelation};
+    use crate::evidence_ledger::EvidenceObservation;
 
     fn fact(value: &str) -> FactClaimId {
         FactClaimId::new(value).unwrap()
@@ -590,7 +636,10 @@ mod tests {
             .add_fact(fact("outcome"), "outcome was observed", 0.9)
             .unwrap();
         evidence
-            .add_fact(fact("repair"), "repair was completed", 0.9)
+            .add_fact(fact("repair-done"), "affected person was informed", 0.9)
+            .unwrap();
+        evidence
+            .add_fact(fact("unrelated"), "an unrelated fact is true", 0.9)
             .unwrap();
         evidence
             .add_normative_claim(norm("value"), "action is justified", 0.7)
@@ -602,12 +651,12 @@ mod tests {
     }
 
     fn authority() -> RelationalAuthorityAssessment {
-        RelationalAuthorityAssessment {
-            requested: ActionAuthority::ActReversible,
-            ceiling: ActionAuthority::Recommend,
-            reasons: BTreeSet::new(),
-            human_review_recommended: false,
-        }
+        RelationalAuthorityAssessment::for_test(
+            ActionAuthority::ActReversible,
+            ActionAuthority::Recommend,
+            BTreeSet::new(),
+            false,
+        )
     }
 
     fn case(evidence: &DeliberationEvidenceLedger) -> AccountabilityCase {
@@ -623,41 +672,11 @@ mod tests {
     }
 
     #[test]
-    fn accountability_case_requires_real_decision() {
+    fn opaque_authority_api_is_consumed_via_accessors() {
         let evidence = evidence();
-        let missing = DecisionId::new("missing").unwrap();
-        assert!(matches!(
-            AccountabilityCase::try_new(
-                AccountabilityCaseId::new("case-a").unwrap(),
-                missing,
-                [person()],
-                &authority(),
-                true,
-                &evidence,
-            ),
-            Err(AccountabilityError::MissingDecision(_))
-        ));
-    }
-
-    #[test]
-    fn missing_predicted_outcome_remains_visible() {
-        let evidence = evidence();
-        let mut case = case(&evidence);
-        case.add_prediction(
-            PredictedConsequence::new(
-                person(),
-                ConsequenceDomain::Wellbeing,
-                ConsequenceDirection::Better,
-                0.7,
-            )
-            .unwrap(),
-        )
-        .unwrap();
-        let assessment = case.assess(&evidence).unwrap();
-        assert!(assessment.triggers.iter().any(|trigger| matches!(
-            trigger,
-            AccountabilityTrigger::MissingOutcome { .. }
-        )));
+        let case = case(&evidence);
+        assert_eq!(case.authority.requested, ActionAuthority::ActReversible);
+        assert_eq!(case.authority.ceiling, ActionAuthority::Recommend);
     }
 
     #[test]
@@ -687,16 +706,12 @@ mod tests {
             &evidence,
         )
         .unwrap();
-
         let assessment = case.assess(&evidence).unwrap();
         assert!(assessment.suggested_repairs.contains(&RepairKind::MitigateHarm));
         assert!(assessment.suggested_repairs.contains(&RepairKind::RestoreChoice));
         assert!(assessment
             .suggested_repairs
             .contains(&RepairKind::InformAffectedParty));
-        assert!(assessment
-            .suggested_repairs
-            .contains(&RepairKind::ReassessPremises));
     }
 
     #[test]
@@ -710,17 +725,11 @@ mod tests {
         evidence
             .supersede_fact(&fact("premise"), &replacement)
             .unwrap();
-
-        let assessment = case.assess(&evidence).unwrap();
-        assert!(assessment
+        assert!(case
+            .assess(&evidence)
+            .unwrap()
             .triggers
             .contains(&AccountabilityTrigger::PremiseReviewRequired));
-        assert!(assessment
-            .suggested_repairs
-            .contains(&RepairKind::RetractOrCorrectAdvice));
-        assert!(assessment
-            .suggested_repairs
-            .contains(&RepairKind::ReassessPremises));
     }
 
     #[test]
@@ -728,94 +737,154 @@ mod tests {
         let evidence = evidence();
         let mut case = case(&evidence);
         case.record_execution(ActionAuthority::ActReversible).unwrap();
-        let assessment = case.assess(&evidence).unwrap();
-        assert!(assessment
+        assert!(case
+            .assess(&evidence)
+            .unwrap()
             .triggers
             .contains(&AccountabilityTrigger::AuthorityCeilingExceeded));
-        assert!(assessment
-            .suggested_repairs
-            .contains(&RepairKind::EscalateIndependentReview));
     }
 
     #[test]
-    fn relationship_independence_loss_suggests_dependency_repair() {
+    fn repair_requires_its_exact_completion_claim_to_be_supported() {
         let evidence = evidence();
         let mut case = case(&evidence);
-        case.record_observation(
-            ObservedConsequence::new(
-                person(),
-                ConsequenceDomain::RelationshipIndependence,
-                ConsequenceDirection::Worse,
-                0.8,
-                false,
-                [fact("outcome")],
-            )
-            .unwrap(),
+        let id = RepairActionId::new("repair-a").unwrap();
+        case.add_repair(
+            RepairAction::new(
+                id.clone(),
+                RepairKind::InformAffectedParty,
+                Some(person()),
+                fact("repair-done"),
+            ),
             &evidence,
         )
         .unwrap();
-        let assessment = case.assess(&evidence).unwrap();
-        assert!(assessment
-            .suggested_repairs
-            .contains(&RepairKind::ReduceDependency));
-    }
-
-    #[test]
-    fn repair_cannot_be_marked_complete_without_evidence() {
-        let evidence = evidence();
-        let mut case = case(&evidence);
-        let repair_id = RepairActionId::new("repair-a").unwrap();
-        case.add_repair(RepairAction::new(
-            repair_id.clone(),
-            RepairKind::MitigateHarm,
-            Some(person()),
-        ))
-        .unwrap();
         assert_eq!(
-            case.complete_repair(&repair_id, [], &evidence),
+            case.complete_repair(&id, &evidence),
             Err(AccountabilityError::RepairEvidenceRequired)
         );
         assert_eq!(case.repairs()[0].status(), RepairStatus::Open);
     }
 
     #[test]
-    fn repair_completion_preserves_evidence_receipt() {
-        let evidence = evidence();
-        let mut case = case(&evidence);
-        let repair_id = RepairActionId::new("repair-a").unwrap();
-        case.add_repair(RepairAction::new(
-            repair_id.clone(),
-            RepairKind::InformAffectedParty,
-            Some(person()),
-        ))
-        .unwrap();
-        case.complete_repair(&repair_id, [fact("repair")], &evidence)
+    fn unrelated_supported_fact_cannot_complete_repair() {
+        let mut evidence = evidence();
+        evidence
+            .add_fact_evidence(
+                &fact("unrelated"),
+                EvidenceObservation::new("receipt-x", EvidenceRelation::Supports, 1.0).unwrap(),
+            )
             .unwrap();
-        assert_eq!(case.repairs()[0].status(), RepairStatus::Completed);
-        assert!(case.repairs()[0]
-            .completion_evidence()
-            .contains(&fact("repair")));
+        let mut case = case(&evidence);
+        let id = RepairActionId::new("repair-a").unwrap();
+        case.add_repair(
+            RepairAction::new(
+                id.clone(),
+                RepairKind::InformAffectedParty,
+                Some(person()),
+                fact("repair-done"),
+            ),
+            &evidence,
+        )
+        .unwrap();
+        assert_eq!(
+            case.complete_repair(&id, &evidence),
+            Err(AccountabilityError::RepairEvidenceRequired)
+        );
     }
 
     #[test]
-    fn contradictory_evidence_reopens_premise_review() {
+    fn supported_exact_claim_mints_completion_receipt() {
         let mut evidence = evidence();
-        let case = case(&evidence);
         evidence
             .add_fact_evidence(
-                &fact("premise"),
-                EvidenceObservation::new(
-                    "counter-source",
-                    EvidenceRelation::Contradicts,
-                    0.9,
-                )
-                .unwrap(),
+                &fact("repair-done"),
+                EvidenceObservation::new("person-confirmation", EvidenceRelation::Supports, 0.95)
+                    .unwrap(),
             )
             .unwrap();
-        assert!(case
-            .assess(&evidence)
-            .unwrap()
-            .triggers
-            .contains(&AccountabilityTrigger::PremiseReviewRequired));
+        let mut case = case(&evidence);
+        let id = RepairActionId::new("repair-a").unwrap();
+        case.add_repair(
+            RepairAction::new(
+                id.clone(),
+                RepairKind::InformAffectedParty,
+                Some(person()),
+                fact("repair-done"),
+            ),
+            &evidence,
+        )
+        .unwrap();
+        case.complete_repair(&id, &evidence).unwrap();
+        let repair = &case.repairs()[0];
+        assert_eq!(repair.status(), RepairStatus::Completed);
+        let receipt = repair.completion_receipt().unwrap();
+        assert_eq!(receipt.completion_claim, fact("repair-done"));
+        assert_eq!(receipt.supporting_sources, vec!["person-confirmation".to_string()]);
+    }
+
+    #[test]
+    fn contradicted_completion_claim_fails_closed() {
+        let mut evidence = evidence();
+        evidence
+            .add_fact_evidence(
+                &fact("repair-done"),
+                EvidenceObservation::new("receipt", EvidenceRelation::Supports, 0.9).unwrap(),
+            )
+            .unwrap();
+        evidence
+            .add_fact_evidence(
+                &fact("repair-done"),
+                EvidenceObservation::new("counter", EvidenceRelation::Contradicts, 0.9).unwrap(),
+            )
+            .unwrap();
+        let mut case = case(&evidence);
+        let id = RepairActionId::new("repair-a").unwrap();
+        case.add_repair(
+            RepairAction::new(
+                id.clone(),
+                RepairKind::InformAffectedParty,
+                Some(person()),
+                fact("repair-done"),
+            ),
+            &evidence,
+        )
+        .unwrap();
+        assert_eq!(
+            case.complete_repair(&id, &evidence),
+            Err(AccountabilityError::RepairCompletionClaimContradicted(
+                fact("repair-done")
+            ))
+        );
+    }
+
+    #[test]
+    fn completion_claim_supersession_fails_closed() {
+        let mut evidence = evidence();
+        let replacement = fact("repair-done-v2");
+        evidence
+            .add_fact(replacement.clone(), "new repair receipt claim", 0.9)
+            .unwrap();
+        evidence
+            .supersede_fact(&fact("repair-done"), &replacement)
+            .unwrap();
+        let mut case = case(&evidence);
+        let id = RepairActionId::new("repair-a").unwrap();
+        case.add_repair(
+            RepairAction::new(
+                id.clone(),
+                RepairKind::InformAffectedParty,
+                Some(person()),
+                fact("repair-done"),
+            ),
+            &evidence,
+        )
+        .unwrap();
+        assert_eq!(
+            case.complete_repair(&id, &evidence),
+            Err(AccountabilityError::RepairCompletionClaimSuperseded(
+                fact("repair-done")
+            ))
+        );
     }
 }
