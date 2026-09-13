@@ -19,6 +19,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Barrier, mpsc};
 
 pub const GWT1_RAW_OBSERVATION_SCHEMA_V1: &str = "butlin-gwt1-raw-observations-v1";
+pub const GWT1_SPECIALIZATION_CONTRACT_V1: &str = "gwt1-specialization-matrix-v1";
+pub const GWT1_TRAJECTORY_SCHEDULE_V1: &str = "gwt1-specialist-trajectory-v1-48";
+pub const GWT1_TRAJECTORY_STEPS_V1: u32 = 48;
 pub const GWT1_SPECIALIST_IDS_V1: [&str; 4] = [
     "drive_manager",
     "memory_manager",
@@ -88,6 +91,8 @@ pub struct Gwt1ConcurrencyRawV1 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Gwt1RawObservationsV1 {
     pub schema: String,
+    pub specialization_contract: String,
+    pub trajectory_schedule: String,
     pub perturbations: Vec<Gwt1PerturbationRawV1>,
     pub solo_panel: Gwt1SoloPanelRawV1,
     pub trajectory: Vec<Gwt1TrajectoryStepRawV1>,
@@ -282,9 +287,9 @@ fn run_solo_panel() -> Gwt1SoloPanelRawV1 {
 fn run_trajectory() -> (Vec<Gwt1TrajectoryStepRawV1>, bool) {
     let mut sequential = SpecialistPanel::default();
     let mut parallel = SpecialistPanel::default();
-    let mut trajectory = Vec::with_capacity(48);
+    let mut trajectory = Vec::with_capacity(GWT1_TRAJECTORY_STEPS_V1 as usize);
 
-    for step in 0..48 {
+    for step in 0..GWT1_TRAJECTORY_STEPS_V1 {
         let snapshot = trajectory_snapshot(step);
         trajectory.push(Gwt1TrajectoryStepRawV1 {
             step,
@@ -400,6 +405,8 @@ pub fn run_gwt1_specialist_qualification_v1(
 
     Ok(Gwt1RawObservationsV1 {
         schema: GWT1_RAW_OBSERVATION_SCHEMA_V1.to_string(),
+        specialization_contract: GWT1_SPECIALIZATION_CONTRACT_V1.to_string(),
+        trajectory_schedule: GWT1_TRAJECTORY_SCHEDULE_V1.to_string(),
         perturbations,
         solo_panel,
         trajectory,
@@ -416,8 +423,16 @@ mod tests {
     fn runner_emits_frozen_complete_shape() {
         let raw = run_gwt1_specialist_qualification_v1().expect("GWT-1 runner");
         assert_eq!(raw.schema, GWT1_RAW_OBSERVATION_SCHEMA_V1);
+        assert_eq!(raw.specialization_contract, GWT1_SPECIALIZATION_CONTRACT_V1);
+        assert_eq!(raw.trajectory_schedule, GWT1_TRAJECTORY_SCHEDULE_V1);
         assert_eq!(raw.perturbations.len(), 4);
-        assert_eq!(raw.trajectory.len(), 48);
+        assert_eq!(raw.trajectory.len(), GWT1_TRAJECTORY_STEPS_V1 as usize);
+        assert!(
+            raw.trajectory
+                .iter()
+                .enumerate()
+                .all(|(index, step)| step.step == index as u32)
+        );
         assert_eq!(raw.concurrency.completed_specialists.len(), 4);
         assert_eq!(raw.concurrency.worker_names.len(), 4);
     }
@@ -427,6 +442,8 @@ mod tests {
         let first = run_gwt1_specialist_qualification_v1().expect("first run");
         let second = run_gwt1_specialist_qualification_v1().expect("second run");
 
+        assert_eq!(first.specialization_contract, second.specialization_contract);
+        assert_eq!(first.trajectory_schedule, second.trajectory_schedule);
         assert_eq!(first.perturbations, second.perturbations);
         assert_eq!(first.solo_panel, second.solo_panel);
         assert_eq!(first.trajectory, second.trajectory);
