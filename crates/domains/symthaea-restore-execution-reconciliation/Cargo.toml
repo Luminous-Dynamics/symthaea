@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-restore-execution-reconciliation"
+version = "0.1.0"
+edition = "2024"
+description = "Post-crash reconciliation of in-doubt episodic restore executions from anchored durable evidence"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-episodic-continuity = { path = "../symthaea-episodic-continuity" }
+symthaea-episodic-continuity-anchor = { path = "../symthaea-episodic-continuity-anchor" }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
+symthaea-memory = { path = "../symthaea-memory" }
+symthaea-welfare-assurance = { path = "../symthaea-welfare-assurance" }
+thiserror = { workspace = true }
