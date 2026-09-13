@@ -34,7 +34,9 @@ check_blob "docs/release/evidence/WCARE44_BUILDER_AUTH_OBSERVATION_SCHEMA_V1.jso
 check_blob "docs/release/evidence/WCARE44_TEMPORAL_OBSERVATION_SCHEMA_V1.json" "2fabbb71170d0efe34e01a2166d197a44e056b3b"
 check_blob "docs/release/evidence/WCARE44_CANDIDATE_RESULT_SCHEMA_V1.json" "2db071910816c1354bc8e14a46e8118ea8052a97"
 check_blob "scripts/wcare44_candidate_kernel.py" "c5e0f52e34c4753028a00cf6891c8725d04e6b9a"
+check_blob "scripts/wcare44_candidate_qualify.py" "e8f1e9d9eb9dc90710d37acefc19504bb6401e66"
 check_blob "scripts/wcare44_candidate_selftest.py" "1449466d0f237871360904c0228f12e8f7af2231"
+check_blob "scripts/wcare44_frontdoor_selftest.py" "4ecf05516dfb96d40450ca3e90e81679499bd812"
 
 if ! python3 - <<'PY'
 from pathlib import Path
@@ -59,7 +61,9 @@ for field in (
     assert result_schema['properties'][field]['const'] is False, field
 for path in (
     Path('scripts/wcare44_candidate_kernel.py'),
+    Path('scripts/wcare44_candidate_qualify.py'),
     Path('scripts/wcare44_candidate_selftest.py'),
+    Path('scripts/wcare44_frontdoor_selftest.py'),
 ):
     compile(path.read_text(), str(path), 'exec')
 PY
@@ -93,5 +97,29 @@ do
   fi
 done
 
-emit "PASS_PROTOCOL_INTEGRITY" "exact_wcare44_candidate_bytes_and_graph_adversarial_campaign_match"
+if ! python3 scripts/wcare44_frontdoor_selftest.py >/tmp/wcare44-frontdoor-selftest.json 2>/tmp/wcare44-frontdoor-selftest.stderr; then
+  emit "INVALID_PROTOCOL" "frontdoor_adversarial_campaign_failed"
+  exit 4
+fi
+for marker in \
+  '"classification":"PASS_WCARE44_FRONTDOOR_SELFTEST"' \
+  '"valid_candidate_path_preserved":true' \
+  '"missing_builder_field_rejected":true' \
+  '"unknown_builder_field_rejected":true' \
+  '"wrong_builder_verifier_identity_rejected":true' \
+  '"wrong_temporal_verifier_identity_rejected":true' \
+  '"malformed_builder_boolean_rejected":true' \
+  '"malformed_auth_plan_time_rejected":true' \
+  '"malformed_backend_contract_rejected":true' \
+  '"missing_temporal_field_rejected":true' \
+  '"final_promotion_remains_blocked":true' \
+  '"runtime_authority_granted":false'
+do
+  if ! grep -q "$marker" /tmp/wcare44-frontdoor-selftest.json; then
+    emit "INVALID_PROTOCOL" "frontdoor_selftest_missing_marker:$marker"
+    exit 4
+  fi
+done
+
+emit "PASS_PROTOCOL_INTEGRITY" "exact_wcare44_candidate_frontdoor_bytes_and_adversarial_campaigns_match"
 exit 0
