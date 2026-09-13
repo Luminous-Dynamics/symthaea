@@ -9,8 +9,11 @@ on:
       - 'crates/domains/symthaea-replicator-ledger/Cargo.toml'
       - 'scripts/rsk_lockfile_delta.py'
       - 'scripts/test_rsk_lockfile_delta.py'
+      - 'scripts/rsk_lockfile_repair_lineage.py'
+      - 'scripts/test_rsk_lockfile_repair_lineage.py'
       - '.github/workflows/rsk-lockfile-repair.yml'
       - 'docs/compliance/adr/ADR-033-rsk-lockfile-repair-qualifier.md'
+      - 'docs/compliance/adr/ADR-034-rsk-lockfile-repair-lineage.md'
   workflow_dispatch:
 
 permissions:
@@ -39,7 +42,7 @@ jobs:
           set -euo pipefail
           base_sha='${{ github.event.pull_request.base.sha }}'
           changed_files="$(git diff --name-only "${base_sha}"...HEAD)"
-          if ! printf '%s\n' "${changed_files}" | grep -Eq '^(Cargo\.lock$|crates/domains/symthaea-replicator-(safety|semantics|ledger)/Cargo\.toml$|scripts/(rsk_lockfile_delta|test_rsk_lockfile_delta)\.py$|\.github/workflows/rsk-lockfile-repair\.yml$)'; then
+          if ! printf '%s\n' "${changed_files}" | grep -Eq '^(Cargo\.lock$|crates/domains/symthaea-replicator-(safety|semantics|ledger)/Cargo\.toml$|scripts/(rsk_lockfile_delta|test_rsk_lockfile_delta|rsk_lockfile_repair_lineage|test_rsk_lockfile_repair_lineage)\.py$|\.github/workflows/rsk-lockfile-repair\.yml$)'; then
             echo 'No RSK lockfile repair Class A surface changed.'
             exit 0
           fi
@@ -65,55 +68,78 @@ jobs:
       - name: Self-test lockfile delta qualifier
         run: python3 scripts/test_rsk_lockfile_delta.py -v
 
+      - name: Self-test lockfile repair lineage verifier
+        run: python3 scripts/test_rsk_lockfile_repair_lineage.py -v
+
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
       - name: State evidence boundary
         run: |
           echo 'NON-ADMISSIBLE DIAGNOSTIC ONLY.'
-          echo 'Cargo may refresh Cargo.lock on this ephemeral runner.'
-          echo 'The candidate must be reviewed and committed separately before --locked qualification can count.'
+          echo 'Cargo may refresh Cargo.lock on this ephemeral runner only in generation mode.'
+          echo 'A committed candidate must be byte-idempotent under the pinned Cargo toolchain.'
+          echo 'Normal RSK qualification must still pass later with --locked.'
 
-      - name: Capture exact input and toolchain identity
+      - name: Capture base, head, input and toolchain identity
         shell: bash
         run: |
           set -euo pipefail
           out="${RUNNER_TEMP}/rsk-lockfile-repair"
           mkdir -p "${out}"
-          cp Cargo.lock "${out}/Cargo.lock.before"
+
+          if [ '${{ github.event_name }}' = 'pull_request' ]; then
+            base_sha='${{ github.event.pull_request.base.sha }}'
+          else
+            base_sha="$(git rev-parse HEAD)"
+          fi
+
+          git show "${base_sha}:Cargo.lock" > "${out}/Cargo.lock.base"
+          cp Cargo.lock "${out}/Cargo.lock.head"
+          printf '%s\n' "${base_sha}" > "${out}/base-head.txt"
           git rev-parse HEAD > "${out}/subject-head.txt"
           rustc --version --verbose > "${out}/rustc-version.txt"
           cargo --version --verbose > "${out}/cargo-version.txt"
-          sha256sum Cargo.lock \
+          sha256sum \
+            "${out}/Cargo.lock.base" \
+            "${out}/Cargo.lock.head" \
             crates/domains/symthaea-replicator-safety/Cargo.toml \
             crates/domains/symthaea-replicator-semantics/Cargo.toml \
             crates/domains/symthaea-replicator-ledger/Cargo.toml \
             > "${out}/input-sha256.txt"
           printf '%s\n' \
             'NON-ADMISSIBLE DIAGNOSTIC ONLY.' \
-            'Do not apply Cargo.lock.candidate without Class A review.' \
+            'Generation mode may produce Cargo.lock.post-cargo for review.' \
+            'Commit-verification mode requires the committed head to remain byte-identical after Cargo.' \
             > "${out}/README.txt"
 
-      - name: Ask pinned Cargo to resolve the workspace lock graph
+      - name: Ask pinned Cargo to resolve the exact-head workspace lock graph
         shell: bash
         run: |
           set -euo pipefail
-          cargo metadata --format-version 1 > "${RUNNER_TEMP}/rsk-lockfile-repair/cargo-metadata.json"
-          cp Cargo.lock "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.candidate"
-          git diff -- Cargo.lock > "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.patch"
+          out="${RUNNER_TEMP}/rsk-lockfile-repair"
+          cargo metadata --format-version 1 > "${out}/cargo-metadata.json"
+          cp Cargo.lock "${out}/Cargo.lock.post-cargo"
+          git diff --no-index -- "${out}/Cargo.lock.base" "${out}/Cargo.lock.head" \
+            > "${out}/Cargo.lock.base-to-head.patch" || true
+          git diff --no-index -- "${out}/Cargo.lock.head" "${out}/Cargo.lock.post-cargo" \
+            > "${out}/Cargo.lock.head-to-post-cargo.patch" || true
 
-      - name: Prove candidate contains only the allowed RSK lock delta
+      - name: Prove base-head-post-Cargo repair lineage
         shell: bash
         run: |
           set -euo pipefail
-          python3 scripts/rsk_lockfile_delta.py \
-            "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.before" \
-            "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.candidate" \
-            --json-out "${RUNNER_TEMP}/rsk-lockfile-repair/delta-report.json"
+          out="${RUNNER_TEMP}/rsk-lockfile-repair"
+          python3 scripts/rsk_lockfile_repair_lineage.py \
+            "${out}/Cargo.lock.base" \
+            "${out}/Cargo.lock.head" \
+            "${out}/Cargo.lock.post-cargo" \
+            --json-out "${out}/lineage-report.json"
           sha256sum \
-            "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.before" \
-            "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.candidate" \
-            > "${RUNNER_TEMP}/rsk-lockfile-repair/lock-sha256.txt"
+            "${out}/Cargo.lock.base" \
+            "${out}/Cargo.lock.head" \
+            "${out}/Cargo.lock.post-cargo" \
+            > "${out}/lock-sha256.txt"
 
       - name: Upload non-admissible lockfile repair evidence
         if: always()
