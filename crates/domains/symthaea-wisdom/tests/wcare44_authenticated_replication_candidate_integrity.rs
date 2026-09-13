@@ -45,7 +45,7 @@ fn wcare44_candidate_review_unit_is_frozen() {
     for (path, expected) in [
         (
             "docs/release/evidence/WCARE44_AUTHENTICATED_REPLICATION_AGGREGATION_PROTOCOL_V1.md",
-            "2c9a65f0cae32a4276f200e440cd643c43537888",
+            "2c1b0f51454b6d5e7b0c98c3d6055fbd63caee3b",
         ),
         (
             "docs/release/evidence/WCARE44_BUILDER_AUTH_OBSERVATION_SCHEMA_V1.json",
@@ -65,7 +65,7 @@ fn wcare44_candidate_review_unit_is_frozen() {
         ),
         (
             "scripts/wcare44_candidate_qualify.py",
-            "e8f1e9d9eb9dc90710d37acefc19504bb6401e66",
+            "44d3ea2572430f828e4dce2fcaf4c6c09756f52e",
         ),
         (
             "scripts/wcare44_candidate_selftest.py",
@@ -73,11 +73,11 @@ fn wcare44_candidate_review_unit_is_frozen() {
         ),
         (
             "scripts/wcare44_frontdoor_selftest.py",
-            "4ecf05516dfb96d40450ca3e90e81679499bd812",
+            "184cdcdaef2aeecd5e627519ced5f50ff567a619",
         ),
         (
             "scripts/wcare44-integrity.sh",
-            "f3e3a825d2b7e2c9ac73c93c0f70c4166c338b89",
+            "51620ff3b13f2740390d9f8a33672f7d8e936640",
         ),
     ] {
         assert_eq!(git_blob(&root, path), expected, "WCARE-44 byte drift: {path}");
@@ -101,6 +101,9 @@ fn wcare44_candidate_and_frontdoor_campaigns_execute() {
         "\"classification\":\"PASS_WCARE44_FRONTDOOR_SELFTEST\"",
         "\"wrong_builder_verifier_identity_rejected\":true",
         "\"wrong_temporal_verifier_identity_rejected\":true",
+        "\"wrong_wcare40_frontdoor_identity_rejected\":true",
+        "\"wrong_wcare40_core_identity_rejected\":true",
+        "\"malformed_optional_field_rejected\":true",
         "\"final_promotion_remains_blocked\":true",
         "\"runtime_authority_granted\":false",
     ] {
