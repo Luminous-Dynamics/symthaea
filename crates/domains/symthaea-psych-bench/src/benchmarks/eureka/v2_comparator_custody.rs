@@ -21,7 +21,7 @@ use super::v2_public_schema::{
 pub(super) const V2_COMPARATOR_FIT_CORPUS_REVISION: &str =
     "EUREKA.002.V2.COMPARATOR_FIT_CORPUS.v2";
 pub(super) const V2_COMPARATOR_CUSTODY_REVISION: &str =
-    "EUREKA.002.V2.COMPARATOR_CUSTODY.v2";
+    "EUREKA.002.V2.COMPARATOR_CUSTODY.v3";
 pub(super) const V2_SHORTCUT_BASELINE_IMPLEMENTATION_REVISION: &str =
     "EUREKA.002.V2.SHORTCUT_BASELINES.v1";
 
@@ -184,6 +184,7 @@ pub(super) struct V2ComparatorCustodyReceipt {
     selection_authorization_commitment: [u8; 32],
     development_record_count: u32,
     analysis_plan_replay_digest: u64,
+    analysis_plan_commitment: [u8; 32],
     commitment: [u8; 32],
 }
 
@@ -205,6 +206,7 @@ impl V2ComparatorCustodyReceipt {
         let development_record_count =
             u32::try_from(corpus.records.len()).expect("V2 Development corpus fits u32");
         let analysis_plan_replay_digest = EUREKA_002_ANALYSIS_PLAN_V1.replay_digest();
+        let analysis_plan_commitment = EUREKA_002_ANALYSIS_PLAN_V1.cryptographic_commitment();
         let commitment = comparator_subject_commitment(
             corpus.schema_commitment,
             corpus.commitment,
@@ -212,6 +214,7 @@ impl V2ComparatorCustodyReceipt {
             selection_authorization_commitment,
             development_record_count,
             analysis_plan_replay_digest,
+            analysis_plan_commitment,
         );
         Ok(Self {
             schema_commitment: corpus.schema_commitment,
@@ -220,6 +223,7 @@ impl V2ComparatorCustodyReceipt {
             selection_authorization_commitment,
             development_record_count,
             analysis_plan_replay_digest,
+            analysis_plan_commitment,
             commitment,
         })
     }
@@ -238,6 +242,14 @@ impl V2ComparatorCustodyReceipt {
 
     pub(super) const fn development_record_count(self) -> u32 {
         self.development_record_count
+    }
+
+    pub(super) const fn analysis_plan_replay_digest(self) -> u64 {
+        self.analysis_plan_replay_digest
+    }
+
+    pub(super) const fn analysis_plan_commitment(self) -> [u8; 32] {
+        self.analysis_plan_commitment
     }
 
     pub(super) const fn commitment(self) -> [u8; 32] {
@@ -266,6 +278,7 @@ fn comparator_subject_commitment(
     selection_authorization_commitment: [u8; 32],
     development_record_count: u32,
     analysis_plan_replay_digest: u64,
+    analysis_plan_commitment: [u8; 32],
 ) -> [u8; 32] {
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, V2_COMPARATOR_CUSTODY_REVISION.as_bytes());
@@ -275,6 +288,7 @@ fn comparator_subject_commitment(
     );
     encode_bytes(&mut bytes, ANALYSIS_PLAN_REVISION.as_bytes());
     bytes.extend_from_slice(&analysis_plan_replay_digest.to_le_bytes());
+    bytes.extend_from_slice(&analysis_plan_commitment);
     bytes.extend_from_slice(&schema_commitment);
     bytes.extend_from_slice(&fit_corpus_commitment);
     encode_bytes(&mut bytes, selected.stable_id().as_bytes());
@@ -548,6 +562,14 @@ mod tests {
         assert_eq!(nearest.schema_commitment(), public_schema_commitment());
         assert_eq!(nearest.fit_corpus_commitment(), corpus.commitment());
         assert_eq!(nearest.development_record_count(), 3);
+        assert_eq!(
+            nearest.analysis_plan_replay_digest(),
+            EUREKA_002_ANALYSIS_PLAN_V1.replay_digest()
+        );
+        assert_eq!(
+            nearest.analysis_plan_commitment(),
+            EUREKA_002_ANALYSIS_PLAN_V1.cryptographic_commitment()
+        );
     }
 
     #[test]
