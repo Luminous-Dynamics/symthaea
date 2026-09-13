@@ -136,6 +136,7 @@ jobs:
       # execute under the normal restricted pull_request token, but it cannot
       # turn an untrusted branch into a repository-signed evidence artifact.
       - name: Generate GitHub build-provenance attestation
+        id: attest
         if: >-
           always() &&
           steps.bundle.outputs.has_evidence == 'true' &&
@@ -144,30 +145,37 @@ jobs:
         with:
           subject-path: target/gwt1-evidence.tar.gz
 
-      - name: Verify and preserve evidence attestation
+      # Verify the exact bundle emitted by the signing action rather than
+      # depending on immediate API indexing. The repository, signer workflow,
+      # exact evidence-subject commit, and GitHub-hosted runner requirement are
+      # all enforced during verification.
+      - name: Verify and preserve exact evidence attestation
         if: >-
           always() &&
           steps.bundle.outputs.has_evidence == 'true' &&
-          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+          steps.attest.outputs.bundle-path != ''
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          ATTESTATION_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          EVIDENCE_SOURCE_SHA: ${{ steps.subject.outputs.sha }}
         run: |
           set -euo pipefail
           mkdir -p target/gwt1-attestation
+          test -f "$ATTESTATION_BUNDLE"
+          cp "$ATTESTATION_BUNDLE" target/gwt1-attestation/attestation.json
 
           gh attestation verify target/gwt1-evidence.tar.gz \
             --repo "$GITHUB_REPOSITORY" \
+            --bundle target/gwt1-attestation/attestation.json \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-qualification.yml" \
+            --source-digest "$EVIDENCE_SOURCE_SHA" \
+            --deny-self-hosted-runners \
             --format json \
             > target/gwt1-attestation/verification.json
 
-          (
-            cd target/gwt1-attestation
-            gh attestation download ../gwt1-evidence.tar.gz \
-              --repo "$GITHUB_REPOSITORY" \
-              --predicate-type https://slsa.dev/provenance/v1
-          )
+          sha256sum target/gwt1-attestation/attestation.json \
+            > target/gwt1-attestation/attestation.json.sha256
 
       - name: Upload raw, bundled, and attested evidence
         if: always()
