@@ -14,11 +14,14 @@ on:
       - "crates/domains/symthaea-psych-bench/Cargo.toml"
       - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_*.rs"
       - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view.rs"
       - "crates/domains/symthaea-psych-bench/src/bin/gwt1_qualification.rs"
   workflow_dispatch:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 concurrency:
   group: gwt1-qualification-${{ github.event.pull_request.number || github.ref }}
@@ -83,11 +86,98 @@ jobs:
             --features symthaea-backend \
             --bin gwt1_qualification
 
-      - name: Upload raw observations and resolved evidence
+      # The scientific process may exit 20/21/22 for NotDemonstrated,
+      # Contradicted, or Inconclusive after writing a complete evidence set.
+      # Package those negative findings too. A red qualification is evidence,
+      # not a reason to discard its observations.
+      - name: Build deterministic evidence bundle
+        id: bundle
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="target/gwt1-evidence"
+          expected=(
+            raw_observations.json
+            evidence_envelope.json
+            resolution.json
+            outcome.txt
+          )
+
+          for file in "${expected[@]}"; do
+            if [[ ! -f "${evidence_dir}/${file}" ]]; then
+              echo "Missing evidence file: ${file}"
+              echo "has_evidence=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          (
+            cd "$evidence_dir"
+            sha256sum "${expected[@]}" > SHA256SUMS
+          )
+
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -C target \
+            -cf - \
+            gwt1-evidence \
+            | gzip -n > target/gwt1-evidence.tar.gz
+
+          sha256sum target/gwt1-evidence.tar.gz \
+            | tee target/gwt1-evidence.tar.gz.sha256
+          echo "has_evidence=true" >> "$GITHUB_OUTPUT"
+
+      # Only same-repository PRs receive an attestation. Fork PR code may still
+      # execute under the normal restricted pull_request token, but it cannot
+      # turn an untrusted branch into a repository-signed evidence artifact.
+      - name: Generate GitHub build-provenance attestation
+        if: >-
+          always() &&
+          steps.bundle.outputs.has_evidence == 'true' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/attest@v4
+        with:
+          subject-path: target/gwt1-evidence.tar.gz
+
+      - name: Verify and preserve evidence attestation
+        if: >-
+          always() &&
+          steps.bundle.outputs.has_evidence == 'true' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/gwt1-attestation
+
+          gh attestation verify target/gwt1-evidence.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-qualification.yml" \
+            --format json \
+            > target/gwt1-attestation/verification.json
+
+          (
+            cd target/gwt1-attestation
+            gh attestation download ../gwt1-evidence.tar.gz \
+              --repo "$GITHUB_REPOSITORY" \
+              --predicate-type https://slsa.dev/provenance/v1
+          )
+
+      - name: Upload raw, bundled, and attested evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gwt1-evidence-${{ steps.subject.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: target/gwt1-evidence/
+          path: |
+            target/gwt1-evidence/
+            target/gwt1-evidence.tar.gz
+            target/gwt1-evidence.tar.gz.sha256
+            target/gwt1-attestation/
           if-no-files-found: warn
           retention-days: 30
