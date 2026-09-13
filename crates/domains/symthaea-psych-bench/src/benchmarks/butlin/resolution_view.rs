@@ -65,8 +65,12 @@ pub struct EvidenceLineageIdentityV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndicatorOutcomeOverlayV1 {
     pub indicator_id: String,
-    /// Outcome immediately before this lineage is applied.
+    /// Outcome immediately before this lineage is considered.
     pub base_outcome: EvidenceOutcome,
+    /// What this evidence lineage itself established.
+    pub lineage_outcome: EvidenceOutcome,
+    /// Indicator outcome after applying this lineage conservatively.
+    /// A negative higher-tier experiment does not erase a valid lower tier.
     pub resolved_outcome: EvidenceOutcome,
     pub lineage: EvidenceLineageIdentityV1,
 }
@@ -118,7 +122,7 @@ pub struct ButlinResolvedEvidenceViewV1 {
     pub base_report_schema_version: u32,
     pub base_report_blake3: String,
     /// Ordered by indicator ID then evidence-lineage rank. Multiple entries for
-    /// the same indicator are intentional when one method builds on another.
+    /// one indicator are intentional when stronger evidence builds on weaker.
     pub overlays: Vec<IndicatorOutcomeOverlayV1>,
     pub resolved_counts: EvidenceOutcomeCountsV1,
 }
@@ -167,7 +171,7 @@ impl std::fmt::Display for EvidenceResolutionViewErrorV1 {
                 observed,
             } => write!(
                 f,
-                "{kind:?} overlay for {indicator_id:?} expects prior outcome {expected:?}, but the resolved chain currently has {observed:?}"
+                "{kind:?} overlay for {indicator_id:?} expects prior outcome {expected:?}, but the chain currently has {observed:?}"
             ),
             Self::InvalidLineageIdentity { indicator_id, field } => write!(
                 f,
@@ -179,7 +183,7 @@ impl std::fmt::Display for EvidenceResolutionViewErrorV1 {
             ),
             Self::CausalPrerequisiteNotObserved { observed } => write!(
                 f,
-                "positive causal GWT-1 promotion requires an independent direct Observed lineage; observed direct outcome was {observed:?}"
+                "positive causal GWT-1 promotion requires an independent direct Observed lineage; direct outcome was {observed:?}"
             ),
         }
     }
@@ -198,26 +202,28 @@ fn is_lower_hex_len(value: &str, len: usize) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn invalid_lineage(indicator_id: &str, field: &str) -> EvidenceResolutionViewErrorV1 {
+    EvidenceResolutionViewErrorV1::InvalidLineageIdentity {
+        indicator_id: indicator_id.to_string(),
+        field: field.to_string(),
+    }
+}
+
 fn validate_artifact_identity(
     indicator_id: &str,
     artifact: &EvidenceArtifactIdentityV1,
 ) -> Result<(), EvidenceResolutionViewErrorV1> {
-    let invalid = |field: &str| EvidenceResolutionViewErrorV1::InvalidLineageIdentity {
-        indicator_id: indicator_id.to_string(),
-        field: field.to_string(),
-    };
-
     if artifact.schema.trim().is_empty() {
-        return Err(invalid("artifact.schema"));
+        return Err(invalid_lineage(indicator_id, "artifact.schema"));
     }
     if !matches!(artifact.digest_algorithm.as_str(), "blake3" | "sha256") {
-        return Err(invalid("artifact.digest_algorithm"));
+        return Err(invalid_lineage(indicator_id, "artifact.digest_algorithm"));
     }
     if !is_lower_hex_len(&artifact.digest, 64) {
-        return Err(invalid("artifact.digest"));
+        return Err(invalid_lineage(indicator_id, "artifact.digest"));
     }
     if artifact.byte_len == 0 {
-        return Err(invalid("artifact.byte_len"));
+        return Err(invalid_lineage(indicator_id, "artifact.byte_len"));
     }
     Ok(())
 }
@@ -226,25 +232,26 @@ fn validate_authority_identity(
     indicator_id: &str,
     authority: &EvidenceAuthorityIdentityV1,
 ) -> Result<(), EvidenceResolutionViewErrorV1> {
-    let invalid = |field: &str| EvidenceResolutionViewErrorV1::InvalidLineageIdentity {
-        indicator_id: indicator_id.to_string(),
-        field: field.to_string(),
-    };
-
     if authority.repository.trim().is_empty() {
-        return Err(invalid("authority.repository"));
+        return Err(invalid_lineage(indicator_id, "authority.repository"));
     }
     if authority.workflow.trim().is_empty() {
-        return Err(invalid("authority.workflow"));
+        return Err(invalid_lineage(indicator_id, "authority.workflow"));
     }
     if !is_hex_len(&authority.workflow_sha, 40) {
-        return Err(invalid("authority.workflow_sha"));
+        return Err(invalid_lineage(indicator_id, "authority.workflow_sha"));
     }
     if !is_lower_hex_len(&authority.attestation_bundle_sha256, 64) {
-        return Err(invalid("authority.attestation_bundle_sha256"));
+        return Err(invalid_lineage(
+            indicator_id,
+            "authority.attestation_bundle_sha256",
+        ));
     }
     if !is_lower_hex_len(&authority.attestation_verification_sha256, 64) {
-        return Err(invalid("authority.attestation_verification_sha256"));
+        return Err(invalid_lineage(
+            indicator_id,
+            "authority.attestation_verification_sha256",
+        ));
     }
     Ok(())
 }
@@ -252,13 +259,8 @@ fn validate_authority_identity(
 fn validate_lineage(
     overlay: &IndicatorOutcomeOverlayV1,
 ) -> Result<(), EvidenceResolutionViewErrorV1> {
-    let invalid = |field: &str| EvidenceResolutionViewErrorV1::InvalidLineageIdentity {
-        indicator_id: overlay.indicator_id.clone(),
-        field: field.to_string(),
-    };
-
     if overlay.lineage.method_id.trim().is_empty() {
-        return Err(invalid("method_id"));
+        return Err(invalid_lineage(&overlay.indicator_id, "method_id"));
     }
     if overlay
         .lineage
@@ -266,33 +268,36 @@ fn validate_lineage(
         .as_deref()
         .is_none_or(|value| value.trim().is_empty())
     {
-        return Err(invalid("policy_id"));
+        return Err(invalid_lineage(&overlay.indicator_id, "policy_id"));
     }
     if !is_hex_len(&overlay.lineage.source_commit_sha, 40) {
-        return Err(invalid("source_commit_sha"));
+        return Err(invalid_lineage(&overlay.indicator_id, "source_commit_sha"));
     }
     if !is_hex_len(&overlay.lineage.source_tree_sha, 40) {
-        return Err(invalid("source_tree_sha"));
+        return Err(invalid_lineage(&overlay.indicator_id, "source_tree_sha"));
     }
     if overlay.lineage.execution_run_id.trim().is_empty() {
-        return Err(invalid("execution_run_id"));
+        return Err(invalid_lineage(&overlay.indicator_id, "execution_run_id"));
     }
     if overlay.lineage.toolchain.trim().is_empty() {
-        return Err(invalid("toolchain"));
+        return Err(invalid_lineage(&overlay.indicator_id, "toolchain"));
     }
     validate_artifact_identity(&overlay.indicator_id, &overlay.lineage.artifact)?;
 
     match overlay.lineage.kind {
         EvidenceLineageKindV1::DirectQualification => {
             if overlay.lineage.authority.is_some() {
-                return Err(invalid("authority"));
+                return Err(invalid_lineage(&overlay.indicator_id, "authority"));
+            }
+            if overlay.lineage_outcome != overlay.resolved_outcome {
+                return Err(invalid_lineage(&overlay.indicator_id, "resolved_outcome"));
             }
             if matches!(
-                overlay.resolved_outcome,
+                overlay.lineage_outcome,
                 EvidenceOutcome::Supported(SupportTier::CausallySupported)
                     | EvidenceOutcome::Supported(SupportTier::FunctionallySupported)
             ) {
-                return Err(invalid("resolved_outcome"));
+                return Err(invalid_lineage(&overlay.indicator_id, "lineage_outcome"));
             }
         }
         EvidenceLineageKindV1::CausalQualification => {
@@ -300,12 +305,27 @@ fn validate_lineage(
                 .lineage
                 .authority
                 .as_ref()
-                .ok_or_else(|| invalid("authority"))?;
+                .ok_or_else(|| invalid_lineage(&overlay.indicator_id, "authority"))?;
             validate_authority_identity(&overlay.indicator_id, authority)?;
-            if overlay.resolved_outcome
-                == EvidenceOutcome::Supported(SupportTier::FunctionallySupported)
-            {
-                return Err(invalid("resolved_outcome"));
+
+            match overlay.lineage_outcome {
+                EvidenceOutcome::Supported(SupportTier::CausallySupported) => {
+                    if overlay.resolved_outcome
+                        != EvidenceOutcome::Supported(SupportTier::CausallySupported)
+                    {
+                        return Err(invalid_lineage(&overlay.indicator_id, "resolved_outcome"));
+                    }
+                }
+                EvidenceOutcome::Supported(_) => {
+                    return Err(invalid_lineage(&overlay.indicator_id, "lineage_outcome"));
+                }
+                EvidenceOutcome::NotDemonstrated
+                | EvidenceOutcome::Contradicted
+                | EvidenceOutcome::Inconclusive => {
+                    if overlay.resolved_outcome != overlay.base_outcome {
+                        return Err(invalid_lineage(&overlay.indicator_id, "resolved_outcome"));
+                    }
+                }
             }
         }
     }
@@ -430,6 +450,7 @@ fn gwt1_direct_overlay_v1(
     let overlay = IndicatorOutcomeOverlayV1 {
         indicator_id: "GWT-1".to_string(),
         base_outcome: base.outcome,
+        lineage_outcome: promotion.evidence_outcome,
         resolved_outcome: promotion.evidence_outcome,
         lineage: EvidenceLineageIdentityV1 {
             kind: EvidenceLineageKindV1::DirectQualification,
@@ -458,13 +479,13 @@ fn gwt1_causal_overlay_v1(
     verified: &super::gwt1_causal_verified_promotion::VerifiedGwt1CausalPromotionV1,
 ) -> Result<IndicatorOutcomeOverlayV1, EvidenceResolutionViewErrorV1> {
     use super::gwt1_causal_promotion_capsule::GWT1_CAUSAL_PROMOTION_CAPSULE_SCHEMA_V1;
+    use super::gwt1_causal_resolution::Gwt1CausalQualificationOutcomeV1;
     use super::gwt1_causal_verified_promotion::{
         GWT1_CAUSAL_APPROVED_PROMOTION_WORKFLOW_SHA_V1, GWT1_CAUSAL_PROMOTION_WORKFLOW_V1,
     };
 
     let capsule = verified.capsule();
-    if capsule.scientific_outcome
-        == super::gwt1_causal_resolution::Gwt1CausalQualificationOutcomeV1::Qualified
+    if capsule.scientific_outcome == Gwt1CausalQualificationOutcomeV1::Qualified
         && direct_overlay.resolved_outcome != EvidenceOutcome::Supported(SupportTier::Observed)
     {
         return Err(EvidenceResolutionViewErrorV1::CausalPrerequisiteNotObserved {
@@ -472,10 +493,20 @@ fn gwt1_causal_overlay_v1(
         });
     }
 
+    let lineage_outcome = capsule.eligible_evidence_outcome;
+    let resolved_outcome = if lineage_outcome
+        == EvidenceOutcome::Supported(SupportTier::CausallySupported)
+    {
+        lineage_outcome
+    } else {
+        direct_overlay.resolved_outcome
+    };
+
     let overlay = IndicatorOutcomeOverlayV1 {
         indicator_id: "GWT-1".to_string(),
         base_outcome: direct_overlay.resolved_outcome,
-        resolved_outcome: capsule.eligible_evidence_outcome,
+        lineage_outcome,
+        resolved_outcome,
         lineage: EvidenceLineageIdentityV1 {
             kind: EvidenceLineageKindV1::CausalQualification,
             method_id: GWT1_CAUSAL_PROMOTION_CAPSULE_SCHEMA_V1.to_string(),
@@ -520,7 +551,8 @@ pub fn resolve_gwt1_evidence_view_v1(
 ///
 /// Positive causal support requires both an independently recomputed direct
 /// `Observed` result and an opaque cryptographically verified causal promotion
-/// token. Both lineages remain present in the returned view.
+/// token. Negative causal science remains visible in `lineage_outcome` but does
+/// not erase a valid lower-tier result.
 #[cfg(feature = "symthaea-backend")]
 pub fn resolve_gwt1_causal_evidence_view_v1(
     report: &ButlinIndicatorReport,
@@ -575,11 +607,13 @@ mod tests {
     fn overlay(
         kind: EvidenceLineageKindV1,
         base_outcome: EvidenceOutcome,
+        lineage_outcome: EvidenceOutcome,
         resolved_outcome: EvidenceOutcome,
     ) -> IndicatorOutcomeOverlayV1 {
         IndicatorOutcomeOverlayV1 {
             indicator_id: "GWT-1".to_string(),
             base_outcome,
+            lineage_outcome,
             resolved_outcome,
             lineage: EvidenceLineageIdentityV1 {
                 kind,
@@ -610,17 +644,19 @@ mod tests {
     }
 
     #[test]
-    fn direct_then_causal_chain_preserves_both_lineages() {
+    fn positive_causal_chain_preserves_both_lineages() {
         let base = report();
         let original = base.clone();
         let direct = overlay(
             EvidenceLineageKindV1::DirectQualification,
             EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
             EvidenceOutcome::Supported(SupportTier::Observed),
+            EvidenceOutcome::Supported(SupportTier::Observed),
         );
         let causal = overlay(
             EvidenceLineageKindV1::CausalQualification,
             EvidenceOutcome::Supported(SupportTier::Observed),
+            EvidenceOutcome::Supported(SupportTier::CausallySupported),
             EvidenceOutcome::Supported(SupportTier::CausallySupported),
         );
         let view = resolve_validated_overlays_v1(&base, vec![causal, direct])
@@ -631,34 +667,51 @@ mod tests {
         assert_eq!(view.overlays[0].lineage.kind, EvidenceLineageKindV1::DirectQualification);
         assert_eq!(view.overlays[1].lineage.kind, EvidenceLineageKindV1::CausalQualification);
         assert_eq!(view.resolved_counts.causally_supported, 1);
-        assert_eq!(view.resolved_counts.not_demonstrated, 1);
         assert_eq!(view.resolved_counts.total(), base.indicators.len());
     }
 
     #[test]
-    fn direct_qualification_cannot_claim_causal_or_functional_support() {
-        for forbidden in [
-            EvidenceOutcome::Supported(SupportTier::CausallySupported),
-            EvidenceOutcome::Supported(SupportTier::FunctionallySupported),
-        ] {
-            let item = overlay(
-                EvidenceLineageKindV1::DirectQualification,
-                EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
-                forbidden,
-            );
-            assert!(matches!(
-                resolve_validated_overlays_v1(&report(), vec![item]),
-                Err(EvidenceResolutionViewErrorV1::InvalidLineageIdentity { .. })
-            ));
-        }
+    fn causal_null_does_not_erase_direct_observed() {
+        let direct = overlay(
+            EvidenceLineageKindV1::DirectQualification,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            EvidenceOutcome::Supported(SupportTier::Observed),
+            EvidenceOutcome::Supported(SupportTier::Observed),
+        );
+        let causal = overlay(
+            EvidenceLineageKindV1::CausalQualification,
+            EvidenceOutcome::Supported(SupportTier::Observed),
+            EvidenceOutcome::NotDemonstrated,
+            EvidenceOutcome::Supported(SupportTier::Observed),
+        );
+        let view = resolve_validated_overlays_v1(&report(), vec![direct, causal])
+            .expect("resolved causal null");
+        assert_eq!(view.resolved_counts.observed, 1);
+        assert_eq!(view.overlays[1].lineage_outcome, EvidenceOutcome::NotDemonstrated);
     }
 
     #[test]
-    fn causal_qualification_cannot_claim_functional_support() {
+    fn causal_negative_cannot_overwrite_lower_tier() {
         let item = overlay(
             EvidenceLineageKindV1::CausalQualification,
+            EvidenceOutcome::Supported(SupportTier::Observed),
+            EvidenceOutcome::Contradicted,
+            EvidenceOutcome::Contradicted,
+        );
+        assert!(matches!(
+            resolve_validated_overlays_v1(&report(), vec![item]),
+            Err(EvidenceResolutionViewErrorV1::InvalidLineageIdentity { .. })
+                | Err(EvidenceResolutionViewErrorV1::LineageInputMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn direct_qualification_cannot_claim_causal_support() {
+        let item = overlay(
+            EvidenceLineageKindV1::DirectQualification,
             EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
-            EvidenceOutcome::Supported(SupportTier::FunctionallySupported),
+            EvidenceOutcome::Supported(SupportTier::CausallySupported),
+            EvidenceOutcome::Supported(SupportTier::CausallySupported),
         );
         assert!(matches!(
             resolve_validated_overlays_v1(&report(), vec![item]),
@@ -667,28 +720,11 @@ mod tests {
     }
 
     #[test]
-    fn chain_input_mismatch_fails_closed() {
-        let direct = overlay(
-            EvidenceLineageKindV1::DirectQualification,
-            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
-            EvidenceOutcome::Supported(SupportTier::Observed),
-        );
-        let causal = overlay(
-            EvidenceLineageKindV1::CausalQualification,
-            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
-            EvidenceOutcome::Supported(SupportTier::CausallySupported),
-        );
-        assert!(matches!(
-            resolve_validated_overlays_v1(&report(), vec![direct, causal]),
-            Err(EvidenceResolutionViewErrorV1::LineageInputMismatch { .. })
-        ));
-    }
-
-    #[test]
     fn duplicate_same_lineage_is_rejected() {
         let item = overlay(
             EvidenceLineageKindV1::DirectQualification,
             EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            EvidenceOutcome::Supported(SupportTier::Observed),
             EvidenceOutcome::Supported(SupportTier::Observed),
         );
         assert!(matches!(
@@ -712,13 +748,38 @@ mod backend_tests {
     use std::collections::BTreeMap;
 
     use super::*;
+    use crate::benchmarks::butlin::gwt1_causal_verified_promotion::verified_gwt1_causal_promotion_for_test;
     use crate::benchmarks::butlin::{
         GWT1_CAUSAL_APPROVED_BUILDER_SHA_V1, GWT1_CAUSAL_PROMOTION_CAPSULE_SCHEMA_V1,
         GWT1_CAUSAL_PROMOTION_POLICY_V1, GWT1_CAUSAL_TRUSTED_BUILDER_WORKFLOW_V1,
         GWT1_CAUSAL_TRUSTED_REPOSITORY_V1, Gwt1CausalPromotionCapsuleV1,
         Gwt1CausalQualificationOutcomeV1, Gwt1ExecutionIdentityV1,
     };
-    use crate::benchmarks::butlin::gwt1_causal_verified_promotion::verified_gwt1_causal_promotion_for_test;
+
+    fn direct_overlay(outcome: EvidenceOutcome) -> IndicatorOutcomeOverlayV1 {
+        IndicatorOutcomeOverlayV1 {
+            indicator_id: "GWT-1".to_string(),
+            base_outcome: EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            lineage_outcome: outcome,
+            resolved_outcome: outcome,
+            lineage: EvidenceLineageIdentityV1 {
+                kind: EvidenceLineageKindV1::DirectQualification,
+                method_id: "direct-v1".to_string(),
+                policy_id: Some("direct-policy-v1".to_string()),
+                source_commit_sha: "a".repeat(40),
+                source_tree_sha: "b".repeat(40),
+                execution_run_id: "run-1".to_string(),
+                toolchain: "rustc test".to_string(),
+                artifact: EvidenceArtifactIdentityV1 {
+                    schema: "raw-v1".to_string(),
+                    digest_algorithm: "blake3".to_string(),
+                    digest: "c".repeat(64),
+                    byte_len: 128,
+                },
+                authority: None,
+            },
+        }
+    }
 
     fn capsule(outcome: Gwt1CausalQualificationOutcomeV1) -> Gwt1CausalPromotionCapsuleV1 {
         let eligibility = match outcome {
@@ -760,11 +821,7 @@ mod backend_tests {
 
     #[test]
     fn positive_causal_overlay_requires_direct_observed() {
-        let direct = overlay(
-            EvidenceLineageKindV1::DirectQualification,
-            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
-            EvidenceOutcome::NotDemonstrated,
-        );
+        let direct = direct_overlay(EvidenceOutcome::NotDemonstrated);
         let verified = verified_gwt1_causal_promotion_for_test(capsule(
             Gwt1CausalQualificationOutcomeV1::Qualified,
         ));
@@ -775,23 +832,16 @@ mod backend_tests {
     }
 
     #[test]
-    fn causal_overlay_from_verified_capsule_is_capped_at_causal() {
-        let direct = overlay(
-            EvidenceLineageKindV1::DirectQualification,
-            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
-            EvidenceOutcome::Supported(SupportTier::Observed),
-        );
+    fn causal_null_preserves_observed_but_records_null_lineage() {
+        let direct = direct_overlay(EvidenceOutcome::Supported(SupportTier::Observed));
         let verified = verified_gwt1_causal_promotion_for_test(capsule(
-            Gwt1CausalQualificationOutcomeV1::Qualified,
+            Gwt1CausalQualificationOutcomeV1::NotDemonstrated,
         ));
         let causal = gwt1_causal_overlay_v1(&direct, &verified).expect("causal overlay");
+        assert_eq!(causal.lineage_outcome, EvidenceOutcome::NotDemonstrated);
         assert_eq!(
             causal.resolved_outcome,
-            EvidenceOutcome::Supported(SupportTier::CausallySupported)
-        );
-        assert_ne!(
-            causal.resolved_outcome,
-            EvidenceOutcome::Supported(SupportTier::FunctionallySupported)
+            EvidenceOutcome::Supported(SupportTier::Observed)
         );
     }
 }
