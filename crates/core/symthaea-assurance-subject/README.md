@@ -13,7 +13,9 @@ same product name
     != same qualified subject
 ```
 
-The crate uses a registered `SurfaceProfile` plus one explicit `SurfaceBinding` per material surface. Every registered surface is `Known(commitment)`, `Unknown`, `Unavailable(reason)`, or `NotApplicable`; omission fails closed. Completeness state is part of the manifest identity.
+The crate uses a registered `SurfaceProfile` plus one explicit `SurfaceBinding` per material surface. Every registered surface is `Known(material-commitment)`, `Unknown`, `Unavailable(reason)`, or `NotApplicable`; omission fails closed. Completeness state is part of the manifest identity.
+
+A known commitment binds both its SHA-256 digest and the commitment method (`ArtifactBytesSha256`, `CanonicalDescriptorSha256`, `ProviderRevisionTokenSha256`, or a custom method ID). A digest of artifact bytes is therefore not silently equivalent to the same digest interpreted as a provider revision token.
 
 The standard external-AI profile covers source/image identity, model, system prompt, tool authority, policy, runtime, deployment envelope, and explicitly named external dependencies. Evaluator/corpus/campaign identity is intentionally excluded and belongs to later qualification-plan/evidence layers.
 
