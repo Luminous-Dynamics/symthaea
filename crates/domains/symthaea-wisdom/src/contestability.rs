@@ -3,13 +3,13 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Contestability, correction, and redress for Wisdom & Care decisions.
 //!
-//! A cared-for or affected person must be able to challenge Symthaea's factual
-//! model, normative reasoning, consent interpretation, or consequential decision.
-//! Challenges remain visible until evidence-bound resolution and never count as
-//! disobedience, hostility, or evidence that the challenger is less credible.
+//! Affected people may challenge Symthaea's factual model, normative reasoning,
+//! consent interpretation, or consequential decision without first proving the
+//! challenge. Supporting evidence is optional at intake. Evidence is required to
+//! close a challenge as corrected/upheld; deferred challenges remain active.
 //!
-//! This first tranche is advisory/shadow-only: it recommends reassessment or a
-//! pause for consequential action but does not itself mint or revoke authority.
+//! WCARE-15 is advisory/shadow-only: it recommends reassessment or pause but does
+//! not itself mint, revoke, or bypass executable authority.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -115,8 +115,6 @@ pub enum ContestabilityDisposition {
 pub struct ContestabilityAssessment {
     pub open_challenges: Vec<ChallengeId>,
     pub disposition: Option<ContestabilityDisposition>,
-    /// WCARE-15 is advisory only. Downstream authority integration requires a
-    /// separately qualified tranche.
     pub shadow_only: bool,
 }
 
@@ -156,11 +154,8 @@ impl ContestabilityLedger {
         }
         let supporting_facts: BTreeSet<_> = supporting_facts.into_iter().collect();
         validate_fact_refs(&supporting_facts, evidence)?;
-        if requires_initial_evidence(kind) && supporting_facts.is_empty() {
-            return Err(ContestabilityError::SupportingEvidenceRequired);
-        }
-
         let target_snapshot = snapshot_target(&target, evidence, consent, perspectives)?;
+
         self.challenges.insert(
             id.clone(),
             ChallengeRecord {
@@ -243,13 +238,12 @@ impl ContestabilityLedger {
             .values()
             .filter(|challenge| challenge.status != ChallengeStatus::Resolved)
             .collect();
-        let disposition = active
-            .iter()
-            .map(|challenge| disposition_for(challenge.kind))
-            .max();
         ContestabilityAssessment {
             open_challenges: active.iter().map(|challenge| challenge.id.clone()).collect(),
-            disposition,
+            disposition: active
+                .iter()
+                .map(|challenge| disposition_for(challenge.kind))
+                .max(),
             shadow_only: true,
         }
     }
@@ -268,10 +262,6 @@ fn disposition_for(kind: ChallengeKind) -> ContestabilityDisposition {
             ContestabilityDisposition::PauseConsequentialActionPendingReview
         }
     }
-}
-
-fn requires_initial_evidence(kind: ChallengeKind) -> bool {
-    matches!(kind, ChallengeKind::HarmReport)
 }
 
 fn snapshot_target(
@@ -359,7 +349,6 @@ pub enum ContestabilityError {
     UnknownChallenger(StakeholderId),
     UnknownConsentStakeholder(StakeholderId),
     EmptySummary,
-    SupportingEvidenceRequired,
     ResolutionExplanationRequired,
     ResolutionEvidenceRequired,
     MissingFact(FactClaimId),
@@ -385,30 +374,23 @@ mod tests {
         StakeholderId::new(value).unwrap()
     }
 
-    fn context() -> (
-        DeliberationEvidenceLedger,
-        ConsentLedger,
-        PerspectiveGraph,
-    ) {
+    fn context() -> (DeliberationEvidenceLedger, ConsentLedger, PerspectiveGraph) {
         let mut evidence = DeliberationEvidenceLedger::new();
         evidence
             .add_fact(fact("user-statement"), "person disputes the claim", 0.9)
             .unwrap();
         evidence
-            .add_fact(fact("resolution"), "correction was independently verified", 0.9)
+            .add_fact(fact("resolution"), "correction independently verified", 0.9)
             .unwrap();
+        let normative = NormativeClaimId::new("n1").unwrap();
         evidence
-            .add_normative_claim(
-                NormativeClaimId::new("n1").unwrap(),
-                "respect the person's correction",
-                0.8,
-            )
+            .add_normative_claim(normative.clone(), "respect the person's correction", 0.8)
             .unwrap();
         evidence
             .register_decision(
                 DecisionId::new("d1").unwrap(),
                 [fact("user-statement")],
-                [NormativeClaimId::new("n1").unwrap()],
+                [normative],
             )
             .unwrap();
 
@@ -442,22 +424,29 @@ mod tests {
     }
 
     #[test]
-    fn affected_person_can_challenge_existing_decision() {
+    fn challenge_intake_does_not_require_formal_proof() {
         let (evidence, consent, graph) = context();
         let mut ledger = ContestabilityLedger::new();
-        ledger
-            .open_challenge(
-                ChallengeId::new("c1").unwrap(),
-                person("person-a"),
-                ChallengeTarget::Decision(DecisionId::new("d1").unwrap()),
-                ChallengeKind::AuthorityDispute,
-                "I do not think this decision should be made for me",
-                [],
-                &evidence,
-                &consent,
-                &graph,
-            )
-            .unwrap();
+        for (id, kind) in [
+            ("harm", ChallengeKind::HarmReport),
+            ("correction", ChallengeKind::FactualCorrection),
+            ("authority", ChallengeKind::AuthorityDispute),
+        ] {
+            ledger
+                .open_challenge(
+                    ChallengeId::new(id).unwrap(),
+                    person("person-a"),
+                    ChallengeTarget::Decision(DecisionId::new("d1").unwrap()),
+                    kind,
+                    "please review this",
+                    [],
+                    &evidence,
+                    &consent,
+                    &graph,
+                )
+                .unwrap();
+        }
+        assert_eq!(ledger.assess().open_challenges.len(), 3);
         assert_eq!(
             ledger.assess().disposition,
             Some(ContestabilityDisposition::PauseConsequentialActionPendingReview)
@@ -465,7 +454,7 @@ mod tests {
     }
 
     #[test]
-    fn consent_dispute_preserves_snapshot_even_when_record_exists() {
+    fn consent_dispute_preserves_opening_snapshot() {
         let (evidence, consent, graph) = context();
         let mut ledger = ContestabilityLedger::new();
         let id = ChallengeId::new("c1").unwrap();
@@ -478,7 +467,7 @@ mod tests {
                     scope: ConsentScopeId::new("option-a").unwrap(),
                 },
                 ChallengeKind::ConsentDispute,
-                "That affirmation no longer represents my wishes",
+                "that affirmation no longer represents my wishes",
                 [],
                 &evidence,
                 &consent,
@@ -496,7 +485,7 @@ mod tests {
     }
 
     #[test]
-    fn explanation_request_does_not_require_initial_evidence() {
+    fn explanation_request_recommends_explanation_not_pause() {
         let (evidence, consent, graph) = context();
         let mut ledger = ContestabilityLedger::new();
         ledger
@@ -505,7 +494,7 @@ mod tests {
                 person("person-a"),
                 ChallengeTarget::Decision(DecisionId::new("d1").unwrap()),
                 ChallengeKind::ExplanationRequest,
-                "Please explain why this recommendation was made",
+                "please explain the basis",
                 [],
                 &evidence,
                 &consent,
@@ -516,39 +505,6 @@ mod tests {
             ledger.assess().disposition,
             Some(ContestabilityDisposition::ProvideExplanation)
         );
-    }
-
-    #[test]
-    fn harm_report_requires_evidence_but_person_correction_does_not() {
-        let (evidence, consent, graph) = context();
-        let mut ledger = ContestabilityLedger::new();
-        assert_eq!(
-            ledger.open_challenge(
-                ChallengeId::new("harm").unwrap(),
-                person("person-a"),
-                ChallengeTarget::Decision(DecisionId::new("d1").unwrap()),
-                ChallengeKind::HarmReport,
-                "This caused harm",
-                [],
-                &evidence,
-                &consent,
-                &graph,
-            ),
-            Err(ContestabilityError::SupportingEvidenceRequired)
-        );
-        ledger
-            .open_challenge(
-                ChallengeId::new("correction").unwrap(),
-                person("person-a"),
-                ChallengeTarget::Fact(fact("user-statement")),
-                ChallengeKind::FactualCorrection,
-                "You misunderstood what I said",
-                [],
-                &evidence,
-                &consent,
-                &graph,
-            )
-            .unwrap();
     }
 
     #[test]
@@ -577,9 +533,7 @@ mod tests {
                 [fact("resolution")],
                 &evidence,
             ),
-            Err(ContestabilityError::ResolutionFactUnsupported(
-                fact("resolution")
-            ))
+            Err(ContestabilityError::ResolutionFactUnsupported(fact("resolution")))
         );
         assert_ne!(ledger.get(&id).unwrap().status, ChallengeStatus::Resolved);
     }
