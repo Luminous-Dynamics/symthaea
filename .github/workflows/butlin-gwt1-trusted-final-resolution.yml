@@ -363,6 +363,11 @@ jobs:
           test -s "$GWT1_FINAL_RESOLUTION_OUTPUT_DIR/resolved_view_v2.json"
           test -s "$GWT1_FINAL_RESOLUTION_OUTPUT_DIR/gwt1_evidence_disposition.json"
           test -s "$GWT1_FINAL_RESOLUTION_OUTPUT_DIR/resolution_candidate.json"
+          test -s "$GWT1_FINAL_RESOLUTION_OUTPUT_DIR/promotion_internal_verification.json"
+          internal_verification_sha256="$(/usr/bin/sha256sum "$GWT1_FINAL_RESOLUTION_OUTPUT_DIR/promotion_internal_verification.json" | /usr/bin/awk '{print $1}')"
+          /usr/bin/jq -e --arg digest "$internal_verification_sha256" \
+            '[.lineages[] | select(.indicator_id=="GWT-1" and .lineage.kind=="causal_qualification")] as $causal | ($causal|length)==1 and ($causal[0].lineage.authority != null) and $causal[0].lineage.authority.attestation_verification_sha256==$digest' \
+            "$GWT1_FINAL_RESOLUTION_OUTPUT_DIR/resolved_view_v2.json" >/dev/null
           test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
       - name: Freeze final authority records and deterministic archive
@@ -404,6 +409,8 @@ jobs:
           rm -rf "$PACKAGE_ROOT"
           mkdir -p "$stage/authority/direct" "$stage/authority/promotion" "$stage/sources/direct" "$stage/sources/promotion/upstream" "$stage/environment"
 
+          /usr/bin/install -m 0644 "$GITHUB_WORKSPACE/.github/scripts/evidence_archive_admission.py" "$stage/archive_admission_engine.py"
+          /usr/bin/install -m 0644 "$GITHUB_WORKSPACE/.github/evidence-profiles/gwt1-final-resolution-v1.json" "$stage/archive_admission_profile.json"
           /usr/bin/install -m 0644 "$CANDIDATE_DIR/base_report.json" "$stage/base_report.json"
           /usr/bin/install -m 0644 "$CANDIDATE_DIR/resolved_view_v2.json" "$stage/resolved_view_v2.json"
           /usr/bin/install -m 0644 "$CANDIDATE_DIR/gwt1_evidence_disposition.json" "$stage/gwt1_evidence_disposition.json"
@@ -446,9 +453,11 @@ jobs:
           /usr/bin/install -m 0644 "$PROMOTION_DIR/promotion_provenance.json" "$stage/authority/promotion/promotion_provenance.json"
           /usr/bin/install -m 0644 "$PROMOTION_DIR/final-input/capsule-verification.json" "$stage/authority/promotion/fresh_capsule_verification.json"
           /usr/bin/install -m 0644 "$PROMOTION_DIR/final-input/profile-verification.json" "$stage/authority/promotion/fresh_profile_verification.json"
+          /usr/bin/install -m 0644 "$CANDIDATE_DIR/promotion_internal_verification.json" "$stage/authority/promotion/internal_verification.json"
           /usr/bin/install -m 0644 "$PROMOTION_DIR/attestation/attestation.json" "$stage/authority/promotion/capsule_attestation.json"
           /usr/bin/install -m 0644 "$PROMOTION_DIR/attestation/verifier-profile-attestation.json" "$stage/authority/promotion/profile_attestation.json"
 
+          internal_verification_sha256="$(/usr/bin/sha256sum "$CANDIDATE_DIR/promotion_internal_verification.json" | /usr/bin/awk '{print $1}')"
           /usr/bin/jq -n --arg schema butlin-gwt1-final-direct-authority-v1 --arg repository "$GITHUB_REPOSITORY" --arg builder_sha "$APPROVED_DIRECT_BUILDER_SHA" \
             --arg subject "$EVIDENCE_SUBJECT_SHA" --arg run_id "$DIRECT_RUN_ID" --arg run_attempt "$DIRECT_RUN_ATTEMPT" --arg archive_sha "$DIRECT_ARCHIVE_SHA256" \
             --arg verifier_profile_sha "$DIRECT_PROFILE_SHA256" --arg archive_verification_sha "$DIRECT_ARCHIVE_VERIFICATION_SHA256" --arg profile_verification_sha "$DIRECT_PROFILE_VERIFICATION_SHA256" \
@@ -459,8 +468,8 @@ jobs:
           /usr/bin/jq -n --arg schema butlin-gwt1-final-promotion-authority-v1 --arg repository "$GITHUB_REPOSITORY" --arg builder_sha "$APPROVED_CAUSAL_BUILDER_SHA" \
             --arg promotion_sha "$APPROVED_PROMOTION_WORKFLOW_SHA" --arg subject "$EVIDENCE_SUBJECT_SHA" --arg causal_run "$CAUSAL_RUN_ID" --arg causal_attempt "$CAUSAL_RUN_ATTEMPT" \
             --arg promotion_run "$PROMOTION_RUN_ID" --arg promotion_attempt "$PROMOTION_RUN_ATTEMPT" --arg capsule_sha "$PROMOTION_CAPSULE_SHA256" --arg verifier_profile_sha "$PROMOTION_PROFILE_SHA256" \
-            --arg capsule_verification_sha "$PROMOTION_CAPSULE_VERIFICATION_SHA256" --arg profile_verification_sha "$PROMOTION_PROFILE_VERIFICATION_SHA256" \
-            '{schema:$schema,repository:$repository,approved_causal_builder_sha:$builder_sha,approved_promotion_workflow_sha:$promotion_sha,evidence_subject_sha:$subject,causal_run_id:$causal_run,causal_run_attempt:$causal_attempt,promotion_run_id:$promotion_run,promotion_run_attempt:$promotion_attempt,promotion_capsule_sha256:$capsule_sha,promotion_verifier_profile_sha256:$verifier_profile_sha,fresh_capsule_verification_sha256:$capsule_verification_sha,fresh_profile_verification_sha256:$profile_verification_sha}' \
+            --arg capsule_verification_sha "$PROMOTION_CAPSULE_VERIFICATION_SHA256" --arg profile_verification_sha "$PROMOTION_PROFILE_VERIFICATION_SHA256" --arg internal_verification_sha "$internal_verification_sha256" \
+            '{schema:$schema,repository:$repository,approved_causal_builder_sha:$builder_sha,approved_promotion_workflow_sha:$promotion_sha,evidence_subject_sha:$subject,causal_run_id:$causal_run,causal_run_attempt:$causal_attempt,promotion_run_id:$promotion_run,promotion_run_attempt:$promotion_attempt,promotion_capsule_sha256:$capsule_sha,promotion_verifier_profile_sha256:$verifier_profile_sha,fresh_capsule_verification_sha256:$capsule_verification_sha,fresh_profile_verification_sha256:$profile_verification_sha,internal_token_verification_sha256:$internal_verification_sha}' \
             > "$stage/authority/promotion/authority.json"
 
           rustc --version --verbose > "$stage/rust-toolchain.txt"
@@ -503,7 +512,23 @@ jobs:
           /usr/bin/tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C "$PACKAGE_ROOT" -cf - gwt1-final-resolution \
             | /usr/bin/gzip -n > "$RUNNER_TEMP/gwt1-final-resolution.tar.gz"
           (cd "$RUNNER_TEMP" && /usr/bin/sha256sum gwt1-final-resolution.tar.gz > gwt1-final-resolution.tar.gz.sha256)
-          echo "archive_sha256=$(/usr/bin/sha256sum "$RUNNER_TEMP/gwt1-final-resolution.tar.gz" | /usr/bin/awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+          final_archive_sha256="$(/usr/bin/sha256sum "$RUNNER_TEMP/gwt1-final-resolution.tar.gz" | /usr/bin/awk '{print $1}')"
+          final_admission="$RUNNER_TEMP/gwt1-final-resolution-admission.json"
+          final_extract="$RUNNER_TEMP/gwt1-final-resolution-admitted"
+          rm -rf "$final_extract"
+          mkdir -p "$final_extract"
+          /usr/bin/python3 "$GITHUB_WORKSPACE/.github/scripts/evidence_archive_admission.py" \
+            --profile "$GITHUB_WORKSPACE/.github/evidence-profiles/gwt1-final-resolution-v1.json" \
+            --archive "$RUNNER_TEMP/gwt1-final-resolution.tar.gz" \
+            --output-dir "$final_extract" > "$final_admission"
+          /usr/bin/jq -e --arg archive_sha "$final_archive_sha256" \
+            '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-final-resolution-archive-v1" and .archive_sha256==$archive_sha and .archive_bytes>0 and .tar_stream_bytes>0 and .member_count==60 and .total_unpacked_bytes>0' \
+            "$final_admission" >/dev/null
+          (cd "$final_extract/gwt1-final-resolution" && /usr/bin/sha256sum -c SHA256SUMS)
+          rm -rf "$final_extract"
+          (cd "$RUNNER_TEMP" && /usr/bin/sha256sum gwt1-final-resolution-admission.json > gwt1-final-resolution-admission.json.sha256)
+          echo "archive_sha256=$final_archive_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Attest complete deterministic final resolved-view archive
         id: final_attest
@@ -540,6 +565,8 @@ jobs:
           path: |
             ${{ runner.temp }}/gwt1-final-resolution.tar.gz
             ${{ runner.temp }}/gwt1-final-resolution.tar.gz.sha256
+            ${{ runner.temp }}/gwt1-final-resolution-admission.json
+            ${{ runner.temp }}/gwt1-final-resolution-admission.json.sha256
             ${{ runner.temp }}/gwt1-final-attestation/
           if-no-files-found: error
           retention-days: 90
