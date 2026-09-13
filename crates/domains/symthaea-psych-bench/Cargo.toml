@@ -18,6 +18,10 @@ symthaea-backend = ["symthaea-core/ctc_wiring", "dep:symthaea", "symthaea/benchm
 # semantics; it only exposes the non-authoritative final-resolution candidate
 # adapter used inside the separately attested trusted workflow.
 trusted-resolution-authority = ["symthaea-backend"]
+# Consumer-side authority is a separate opt-in surface. It may only accept a
+# fully verified/reconstructed final artifact; enabling it does not itself mint
+# authority or change any scientific support tier.
+trusted-resolution-consumer = ["trusted-resolution-authority"]
 neuroevolution = ["dep:symthaea-neuroevolution"]
 neural_validation = ["symthaea-core/neural_validation"]  # TRIBE v2 fMRI comparison benchmark
 nuclear-benchmarks = ["dep:symthaea-nuclear"]            # Nuclear physics science benchmarks
