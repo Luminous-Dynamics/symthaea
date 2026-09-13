@@ -15,7 +15,6 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 from typing import Any
 
@@ -144,6 +143,7 @@ def base_result(detail: str = "uninitialized") -> dict[str, Any]:
         "service_identity_commitment_sha256": None,
         "tsa_signer_certificate_der_sha256": None,
         "tsa_policy_label": None,
+        "message_imprint_algorithm": None,
         "token_cryptographically_verified": False,
         "plan_message_imprint_verified": False,
         "certificate_time_validation_performed": False,
@@ -189,23 +189,26 @@ def parse_final_capsules(values: list[str]) -> dict[str, Path]:
     return result
 
 
-def extract_candidate_time_and_policy(openssl: str, response: Path) -> tuple[datetime, str]:
+def extract_candidate_time_policy_algorithm(openssl: str, response: Path) -> tuple[datetime, str, str]:
     text = run([openssl, "ts", "-reply", "-in", str(response), "-text"]).stdout.decode("utf-8", "strict")
     time_match = re.search(r"^Time stamp:\s*(.+?)\s*$", text, re.MULTILINE)
     policy_match = re.search(r"^Policy OID:\s*(.+?)\s*$", text, re.MULTILINE)
-    if not time_match or not policy_match:
-        raise InvalidEvidence("rfc3161_text_missing_time_or_policy")
-    return parse_openssl_gen_time(time_match.group(1)), policy_match.group(1).strip()
+    algorithm_match = re.search(r"^Hash Algorithm:\s*(.+?)\s*$", text, re.MULTILINE)
+    if not time_match or not policy_match or not algorithm_match:
+        raise InvalidEvidence("rfc3161_text_missing_time_policy_or_algorithm")
+    return (
+        parse_openssl_gen_time(time_match.group(1)),
+        policy_match.group(1).strip(),
+        algorithm_match.group(1).strip().lower(),
+    )
 
 
 def extract_tsa_signer_der_sha256(openssl: str, response: Path) -> str:
     with tempfile.TemporaryDirectory(prefix="wcare43-token-") as raw_tmp:
         tmp = Path(raw_tmp)
         token = tmp / "token.der"
-        certs = tmp / "certs.pem"
         run([openssl, "ts", "-reply", "-in", str(response), "-token_out", "-out", str(token)])
         extracted = run([openssl, "pkcs7", "-inform", "DER", "-in", str(token), "-print_certs"]).stdout
-        certs.write_bytes(extracted)
         blocks = PEM_CERT.findall(extracted)
         if not blocks:
             raise InvalidEvidence("timestamp_token_contains_no_certificates")
@@ -238,7 +241,7 @@ def earliest_replica_starts(
 
     starts: dict[str, datetime] = {}
     for replica_id in replica_ids:
-        capsule, capsule_bytes, capsule_sha = load_json(supplied[replica_id])
+        capsule, _capsule_bytes, capsule_sha = load_json(supplied[replica_id])
         if capsule_sha != require_hex64(expected_hashes.get(replica_id), f"wcare40_final_capsule:{replica_id}"):
             raise InvalidEvidence(f"final_capsule_sha256_mismatch:{replica_id}")
         if capsule.get("protocol_version") != WCARE39_PROTOCOL:
@@ -268,11 +271,11 @@ def earliest_replica_starts(
 def verify(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     out = base_result()
     try:
-        auth_plan, auth_plan_bytes, auth_plan_sha = load_json(Path(args.authentication_plan))
-        proof, proof_bytes, proof_sha = load_json(Path(args.proof_package))
-        policy, policy_bytes, policy_sha = load_json(Path(args.backend_policy))
-        w40_plan, plan_bytes, plan_sha = load_json(Path(args.wcare40_plan))
-        w40_result, result_bytes, result_sha = load_json(Path(args.wcare40_result))
+        auth_plan, _auth_plan_bytes, auth_plan_sha = load_json(Path(args.authentication_plan))
+        proof, _proof_bytes, proof_sha = load_json(Path(args.proof_package))
+        policy, _policy_bytes, policy_sha = load_json(Path(args.backend_policy))
+        w40_plan, _plan_bytes, plan_sha = load_json(Path(args.wcare40_plan))
+        w40_result, _result_bytes, result_sha = load_json(Path(args.wcare40_result))
         response_path = Path(args.timestamp_response)
         response_bytes = read_bytes(response_path)
         response_sha = sha256_bytes(response_bytes)
@@ -371,8 +374,11 @@ def verify(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         if require_hex64(policy.get("openssl_version_output_sha256"), "policy.openssl_version_output_sha256") != version_sha:
             raise InvalidEvidence("openssl_version_output_sha256_mismatch")
 
-        candidate_time, tsa_policy_label = extract_candidate_time_and_policy(openssl_path, response_path)
+        candidate_time, tsa_policy_label, imprint_algorithm = extract_candidate_time_policy_algorithm(openssl_path, response_path)
         out["tsa_policy_label"] = tsa_policy_label
+        if imprint_algorithm != "sha256":
+            raise InvalidEvidence(f"timestamp_message_imprint_algorithm_not_sha256:{imprint_algorithm}")
+        out["message_imprint_algorithm"] = "sha256"
         claimed_commitment = proof.get("commitment_time_utc")
         if not isinstance(claimed_commitment, str):
             raise InvalidEvidence("proof_commitment_time_missing")
@@ -435,9 +441,14 @@ def verify(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             out["disposition"] = "NOT_ESTABLISHED"
             out["detail"] = "timestamp_not_strictly_before_all_qualifying_replicas"
             return out, 1
+        if out["synthetic_fixture_policy"]:
+            out["disposition"] = "NOT_ESTABLISHED"
+            out["detail"] = "synthetic_tsa_fixture_cannot_establish_external_preregistration"
+            return out, 1
 
         out["disposition"] = "ESTABLISHED"
         out["detail"] = "exact_rfc3161_plan_commitment_precedes_all_qualifying_replicas_under_bound_policy"
+        out["external_temporal_authority_established"] = True
         out["preregistration_temporal_precedence_established"] = True
         return out, 0
     except IndeterminateInfrastructure as exc:
