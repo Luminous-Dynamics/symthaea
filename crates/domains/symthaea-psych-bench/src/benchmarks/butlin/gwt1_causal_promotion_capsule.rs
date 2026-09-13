@@ -8,16 +8,20 @@
 //! a piece of data until the capsule itself has been independently attested and
 //! verified by the frozen trusted-workflow path.
 
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 
 use super::gwt1_causal_resolution::Gwt1CausalQualificationOutcomeV1;
 use super::gwt1_end_to_end::Gwt1ExecutionIdentityV1;
+use super::gwt1_qualification::GWT1_SPECIALISTS_V1;
 use super::report::{EvidenceOutcome, SupportTier};
 
 pub const GWT1_CAUSAL_PROMOTION_CAPSULE_SCHEMA_V1: &str =
     "butlin-gwt1-causal-promotion-capsule-v1";
 pub const GWT1_CAUSAL_PROMOTION_POLICY_V1: &str =
     "butlin-gwt1-causal-trusted-promotion-v1";
+pub const GWT1_CAUSAL_TRUSTED_REPOSITORY_V1: &str = "Luminous-Dynamics/symthaea";
 pub const GWT1_CAUSAL_TRUSTED_BUILDER_WORKFLOW_V1: &str =
     ".github/workflows/butlin-gwt1-causal-trusted-builder.yml";
 
@@ -26,10 +30,12 @@ pub struct Gwt1CausalPromotionCapsuleV1 {
     pub schema: String,
     pub policy: String,
     pub indicator_id: String,
+    pub repository: String,
     pub trusted_builder_workflow: String,
     pub trusted_builder_sha: String,
     pub trusted_builder_ref: String,
     pub causal_archive_sha256: String,
+    pub archive_attestation_bundle_sha256: String,
     pub archive_attestation_verification_sha256: String,
     pub evidence_subject: Gwt1ExecutionIdentityV1,
     pub scientific_outcome: Gwt1CausalQualificationOutcomeV1,
@@ -45,16 +51,19 @@ pub enum Gwt1CausalPromotionCapsuleFailureV1 {
     InvalidSchema { observed: String },
     InvalidPolicy { observed: String },
     InvalidIndicator { observed: String },
+    InvalidRepository { observed: String },
     InvalidTrustedWorkflow { observed: String },
     InvalidTrustedBuilderSha { observed: String },
     EmptyTrustedBuilderRef,
     InvalidArchiveSha256 { observed: String },
+    InvalidAttestationBundleSha256 { observed: String },
     InvalidVerificationSha256 { observed: String },
     InvalidSourceCommitSha { observed: String },
     InvalidSourceTreeSha { observed: String },
     EmptyExecutionRunId,
     EmptyToolchain,
-    EmptySpecialistIdentity,
+    SpecialistIdentitySetMismatch { observed: Vec<String> },
+    InvalidSpecialistBlobSha { specialist: String, observed: String },
     OutcomeMappingMismatch,
     InvalidTierCeiling { observed: SupportTier },
 }
@@ -108,6 +117,11 @@ pub fn validate_gwt1_causal_promotion_capsule_v1(
             observed: capsule.indicator_id.clone(),
         });
     }
+    if capsule.repository != GWT1_CAUSAL_TRUSTED_REPOSITORY_V1 {
+        failures.push(Gwt1CausalPromotionCapsuleFailureV1::InvalidRepository {
+            observed: capsule.repository.clone(),
+        });
+    }
     if capsule.trusted_builder_workflow != GWT1_CAUSAL_TRUSTED_BUILDER_WORKFLOW_V1 {
         failures.push(Gwt1CausalPromotionCapsuleFailureV1::InvalidTrustedWorkflow {
             observed: capsule.trusted_builder_workflow.clone(),
@@ -125,6 +139,13 @@ pub fn validate_gwt1_causal_promotion_capsule_v1(
         failures.push(Gwt1CausalPromotionCapsuleFailureV1::InvalidArchiveSha256 {
             observed: capsule.causal_archive_sha256.clone(),
         });
+    }
+    if !is_lower_hex(&capsule.archive_attestation_bundle_sha256, 64) {
+        failures.push(
+            Gwt1CausalPromotionCapsuleFailureV1::InvalidAttestationBundleSha256 {
+                observed: capsule.archive_attestation_bundle_sha256.clone(),
+            },
+        );
     }
     if !is_lower_hex(&capsule.archive_attestation_verification_sha256, 64) {
         failures.push(
@@ -149,14 +170,29 @@ pub fn validate_gwt1_causal_promotion_capsule_v1(
     if capsule.evidence_subject.toolchain.trim().is_empty() {
         failures.push(Gwt1CausalPromotionCapsuleFailureV1::EmptyToolchain);
     }
-    if capsule.evidence_subject.specialist_blob_shas.is_empty()
-        || capsule
-            .evidence_subject
-            .specialist_blob_shas
-            .values()
-            .any(|sha| !is_lower_hex(sha, 40))
-    {
-        failures.push(Gwt1CausalPromotionCapsuleFailureV1::EmptySpecialistIdentity);
+
+    let expected_ids: BTreeSet<String> = GWT1_SPECIALISTS_V1
+        .iter()
+        .map(|id| (*id).to_string())
+        .collect();
+    let observed_ids: BTreeSet<String> = capsule
+        .evidence_subject
+        .specialist_blob_shas
+        .keys()
+        .cloned()
+        .collect();
+    if observed_ids != expected_ids {
+        failures.push(Gwt1CausalPromotionCapsuleFailureV1::SpecialistIdentitySetMismatch {
+            observed: observed_ids.into_iter().collect(),
+        });
+    }
+    for (specialist, sha) in &capsule.evidence_subject.specialist_blob_shas {
+        if !is_lower_hex(sha, 40) {
+            failures.push(Gwt1CausalPromotionCapsuleFailureV1::InvalidSpecialistBlobSha {
+                specialist: specialist.clone(),
+                observed: sha.clone(),
+            });
+        }
     }
 
     let expected = map_gwt1_causal_outcome_to_eligibility_v1(capsule.scientific_outcome);
@@ -184,14 +220,16 @@ mod tests {
             schema: GWT1_CAUSAL_PROMOTION_CAPSULE_SCHEMA_V1.to_string(),
             policy: GWT1_CAUSAL_PROMOTION_POLICY_V1.to_string(),
             indicator_id: "GWT-1".to_string(),
+            repository: GWT1_CAUSAL_TRUSTED_REPOSITORY_V1.to_string(),
             trusted_builder_workflow: GWT1_CAUSAL_TRUSTED_BUILDER_WORKFLOW_V1.to_string(),
             trusted_builder_sha: "a".repeat(40),
             trusted_builder_ref: "refs/heads/main".to_string(),
             causal_archive_sha256: "b".repeat(64),
-            archive_attestation_verification_sha256: "c".repeat(64),
+            archive_attestation_bundle_sha256: "c".repeat(64),
+            archive_attestation_verification_sha256: "d".repeat(64),
             evidence_subject: Gwt1ExecutionIdentityV1 {
-                source_commit_sha: "d".repeat(40),
-                source_tree_sha: "e".repeat(40),
+                source_commit_sha: "e".repeat(40),
+                source_tree_sha: "f".repeat(40),
                 execution_run_id: "123/1".to_string(),
                 toolchain: "rustc 1.96.0 test".to_string(),
                 specialist_blob_shas: BTreeMap::from([
@@ -263,6 +301,18 @@ mod tests {
             .any(|failure| matches!(
                 failure,
                 Gwt1CausalPromotionCapsuleFailureV1::InvalidTrustedWorkflow { .. }
+            )));
+    }
+
+    #[test]
+    fn incomplete_specialist_identity_fails_shape_validation() {
+        let mut item = capsule(Gwt1CausalQualificationOutcomeV1::Qualified);
+        item.evidence_subject.specialist_blob_shas.remove("perception_manager");
+        assert!(validate_gwt1_causal_promotion_capsule_v1(&item)
+            .iter()
+            .any(|failure| matches!(
+                failure,
+                Gwt1CausalPromotionCapsuleFailureV1::SpecialistIdentitySetMismatch { .. }
             )));
     }
 }
