@@ -7,6 +7,8 @@
 //! their deterministic family-balanced order. It owns no target/comparator
 //! prediction authority and performs no evaluation.
 
+use std::collections::BTreeSet;
+
 use super::v2_corpus_schedule::{
     V2ScheduleMaterializationError, V2SchedulePartition, V2ScheduledRow,
     canonical_schedule_root, materialize_all_rows, materialize_family_rows,
@@ -18,6 +20,22 @@ pub(super) const V2_HELDOUT_ROOT_REVISION: &str = "EUREKA.002.V2.HELDOUT_ROOT.v1
 pub(super) const V2_HELDOUT_PLAN_REVISION: &str = "EUREKA.002.V2.HELDOUT_PLAN.v1";
 pub(super) const V2_HELDOUT_ROWS_PER_FAMILY: usize = 64;
 pub(super) const V2_HELDOUT_ROWS_TOTAL: usize = 128;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum V2HeldOutPlanError {
+    Materialization(V2ScheduleMaterializationError),
+    WrongTotalCount,
+    NonHeldOutRow,
+    FamilyImbalance,
+    ActionImbalance,
+    DuplicateRowIdentity,
+}
+
+impl From<V2ScheduleMaterializationError> for V2HeldOutPlanError {
+    fn from(value: V2ScheduleMaterializationError) -> Self {
+        Self::Materialization(value)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct V2HeldOutPlan {
@@ -45,8 +63,7 @@ impl V2HeldOutPlan {
     }
 }
 
-pub(super) fn materialize_heldout_plan(
-) -> Result<V2HeldOutPlan, V2ScheduleMaterializationError> {
+pub(super) fn materialize_heldout_plan() -> Result<V2HeldOutPlan, V2HeldOutPlanError> {
     let mut rows = Vec::with_capacity(V2_HELDOUT_ROWS_TOTAL);
     for family in V2PublicFamily::ALL {
         rows.extend(
@@ -56,13 +73,44 @@ pub(super) fn materialize_heldout_plan(
         );
     }
     let full_schedule_root = canonical_schedule_root(&materialize_all_rows()?);
-    Ok(freeze_heldout_rows(rows, full_schedule_root))
+    freeze_heldout_rows(rows, full_schedule_root)
 }
 
 fn freeze_heldout_rows(
     rows: Vec<V2ScheduledRow>,
     full_schedule_root: [u8; 32],
-) -> V2HeldOutPlan {
+) -> Result<V2HeldOutPlan, V2HeldOutPlanError> {
+    if rows.len() != V2_HELDOUT_ROWS_TOTAL {
+        return Err(V2HeldOutPlanError::WrongTotalCount);
+    }
+    if rows
+        .iter()
+        .any(|row| row.partition() != V2SchedulePartition::HeldOut)
+    {
+        return Err(V2HeldOutPlanError::NonHeldOutRow);
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut family_histogram = [0_usize; 2];
+    let mut action_histogram = [0_usize; V2_ACTION_COUNT as usize];
+    for row in rows.iter().copied() {
+        if !seen.insert(row.row_identity()) {
+            return Err(V2HeldOutPlanError::DuplicateRowIdentity);
+        }
+        let family = match row.family() {
+            V2PublicFamily::PublicFlowV2 => 0,
+            V2PublicFamily::PublicRelayV2 => 1,
+        };
+        family_histogram[family] += 1;
+        action_histogram[usize::from(row.action_index())] += 1;
+    }
+    if family_histogram != [V2_HELDOUT_ROWS_PER_FAMILY; 2] {
+        return Err(V2HeldOutPlanError::FamilyImbalance);
+    }
+    if action_histogram != [32_usize; V2_ACTION_COUNT as usize] {
+        return Err(V2HeldOutPlanError::ActionImbalance);
+    }
+
     let mut flow: Vec<_> = rows
         .iter()
         .copied()
@@ -76,19 +124,19 @@ fn freeze_heldout_rows(
     flow.sort_by_key(|row| heldout_order_key(*row));
     relay.sort_by_key(|row| heldout_order_key(*row));
 
-    let mut ordered_rows = Vec::with_capacity(flow.len().saturating_add(relay.len()));
+    let mut ordered_rows = Vec::with_capacity(V2_HELDOUT_ROWS_TOTAL);
     for (flow_row, relay_row) in flow.into_iter().zip(relay) {
         ordered_rows.push(flow_row);
         ordered_rows.push(relay_row);
     }
     let ordered_root = heldout_root(&ordered_rows);
     let commitment = heldout_plan_commitment(full_schedule_root, ordered_root, ordered_rows.len());
-    V2HeldOutPlan {
+    Ok(V2HeldOutPlan {
         ordered_rows,
         full_schedule_root,
         ordered_root,
         commitment,
-    }
+    })
 }
 
 fn heldout_order_key(row: V2ScheduledRow) -> [u8; 32] {
@@ -154,19 +202,6 @@ mod tests {
             assert_eq!(pair[0].partition(), V2SchedulePartition::HeldOut);
             assert_eq!(pair[1].partition(), V2SchedulePartition::HeldOut);
         }
-
-        let mut family_histogram = [0_usize; 2];
-        let mut action_histogram = [0_usize; V2_ACTION_COUNT as usize];
-        for row in first.ordered_rows().iter().copied() {
-            let family = match row.family() {
-                V2PublicFamily::PublicFlowV2 => 0,
-                V2PublicFamily::PublicRelayV2 => 1,
-            };
-            family_histogram[family] += 1;
-            action_histogram[usize::from(row.action_index())] += 1;
-        }
-        assert_eq!(family_histogram, [V2_HELDOUT_ROWS_PER_FAMILY; 2]);
-        assert_eq!(action_histogram, [32, 32, 32, 32]);
     }
 
     #[test]
@@ -174,10 +209,30 @@ mod tests {
         let canonical = materialize_heldout_plan().unwrap();
         let mut reversed = canonical.ordered_rows().to_vec();
         reversed.reverse();
-        let rebuilt = freeze_heldout_rows(reversed, canonical.full_schedule_root());
+        let rebuilt = freeze_heldout_rows(reversed, canonical.full_schedule_root()).unwrap();
         assert_eq!(canonical.ordered_rows(), rebuilt.ordered_rows());
         assert_eq!(canonical.ordered_root(), rebuilt.ordered_root());
         assert_eq!(canonical.commitment(), rebuilt.commitment());
+    }
+
+    #[test]
+    fn malformed_heldout_sets_fail_closed() {
+        let canonical = materialize_heldout_plan().unwrap();
+        let mut missing = canonical.ordered_rows().to_vec();
+        missing.pop();
+        assert_eq!(
+            freeze_heldout_rows(missing, canonical.full_schedule_root()),
+            Err(V2HeldOutPlanError::WrongTotalCount)
+        );
+
+        let mut duplicated = canonical.ordered_rows().to_vec();
+        duplicated[1] = duplicated[0];
+        assert!(matches!(
+            freeze_heldout_rows(duplicated, canonical.full_schedule_root()),
+            Err(V2HeldOutPlanError::DuplicateRowIdentity)
+                | Err(V2HeldOutPlanError::FamilyImbalance)
+                | Err(V2HeldOutPlanError::ActionImbalance)
+        ));
     }
 
     #[test]
