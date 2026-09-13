@@ -1,0 +1,204 @@
+name: Simulation Routed Release
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-release/**"
+      - "crates/bridges/symthaea-sim-deployment-routing/**"
+      - "crates/bridges/symthaea-sim-deployment/**"
+      - "crates/bridges/symthaea-sim-worker-qualification/**"
+      - "crates/bridges/symthaea-sim-worker-filesystem/**"
+      - "crates/bridges/symthaea-sim-worker-containment/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/simulation-routed-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  simulation-routed-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 qualification subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          uname -a
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
+
+      - name: Cache Cargo and Component builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-simulation-routed-release-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-release/**', 'crates/bridges/symthaea-sim-deployment-routing/**', 'examples/extensions/hello-simulation/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-routed-release-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-routed-release-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the routed-release graph."
+          else
+            cat simulation-routed-release-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-routed-release-cargo-lock-patch
+          path: simulation-routed-release-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Require standalone guest WIT parity
+        run: |
+          cmp crates/core/symthaea-extension-core/wit/extension-control.wit \
+              examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+              examples/extensions/hello-simulation/wit/simulation-provider.wit
+
+      - name: Build exact standalone simulation Component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum "$component" examples/extensions/hello-simulation/manifest.json
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Build exact contained worker and qualification probes
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-worker-filesystem \
+            --bin symthaea-sim-filesystem-worker \
+            --bin symthaea-sim-filesystem-probe
+          cargo build --locked \
+            -p symthaea-sim-worker-containment \
+            --bin symthaea-sim-containment-probe
+          sha256sum \
+            target/debug/symthaea-sim-filesystem-worker \
+            target/debug/symthaea-sim-filesystem-probe \
+            target/debug/symthaea-sim-containment-probe
+
+      - name: Execute exact containment probes
+        run: |
+          target/debug/symthaea-sim-containment-probe | tee routed-release-seccomp-probe.txt
+          target/debug/symthaea-sim-filesystem-probe | tee routed-release-landlock-probe.txt
+          grep -qx 'containment_probe=pass' routed-release-seccomp-probe.txt
+          grep -qx 'filesystem_probe=pass' routed-release-landlock-probe.txt
+
+      - name: Mint exact worker qualification evidence root
+        run: |
+          {
+            echo "worker_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-worker | cut -d' ' -f1)"
+            echo "containment_probe_sha256=$(sha256sum target/debug/symthaea-sim-containment-probe | cut -d' ' -f1)"
+            echo "filesystem_probe_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-probe | cut -d' ' -f1)"
+            echo "worker_image_profile=symthaea.simulation.worker-image.memfd-sealed-v1"
+            echo "supervisor_profile=symthaea.simulation.worker-supervisor.linux-rlimit-v1"
+            echo "worker_protocol=symthaea.simulation.worker.v1"
+            echo "process_containment_profile=symthaea.simulation.worker-containment.seccomp-x86_64-v1"
+            echo "filesystem_containment_profile=symthaea.simulation.worker-filesystem.landlock-deny-content-v1"
+            echo "---seccomp-probe---"
+            cat routed-release-seccomp-probe.txt
+            echo "---landlock-probe---"
+            cat routed-release-landlock-probe.txt
+          } > routed-release-worker-qualification-bundle.txt
+          qualification_sha="$(sha256sum routed-release-worker-qualification-bundle.txt | cut -d' ' -f1)"
+          echo "qualification_evidence_sha256=${qualification_sha}" | tee routed-release-worker-qualification-root.txt
+
+      - name: Check canonical release crate
+        run: cargo check --locked -p symthaea-sim-release --all-targets
+
+      - name: Test canonical release unit corpus
+        run: cargo test --locked -p symthaea-sim-release
+
+      - name: Strict Clippy canonical release crate
+        run: cargo clippy --locked -p symthaea-sim-release --all-targets -- -D warnings
+
+      - name: Execute real routed contained release corpus
+        env:
+          SYMTHAEA_FILESYSTEM_WORKER_BIN: ${{ github.workspace }}/target/debug/symthaea-sim-filesystem-worker
+        run: |
+          qualification_sha="$(cut -d= -f2 routed-release-worker-qualification-root.txt)"
+          test "${#qualification_sha}" -eq 64
+          SYMTHAEA_WORKER_QUALIFICATION_EVIDENCE_SHA256="$qualification_sha" \
+            cargo test --locked \
+              -p symthaea-sim-release \
+              --test routed_release \
+              -- --ignored --test-threads=1
+
+      - name: Record exact routed release subject
+        run: |
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          qualification_sha="$(cut -d= -f2 routed-release-worker-qualification-root.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "manifest_sha256=$(sha256sum examples/extensions/hello-simulation/manifest.json | cut -d' ' -f1)"
+            echo "component_sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+            echo "worker_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-worker | cut -d' ' -f1)"
+            echo "worker_qualification_evidence_sha256=${qualification_sha}"
+            echo "release_profile=symthaea.simulation.release.v1"
+            echo "contained_release_backend=extension-component-contained-deployment-v1"
+            echo "contained_release_adapter=symthaea-sim-deployment-release-v1"
+            echo "release_format_parallel_copy=false"
+            echo "generic_preexecuted_finalizer_public=false"
+            echo "public_preexecuted_capability=RoutedDeploymentInvocation"
+            echo "worker_mints_simulation_evidence=false"
+            echo "provider_warnings_mutated=false"
+            echo "canonical_output_excludes_execution_evidence=true"
+            echo "deployment_sha_bound_via_execution_evidence=true"
+            echo "worker_qualification_root_bound_via_execution_evidence=true"
+            echo "admission_release_currentness=final_recheck_required"
+            echo "worker_qualification_release_currentness=final_recheck_required"
+            echo "dual_release_revocation_corpus=admission+worker_qualification"
+            echo "engineering_evidence=false"
+            echo "manifest_runtime=wasm_preserved"
+            echo "cgroup=not_established"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-routed-release-receipt.txt
+
+      - name: Upload routed release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-routed-release-evidence
+          path: |
+            routed-release-seccomp-probe.txt
+            routed-release-landlock-probe.txt
+            routed-release-worker-qualification-bundle.txt
+            routed-release-worker-qualification-root.txt
+            simulation-routed-release-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
