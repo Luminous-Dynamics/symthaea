@@ -6,7 +6,8 @@ def load(path):
     rows=list(csv.DictReader(open(path,newline='')))
     chains={}
     for row in rows:
-        cid=row['chain']; chains.setdefault(cid,[]).append({k:float(row[k]) for k in FIELDS})
+        cid=row['chain']
+        chains.setdefault(cid,[]).append({k:float(row[k]) for k in FIELDS})
     return rows,chains
 
 def estimate(rows):
