@@ -44,7 +44,7 @@ fn fork_siblings_are_not_independent_evidence_units() {
     let mut ledger = ContinuityIdentityLedger::new();
     ledger.register_root(sid("root"), 1).unwrap();
     ledger.record(ContinuityEvent::new(
-        ContinuityEventId::new("fork"),
+        ContinuityEventId::new("fork").unwrap(),
         sid("root"),
         vec![sid("branch-a"), sid("branch-b")],
         ContinuityKind::Fork,
@@ -68,7 +68,7 @@ fn sibling_survival_never_proves_destroyed_branch_was_replaceable() {
     let mut ledger = ContinuityIdentityLedger::new();
     ledger.register_root(sid("root"), 1).unwrap();
     ledger.record(ContinuityEvent::new(
-        ContinuityEventId::new("fork"),
+        ContinuityEventId::new("fork").unwrap(),
         sid("root"),
         vec![sid("branch-a"), sid("branch-b")],
         ContinuityKind::Fork,
