@@ -59,6 +59,8 @@ mod v2_target_contract;
 #[allow(dead_code)]
 mod v2_comparator_custody;
 #[cfg(test)]
+mod v2_frozen_comparator;
+#[cfg(test)]
 mod v2_paired_subject;
 #[cfg(test)]
 #[allow(dead_code)]
