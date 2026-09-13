@@ -21,6 +21,7 @@
 //! - Automatic RQ episode publication from validated canonical decisions
 //! - Live measurement-only shadowing of the production meta-reasoner through canonical V2
 //! - Evidence-backed objective intervals that preserve unknown axes instead of fabricating neutrality
+//! - Evidence-seeking V3 planning with Select / NeedEvidence / Abstain outcomes
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -34,6 +35,7 @@ pub mod reasoning_episode_emitter;
 pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
+pub mod reasoning_evidence_seeking;
 pub mod reasoning_kernel;
 pub mod reasoning_kernel_v2;
 pub mod reasoning_meta_control_probe;
@@ -86,6 +88,11 @@ pub use reasoning_evaluator_policy::{
 pub use reasoning_evidence_revision_probe::{
     run_evidence_revision_probe, ConflictActionObservation, EvidenceRevisionProbeReport,
     EVIDENCE_REVISION_PROBE_VERSION,
+};
+pub use reasoning_evidence_seeking::{
+    plan_with_evidence, EvidenceRequest, EvidenceRequestKind, EvidenceSeekingAbstention,
+    EvidenceSeekingOutcome, EvidenceSeekingPlanReport, EvidenceSeekingPlannerError,
+    EVIDENCE_SEEKING_PLANNER_VERSION,
 };
 pub use reasoning_kernel::{
     CanonicalReasoningDecision, CanonicalReasoningInput, CanonicalReasoningKernel,
