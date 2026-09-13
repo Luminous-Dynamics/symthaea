@@ -404,10 +404,7 @@ mod tests {
 
     #[test]
     fn aggregate_mass_overflow_fails_closed() {
-        let fixture = process(
-            &[(f64::MAX, f64::MAX), (f64::MAX, f64::MAX)],
-            &[(1.0, 1.0)],
-        );
+        let fixture = process(&[(f64::MAX, f64::MAX), (f64::MAX, f64::MAX)], &[(1.0, 1.0)]);
         assert_eq!(
             evaluate_mass_balance(&fixture, MassBalanceTolerance::zero()),
             Err(OntologyError::InvalidQuantity(
@@ -420,10 +417,7 @@ mod tests {
     fn effective_relative_tolerance_overflow_fails_closed() {
         let fixture = process(&[(f64::MAX, f64::MAX)], &[(f64::MAX, f64::MAX)]);
         assert_eq!(
-            evaluate_mass_balance(
-                &fixture,
-                MassBalanceTolerance::new(0.0, f64::MAX).unwrap(),
-            ),
+            evaluate_mass_balance(&fixture, MassBalanceTolerance::new(0.0, f64::MAX).unwrap(),),
             Err(OntologyError::InvalidQuantity(
                 "mass_balance_effective_tolerance"
             ))
