@@ -19,6 +19,7 @@ on:
       - 'crates/bridges/symthaea-energy-native-dossier/**'
       - 'crates/bridges/symthaea-energy-native-campaign-admission/**'
       - 'scripts/qualify-energy-evidence.sh'
+      - 'scripts/verify-energy-evidence-receipt.py'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - '.github/workflows/energy-evidence-fast.yml'
@@ -68,15 +69,17 @@ jobs:
             echo "- Full-workspace integration qualification: **not implied**"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Prepare exact PR base for governance comparison
+      - name: Pin immutable PR base for governance comparison
         if: github.event_name == 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
-          git fetch --no-tags origin \
-            "${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
-          actual_base="$(git rev-parse "origin/${GITHUB_BASE_REF}")"
-          test "$actual_base" = "$QUALIFICATION_BASE_SHA"
+          if ! git cat-file -e "${QUALIFICATION_BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$QUALIFICATION_BASE_SHA"
+          fi
+          test "$(git rev-parse "${QUALIFICATION_BASE_SHA}^{commit}")" = "$QUALIFICATION_BASE_SHA"
+          git update-ref "refs/remotes/origin/${GITHUB_BASE_REF}" "$QUALIFICATION_BASE_SHA"
+          test "$(git rev-parse "refs/remotes/origin/${GITHUB_BASE_REF}")" = "$QUALIFICATION_BASE_SHA"
 
       - name: Governance check
         if: github.event_name == 'pull_request'
@@ -102,6 +105,19 @@ jobs:
         id: qualification
         shell: bash
         run: bash scripts/qualify-energy-evidence.sh
+
+      - name: Verify emitted receipt invariants
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/energy-evidence-fast"
+          if [[ -f "$evidence_dir/qualification-receipt.json" ]]; then
+            python3 scripts/verify-energy-evidence-receipt.py \
+              "$evidence_dir/qualification-receipt.json"
+          else
+            echo "No receipt to verify; qualification failed before receipt emission."
+          fi
 
       - name: Summarize qualification receipt
         if: always()

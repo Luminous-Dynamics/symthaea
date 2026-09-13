@@ -25,8 +25,17 @@ if [[ -z "$ROOT" ]]; then
 fi
 cd "$ROOT"
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "ERROR: tracked worktree/index must be clean before qualification" >&2
+require_clean_subject() {
+  local status
+  status="$(git status --porcelain=v1 --untracked-files=all --ignored=no)"
+  if [[ -n "$status" ]]; then
+    echo "ERROR: qualification subject must have no tracked/index/untracked changes" >&2
+    printf '%s\n' "$status" >&2
+    return 1
+  fi
+}
+
+if ! require_clean_subject; then
   exit 2
 fi
 
@@ -163,9 +172,8 @@ if [[ "$(git rev-parse 'HEAD^{tree}')" != "$GIT_TREE_SHA" ]]; then
   echo "ERROR: qualification tree identity moved during execution" >&2
   exit 2
 fi
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "ERROR: tracked checkout differs after qualification/restoration" >&2
-  git status --short >&2
+if ! require_clean_subject; then
+  echo "ERROR: checkout differs after qualification/restoration" >&2
   exit 2
 fi
 
