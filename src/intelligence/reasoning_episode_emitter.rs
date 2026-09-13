@@ -76,7 +76,7 @@ pub fn emit_reasoning_episode(
         });
     }
 
-    let outcome_abstained = matches!(publication.outcome, ReasoningOutcome::Abstained { .. });
+    let outcome_abstained = matches!(&publication.outcome, ReasoningOutcome::Abstained { .. });
     if outcome_abstained != decision.abstained {
         return Err(EpisodeEmissionError::AbstentionMismatch {
             decision_abstained: decision.abstained,
@@ -98,6 +98,7 @@ pub fn emit_reasoning_episode(
             }
         }
     }
+    drop(evidence_ids);
 
     for operation in &publication.public_operations {
         let trimmed = operation.operation.trim();
@@ -303,7 +304,11 @@ mod tests {
         }
     }
 
-    fn decision(abstained: bool, evidence_items: usize, assumptions: usize) -> CanonicalReasoningDecisionV2 {
+    fn decision(
+        abstained: bool,
+        evidence_items: usize,
+        assumptions: usize,
+    ) -> CanonicalReasoningDecisionV2 {
         let mut kernel = CanonicalReasoningKernelV2::new(8).unwrap();
         kernel
             .reason(CanonicalReasoningInputV2 {
@@ -377,9 +382,18 @@ mod tests {
         let emitted = emit_reasoning_episode(&decision, asserted_publication()).unwrap();
         emitted.episode.validate().unwrap();
         assert_eq!(emitted.decision_commitment, decision.decision_commitment);
-        assert_eq!(emitted.episode.decisions[0].operation, "canonical-context-competition");
-        assert_eq!(emitted.episode.decisions[1].operation, "canonical-robust-objective-selection");
-        assert_eq!(emitted.episode.decisions[2].operation, "canonical-meta-state-freeze");
+        assert_eq!(
+            emitted.episode.decisions[0].operation,
+            "canonical-context-competition"
+        );
+        assert_eq!(
+            emitted.episode.decisions[1].operation,
+            "canonical-robust-objective-selection"
+        );
+        assert_eq!(
+            emitted.episode.decisions[2].operation,
+            "canonical-meta-state-freeze"
+        );
         assert_eq!(emitted.episode.id().unwrap(), emitted.episode_id);
     }
 
