@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-evidence-independence-lifecycle"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bitemporal lifecycle and current-reliance semantics for verifier profile provenance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "lifecycle", "provenance"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-evidence-independence-provenance = { path = "../symthaea-evidence-independence-provenance" }
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+symthaea-evidence-verifier-diversity = { path = "../symthaea-evidence-verifier-diversity" }
