@@ -46,6 +46,8 @@ A `SurfaceProfile` defines the complete set of material surfaces a manifest is e
 
 Profiles are canonical and order-independent. Duplicate registered surfaces fail closed.
 
+Canonical profile surfaces and manifest bindings are ordered by lexicographic UTF-8 byte order of their canonical wire names (for example `custom:aaa` sorts before `model`). Rust enum declaration order has no wire authority. The `canonical_subject_golden_vector_v1` test freezes both a profile digest and full manifest digest so independent implementations can detect byte-level canonicalization drift.
+
 Evaluator implementation, corpus, intervention schedule, verifier identity, acceptance gates, and analysis plan are intentionally excluded: those describe the qualification campaign, not the system under test.
 
 ## Completeness is identity
