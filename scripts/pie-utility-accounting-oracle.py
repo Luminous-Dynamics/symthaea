@@ -86,8 +86,8 @@ class ElectricalReport:
     peak_power_w: Interval
     gross_energy_capacity: str
     steady_cycle_energy_capacity: str
-    gross_continuous_power: str
-    steady_cycle_continuous_power: str
+    gross_average_power_screen: str
+    steady_cycle_average_power_screen: str
     peak_power: str
 
 
@@ -247,11 +247,13 @@ def evaluate_electrical(case: ElectricalCase) -> ElectricalReport:
         gross_average_power_w=gross_average,
         net_steady_cycle_average_power_w=net_average,
         peak_power_w=case.peak_power_w,
-        # Gross screens make no temporal recovery-credit assumption.
+        # Gross screens make no temporal recovery-credit assumption. The power result is
+        # a cycle-average demand screen against sustained capacity, not a time-resolved
+        # dispatch or load-profile proof.
         gross_energy_capacity=feasibility(
             case.gross_energy_j, case.available_energy_capacity_j
         ).value,
-        gross_continuous_power=feasibility(
+        gross_average_power_screen=feasibility(
             gross_average, case.available_continuous_power_w
         ).value,
         # Steady-cycle screens are separately named because they assume energy
@@ -260,7 +262,7 @@ def evaluate_electrical(case: ElectricalCase) -> ElectricalReport:
         steady_cycle_energy_capacity=feasibility(
             net_steady, case.available_energy_capacity_j
         ).value,
-        steady_cycle_continuous_power=feasibility(
+        steady_cycle_average_power_screen=feasibility(
             net_average, case.available_continuous_power_w
         ).value,
         peak_power=feasibility(
@@ -374,7 +376,7 @@ def self_test() -> None:
         available_peak_power_w=Interval(100.0, 100.0),
     ))
     assert peak_fail.gross_energy_capacity == Feasibility.GUARANTEED.value
-    assert peak_fail.gross_continuous_power == Feasibility.GUARANTEED.value
+    assert peak_fail.gross_average_power_screen == Feasibility.GUARANTEED.value
     assert peak_fail.peak_power == Feasibility.IMPOSSIBLE.value
 
     recovery = evaluate_electrical(_base_case(
@@ -430,8 +432,8 @@ def self_test() -> None:
     ))
     assert separated.gross_energy_capacity == Feasibility.IMPOSSIBLE.value
     assert separated.steady_cycle_energy_capacity == Feasibility.GUARANTEED.value
-    assert separated.gross_continuous_power == Feasibility.IMPOSSIBLE.value
-    assert separated.steady_cycle_continuous_power == Feasibility.GUARANTEED.value
+    assert separated.gross_average_power_screen == Feasibility.IMPOSSIBLE.value
+    assert separated.steady_cycle_average_power_screen == Feasibility.GUARANTEED.value
 
     low_heat = evaluate_thermal(
         ThermalSupply(Interval(100.0, 100.0), Interval(350.0, 400.0)),

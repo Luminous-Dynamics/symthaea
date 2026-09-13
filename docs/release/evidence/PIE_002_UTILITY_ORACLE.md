@@ -52,6 +52,10 @@ recoverable energy
 
 A process can be `Impossible` on its gross/current supply screen while a separately named steady-cycle accounting screen is `Guaranteed`. The latter does not overwrite the former.
 
+## Power-screen boundary
+
+The reported gross and steady-cycle power feasibility fields are **cycle-average power screens** derived from energy divided by declared batch duration and compared with declared sustained capacity. They are not time-resolved load-profile, ramp-rate, dispatch, transient-stability, or continuous-delivery proofs. Peak power remains a separate screen.
+
 ## Electrical recovery bounds
 
 Accepted recovery is bounded by all of:
