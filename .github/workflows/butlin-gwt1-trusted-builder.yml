@@ -8,8 +8,6 @@ on:
         required: true
         type: string
 
-# Reusable workflow permissions are constrained again at each job. Candidate
-# code never shares a job with OIDC or attestation authority.
 permissions: {}
 
 jobs:
@@ -40,7 +38,6 @@ jobs:
           TRUSTED_BUILDER_PATH: ${{ job.workflow_file_path }}
         run: |
           set -euo pipefail
-
           test "$TRUSTED_BUILDER_REPOSITORY" = "$GITHUB_REPOSITORY"
           test "$TRUSTED_BUILDER_PATH" = ".github/workflows/butlin-gwt1-trusted-builder.yml"
           [[ "$EVIDENCE_SUBJECT_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -57,12 +54,10 @@ jobs:
             "src/cognitive_loop/managers/learning_manager.rs"
             "src/cognitive_loop/managers/perception_manager.rs"
           )
-
           mapfile -t changed_paths < <(
             git diff --name-only --diff-filter=ACDMRTUXB \
               "$TRUSTED_BUILDER_SHA" "$EVIDENCE_SUBJECT_SHA"
           )
-
           for path in "${changed_paths[@]}"; do
             allowed=false
             for candidate in "${allowed_subject_paths[@]}"; do
@@ -76,14 +71,11 @@ jobs:
               exit 1
             fi
           done
-
           test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
       - name: Install pinned Rust 1.96.0
         uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
 
-      # No shared target or Cargo cache is restored into the evidence-producing
-      # job. The scientific subject is rebuilt from the locked dependency graph.
       - name: Execute direct GWT-1 qualification
         shell: bash
         env:
@@ -113,21 +105,13 @@ jobs:
           test -x /usr/bin/sha256sum
           test -x /usr/bin/tar
           test -x /usr/bin/gzip
-
-          # Candidate execution may not mutate tracked source. Any such mutation
-          # voids evidence before transport packaging.
           test "$(git rev-parse HEAD)" = "$EVIDENCE_SUBJECT_SHA"
           if [[ -n "$(git status --porcelain=v1 --untracked-files=no)" ]]; then
             echo "Candidate execution mutated tracked source; evidence void." >&2
             exit 1
           fi
 
-          expected=(
-            raw_observations.json
-            evidence_envelope.json
-            resolution.json
-            outcome.txt
-          )
+          expected=(raw_observations.json evidence_envelope.json resolution.json outcome.txt)
           for file in "${expected[@]}"; do
             if [[ ! -f "${SOURCE_DIR}/${file}" ]]; then
               echo "Missing evidence file: ${file}"
@@ -152,43 +136,15 @@ jobs:
             --arg repository "$GITHUB_REPOSITORY" \
             --arg run_id "$GITHUB_RUN_ID" \
             --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
-            '{
-              schema: "butlin-gwt1-trusted-builder-provenance-v1",
-              evidence_subject_sha: $evidence_subject_sha,
-              trusted_builder_sha: $trusted_builder_sha,
-              trusted_builder_ref: $trusted_builder_ref,
-              repository: $repository,
-              run_id: $run_id,
-              run_attempt: $run_attempt,
-              permitted_subject_paths: [
-                "src/cognitive_loop/managers/drive_manager.rs",
-                "src/cognitive_loop/managers/memory_manager.rs",
-                "src/cognitive_loop/managers/learning_manager.rs",
-                "src/cognitive_loop/managers/perception_manager.rs"
-              ]
-            }' > "$stage_dir/workflow_provenance.json"
+            '{schema:"butlin-gwt1-trusted-builder-provenance-v1",evidence_subject_sha:$evidence_subject_sha,trusted_builder_sha:$trusted_builder_sha,trusted_builder_ref:$trusted_builder_ref,repository:$repository,run_id:$run_id,run_attempt:$run_attempt,permitted_subject_paths:["src/cognitive_loop/managers/drive_manager.rs","src/cognitive_loop/managers/memory_manager.rs","src/cognitive_loop/managers/learning_manager.rs","src/cognitive_loop/managers/perception_manager.rs"]}' \
+            > "$stage_dir/workflow_provenance.json"
 
           expected+=(workflow_provenance.json)
-          (
-            cd "$stage_dir"
-            /usr/bin/sha256sum "${expected[@]}" > SHA256SUMS
-          )
-
-          /usr/bin/tar \
-            --sort=name \
-            --mtime='UTC 1970-01-01' \
-            --owner=0 \
-            --group=0 \
-            --numeric-owner \
-            -C "$stage_root" \
-            -cf - \
-            gwt1-evidence \
+          (cd "$stage_dir" && /usr/bin/sha256sum "${expected[@]}" > SHA256SUMS)
+          /usr/bin/tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            -C "$stage_root" -cf - gwt1-evidence \
             | /usr/bin/gzip -n > "$TRANSPORT_DIR/gwt1-evidence.tar.gz"
-
-          (
-            cd "$TRANSPORT_DIR"
-            /usr/bin/sha256sum gwt1-evidence.tar.gz > gwt1-evidence.tar.gz.sha256
-          )
+          (cd "$TRANSPORT_DIR" && /usr/bin/sha256sum gwt1-evidence.tar.gz > gwt1-evidence.tar.gz.sha256)
 
           artifact_name="gwt1-intermediate-unattested-${EVIDENCE_SUBJECT_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           echo "has_evidence=true" >> "$GITHUB_OUTPUT"
@@ -224,8 +180,6 @@ jobs:
           name: ${{ needs.qualify.outputs.artifact_name }}
           path: ${{ runner.temp }}/gwt1-direct-intermediate
 
-      # Trusted verifier code comes from the reusable workflow revision, never
-      # from the evidence subject being qualified.
       - name: Checkout trusted evaluator revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -259,151 +213,54 @@ jobs:
           TRUSTED_GH_CONFIG_DIR: ${{ runner.temp }}/gwt1-direct-trusted-gh-config
         run: |
           set -euo pipefail
-          test "$(uname -s)" = "Linux"
-          test "$(uname -m)" = "x86_64"
-          test -x /usr/bin/curl
-          test -x /usr/bin/sha256sum
-          test -x /usr/bin/tar
-          test -x /usr/bin/awk
-
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
           rm -rf "$TRUSTED_GH_ROOT" "$TRUSTED_GH_CONFIG_DIR"
           mkdir -p "$TRUSTED_GH_ROOT" "$TRUSTED_GH_CONFIG_DIR"
           chmod 0700 "$TRUSTED_GH_CONFIG_DIR"
-
           archive="$TRUSTED_GH_ROOT/gh_${TRUSTED_GH_VERSION}_linux_amd64.tar.gz"
-          /usr/bin/curl \
-            --fail \
-            --location \
-            --proto '=https' \
-            --tlsv1.2 \
-            --output "$archive" \
-            "$TRUSTED_GH_ARCHIVE_URL"
-
-          printf '%s  %s\n' "$TRUSTED_GH_ARCHIVE_SHA256" "$archive" \
-            | /usr/bin/sha256sum -c -
-
+          /usr/bin/curl --fail --location --proto '=https' --tlsv1.2 --output "$archive" "$TRUSTED_GH_ARCHIVE_URL"
+          printf '%s  %s\n' "$TRUSTED_GH_ARCHIVE_SHA256" "$archive" | /usr/bin/sha256sum -c -
           /usr/bin/tar --no-same-owner -xzf "$archive" -C "$TRUSTED_GH_ROOT"
           gh_path="$TRUSTED_GH_ROOT/gh_${TRUSTED_GH_VERSION}_linux_amd64/bin/gh"
           test -x "$gh_path"
-
           version_output="$($gh_path --version)"
-          version_token="$(printf '%s\n' "$version_output" | /usr/bin/awk 'NR == 1 { print $3 }')"
-          test "$version_token" = "$TRUSTED_GH_VERSION"
+          test "$(printf '%s\n' "$version_output" | /usr/bin/awk 'NR==1{print $3}')" = "$TRUSTED_GH_VERSION"
+          gh_binary_sha256="$(/usr/bin/sha256sum "$gh_path" | /usr/bin/awk '{print $1}')"
+          version_output_sha256="$(printf '%s' "$version_output" | /usr/bin/sha256sum | /usr/bin/awk '{print $1}')"
+          echo "gh_path=$gh_path" >> "$GITHUB_OUTPUT"
+          echo "gh_binary_sha256=$gh_binary_sha256" >> "$GITHUB_OUTPUT"
+          echo "version_output_sha256=$version_output_sha256" >> "$GITHUB_OUTPUT"
 
-          gh_binary_sha256="$(/usr/bin/sha256sum "$gh_path" | /usr/bin/awk '{ print $1 }')"
-          version_output_sha256="$(printf '%s' "$version_output" | /usr/bin/sha256sum | /usr/bin/awk '{ print $1 }')"
-          [[ "$gh_binary_sha256" =~ ^[0-9a-f]{64}$ ]]
-          [[ "$version_output_sha256" =~ ^[0-9a-f]{64}$ ]]
-
-          {
-            echo "gh_path=$gh_path"
-            echo "gh_binary_sha256=$gh_binary_sha256"
-            echo "version_output_sha256=$version_output_sha256"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Verify bounded archive transport, headers, and exact contents
+      - name: Admit exact direct evidence archive through frozen shared policy
+        id: archive_admission
         shell: bash
         env:
           PACKAGE_DIR: ${{ runner.temp }}/gwt1-direct-intermediate
-          MAX_ARCHIVE_BYTES: "67108864"
-          MAX_MEMBER_BYTES: "67108864"
-          MAX_TOTAL_UNPACKED_BYTES: "134217728"
+          ADMISSION_ENGINE: ${{ github.workspace }}/.github/scripts/evidence_archive_admission.py
+          ADMISSION_PROFILE: ${{ github.workspace }}/.github/evidence-profiles/gwt1-direct-evidence-v1.json
         run: |
           set -euo pipefail
-          test -x /usr/bin/python3
-          test -x /usr/bin/sha256sum
-          test -x /usr/bin/stat
-
-          archive="$PACKAGE_DIR/gwt1-evidence.tar.gz"
-          archive_bytes="$(/usr/bin/stat -c '%s' "$archive")"
-          [[ "$archive_bytes" =~ ^[0-9]+$ ]]
-          (( archive_bytes > 0 && archive_bytes <= MAX_ARCHIVE_BYTES ))
-
-          (
-            cd "$PACKAGE_DIR"
-            /usr/bin/sha256sum -c gwt1-evidence.tar.gz.sha256
-          )
-
+          (cd "$PACKAGE_DIR" && /usr/bin/sha256sum -c gwt1-evidence.tar.gz.sha256)
+          engine_sha256="$(/usr/bin/sha256sum "$ADMISSION_ENGINE" | /usr/bin/awk '{print $1}')"
+          profile_sha256="$(/usr/bin/sha256sum "$ADMISSION_PROFILE" | /usr/bin/awk '{print $1}')"
           rm -rf "$PACKAGE_DIR/extracted"
           mkdir -p "$PACKAGE_DIR/extracted"
-
-          /usr/bin/python3 - \
-            "$archive" \
-            "$PACKAGE_DIR/extracted" \
-            "$MAX_MEMBER_BYTES" \
-            "$MAX_TOTAL_UNPACKED_BYTES" <<'PY'
-          import pathlib
-          import shutil
-          import sys
-          import tarfile
-
-          archive = pathlib.Path(sys.argv[1])
-          output_root = pathlib.Path(sys.argv[2]).resolve()
-          max_member_bytes = int(sys.argv[3])
-          max_total_unpacked_bytes = int(sys.argv[4])
-          expected = {
-              "gwt1-evidence",
-              "gwt1-evidence/SHA256SUMS",
-              "gwt1-evidence/evidence_envelope.json",
-              "gwt1-evidence/outcome.txt",
-              "gwt1-evidence/raw_observations.json",
-              "gwt1-evidence/resolution.json",
-              "gwt1-evidence/workflow_provenance.json",
-          }
-
-          with tarfile.open(archive, mode="r:gz") as tf:
-              members = tf.getmembers()
-              names = [member.name for member in members]
-              if len(names) != len(set(names)):
-                  raise SystemExit("duplicate archive member path")
-              if set(names) != expected:
-                  missing = sorted(expected - set(names))
-                  extra = sorted(set(names) - expected)
-                  raise SystemExit(f"archive member mismatch: missing={missing} extra={extra}")
-
-              total_unpacked = 0
-              for member in members:
-                  name = member.name
-                  if not name or name.startswith("/") or "\\" in name or "//" in name:
-                      raise SystemExit(f"unsafe archive path: {name!r}")
-                  parts = name.split("/")
-                  if any(part in ("", ".", "..") for part in parts):
-                      raise SystemExit(f"unsafe archive path component: {name!r}")
-                  if member.uid != 0 or member.gid != 0 or int(member.mtime) != 0:
-                      raise SystemExit(f"non-canonical archive metadata: {name!r}")
-
-                  if name == "gwt1-evidence":
-                      if not member.isdir() or (member.mode & 0o777) != 0o755:
-                          raise SystemExit("archive root metadata is not canonical")
-                      continue
-
-                  if not member.isfile():
-                      raise SystemExit(f"non-regular evidence member: {name!r}")
-                  if member.issym() or member.islnk() or member.isdev() or member.isfifo():
-                      raise SystemExit(f"forbidden evidence member type: {name!r}")
-                  if (member.mode & 0o777) != 0o644:
-                      raise SystemExit(f"non-canonical evidence mode: {name!r}")
-                  if member.size <= 0 or member.size > max_member_bytes:
-                      raise SystemExit(f"evidence member outside size bound: {name!r} size={member.size}")
-
-                  total_unpacked += member.size
-                  if total_unpacked > max_total_unpacked_bytes:
-                      raise SystemExit("archive exceeds total unpacked-size bound")
-
-                  path = pathlib.PurePosixPath(name)
-                  destination = output_root.joinpath(*path.parts)
-                  destination.parent.mkdir(parents=True, exist_ok=True)
-                  source = tf.extractfile(member)
-                  if source is None:
-                      raise SystemExit(f"could not read evidence member: {name!r}")
-                  with source, destination.open("wb") as target:
-                      shutil.copyfileobj(source, target)
-          PY
-
-          (
-            cd "$PACKAGE_DIR/extracted/gwt1-evidence"
-            /usr/bin/sha256sum -c SHA256SUMS
-          )
+          /usr/bin/python3 "$ADMISSION_ENGINE" --profile "$ADMISSION_PROFILE" \
+            --archive "$PACKAGE_DIR/gwt1-evidence.tar.gz" --output-dir "$PACKAGE_DIR/extracted" \
+            > "$PACKAGE_DIR/archive_admission.json"
+          archive_sha256="$(/usr/bin/sha256sum "$PACKAGE_DIR/gwt1-evidence.tar.gz" | /usr/bin/awk '{print $1}')"
+          /usr/bin/jq -e --arg archive_sha256 "$archive_sha256" \
+            '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-direct-evidence-archive-v1" and .archive_sha256==$archive_sha256 and .archive_bytes>0 and .tar_stream_bytes>0 and .member_count==7 and .total_unpacked_bytes>0' \
+            "$PACKAGE_DIR/archive_admission.json" >/dev/null
+          /usr/bin/install -m 0644 "$ADMISSION_PROFILE" "$PACKAGE_DIR/archive_admission_profile.json"
+          /usr/bin/install -m 0644 "$ADMISSION_ENGINE" "$PACKAGE_DIR/archive_admission_engine.py"
+          admission_result_sha256="$(/usr/bin/sha256sum "$PACKAGE_DIR/archive_admission.json" | /usr/bin/awk '{print $1}')"
+          (cd "$PACKAGE_DIR/extracted/gwt1-evidence" && /usr/bin/sha256sum -c SHA256SUMS)
+          echo "engine_sha256=$engine_sha256" >> "$GITHUB_OUTPUT"
+          echo "profile_sha256=$profile_sha256" >> "$GITHUB_OUTPUT"
+          echo "result_sha256=$admission_result_sha256" >> "$GITHUB_OUTPUT"
+          echo "archive_sha256=$archive_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Install pinned Rust 1.96.0 for trusted verifier
         uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
@@ -418,64 +275,25 @@ jobs:
           PACKAGE_DIR: ${{ runner.temp }}/gwt1-direct-intermediate
         run: |
           set -euo pipefail
-          git cat-file -e "${EVIDENCE_SUBJECT_SHA}^{commit}" 2>/dev/null \
-            || git fetch --no-tags origin "$EVIDENCE_SUBJECT_SHA"
-
+          git cat-file -e "${EVIDENCE_SUBJECT_SHA}^{commit}" 2>/dev/null || git fetch --no-tags origin "$EVIDENCE_SUBJECT_SHA"
           source_tree_sha="$(git rev-parse "${EVIDENCE_SUBJECT_SHA}^{tree}")"
           drive_blob="$(git rev-parse "${EVIDENCE_SUBJECT_SHA}:src/cognitive_loop/managers/drive_manager.rs")"
           memory_blob="$(git rev-parse "${EVIDENCE_SUBJECT_SHA}:src/cognitive_loop/managers/memory_manager.rs")"
           learning_blob="$(git rev-parse "${EVIDENCE_SUBJECT_SHA}:src/cognitive_loop/managers/learning_manager.rs")"
           perception_blob="$(git rev-parse "${EVIDENCE_SUBJECT_SHA}:src/cognitive_loop/managers/perception_manager.rs")"
-
           identity_file="$RUNNER_TEMP/gwt1-direct-expected-source-identity.json"
-          /usr/bin/jq -n \
-            --arg source_commit_sha "$EVIDENCE_SUBJECT_SHA" \
-            --arg source_tree_sha "$source_tree_sha" \
-            --arg drive_blob "$drive_blob" \
-            --arg memory_blob "$memory_blob" \
-            --arg learning_blob "$learning_blob" \
-            --arg perception_blob "$perception_blob" \
-            '{
-              source_commit_sha: $source_commit_sha,
-              source_tree_sha: $source_tree_sha,
-              specialist_blob_shas: {
-                drive_manager: $drive_blob,
-                memory_manager: $memory_blob,
-                learning_manager: $learning_blob,
-                perception_manager: $perception_blob
-              }
-            }' > "$identity_file"
-
+          /usr/bin/jq -n --arg source_commit_sha "$EVIDENCE_SUBJECT_SHA" --arg source_tree_sha "$source_tree_sha" \
+            --arg drive_blob "$drive_blob" --arg memory_blob "$memory_blob" --arg learning_blob "$learning_blob" --arg perception_blob "$perception_blob" \
+            '{source_commit_sha:$source_commit_sha,source_tree_sha:$source_tree_sha,specialist_blob_shas:{drive_manager:$drive_blob,memory_manager:$memory_blob,learning_manager:$learning_blob,perception_manager:$perception_blob}}' > "$identity_file"
           rustc --version --verbose > "$RUNNER_TEMP/gwt1-direct-expected-toolchain.txt"
-
           provenance="${PACKAGE_DIR}/extracted/gwt1-evidence/workflow_provenance.json"
-          /usr/bin/jq -e \
-            --arg evidence_subject_sha "$EVIDENCE_SUBJECT_SHA" \
-            --arg trusted_builder_sha "$TRUSTED_BUILDER_SHA" \
-            --arg trusted_builder_ref "$TRUSTED_BUILDER_REF" \
-            --arg repository "$GITHUB_REPOSITORY" \
-            --arg run_id "$GITHUB_RUN_ID" \
-            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
-            '.schema == "butlin-gwt1-trusted-builder-provenance-v1"
-              and .evidence_subject_sha == $evidence_subject_sha
-              and .trusted_builder_sha == $trusted_builder_sha
-              and .trusted_builder_ref == $trusted_builder_ref
-              and .repository == $repository
-              and .run_id == $run_id
-              and .run_attempt == $run_attempt
-              and .permitted_subject_paths == [
-                "src/cognitive_loop/managers/drive_manager.rs",
-                "src/cognitive_loop/managers/memory_manager.rs",
-                "src/cognitive_loop/managers/learning_manager.rs",
-                "src/cognitive_loop/managers/perception_manager.rs"
-              ]' \
+          /usr/bin/jq -e --arg evidence_subject_sha "$EVIDENCE_SUBJECT_SHA" --arg trusted_builder_sha "$TRUSTED_BUILDER_SHA" \
+            --arg trusted_builder_ref "$TRUSTED_BUILDER_REF" --arg repository "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '.schema=="butlin-gwt1-trusted-builder-provenance-v1" and .evidence_subject_sha==$evidence_subject_sha and .trusted_builder_sha==$trusted_builder_sha and .trusted_builder_ref==$trusted_builder_ref and .repository==$repository and .run_id==$run_id and .run_attempt==$run_attempt and .permitted_subject_paths==["src/cognitive_loop/managers/drive_manager.rs","src/cognitive_loop/managers/memory_manager.rs","src/cognitive_loop/managers/learning_manager.rs","src/cognitive_loop/managers/perception_manager.rs"]' \
             "$provenance" >/dev/null
-
           echo "identity_file=$identity_file" >> "$GITHUB_OUTPUT"
           echo "toolchain_file=$RUNNER_TEMP/gwt1-direct-expected-toolchain.txt" >> "$GITHUB_OUTPUT"
 
-      # No candidate code executes here. The trusted verifier is rebuilt from
-      # job.workflow_sha with a clean locked Cargo state.
       - name: Recompute evidence with trusted verifier
         shell: bash
         env:
@@ -500,46 +318,22 @@ jobs:
           TRUSTED_GH_ARCHIVE_SHA256: "e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be"
           TRUSTED_GH_BINARY_SHA256: ${{ steps.trusted_gh.outputs.gh_binary_sha256 }}
           TRUSTED_GH_VERSION_OUTPUT_SHA256: ${{ steps.trusted_gh.outputs.version_output_sha256 }}
-          MAX_ARCHIVE_BYTES: "67108864"
-          MAX_MEMBER_BYTES: "67108864"
-          MAX_TOTAL_UNPACKED_BYTES: "134217728"
+          ADMISSION_ENGINE_SHA256: ${{ steps.archive_admission.outputs.engine_sha256 }}
+          ADMISSION_PROFILE_SHA256: ${{ steps.archive_admission.outputs.profile_sha256 }}
+          ADMISSION_RESULT_SHA256: ${{ steps.archive_admission.outputs.result_sha256 }}
+          EVIDENCE_ARCHIVE_SHA256: ${{ steps.archive_admission.outputs.archive_sha256 }}
         run: |
           set -euo pipefail
-          archive_sha256="$(/usr/bin/sha256sum "$PACKAGE_DIR/gwt1-evidence.tar.gz" | /usr/bin/awk '{print $1}')"
-          /usr/bin/jq -n \
-            --arg schema "butlin-gwt1-direct-attestation-verifier-profile-v1" \
-            --arg repository "$GITHUB_REPOSITORY" \
-            --arg trusted_builder_sha "$TRUSTED_BUILDER_SHA" \
-            --arg verifier "github-cli" \
-            --arg verifier_version "$TRUSTED_GH_VERSION" \
-            --arg distribution_url "$TRUSTED_GH_ARCHIVE_URL" \
-            --arg distribution_sha256 "$TRUSTED_GH_ARCHIVE_SHA256" \
-            --arg executable_sha256 "$TRUSTED_GH_BINARY_SHA256" \
-            --arg version_output_sha256 "$TRUSTED_GH_VERSION_OUTPUT_SHA256" \
-            --arg evidence_archive_sha256 "$archive_sha256" \
-            --argjson max_archive_bytes "$MAX_ARCHIVE_BYTES" \
-            --argjson max_member_bytes "$MAX_MEMBER_BYTES" \
-            --argjson max_total_unpacked_bytes "$MAX_TOTAL_UNPACKED_BYTES" \
-            '{
-              schema: $schema,
-              repository: $repository,
-              trusted_builder_sha: $trusted_builder_sha,
-              verifier: $verifier,
-              verifier_version: $verifier_version,
-              distribution_url: $distribution_url,
-              distribution_sha256: $distribution_sha256,
-              executable_sha256: $executable_sha256,
-              version_output_sha256: $version_output_sha256,
-              configuration_policy: "isolated-gh-config-v1",
-              archive_validation_policy: "exact-bounded-regular-members-v1",
-              deny_self_hosted_runners: true,
-              max_archive_bytes: $max_archive_bytes,
-              max_member_bytes: $max_member_bytes,
-              max_total_unpacked_bytes: $max_total_unpacked_bytes,
-              evidence_archive_sha256: $evidence_archive_sha256
-            }' > "$PACKAGE_DIR/direct_verifier_profile.json"
-          /usr/bin/sha256sum "$PACKAGE_DIR/direct_verifier_profile.json" \
-            > "$PACKAGE_DIR/direct_verifier_profile.json.sha256"
+          /usr/bin/jq -n --arg schema "butlin-gwt1-direct-attestation-verifier-profile-v2" --arg repository "$GITHUB_REPOSITORY" \
+            --arg trusted_builder_sha "$TRUSTED_BUILDER_SHA" --arg verifier github-cli --arg verifier_version "$TRUSTED_GH_VERSION" \
+            --arg distribution_url "$TRUSTED_GH_ARCHIVE_URL" --arg distribution_sha256 "$TRUSTED_GH_ARCHIVE_SHA256" \
+            --arg executable_sha256 "$TRUSTED_GH_BINARY_SHA256" --arg version_output_sha256 "$TRUSTED_GH_VERSION_OUTPUT_SHA256" \
+            --arg archive_admission_profile_id gwt1-direct-evidence-archive-v1 --arg archive_admission_engine_sha256 "$ADMISSION_ENGINE_SHA256" \
+            --arg archive_admission_profile_sha256 "$ADMISSION_PROFILE_SHA256" --arg archive_admission_result_sha256 "$ADMISSION_RESULT_SHA256" \
+            --arg evidence_archive_sha256 "$EVIDENCE_ARCHIVE_SHA256" \
+            '{schema:$schema,repository:$repository,trusted_builder_sha:$trusted_builder_sha,verifier:$verifier,verifier_version:$verifier_version,distribution_url:$distribution_url,distribution_sha256:$distribution_sha256,executable_sha256:$executable_sha256,version_output_sha256:$version_output_sha256,configuration_policy:"isolated-gh-config-v1",archive_admission_profile_id:$archive_admission_profile_id,archive_admission_engine_sha256:$archive_admission_engine_sha256,archive_admission_profile_sha256:$archive_admission_profile_sha256,archive_admission_result_sha256:$archive_admission_result_sha256,deny_self_hosted_runners:true,evidence_archive_sha256:$evidence_archive_sha256}' \
+            > "$PACKAGE_DIR/direct_verifier_profile.json"
+          (cd "$PACKAGE_DIR" && /usr/bin/sha256sum direct_verifier_profile.json > direct_verifier_profile.json.sha256)
 
       - name: Generate trusted direct-evidence attestation
         id: evidence_attest
@@ -568,40 +362,23 @@ jobs:
         run: |
           set -euo pipefail
           test -x "$TRUSTED_GH_PATH"
+          unset GH_HOST GH_ENTERPRISE_TOKEN
           mkdir -p "$PACKAGE_DIR/attestation"
-          test -f "$EVIDENCE_ATTESTATION_BUNDLE"
-          test -f "$VERIFIER_PROFILE_ATTESTATION_BUNDLE"
-
           cp "$EVIDENCE_ATTESTATION_BUNDLE" "$PACKAGE_DIR/attestation/attestation.json"
-          cp "$VERIFIER_PROFILE_ATTESTATION_BUNDLE" \
-            "$PACKAGE_DIR/attestation/verifier-profile-attestation.json"
-
-          "$TRUSTED_GH_PATH" attestation verify "$PACKAGE_DIR/gwt1-evidence.tar.gz" \
-            --repo "$GITHUB_REPOSITORY" \
-            --bundle "$PACKAGE_DIR/attestation/attestation.json" \
-            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-trusted-builder.yml" \
-            --signer-digest "$TRUSTED_BUILDER_SHA" \
-            --deny-self-hosted-runners \
-            --format json \
-            > "$PACKAGE_DIR/attestation/verification.json"
-
-          "$TRUSTED_GH_PATH" attestation verify "$PACKAGE_DIR/direct_verifier_profile.json" \
-            --repo "$GITHUB_REPOSITORY" \
-            --bundle "$PACKAGE_DIR/attestation/verifier-profile-attestation.json" \
-            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-trusted-builder.yml" \
-            --signer-digest "$TRUSTED_BUILDER_SHA" \
-            --deny-self-hosted-runners \
-            --format json \
-            > "$PACKAGE_DIR/attestation/verifier-profile-verification.json"
-
-          /usr/bin/sha256sum "$PACKAGE_DIR/attestation/attestation.json" \
-            > "$PACKAGE_DIR/attestation/attestation.json.sha256"
-          /usr/bin/sha256sum "$PACKAGE_DIR/attestation/verification.json" \
-            > "$PACKAGE_DIR/attestation/verification.json.sha256"
-          /usr/bin/sha256sum "$PACKAGE_DIR/attestation/verifier-profile-attestation.json" \
-            > "$PACKAGE_DIR/attestation/verifier-profile-attestation.json.sha256"
-          /usr/bin/sha256sum "$PACKAGE_DIR/attestation/verifier-profile-verification.json" \
-            > "$PACKAGE_DIR/attestation/verifier-profile-verification.json.sha256"
+          cp "$VERIFIER_PROFILE_ATTESTATION_BUNDLE" "$PACKAGE_DIR/attestation/verifier-profile-attestation.json"
+          "$TRUSTED_GH_PATH" attestation verify "$PACKAGE_DIR/gwt1-evidence.tar.gz" --repo "$GITHUB_REPOSITORY" \
+            --bundle "$PACKAGE_DIR/attestation/attestation.json" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-trusted-builder.yml" \
+            --signer-digest "$TRUSTED_BUILDER_SHA" --deny-self-hosted-runners --format json > "$PACKAGE_DIR/attestation/verification.json"
+          "$TRUSTED_GH_PATH" attestation verify "$PACKAGE_DIR/direct_verifier_profile.json" --repo "$GITHUB_REPOSITORY" \
+            --bundle "$PACKAGE_DIR/attestation/verifier-profile-attestation.json" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-trusted-builder.yml" \
+            --signer-digest "$TRUSTED_BUILDER_SHA" --deny-self-hosted-runners --format json > "$PACKAGE_DIR/attestation/verifier-profile-verification.json"
+          (
+            cd "$PACKAGE_DIR/attestation"
+            /usr/bin/sha256sum attestation.json > attestation.json.sha256
+            /usr/bin/sha256sum verification.json > verification.json.sha256
+            /usr/bin/sha256sum verifier-profile-attestation.json > verifier-profile-attestation.json.sha256
+            /usr/bin/sha256sum verifier-profile-verification.json > verifier-profile-verification.json.sha256
+          )
 
       - name: Upload trusted attested direct evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -610,6 +387,9 @@ jobs:
           path: |
             ${{ runner.temp }}/gwt1-direct-intermediate/gwt1-evidence.tar.gz
             ${{ runner.temp }}/gwt1-direct-intermediate/gwt1-evidence.tar.gz.sha256
+            ${{ runner.temp }}/gwt1-direct-intermediate/archive_admission.json
+            ${{ runner.temp }}/gwt1-direct-intermediate/archive_admission_profile.json
+            ${{ runner.temp }}/gwt1-direct-intermediate/archive_admission_engine.py
             ${{ runner.temp }}/gwt1-direct-intermediate/direct_verifier_profile.json
             ${{ runner.temp }}/gwt1-direct-intermediate/direct_verifier_profile.json.sha256
             ${{ runner.temp }}/gwt1-direct-intermediate/attestation/
