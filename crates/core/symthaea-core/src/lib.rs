@@ -84,6 +84,8 @@ pub mod genesis;
 pub mod hdc;
 /// Fail-closed implicit equality manifolds, local projection, and tangent bases.
 pub mod implicit_manifold;
+/// Proof-strength kinodynamic reachability, plant-time semantics, and dynamics replay.
+pub mod kinodynamic_reachability;
 /// Qualified local charts, overlap witnesses, and partial finite-atlas evidence.
 pub mod manifold_atlas;
 /// Fallible coordinate-dependent Riemannian metric fields with validated samples.
