@@ -1,0 +1,125 @@
+name: RSK Lockfile Repair Diagnostic
+
+on:
+  pull_request:
+    paths:
+      - 'Cargo.lock'
+      - 'crates/domains/symthaea-replicator-safety/Cargo.toml'
+      - 'crates/domains/symthaea-replicator-semantics/Cargo.toml'
+      - 'crates/domains/symthaea-replicator-ledger/Cargo.toml'
+      - 'scripts/rsk_lockfile_delta.py'
+      - 'scripts/test_rsk_lockfile_delta.py'
+      - '.github/workflows/rsk-lockfile-repair.yml'
+      - 'docs/compliance/adr/ADR-033-rsk-lockfile-repair-qualifier.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rsk-lockfile-repair-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  lockfile-repair-diagnostic:
+    name: RSK Cargo.lock repair diagnostic (non-admissible)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Require Class A ADR for repair-surface changes
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha='${{ github.event.pull_request.base.sha }}'
+          changed_files="$(git diff --name-only "${base_sha}"...HEAD)"
+          if ! printf '%s\n' "${changed_files}" | grep -Eq '^(Cargo\.lock$|crates/domains/symthaea-replicator-(safety|semantics|ledger)/Cargo\.toml$|scripts/(rsk_lockfile_delta|test_rsk_lockfile_delta)\.py$|\.github/workflows/rsk-lockfile-repair\.yml$)'; then
+            echo 'No RSK lockfile repair Class A surface changed.'
+            exit 0
+          fi
+          adr_files="$(printf '%s\n' "${changed_files}" | grep -E '^docs/compliance/adr/ADR-[0-9]+.*\.md$' || true)"
+          if [ -z "${adr_files}" ]; then
+            echo 'ERROR: lockfile repair Class A changes require a changed ADR.'
+            exit 1
+          fi
+          valid=false
+          while IFS= read -r adr; do
+            [ -n "${adr}" ] || continue
+            if grep -Eq '(Replicator Safety Kernel|RSK)' "${adr}" \
+              && grep -Eq '^\*\*Change Class\*\*: A([[:space:]]|$)' "${adr}"; then
+              valid=true
+              break
+            fi
+          done <<< "${adr_files}"
+          if ! ${valid}; then
+            echo 'ERROR: changed ADRs do not identify RSK and Change Class A.'
+            exit 1
+          fi
+
+      - name: Self-test lockfile delta qualifier
+        run: python3 scripts/test_rsk_lockfile_delta.py -v
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: State evidence boundary
+        run: |
+          echo 'NON-ADMISSIBLE DIAGNOSTIC ONLY.'
+          echo 'Cargo may refresh Cargo.lock on this ephemeral runner.'
+          echo 'The candidate must be reviewed and committed separately before --locked qualification can count.'
+
+      - name: Capture exact input and toolchain identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/rsk-lockfile-repair"
+          mkdir -p "${out}"
+          cp Cargo.lock "${out}/Cargo.lock.before"
+          git rev-parse HEAD > "${out}/subject-head.txt"
+          rustc --version --verbose > "${out}/rustc-version.txt"
+          cargo --version --verbose > "${out}/cargo-version.txt"
+          sha256sum Cargo.lock \
+            crates/domains/symthaea-replicator-safety/Cargo.toml \
+            crates/domains/symthaea-replicator-semantics/Cargo.toml \
+            crates/domains/symthaea-replicator-ledger/Cargo.toml \
+            > "${out}/input-sha256.txt"
+          printf '%s\n' \
+            'NON-ADMISSIBLE DIAGNOSTIC ONLY.' \
+            'Do not apply Cargo.lock.candidate without Class A review.' \
+            > "${out}/README.txt"
+
+      - name: Ask pinned Cargo to resolve the workspace lock graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 > "${RUNNER_TEMP}/rsk-lockfile-repair/cargo-metadata.json"
+          cp Cargo.lock "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.candidate"
+          git diff -- Cargo.lock > "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.patch"
+
+      - name: Prove candidate contains only the allowed RSK lock delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/rsk_lockfile_delta.py \
+            "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.before" \
+            "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.candidate" \
+            --json-out "${RUNNER_TEMP}/rsk-lockfile-repair/delta-report.json"
+          sha256sum \
+            "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.before" \
+            "${RUNNER_TEMP}/rsk-lockfile-repair/Cargo.lock.candidate" \
+            > "${RUNNER_TEMP}/rsk-lockfile-repair/lock-sha256.txt"
+
+      - name: Upload non-admissible lockfile repair evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsk-lockfile-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rsk-lockfile-repair/**
+          if-no-files-found: error
+          retention-days: 30
