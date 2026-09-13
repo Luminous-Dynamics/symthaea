@@ -53,6 +53,15 @@ def invalid(detail: str, *, output: Path | None, extra: dict | None = None) -> i
     return emit(receipt, output)
 
 
+def parse_time(value: object) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError("timestamp must be a string")
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return parsed
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("commitment", type=Path)
@@ -80,6 +89,7 @@ def main() -> int:
         "candidate_epoch",
         "candidate_sha",
         "evaluator_lineage_class",
+        "evaluator_lineage_note",
         "bundle_sha256",
         "bundle_byte_length",
         "case_count",
@@ -102,6 +112,15 @@ def main() -> int:
 
     if commitment["evaluator_lineage_class"] not in ALLOWED_LINEAGES:
         return invalid("invalid_evaluator_lineage_class", output=args.receipt)
+    if not isinstance(commitment["evaluator_lineage_note"], str) or not commitment["evaluator_lineage_note"].strip():
+        return invalid("evaluator_lineage_note_missing", output=args.receipt)
+
+    try:
+        parse_time(commitment["commitment_created_utc"])
+        if "reveal_not_before_utc" in commitment and datetime.now(timezone.utc) < parse_time(commitment["reveal_not_before_utc"]):
+            return invalid("reveal_before_committed_not_before_time", output=args.receipt)
+    except (TypeError, ValueError):
+        return invalid("commitment_timestamp_invalid", output=args.receipt)
 
     if commitment["bundle_byte_length"] != len(bundle_bytes):
         return invalid("bundle_byte_length_mismatch", output=args.receipt)
@@ -143,6 +162,7 @@ def main() -> int:
         "scoring_spec_sha256": sha256_bytes(scoring_bytes),
         "adjudication_spec_sha256": sha256_bytes(adjudication_bytes),
         "evaluator_lineage_class": commitment["evaluator_lineage_class"],
+        "evaluator_lineage_note": commitment["evaluator_lineage_note"],
         "verified_at_utc": datetime.now(timezone.utc).isoformat(),
         "candidate_execution_authorized_by_this_receipt": False,
         "phenomenal_experience_established": False,
