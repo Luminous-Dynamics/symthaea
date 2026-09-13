@@ -98,6 +98,24 @@ def main() -> int:
         rewrite_json(temporal, lambda value: value.__setitem__("wcare43_verifier_sha256", base.hx("9")))
         expect_invalid(argv(f, temporal, observations), "temporal_observation_verifier_sha256_not_preregistered")
 
+        wrong_w40_frontdoor = root / "wrong-w40-frontdoor"
+        wrong_w40_frontdoor.mkdir()
+        f, observations, temporal = strict_fixture(wrong_w40_frontdoor)
+        rewrite_json(f["auth"], lambda value: value.__setitem__("wcare40_frontdoor_sha256", base.hx("f")))
+        expect_invalid(
+            argv(f, temporal, observations),
+            "wcare41_wcare40_frontdoor_sha256_does_not_match_wcare40_result",
+        )
+
+        wrong_w40_core = root / "wrong-w40-core"
+        wrong_w40_core.mkdir()
+        f, observations, temporal = strict_fixture(wrong_w40_core)
+        rewrite_json(f["auth"], lambda value: value.__setitem__("wcare40_core_verifier_sha256", base.hx("f")))
+        expect_invalid(
+            argv(f, temporal, observations),
+            "wcare41_wcare40_core_verifier_sha256_does_not_match_wcare40_result",
+        )
+
         malformed_bool = root / "malformed-bool"
         malformed_bool.mkdir()
         f, observations, temporal = strict_fixture(malformed_bool)
@@ -122,6 +140,12 @@ def main() -> int:
         rewrite_json(temporal, lambda value: value.pop("wcare43_result_sha256"))
         expect_invalid(argv(f, temporal, observations), "temporal_observation_missing_fields:wcare43_result_sha256")
 
+        malformed_notes = root / "malformed-notes"
+        malformed_notes.mkdir()
+        f, observations, temporal = strict_fixture(malformed_notes)
+        rewrite_json(observations[0], lambda value: value.__setitem__("notes", 42))
+        expect_invalid(argv(f, temporal, observations), "builder_observation_invalid_string:notes")
+
     print(json.dumps({
         "authority": "MeasurementOnly",
         "classification": "PASS_WCARE44_FRONTDOOR_SELFTEST",
@@ -130,10 +154,13 @@ def main() -> int:
         "unknown_builder_field_rejected": True,
         "wrong_builder_verifier_identity_rejected": True,
         "wrong_temporal_verifier_identity_rejected": True,
+        "wrong_wcare40_frontdoor_identity_rejected": True,
+        "wrong_wcare40_core_identity_rejected": True,
         "malformed_builder_boolean_rejected": True,
         "malformed_auth_plan_time_rejected": True,
         "malformed_backend_contract_rejected": True,
         "missing_temporal_field_rejected": True,
+        "malformed_optional_field_rejected": True,
         "final_promotion_remains_blocked": True,
         "runtime_authority_granted": False,
     }, sort_keys=True, separators=(",", ":")))
