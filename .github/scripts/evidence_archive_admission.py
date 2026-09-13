@@ -2,8 +2,10 @@
 """Fail-closed admission for deterministic evidence tar.gz archives.
 
 This module is intentionally stdlib-only. It validates a frozen JSON profile and
-an archive's transport shape, tar headers, member types, metadata, and resource
-bounds before copying any admitted file bytes into a fresh output directory.
+an archive's transport shape, decompressed stream budget, tar headers, member
+types, metadata, and resource bounds before copying any admitted file bytes into
+a staging directory. Only a fully admitted archive is committed to the requested
+output directory.
 
 Admission is a transport/security theorem only. It does not establish scientific
 validity, signer authority, evidence positivity, or any support tier.
@@ -12,20 +14,63 @@ validity, signer authority, evidence positivity, or any support tier.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
+import io
 import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
+import stat
 import sys
 import tarfile
-from typing import Any
+import tempfile
+from typing import Any, BinaryIO
 
 PROFILE_SCHEMA_V1 = "butlin-evidence-archive-admission-profile-v1"
+RESULT_SCHEMA_V1 = "butlin-evidence-archive-admission-result-v1"
 
 
 class ArchiveAdmissionError(RuntimeError):
     """Raised when a profile or archive fails closed admission."""
+
+
+class _BoundedReader(io.RawIOBase):
+    """Read-only wrapper that fails before a decompressed byte budget is exceeded."""
+
+    def __init__(self, source: BinaryIO, limit: int) -> None:
+        super().__init__()
+        self._source = source
+        self._limit = limit
+        self.count = 0
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return False
+
+    def read(self, size: int = -1) -> bytes:
+        remaining = self._limit - self.count
+        # Read one byte beyond the remaining allowance so an over-budget stream
+        # fails immediately instead of becoming indistinguishable from EOF.
+        if size is None or size < 0:
+            request = remaining + 1
+        else:
+            request = min(size, remaining + 1)
+        data = self._source.read(request)
+        self.count += len(data)
+        if self.count > self._limit:
+            raise ArchiveAdmissionError(
+                f"decompressed tar stream exceeds bound of {self._limit} bytes"
+            )
+        return data
+
+    def readinto(self, buffer: bytearray | memoryview) -> int:
+        data = self.read(len(buffer))
+        size = len(data)
+        buffer[:size] = data
+        return size
 
 
 def _require_exact_keys(obj: dict[str, Any], expected: set[str], context: str) -> None:
@@ -83,6 +128,7 @@ def load_profile(path: Path) -> dict[str, Any]:
             "canonical_gid",
             "canonical_mtime",
             "max_archive_bytes",
+            "max_tar_stream_bytes",
             "max_member_bytes",
             "max_total_unpacked_bytes",
             "members",
@@ -105,6 +151,7 @@ def load_profile(path: Path) -> dict[str, Any]:
         profile[field] = _require_nonnegative_int(profile[field], field)
     for field in (
         "max_archive_bytes",
+        "max_tar_stream_bytes",
         "max_member_bytes",
         "max_total_unpacked_bytes",
     ):
@@ -169,6 +216,17 @@ def load_profile(path: Path) -> dict[str, Any]:
     if root_spec_count != 1:
         raise ArchiveAdmissionError("profile must contain exactly one root directory member")
 
+    by_path = {member["path"]: member for member in normalized_members}
+    for member in normalized_members:
+        parts = member["path"].split("/")
+        for depth in range(1, len(parts)):
+            parent = "/".join(parts[:depth])
+            parent_spec = by_path.get(parent)
+            if parent_spec is None or parent_spec["kind"] != "directory":
+                raise ArchiveAdmissionError(
+                    f"profile member {member['path']!r} lacks declared directory parent {parent!r}"
+                )
+
     profile["members"] = normalized_members
     return profile
 
@@ -196,6 +254,40 @@ def _prepare_output_dir(output_dir: Path) -> Path:
     return output_dir.resolve(strict=True)
 
 
+def _create_declared_directories(
+    staging_root: Path, expected: dict[str, dict[str, Any]]
+) -> None:
+    directories = [
+        member for member in expected.values() if member["kind"] == "directory"
+    ]
+    for spec in sorted(directories, key=lambda item: len(item["path"].split("/"))):
+        destination = staging_root.joinpath(*spec["path"].split("/"))
+        destination.mkdir(mode=spec["mode"], parents=False, exist_ok=False)
+        os.chmod(destination, spec["mode"])
+
+
+def _exclusive_copy(source: BinaryIO, destination: Path, mode: int) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(destination, flags, mode)
+    except OSError as error:
+        raise ArchiveAdmissionError(
+            f"failed exclusive creation of {destination}: {error}"
+        ) from error
+    try:
+        with os.fdopen(fd, "wb") as target:
+            shutil.copyfileobj(source, target, length=1024 * 1024)
+        os.chmod(destination, mode)
+    except Exception:
+        try:
+            destination.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+
+
 def admit_archive(profile: dict[str, Any], archive: Path, output_dir: Path) -> dict[str, Any]:
     if not archive.is_absolute():
         raise ArchiveAdmissionError("archive path must be absolute")
@@ -203,7 +295,7 @@ def admit_archive(profile: dict[str, Any], archive: Path, output_dir: Path) -> d
         archive_lstat = archive.lstat()
     except OSError as error:
         raise ArchiveAdmissionError(f"cannot stat archive: {error}") from error
-    if archive.is_symlink() or not archive.is_file():
+    if stat.S_ISLNK(archive_lstat.st_mode) or not stat.S_ISREG(archive_lstat.st_mode):
         raise ArchiveAdmissionError("archive must be a non-symlink regular file")
     archive_bytes = archive_lstat.st_size
     if archive_bytes <= 0 or archive_bytes > profile["max_archive_bytes"]:
@@ -213,112 +305,134 @@ def admit_archive(profile: dict[str, Any], archive: Path, output_dir: Path) -> d
 
     output_root = _prepare_output_dir(output_dir)
     expected = {member["path"]: member for member in profile["members"]}
-
-    try:
-        tf = tarfile.open(archive, mode="r:gz")
-    except (OSError, tarfile.TarError) as error:
-        raise ArchiveAdmissionError(f"cannot open tar.gz archive: {error}") from error
+    staging_root = Path(
+        tempfile.mkdtemp(prefix=".archive-admission-", dir=output_root)
+    ).resolve(strict=True)
+    _create_declared_directories(staging_root, expected)
 
     total_unpacked = 0
+    tar_stream_bytes = 0
+    seen: set[str] = set()
+
     try:
-        members = tf.getmembers()
-        names = [member.name for member in members]
-        if len(names) != len(set(names)):
-            raise ArchiveAdmissionError("duplicate archive member path")
-        if set(names) != set(expected):
-            missing = sorted(set(expected) - set(names))
-            extra = sorted(set(names) - set(expected))
-            raise ArchiveAdmissionError(
-                f"archive member mismatch: missing={missing} extra={extra}"
-            )
+        try:
+            compressed = archive.open("rb")
+            gzip_stream = gzip.GzipFile(fileobj=compressed, mode="rb")
+            bounded = _BoundedReader(gzip_stream, profile["max_tar_stream_bytes"])
+            tf = tarfile.open(fileobj=bounded, mode="r|")
+        except (OSError, EOFError, gzip.BadGzipFile, tarfile.TarError) as error:
+            raise ArchiveAdmissionError(f"cannot open bounded tar.gz archive: {error}") from error
 
-        admitted: list[tuple[tarfile.TarInfo, dict[str, Any], tuple[str, ...]]] = []
-        for member in members:
-            spec = expected[member.name]
-            parts = _validate_posix_path(member.name, "archive member")
+        try:
+            for member in tf:
+                name = member.name
+                parts = _validate_posix_path(name, "archive member")
+                if name in seen:
+                    raise ArchiveAdmissionError(f"duplicate archive member path {name!r}")
+                seen.add(name)
 
-            if member.pax_headers:
-                raise ArchiveAdmissionError(
-                    f"extended PAX metadata is not allowed: {member.name!r}"
-                )
-            if getattr(member, "sparse", None):
-                raise ArchiveAdmissionError(f"sparse member is not allowed: {member.name!r}")
-            if member.uid != profile["canonical_uid"]:
-                raise ArchiveAdmissionError(f"wrong uid for {member.name!r}")
-            if member.gid != profile["canonical_gid"]:
-                raise ArchiveAdmissionError(f"wrong gid for {member.name!r}")
-            if int(member.mtime) != profile["canonical_mtime"]:
-                raise ArchiveAdmissionError(f"wrong mtime for {member.name!r}")
-            if (member.mode & 0o7777) != spec["mode"]:
-                raise ArchiveAdmissionError(f"wrong mode for {member.name!r}")
+                spec = expected.get(name)
+                if spec is None:
+                    raise ArchiveAdmissionError(f"unexpected archive member {name!r}")
 
-            if spec["kind"] == "directory":
-                if not member.isdir():
+                if member.pax_headers:
                     raise ArchiveAdmissionError(
-                        f"expected directory but observed another type: {member.name!r}"
+                        f"extended PAX metadata is not allowed: {name!r}"
                     )
-                if member.size != 0:
-                    raise ArchiveAdmissionError(
-                        f"directory member has non-zero size: {member.name!r}"
-                    )
-            else:
+                if getattr(member, "sparse", None):
+                    raise ArchiveAdmissionError(f"sparse member is not allowed: {name!r}")
+                if member.uid != profile["canonical_uid"]:
+                    raise ArchiveAdmissionError(f"wrong uid for {name!r}")
+                if member.gid != profile["canonical_gid"]:
+                    raise ArchiveAdmissionError(f"wrong gid for {name!r}")
+                if int(member.mtime) != profile["canonical_mtime"]:
+                    raise ArchiveAdmissionError(f"wrong mtime for {name!r}")
+                if (member.mode & 0o7777) != spec["mode"]:
+                    raise ArchiveAdmissionError(f"wrong mode for {name!r}")
+
+                if spec["kind"] == "directory":
+                    if not member.isdir():
+                        raise ArchiveAdmissionError(
+                            f"expected directory but observed another type: {name!r}"
+                        )
+                    if member.size != 0:
+                        raise ArchiveAdmissionError(
+                            f"directory member has non-zero size: {name!r}"
+                        )
+                    continue
+
                 if not member.isfile():
                     raise ArchiveAdmissionError(
-                        f"expected regular file but observed another type: {member.name!r}"
+                        f"expected regular file but observed another type: {name!r}"
                     )
                 if member.issym() or member.islnk() or member.isdev() or member.isfifo():
-                    raise ArchiveAdmissionError(
-                        f"forbidden special member type: {member.name!r}"
-                    )
+                    raise ArchiveAdmissionError(f"forbidden special member type: {name!r}")
                 if member.size == 0 and not spec["allow_empty"]:
-                    raise ArchiveAdmissionError(f"empty member forbidden: {member.name!r}")
+                    raise ArchiveAdmissionError(f"empty member forbidden: {name!r}")
                 if member.size < 0 or member.size > spec["max_bytes"]:
                     raise ArchiveAdmissionError(
-                        f"member outside size bound: {member.name!r} size={member.size}"
+                        f"member outside size bound: {name!r} size={member.size}"
                     )
                 total_unpacked += member.size
                 if total_unpacked > profile["max_total_unpacked_bytes"]:
                     raise ArchiveAdmissionError("archive exceeds total unpacked-size bound")
 
-            admitted.append((member, spec, parts))
+                destination = staging_root.joinpath(*parts)
+                parent = destination.parent.resolve(strict=True)
+                if staging_root != parent and staging_root not in parent.parents:
+                    raise ArchiveAdmissionError(
+                        f"resolved extraction parent escaped staging root: {name!r}"
+                    )
+                source = tf.extractfile(member)
+                if source is None:
+                    raise ArchiveAdmissionError(f"could not read member: {name!r}")
+                try:
+                    with source:
+                        _exclusive_copy(source, destination, spec["mode"])
+                except OSError as error:
+                    raise ArchiveAdmissionError(
+                        f"failed controlled extraction of {name!r}: {error}"
+                    ) from error
+                if destination.stat().st_size != member.size:
+                    raise ArchiveAdmissionError(
+                        f"extracted size mismatch for {name!r}: expected={member.size} observed={destination.stat().st_size}"
+                    )
 
-        # Create only profile-declared directories, shallowest first.
-        for member, spec, parts in sorted(admitted, key=lambda item: len(item[2])):
-            if spec["kind"] != "directory":
-                continue
-            destination = output_root.joinpath(*parts)
-            destination.mkdir(mode=spec["mode"], parents=False, exist_ok=False)
-
-        # Copy bytes only from already-admitted regular members. Never call
-        # TarFile.extract()/extractall(), so link/device semantics cannot escape.
-        for member, spec, parts in admitted:
-            if spec["kind"] != "file":
-                continue
-            destination = output_root.joinpath(*parts)
-            parent = destination.parent.resolve(strict=True)
-            if output_root != parent and output_root not in parent.parents:
-                raise ArchiveAdmissionError(
-                    f"resolved extraction parent escaped output root: {member.name!r}"
-                )
-            source = tf.extractfile(member)
-            if source is None:
-                raise ArchiveAdmissionError(f"could not read member: {member.name!r}")
+            tar_stream_bytes = bounded.count
+        except (OSError, EOFError, gzip.BadGzipFile, tarfile.TarError) as error:
+            raise ArchiveAdmissionError(f"archive stream failed during admission: {error}") from error
+        finally:
             try:
-                with source, destination.open("xb") as target:
-                    shutil.copyfileobj(source, target, length=1024 * 1024)
-                os.chmod(destination, spec["mode"])
-            except OSError as error:
-                raise ArchiveAdmissionError(
-                    f"failed controlled extraction of {member.name!r}: {error}"
-                ) from error
-    finally:
-        tf.close()
+                tf.close()
+            finally:
+                try:
+                    gzip_stream.close()
+                finally:
+                    compressed.close()
+
+        missing = sorted(set(expected) - seen)
+        if missing:
+            raise ArchiveAdmissionError(f"archive is missing required members: {missing}")
+        if seen != set(expected):
+            raise ArchiveAdmissionError("archive member set failed exact-match admission")
+
+        # Commit only after the entire archive has passed. A failure leaves the
+        # caller's output directory empty rather than partially trusted.
+        staged_children = list(staging_root.iterdir())
+        for child in staged_children:
+            child.rename(output_root / child.name)
+    except Exception:
+        shutil.rmtree(staging_root, ignore_errors=True)
+        raise
+    else:
+        staging_root.rmdir()
 
     return {
-        "schema": "butlin-evidence-archive-admission-result-v1",
+        "schema": RESULT_SCHEMA_V1,
         "profile_id": profile["profile_id"],
         "archive_sha256": _sha256_file(archive),
         "archive_bytes": archive_bytes,
+        "tar_stream_bytes": tar_stream_bytes,
         "member_count": len(expected),
         "total_unpacked_bytes": total_unpacked,
     }
