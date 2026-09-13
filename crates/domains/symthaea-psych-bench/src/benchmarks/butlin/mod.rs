@@ -36,6 +36,7 @@ pub mod qualification_design;
 pub mod qualification_runtime;
 pub mod report;
 pub mod resolution_view;
+pub mod resolution_view_v2;
 
 #[cfg(feature = "symthaea-backend")]
 pub use gwt1_causal_envelope::{
@@ -111,3 +112,11 @@ pub use resolution_view::{
 };
 #[cfg(feature = "symthaea-backend")]
 pub use resolution_view::{resolve_gwt1_causal_evidence_view_v1, resolve_gwt1_evidence_view_v1};
+pub use resolution_view_v2::{
+    BUTLIN_RESOLVED_EVIDENCE_VIEW_SCHEMA_V2, ButlinResolvedEvidenceViewV2,
+    EvidenceResolutionViewErrorV2, IndicatorEvidenceLineageV2,
+};
+#[cfg(feature = "symthaea-backend")]
+pub use resolution_view_v2::{
+    resolve_gwt1_causal_evidence_view_v2, resolve_gwt1_evidence_view_v2,
+};
