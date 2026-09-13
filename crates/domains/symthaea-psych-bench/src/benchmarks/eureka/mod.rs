@@ -50,6 +50,8 @@ mod v2_evidence_identity;
 #[cfg(test)]
 mod v2_corpus_schedule;
 #[cfg(test)]
+mod v2_development_order;
+#[cfg(test)]
 mod v2_construct;
 #[cfg(test)]
 mod v2_construct_independent_audit;
@@ -62,6 +64,10 @@ mod v2_target_contract;
 mod v2_comparator_custody;
 #[cfg(test)]
 mod v2_frozen_comparator;
+#[cfg(all(test, feature = "symthaea-backend"))]
+mod v2_fep_development;
+#[cfg(test)]
+mod v2_fep_development_reachability_tests;
 #[cfg(test)]
 mod v2_paired_subject;
 #[cfg(test)]
