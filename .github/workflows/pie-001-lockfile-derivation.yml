@@ -1,0 +1,145 @@
+name: PIE-001 Lockfile Derivation
+
+on:
+  push:
+    branches:
+      - derive/pie-001-lockfile-5b31b29d
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  derive:
+    name: Derive exact Cargo.lock successor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SUBJECT_SHA: 5b31b29d2c324ae307f5bd15b07f0e1dc1cea3af
+      PACKAGE: symthaea-planetary-industry
+      CANDIDATE_BRANCH: derived/pie-001-lockfile-candidate
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Prove exact clean subject
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git status --porcelain --untracked-files=no)"
+          git rev-parse HEAD^{tree} | tee source-tree.txt
+          sha256sum Cargo.lock | tee source-lock-sha256.txt
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Ask Cargo to materialize missing lock state
+        id: materialize
+        continue-on-error: true
+        run: cargo check -p "$PACKAGE" --all-targets
+
+      - name: Verify closed-world lockfile mutation
+        id: lock_scope
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only)"
+          printf 'changed paths:\n%s\n' "$changed"
+          test "$changed" = "Cargo.lock"
+          grep -q '^name = "symthaea-planetary-industry"$' Cargo.lock
+          git diff -- Cargo.lock | tee pie-001-Cargo.lock.patch
+          test -s pie-001-Cargo.lock.patch
+          sha256sum Cargo.lock | tee candidate-lock-sha256.txt
+          sha256sum pie-001-Cargo.lock.patch | tee patch-sha256.txt
+
+      - name: Candidate package rustfmt
+        id: fmt
+        continue-on-error: true
+        run: cargo fmt -p "$PACKAGE" -- --check
+
+      - name: Candidate locked check
+        id: check
+        continue-on-error: true
+        run: cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Candidate locked tests
+        id: test
+        continue-on-error: true
+        run: cargo test -p "$PACKAGE" --all-targets --locked --no-fail-fast
+
+      - name: Candidate locked strict clippy
+        id: clippy
+        continue-on-error: true
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Freeze one-file candidate successor
+        id: freeze
+        if: steps.lock_scope.outcome == 'success' && steps.fmt.outcome == 'success' && steps.check.outcome == 'success' && steps.test.outcome == 'success' && steps.clippy.outcome == 'success'
+        run: |
+          set -euo pipefail
+          git config user.name "PIE qualification bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add Cargo.lock
+          test "$(git diff --cached --name-only)" = "Cargo.lock"
+          git commit -m "chore(pie): refresh lockfile for planetary industry"
+          test "$(git rev-parse HEAD^)" = "$SUBJECT_SHA"
+          git rev-parse HEAD | tee candidate-commit.txt
+          git rev-parse HEAD^{tree} | tee candidate-tree.txt
+          git push origin "HEAD:refs/heads/$CANDIDATE_BRANCH" --force-with-lease
+
+      - name: Emit derivation receipt
+        if: always()
+        run: |
+          candidate_commit="NONE"
+          candidate_tree="NONE"
+          [ -f candidate-commit.txt ] && candidate_commit="$(cat candidate-commit.txt)"
+          [ -f candidate-tree.txt ] && candidate_tree="$(cat candidate-tree.txt)"
+          source_tree="$(cat source-tree.txt 2>/dev/null || echo UNKNOWN)"
+          cat > pie-001-lockfile-derivation.json <<EOF
+          {
+            "schema": "symthaea.pie.lockfile-derivation.v1",
+            "source_subject_sha": "$SUBJECT_SHA",
+            "source_subject_tree": "$source_tree",
+            "package": "$PACKAGE",
+            "rust_toolchain": "1.96.0",
+            "materialize_check_outcome": "${{ steps.materialize.outcome }}",
+            "closed_world_lock_scope": "${{ steps.lock_scope.outcome }}",
+            "candidate_fmt": "${{ steps.fmt.outcome }}",
+            "candidate_locked_check": "${{ steps.check.outcome }}",
+            "candidate_locked_test": "${{ steps.test.outcome }}",
+            "candidate_locked_clippy": "${{ steps.clippy.outcome }}",
+            "freeze_outcome": "${{ steps.freeze.outcome }}",
+            "candidate_commit": "$candidate_commit",
+            "candidate_tree": "$candidate_tree",
+            "allowed_tracked_mutation": "Cargo.lock only",
+            "authority": "diagnostic derivation; candidate must be independently qualified"
+          }
+          EOF
+          cat pie-001-lockfile-derivation.json
+
+      - name: Upload derivation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-001-lockfile-derivation
+          path: |
+            pie-001-lockfile-derivation.json
+            pie-001-Cargo.lock.patch
+            source-tree.txt
+            source-lock-sha256.txt
+            candidate-lock-sha256.txt
+            patch-sha256.txt
+            candidate-commit.txt
+            candidate-tree.txt
+          if-no-files-found: warn
+
+      - name: Require frozen candidate
+        if: always()
+        run: test "${{ steps.freeze.outcome }}" = success
