@@ -27,7 +27,7 @@ pub use causal_discovery::{CausalDirection, CausalDiscoveryEngine, MetaFeatures}
 pub use nixos_causal::NixOSCausalAnalyzer;
 pub use reasoning_capability_artifact::{
     CapabilityArtifactError, ReasoningCapabilityArtifact,
-    REASONING_CAPABILITY_ARTIFACT_SCHEMA_VERSION,
+    REASONING_CAPABILITY_ARTIFACT_SCHEMA_VERSION, REASONING_CAPABILITY_ARTIFACT_SERIALIZATION,
 };
 pub use reasoning_capability_matrix::{
     build_capability_lane, build_capability_matrix, BaselineMetric, CapabilityLaneDescriptor,
