@@ -7,7 +7,8 @@ use symthaea_discovery::{
 use symthaea_energy_evidence_envelope::wrap_evidence_payload_json;
 use symthaea_energy_material_campaign::{
     admit_campaign_result, freeze_campaign_manifest, AcquisitionDeclaration,
-    CampaignAdmissionReceipt, EvidenceLanePlan, SourceCommitment, Tier1CampaignManifest,
+    CampaignAdmissionReceipt, CampaignError, EvidenceLanePlan, SourceCommitment,
+    Tier1CampaignManifest,
 };
 use symthaea_energy_material_candidate_version::{
     anchor_candidate, bind_dossier_to_candidate_version, ReceiptVersionAttestation,
@@ -19,7 +20,7 @@ use symthaea_energy_material_screening::{
     EnergyMaterialScreeningPolicy, EvidenceDimension, MetricContract,
 };
 use symthaea_energy_native_campaign_admission::{
-    admit_native_campaign_result, NativeCampaignAdmissionReceipt,
+    admit_native_campaign_result, NativeAdmissionError, NativeCampaignAdmissionReceipt,
 };
 use symthaea_energy_native_dossier::assemble_native_envelope_dossier;
 
@@ -32,13 +33,67 @@ const ARTIFACT_SHA: &str =
 const WRONG_SHA: &str =
     "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mutation {
     Clean,
     WrongQuery,
     MissingArtifactProvenance,
     WrongReceipt,
     UnexpectedDeclaration,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FailureClass {
+    Setup,
+    AcquisitionDeclarationBinding,
+    AcquiredArtifactProvenance,
+    UnexpectedDeclaration,
+    OtherAdmission,
+}
+
+impl Mutation {
+    fn expected_failure(self) -> Option<FailureClass> {
+        match self {
+            Self::Clean => None,
+            // The compatibility API intentionally combines query and receipt
+            // mismatch into AcquisitionDeclarationMismatch. The native API is
+            // more specific, but both belong to one semantic binding class.
+            Self::WrongQuery | Self::WrongReceipt => {
+                Some(FailureClass::AcquisitionDeclarationBinding)
+            }
+            Self::MissingArtifactProvenance => Some(FailureClass::AcquiredArtifactProvenance),
+            Self::UnexpectedDeclaration => Some(FailureClass::UnexpectedDeclaration),
+        }
+    }
+}
+
+fn classify_compatibility(error: &CampaignError) -> FailureClass {
+    match error {
+        CampaignError::AcquisitionDeclarationMismatch(_) => {
+            FailureClass::AcquisitionDeclarationBinding
+        }
+        CampaignError::AcquiredArtifactNotInProvenance(_) => {
+            FailureClass::AcquiredArtifactProvenance
+        }
+        CampaignError::UnexpectedAcquisitionDeclaration => FailureClass::UnexpectedDeclaration,
+        _ => FailureClass::OtherAdmission,
+    }
+}
+
+fn classify_native(error: &NativeAdmissionError) -> FailureClass {
+    match error {
+        NativeAdmissionError::AcquisitionQueryMismatch(_)
+        | NativeAdmissionError::AcquisitionReceiptMismatch(_) => {
+            FailureClass::AcquisitionDeclarationBinding
+        }
+        NativeAdmissionError::AcquiredArtifactNotInProvenance(_) => {
+            FailureClass::AcquiredArtifactProvenance
+        }
+        NativeAdmissionError::UnexpectedAcquisitionDeclaration => {
+            FailureClass::UnexpectedDeclaration
+        }
+        _ => FailureClass::OtherAdmission,
+    }
 }
 
 fn code(dimension: EvidenceDimension) -> u8 {
@@ -158,10 +213,7 @@ fn compatibility_receipt_sha(dimension: EvidenceDimension) -> String {
     std::iter::repeat(nibble).take(64).collect()
 }
 
-fn declaration(
-    source_receipt_sha256: String,
-    mutation: Mutation,
-) -> AcquisitionDeclaration {
+fn declaration(source_receipt_sha256: String, mutation: Mutation) -> AcquisitionDeclaration {
     AcquisitionDeclaration {
         dimension: EvidenceDimension::FunctionalPerformance,
         acquisition_query_sha256: if matches!(mutation, Mutation::WrongQuery) {
@@ -191,7 +243,9 @@ fn unexpected_declaration() -> AcquisitionDeclaration {
     }
 }
 
-fn run_compatibility(mutation: Mutation) -> Result<CampaignAdmissionReceipt, String> {
+fn run_compatibility(
+    mutation: Mutation,
+) -> Result<CampaignAdmissionReceipt, FailureClass> {
     let manifest = manifest();
     let candidate = candidate();
     let candidate_sha = manifest.candidate_anchor.candidate_sha256.clone();
@@ -233,9 +287,9 @@ fn run_compatibility(mutation: Mutation) -> Result<CampaignAdmissionReceipt, Str
         assertions,
         contributions,
     )
-    .map_err(|error| format!("assemble compatibility dossier: {error:?}"))?;
+    .map_err(|_| FailureClass::Setup)?;
     let bound = bind_dossier_to_candidate_version(candidate, dossier, attestations)
-        .map_err(|error| format!("bind compatibility dossier: {error:?}"))?;
+        .map_err(|_| FailureClass::Setup)?;
 
     let mut declarations = vec![declaration(
         compatibility_receipt_sha(EvidenceDimension::FunctionalPerformance),
@@ -246,10 +300,12 @@ fn run_compatibility(mutation: Mutation) -> Result<CampaignAdmissionReceipt, Str
     }
 
     admit_campaign_result(&manifest, &bound, declarations)
-        .map_err(|error| format!("compatibility admission: {error:?}"))
+        .map_err(|error| classify_compatibility(&error))
 }
 
-fn run_native(mutation: Mutation) -> Result<NativeCampaignAdmissionReceipt, String> {
+fn run_native(
+    mutation: Mutation,
+) -> Result<NativeCampaignAdmissionReceipt, FailureClass> {
     let manifest = manifest();
     let candidate_id = manifest.candidate_anchor.candidate.id.clone();
     let mut assertions = Vec::new();
@@ -264,10 +320,8 @@ fn run_native(mutation: Mutation) -> Result<NativeCampaignAdmissionReceipt, Stri
             "prospective-admission-parity-fixture-v0",
             format!("{{\"dimension\":{}}}", code(dimension)),
         )
-        .map_err(|error| format!("wrap native envelope: {error:?}"))?;
-        let receipt_sha = envelope
-            .sha256()
-            .map_err(|error| format!("hash native envelope: {error:?}"))?;
+        .map_err(|_| FailureClass::Setup)?;
+        let receipt_sha = envelope.sha256().map_err(|_| FailureClass::Setup)?;
         if dimension == EvidenceDimension::FunctionalPerformance {
             functional_receipt = Some(receipt_sha.clone());
         }
@@ -283,7 +337,7 @@ fn run_native(mutation: Mutation) -> Result<NativeCampaignAdmissionReceipt, Stri
     }
 
     let dossier = assemble_native_envelope_dossier(&manifest, assertions, envelopes)
-        .map_err(|error| format!("assemble native dossier: {error:?}"))?;
+        .map_err(|_| FailureClass::Setup)?;
     let mut declarations = vec![declaration(
         functional_receipt.expect("functional-performance envelope is mandatory"),
         mutation,
@@ -293,7 +347,7 @@ fn run_native(mutation: Mutation) -> Result<NativeCampaignAdmissionReceipt, Stri
     }
 
     admit_native_campaign_result(&manifest, &dossier, declarations)
-        .map_err(|error| format!("native admission: {error:?}"))
+        .map_err(|error| classify_native(&error))
 }
 
 #[test]
@@ -312,23 +366,25 @@ fn clean_prospective_acquisition_is_accepted_by_both_paths() {
 }
 
 #[test]
-fn prospective_acquisition_failures_have_accept_reject_parity() {
+fn prospective_acquisition_failures_have_semantic_class_parity() {
     for mutation in [
         Mutation::WrongQuery,
         Mutation::MissingArtifactProvenance,
         Mutation::WrongReceipt,
         Mutation::UnexpectedDeclaration,
     ] {
+        let expected = mutation.expected_failure().unwrap();
         let compatibility = run_compatibility(mutation);
         let native = run_native(mutation);
         assert_eq!(
-            compatibility.is_ok(),
-            native.is_ok(),
-            "prospective-acquisition parity diverged for {mutation:?}: compatibility={compatibility:?}, native={native:?}"
+            compatibility,
+            Err(expected),
+            "compatibility prospective path failed in the wrong semantic class for {mutation:?}"
         );
-        assert!(
-            compatibility.is_err(),
-            "corrupted prospective campaign unexpectedly passed for {mutation:?}"
+        assert_eq!(
+            native,
+            Err(expected),
+            "native prospective path failed in the wrong semantic class for {mutation:?}"
         );
     }
 }
