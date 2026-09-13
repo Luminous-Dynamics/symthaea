@@ -4,9 +4,9 @@
 
 //! Deterministic irregular-time compositional state-tracking benchmark.
 //!
-//! The benchmark is intentionally model-agnostic. It generates an exact symbolic
-//! world, event stream, and query/answer oracle so HLS, legacy HDC-LTC, CfC,
-//! recurrent, SSM, and attention baselines can receive equivalent supervision.
+//! This module is intentionally model-agnostic. It generates an exact symbolic
+//! world, event stream, query stream, and oracle so HLS, legacy HDC-LTC, CfC,
+//! recurrent, SSM, and attention baselines can be evaluated on the same task.
 //!
 //! World structure:
 //!
@@ -14,10 +14,9 @@
 //! object --owned_by--> entity --located_at--> location
 //! ```
 //!
-//! Events independently update either ownership or entity location. Therefore
-//! `ObjectLocation` queries require composition across two mutable relations.
-//! Historical queries require the model to answer about an earlier world state
-//! after later events have already occurred.
+//! Ownership and location mutate independently. `ObjectLocation` therefore
+//! requires composition across two mutable relations. Historical queries ask
+//! about an earlier world state after later events have already been observed.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -28,19 +27,13 @@ pub type LocationId = u16;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TrackingEventKind {
-    MoveEntity {
-        entity: EntityId,
-        to: LocationId,
-    },
-    TransferObject {
-        object: ObjectId,
-        to: EntityId,
-    },
+    MoveEntity { entity: EntityId, to: LocationId },
+    TransferObject { object: ObjectId, to: EntityId },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TrackingEvent {
-    /// Monotonically increasing event time in arbitrary continuous-time units.
+    /// Strictly increasing event time in arbitrary continuous-time units.
     pub time: f64,
     pub kind: TrackingEventKind,
 }
@@ -49,7 +42,7 @@ pub struct TrackingEvent {
 pub enum TrackingQueryKind {
     EntityLocation { entity: EntityId },
     ObjectOwner { object: ObjectId },
-    /// Compositional query: object -> owner -> owner's current location.
+    /// Two-hop mutable query: object -> owner -> owner's location.
     ObjectLocation { object: ObjectId },
 }
 
@@ -63,8 +56,8 @@ pub enum TrackingAnswer {
 pub struct TrackingQuery {
     /// Query is presented after this event has been observed.
     pub asked_after_event: usize,
-    /// World state to query. If smaller than `asked_after_event`, this is a
-    /// retrospective/historical query.
+    /// State index to answer about. Historical iff this is strictly smaller
+    /// than `asked_after_event`.
     pub as_of_event: usize,
     pub as_of_time: f64,
     pub kind: TrackingQueryKind,
@@ -83,13 +76,14 @@ pub struct StateTrackingBenchmarkConfig {
     pub objects: usize,
     pub locations: usize,
     pub events: usize,
-    /// Emit a query bundle after every N events.
+    /// Emit a current-state query bundle after every N events.
     pub query_every: usize,
     /// Minimum positive inter-event interval.
     pub min_dt: f64,
     /// Maximum positive inter-event interval.
     pub max_dt: f64,
-    /// Fraction of query bundles that include a retrospective target.
+    /// Probability that a query bundle also receives one strictly historical
+    /// compositional query.
     pub historical_query_rate: f64,
     pub seed: u64,
 }
@@ -242,8 +236,7 @@ impl StateTrackingBenchmark {
                 len: self.events.len(),
             });
         }
-        let state = self.replay_through(as_of_event);
-        Ok(answer(&state, kind))
+        Ok(answer(&self.replay_through(as_of_event), kind))
     }
 
     /// Score predictions in query order.
@@ -275,34 +268,32 @@ impl StateTrackingBenchmark {
 
         for (prediction, query) in predictions.iter().zip(self.queries.iter()) {
             let correct = *prediction == query.expected;
-            if correct {
-                score.correct += 1;
-            }
+            let hit = correct as usize;
+            score.correct += hit;
 
             if query.is_historical() {
                 score.historical_total += 1;
-                score.historical_correct += usize::from(correct);
+                score.historical_correct += hit;
             } else {
                 score.current_total += 1;
-                score.current_correct += usize::from(correct);
+                score.current_correct += hit;
             }
 
             match query.kind {
                 TrackingQueryKind::EntityLocation { .. } => {
                     score.entity_location_total += 1;
-                    score.entity_location_correct += usize::from(correct);
+                    score.entity_location_correct += hit;
                 }
                 TrackingQueryKind::ObjectOwner { .. } => {
                     score.object_owner_total += 1;
-                    score.object_owner_correct += usize::from(correct);
+                    score.object_owner_correct += hit;
                 }
                 TrackingQueryKind::ObjectLocation { .. } => {
                     score.object_location_total += 1;
-                    score.object_location_correct += usize::from(correct);
+                    score.object_location_correct += hit;
                 }
             }
         }
-
         Ok(score)
     }
 
@@ -344,7 +335,8 @@ impl StateTrackingBenchmark {
             )?;
 
             if asked_after > 0 && rng.next_f64() < self.config.historical_query_rate {
-                let as_of = rng.index(asked_after + 1);
+                // Strictly retrospective: index is always in [0, asked_after).
+                let as_of = rng.index(asked_after);
                 let historical_object = rng.index(self.config.objects) as ObjectId;
                 self.push_query(
                     &mut queries,
@@ -356,7 +348,6 @@ impl StateTrackingBenchmark {
                 )?;
             }
         }
-
         Ok(queries)
     }
 
@@ -440,6 +431,7 @@ fn validate_config(
         ("objects", config.objects),
         ("locations", config.locations),
     ] {
+        // A u16 id can represent 65,536 distinct values: 0..=65,535.
         if count > u16::MAX as usize + 1 {
             return Err(StateTrackingBenchmarkError::TooManyIds(name));
         }
@@ -486,8 +478,15 @@ struct XorShift64 {
 
 impl XorShift64 {
     fn new(seed: u64) -> Self {
+        let mixed = seed ^ 0x9E3779B97F4A7C15;
         Self {
-            state: seed ^ 0x9E3779B97F4A7C15,
+            // Xorshift has an absorbing all-zero state. Remap that one seed to a
+            // fixed non-zero state so every u64 seed remains usable.
+            state: if mixed == 0 {
+                0xD1B54A32D192ED03
+            } else {
+                mixed
+            },
         }
     }
 
@@ -503,7 +502,6 @@ impl XorShift64 {
     }
 
     fn next_f64(&mut self) -> f64 {
-        // 53 random bits mapped to [0,1).
         let bits = self.next_u64() >> 11;
         bits as f64 * (1.0 / ((1_u64 << 53) as f64))
     }
@@ -531,6 +529,18 @@ mod tests {
     }
 
     #[test]
+    fn pathological_zero_xorshift_seed_remains_live() {
+        let seed = 0x9E3779B97F4A7C15;
+        let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
+            seed,
+            events: 32,
+            ..StateTrackingBenchmarkConfig::default()
+        })
+        .unwrap();
+        assert!(benchmark.events.windows(2).all(|pair| pair[1].time > pair[0].time));
+    }
+
+    #[test]
     fn timestamps_are_strictly_increasing_and_irregular() {
         let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
             events: 1000,
@@ -539,7 +549,6 @@ mod tests {
             ..StateTrackingBenchmarkConfig::default()
         })
         .unwrap();
-
         let dts = benchmark
             .events
             .windows(2)
@@ -559,17 +568,18 @@ mod tests {
             ..StateTrackingBenchmarkConfig::default()
         })
         .unwrap();
-
         for query in &benchmark.queries {
-            let answer = benchmark
-                .oracle_answer(query.as_of_event, &query.kind)
-                .unwrap();
-            assert_eq!(answer, query.expected);
+            assert_eq!(
+                benchmark
+                    .oracle_answer(query.as_of_event, &query.kind)
+                    .unwrap(),
+                query.expected
+            );
         }
     }
 
     #[test]
-    fn benchmark_contains_compositional_and_historical_queries() {
+    fn requested_historical_queries_are_strictly_retrospective() {
         let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
             events: 500,
             query_every: 5,
@@ -577,7 +587,25 @@ mod tests {
             ..StateTrackingBenchmarkConfig::default()
         })
         .unwrap();
-        assert!(benchmark.queries.iter().any(TrackingQuery::is_historical));
+        let historical = benchmark
+            .queries
+            .iter()
+            .filter(|query| query.is_historical())
+            .collect::<Vec<_>>();
+        assert!(!historical.is_empty());
+        assert!(historical
+            .iter()
+            .all(|query| query.as_of_event < query.asked_after_event));
+    }
+
+    #[test]
+    fn benchmark_contains_compositional_queries() {
+        let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
+            events: 100,
+            query_every: 5,
+            ..StateTrackingBenchmarkConfig::default()
+        })
+        .unwrap();
         assert!(benchmark
             .queries
             .iter()
@@ -588,6 +616,7 @@ mod tests {
     fn perfect_oracle_predictions_score_one() {
         let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
             events: 100,
+            historical_query_rate: 1.0,
             ..StateTrackingBenchmarkConfig::default()
         })
         .unwrap();
@@ -599,9 +628,7 @@ mod tests {
         let score = benchmark.score(&predictions).unwrap();
         assert_eq!(score.accuracy(), 1.0);
         assert_eq!(score.current_accuracy(), 1.0);
-        if score.historical_total > 0 {
-            assert_eq!(score.historical_accuracy(), 1.0);
-        }
+        assert_eq!(score.historical_accuracy(), 1.0);
         assert_eq!(score.compositional_accuracy(), 1.0);
     }
 }
