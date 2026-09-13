@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-forge-cgroup-release-validation"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Deterministic Forge validation bound to release-verified cgroup containment"
+
+[dependencies]
+symthaea-algorithms = { path = "../../core/symthaea-algorithms" }
+symthaea-forge = { path = "../../domains/symthaea-forge" }
+symthaea-forge-cgroup-validation = { path = "../symthaea-forge-cgroup-validation" }
+symthaea-forge-linux-cgroup-control = { path = "../symthaea-forge-linux-cgroup-control" }
+symthaea-forge-linux-cgroup-observed-exec = { path = "../symthaea-forge-linux-cgroup-observed-exec" }
+symthaea-forge-linux-observed-exec = { path = "../symthaea-forge-linux-observed-exec" }
+serde = { workspace = true }
+thiserror = { workspace = true }
