@@ -1,0 +1,116 @@
+name: PIE-000 Lockfile Derivation
+
+on:
+  push:
+    branches:
+      - derive/pie-000-lockfile-f313e9cd
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  derive:
+    name: Derive PIE-000 Cargo.lock successor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SUBJECT_SHA: f313e9cdd105ce0a1ef37d7b19ae946dced54054
+      PACKAGE: symthaea-planetary-industry
+      CANDIDATE_BRANCH: derived/pie-000-lockfile-candidate
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Prove exact clean subject
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git status --porcelain --untracked-files=no)"
+          git rev-parse HEAD^{tree} | tee source-tree.txt
+          sha256sum Cargo.lock | tee source-lock-sha256.txt
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Materialize missing lock state
+        run: cargo check -p "$PACKAGE" --all-targets
+
+      - name: Verify closed-world lockfile mutation
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only)"
+          printf 'changed paths:\n%s\n' "$changed"
+          test "$changed" = "Cargo.lock"
+          grep -q '^name = "symthaea-planetary-industry"$' Cargo.lock
+          git diff -- Cargo.lock | tee pie-000-Cargo.lock.patch
+          test -s pie-000-Cargo.lock.patch
+          sha256sum Cargo.lock | tee candidate-lock-sha256.txt
+          sha256sum pie-000-Cargo.lock.patch | tee patch-sha256.txt
+
+      - name: Candidate package rustfmt
+        run: cargo fmt -p "$PACKAGE" -- --check
+
+      - name: Candidate locked check
+        run: cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Candidate locked tests
+        run: cargo test -p "$PACKAGE" --all-targets --locked --no-fail-fast
+
+      - name: Candidate locked strict clippy
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Freeze one-file candidate successor
+        run: |
+          set -euo pipefail
+          git config user.name "PIE qualification bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add Cargo.lock
+          test "$(git diff --cached --name-only)" = "Cargo.lock"
+          git commit -m "chore(pie): refresh lockfile for planetary industry"
+          test "$(git rev-parse HEAD^)" = "$SUBJECT_SHA"
+          git rev-parse HEAD | tee candidate-commit.txt
+          git rev-parse HEAD^{tree} | tee candidate-tree.txt
+          git push origin "HEAD:refs/heads/$CANDIDATE_BRANCH" --force-with-lease
+
+      - name: Emit derivation receipt
+        run: |
+          cat > pie-000-lockfile-derivation.json <<EOF
+          {
+            "schema": "symthaea.pie.lockfile-derivation.v1",
+            "source_subject_sha": "$SUBJECT_SHA",
+            "source_subject_tree": "$(cat source-tree.txt)",
+            "package": "$PACKAGE",
+            "rust_toolchain": "1.96.0",
+            "candidate_lock_sha256": "$(cut -d' ' -f1 candidate-lock-sha256.txt)",
+            "patch_sha256": "$(cut -d' ' -f1 patch-sha256.txt)",
+            "candidate_commit": "$(cat candidate-commit.txt)",
+            "candidate_tree": "$(cat candidate-tree.txt)",
+            "allowed_tracked_mutation": "Cargo.lock only",
+            "qualification": "rustfmt + locked all-target check + locked all-target tests + locked strict clippy",
+            "authority": "focused package qualification; not repository-wide CI"
+          }
+          EOF
+          cat pie-000-lockfile-derivation.json
+
+      - name: Upload derivation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-000-lockfile-derivation
+          path: |
+            pie-000-lockfile-derivation.json
+            pie-000-Cargo.lock.patch
+            source-tree.txt
+            source-lock-sha256.txt
+            candidate-lock-sha256.txt
+            patch-sha256.txt
+            candidate-commit.txt
+            candidate-tree.txt
+          if-no-files-found: error
