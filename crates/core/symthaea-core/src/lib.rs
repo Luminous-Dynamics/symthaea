@@ -84,6 +84,8 @@ pub mod hdc;
 pub mod implicit_manifold;
 /// Qualified local charts, overlap witnesses, and partial finite-atlas evidence.
 pub mod manifold_atlas;
+/// Fallible coordinate-dependent Riemannian metric fields with validated samples.
+pub mod metric_field;
 /// Shared mathematical utilities: softmax, numerical helpers.
 pub mod math;
 /// Planar SO(2)/SE(2) configuration geometry built on the shared circle factor.
