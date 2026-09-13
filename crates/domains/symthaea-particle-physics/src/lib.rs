@@ -22,6 +22,8 @@
 //!   with explicit orientation and per-orientation path work bounds
 //! - **Bounded Bresenham Wilson transport**: linear-cost generalized off-axis
 //!   paths for benchmark-scale cubic-orbit measurements
+//! - **Deterministic LQCD reductions**: canonical-key binary64 pairwise aggregation
+//!   with explicit shard-union semantics and fail-closed malformed inputs
 //!
 //! ## Natural Units
 //!
@@ -44,6 +46,7 @@ pub mod lattice_bresenham_wilson;
 pub mod lattice_cubic_wilson;
 pub mod lattice_gauge;
 pub mod lattice_mixed_wilson;
+pub mod lattice_numerical_profile;
 pub mod lattice_off_axis_wilson;
 pub mod lattice_qcd;
 pub mod lattice_spatial_smearing;
@@ -80,6 +83,10 @@ pub use lattice_gauge::{
 pub use lattice_mixed_wilson::{
     MIXED_SPATIAL_APE_TEMPORAL_UNSMEARED_WILSON_ID, MixedWilsonError,
     average_mixed_spatial_wilson_rectangle, mixed_spatial_wilson_rectangle,
+};
+pub use lattice_numerical_profile::{
+    LQCD_CANONICAL_KEYED_PAIRWISE_F64_ID, LQCD_CANONICAL_REDUCTION_PROFILE,
+    LqcdReductionError, LqcdReductionProfile, canonical_keyed_mean, canonical_keyed_sum,
 };
 pub use lattice_off_axis_wilson::{
     SHORTEST_PATH_SYMMETRIZED_OFF_AXIS_WILSON_ID, OffAxisWilsonError,
