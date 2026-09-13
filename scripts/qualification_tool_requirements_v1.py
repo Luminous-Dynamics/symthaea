@@ -200,6 +200,29 @@ def normalize_requirements(
             f"required tool: missing={missing}"
         )
 
+    # Automatic floor: every bare executable directly named by a recipe must be represented by a
+    # tool requirement for that exact recipe. Repository-relative argv entries containing '/' are
+    # source/input-closure concerns; auxiliary subprocesses remain explicitly reviewed profile
+    # semantics rather than guessed here.
+    tools_by_recipe: dict[str, set[str]] = {recipe_id: set() for recipe_id in resolved_recipe_ids}
+    for tool in tools:
+        for recipe_id in tool["required_for_recipe_ids"]:
+            tools_by_recipe[recipe_id].add(tool["executable_basename"])
+    for recipe in resolved_recipes:
+        directly_invoked = sorted(
+            {
+                step["argv"][0]
+                for step in recipe["steps"]
+                if "/" not in step["argv"][0]
+            }
+        )
+        missing_direct = sorted(set(directly_invoked) - tools_by_recipe[recipe["recipe_id"]])
+        if missing_direct:
+            raise train.TrainManifestError(
+                "qualification tool requirements: direct recipe executables are not covered by "
+                f"tool requirements for {recipe['recipe_id']}: {missing_direct}"
+            )
+
     non_claims = train._require_sorted_unique_strings(
         value["non_claims"], where="qualification tool requirements.non_claims"
     )
