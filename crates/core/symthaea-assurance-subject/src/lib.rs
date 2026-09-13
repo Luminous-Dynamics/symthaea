@@ -188,6 +188,57 @@ impl SurfaceLocator {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CommitmentMethod {
+    /// SHA-256 over the exact artifact bytes.
+    ArtifactBytesSha256,
+    /// SHA-256 over a separately specified canonical descriptor. The
+    /// descriptor schema/version must be part of the surrounding assurance
+    /// contract before this method can imply cross-implementation equality.
+    CanonicalDescriptorSha256,
+    /// SHA-256 over an exact provider revision token. This binds the token,
+    /// but does not prove that the provider treats the token as immutable.
+    ProviderRevisionTokenSha256,
+    /// Domain-specific method identifier. Consumers must understand the
+    /// method semantics before treating two commitments as equivalent.
+    Custom(StableId),
+}
+
+impl CommitmentMethod {
+    fn canonical_name(&self) -> String {
+        match self {
+            Self::ArtifactBytesSha256 => "artifact-bytes-sha256".into(),
+            Self::CanonicalDescriptorSha256 => "canonical-descriptor-sha256".into(),
+            Self::ProviderRevisionTokenSha256 => "provider-revision-token-sha256".into(),
+            Self::Custom(id) => format!("custom:{}", id.as_str()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MaterialCommitment {
+    method: CommitmentMethod,
+    digest: DigestSha256,
+}
+
+impl MaterialCommitment {
+    pub fn new(method: CommitmentMethod, digest: DigestSha256) -> Self {
+        Self { method, digest }
+    }
+
+    pub fn artifact_bytes(digest: DigestSha256) -> Self {
+        Self::new(CommitmentMethod::ArtifactBytesSha256, digest)
+    }
+
+    pub fn method(&self) -> &CommitmentMethod {
+        &self.method
+    }
+
+    pub fn digest(&self) -> &DigestSha256 {
+        &self.digest
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnavailabilityReason {
     ProviderDoesNotExpose,
@@ -211,9 +262,10 @@ impl UnavailabilityReason {
 pub enum SurfaceState {
     /// Exact material identity commitment is available.
     ///
-    /// This does not imply that the committed artifact is retrievable or
-    /// executable; ASSURE-001 establishes identity completeness, not replay.
-    Known(DigestSha256),
+    /// The commitment method is identity-bound so a hash of artifact bytes is
+    /// not silently equated with a hash of a descriptor or provider token.
+    /// A known commitment still does not imply retrievability or replayability.
+    Known(MaterialCommitment),
     /// The surface is material, but its exact identity is not known.
     Unknown,
     /// The surface is material, but the exact identity cannot currently be
@@ -384,15 +436,22 @@ impl AiSubjectManifest {
             field(&mut out, "state", binding.state.canonical_name());
             match &binding.state {
                 SurfaceState::Known(commitment) => {
-                    field(&mut out, "commitment", commitment.as_str());
+                    field(
+                        &mut out,
+                        "commitment-method",
+                        &commitment.method.canonical_name(),
+                    );
+                    field(&mut out, "commitment-digest", commitment.digest.as_str());
                     field(&mut out, "unavailability", "");
                 }
                 SurfaceState::Unavailable(reason) => {
-                    field(&mut out, "commitment", "");
+                    field(&mut out, "commitment-method", "");
+                    field(&mut out, "commitment-digest", "");
                     field(&mut out, "unavailability", &reason.canonical_name());
                 }
                 SurfaceState::Unknown | SurfaceState::NotApplicable => {
-                    field(&mut out, "commitment", "");
+                    field(&mut out, "commitment-method", "");
+                    field(&mut out, "commitment-digest", "");
                     field(&mut out, "unavailability", "");
                 }
             }
