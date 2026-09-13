@@ -17,12 +17,12 @@ def selftest(policy_path:Path):
   r=Path(td);repo=r/'repo';rt=r/'rt';er=r/'evidence';repo.mkdir();rt.mkdir();er.mkdir()
   pol={'schema_version':P,'study_id':'synthetic','required_environment_profiles':['acquisition','gis','analysis'],'protected_files':['tool.py'],
    'stage_plan':[{'id':'acquire','environment_profile':'acquisition','may_access_network':True},{'id':'gis','environment_profile':'gis','may_access_network':False},{'id':'analysis','environment_profile':'analysis','may_access_network':False}],
-   'network_authorized_stage_ids':['acquire'],'classification_order':['descriptive_geometry','empirical_sampled_visibility','hybrid_scenario_sampled_visibility','risk_qualified_visibility','deterministic_visibility'],
+   'network_authorized_stage_ids':['acquire'],'environment_contracts':{k:{'required_packages':['numpy'] if k in ('gis','analysis') else [],'required_libraries':['openssl'] if k=='acquisition' else (['gdal','proj'] if k=='gis' else []),'required_environment_variables':['PYTHONHASHSEED','TZ']} for k in ['acquisition','gis','analysis']},'classification_order':['descriptive_geometry','empirical_sampled_visibility','hybrid_scenario_sampled_visibility','risk_qualified_visibility','deterministic_visibility'],
    'classification_ceiling':'hybrid_scenario_sampled_visibility','semantic_rules':{'descriptive_geometry':{'enabled':True,'requires_all_artifact_ids':['q']},'empirical_sampled_visibility':{'enabled':True,'requires_all_artifact_ids':['q']},'hybrid_scenario_sampled_visibility':{'enabled':True,'requires_all_artifact_ids':['z']},'risk_qualified_visibility':{'enabled':False,'requires_all_artifact_ids':[]},'deterministic_visibility':{'enabled':False,'requires_all_artifact_ids':[]}}}
   pp=r/'policy.json';wj(pp,pol);(repo/'tool.py').write_text('fixed\n')
   em={}
   for k in ['acquisition','gis','analysis']:
-   em[k]=k+'.json';wj(rt/em[k],{'schema_version':E,'profile':k,'runtime':{'python':'3.13','platform':'synthetic'}})
+   em[k]=k+'.json';wj(rt/em[k],{'schema_version':E,'profile':k,'runtime':{'python':{'implementation':'cpython','version':'3.13.0','executable_sha256':'a'*64},'platform':{'system':'Linux','machine':'x86_64'},'packages':({'numpy':'1.26.4'} if k in ('gis','analysis') else {}),'libraries':({'openssl':'OpenSSL synthetic'} if k=='acquisition' else ({'gdal':'3.9.0','proj':'9.4.0'} if k=='gis' else {})),'environment':{'PYTHONHASHSEED':None,'TZ':'UTC'}}})
   head='1'*64;pre=prepare(pp,repo,head,rt,em)
   if pre!=prepare(pp,repo,head,rt,em):raise CE('PREPARED not deterministic')
 
@@ -44,7 +44,7 @@ def selftest(policy_path:Path):
   if fi!=finalize(pre,fr,pp,repo,head,rt,mp,er,ap):raise CE('FINALIZED not deterministic')
   if fi['promotion_eligible'] is not False or fi['campaign_completeness']!='incomplete_declared':raise CE('FINALIZED incorrectly promoted incomplete campaign')
 
-  old=(rt/'analysis.json').read_bytes();wj(rt/'analysis.json',{'schema_version':E,'profile':'analysis','runtime':{'python':'drift'}});expect('environment drift before freeze',lambda:verify_pre(pre,pp,repo,head,rt));(rt/'analysis.json').write_bytes(old)
+  old=(rt/'analysis.json').read_bytes();wj(rt/'analysis.json',{'schema_version':E,'profile':'analysis','runtime':{'python':{'implementation':'cpython','version':'drift','executable_sha256':'a'*64},'platform':{'system':'Linux','machine':'x86_64'},'packages':{'numpy':'1.26.4'},'libraries':{},'environment':{'PYTHONHASHSEED':None,'TZ':'UTC'}}});expect('environment drift before freeze',lambda:verify_pre(pre,pp,repo,head,rt));(rt/'analysis.json').write_bytes(old)
   oldt=(repo/'tool.py').read_bytes();(repo/'tool.py').write_text('drift\n');expect('tool drift before freeze',lambda:verify_pre(pre,pp,repo,head,rt));(repo/'tool.py').write_bytes(oldt)
 
   oldz=(er/'z.json').read_bytes();wj(er/'z.json',receipt({'schema_version':'z.v1','upstream':q['receipt_sha256'],'changed':True}));expect('artifact substitution after freeze',lambda:verify_frz(fr,pre,pp,repo,head,rt,mp,er));(er/'z.json').write_bytes(oldz)
@@ -70,7 +70,7 @@ def selftest(policy_path:Path):
   bad={'schema_version':A,'study_id':'synthetic','evidence_class':'risk_qualified_visibility','basis_artifact_ids':['z']};expect('over-promotion',lambda:classify(pol,va(bad,'synthetic'),{'q','z'}))
   wrong={'schema_version':A,'study_id':'synthetic','evidence_class':'hybrid_scenario_sampled_visibility','basis_artifact_ids':['q']};expect('missing provenance',lambda:classify(pol,va(wrong,'synthetic'),{'q','z'}))
   future_basis={'schema_version':A,'study_id':'synthetic','evidence_class':'descriptive_geometry','basis_artifact_ids':['future']};expect('unavailable semantic basis',lambda:classify(pol,va(future_basis,'synthetic'),{'q','z'}))
- print('LL-009AG self-test PASS: deterministic replay; exact dependency bindings; required/optional/unavailable handling; drift, substitution, closure, self-hash tamper, cycles, and semantic over-promotion fail closed')
+ print('LL-009AG self-test PASS: deterministic replay; exact dependency bindings; required/optional/unavailable handling; environment contracts; drift, substitution, closure, self-hash tamper, cycles, and semantic over-promotion fail closed')
 
 def rr(p:Path,sch:str):v=lj(p);vr(v,sch);return v
 def common(x):x.add_argument('--policy',type=Path,required=True);x.add_argument('--repo-root',type=Path,required=True);x.add_argument('--repo-head',required=True);x.add_argument('--runtime-root',type=Path,required=True)
