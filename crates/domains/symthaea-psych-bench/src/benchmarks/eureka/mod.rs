@@ -21,6 +21,8 @@ mod custody_identity_tests;
 mod fep_comparator_freeze;
 #[cfg(feature = "symthaea-backend")]
 mod fep_development;
+#[cfg(feature = "symthaea-backend")]
+mod heldout_seal;
 pub mod hidden_world;
 mod promotion;
 mod selection;
