@@ -18,23 +18,25 @@ use super::super::types::{EffectiveDimSource, RecurrentMaskEvent};
 
 /// Resolve the immediately preceding committed cognitive-loop FEP action for JEPA.
 ///
-/// Presence comes from the generic FEP agent's learning-commitment slot rather
-/// than the legacy zero-filled `last_action_idx` compatibility field. The live
-/// cognitive-loop action domain is deliberately closed to the four typed actions
-/// introduced by #2083; configuration drift therefore fails closed instead of
+/// Presence comes from the generic FEP agent's learning-commitment slot. Freshness
+/// comes from agreement with `last_action_idx`, which is rewritten after each live
+/// FEP step. The live cognitive-loop action domain is deliberately closed to the
+/// four typed actions introduced by #2083. Cold start, reset, stale commitment,
+/// rejected selection, and configuration drift therefore fail closed instead of
 /// manufacturing action identity.
 #[cfg(any(feature = "jepa", test))]
 fn jepa_predecessor_action(
     committed_action: Option<usize>,
+    compatibility_action: u8,
     configured_actions: usize,
 ) -> Option<u8> {
     if configured_actions != InternalRegulationAction::ALL.len() {
         return None;
     }
 
-    committed_action
-        .and_then(|index| InternalRegulationAction::try_from(index).ok())
-        .map(|action| action.raw_index() as u8)
+    let action = committed_action.and_then(|index| InternalRegulationAction::try_from(index).ok())?;
+    let raw = action.raw_index() as u8;
+    (raw == compatibility_action).then_some(raw)
 }
 
 impl CognitiveLoopService {
@@ -561,12 +563,11 @@ impl CognitiveLoopService {
 
             // CfC planning runs before this cycle's FEP step. Condition JEPA only
             // on an action that the generic FEP agent actually committed on the
-            // preceding cycle and that belongs to the exact four-action typed
-            // cognitive-loop domain. Cold start, reset, configuration drift, and
-            // rejected out-of-domain selections therefore produce no fabricated
-            // action-conditioned training example.
+            // preceding cycle, whose per-cycle compatibility slot agrees, and that
+            // belongs to the exact four-action typed cognitive-loop domain.
             let previous_action = jepa_predecessor_action(
                 self.fep.agent.last_action,
+                self.fep.last_action_idx,
                 self.fep.agent.config.num_actions,
             );
 
@@ -581,8 +582,9 @@ impl CognitiveLoopService {
             } else {
                 tracing::trace!(
                     committed_action = ?self.fep.agent.last_action,
+                    compatibility_action = self.fep.last_action_idx,
                     configured_actions = self.fep.agent.config.num_actions,
-                    "JEPA action-conditioned training skipped: no valid committed FEP predecessor"
+                    "JEPA action-conditioned training skipped: no fresh valid committed FEP predecessor"
                 );
             }
         }
@@ -782,24 +784,33 @@ mod tests {
 
     #[test]
     fn jepa_predecessor_requires_real_commitment() {
-        assert_eq!(jepa_predecessor_action(None, 4), None);
+        assert_eq!(jepa_predecessor_action(None, 0, 4), None);
     }
 
     #[test]
-    fn jepa_predecessor_preserves_all_typed_actions() {
+    fn jepa_predecessor_preserves_all_fresh_typed_actions() {
         for action in 0..4 {
-            assert_eq!(jepa_predecessor_action(Some(action), 4), Some(action as u8));
+            assert_eq!(
+                jepa_predecessor_action(Some(action), action as u8, 4),
+                Some(action as u8)
+            );
         }
     }
 
     #[test]
+    fn jepa_predecessor_rejects_stale_commitment() {
+        assert_eq!(jepa_predecessor_action(Some(2), 3, 4), None);
+        assert_eq!(jepa_predecessor_action(Some(1), 4, 4), None);
+    }
+
+    #[test]
     fn jepa_predecessor_rejects_out_of_domain_commitment() {
-        assert_eq!(jepa_predecessor_action(Some(4), 4), None);
+        assert_eq!(jepa_predecessor_action(Some(4), 4, 4), None);
     }
 
     #[test]
     fn jepa_predecessor_fails_closed_on_action_domain_drift() {
-        assert_eq!(jepa_predecessor_action(Some(0), 5), None);
-        assert_eq!(jepa_predecessor_action(Some(3), 3), None);
+        assert_eq!(jepa_predecessor_action(Some(0), 0, 5), None);
+        assert_eq!(jepa_predecessor_action(Some(3), 3, 3), None);
     }
 }
