@@ -14,6 +14,7 @@
 //! - Public development probe for meta-reasoning control-flow and state persistence
 //! - Public development probe for context-optimizer objective plumbing
 //! - Canonical typed objective selection over measured primitive coordinates
+//! - Two-phase longitudinal metacognitive state with pre-outcome freezing
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -26,6 +27,7 @@ pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
 pub mod reasoning_meta_control_probe;
+pub mod reasoning_meta_state;
 pub mod reasoning_metacognition;
 pub mod reasoning_objective_core;
 pub mod reasoning_objective_plumbing_probe;
@@ -66,6 +68,12 @@ pub use reasoning_evidence_revision_probe::{
 pub use reasoning_meta_control_probe::{
     run_meta_control_probe, MetaControlObservation, MetaControlProbeReport,
     META_CONTROL_PROBE_VERSION,
+};
+pub use reasoning_meta_state::{
+    MetaCommitReport, MetaEpistemicState, MetaEpisodeObservation, MetaEpisodeRecord,
+    MetaOutcomeFeedback, MetaSignalRevision, MetaStateAuthority, MetaStateCheckpoint,
+    MetaStateError, MetaSupportSignals, OutcomeCommitReport,
+    META_EPISTEMIC_STATE_SCHEMA_VERSION,
 };
 pub use reasoning_metacognition::{
     evaluate_metacognition, BinaryDetectionReport, ConfidenceRevisionDirection,
