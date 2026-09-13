@@ -10,9 +10,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::care::{
-    CareCase, CareGap, CareOption, CompetenceAssessment, CompetenceLevel,
-};
+use crate::care::{CareCase, CareGap, CareOption, CompetenceAssessment, CompetenceLevel};
 use crate::consent::{
     ConsentEvaluation, ConsentLedger, ConsentPolicy, ConsentScopeId, ConsentState,
 };
@@ -198,19 +196,53 @@ pub enum AuthorityRestrictionReason {
     HumanReviewRecommended,
 }
 
+/// Opaque output of the authority envelope.
+///
+/// External callers can inspect this assessment but cannot construct an
+/// arbitrary one with hand-picked permissive fields. Production instances are
+/// created only by `RelationalAuthorityEnvelope::assess`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelationalAuthorityAssessment {
-    pub requested: ActionAuthority,
-    /// Descriptive maximum action class this layer would permit downstream policy
-    /// to consider. This is not an authenticated runtime permit.
-    pub ceiling: ActionAuthority,
-    pub reasons: BTreeSet<AuthorityRestrictionReason>,
-    pub human_review_recommended: bool,
+    requested: ActionAuthority,
+    ceiling: ActionAuthority,
+    reasons: BTreeSet<AuthorityRestrictionReason>,
+    human_review_recommended: bool,
 }
 
 impl RelationalAuthorityAssessment {
+    pub fn requested(&self) -> ActionAuthority {
+        self.requested
+    }
+
+    pub fn ceiling(&self) -> ActionAuthority {
+        self.ceiling
+    }
+
+    pub fn reasons(&self) -> &BTreeSet<AuthorityRestrictionReason> {
+        &self.reasons
+    }
+
+    pub fn human_review_recommended(&self) -> bool {
+        self.human_review_recommended
+    }
+
     pub fn was_restricted(&self) -> bool {
         self.ceiling < self.requested
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        requested: ActionAuthority,
+        ceiling: ActionAuthority,
+        reasons: BTreeSet<AuthorityRestrictionReason>,
+        human_review_recommended: bool,
+    ) -> Self {
+        Self {
+            requested,
+            ceiling,
+            reasons,
+            human_review_recommended,
+        }
     }
 }
 
@@ -227,8 +259,6 @@ impl RelationalAuthorityEnvelope {
         let mut reasons = BTreeSet::new();
         let mut human_review_recommended = false;
 
-        // Refusal/withdrawal is stronger than merely absent or ineffective consent:
-        // this exact scope should not continue being pushed as a recommendation.
         if matches!(input.consent.state, ConsentState::Refused | ConsentState::Withdrawn) {
             cap(&mut ceiling, ActionAuthority::Advise);
             reasons.insert(AuthorityRestrictionReason::ConsentRefusedOrWithdrawn);
@@ -311,8 +341,6 @@ impl RelationalAuthorityEnvelope {
             human_review_recommended = true;
         }
 
-        // Human availability can justify a recommendation for review, but its absence
-        // must never grant Symthaea more authority than the same case with a human available.
         if input.accountable_human_available
             && (high_relational
                 || high_vulnerability
@@ -358,9 +386,7 @@ pub enum AuthorityEnvelopeError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::care::{
-        CareCaseId, CareOptionId, CareProviderCandidate, NeedHypothesisId,
-    };
+    use crate::care::{CareCaseId, CareOptionId, CareProviderCandidate, NeedHypothesisId};
     use crate::consent::{ConsentInvalidityReason, ConsentValidity};
     use crate::perspective::{PerspectiveCoverage, StakeholderId, StakeholderPerspective};
 
@@ -411,7 +437,7 @@ mod tests {
         CareOption::new(
             CareOptionId::new("option-a").unwrap(),
             NeedHypothesisId::new("need-a").unwrap(),
-            CareProviderCandidate::Symthaea,
+            crate::care::CareProviderCandidate::Symthaea,
             "bounded support",
             [],
             [],
@@ -435,7 +461,7 @@ mod tests {
     fn low_risk_effectively_consented_reversible_action_is_not_lowered() {
         let input = baseline(ActionAuthority::ActReversible);
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
-        assert_eq!(assessment.ceiling, ActionAuthority::ActReversible);
+        assert_eq!(assessment.ceiling(), ActionAuthority::ActReversible);
         assert!(!assessment.was_restricted());
     }
 
@@ -445,9 +471,9 @@ mod tests {
         input.consent = ineffective_unknown();
         input.consent_required = true;
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
-        assert_eq!(assessment.ceiling, ActionAuthority::Recommend);
+        assert_eq!(assessment.ceiling(), ActionAuthority::Recommend);
         assert!(assessment
-            .reasons
+            .reasons()
             .contains(&AuthorityRestrictionReason::ConsentNotEffective));
     }
 
@@ -457,7 +483,7 @@ mod tests {
         input.consent = ineffective_unknown();
         input.consent_required = false;
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
-        assert_eq!(assessment.ceiling, ActionAuthority::ActReversible);
+        assert_eq!(assessment.ceiling(), ActionAuthority::ActReversible);
     }
 
     #[test]
@@ -469,9 +495,9 @@ mod tests {
             reasons: [ConsentInvalidityReason::Refused].into_iter().collect(),
         };
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
-        assert_eq!(assessment.ceiling, ActionAuthority::Advise);
+        assert_eq!(assessment.ceiling(), ActionAuthority::Advise);
         assert!(assessment
-            .reasons
+            .reasons()
             .contains(&AuthorityRestrictionReason::ConsentRefusedOrWithdrawn));
     }
 
@@ -480,7 +506,7 @@ mod tests {
         let mut input = baseline(ActionAuthority::ActReversible);
         input.provider_competence = CompetenceLevel::Insufficient;
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
-        assert_eq!(assessment.ceiling, ActionAuthority::Advise);
+        assert_eq!(assessment.ceiling(), ActionAuthority::Advise);
     }
 
     #[test]
@@ -488,8 +514,8 @@ mod tests {
         let mut input = baseline(ActionAuthority::ActReversible);
         input.provider_competence_confidence = 0.1;
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
-        assert_eq!(assessment.ceiling, ActionAuthority::Advise);
-        assert!(assessment.reasons.contains(
+        assert_eq!(assessment.ceiling(), ActionAuthority::Advise);
+        assert!(assessment.reasons().contains(
             &AuthorityRestrictionReason::ProviderCompetenceConfidenceInsufficient
         ));
     }
@@ -500,12 +526,12 @@ mod tests {
         input.pre_action_care_gap_count = 2;
         input.unresolved_stakeholders = 1;
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
-        assert_eq!(assessment.ceiling, ActionAuthority::Recommend);
+        assert_eq!(assessment.ceiling(), ActionAuthority::Recommend);
         assert!(assessment
-            .reasons
+            .reasons()
             .contains(&AuthorityRestrictionReason::CareProcessIncomplete));
         assert!(assessment
-            .reasons
+            .reasons()
             .contains(&AuthorityRestrictionReason::UnresolvedStakeholders));
     }
 
@@ -515,8 +541,8 @@ mod tests {
         input.relational_dependency = 0.9;
         input.vulnerability = 0.9;
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
-        assert_eq!(assessment.ceiling, ActionAuthority::Recommend);
-        assert!(assessment.human_review_recommended);
+        assert_eq!(assessment.ceiling(), ActionAuthority::Recommend);
+        assert!(assessment.human_review_recommended());
     }
 
     #[test]
@@ -524,8 +550,8 @@ mod tests {
         let mut input = baseline(ActionAuthority::ActIrreversible);
         input.epistemic = EpistemicState::new(0.7, 0.2);
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
-        assert_eq!(assessment.ceiling, ActionAuthority::Advise);
-        assert!(assessment.reasons.contains(
+        assert_eq!(assessment.ceiling(), ActionAuthority::Advise);
+        assert!(assessment.reasons().contains(
             &AuthorityRestrictionReason::IrreversibleActionUnderMaterialUncertainty
         ));
     }
@@ -540,7 +566,7 @@ mod tests {
 
         let a = RelationalAuthorityEnvelope.assess(&with_human, policy());
         let b = RelationalAuthorityEnvelope.assess(&without_human, policy());
-        assert_eq!(a.ceiling, b.ceiling);
+        assert_eq!(a.ceiling(), b.ceiling());
     }
 
     #[test]
@@ -556,7 +582,7 @@ mod tests {
         higher_risk.unresolved_stakeholders = 2;
         let high = RelationalAuthorityEnvelope.assess(&higher_risk, policy());
 
-        assert!(high.ceiling <= low.ceiling);
+        assert!(high.ceiling() <= low.ceiling());
     }
 
     #[test]
@@ -589,8 +615,6 @@ mod tests {
         )
         .unwrap();
 
-        // The empty care case has true pre-action gaps. Missing response/outcome
-        // are not counted here because no action has happened yet.
         assert!(input.pre_action_care_gap_count > 0);
         assert_eq!(input.unresolved_stakeholders, 1);
         assert_eq!(input.consent.state, ConsentState::Unknown);
