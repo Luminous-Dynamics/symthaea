@@ -22,6 +22,8 @@ use symthaea_energy_native_dossier::{
 
 const LINEAGE_SHA: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const OTHER_LINEAGE_SHA: &str =
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
 fn code(dimension: EvidenceDimension) -> u8 {
     match dimension {
@@ -226,6 +228,38 @@ fn changed_candidate_specification_invalidates_old_receipt_replay() {
         original_manifest.candidate_anchor.candidate_sha256,
         changed_manifest.candidate_anchor.candidate_sha256
     );
+    assert_ne!(
+        original_manifest.sha256().unwrap(),
+        changed_manifest.sha256().unwrap()
+    );
+    assert!(receipt.validate_with_inputs(&changed_manifest, &dossier).is_err());
+}
+
+#[test]
+fn changed_lane_method_parameters_invalidate_old_receipt_replay() {
+    let (original_manifest, dossier, receipt) = clean_inputs();
+    let mut changed_manifest = original_manifest.clone();
+    changed_manifest.evidence_lanes[0]
+        .method_parameters
+        .insert("screening_mode".into(), "alternate".into());
+    changed_manifest.validate().unwrap();
+
+    assert_ne!(
+        original_manifest.sha256().unwrap(),
+        changed_manifest.sha256().unwrap()
+    );
+    assert!(receipt.validate_with_inputs(&changed_manifest, &dossier).is_err());
+}
+
+#[test]
+fn changed_source_commitment_invalidates_old_receipt_replay() {
+    let (original_manifest, dossier, receipt) = clean_inputs();
+    let mut changed_manifest = original_manifest.clone();
+    changed_manifest.evidence_lanes[0].source_commitment = SourceCommitment::InternalLineage {
+        sha256: OTHER_LINEAGE_SHA.into(),
+    };
+    changed_manifest.validate().unwrap();
+
     assert_ne!(
         original_manifest.sha256().unwrap(),
         changed_manifest.sha256().unwrap()
