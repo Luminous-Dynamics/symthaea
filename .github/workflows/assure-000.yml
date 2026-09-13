@@ -1,0 +1,37 @@
+name: ASSURE-000 Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/assurance/symthaea-assurance-core/**'
+      - '.github/workflows/assure-000.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Prove exact subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "head=$(git rev-parse HEAD)"
+          git diff --exit-code
+      - name: Format
+        run: cargo fmt --manifest-path crates/assurance/symthaea-assurance-core/Cargo.toml -- --check
+      - name: Check
+        run: cargo check --locked --manifest-path crates/assurance/symthaea-assurance-core/Cargo.toml
+      - name: Test
+        run: cargo test --locked --manifest-path crates/assurance/symthaea-assurance-core/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path crates/assurance/symthaea-assurance-core/Cargo.toml --all-targets -- -D warnings
