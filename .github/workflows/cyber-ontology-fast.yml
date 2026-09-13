@@ -1,0 +1,136 @@
+# Focused raw-head qualification for the versioned cyber ontology bridge.
+#
+# This workflow is additive. It proves package-focused properties of the exact
+# PR head; repository-wide CI remains the integration authority and may evaluate
+# a distinct GitHub synthetic merge subject.
+
+name: Cyber Ontology Fast Lane
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-cyber-ontology/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/cyber-ontology-fast.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  QUALIFICATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  QUALIFICATION_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+  EVENT_SHA: ${{ github.sha }}
+
+jobs:
+  cyber-ontology:
+    name: symthaea-cyber-ontology raw-head qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact raw-head subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Bind qualification subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          if [[ "$actual_head" != "$QUALIFICATION_HEAD_SHA" ]]; then
+            echo "ERROR: checked-out subject $actual_head != declared raw head $QUALIFICATION_HEAD_SHA" >&2
+            exit 1
+          fi
+
+          lock_digest="$(sha256sum Cargo.lock | awk '{print $1}')"
+          manifest_digest="$(sha256sum crates/domains/symthaea-cyber-ontology/Cargo.toml | awk '{print $1}')"
+
+          echo "Qualification subject (raw head): $actual_head"
+          echo "PR base subject: ${QUALIFICATION_BASE_SHA:-n/a}"
+          echo "GitHub event SHA: $EVENT_SHA"
+          echo "Cargo.lock SHA-256: $lock_digest"
+          echo "Cyber manifest SHA-256: $manifest_digest"
+
+          {
+            echo "## Cyber Ontology Fast Lane qualification subject"
+            echo
+            echo "- Raw head: \`$actual_head\`"
+            echo "- PR base: \`${QUALIFICATION_BASE_SHA:-n/a}\`"
+            echo "- Event SHA: \`$EVENT_SHA\`"
+            echo "- Cargo.lock SHA-256: \`$lock_digest\`"
+            echo "- cyber-ontology Cargo.toml SHA-256: \`$manifest_digest\`"
+            echo "- Subject class: **raw PR head / package-focused**"
+            echo "- Integration/full-repository qualification: **not implied by this lane**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare PR base for governance comparison
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          actual_base="$(git rev-parse "origin/${GITHUB_BASE_REF}")"
+          if [[ "$actual_base" != "$QUALIFICATION_BASE_SHA" ]]; then
+            echo "ERROR: fetched base $actual_base != event base $QUALIFICATION_BASE_SHA" >&2
+            exit 1
+          fi
+
+      - name: Governance check
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-class-a-changes.sh --ci
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache focused Cargo state
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/cyber-ontology-fast
+          key: ${{ runner.os }}-cyber-ontology-fast-${{ hashFiles('Cargo.lock', 'crates/domains/symthaea-cyber-ontology/Cargo.toml', 'crates/domains/symthaea-support/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cyber-ontology-fast-
+
+      - name: Format cyber ontology
+        run: cargo fmt -p symthaea-cyber-ontology -- --check
+
+      - name: Compile exact support dependency surface
+        env:
+          CARGO_TARGET_DIR: target/cyber-ontology-fast
+        run: cargo check --locked -p symthaea-support --all-targets
+
+      - name: Test cyber ontology
+        env:
+          CARGO_TARGET_DIR: target/cyber-ontology-fast
+        run: cargo test --locked -p symthaea-cyber-ontology --all-targets
+
+      - name: Clippy cyber ontology
+        env:
+          CARGO_TARGET_DIR: target/cyber-ontology-fast
+        run: cargo clippy --locked -p symthaea-cyber-ontology --all-targets -- -D warnings
+
+      - name: Verify tracked source immutability and subject binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_HEAD_SHA"
+          if ! git diff --quiet -- . ':!Cargo.lock'; then
+            echo "ERROR: qualification steps modified tracked source files" >&2
+            git diff -- . ':!Cargo.lock'
+            exit 1
+          fi
+          echo "Raw-head subject remained bound to $QUALIFICATION_HEAD_SHA"
