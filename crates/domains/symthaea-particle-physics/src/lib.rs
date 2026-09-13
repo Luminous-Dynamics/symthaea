@@ -28,6 +28,7 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_covariance;
+pub mod lattice_linear_gls;
 pub mod lattice_qcd;
 pub mod relativistic_qm;
 pub mod renormalization;
@@ -46,6 +47,7 @@ pub use decay_widths::{
 pub use lattice_covariance::{
     CorrelatedConstantFit, CovarianceError, correlated_constant_fit, sample_covariance,
 };
+pub use lattice_linear_gls::{CorrelatedLinearFit, correlated_linear_fit};
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
     qcd_beta, qed_beta,
