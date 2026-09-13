@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-sim-worker-qualification"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Host-issued qualification authority for exact supervised simulation worker images"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+symthaea-sim-worker = { path = "../symthaea-sim-worker" }
+symthaea-sim-worker-image = { path = "../symthaea-sim-worker-image" }
+symthaea-sim-worker-containment = { path = "../symthaea-sim-worker-containment" }
+symthaea-sim-worker-filesystem = { path = "../symthaea-sim-worker-filesystem" }

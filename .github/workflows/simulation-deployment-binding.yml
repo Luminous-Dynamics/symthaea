@@ -1,0 +1,220 @@
+name: Simulation Deployment Binding
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-deployment/**"
+      - "crates/bridges/symthaea-sim-worker-qualification/**"
+      - "crates/bridges/symthaea-sim-worker-filesystem/**"
+      - "crates/bridges/symthaea-sim-worker-containment/**"
+      - "crates/bridges/symthaea-sim-worker-image/**"
+      - "crates/bridges/symthaea-sim-worker/**"
+      - "crates/core/symthaea-extension-admission/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/simulation-deployment-binding.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  simulation-deployment-binding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 qualification subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          uname -a
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
+
+      - name: Cache Cargo and Component builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-simulation-deployment-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-deployment/**', 'crates/bridges/symthaea-sim-worker-qualification/**', 'crates/bridges/symthaea-sim-worker-filesystem/**', 'examples/extensions/hello-simulation/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-deployment-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-deployment-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the deployment graph."
+          else
+            echo "Cargo.lock requires the following generated update:"
+            cat simulation-deployment-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-deployment-cargo-lock-patch
+          path: simulation-deployment-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Require standalone guest WIT parity
+        run: |
+          cmp crates/core/symthaea-extension-core/wit/extension-control.wit \
+              examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+              examples/extensions/hello-simulation/wit/simulation-provider.wit
+
+      - name: Build exact standalone simulation Component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum "$component" examples/extensions/hello-simulation/manifest.json
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Build exact worker and containment probes
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-worker-filesystem \
+            --bin symthaea-sim-filesystem-worker \
+            --bin symthaea-sim-filesystem-probe
+          cargo build --locked \
+            -p symthaea-sim-worker-containment \
+            --bin symthaea-sim-containment-probe
+          test -x target/debug/symthaea-sim-filesystem-worker
+          test -x target/debug/symthaea-sim-filesystem-probe
+          test -x target/debug/symthaea-sim-containment-probe
+          sha256sum \
+            target/debug/symthaea-sim-filesystem-worker \
+            target/debug/symthaea-sim-filesystem-probe \
+            target/debug/symthaea-sim-containment-probe
+
+      - name: Execute exact containment probes
+        run: |
+          target/debug/symthaea-sim-containment-probe \
+            | tee simulation-deployment-seccomp-probe.txt
+          target/debug/symthaea-sim-filesystem-probe \
+            | tee simulation-deployment-landlock-probe.txt
+          grep -qx 'containment_probe=pass' simulation-deployment-seccomp-probe.txt
+          grep -qx 'filesystem_probe=pass' simulation-deployment-landlock-probe.txt
+
+      - name: Mint qualification evidence root for exact worker lineage
+        run: |
+          {
+            echo "worker_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-worker | cut -d' ' -f1)"
+            echo "containment_probe_sha256=$(sha256sum target/debug/symthaea-sim-containment-probe | cut -d' ' -f1)"
+            echo "filesystem_probe_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-probe | cut -d' ' -f1)"
+            echo "worker_image_profile=symthaea.simulation.worker-image.memfd-sealed-v1"
+            echo "supervisor_profile=symthaea.simulation.worker-supervisor.linux-rlimit-v1"
+            echo "worker_protocol=symthaea.simulation.worker.v1"
+            echo "process_containment_profile=symthaea.simulation.worker-containment.seccomp-x86_64-v1"
+            echo "filesystem_containment_profile=symthaea.simulation.worker-filesystem.landlock-deny-content-v1"
+            echo "---seccomp-probe---"
+            cat simulation-deployment-seccomp-probe.txt
+            echo "---landlock-probe---"
+            cat simulation-deployment-landlock-probe.txt
+          } > simulation-worker-qualification-bundle.txt
+          qualification_sha="$(sha256sum simulation-worker-qualification-bundle.txt | cut -d' ' -f1)"
+          test -n "$qualification_sha"
+          echo "qualification_evidence_sha256=${qualification_sha}" \
+            | tee simulation-worker-qualification-root.txt
+
+      - name: Check deployment and qualification crates
+        run: |
+          cargo check --locked -p symthaea-sim-worker-qualification --all-targets
+          cargo check --locked -p symthaea-sim-deployment --all-targets
+
+      - name: Test deployment and qualification unit corpus
+        run: |
+          cargo test --locked -p symthaea-sim-worker-qualification
+          cargo test --locked -p symthaea-sim-deployment
+
+      - name: Strict Clippy deployment and qualification crates
+        run: |
+          cargo clippy --locked -p symthaea-sim-worker-qualification --all-targets -- -D warnings
+          cargo clippy --locked -p symthaea-sim-deployment --all-targets -- -D warnings
+
+      - name: Execute real Component through exact admission and qualified deployment
+        env:
+          SYMTHAEA_FILESYSTEM_WORKER_BIN: ${{ github.workspace }}/target/debug/symthaea-sim-filesystem-worker
+        run: |
+          qualification_sha="$(cut -d= -f2 simulation-worker-qualification-root.txt)"
+          test "${#qualification_sha}" -eq 64
+          SYMTHAEA_WORKER_QUALIFICATION_EVIDENCE_SHA256="$qualification_sha" \
+            cargo test --locked \
+              -p symthaea-sim-deployment \
+              --test deployment_binding \
+              exact_admission_and_exact_qualified_worker_execute_real_component \
+              -- --ignored --exact --test-threads=1
+
+      - name: Record exact deployment qualification subject
+        run: |
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          qualification_sha="$(cut -d= -f2 simulation-worker-qualification-root.txt)"
+          landlock_abi="$(sed -n 's/^landlock_abi=//p' simulation-deployment-landlock-probe.txt)"
+          handled_fs="$(sed -n 's/^handled_access_fs=//p' simulation-deployment-landlock-probe.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "manifest_sha256=$(sha256sum examples/extensions/hello-simulation/manifest.json | cut -d' ' -f1)"
+            echo "component_sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+            echo "worker_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-worker | cut -d' ' -f1)"
+            echo "worker_qualification_evidence_sha256=${qualification_sha}"
+            echo "worker_qualification_profile=symthaea.simulation.worker-qualification.v1"
+            echo "deployment_profile=symthaea.simulation.deployment.v1"
+            echo "deployment_transport=symthaea.simulation.deployment.local-contained-worker.v1"
+            echo "package_runtime=wasm_preserved_exactly"
+            echo "manifest_runtime_rewrite=forbidden"
+            echo "admission_currentness=issuance+pre_execution+post_execution"
+            echo "worker_qualification_currentness=issuance+pre_execution+post_execution"
+            echo "sealed_image_profile=symthaea.simulation.worker-image.memfd-sealed-v1"
+            echo "process_containment_profile=symthaea.simulation.worker-containment.seccomp-x86_64-v1"
+            echo "filesystem_containment_profile=symthaea.simulation.worker-filesystem.landlock-deny-content-v1"
+            echo "landlock_abi=${landlock_abi}"
+            echo "handled_access_fs=${handled_fs}"
+            echo "cgroup=not_established"
+            echo "provider_selection=not_established_by_deployment_binding"
+            echo "release_receipt=not_minted_by_deployment_binding"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-deployment-receipt.txt
+
+      - name: Upload deployment qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-deployment-evidence
+          path: |
+            simulation-deployment-seccomp-probe.txt
+            simulation-deployment-landlock-probe.txt
+            simulation-worker-qualification-bundle.txt
+            simulation-worker-qualification-root.txt
+            simulation-deployment-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
