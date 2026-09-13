@@ -268,8 +268,7 @@ impl ContinuityIdentityLedger {
             self.parent.insert(successor.clone(), event.predecessor.clone());
             self.event_by_successor.insert(successor.clone(), event.id.clone());
         }
-        self.latest_revision
-            .insert(event.predecessor.clone(), event.to_revision);
+        self.latest_revision.insert(event.predecessor.clone(), event.to_revision);
         if !event.predecessor_continues {
             self.inactive_instances.insert(event.predecessor.clone());
         }
@@ -339,7 +338,7 @@ impl ContinuityIdentityLedger {
         }
 
         for event in self.events.values().filter(|event| {
-            event.predecessor == *lost_instance && event.predecessor_continues
+            event.predecessor.as_str() == lost_instance.as_str() && event.predecessor_continues
         }) {
             surviving_siblings.extend(event.successors.iter().cloned());
         }
@@ -371,6 +370,14 @@ impl ContinuityIdentityLedger {
         let left_ancestors = self.ancestor_set(left);
         let right_ancestors = self.ancestor_set(right);
         Ok(!left_ancestors.is_disjoint(&right_ancestors))
+    }
+
+    pub fn disqualifies_independent_replication(
+        &self,
+        left: &SubjectInstanceId,
+        right: &SubjectInstanceId,
+    ) -> Result<bool, ContinuityIdentityError> {
+        self.shares_recorded_ancestry(left, right)
     }
 
     pub fn is_active(&self, instance: &SubjectInstanceId) -> Result<bool, ContinuityIdentityError> {
@@ -506,7 +513,7 @@ mod tests {
         ).unwrap()).unwrap();
         let a = ledger.assess_instance(&sid("a")).unwrap();
         assert!(a.sibling_instances().contains(&sid("b")));
-        assert!(ledger.shares_recorded_ancestry(&sid("a"), &sid("b")).unwrap());
+        assert!(ledger.disqualifies_independent_replication(&sid("a"), &sid("b")).unwrap());
         assert!(!a.phenomenal_identity_established());
     }
 }
