@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'rust-toolchain.toml'
       - 'crates/domains/symthaea-replicator-safety/Cargo.toml'
       - 'crates/domains/symthaea-replicator-semantics/Cargo.toml'
       - 'crates/domains/symthaea-replicator-ledger/Cargo.toml'
@@ -14,6 +16,7 @@ on:
       - '.github/workflows/rsk-lockfile-repair.yml'
       - 'docs/compliance/adr/ADR-033-rsk-lockfile-repair-qualifier.md'
       - 'docs/compliance/adr/ADR-034-rsk-lockfile-repair-lineage.md'
+      - 'docs/compliance/adr/ADR-035-rsk-lockfile-repair-worktree-purity.md'
   workflow_dispatch:
 
 permissions:
@@ -42,7 +45,7 @@ jobs:
           set -euo pipefail
           base_sha='${{ github.event.pull_request.base.sha }}'
           changed_files="$(git diff --name-only "${base_sha}"...HEAD)"
-          if ! printf '%s\n' "${changed_files}" | grep -Eq '^(Cargo\.lock$|crates/domains/symthaea-replicator-(safety|semantics|ledger)/Cargo\.toml$|scripts/(rsk_lockfile_delta|test_rsk_lockfile_delta|rsk_lockfile_repair_lineage|test_rsk_lockfile_repair_lineage)\.py$|\.github/workflows/rsk-lockfile-repair\.yml$)'; then
+          if ! printf '%s\n' "${changed_files}" | grep -Eq '^(Cargo\.lock$|Cargo\.toml$|rust-toolchain\.toml$|crates/domains/symthaea-replicator-(safety|semantics|ledger)/Cargo\.toml$|scripts/(rsk_lockfile_delta|test_rsk_lockfile_delta|rsk_lockfile_repair_lineage|test_rsk_lockfile_repair_lineage)\.py$|\.github/workflows/rsk-lockfile-repair\.yml$)'; then
             echo 'No RSK lockfile repair Class A surface changed.'
             exit 0
           fi
@@ -79,7 +82,24 @@ jobs:
           echo 'NON-ADMISSIBLE DIAGNOSTIC ONLY.'
           echo 'Cargo may refresh Cargo.lock on this ephemeral runner only in generation mode.'
           echo 'A committed candidate must be byte-idempotent under the pinned Cargo toolchain.'
+          echo 'No repository path other than Cargo.lock may change.'
           echo 'Normal RSK qualification must still pass later with --locked.'
+
+      - name: Require clean exact-head checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            echo 'ERROR: tracked worktree is dirty before Cargo.'
+            git status --porcelain=v1 --untracked-files=all
+            exit 1
+          fi
+          untracked="$(git ls-files --others --exclude-standard)"
+          if [ -n "${untracked}" ]; then
+            echo 'ERROR: untracked files exist before Cargo.'
+            printf '%s\n' "${untracked}"
+            exit 1
+          fi
 
       - name: Capture base, head, input and toolchain identity
         shell: bash
@@ -103,6 +123,8 @@ jobs:
           sha256sum \
             "${out}/Cargo.lock.base" \
             "${out}/Cargo.lock.head" \
+            Cargo.toml \
+            rust-toolchain.toml \
             crates/domains/symthaea-replicator-safety/Cargo.toml \
             crates/domains/symthaea-replicator-semantics/Cargo.toml \
             crates/domains/symthaea-replicator-ledger/Cargo.toml \
@@ -111,6 +133,7 @@ jobs:
             'NON-ADMISSIBLE DIAGNOSTIC ONLY.' \
             'Generation mode may produce Cargo.lock.post-cargo for review.' \
             'Commit-verification mode requires the committed head to remain byte-identical after Cargo.' \
+            'No repository path other than Cargo.lock may change.' \
             > "${out}/README.txt"
 
       - name: Ask pinned Cargo to resolve the exact-head workspace lock graph
@@ -120,10 +143,35 @@ jobs:
           out="${RUNNER_TEMP}/rsk-lockfile-repair"
           cargo metadata --format-version 1 > "${out}/cargo-metadata.json"
           cp Cargo.lock "${out}/Cargo.lock.post-cargo"
+          git status --porcelain=v1 --untracked-files=all > "${out}/post-cargo-worktree-status.txt"
           git diff --no-index -- "${out}/Cargo.lock.base" "${out}/Cargo.lock.head" \
             > "${out}/Cargo.lock.base-to-head.patch" || true
           git diff --no-index -- "${out}/Cargo.lock.head" "${out}/Cargo.lock.post-cargo" \
             > "${out}/Cargo.lock.head-to-post-cargo.patch" || true
+
+      - name: Require Cargo changed only Cargo.lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --cached --quiet; then
+            echo 'ERROR: Cargo or another process staged repository changes.'
+            git status --porcelain=v1 --untracked-files=all
+            exit 1
+          fi
+
+          untracked="$(git ls-files --others --exclude-standard)"
+          if [ -n "${untracked}" ]; then
+            echo 'ERROR: Cargo or another process created untracked repository files.'
+            printf '%s\n' "${untracked}"
+            exit 1
+          fi
+
+          changed="$(git diff --name-only)"
+          if [ -n "${changed}" ] && [ "${changed}" != 'Cargo.lock' ]; then
+            echo 'ERROR: Cargo changed repository paths other than Cargo.lock.'
+            printf '%s\n' "${changed}"
+            exit 1
+          fi
 
       - name: Prove base-head-post-Cargo repair lineage
         shell: bash
