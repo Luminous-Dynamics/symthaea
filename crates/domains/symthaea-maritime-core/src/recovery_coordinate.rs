@@ -4,9 +4,8 @@
 //! Nominal regenerative runway and role-support closure do not by themselves say
 //! whether a degraded, previously qualified flow can be restored after a modeled
 //! disturbance. This module qualifies that separate recovery coordinate without
-//! changing the nominal closure theorem. V1 deliberately requires the recovery
-//! reserve to sit outside the nominal successor-construction/qualification support
-//! closure so using recovery does not silently redefine the scalar runway basis.
+//! changing the nominal closure theorem. The recovery reserve is therefore a
+//! separately evidence-bound resource, not a dependency added to the closure model.
 
 use crate::{
     DependencyGovernance, RegenerativeClosureModel, RegenerativeFlowKindV1,
@@ -29,7 +28,10 @@ pub struct RegenerativeRecoveryCoordinatePolicyV1 {
     pub flow_kind: RegenerativeFlowKindV1,
     /// Exact healthy flow rate that may be restored after degradation.
     pub qualified_units_per_period: u64,
-    pub reserve_dependency_id: String,
+    /// Recovery reserve is intentionally outside the nominal closure-model subject.
+    pub external_recovery_reserve_id: String,
+    pub external_recovery_reserve_binding: String,
+    pub external_recovery_reserve_units: u64,
     pub reserve_units_per_recovery: u64,
     /// Evidence that recovery restores an already-qualified capability rather than
     /// introducing a new production/recycling capability after failure.
@@ -50,12 +52,14 @@ pub struct RegenerativeRecoveryCoordinateReportV1 {
     pub target_dependency_id: String,
     pub flow_kind: RegenerativeFlowKindV1,
     pub qualified_units_per_period: u64,
-    pub reserve_dependency_id: String,
+    pub external_recovery_reserve_id: String,
+    pub external_recovery_reserve_binding: String,
+    pub external_recovery_reserve_units: u64,
     pub reserve_units_per_recovery: u64,
     pub role_support_dependency_ids: Vec<String>,
-    /// True because V1 requires the recovery reserve to remain outside the nominal
-    /// construction/qualification support closure.
-    pub reserve_outside_nominal_role_support_closure: bool,
+    /// True because a successful report proves the external reserve does not
+    /// collide with any dependency identity in the nominal closure model.
+    pub reserve_external_to_nominal_closure: bool,
     /// Authorization bit for disturbance-conditioned claims that explicitly bind
     /// this recovery coordinate. It does not alter nominal scalar H.
     pub disturbance_recovery_coordinate_qualified: bool,
@@ -85,6 +89,9 @@ pub struct RegenerativeDisturbanceRecoveryAuthorizationV1 {
     pub flow_kind: RegenerativeFlowKindV1,
     pub degraded_units_per_period: u64,
     pub qualified_restore_units_per_period: u64,
+    pub external_recovery_reserve_id: String,
+    pub external_recovery_reserve_binding: String,
+    pub reserve_units_per_recovery: u64,
     pub disturbance_conditioned_recovery_authorized: bool,
 }
 
@@ -99,11 +106,9 @@ pub enum RegenerativeRecoveryCoordinateError {
     ZeroReserveCost,
     TargetAndReserveNotDistinct,
     UnknownTargetDependency { dependency_id: String },
-    UnknownReserveDependency { dependency_id: String },
     SafeguardedTargetClaimsLocalRecovery { dependency_id: String },
-    SafeguardedReserveClaimsLocalRecovery { dependency_id: String },
     TargetOutsideRoleSupportClosure { dependency_id: String },
-    RecoveryReserveInsideRoleSupportClosure { dependency_id: String },
+    ExternalRecoveryReserveCollidesWithModelDependency { dependency_id: String },
     TargetFlowRateMismatch {
         dependency_id: String,
         modeled_units_per_period: u64,
@@ -113,17 +118,17 @@ pub enum RegenerativeRecoveryCoordinateError {
         dependency_id: String,
         flow_kind: RegenerativeFlowKindV1,
     },
-    StaticRecoveryReserveInsufficient {
-        dependency_id: String,
+    ExternalRecoveryReserveInsufficient {
+        reserve_id: String,
         required_units: u64,
-        stockpile_units: u64,
+        available_units: u64,
     },
     DisturbanceRecoverySubjectMismatch,
     DisturbanceDoesNotDegradeQualifiedFlow,
 }
 
 /// Qualify one explicit recovery coordinate against the exact healthy successor
-/// model and support graph.
+/// model and support graph while leaving that nominal subject unchanged.
 pub fn qualify_regenerative_recovery_coordinate(
     policy: &RegenerativeRecoveryCoordinatePolicyV1,
     profile: &RegenerativeLineageViabilityProfileV1,
@@ -144,10 +149,12 @@ pub fn qualify_regenerative_recovery_coordinate(
             dependency_id: policy.target_dependency_id.clone(),
         });
     }
-    if role_support.contains(&policy.reserve_dependency_id) {
+    if model.dependencies.iter().any(|dependency| {
+        dependency.dependency_id == policy.external_recovery_reserve_id
+    }) {
         return Err(
-            RegenerativeRecoveryCoordinateError::RecoveryReserveInsideRoleSupportClosure {
-                dependency_id: policy.reserve_dependency_id.clone(),
+            RegenerativeRecoveryCoordinateError::ExternalRecoveryReserveCollidesWithModelDependency {
+                dependency_id: policy.external_recovery_reserve_id.clone(),
             },
         );
     }
@@ -159,24 +166,10 @@ pub fn qualify_regenerative_recovery_coordinate(
         .ok_or_else(|| RegenerativeRecoveryCoordinateError::UnknownTargetDependency {
             dependency_id: policy.target_dependency_id.clone(),
         })?;
-    let reserve = model
-        .dependencies
-        .iter()
-        .find(|dependency| dependency.dependency_id == policy.reserve_dependency_id)
-        .ok_or_else(|| RegenerativeRecoveryCoordinateError::UnknownReserveDependency {
-            dependency_id: policy.reserve_dependency_id.clone(),
-        })?;
     if target.governance == DependencyGovernance::SafeguardedExternal {
         return Err(
             RegenerativeRecoveryCoordinateError::SafeguardedTargetClaimsLocalRecovery {
                 dependency_id: target.dependency_id.clone(),
-            },
-        );
-    }
-    if reserve.governance == DependencyGovernance::SafeguardedExternal {
-        return Err(
-            RegenerativeRecoveryCoordinateError::SafeguardedReserveClaimsLocalRecovery {
-                dependency_id: reserve.dependency_id.clone(),
             },
         );
     }
@@ -200,12 +193,12 @@ pub fn qualify_regenerative_recovery_coordinate(
             flow_kind: policy.flow_kind,
         });
     }
-    if reserve.stockpile_units < policy.reserve_units_per_recovery {
+    if policy.external_recovery_reserve_units < policy.reserve_units_per_recovery {
         return Err(
-            RegenerativeRecoveryCoordinateError::StaticRecoveryReserveInsufficient {
-                dependency_id: reserve.dependency_id.clone(),
+            RegenerativeRecoveryCoordinateError::ExternalRecoveryReserveInsufficient {
+                reserve_id: policy.external_recovery_reserve_id.clone(),
                 required_units: policy.reserve_units_per_recovery,
-                stockpile_units: reserve.stockpile_units,
+                available_units: policy.external_recovery_reserve_units,
             },
         );
     }
@@ -222,10 +215,12 @@ pub fn qualify_regenerative_recovery_coordinate(
         target_dependency_id: policy.target_dependency_id.clone(),
         flow_kind: policy.flow_kind,
         qualified_units_per_period: policy.qualified_units_per_period,
-        reserve_dependency_id: policy.reserve_dependency_id.clone(),
+        external_recovery_reserve_id: policy.external_recovery_reserve_id.clone(),
+        external_recovery_reserve_binding: policy.external_recovery_reserve_binding.clone(),
+        external_recovery_reserve_units: policy.external_recovery_reserve_units,
         reserve_units_per_recovery: policy.reserve_units_per_recovery,
         role_support_dependency_ids: role_support.into_iter().collect(),
-        reserve_outside_nominal_role_support_closure: true,
+        reserve_external_to_nominal_closure: true,
         disturbance_recovery_coordinate_qualified: true,
     })
 }
@@ -262,6 +257,9 @@ pub fn authorize_regenerative_disturbance_recovery(
         flow_kind: recovery.flow_kind,
         degraded_units_per_period: disturbance.degraded_units_per_period,
         qualified_restore_units_per_period: recovery.qualified_units_per_period,
+        external_recovery_reserve_id: recovery.external_recovery_reserve_id.clone(),
+        external_recovery_reserve_binding: recovery.external_recovery_reserve_binding.clone(),
+        reserve_units_per_recovery: recovery.reserve_units_per_recovery,
         disturbance_conditioned_recovery_authorized: true,
     })
 }
@@ -308,7 +306,8 @@ fn validate_policy(
     validate_id(&policy.policy_id)?;
     validate_binding(&policy.evidence_binding)?;
     validate_id(&policy.target_dependency_id)?;
-    validate_id(&policy.reserve_dependency_id)?;
+    validate_id(&policy.external_recovery_reserve_id)?;
+    validate_binding(&policy.external_recovery_reserve_binding)?;
     validate_binding(&policy.recovery_qualification_binding)?;
     if policy.qualified_units_per_period == 0 {
         return Err(RegenerativeRecoveryCoordinateError::ZeroQualifiedFlow);
@@ -316,7 +315,7 @@ fn validate_policy(
     if policy.reserve_units_per_recovery == 0 {
         return Err(RegenerativeRecoveryCoordinateError::ZeroReserveCost);
     }
-    if policy.target_dependency_id == policy.reserve_dependency_id {
+    if policy.target_dependency_id == policy.external_recovery_reserve_id {
         return Err(RegenerativeRecoveryCoordinateError::TargetAndReserveNotDistinct);
     }
     Ok(())
