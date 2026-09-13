@@ -45,6 +45,29 @@ jobs:
           set -euo pipefail
           cargo check --manifest-path crates/core/symthaea-assurance-core/Cargo.toml
           git diff -- Cargo.lock || true
+      - name: Capture reconciled lock evidence
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/assure-000-lock
+          cp Cargo.lock target/assure-000-lock/Cargo.lock
+          LOCK_SHA256="$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          {
+            printf 'candidate_head=%s\n' "$EXPECTED_HEAD"
+            printf 'lock_sha256=%s\n' "$LOCK_SHA256"
+            rustc --version
+            cargo --version
+          } > target/assure-000-lock/MANIFEST.txt
+          cat target/assure-000-lock/MANIFEST.txt
+      - name: Upload reconciled lock evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: assure-000-lock-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/assure-000-lock/
+          if-no-files-found: error
+          retention-days: 7
       - name: Test
         run: cargo test --manifest-path crates/core/symthaea-assurance-core/Cargo.toml
       - name: Strict Clippy
