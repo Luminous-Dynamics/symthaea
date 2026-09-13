@@ -55,6 +55,18 @@ pub struct Gwt1TrustedResolutionCandidateV1 {
     /// Diagnostic state that prevents a retained `Observed` support floor from
     /// hiding a causal null, contradiction, or inconclusive result.
     pub disposition: Gwt1EvidenceDispositionSummaryV1,
+    /// Exact bytes produced by the *same* inner GitHub attestation verification
+    /// invocation whose SHA-256 is embedded in the causal V2 authority lineage.
+    /// These bytes are intentionally skipped from the aggregate JSON object and
+    /// are emitted as their own retained file by the trusted adapter.
+    #[serde(skip)]
+    promotion_attestation_verification_bytes: Vec<u8>,
+}
+
+impl Gwt1TrustedResolutionCandidateV1 {
+    pub fn promotion_attestation_verification_bytes(&self) -> &[u8] {
+        &self.promotion_attestation_verification_bytes
+    }
 }
 
 #[derive(Debug)]
@@ -203,6 +215,9 @@ pub fn generate_gwt1_trusted_resolution_candidate_v1(
         sha256sum_executable,
         gh_config_dir,
     )?;
+    let promotion_attestation_verification_bytes = verified_causal
+        .promotion_attestation_verification_bytes()
+        .to_vec();
 
     let base_report = canonical_base_report()?;
     let resolved_view =
@@ -214,6 +229,7 @@ pub fn generate_gwt1_trusted_resolution_candidate_v1(
         base_report,
         resolved_view,
         disposition,
+        promotion_attestation_verification_bytes,
     })
 }
 
