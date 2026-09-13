@@ -180,7 +180,6 @@ mod tests {
         let record = V2PublicTransitionEvidence::new(
             V2PublicFamily::PublicFlowV2,
             V2CorpusPartition::Development,
-            [1_u8; 32],
             V2PublicState::new([3, 4, 5, 0]).unwrap(),
             PublicAction::Pulse { slot: 0 },
             V2PublicState::new([2, 5 + post_delta, 5, 0]).unwrap(),
