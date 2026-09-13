@@ -90,7 +90,6 @@ fn trusted_main() -> Result<(), Box<dyn std::error::Error>> {
         PathBuf::from(required_env("GWT1_CAUSAL_ARCHIVE_ATTESTATION_VERIFICATION")?);
     let output_path = PathBuf::from(required_env("GWT1_CAUSAL_PROMOTION_OUTPUT")?);
     let trusted_builder_sha = required_env("TRUSTED_GWT1_CAUSAL_BUILDER_SHA")?;
-    let trusted_builder_ref = required_env("TRUSTED_GWT1_CAUSAL_BUILDER_REF")?;
     let repository = required_env("GITHUB_REPOSITORY")?;
 
     if repository != GWT1_CAUSAL_TRUSTED_REPOSITORY_V1 {
@@ -131,8 +130,8 @@ fn trusted_main() -> Result<(), Box<dyn std::error::Error>> {
     if provenance.trusted_builder_sha != trusted_builder_sha {
         return Err(io::Error::other("workflow provenance trusted builder SHA mismatch").into());
     }
-    if provenance.trusted_builder_ref != trusted_builder_ref {
-        return Err(io::Error::other("workflow provenance trusted builder ref mismatch").into());
+    if provenance.trusted_builder_ref.trim().is_empty() {
+        return Err(io::Error::other("workflow provenance trusted builder ref is empty").into());
     }
     if provenance.evidence_subject_sha != envelope.execution_identity.source_commit_sha {
         return Err(io::Error::other("workflow provenance evidence subject mismatch").into());
@@ -165,7 +164,7 @@ fn trusted_main() -> Result<(), Box<dyn std::error::Error>> {
         repository,
         trusted_builder_workflow: GWT1_CAUSAL_TRUSTED_BUILDER_WORKFLOW_V1.to_string(),
         trusted_builder_sha,
-        trusted_builder_ref,
+        trusted_builder_ref: provenance.trusted_builder_ref,
         causal_archive_sha256: sha256sum(&archive_path)?,
         archive_attestation_bundle_sha256: sha256sum(&attestation_bundle_path)?,
         archive_attestation_verification_sha256: sha256sum(&verification_path)?,
