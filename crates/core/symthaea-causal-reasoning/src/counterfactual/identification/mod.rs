@@ -15,6 +15,7 @@ pub mod discovery;
 pub mod estimation;
 pub mod id_algorithm;
 pub mod reasoner;
+pub mod semantic;
 
 #[cfg(test)]
 mod tests;
