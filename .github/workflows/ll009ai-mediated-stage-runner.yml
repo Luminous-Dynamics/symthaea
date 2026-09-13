@@ -1,0 +1,50 @@
+name: LL-009AI Mediated Stage Runner Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/ll009ai_stage_runner.py'
+      - 'scripts/ll009ah_checkpoint.py'
+      - 'scripts/ll009ag_common.py'
+      - 'scripts/ll009ag_git_subject.py'
+      - 'scripts/ll009ag_campaign.py'
+      - 'scripts/capture_ll009ag_environment.py'
+      - 'configs/lunar_transport/ll009ag_site01_campaign_v1.json'
+      - 'docs/research/LUNAR_LAUNCHER_LL009AI_MEDIATED_STAGE_RUNNER.md'
+      - '.github/workflows/ll009ai-mediated-stage-runner.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile AG/AH/AI campaign-control tools
+        run: >-
+          python -m py_compile
+          scripts/ll009ag_common.py
+          scripts/ll009ag_git_subject.py
+          scripts/ll009ag_campaign.py
+          scripts/capture_ll009ag_environment.py
+          scripts/ll009ah_checkpoint.py
+          scripts/ll009ai_stage_runner.py
+      - name: Verify AI is inside the AG protected execution surface
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          policy = json.loads(Path('configs/lunar_transport/ll009ag_site01_campaign_v1.json').read_text())
+          assert 'scripts/ll009ah_checkpoint.py' in policy['protected_files']
+          assert 'scripts/ll009ai_stage_runner.py' in policy['protected_files']
+          print('LL-009AI protected-surface binding: PASS')
+          PY
+      - name: Execute AI mediated-runner synthetic qualification
+        run: python scripts/ll009ai_stage_runner.py self-test
