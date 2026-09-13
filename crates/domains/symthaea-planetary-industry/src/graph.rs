@@ -88,10 +88,10 @@ impl IndustrialProcessGraph {
         // explicit through `OutputDisposition::Unknown`; dangling IDs are errors.
         for process in &self.processes {
             for output in &process.outputs {
-                if let OutputDisposition::Process(target) = &output.disposition {
-                    if !process_ids.contains(target) {
-                        return Err(OntologyError::UnknownProcess(target.clone()));
-                    }
+                if let OutputDisposition::Process(target) = &output.disposition
+                    && !process_ids.contains(target)
+                {
+                    return Err(OntologyError::UnknownProcess(target.clone()));
                 }
             }
         }
