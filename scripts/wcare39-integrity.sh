@@ -29,12 +29,18 @@ check_blob() {
   fi
 }
 
-check_blob "docs/release/evidence/WCARE39_EXECUTION_CAPSULE_PROTOCOL_V1.md" "c196824cba4afd25ec6e59d6215a33e24a97cbb3"
+check_blob "docs/release/evidence/WCARE39_EXECUTION_CAPSULE_PROTOCOL_V1.md" "af313132a55160a2db2423efacf5cd8a2c88f605"
 check_blob "docs/release/evidence/WCARE39_EXECUTION_CAPSULE_SCHEMA_V1.json" "0d3936654d947062664999bbb59063e9f24f1b24"
 check_blob "docs/release/evidence/WCARE39_COMMAND_PLAN_SCHEMA_V1.json" "e2b0a027daaf3518a21e36b5f6c97952879ad470"
 check_blob "docs/release/evidence/WCARE39_EXECUTION_STATUS_SCHEMA_V1.json" "35afbd3c4dbd7e5bd765509ffb1839b543c228af"
 check_blob "scripts/wcare39_execution_capsule.py" "17c43109a59047052737b39a5d12465b2d824eb1"
-check_blob "scripts/wcare39_selftest.py" "42f0bc87ffafe3c359af7774f50545b80a17c8fe"
+check_blob "scripts/wcare39-qualify.sh" "5a86b1055b1d9415d09679ccc7d06aca94de30e2"
+check_blob "scripts/wcare39_selftest.py" "dd32058e770cd9014beced33e8ba34805a029ca3"
+
+if ! bash -n scripts/wcare39-qualify.sh; then
+  emit "INVALID_PROTOCOL" "qualifier_shell_syntax_failed"
+  exit 4
+fi
 
 if ! python3 - <<'PY'
 from pathlib import Path
@@ -52,6 +58,10 @@ if ! python3 scripts/wcare39_selftest.py >/tmp/wcare39-selftest.json 2>/tmp/wcar
 fi
 if ! grep -q '"classification":"PASS_WCARE39_SELFTEST"' /tmp/wcare39-selftest.json; then
   emit "INVALID_PROTOCOL" "synthetic_campaign_did_not_report_pass"
+  exit 4
+fi
+if ! grep -q '"qualifier_exit_contract_verified":true' /tmp/wcare39-selftest.json; then
+  emit "INVALID_PROTOCOL" "qualifier_exit_contract_not_verified"
   exit 4
 fi
 
