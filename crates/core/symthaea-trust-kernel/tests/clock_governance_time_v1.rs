@@ -206,16 +206,12 @@ fn validity_must_cover_the_entire_trusted_interval() {
         Err(ClockGovernanceTimeError::NotValidAcrossEnvelope)
     );
     assert_eq!(
-        envelope.require_authority_valid_across_seconds_window(1_500, 3_000, true, true),
+        envelope.require_valid_across_seconds_window(1_500, 3_000),
         Err(ClockGovernanceTimeError::NotValidAcrossEnvelope)
     );
     assert_eq!(
-        envelope.require_authority_valid_across_seconds_window(900, 3_000, false, true),
-        Err(ClockGovernanceTimeError::InactiveAuthority)
-    );
-    assert_eq!(
-        envelope.require_authority_valid_across_seconds_window(900, 3_000, true, false),
-        Err(ClockGovernanceTimeError::UsageNotAllowed)
+        envelope.require_valid_across_seconds_window(1_500, 1_500),
+        Err(ClockGovernanceTimeError::InvalidValidityWindow)
     );
 }
 
@@ -250,7 +246,7 @@ fn time_scaling_fails_closed_on_overflow() {
 }
 
 #[test]
-fn governance_time_surface_has_no_caller_current_time_constructor() {
+fn governance_time_surface_has_no_caller_current_time_or_foreign_authority_inputs() {
     let source = include_str!("../src/clock_governance_time.rs");
     let start = source
         .find("pub fn derive_clock_governance_evaluation_envelope_v1")
@@ -262,6 +258,10 @@ fn governance_time_surface_has_no_caller_current_time_constructor() {
     assert!(signature.contains("OperationalClockBasisV1"));
     assert!(!signature.contains("unix_s"));
     assert!(!signature.contains("unix_ms"));
+    assert!(!source.contains("active: bool"));
+    assert!(!source.contains("usage_allowed: bool"));
+    assert!(!source.contains("InactiveAuthority"));
+    assert!(!source.contains("UsageNotAllowed"));
     assert!(!source.contains(
         "Serialize, Deserialize)]\npub struct ClockGovernanceEvaluationEnvelopeV1"
     ));
