@@ -8,8 +8,12 @@
 //! It varies dimension, relation-key count, candidate-value count, checkpoint
 //! horizon, and validity-span length independently. The key load coordinate is
 //! `key_count * horizon / dim`: the number of represented key/checkpoint facts per
-//! temporal dimension. Span length changes archive write count but not that fact
-//! load, allowing the two effects to be separated empirically.
+//! temporal dimension.
+//!
+//! The span-length axis changes both archive segmentation and the expected rate at
+//! which independently resampled span values differ. It is therefore reported with
+//! the *realized* semantic-change count rather than being interpreted as either a
+//! pure write-density axis or a guaranteed one-change-per-boundary mutation axis.
 
 use crate::continuous_hv::UnitaryRole;
 use crate::temporal_phasor::TemporalAxis;
@@ -141,9 +145,19 @@ pub struct ValidityCapacityObservation {
     pub mean_margin: f64,
     pub smallest_margin: f64,
     pub spans_written: u64,
+    /// Number of adjacent span boundaries whose assigned semantic value changed.
+    pub realized_semantic_changes: u64,
+    /// Number of candidate values actually used by at least one written span.
+    pub used_candidate_values: usize,
     pub represented_key_checkpoint_facts: u64,
     pub facts_per_dimension: f64,
     pub candidate_score_evaluations: u64,
+    /// Maximum absolute pairwise cosine within the key role codebook.
+    pub max_abs_key_similarity: f64,
+    /// Maximum absolute pairwise cosine within the candidate value codebook.
+    pub max_abs_candidate_similarity: f64,
+    /// Maximum absolute cosine between any key role and any candidate role.
+    pub max_abs_key_candidate_similarity: f64,
     /// Complex history accumulator only (`real` + `imag` f64 payloads).
     pub history_payload_bytes: u64,
     /// Temporal-axis frequency payload only.
@@ -225,14 +239,26 @@ fn run_case(
     let mut memory = ValidityIntervalMemory::new(case.dim)?;
 
     let mut expected_spans = 0u64;
+    let mut realized_semantic_changes = 0u64;
+    let mut used_candidate_values = HashSet::new();
     for (key_index, key) in keys.iter().enumerate() {
         let mut start = 0u64;
         let mut span_index = 0u64;
+        let mut previous_value = None::<usize>;
         while start < case.horizon {
             let end = (start + case.span_length).min(case.horizon);
             let value_index = assigned_value(seed, key_index, span_index, case.candidate_count);
+            if previous_value.is_some_and(|previous| previous != value_index) {
+                realized_semantic_changes = realized_semantic_changes
+                    .checked_add(1)
+                    .ok_or(ValidityCapacityError::SizeOverflow)?;
+            }
+            previous_value = Some(value_index);
+            used_candidate_values.insert(value_index);
             memory.write_span(&axis, key, &values[value_index], start, end)?;
-            expected_spans = expected_spans.checked_add(1).ok_or(ValidityCapacityError::SizeOverflow)?;
+            expected_spans = expected_spans
+                .checked_add(1)
+                .ok_or(ValidityCapacityError::SizeOverflow)?;
             start = end;
             span_index += 1;
         }
@@ -258,14 +284,20 @@ fn run_case(
         .ok()
         .and_then(|keys| keys.checked_mul(case.horizon))
         .ok_or(ValidityCapacityError::SizeOverflow)?;
-    let candidate_count_u64 = u64::try_from(case.candidate_count).map_err(|_| ValidityCapacityError::SizeOverflow)?;
+    let candidate_count_u64 = u64::try_from(case.candidate_count)
+        .map_err(|_| ValidityCapacityError::SizeOverflow)?;
     let candidate_score_evaluations = total_queries
         .checked_mul(candidate_count_u64)
         .ok_or(ValidityCapacityError::SizeOverflow)?;
     let dim_u64 = u64::try_from(case.dim).map_err(|_| ValidityCapacityError::SizeOverflow)?;
-    let key_count_u64 = u64::try_from(case.key_count).map_err(|_| ValidityCapacityError::SizeOverflow)?;
-    let history_payload_bytes = dim_u64.checked_mul(16).ok_or(ValidityCapacityError::SizeOverflow)?;
-    let temporal_axis_payload_bytes = dim_u64.checked_mul(8).ok_or(ValidityCapacityError::SizeOverflow)?;
+    let key_count_u64 = u64::try_from(case.key_count)
+        .map_err(|_| ValidityCapacityError::SizeOverflow)?;
+    let history_payload_bytes = dim_u64
+        .checked_mul(16)
+        .ok_or(ValidityCapacityError::SizeOverflow)?;
+    let temporal_axis_payload_bytes = dim_u64
+        .checked_mul(8)
+        .ok_or(ValidityCapacityError::SizeOverflow)?;
     let codebook_payload_bytes = key_count_u64
         .checked_add(candidate_count_u64)
         .and_then(|roles| roles.checked_mul(dim_u64))
@@ -282,9 +314,14 @@ fn run_case(
         mean_margin: margin_sum / total_queries as f64,
         smallest_margin,
         spans_written: expected_spans,
+        realized_semantic_changes,
+        used_candidate_values: used_candidate_values.len(),
         represented_key_checkpoint_facts: represented_facts,
         facts_per_dimension: represented_facts as f64 / case.dim as f64,
         candidate_score_evaluations,
+        max_abs_key_similarity: max_abs_pairwise_similarity(&keys),
+        max_abs_candidate_similarity: max_abs_pairwise_similarity(&values),
+        max_abs_key_candidate_similarity: max_abs_cross_similarity(&keys, &values),
         history_payload_bytes,
         temporal_axis_payload_bytes,
         codebook_payload_bytes,
@@ -304,6 +341,36 @@ fn splitmix64(mut value: u64) -> u64 {
     value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
     value ^ (value >> 31)
+}
+
+fn role_similarity(left: &UnitaryRole, right: &UnitaryRole) -> f64 {
+    debug_assert_eq!(left.dim(), right.dim());
+    left.as_slice()
+        .iter()
+        .zip(right.as_slice())
+        .map(|(&left, &right)| (left * right) as f64)
+        .sum::<f64>()
+        / left.dim() as f64
+}
+
+fn max_abs_pairwise_similarity(roles: &[UnitaryRole]) -> f64 {
+    let mut maximum = 0.0_f64;
+    for left in 0..roles.len() {
+        for right in (left + 1)..roles.len() {
+            maximum = maximum.max(role_similarity(&roles[left], &roles[right]).abs());
+        }
+    }
+    maximum
+}
+
+fn max_abs_cross_similarity(left: &[UnitaryRole], right: &[UnitaryRole]) -> f64 {
+    let mut maximum = 0.0_f64;
+    for left_role in left {
+        for right_role in right {
+            maximum = maximum.max(role_similarity(left_role, right_role).abs());
+        }
+    }
+    maximum
 }
 
 fn validate_plan(plan: &ValidityCapacityPlan) -> Result<(), ValidityCapacityError> {
@@ -363,6 +430,19 @@ mod tests {
                 observation.represented_key_checkpoint_facts,
                 observation.case.key_count as u64 * observation.case.horizon
             );
+            assert!(observation.used_candidate_values <= observation.case.candidate_count);
+            let maximum_boundaries = observation
+                .spans_written
+                .saturating_sub(observation.case.key_count as u64);
+            assert!(observation.realized_semantic_changes <= maximum_boundaries);
+            for similarity in [
+                observation.max_abs_key_similarity,
+                observation.max_abs_candidate_similarity,
+                observation.max_abs_key_candidate_similarity,
+            ] {
+                assert!(similarity.is_finite());
+                assert!((0.0..=1.0).contains(&similarity));
+            }
         }
     }
 
@@ -372,23 +452,38 @@ mod tests {
         assert_eq!(plan.cases.len(), 27);
         assert_eq!(plan.replicate_seeds, vec![31_001, 31_002, 31_003, 31_004, 31_005]);
         assert_eq!(
-            plan.cases.iter().filter(|case| case.axis == ValidityCapacityAxis::Dimension).count(),
+            plan.cases
+                .iter()
+                .filter(|case| case.axis == ValidityCapacityAxis::Dimension)
+                .count(),
             5
         );
         assert_eq!(
-            plan.cases.iter().filter(|case| case.axis == ValidityCapacityAxis::KeyCount).count(),
+            plan.cases
+                .iter()
+                .filter(|case| case.axis == ValidityCapacityAxis::KeyCount)
+                .count(),
             5
         );
         assert_eq!(
-            plan.cases.iter().filter(|case| case.axis == ValidityCapacityAxis::CandidateCount).count(),
+            plan.cases
+                .iter()
+                .filter(|case| case.axis == ValidityCapacityAxis::CandidateCount)
+                .count(),
             5
         );
         assert_eq!(
-            plan.cases.iter().filter(|case| case.axis == ValidityCapacityAxis::Horizon).count(),
+            plan.cases
+                .iter()
+                .filter(|case| case.axis == ValidityCapacityAxis::Horizon)
+                .count(),
             5
         );
         assert_eq!(
-            plan.cases.iter().filter(|case| case.axis == ValidityCapacityAxis::SpanLength).count(),
+            plan.cases
+                .iter()
+                .filter(|case| case.axis == ValidityCapacityAxis::SpanLength)
+                .count(),
             7
         );
     }
