@@ -15,8 +15,8 @@ ASSURE-000 defines a domain-neutral vocabulary for exact subject identity, claim
 
 The kernel content-addresses:
 
-- `SubjectManifest` — canonical component order + optional deployment envelope;
-- `Claim` — exact subject, claim ID, statement, and scope;
+- `SubjectManifest` — canonical committed subject components;
+- `Claim` — exact subject, claim ID, statement, and declared scope label;
 - `QualificationPlan` — exact claim, maximum support ceiling, and invalidation set;
 - `EvidenceArtifact` — exact subject/claim binding, evidence kind, artifact digest, and producer/executor/verifier/signer provenance;
 - `QualificationResult` — exact subject/claim/plan identity, evidence commitments, outcome, ceiling, and invalidation set.
@@ -29,8 +29,7 @@ Evidence cannot be rebound to a different subject or claim. Duplicate evidence I
 - `Observed` requires observation evidence;
 - `CausallySupported` requires controlled-intervention evidence;
 - `FunctionallySupported` requires controlled-intervention plus functional-benchmark evidence;
-- `Reproduced` additionally requires reproduction evidence whose verifier identity is distinct from the producer and executor identities;
-- `DeploymentQualified` additionally requires runtime-receipt evidence and an explicit deployment envelope.
+- `Reproduced` additionally requires reproduction evidence whose verifier identity is distinct from the producer and executor identities.
 
 The ladder is not a generic score. Each successor tier has explicit predicates, and `QualificationPlan::maximum_support` is a hard claim ceiling.
 
@@ -49,6 +48,18 @@ different verifier ID
 
 Symthaea already has a stronger generic verifier-diversity model in PR #1912, where reviewed verifier profiles carry organization, review-process, toolchain, and evidence-source fault domains. ASSURE-000 does not duplicate that ontology. A later assurance layer must bind and evaluate those stronger independence facts before using independent-verification language.
 
+## Support is not deployment eligibility
+
+ASSURE-000 also deliberately keeps deployment off the support ladder.
+
+```text
+stronger evidentiary support
+    != deployment eligibility
+    != deployment authorization
+```
+
+A runtime receipt may be admitted as evidence, but its presence does not create another support tier. ASSURE-001 may bind an exact deployment envelope as part of a richer external-AI subject manifest, and later campaign/policy layers may assess deployment-specific claims. The core kernel itself never turns evidence strength into authority.
+
 ## Negative and orthogonal findings
 
 - `NotDemonstrated`
@@ -65,4 +76,4 @@ Qualification results retain an explicit invalidation set. Matching a declared c
 
 ## Deliberate nonclaims
 
-ASSURE-000 does not establish certification, compliance, agent safety, deployment authorization, common-cause verifier independence, independent audit, runtime isolation, red-team completeness, or regulatory conformity. It provides the semantic substrate later assurance campaigns can use to make narrower evidence-backed claims.
+ASSURE-000 does not establish certification, compliance, agent safety, deployment eligibility, deployment authorization, common-cause verifier independence, independent audit, runtime isolation, red-team completeness, or regulatory conformity. It provides the semantic substrate later assurance campaigns can use to make narrower evidence-backed claims.
