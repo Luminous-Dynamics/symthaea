@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/eureka-002-integrated-subject-v1.json",
+  "title": "EUREKA-002 Integrated Execution Subject V1",
+  "description": "Machine-readable identity for the exact source tree eligible for EUREKA-002 qualification and later unblinding authorization. This schema grants no scientific or execution authority by itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_revision",
+    "claim_id",
+    "scientific_protocol_revision",
+    "exact_execution_commit",
+    "exact_source_tree",
+    "cargo_lock_digest",
+    "rust_toolchain",
+    "enabled_features",
+    "target_scope",
+    "protocol_freeze_issue",
+    "qualification_profile_identity",
+    "frozen_layers",
+    "source_status"
+  ],
+  "properties": {
+    "schema_revision": {
+      "const": "EUREKA.002Z.INTEGRATED_SUBJECT.v1"
+    },
+    "claim_id": {
+      "const": "EUREKA.PREDICTIVE_MODELING.v1"
+    },
+    "scientific_protocol_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "exact_execution_commit": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "exact_source_tree": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "cargo_lock_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "rust_toolchain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "enabled_features": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "target_scope": {
+      "const": "ProductionFepComponentSnapshot"
+    },
+    "protocol_freeze_issue": {
+      "const": 2355
+    },
+    "qualification_profile_identity": {
+      "$ref": "#/$defs/digest"
+    },
+    "frozen_layers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/frozenLayer"
+      }
+    },
+    "source_status": {
+      "enum": [
+        "SourceCandidate",
+        "QualifiedExactHead",
+        "HistoricallyQualified",
+        "Stale"
+      ]
+    },
+    "exact_head_qualification_receipt": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "integration_qualification_receipt": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "heldout_outcome_count_at_subject_freeze": {
+      "type": "integer",
+      "const": 0
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "source_status": {
+            "const": "QualifiedExactHead"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "exact_head_qualification_receipt",
+          "heldout_outcome_count_at_subject_freeze"
+        ],
+        "properties": {
+          "exact_head_qualification_receipt": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{40}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "frozenLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer_id",
+        "source_commit",
+        "semantic_role",
+        "scientific_semantics_changed"
+      ],
+      "properties": {
+        "layer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_commit": {
+          "$ref": "#/$defs/gitSha"
+        },
+        "semantic_role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issue": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "pull_request": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "scientific_semantics_changed": {
+          "type": "boolean"
+        },
+        "superseded_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/gitSha"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
