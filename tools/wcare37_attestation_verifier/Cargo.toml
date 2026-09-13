@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+# Standalone qualification tool: intentionally outside the Symthaea workspace.
+# Executable qualification is fail-closed until this tool has its own committed
+# Cargo.lock; scripts/wcare37-qualify.sh refuses PASS_VERIFIER without it.
 [workspace]
 
 [dependencies]
