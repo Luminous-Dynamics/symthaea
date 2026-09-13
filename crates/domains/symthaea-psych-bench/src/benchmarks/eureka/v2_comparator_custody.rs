@@ -19,7 +19,7 @@ use super::v2_public_schema::{
 };
 
 pub(super) const V2_COMPARATOR_FIT_CORPUS_REVISION: &str =
-    "EUREKA.002.V2.COMPARATOR_FIT_CORPUS.v1";
+    "EUREKA.002.V2.COMPARATOR_FIT_CORPUS.v2";
 pub(super) const V2_COMPARATOR_CUSTODY_REVISION: &str =
     "EUREKA.002.V2.COMPARATOR_CUSTODY.v1";
 pub(super) const V2_SHORTCUT_BASELINE_IMPLEMENTATION_REVISION: &str =
@@ -48,8 +48,12 @@ impl V2CorpusPartition {
 pub(super) enum V2ComparatorCustodyError {
     PublicSchema(V2PublicSchemaError),
     EmptyFitCorpus,
+    ZeroCanonicalRowIdentity,
+    FamilyContextMismatch,
+    ContextChangedAcrossTransition,
     NonDevelopmentFitEvidence,
     DuplicateCanonicalRowIdentity,
+    DuplicateCanonicalTransition,
 }
 
 impl From<V2PublicSchemaError> for V2ComparatorCustodyError {
@@ -81,7 +85,16 @@ impl V2PublicTransitionEvidence {
         action: PublicAction,
         post: V2PublicState,
     ) -> Result<Self, V2ComparatorCustodyError> {
+        if row_identity == [0_u8; 32] {
+            return Err(V2ComparatorCustodyError::ZeroCanonicalRowIdentity);
+        }
         action_index(action)?;
+        if !pre.belongs_to(family) || !post.belongs_to(family) {
+            return Err(V2ComparatorCustodyError::FamilyContextMismatch);
+        }
+        if pre.context() != post.context() {
+            return Err(V2ComparatorCustodyError::ContextChangedAcrossTransition);
+        }
         Ok(Self {
             family,
             partition,
@@ -123,10 +136,14 @@ impl V2DevelopmentFitCorpus {
             return Err(V2ComparatorCustodyError::NonDevelopmentFitEvidence);
         }
 
-        let mut seen = BTreeSet::new();
+        let mut seen_ids = BTreeSet::new();
+        let mut seen_transitions = BTreeSet::new();
         for record in &records {
-            if !seen.insert(record.row_identity) {
+            if !seen_ids.insert(record.row_identity) {
                 return Err(V2ComparatorCustodyError::DuplicateCanonicalRowIdentity);
+            }
+            if !seen_transitions.insert(canonical_transition_bytes(record)) {
+                return Err(V2ComparatorCustodyError::DuplicateCanonicalTransition);
             }
         }
         records.sort_by_key(|record| record.row_identity);
@@ -255,6 +272,23 @@ fn comparator_subject_commitment(
     *blake3::hash(&bytes).as_bytes()
 }
 
+/// Exact transition bytes excluding the row identity.
+///
+/// This is used only for duplicate-content rejection. It is intentionally an
+/// exact byte key rather than a hash so custody does not depend on collision
+/// assumptions merely to notice duplicate fit evidence.
+fn canonical_transition_bytes(record: &V2PublicTransitionEvidence) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.push(record.family.tag());
+    bytes.push(record.partition.tag());
+    encode_state(&mut bytes, record.pre);
+    bytes.extend_from_slice(
+        &(action_index(record.action).expect("record action validated") as u64).to_le_bytes(),
+    );
+    encode_state(&mut bytes, record.post);
+    bytes
+}
+
 fn encode_record(bytes: &mut Vec<u8>, record: &V2PublicTransitionEvidence) {
     bytes.push(record.family.tag());
     bytes.push(record.partition.tag());
@@ -358,6 +392,48 @@ mod tests {
     }
 
     #[test]
+    fn zero_row_identity_fails_closed() {
+        let result = V2PublicTransitionEvidence::new(
+            V2PublicFamily::PublicFlowV2,
+            V2CorpusPartition::Development,
+            [0_u8; 32],
+            V2PublicState::new([1, 2, 3, 0]).unwrap(),
+            PublicAction::NoOp,
+            V2PublicState::new([1, 2, 3, 0]).unwrap(),
+        );
+        assert_eq!(result, Err(V2ComparatorCustodyError::ZeroCanonicalRowIdentity));
+    }
+
+    #[test]
+    fn family_context_mismatch_fails_closed() {
+        let result = V2PublicTransitionEvidence::new(
+            V2PublicFamily::PublicFlowV2,
+            V2CorpusPartition::Development,
+            [1_u8; 32],
+            V2PublicState::new([1, 2, 3, 5]).unwrap(),
+            PublicAction::NoOp,
+            V2PublicState::new([1, 2, 3, 5]).unwrap(),
+        );
+        assert_eq!(result, Err(V2ComparatorCustodyError::FamilyContextMismatch));
+    }
+
+    #[test]
+    fn changing_context_within_transition_fails_closed() {
+        let result = V2PublicTransitionEvidence::new(
+            V2PublicFamily::PublicFlowV2,
+            V2CorpusPartition::Development,
+            [1_u8; 32],
+            V2PublicState::new([1, 2, 3, 0]).unwrap(),
+            PublicAction::NoOp,
+            V2PublicState::new([1, 2, 3, 1]).unwrap(),
+        );
+        assert_eq!(
+            result,
+            Err(V2ComparatorCustodyError::ContextChangedAcrossTransition)
+        );
+    }
+
+    #[test]
     fn duplicate_row_identity_fails_closed() {
         let mut records = development_records();
         let duplicate = records[0].clone();
@@ -365,6 +441,18 @@ mod tests {
         assert_eq!(
             V2DevelopmentFitCorpus::freeze(records),
             Err(V2ComparatorCustodyError::DuplicateCanonicalRowIdentity)
+        );
+    }
+
+    #[test]
+    fn duplicate_transition_under_different_identity_fails_closed() {
+        let mut records = development_records();
+        let mut duplicate = records[0].clone();
+        duplicate.row_identity = [0xA5_u8; 32];
+        records.push(duplicate);
+        assert_eq!(
+            V2DevelopmentFitCorpus::freeze(records),
+            Err(V2ComparatorCustodyError::DuplicateCanonicalTransition)
         );
     }
 
