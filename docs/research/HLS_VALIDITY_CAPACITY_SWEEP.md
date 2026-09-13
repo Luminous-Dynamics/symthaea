@@ -16,23 +16,25 @@ The archive represents one value for every active relation key at every causal c
 
 This is the represented key-checkpoint facts per temporal dimension.
 
-The hypothesis is not that `rho` alone determines performance. Candidate cleanup competition, codebook crosstalk, and finite-dimensional effects may matter independently. The sweep varies those factors separately.
+The hypothesis is not that `rho` alone determines performance. Candidate cleanup competition, codebook coherence, semantic-change density, and finite-dimensional temporal crosstalk may matter independently. The sweep records diagnostics for those alternatives rather than attributing every failure to `rho`.
 
 ## Why span length is a separate axis
 
 A value valid over `[start, end)` is archived with one analytic O(D) span write regardless of interval length.
 
-Changing span length therefore changes the number of closed archive writes while **not changing** `key_count * horizon`, the number of represented key-checkpoint facts.
+Changing span length keeps `key_count * horizon` fixed, but it changes both:
 
-If retrieval accuracy changes strongly with span length at fixed `key_count`, `horizon`, and `dimension`, that is evidence that write segmentation/numerics matter beyond the simple fact-load hypothesis.
+- the number of closed span writes;
+- the number of opportunities for the independently resampled span value to change.
 
-### Pre-execution limitation: segmentation is not guaranteed semantic mutation
+Because adjacent spans can draw the same candidate, span length is **not** a guaranteed one-semantic-change-per-boundary axis. Conversely, because values are independently resampled at each span, it is also **not** a pure numerical/write-segmentation axis.
 
-Source audit found that `research_v0` assigns each span's candidate independently from the deterministic pseudo-random schedule. Adjacent spans can therefore occasionally select the same candidate. Under the intended approximately uniform assignment, the repeat probability is roughly `1 / candidate_count`.
+`research_v0` therefore records the realized semantic-change count for every observation. Span-length results must be interpreted as a joint segmentation + stochastic mutation-density manipulation, with the realized change count used to disambiguate the two effects.
 
-Consequently, the span-length axis in `research_v0` must be interpreted as a **span-segmentation / write-density axis**, not as a guaranteed semantic-mutation-density axis.
+A later confirmatory plan may add two cleaner controls:
 
-This limitation was identified before result interpretation. The frozen cases and seeds are intentionally left unchanged rather than silently editing the preregistered schedule. A later confirmatory version may add a separate forced-change mutation axis in which every adjacent span is required to choose a different value.
+1. a forced-change mutation axis where every adjacent span must select a different value;
+2. a pure-segmentation axis where a fixed semantic history is split into different numbers of mathematically equivalent writes.
 
 ## Fixed replicate seeds
 
@@ -44,70 +46,35 @@ Seeds may not be added, removed, or selected after observing outcomes while call
 
 ## Axis A — dimension
 
-Fixed:
+Fixed: keys 8, candidates 8, horizon 128 checkpoints, span length 8.
 
-- keys: 8;
-- candidates: 8;
-- horizon: 128 checkpoints;
-- span length: 8.
-
-Dimensions:
-
-`512, 1024, 2048, 4096, 8192`.
+Dimensions: `512, 1024, 2048, 4096, 8192`.
 
 ## Axis B — relation-key count
 
-Fixed:
+Fixed: dimension 4096, candidates 8, horizon 128, span length 8.
 
-- dimension: 4096;
-- candidates: 8;
-- horizon: 128;
-- span length: 8.
-
-Key counts:
-
-`2, 4, 8, 16, 32`.
+Key counts: `2, 4, 8, 16, 32`.
 
 ## Axis C — candidate count
 
-Fixed:
+Fixed: dimension 4096, keys 8, horizon 128, span length 8.
 
-- dimension: 4096;
-- keys: 8;
-- horizon: 128;
-- span length: 8.
-
-Candidate counts:
-
-`2, 4, 8, 16, 32`.
+Candidate counts: `2, 4, 8, 16, 32`.
 
 ## Axis D — checkpoint horizon
 
-Fixed:
+Fixed: dimension 4096, keys 8, candidates 8, span length 8.
 
-- dimension: 4096;
-- keys: 8;
-- candidates: 8;
-- span length: 8.
+Horizons: `32, 64, 128, 256, 512`.
 
-Horizons:
+## Axis E — span length / stochastic mutation density
 
-`32, 64, 128, 256, 512`.
+Fixed: dimension 4096, keys 8, candidates 8, horizon 256.
 
-## Axis E — span length / archive segmentation
+Span lengths: `1, 2, 4, 8, 16, 32, 64`.
 
-Fixed:
-
-- dimension: 4096;
-- keys: 8;
-- candidates: 8;
-- horizon: 256.
-
-Span lengths:
-
-`1, 2, 4, 8, 16, 32, 64`.
-
-This axis controls scheduled span segmentation and write count. It does not guarantee that every boundary changes the semantic candidate value.
+The runner records both nominal span writes and realized semantic changes, so an observed effect can be related to the history that was actually generated rather than inferred from span length alone.
 
 ## Total study
 
@@ -131,20 +98,27 @@ No best seed, best checkpoint, or best candidate subset is selected.
 
 Each observation reports:
 
-- correct queries;
-- total queries;
-- accuracy;
-- mean cleanup margin;
-- smallest cleanup margin;
+- correct queries, total queries, and accuracy;
+- mean cleanup margin and smallest cleanup margin;
 - closed spans written;
-- represented key-checkpoint facts;
-- facts per dimension (`rho`);
+- realized semantic changes;
+- number of candidate values actually used;
+- represented key-checkpoint facts and facts per dimension (`rho`);
 - candidate-score evaluations;
+- maximum absolute pairwise similarity within the key codebook;
+- maximum absolute pairwise similarity within the candidate codebook;
+- maximum absolute key-to-candidate codebook similarity;
 - complex history payload bytes;
 - temporal-axis payload bytes;
 - key/value codebook payload bytes.
 
+The codebook-coherence diagnostics are important because a low-dimensional failure should not automatically be attributed to temporal capacity if that replicate also produced unusually correlated bipolar roles.
+
 Payload figures deliberately remain separate. They are not presented as a single misleading total because history state, temporal basis, and semantic codebook have different reuse semantics.
+
+## Query-compute contract
+
+Validity cleanup constructs the temporal query phasor once per checkpoint query, then reuses it across all candidate correlations. The deterministic operation accounting therefore separates one temporal-role construction from the `candidate_count` score evaluations rather than hiding repeated trigonometric work inside each candidate.
 
 ## Interpretation rules
 
@@ -152,13 +126,14 @@ Payload figures deliberately remain separate. They are not presented as a single
 2. The first dimension or horizon that fails is not to be hidden by averaging only successful cases.
 3. Accuracy and cleanup margin must both be examined; high accuracy with near-zero margin is fragile.
 4. Candidate-count effects must not be attributed to temporal capacity without comparison to the fixed-load candidate axis.
-5. Span-length effects in `research_v0` are segmentation/write-density effects, not pure semantic-mutation effects.
-6. `research_v0` is descriptive/exploratory. Any confirmatory threshold must be frozen later on untouched seeds.
-7. Wall-clock throughput is not part of this first deterministic core result; operation counts are reported instead. A dedicated benchmark can measure timing later.
+5. Span-length effects must be interpreted with realized semantic-change count; they are neither pure write-density nor guaranteed mutation-density effects.
+6. Replicates with unusually high codebook coherence must be visible rather than silently discarded.
+7. `research_v0` is descriptive/exploratory. Any confirmatory threshold must be frozen later on untouched seeds.
+8. Wall-clock throughput is not part of this first deterministic core result; a dedicated benchmark can measure timing later.
 
 ## Next decision
 
-If results show a stable regime with useful cleanup margins, freeze a separate historical state-tracking experiment that uses untouched benchmark seeds and compares:
+If results show a stable regime with useful cleanup margins after controlling for codebook coherence and realized mutation density, freeze a separate historical state-tracking experiment that uses untouched benchmark seeds and compares:
 
 - explicit event-log oracle;
 - validity archive;
