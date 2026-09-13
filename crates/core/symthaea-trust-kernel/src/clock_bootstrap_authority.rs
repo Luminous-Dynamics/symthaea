@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! External-authority admission for the first trusted clock bootstrap interval.
 //!
-//! Serializable claim/evidence records are audit material only. The private
-//! verified capability is minted only after an externally supplied authority
-//! adapter accepts evidence bound to the exact claim, provider and policy.
+//! V2 binds the exact initial clock-evaluation-policy identity into the claim
+//! authenticated by the external provider. Serializable claim/evidence records
+//! remain audit material only; the verified capability is private and one-way.
 //! No candidate clock window or candidate time participates in this boundary.
 
 use crate::digest::{Sha256Digest, domain_hash};
@@ -12,25 +12,26 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-pub const CLOCK_BOOTSTRAP_CLAIM_SCHEMA: &str = "symthaea.trust.clock-bootstrap-claim.v1";
+pub const CLOCK_BOOTSTRAP_CLAIM_SCHEMA: &str = "symthaea.trust.clock-bootstrap-claim.v2";
 pub const CLOCK_BOOTSTRAP_AUTHORITY_EVIDENCE_SCHEMA: &str =
-    "symthaea.trust.clock-bootstrap-authority-evidence.v1";
+    "symthaea.trust.clock-bootstrap-authority-evidence.v2";
 pub const VERIFIED_CLOCK_BOOTSTRAP_AUTHORITY_SCHEMA: &str =
-    "symthaea.trust.verified-clock-bootstrap-authority.v1";
+    "symthaea.trust.verified-clock-bootstrap-authority.v2";
 
-const CLOCK_BOOTSTRAP_CLAIM_DOMAIN: &[u8] = b"symthaea.trust.clock-bootstrap-claim.v1\0";
+const CLOCK_BOOTSTRAP_CLAIM_DOMAIN: &[u8] = b"symthaea.trust.clock-bootstrap-claim.v2\0";
 const CLOCK_BOOTSTRAP_AUTHORITY_EVIDENCE_DOMAIN: &[u8] =
-    b"symthaea.trust.clock-bootstrap-authority-evidence.v1\0";
+    b"symthaea.trust.clock-bootstrap-authority-evidence.v2\0";
 const VERIFIED_CLOCK_BOOTSTRAP_AUTHORITY_DOMAIN: &[u8] =
-    b"symthaea.trust.verified-clock-bootstrap-authority.v1\0";
+    b"symthaea.trust.verified-clock-bootstrap-authority.v2\0";
 const CLOCK_BOOTSTRAP_PURPOSE: &str = "ClockBootstrap";
 const MAX_BOOTSTRAP_PROVIDER_ID_BYTES: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ClockBootstrapClaimV1 {
+pub struct ClockBootstrapClaimV2 {
     schema: String,
     purpose: String,
     trust_snapshot_digest: Sha256Digest,
+    clock_evaluation_policy_id: Sha256Digest,
     trusted_lower_unix_ms: u64,
     trusted_upper_unix_ms: u64,
     #[serde(rename = "id")]
@@ -38,7 +39,7 @@ pub struct ClockBootstrapClaimV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ClockBootstrapAuthorityEvidenceV1 {
+pub struct ClockBootstrapAuthorityEvidenceV2 {
     schema: String,
     claim_id: Sha256Digest,
     provider_id: String,
@@ -49,16 +50,17 @@ pub struct ClockBootstrapAuthorityEvidenceV1 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct VerifiedClockBootstrapAuthorityIdV1(Sha256Digest);
+pub struct VerifiedClockBootstrapAuthorityIdV2(Sha256Digest);
 
 #[derive(Debug, Clone)]
 #[must_use]
-pub struct VerifiedClockBootstrapAuthorityV1 {
-    id: VerifiedClockBootstrapAuthorityIdV1,
+pub struct VerifiedClockBootstrapAuthorityV2 {
+    id: VerifiedClockBootstrapAuthorityIdV2,
     claim_id: Sha256Digest,
     authority_evidence_id: Sha256Digest,
     provider_id: String,
     authority_policy_digest: Sha256Digest,
+    clock_evaluation_policy_id: Sha256Digest,
 }
 
 pub trait ClockBootstrapAuthorityVerifier {
@@ -85,9 +87,10 @@ pub enum ClockBootstrapAuthorityError {
     Encoding(String),
 }
 
-impl ClockBootstrapClaimV1 {
+impl ClockBootstrapClaimV2 {
     pub fn new(
         trust_snapshot_digest: Sha256Digest,
+        clock_evaluation_policy_id: Sha256Digest,
         trusted_lower_unix_ms: u64,
         trusted_upper_unix_ms: u64,
     ) -> Result<Self, ClockBootstrapAuthorityError> {
@@ -98,6 +101,7 @@ impl ClockBootstrapClaimV1 {
             schema: CLOCK_BOOTSTRAP_CLAIM_SCHEMA.to_string(),
             purpose: CLOCK_BOOTSTRAP_PURPOSE.to_string(),
             trust_snapshot_digest,
+            clock_evaluation_policy_id,
             trusted_lower_unix_ms,
             trusted_upper_unix_ms,
             id: Sha256Digest([0; 32]),
@@ -119,23 +123,16 @@ impl ClockBootstrapClaimV1 {
         Ok(())
     }
 
-    pub fn id(&self) -> Sha256Digest {
-        self.id
-    }
-    pub fn trust_snapshot_digest(&self) -> Sha256Digest {
-        self.trust_snapshot_digest
-    }
-    pub fn trusted_lower_unix_ms(&self) -> u64 {
-        self.trusted_lower_unix_ms
-    }
-    pub fn trusted_upper_unix_ms(&self) -> u64 {
-        self.trusted_upper_unix_ms
-    }
+    pub fn id(&self) -> Sha256Digest { self.id }
+    pub fn trust_snapshot_digest(&self) -> Sha256Digest { self.trust_snapshot_digest }
+    pub fn clock_evaluation_policy_id(&self) -> Sha256Digest { self.clock_evaluation_policy_id }
+    pub fn trusted_lower_unix_ms(&self) -> u64 { self.trusted_lower_unix_ms }
+    pub fn trusted_upper_unix_ms(&self) -> u64 { self.trusted_upper_unix_ms }
 }
 
-impl ClockBootstrapAuthorityEvidenceV1 {
+impl ClockBootstrapAuthorityEvidenceV2 {
     pub fn new(
-        claim: &ClockBootstrapClaimV1,
+        claim: &ClockBootstrapClaimV2,
         provider_id: impl Into<String>,
         authority_policy_digest: Sha256Digest,
         external_evidence_digest: Sha256Digest,
@@ -166,55 +163,32 @@ impl ClockBootstrapAuthorityEvidenceV1 {
         Ok(())
     }
 
-    pub fn id(&self) -> Sha256Digest {
-        self.id
-    }
-    pub fn claim_id(&self) -> Sha256Digest {
-        self.claim_id
-    }
-    pub fn provider_id(&self) -> &str {
-        &self.provider_id
-    }
-    pub fn authority_policy_digest(&self) -> Sha256Digest {
-        self.authority_policy_digest
-    }
-    pub fn external_evidence_digest(&self) -> Sha256Digest {
-        self.external_evidence_digest
-    }
+    pub fn id(&self) -> Sha256Digest { self.id }
+    pub fn claim_id(&self) -> Sha256Digest { self.claim_id }
+    pub fn provider_id(&self) -> &str { &self.provider_id }
+    pub fn authority_policy_digest(&self) -> Sha256Digest { self.authority_policy_digest }
+    pub fn external_evidence_digest(&self) -> Sha256Digest { self.external_evidence_digest }
 }
 
-impl VerifiedClockBootstrapAuthorityIdV1 {
-    pub fn as_digest(self) -> Sha256Digest {
-        self.0
-    }
-    pub fn to_hex(self) -> String {
-        self.0.to_hex()
-    }
+impl VerifiedClockBootstrapAuthorityIdV2 {
+    pub fn as_digest(self) -> Sha256Digest { self.0 }
+    pub fn to_hex(self) -> String { self.0.to_hex() }
 }
 
-impl VerifiedClockBootstrapAuthorityV1 {
-    pub fn id(&self) -> VerifiedClockBootstrapAuthorityIdV1 {
-        self.id
-    }
-    pub fn claim_id(&self) -> Sha256Digest {
-        self.claim_id
-    }
-    pub fn authority_evidence_id(&self) -> Sha256Digest {
-        self.authority_evidence_id
-    }
-    pub fn provider_id(&self) -> &str {
-        &self.provider_id
-    }
-    pub fn authority_policy_digest(&self) -> Sha256Digest {
-        self.authority_policy_digest
-    }
+impl VerifiedClockBootstrapAuthorityV2 {
+    pub fn id(&self) -> VerifiedClockBootstrapAuthorityIdV2 { self.id }
+    pub fn claim_id(&self) -> Sha256Digest { self.claim_id }
+    pub fn authority_evidence_id(&self) -> Sha256Digest { self.authority_evidence_id }
+    pub fn provider_id(&self) -> &str { &self.provider_id }
+    pub fn authority_policy_digest(&self) -> Sha256Digest { self.authority_policy_digest }
+    pub fn clock_evaluation_policy_id(&self) -> Sha256Digest { self.clock_evaluation_policy_id }
 }
 
 pub fn verify_clock_bootstrap_authority(
-    claim: &ClockBootstrapClaimV1,
-    evidence: &ClockBootstrapAuthorityEvidenceV1,
+    claim: &ClockBootstrapClaimV2,
+    evidence: &ClockBootstrapAuthorityEvidenceV2,
     verifier: &dyn ClockBootstrapAuthorityVerifier,
-) -> Result<VerifiedClockBootstrapAuthorityV1, ClockBootstrapAuthorityError> {
+) -> Result<VerifiedClockBootstrapAuthorityV2, ClockBootstrapAuthorityError> {
     claim.validate()?;
     evidence.validate()?;
     if evidence.claim_id() != claim.id() {
@@ -241,64 +215,42 @@ pub fn verify_clock_bootstrap_authority(
         Err(reason) => return Err(ClockBootstrapAuthorityError::ExternalVerifierError(reason)),
     }
 
-    let id = VerifiedClockBootstrapAuthorityIdV1(compute_verified_authority_id(
+    let id = VerifiedClockBootstrapAuthorityIdV2(compute_verified_authority_id(
         claim.id(),
         evidence.id(),
         evidence.provider_id(),
         evidence.authority_policy_digest(),
     )?);
-    Ok(VerifiedClockBootstrapAuthorityV1 {
+    Ok(VerifiedClockBootstrapAuthorityV2 {
         id,
         claim_id: claim.id(),
         authority_evidence_id: evidence.id(),
         provider_id: evidence.provider_id().to_string(),
         authority_policy_digest: evidence.authority_policy_digest(),
+        clock_evaluation_policy_id: claim.clock_evaluation_policy_id(),
     })
 }
 
-fn compute_claim_id(
-    claim: &ClockBootstrapClaimV1,
-) -> Result<Sha256Digest, ClockBootstrapAuthorityError> {
-    Ok(domain_hash(
-        CLOCK_BOOTSTRAP_CLAIM_DOMAIN,
-        &canonical_claim_preimage_bytes(claim)?,
-    ))
+fn compute_claim_id(claim: &ClockBootstrapClaimV2) -> Result<Sha256Digest, ClockBootstrapAuthorityError> {
+    Ok(domain_hash(CLOCK_BOOTSTRAP_CLAIM_DOMAIN, &canonical_claim_preimage_bytes(claim)?))
 }
 
-fn canonical_claim_preimage_bytes(
-    claim: &ClockBootstrapClaimV1,
-) -> Result<Vec<u8>, ClockBootstrapAuthorityError> {
+fn canonical_claim_preimage_bytes(claim: &ClockBootstrapClaimV2) -> Result<Vec<u8>, ClockBootstrapAuthorityError> {
     canonical_json_bytes([
+        ("clock_evaluation_policy_id", Value::String(claim.clock_evaluation_policy_id.to_hex())),
         ("purpose", Value::String(claim.purpose.clone())),
         ("schema", Value::String(claim.schema.clone())),
-        (
-            "trust_snapshot_digest",
-            Value::String(claim.trust_snapshot_digest.to_hex()),
-        ),
-        (
-            "trusted_lower_unix_ms",
-            Value::from(claim.trusted_lower_unix_ms),
-        ),
-        (
-            "trusted_upper_unix_ms",
-            Value::from(claim.trusted_upper_unix_ms),
-        ),
+        ("trust_snapshot_digest", Value::String(claim.trust_snapshot_digest.to_hex())),
+        ("trusted_lower_unix_ms", Value::from(claim.trusted_lower_unix_ms)),
+        ("trusted_upper_unix_ms", Value::from(claim.trusted_upper_unix_ms)),
     ])
 }
 
-fn compute_evidence_id(
-    evidence: &ClockBootstrapAuthorityEvidenceV1,
-) -> Result<Sha256Digest, ClockBootstrapAuthorityError> {
+fn compute_evidence_id(evidence: &ClockBootstrapAuthorityEvidenceV2) -> Result<Sha256Digest, ClockBootstrapAuthorityError> {
     let bytes = canonical_json_bytes([
-        (
-            "authority_policy_digest",
-            Value::String(evidence.authority_policy_digest.to_hex()),
-        ),
+        ("authority_policy_digest", Value::String(evidence.authority_policy_digest.to_hex())),
         ("claim_id", Value::String(evidence.claim_id.to_hex())),
-        (
-            "external_evidence_digest",
-            Value::String(evidence.external_evidence_digest.to_hex()),
-        ),
+        ("external_evidence_digest", Value::String(evidence.external_evidence_digest.to_hex())),
         ("provider_id", Value::String(evidence.provider_id.clone())),
         ("schema", Value::String(evidence.schema.clone())),
     ])?;
@@ -312,31 +264,17 @@ fn compute_verified_authority_id(
     authority_policy_digest: Sha256Digest,
 ) -> Result<Sha256Digest, ClockBootstrapAuthorityError> {
     let bytes = canonical_json_bytes([
-        (
-            "authority_evidence_id",
-            Value::String(authority_evidence_id.to_hex()),
-        ),
-        (
-            "authority_policy_digest",
-            Value::String(authority_policy_digest.to_hex()),
-        ),
+        ("authority_evidence_id", Value::String(authority_evidence_id.to_hex())),
+        ("authority_policy_digest", Value::String(authority_policy_digest.to_hex())),
         ("claim_id", Value::String(claim_id.to_hex())),
         ("provider_id", Value::String(provider_id.to_string())),
-        (
-            "schema",
-            Value::String(VERIFIED_CLOCK_BOOTSTRAP_AUTHORITY_SCHEMA.to_string()),
-        ),
+        ("schema", Value::String(VERIFIED_CLOCK_BOOTSTRAP_AUTHORITY_SCHEMA.to_string())),
     ])?;
     Ok(domain_hash(VERIFIED_CLOCK_BOOTSTRAP_AUTHORITY_DOMAIN, &bytes))
 }
 
-fn canonical_json_bytes<const N: usize>(
-    fields: [(&str, Value); N],
-) -> Result<Vec<u8>, ClockBootstrapAuthorityError> {
-    let map = fields
-        .into_iter()
-        .map(|(key, value)| (key.to_string(), value))
-        .collect::<BTreeMap<_, _>>();
+fn canonical_json_bytes<const N: usize>(fields: [(&str, Value); N]) -> Result<Vec<u8>, ClockBootstrapAuthorityError> {
+    let map = fields.into_iter().map(|(key, value)| (key.to_string(), value)).collect::<BTreeMap<_, _>>();
     serde_json::to_vec(&map).map_err(|error| ClockBootstrapAuthorityError::Encoding(error.to_string()))
 }
 

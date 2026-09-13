@@ -35,8 +35,8 @@ pub use clock::{
 pub use clock_bootstrap_authority::{
     CLOCK_BOOTSTRAP_AUTHORITY_EVIDENCE_SCHEMA, CLOCK_BOOTSTRAP_CLAIM_SCHEMA,
     VERIFIED_CLOCK_BOOTSTRAP_AUTHORITY_SCHEMA, ClockBootstrapAuthorityError,
-    ClockBootstrapAuthorityEvidenceV1, ClockBootstrapAuthorityVerifier, ClockBootstrapClaimV1,
-    VerifiedClockBootstrapAuthorityIdV1, VerifiedClockBootstrapAuthorityV1,
+    ClockBootstrapAuthorityEvidenceV2, ClockBootstrapAuthorityVerifier, ClockBootstrapClaimV2,
+    VerifiedClockBootstrapAuthorityIdV2, VerifiedClockBootstrapAuthorityV2,
     verify_clock_bootstrap_authority,
 };
 pub use clock_witness::{
