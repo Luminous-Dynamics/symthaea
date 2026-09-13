@@ -1,0 +1,185 @@
+name: HYPERSPACE-003R Forward Transport Capsule
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hyperspace-003r-forward-transport.yml'
+      - 'crates/core/symthaea-core/examples/hyperspace_003r_forward_transport.rs'
+      - 'crates/core/symthaea-core/src/state_space.rs'
+      - 'crates/core/symthaea-core/src/continuous_reachability.rs'
+      - 'crates/core/symthaea-core/src/hyperspace_benchmark.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: 9b7bf7c22b673aabdd735f8c15f4620a3e7fb2f0
+  FAILED_H003_SUBJECT: 962c3b72350251713c54b7b6328960a2a6f35595
+  FAILED_H003_ARTIFACT_DIGEST: sha256:03673207c9c0a12691b0708c4f92fbb7096fc79eaeee9b981767a776680a6851
+  PREREG_ISSUE: '2427'
+
+jobs:
+  forward-transport:
+    name: Exact forward representation-transport repair
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact source subject and qualified parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/hyperspace-003r
+          {
+            echo "schema=symthaea.hyperspace-003r.environment.v1"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "parent_sha=$(git rev-parse HEAD^)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "qualified_hyperspace_002q_head=$BASE_SHA"
+            echo "failed_hyperspace_003_subject=$FAILED_H003_SUBJECT"
+            echo "failed_hyperspace_003_artifact_digest=$FAILED_H003_ARTIFACT_DIGEST"
+            echo "historical_hyperspace_003_verdict=FAIL"
+            echo "runner_label=ubuntu-24.04"
+            echo "preregistration_issue=$PREREG_ISSUE"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+          } > artifacts/hyperspace-003r/environment.txt
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Extend environment capsule
+        run: |
+          set -euo pipefail
+          cpu_model="$(awk -F: '/^model name/{sub(/^[[:space:]]+/, "", $2); print $2; exit}' /proc/cpuinfo || true)"
+          cpu_flags="$(awk -F: '/^flags/{sub(/^[[:space:]]+/, "", $2); print $2; exit}' /proc/cpuinfo || true)"
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "rustc_host=$(rustc -vV | sed -n 's/^host: //p')"
+            echo "rustc_commit=$(rustc -vV | sed -n 's/^commit-hash: //p')"
+            echo "llvm_version=$(rustc -vV | sed -n 's/^LLVM version: //p')"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "image_os=${ImageOS:-unknown}"
+            echo "image_version=${ImageVersion:-unknown}"
+            echo "kernel=$(uname -srmo)"
+            echo "libc=$(getconf GNU_LIBC_VERSION 2>/dev/null || echo unknown)"
+            echo "cpu_model=${cpu_model:-unknown}"
+            echo "cpu_flags_sha256=$(printf '%s' "$cpu_flags" | sha256sum | awk '{print $1}')"
+          } >> artifacts/hyperspace-003r/environment.txt
+
+      - name: Compile exact forward-transport reporter
+        run: |
+          cargo check --locked -p symthaea-core --no-default-features \
+            --example hyperspace_003r_forward_transport
+
+      - name: Produce machine-readable forward-transport receipt
+        run: |
+          cargo run --locked -p symthaea-core --no-default-features \
+            --example hyperspace_003r_forward_transport -- \
+            --subject "$SUBJECT_SHA" \
+            --output artifacts/hyperspace-003r/report.json
+
+      - name: Hash complete evidence capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd artifacts/hyperspace-003r
+          : > SHA256SUMS
+          for file in environment.txt report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Validate preregistered repair theorem
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path('artifacts/hyperspace-003r/report.json').read_text())
+          assert report['schema'] == 'symthaea.hyperspace-003r.forward-transport.v1'
+          assert report['source_subject'] == os.environ['SUBJECT_SHA'].lower()
+          assert report['preregistration_issue'] == 2427
+          assert report['qualified_hyperspace_002q_head'] == os.environ['BASE_SHA']
+          assert report['failed_hyperspace_003_subject'] == os.environ['FAILED_H003_SUBJECT']
+          assert report['failed_hyperspace_003_artifact_digest'] == os.environ['FAILED_H003_ARTIFACT_DIGEST']
+          assert report['historical_hyperspace_003_verdict'] == 'FAIL'
+          assert report['can_rewrite_hyperspace_003'] is False
+
+          env_lines = Path('artifacts/hyperspace-003r/environment.txt').read_text().splitlines()
+          environment = dict(line.split('=', 1) for line in env_lines if '=' in line)
+          assert environment['subject_sha'] == os.environ['SUBJECT_SHA']
+          assert environment['parent_sha'] == os.environ['BASE_SHA']
+          assert environment['qualified_hyperspace_002q_head'] == os.environ['BASE_SHA']
+          assert environment['failed_hyperspace_003_subject'] == os.environ['FAILED_H003_SUBJECT']
+          assert environment['failed_hyperspace_003_artifact_digest'] == os.environ['FAILED_H003_ARTIFACT_DIGEST']
+          assert environment['historical_hyperspace_003_verdict'] == 'FAIL'
+          assert environment['runner_label'] == 'ubuntu-24.04'
+          assert environment['tree_sha']
+          assert environment['cargo_lock_sha256']
+          assert environment['rustc']
+
+          control = report['control']
+          assert control['historical_h003_verdict'] == 'FAIL'
+          assert control['failed_h003_subject'] == os.environ['FAILED_H003_SUBJECT']
+          assert control['failed_h003_artifact_digest'] == os.environ['FAILED_H003_ARTIFACT_DIGEST']
+          assert control['inverse_is_authority_for_canonical_identity'] is False
+          assert control['transform_count'] == 6
+          assert control['required_transform_count'] == 6
+          assert control['failed_transform_count'] == 0
+          assert control['negative_controls_rejected'] == 6
+          assert control['required_negative_controls_rejected'] == 6
+          assert all(item['exact_forward_equal'] is True for item in control['transforms'])
+          assert all(item['exact_external_endpoints'] is True for item in control['transforms'])
+          assert all(item['negative_control_rejected'] is True for item in control['transforms'])
+          assert all(item['pass'] is True for item in control['transforms'])
+          assert control['pass'] is True
+          assert report['verdict'] == 'PASS'
+
+          summary = Path(os.environ['GITHUB_STEP_SUMMARY'])
+          with summary.open('a') as f:
+              f.write('## HYPERSPACE-003R exact forward transport\n\n')
+              f.write(f"**Subject:** `{report['source_subject']}`\n\n")
+              f.write(f"**Qualified parent:** `{environment['parent_sha']}`\n\n")
+              f.write(f"**Historical H003:** `{report['failed_hyperspace_003_subject']}` = `FAIL`\n\n")
+              f.write(f"**Transforms:** `{control['transform_count']}/6`\n\n")
+              f.write(f"**Negative controls rejected:** `{control['negative_controls_rejected']}/6`\n\n")
+              f.write(f"**Max inverse diagnostic error:** `{control['observed_max_inverse_roundtrip_error']}`\n\n")
+              f.write(f"**Verdict:** `{report['verdict']}`\n\n")
+              f.write('Exact forward equality owns representation transport. Inverse roundtrip remains diagnostic and H003 remains FAIL.\n')
+          PY
+
+      - name: Upload evidence capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hyperspace-003r-forward-transport-${{ env.SUBJECT_SHA }}
+          path: artifacts/hyperspace-003r/
+          if-no-files-found: error
+          retention-days: 90
