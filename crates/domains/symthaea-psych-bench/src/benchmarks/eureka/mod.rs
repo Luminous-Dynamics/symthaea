@@ -43,6 +43,8 @@ mod target_contract;
 mod target_lineage;
 #[cfg(test)]
 mod transition_identity_tests;
+#[cfg(test)]
+mod v2_construct;
 
 pub use consequence::{
     ConsequenceMetrics, ConsequencePrediction, ConsequenceScore, ConsequenceScoringError,
