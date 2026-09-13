@@ -49,7 +49,7 @@ fn artifact_content_or_provenance_change_changes_result_identity() {
         )
     };
 
-    let first = QualificationResult::resolve(
+    let first = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan,
@@ -57,7 +57,7 @@ fn artifact_content_or_provenance_change_changes_result_identity() {
         QualificationOutcome::Supported(SupportTier::Observed),
     )
     .unwrap();
-    let changed_bytes = QualificationResult::resolve(
+    let changed_bytes = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan,
@@ -65,7 +65,7 @@ fn artifact_content_or_provenance_change_changes_result_identity() {
         QualificationOutcome::Supported(SupportTier::Observed),
     )
     .unwrap();
-    let changed_provenance = QualificationResult::resolve(
+    let changed_provenance = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan,
