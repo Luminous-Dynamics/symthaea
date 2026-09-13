@@ -5,7 +5,10 @@
 //! epistemic ignorance, not an even/odd or ordinal action ontology. Confirmed
 //! transition learning may then differentiate individual action models.
 
-use symthaea_fep::generative_model::GenerativeModel;
+use symthaea_fep::generative_model::{
+    ACTION_TRANSITION_PRIOR_SCHEMA_V1, ActionTransitionPriorError, ActionTransitionPriorV1,
+    GenerativeModel,
+};
 use symthaea_fep::types::{HiddenState, Observation};
 
 const STATE_DIM: usize = 4;
@@ -26,6 +29,33 @@ fn one_hot_state(index: usize) -> HiddenState {
 
 fn observation() -> Observation {
     Observation::from_consciousness_state(0.7, 0.4, 0.6, 0.3)
+}
+
+fn explicit_prior() -> ActionTransitionPriorV1 {
+    ActionTransitionPriorV1::new(
+        vec![
+            vec![0.80, 0.20, 0.00, 0.00],
+            vec![0.10, 0.80, 0.10, 0.00],
+            vec![0.00, 0.10, 0.80, 0.10],
+            vec![0.00, 0.00, 0.20, 0.80],
+        ],
+        vec![0.02, -0.01, 0.00, 0.01],
+    )
+}
+
+fn assert_rejected_without_mutation(
+    model: &mut GenerativeModel,
+    action: usize,
+    prior: ActionTransitionPriorV1,
+) -> ActionTransitionPriorError {
+    let matrices_before = model.transition_matrices.clone();
+    let biases_before = model.transition_bias.clone();
+    let error = model
+        .apply_action_transition_prior_v1(action, prior)
+        .expect_err("invalid prior must fail closed");
+    assert_eq!(model.transition_matrices, matrices_before);
+    assert_eq!(model.transition_bias, biases_before);
+    error
 }
 
 #[test]
@@ -106,6 +136,121 @@ fn distinct_confirmed_transitions_differentiate_action_models() {
         predicted_zero, predicted_one,
         "different confirmed consequences must become distinguishable predictions"
     );
+}
+
+#[test]
+fn explicit_v1_prior_is_atomic_and_action_local() {
+    let mut model = GenerativeModel::new(STATE_DIM, OBS_DIM, 3);
+    let action_zero_before = model.transition_matrices[0].clone();
+    let action_two_before = model.transition_matrices[2].clone();
+    let prior = explicit_prior();
+
+    model
+        .apply_action_transition_prior_v1(1, prior.clone())
+        .expect("valid V1 prior should apply");
+
+    assert_eq!(model.transition_matrices[0], action_zero_before);
+    assert_eq!(model.transition_matrices[1], prior.transition_matrix);
+    assert_eq!(model.transition_bias[1], prior.transition_bias);
+    assert_eq!(model.transition_matrices[2], action_two_before);
+}
+
+#[test]
+fn invalid_v1_priors_fail_closed_without_partial_mutation() {
+    let mut model = GenerativeModel::new(STATE_DIM, OBS_DIM, 2);
+
+    let mut wrong_schema = explicit_prior();
+    wrong_schema.schema_version = ACTION_TRANSITION_PRIOR_SCHEMA_V1 + 1;
+    assert!(matches!(
+        assert_rejected_without_mutation(&mut model, 0, wrong_schema),
+        ActionTransitionPriorError::UnsupportedSchemaVersion { .. }
+    ));
+
+    assert!(matches!(
+        assert_rejected_without_mutation(&mut model, 2, explicit_prior()),
+        ActionTransitionPriorError::ActionOutOfRange { .. }
+    ));
+
+    let mut wrong_rows = explicit_prior();
+    wrong_rows.transition_matrix.pop();
+    assert!(matches!(
+        assert_rejected_without_mutation(&mut model, 0, wrong_rows),
+        ActionTransitionPriorError::MatrixRowCountMismatch { .. }
+    ));
+
+    let mut wrong_columns = explicit_prior();
+    wrong_columns.transition_matrix[1].pop();
+    assert!(matches!(
+        assert_rejected_without_mutation(&mut model, 0, wrong_columns),
+        ActionTransitionPriorError::MatrixColumnCountMismatch { .. }
+    ));
+
+    let mut non_finite_matrix = explicit_prior();
+    non_finite_matrix.transition_matrix[0][0] = f64::NAN;
+    assert!(matches!(
+        assert_rejected_without_mutation(&mut model, 0, non_finite_matrix),
+        ActionTransitionPriorError::NonFiniteMatrixValue { .. }
+    ));
+
+    let mut out_of_range = explicit_prior();
+    out_of_range.transition_matrix[0][0] = 1.1;
+    out_of_range.transition_matrix[0][1] = -0.1;
+    assert!(matches!(
+        assert_rejected_without_mutation(&mut model, 0, out_of_range),
+        ActionTransitionPriorError::ProbabilityOutOfRange { .. }
+    ));
+
+    let mut unnormalized = explicit_prior();
+    unnormalized.transition_matrix[0][0] = 0.7;
+    assert!(matches!(
+        assert_rejected_without_mutation(&mut model, 0, unnormalized),
+        ActionTransitionPriorError::RowNotNormalized { .. }
+    ));
+
+    let mut wrong_bias_length = explicit_prior();
+    wrong_bias_length.transition_bias.pop();
+    assert!(matches!(
+        assert_rejected_without_mutation(&mut model, 0, wrong_bias_length),
+        ActionTransitionPriorError::BiasLengthMismatch { .. }
+    ));
+
+    let mut non_finite_bias = explicit_prior();
+    non_finite_bias.transition_bias[2] = f64::INFINITY;
+    assert!(matches!(
+        assert_rejected_without_mutation(&mut model, 0, non_finite_bias),
+        ActionTransitionPriorError::NonFiniteBiasValue { .. }
+    ));
+}
+
+#[test]
+fn learned_and_explicit_action_identity_survives_json_round_trip() {
+    let mut model = GenerativeModel::new(STATE_DIM, OBS_DIM, 3);
+    model
+        .apply_action_transition_prior_v1(2, explicit_prior())
+        .expect("valid prior should apply");
+    model.learn_transition(
+        &one_hot_state(0),
+        1,
+        &one_hot_state(3),
+        &observation(),
+    );
+
+    let encoded = serde_json::to_string(&model).expect("model should serialize");
+    let restored: GenerativeModel =
+        serde_json::from_str(&encoded).expect("model should deserialize");
+
+    assert_eq!(restored.transition_matrices, model.transition_matrices);
+    assert_eq!(restored.transition_bias, model.transition_bias);
+    assert_eq!(restored.num_actions, model.num_actions);
+    assert_eq!(restored.state_dim, model.state_dim);
+
+    let state = asymmetric_state();
+    for action in 0..model.num_actions {
+        assert_eq!(
+            restored.predict_next_state(&state, action).mean,
+            model.predict_next_state(&state, action).mean
+        );
+    }
 }
 
 #[test]
