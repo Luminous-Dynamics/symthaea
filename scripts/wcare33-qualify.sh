@@ -16,6 +16,7 @@ RECEIPT="$OUT_DIR/receipt.json"
 COMPILE_LOG="$OUT_DIR/compile.log"
 CORPUS_LOG="$OUT_DIR/corpus-integrity.log"
 RUNNER_LOG="$OUT_DIR/adversarial-runner.log"
+METAMORPHIC_LOG="$OUT_DIR/metamorphic-invariants.log"
 mkdir -p "$OUT_DIR"
 
 classification="INFRASTRUCTURE_INDETERMINATE"
@@ -31,7 +32,7 @@ json_safe() {
 
 emit_receipt() {
   cat > "$RECEIPT" <<EOF
-{"authority":"MeasurementOnly","case_count":24,"cargo":"$(json_safe "$cargo_version")","classification":"$classification","composition_commit":"$COMPOSITION","corpus_sha256":"$CORPUS_SHA256","detail":"$(json_safe "$detail")","head_sha":"$head_sha","manifest_sha256":"$MANIFEST_SHA256","rustc":"$(json_safe "$rustc_version")","schema_sha256":"$SCHEMA_SHA256","stage":"$stage","wcare29_parent":"$WCARE29_PARENT","wcare32_parent":"$WCARE32_PARENT"}
+{"authority":"MeasurementOnly","case_count":24,"cargo":"$(json_safe "$cargo_version")","classification":"$classification","composition_commit":"$COMPOSITION","corpus_sha256":"$CORPUS_SHA256","detail":"$(json_safe "$detail")","head_sha":"$head_sha","manifest_sha256":"$MANIFEST_SHA256","metamorphic_required":true,"rustc":"$(json_safe "$rustc_version")","schema_sha256":"$SCHEMA_SHA256","stage":"$stage","wcare29_parent":"$WCARE29_PARENT","wcare32_parent":"$WCARE32_PARENT"}
 EOF
   printf 'WCARE-33 %s (%s: %s)\nreceipt: %s\n' "$classification" "$stage" "$detail" "$RECEIPT"
 }
@@ -89,6 +90,7 @@ stage="compile"
 if ! cargo test --locked -p symthaea-wisdom \
   --test wcare32_corpus_integrity \
   --test wcare33_reciprocal_adversarial_runner \
+  --test wcare33_metamorphic_invariants \
   --no-run >"$COMPILE_LOG" 2>&1; then
   classification="$(compile_failure_classification "$COMPILE_LOG")"
   detail="compile_gate_failed"
@@ -112,7 +114,15 @@ if ! cargo test --locked -p symthaea-wisdom \
   finish 1
 fi
 
+stage="metamorphic_invariants"
+if ! cargo test --locked -p symthaea-wisdom \
+  --test wcare33_metamorphic_invariants -- --nocapture >"$METAMORPHIC_LOG" 2>&1; then
+  classification="FAIL_SUBJECT"
+  detail="one_or_more_metamorphic_invariants_failed"
+  finish 1
+fi
+
 classification="PASS_SUBJECT"
 stage="complete"
-detail="all_24_frozen_cases_and_global_boundaries_passed"
+detail="all_24_frozen_cases_global_boundaries_and_metamorphic_invariants_passed"
 finish 0
