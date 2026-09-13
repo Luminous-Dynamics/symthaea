@@ -97,7 +97,7 @@ where
     A: ContinuityHeadAnchor,
     P: ExecutionJournalPersistence,
 {
-    let prepared = exact_in_doubt_prepared(journal, execution_id)?;
+    let prepared = exact_in_doubt_prepared::<A::Error>(journal, execution_id)?;
     let prepared_digest = digest_prepared_execution(&prepared)
         .map_err(RestoreExecutionReconciliationError::Journal)?;
     if prepared.action != SubjectAffectingAction::MemoryModification {
@@ -126,7 +126,7 @@ where
         return Err(RestoreExecutionReconciliationError::AnchoredQuarantineHeadMismatch);
     }
 
-    let restored = exact_restored_transition(
+    let restored = exact_restored_transition::<A::Error>(
         anchored.recovered.quarantine_ledger.events(),
         execution_id,
     )?;
@@ -268,10 +268,13 @@ where
     }
 }
 
-fn exact_in_doubt_prepared(
+fn exact_in_doubt_prepared<E>(
     journal: &InterventionExecutionJournal,
     execution_id: &str,
-) -> Result<PreparedInterventionExecution, RestoreExecutionReconciliationError<std::io::Error>> {
+) -> Result<PreparedInterventionExecution, RestoreExecutionReconciliationError<E>>
+where
+    E: StdError + Send + Sync + 'static,
+{
     let matches: Vec<_> = journal
         .recovery_report()
         .in_doubt
