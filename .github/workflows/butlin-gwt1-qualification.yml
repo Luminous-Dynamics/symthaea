@@ -59,8 +59,9 @@ jobs:
           test "$observed" = "$expected"
           tracked_changes="$(git status --porcelain=v1 --untracked-files=no)"
           test -z "$tracked_changes"
-          echo "Exact subject: $observed"
-          echo "Tree: $(git rev-parse HEAD^{tree})"
+          echo "Exact evidence subject: $observed"
+          echo "Evidence subject tree: $(git rev-parse HEAD^{tree})"
+          echo "GitHub signer/source context: ${GITHUB_SHA} @ ${GITHUB_REF}"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -94,6 +95,8 @@ jobs:
         id: bundle
         if: always()
         shell: bash
+        env:
+          EVIDENCE_SUBJECT_SHA: ${{ steps.subject.outputs.sha }}
         run: |
           set -euo pipefail
           evidence_dir="target/gwt1-evidence"
@@ -112,6 +115,28 @@ jobs:
             fi
           done
 
+          # Keep the scientific subject and the GitHub signer context distinct.
+          # For pull_request, GITHUB_SHA/GITHUB_REF describe GitHub's synthetic
+          # merge source used in the OIDC certificate, while EVIDENCE_SUBJECT_SHA
+          # is the exact PR head explicitly checked out and executed above.
+          jq -n \
+            --arg evidence_subject_sha "$EVIDENCE_SUBJECT_SHA" \
+            --arg github_source_sha "$GITHUB_SHA" \
+            --arg github_source_ref "$GITHUB_REF" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '{
+              schema: "butlin-gwt1-workflow-provenance-v1",
+              evidence_subject_sha: $evidence_subject_sha,
+              github_attestation_source_sha: $github_source_sha,
+              github_attestation_source_ref: $github_source_ref,
+              repository: $repository,
+              run_id: $run_id,
+              run_attempt: $run_attempt
+            }' > "${evidence_dir}/workflow_provenance.json"
+
+          expected+=(workflow_provenance.json)
           (
             cd "$evidence_dir"
             sha256sum "${expected[@]}" > SHA256SUMS
@@ -146,9 +171,11 @@ jobs:
           subject-path: target/gwt1-evidence.tar.gz
 
       # Verify the exact bundle emitted by the signing action rather than
-      # depending on immediate API indexing. The repository, signer workflow,
-      # exact evidence-subject commit, and GitHub-hosted runner requirement are
-      # all enforced during verification.
+      # depending on immediate API indexing. On pull_request, GitHub's OIDC
+      # certificate identifies the synthetic merge source (GITHUB_SHA/ref),
+      # not the separately checked-out evidence-subject head. Verify the former
+      # cryptographically; the signed evidence bundle records and internally
+      # proves the latter.
       - name: Verify and preserve exact evidence attestation
         if: >-
           always() &&
@@ -158,7 +185,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ATTESTATION_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
-          EVIDENCE_SOURCE_SHA: ${{ steps.subject.outputs.sha }}
+          ATTESTATION_SOURCE_SHA: ${{ github.sha }}
+          ATTESTATION_SOURCE_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
           mkdir -p target/gwt1-attestation
@@ -169,7 +197,9 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --bundle target/gwt1-attestation/attestation.json \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-qualification.yml" \
-            --source-digest "$EVIDENCE_SOURCE_SHA" \
+            --signer-digest "$ATTESTATION_SOURCE_SHA" \
+            --source-digest "$ATTESTATION_SOURCE_SHA" \
+            --source-ref "$ATTESTATION_SOURCE_REF" \
             --deny-self-hosted-runners \
             --format json \
             > target/gwt1-attestation/verification.json
