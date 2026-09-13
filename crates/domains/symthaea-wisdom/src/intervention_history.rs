@@ -275,6 +275,14 @@ impl InterventionHistoryLedger {
         Ok(())
     }
 
+    /// Read-only exact event lookup for qualification layers.
+    ///
+    /// This exposes recorded history without granting mutation or reclassification
+    /// authority to downstream binders.
+    pub fn get(&self, event_id: &InterventionEventId) -> Option<&InterventionHistoryEntry> {
+        self.entries.get(event_id)
+    }
+
     pub fn assess_subject(
         &self,
         subject_ref: &str,
