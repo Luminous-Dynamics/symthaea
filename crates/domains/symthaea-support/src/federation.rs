@@ -1,15 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Federation Loop — Knowledge graduation and outbound cognitive update preparation
+//! Federation review — evaluates support resolutions for promotion candidacy.
 //!
-//! Evaluates pending resolutions against graduation criteria and packages
-//! high-quality knowledge for DHT publication as cognitive updates.
+//! Quality graduation is not publication authority. This module no longer turns
+//! a high-quality resolution directly into an outbound DHT update. It produces a
+//! reviewable candidate; publication remains a distinct transition.
 
 use crate::knowledge::KnowledgeManager;
+use crate::knowledge_source::KnowledgeShareabilityV1;
+use crate::technology::TechnologyIdentityV1;
 use crate::types::*;
 
-/// A pending resolution awaiting graduation evaluation.
 #[derive(Debug, Clone)]
 pub struct PendingResolution {
     pub resolution_id: String,
@@ -18,67 +20,97 @@ pub struct PendingResolution {
     pub retrieval_count: u32,
     pub category: SupportCategory,
     pub pattern: String,
+    /// Local/privacy sharing disposition established by the owning context.
+    pub shareability: KnowledgeShareabilityV1,
+    /// Exact technology context when established; absence means applicability is unknown.
+    pub technology: Option<TechnologyIdentityV1>,
 }
 
-/// Result of a graduation check across pending resolutions.
+/// Review artifact. Possession of this value is not federation/publication authority.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KnowledgePromotionCandidateV1 {
+    pub resolution_id: String,
+    pub category: SupportCategory,
+    pub pattern: String,
+    pub phi: f64,
+    pub effectiveness_rating: u8,
+    pub retrieval_count: u32,
+    pub technology: Option<TechnologyIdentityV1>,
+}
+
 #[derive(Debug, Clone)]
 pub struct FederationResult {
-    /// Cognitive updates ready for DHT publication.
+    /// Candidates requiring an independent promotion/publication decision.
+    pub promotion_candidates: Vec<KnowledgePromotionCandidateV1>,
+    /// Legacy field retained for API compatibility. Automatic graduation never
+    /// populates it; outbound publication must be explicit downstream.
     pub outbound_updates: Vec<CognitiveUpdateData>,
-    /// Number of resolutions evaluated.
     pub evaluated: usize,
-    /// Number that graduated.
+    /// Number meeting quality thresholds and permitted to enter promotion review.
     pub graduated: usize,
-    /// Number deferred for later evaluation.
     pub deferred: usize,
+    pub rejected: usize,
+    /// High-quality items blocked because sharing permission was local-only or unknown.
+    pub withheld: usize,
 }
 
-/// Evaluate pending resolutions against graduation criteria.
+/// Evaluate pending resolutions for promotion review.
 ///
-/// Resolutions that meet the graduation threshold (high phi, good effectiveness
-/// rating, sufficient retrievals) are packaged as cognitive updates for DHT
-/// federation. Deferred resolutions remain in the pending queue for re-evaluation.
+/// `Graduate` here means "quality threshold met". Only items already marked
+/// `ReviewRequired` can become promotion candidates. `LocalOnly` and
+/// `NotEstablished` are withheld regardless of quality.
 pub fn check_graduations(
     manager: &KnowledgeManager,
     pending: &[PendingResolution],
 ) -> FederationResult {
-    let mut outbound = Vec::new();
+    let mut candidates = Vec::new();
     let mut graduated = 0;
     let mut deferred = 0;
+    let mut rejected = 0;
+    let mut withheld = 0;
 
     for res in pending {
-        let decision =
-            manager.evaluate_for_graduation(res.phi, res.effectiveness_rating, res.retrieval_count);
-
+        let decision = manager.evaluate_for_graduation(
+            res.phi,
+            res.effectiveness_rating,
+            res.retrieval_count,
+        );
         match decision {
             GraduationDecision::Graduate => {
-                let update = prepare_outbound_update(
-                    Vec::new(), // encoding populated by caller from HDC space
-                    res.phi,
-                    res.category.clone(),
-                    res.pattern.clone(),
-                );
-                outbound.push(update);
-                graduated += 1;
+                if res.shareability == KnowledgeShareabilityV1::ReviewRequired {
+                    candidates.push(KnowledgePromotionCandidateV1 {
+                        resolution_id: res.resolution_id.clone(),
+                        category: res.category.clone(),
+                        pattern: res.pattern.clone(),
+                        phi: res.phi,
+                        effectiveness_rating: res.effectiveness_rating,
+                        retrieval_count: res.retrieval_count,
+                        technology: res.technology.clone(),
+                    });
+                    graduated += 1;
+                } else {
+                    withheld += 1;
+                }
             }
-            GraduationDecision::Defer(_) => {
-                deferred += 1;
-            }
-            GraduationDecision::Reject(_) => {
-                // Rejected — drop silently
-            }
+            GraduationDecision::Defer(_) => deferred += 1,
+            GraduationDecision::Reject(_) => rejected += 1,
         }
     }
 
     FederationResult {
-        outbound_updates: outbound,
+        promotion_candidates: candidates,
+        outbound_updates: Vec::new(),
         evaluated: pending.len(),
         graduated,
         deferred,
+        rejected,
+        withheld,
     }
 }
 
-/// Package a graduated resolution as a cognitive update for DHT publication.
+/// Explicit low-level packaging step for an independently approved promotion.
+/// Calling this function is not itself a proof that privacy, applicability,
+/// provenance, or organizational publication policy has been satisfied.
 pub fn prepare_outbound_update(
     encoding: Vec<u8>,
     phi: f64,
@@ -99,80 +131,70 @@ mod tests {
 
     fn make_pending(phi: f64, rating: u8, retrievals: u32) -> PendingResolution {
         PendingResolution {
-            resolution_id: format!("res-{}", phi),
+            resolution_id: format!("res-{phi}"),
             phi,
             effectiveness_rating: rating,
             retrieval_count: retrievals,
             category: SupportCategory::Network,
-            pattern: "Restart DNS service".to_string(),
+            pattern: "Restart DNS service".into(),
+            shareability: KnowledgeShareabilityV1::ReviewRequired,
+            technology: None,
         }
     }
 
     #[test]
-    fn high_quality_resolution_graduates() {
+    fn high_quality_resolution_becomes_review_candidate_not_outbound_update() {
         let manager = KnowledgeManager::new();
-        let pending = vec![make_pending(0.8, 5, 5)];
-        let result = check_graduations(&manager, &pending);
+        let result = check_graduations(&manager, &[make_pending(0.8, 5, 5)]);
         assert_eq!(result.graduated, 1);
-        assert_eq!(result.outbound_updates.len(), 1);
-        assert!((result.outbound_updates[0].phi - 0.8).abs() < f64::EPSILON);
+        assert_eq!(result.promotion_candidates.len(), 1);
+        assert!(result.outbound_updates.is_empty());
+    }
+
+    #[test]
+    fn local_only_high_quality_resolution_is_withheld() {
+        let manager = KnowledgeManager::new();
+        let mut item = make_pending(0.9, 5, 5);
+        item.shareability = KnowledgeShareabilityV1::LocalOnly;
+        let result = check_graduations(&manager, &[item]);
+        assert_eq!(result.graduated, 0);
+        assert_eq!(result.withheld, 1);
+        assert!(result.promotion_candidates.is_empty());
+    }
+
+    #[test]
+    fn unknown_shareability_is_withheld() {
+        let manager = KnowledgeManager::new();
+        let mut item = make_pending(0.9, 5, 5);
+        item.shareability = KnowledgeShareabilityV1::NotEstablished;
+        let result = check_graduations(&manager, &[item]);
+        assert_eq!(result.withheld, 1);
     }
 
     #[test]
     fn low_quality_resolution_rejected() {
         let manager = KnowledgeManager::new();
-        let pending = vec![make_pending(0.1, 1, 0)];
-        let result = check_graduations(&manager, &pending);
+        let result = check_graduations(&manager, &[make_pending(0.1, 1, 0)]);
+        assert_eq!(result.rejected, 1);
         assert_eq!(result.graduated, 0);
-        assert_eq!(result.deferred, 0);
-        assert!(result.outbound_updates.is_empty());
     }
 
     #[test]
     fn medium_quality_deferred() {
         let manager = KnowledgeManager::new();
-        let pending = vec![make_pending(0.4, 3, 2)];
-        let result = check_graduations(&manager, &pending);
-        assert_eq!(result.graduated, 0);
+        let result = check_graduations(&manager, &[make_pending(0.4, 3, 2)]);
         assert_eq!(result.deferred, 1);
     }
 
     #[test]
-    fn mixed_batch_processes_correctly() {
-        let manager = KnowledgeManager::new();
-        let pending = vec![
-            make_pending(0.8, 5, 5), // graduate
-            make_pending(0.4, 3, 2), // defer
-            make_pending(0.1, 1, 0), // reject
-            make_pending(0.9, 4, 3), // graduate
-        ];
-        let result = check_graduations(&manager, &pending);
-        assert_eq!(result.evaluated, 4);
-        assert_eq!(result.graduated, 2);
-        assert_eq!(result.deferred, 1);
-        assert_eq!(result.outbound_updates.len(), 2);
-    }
-
-    #[test]
-    fn empty_pending_returns_empty() {
-        let manager = KnowledgeManager::new();
-        let result = check_graduations(&manager, &[]);
-        assert_eq!(result.evaluated, 0);
-        assert_eq!(result.graduated, 0);
-        assert!(result.outbound_updates.is_empty());
-    }
-
-    #[test]
-    fn prepare_outbound_update_sets_fields() {
+    fn explicit_packaging_remains_separate() {
         let update = prepare_outbound_update(
             vec![1, 2, 3],
             0.75,
             SupportCategory::Holochain,
-            "Clear lair cache".to_string(),
+            "Clear lair cache".into(),
         );
         assert_eq!(update.encoding, vec![1, 2, 3]);
-        assert!((update.phi - 0.75).abs() < f64::EPSILON);
-        assert_eq!(update.category, SupportCategory::Holochain);
         assert_eq!(update.resolution_pattern, "Clear lair cache");
     }
 }
