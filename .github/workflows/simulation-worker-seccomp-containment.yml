@@ -1,0 +1,164 @@
+name: Simulation Worker Seccomp Containment
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-worker-containment/**"
+      - "crates/bridges/symthaea-sim-worker-image/**"
+      - "crates/bridges/symthaea-sim-worker/**"
+      - "crates/bridges/symthaea-extension-simulation-host/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/simulation-worker-seccomp-containment.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  worker-seccomp-containment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
+
+      - name: Cache Cargo and Component builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-simulation-seccomp-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-worker-containment/**', 'crates/bridges/symthaea-sim-worker-image/**', 'examples/extensions/hello-simulation/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-seccomp-
+
+      - name: Require Linux x86_64 qualification subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          uname -a
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-worker-seccomp-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the containment graph."
+          else
+            echo "Cargo.lock requires the following generated update:"
+            cat simulation-worker-seccomp-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-worker-seccomp-cargo-lock-patch
+          path: simulation-worker-seccomp-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Require standalone guest WIT parity
+        run: |
+          cmp crates/core/symthaea-extension-core/wit/extension-control.wit \
+              examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+              examples/extensions/hello-simulation/wit/simulation-provider.wit
+
+      - name: Build exact standalone simulation Component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum "$component" examples/extensions/hello-simulation/manifest.json
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Build exact contained worker and probe
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-worker-containment \
+            --bin symthaea-sim-contained-worker \
+            --bin symthaea-sim-containment-probe
+          test -x target/debug/symthaea-sim-contained-worker
+          test -x target/debug/symthaea-sim-containment-probe
+          sha256sum \
+            target/debug/symthaea-sim-contained-worker \
+            target/debug/symthaea-sim-containment-probe
+
+      - name: Execute negative syscall containment probe
+        run: target/debug/symthaea-sim-containment-probe
+
+      - name: Check containment crate
+        run: cargo check --locked -p symthaea-sim-worker-containment --all-targets
+
+      - name: Test containment crate
+        run: cargo test --locked -p symthaea-sim-worker-containment
+
+      - name: Strict Clippy containment crate
+        run: cargo clippy --locked -p symthaea-sim-worker-containment --all-targets -- -D warnings
+
+      - name: Execute real Component through exact contained sealed worker
+        env:
+          SYMTHAEA_CONTAINED_WORKER_BIN: ${{ github.workspace }}/target/debug/symthaea-sim-contained-worker
+        run: |
+          cargo test --locked \
+            -p symthaea-sim-worker-containment \
+            --test hello_contained_worker \
+            -- --ignored --test-threads=1
+
+      - name: Record exact containment qualification subject
+        run: |
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "manifest_sha256=$(sha256sum examples/extensions/hello-simulation/manifest.json | cut -d' ' -f1)"
+            echo "component_sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+            echo "contained_worker_sha256=$(sha256sum target/debug/symthaea-sim-contained-worker | cut -d' ' -f1)"
+            echo "containment_probe_sha256=$(sha256sum target/debug/symthaea-sim-containment-probe | cut -d' ' -f1)"
+            echo "containment_profile=symthaea.simulation.worker-containment.seccomp-x86_64-v1"
+            echo "fd_policy=close_all_ge_3_before_frame_parse"
+            echo "clone3=enosys"
+            echo "clone=allow_only_clone_thread"
+            echo "network_syscalls=deny_eperm"
+            echo "later_exec=deny_eperm"
+            echo "io_uring=deny_eperm"
+            echo "ptrace_process_vm=deny_eperm"
+            echo "bpf_perf_keyring=deny_eperm"
+            echo "namespace_mount_admin=deny_eperm"
+            echo "filesystem_open_isolation=not_established"
+            echo "cgroup=not_established"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-worker-seccomp-receipt.txt
+
+      - name: Upload containment qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-worker-seccomp-receipt
+          path: simulation-worker-seccomp-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
