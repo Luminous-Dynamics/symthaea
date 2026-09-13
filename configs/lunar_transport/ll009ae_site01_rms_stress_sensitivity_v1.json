@@ -1,0 +1,16 @@
+{
+  "schema_version": "ll009ae.rms-stress-sensitivity-policy.v1",
+  "semantics_class": "model_conditional_rms_stress_sensitivity_frontier",
+  "stress_factors": [0.75, 1.0, 1.25, 1.5, 2.0, 3.0],
+  "intervention": "multiply_far_product90_rms_before_geometry_aware_markov_solver",
+  "baseline_reproduction": "byte_exact_y_and_s_at_lambda_1",
+  "probability_calibration_claim": "prohibited",
+  "lambda_below_one_semantics": "diagnostic_non_conservative",
+  "horizon_monotonicity_tolerance_deg": 1e-10,
+  "engineering_thresholds": {},
+  "notes": [
+    "Lambda is a declared sensitivity coordinate, not an inferred Product90 calibration multiplier.",
+    "Lambda below one is retained only to expose local slope/asymmetry of the response surface and is never conservative.",
+    "Mission or architecture thresholds must be established by an independent requirement before being added here."
+  ]
+}
