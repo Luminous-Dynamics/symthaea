@@ -30,6 +30,7 @@ jobs:
         with:
           ref: ${{ inputs.evidence_subject_sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Prove trusted evaluator lineage
         shell: bash
@@ -250,6 +251,7 @@ jobs:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Verify archive transport and exact contents
         shell: bash
