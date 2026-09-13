@@ -12,6 +12,7 @@ on:
     paths:
       - 'crates/domains/symthaea-support/**'
       - 'crates/core/symthaea-logparse/**'
+      - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
