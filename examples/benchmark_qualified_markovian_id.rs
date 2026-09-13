@@ -3,8 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! RQ-005B qualified Markovian identification evidence lane.
 //!
-//! Public development/conformance evidence only. The expected formulas are visible in this
-//! runner, so this lane is `DevelopmentProbe` + `Exposed`, not fresh holdout evidence.
+//! Public development/conformance evidence only. The expected expression trees are visible in
+//! this runner, so this lane is `DevelopmentProbe` + `Exposed`, not fresh holdout evidence.
 //!
 //! Run with `--features reasoning_engine`.
 
@@ -16,8 +16,8 @@ mod qualified {
 
     use serde::Serialize;
     use symthaea::consciousness::counterfactual::{
-        CausalGraphWithLatents, QualifiedMarkovianId, QualifiedMarkovianIdError,
-        QUALIFIED_MARKOVIAN_ID_VERSION,
+        CausalExpression, CausalGraphWithLatents, QualifiedMarkovianId,
+        QualifiedMarkovianIdError, QUALIFIED_MARKOVIAN_ID_VERSION,
     };
     use symthaea::intelligence::{
         AbstentionReason, CapabilityLaneBundle, CapabilityLaneDescriptor, ContaminationStatus,
@@ -32,9 +32,9 @@ mod qualified {
     const CONFIGURATION_ID: &str = "qualified-markovian-id-v1";
     const CONTAMINATION_POLICY: &str = "rq-005b-public-fixtures-v1";
 
-    #[derive(Debug, Clone, Copy)]
-    enum Expected<'a> {
-        Formula(&'a str),
+    #[derive(Debug)]
+    enum Expected {
+        Formula(CausalExpression),
         UnsupportedLatent,
         DirectedCycle,
     }
@@ -47,6 +47,24 @@ mod qualified {
         exact_correct: usize,
         failures: Vec<String>,
         bundle_path: String,
+    }
+
+    fn p(outcome: usize, conditioning: Vec<usize>) -> CausalExpression {
+        CausalExpression::Probability {
+            outcome: vec![outcome],
+            conditioning,
+        }
+    }
+
+    fn product(parts: Vec<CausalExpression>) -> CausalExpression {
+        CausalExpression::Product(parts)
+    }
+
+    fn sum(sum_over: Vec<usize>, inner: CausalExpression) -> CausalExpression {
+        CausalExpression::Sum {
+            sum_over,
+            inner: Box::new(inner),
+        }
     }
 
     pub fn run() -> Result<(), String> {
@@ -72,7 +90,7 @@ mod qualified {
             ),
             vec![0],
             vec![1],
-            Expected::Formula("P(Y|X)"),
+            Expected::Formula(p(1, vec![0])),
             &mut episodes,
             &mut receipts,
             &mut failures,
@@ -88,7 +106,10 @@ mod qualified {
             ),
             vec![0],
             vec![1],
-            Expected::Formula("Σ_{Z} [P(Z) × P(Y|X,Z)]"),
+            Expected::Formula(sum(
+                vec![2],
+                product(vec![p(2, vec![]), p(1, vec![0, 2])]),
+            )),
             &mut episodes,
             &mut receipts,
             &mut failures,
@@ -104,7 +125,10 @@ mod qualified {
             ),
             vec![0],
             vec![2],
-            Expected::Formula("Σ_{M} [P(M|X) × P(Y|M)]"),
+            Expected::Formula(sum(
+                vec![1],
+                product(vec![p(1, vec![0]), p(2, vec![1])]),
+            )),
             &mut episodes,
             &mut receipts,
             &mut failures,
@@ -120,7 +144,10 @@ mod qualified {
             ),
             vec![0],
             vec![1],
-            Expected::Formula("Σ_{Z1,Z2} [P(Z1) × P(Z2) × P(Y|X,Z1,Z2)]"),
+            Expected::Formula(sum(
+                vec![2, 3],
+                product(vec![p(2, vec![]), p(3, vec![]), p(1, vec![0, 2, 3])]),
+            )),
             &mut episodes,
             &mut receipts,
             &mut failures,
@@ -208,7 +235,7 @@ mod qualified {
         graph: CausalGraphWithLatents,
         treatment: Vec<usize>,
         outcome: Vec<usize>,
-        expected: Expected<'_>,
+        expected: Expected,
         episodes: &mut Vec<ReasoningEpisode>,
         receipts: &mut Vec<ReasoningQualificationReceipt>,
         failures: &mut Vec<String>,
@@ -219,11 +246,16 @@ mod qualified {
 
         let actual = QualifiedMarkovianId::new().identify(&graph, &treatment, &outcome);
         let (actual_label, correct, reasoning_outcome) = match (expected, actual) {
-            (Expected::Formula(expected_formula), Ok(expression)) => {
+            (Expected::Formula(expected_expression), Ok(expression)) => {
+                let expected_value = serde_json::to_value(&expected_expression)
+                    .map_err(|err| format!("failed to encode expected expression {id}: {err}"))?;
+                let observed_value = serde_json::to_value(&expression)
+                    .map_err(|err| format!("failed to encode observed expression {id}: {err}"))?;
+                let correct = observed_value == expected_value;
                 let observed = expression.to_string(&graph.nodes);
-                let correct = observed == expected_formula;
+                let expected = expected_expression.to_string(&graph.nodes);
                 (
-                    format!("formula:{observed}"),
+                    format!("formula:{observed}; expected:{expected}"),
                     correct,
                     ReasoningOutcome::Asserted {
                         value: observed,
@@ -231,7 +263,10 @@ mod qualified {
                     },
                 )
             }
-            (Expected::UnsupportedLatent, Err(QualifiedMarkovianIdError::UnsupportedLatentGraph { .. })) => (
+            (
+                Expected::UnsupportedLatent,
+                Err(QualifiedMarkovianIdError::UnsupportedLatentGraph { .. }),
+            ) => (
                 "unidentified:unsupported-latent".into(),
                 true,
                 ReasoningOutcome::Abstained {
@@ -248,7 +283,10 @@ mod qualified {
                 },
             ),
             (expected, Ok(expression)) => (
-                format!("unexpected-formula:{}", expression.to_string(&graph.nodes)),
+                format!(
+                    "unexpected-formula:{}; expected={expected:?}",
+                    expression.to_string(&graph.nodes)
+                ),
                 false,
                 ReasoningOutcome::Asserted {
                     value: "unexpected-formula".into(),
