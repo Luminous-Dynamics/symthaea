@@ -17,6 +17,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+PROFILE_ID = "cyber-ontology-focused-v2"
+REQUIRED_GATES = [
+    "subject_binding", "base_binding", "governance", "cargo_metadata",
+    "format", "support_check", "tests", "clippy", "postflight_immutability",
+]
+COMMAND_GATES: list[tuple[str, list[str], bool]] = [
+    ("cargo_metadata", ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"], True),
+    ("format", ["cargo", "fmt", "-p", "symthaea-cyber-ontology", "--", "--check"], False),
+    ("support_check", ["cargo", "check", "--locked", "-p", "symthaea-support", "--all-targets"], False),
+    ("tests", ["cargo", "test", "--locked", "-p", "symthaea-cyber-ontology", "--all-targets"], False),
+    ("clippy", ["cargo", "clippy", "--locked", "-p", "symthaea-cyber-ontology", "--all-targets", "--", "-D", "warnings"], False),
+]
+
 ROOT = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip())
 os.chdir(ROOT)
 OUT = Path(os.environ.get("CYBER_QUALIFICATION_DIR", "/tmp/symthaea-cyber-ontology-qualification-v2"))
@@ -55,6 +68,24 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def canonical_sha256(value: object) -> str:
+    data = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(data).hexdigest()
+
+
+def recipe_semantics() -> dict:
+    return {
+        "profile_id": PROFILE_ID,
+        "subject_class": "raw_pr_head_package_focused",
+        "required_gates": REQUIRED_GATES,
+        "governance_command": ["bash", "scripts/check-class-a-changes.sh", "--ci"],
+        "commands": [{"gate": n, "argv": a, "quiet_stdout": q} for n, a, q in COMMAND_GATES],
+        "preflight": "exact_commit_and_tree_clean_checkout",
+        "postflight": "same_commit_tree_and_clean_checkout",
+        "positive_receipt_rule": "all_required_gates_pass_or_explicitly_not_applicable",
+    }
+
+
 def clean_exact_checkout() -> bool:
     if capture(["git", "rev-parse", "HEAD"]) != ACTUAL_SHA:
         return False
@@ -74,10 +105,8 @@ def gate(name: str, argv: list[str], *, quiet: bool = False) -> None:
 def declared_inputs() -> str:
     paths = [
         "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo",
-        "crates/domains/symthaea-cyber-ontology",
-        "crates/domains/symthaea-support",
-        "scripts/check-class-a-changes.sh",
-        "scripts/qualify-cyber-ontology-fast.py",
+        "crates/domains/symthaea-cyber-ontology", "crates/domains/symthaea-support",
+        "scripts/check-class-a-changes.sh", "scripts/qualify-cyber-ontology-fast.py",
         ".github/workflows/cyber-ontology-fast.yml",
     ]
     raw = subprocess.check_output(["git", "ls-files", "-z", "--", *paths])
@@ -85,31 +114,22 @@ def declared_inputs() -> str:
     rows = []
     for name in files:
         p = ROOT / name
-        blob = capture(["git", "hash-object", name])
-        rows.append(f"{blob}\t{sha256(p)}\t{name}\n")
+        rows.append(f"{capture(['git', 'hash-object', name])}\t{sha256(p)}\t{name}\n")
     INPUTS.write_text("".join(rows))
     return sha256(INPUTS)
 
 
 def classify() -> str:
-    required = [
-        "subject_binding", "base_binding", "governance", "cargo_metadata",
-        "format", "support_check", "tests", "clippy", "postflight_immutability",
-    ]
-    failed = [n for n in required if GATES.get(n) not in {"PASS", "NOT_APPLICABLE"}]
+    failed = [n for n in REQUIRED_GATES if GATES.get(n) not in {"PASS", "NOT_APPLICABLE"}]
     if not failed:
         return "Passed"
     if len(failed) > 1:
         return "MultipleRequiredGateFailures"
     return {
-        "subject_binding": "SubjectBindingFailed",
-        "base_binding": "BaseBindingFailed",
-        "governance": "GovernanceFailed",
-        "cargo_metadata": "DependencyMetadataFailed",
-        "format": "FormattingFailed",
-        "support_check": "DependencyCompileFailed",
-        "tests": "TestsFailed",
-        "clippy": "ClippyFailed",
+        "subject_binding": "SubjectBindingFailed", "base_binding": "BaseBindingFailed",
+        "governance": "GovernanceFailed", "cargo_metadata": "DependencyMetadataFailed",
+        "format": "FormattingFailed", "support_check": "DependencyCompileFailed",
+        "tests": "TestsFailed", "clippy": "ClippyFailed",
         "postflight_immutability": "SubjectIntegrityFailed",
     }[failed[0]]
 
@@ -122,44 +142,36 @@ def write_json(path: Path, obj: dict) -> str:
 
 
 def attempt_object(terminal: str, input_digest: str, verifier_error: str | None = None) -> dict:
-    positive = terminal == "Passed" and verifier_error is None
     return {
         "schema_version": "symthaea.focused-qualification-attempt.v2",
+        "qualification_profile": {
+            "profile_id": PROFILE_ID,
+            "recipe_semantics_sha256": canonical_sha256(recipe_semantics()),
+            "required_gates": REQUIRED_GATES,
+        },
         "terminal_disposition": terminal,
-        "positive_receipt_eligible": positive,
+        "positive_receipt_eligible": terminal == "Passed" and verifier_error is None,
         "verifier_error": verifier_error,
         "subject": {
-            "class": "raw_pr_head_package_focused",
-            "repository": os.environ.get("GITHUB_REPOSITORY"),
-            "checked_out_commit_sha": ACTUAL_SHA,
-            "checked_out_tree_sha": ACTUAL_TREE,
-            "expected_head_sha": EXPECTED_SHA,
-            "pr_base_sha": EXPECTED_BASE or None,
-            "provider_event_sha": os.environ.get("GITHUB_SHA"),
-            "source_state": SOURCE_STATE,
+            "class": "raw_pr_head_package_focused", "repository": os.environ.get("GITHUB_REPOSITORY"),
+            "checked_out_commit_sha": ACTUAL_SHA, "checked_out_tree_sha": ACTUAL_TREE,
+            "expected_head_sha": EXPECTED_SHA, "pr_base_sha": EXPECTED_BASE or None,
+            "provider_event_sha": os.environ.get("GITHUB_SHA"), "source_state": SOURCE_STATE,
         },
         "provider_attempt": {
             "provider": "github-actions" if os.environ.get("GITHUB_ACTIONS") == "true" else "local",
-            "workflow": os.environ.get("GITHUB_WORKFLOW"),
-            "run_id": os.environ.get("GITHUB_RUN_ID"),
-            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
-            "event_name": os.environ.get("GITHUB_EVENT_NAME"),
-            "runner_os": os.environ.get("RUNNER_OS"),
-            "runner_arch": os.environ.get("RUNNER_ARCH"),
-            "runner_image_os": os.environ.get("ImageOS"),
-            "runner_image_version": os.environ.get("ImageVersion"),
+            "workflow": os.environ.get("GITHUB_WORKFLOW"), "run_id": os.environ.get("GITHUB_RUN_ID"),
+            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"), "event_name": os.environ.get("GITHUB_EVENT_NAME"),
+            "runner_os": os.environ.get("RUNNER_OS"), "runner_arch": os.environ.get("RUNNER_ARCH"),
+            "runner_image_os": os.environ.get("ImageOS"), "runner_image_version": os.environ.get("ImageVersion"),
         },
         "recipe_trust": {
-            "class": "candidate_recipe_self_execution",
-            "ordinary_qualification_authority": False,
-            "requires_base_owned_witness": True,
-            "witness_program": "#1157",
+            "class": "candidate_recipe_self_execution", "ordinary_qualification_authority": False,
+            "requires_base_owned_witness": True, "witness_program": "#1157",
         },
         "input_manifest": {
-            "class": "declared_v1_not_full_transitive_closure",
-            "sha256": input_digest,
-            "full_input_closure_claimed": False,
-            "future_closure_theorem": "#913",
+            "class": "declared_v1_not_full_transitive_closure", "sha256": input_digest,
+            "full_input_closure_claimed": False, "future_closure_theorem": "#913",
         },
         "recipe": {
             "verifier_sha256": sha256(ROOT / "scripts/qualify-cyber-ontology-fast.py"),
@@ -168,23 +180,17 @@ def attempt_object(terminal: str, input_digest: str, verifier_error: str | None 
             "upload_artifact_action_sha": os.environ.get("UPLOAD_ARTIFACT_ACTION_SHA"),
         },
         "toolchain": {
-            "selector": "rust-toolchain.toml",
-            "rustc": capture(["rustc", "-V"]),
-            "cargo": capture(["cargo", "-V"]),
-            "rustfmt": capture(["rustfmt", "-V"]),
+            "selector": "rust-toolchain.toml", "rustc": capture(["rustc", "-V"]),
+            "cargo": capture(["cargo", "-V"]), "rustfmt": capture(["rustfmt", "-V"]),
             "clippy": capture(["cargo", "clippy", "-V"]),
             "environment_class": "observed_provider_environment_not_capsule_qualified",
-            "reproducible_environment_claimed": False,
-            "future_environment_theorem": "#917",
+            "reproducible_environment_claimed": False, "future_environment_theorem": "#917",
         },
         "gates": GATES,
         "scope": {
-            "package": "symthaea-cyber-ontology",
-            "support_dependency_compiled": True,
-            "full_repository_integration_implied": False,
-            "security_effectiveness_implied": False,
-            "scientific_authority": "none",
-            "execution_authority": "none",
+            "package": "symthaea-cyber-ontology", "support_dependency_compiled": True,
+            "full_repository_integration_implied": False, "security_effectiveness_implied": False,
+            "scientific_authority": "none", "execution_authority": "none",
         },
     }
 
@@ -192,12 +198,15 @@ def attempt_object(terminal: str, input_digest: str, verifier_error: str | None 
 def positive_object(attempt_digest: str, input_digest: str) -> dict:
     return {
         "schema_version": "symthaea.focused-candidate-qualification-receipt.v2",
+        "qualification_profile": {
+            "profile_id": PROFILE_ID,
+            "recipe_semantics_sha256": canonical_sha256(recipe_semantics()),
+            "required_gates": REQUIRED_GATES,
+        },
         "disposition": "Passed",
         "subject": {
-            "class": "raw_pr_head_package_focused",
-            "repository": os.environ.get("GITHUB_REPOSITORY"),
-            "checked_out_commit_sha": ACTUAL_SHA,
-            "checked_out_tree_sha": ACTUAL_TREE,
+            "class": "raw_pr_head_package_focused", "repository": os.environ.get("GITHUB_REPOSITORY"),
+            "checked_out_commit_sha": ACTUAL_SHA, "checked_out_tree_sha": ACTUAL_TREE,
             "pr_base_sha": EXPECTED_BASE or None,
         },
         "attempt_sha256": attempt_digest,
@@ -207,8 +216,7 @@ def positive_object(attempt_digest: str, input_digest: str) -> dict:
             "trusted_recipe_admission_implied": False,
         },
         "input_manifest": {
-            "class": "declared_v1_not_full_transitive_closure",
-            "sha256": input_digest,
+            "class": "declared_v1_not_full_transitive_closure", "sha256": input_digest,
             "full_input_closure_claimed": False,
         },
         "recipe": {
@@ -216,12 +224,9 @@ def positive_object(attempt_digest: str, input_digest: str) -> dict:
             "workflow_sha256": sha256(ROOT / ".github/workflows/cyber-ontology-fast.yml"),
         },
         "scope": {
-            "package": "symthaea-cyber-ontology",
-            "full_repository_integration_implied": False,
-            "current_admission_implied": False,
-            "security_effectiveness_implied": False,
-            "scientific_authority": "none",
-            "execution_authority": "none",
+            "package": "symthaea-cyber-ontology", "full_repository_integration_implied": False,
+            "current_admission_implied": False, "security_effectiveness_implied": False,
+            "scientific_authority": "none", "execution_authority": "none",
         },
     }
 
@@ -250,11 +255,8 @@ def main() -> int:
 
         input_digest = declared_inputs()
         os.environ.setdefault("CARGO_TARGET_DIR", "target/cyber-ontology-fast")
-        gate("cargo_metadata", ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"], quiet=True)
-        gate("format", ["cargo", "fmt", "-p", "symthaea-cyber-ontology", "--", "--check"])
-        gate("support_check", ["cargo", "check", "--locked", "-p", "symthaea-support", "--all-targets"])
-        gate("tests", ["cargo", "test", "--locked", "-p", "symthaea-cyber-ontology", "--all-targets"])
-        gate("clippy", ["cargo", "clippy", "--locked", "-p", "symthaea-cyber-ontology", "--all-targets", "--", "-D", "warnings"])
+        for name, argv, quiet in COMMAND_GATES:
+            gate(name, argv, quiet=quiet)
         if clean_exact_checkout():
             SOURCE_STATE = "clean-exact-checkout-postflight"
             GATES["postflight_immutability"] = "PASS"
@@ -263,7 +265,7 @@ def main() -> int:
             GATES["postflight_immutability"] = "FAIL"
     except Exception as exc:
         verifier_error = f"{type(exc).__name__}: {exc}"
-        for name in ["base_binding", "governance", "cargo_metadata", "format", "support_check", "tests", "clippy", "postflight_immutability"]:
+        for name in REQUIRED_GATES:
             GATES.setdefault(name, "NOT_RUN")
 
     terminal = classify() if verifier_error is None else "VerifierOrPreflightFailure"
@@ -274,6 +276,8 @@ def main() -> int:
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as f:
             f.write("## Cyber ontology focused candidate qualification\n\n")
+            f.write(f"- profile: `{PROFILE_ID}`\n")
+            f.write(f"- recipe semantics SHA-256: `{canonical_sha256(recipe_semantics())}`\n")
             f.write(f"- terminal disposition: **{terminal}**\n")
             f.write(f"- checked-out SHA: `{ACTUAL_SHA}`\n")
             f.write(f"- checked-out tree: `{ACTUAL_TREE}`\n")
