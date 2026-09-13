@@ -14,6 +14,7 @@ mod campaign;
 mod campaign_manifest;
 pub mod consequence;
 pub mod constitution;
+mod cross_family_analysis;
 mod custody;
 #[cfg(test)]
 mod custody_identity_tests;
