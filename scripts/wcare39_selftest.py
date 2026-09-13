@@ -35,9 +35,10 @@ def init_repo(root: Path) -> str:
     write(root / "Cargo.lock", "# synthetic cargo lock\n")
     write(root / "flake.lock", "{}\n")
     write(root / "rust-toolchain.toml", "[toolchain]\nchannel = \"stable\"\n")
-    write(root / "pass_stage.py", "from pathlib import Path\nPath('target/pass-receipt.json').write_text('{"ok":true}\\n')\n")
+    write(root / "pass_stage.py", "from pathlib import Path\nPath('target/pass-receipt.json').write_text('{\"ok\":true}\\n')\n")
     write(root / "fail_stage.py", "raise SystemExit(7)\n")
     write(root / "drift_stage.py", "from pathlib import Path\np=Path('Cargo.lock')\np.write_text(p.read_text()+'# drift\\n')\n")
+    write(root / "delete_stage.py", "from pathlib import Path\nPath(__file__).unlink()\n")
     write(root / "wcare38_dummy.py", "raise SystemExit(0)\n")
     run(["git", "add", "."], root)
     run(["git", "commit", "-q", "-m", "synthetic subject"], root)
@@ -45,11 +46,10 @@ def init_repo(root: Path) -> str:
 
 
 def plan(root: Path, head: str, script: str, output: str | None) -> dict:
-    script_path = root / script
     return {
         "protocol_version": PROTOCOL,
         "subject_git_head": head,
-        "subject_digests": {script: sha(script_path)},
+        "subject_digests": {script: sha(root / script)},
         "materials": [],
         "safe_environment": [],
         "network_policy_declared": "Unspecified",
@@ -70,11 +70,7 @@ def execute(root: Path, plan_value: dict, name: str) -> tuple[int, dict]:
     target.mkdir(exist_ok=True)
     plan_path = target / f"{name}-plan.json"
     plan_path.write_text(json.dumps(plan_value, sort_keys=True, separators=(",", ":")) + "\n")
-    proc = run(
-        [sys.executable, str(RUNNER), "run", str(plan_path), f"target/{name}-capsule"],
-        root,
-        check=False,
-    )
+    proc = run([sys.executable, str(RUNNER), "run", str(plan_path), f"target/{name}-capsule"], root, check=False)
     try:
         result = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
@@ -100,26 +96,30 @@ def main() -> int:
 
         code, passed = execute(root, plan(root, head, "pass_stage.py", "target/pass-receipt.json"), "pass")
         assert code == 0, passed
-        assert passed["classification"] == "QUALIFIED_EXECUTION", passed
-        assert passed["environment_integrity"] == "QUALIFIED", passed
+        assert passed["classification"] == "QUALIFIED_EXECUTION" and passed["environment_integrity"] == "QUALIFIED", passed
         assert passed["subject_outcome"] == "PASS", passed
         assert passed["commands"][0]["output_receipt_sha256"] == sha(root / "target/pass-receipt.json")
         assert_prepared_binding(root, "pass", passed)
 
         code, failed = execute(root, plan(root, head, "fail_stage.py", None), "fail")
         assert code == 0, failed
-        assert failed["classification"] == "QUALIFIED_EXECUTION", failed
-        assert failed["environment_integrity"] == "QUALIFIED", failed
+        assert failed["classification"] == "QUALIFIED_EXECUTION" and failed["environment_integrity"] == "QUALIFIED", failed
         assert failed["subject_outcome"] == "FAIL", failed
         assert_prepared_binding(root, "fail", failed)
 
         code, drifted = execute(root, plan(root, head, "drift_stage.py", None), "drift")
         assert code == 2, drifted
-        assert drifted["classification"] == "ENVIRONMENT_DRIFT", drifted
-        assert drifted["environment_integrity"] == "DRIFTED", drifted
-        assert "materials" in drifted["drift_fields"], drifted
-        assert "worktree_clean" in drifted["drift_fields"], drifted
+        assert drifted["classification"] == "ENVIRONMENT_DRIFT" and drifted["environment_integrity"] == "DRIFTED", drifted
+        assert "materials" in drifted["drift_fields"] and "worktree_clean" in drifted["drift_fields"], drifted
         assert_prepared_binding(root, "drift", drifted)
+        run(["git", "reset", "--hard", "-q", "HEAD"], root)
+
+        code, deleted = execute(root, plan(root, head, "delete_stage.py", None), "delete-subject")
+        assert code == 2, deleted
+        assert deleted["classification"] == "ENVIRONMENT_DRIFT", deleted
+        assert "subject_digests" in deleted["drift_fields"], deleted
+        assert deleted["subject_digests"]["delete_stage.py"] is None, deleted
+        assert_prepared_binding(root, "delete-subject", deleted)
         run(["git", "reset", "--hard", "-q", "HEAD"], root)
 
         code, blocked = execute(root, plan(root, head, "wcare38_dummy.py", None), "wcare38-lock")
@@ -136,6 +136,7 @@ def main() -> int:
         "qualified_pass_observed": True,
         "qualified_subject_failure_observed": True,
         "environment_drift_observed": True,
+        "missing_subject_drift_observed": True,
         "wcare37_lock_blocker_preserved": True,
         "runtime_authority_granted": False,
     }, sort_keys=True, separators=(",", ":")))
