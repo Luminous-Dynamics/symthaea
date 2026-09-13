@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::{
     CelestialBody, DurationRangeS, EnergyRangeJ, EvidenceRef, GravityRangeMps2, MassRangeKg,
-    MaterialGrade, OntologyError, PhysicalForm, PowerRangeW, PressureRangePa,
-    TemperatureRangeK, require_text, validate_evidence,
+    MaterialGrade, OntologyError, PhysicalForm, PowerRangeW, PressureRangePa, TemperatureRangeK,
+    require_text, validate_evidence,
 };
 
 /// Functional role of a process input.
