@@ -19,7 +19,7 @@ pub mod ablation;
 #[cfg(feature = "symthaea-backend")]
 pub mod ae2_empirical_runner;
 #[cfg(feature = "symthaea-backend")]
-pub mod gwt1_causal_qualification;
+pub mod gwt1_causal_resolution;
 pub mod gwt1_evidence_envelope;
 #[cfg(feature = "symthaea-backend")]
 pub mod gwt1_end_to_end;
@@ -30,7 +30,7 @@ pub mod qualification_runtime;
 pub mod report;
 
 #[cfg(feature = "symthaea-backend")]
-pub use gwt1_causal_qualification::{
+pub use gwt1_causal_resolution::{
     GWT1_CAUSAL_QUALIFICATION_SCHEMA_V1, Gwt1CausalEvidenceV1,
     Gwt1CausalQualificationFailureV1, Gwt1CausalQualificationOutcomeV1,
     Gwt1CausalQualificationResolutionV1, resolve_gwt1_causal_v1,
