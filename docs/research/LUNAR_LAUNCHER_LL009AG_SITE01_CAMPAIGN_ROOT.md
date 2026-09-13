@@ -62,7 +62,7 @@ The field path is data, not a heuristic. LL-009AG does not search a receipt for 
 
 A present artifact may not depend on an absent optional diagnostic or a `not_yet_available` node. Dependency cycles, duplicate logical IDs, duplicate paths, duplicate bindings, and incomplete binding coverage are rejected before evidence can freeze.
 
-## Environment separation
+## Environment separation and capture
 
 The campaign deliberately requires three capsules rather than pretending one Python installation governs all stages:
 
@@ -70,9 +70,30 @@ The campaign deliberately requires three capsules rather than pretending one Pyt
 - `gis`: extraction, role binding, raster/materialization, cross-method terrain work;
 - `analysis`: horizon, uncertainty, visibility, semantic reconciliation, and finalization.
 
-Each capsule uses schema `ll009ag.environment-capsule.v1`, names its exact profile, and contains a non-empty `runtime` object. The capsule bytes and canonical payload are both bound by the PREPARED receipt.
+An environment capsule is not an arbitrary note. Schema `ll009ag.environment-capsule.v1` requires five runtime sections: `python`, `platform`, `packages`, `libraries`, and `environment`. Python identity includes implementation, exact version, and SHA-256 of the resolved interpreter executable. Platform identity includes system and machine. Package and native-library versions required by the profile are explicit policy obligations. Every determinism-sensitive environment variable named by policy must be present in the capsule, with an unset variable represented explicitly as JSON `null`.
 
-Only `source_acquisition` is network-authorized by the checked-in policy. Numerical stages are explicitly offline in the campaign plan.
+The checked Site01 policy currently requires OpenSSL identity for acquisition; NumPy, Rasterio, GDAL and PROJ identity for GIS; NumPy for analysis; and profile-specific locale, timezone, Python-hash, GIS-data and numerical-thread environment variables. These are identity requirements, not an automatic assertion that any observed version is scientifically acceptable; upstream toolchain receipts/policies still govern their own promotion requirements.
+
+`scripts/capture_ll009ag_environment.py` captures this information from the environment actually executing a stage. It performs no network access, probes only the versions required by the checked policy, hashes the active resolved Python executable, and uses no-clobber output semantics. A differing capsule cannot silently overwrite an earlier one.
+
+For example, execute each capture inside the environment that will actually run that profile:
+
+```bash
+python scripts/capture_ll009ag_environment.py \
+  --policy configs/lunar_transport/ll009ag_site01_campaign_v1.json \
+  --profile acquisition \
+  --output campaign/runtime/acquisition.json
+```
+
+Repeat separately for `gis` and `analysis` from their actual execution environments. Do not capture all three from one shell merely to satisfy the schema.
+
+The capsule bytes and canonical payload are both bound by the PREPARED receipt. Only `source_acquisition` is network-authorized by the checked-in campaign plan; numerical stages are explicitly offline.
+
+## Protected execution surface
+
+PREPARED does not merely protect AG's own orchestrator. The checked policy enumerates the exact materialized code/configuration surface used by the real Site01 evidence chain from K through AF, including NASA acquisition, GIS materialization, uncertainty semantics, clone/spatial-support logic, Product90 RMS envelopes, memberwise hybrid composition, S/Z visibility semantics, SDEM cross-method/calibration audits, and AE/AF stress analysis. The dedicated qualification workflow verifies every protected path exists on the exact checked head before AG logic can pass.
+
+The campaign policy itself is independently byte-hashed into PREPARED, so changing the protected-file list also invalidates preparation.
 
 ## Semantic ceiling
 
@@ -90,7 +111,7 @@ The FROZEN receipt records present, missing-optional, and declared-unavailable n
 
 ## Typical real-campaign flow
 
-Preparation requires the exact repository head plus explicit paths to all three environment capsules:
+After capturing the three profile environments, preparation requires the exact repository head plus explicit paths to those capsules:
 
 ```bash
 python scripts/freeze_ll009ag_site01_campaign.py prepare \
@@ -136,6 +157,6 @@ python scripts/freeze_ll009ag_site01_campaign.py finalize \
 
 ## Qualification scope
 
-The dedicated workflow performs Python compilation and a dependency-free synthetic state-machine campaign. The synthetic campaign checks deterministic PREPARED/FROZEN/FINALIZED replay; runtime and protected-tool drift; artifact substitution; exact receipt- and file-hash dependency bindings; valid-but-wrong upstream substitution; required, optional-diagnostic, and declared-unavailable handling; closed evidence-root enforcement; invalid inner receipt self-hashes; dependency cycles; missing bindings; unavailable semantic bases; missing semantic provenance; and attempted over-promotion.
+The dedicated workflow compiles the AG tools, executes the environment-capture self-test, verifies that the complete checked protected-file surface exists, and runs a dependency-free synthetic state-machine campaign. The synthetic campaign checks deterministic PREPARED/FROZEN/FINALIZED replay; structured environment contracts; runtime and protected-tool drift; artifact substitution; exact receipt- and file-hash dependency bindings; valid-but-wrong upstream substitution; required, optional-diagnostic, and declared-unavailable handling; closed evidence-root enforcement; invalid inner receipt self-hashes; dependency cycles; missing bindings; unavailable semantic bases; missing semantic provenance; and attempted over-promotion.
 
 The workflow downloads no NASA source bytes and produces no scientific Site01 result. A green workflow therefore qualifies LL-009AG's campaign-control logic only; it is not evidence that the Product104 Connecting Ridge archive has been acquired, that a real SDEM has been role-bound, or that any visibility class stronger than the existing upstream evidence has been established.
