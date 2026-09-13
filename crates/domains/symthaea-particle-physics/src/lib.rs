@@ -18,6 +18,8 @@
 //!   sourced exclusively from the original ensemble field
 //! - **Off-axis Wilson measurement**: explicit shortest-path-symmetrized spatial
 //!   transport with a caller-bounded path-count budget
+//! - **Cubic-orbit Wilson averaging**: equal-weight signed-permutation averaging
+//!   with explicit orientation and per-orientation path work bounds
 //!
 //! ## Natural Units
 //!
@@ -36,6 +38,7 @@ pub mod cross_sections;
 pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
+pub mod lattice_cubic_wilson;
 pub mod lattice_gauge;
 pub mod lattice_mixed_wilson;
 pub mod lattice_off_axis_wilson;
@@ -54,6 +57,11 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use lattice_cubic_wilson::{
+    CUBIC_SIGNED_PERMUTATION_ORBIT_ID, CubicOrbitWilsonError,
+    CubicOrbitWilsonMeasurement, average_cubic_orbit_mixed_wilson_loop,
+    cubic_signed_permutation_orbit,
 };
 pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
