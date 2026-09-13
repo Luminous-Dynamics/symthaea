@@ -101,6 +101,8 @@ The signer commits to the exact trust-policy SHA-256 in the signed envelope. Rep
 
 A trust match requires both key ID and public key to match the registry entry. Reusing a trusted key ID with a different public key is untrusted, not a key rotation.
 
+An empty authorization list is valid policy state and means the key is not trusted for that scope/strength; it does not make the policy structurally invalid.
+
 A valid self-signature proves control of the corresponding private key only. It does not establish that the key belongs to an independent organization or is trusted for any scope.
 
 A key authorized only for `OrganizerVerified` cannot mint `ExternalVerified` or `InstitutionalAttestation` provenance. A relation assessor authorized only for `OrganizerAssessed` cannot mint `ExternalVerified` or `InstitutionalAttestation` relation evidence.
