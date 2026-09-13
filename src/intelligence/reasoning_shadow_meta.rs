@@ -5,13 +5,11 @@
 //!
 //! The historical `MetaCognitiveReasoner` remains behavior-authoritative in this wrapper. Every
 //! successful historical call is mirrored into the canonical V2 reasoning kernel using the same
-//! production-shaped candidate set. Canonical success/failure is recorded only as telemetry and
-//! never changes the returned historical result or learning/plasticity.
+//! production-shaped candidate set. Canonical success/failure and selection agreement are recorded
+//! only as telemetry and never change the returned historical result or learning/plasticity.
 
 use super::reasoning_context_competition::{ContextHypothesis, ContextResolution};
-use super::reasoning_kernel_v2::{
-    CanonicalReasoningInputV2, CanonicalReasoningKernelV2,
-};
+use super::reasoning_kernel_v2::{CanonicalReasoningInputV2, CanonicalReasoningKernelV2};
 use crate::consciousness::meta_reasoning::{
     MetaCognitiveReasoner, MetaReasoningConfig, MetaReasoningResult,
 };
@@ -33,6 +31,8 @@ pub struct ShadowMetaStats {
     pub rejected: u64,
     pub resolved_contexts: u64,
     pub ambiguous_contexts: u64,
+    pub selection_agreements: u64,
+    pub selection_disagreements: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -43,7 +43,11 @@ pub struct ShadowMetaObservation {
     pub committed: bool,
     pub primary_context: Option<crate::consciousness::context_aware_evolution::ReasoningContext>,
     pub active_contexts: usize,
-    pub selected_candidate: Option<String>,
+    pub legacy_selected_candidate: String,
+    pub canonical_selected_candidate: Option<String>,
+    pub selection_agreement: Option<bool>,
+    pub legacy_meta_confidence: f64,
+    pub legacy_context_confidence: f64,
     pub decision_commitment: Option<String>,
     pub rejection: Option<String>,
 }
@@ -108,6 +112,9 @@ impl ShadowQualifiedMetaReasoner {
         let attempt = self.stats.attempts;
         self.stats.attempts = self.stats.attempts.saturating_add(1);
         let sequence = self.canonical_next_sequence();
+        let legacy_selected_candidate = legacy_result.optimization_result.primitive.name.clone();
+        let legacy_meta_confidence = legacy_result.meta_confidence;
+        let legacy_context_confidence = legacy_result.context_reflection.confidence;
 
         let hypotheses = context_hypotheses(legacy_result);
         let strategy_support = legacy_result
@@ -138,6 +145,17 @@ impl ShadowQualifiedMetaReasoner {
                             self.stats.ambiguous_contexts.saturating_add(1)
                     }
                 }
+
+                let canonical_selected_candidate = decision.selected_candidate.name.clone();
+                let selection_agreement = canonical_selected_candidate == legacy_selected_candidate;
+                if selection_agreement {
+                    self.stats.selection_agreements =
+                        self.stats.selection_agreements.saturating_add(1);
+                } else {
+                    self.stats.selection_disagreements =
+                        self.stats.selection_disagreements.saturating_add(1);
+                }
+
                 self.last_observation = Some(ShadowMetaObservation {
                     shadow_version: LIVE_META_SHADOW_VERSION.into(),
                     attempt,
@@ -145,7 +163,11 @@ impl ShadowQualifiedMetaReasoner {
                     committed: true,
                     primary_context: Some(decision.context_selection.assessment.primary_context),
                     active_contexts: decision.context_selection.assessment.active_contexts.len(),
-                    selected_candidate: Some(decision.selected_candidate.name.clone()),
+                    legacy_selected_candidate,
+                    canonical_selected_candidate: Some(canonical_selected_candidate),
+                    selection_agreement: Some(selection_agreement),
+                    legacy_meta_confidence,
+                    legacy_context_confidence,
                     decision_commitment: Some(decision.decision_commitment.clone()),
                     rejection: None,
                 });
@@ -159,7 +181,11 @@ impl ShadowQualifiedMetaReasoner {
                     committed: false,
                     primary_context: None,
                     active_contexts: 0,
-                    selected_candidate: None,
+                    legacy_selected_candidate,
+                    canonical_selected_candidate: None,
+                    selection_agreement: None,
+                    legacy_meta_confidence,
+                    legacy_context_confidence,
                     decision_commitment: None,
                     rejection: Some(err.to_string()),
                 });
@@ -234,7 +260,9 @@ mod tests {
         assert_eq!(reasoner.shadow_stats().attempts, 1);
         assert_eq!(reasoner.shadow_stats().rejected, 1);
         assert_eq!(reasoner.canonical_next_sequence(), 0);
-        assert!(!reasoner.last_shadow_observation().unwrap().committed);
+        let observation = reasoner.last_shadow_observation().unwrap();
+        assert!(!observation.committed);
+        assert!(observation.selection_agreement.is_none());
     }
 
     #[test]
@@ -252,6 +280,8 @@ mod tests {
         let observation = reasoner.last_shadow_observation().unwrap();
         assert!(observation.committed);
         assert!(observation.decision_commitment.is_some());
+        assert!(observation.canonical_selected_candidate.is_some());
+        assert!(observation.selection_agreement.is_some());
 
         let mut second_chain = ReasoningChain::new(BinaryHV::random(1502));
         let second = reasoner.meta_reason(
@@ -262,6 +292,11 @@ mod tests {
         assert!(second.is_ok());
         assert_eq!(reasoner.shadow_stats().committed, 2);
         assert_eq!(reasoner.canonical_next_sequence(), 2);
+        assert_eq!(
+            reasoner.shadow_stats().selection_agreements
+                + reasoner.shadow_stats().selection_disagreements,
+            2
+        );
     }
 
     #[test]
