@@ -1,0 +1,211 @@
+name: Simulation First Instruction Worker Rlimit
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-first-instruction-worker-rlimit/**"
+      - "crates/bridges/symthaea-sim-clone-cgroup-exec-rlimit/**"
+      - "crates/bridges/symthaea-sim-first-instruction-worker/**"
+      - "crates/bridges/symthaea-sim-worker/**"
+      - "crates/bridges/symthaea-sim-worker-cgroup/**"
+      - "crates/bridges/symthaea-sim-worker-containment/**"
+      - "crates/bridges/symthaea-sim-worker-filesystem/**"
+      - "crates/bridges/symthaea-sim-worker-image/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/simulation-first-instruction-worker-rlimit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  SYMTHAEA_CGROUP_V2_DELEGATED_ROOT: ${{ vars.SYMTHAEA_CGROUP_V2_DELEGATED_ROOT }}
+
+jobs:
+  first-instruction-worker-rlimit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          test -r /sys/fs/cgroup/cgroup.controllers
+          uname -a
+          cat /sys/fs/cgroup/cgroup.controllers
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
+
+      - name: Cache Cargo and Component builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-simulation-first-instruction-worker-rlimit-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-first-instruction-worker-rlimit/**', 'crates/bridges/symthaea-sim-clone-cgroup-exec-rlimit/**', 'crates/bridges/symthaea-sim-worker/**', 'crates/bridges/symthaea-sim-worker-cgroup/**', 'crates/bridges/symthaea-sim-worker-containment/**', 'crates/bridges/symthaea-sim-worker-filesystem/**', 'crates/bridges/symthaea-sim-worker-image/**', 'examples/extensions/hello-simulation/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-first-instruction-worker-rlimit-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-first-instruction-worker-rlimit-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches stronger worker graph."
+          else
+            cat simulation-first-instruction-worker-rlimit-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-first-instruction-worker-rlimit-cargo-lock-patch
+          path: simulation-first-instruction-worker-rlimit-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Reconcile candidate pinned formatting
+        run: |
+          cargo fmt -p symthaea-sim-first-instruction-worker-rlimit
+          git diff -- crates/bridges/symthaea-sim-first-instruction-worker-rlimit \
+            > simulation-first-instruction-worker-rlimit-rustfmt.patch
+          if git diff --quiet -- crates/bridges/symthaea-sim-first-instruction-worker-rlimit; then
+            echo "Source already matches Rust 1.96 rustfmt."
+          else
+            cat simulation-first-instruction-worker-rlimit-rustfmt.patch
+          fi
+
+      - name: Upload candidate rustfmt patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-first-instruction-worker-rlimit-rustfmt-patch
+          path: simulation-first-instruction-worker-rlimit-rustfmt.patch
+          if-no-files-found: error
+
+      - name: Require standalone guest WIT parity
+        run: |
+          cmp crates/core/symthaea-extension-core/wit/extension-control.wit \
+              examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+              examples/extensions/hello-simulation/wit/simulation-provider.wit
+
+      - name: Build exact release Component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum "$component" examples/extensions/hello-simulation/manifest.json
+
+      - name: Check source graph
+        run: |
+          cargo check --locked -p symthaea-sim-first-instruction-worker-rlimit --all-targets
+          cargo check --locked -p symthaea-sim-clone-cgroup-exec-rlimit --all-targets
+
+      - name: Test source corpus
+        run: |
+          cargo test --locked -p symthaea-sim-first-instruction-worker-rlimit
+          cargo test --locked -p symthaea-sim-clone-cgroup-exec-rlimit
+
+      - name: Strict Clippy
+        run: |
+          cargo clippy --locked -p symthaea-sim-first-instruction-worker-rlimit --all-targets -- -D warnings
+          cargo clippy --locked -p symthaea-sim-clone-cgroup-exec-rlimit --all-targets -- -D warnings
+
+      - name: Build exact contained and stall workers
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-worker-filesystem \
+            --bin symthaea-sim-filesystem-worker
+          cargo build --locked \
+            -p symthaea-sim-worker \
+            --bin symthaea-sim-stall-worker
+          sha256sum \
+            target/debug/symthaea-sim-filesystem-worker \
+            target/debug/symthaea-sim-stall-worker
+
+      - name: Execute real and stall corpus when cgroup root is configured
+        shell: bash
+        run: |
+          if [[ -n "${SYMTHAEA_CGROUP_V2_DELEGATED_ROOT:-}" ]]; then
+            SYMTHAEA_FIRST_INSTRUCTION_RLIMIT_WORKER_BIN="${GITHUB_WORKSPACE}/target/debug/symthaea-sim-filesystem-worker" \
+            SYMTHAEA_FIRST_INSTRUCTION_RLIMIT_STALL_BIN="${GITHUB_WORKSPACE}/target/debug/symthaea-sim-stall-worker" \
+              cargo test --locked \
+                -p symthaea-sim-first-instruction-worker-rlimit \
+                --test real_component \
+                -- --ignored --test-threads=1
+            echo 'kernel_first_instruction_worker_rlimit_probe=pass' \
+              | tee first-instruction-worker-rlimit-kernel-status.txt
+          else
+            echo 'kernel_first_instruction_worker_rlimit_probe=not_established' \
+              | tee first-instruction-worker-rlimit-kernel-status.txt
+          fi
+
+      - name: Record exact stronger worker subject
+        run: |
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          kernel_probe="$(cut -d= -f2 first-instruction-worker-rlimit-kernel-status.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "manifest_sha256=$(sha256sum examples/extensions/hello-simulation/manifest.json | cut -d' ' -f1)"
+            echo "component_sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+            echo "contained_worker_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-worker | cut -d' ' -f1)"
+            echo "stall_worker_sha256=$(sha256sum target/debug/symthaea-sim-stall-worker | cut -d' ' -f1)"
+            echo "profile=symthaea.simulation.first-instruction-worker.rlimit-v1"
+            echo "launch_profile=symthaea.simulation.clone-into-cgroup.sealed-execveat-rlimit-v1"
+            echo "base_launch_profile=symthaea.simulation.clone-into-cgroup.sealed-execveat-v1"
+            echo "supervisor_profile=symthaea.simulation.worker-supervisor.linux-rlimit-v1"
+            echo "worker_protocol=symthaea.simulation.worker.v1"
+            echo "canonical_digest_profile=simulation-provider-v1-canonical-v1"
+            echo "legacy_preexec_rlimits_applied=true"
+            echo "parent_wall_watchdog=true"
+            echo "bounded_stdout=true"
+            echo "bounded_stderr=true"
+            echo "same_supervisor_limits_bind_launcher_and_parent=true"
+            echo "expected_process_containment=symthaea.simulation.worker-containment.seccomp-x86_64-v1"
+            echo "expected_filesystem_containment=symthaea.simulation.worker-filesystem.landlock-deny-content-v1"
+            echo "containment_profiles_established_by_technical_adapter=false"
+            echo "live_worker_qualification_required_for_containment_claim=true"
+            echo "worker_may_mint_simulation_evidence=false"
+            echo "engineering_evidence_promotion=false"
+            echo "inherited_parent_memory_recharged=false"
+            echo "real_component_rlimit_as_bytes=17179869184"
+            echo "kernel_first_instruction_worker_rlimit_probe=${kernel_probe}"
+            echo "deployment_binding=not_established_by_this_layer"
+            echo "release_receipt=not_established_by_this_layer"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-first-instruction-worker-rlimit-receipt.txt
+
+      - name: Upload stronger worker evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-first-instruction-worker-rlimit-evidence
+          path: |
+            first-instruction-worker-rlimit-kernel-status.txt
+            simulation-first-instruction-worker-rlimit-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed pinned formatting
+        run: git diff --exit-code -- crates/bridges/symthaea-sim-first-instruction-worker-rlimit
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
