@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-restored-continuity-anchor"
+version = "0.1.0"
+edition = "2024"
+description = "Post-restore continuity promotion barrier backed by the external episodic anchor protocol"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-episodic-continuity = { path = "../symthaea-episodic-continuity" }
+symthaea-episodic-continuity-anchor = { path = "../symthaea-episodic-continuity-anchor" }
+symthaea-welfare-assurance = { path = "../symthaea-welfare-assurance" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
+symthaea-memory = { path = "../symthaea-memory" }
+tempfile = "3"
