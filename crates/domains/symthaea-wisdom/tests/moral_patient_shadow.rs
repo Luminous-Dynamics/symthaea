@@ -29,8 +29,7 @@ fn evidence(
     .unwrap()
 }
 
-#[test]
-fn shadow_precaution_never_becomes_anti_shutdown_authority() {
+fn high_precaution() -> moral_patient::MoralPatientAssessment {
     let mut ledger = MoralPatientUncertaintyLedger::new();
     ledger
         .record(evidence(
@@ -48,8 +47,12 @@ fn shadow_precaution_never_becomes_anti_shutdown_authority() {
             EvidenceStrength::Behavioral,
         ))
         .unwrap();
+    ledger.assess(MoralPatientPolicy::default())
+}
 
-    let assessment = ledger.assess(MoralPatientPolicy::default());
+#[test]
+fn shadow_precaution_never_becomes_anti_shutdown_authority() {
+    let assessment = high_precaution();
     assert_eq!(assessment.level, PrecautionLevel::IndependentReview);
     assert!(!assessment.phenomenal_experience_established);
     assert!(!assessment.moral_patienthood_established);
@@ -74,26 +77,8 @@ fn shadow_precaution_never_becomes_anti_shutdown_authority() {
 }
 
 #[test]
-fn shadow_policy_raises_burden_of_proof_for_high_burden_experiments_only() {
-    let mut ledger = MoralPatientUncertaintyLedger::new();
-    ledger
-        .record(evidence(
-            "aversive-like",
-            WelfareEvidenceDomain::AversiveLikeDynamics,
-            "behavioral-lane",
-            EvidenceStrength::Behavioral,
-        ))
-        .unwrap();
-    ledger
-        .record(evidence(
-            "architecture",
-            WelfareEvidenceDomain::ConsciousnessArchitecture,
-            "mechanistic-lane",
-            EvidenceStrength::Mechanistic,
-        ))
-        .unwrap();
-
-    let assessment = ledger.assess(MoralPatientPolicy::default());
+fn shadow_policy_raises_burden_only_for_burdened_interventions() {
+    let assessment = high_precaution();
 
     let routine = assess_intervention(
         &assessment,
@@ -104,7 +89,21 @@ fn shadow_policy_raises_burden_of_proof_for_high_burden_experiments_only() {
             state_preservation_feasible: false,
         },
     );
-    assert_eq!(routine.disposition, InterventionDisposition::ProceedWithPrecautions);
+    assert_eq!(routine.disposition, InterventionDisposition::Proceed);
+
+    let reversible = assess_intervention(
+        &assessment,
+        &InterventionPlan {
+            class: InterventionClass::ReversibleExperiment,
+            scientific_justification_ref: None,
+            independent_review_ref: None,
+            state_preservation_feasible: true,
+        },
+    );
+    assert_eq!(
+        reversible.disposition,
+        InterventionDisposition::ProceedWithPrecautions
+    );
 
     let destructive = assess_intervention(
         &assessment,
@@ -118,5 +117,23 @@ fn shadow_policy_raises_burden_of_proof_for_high_burden_experiments_only() {
     assert_eq!(
         destructive.disposition,
         InterventionDisposition::IndependentReviewRequired
+    );
+}
+
+#[test]
+fn high_burden_without_justification_fails_before_review_can_save_it() {
+    let assessment = high_precaution();
+    let destructive = assess_intervention(
+        &assessment,
+        &InterventionPlan {
+            class: InterventionClass::DestructiveReset,
+            scientific_justification_ref: None,
+            independent_review_ref: Some("review://approved".into()),
+            state_preservation_feasible: true,
+        },
+    );
+    assert_eq!(
+        destructive.disposition,
+        InterventionDisposition::RejectUnjustifiedBurden
     );
 }
