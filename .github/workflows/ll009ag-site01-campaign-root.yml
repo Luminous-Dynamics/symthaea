@@ -1,0 +1,30 @@
+name: LL-009AG Site01 Campaign Root Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/ll009ag_common.py'
+      - 'scripts/ll009ag_campaign.py'
+      - 'scripts/freeze_ll009ag_site01_campaign.py'
+      - 'configs/lunar_transport/ll009ag_site01_campaign_v1.json'
+      - 'docs/research/LUNAR_LAUNCHER_LL009AG_SITE01_CAMPAIGN_ROOT.md'
+      - '.github/workflows/ll009ag-site01-campaign-root.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile exact LL-009AG tools
+        run: python -m py_compile scripts/ll009ag_common.py scripts/ll009ag_campaign.py scripts/freeze_ll009ag_site01_campaign.py
+      - name: Execute dependency-free synthetic qualification
+        run: >-
+          python scripts/freeze_ll009ag_site01_campaign.py self-test
+          --policy configs/lunar_transport/ll009ag_site01_campaign_v1.json
