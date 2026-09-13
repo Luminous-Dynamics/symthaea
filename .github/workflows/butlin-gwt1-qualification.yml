@@ -14,11 +14,14 @@ on:
       - "crates/domains/symthaea-psych-bench/Cargo.toml"
       - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_*.rs"
       - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view.rs"
       - "crates/domains/symthaea-psych-bench/src/bin/gwt1_qualification.rs"
   workflow_dispatch:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 concurrency:
   group: gwt1-qualification-${{ github.event.pull_request.number || github.ref }}
@@ -56,8 +59,9 @@ jobs:
           test "$observed" = "$expected"
           tracked_changes="$(git status --porcelain=v1 --untracked-files=no)"
           test -z "$tracked_changes"
-          echo "Exact subject: $observed"
-          echo "Tree: $(git rev-parse HEAD^{tree})"
+          echo "Exact evidence subject: $observed"
+          echo "Evidence subject tree: $(git rev-parse HEAD^{tree})"
+          echo "GitHub signer/source context: ${GITHUB_SHA} @ ${GITHUB_REF}"
 
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -83,11 +87,135 @@ jobs:
             --features symthaea-backend \
             --bin gwt1_qualification
 
-      - name: Upload raw observations and resolved evidence
+      # The scientific process may exit 20/21/22 for NotDemonstrated,
+      # Contradicted, or Inconclusive after writing a complete evidence set.
+      # Package those negative findings too. A red qualification is evidence,
+      # not a reason to discard its observations.
+      - name: Build deterministic evidence bundle
+        id: bundle
+        if: always()
+        shell: bash
+        env:
+          EVIDENCE_SUBJECT_SHA: ${{ steps.subject.outputs.sha }}
+        run: |
+          set -euo pipefail
+          evidence_dir="target/gwt1-evidence"
+          expected=(
+            raw_observations.json
+            evidence_envelope.json
+            resolution.json
+            outcome.txt
+          )
+
+          for file in "${expected[@]}"; do
+            if [[ ! -f "${evidence_dir}/${file}" ]]; then
+              echo "Missing evidence file: ${file}"
+              echo "has_evidence=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          # Keep the scientific subject and the GitHub signer context distinct.
+          # For pull_request, GITHUB_SHA/GITHUB_REF describe GitHub's synthetic
+          # merge source used in the OIDC certificate, while EVIDENCE_SUBJECT_SHA
+          # is the exact PR head explicitly checked out and executed above.
+          jq -n \
+            --arg evidence_subject_sha "$EVIDENCE_SUBJECT_SHA" \
+            --arg github_source_sha "$GITHUB_SHA" \
+            --arg github_source_ref "$GITHUB_REF" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '{
+              schema: "butlin-gwt1-workflow-provenance-v1",
+              evidence_subject_sha: $evidence_subject_sha,
+              github_attestation_source_sha: $github_source_sha,
+              github_attestation_source_ref: $github_source_ref,
+              repository: $repository,
+              run_id: $run_id,
+              run_attempt: $run_attempt
+            }' > "${evidence_dir}/workflow_provenance.json"
+
+          expected+=(workflow_provenance.json)
+          (
+            cd "$evidence_dir"
+            sha256sum "${expected[@]}" > SHA256SUMS
+          )
+
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -C target \
+            -cf - \
+            gwt1-evidence \
+            | gzip -n > target/gwt1-evidence.tar.gz
+
+          sha256sum target/gwt1-evidence.tar.gz \
+            | tee target/gwt1-evidence.tar.gz.sha256
+          echo "has_evidence=true" >> "$GITHUB_OUTPUT"
+
+      # Only same-repository PRs receive an attestation. Fork PR code may still
+      # execute under the normal restricted pull_request token, but it cannot
+      # turn an untrusted branch into a repository-signed evidence artifact.
+      - name: Generate GitHub build-provenance attestation
+        id: attest
+        if: >-
+          always() &&
+          steps.bundle.outputs.has_evidence == 'true' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/attest@v4
+        with:
+          subject-path: target/gwt1-evidence.tar.gz
+
+      # Verify the exact bundle emitted by the signing action rather than
+      # depending on immediate API indexing. On pull_request, GitHub's OIDC
+      # certificate identifies the synthetic merge source (GITHUB_SHA/ref),
+      # not the separately checked-out evidence-subject head. Verify the former
+      # cryptographically; the signed evidence bundle records and internally
+      # proves the latter.
+      - name: Verify and preserve exact evidence attestation
+        if: >-
+          always() &&
+          steps.bundle.outputs.has_evidence == 'true' &&
+          steps.attest.outputs.bundle-path != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATTESTATION_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          ATTESTATION_SOURCE_SHA: ${{ github.sha }}
+          ATTESTATION_SOURCE_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/gwt1-attestation
+          test -f "$ATTESTATION_BUNDLE"
+          cp "$ATTESTATION_BUNDLE" target/gwt1-attestation/attestation.json
+
+          gh attestation verify target/gwt1-evidence.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
+            --bundle target/gwt1-attestation/attestation.json \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-qualification.yml" \
+            --signer-digest "$ATTESTATION_SOURCE_SHA" \
+            --source-digest "$ATTESTATION_SOURCE_SHA" \
+            --source-ref "$ATTESTATION_SOURCE_REF" \
+            --deny-self-hosted-runners \
+            --format json \
+            > target/gwt1-attestation/verification.json
+
+          sha256sum target/gwt1-attestation/attestation.json \
+            > target/gwt1-attestation/attestation.json.sha256
+
+      - name: Upload raw, bundled, and attested evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gwt1-evidence-${{ steps.subject.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: target/gwt1-evidence/
+          path: |
+            target/gwt1-evidence/
+            target/gwt1-evidence.tar.gz
+            target/gwt1-evidence.tar.gz.sha256
+            target/gwt1-attestation/
           if-no-files-found: warn
           retention-days: 30
