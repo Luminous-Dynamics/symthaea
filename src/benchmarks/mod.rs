@@ -25,10 +25,12 @@
 //! | [`unified_causal_understanding`] | Combined causal + HDC reasoning |
 //! | [`unified_architecture`] | End-to-end architecture validation |
 //! | [`fep_temporal_benchmark`] | Free-energy principle temporal dynamics |
+//! | [`gwt1_specialist_qualification`] | Structured direct GWT-1 specialist observations |
 
 pub mod causal_tower;
 pub mod cognitive_loop_validation;
 pub mod fep_temporal_benchmark;
+pub mod gwt1_specialist_qualification;
 pub mod unified_architecture;
 pub mod unified_causal_understanding;
 

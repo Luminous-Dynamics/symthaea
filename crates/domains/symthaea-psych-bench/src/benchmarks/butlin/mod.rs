@@ -19,6 +19,8 @@ pub mod ablation;
 #[cfg(feature = "symthaea-backend")]
 pub mod ae2_empirical_runner;
 pub mod gwt1_evidence_envelope;
+#[cfg(feature = "symthaea-backend")]
+pub mod gwt1_end_to_end;
 pub mod gwt1_qualification;
 pub mod indicators;
 pub mod qualification_design;
@@ -30,6 +32,11 @@ pub use gwt1_evidence_envelope::{
     GWT1_RAW_OBSERVATION_SCHEMA_V1, Gwt1ArtifactIntegrityFailureV1,
     Gwt1EvidenceEnvelopeResolutionV1, Gwt1EvidenceEnvelopeV1, Gwt1RawObservationArtifactV1,
     describe_raw_observations_v1, raw_observation_blake3, resolve_gwt1_evidence_envelope_v1,
+};
+#[cfg(feature = "symthaea-backend")]
+pub use gwt1_end_to_end::{
+    Gwt1EndToEndErrorV1, Gwt1EndToEndEvidenceV1, Gwt1ExecutionIdentityV1,
+    build_gwt1_evidence_v1, run_gwt1_end_to_end_v1,
 };
 pub use gwt1_qualification::{
     GWT1_MIN_TRAJECTORY_STEPS_V1, GWT1_PERTURBATIONS_V1, GWT1_QUALIFICATION_SCHEMA_V1,
