@@ -32,6 +32,7 @@
 
 pub mod autopoiesis;
 pub mod care;
+pub mod consent;
 pub mod evidence_ledger;
 pub mod harmonics;
 pub mod meta_cognition;
@@ -45,6 +46,10 @@ pub use care::{
     CareOutcome, CareProviderCandidate, CompetenceAssessment, CompetenceLevel, NeedHypothesis,
     NeedHypothesisId, NeedProvenance, OutcomeDirection, PersonResponse, ResponsibilityCandidate,
     ResponsivenessRecord,
+};
+pub use consent::{
+    ConsentError, ConsentEvaluation, ConsentInvalidityReason, ConsentLedger, ConsentPolicy,
+    ConsentProvenance, ConsentRecord, ConsentScopeId, ConsentState, ConsentValidity,
 };
 pub use evidence_ledger::{
     Claim, Conflict, DecisionDependencyLedger, DecisionId, DecisionRecord,
