@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-sim-clone-cgroup"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "First-instruction clone3 cgroup placement primitive for Symthaea simulation workers"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+libc.workspace = true
+serde.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+symthaea-sim-worker-cgroup = { path = "../symthaea-sim-worker-cgroup" }
+
+[[bin]]
+name = "symthaea-sim-clone-cgroup-probe"
+path = "src/bin/symthaea-sim-clone-cgroup-probe.rs"
