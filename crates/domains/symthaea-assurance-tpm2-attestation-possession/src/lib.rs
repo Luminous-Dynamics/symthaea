@@ -27,6 +27,8 @@ pub struct PcrBankSelection {
 impl PcrBankSelection {
     pub fn validate(&self) -> bool {
         !self.hash_alg.trim().is_empty()
+            && self.hash_alg == self.hash_alg.trim()
+            && self.hash_alg == self.hash_alg.to_ascii_lowercase()
             && !self.pcrs.is_empty()
             && self.pcrs.len() <= 24
             && self.pcrs.iter().all(|pcr| *pcr <= 23)
@@ -287,6 +289,8 @@ pub struct AttestationPossessionPolicy {
     pub expected_platform_qualification_digest: String,
     pub expected_ak_binding_digest: String,
     pub expected_pcr_selection_digest: String,
+    pub expected_verifier_ref: String,
+    pub expected_verification_tool_digest: String,
     pub max_challenge_lifetime_ms: u64,
     pub max_quote_to_verification_ms: u64,
     pub require_fixed_tpm: bool,
@@ -301,6 +305,8 @@ impl AttestationPossessionPolicy {
             && valid_digest(&self.expected_platform_qualification_digest)
             && valid_digest(&self.expected_ak_binding_digest)
             && valid_digest(&self.expected_pcr_selection_digest)
+            && !self.expected_verifier_ref.trim().is_empty()
+            && valid_digest(&self.expected_verification_tool_digest)
             && self.max_challenge_lifetime_ms > 0
             && self.max_quote_to_verification_ms > 0
             && nonempty_refs(&self.evidence_refs)
@@ -356,12 +362,16 @@ pub enum AttestationPossessionError {
     InvalidPolicy,
     InvalidChallenge,
     ChallengeLifetimeExceeded,
+    ChallengeVerifierMismatch,
     QualificationOutsideChallengeWindow,
     PlatformQualificationMismatch,
+    PlatformQualifiedAfterChallenge,
     InvalidAkBinding,
     AkBindingMismatch,
+    AkReviewedAfterChallenge,
     AkNotFixedToTpm,
     AkNotRestrictedSigning,
+    VerifierNotIndependent,
     PcrSelectionMismatch,
     InvalidQuoteArtifacts,
     QuoteChallengeMismatch,
@@ -371,6 +381,7 @@ pub enum AttestationPossessionError {
     QuoteOutsideChallengeWindow,
     InvalidVerificationReceipt,
     VerificationVerifierMismatch,
+    VerificationToolMismatch,
     VerificationBindingMismatch,
     VerificationBeforeQuote,
     VerificationLagExceeded,
@@ -395,6 +406,9 @@ pub fn qualify_attestation_possession(
     if challenge.expires_at_ms - challenge.issued_at_ms > policy.max_challenge_lifetime_ms {
         return Err(AttestationPossessionError::ChallengeLifetimeExceeded);
     }
+    if challenge.verifier_ref != policy.expected_verifier_ref {
+        return Err(AttestationPossessionError::ChallengeVerifierMismatch);
+    }
     if qualified_at_ms < challenge.issued_at_ms || qualified_at_ms > challenge.expires_at_ms {
         return Err(AttestationPossessionError::QualificationOutsideChallengeWindow);
     }
@@ -402,6 +416,9 @@ pub fn qualify_attestation_possession(
     let platform_digest = platform.qualification_digest();
     if platform_digest != policy.expected_platform_qualification_digest {
         return Err(AttestationPossessionError::PlatformQualificationMismatch);
+    }
+    if platform.qualified_at_ms > challenge.issued_at_ms {
+        return Err(AttestationPossessionError::PlatformQualifiedAfterChallenge);
     }
 
     if !ak.validate() {
@@ -411,11 +428,20 @@ pub fn qualify_attestation_possession(
     if ak_digest != policy.expected_ak_binding_digest {
         return Err(AttestationPossessionError::AkBindingMismatch);
     }
+    if ak.reviewed_at_ms > challenge.issued_at_ms {
+        return Err(AttestationPossessionError::AkReviewedAfterChallenge);
+    }
     if policy.require_fixed_tpm && !ak.fixed_tpm {
         return Err(AttestationPossessionError::AkNotFixedToTpm);
     }
     if policy.require_restricted_signing && !ak.restricted_signing {
         return Err(AttestationPossessionError::AkNotRestrictedSigning);
+    }
+    if challenge.verifier_ref == platform.trust_store_ref
+        || challenge.verifier_ref == platform.adapter_id
+        || challenge.verifier_ref == ak.ak_id
+    {
+        return Err(AttestationPossessionError::VerifierNotIndependent);
     }
 
     let selection_digest = pcr_selection_digest(&challenge.pcr_selection)
@@ -453,6 +479,9 @@ pub fn qualify_attestation_possession(
     }
     if verification.verifier_ref != challenge.verifier_ref {
         return Err(AttestationPossessionError::VerificationVerifierMismatch);
+    }
+    if verification.verification_tool_digest != policy.expected_verification_tool_digest {
+        return Err(AttestationPossessionError::VerificationToolMismatch);
     }
     if verification.challenge_digest != challenge.challenge_digest()
         || verification.ak_binding_digest != ak_digest
@@ -573,12 +602,10 @@ impl AttestationAcceptanceLedger {
             return Err(AttestationAcceptanceError::AcceptanceTimeRegressed);
         }
 
-        let nonce_digest = digest_bytes(
-            &hex_to_bytes(&challenge.nonce_hex)
-                .ok_or(AttestationAcceptanceError::Qualification(
-                    AttestationPossessionError::InvalidChallenge,
-                ))?,
-        );
+        let nonce_bytes = hex_to_bytes(&challenge.nonce_hex).ok_or(
+            AttestationAcceptanceError::Qualification(AttestationPossessionError::InvalidChallenge),
+        )?;
+        let nonce_digest = digest_bytes(&nonce_bytes);
         let quote_digest = quote.artifact_digest();
 
         if self
@@ -800,6 +827,8 @@ mod tests {
             expected_platform_qualification_digest: platform().qualification_digest(),
             expected_ak_binding_digest: ak().binding_digest(),
             expected_pcr_selection_digest: pcr_selection_digest(&challenge.pcr_selection).unwrap(),
+            expected_verifier_ref: challenge.verifier_ref.clone(),
+            expected_verification_tool_digest: digest("tpm2-checkquote"),
             max_challenge_lifetime_ms: 2_000,
             max_quote_to_verification_ms: 500,
             require_fixed_tpm: true,
@@ -911,7 +940,27 @@ mod tests {
     }
 
     #[test]
-    fn quote_or_verification_outside_freshness_window_is_rejected() {
+    fn verifier_and_tool_are_policy_bound() {
+        let challenge = challenge("challenge:1", &"ab".repeat(32));
+        let quote = quote(&challenge);
+        let mut verification = verification(&challenge, &quote);
+        verification.verification_tool_digest = digest("other-tool");
+        assert_eq!(
+            qualify_attestation_possession(
+                &policy(&challenge),
+                &platform(),
+                &challenge,
+                &ak(),
+                &quote,
+                &verification,
+                10_400,
+            ),
+            Err(AttestationPossessionError::VerificationToolMismatch)
+        );
+    }
+
+    #[test]
+    fn quote_outside_freshness_window_is_rejected() {
         let challenge = challenge("challenge:1", &"ab".repeat(32));
         let mut quote = quote(&challenge);
         quote.collected_at_ms = 11_001;
