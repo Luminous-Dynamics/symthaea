@@ -8,19 +8,59 @@ The campaign is monotonic:
 
 `PREPARED -> FROZEN -> FINALIZED`
 
-`PREPARED` binds the exact repository head, campaign policy, protected scripts/configs, stage plan, and three independent runtime capsules (`acquisition`, `gis`, `analysis`). Environment or protected-input drift at this stage means the campaign must be prepared again.
+`PREPARED` binds the exact repository head, campaign policy, protected scripts/configs, stage plan, and three independent runtime capsules (`acquisition`, `gis`, `analysis`). Environment or protected-input drift at this stage means the preparation is invalid and the campaign must be prepared again.
 
-`FROZEN` is the point at which evidence begins. It binds an explicit evidence manifest, a closed evidence-root file set, every artifact's outer SHA-256 and byte count, the declared dependency DAG, and—only when explicitly requested by that artifact entry—the artifact's canonical `receipt_sha256`. After this transition, substitution or drift is fatal; evidence from different lineages must not be combined.
+`FROZEN` is the point at which evidence begins. It binds an explicit evidence manifest, the exact present evidence-root file set, every present artifact's outer SHA-256 and byte count, canonical receipt self-hashes when requested, and verified dependency edges. After this transition, substitution or drift is fatal; evidence from different lineages must not be combined.
 
 `FINALIZED` replays all PREPARED and FROZEN bindings, verifies the exact evidence-root file set, binds an explicit semantic assertion, and applies the policy's promotion ceiling. It does not recompute numerical terrain or visibility values.
 
+## Explicit availability classes
+
+Every logical artifact is declared as exactly one of:
+
+- `required` — must exist and fully verify or the campaign fails;
+- `optional_diagnostic` — may be absent, but if present it must pass exactly the same hashing, self-hash, dependency, and closure checks as required evidence;
+- `not_yet_available` — an explicit future/missing evidence surface. It has no path and cannot silently masquerade as success.
+
+A campaign containing any `not_yet_available` node is `incomplete_declared` and has `promotion_eligible=false`. Such a campaign may still be FINALIZED as an immutable integrity snapshot, but that final root is not promotable scientific evidence. Missing optional diagnostics are recorded separately and do not become positive evidence.
+
 ## No hidden discovery
 
-The evidence manifest is authoritative and explicit. Each artifact supplies a logical artifact ID, a normalized relative path under the evidence root, exact logical dependencies, and a `self_hash_mode` of either `none` or `canonical_receipt_sha256`.
+The evidence manifest is authoritative and explicit. Each present artifact supplies a logical artifact ID, a normalized relative path under the evidence root, exact logical dependencies, a requirement class, and a `self_hash_mode` of either `none` or `canonical_receipt_sha256`.
 
 LL-009AG never assigns a scientific role from a filename, glob, extension, or directory name. The presence of a field called `receipt_sha256` is not enough to opt an artifact into receipt verification; the manifest must explicitly declare the canonical self-hash mode.
 
-The evidence directory is closed: every regular file must appear exactly once in the manifest, and every manifest path must exist. Symlinks and special files fail closed.
+The evidence directory is closed over **present** evidence: every regular file must correspond to exactly one present manifest node. Symlinks and special files fail closed. Required missing files fail closed. Optional missing files and declared-unavailable nodes remain explicit manifest state rather than hidden filesystem inference.
+
+## Dependency edges are evidence
+
+A declared DAG edge is not trusted by itself. Every present child must contain the exact identity of every declared parent at a reviewed JSON field path. The manifest declares one `dependency_binding` per parent using either:
+
+- `receipt_sha256` — the parent's verified canonical receipt identity; or
+- `sha256` — the exact SHA-256 of the parent file bytes.
+
+For example:
+
+```json
+{
+  "id": "visibility",
+  "path": "visibility.json",
+  "requirement": "required",
+  "dependencies": ["horizon"],
+  "dependency_bindings": [
+    {
+      "dependency_id": "horizon",
+      "field_path": ["k_horizon_pack_sha256"],
+      "identity": "sha256"
+    }
+  ],
+  "self_hash_mode": "canonical_receipt_sha256"
+}
+```
+
+The field path is data, not a heuristic. LL-009AG does not search a receipt for a plausible hash. A self-consistent child receipt that points to a different valid upstream object therefore fails closed.
+
+A present artifact may not depend on an absent optional diagnostic or a `not_yet_available` node. Dependency cycles, duplicate logical IDs, duplicate paths, duplicate bindings, and incomplete binding coverage are rejected before evidence can freeze.
 
 ## Environment separation
 
@@ -40,11 +80,13 @@ The checked-in campaign policy currently caps finalization at `hybrid_scenario_s
 
 Promotion to that class requires frozen artifact ID `ll009z_visibility_reconciliation` to appear in the final semantic assertion's explicit basis. `risk_qualified_visibility` and `deterministic_visibility` are disabled.
 
-This is intentional. LL-009AG does not create a joint Q × Product90 probability theorem, does not convert Product90 RMS into a certified true-second-moment bound, does not upgrade spatial support, and does not treat an SDEM as independent ground truth.
+This is intentional. LL-009AG does not create a joint Q × Product90 probability theorem, does not convert Product90 RMS into a certified true-second-moment bound, does not upgrade spatial support, and does not treat an SDEM as independent ground truth. An incomplete campaign root is non-promotable regardless of the semantic class carried by its present evidence.
 
 ## Receipt schemas
 
 The three state receipts are `ll009ag.campaign-preparation-receipt.v1`, `ll009ag.campaign-freeze-receipt.v1`, and `ll009ag.campaign-finalization-receipt.v1`. Receipts use canonical JSON with sorted keys, compact separators, UTF-8, and a trailing newline. `receipt_sha256` is SHA-256 over the same canonical object with that field omitted.
+
+The FROZEN receipt records present, missing-optional, and declared-unavailable nodes separately, together with every successfully verified dependency binding. FINALIZED records `campaign_completeness` and `promotion_eligible` rather than inferring completeness from file presence.
 
 ## Typical real-campaign flow
 
@@ -94,6 +136,6 @@ python scripts/freeze_ll009ag_site01_campaign.py finalize \
 
 ## Qualification scope
 
-The dedicated workflow performs only Python compilation and a dependency-free synthetic state-machine campaign. The synthetic campaign checks deterministic replay and fail-closed behavior for runtime drift, protected-tool drift, artifact substitution, missing or extra evidence files, invalid inner receipt self-hashes, dependency cycles, missing semantic provenance, and attempted over-promotion.
+The dedicated workflow performs Python compilation and a dependency-free synthetic state-machine campaign. The synthetic campaign checks deterministic PREPARED/FROZEN/FINALIZED replay; runtime and protected-tool drift; artifact substitution; exact receipt- and file-hash dependency bindings; valid-but-wrong upstream substitution; required, optional-diagnostic, and declared-unavailable handling; closed evidence-root enforcement; invalid inner receipt self-hashes; dependency cycles; missing bindings; unavailable semantic bases; missing semantic provenance; and attempted over-promotion.
 
 The workflow downloads no NASA source bytes and produces no scientific Site01 result. A green workflow therefore qualifies LL-009AG's campaign-control logic only; it is not evidence that the Product104 Connecting Ridge archive has been acquired, that a real SDEM has been role-bound, or that any visibility class stronger than the existing upstream evidence has been established.
