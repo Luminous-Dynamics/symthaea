@@ -1,0 +1,96 @@
+name: PIE-002D Binding Oracle Exact Subject Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002d-binding-731ff61d
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify PIE-002D projection-to-accounting binding oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SUBJECT_SHA: 731ff61d1199d6e62fa63751de74f145c081c037
+      PARENT_SHA: ada0d92fce3f0ff10883061b0608edfd37b16317
+      SUBJECT_TREE: e1d0b72d02c4d7168e63e1750da0594deec1d0aa
+      SCRIPT: scripts/pie-utility-case-binding-oracle.py
+      EVIDENCE: docs/release/evidence/PIE_002D_UTILITY_CASE_BINDING_ORACLE.md
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject, lineage, tree, and file scope
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SUBJECT_TREE"
+          mapfile -t files < <(git diff --name-only "$PARENT_SHA" "$SUBJECT_SHA" | sort)
+          printf '%s\n' "${files[@]}"
+          test "${#files[@]}" -eq 2
+          test "${files[0]}" = "$EVIDENCE"
+          test "${files[1]}" = "$SCRIPT"
+
+      - name: Record subject file digests
+        run: sha256sum "$SCRIPT" "$EVIDENCE" | tee pie-002d-binding-files.sha256
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+
+      - name: Record Python identity
+        run: python --version
+
+      - name: Compile oracle syntax
+        id: syntax
+        continue-on-error: true
+        run: python -m py_compile "$SCRIPT"
+
+      - name: Execute oracle self-test
+        id: test
+        continue-on-error: true
+        run: python "$SCRIPT" --self-test
+
+      - name: Emit machine-readable qualification receipt
+        if: always()
+        run: |
+          cat > pie-002d-binding-qualification.json <<EOF
+          {
+            "schema": "symthaea.pie.exact-subject-qualification.v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$PARENT_SHA",
+            "tree_sha": "$SUBJECT_TREE",
+            "python": "3.13.5",
+            "gates": {
+              "syntax": "${{ steps.syntax.outcome }}",
+              "self_test": "${{ steps.test.outcome }}"
+            },
+            "scope": "Projection-to-accounting binding only; no utility feasibility, storage dispatch, thermodynamic, process-performance, or control-authority claim."
+          }
+          EOF
+          cat pie-002d-binding-qualification.json
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-002d-binding-oracle-exact-subject-qualification
+          path: |
+            pie-002d-binding-qualification.json
+            pie-002d-binding-files.sha256
+          if-no-files-found: error
+
+      - name: Enforce oracle gates
+        if: always()
+        run: |
+          test "${{ steps.syntax.outcome }}" = success
+          test "${{ steps.test.outcome }}" = success
