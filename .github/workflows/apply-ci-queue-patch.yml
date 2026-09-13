@@ -1,0 +1,107 @@
+name: Apply CI Queue Fanout Patch
+
+on:
+  push:
+    branches: [ci/queue-fanout-gate-v0]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'ci: stage queue fanout patch helper'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact patch subject
+        shell: bash
+        env:
+          EXPECTED_BASE: ada0d92fce3f0ff10883061b0608edfd37b16317
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_BASE"
+          changed="$(git diff --name-only "$EXPECTED_BASE"...HEAD)"
+          test "$changed" = ".github/workflows/apply-ci-queue-patch.yml"
+
+      - name: Gate expensive matrices behind core preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/ci.yml')
+          lines = path.read_text().splitlines(keepends=True)
+          add_after_runner = {'test-all-features', 'test-feature-matrix'}
+          replace_existing = {'test-feature-matrix-critical', 'feature-interactions'}
+          expected = add_after_runner | replace_existing
+          changed = set()
+          current = None
+          out = []
+
+          for line in lines:
+              if line.startswith('  ') and not line.startswith('    ') and line.rstrip().endswith(':'):
+                  current = line.strip()[:-1]
+
+              if current in replace_existing and line.strip() == 'needs: test':
+                  out.append('    needs: [fmt, clippy, test]\n')
+                  changed.add(current)
+                  continue
+
+              out.append(line)
+              if current in add_after_runner and line.strip() == 'runs-on: ubuntu-latest':
+                  out.append('    needs: [fmt, clippy, test]\n')
+                  changed.add(current)
+
+          if changed != expected:
+              raise SystemExit(f'patch subject mismatch: changed={sorted(changed)} expected={sorted(expected)}')
+
+          path.write_text(''.join(out))
+          PY
+
+          git diff --check
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path('.github/workflows/ci.yml').read_text().splitlines()
+          targets = {
+              'test-all-features',
+              'test-feature-matrix-critical',
+              'test-feature-matrix',
+              'feature-interactions',
+          }
+          found = {}
+          current = None
+          for line in text:
+              if line.startswith('  ') and not line.startswith('    ') and line.rstrip().endswith(':'):
+                  current = line.strip()[:-1]
+              if current in targets and line.strip().startswith('needs:'):
+                  found.setdefault(current, []).append(line.strip())
+          expected = {name: ['needs: [fmt, clippy, test]'] for name in targets}
+          if found != expected:
+              raise SystemExit(f'post-patch dependency mismatch: {found!r}')
+          print('dependency-gate patch verified')
+          PY
+
+          ruby -e 'require "yaml"; YAML.load_file(ARGV[0]); puts "yaml-ok"' .github/workflows/ci.yml
+
+      - name: Commit only the reviewed CI delta
+        shell: bash
+        env:
+          EXPECTED_BASE: ada0d92fce3f0ff10883061b0608edfd37b16317
+        run: |
+          set -euo pipefail
+          rm .github/workflows/apply-ci-queue-patch.yml
+          git add .github/workflows/ci.yml .github/workflows/apply-ci-queue-patch.yml
+          staged="$(git diff --cached --name-only)"
+          test "$staged" = $'.github/workflows/apply-ci-queue-patch.yml\n.github/workflows/ci.yml'
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'ci: gate expensive matrices behind preflight'
+          test "$(git diff --name-only "$EXPECTED_BASE"...HEAD)" = '.github/workflows/ci.yml'
+          git push origin HEAD:ci/queue-fanout-gate-v0
