@@ -6,6 +6,11 @@
 //! payloads remain outside live memory and may re-enter only through this exact point-lookup path.
 //! The lookup result is treated as untrusted transport until it is rebound to the recovered
 //! quarantine ledger's exact UUID, content ID, escrow digest, persistence reference and target.
+//!
+//! For deployments using an independent monotonic continuity anchor, local `Restored` durability
+//! is still not live-promotion authority. The exact resulting continuity state must pass the
+//! restored-continuity promotion barrier before the already-validated candidate heap is swapped
+//! into canonical live memory.
 
 #![deny(unsafe_code)]
 
@@ -43,18 +48,19 @@ use crate::quarantine_state_ledger::{
     EpisodicQuarantineStateLedger, QuarantineLedgerError, QuarantineLedgerState,
 };
 use crate::replay_recovery::DurableEvidenceBoundInterventionPermit;
+use crate::restored_continuity_promotion::{
+    RestoredContinuityPromotionBarrier, RestoredContinuityPromotionError,
+    RestoredContinuityPromotionFailure, RestoredContinuityPromotionRequest,
+    VerifiedRestoredContinuityPromotion,
+};
 
 const PERSISTED_RESTORE_TRANSITION_DOMAIN: &[u8] =
     b"symthaea.welfare.persisted-episodic-restore-transition.v1\0";
 const PERSISTED_RESTORE_RESULT_DOMAIN: &[u8] =
-    b"symthaea.welfare.persisted-episodic-restore-result.v1\0";
+    b"symthaea.welfare.persisted-episodic-restore-result.v2\0";
 const MAX_REF_BYTES: usize = 2048;
 
 /// Raw point-lookup result from a durable quarantine store.
-///
-/// The fields are intentionally public transport data, not trusted evidence. The governed restore
-/// adapter independently recomputes and compares every binding against the recovered quarantine
-/// ledger before any live-memory state is constructed.
 #[derive(Debug, Clone)]
 pub struct PersistedEpisodicEscrowRow {
     pub escrow: EpisodicQuarantineEscrow,
@@ -62,10 +68,7 @@ pub struct PersistedEpisodicEscrowRow {
     pub persistence_ref: String,
 }
 
-/// Purpose-separated durable point-lookup boundary.
-///
-/// There is deliberately no bulk enumeration method here. Implementations resolve one exact
-/// `EpisodeInstanceId` or return `None`.
+/// Purpose-separated durable point-lookup boundary. There is deliberately no bulk enumeration.
 pub trait EpisodicQuarantineEscrowLookup {
     type Error: StdError + Send + Sync + 'static;
 
@@ -75,8 +78,8 @@ pub trait EpisodicQuarantineEscrowLookup {
     ) -> Result<Option<PersistedEpisodicEscrowRow>, Self::Error>;
 }
 
-/// Evidence returned only after the persisted occurrence is durably released by the quarantine
-/// ledger and atomically swapped into the canonical live replay state.
+/// Evidence returned only after local restore durability, independent continuity promotion, and
+/// exact live-heap activation all succeed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PersistedEpisodicRestoreReceipt {
     pub target_id: String,
@@ -96,6 +99,7 @@ pub struct PersistedEpisodicRestoreReceipt {
     pub restore_prepared_persistence_ref: String,
     pub restored_persistence_ref: String,
     pub ledger_generation: u64,
+    pub continuity_promotion: VerifiedRestoredContinuityPromotion,
 }
 
 #[derive(Debug, Clone)]
@@ -112,11 +116,13 @@ struct VerifiedCandidateState {
     after_active_digest: Sha256Digest,
 }
 
-struct PersistedEpisodicRestoreExecutor<'a, L, Q>
+struct PersistedEpisodicRestoreExecutor<'a, L, Q, B>
 where
     L: EpisodicQuarantineEscrowLookup,
     Q: QuarantineLedgerPersistence,
+    B: RestoredContinuityPromotionBarrier,
 {
+    store_target_id: String,
     expected_target_id: String,
     execution_id: String,
     instance_id: EpisodeInstanceId,
@@ -124,13 +130,15 @@ where
     ledger: &'a mut EpisodicQuarantineStateLedger,
     lookup: &'a L,
     ledger_persistence: &'a mut Q,
+    promotion_barrier: &'a mut B,
     completed_at_unix_s: u64,
 }
 
-impl<L, Q> PersistedEpisodicRestoreExecutor<'_, L, Q>
+impl<L, Q, B> PersistedEpisodicRestoreExecutor<'_, L, Q, B>
 where
     L: EpisodicQuarantineEscrowLookup,
     Q: QuarantineLedgerPersistence,
+    B: RestoredContinuityPromotionBarrier,
 {
     fn validate_permit(
         &self,
@@ -162,9 +170,7 @@ where
         Ok(())
     }
 
-    fn validate_live_absence(
-        &self,
-    ) -> Result<(), PersistedEpisodicRestoreInterventionError> {
+    fn validate_live_absence(&self) -> Result<(), PersistedEpisodicRestoreInterventionError> {
         if self
             .memory
             .get_top_episode_instances(self.memory.len())
@@ -250,8 +256,9 @@ where
         if episode_content_id(&active.1)? != material.escrow.content_id {
             return Err(PersistedEpisodicRestoreInterventionError::ContentIdentityMismatch);
         }
-        let after_active_digest = digest_episodic_memory(&candidate)
-            .map_err(|error| PersistedEpisodicRestoreInterventionError::MemoryState(error.to_string()))?;
+        let after_active_digest = digest_episodic_memory(&candidate).map_err(|error| {
+            PersistedEpisodicRestoreInterventionError::MemoryState(error.to_string())
+        })?;
         Ok(VerifiedCandidateState {
             memory: candidate,
             after_active_count,
@@ -261,10 +268,11 @@ where
     }
 }
 
-impl<L, Q> ReceiptedInterventionExecutor for PersistedEpisodicRestoreExecutor<'_, L, Q>
+impl<L, Q, B> ReceiptedInterventionExecutor for PersistedEpisodicRestoreExecutor<'_, L, Q, B>
 where
     L: EpisodicQuarantineEscrowLookup,
     Q: QuarantineLedgerPersistence,
+    B: RestoredContinuityPromotionBarrier,
 {
     type Output = PersistedEpisodicRestoreReceipt;
     type Error = PersistedEpisodicRestoreExecutionError<L::Error, Q::Error>;
@@ -286,11 +294,14 @@ where
 
         let before_active_count = self.memory.len();
         let before_quarantined_count = self.memory.quarantined_len();
-        let before_active_digest = digest_episodic_memory(self.memory)
-            .map_err(|error| PersistedEpisodicRestoreInterventionError::MemoryState(error.to_string()))?;
+        let before_active_digest = digest_episodic_memory(self.memory).map_err(|error| {
+            PersistedEpisodicRestoreInterventionError::MemoryState(error.to_string())
+        })?;
 
-        // Persist domain write-ahead state before constructing any candidate active memory.
-        let ledger_before_prepare = self.ledger.clone();
+        // Once a persistence call is attempted, failure is ambiguous: the backend may have
+        // committed before the response was lost. Never fabricate an in-memory rollback merely
+        // because durability confirmation failed. The generic execution journal marks the attempt
+        // in-doubt and live episodic memory remains unchanged.
         let restore_prepared_head = self
             .ledger
             .append_restore_prepared(
@@ -301,27 +312,19 @@ where
                 &self.execution_id,
             )
             .map_err(PersistedEpisodicRestoreInterventionError::from)?;
-        let restore_prepared_persistence_ref = match self
+        let restore_prepared_persistence_ref = self
             .ledger_persistence
             .persist_quarantine_ledger(self.ledger.events(), restore_prepared_head)
-        {
-            Ok(reference) => reference,
-            Err(error) => {
-                *self.ledger = ledger_before_prepare;
-                return Err(PersistedEpisodicRestoreExecutionError::RestorePreparedPersistence(
-                    error,
-                ));
-            }
-        };
+            .map_err(PersistedEpisodicRestoreExecutionError::RestorePreparedPersistence)?;
         if !valid_ref(&restore_prepared_persistence_ref) {
-            *self.ledger = ledger_before_prepare;
             return Err(
                 PersistedEpisodicRestoreInterventionError::InvalidLedgerPersistenceReference.into(),
             );
         }
 
-        // Copy-on-write activation: every fallible memory validation happens on a clone while the
-        // canonical live heap remains unchanged and the durable ledger still says quarantined.
+        // Every fallible memory validation happens on a clone while canonical live memory remains
+        // unchanged. The clone is not promotable until local Restored and the external continuity
+        // barrier both succeed.
         let candidate = self.build_candidate(&material)?;
         let transition_digest = digest_persisted_restore_transition(
             &self.expected_target_id,
@@ -340,46 +343,50 @@ where
             &restore_prepared_persistence_ref,
         );
 
-        // Commit terminal domain state while the actual canonical heap is still unchanged. Once
-        // this durable record exists, the remaining operation is an infallible Rust assignment of
-        // an already validated candidate. A crash in that tiny window recovers from the durable
-        // `Restored` ledger state and reconstructs the occurrence active on the next restart.
-        let ledger_prepared = self.ledger.clone();
-        let restored_head = match self.ledger.append_restored(
-            &self.expected_target_id,
-            self.instance_id,
-            material.escrow.content_id,
-            self.completed_at_unix_s,
-            &self.execution_id,
-            transition_digest,
-        ) {
-            Ok(head) => head,
-            Err(error) => {
-                *self.ledger = ledger_prepared;
-                return Err(PersistedEpisodicRestoreExecutionError::Ledger(error));
-            }
-        };
-        let restored_persistence_ref = match self
+        let restored_head = self
+            .ledger
+            .append_restored(
+                &self.expected_target_id,
+                self.instance_id,
+                material.escrow.content_id,
+                self.completed_at_unix_s,
+                &self.execution_id,
+                transition_digest,
+            )
+            .map_err(PersistedEpisodicRestoreExecutionError::Ledger)?;
+        let restored_persistence_ref = self
             .ledger_persistence
             .persist_quarantine_ledger(self.ledger.events(), restored_head)
-        {
-            Ok(reference) => reference,
-            Err(error) => {
-                *self.ledger = ledger_prepared;
-                return Err(PersistedEpisodicRestoreExecutionError::RestoredPersistence(
-                    error,
-                ));
-            }
-        };
+            .map_err(PersistedEpisodicRestoreExecutionError::RestoredPersistence)?;
         if !valid_ref(&restored_persistence_ref) {
-            *self.ledger = ledger_prepared;
             return Err(
                 PersistedEpisodicRestoreInterventionError::InvalidLedgerPersistenceReference.into(),
             );
         }
 
-        // No fallible state transition follows this assignment. The exact candidate already passed
-        // all memory-level validation and the terminal quarantine-ledger state is durable.
+        // Local Restored durability is not enough in an anchored deployment. The barrier must
+        // independently accept the complete resulting continuity state before the candidate can
+        // become live. Barrier failure leaves the canonical heap unchanged and execution in-doubt.
+        let promotion_request = RestoredContinuityPromotionRequest::try_new(
+            &self.store_target_id,
+            &self.expected_target_id,
+            self.instance_id,
+            material.escrow.content_id,
+            &self.execution_id,
+            restored_head,
+        )
+        .map_err(PersistedEpisodicRestoreExecutionError::PromotionRequest)?;
+        let continuity_promotion = self
+            .promotion_barrier
+            .commit_restored_continuity(&promotion_request)
+            .map_err(PersistedEpisodicRestoreExecutionError::PromotionBarrier)?;
+        continuity_promotion
+            .validate_for(&promotion_request)
+            .map_err(PersistedEpisodicRestoreExecutionError::PromotionEvidence)?;
+
+        // No fallible state transition follows this assignment. The candidate already passed exact
+        // memory validation, local Restored is durable, and the complete continuity state has been
+        // independently promoted.
         *self.memory = candidate.memory;
 
         let receipt = PersistedEpisodicRestoreReceipt {
@@ -400,10 +407,11 @@ where
             restore_prepared_persistence_ref,
             restored_persistence_ref,
             ledger_generation: self.ledger.generation(),
+            continuity_promotion,
         };
         let result_digest = digest_persisted_restore_result(&receipt, permit.rationale());
         let evidence_ref = format!(
-            "symthaea-memory:persisted-episodic-restore:v1:sha256:{}",
+            "symthaea-memory:persisted-episodic-restore:v2:sha256:{}",
             hex_digest(result_digest)
         );
         ReceiptedExecution::new(
@@ -417,10 +425,10 @@ where
 }
 
 /// Govern one exact post-restart restoration through evidence-bound authority, explicit consent,
-/// independent review, an exact durable escrow point lookup, two-phase quarantine-ledger state and
-/// copy-on-write canonical heap activation.
+/// exact escrow lookup, durable two-phase restore, independent continuity promotion, and only then
+/// canonical live activation.
 #[allow(clippy::too_many_arguments)]
-pub fn execute_governed_persisted_episodic_restore<P, L, Q>(
+pub fn execute_governed_persisted_episodic_restore<P, L, Q, B>(
     permit: DurableEvidenceBoundInterventionPermit,
     execution_id: impl Into<String>,
     store_target_id: &str,
@@ -438,6 +446,7 @@ pub fn execute_governed_persisted_episodic_restore<P, L, Q>(
     journal: &mut InterventionExecutionJournal,
     execution_persistence: &mut P,
     ledger_persistence: &mut Q,
+    promotion_barrier: &mut B,
 ) -> Result<
     JournaledExecutionOutcome<
         PersistedEpisodicRestoreReceipt,
@@ -450,6 +459,7 @@ where
     P: ExecutionJournalPersistence,
     L: EpisodicQuarantineEscrowLookup,
     Q: QuarantineLedgerPersistence,
+    B: RestoredContinuityPromotionBarrier,
 {
     let execution_id = execution_id.into();
     if execution_id.trim().is_empty() || execution_id != execution_id.trim() {
@@ -457,12 +467,13 @@ where
             PersistedEpisodicRestoreInterventionError::InvalidExecutionId,
         ));
     }
-    let expected_target_id = episodic_instance_target_id(store_target_id, instance_id)
-        .map_err(|error| {
+    let expected_target_id = episodic_instance_target_id(store_target_id, instance_id).map_err(
+        |error| {
             GovernedPersistedEpisodicRestoreError::Configuration(
                 PersistedEpisodicRestoreInterventionError::TargetConstruction(error.to_string()),
             )
-        })?;
+        },
+    )?;
     if permit.action() != SubjectAffectingAction::MemoryModification {
         return Err(GovernedPersistedEpisodicRestoreError::Configuration(
             PersistedEpisodicRestoreInterventionError::WrongAction {
@@ -480,6 +491,7 @@ where
     }
 
     let mut executor = PersistedEpisodicRestoreExecutor {
+        store_target_id: store_target_id.to_string(),
         expected_target_id: permit.target_id().to_string(),
         execution_id: execution_id.clone(),
         instance_id,
@@ -487,6 +499,7 @@ where
         ledger,
         lookup,
         ledger_persistence,
+        promotion_barrier,
         completed_at_unix_s: unix_s,
     };
 
@@ -607,6 +620,14 @@ fn digest_persisted_restore_result(
     hash_text(&mut hasher, &receipt.restore_prepared_persistence_ref);
     hash_text(&mut hasher, &receipt.restored_persistence_ref);
     hasher.update(&receipt.ledger_generation.to_le_bytes());
+    hasher.update(&receipt.continuity_promotion.previous_anchor_commitment().0);
+    hasher.update(&receipt.continuity_promotion.next_anchor_commitment().0);
+    hasher.update(&receipt.continuity_promotion.next_anchor_revision().to_le_bytes());
+    hasher.update(&receipt.continuity_promotion.continuity_manifest_digest().0);
+    hash_text(
+        &mut hasher,
+        receipt.continuity_promotion.anchor_reference(),
+    );
     hash_text(&mut hasher, rationale);
     hasher.finalize()
 }
@@ -715,12 +736,18 @@ where
     Intervention(#[from] PersistedEpisodicRestoreInterventionError),
     #[error("persisted escrow point lookup failed: {0}")]
     Lookup(#[source] LE),
-    #[error("could not durably persist RestorePrepared quarantine-ledger state: {0}")]
+    #[error("could not confirm durable RestorePrepared quarantine-ledger state: {0}")]
     RestorePreparedPersistence(#[source] QE),
-    #[error("could not durably persist Restored quarantine-ledger state: {0}")]
+    #[error("could not confirm durable Restored quarantine-ledger state: {0}")]
     RestoredPersistence(#[source] QE),
     #[error("quarantine-ledger transition failed after candidate construction: {0}")]
     Ledger(#[source] QuarantineLedgerError),
+    #[error("could not construct restored-continuity promotion request: {0}")]
+    PromotionRequest(#[source] RestoredContinuityPromotionError),
+    #[error("independent restored-continuity promotion failed: {0}")]
+    PromotionBarrier(#[source] RestoredContinuityPromotionFailure),
+    #[error("returned restored-continuity promotion evidence did not bind the exact restore: {0}")]
+    PromotionEvidence(#[source] RestoredContinuityPromotionError),
     #[error(transparent)]
     Observation(#[from] ExecutionObservationError),
 }
