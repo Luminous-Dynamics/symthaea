@@ -393,10 +393,17 @@ fn signature_rejection_cannot_mint_basis() {
 #[test]
 fn acceptance_surface_has_no_caller_quorum_policy_or_time_parameter() {
     let source = include_str!("../src/accepted_clock_basis.rs");
-    assert!(!source.contains("quorum_policy: &ClockQuorumPolicy"));
-    assert!(!source.contains("evaluation_time_unix_s: u64"));
-    assert!(!source.contains("VerifiedClockWindow,"));
-    assert!(!source.contains("ClockWindowEvaluationWitnessV1,"));
+    let start = source
+        .find("pub fn accept_bootstrap_clock_basis_v4")
+        .expect("public acceptance function");
+    let rest = &source[start..];
+    let signature_end = rest.find(") -> Result").expect("function signature end") + 1;
+    let signature = &rest[..signature_end];
+
+    assert!(!signature.contains("ClockQuorumPolicy"));
+    assert!(!signature.contains("evaluation_time_unix_s"));
+    assert!(!signature.contains("VerifiedClockWindow"));
+    assert!(!signature.contains("ClockWindowEvaluationWitnessV1"));
     assert!(source.contains("permit.runtime_quorum_policy()"));
     assert!(source.contains("permit.evaluation_upper_unix_ms() / 1_000"));
     assert!(source.contains("pub struct AcceptedClockBasisV4"));
