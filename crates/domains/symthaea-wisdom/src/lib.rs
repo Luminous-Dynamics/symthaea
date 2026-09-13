@@ -31,6 +31,7 @@
 #![deny(unsafe_code)]
 
 pub mod autopoiesis;
+pub mod evidence_ledger;
 pub mod harmonics;
 pub mod meta_cognition;
 pub mod ontology;
@@ -38,6 +39,12 @@ pub mod perspective;
 pub mod practical_wisdom;
 
 pub use autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
+pub use evidence_ledger::{
+    Claim, Conflict, DecisionDependencyLedger, DecisionId, DecisionRecord,
+    DecisionReviewReason, DeliberationEvidenceLedger, EvidenceLedgerError,
+    EvidenceObservation, EvidenceRelation, FactClaim, FactClaimId, FactConflict, FactLedger,
+    NormativeClaim, NormativeClaimId, NormativeConflict, NormativeLedger,
+};
 pub use harmonics::{
     ActiveHarmonic, HarmonicMode, HarmonicProfile, HarmonicQuestion, ReasoningBias,
 };
