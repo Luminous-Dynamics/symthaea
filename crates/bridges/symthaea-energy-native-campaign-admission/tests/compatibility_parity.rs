@@ -161,8 +161,12 @@ fn manifest() -> Tier1CampaignManifest {
     .unwrap()
 }
 
-fn prediction(dimension: EvidenceDimension, mutation: Mutation) -> Prediction {
-    let targeted = dimension == EvidenceDimension::FunctionalPerformance;
+fn prediction(
+    dimension: EvidenceDimension,
+    target_dimension: EvidenceDimension,
+    mutation: Mutation,
+) -> Prediction {
+    let targeted = dimension == target_dimension;
     let wrong_model = targeted && matches!(mutation, Mutation::WrongModel);
     let missing_lineage = targeted && matches!(mutation, Mutation::MissingLineage);
     let missing_required = targeted && matches!(mutation, Mutation::MissingRequiredEvidence);
@@ -213,6 +217,7 @@ fn compatibility_receipt_sha(dimension: EvidenceDimension) -> String {
 }
 
 fn run_compatibility(
+    target_dimension: EvidenceDimension,
     mutation: Mutation,
 ) -> Result<CampaignAdmissionReceipt, FailureClass> {
     let manifest = manifest();
@@ -239,7 +244,7 @@ fn run_compatibility(
             candidate_id: candidate.id.clone(),
             identity_assertion_id: assertion_id,
             source_receipt_sha256: receipt_sha.clone(),
-            prediction: prediction(dimension, mutation),
+            prediction: prediction(dimension, target_dimension, mutation),
         });
         attestations.push(ReceiptVersionAttestation {
             attestation_id: format!("compat-attestation-{}", code(dimension)),
@@ -266,6 +271,7 @@ fn run_compatibility(
 }
 
 fn run_native(
+    target_dimension: EvidenceDimension,
     mutation: Mutation,
 ) -> Result<NativeCampaignAdmissionReceipt, FailureClass> {
     let manifest = manifest();
@@ -278,7 +284,7 @@ fn run_native(
         let envelope = wrap_evidence_payload_json(
             &manifest,
             dimension,
-            prediction(dimension, mutation),
+            prediction(dimension, target_dimension, mutation),
             "campaign-admission-parity-fixture-v0",
             format!("{{\"dimension\":{}}}", code(dimension)),
         )
@@ -303,8 +309,9 @@ fn run_native(
 
 #[test]
 fn clean_campaign_is_accepted_by_both_admission_paths() {
-    let compatibility = run_compatibility(Mutation::Clean).unwrap();
-    let native = run_native(Mutation::Clean).unwrap();
+    let target = EvidenceDimension::FunctionalPerformance;
+    let compatibility = run_compatibility(target, Mutation::Clean).unwrap();
+    let native = run_native(target, Mutation::Clean).unwrap();
 
     assert_eq!(
         compatibility.campaign_manifest_sha256,
@@ -318,25 +325,27 @@ fn clean_campaign_is_accepted_by_both_admission_paths() {
 }
 
 #[test]
-fn compatibility_and_native_paths_fail_in_the_same_semantic_class() {
-    for mutation in [
-        Mutation::WrongModel,
-        Mutation::MissingLineage,
-        Mutation::MissingRequiredEvidence,
-        Mutation::LowFidelity,
-    ] {
-        let expected = mutation.expected_failure().unwrap();
-        let compatibility = run_compatibility(mutation);
-        let native = run_native(mutation);
-        assert_eq!(
-            compatibility,
-            Err(expected),
-            "compatibility path failed in the wrong semantic class for {mutation:?}"
-        );
-        assert_eq!(
-            native,
-            Err(expected),
-            "native path failed in the wrong semantic class for {mutation:?}"
-        );
+fn all_dimensions_fail_in_the_same_semantic_class_on_both_paths() {
+    for target_dimension in EvidenceDimension::ALL {
+        for mutation in [
+            Mutation::WrongModel,
+            Mutation::MissingLineage,
+            Mutation::MissingRequiredEvidence,
+            Mutation::LowFidelity,
+        ] {
+            let expected = mutation.expected_failure().unwrap();
+            let compatibility = run_compatibility(target_dimension, mutation);
+            let native = run_native(target_dimension, mutation);
+            assert_eq!(
+                compatibility,
+                Err(expected),
+                "compatibility path failed in the wrong semantic class for dimension={target_dimension:?}, mutation={mutation:?}"
+            );
+            assert_eq!(
+                native,
+                Err(expected),
+                "native path failed in the wrong semantic class for dimension={target_dimension:?}, mutation={mutation:?}"
+            );
+        }
     }
 }
