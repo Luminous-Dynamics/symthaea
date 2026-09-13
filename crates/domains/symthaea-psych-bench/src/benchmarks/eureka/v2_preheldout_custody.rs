@@ -142,7 +142,10 @@ impl V2PreHeldOutManifest {
 }
 
 /// Non-Clone campaign capability. It owns the sealed target artifact, narrowed
-/// selected comparator, and exact HeldOut plan. No training/refit APIs exist.
+/// selected comparator, and evaluator-private HeldOut plan. The public surface
+/// deliberately does not expose HeldOut rows/post-states; a later prospective
+/// runner must use a dedicated row-custody boundary to reveal outcomes only
+/// after both subject predictions are frozen.
 #[derive(Debug)]
 pub(super) struct V2PreHeldOutCampaignCapability {
     development: V2FepDevelopmentArtifact,
@@ -168,8 +171,8 @@ impl V2PreHeldOutCampaignCapability {
         &self.selected_comparator
     }
 
-    pub(super) fn heldout_plan(&self) -> &V2HeldOutPlan {
-        &self.heldout_plan
+    pub(super) fn heldout_row_count(&self) -> usize {
+        self.heldout_plan.ordered_rows().len()
     }
 
     pub(super) const fn manifest(&self) -> V2PreHeldOutManifest {
@@ -429,9 +432,9 @@ mod tests {
         );
         assert_eq!(
             manifest.heldout_ordered_root(),
-            capability.heldout_plan().ordered_root()
+            capability.heldout_plan.ordered_root()
         );
-        assert_eq!(capability.heldout_plan().ordered_rows().len(), 128);
+        assert_eq!(capability.heldout_row_count(), 128);
         assert_eq!(
             manifest.scorer_source_commitment(),
             consequence_scorer_source_commitment()
