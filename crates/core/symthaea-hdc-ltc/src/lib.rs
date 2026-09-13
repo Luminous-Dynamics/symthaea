@@ -27,6 +27,8 @@
 //! - [`train_current_only_episode`] is the fail-closed experiment gate for the
 //!   first learned result: historical queries are rejected before the recurrent
 //!   state or parameters can mutate.
+//! - [`run_exact_learning_ablation`] executes the fixed-seed paired current-state
+//!   learned-vs-frozen experiment without best-seed selection.
 //! - [`InvariantContextMixer`] supplies O(KD) cross-dimensional magnitude
 //!   context without violating the full bipolar role symmetry.
 //! - [`ContextualHolographicLiquidCell`] composes invariant context with the
@@ -55,6 +57,7 @@ pub mod state_tracking_codec;
 pub mod state_tracking_current_only;
 pub mod state_tracking_eval;
 pub mod state_tracking_exact_training;
+pub mod state_tracking_learning_ablation;
 pub mod state_tracking_readout;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
@@ -87,5 +90,10 @@ pub use state_tracking_eval::{
 pub use state_tracking_exact_training::{
     AssociativeEpisodeMetrics, ExactEpisodeTrainingConfig, ExactEpisodeTrainingError,
     ExactEpisodeTrainingReport, evaluate_associative_episode, train_exact_episode,
+};
+pub use state_tracking_learning_ablation::{
+    ExactLearningAblationError, ExactLearningAblationPlan, ExactLearningAblationResult,
+    HeldOutWorldComparison, PairedEffectSummary, TrainingWorldResult,
+    run_exact_learning_ablation,
 };
 pub use state_tracking_readout::{TrackingPrototypeReadout, TrackingReadoutError};
