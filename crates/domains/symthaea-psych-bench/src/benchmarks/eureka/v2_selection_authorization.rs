@@ -1,24 +1,28 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! EUREKA-002 V2 typed Calibration-only comparator-selection authorization.
+//! EUREKA-002 V2 Calibration execution and typed comparator selection.
 //!
-//! This source/test-only module freezes the evidence grammar and deterministic
-//! selection theorem before a V2 Calibration runner exists. It does not execute
-//! fitted baselines and therefore does not itself prove that the raw count
-//! receipts came from real comparator execution. A future runner must produce
-//! these receipts from the exact frozen subjects and canonical Calibration
-//! corpus before this authorization becomes runtime evidence.
+//! The externally usable selection path executes the frozen Development-only
+//! shortcut-comparator subject over the exact canonical Calibration corpus and
+//! derives raw receipts from the canonical consequence scorer. Callers cannot
+//! supply selected kinds, eligibility bits, scores, or raw count receipts.
 
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
 use super::analysis_plan::{ANALYSIS_PLAN_REVISION, EUREKA_002_ANALYSIS_PLAN_V1};
 use super::baselines::ShortcutBaselineKind;
-use super::hidden_world::PublicAction;
+use super::consequence::{
+    ConsequenceScore, ConsequenceScoringError, score_consequence,
+};
+use super::hidden_world::{PublicAction, PublicObservation, PublicValue};
 use super::v2_comparator_custody::{
     V2ComparatorCustodyError, V2ComparatorCustodyReceipt, V2CorpusPartition,
     V2DevelopmentFitCorpus, V2PublicTransitionEvidence, canonical_transition_semantics_bytes,
+};
+use super::v2_frozen_comparator::{
+    V2FrozenComparatorSubject, comparator_implementation_commitment,
 };
 use super::v2_public_schema::{
     V2_OBSERVATION_DIM, V2PublicFamily, V2PublicState, public_schema_commitment,
@@ -31,9 +35,9 @@ pub(super) const V2_CALIBRATION_CORPUS_REVISION: &str =
 pub(super) const V2_COMPARATOR_CALIBRATION_RECEIPT_REVISION: &str =
     "EUREKA.002.V2.COMPARATOR_CALIBRATION_RECEIPT.v2";
 pub(super) const V2_SELECTION_IMPLEMENTATION_REVISION: &str =
-    "EUREKA.002.V2.COMPARATOR_SELECTION_IMPLEMENTATION.v2";
+    "EUREKA.002.V2.COMPARATOR_SELECTION_IMPLEMENTATION.v3";
 pub(super) const V2_SELECTION_AUTHORIZATION_REVISION: &str =
-    "EUREKA.002.V2.COMPARATOR_SELECTION_AUTHORIZATION.v3";
+    "EUREKA.002.V2.COMPARATOR_SELECTION_AUTHORIZATION.v4";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum V2SelectionAuthorizationError {
@@ -52,6 +56,11 @@ pub(super) enum V2SelectionAuthorizationError {
     UnexpectedComparatorReceipt,
     ReceiptTrialCountMismatch,
     FitCorpusCommitmentMismatch,
+    ComparatorSubjectFitMismatch,
+    ComparatorSubjectSchemaMismatch,
+    ComparatorImplementationMismatch,
+    ComparatorPredictionActionMismatch,
+    Scoring(ConsequenceScoringError),
     Custody(V2ComparatorCustodyError),
 }
 
@@ -63,13 +72,12 @@ impl From<V2ComparatorCustodyError> for V2SelectionAuthorizationError {
 
 /// Canonical Calibration transition evidence.
 ///
-/// Row identity is derived internally from exact transition provenance and the
-/// fixed Calibration partition. The semantic key deliberately excludes
-/// partition and row identity so exact public-transition reuse can be detected
-/// across Development/Calibration despite their different canonical row IDs.
+/// The validated transition is retained privately so Calibration execution can
+/// inspect only the exact public semantics that minted the row identity. There
+/// is no separate caller-authored query/outcome representation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct V2CalibrationEvidence {
-    row_identity: [u8; 32],
+    transition: V2PublicTransitionEvidence,
     transition_semantics_bytes: Vec<u8>,
     canonical_bytes: Vec<u8>,
 }
@@ -81,15 +89,15 @@ impl V2CalibrationEvidence {
         action: PublicAction,
         post: V2PublicState,
     ) -> Result<Self, V2SelectionAuthorizationError> {
-        let validated = V2PublicTransitionEvidence::new(
+        let transition = V2PublicTransitionEvidence::new(
             family,
             V2CorpusPartition::Calibration,
             pre,
             action,
             post,
         )?;
-        let row_identity = validated.row_identity();
-        let transition_semantics_bytes = canonical_transition_semantics_bytes(&validated);
+        let row_identity = transition.row_identity();
+        let transition_semantics_bytes = canonical_transition_semantics_bytes(&transition);
 
         let mut canonical_bytes = Vec::new();
         encode_bytes(
@@ -102,20 +110,36 @@ impl V2CalibrationEvidence {
         canonical_bytes.extend_from_slice(&transition_semantics_bytes);
 
         Ok(Self {
-            row_identity,
+            transition,
             transition_semantics_bytes,
             canonical_bytes,
         })
     }
 
     pub(super) const fn row_identity(&self) -> [u8; 32] {
-        self.row_identity
+        self.transition.row_identity()
+    }
+
+    const fn family(&self) -> V2PublicFamily {
+        self.transition.family()
+    }
+
+    const fn pre(&self) -> V2PublicState {
+        self.transition.pre()
+    }
+
+    const fn action(&self) -> PublicAction {
+        self.transition.action()
+    }
+
+    const fn post(&self) -> V2PublicState {
+        self.transition.post()
     }
 }
 
 /// Canonically ordered Calibration-only corpus bound to one exact Development
 /// fit corpus. Both identity and exact public-transition semantic disjointness
-/// are checked before any selection decision is minted.
+/// are checked before any comparator is executed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct V2CalibrationCorpus {
     records: Vec<V2CalibrationEvidence>,
@@ -146,7 +170,7 @@ impl V2CalibrationCorpus {
         let mut seen_ids = BTreeSet::new();
         let mut seen_transitions = BTreeSet::new();
         for record in &records {
-            if development_ids.contains(&record.row_identity) {
+            if development_ids.contains(&record.row_identity()) {
                 return Err(
                     V2SelectionAuthorizationError::DevelopmentCalibrationIdentityOverlap,
                 );
@@ -156,14 +180,14 @@ impl V2CalibrationCorpus {
                     V2SelectionAuthorizationError::DevelopmentCalibrationTransitionOverlap,
                 );
             }
-            if !seen_ids.insert(record.row_identity) {
+            if !seen_ids.insert(record.row_identity()) {
                 return Err(V2SelectionAuthorizationError::DuplicateCalibrationRowIdentity);
             }
             if !seen_transitions.insert(record.transition_semantics_bytes.clone()) {
                 return Err(V2SelectionAuthorizationError::DuplicateCalibrationTransition);
             }
         }
-        records.sort_by_key(|record| record.row_identity);
+        records.sort_by_key(V2CalibrationEvidence::row_identity);
 
         let schema_commitment = public_schema_commitment();
         let fit_corpus_commitment = development.commitment();
@@ -218,10 +242,9 @@ pub(super) struct V2ComparatorCalibrationReceipt {
 }
 
 impl V2ComparatorCalibrationReceipt {
-    /// Private on purpose: until a real V2 Calibration runner exists, only this
-    /// module's regression corpus may synthesize raw counts. The eventual runner
-    /// should live behind this module or add a constructor that consumes scorer
-    /// output directly rather than exposing an arbitrary public receipt mint.
+    /// Private by design. Runtime callers cannot mint raw receipts. The only
+    /// externally usable selection path below constructs these counts from
+    /// frozen comparator predictions plus the canonical scorer.
     fn from_raw_counts(
         kind: ShortcutBaselineKind,
         total_trials: u32,
@@ -308,6 +331,8 @@ pub(super) struct V2ComparatorSelectionAuthorization {
     analysis_plan_commitment: [u8; 32],
     fit_corpus_commitment: [u8; 32],
     calibration_corpus_commitment: [u8; 32],
+    comparator_subject_commitment: [u8; 32],
+    comparator_implementation_commitment: [u8; 32],
     selected: ShortcutBaselineKind,
     receipts: Vec<V2ComparatorCalibrationReceipt>,
     commitment: [u8; 32],
@@ -326,6 +351,10 @@ impl V2ComparatorSelectionAuthorization {
         self.calibration_corpus_commitment
     }
 
+    pub(super) const fn comparator_subject_commitment(&self) -> [u8; 32] {
+        self.comparator_subject_commitment
+    }
+
     pub(super) const fn selected(&self) -> ShortcutBaselineKind {
         self.selected
     }
@@ -341,6 +370,8 @@ pub(super) struct V2InconclusiveSelectionReceipt {
     analysis_plan_commitment: [u8; 32],
     fit_corpus_commitment: [u8; 32],
     calibration_corpus_commitment: [u8; 32],
+    comparator_subject_commitment: [u8; 32],
+    comparator_implementation_commitment: [u8; 32],
     receipts: Vec<V2ComparatorCalibrationReceipt>,
     commitment: [u8; 32],
 }
@@ -351,17 +382,130 @@ pub(super) enum V2ComparatorSelectionOutcome {
     Inconclusive(V2InconclusiveSelectionReceipt),
 }
 
-/// Deterministically reconstruct the preregistered comparator choice from a
-/// complete set of raw-count receipts. No selected kind or eligibility bit is
-/// accepted from the caller.
-pub(super) fn authorize_selection(
+/// The only externally usable Calibration-selection path.
+///
+/// Every preregistered comparator is executed over every canonical Calibration
+/// row. Raw receipt counts are produced internally from the canonical scorer.
+pub(super) fn execute_calibration_selection(
     development: &V2DevelopmentFitCorpus,
     calibration: &V2CalibrationCorpus,
-    mut receipts: Vec<V2ComparatorCalibrationReceipt>,
+    subject: &V2FrozenComparatorSubject,
 ) -> Result<V2ComparatorSelectionOutcome, V2SelectionAuthorizationError> {
+    validate_subject_lineage(development, calibration, subject)?;
+
+    let mut receipts = Vec::with_capacity(EUREKA_002_ANALYSIS_PLAN_V1.eligible_comparators.len());
+    for kind in EUREKA_002_ANALYSIS_PLAN_V1.eligible_comparators {
+        receipts.push(execute_one_comparator(*kind, calibration, subject)?);
+    }
+    authorize_selection(development, calibration, subject, receipts)
+}
+
+fn execute_one_comparator(
+    kind: ShortcutBaselineKind,
+    calibration: &V2CalibrationCorpus,
+    subject: &V2FrozenComparatorSubject,
+) -> Result<V2ComparatorCalibrationReceipt, V2SelectionAuthorizationError> {
+    let mut scored_trials = 0_u32;
+    let mut abstained_trials = 0_u32;
+    let mut out_of_domain_trials = 0_u32;
+    let mut change_bearing_scored_trials = 0_u32;
+    let mut true_positive_changes = 0_u64;
+    let mut false_positive_changes = 0_u64;
+    let mut missed_changes = 0_u64;
+
+    for row in &calibration.records {
+        let prediction = subject.predict(kind, row.family(), row.pre(), row.action());
+        if prediction.action != row.action() {
+            return Err(V2SelectionAuthorizationError::ComparatorPredictionActionMismatch);
+        }
+        let pre = observation(row.pre());
+        let post = observation(row.post());
+        match score_consequence(&pre, &prediction, &post)
+            .map_err(V2SelectionAuthorizationError::Scoring)?
+        {
+            ConsequenceScore::Scored(metrics) => {
+                scored_trials = scored_trials.saturating_add(1);
+                if metrics.actual_changed > 0 {
+                    change_bearing_scored_trials =
+                        change_bearing_scored_trials.saturating_add(1);
+                }
+                true_positive_changes = true_positive_changes.saturating_add(
+                    u64::try_from(metrics.true_positive_changes)
+                        .expect("V2 field count fits u64"),
+                );
+                false_positive_changes = false_positive_changes.saturating_add(
+                    u64::try_from(metrics.false_positive_changes)
+                        .expect("V2 field count fits u64"),
+                );
+                missed_changes = missed_changes.saturating_add(
+                    u64::try_from(metrics.missed_changes).expect("V2 field count fits u64"),
+                );
+            }
+            ConsequenceScore::AbstainedInsufficientEvidence => {
+                abstained_trials = abstained_trials.saturating_add(1);
+            }
+            ConsequenceScore::OutOfQualifiedDomain => {
+                out_of_domain_trials = out_of_domain_trials.saturating_add(1);
+            }
+        }
+    }
+
+    V2ComparatorCalibrationReceipt::from_raw_counts(
+        kind,
+        u32::try_from(calibration.len()).expect("V2 Calibration corpus fits u32"),
+        scored_trials,
+        abstained_trials,
+        out_of_domain_trials,
+        change_bearing_scored_trials,
+        true_positive_changes,
+        false_positive_changes,
+        missed_changes,
+    )
+}
+
+fn validate_subject_lineage(
+    development: &V2DevelopmentFitCorpus,
+    calibration: &V2CalibrationCorpus,
+    subject: &V2FrozenComparatorSubject,
+) -> Result<(), V2SelectionAuthorizationError> {
     if development.commitment() != calibration.fit_corpus_commitment {
         return Err(V2SelectionAuthorizationError::FitCorpusCommitmentMismatch);
     }
+    if subject.fit_corpus_commitment() != development.commitment() {
+        return Err(V2SelectionAuthorizationError::ComparatorSubjectFitMismatch);
+    }
+    if subject.schema_commitment() != development.schema_commitment()
+        || subject.schema_commitment() != calibration.schema_commitment()
+    {
+        return Err(V2SelectionAuthorizationError::ComparatorSubjectSchemaMismatch);
+    }
+    if subject.implementation_commitment() != comparator_implementation_commitment() {
+        return Err(V2SelectionAuthorizationError::ComparatorImplementationMismatch);
+    }
+    Ok(())
+}
+
+fn observation(state: V2PublicState) -> PublicObservation {
+    PublicObservation {
+        step: 0,
+        fields: state
+            .fields()
+            .into_iter()
+            .map(PublicValue::Count)
+            .collect(),
+    }
+}
+
+/// Internal deterministic reconstruction from a complete receipt set. This is
+/// intentionally private: runtime callers cannot bypass comparator execution by
+/// handing in caller-authored raw counts.
+fn authorize_selection(
+    development: &V2DevelopmentFitCorpus,
+    calibration: &V2CalibrationCorpus,
+    subject: &V2FrozenComparatorSubject,
+    mut receipts: Vec<V2ComparatorCalibrationReceipt>,
+) -> Result<V2ComparatorSelectionOutcome, V2SelectionAuthorizationError> {
+    validate_subject_lineage(development, calibration, subject)?;
 
     receipts.sort_by(|left, right| left.kind.stable_id().cmp(right.kind.stable_id()));
     validate_complete_receipt_set(&receipts, calibration.len())?;
@@ -384,6 +528,8 @@ pub(super) fn authorize_selection(
     let analysis_plan_commitment = EUREKA_002_ANALYSIS_PLAN_V1.cryptographic_commitment();
     let fit_corpus_commitment = development.commitment();
     let calibration_corpus_commitment = calibration.commitment;
+    let comparator_subject_commitment = subject.commitment();
+    let comparator_implementation_commitment = subject.implementation_commitment();
 
     match selected {
         Some(selected) => {
@@ -394,6 +540,8 @@ pub(super) fn authorize_selection(
                 analysis_plan_commitment,
                 fit_corpus_commitment,
                 calibration_corpus_commitment,
+                comparator_subject_commitment,
+                comparator_implementation_commitment,
                 Some(selected),
                 &receipts,
             );
@@ -404,6 +552,8 @@ pub(super) fn authorize_selection(
                     analysis_plan_commitment,
                     fit_corpus_commitment,
                     calibration_corpus_commitment,
+                    comparator_subject_commitment,
+                    comparator_implementation_commitment,
                     selected,
                     receipts,
                     commitment,
@@ -418,6 +568,8 @@ pub(super) fn authorize_selection(
                 analysis_plan_commitment,
                 fit_corpus_commitment,
                 calibration_corpus_commitment,
+                comparator_subject_commitment,
+                comparator_implementation_commitment,
                 None,
                 &receipts,
             );
@@ -427,6 +579,8 @@ pub(super) fn authorize_selection(
                     analysis_plan_commitment,
                     fit_corpus_commitment,
                     calibration_corpus_commitment,
+                    comparator_subject_commitment,
+                    comparator_implementation_commitment,
                     receipts,
                     commitment,
                 },
@@ -531,6 +685,8 @@ fn selection_commitment(
     analysis_plan_commitment: [u8; 32],
     fit_corpus_commitment: [u8; 32],
     calibration_corpus_commitment: [u8; 32],
+    comparator_subject_commitment: [u8; 32],
+    comparator_implementation_commitment: [u8; 32],
     selected: Option<ShortcutBaselineKind>,
     receipts: &[V2ComparatorCalibrationReceipt],
 ) -> [u8; 32] {
@@ -543,6 +699,8 @@ fn selection_commitment(
     bytes.extend_from_slice(&schema_commitment);
     bytes.extend_from_slice(&fit_corpus_commitment);
     bytes.extend_from_slice(&calibration_corpus_commitment);
+    bytes.extend_from_slice(&comparator_subject_commitment);
+    bytes.extend_from_slice(&comparator_implementation_commitment);
     bytes.push(status_tag);
     match selected {
         Some(kind) => {
@@ -620,6 +778,51 @@ mod tests {
         .unwrap()
     }
 
+    fn execution_development() -> V2DevelopmentFitCorpus {
+        V2DevelopmentFitCorpus::freeze(vec![
+            V2PublicTransitionEvidence::new(
+                V2PublicFamily::PublicFlowV2,
+                V2CorpusPartition::Development,
+                V2PublicState::new([1, 2, 3, 0]).unwrap(),
+                PublicAction::Pulse { slot: 0 },
+                V2PublicState::new([0, 3, 3, 0]).unwrap(),
+            )
+            .unwrap(),
+            V2PublicTransitionEvidence::new(
+                V2PublicFamily::PublicFlowV2,
+                V2CorpusPartition::Development,
+                V2PublicState::new([5, 2, 3, 0]).unwrap(),
+                PublicAction::Pulse { slot: 0 },
+                V2PublicState::new([4, 3, 3, 0]).unwrap(),
+            )
+            .unwrap(),
+        ])
+        .unwrap()
+    }
+
+    fn execution_calibration(development: &V2DevelopmentFitCorpus) -> V2CalibrationCorpus {
+        V2CalibrationCorpus::freeze(
+            development,
+            vec![
+                V2CalibrationEvidence::new(
+                    V2PublicFamily::PublicFlowV2,
+                    V2PublicState::new([8, 2, 3, 0]).unwrap(),
+                    PublicAction::Pulse { slot: 0 },
+                    V2PublicState::new([7, 3, 3, 0]).unwrap(),
+                )
+                .unwrap(),
+                V2CalibrationEvidence::new(
+                    V2PublicFamily::PublicFlowV2,
+                    V2PublicState::new([9, 2, 3, 0]).unwrap(),
+                    PublicAction::Pulse { slot: 0 },
+                    V2PublicState::new([8, 3, 3, 0]).unwrap(),
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap()
+    }
+
     fn receipt(
         kind: ShortcutBaselineKind,
         tp: u64,
@@ -647,9 +850,9 @@ mod tests {
         let development_same_semantics = V2PublicTransitionEvidence::new(
             V2PublicFamily::PublicFlowV2,
             V2CorpusPartition::Development,
-            V2PublicState::new([8, 3, 2, 0]).unwrap(),
-            PublicAction::Pulse { slot: 1 },
-            V2PublicState::new([8, 2, 3, 0]).unwrap(),
+            calibration.pre(),
+            calibration.action(),
+            calibration.post(),
         )
         .unwrap();
         assert_ne!(calibration.row_identity(), [0_u8; 32]);
@@ -675,24 +878,6 @@ mod tests {
     }
 
     #[test]
-    fn defensive_development_calibration_identity_overlap_fails_closed() {
-        let development = development();
-        let mut overlap = calibration_record(3);
-        overlap.row_identity = development.records()[0].row_identity();
-        let mut canonical = Vec::new();
-        encode_bytes(&mut canonical, V2_CALIBRATION_EVIDENCE_REVISION.as_bytes());
-        canonical.extend_from_slice(&public_schema_commitment());
-        canonical.push(V2CorpusPartition::Calibration.tag());
-        canonical.extend_from_slice(&overlap.row_identity);
-        canonical.extend_from_slice(&overlap.transition_semantics_bytes);
-        overlap.canonical_bytes = canonical;
-        assert_eq!(
-            V2CalibrationCorpus::freeze(&development, vec![overlap]),
-            Err(V2SelectionAuthorizationError::DevelopmentCalibrationIdentityOverlap)
-        );
-    }
-
-    #[test]
     fn development_calibration_semantic_overlap_with_partition_distinct_ids_fails_closed() {
         let development = development();
         let overlap = V2CalibrationEvidence::new(
@@ -706,25 +891,6 @@ mod tests {
         assert_eq!(
             V2CalibrationCorpus::freeze(&development, vec![overlap]),
             Err(V2SelectionAuthorizationError::DevelopmentCalibrationTransitionOverlap)
-        );
-    }
-
-    #[test]
-    fn duplicate_calibration_transition_still_fails_if_internal_identity_is_corrupted() {
-        let development = development();
-        let a = calibration_record(0);
-        let mut b = a.clone();
-        b.row_identity = [0xA5_u8; 32];
-        let mut canonical = Vec::new();
-        encode_bytes(&mut canonical, V2_CALIBRATION_EVIDENCE_REVISION.as_bytes());
-        canonical.extend_from_slice(&public_schema_commitment());
-        canonical.push(V2CorpusPartition::Calibration.tag());
-        canonical.extend_from_slice(&b.row_identity);
-        canonical.extend_from_slice(&b.transition_semantics_bytes);
-        b.canonical_bytes = canonical;
-        assert_eq!(
-            V2CalibrationCorpus::freeze(&development, vec![a, b]),
-            Err(V2SelectionAuthorizationError::DuplicateCalibrationTransition)
         );
     }
 
@@ -746,45 +912,106 @@ mod tests {
         assert_eq!(eligible.micro_f1_numerator, 24);
         assert_eq!(eligible.micro_f1_denominator, 28);
         assert!(eligible.eligible());
+    }
 
+    #[test]
+    fn executed_calibration_derives_complete_receipts_and_selection() {
+        let development = execution_development();
+        let calibration = execution_calibration(&development);
+        let subject = V2FrozenComparatorSubject::freeze(&development);
+        let outcome = execute_calibration_selection(&development, &calibration, &subject).unwrap();
+        let V2ComparatorSelectionOutcome::Selected(authorization) = outcome else {
+            panic!("fixture must produce an eligible primary comparator");
+        };
+        assert_eq!(authorization.selected(), ShortcutBaselineKind::ActionMarginalDelta);
+        assert_eq!(authorization.receipts.len(), EUREKA_002_ANALYSIS_PLAN_V1.eligible_comparators.len());
         assert_eq!(
-            V2ComparatorCalibrationReceipt::from_raw_counts(
-                ShortcutBaselineKind::NearestTransition,
-                10,
-                9,
-                0,
-                0,
-                8,
-                1,
-                1,
-                1,
-            ),
-            Err(V2SelectionAuthorizationError::StatusCountMismatch)
+            authorization.comparator_subject_commitment(),
+            subject.commitment()
         );
+        let exact = authorization
+            .receipts
+            .iter()
+            .find(|receipt| receipt.kind == ShortcutBaselineKind::ExactLookup)
+            .unwrap();
+        assert_eq!(exact.scored_trials, 0);
+        assert_eq!(exact.abstained_trials, 2);
+        assert_eq!(exact.out_of_domain_trials, 0);
+    }
+
+    #[test]
+    fn calibration_execution_is_order_invariant_after_canonical_freeze() {
+        let development = execution_development();
+        let subject = V2FrozenComparatorSubject::freeze(&development);
+        let a = execution_calibration(&development);
+        let b = V2CalibrationCorpus::freeze(
+            &development,
+            vec![
+                V2CalibrationEvidence::new(
+                    V2PublicFamily::PublicFlowV2,
+                    V2PublicState::new([9, 2, 3, 0]).unwrap(),
+                    PublicAction::Pulse { slot: 0 },
+                    V2PublicState::new([8, 3, 3, 0]).unwrap(),
+                )
+                .unwrap(),
+                V2CalibrationEvidence::new(
+                    V2PublicFamily::PublicFlowV2,
+                    V2PublicState::new([8, 2, 3, 0]).unwrap(),
+                    PublicAction::Pulse { slot: 0 },
+                    V2PublicState::new([7, 3, 3, 0]).unwrap(),
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap();
+        let first = execute_calibration_selection(&development, &a, &subject).unwrap();
+        let second = execute_calibration_selection(&development, &b, &subject).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn stale_fit_subject_cannot_execute_calibration() {
+        let development = execution_development();
+        let calibration = execution_calibration(&development);
+        let other_development = V2DevelopmentFitCorpus::freeze(vec![
+            V2PublicTransitionEvidence::new(
+                V2PublicFamily::PublicFlowV2,
+                V2CorpusPartition::Development,
+                V2PublicState::new([2, 2, 3, 0]).unwrap(),
+                PublicAction::Pulse { slot: 0 },
+                V2PublicState::new([1, 3, 3, 0]).unwrap(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let stale = V2FrozenComparatorSubject::freeze(&other_development);
         assert_eq!(
-            V2ComparatorCalibrationReceipt::from_raw_counts(
-                ShortcutBaselineKind::NearestTransition,
-                2,
-                2,
-                0,
-                0,
-                0,
-                1,
-                0,
-                0,
-            ),
-            Err(V2SelectionAuthorizationError::ChangeBearingCountsInconsistent)
+            execute_calibration_selection(&development, &calibration, &stale),
+            Err(V2SelectionAuthorizationError::ComparatorSubjectFitMismatch)
         );
     }
 
     #[test]
-    fn exact_fraction_selection_is_order_invariant() {
+    fn exact_fraction_selection_is_order_invariant_for_internal_receipts() {
         let development = development();
         let calibration = calibration(&development);
-        let forward = authorize_selection(&development, &calibration, complete_receipts()).unwrap();
+        let subject = V2FrozenComparatorSubject::freeze(&development);
+        let forward = authorize_selection(
+            &development,
+            &calibration,
+            &subject,
+            complete_receipts(),
+        )
+        .unwrap();
         let mut reverse_receipts = complete_receipts();
         reverse_receipts.reverse();
-        let reverse = authorize_selection(&development, &calibration, reverse_receipts).unwrap();
+        let reverse = authorize_selection(
+            &development,
+            &calibration,
+            &subject,
+            reverse_receipts,
+        )
+        .unwrap();
         let (
             V2ComparatorSelectionOutcome::Selected(forward),
             V2ComparatorSelectionOutcome::Selected(reverse),
@@ -794,20 +1021,20 @@ mod tests {
         };
         assert_eq!(forward.selected(), ShortcutBaselineKind::NearestTransition);
         assert_eq!(forward.commitment(), reverse.commitment());
-        assert_eq!(forward.calibration_corpus_commitment(), calibration.commitment());
     }
 
     #[test]
     fn exact_f1_tie_uses_stable_id_not_input_order() {
         let development = development();
         let calibration = calibration(&development);
+        let subject = V2FrozenComparatorSubject::freeze(&development);
         let tied = vec![
             receipt(ShortcutBaselineKind::SimpleMarkov, 1, 1, 1),
             receipt(ShortcutBaselineKind::NearestTransition, 1, 1, 1),
             receipt(ShortcutBaselineKind::ExactLookup, 1, 1, 1),
             receipt(ShortcutBaselineKind::ActionMarginalDelta, 1, 1, 1),
         ];
-        let outcome = authorize_selection(&development, &calibration, tied).unwrap();
+        let outcome = authorize_selection(&development, &calibration, &subject, tied).unwrap();
         let V2ComparatorSelectionOutcome::Selected(authorization) = outcome else {
             panic!("all four tied receipts are eligible");
         };
@@ -818,46 +1045,30 @@ mod tests {
     }
 
     #[test]
-    fn incomplete_or_duplicate_receipt_set_fails_closed() {
+    fn incomplete_or_duplicate_internal_receipt_set_fails_closed() {
         let development = development();
         let calibration = calibration(&development);
+        let subject = V2FrozenComparatorSubject::freeze(&development);
         let mut missing = complete_receipts();
         missing.pop();
         assert_eq!(
-            authorize_selection(&development, &calibration, missing),
+            authorize_selection(&development, &calibration, &subject, missing),
             Err(V2SelectionAuthorizationError::MissingComparatorReceipt)
         );
 
         let mut duplicate = complete_receipts();
         duplicate[3] = duplicate[0];
         assert_eq!(
-            authorize_selection(&development, &calibration, duplicate),
+            authorize_selection(&development, &calibration, &subject, duplicate),
             Err(V2SelectionAuthorizationError::DuplicateComparatorReceipt)
         );
     }
 
     #[test]
-    fn changing_raw_counts_changes_selection_authorization_commitment() {
+    fn no_eligible_internal_receipts_are_inconclusive_not_authorized() {
         let development = development();
         let calibration = calibration(&development);
-        let first = authorize_selection(&development, &calibration, complete_receipts()).unwrap();
-        let mut changed = complete_receipts();
-        changed[0] = receipt(ShortcutBaselineKind::ActionMarginalDelta, 3, 2, 1);
-        let second = authorize_selection(&development, &calibration, changed).unwrap();
-        let (
-            V2ComparatorSelectionOutcome::Selected(first),
-            V2ComparatorSelectionOutcome::Selected(second),
-        ) = (first, second)
-        else {
-            panic!("fixtures must remain selected");
-        };
-        assert_ne!(first.commitment(), second.commitment());
-    }
-
-    #[test]
-    fn no_eligible_comparator_is_inconclusive_not_authorized() {
-        let development = development();
-        let calibration = calibration(&development);
+        let subject = V2FrozenComparatorSubject::freeze(&development);
         let receipts = EUREKA_002_ANALYSIS_PLAN_V1
             .eligible_comparators
             .iter()
@@ -869,15 +1080,16 @@ mod tests {
                 .unwrap()
             })
             .collect();
-        let outcome = authorize_selection(&development, &calibration, receipts).unwrap();
+        let outcome = authorize_selection(&development, &calibration, &subject, receipts).unwrap();
         assert!(matches!(outcome, V2ComparatorSelectionOutcome::Inconclusive(_)));
     }
 
     #[test]
-    fn typed_selected_authorization_can_mint_custody_for_exact_fit_only() {
-        let development = development();
-        let calibration = calibration(&development);
-        let outcome = authorize_selection(&development, &calibration, complete_receipts()).unwrap();
+    fn typed_executed_authorization_can_mint_custody_for_exact_fit_only() {
+        let development = execution_development();
+        let calibration = execution_calibration(&development);
+        let subject = V2FrozenComparatorSubject::freeze(&development);
+        let outcome = execute_calibration_selection(&development, &calibration, &subject).unwrap();
         let V2ComparatorSelectionOutcome::Selected(authorization) = outcome else {
             panic!("fixture must select comparator");
         };
