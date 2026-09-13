@@ -16,6 +16,9 @@
 //!   temporal update commutes with `UnitaryRole` binding.
 //! - [`HlsParameters`] exposes the complete theorem-compatible trainable surface
 //!   as one validated atomic snapshot.
+//! - [`HlsEligibilityTrace`] and [`step_with_eligibility`] expose exact online
+//!   forward sensitivities for the diagonal recurrence when the global norm
+//!   limiter does not activate.
 //! - [`InvariantContextMixer`] supplies O(KD) cross-dimensional magnitude
 //!   context without violating the full bipolar role symmetry.
 //! - [`ContextualHolographicLiquidCell`] composes invariant context with the
@@ -33,6 +36,7 @@
 pub mod config;
 pub mod contextual_holographic_liquid;
 pub mod continuous_hv;
+pub mod hls_online_trace;
 pub mod holographic_liquid;
 pub mod invariant_context;
 pub mod network;
@@ -45,6 +49,7 @@ pub mod state_tracking_readout;
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use contextual_holographic_liquid::{ContextualHlsError, ContextualHolographicLiquidCell};
 pub use continuous_hv::{ContinuousHV, HDC_DIMENSION, UnitaryRole};
+pub use hls_online_trace::{HlsEligibilityTrace, HlsTraceError, step_with_eligibility};
 pub use holographic_liquid::{
     HlsActivation, HlsConfig, HlsError, HlsParameters, HolographicLiquidCell,
 };
