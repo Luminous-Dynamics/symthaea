@@ -15,7 +15,7 @@ permissions: {}
 jobs:
   qualify:
     name: Execute candidate without signing authority
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -209,7 +209,7 @@ jobs:
     name: Independently verify and attest evidence
     needs: qualify
     if: always() && needs.qualify.outputs.has_evidence == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -301,14 +301,23 @@ jobs:
             echo "version_output_sha256=$version_output_sha256"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Verify archive transport, headers, and exact contents
+      - name: Verify bounded archive transport, headers, and exact contents
         shell: bash
         env:
           PACKAGE_DIR: ${{ runner.temp }}/gwt1-direct-intermediate
+          MAX_ARCHIVE_BYTES: "67108864"
+          MAX_MEMBER_BYTES: "67108864"
+          MAX_TOTAL_UNPACKED_BYTES: "134217728"
         run: |
           set -euo pipefail
           test -x /usr/bin/python3
           test -x /usr/bin/sha256sum
+          test -x /usr/bin/stat
+
+          archive="$PACKAGE_DIR/gwt1-evidence.tar.gz"
+          archive_bytes="$(/usr/bin/stat -c '%s' "$archive")"
+          [[ "$archive_bytes" =~ ^[0-9]+$ ]]
+          (( archive_bytes > 0 && archive_bytes <= MAX_ARCHIVE_BYTES ))
 
           (
             cd "$PACKAGE_DIR"
@@ -318,7 +327,11 @@ jobs:
           rm -rf "$PACKAGE_DIR/extracted"
           mkdir -p "$PACKAGE_DIR/extracted"
 
-          /usr/bin/python3 - "$PACKAGE_DIR/gwt1-evidence.tar.gz" "$PACKAGE_DIR/extracted" <<'PY'
+          /usr/bin/python3 - \
+            "$archive" \
+            "$PACKAGE_DIR/extracted" \
+            "$MAX_MEMBER_BYTES" \
+            "$MAX_TOTAL_UNPACKED_BYTES" <<'PY'
           import pathlib
           import shutil
           import sys
@@ -326,6 +339,8 @@ jobs:
 
           archive = pathlib.Path(sys.argv[1])
           output_root = pathlib.Path(sys.argv[2]).resolve()
+          max_member_bytes = int(sys.argv[3])
+          max_total_unpacked_bytes = int(sys.argv[4])
           expected = {
               "gwt1-evidence",
               "gwt1-evidence/SHA256SUMS",
@@ -338,7 +353,7 @@ jobs:
 
           with tarfile.open(archive, mode="r:gz") as tf:
               members = tf.getmembers()
-              names = [member.name.rstrip("/") for member in members]
+              names = [member.name for member in members]
               if len(names) != len(set(names)):
                   raise SystemExit("duplicate archive member path")
               if set(names) != expected:
@@ -346,26 +361,41 @@ jobs:
                   extra = sorted(set(names) - expected)
                   raise SystemExit(f"archive member mismatch: missing={missing} extra={extra}")
 
-              for member, normalized in zip(members, names):
-                  if not normalized or "\\" in normalized:
-                      raise SystemExit(f"invalid archive path: {member.name!r}")
-                  path = pathlib.PurePosixPath(normalized)
-                  if path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
-                      raise SystemExit(f"unsafe archive path: {member.name!r}")
-                  if normalized == "gwt1-evidence":
-                      if not member.isdir():
-                          raise SystemExit("archive root is not a directory")
-                      continue
-                  if not member.isfile():
-                      raise SystemExit(f"non-regular evidence member: {member.name!r}")
-                  if member.issym() or member.islnk() or member.isdev() or member.isfifo():
-                      raise SystemExit(f"forbidden evidence member type: {member.name!r}")
+              total_unpacked = 0
+              for member in members:
+                  name = member.name
+                  if not name or name.startswith("/") or "\\" in name or "//" in name:
+                      raise SystemExit(f"unsafe archive path: {name!r}")
+                  parts = name.split("/")
+                  if any(part in ("", ".", "..") for part in parts):
+                      raise SystemExit(f"unsafe archive path component: {name!r}")
+                  if member.uid != 0 or member.gid != 0 or int(member.mtime) != 0:
+                      raise SystemExit(f"non-canonical archive metadata: {name!r}")
 
+                  if name == "gwt1-evidence":
+                      if not member.isdir() or (member.mode & 0o777) != 0o755:
+                          raise SystemExit("archive root metadata is not canonical")
+                      continue
+
+                  if not member.isfile():
+                      raise SystemExit(f"non-regular evidence member: {name!r}")
+                  if member.issym() or member.islnk() or member.isdev() or member.isfifo():
+                      raise SystemExit(f"forbidden evidence member type: {name!r}")
+                  if (member.mode & 0o777) != 0o644:
+                      raise SystemExit(f"non-canonical evidence mode: {name!r}")
+                  if member.size <= 0 or member.size > max_member_bytes:
+                      raise SystemExit(f"evidence member outside size bound: {name!r} size={member.size}")
+
+                  total_unpacked += member.size
+                  if total_unpacked > max_total_unpacked_bytes:
+                      raise SystemExit("archive exceeds total unpacked-size bound")
+
+                  path = pathlib.PurePosixPath(name)
                   destination = output_root.joinpath(*path.parts)
                   destination.parent.mkdir(parents=True, exist_ok=True)
                   source = tf.extractfile(member)
                   if source is None:
-                      raise SystemExit(f"could not read evidence member: {member.name!r}")
+                      raise SystemExit(f"could not read evidence member: {name!r}")
                   with source, destination.open("wb") as target:
                       shutil.copyfileobj(source, target)
           PY
@@ -470,6 +500,9 @@ jobs:
           TRUSTED_GH_ARCHIVE_SHA256: "e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be"
           TRUSTED_GH_BINARY_SHA256: ${{ steps.trusted_gh.outputs.gh_binary_sha256 }}
           TRUSTED_GH_VERSION_OUTPUT_SHA256: ${{ steps.trusted_gh.outputs.version_output_sha256 }}
+          MAX_ARCHIVE_BYTES: "67108864"
+          MAX_MEMBER_BYTES: "67108864"
+          MAX_TOTAL_UNPACKED_BYTES: "134217728"
         run: |
           set -euo pipefail
           archive_sha256="$(/usr/bin/sha256sum "$PACKAGE_DIR/gwt1-evidence.tar.gz" | /usr/bin/awk '{print $1}')"
@@ -484,6 +517,9 @@ jobs:
             --arg executable_sha256 "$TRUSTED_GH_BINARY_SHA256" \
             --arg version_output_sha256 "$TRUSTED_GH_VERSION_OUTPUT_SHA256" \
             --arg evidence_archive_sha256 "$archive_sha256" \
+            --argjson max_archive_bytes "$MAX_ARCHIVE_BYTES" \
+            --argjson max_member_bytes "$MAX_MEMBER_BYTES" \
+            --argjson max_total_unpacked_bytes "$MAX_TOTAL_UNPACKED_BYTES" \
             '{
               schema: $schema,
               repository: $repository,
@@ -495,7 +531,11 @@ jobs:
               executable_sha256: $executable_sha256,
               version_output_sha256: $version_output_sha256,
               configuration_policy: "isolated-gh-config-v1",
+              archive_validation_policy: "exact-bounded-regular-members-v1",
               deny_self_hosted_runners: true,
+              max_archive_bytes: $max_archive_bytes,
+              max_member_bytes: $max_member_bytes,
+              max_total_unpacked_bytes: $max_total_unpacked_bytes,
               evidence_archive_sha256: $evidence_archive_sha256
             }' > "$PACKAGE_DIR/direct_verifier_profile.json"
           /usr/bin/sha256sum "$PACKAGE_DIR/direct_verifier_profile.json" \
