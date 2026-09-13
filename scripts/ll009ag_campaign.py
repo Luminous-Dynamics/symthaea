@@ -2,16 +2,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 from ll009ag_common import *
+from ll009ag_git_subject import capture_git_subject,repo_relative
 REQS={'required','optional_diagnostic','not_yet_available'}
 IDS={'sha256','receipt_sha256'}
 
+def _subject(pp:Path,repo:Path,head:str,p:dict[str,Any])->dict[str,Any]:
+ policy_rel=repo_relative(repo,pp,'campaign policy')
+ return capture_git_subject(repo,head,[policy_rel,*p['protected_files']])
+
 def prepare(pp:Path,repo:Path,head:str,rt:Path,em:dict[str,str])->dict[str,Any]:
- p=vp(lj(pp));head=sha(head,'repo head')
- return receipt({'schema_version':PRE,'state':'PREPARED','study_id':p['study_id'],'repo_head':head,'policy':{'sha256':hf(pp),'byte_count':pp.stat().st_size},'protected_files':pbind(p,repo),'environment_capsules':envbind(p,rt,em),'stage_plan_sha256':hb(cb(p['stage_plan'])),'network_authorized_stage_ids':list(p['network_authorized_stage_ids']),'drift_rule':'drift_before_evidence_requires_reprepare;post_freeze_drift_refuses_mixed_lineage'})
+ p=vp(lj(pp));subject=_subject(pp,repo,head,p)
+ return receipt({'schema_version':PRE,'state':'PREPARED','study_id':p['study_id'],'repo_head':subject['head_commit_oid'],'repo_subject':subject,'policy':{'sha256':hf(pp),'byte_count':pp.stat().st_size},'protected_files':pbind(p,repo),'environment_capsules':envbind(p,rt,em),'stage_plan_sha256':hb(cb(p['stage_plan'])),'network_authorized_stage_ids':list(p['network_authorized_stage_ids']),'drift_rule':'drift_before_evidence_requires_reprepare;post_freeze_drift_refuses_mixed_lineage'})
 
 def verify_pre(pre:dict[str,Any],pp:Path,repo:Path,head:str,rt:Path)->dict[str,Any]:
- vr(pre,PRE);p=vp(lj(pp))
- if pre.get('state')!='PREPARED' or pre.get('study_id')!=p['study_id'] or pre.get('repo_head')!=sha(head,'repo head'):raise CE('PREPARED identity/head mismatch')
+ vr(pre,PRE);p=vp(lj(pp));subject=_subject(pp,repo,head,p)
+ if pre.get('state')!='PREPARED' or pre.get('study_id')!=p['study_id'] or pre.get('repo_head')!=subject['head_commit_oid'] or pre.get('repo_subject')!=subject:raise CE('PREPARED identity/Git subject mismatch')
  if pre.get('policy')!={'sha256':hf(pp),'byte_count':pp.stat().st_size}:raise CE('policy drift since PREPARED')
  now={x['path']:x for x in pbind(p,repo)};old={x.get('path'):x for x in pre.get('protected_files',[]) if isinstance(x,dict)}
  if now!=old:raise CE('protected file drift since PREPARED')
