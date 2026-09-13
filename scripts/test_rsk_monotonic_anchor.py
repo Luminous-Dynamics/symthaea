@@ -6,12 +6,14 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 import json
 import unittest
 from pathlib import Path
 
 import rsk_monotonic_anchor as anchor
 import rsk_schema_registry as registry
+import rsk_semantic_schema as semantic
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +25,15 @@ ANCHOR_GOLDEN = (
     ROOT
     / "docs/architecture/replicator-safety/golden/RSK_MONOTONIC_ANCHOR_GOLDEN_V0_1.json"
 )
+XENIA_GOLDEN = (
+    ROOT
+    / "docs/architecture/replicator-safety/golden/RSK_XENIA_STATE_WITNESS_GOLDEN_V0_1.json"
+)
+
+XENIA_TARGET_DOMAIN = b"symthaea.rsk.xenia-target.v1\0"
+XENIA_EPOCH_DOMAIN = b"symthaea.rsk.xenia-epoch.v1\0"
+XENIA_COMMITMENT_DOMAIN = b"xenia:state-commitment:v1"
+XENIA_COMMITMENT_SCHEMA = b"xenia-state-commitment-v1"
 
 
 def registry_golden() -> dict:
@@ -31,6 +42,30 @@ def registry_golden() -> dict:
 
 def anchor_golden() -> dict:
     return json.loads(ANCHOR_GOLDEN.read_text())
+
+
+def xenia_golden() -> dict:
+    return json.loads(XENIA_GOLDEN.read_text())
+
+
+def _push_bytes(buffer: bytearray, value: bytes) -> None:
+    buffer.extend(len(value).to_bytes(8, "big"))
+    buffer.extend(value)
+
+
+def xenia_commitment_message(namespace: str, vector: dict) -> bytes:
+    message = bytearray()
+    _push_bytes(message, XENIA_COMMITMENT_DOMAIN)
+    _push_bytes(message, XENIA_COMMITMENT_SCHEMA)
+    _push_bytes(message, namespace.encode("utf-8"))
+    _push_bytes(message, bytes.fromhex(vector["target_id_hex"]))
+    _push_bytes(message, bytes.fromhex(vector["epoch_id_hex"]))
+    message.extend(vector["counter"].to_bytes(8, "big"))
+    _push_bytes(message, bytes.fromhex(vector["previous_commitment_hex"]))
+    _push_bytes(message, bytes.fromhex(vector["state_digest_hex"]))
+    _push_bytes(message, bytes.fromhex(vector["trust_context_digest_hex"]))
+    message.extend(vector["timestamp_unix_secs"].to_bytes(8, "big"))
+    return bytes(message)
 
 
 def accepted_registry_state() -> registry.AntiRollbackState:
@@ -229,6 +264,54 @@ class MonotonicAnchorTests(unittest.TestCase):
             state, anchor_first, policy(data), trusted(data)
         )
         self.assertEqual(external_first.status, "frozen")
+
+    def test_xenia_target_and_epoch_derivation_are_frozen(self) -> None:
+        data = xenia_golden()
+        target = data["target_derivation"]
+        canonical = semantic.canonical_bytes(
+            {
+                "deployment_identity": target["deployment_identity"],
+                "registry_id": target["registry_id"],
+            }
+        )
+        self.assertEqual(canonical.decode("utf-8"), target["canonical_json_utf8"])
+        target_id = hashlib.sha256(XENIA_TARGET_DOMAIN + canonical).digest()
+        self.assertEqual(target_id.hex(), target["expected_target_id_hex"])
+
+        epoch = data["epoch_derivation"]
+        epoch_id = hashlib.sha256(
+            XENIA_EPOCH_DOMAIN
+            + target_id
+            + epoch["rsk_recovery_epoch"].to_bytes(8, "big")
+        ).digest()
+        self.assertEqual(epoch_id.hex(), epoch["expected_epoch_id_hex"])
+
+    def test_xenia_commitment_wire_vectors_match_published_bytes(self) -> None:
+        data = xenia_golden()
+        for vector in data["wire_vectors"]:
+            with self.subTest(vector=vector["name"]):
+                message = xenia_commitment_message(data["namespace"], vector)
+                self.assertEqual(len(message), 321)
+                self.assertEqual(message.hex(), vector["expected_message_hex"])
+
+    def test_sequence_one_binds_published_xenia_genesis_fingerprint(self) -> None:
+        vectors = {item["name"]: item for item in xenia_golden()["wire_vectors"]}
+        genesis = vectors["counter_zero_genesis"]
+        sequence_one = vectors["counter_one_binds_genesis"]
+        self.assertEqual(genesis["counter"], 0)
+        self.assertEqual(genesis["previous_commitment_hex"], "0" * 64)
+        self.assertEqual(sequence_one["counter"], 1)
+        self.assertEqual(
+            sequence_one["previous_commitment_hex"],
+            genesis["xenia_blake3_fingerprint_hex"],
+        )
+
+    def test_rsk_state_digest_mapping_is_decode_not_rehash(self) -> None:
+        digest_hex = anchor.registry_tracker_digest(accepted_registry_state())
+        raw = bytes.fromhex(digest_hex)
+        self.assertEqual(len(raw), 32)
+        self.assertEqual(raw.hex(), digest_hex)
+        self.assertNotEqual(hashlib.sha256(raw).hexdigest(), digest_hex)
 
     def test_epoch_change_is_not_ordinary_progress(self) -> None:
         data = anchor_golden()
