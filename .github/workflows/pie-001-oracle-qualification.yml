@@ -1,0 +1,75 @@
+name: PIE-001 Oracle Exact Subject Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-001-oracle-672de961
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Execute frozen PIE-001 Python oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SUBJECT_SHA: 672de96181c7e352763e62983334e9deb8f14cc9
+      ORACLE: scripts/pie-mass-balance-oracle.py
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 1
+
+      - name: Verify exact subject identity
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$SUBJECT_SHA" "$actual"
+          test "$actual" = "$SUBJECT_SHA"
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+
+      - name: Record Python identity
+        run: python3 --version
+
+      - name: Compile oracle syntax
+        run: python3 -m py_compile "$ORACLE"
+
+      - name: Execute oracle self-test
+        id: selftest
+        run: |
+          set -euo pipefail
+          output="$(python3 "$ORACLE" --self-test)"
+          printf '%s\n' "$output"
+          test "$output" = ok
+
+      - name: Emit machine-readable receipt
+        if: always()
+        run: |
+          cat > pie-001-oracle-qualification.json <<EOF
+          {
+            "schema": "symthaea.pie.oracle-qualification.v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "oracle": "$ORACLE",
+            "python": "3.13.5",
+            "syntax": "${{ steps.selftest.outcome == 'success' && 'success' || 'see-job' }}",
+            "self_test": "${{ steps.selftest.outcome }}",
+            "scope": "Independent reference-oracle execution only; not production Rust qualification or physical-process validation."
+          }
+          EOF
+          cat pie-001-oracle-qualification.json
+
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-001-oracle-exact-subject-qualification
+          path: pie-001-oracle-qualification.json
+          if-no-files-found: error
