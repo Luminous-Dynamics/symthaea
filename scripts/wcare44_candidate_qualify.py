@@ -12,6 +12,7 @@ import wcare44_candidate_kernel as kernel
 
 PROTOCOL = "wcare44-authenticated-replication-aggregation-v1"
 WCARE41 = "wcare41-authenticated-preregistration-v1"
+WCARE40 = "wcare40-execution-replication-v1"
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 TOKEN = re.compile(r"^[A-Za-z0-9._:-]+$")
 UTC20 = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
@@ -85,6 +86,11 @@ def bool_field(value: dict[str, Any], field: str, label: str) -> None:
         raise InvalidContract(f"{label}_invalid_boolean:{field}")
 
 
+def optional_string_field(value: dict[str, Any], field: str, label: str) -> None:
+    if field in value and not isinstance(value[field], str):
+        raise InvalidContract(f"{label}_invalid_string:{field}")
+
+
 def validate_backend(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise InvalidContract(f"{label}_not_object")
@@ -116,7 +122,18 @@ def validate_auth_plan(path: str) -> dict[str, Any]:
     evaluation_utc = value.get("evaluation_utc")
     if not isinstance(evaluation_utc, str) or not UTC20.fullmatch(evaluation_utc):
         raise InvalidContract("wcare41_authentication_plan_invalid_evaluation_utc")
+    optional_string_field(value, "notes", "wcare41_authentication_plan")
     return value
+
+
+def validate_wcare40_verifier_binding(result_path: str, auth_plan: dict[str, Any]) -> None:
+    result = load_object(result_path, "wcare40_result")
+    if result.get("protocol_version") != WCARE40:
+        raise InvalidContract("wcare40_result_protocol_mismatch")
+    for field in ("wcare40_frontdoor_sha256", "wcare40_core_verifier_sha256"):
+        actual = sha_field(result, field, "wcare40_result")
+        if actual != auth_plan[field]:
+            raise InvalidContract(f"wcare41_{field}_does_not_match_wcare40_result")
 
 
 def validate_builder_observation(path: str, expected_verifier_sha256: str) -> None:
@@ -137,6 +154,7 @@ def validate_builder_observation(path: str, expected_verifier_sha256: str) -> No
         raise InvalidContract("builder_observation_verifier_sha256_not_preregistered")
     bool_field(value, "verifier_execution_qualified", "builder_observation")
     bool_field(value, "synthetic", "builder_observation")
+    optional_string_field(value, "notes", "builder_observation")
 
 
 def validate_temporal_observation(path: str, expected_verifier_sha256: str) -> None:
@@ -155,6 +173,7 @@ def validate_temporal_observation(path: str, expected_verifier_sha256: str) -> N
         raise InvalidContract("temporal_observation_verifier_sha256_not_preregistered")
     bool_field(value, "verifier_execution_qualified", "temporal_observation")
     bool_field(value, "synthetic", "temporal_observation")
+    optional_string_field(value, "notes", "temporal_observation")
 
 
 def invalid(detail: str) -> tuple[dict[str, Any], int]:
@@ -170,6 +189,7 @@ def main() -> int:
     args = kernel.parser().parse_args()
     try:
         auth_plan = validate_auth_plan(args.wcare41_authentication_plan)
+        validate_wcare40_verifier_binding(args.wcare40_result, auth_plan)
         builder_verifier_sha256 = auth_plan["builder_verifier"]["executable_sha256"]
         temporal_verifier_sha256 = auth_plan["temporal_verifier"]["executable_sha256"]
         for path in args.builder_observation:
