@@ -29,6 +29,9 @@ mod heldout_evidence_envelope;
 mod heldout_seal;
 pub mod hidden_world;
 mod promotion;
+// Prototype-only until #2375 consumes this kernel. Remove the allow when the
+// execution-authorization path makes the module live in ordinary builds.
+#[allow(dead_code)]
 mod qualification_receipt;
 mod relay_triad;
 #[cfg(feature = "symthaea-backend")]
