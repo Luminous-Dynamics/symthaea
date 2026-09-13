@@ -49,11 +49,8 @@ v = json.loads(Path('docs/release/evidence/WCARE42_BUILDER_ATTESTATION_GOLDEN_VE
 assert v['producer'] == 'python-cryptography-ed25519'
 assert v['canonical_message_sha256'] == '2054958f9c99f594131c7335f89e8ce5dc68b46ba92eb91a3201eafadc4f523f'
 assert v['signature_ed25519_hex'] == 'd9bc6dae63c3fc60c50b2c1f443a6a9d714006659c31380609b35d85a0efe4cdf15b5cb1f862ce618c540ae5617862f51b661c06acb1d83b174acd296ea56c06'
-for path in (
-    'docs/release/evidence/WCARE42_BUILDER_ATTESTATION_RESULT_SCHEMA_V1.json',
-):
-    value = json.loads(Path(path).read_text())
-    assert isinstance(value, dict) and value.get('additionalProperties') is False
+value = json.loads(Path('docs/release/evidence/WCARE42_BUILDER_ATTESTATION_RESULT_SCHEMA_V1.json').read_text())
+assert isinstance(value, dict) and value.get('additionalProperties') is False
 PY
 then
   emit "INVALID_PROTOCOL" "golden_vector_or_schema_integrity_failed"
@@ -66,7 +63,7 @@ if [[ -f tools/wcare42_builder_attestation_verifier/Cargo.lock ]]; then
 fi
 
 set +e
-BLOCKER_OUTPUT="$(scripts/wcare42-qualify.sh missing-envelope.json missing-policy.json missing-plan.json missing-result.json missing-subject.json 2026-09-13T12:00:00Z 2>/tmp/wcare42-blocker.stderr)"
+BLOCKER_OUTPUT="$(bash scripts/wcare42-qualify.sh missing-envelope.json missing-policy.json missing-plan.json missing-result.json missing-subject.json 2026-09-13T12:00:00Z 2>/tmp/wcare42-blocker.stderr)"
 BLOCKER_STATUS=$?
 set -e
 if [[ "$BLOCKER_STATUS" -ne 3 ]]; then
