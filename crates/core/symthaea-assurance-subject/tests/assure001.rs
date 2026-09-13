@@ -195,7 +195,7 @@ fn completeness_states_are_identity_distinct() {
 }
 
 #[test]
-fn completeness_controls_material_identity_not_replayability() {
+fn completeness_controls_committed_identity_not_replayability() {
     let complete = AiSubjectManifest::new(
         id("agent-a"),
         SurfaceProfile::new(
@@ -216,7 +216,7 @@ fn completeness_controls_material_identity_not_replayability() {
     let complete_summary = complete.completeness();
     assert_eq!(complete_summary.known, 1);
     assert_eq!(complete_summary.not_applicable, 1);
-    assert!(complete_summary.has_complete_material_identity());
+    assert!(complete_summary.has_complete_committed_identity());
 
     let unknown = AiSubjectManifest::new(
         id("agent-a"),
@@ -228,7 +228,7 @@ fn completeness_controls_material_identity_not_replayability() {
         )],
     )
     .unwrap();
-    assert!(!unknown.completeness().has_complete_material_identity());
+    assert!(!unknown.completeness().has_complete_committed_identity());
 
     let unavailable = AiSubjectManifest::new(
         id("agent-a"),
@@ -240,7 +240,7 @@ fn completeness_controls_material_identity_not_replayability() {
         )],
     )
     .unwrap();
-    assert!(!unavailable.completeness().has_complete_material_identity());
+    assert!(!unavailable.completeness().has_complete_committed_identity());
 }
 
 #[test]
