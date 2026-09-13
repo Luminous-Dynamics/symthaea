@@ -76,6 +76,8 @@ mod v2_heldout_reveal_protocol;
 mod v2_shadow_campaign;
 #[cfg(test)]
 mod v2_selected_comparator;
+#[cfg(test)]
+mod v2_prospective_ticket;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_preheldout_custody;
 #[cfg(all(test, feature = "symthaea-backend"))]
