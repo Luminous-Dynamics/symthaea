@@ -15,6 +15,7 @@
 //! - Public development probe for context-optimizer objective plumbing
 //! - Canonical typed objective selection over measured primitive coordinates
 //! - Two-phase longitudinal metacognitive state with pre-outcome freezing
+//! - Canonical per-subject reasoning orchestration with plasticity held at baseline
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -26,6 +27,7 @@ pub mod reasoning_capability_matrix;
 pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
+pub mod reasoning_kernel;
 pub mod reasoning_meta_control_probe;
 pub mod reasoning_meta_state;
 pub mod reasoning_metacognition;
@@ -64,6 +66,11 @@ pub use reasoning_evaluator_policy::{
 pub use reasoning_evidence_revision_probe::{
     run_evidence_revision_probe, ConflictActionObservation, EvidenceRevisionProbeReport,
     EVIDENCE_REVISION_PROBE_VERSION,
+};
+pub use reasoning_kernel::{
+    CanonicalReasoningDecision, CanonicalReasoningInput, CanonicalReasoningKernel,
+    CanonicalSubjectCheckpoint, ReasoningKernelError, BASELINE_PLASTICITY_MULTIPLIER,
+    CANONICAL_REASONING_KERNEL_VERSION,
 };
 pub use reasoning_meta_control_probe::{
     run_meta_control_probe, MetaControlObservation, MetaControlProbeReport,
