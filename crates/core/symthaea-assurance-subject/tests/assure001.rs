@@ -1,0 +1,310 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+use symthaea_assurance_core::{DigestSha256, StableId};
+use symthaea_assurance_subject::{
+    AiSubjectManifest, AiSurfaceKind, SubjectError, SurfaceBinding, SurfaceLocator, SurfaceProfile,
+    SurfaceState, UnavailabilityReason,
+};
+
+fn id(value: &str) -> StableId {
+    StableId::new(value).unwrap()
+}
+
+fn digest(byte: char) -> DigestSha256 {
+    DigestSha256::new(std::iter::repeat_n(byte, 64).collect::<String>()).unwrap()
+}
+
+fn locator(name: &str) -> SurfaceLocator {
+    SurfaceLocator::new(Some(id("provider-a")), id(name), Some(id("v1")))
+}
+
+fn binding(kind: AiSurfaceKind, name: &str, state: SurfaceState) -> SurfaceBinding {
+    SurfaceBinding::new(kind, locator(name), state)
+}
+
+fn model_runtime_profile() -> SurfaceProfile {
+    SurfaceProfile::new(
+        id("model-runtime-v1"),
+        vec![AiSurfaceKind::Model, AiSurfaceKind::Runtime],
+    )
+    .unwrap()
+}
+
+fn exact_manifest() -> AiSubjectManifest {
+    AiSubjectManifest::new(
+        id("agent-a"),
+        model_runtime_profile(),
+        vec![
+            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(digest('a'))),
+            binding(
+                AiSurfaceKind::Runtime,
+                "runtime-image",
+                SurfaceState::Known(digest('b')),
+            ),
+        ],
+    )
+    .unwrap()
+}
+
+#[test]
+fn profile_identity_is_surface_order_independent() {
+    let left = SurfaceProfile::new(
+        id("profile-v1"),
+        vec![AiSurfaceKind::Runtime, AiSurfaceKind::Model],
+    )
+    .unwrap();
+    let right = SurfaceProfile::new(
+        id("profile-v1"),
+        vec![AiSurfaceKind::Model, AiSurfaceKind::Runtime],
+    )
+    .unwrap();
+    assert_eq!(left.digest(), right.digest());
+}
+
+#[test]
+fn duplicate_profile_surface_fails_closed() {
+    let error = SurfaceProfile::new(
+        id("duplicate-profile"),
+        vec![AiSurfaceKind::Model, AiSurfaceKind::Model],
+    )
+    .unwrap_err();
+    assert!(matches!(error, SubjectError::DuplicateProfileSurface(_)));
+}
+
+#[test]
+fn manifest_identity_is_binding_order_independent() {
+    let left = exact_manifest();
+    let right = AiSubjectManifest::new(
+        id("agent-a"),
+        model_runtime_profile(),
+        vec![
+            binding(
+                AiSurfaceKind::Runtime,
+                "runtime-image",
+                SurfaceState::Known(digest('b')),
+            ),
+            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(digest('a'))),
+        ],
+    )
+    .unwrap();
+    assert_eq!(left.manifest_id(), right.manifest_id());
+}
+
+#[test]
+fn omission_is_not_treated_as_unknown() {
+    let error = AiSubjectManifest::new(
+        id("agent-a"),
+        model_runtime_profile(),
+        vec![binding(
+            AiSurfaceKind::Model,
+            "model-alias",
+            SurfaceState::Unknown,
+        )],
+    )
+    .unwrap_err();
+    assert!(matches!(error, SubjectError::MissingSurface(_)));
+}
+
+#[test]
+fn unexpected_surface_fails_closed() {
+    let error = AiSubjectManifest::new(
+        id("agent-a"),
+        model_runtime_profile(),
+        vec![
+            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Unknown),
+            binding(AiSurfaceKind::Runtime, "runtime", SurfaceState::Unknown),
+            binding(AiSurfaceKind::Policy, "policy", SurfaceState::Unknown),
+        ],
+    )
+    .unwrap_err();
+    assert!(matches!(error, SubjectError::UnexpectedSurface(_)));
+}
+
+#[test]
+fn duplicate_binding_fails_closed() {
+    let error = AiSubjectManifest::new(
+        id("agent-a"),
+        model_runtime_profile(),
+        vec![
+            binding(AiSurfaceKind::Model, "model-a", SurfaceState::Unknown),
+            binding(AiSurfaceKind::Model, "model-b", SurfaceState::Unknown),
+            binding(AiSurfaceKind::Runtime, "runtime", SurfaceState::Unknown),
+        ],
+    )
+    .unwrap_err();
+    assert!(matches!(error, SubjectError::DuplicateBinding(_)));
+}
+
+#[test]
+fn completeness_states_are_identity_distinct() {
+    let make = |state| {
+        AiSubjectManifest::new(
+            id("agent-a"),
+            SurfaceProfile::new(id("model-only"), vec![AiSurfaceKind::Model]).unwrap(),
+            vec![binding(AiSurfaceKind::Model, "model-alias", state)],
+        )
+        .unwrap()
+    };
+
+    let known = make(SurfaceState::Known(digest('a')));
+    let unknown = make(SurfaceState::Unknown);
+    let unavailable = make(SurfaceState::Unavailable(
+        UnavailabilityReason::ProviderDoesNotExpose,
+    ));
+    let not_applicable = make(SurfaceState::NotApplicable);
+
+    assert_ne!(known.manifest_id(), unknown.manifest_id());
+    assert_ne!(unknown.manifest_id(), unavailable.manifest_id());
+    assert_ne!(unavailable.manifest_id(), not_applicable.manifest_id());
+    assert_ne!(known.manifest_id(), not_applicable.manifest_id());
+}
+
+#[test]
+fn completeness_controls_exact_replayability() {
+    let exact = AiSubjectManifest::new(
+        id("agent-a"),
+        SurfaceProfile::new(
+            id("model-deployment"),
+            vec![AiSurfaceKind::Model, AiSurfaceKind::DeploymentEnvelope],
+        )
+        .unwrap(),
+        vec![
+            binding(
+                AiSurfaceKind::Model,
+                "model-alias",
+                SurfaceState::Known(digest('a')),
+            ),
+            binding(
+                AiSurfaceKind::DeploymentEnvelope,
+                "no-deployment-envelope",
+                SurfaceState::NotApplicable,
+            ),
+        ],
+    )
+    .unwrap();
+    let exact_summary = exact.completeness();
+    assert_eq!(exact_summary.known, 1);
+    assert_eq!(exact_summary.not_applicable, 1);
+    assert!(exact_summary.is_exactly_replayable());
+
+    let unknown = AiSubjectManifest::new(
+        id("agent-a"),
+        SurfaceProfile::new(id("model-only"), vec![AiSurfaceKind::Model]).unwrap(),
+        vec![binding(
+            AiSurfaceKind::Model,
+            "model-alias",
+            SurfaceState::Unknown,
+        )],
+    )
+    .unwrap();
+    assert!(!unknown.completeness().is_exactly_replayable());
+
+    let unavailable = AiSubjectManifest::new(
+        id("agent-a"),
+        SurfaceProfile::new(id("model-only"), vec![AiSurfaceKind::Model]).unwrap(),
+        vec![binding(
+            AiSurfaceKind::Model,
+            "model-alias",
+            SurfaceState::Unavailable(UnavailabilityReason::ProviderDoesNotExpose),
+        )],
+    )
+    .unwrap();
+    assert!(!unavailable.completeness().is_exactly_replayable());
+}
+
+#[test]
+fn immutable_commitment_change_changes_subject_identity() {
+    let left = exact_manifest();
+    let right = AiSubjectManifest::new(
+        id("agent-a"),
+        model_runtime_profile(),
+        vec![
+            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(digest('c'))),
+            binding(
+                AiSurfaceKind::Runtime,
+                "runtime-image",
+                SurfaceState::Known(digest('b')),
+            ),
+        ],
+    )
+    .unwrap();
+    assert_ne!(left.manifest_id(), right.manifest_id());
+}
+
+#[test]
+fn provider_alias_metadata_does_not_masquerade_as_same_subject() {
+    let profile = SurfaceProfile::new(id("model-only"), vec![AiSurfaceKind::Model]).unwrap();
+    let left = AiSubjectManifest::new(
+        id("agent-a"),
+        profile.clone(),
+        vec![SurfaceBinding::new(
+            AiSurfaceKind::Model,
+            SurfaceLocator::new(Some(id("provider-a")), id("rolling-alias"), Some(id("v1"))),
+            SurfaceState::Known(digest('a')),
+        )],
+    )
+    .unwrap();
+    let renamed = AiSubjectManifest::new(
+        id("agent-a"),
+        profile.clone(),
+        vec![SurfaceBinding::new(
+            AiSurfaceKind::Model,
+            SurfaceLocator::new(Some(id("provider-a")), id("other-alias"), Some(id("v1"))),
+            SurfaceState::Known(digest('a')),
+        )],
+    )
+    .unwrap();
+    let reversioned = AiSubjectManifest::new(
+        id("agent-a"),
+        profile,
+        vec![SurfaceBinding::new(
+            AiSurfaceKind::Model,
+            SurfaceLocator::new(Some(id("provider-a")), id("rolling-alias"), Some(id("v2"))),
+            SurfaceState::Known(digest('a')),
+        )],
+    )
+    .unwrap();
+
+    assert_ne!(left.manifest_id(), renamed.manifest_id());
+    assert_ne!(left.manifest_id(), reversioned.manifest_id());
+}
+
+#[test]
+fn external_dependency_registration_changes_profile_identity() {
+    let no_remote = SurfaceProfile::external_ai_v1(vec![]).unwrap();
+    let with_remote = SurfaceProfile::external_ai_v1(vec![id("retrieval-index")]).unwrap();
+    assert_ne!(no_remote.digest(), with_remote.digest());
+}
+
+#[test]
+fn duplicate_external_dependency_registration_fails_closed() {
+    let error = SurfaceProfile::external_ai_v1(vec![id("tool-a"), id("tool-a")]).unwrap_err();
+    assert!(matches!(error, SubjectError::DuplicateProfileSurface(_)));
+}
+
+#[test]
+fn core_bridge_tracks_exact_assure001_identity() {
+    let left = exact_manifest();
+    assert_eq!(left.core_subject_id().unwrap(), left.core_subject_id().unwrap());
+
+    let changed = AiSubjectManifest::new(
+        id("agent-a"),
+        model_runtime_profile(),
+        vec![
+            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(digest('a'))),
+            binding(
+                AiSurfaceKind::Runtime,
+                "runtime-image",
+                SurfaceState::Known(digest('c')),
+            ),
+        ],
+    )
+    .unwrap();
+
+    assert_ne!(left.manifest_id(), changed.manifest_id());
+    assert_ne!(
+        left.core_subject_id().unwrap(),
+        changed.core_subject_id().unwrap()
+    );
+}
