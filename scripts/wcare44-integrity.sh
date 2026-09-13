@@ -29,14 +29,14 @@ check_blob() {
   fi
 }
 
-check_blob "docs/release/evidence/WCARE44_AUTHENTICATED_REPLICATION_AGGREGATION_PROTOCOL_V1.md" "2c9a65f0cae32a4276f200e440cd643c43537888"
+check_blob "docs/release/evidence/WCARE44_AUTHENTICATED_REPLICATION_AGGREGATION_PROTOCOL_V1.md" "2c1b0f51454b6d5e7b0c98c3d6055fbd63caee3b"
 check_blob "docs/release/evidence/WCARE44_BUILDER_AUTH_OBSERVATION_SCHEMA_V1.json" "f129ae7fef8d20856277a97f6f549b9313e98e8c"
 check_blob "docs/release/evidence/WCARE44_TEMPORAL_OBSERVATION_SCHEMA_V1.json" "2fabbb71170d0efe34e01a2166d197a44e056b3b"
 check_blob "docs/release/evidence/WCARE44_CANDIDATE_RESULT_SCHEMA_V1.json" "2db071910816c1354bc8e14a46e8118ea8052a97"
 check_blob "scripts/wcare44_candidate_kernel.py" "c5e0f52e34c4753028a00cf6891c8725d04e6b9a"
-check_blob "scripts/wcare44_candidate_qualify.py" "e8f1e9d9eb9dc90710d37acefc19504bb6401e66"
+check_blob "scripts/wcare44_candidate_qualify.py" "44d3ea2572430f828e4dce2fcaf4c6c09756f52e"
 check_blob "scripts/wcare44_candidate_selftest.py" "1449466d0f237871360904c0228f12e8f7af2231"
-check_blob "scripts/wcare44_frontdoor_selftest.py" "4ecf05516dfb96d40450ca3e90e81679499bd812"
+check_blob "scripts/wcare44_frontdoor_selftest.py" "184cdcdaef2aeecd5e627519ced5f50ff567a619"
 
 if ! python3 - <<'PY'
 from pathlib import Path
@@ -108,10 +108,13 @@ for marker in \
   '"unknown_builder_field_rejected":true' \
   '"wrong_builder_verifier_identity_rejected":true' \
   '"wrong_temporal_verifier_identity_rejected":true' \
+  '"wrong_wcare40_frontdoor_identity_rejected":true' \
+  '"wrong_wcare40_core_identity_rejected":true' \
   '"malformed_builder_boolean_rejected":true' \
   '"malformed_auth_plan_time_rejected":true' \
   '"malformed_backend_contract_rejected":true' \
   '"missing_temporal_field_rejected":true' \
+  '"malformed_optional_field_rejected":true' \
   '"final_promotion_remains_blocked":true' \
   '"runtime_authority_granted":false'
 do
