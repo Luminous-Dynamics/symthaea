@@ -59,8 +59,6 @@ pub enum AssuranceError {
     InsufficientEvidenceForTier(String),
     #[error("reproduced support requires a verifier identity distinct from producer and executor")]
     MissingDistinctVerifier,
-    #[error("deployment-qualified support requires an explicit deployment envelope")]
-    MissingDeploymentEnvelope,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -146,14 +144,12 @@ pub struct SubjectComponent {
 pub struct SubjectManifest {
     subject_name: StableId,
     components: Vec<SubjectComponent>,
-    deployment_envelope: Option<StableId>,
 }
 
 impl SubjectManifest {
     pub fn new(
         subject_name: StableId,
         mut components: Vec<SubjectComponent>,
-        deployment_envelope: Option<StableId>,
     ) -> Result<Self, AssuranceError> {
         if components.is_empty() {
             return Err(AssuranceError::EmptySubject);
@@ -169,7 +165,6 @@ impl SubjectManifest {
         Ok(Self {
             subject_name,
             components,
-            deployment_envelope,
         })
     }
 
@@ -181,14 +176,9 @@ impl SubjectManifest {
         &self.components
     }
 
-    pub fn deployment_envelope(&self) -> Option<&StableId> {
-        self.deployment_envelope.as_ref()
-    }
-
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut out = String::from("symthaea-assurance-subject-v1\n");
         field(&mut out, "name", self.subject_name.as_str());
-        optional_id(&mut out, "deployment-envelope", self.deployment_envelope());
         field(
             &mut out,
             "component-count",
@@ -261,7 +251,6 @@ pub enum SupportTier {
     CausallySupported,
     FunctionallySupported,
     Reproduced,
-    DeploymentQualified,
 }
 
 impl SupportTier {
@@ -272,7 +261,6 @@ impl SupportTier {
             Self::CausallySupported => "causally-supported",
             Self::FunctionallySupported => "functionally-supported",
             Self::Reproduced => "reproduced",
-            Self::DeploymentQualified => "deployment-qualified",
         }
     }
 }
@@ -532,9 +520,6 @@ impl QualificationResult {
             {
                 return Err(AssuranceError::MissingDistinctVerifier);
             }
-            if tier == SupportTier::DeploymentQualified && subject.deployment_envelope().is_none() {
-                return Err(AssuranceError::MissingDeploymentEnvelope);
-            }
         }
 
         Ok(Self {
@@ -616,12 +601,6 @@ fn require_evidence_for_tier(
             has(EvidenceKind::ControlledIntervention)
                 && has(EvidenceKind::FunctionalBenchmark)
                 && has(EvidenceKind::Reproduction)
-        }
-        SupportTier::DeploymentQualified => {
-            has(EvidenceKind::ControlledIntervention)
-                && has(EvidenceKind::FunctionalBenchmark)
-                && has(EvidenceKind::Reproduction)
-                && has(EvidenceKind::RuntimeReceipt)
         }
     };
     if enough {
