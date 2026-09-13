@@ -57,8 +57,8 @@ pub enum AssuranceError {
     ClaimCeilingExceeded,
     #[error("evidence does not satisfy the proposed support tier: {0}")]
     InsufficientEvidenceForTier(String),
-    #[error("independently reproduced support requires distinct verifier provenance")]
-    MissingIndependentVerifier,
+    #[error("reproduced support requires a verifier identity distinct from producer and executor")]
+    MissingDistinctVerifier,
     #[error("deployment-qualified support requires an explicit deployment envelope")]
     MissingDeploymentEnvelope,
 }
@@ -260,7 +260,7 @@ pub enum SupportTier {
     Observed,
     CausallySupported,
     FunctionallySupported,
-    IndependentlyReproduced,
+    Reproduced,
     DeploymentQualified,
 }
 
@@ -271,7 +271,7 @@ impl SupportTier {
             Self::Observed => "observed",
             Self::CausallySupported => "causally-supported",
             Self::FunctionallySupported => "functionally-supported",
-            Self::IndependentlyReproduced => "independently-reproduced",
+            Self::Reproduced => "reproduced",
             Self::DeploymentQualified => "deployment-qualified",
         }
     }
@@ -307,7 +307,7 @@ pub enum EvidenceKind {
     Observation,
     ControlledIntervention,
     FunctionalBenchmark,
-    IndependentReproduction,
+    Reproduction,
     RuntimeReceipt,
     ExternalAttestation,
     Custom(StableId),
@@ -320,7 +320,7 @@ impl EvidenceKind {
             Self::Observation => "observation".into(),
             Self::ControlledIntervention => "controlled-intervention".into(),
             Self::FunctionalBenchmark => "functional-benchmark".into(),
-            Self::IndependentReproduction => "independent-reproduction".into(),
+            Self::Reproduction => "reproduction".into(),
             Self::RuntimeReceipt => "runtime-receipt".into(),
             Self::ExternalAttestation => "external-attestation".into(),
             Self::Custom(id) => format!("custom:{}", id.as_str()),
@@ -351,7 +351,13 @@ impl EvidenceProvenance {
         }
     }
 
-    pub fn has_independent_verifier(&self) -> bool {
+    /// Returns true only when a verifier identity is present and differs from
+    /// both producer and executor identities.
+    ///
+    /// This is identity separation, not evidence of common-cause independence.
+    /// Organization, review-process, toolchain, and evidence-source diversity
+    /// require a stronger verifier-diversity layer.
+    pub fn has_distinct_verifier_identity(&self) -> bool {
         self.verifier
             .as_ref()
             .is_some_and(|verifier| verifier != &self.producer && verifier != &self.executor)
@@ -518,13 +524,13 @@ impl QualificationResult {
                 return Err(AssuranceError::ClaimCeilingExceeded);
             }
             require_evidence_for_tier(tier, evidence)?;
-            if tier >= SupportTier::IndependentlyReproduced
+            if tier >= SupportTier::Reproduced
                 && !evidence.iter().any(|artifact| {
-                    artifact.kind == EvidenceKind::IndependentReproduction
-                        && artifact.provenance.has_independent_verifier()
+                    artifact.kind == EvidenceKind::Reproduction
+                        && artifact.provenance.has_distinct_verifier_identity()
                 })
             {
-                return Err(AssuranceError::MissingIndependentVerifier);
+                return Err(AssuranceError::MissingDistinctVerifier);
             }
             if tier == SupportTier::DeploymentQualified && subject.deployment_envelope().is_none() {
                 return Err(AssuranceError::MissingDeploymentEnvelope);
@@ -606,15 +612,15 @@ fn require_evidence_for_tier(
         SupportTier::FunctionallySupported => {
             has(EvidenceKind::ControlledIntervention) && has(EvidenceKind::FunctionalBenchmark)
         }
-        SupportTier::IndependentlyReproduced => {
+        SupportTier::Reproduced => {
             has(EvidenceKind::ControlledIntervention)
                 && has(EvidenceKind::FunctionalBenchmark)
-                && has(EvidenceKind::IndependentReproduction)
+                && has(EvidenceKind::Reproduction)
         }
         SupportTier::DeploymentQualified => {
             has(EvidenceKind::ControlledIntervention)
                 && has(EvidenceKind::FunctionalBenchmark)
-                && has(EvidenceKind::IndependentReproduction)
+                && has(EvidenceKind::Reproduction)
                 && has(EvidenceKind::RuntimeReceipt)
         }
     };
