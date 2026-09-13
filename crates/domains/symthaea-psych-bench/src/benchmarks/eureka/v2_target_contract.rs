@@ -9,58 +9,37 @@
 //! a fixed, lossless-on-grid bridge into the production FEP's 4-D observation
 //! interface.
 
-use symthaea_fep::{
-    ActionOutcome, FepHeldOutSubject, FrozenPredictionCommitment,
-};
+use symthaea_fep::{ActionOutcome, FepHeldOutSubject, FrozenPredictionCommitment};
 
 use super::consequence::{ConsequencePrediction, PredictionOutcome};
 use super::hidden_world::{PublicAction, PublicValue};
 use super::target_contract::EurekaTargetScope;
+use super::v2_public_schema::{
+    V2_CANONICAL_ACTIONS, V2_CONTEXT_DENOMINATOR, V2_COUNT_DENOMINATOR, V2_OBSERVATION_DIM,
+    V2_PUBLIC_SCHEMA_REVISION, V2_REQUIRED_ACTIONS, V2PublicSchemaError, V2PublicState,
+    action_index,
+};
 
 pub(super) const V2_FEP_TARGET_ADAPTER_REVISION: &str =
-    "EUREKA.002.V2.PRODUCTION_FEP_NORMALIZED_ADAPTER.v1";
+    "EUREKA.002.V2.PRODUCTION_FEP_NORMALIZED_ADAPTER.v2";
 pub(super) const V2_FEP_TARGET_CONTRACT_REVISION: &str =
-    "EUREKA.002.V2.PRODUCTION_FEP_TARGET_CONTRACT.v1";
-pub(super) const V2_COUNT_DENOMINATOR: i32 = 31;
-pub(super) const V2_CONTEXT_DENOMINATOR: i32 = 7;
-pub(super) const V2_OBSERVATION_DIM: usize = 4;
-pub(super) const V2_REQUIRED_ACTIONS: usize = 4;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) struct V2PublicState {
-    fields: [i32; 4],
-}
-
-impl V2PublicState {
-    pub(super) fn new(fields: [i32; 4]) -> Result<Self, V2TargetContractError> {
-        for (index, value) in fields[..3].iter().copied().enumerate() {
-            if !(0..=V2_COUNT_DENOMINATOR).contains(&value) {
-                return Err(V2TargetContractError::PublicCountOutOfRange { index, value });
-            }
-        }
-        let context = fields[3];
-        if !(0..=V2_CONTEXT_DENOMINATOR).contains(&context) {
-            return Err(V2TargetContractError::PublicContextOutOfRange { value: context });
-        }
-        Ok(Self { fields })
-    }
-
-    pub(super) const fn fields(self) -> [i32; 4] {
-        self.fields
-    }
-}
+    "EUREKA.002.V2.PRODUCTION_FEP_TARGET_CONTRACT.v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum V2TargetContractError {
-    PublicCountOutOfRange { index: usize, value: i32 },
-    PublicContextOutOfRange { value: i32 },
+    PublicSchema(V2PublicSchemaError),
     ObservationDimensionMismatch { expected: usize, actual: usize },
     InsufficientActionCapacity { required: usize, actual: usize },
-    UnsupportedPublicAction,
     OutcomeActionMismatch { expected: usize, actual: usize },
     TargetOutputDimensionMismatch { expected: usize, actual: usize },
     NonFiniteTargetOutput { index: usize },
     TargetValueOutOfI32Range { index: usize },
+}
+
+impl From<V2PublicSchemaError> for V2TargetContractError {
+    fn from(value: V2PublicSchemaError) -> Self {
+        Self::PublicSchema(value)
+    }
 }
 
 /// Stateless shared adapter used identically for both V2 public world families.
@@ -68,7 +47,7 @@ pub(super) struct V2FepAdapter;
 
 impl V2FepAdapter {
     /// Lossless-on-grid mapping into the production FEP observation scale.
-    pub(super) fn encode_state(state: V2PublicState) -> [f64; 4] {
+    pub(super) fn encode_state(state: V2PublicState) -> [f64; V2_OBSERVATION_DIM] {
         let fields = state.fields();
         [
             f64::from(fields[0]) / f64::from(V2_COUNT_DENOMINATOR),
@@ -80,13 +59,7 @@ impl V2FepAdapter {
 
     /// One exact action bijection shared by both V2 families.
     pub(super) fn encode_action(action: PublicAction) -> Result<usize, V2TargetContractError> {
-        match action {
-            PublicAction::NoOp => Ok(0),
-            PublicAction::Pulse { slot: 0 } => Ok(1),
-            PublicAction::Pulse { slot: 1 } => Ok(2),
-            PublicAction::Pulse { slot: 2 } => Ok(3),
-            _ => Err(V2TargetContractError::UnsupportedPublicAction),
-        }
+        Ok(action_index(action)?)
     }
 
     /// Decode only public expected-observation semantics.
@@ -95,7 +68,7 @@ impl V2FepAdapter {
     /// ordinary wrong integer predictions so the scorer can penalize them.
     pub(super) fn decode_expected_state(
         expected_observation: &[f64],
-    ) -> Result<[i32; 4], V2TargetContractError> {
+    ) -> Result<[i32; V2_OBSERVATION_DIM], V2TargetContractError> {
         if expected_observation.len() != V2_OBSERVATION_DIM {
             return Err(V2TargetContractError::TargetOutputDimensionMismatch {
                 expected: V2_OBSERVATION_DIM,
@@ -115,7 +88,7 @@ impl V2FepAdapter {
             f64::from(V2_COUNT_DENOMINATOR),
             f64::from(V2_CONTEXT_DENOMINATOR),
         ];
-        let mut output = [0_i32; 4];
+        let mut output = [0_i32; V2_OBSERVATION_DIM];
         for index in 0..V2_OBSERVATION_DIM {
             let scaled = expected_observation[index] * scales[index];
             if !scaled.is_finite()
@@ -227,6 +200,7 @@ fn contract_commitment(
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, V2_FEP_TARGET_CONTRACT_REVISION.as_bytes());
     encode_bytes(&mut bytes, V2_FEP_TARGET_ADAPTER_REVISION.as_bytes());
+    encode_bytes(&mut bytes, V2_PUBLIC_SCHEMA_REVISION.as_bytes());
     bytes.push(match scope {
         EurekaTargetScope::ProductionFepComponentSnapshot => 1,
         EurekaTargetScope::FullCognitiveLoop => 2,
@@ -235,12 +209,7 @@ fn contract_commitment(
     bytes.extend_from_slice(&(action_count as u64).to_le_bytes());
     bytes.extend_from_slice(&V2_COUNT_DENOMINATOR.to_le_bytes());
     bytes.extend_from_slice(&V2_CONTEXT_DENOMINATOR.to_le_bytes());
-    for action in [
-        PublicAction::NoOp,
-        PublicAction::Pulse { slot: 0 },
-        PublicAction::Pulse { slot: 1 },
-        PublicAction::Pulse { slot: 2 },
-    ] {
+    for action in V2_CANONICAL_ACTIONS {
         bytes.push(V2FepAdapter::encode_action(action).expect("canonical V2 action") as u8);
     }
     bytes.extend_from_slice(learned_subject_commitment.as_bytes());
@@ -297,7 +266,7 @@ mod tests {
         for a in [0, 1, 15, 31] {
             for b in [0, 7, 16, 31] {
                 for c in [0, 11, 23, 31] {
-                    for context in 0..=7 {
+                    for context in 0..=V2_CONTEXT_DENOMINATOR {
                         let state = V2PublicState::new([a, b, c, context]).unwrap();
                         assert_eq!(
                             V2FepAdapter::decode_expected_state(&V2FepAdapter::encode_state(state))
@@ -311,23 +280,15 @@ mod tests {
     }
 
     #[test]
-    fn action_mapping_is_exact_bijection_and_rejects_aliases() {
-        assert_eq!(V2FepAdapter::encode_action(PublicAction::NoOp), Ok(0));
-        assert_eq!(
-            V2FepAdapter::encode_action(PublicAction::Pulse { slot: 0 }),
-            Ok(1)
-        );
-        assert_eq!(
-            V2FepAdapter::encode_action(PublicAction::Pulse { slot: 1 }),
-            Ok(2)
-        );
-        assert_eq!(
-            V2FepAdapter::encode_action(PublicAction::Pulse { slot: 2 }),
-            Ok(3)
-        );
+    fn action_mapping_consumes_the_canonical_public_schema() {
+        for (index, action) in V2_CANONICAL_ACTIONS.into_iter().enumerate() {
+            assert_eq!(V2FepAdapter::encode_action(action), Ok(index));
+        }
         assert_eq!(
             V2FepAdapter::encode_action(PublicAction::Pulse { slot: 3 }),
-            Err(V2TargetContractError::UnsupportedPublicAction)
+            Err(V2TargetContractError::PublicSchema(
+                V2PublicSchemaError::UnsupportedAction
+            ))
         );
         assert!(matches!(
             V2FepAdapter::encode_action(PublicAction::Transfer {
@@ -335,7 +296,9 @@ mod tests {
                 to: 1,
                 amount: 1
             }),
-            Err(V2TargetContractError::UnsupportedPublicAction)
+            Err(V2TargetContractError::PublicSchema(
+                V2PublicSchemaError::UnsupportedAction
+            ))
         ));
     }
 
@@ -391,7 +354,7 @@ mod tests {
         let outcome = ActionOutcome {
             action: 0,
             predicted_next_state: HiddenState::new(8),
-            expected_observation: vec![0.0; 4],
+            expected_observation: vec![0.0; V2_OBSERVATION_DIM],
             timestamp: 0,
         };
         assert_eq!(
@@ -412,8 +375,8 @@ mod tests {
             contract.scope(),
             EurekaTargetScope::ProductionFepComponentSnapshot
         );
-        assert_eq!(contract.observation_dim(), 4);
-        assert_eq!(contract.action_count(), 4);
+        assert_eq!(contract.observation_dim(), V2_OBSERVATION_DIM);
+        assert_eq!(contract.action_count(), V2_REQUIRED_ACTIONS);
         assert_eq!(contract.learned_subject_commitment(), learned);
         assert_ne!(contract.commitment(), [0_u8; 32]);
     }
@@ -440,7 +403,10 @@ mod tests {
         );
         let contract_a = V2FepTargetContract::from_heldout_subject(&subject_a).unwrap();
         let contract_b = V2FepTargetContract::from_heldout_subject(&subject_b).unwrap();
-        assert_ne!(contract_a.learned_subject_commitment(), contract_b.learned_subject_commitment());
+        assert_ne!(
+            contract_a.learned_subject_commitment(),
+            contract_b.learned_subject_commitment()
+        );
         assert_ne!(contract_a.commitment(), contract_b.commitment());
     }
 }
