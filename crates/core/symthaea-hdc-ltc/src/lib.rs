@@ -14,6 +14,8 @@
 //!   `{ -1, +1 }`, so role binding is an isometry.
 //! - [`HolographicLiquidCell`] is a theorem-bearing diagonal research cell whose
 //!   temporal update commutes with `UnitaryRole` binding.
+//! - [`HlsParameters`] exposes the complete theorem-compatible trainable surface
+//!   as one validated atomic snapshot.
 //! - [`InvariantContextMixer`] supplies O(KD) cross-dimensional magnitude
 //!   context without violating the full bipolar role symmetry.
 //! - [`ContextualHolographicLiquidCell`] composes invariant context with the
@@ -43,7 +45,9 @@ pub mod state_tracking_readout;
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use contextual_holographic_liquid::{ContextualHlsError, ContextualHolographicLiquidCell};
 pub use continuous_hv::{ContinuousHV, HDC_DIMENSION, UnitaryRole};
-pub use holographic_liquid::{HlsActivation, HlsConfig, HlsError, HolographicLiquidCell};
+pub use holographic_liquid::{
+    HlsActivation, HlsConfig, HlsError, HlsParameters, HolographicLiquidCell,
+};
 pub use invariant_context::{ContextMixerError, InvariantContextMixer};
 pub use network::{HdcLtcUnifiedNetwork, StepTimingConfig};
 pub use neuron::HdcLtcUnifiedNeuron;
