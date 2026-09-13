@@ -20,6 +20,7 @@
 //! - Canonical kernel V2 with robust multi-context selection and content-bound decisions
 //! - Automatic RQ episode publication from validated canonical decisions
 //! - Live measurement-only shadowing of the production meta-reasoner through canonical V2
+//! - Evidence-backed objective intervals that preserve unknown axes instead of fabricating neutrality
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -39,6 +40,7 @@ pub mod reasoning_meta_control_probe;
 pub mod reasoning_meta_state;
 pub mod reasoning_metacognition;
 pub mod reasoning_objective_core;
+pub mod reasoning_objective_evidence;
 pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
 pub mod reasoning_shadow_meta;
@@ -116,6 +118,12 @@ pub use reasoning_objective_core::{
     ObjectiveKind, ObjectiveSelectionReport, ObjectiveVector,
     ObjectiveWeights as CanonicalObjectiveWeights, REASONING_OBJECTIVE_CORE_VERSION,
 };
+pub use reasoning_objective_evidence::{
+    select_from_objective_evidence, CandidateEvidenceEvaluation, CandidateObjectiveEvidence,
+    ContextualEvidenceScore, ObjectiveEvidence, ObjectiveEvidenceError,
+    ObjectiveEvidenceSelection, ObjectiveEvidenceSelectionReport, ObjectiveEvidenceStatus,
+    ObjectiveUnknownReason, ScoreInterval, OBJECTIVE_EVIDENCE_SELECTOR_VERSION,
+};
 pub use reasoning_objective_plumbing_probe::{
     run_objective_plumbing_probe, ObjectivePlumbingObservation,
     ObjectivePlumbingProbeReport, OBJECTIVE_PLUMBING_PROBE_VERSION,
@@ -127,5 +135,6 @@ pub use reasoning_qualification::{
     ResourceUsage, REASONING_EPISODE_SCHEMA_VERSION,
 };
 pub use reasoning_shadow_meta::{
-    ShadowMetaObservation, ShadowMetaStats, ShadowQualifiedMetaReasoner, LIVE_META_SHADOW_VERSION,
+    ObjectiveSpread, ShadowMetaObservation, ShadowMetaStats, ShadowQualifiedMetaReasoner,
+    LIVE_META_SHADOW_VERSION,
 };
