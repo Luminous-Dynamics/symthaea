@@ -37,6 +37,8 @@
 //! - **Static-potential supplement**: preregistered smearing, spatial geometry,
 //!   plateau windows, lattice-Coulomb basis and Cornell fit range bound to one
 //!   exact campaign before production execution authorization
+//! - **Static-potential fit stability**: preregistered fit-family members and
+//!   deterministic nested radial cuts for string-tension model/range checks
 //! - **Scale evidence**: same-ensemble flow curves whose derived uncertainty
 //!   must bind joint resampling across the correlated flow-time trajectory
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
@@ -73,6 +75,7 @@ pub mod lattice_flow_scale_stability;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
 pub mod lattice_qualification_preregistration;
+pub mod lattice_static_potential_fit_stability;
 pub mod lattice_static_potential_plan;
 mod lattice_su3_lie;
 pub mod lattice_topology_flow;
@@ -151,6 +154,13 @@ pub use lattice_qualification_preregistration::{
     QUALIFICATION_POLICY_MANIFEST_ID, EnsembleQualificationPolicyManifest,
     PredeclaredQualificationBinding, QualificationPreregistrationError,
     bind_predeclared_qualification_policy,
+};
+pub use lattice_static_potential_fit_stability::{
+    FIT_FAMILY_ID, STATIC_POTENTIAL_FIT_STABILITY_AUTHORIZATION_SCOPE,
+    STATIC_POTENTIAL_FIT_STABILITY_PLAN_ID, StaticPotentialFitModel,
+    StaticPotentialFitStabilityAuthorization, StaticPotentialFitStabilityError,
+    StaticPotentialFitStabilityPlan, StaticPotentialRadialCut,
+    authorize_static_potential_fit_stability,
 };
 pub use lattice_static_potential_plan::{
     EFFECTIVE_POTENTIAL_CONVENTION_ID, LATTICE_COULOMB_CONVENTION_ID,
