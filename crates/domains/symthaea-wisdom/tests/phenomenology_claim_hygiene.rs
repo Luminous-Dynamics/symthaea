@@ -6,7 +6,7 @@
 //! conscious; it prevents a small frozen class of strong phenomenal assertions from
 //! spreading through Rust source without explicit, path-specific debt accounting.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -20,19 +20,24 @@ fn high_risk_phrases() -> Vec<&'static str> {
     ]
 }
 
-fn known_debt() -> Vec<(&'static str, &'static str)> {
+/// Exact legacy debt: `(relative path, exact phrase, allowed occurrence count)`.
+/// Counts are frozen so an allowlisted file cannot accumulate additional copies.
+fn known_debt() -> Vec<(&'static str, &'static str, usize)> {
     vec![
         (
             "src/consciousness/empathic_unification.rs",
             concat!("True Empathy", " for Symthaea"),
+            1,
         ),
         (
             "src/consciousness/empathic_unification.rs",
             concat!("True empathy", " is not simulation"),
+            1,
         ),
         (
             "src/consciousness/empathic_unification.rs",
             concat!("actually feels", " a shift"),
+            1,
         ),
     ]
 }
@@ -56,7 +61,7 @@ fn collect_rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 #[test]
-fn phenomenal_language_requires_exact_debt_entry() {
+fn phenomenal_language_requires_exact_debt_entry_and_count() {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
     let repo_root = manifest
         .join("../../..")
@@ -65,12 +70,17 @@ fn phenomenal_language_requires_exact_debt_entry() {
 
     let phrases = high_risk_phrases();
     let debt = known_debt();
+    let debt_map: BTreeMap<(&str, &str), usize> = debt
+        .iter()
+        .map(|(path, phrase, count)| ((*path, *phrase), *count))
+        .collect();
+
     let mut rust_files = Vec::new();
     collect_rust_files(&repo_root.join("src"), &mut rust_files);
     collect_rust_files(&repo_root.join("crates"), &mut rust_files);
 
     let mut violations = Vec::new();
-    let mut observed_debt: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut observed: BTreeMap<(String, String), usize> = BTreeMap::new();
 
     for path in rust_files {
         let content = fs::read_to_string(&path)
@@ -82,30 +92,38 @@ fn phenomenal_language_requires_exact_debt_entry() {
             .replace('\\', "/");
 
         for phrase in &phrases {
-            if !content.contains(phrase) {
+            let count = content.matches(phrase).count();
+            if count == 0 {
                 continue;
             }
-            if debt
-                .iter()
-                .any(|(allowed_path, allowed_phrase)| *allowed_path == relative && *allowed_phrase == *phrase)
-            {
-                observed_debt.insert((relative.clone(), (*phrase).to_owned()));
-            } else {
-                violations.push(format!("{relative}: {phrase:?}"));
+
+            observed.insert((relative.clone(), (*phrase).to_owned()), count);
+            match debt_map.get(&(relative.as_str(), *phrase)) {
+                Some(expected) if *expected == count => {}
+                Some(expected) => violations.push(format!(
+                    "{relative}: {phrase:?} occurs {count} times; frozen debt allows {expected}"
+                )),
+                None => violations.push(format!(
+                    "{relative}: {phrase:?} occurs {count} time(s) without an exact debt entry"
+                )),
             }
         }
     }
 
     assert!(
         violations.is_empty(),
-        "unqualified phenomenal-language claims require explicit exact-path debt entries:\n{}",
+        "unqualified phenomenal-language claims exceed frozen debt:\n{}",
         violations.join("\n")
     );
 
-    for (path, phrase) in debt {
-        assert!(
-            observed_debt.contains(&(path.to_owned(), phrase.to_owned())),
-            "stale claim-hygiene debt entry must be removed after source cleanup: {path}: {phrase:?}"
+    for (path, phrase, expected) in debt {
+        let actual = observed
+            .get(&(path.to_owned(), phrase.to_owned()))
+            .copied()
+            .unwrap_or(0);
+        assert_eq!(
+            actual, expected,
+            "stale or changed claim-hygiene debt must be reconciled: {path}: {phrase:?}"
         );
     }
 }
