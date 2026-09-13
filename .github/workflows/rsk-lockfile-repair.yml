@@ -17,6 +17,7 @@ on:
       - 'docs/compliance/adr/ADR-033-rsk-lockfile-repair-qualifier.md'
       - 'docs/compliance/adr/ADR-034-rsk-lockfile-repair-lineage.md'
       - 'docs/compliance/adr/ADR-035-rsk-lockfile-repair-worktree-purity.md'
+      - 'docs/compliance/adr/ADR-036-rsk-lockfile-repair-intent-freeze.md'
   workflow_dispatch:
 
 permissions:
@@ -82,6 +83,7 @@ jobs:
           echo 'NON-ADMISSIBLE DIAGNOSTIC ONLY.'
           echo 'Cargo may refresh Cargo.lock on this ephemeral runner only in generation mode.'
           echo 'A committed candidate must be byte-idempotent under the pinned Cargo toolchain.'
+          echo 'A committed candidate may not change dependency-intent inputs relative to the PR base.'
           echo 'No repository path other than Cargo.lock may change.'
           echo 'Normal RSK qualification must still pass later with --locked.'
 
@@ -133,8 +135,35 @@ jobs:
             'NON-ADMISSIBLE DIAGNOSTIC ONLY.' \
             'Generation mode may produce Cargo.lock.post-cargo for review.' \
             'Commit-verification mode requires the committed head to remain byte-identical after Cargo.' \
+            'Commit-verification mode also requires dependency-intent inputs to match the PR base.' \
             'No repository path other than Cargo.lock may change.' \
             > "${out}/README.txt"
+
+      - name: Freeze dependency intent for committed lockfile candidate
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/rsk-lockfile-repair"
+          base_sha='${{ github.event.pull_request.base.sha }}'
+          intent_paths=(
+            Cargo.toml
+            rust-toolchain.toml
+            crates/domains/symthaea-replicator-safety/Cargo.toml
+            crates/domains/symthaea-replicator-semantics/Cargo.toml
+            crates/domains/symthaea-replicator-ledger/Cargo.toml
+          )
+
+          git diff "${base_sha}" HEAD -- "${intent_paths[@]}" \
+            > "${out}/dependency-intent.base-to-head.patch"
+
+          if ! cmp -s "${out}/Cargo.lock.base" "${out}/Cargo.lock.head"; then
+            if [ -s "${out}/dependency-intent.base-to-head.patch" ]; then
+              echo 'ERROR: committed Cargo.lock repair also changes dependency intent.'
+              cat "${out}/dependency-intent.base-to-head.patch"
+              exit 1
+            fi
+          fi
 
       - name: Ask pinned Cargo to resolve the exact-head workspace lock graph
         shell: bash
