@@ -4,47 +4,35 @@
 
 //! # symthaea-hdc-ltc
 //!
-//! Hyperdimensional Liquid Time-Constant neural network with O(1) closed-form
-//! temporal evolution.
+//! Hyperdimensional recurrent state with solver-free liquid-time evolution.
 //!
-//! ## Core Innovation
+//! The crate deliberately separates two kinds of distributed object:
 //!
-//! Traditional neural networks use weight *matrices* (O(D^2) parameters) and
-//! require ODE integration for temporal dynamics (O(steps) per time jump).
+//! - [`ContinuousHV`] carries arbitrary continuous state and learned/modulatory
+//!   fields.
+//! - [`UnitaryRole`] carries reversible real HDC roles with components in
+//!   `{ -1, +1 }`, so role binding is norm- and inner-product-preserving.
 //!
-//! This crate replaces both:
-//! - **Weight matrices** become weight *hypervectors* via HDC binding (element-wise multiply)
-//! - **ODE integration** becomes a closed-form exponential interpolation (O(1) per jump)
-//!
-//! The result: a single neuron with a 16,384-dimensional state that can jump to
-//! *any* time horizon in O(D) operations.
-//!
-//! ## Mathematical Basis
-//!
-//! The neuron ODE:
-//! ```text
-//! dx/dt = (-x + f(W . x + U . u)) / tau(||x||)
-//! ```
-//!
-//! Has the closed-form solution:
-//! ```text
-//! x(t + dt) = sigma * x_inf + (1 - sigma) * x(t)
-//! ```
-//!
-//! Where `x_inf = f(W . x + U . u)` is the equilibrium, and `sigma` is an
-//! adaptive gating factor that depends on dt, state, and input.
+//! A neuron update is O(D) in the hypervector dimension and independent of the
+//! number of numerical ODE substeps associated with the elapsed `dt`.
 //!
 //! ## Quick Start
 //!
 //! ```rust
-//! use symthaea_hdc_ltc::{ContinuousHV, NeuronConfig, HdcLtcUnifiedNeuron};
+//! use symthaea_hdc_ltc::{
+//!     ContinuousHV, HdcLtcUnifiedNeuron, NeuronConfig, UnitaryRole,
+//! };
 //!
 //! let config = NeuronConfig { dim: 1024, ..NeuronConfig::default() };
 //! let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
-//!
 //! let input = ContinuousHV::new_random(1024, 123);
-//! neuron.evolve_closed_form(0.1, &input);   // 100 ms jump
-//! neuron.evolve_closed_form(100.0, &input);  // 100 second jump (same cost!)
+//!
+//! neuron.evolve_closed_form(0.1, &input);
+//!
+//! let role = UnitaryRole::new(1024, 7);
+//! let bound = role.bind(neuron.state());
+//! let recovered = role.unbind(&bound);
+//! assert_eq!(&recovered, neuron.state());
 //! ```
 
 pub mod config;
@@ -53,6 +41,6 @@ pub mod network;
 pub mod neuron;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
-pub use continuous_hv::{ContinuousHV, HDC_DIMENSION};
+pub use continuous_hv::{ContinuousHV, HDC_DIMENSION, UnitaryRole};
 pub use network::{HdcLtcUnifiedNetwork, StepTimingConfig};
 pub use neuron::HdcLtcUnifiedNeuron;
