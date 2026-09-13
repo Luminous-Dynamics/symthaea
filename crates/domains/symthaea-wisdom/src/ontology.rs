@@ -91,9 +91,10 @@ pub enum AffectiveSignalKind {
 
 /// Bounded affective evidence with explicit confidence.
 ///
-/// `intensity` and `confidence` are expected to be in `[0, 1]`. Construction
-/// clamps both fields. This is evidence for an affect-related computation, not
-/// evidence that Symthaea phenomenally feels the represented state.
+/// Non-finite affective inputs are treated as untrusted evidence rather than
+/// allowing NaN/Infinity to leak into later reasoning. This remains evidence for
+/// an affect-related computation, not evidence that Symthaea phenomenally feels
+/// the represented state.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AffectiveSignal {
     pub kind: AffectiveSignalKind,
@@ -105,8 +106,8 @@ impl AffectiveSignal {
     pub fn new(kind: AffectiveSignalKind, intensity: f32, confidence: f32) -> Self {
         Self {
             kind,
-            intensity: intensity.clamp(0.0, 1.0),
-            confidence: confidence.clamp(0.0, 1.0),
+            intensity: bounded_evidence(intensity),
+            confidence: bounded_evidence(confidence),
         }
     }
 }
@@ -115,7 +116,8 @@ impl AffectiveSignal {
 ///
 /// Values are represented as uncertainty rather than confidence so callers do
 /// not accidentally treat moral disagreement as factual ignorance or vice
-/// versa. Both fields are clamped to `[0, 1]`.
+/// versa. Non-finite uncertainty fails closed to `1.0` (maximum uncertainty)
+/// rather than allowing NaN comparisons to suppress safety restrictions.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EpistemicState {
     pub factual_uncertainty: f32,
@@ -125,14 +127,30 @@ pub struct EpistemicState {
 impl EpistemicState {
     pub fn new(factual_uncertainty: f32, normative_uncertainty: f32) -> Self {
         Self {
-            factual_uncertainty: factual_uncertainty.clamp(0.0, 1.0),
-            normative_uncertainty: normative_uncertainty.clamp(0.0, 1.0),
+            factual_uncertainty: bounded_uncertainty(factual_uncertainty),
+            normative_uncertainty: bounded_uncertainty(normative_uncertainty),
         }
     }
 
     /// Conservative aggregate uncertainty. The larger uncertainty dominates.
     pub fn max_uncertainty(&self) -> f32 {
         self.factual_uncertainty.max(self.normative_uncertainty)
+    }
+}
+
+fn bounded_evidence(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+fn bounded_uncertainty(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        1.0
     }
 }
 
@@ -178,10 +196,25 @@ mod tests {
     }
 
     #[test]
+    fn non_finite_affective_signal_becomes_untrusted() {
+        let signal = AffectiveSignal::new(AffectiveSignalKind::Distress, f32::NAN, f32::INFINITY);
+        assert_eq!(signal.intensity, 0.0);
+        assert_eq!(signal.confidence, 0.0);
+    }
+
+    #[test]
     fn epistemic_uncertainties_are_bounded_and_distinct() {
         let state = EpistemicState::new(1.5, -0.5);
         assert_eq!(state.factual_uncertainty, 1.0);
         assert_eq!(state.normative_uncertainty, 0.0);
+        assert_eq!(state.max_uncertainty(), 1.0);
+    }
+
+    #[test]
+    fn non_finite_uncertainty_fails_closed() {
+        let state = EpistemicState::new(f32::NAN, f32::INFINITY);
+        assert_eq!(state.factual_uncertainty, 1.0);
+        assert_eq!(state.normative_uncertainty, 1.0);
         assert_eq!(state.max_uncertainty(), 1.0);
     }
 
