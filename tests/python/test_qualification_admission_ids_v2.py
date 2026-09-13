@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -151,3 +152,18 @@ def test_v2_work_identity_is_not_v3_json_identity():
     result = admission_v2.derive_admission_identities_v2(admission, p)
     assert result["admission_subject_id_v2"] != admission["admission_subject_id"]
     assert result["admission_request_id_v2"] != admission["admission_id"]
+
+
+def test_migration_file_loader_rejects_duplicate_json_keys(tmp_path):
+    path = tmp_path / "ambiguous.json"
+    path.write_text('{"schema":"one","schema":"two"}', encoding="utf-8")
+    with pytest.raises(train.TrainManifestError, match="duplicate JSON object key"):
+        admission_v2._load_json(path)
+
+
+def test_migration_file_loader_rejects_oversized_input(tmp_path, monkeypatch):
+    path = tmp_path / "oversized.json"
+    path.write_text(json.dumps({"padding": "x" * 128}), encoding="utf-8")
+    monkeypatch.setattr(train, "MAX_MANIFEST_BYTES", 32)
+    with pytest.raises(train.TrainManifestError, match="exceeds 32 bytes"):
+        admission_v2._load_json(path)
