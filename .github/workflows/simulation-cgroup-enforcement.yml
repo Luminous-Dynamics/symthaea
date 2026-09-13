@@ -1,0 +1,142 @@
+name: Simulation Cgroup Enforcement
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-worker-cgroup/**"
+      - ".github/workflows/simulation-cgroup-enforcement.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  SYMTHAEA_CGROUP_V2_DELEGATED_ROOT: ${{ vars.SYMTHAEA_CGROUP_V2_DELEGATED_ROOT }}
+
+jobs:
+  enforcement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux cgroup-v2 subject
+        run: |
+          test "$(uname -s)" = Linux
+          test -r /sys/fs/cgroup/cgroup.controllers
+          cat /sys/fs/cgroup/cgroup.controllers
+          uname -a
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-simulation-cgroup-enforcement-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-worker-cgroup/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-cgroup-enforcement-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-cgroup-enforcement-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the cgroup-enforcement graph."
+          else
+            cat simulation-cgroup-enforcement-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-cgroup-enforcement-cargo-lock-patch
+          path: simulation-cgroup-enforcement-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-sim-worker-cgroup -- --check
+
+      - name: Check and test cgroup crate
+        run: |
+          cargo check --locked -p symthaea-sim-worker-cgroup --all-targets
+          cargo test --locked -p symthaea-sim-worker-cgroup
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-sim-worker-cgroup --all-targets -- -D warnings
+
+      - name: Build exact enforcement probe
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-worker-cgroup \
+            --bin symthaea-sim-cgroup-v2-enforcement-probe
+          sha256sum target/debug/symthaea-sim-cgroup-v2-enforcement-probe
+
+      - name: Execute adversarial resource enforcement when configured
+        shell: bash
+        run: |
+          if [[ -n "${SYMTHAEA_CGROUP_V2_DELEGATED_ROOT:-}" ]]; then
+            cargo run --locked \
+              -p symthaea-sim-worker-cgroup \
+              --bin symthaea-sim-cgroup-v2-enforcement-probe \
+              | tee cgroup-enforcement-probe.txt
+            grep -qx 'pids_max_enforced=pass' cgroup-enforcement-probe.txt
+            grep -qx 'memory_max_enforced=pass' cgroup-enforcement-probe.txt
+            grep -qx 'cpu_max_enforced=pass' cgroup-enforcement-probe.txt
+            grep -qx 'cgroup_v2_limits_probe=pass' cgroup-enforcement-probe.txt
+            echo 'resource_overlimit_adversarial_probe=pass' \
+              | tee cgroup-enforcement-kernel-status.txt
+          else
+            echo 'resource_overlimit_adversarial_probe=not_established' \
+              | tee cgroup-enforcement-kernel-status.txt
+            echo 'cgroup_v2_limits_probe=not_run_no_explicit_resource_root' \
+              | tee cgroup-enforcement-probe.txt
+          fi
+
+      - name: Record exact enforcement subject
+        run: |
+          kernel_probe="$(cut -d= -f2 cgroup-enforcement-kernel-status.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "probe_sha256=$(sha256sum target/debug/symthaea-sim-cgroup-v2-enforcement-probe | cut -d' ' -f1)"
+            echo "cgroup_profile=symthaea.simulation.worker-cgroup.v2-v1"
+            echo "workload_triggered_after_placement=true"
+            echo "controller_baselines_after_placement=true"
+            echo "pids_limit_evidence=clone_or_fork_returns_EAGAIN"
+            echo "memory_limit_evidence=memory.events_oom_or_oom_kill_increase"
+            echo "cpu_limit_evidence=cpu.stat_nr_throttled_or_throttled_usec_increase"
+            echo "memory_oom_group_required=true"
+            echo "pre_migration_memory_recharged=false"
+            echo "full_lifetime_memory_accounting=false"
+            echo "resource_root_source=explicit_host_configuration"
+            echo "delegation_origin_inferred_from_kernel=false"
+            echo "resource_overlimit_adversarial_probe=${kernel_probe}"
+            echo "first_instruction_containment_claim=false"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-cgroup-enforcement-receipt.txt
+
+      - name: Upload cgroup enforcement evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-cgroup-enforcement-evidence
+          path: |
+            cgroup-enforcement-probe.txt
+            cgroup-enforcement-kernel-status.txt
+            simulation-cgroup-enforcement-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock

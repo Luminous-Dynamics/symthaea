@@ -7,6 +7,7 @@ description = "Parent-owned cgroup v2 resource leases for Symthaea simulation wo
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [dependencies]
+libc.workspace = true
 serde.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
@@ -14,3 +15,7 @@ thiserror.workspace = true
 [[bin]]
 name = "symthaea-sim-cgroup-v2-probe"
 path = "src/bin/symthaea-sim-cgroup-v2-probe.rs"
+
+[[bin]]
+name = "symthaea-sim-cgroup-v2-enforcement-probe"
+path = "src/bin/symthaea-sim-cgroup-v2-enforcement-probe.rs"
