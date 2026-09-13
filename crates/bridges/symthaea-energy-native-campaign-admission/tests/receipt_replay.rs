@@ -35,12 +35,12 @@ fn code(dimension: EvidenceDimension) -> u8 {
     }
 }
 
-fn manifest() -> Tier1CampaignManifest {
+fn manifest_with_formula(formula: &str) -> Tier1CampaignManifest {
     let candidate = Candidate {
         id: CandidateId::new("receipt-replay-candidate").unwrap(),
         kind: "energy_material".into(),
         specification: BTreeMap::from([
-            ("formula".into(), "LiFePO4".into()),
+            ("formula".into(), formula.into()),
             ("phase".into(), "olivine".into()),
         ]),
         origin: CandidateOrigin::UserProposed,
@@ -87,10 +87,14 @@ fn manifest() -> Tier1CampaignManifest {
     .unwrap()
 }
 
-fn prediction(dimension: EvidenceDimension) -> Prediction {
+fn manifest() -> Tier1CampaignManifest {
+    manifest_with_formula("LiFePO4")
+}
+
+fn prediction_with_offset(dimension: EvidenceDimension, offset: f64) -> Prediction {
     Prediction {
         metric: format!("metric-{}", code(dimension)),
-        value: 1.0 + f64::from(code(dimension)),
+        value: 1.0 + f64::from(code(dimension)) + offset,
         unit: "score".into(),
         uncertainty: UncertaintyEstimate::new(1.0, 0.0).unwrap(),
         fidelity: FidelityLevel::Surrogate,
@@ -112,21 +116,33 @@ fn prediction(dimension: EvidenceDimension) -> Prediction {
     }
 }
 
-fn clean_inputs() -> (
+fn prediction(dimension: EvidenceDimension) -> Prediction {
+    prediction_with_offset(dimension, 0.0)
+}
+
+fn build_inputs(
+    manifest: Tier1CampaignManifest,
+    reverse_caller_order: bool,
+    changed_dimension: Option<EvidenceDimension>,
+) -> (
     Tier1CampaignManifest,
     NativeEnvelopeDossier,
     NativeCampaignAdmissionReceipt,
 ) {
-    let manifest = manifest();
     let candidate_id = manifest.candidate_anchor.candidate.id.clone();
     let mut assertions = Vec::new();
     let mut envelopes = Vec::new();
 
     for dimension in EvidenceDimension::ALL {
+        let prediction = if Some(dimension) == changed_dimension {
+            prediction_with_offset(dimension, 0.125)
+        } else {
+            prediction(dimension)
+        };
         let envelope = wrap_evidence_payload_json(
             &manifest,
             dimension,
-            prediction(dimension),
+            prediction,
             "receipt-replay-fixture-v0",
             format!("{{\"dimension\":{}}}", code(dimension)),
         )
@@ -143,9 +159,22 @@ fn clean_inputs() -> (
         envelopes.push(envelope);
     }
 
+    if reverse_caller_order {
+        assertions.reverse();
+        envelopes.reverse();
+    }
+
     let dossier = assemble_native_envelope_dossier(&manifest, assertions, envelopes).unwrap();
     let receipt = admit_native_campaign_result(&manifest, &dossier, vec![]).unwrap();
     (manifest, dossier, receipt)
+}
+
+fn clean_inputs() -> (
+    Tier1CampaignManifest,
+    NativeEnvelopeDossier,
+    NativeCampaignAdmissionReceipt,
+) {
+    build_inputs(manifest(), false, None)
 }
 
 #[test]
@@ -155,6 +184,53 @@ fn clean_receipt_replays_deterministically() {
     let recomputed = admit_native_campaign_result(&manifest, &dossier, vec![]).unwrap();
     assert_eq!(receipt, recomputed);
     assert_eq!(receipt.sha256().unwrap(), recomputed.sha256().unwrap());
+}
+
+#[test]
+fn caller_envelope_and_identity_order_is_not_scientific_identity() {
+    let (manifest_a, dossier_a, receipt_a) = build_inputs(manifest(), false, None);
+    let (manifest_b, dossier_b, receipt_b) = build_inputs(manifest(), true, None);
+
+    assert_eq!(manifest_a.sha256().unwrap(), manifest_b.sha256().unwrap());
+    assert_eq!(
+        dossier_a.sha256(&manifest_a).unwrap(),
+        dossier_b.sha256(&manifest_b).unwrap()
+    );
+    assert_eq!(receipt_a, receipt_b);
+    assert_eq!(receipt_a.sha256().unwrap(), receipt_b.sha256().unwrap());
+}
+
+#[test]
+fn changed_prediction_changes_dossier_and_admission_identity() {
+    let (manifest_a, dossier_a, receipt_a) = build_inputs(manifest(), false, None);
+    let (manifest_b, dossier_b, receipt_b) = build_inputs(
+        manifest(),
+        false,
+        Some(EvidenceDimension::ThermodynamicStability),
+    );
+
+    assert_eq!(manifest_a.sha256().unwrap(), manifest_b.sha256().unwrap());
+    assert_ne!(
+        dossier_a.sha256(&manifest_a).unwrap(),
+        dossier_b.sha256(&manifest_b).unwrap()
+    );
+    assert_ne!(receipt_a.sha256().unwrap(), receipt_b.sha256().unwrap());
+}
+
+#[test]
+fn changed_candidate_specification_invalidates_old_receipt_replay() {
+    let (original_manifest, dossier, receipt) = clean_inputs();
+    let changed_manifest = manifest_with_formula("NaFePO4");
+
+    assert_ne!(
+        original_manifest.candidate_anchor.candidate_sha256,
+        changed_manifest.candidate_anchor.candidate_sha256
+    );
+    assert_ne!(
+        original_manifest.sha256().unwrap(),
+        changed_manifest.sha256().unwrap()
+    );
+    assert!(receipt.validate_with_inputs(&changed_manifest, &dossier).is_err());
 }
 
 #[test]
