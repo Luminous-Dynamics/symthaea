@@ -16,10 +16,7 @@ use symthaea_core::intervention_interlock::ExplicitConsentState;
 use symthaea_core::welfare::SubjectAffectingAction;
 use symthaea_fabrication_kernel::crypto_digest::{Sha256, Sha256Digest};
 use symthaea_fabrication_kernel::trust::TrustSnapshot;
-use symthaea_memory::episodic_replay::{
-    EpisodeInstanceId, EpisodicMemory,
-    persisted_import::PersistedEpisodicImportError,
-};
+use symthaea_memory::episodic_replay::{EpisodeInstanceId, EpisodicMemory};
 use symthaea_psych_bench::moral_patient::{MoralPatientEvidenceProfile, PrecautionPolicy};
 use symthaea_welfare_authority::WelfareAuthorityPolicyManifest;
 use symthaea_welfare_consent::{SubjectConsentLedger, SubjectIdentityRegistry};
@@ -38,8 +35,9 @@ use crate::memory_quarantine::{
     EpisodicQuarantineEscrow, digest_episodic_quarantine_escrow, episodic_instance_target_id,
 };
 use crate::persisted_memory_restore::{
-    EpisodicQuarantineEscrowLookup, PersistedEpisodicEscrowRow, PersistedEpisodicRestoreExecutionError,
-    PersistedEpisodicRestoreInterventionError, PersistedEpisodicRestoreReceipt,
+    EpisodicQuarantineEscrowLookup, PersistedEpisodicEscrowRow,
+    PersistedEpisodicRestoreExecutionError, PersistedEpisodicRestoreInterventionError,
+    PersistedEpisodicRestoreReceipt,
 };
 use crate::persisted_restore_correlation_v2::{
     PersistedRestoreCorrelationV2Error, digest_persisted_restore_correlation_from_context_v2,
@@ -141,10 +139,12 @@ where
         context: &PreparedExecutionContextV2,
     ) -> Result<(), PersistedEpisodicRestoreExecutionV2Error<L::Error, Q::Error>> {
         if context.execution_id() != self.execution_id {
-            return Err(PersistedEpisodicRestoreExecutionV2Error::PreparedExecutionIdMismatch {
-                expected: self.execution_id.clone(),
-                actual: context.execution_id().to_string(),
-            });
+            return Err(
+                PersistedEpisodicRestoreExecutionV2Error::PreparedExecutionIdMismatch {
+                    expected: self.execution_id.clone(),
+                    actual: context.execution_id().to_string(),
+                },
+            );
         }
         if context.target_id() != self.expected_target_id {
             return Err(PersistedEpisodicRestoreExecutionV2Error::PreparedTargetMismatch {
@@ -712,7 +712,8 @@ mod tests {
         let target = "symthaea:self:episodic-memory:instance:v2-test";
         let prepared = prepared("authority:v2:test", target);
         let prepared_digest = digest_prepared_execution(&prepared).unwrap();
-        PreparedExecutionContextV2::verify_exact_prepared_digest(&prepared, prepared_digest).unwrap();
+        PreparedExecutionContextV2::verify_exact_prepared_digest(&prepared, prepared_digest)
+            .unwrap();
         let context = PreparedExecutionContextV2::from_verified_durable(
             &prepared,
             prepared_digest,
@@ -723,7 +724,7 @@ mod tests {
     }
 
     #[test]
-    fn V2_result_domain_is_distinct_from_legacy_result_domain() {
+    fn v2_result_domain_is_distinct_from_legacy_result_domain() {
         assert_eq!(
             PERSISTED_RESTORE_RESULT_V3_DOMAIN,
             b"symthaea.welfare.persisted-episodic-restore-result.v3\0"
