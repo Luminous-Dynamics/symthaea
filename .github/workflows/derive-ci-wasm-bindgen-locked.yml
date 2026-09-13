@@ -1,0 +1,99 @@
+name: Derive CI wasm-bindgen Locked Install
+
+on:
+  push:
+    branches:
+      - derive/ci-wasm-bindgen-locked-ada0d92f
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  derive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SUBJECT_SHA: ada0d92fce3f0ff10883061b0608edfd37b16317
+      CANDIDATE_BRANCH: fix/ci-wasm-bindgen-locked
+      WORKFLOW_PATH: .github/workflows/ci.yml
+    steps:
+      - name: Checkout exact main subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact clean subject
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Apply one deterministic workflow replacement
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/ci.yml')
+          old = 'run: cargo install wasm-bindgen-cli --version 0.2.108'
+          new = 'run: cargo install wasm-bindgen-cli --version 0.2.108 --locked'
+          text = path.read_text()
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'expected exactly one un-locked install command, found {count}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Prove closed-world one-file/one-line change
+        run: |
+          set -euo pipefail
+          test "$(git diff --name-only)" = "$WORKFLOW_PATH"
+          git diff --check
+          git diff -- "$WORKFLOW_PATH" | tee ci-wasm-bindgen-locked.patch
+          additions="$(git diff --numstat -- "$WORKFLOW_PATH" | awk '{print $1}')"
+          deletions="$(git diff --numstat -- "$WORKFLOW_PATH" | awk '{print $2}')"
+          test "$additions" = 1
+          test "$deletions" = 1
+          grep -Fq 'run: cargo install wasm-bindgen-cli --version 0.2.108 --locked' "$WORKFLOW_PATH"
+          ! grep -Fq 'run: cargo install wasm-bindgen-cli --version 0.2.108$' "$WORKFLOW_PATH"
+          sha256sum ci-wasm-bindgen-locked.patch
+
+      - name: Freeze candidate commit
+        run: |
+          set -euo pipefail
+          git config user.name "CI derivation bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add "$WORKFLOW_PATH"
+          test "$(git diff --cached --name-only)" = "$WORKFLOW_PATH"
+          git commit -m "fix(ci): lock wasm-bindgen CLI install"
+          test "$(git rev-parse HEAD^)" = "$SUBJECT_SHA"
+          git rev-parse HEAD | tee candidate-commit.txt
+          git rev-parse HEAD^{tree} | tee candidate-tree.txt
+          git push origin "HEAD:refs/heads/$CANDIDATE_BRANCH" --force-with-lease
+
+      - name: Emit derivation receipt
+        run: |
+          cat > ci-wasm-bindgen-locked-receipt.json <<EOF
+          {
+            "schema": "symthaea.ci.workflow-derivation.v1",
+            "source_subject_sha": "$SUBJECT_SHA",
+            "changed_path": "$WORKFLOW_PATH",
+            "semantic_change": "add --locked to pinned wasm-bindgen-cli 0.2.108 install",
+            "candidate_commit": "$(cat candidate-commit.txt)",
+            "candidate_tree": "$(cat candidate-tree.txt)",
+            "isolated_proof_run": 34766609210,
+            "isolated_proof_job": 103748587901
+          }
+          EOF
+          cat ci-wasm-bindgen-locked-receipt.json
+
+      - name: Upload derivation receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-wasm-bindgen-locked-derivation
+          path: |
+            ci-wasm-bindgen-locked.patch
+            ci-wasm-bindgen-locked-receipt.json
+            candidate-commit.txt
+            candidate-tree.txt
+          if-no-files-found: error
