@@ -17,6 +17,21 @@ import subprocess
 import sys
 from pathlib import Path
 
+PROFILE_ID = "support-focused-v2"
+REQUIRED_GATES = [
+    "subject_binding", "base_binding", "governance", "cargo_metadata",
+    "format", "default_tests", "clippy", "logparse_tests",
+    "root_support_check", "postflight_immutability",
+]
+COMMAND_GATES: list[tuple[str, list[str], bool]] = [
+    ("cargo_metadata", ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"], True),
+    ("format", ["cargo", "fmt", "-p", "symthaea-support", "--", "--check"], False),
+    ("default_tests", ["cargo", "test", "--locked", "-p", "symthaea-support", "--all-targets"], False),
+    ("clippy", ["cargo", "clippy", "--locked", "-p", "symthaea-support", "--all-targets", "--", "-D", "warnings"], False),
+    ("logparse_tests", ["cargo", "test", "--locked", "-p", "symthaea-support", "--all-targets", "--features", "logparse-adapter"], False),
+    ("root_support_check", ["cargo", "check", "--locked", "-p", "symthaea", "--no-default-features", "--features", "support"], False),
+]
+
 ROOT = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip())
 os.chdir(ROOT)
 OUT = Path(os.environ.get("SUPPORT_QUALIFICATION_DIR", "/tmp/symthaea-support-qualification-v2"))
@@ -55,6 +70,27 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def canonical_sha256(value: object) -> str:
+    data = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(data).hexdigest()
+
+
+def recipe_semantics() -> dict:
+    return {
+        "profile_id": PROFILE_ID,
+        "subject_class": "raw_pr_head_package_focused",
+        "required_gates": REQUIRED_GATES,
+        "governance_command": ["bash", "scripts/check-class-a-changes.sh", "--ci"],
+        "commands": [
+            {"gate": name, "argv": argv, "quiet_stdout": quiet}
+            for name, argv, quiet in COMMAND_GATES
+        ],
+        "preflight": "exact_commit_and_tree_clean_checkout",
+        "postflight": "same_commit_tree_and_clean_checkout",
+        "positive_receipt_rule": "all_required_gates_pass_or_explicitly_not_applicable",
+    }
+
+
 def clean_exact_checkout() -> bool:
     if capture(["git", "rev-parse", "HEAD"]) != ACTUAL_SHA:
         return False
@@ -73,7 +109,7 @@ def gate(name: str, argv: list[str], *, quiet: bool = False) -> None:
 
 def declared_inputs() -> str:
     paths = [
-        "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo",
+        "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo", "src",
         "crates/domains/symthaea-support", "crates/core/symthaea-logparse",
         "scripts/check-class-a-changes.sh", "scripts/qualify-support-fast.py",
         ".github/workflows/support-fast.yml",
@@ -90,12 +126,7 @@ def declared_inputs() -> str:
 
 
 def classify() -> str:
-    required = [
-        "subject_binding", "base_binding", "governance", "cargo_metadata",
-        "format", "default_tests", "clippy", "logparse_tests",
-        "root_support_check", "postflight_immutability",
-    ]
-    failed = [n for n in required if GATES.get(n) not in {"PASS", "NOT_APPLICABLE"}]
+    failed = [n for n in REQUIRED_GATES if GATES.get(n) not in {"PASS", "NOT_APPLICABLE"}]
     if not failed:
         return "Passed"
     if len(failed) > 1:
@@ -121,14 +152,16 @@ def write_json(path: Path, obj: dict) -> str:
     return digest
 
 
-def tool(name: str, argv: list[str]) -> str:
-    return capture(argv)
-
-
 def attempt_object(terminal: str, input_digest: str, verifier_error: str | None = None) -> dict:
+    semantics = recipe_semantics()
     positive = terminal == "Passed" and verifier_error is None
     return {
         "schema_version": "symthaea.focused-qualification-attempt.v2",
+        "qualification_profile": {
+            "profile_id": PROFILE_ID,
+            "recipe_semantics_sha256": canonical_sha256(semantics),
+            "required_gates": REQUIRED_GATES,
+        },
         "terminal_disposition": terminal,
         "positive_receipt_eligible": positive,
         "verifier_error": verifier_error,
@@ -173,10 +206,10 @@ def attempt_object(terminal: str, input_digest: str, verifier_error: str | None 
         },
         "toolchain": {
             "selector": "rust-toolchain.toml",
-            "rustc": tool("rustc", ["rustc", "-V"]),
-            "cargo": tool("cargo", ["cargo", "-V"]),
-            "rustfmt": tool("rustfmt", ["rustfmt", "-V"]),
-            "clippy": tool("clippy", ["cargo", "clippy", "-V"]),
+            "rustc": capture(["rustc", "-V"]),
+            "cargo": capture(["cargo", "-V"]),
+            "rustfmt": capture(["rustfmt", "-V"]),
+            "clippy": capture(["cargo", "clippy", "-V"]),
             "environment_class": "observed_provider_environment_not_capsule_qualified",
             "reproducible_environment_claimed": False,
             "future_environment_theorem": "#917",
@@ -194,8 +227,14 @@ def attempt_object(terminal: str, input_digest: str, verifier_error: str | None 
 
 
 def positive_object(attempt_digest: str, input_digest: str) -> dict:
+    semantics = recipe_semantics()
     return {
         "schema_version": "symthaea.focused-candidate-qualification-receipt.v2",
+        "qualification_profile": {
+            "profile_id": PROFILE_ID,
+            "recipe_semantics_sha256": canonical_sha256(semantics),
+            "required_gates": REQUIRED_GATES,
+        },
         "disposition": "Passed",
         "subject": {
             "class": "raw_pr_head_package_focused",
@@ -253,12 +292,8 @@ def main() -> int:
 
         input_digest = declared_inputs()
         os.environ.setdefault("CARGO_TARGET_DIR", "target/support-fast")
-        gate("cargo_metadata", ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"], quiet=True)
-        gate("format", ["cargo", "fmt", "-p", "symthaea-support", "--", "--check"])
-        gate("default_tests", ["cargo", "test", "--locked", "-p", "symthaea-support", "--all-targets"])
-        gate("clippy", ["cargo", "clippy", "--locked", "-p", "symthaea-support", "--all-targets", "--", "-D", "warnings"])
-        gate("logparse_tests", ["cargo", "test", "--locked", "-p", "symthaea-support", "--all-targets", "--features", "logparse-adapter"])
-        gate("root_support_check", ["cargo", "check", "--locked", "-p", "symthaea", "--no-default-features", "--features", "support"])
+        for name, argv, quiet in COMMAND_GATES:
+            gate(name, argv, quiet=quiet)
         if clean_exact_checkout():
             SOURCE_STATE = "clean-exact-checkout-postflight"
             GATES["postflight_immutability"] = "PASS"
@@ -267,7 +302,7 @@ def main() -> int:
             GATES["postflight_immutability"] = "FAIL"
     except Exception as exc:
         verifier_error = f"{type(exc).__name__}: {exc}"
-        for name in ["base_binding", "governance", "cargo_metadata", "format", "default_tests", "clippy", "logparse_tests", "root_support_check", "postflight_immutability"]:
+        for name in REQUIRED_GATES:
             GATES.setdefault(name, "NOT_RUN")
 
     terminal = classify() if verifier_error is None else "VerifierOrPreflightFailure"
@@ -278,6 +313,8 @@ def main() -> int:
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as f:
             f.write("## Support focused candidate qualification\n\n")
+            f.write(f"- profile: `{PROFILE_ID}`\n")
+            f.write(f"- recipe semantics SHA-256: `{canonical_sha256(recipe_semantics())}`\n")
             f.write(f"- terminal disposition: **{terminal}**\n")
             f.write(f"- checked-out SHA: `{ACTUAL_SHA}`\n")
             f.write(f"- checked-out tree: `{ACTUAL_TREE}`\n")
