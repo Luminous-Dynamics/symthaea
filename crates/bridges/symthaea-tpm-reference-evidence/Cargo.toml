@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-tpm-reference-evidence"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Typed candidate evidence from TPM/reference qualification into formal safety obligations"
+
+[dependencies]
+blake3.workspace = true
+serde.workspace = true
+symthaea-domain-awareness-evidence = { path = "../symthaea-domain-awareness-evidence" }
+symthaea-formal-safety = { path = "../../domains/symthaea-formal-safety" }
+symthaea-assurance-tpm-reference-crucible = { path = "../../domains/symthaea-assurance-tpm-reference-crucible" }
