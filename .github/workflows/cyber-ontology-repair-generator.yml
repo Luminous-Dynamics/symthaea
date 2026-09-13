@@ -12,21 +12,25 @@ permissions:
 
 jobs:
   repair:
-    if: github.event.head_commit.message == 'chore(cyber): stage one-shot repair generator'
+    if: ${{ github.event.head_commit.message == 'chore(cyber): repair one-shot generator syntax' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact staged subject
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 2
+          fetch-depth: 3
           persist-credentials: true
 
       - name: Prove one-shot ancestry
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "f5e5ae6bbb4caed758599ebc8b6c45ed410ae76c"
+          failed_subject='f5e5ae6bbb4caed758599ebc8b6c45ed410ae76c'
+          test "$(git rev-parse HEAD^^)" = "$failed_subject"
+          mapfile -t staged_only < <(git diff --name-only "$failed_subject"..HEAD | sort)
+          test "${#staged_only[@]}" -eq 1
+          test "${staged_only[0]}" = '.github/workflows/cyber-ontology-repair-generator.yml'
           test "$(git status --porcelain)" = ""
 
       - name: Install repository Rust toolchain
