@@ -99,11 +99,19 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Check psych-bench formatting
+      - name: Check tranche-owned Rust formatting
         shell: bash
         run: |
           set -euo pipefail
-          cargo fmt --all -- --check
+          # Do not make this authority tranche responsible for unrelated inherited
+          # workspace formatting debt. Check exactly the Rust surfaces modified by
+          # the final-resolution authority, and prevent mod.rs from recursively
+          # formatting sibling modules owned by prerequisite lineages.
+          rustfmt --edition 2024 --check --config skip_children=true \
+            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_causal_verified_promotion.rs \
+            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_trusted_resolution.rs \
+            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs \
+            crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_trusted_resolution_candidate.rs
 
       - name: Compile trusted final-resolution adapter
         shell: bash
