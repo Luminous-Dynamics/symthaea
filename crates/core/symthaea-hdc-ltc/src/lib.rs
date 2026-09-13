@@ -24,6 +24,9 @@
 //! - [`train_exact_episode`] accumulates those exact query gradients while
 //!   parameters remain frozen for a complete world, then applies one bounded
 //!   episode-end recurrent update.
+//! - [`train_current_only_episode`] is the fail-closed experiment gate for the
+//!   first learned result: historical queries are rejected before the recurrent
+//!   state or parameters can mutate.
 //! - [`InvariantContextMixer`] supplies O(KD) cross-dimensional magnitude
 //!   context without violating the full bipolar role symmetry.
 //! - [`ContextualHolographicLiquidCell`] composes invariant context with the
@@ -49,6 +52,7 @@ pub mod neuron;
 pub mod state_tracking_associative;
 pub mod state_tracking_benchmark;
 pub mod state_tracking_codec;
+pub mod state_tracking_current_only;
 pub mod state_tracking_eval;
 pub mod state_tracking_exact_training;
 pub mod state_tracking_readout;
@@ -72,6 +76,10 @@ pub use state_tracking_benchmark::{
     TrackingQueryKind, TrackingScore,
 };
 pub use state_tracking_codec::{StateTrackingCodec, TrackingCodecError};
+pub use state_tracking_current_only::{
+    CurrentOnlyTrainingError, evaluate_current_only_episode, train_current_only_episode,
+    validate_current_only_benchmark,
+};
 pub use state_tracking_eval::{
     FrozenTrackingEvalConfig, FrozenTrackingEvalError, FrozenTrackingEvalResult,
     FrozenTrackingReservoir, evaluate_frozen_reservoir,
