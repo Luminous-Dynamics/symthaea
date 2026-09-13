@@ -1,0 +1,215 @@
+name: Simulation Public Worker Execution
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-public-worker-execution/**"
+      - "crates/bridges/symthaea-sim-public-worker-input/**"
+      - "crates/bridges/symthaea-sim-first-instruction-worker-rlimit/**"
+      - "crates/bridges/symthaea-sim-clone-cgroup-exec-rlimit/**"
+      - "crates/bridges/symthaea-sim-worker/**"
+      - "crates/bridges/symthaea-sim-worker-cgroup/**"
+      - "crates/bridges/symthaea-sim-worker-containment/**"
+      - "crates/bridges/symthaea-sim-worker-filesystem/**"
+      - "crates/bridges/symthaea-sim-worker-image/**"
+      - "crates/bridges/symthaea-extension-host/**"
+      - "crates/bridges/symthaea-extension-simulation-host/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/simulation-public-worker-execution.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  SYMTHAEA_CGROUP_V2_DELEGATED_ROOT: ${{ vars.SYMTHAEA_CGROUP_V2_DELEGATED_ROOT }}
+
+jobs:
+  public-worker-execution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          test -r /sys/fs/cgroup/cgroup.controllers
+          uname -a
+          cat /sys/fs/cgroup/cgroup.controllers
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
+
+      - name: Cache Cargo and Component builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-simulation-public-worker-execution-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-public-worker-execution/**', 'crates/bridges/symthaea-sim-public-worker-input/**', 'crates/bridges/symthaea-sim-first-instruction-worker-rlimit/**', 'crates/bridges/symthaea-sim-clone-cgroup-exec-rlimit/**', 'crates/bridges/symthaea-sim-worker/**', 'crates/bridges/symthaea-sim-worker-cgroup/**', 'crates/bridges/symthaea-sim-worker-containment/**', 'crates/bridges/symthaea-sim-worker-filesystem/**', 'crates/bridges/symthaea-sim-worker-image/**', 'crates/bridges/symthaea-extension-host/**', 'crates/bridges/symthaea-extension-simulation-host/**', 'examples/extensions/hello-simulation/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-public-worker-execution-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-public-worker-execution-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches public worker execution graph."
+          else
+            cat simulation-public-worker-execution-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-public-worker-execution-cargo-lock-patch
+          path: simulation-public-worker-execution-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Reconcile candidate pinned formatting
+        run: |
+          cargo fmt -p symthaea-sim-public-worker-execution
+          git diff -- crates/bridges/symthaea-sim-public-worker-execution \
+            > simulation-public-worker-execution-rustfmt.patch
+          if git diff --quiet -- crates/bridges/symthaea-sim-public-worker-execution; then
+            echo "Source already matches Rust 1.96 rustfmt."
+          else
+            cat simulation-public-worker-execution-rustfmt.patch
+          fi
+
+      - name: Upload candidate rustfmt patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-public-worker-execution-rustfmt-patch
+          path: simulation-public-worker-execution-rustfmt.patch
+          if-no-files-found: error
+
+      - name: Require standalone guest WIT parity
+        run: |
+          cmp crates/core/symthaea-extension-core/wit/extension-control.wit \
+              examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+              examples/extensions/hello-simulation/wit/simulation-provider.wit
+
+      - name: Build exact release Component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum "$component" examples/extensions/hello-simulation/manifest.json
+
+      - name: Check source graph
+        run: |
+          cargo check --locked -p symthaea-sim-public-worker-execution --all-targets
+          cargo check --locked -p symthaea-sim-public-worker-input --all-targets
+          cargo check --locked -p symthaea-sim-first-instruction-worker-rlimit --all-targets
+
+      - name: Test source corpus
+        run: |
+          cargo test --locked -p symthaea-sim-public-worker-execution
+          cargo test --locked -p symthaea-sim-public-worker-input
+          cargo test --locked -p symthaea-sim-first-instruction-worker-rlimit
+
+      - name: Strict Clippy
+        run: |
+          cargo clippy --locked -p symthaea-sim-public-worker-execution --all-targets -- -D warnings
+          cargo clippy --locked -p symthaea-sim-public-worker-input --all-targets -- -D warnings
+          cargo clippy --locked -p symthaea-sim-first-instruction-worker-rlimit --all-targets -- -D warnings
+
+      - name: Build exact contained worker
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-worker-filesystem \
+            --bin symthaea-sim-filesystem-worker
+          sha256sum target/debug/symthaea-sim-filesystem-worker
+
+      - name: Execute real public profile when cgroup root is configured
+        shell: bash
+        run: |
+          if [[ -n "${SYMTHAEA_CGROUP_V2_DELEGATED_ROOT:-}" ]]; then
+            SYMTHAEA_PUBLIC_EXECUTION_WORKER_BIN="${GITHUB_WORKSPACE}/target/debug/symthaea-sim-filesystem-worker" \
+              cargo test --locked \
+                -p symthaea-sim-public-worker-execution \
+                --test real_component \
+                -- --ignored --test-threads=1
+            echo 'kernel_public_worker_execution_probe=pass' \
+              | tee public-worker-execution-kernel-status.txt
+          else
+            echo 'kernel_public_worker_execution_probe=not_established' \
+              | tee public-worker-execution-kernel-status.txt
+          fi
+
+      - name: Record exact public execution subject
+        run: |
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          kernel_probe="$(cut -d= -f2 public-worker-execution-kernel-status.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "manifest_sha256=$(sha256sum examples/extensions/hello-simulation/manifest.json | cut -d' ' -f1)"
+            echo "component_sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+            echo "contained_worker_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-worker | cut -d' ' -f1)"
+            echo "profile=symthaea.simulation.public-worker-execution.v1"
+            echo "input_profile=symthaea.simulation.public-worker-input-envelope.v1"
+            echo "inner_profile=symthaea.simulation.first-instruction-worker.rlimit-v1"
+            echo "address_space_bytes=17179869184"
+            echo "cpu_seconds=15"
+            echo "file_size_bytes=1048576"
+            echo "open_files=32"
+            echo "process_count=64"
+            echo "wall_time_ms=20000"
+            echo "max_stdout_bytes=16777236"
+            echo "max_stderr_bytes=262144"
+            echo "cgroup_memory_max_bytes=2147483648"
+            echo "cgroup_pids_max=64"
+            echo "cgroup_cpu_quota_us=100000"
+            echo "cgroup_cpu_period_us=100000"
+            echo "max_response_json_bytes=16777216"
+            echo "response_frame_overhead_bytes=20"
+            echo "max_response_frame_bytes=16777236"
+            echo "framed_response_fits_stdout_exactly=true"
+            echo "caller_supplied_supervisor_limits=false"
+            echo "alternate_cgroup_limits_rejected=true"
+            echo "legacy_preexec_rlimits_applied_by_inner=true"
+            echo "worker_may_mint_simulation_evidence=false"
+            echo "engineering_evidence_promotion=false"
+            echo "deployment_binding=not_established_by_this_layer"
+            echo "release_receipt=not_established_by_this_layer"
+            echo "kernel_public_worker_execution_probe=${kernel_probe}"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-public-worker-execution-receipt.txt
+
+      - name: Upload public execution evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-public-worker-execution-evidence
+          path: |
+            public-worker-execution-kernel-status.txt
+            simulation-public-worker-execution-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed pinned formatting
+        run: git diff --exit-code -- crates/bridges/symthaea-sim-public-worker-execution
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
