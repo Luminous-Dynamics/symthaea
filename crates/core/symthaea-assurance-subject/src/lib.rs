@@ -209,7 +209,10 @@ impl UnavailabilityReason {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SurfaceState {
-    /// Exact material commitment is available.
+    /// Exact material identity commitment is available.
+    ///
+    /// This does not imply that the committed artifact is retrievable or
+    /// executable; ASSURE-001 establishes identity completeness, not replay.
     Known(DigestSha256),
     /// The surface is material, but its exact identity is not known.
     Unknown,
@@ -270,7 +273,13 @@ pub struct CompletenessSummary {
 }
 
 impl CompletenessSummary {
-    pub fn is_exactly_replayable(self) -> bool {
+    /// Returns true when every applicable registered surface has an exact
+    /// material identity commitment.
+    ///
+    /// This is intentionally **not** called replayability. A known commitment
+    /// does not prove artifact availability, provider cooperation, or a
+    /// runnable execution environment.
+    pub fn has_complete_material_identity(self) -> bool {
         self.unknown == 0 && self.unavailable == 0
     }
 }
