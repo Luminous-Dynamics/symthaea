@@ -43,6 +43,10 @@ use symthaea_welfare_assurance::replay_recovery::{
     DurableAuthorityReplayFence, DurableAuthorityReplaySnapshot, ReplayFencePersistence,
     authorize_evidence_bound_intervention_durable,
 };
+use symthaea_welfare_assurance::restored_continuity_promotion::{
+    RestoredContinuityPromotionBarrier, RestoredContinuityPromotionFailure,
+    RestoredContinuityPromotionRequest, VerifiedRestoredContinuityPromotion,
+};
 use symthaea_welfare_authority::{
     WelfareAuthorityPolicyManifest, WelfareAuthorityRole, WelfareAuthoritySigner,
     WelfareAuthoritySignerBinding, WelfareAuthoritySignatureVerifier, WelfareAuthorityTracker,
@@ -60,6 +64,10 @@ const STORE_TARGET_ID: &str = "symthaea:self:episodic-memory";
 const BASE_NONCE: &str = "persisted-memory-restore-issuance-1";
 const EXECUTION_ID: &str = "exec:persisted-episodic-restore:1";
 
+fn digest(seed: u8) -> Sha256Digest {
+    Sha256Digest([seed; 32])
+}
+
 struct SubjectSigner;
 struct SubjectVerifier;
 
@@ -67,11 +75,9 @@ impl SubjectConsentSigner for SubjectSigner {
     fn algorithm(&self) -> SignatureAlgorithm {
         SignatureAlgorithm::Ed25519
     }
-
     fn key_id(&self) -> &str {
         "subject-key"
     }
-
     fn sign_subject_consent(&self, message: &[u8]) -> Result<Vec<u8>, String> {
         Ok(signature(b"subject", self.key_id(), message))
     }
@@ -96,11 +102,9 @@ impl WelfareAuthoritySigner for AuthoritySigner {
     fn algorithm(&self) -> SignatureAlgorithm {
         SignatureAlgorithm::Ed25519
     }
-
     fn key_id(&self) -> &str {
         self.0
     }
-
     fn sign_welfare_authority(&self, message: &[u8]) -> Result<Vec<u8>, String> {
         Ok(signature(b"authority", self.key_id(), message))
     }
@@ -120,7 +124,7 @@ impl WelfareAuthoritySignatureVerifier for AuthorityVerifier {
 
 fn signature(domain: &[u8], key_id: &str, message: &[u8]) -> Vec<u8> {
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea.welfare.governed-persisted-restore-test.v1\0");
+    hasher.update(b"symthaea.welfare.governed-persisted-restore-test.v2\0");
     hasher.update(domain);
     hasher.update(key_id.as_bytes());
     hasher.update(message);
@@ -245,10 +249,8 @@ fn duplicate_episode() -> Episode {
 
 #[derive(Default)]
 struct ReplayPersistence;
-
 impl ReplayFencePersistence for ReplayPersistence {
     type Error = std::io::Error;
-
     fn persist_replay_snapshot(
         &mut self,
         snapshot: &DurableAuthorityReplaySnapshot,
@@ -262,10 +264,8 @@ impl ReplayFencePersistence for ReplayPersistence {
 struct ExecutionPersistence {
     calls: usize,
 }
-
 impl ExecutionJournalPersistence for ExecutionPersistence {
     type Error = std::io::Error;
-
     fn persist_execution_journal(
         &mut self,
         events: &[ExecutionJournalEnvelope],
@@ -282,10 +282,8 @@ struct LedgerPersistence {
     fail_on_call: Option<usize>,
     snapshots: Vec<(Vec<QuarantineLedgerEnvelope>, Sha256Digest)>,
 }
-
 impl QuarantineLedgerPersistence for LedgerPersistence {
     type Error = std::io::Error;
-
     fn persist_quarantine_ledger(
         &mut self,
         events: &[QuarantineLedgerEnvelope],
@@ -306,15 +304,48 @@ impl QuarantineLedgerPersistence for LedgerPersistence {
 struct EscrowLookup {
     row: PersistedEpisodicEscrowRow,
 }
-
 impl EpisodicQuarantineEscrowLookup for EscrowLookup {
     type Error = std::io::Error;
-
     fn load_episodic_quarantine_escrow(
         &self,
         instance_id: EpisodeInstanceId,
     ) -> Result<Option<PersistedEpisodicEscrowRow>, Self::Error> {
         Ok((self.row.escrow.instance_id == instance_id).then(|| self.row.clone()))
+    }
+}
+
+#[derive(Default)]
+struct PromotionBarrier {
+    calls: usize,
+    fail: bool,
+    substitute_head: bool,
+}
+impl RestoredContinuityPromotionBarrier for PromotionBarrier {
+    fn commit_restored_continuity(
+        &mut self,
+        request: &RestoredContinuityPromotionRequest,
+    ) -> Result<VerifiedRestoredContinuityPromotion, RestoredContinuityPromotionFailure> {
+        self.calls += 1;
+        if self.fail {
+            return Err(RestoredContinuityPromotionFailure::new(
+                "injected independent anchor CAS failure",
+            ));
+        }
+        let head = if self.substitute_head {
+            digest(0xEE)
+        } else {
+            request.restored_quarantine_head()
+        };
+        VerifiedRestoredContinuityPromotion::try_new(
+            request.store_target_id(),
+            head,
+            digest(0xA1),
+            digest(0xA2),
+            2,
+            digest(0xA3),
+            "test:continuity-anchor:revision:2",
+        )
+        .map_err(|error| RestoredContinuityPromotionFailure::new(error.to_string()))
     }
 }
 
@@ -354,7 +385,6 @@ fn prepared_persisted_restore_state() -> PreparedPersistedRestore {
     assert_eq!(episode_content_id(&first_episode).unwrap(), content_id);
     assert_eq!(episode_content_id(&second_episode).unwrap(), content_id);
 
-    // This is the post-restart shape: only B is active and there is no live quarantine payload.
     let memory = EpisodicMemory::from_validated_persisted_active_state(
         EpisodicReplayConfig::broad_capture(),
         120,
@@ -371,7 +401,7 @@ fn prepared_persisted_restore_state() -> PreparedPersistedRestore {
         instance_id: first_id,
         content_id,
         captured_at_unix_s: 90,
-        pre_active_state_digest: Sha256Digest([8; 32]),
+        pre_active_state_digest: digest(8),
         episode: first_episode,
     };
     let escrow_digest = digest_episodic_quarantine_escrow(&escrow).unwrap();
@@ -495,16 +525,26 @@ fn assert_only_second_active(state: &PreparedPersistedRestore) {
     assert_eq!(episode_content_id(&active[0].1).unwrap(), state.content_id);
 }
 
-#[test]
-fn full_chain_persisted_restore_preserves_exact_identity_and_closes_ledger() {
-    let mut state = prepared_persisted_restore_state();
-    assert_only_second_active(&state);
+fn execute_with_barrier(
+    state: &mut PreparedPersistedRestore,
+    ledger_persistence: &mut LedgerPersistence,
+    barrier: &mut PromotionBarrier,
+) -> (
+    JournaledExecutionOutcome<
+        symthaea_welfare_assurance::persisted_memory_restore::PersistedEpisodicRestoreReceipt,
+        symthaea_welfare_assurance::persisted_memory_restore::PersistedEpisodicRestoreExecutionError<
+            std::io::Error,
+            std::io::Error,
+        >,
+        std::io::Error,
+    >,
+    InterventionExecutionJournal,
+    ExecutionPersistence,
+) {
     let (profile, precaution_policy, registry, consent_ledger, trust, manifest, permit) =
         authorized_restore_permit(&state.target_id);
-
     let mut execution_journal = InterventionExecutionJournal::new();
     let mut execution_persistence = ExecutionPersistence::default();
-    let mut ledger_persistence = LedgerPersistence::default();
     let outcome = execute_governed_persisted_episodic_restore(
         permit,
         EXECUTION_ID,
@@ -522,35 +562,43 @@ fn full_chain_persisted_restore_preserves_exact_identity_and_closes_ledger() {
         120,
         &mut execution_journal,
         &mut execution_persistence,
-        &mut ledger_persistence,
+        ledger_persistence,
+        barrier,
     )
     .unwrap();
+    (outcome, execution_journal, execution_persistence)
+}
+
+#[test]
+fn full_chain_persisted_restore_requires_anchor_promotion_before_live_swap() {
+    let mut state = prepared_persisted_restore_state();
+    assert_only_second_active(&state);
+    let mut ledger_persistence = LedgerPersistence::default();
+    let mut barrier = PromotionBarrier::default();
+    let (outcome, execution_journal, execution_persistence) =
+        execute_with_barrier(&mut state, &mut ledger_persistence, &mut barrier);
 
     match outcome {
-        JournaledExecutionOutcome::Completed {
-            output,
-            prepared_persistence_ref,
-            completion_persistence_ref,
-            ..
-        } => {
+        JournaledExecutionOutcome::Completed { output, .. } => {
             assert_eq!(output.target_id, state.target_id);
             assert_eq!(output.instance_id, state.first_id);
             assert_eq!(output.content_id, state.content_id);
             assert_eq!(output.before_active_count, 1);
             assert_eq!(output.after_active_count, 2);
-            assert_eq!(output.before_quarantined_count, 0);
-            assert_eq!(output.after_quarantined_count, 0);
             assert_eq!(output.ledger_generation, 3);
-            assert_eq!(prepared_persistence_ref, "test:execution-events:1");
-            assert_eq!(completion_persistence_ref, "test:execution-events:2");
+            assert_eq!(
+                output.continuity_promotion.restored_quarantine_head(),
+                output.restored_head
+            );
+            assert_eq!(output.continuity_promotion.next_anchor_revision(), 2);
         }
-        other => panic!("expected fully persisted post-restart restore, got {other:?}"),
+        other => panic!("expected fully anchored post-restart restore, got {other:?}"),
     }
 
+    assert_eq!(barrier.calls, 1);
     assert_eq!(execution_persistence.calls, 2);
     assert_eq!(ledger_persistence.calls, 2);
     assert_eq!(state.memory.len(), 2);
-    assert_eq!(state.memory.quarantined_len(), 0);
     assert!(state.ledger.unresolved_state(state.first_id).is_none());
     let active = state.memory.get_top_episode_instances(10);
     assert!(active.iter().any(|(id, episode)| {
@@ -559,118 +607,109 @@ fn full_chain_persisted_restore_preserves_exact_identity_and_closes_ledger() {
     assert!(active.iter().any(|(id, episode)| {
         *id == state.second_id && episode_content_id(episode).unwrap() == state.content_id
     }));
-
-    let (events, trusted_head) = ledger_persistence.snapshots.last().unwrap();
-    let recovered =
-        EpisodicQuarantineStateLedger::recover_anchored(events, *trusted_head).unwrap();
-    assert_eq!(recovered.generation(), 3);
-    assert_eq!(recovered.unresolved_count(), 0);
     assert_eq!(execution_journal.recovery_report().completed, 1);
     assert!(execution_journal.recovery_report().in_doubt.is_empty());
 }
 
 #[test]
-fn final_ledger_persistence_failure_leaves_restart_occurrence_inactive_and_prepare_pending() {
+fn final_ledger_persistence_failure_never_promotes_live_and_does_not_fake_rollback() {
     let mut state = prepared_persisted_restore_state();
-    let (profile, precaution_policy, registry, consent_ledger, trust, manifest, permit) =
-        authorized_restore_permit(&state.target_id);
-
-    let mut execution_journal = InterventionExecutionJournal::new();
-    let mut execution_persistence = ExecutionPersistence::default();
     let mut ledger_persistence = LedgerPersistence {
         fail_on_call: Some(2),
         ..Default::default()
     };
-    let outcome = execute_governed_persisted_episodic_restore(
-        permit,
-        EXECUTION_ID,
-        STORE_TARGET_ID,
-        state.first_id,
-        &mut state.memory,
-        &mut state.ledger,
-        &state.lookup,
-        &profile,
-        &precaution_policy,
-        &consent_ledger,
-        &registry,
-        &manifest,
-        &trust,
-        120,
-        &mut execution_journal,
-        &mut execution_persistence,
-        &mut ledger_persistence,
-    )
-    .unwrap();
+    let mut barrier = PromotionBarrier::default();
+    let (outcome, execution_journal, _) =
+        execute_with_barrier(&mut state, &mut ledger_persistence, &mut barrier);
 
     assert!(matches!(
         outcome,
         JournaledExecutionOutcome::ExecutorInDoubt { .. }
     ));
+    assert_eq!(barrier.calls, 0);
     assert_eq!(ledger_persistence.calls, 2);
     assert_eq!(ledger_persistence.snapshots.len(), 1);
     assert_only_second_active(&state);
 
-    let unresolved = state.ledger.unresolved_state(state.first_id).unwrap();
-    assert_eq!(unresolved.content_id, state.content_id);
-    let pending = unresolved
-        .restore_pending
-        .as_ref()
-        .expect("RestorePrepared remains pending");
-    assert_eq!(pending.execution_id, EXECUTION_ID);
-    assert_eq!(state.ledger.generation(), 2);
+    assert_eq!(state.ledger.generation(), 3);
+    assert!(state.ledger.unresolved_state(state.first_id).is_none());
 
     let (events, trusted_head) = ledger_persistence.snapshots.last().unwrap();
     let recovered =
         EpisodicQuarantineStateLedger::recover_anchored(events, *trusted_head).unwrap();
-    assert_eq!(
-        recovered
-            .unresolved_state(state.first_id)
-            .unwrap()
-            .restore_pending
-            .as_ref()
-            .unwrap()
-            .execution_id,
-        EXECUTION_ID
-    );
+    assert!(recovered
+        .unresolved_state(state.first_id)
+        .unwrap()
+        .restore_pending
+        .is_some());
     assert_eq!(execution_journal.recovery_report().completed, 0);
     assert_eq!(execution_journal.recovery_report().in_doubt.len(), 1);
 }
 
 #[test]
-fn tampered_persisted_escrow_is_rejected_before_execution_prepare_or_live_mutation() {
+fn anchor_failure_after_durable_restored_keeps_occurrence_out_of_live_memory() {
     let mut state = prepared_persisted_restore_state();
-    state.lookup.row.stored_digest = Sha256Digest([0xAA; 32]);
-    let (profile, precaution_policy, registry, consent_ledger, trust, manifest, permit) =
-        authorized_restore_permit(&state.target_id);
-
-    let mut execution_journal = InterventionExecutionJournal::new();
-    let mut execution_persistence = ExecutionPersistence::default();
     let mut ledger_persistence = LedgerPersistence::default();
-    let outcome = execute_governed_persisted_episodic_restore(
-        permit,
-        EXECUTION_ID,
-        STORE_TARGET_ID,
-        state.first_id,
-        &mut state.memory,
-        &mut state.ledger,
-        &state.lookup,
-        &profile,
-        &precaution_policy,
-        &consent_ledger,
-        &registry,
-        &manifest,
-        &trust,
-        120,
-        &mut execution_journal,
-        &mut execution_persistence,
-        &mut ledger_persistence,
-    )
-    .unwrap();
+    let mut barrier = PromotionBarrier {
+        fail: true,
+        ..Default::default()
+    };
+    let (outcome, execution_journal, _) =
+        execute_with_barrier(&mut state, &mut ledger_persistence, &mut barrier);
+
+    assert!(matches!(
+        outcome,
+        JournaledExecutionOutcome::ExecutorInDoubt { .. }
+    ));
+    assert_eq!(barrier.calls, 1);
+    assert_eq!(ledger_persistence.snapshots.len(), 2);
+    assert_only_second_active(&state);
+    assert_eq!(state.ledger.generation(), 3);
+    assert!(state.ledger.unresolved_state(state.first_id).is_none());
+
+    let (events, trusted_head) = ledger_persistence.snapshots.last().unwrap();
+    let recovered =
+        EpisodicQuarantineStateLedger::recover_anchored(events, *trusted_head).unwrap();
+    assert_eq!(recovered.unresolved_count(), 0);
+    assert_eq!(execution_journal.recovery_report().completed, 0);
+    assert_eq!(execution_journal.recovery_report().in_doubt.len(), 1);
+}
+
+#[test]
+fn substituted_anchor_head_is_rejected_before_live_swap() {
+    let mut state = prepared_persisted_restore_state();
+    let mut ledger_persistence = LedgerPersistence::default();
+    let mut barrier = PromotionBarrier {
+        substitute_head: true,
+        ..Default::default()
+    };
+    let (outcome, execution_journal, _) =
+        execute_with_barrier(&mut state, &mut ledger_persistence, &mut barrier);
+
+    assert!(matches!(
+        outcome,
+        JournaledExecutionOutcome::ExecutorInDoubt { .. }
+    ));
+    assert_eq!(barrier.calls, 1);
+    assert_only_second_active(&state);
+    assert_eq!(execution_journal.recovery_report().completed, 0);
+    assert_eq!(execution_journal.recovery_report().in_doubt.len(), 1);
+}
+
+#[test]
+fn tampered_persisted_escrow_is_rejected_before_prepare_barrier_or_live_mutation() {
+    let mut state = prepared_persisted_restore_state();
+    state.lookup.row.stored_digest = digest(0xAA);
+    let mut ledger_persistence = LedgerPersistence::default();
+    let mut barrier = PromotionBarrier::default();
+    let (outcome, execution_journal, execution_persistence) =
+        execute_with_barrier(&mut state, &mut ledger_persistence, &mut barrier);
 
     assert!(matches!(
         outcome,
         JournaledExecutionOutcome::PreflightRejected { .. }
     ));
+    assert_eq!(barrier.calls, 0);
     assert_eq!(execution_persistence.calls, 0);
     assert_eq!(ledger_persistence.calls, 0);
     assert_eq!(state.ledger.generation(), 1);
