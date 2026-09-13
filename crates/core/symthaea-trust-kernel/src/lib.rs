@@ -19,6 +19,7 @@
 #![deny(unsafe_code)]
 
 mod clock;
+mod clock_bootstrap_authority;
 mod clock_witness;
 mod continuity;
 mod digest;
@@ -30,6 +31,13 @@ pub use clock::{
     ClockQuorumPolicy, ClockTrackingError, ClockViolation, VerifiedClockWindow,
     canonical_clock_observation_bytes, digest_clock_epoch_tracker, digest_clock_observation,
     verify_clock_quorum,
+};
+pub use clock_bootstrap_authority::{
+    CLOCK_BOOTSTRAP_AUTHORITY_EVIDENCE_SCHEMA, CLOCK_BOOTSTRAP_CLAIM_SCHEMA,
+    VERIFIED_CLOCK_BOOTSTRAP_AUTHORITY_SCHEMA, ClockBootstrapAuthorityError,
+    ClockBootstrapAuthorityEvidenceV2, ClockBootstrapAuthorityVerifier, ClockBootstrapClaimV2,
+    VerifiedClockBootstrapAuthorityIdV2, VerifiedClockBootstrapAuthorityV2,
+    verify_clock_bootstrap_authority,
 };
 pub use clock_witness::{
     AcceptedClockObservationV1, CLOCK_WINDOW_EVALUATION_WITNESS_SCHEMA, ClockSignerV1,
