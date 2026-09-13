@@ -17,56 +17,32 @@ use super::cross_family_analysis::{
     AnalysisMetricOutcome, EvidenceFamilyId, PairedAnalysisRow, RawConsequenceCounts,
     analyze_cross_family_v1,
 };
-use super::hidden_world::{
-    CorpusPartition, PublicAction, PublicObservation, PublicValue,
-};
+use super::hidden_world::{CorpusPartition, PublicAction, PublicObservation, PublicValue};
 use super::promotion::PairedEstimateBps;
+use super::v2_public_schema::{
+    V2_ACTION_COUNT, V2_COUNT_CARDINALITY, V2_OBSERVATION_DIM, V2_PUBLIC_MODES_PER_FAMILY,
+    V2PublicFamily, V2PublicState, action_from_index, public_schema_commitment,
+};
 
-const SCHEDULE_REVISION: &str = "EUREKA.002.V2.CONSTRUCT_SCHEDULE.prototype.v4";
-const JOINT_ORDER_REVISION: &str = "EUREKA.002.V2.JOINT_DEVELOPMENT_ORDER.prototype.v1";
-const STATE_CARDINALITY: u16 = 32;
-const MODES: u8 = 4;
-const ACTIONS: u8 = 4;
+const SCHEDULE_REVISION: &str = "EUREKA.002.V2.CONSTRUCT_SCHEDULE.prototype.v5";
+const JOINT_ORDER_REVISION: &str = "EUREKA.002.V2.JOINT_DEVELOPMENT_ORDER.prototype.v2";
+const MAX_POSITIVE_FIELD_DELTA: u16 = 2;
+const PRE_STATE_CARDINALITY: u16 = V2_COUNT_CARDINALITY - MAX_POSITIVE_FIELD_DELTA;
 const PER_STRATUM: usize = 30;
 const DEV_PER_STRATUM: usize = 16;
 const CAL_PER_STRATUM: usize = 8;
 const HELD_PER_STRATUM: usize = 4;
 const EXT_PER_STRATUM: usize = 2;
-const STRATA: usize = 16;
+const STRATA: usize =
+    (V2_PUBLIC_MODES_PER_FAMILY as usize) * (V2_ACTION_COUNT as usize);
 const ROWS_PER_FAMILY: usize = STRATA * PER_STRATUM;
 const CONSTRUCT_HEADROOM_BPS: i32 = 500;
 const MAX_PARTITION_MEAN_SPREAD_MILLI: i64 = 8_000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum Family {
-    ConservedFlow,
-    PublicRelay,
-}
-
-impl Family {
-    const ALL: [Self; 2] = [Self::ConservedFlow, Self::PublicRelay];
-
-    const fn tag(self) -> u8 {
-        match self {
-            Self::ConservedFlow => 1,
-            Self::PublicRelay => 2,
-        }
-    }
-
-    fn context(self, mode: u8) -> i32 {
-        match self {
-            Self::ConservedFlow => i32::from(mode),
-            Self::PublicRelay => 4 + i32::from(mode),
-        }
-    }
-
-    /// Reuse the already-frozen V1 statistical engine's two family lanes only
-    /// as bootstrap buckets. These aliases do not relabel the V2 world families.
-    const fn analysis_lane(self) -> EvidenceFamilyId {
-        match self {
-            Self::ConservedFlow => EvidenceFamilyId::ResourceFlowV1,
-            Self::PublicRelay => EvidenceFamilyId::RelayTriadV1,
-        }
+fn analysis_lane(family: V2PublicFamily) -> EvidenceFamilyId {
+    match family {
+        V2PublicFamily::PublicFlowV2 => EvidenceFamilyId::ResourceFlowV1,
+        V2PublicFamily::PublicRelayV2 => EvidenceFamilyId::RelayTriadV1,
     }
 }
 
@@ -119,10 +95,31 @@ impl Partition {
     }
 }
 
+/// Construct-local integer vector used for both actual states and unconstrained
+/// baseline predictions.
+///
+/// Actual schedule states are created only through [`State::public`], which
+/// validates them against [`V2PublicState`]. Baseline predictions intentionally
+/// use [`State::prediction`] so finite out-of-domain guesses remain scoreable as
+/// wrong rather than being clipped or rejected by the benchmark.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct State([i32; 4]);
+struct State([i32; V2_OBSERVATION_DIM]);
 
 impl State {
+    fn public(fields: [i32; V2_OBSERVATION_DIM]) -> Result<Self, ConstructError> {
+        V2PublicState::new(fields)
+            .map(|_| Self(fields))
+            .map_err(|_| ConstructError::PublicSchema)
+    }
+
+    const fn prediction(fields: [i32; V2_OBSERVATION_DIM]) -> Self {
+        Self(fields)
+    }
+
+    const fn fields(self) -> [i32; V2_OBSERVATION_DIM] {
+        self.0
+    }
+
     fn observation(self) -> PublicObservation {
         PublicObservation {
             step: 0,
@@ -133,7 +130,7 @@ impl State {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Row {
-    family: Family,
+    family: V2PublicFamily,
     partition: Partition,
     mode: u8,
     action_index: u8,
@@ -146,9 +143,9 @@ struct Row {
 impl Row {
     fn changed_fields(&self) -> usize {
         self.pre
-            .0
+            .fields()
             .into_iter()
-            .zip(self.post.0)
+            .zip(self.post.fields())
             .filter(|(before, after)| before != after)
             .count()
     }
@@ -156,6 +153,7 @@ impl Row {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ConstructError {
+    PublicSchema,
     StateGenerationBudget,
     Cardinality,
     Imbalance,
@@ -248,7 +246,7 @@ impl BaselineReport {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct FamilyReport {
-    family: Family,
+    family: V2PublicFamily,
     schedule_root: [u8; 32],
     selected: ShortcutBaselineKind,
     calibration: Vec<BaselineReport>,
@@ -269,14 +267,8 @@ struct ConstructReport {
     oracle_overall_value: Option<PairedEstimateBps>,
 }
 
-fn action(index: u8) -> PublicAction {
-    match index {
-        0 => PublicAction::NoOp,
-        1 => PublicAction::Pulse { slot: 0 },
-        2 => PublicAction::Pulse { slot: 1 },
-        3 => PublicAction::Pulse { slot: 2 },
-        _ => unreachable!("V2 action index must be < 4"),
-    }
+fn action(index: u8) -> Result<PublicAction, ConstructError> {
+    action_from_index(usize::from(index)).map_err(|_| ConstructError::PublicSchema)
 }
 
 fn transfer_one(values: &mut [i32; 3], from: usize, to: usize) {
@@ -286,69 +278,71 @@ fn transfer_one(values: &mut [i32; 3], from: usize, to: usize) {
     }
 }
 
-fn transition(family: Family, pre: State, action_index: u8) -> State {
+fn transition(
+    family: V2PublicFamily,
+    pre: State,
+    action_index: u8,
+) -> Result<State, ConstructError> {
     match family {
-        Family::ConservedFlow => {
-            let [x, y, z, mode] = pre.0;
+        V2PublicFamily::PublicFlowV2 => {
+            let [x, y, z, mode] = pre.fields();
             let mut values = [x, y, z];
             match action_index {
                 0 => {}
                 1 => transfer_one(&mut values, 0, 1),
                 2 => transfer_one(&mut values, 1, 2),
                 3 => transfer_one(&mut values, 2, 0),
-                _ => unreachable!(),
+                _ => return Err(ConstructError::PublicSchema),
             }
             match mode {
                 0 => {}
                 1 => values[0] = values[0].saturating_add(1),
                 2 => transfer_one(&mut values, 0, 1),
                 3 => transfer_one(&mut values, 1, 2),
-                _ => unreachable!("flow context must be 0..=3"),
+                _ => return Err(ConstructError::PublicSchema),
             }
-            State([values[0], values[1], values[2], mode])
+            State::public([values[0], values[1], values[2], mode])
         }
-        Family::PublicRelay => {
-            let [mut x, mut y, mut z, rule] = pre.0;
+        V2PublicFamily::PublicRelayV2 => {
+            let [mut x, mut y, mut z, rule] = pre.fields();
             match action_index {
                 0 => {}
                 1 => x = x.saturating_add(1),
                 2 => y = y.saturating_add(1),
                 3 => z = z.saturating_add(1),
-                _ => unreachable!(),
+                _ => return Err(ConstructError::PublicSchema),
             }
             match rule {
                 4 => {}
                 5 => y = x,
                 6 => z = y,
                 7 => x = z,
-                _ => unreachable!("relay context must be 4..=7"),
+                _ => return Err(ConstructError::PublicSchema),
             }
-            State([x, y, z, rule])
+            State::public([x, y, z, rule])
         }
     }
 }
 
-fn schedule(family: Family) -> Result<Vec<Row>, ConstructError> {
+fn schedule(family: V2PublicFamily) -> Result<Vec<Row>, ConstructError> {
     let mut rows = Vec::with_capacity(ROWS_PER_FAMILY);
-    for mode in 0..MODES {
-        for action_index in 0..ACTIONS {
+    for mode in 0..V2_PUBLIC_MODES_PER_FAMILY {
+        let context = family
+            .context(mode)
+            .map_err(|_| ConstructError::PublicSchema)?;
+        for action_index in 0..V2_ACTION_COUNT {
             let states = stratum_states(family, mode, action_index)?;
             for partition in Partition::ALL {
                 for index in partition.range() {
                     let triple = states[index];
-                    let pre = State([
-                        triple[0],
-                        triple[1],
-                        triple[2],
-                        family.context(mode),
-                    ]);
-                    let post = transition(family, pre, action_index);
+                    let pre = State::public([triple[0], triple[1], triple[2], context])?;
+                    let post = transition(family, pre, action_index)?;
                     rows.push(Row {
                         family,
                         partition,
                         mode,
                         action_index,
-                        action: action(action_index),
+                        action: action(action_index)?,
                         pre,
                         post,
                         identity: row_identity(
@@ -371,8 +365,14 @@ fn schedule(family: Family) -> Result<Vec<Row>, ConstructError> {
 
 /// Partition is deliberately not an input: one common 30-state stream is
 /// created per family × public-context × action, then partitioned by position.
+///
+/// Generated pre-state counts use `0..PRE_STATE_CARDINALITY`, not the complete
+/// public domain. The two-count headroom is required because PublicFlowV2 can
+/// legitimately add +2 to one field in one transition (prescribed action +
+/// public mode rule). This guarantees every realized actual post-state remains
+/// inside the canonical `0..=31` public count range.
 fn stratum_states(
-    family: Family,
+    family: V2PublicFamily,
     mode: u8,
     action_index: u8,
 ) -> Result<Vec<[i32; 3]>, ConstructError> {
@@ -382,9 +382,9 @@ fn stratum_states(
         let digest = schedule_digest(b"public-state", family, mode, action_index, ordinal);
         let bytes = digest.as_bytes();
         let state = [
-            i32::from(u16::from_le_bytes([bytes[0], bytes[1]]) % STATE_CARDINALITY),
-            i32::from(u16::from_le_bytes([bytes[2], bytes[3]]) % STATE_CARDINALITY),
-            i32::from(u16::from_le_bytes([bytes[4], bytes[5]]) % STATE_CARDINALITY),
+            i32::from(u16::from_le_bytes([bytes[0], bytes[1]]) % PRE_STATE_CARDINALITY),
+            i32::from(u16::from_le_bytes([bytes[2], bytes[3]]) % PRE_STATE_CARDINALITY),
+            i32::from(u16::from_le_bytes([bytes[4], bytes[5]]) % PRE_STATE_CARDINALITY),
         ];
         if seen.insert(state) {
             states.push(state);
@@ -398,13 +398,14 @@ fn stratum_states(
 
 fn schedule_digest(
     purpose: &[u8],
-    family: Family,
+    family: V2PublicFamily,
     mode: u8,
     action_index: u8,
     ordinal: u32,
 ) -> blake3::Hash {
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, SCHEDULE_REVISION.as_bytes());
+    bytes.extend_from_slice(&public_schema_commitment());
     encode_bytes(&mut bytes, purpose);
     bytes.push(family.tag());
     bytes.push(mode);
@@ -414,7 +415,7 @@ fn schedule_digest(
 }
 
 fn row_identity(
-    family: Family,
+    family: V2PublicFamily,
     partition: Partition,
     mode: u8,
     action_index: u8,
@@ -422,7 +423,8 @@ fn row_identity(
     post: State,
 ) -> [u8; 32] {
     let mut bytes = Vec::new();
-    encode_bytes(&mut bytes, b"EUREKA.002.V2.ROW.prototype.v4");
+    encode_bytes(&mut bytes, b"EUREKA.002.V2.ROW.prototype.v5");
+    bytes.extend_from_slice(&public_schema_commitment());
     bytes.push(family.tag());
     bytes.push(partition.tag());
     bytes.push(mode);
@@ -433,7 +435,7 @@ fn row_identity(
 }
 
 fn encode_state(bytes: &mut Vec<u8>, state: State) {
-    for value in state.0 {
+    for value in state.fields() {
         bytes.extend_from_slice(&value.to_le_bytes());
     }
 }
@@ -455,8 +457,8 @@ fn validate_balance(rows: &[Row]) -> Result<(), ConstructError> {
         return Err(ConstructError::Cardinality);
     }
     for partition in Partition::ALL {
-        for mode in 0..MODES {
-            for action_index in 0..ACTIONS {
+        for mode in 0..V2_PUBLIC_MODES_PER_FAMILY {
+            for action_index in 0..V2_ACTION_COUNT {
                 let count = rows
                     .iter()
                     .filter(|row| {
@@ -475,9 +477,10 @@ fn validate_balance(rows: &[Row]) -> Result<(), ConstructError> {
 }
 
 fn validate_novelty(rows: &[Row]) -> Result<(), ConstructError> {
-    let mut outcomes = BTreeMap::<(Family, State, u8), State>::new();
-    let mut key_partitions = BTreeMap::<(Family, State, u8), Partition>::new();
-    let mut transition_partitions = BTreeMap::<(Family, State, u8, State), Partition>::new();
+    let mut outcomes = BTreeMap::<(V2PublicFamily, State, u8), State>::new();
+    let mut key_partitions = BTreeMap::<(V2PublicFamily, State, u8), Partition>::new();
+    let mut transition_partitions =
+        BTreeMap::<(V2PublicFamily, State, u8, State), Partition>::new();
     for row in rows {
         let key = (row.family, row.pre, row.action_index);
         if let Some(previous) = outcomes.insert(key, row.post) {
@@ -508,7 +511,7 @@ fn max_partition_mean_spread_milli(rows: &[Row]) -> Result<i64, ConstructError> 
             let mut sum = 0_i64;
             let mut count = 0_i64;
             for row in rows.iter().filter(|row| row.partition == partition) {
-                sum = sum.saturating_add(i64::from(row.pre.0[field]));
+                sum = sum.saturating_add(i64::from(row.pre.fields()[field]));
                 count = count.saturating_add(1);
             }
             if count == 0 {
@@ -554,31 +557,31 @@ fn baseline_prediction(
             if candidates.is_empty() {
                 return None;
             }
-            let mut output = query.pre.0;
+            let mut output = query.pre.fields();
             for (index, slot) in output.iter_mut().enumerate() {
                 let mut deltas = BTreeMap::<i32, u32>::new();
                 for row in &candidates {
-                    let delta = row.post.0[index].saturating_sub(row.pre.0[index]);
+                    let delta = row.post.fields()[index].saturating_sub(row.pre.fields()[index]);
                     *deltas.entry(delta).or_default() += 1;
                 }
                 *slot = slot.saturating_add(choose_mode_i32(&deltas)?);
             }
-            Some(State(output))
+            Some(State::prediction(output))
         }
         ShortcutBaselineKind::SimpleMarkov => {
-            let mut output = query.pre.0;
+            let mut output = query.pre.fields();
             for (index, slot) in output.iter_mut().enumerate() {
                 let mut values = BTreeMap::<i32, u32>::new();
                 for row in development.iter().filter(|row| {
                     row.family == query.family
                         && row.action_index == query.action_index
-                        && row.pre.0[index] == query.pre.0[index]
+                        && row.pre.fields()[index] == query.pre.fields()[index]
                 }) {
-                    *values.entry(row.post.0[index]).or_default() += 1;
+                    *values.entry(row.post.fields()[index]).or_default() += 1;
                 }
                 *slot = choose_mode_i32(&values)?;
             }
-            Some(State(output))
+            Some(State::prediction(output))
         }
     }
 }
@@ -606,9 +609,9 @@ fn choose_mode_state(counts: &BTreeMap<State, u32>) -> Option<State> {
 }
 
 fn distance(left: State, right: State) -> u64 {
-    left.0
+    left.fields()
         .into_iter()
-        .zip(right.0)
+        .zip(right.fields())
         .map(|(a, b)| i64::from(a).abs_diff(i64::from(b)))
         .sum()
 }
@@ -636,8 +639,11 @@ fn oracle_score(rows: &[Row]) -> Counts {
 
 fn accumulate(counts: &mut Counts, pre: State, predicted: State, actual: State) {
     let mut changed = false;
-    for ((before, predicted_value), actual_value) in
-        pre.0.into_iter().zip(predicted.0).zip(actual.0)
+    for ((before, predicted_value), actual_value) in pre
+        .fields()
+        .into_iter()
+        .zip(predicted.fields())
+        .zip(actual.fields())
     {
         let did_change = before != actual_value;
         let predicted_change = before != predicted_value;
@@ -672,8 +678,11 @@ fn raw_counts(pre: State, predicted: State, actual: State) -> RawConsequenceCoun
     let mut missed = 0_u16;
     let mut correct_changed = 0_u16;
     let mut correct_unchanged = 0_u16;
-    for ((before, predicted_value), actual_value) in
-        pre.0.into_iter().zip(predicted.0).zip(actual.0)
+    for ((before, predicted_value), actual_value) in pre
+        .fields()
+        .into_iter()
+        .zip(predicted.fields())
+        .zip(actual.fields())
     {
         let did_change = before != actual_value;
         let predicted_change = before != predicted_value;
@@ -692,7 +701,7 @@ fn raw_counts(pre: State, predicted: State, actual: State) -> RawConsequenceCoun
         }
     }
     RawConsequenceCounts {
-        field_count: 4,
+        field_count: V2_OBSERVATION_DIM as u16,
         actual_changed,
         true_positive_changes: tp,
         false_positive_changes: fp,
@@ -703,7 +712,7 @@ fn raw_counts(pre: State, predicted: State, actual: State) -> RawConsequenceCoun
 }
 
 fn construct_analysis_rows(
-    family: Family,
+    family: V2PublicFamily,
     development: &[Row],
     heldout: &[Row],
     selected: ShortcutBaselineKind,
@@ -722,7 +731,7 @@ fn construct_analysis_rows(
             let family_prefix = u64::from(family.tag()) << 56;
             PairedAnalysisRow {
                 row_identity: family_prefix | (index_u64 + 1),
-                family: family.analysis_lane(),
+                family: analysis_lane(family),
                 partition: CorpusPartition::HeldOutEvaluation,
                 seed_identity: index_u64,
                 disposition: CampaignRowDisposition::ValidScored,
@@ -754,7 +763,8 @@ fn schedule_root(rows: &[Row]) -> [u8; 32] {
     let mut identities: Vec<_> = rows.iter().map(|row| row.identity).collect();
     identities.sort_unstable();
     let mut bytes = Vec::new();
-    encode_bytes(&mut bytes, b"EUREKA.002.V2.SCHEDULE_ROOT.prototype.v1");
+    encode_bytes(&mut bytes, b"EUREKA.002.V2.SCHEDULE_ROOT.prototype.v2");
+    bytes.extend_from_slice(&public_schema_commitment());
     for identity in identities {
         bytes.extend_from_slice(&identity);
     }
@@ -762,8 +772,14 @@ fn schedule_root(rows: &[Row]) -> [u8; 32] {
 }
 
 fn joint_development() -> Result<Vec<Row>, ConstructError> {
-    let mut flow = partition_rows(&schedule(Family::ConservedFlow)?, Partition::Development);
-    let mut relay = partition_rows(&schedule(Family::PublicRelay)?, Partition::Development);
+    let mut flow = partition_rows(
+        &schedule(V2PublicFamily::PublicFlowV2)?,
+        Partition::Development,
+    );
+    let mut relay = partition_rows(
+        &schedule(V2PublicFamily::PublicRelayV2)?,
+        Partition::Development,
+    );
     if flow.len() != 256 || relay.len() != 256 {
         return Err(ConstructError::JointOrder);
     }
@@ -780,13 +796,18 @@ fn joint_development() -> Result<Vec<Row>, ConstructError> {
 fn order_key(row: &Row) -> [u8; 32] {
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, JOINT_ORDER_REVISION.as_bytes());
+    bytes.extend_from_slice(&public_schema_commitment());
     bytes.extend_from_slice(&row.identity);
     *blake3::hash(&bytes).as_bytes()
 }
 
 fn ordered_root(rows: &[Row]) -> [u8; 32] {
     let mut bytes = Vec::new();
-    encode_bytes(&mut bytes, b"EUREKA.002.V2.JOINT_DEVELOPMENT_ROOT.prototype.v1");
+    encode_bytes(
+        &mut bytes,
+        b"EUREKA.002.V2.JOINT_DEVELOPMENT_ROOT.prototype.v2",
+    );
+    bytes.extend_from_slice(&public_schema_commitment());
     for row in rows {
         bytes.extend_from_slice(&row.identity);
     }
@@ -797,7 +818,7 @@ fn audit() -> Result<ConstructReport, ConstructError> {
     let mut family_reports = Vec::new();
     let mut analysis_rows = Vec::new();
     let mut total_rows = 0_u32;
-    for family in Family::ALL {
+    for family in V2PublicFamily::ALL {
         let rows = schedule(family)?;
         validate_balance(&rows)?;
         validate_novelty(&rows)?;
@@ -849,12 +870,12 @@ fn audit() -> Result<ConstructReport, ConstructError> {
             .zip(heldout_report.counts.value_bps())
             .map(|(oracle_score, comparator_score)| oracle_score - comparator_score)
             .ok_or(ConstructError::ValueHeadroom)?;
-        let required_f1_gap = i32::from(
-            EUREKA_002_ANALYSIS_PLAN_V1.changed_field_f1_margin_bps,
-        ) + CONSTRUCT_HEADROOM_BPS;
-        let required_value_gap = i32::from(
-            EUREKA_002_ANALYSIS_PLAN_V1.changed_value_accuracy_margin_bps,
-        ) + CONSTRUCT_HEADROOM_BPS;
+        let required_f1_gap =
+            i32::from(EUREKA_002_ANALYSIS_PLAN_V1.changed_field_f1_margin_bps)
+                + CONSTRUCT_HEADROOM_BPS;
+        let required_value_gap =
+            i32::from(EUREKA_002_ANALYSIS_PLAN_V1.changed_value_accuracy_margin_bps)
+                + CONSTRUCT_HEADROOM_BPS;
         if f1_gap < required_f1_gap {
             return Err(ConstructError::F1Headroom);
         }
@@ -882,8 +903,8 @@ fn audit() -> Result<ConstructReport, ConstructError> {
         });
     }
 
-    let bootstrap = analyze_cross_family_v1(&analysis_rows)
-        .map_err(|_| ConstructError::BootstrapAnalysis)?;
+    let bootstrap =
+        analyze_cross_family_v1(&analysis_rows).map_err(|_| ConstructError::BootstrapAnalysis)?;
     if bootstrap.final_disposition != ScientificDisposition::Supported {
         return Err(ConstructError::BootstrapNotSupportCapable);
     }
@@ -911,8 +932,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn generated_pre_state_margin_keeps_realized_actuals_inside_public_schema() {
+        assert_eq!(MAX_POSITIVE_FIELD_DELTA, 2);
+        assert_eq!(PRE_STATE_CARDINALITY, V2_COUNT_CARDINALITY - 2);
+        for family in V2PublicFamily::ALL {
+            for row in schedule(family).unwrap() {
+                assert!(V2PublicState::new(row.pre.fields()).is_ok());
+                assert!(V2PublicState::new(row.post.fields()).is_ok());
+            }
+        }
+    }
+
+    #[test]
     fn exact_partition_counts_and_balance_hold() {
-        for family in Family::ALL {
+        for family in V2PublicFamily::ALL {
             let rows = schedule(family).unwrap();
             validate_balance(&rows).unwrap();
             for partition in Partition::ALL {
@@ -926,14 +959,14 @@ mod tests {
 
     #[test]
     fn public_sufficiency_and_semantic_partition_novelty_hold() {
-        for family in Family::ALL {
+        for family in V2PublicFamily::ALL {
             validate_novelty(&schedule(family).unwrap()).unwrap();
         }
     }
 
     #[test]
     fn exact_lookup_has_zero_calibration_replay_coverage() {
-        for family in Family::ALL {
+        for family in V2PublicFamily::ALL {
             let rows = schedule(family).unwrap();
             let development = partition_rows(&rows, Partition::Development);
             let calibration = partition_rows(&rows, Partition::Calibration);
@@ -947,7 +980,7 @@ mod tests {
 
     #[test]
     fn every_partition_contains_change_and_true_no_change_trials() {
-        for family in Family::ALL {
+        for family in V2PublicFamily::ALL {
             let rows = schedule(family).unwrap();
             for partition in Partition::ALL {
                 let subset = partition_rows(&rows, partition);
@@ -959,7 +992,7 @@ mod tests {
 
     #[test]
     fn partition_numeric_distributions_are_not_grossly_separated() {
-        for family in Family::ALL {
+        for family in V2PublicFamily::ALL {
             let spread = max_partition_mean_spread_milli(&schedule(family).unwrap()).unwrap();
             assert!(spread <= MAX_PARTITION_MEAN_SPREAD_MILLI);
         }
@@ -973,8 +1006,8 @@ mod tests {
         assert_eq!(first.len(), 512);
         assert_eq!(ordered_root(&first), ordered_root(&second));
         for pair in first.chunks_exact(2) {
-            assert_eq!(pair[0].family, Family::ConservedFlow);
-            assert_eq!(pair[1].family, Family::PublicRelay);
+            assert_eq!(pair[0].family, V2PublicFamily::PublicFlowV2);
+            assert_eq!(pair[1].family, V2PublicFamily::PublicRelayV2);
             assert_eq!(pair[0].partition, Partition::Development);
             assert_eq!(pair[1].partition, Partition::Development);
         }
@@ -1023,18 +1056,18 @@ mod tests {
     }
 
     #[test]
-    fn target_visible_shape_is_exactly_four_counts_and_four_actions() {
-        for family in Family::ALL {
+    fn target_visible_shape_consumes_canonical_schema() {
+        for family in V2PublicFamily::ALL {
             for row in schedule(family).unwrap().iter().take(32) {
                 let observation = row.pre.observation();
-                assert_eq!(observation.fields.len(), 4);
+                assert_eq!(observation.fields.len(), V2_OBSERVATION_DIM);
                 assert!(
                     observation
                         .fields
                         .iter()
                         .all(|value| matches!(value, PublicValue::Count(_)))
                 );
-                assert_eq!(row.action, action(row.action_index));
+                assert_eq!(row.action, action(row.action_index).unwrap());
             }
         }
     }
