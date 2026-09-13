@@ -44,6 +44,8 @@ mod target_lineage;
 #[cfg(test)]
 mod transition_identity_tests;
 #[cfg(test)]
+mod v2_public_schema;
+#[cfg(test)]
 mod v2_target_contract;
 
 pub use consequence::{
