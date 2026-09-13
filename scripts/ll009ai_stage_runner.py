@@ -48,13 +48,17 @@ def write_once(path: Path, value: dict[str, Any]) -> None:
 
 
 def _safe_dir(repo: Path, raw: Any, label: str) -> Path:
-    r = rel(raw, label)
+    if raw == ".":
+        r = "."
+    else:
+        r = rel(raw, label)
     root = repo.resolve(strict=True)
     p = root
-    for part in r.split("/"):
-        p = p / part
-        if p.is_symlink():
-            raise CE(f"{label} traverses symlink: {p}")
+    if r != ".":
+        for part in r.split("/"):
+            p = p / part
+            if p.is_symlink():
+                raise CE(f"{label} traverses symlink: {p}")
     try:
         q = p.resolve(strict=True)
     except FileNotFoundError as e:
@@ -104,7 +108,8 @@ def _plan(v: Any, policy: dict[str, Any], stages: list[dict[str, Any]]) -> list[
             if not isinstance(argv, list) or not argv:
                 raise CE(f"AI stage {sid} command {command_index} argv must be non-empty list")
             argv = [req(x, f"AI stage {sid} command argv token") for x in argv]
-            cwd = rel(command.get("cwd", "."), f"AI stage {sid} command cwd")
+            raw_cwd = command.get("cwd", ".")
+            cwd = "." if raw_cwd == "." else rel(raw_cwd, f"AI stage {sid} command cwd")
             normalized.append({"runner": "prepared_python", "argv": argv, "cwd": cwd})
         out.append(
             {
@@ -289,6 +294,11 @@ def run_stage(
     write_once(guard_output, guard)
     _verify_receipt_file(guard_output, guard, GUARD)
     command_witnesses = _run_commands(stage, repo, evidence_root, guard_output)
+    post_policy, post_commands = verify_execution_lock(
+        ai_lock, ah_lock, pre, policy_path, repo, head, runtime_root, manifest_path, stage_map_path, command_plan_path
+    )
+    if post_policy["study_id"] != policy["study_id"] or post_commands != commands:
+        raise CE("AI campaign/command plan changed during stage execution")
     _verify_receipt_file(guard_output, guard, GUARD)
     checkpoint = create_checkpoint(
         guard, ah_lock, previous, pre, policy_path, repo, head, runtime_root, manifest_path, stage_map_path, evidence_root
