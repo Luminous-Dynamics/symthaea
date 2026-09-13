@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   restack:
-    if: "${{ github.event.head_commit.message == 'stage exact #1155 on persistence-qualified parent' }}"
+    if: "${{ github.event.head_commit.message == 'bind staged #1155 product scope explicitly' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.ref_name }}
-          fetch-depth: 4
+          fetch-depth: 5
           persist-credentials: true
 
       - name: Prove frozen old and new lineage
@@ -33,8 +33,9 @@ jobs:
           fixture_parent='7022812c49841a052bd0156f55b363ce84929b90'
           workflow='.github/workflows/restack-1155-on-fabrication-persistence.yml'
 
-          test "$(git rev-parse HEAD^)" = "$new_parent"
-          test "$(git diff --name-only HEAD^..HEAD)" = "$workflow"
+          test "$(git rev-parse HEAD^^)" = "$new_parent"
+          test "$(git rev-list --count "$new_parent"..HEAD)" = '2'
+          test "$(git diff --name-only "$new_parent"..HEAD)" = "$workflow"
           test "$(git rev-parse "$new_parent^")" = "$fixture_parent"
           test "$(git rev-parse "$fixture_parent^")" = "$root"
 
@@ -42,7 +43,6 @@ jobs:
           test "$(git rev-parse "$old_head^")" = "$root"
           test "$(git rev-list --count "$root".."$old_head")" = '1'
 
-          # Persistence prerequisites do not own any migration file or lock edge.
           unchanged=(
             'Cargo.lock'
             'crates/core/symthaea-evidence-plane/src/lib.rs'
@@ -73,7 +73,6 @@ jobs:
         run: |
           set -euo pipefail
           old_head='004b3a4968fe1106a1e6603e9fe405c339cd9fda'
-          old_parent='04b7d3182bdea0ec647b6c1ee4511901807415fb'
           new_parent='f687a55efc6b6bbfb7808a683c7b40e30149c090'
           exact=(
             'Cargo.lock'
@@ -96,11 +95,9 @@ jobs:
           src = Path('/tmp/migration.yml').read_text()
           if src.count(old) != 1:
               raise SystemExit(f'expected one exact parent assertion, got {src.count(old)}')
-          out = src.replace(old, new)
-          Path('.github/workflows/evidence-plane-shared-digest-migration.yml').write_text(out)
+          Path('.github/workflows/evidence-plane-shared-digest-migration.yml').write_text(src.replace(old, new))
           PY
 
-          mapfile -t changed < <(git diff --name-only HEAD | sort)
           expected=(
             '.github/workflows/evidence-plane-shared-digest-migration.yml'
             'Cargo.lock'
@@ -109,7 +106,9 @@ jobs:
             'crates/domains/symthaea-fabrication-kernel/src/lib.rs'
             'crates/domains/symthaea-fabrication-kernel/tests/crypto_digest_compatibility.rs'
           )
-          test "${#changed[@]}" -eq "${#expected[@]}"
+          git add -A -- "${expected[@]}"
+          mapfile -t changed < <(git diff --cached --name-only HEAD | sort)
+          test "${#changed[@]}" -eq 6
           for i in "${!expected[@]}"; do test "${changed[$i]}" = "${expected[$i]}"; done
 
       - name: Re-prove exact lock transition
