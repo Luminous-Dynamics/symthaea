@@ -62,6 +62,16 @@ fn campaign_capability_contains_only_sealed_or_narrowed_authorities() {
             "campaign capability must not expose broader authority: {forbidden}"
         );
     }
+
+    let impl_start = production_source
+        .find("impl V2PreHeldOutCampaignCapability")
+        .expect("campaign capability impl exists");
+    let capability_api = &production_source[impl_start..];
+    assert!(
+        !capability_api.contains("pub(super) fn heldout_plan("),
+        "full HeldOut plan/post-state authority must remain evaluator-private"
+    );
+    assert!(capability_api.contains("pub(super) fn heldout_row_count("));
 }
 
 #[test]
