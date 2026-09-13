@@ -116,6 +116,10 @@ pub struct VerifiedGwt1CausalPromotionV1 {
     capsule_byte_len: u64,
     promotion_attestation_bundle_sha256: String,
     promotion_attestation_verification_sha256: String,
+    // Preserve the exact verifier stdout whose digest is carried into the V2
+    // causal authority identity. This stays crate-private so retaining replay
+    // evidence does not widen the authority-construction surface.
+    promotion_attestation_verification_bytes: Vec<u8>,
 }
 
 impl VerifiedGwt1CausalPromotionV1 {
@@ -137,6 +141,10 @@ impl VerifiedGwt1CausalPromotionV1 {
 
     pub fn promotion_attestation_verification_sha256(&self) -> &str {
         &self.promotion_attestation_verification_sha256
+    }
+
+    pub(crate) fn promotion_attestation_verification_bytes(&self) -> &[u8] {
+        &self.promotion_attestation_verification_bytes
     }
 }
 
@@ -334,6 +342,9 @@ pub(crate) fn verify_gwt1_causal_promotion_package_v1(
         ));
     }
 
+    let verification_bytes = output.stdout;
+    let verification_sha256 = sha256_bytes(sha256sum_executable, &verification_bytes)?;
+
     Ok(VerifiedGwt1CausalPromotionV1 {
         capsule,
         capsule_sha256: sha256_bytes(sha256sum_executable, &capsule_bytes)?,
@@ -342,10 +353,8 @@ pub(crate) fn verify_gwt1_causal_promotion_package_v1(
             sha256sum_executable,
             &bundle_bytes,
         )?,
-        promotion_attestation_verification_sha256: sha256_bytes(
-            sha256sum_executable,
-            &output.stdout,
-        )?,
+        promotion_attestation_verification_sha256: verification_sha256,
+        promotion_attestation_verification_bytes: verification_bytes,
     })
 }
 
@@ -359,6 +368,7 @@ pub(crate) fn verified_gwt1_causal_promotion_for_test(
         capsule_byte_len: 256,
         promotion_attestation_bundle_sha256: "b".repeat(64),
         promotion_attestation_verification_sha256: "c".repeat(64),
+        promotion_attestation_verification_bytes: b"{}".to_vec(),
     }
 }
 
@@ -436,7 +446,7 @@ mod tests {
     #[test]
     fn relative_config_path_is_rejected() {
         assert!(matches!(
-            validate_trusted_config_dir(Path::new("gh-config")),
+            validate_trusted_config_dir(Path::new("gh-config"),),
             Err(Gwt1CausalPromotionVerificationErrorV1::VerifierConfigPathNotAbsolute { .. })
         ));
     }
