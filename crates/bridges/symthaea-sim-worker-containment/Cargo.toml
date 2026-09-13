@@ -1,0 +1,25 @@
+[package]
+name = "symthaea-sim-worker-containment"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Linux seccomp containment profile for supervised Symthaea simulation workers"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+libc.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+symthaea-extension-simulation-host = { path = "../symthaea-extension-simulation-host" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-sim-digest = { path = "../symthaea-sim-digest" }
+symthaea-sim-worker = { path = "../symthaea-sim-worker" }
+symthaea-sim-worker-image = { path = "../symthaea-sim-worker-image" }
+
+[[bin]]
+name = "symthaea-sim-contained-worker"
+path = "src/bin/symthaea-sim-contained-worker.rs"
+
+[[bin]]
+name = "symthaea-sim-containment-probe"
+path = "src/bin/symthaea-sim-containment-probe.rs"
