@@ -20,6 +20,8 @@
 //!   transport with a caller-bounded path-count budget
 //! - **Cubic-orbit Wilson averaging**: equal-weight signed-permutation averaging
 //!   with explicit orientation and per-orientation path work bounds
+//! - **Bounded Bresenham Wilson transport**: linear-cost generalized off-axis
+//!   paths for benchmark-scale cubic-orbit measurements
 //!
 //! ## Natural Units
 //!
@@ -38,6 +40,7 @@ pub mod cross_sections;
 pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
+pub mod lattice_bresenham_wilson;
 pub mod lattice_cubic_wilson;
 pub mod lattice_gauge;
 pub mod lattice_mixed_wilson;
@@ -57,6 +60,12 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use lattice_bresenham_wilson::{
+    GENERALIZED_BRESENHAM_WILSON_ID, BresenhamCubicWilsonMeasurement, BresenhamStep,
+    BresenhamWilsonError, average_bresenham_mixed_wilson_loop,
+    average_cubic_bresenham_mixed_wilson_loop, bresenham_mixed_wilson_loop,
+    bresenham_spatial_transporter, generalized_bresenham_steps,
 };
 pub use lattice_cubic_wilson::{
     CUBIC_SIGNED_PERMUTATION_ORBIT_ID, CubicOrbitWilsonError,
