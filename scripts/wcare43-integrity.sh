@@ -31,7 +31,7 @@ check_blob() {
 
 check_blob "docs/release/evidence/WCARE43_RFC3161_PREREGISTRATION_PROTOCOL_V1.md" "76ff1774ee510c096649b82cfc3857deaf921e12"
 check_blob "docs/release/evidence/WCARE43_RFC3161_BACKEND_POLICY_SCHEMA_V1.json" "2e04e221a5d89bd2da3ea4244649898b66e47a74"
-check_blob "docs/release/evidence/WCARE43_RFC3161_RESULT_SCHEMA_V1.json" "7d67eec8adc535d37b4a62c748ad24d3b02d30d0"
+check_blob "docs/release/evidence/WCARE43_RFC3161_RESULT_SCHEMA_V1.json" "f504e2fed24a0637621f7ab757e580f33b321a98"
 check_blob "scripts/wcare43_rfc3161_verify.py" "e89b66a24cb51bed589911b082ea6fef5ffd369b"
 check_blob "scripts/wcare43_selftest.py" "7906ce87f7b121464b42dbf35584ddbc9a50ae4d"
 check_blob "docs/release/evidence/fixtures/wcare43/a.final.json" "8cec0486532180e6f4fe0f58920c1f318b5154ac"
