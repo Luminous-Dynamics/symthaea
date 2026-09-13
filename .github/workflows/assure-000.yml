@@ -3,7 +3,8 @@ name: ASSURE-000 Qualification
 on:
   pull_request:
     paths:
-      - 'crates/assurance/symthaea-assurance-core/**'
+      - 'crates/core/symthaea-assurance-core/**'
+      - 'Cargo.lock'
       - '.github/workflows/assure-000.yml'
   workflow_dispatch:
 
@@ -28,10 +29,20 @@ jobs:
           echo "head=$(git rev-parse HEAD)"
           git diff --exit-code
       - name: Format
-        run: cargo fmt --manifest-path crates/assurance/symthaea-assurance-core/Cargo.toml -- --check
-      - name: Check
-        run: cargo check --locked --manifest-path crates/assurance/symthaea-assurance-core/Cargo.toml
+        run: cargo fmt --manifest-path crates/core/symthaea-assurance-core/Cargo.toml -- --check
+      - name: Check and expose lock reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --manifest-path crates/core/symthaea-assurance-core/Cargo.toml
+          git diff -- Cargo.lock || true
       - name: Test
-        run: cargo test --locked --manifest-path crates/assurance/symthaea-assurance-core/Cargo.toml
+        run: cargo test --manifest-path crates/core/symthaea-assurance-core/Cargo.toml
       - name: Strict Clippy
-        run: cargo clippy --locked --manifest-path crates/assurance/symthaea-assurance-core/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --manifest-path crates/core/symthaea-assurance-core/Cargo.toml --all-targets -- -D warnings
+      - name: Require committed lock parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff -- Cargo.lock
+          git diff --exit-code -- Cargo.lock
