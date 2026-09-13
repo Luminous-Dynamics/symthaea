@@ -14,9 +14,16 @@
 //! object --owned_by--> entity --located_at--> location
 //! ```
 //!
-//! Ownership and location mutate independently. `ObjectLocation` therefore
-//! requires composition across two mutable relations. Historical queries ask
-//! about an earlier world state after later events have already been observed.
+//! Every generated episode begins with an **observable initialization prefix**:
+//! one `MoveEntity` fact for every entity and one `TransferObject` fact for every
+//! object, deterministically shuffled. Only after that complete world snapshot
+//! has been presented do ordinary mutations and scored queries begin. This keeps
+//! train/test initial worlds seed-randomized without making any scored fact
+//! unknowable to the model.
+//!
+//! Ownership and location then mutate independently. `ObjectLocation` requires
+//! composition across two mutable relations. Historical queries ask about an
+//! earlier fully-observed world state after later events have been seen.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -75,8 +82,10 @@ pub struct StateTrackingBenchmarkConfig {
     pub entities: usize,
     pub objects: usize,
     pub locations: usize,
+    /// Number of ordinary mutation events **after** the observable initialization
+    /// prefix. Total stream length is `entities + objects + events`.
     pub events: usize,
-    /// Emit a current-state query bundle after every N events.
+    /// Emit a current-state query bundle after every N mutation events.
     pub query_every: usize,
     /// Minimum positive inter-event interval.
     pub min_dt: f64,
@@ -177,6 +186,11 @@ pub struct StateTrackingBenchmark {
     pub config: StateTrackingBenchmarkConfig,
     pub events: Vec<TrackingEvent>,
     pub queries: Vec<TrackingQuery>,
+    /// Number of leading events that completely disclose the randomized initial
+    /// world. No generated query is asked before this prefix has completed, and
+    /// no historical target points into a partially initialized state.
+    #[serde(default)]
+    pub initialization_events: usize,
     initial_entity_locations: Vec<LocationId>,
     initial_object_owners: Vec<EntityId>,
 }
@@ -188,8 +202,8 @@ impl StateTrackingBenchmark {
         validate_config(&config)?;
         let mut rng = XorShift64::new(config.seed);
 
-        // Initial latent world is seed-dependent. This prevents a query-only
-        // readout from learning one fixed modulo mapping across train/test seeds.
+        // Initial latent world is seed-dependent so a query-only model cannot
+        // memorize one fixed mapping across world seeds.
         let initial_entity_locations = (0..config.entities)
             .map(|_| rng.index(config.locations) as LocationId)
             .collect::<Vec<_>>();
@@ -197,8 +211,30 @@ impl StateTrackingBenchmark {
             .map(|_| rng.index(config.entities) as EntityId)
             .collect::<Vec<_>>();
 
-        let mut events = Vec::with_capacity(config.events);
+        // Crucially, the randomized initial state is then made fully observable.
+        let mut bootstrap = Vec::with_capacity(config.entities + config.objects);
+        for (entity, &to) in initial_entity_locations.iter().enumerate() {
+            bootstrap.push(TrackingEventKind::MoveEntity {
+                entity: entity as EntityId,
+                to,
+            });
+        }
+        for (object, &to) in initial_object_owners.iter().enumerate() {
+            bootstrap.push(TrackingEventKind::TransferObject {
+                object: object as ObjectId,
+                to,
+            });
+        }
+        rng.shuffle(&mut bootstrap);
+        let initialization_events = bootstrap.len();
+
+        let mut events = Vec::with_capacity(initialization_events + config.events);
         let mut time = 0.0_f64;
+        for kind in bootstrap {
+            time += sample_log_uniform(&mut rng, config.min_dt, config.max_dt);
+            events.push(TrackingEvent { time, kind });
+        }
+
         for _ in 0..config.events {
             time += sample_log_uniform(&mut rng, config.min_dt, config.max_dt);
             let kind = if rng.next_bool() {
@@ -219,11 +255,19 @@ impl StateTrackingBenchmark {
             config,
             events,
             queries: Vec::new(),
+            initialization_events,
             initial_entity_locations,
             initial_object_owners,
         };
         benchmark.queries = benchmark.generate_queries(&mut rng)?;
         Ok(benchmark)
+    }
+
+    /// Index of the first fully observed world state (immediately after the
+    /// initialization prefix). Returns `None` only for legacy deserialized data
+    /// that lacks a prefix.
+    pub fn first_fully_observed_event(&self) -> Option<usize> {
+        self.initialization_events.checked_sub(1)
     }
 
     /// Exact symbolic answer at the state immediately after `as_of_event`.
@@ -304,10 +348,17 @@ impl StateTrackingBenchmark {
         rng: &mut XorShift64,
     ) -> Result<Vec<TrackingQuery>, StateTrackingBenchmarkError> {
         let mut queries = Vec::new();
+        let Some(first_observed) = self.first_fully_observed_event() else {
+            return Ok(queries);
+        };
 
-        for asked_after in (self.config.query_every - 1..self.events.len())
-            .step_by(self.config.query_every)
-        {
+        // `query_every` is measured over post-bootstrap mutation events.
+        let first_query = self.initialization_events + self.config.query_every - 1;
+        if first_query >= self.events.len() {
+            return Ok(queries);
+        }
+
+        for asked_after in (first_query..self.events.len()).step_by(self.config.query_every) {
             let current_entity = rng.index(self.config.entities) as EntityId;
             let current_object = rng.index(self.config.objects) as ObjectId;
 
@@ -336,8 +387,9 @@ impl StateTrackingBenchmark {
                 },
             )?;
 
-            if asked_after > 0 && rng.next_f64() < self.config.historical_query_rate {
-                let as_of = rng.index(asked_after);
+            if asked_after > first_observed && rng.next_f64() < self.config.historical_query_rate {
+                // Fully observed retrospective targets only: [first_observed, asked_after).
+                let as_of = first_observed + rng.index(asked_after - first_observed);
                 let historical_object = rng.index(self.config.objects) as ObjectId;
                 self.push_query(
                     &mut queries,
@@ -464,7 +516,11 @@ fn sample_log_uniform(rng: &mut XorShift64, min: f64, max: f64) -> f64 {
 }
 
 fn ratio(correct: usize, total: usize) -> f64 {
-    if total == 0 { 0.0 } else { correct as f64 / total as f64 }
+    if total == 0 {
+        0.0
+    } else {
+        correct as f64 / total as f64
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -476,7 +532,11 @@ impl XorShift64 {
     fn new(seed: u64) -> Self {
         let mixed = seed ^ 0x9E3779B97F4A7C15;
         Self {
-            state: if mixed == 0 { 0xD1B54A32D192ED03 } else { mixed },
+            state: if mixed == 0 {
+                0xD1B54A32D192ED03
+            } else {
+                mixed
+            },
         }
     }
 
@@ -487,7 +547,9 @@ impl XorShift64 {
         self.state
     }
 
-    fn next_bool(&mut self) -> bool { self.next_u64() & 1 == 1 }
+    fn next_bool(&mut self) -> bool {
+        self.next_u64() & 1 == 1
+    }
 
     fn next_f64(&mut self) -> f64 {
         let bits = self.next_u64() >> 11;
@@ -498,21 +560,95 @@ impl XorShift64 {
         debug_assert!(len > 0);
         (self.next_u64() as usize) % len
     }
+
+    fn shuffle<T>(&mut self, values: &mut [T]) {
+        for index in (1..values.len()).rev() {
+            let swap_with = self.index(index + 1);
+            values.swap(index, swap_with);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn generation_is_deterministic() {
-        let config = StateTrackingBenchmarkConfig { events: 200, ..Default::default() };
+        let config = StateTrackingBenchmarkConfig {
+            events: 200,
+            ..Default::default()
+        };
         let a = StateTrackingBenchmark::generate(config.clone()).unwrap();
         let b = StateTrackingBenchmark::generate(config).unwrap();
         assert_eq!(a.events, b.events);
         assert_eq!(a.queries, b.queries);
+        assert_eq!(a.initialization_events, b.initialization_events);
         assert_eq!(a.initial_entity_locations, b.initial_entity_locations);
         assert_eq!(a.initial_object_owners, b.initial_object_owners);
+    }
+
+    #[test]
+    fn initialization_prefix_discloses_every_randomized_fact_exactly_once() {
+        let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
+            entities: 7,
+            objects: 11,
+            locations: 5,
+            events: 32,
+            seed: 9,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(benchmark.initialization_events, 18);
+        assert_eq!(benchmark.events.len(), 18 + 32);
+
+        let mut seen_entities = HashSet::new();
+        let mut seen_objects = HashSet::new();
+        for event in benchmark.events.iter().take(benchmark.initialization_events) {
+            match event.kind {
+                TrackingEventKind::MoveEntity { entity, to } => {
+                    assert!(seen_entities.insert(entity));
+                    assert_eq!(
+                        to,
+                        benchmark.initial_entity_locations[entity as usize],
+                        "bootstrap location must disclose latent initial world"
+                    );
+                }
+                TrackingEventKind::TransferObject { object, to } => {
+                    assert!(seen_objects.insert(object));
+                    assert_eq!(
+                        to,
+                        benchmark.initial_object_owners[object as usize],
+                        "bootstrap owner must disclose latent initial world"
+                    );
+                }
+            }
+        }
+        assert_eq!(seen_entities.len(), 7);
+        assert_eq!(seen_objects.len(), 11);
+    }
+
+    #[test]
+    fn no_query_uses_partially_initialized_world() {
+        let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
+            entities: 8,
+            objects: 12,
+            events: 100,
+            query_every: 1,
+            historical_query_rate: 1.0,
+            ..Default::default()
+        })
+        .unwrap();
+        let first_observed = benchmark.first_fully_observed_event().unwrap();
+        assert!(benchmark
+            .queries
+            .iter()
+            .all(|query| query.asked_after_event >= benchmark.initialization_events));
+        assert!(benchmark
+            .queries
+            .iter()
+            .all(|query| query.as_of_event >= first_observed));
     }
 
     #[test]
@@ -541,7 +677,10 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        assert!(benchmark.events.windows(2).all(|pair| pair[1].time > pair[0].time));
+        assert!(benchmark
+            .events
+            .windows(2)
+            .all(|pair| pair[1].time > pair[0].time));
     }
 
     #[test]
@@ -553,11 +692,18 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        let dts = benchmark.events.windows(2).map(|pair| pair[1].time - pair[0].time).collect::<Vec<_>>();
+        let dts = benchmark
+            .events
+            .windows(2)
+            .map(|pair| pair[1].time - pair[0].time)
+            .collect::<Vec<_>>();
         assert!(dts.iter().all(|dt| *dt > 0.0));
         let min = dts.iter().copied().fold(f64::INFINITY, f64::min);
         let max = dts.iter().copied().fold(0.0_f64, f64::max);
-        assert!(max / min > 1_000.0, "insufficient irregularity: min={min} max={max}");
+        assert!(
+            max / min > 1_000.0,
+            "insufficient irregularity: min={min} max={max}"
+        );
     }
 
     #[test]
@@ -569,12 +715,17 @@ mod tests {
         })
         .unwrap();
         for query in &benchmark.queries {
-            assert_eq!(benchmark.oracle_answer(query.as_of_event, &query.kind).unwrap(), query.expected);
+            assert_eq!(
+                benchmark
+                    .oracle_answer(query.as_of_event, &query.kind)
+                    .unwrap(),
+                query.expected
+            );
         }
     }
 
     #[test]
-    fn requested_historical_queries_are_strictly_retrospective() {
+    fn requested_historical_queries_are_strict_and_fully_observed() {
         let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
             events: 500,
             query_every: 5,
@@ -582,9 +733,16 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        let historical = benchmark.queries.iter().filter(|query| query.is_historical()).collect::<Vec<_>>();
+        let first_observed = benchmark.first_fully_observed_event().unwrap();
+        let historical = benchmark
+            .queries
+            .iter()
+            .filter(|query| query.is_historical())
+            .collect::<Vec<_>>();
         assert!(!historical.is_empty());
-        assert!(historical.iter().all(|query| query.as_of_event < query.asked_after_event));
+        assert!(historical.iter().all(|query| {
+            query.as_of_event >= first_observed && query.as_of_event < query.asked_after_event
+        }));
     }
 
     #[test]
@@ -595,7 +753,10 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        assert!(benchmark.queries.iter().any(|query| matches!(query.kind, TrackingQueryKind::ObjectLocation { .. })));
+        assert!(benchmark.queries.iter().any(|query| matches!(
+            query.kind,
+            TrackingQueryKind::ObjectLocation { .. }
+        )));
     }
 
     #[test]
@@ -606,7 +767,11 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        let predictions = benchmark.queries.iter().map(|query| query.expected).collect::<Vec<_>>();
+        let predictions = benchmark
+            .queries
+            .iter()
+            .map(|query| query.expected)
+            .collect::<Vec<_>>();
         let score = benchmark.score(&predictions).unwrap();
         assert_eq!(score.accuracy(), 1.0);
         assert_eq!(score.current_accuracy(), 1.0);
