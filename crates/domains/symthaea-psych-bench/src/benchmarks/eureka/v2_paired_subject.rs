@@ -12,11 +12,12 @@ use super::analysis_plan::{ANALYSIS_PLAN_REVISION, EUREKA_002_ANALYSIS_PLAN_V1};
 use super::v2_comparator_custody::V2ComparatorCustodyReceipt;
 use super::v2_target_contract::V2FepTargetContract;
 
-pub(super) const V2_PAIRED_SUBJECT_REVISION: &str = "EUREKA.002.V2.PAIRED_SUBJECT.v1";
+pub(super) const V2_PAIRED_SUBJECT_REVISION: &str = "EUREKA.002.V2.PAIRED_SUBJECT.v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum V2PairedSubjectError {
     PublicSchemaMismatch,
+    AnalysisPlanMismatch,
     ZeroTargetCommitment,
     ZeroComparatorCommitment,
 }
@@ -27,6 +28,7 @@ pub(super) struct V2PairedSubjectContract {
     target_contract_commitment: [u8; 32],
     comparator_subject_commitment: [u8; 32],
     analysis_plan_replay_digest: u64,
+    analysis_plan_commitment: [u8; 32],
     commitment: [u8; 32],
 }
 
@@ -39,6 +41,13 @@ impl V2PairedSubjectContract {
             target.public_schema_commitment(),
             comparator.schema_commitment(),
         )?;
+        let analysis_plan_replay_digest = EUREKA_002_ANALYSIS_PLAN_V1.replay_digest();
+        let analysis_plan_commitment = EUREKA_002_ANALYSIS_PLAN_V1.cryptographic_commitment();
+        validate_analysis_plan_pair(
+            analysis_plan_commitment,
+            comparator.analysis_plan_commitment(),
+        )?;
+
         let target_contract_commitment = target.commitment();
         let comparator_subject_commitment = comparator.commitment();
         if target_contract_commitment == [0_u8; 32] {
@@ -47,18 +56,19 @@ impl V2PairedSubjectContract {
         if comparator_subject_commitment == [0_u8; 32] {
             return Err(V2PairedSubjectError::ZeroComparatorCommitment);
         }
-        let analysis_plan_replay_digest = EUREKA_002_ANALYSIS_PLAN_V1.replay_digest();
         let commitment = paired_subject_commitment(
             public_schema_commitment,
             target_contract_commitment,
             comparator_subject_commitment,
             analysis_plan_replay_digest,
+            analysis_plan_commitment,
         );
         Ok(Self {
             public_schema_commitment,
             target_contract_commitment,
             comparator_subject_commitment,
             analysis_plan_replay_digest,
+            analysis_plan_commitment,
             commitment,
         })
     }
@@ -79,6 +89,10 @@ impl V2PairedSubjectContract {
         self.analysis_plan_replay_digest
     }
 
+    pub(super) const fn analysis_plan_commitment(self) -> [u8; 32] {
+        self.analysis_plan_commitment
+    }
+
     pub(super) const fn commitment(self) -> [u8; 32] {
         self.commitment
     }
@@ -94,16 +108,28 @@ fn validate_schema_pair(
     Ok(target_schema)
 }
 
+fn validate_analysis_plan_pair(
+    expected: [u8; 32],
+    comparator: [u8; 32],
+) -> Result<[u8; 32], V2PairedSubjectError> {
+    if expected != comparator {
+        return Err(V2PairedSubjectError::AnalysisPlanMismatch);
+    }
+    Ok(expected)
+}
+
 fn paired_subject_commitment(
     public_schema_commitment: [u8; 32],
     target_contract_commitment: [u8; 32],
     comparator_subject_commitment: [u8; 32],
     analysis_plan_replay_digest: u64,
+    analysis_plan_commitment: [u8; 32],
 ) -> [u8; 32] {
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, V2_PAIRED_SUBJECT_REVISION.as_bytes());
     encode_bytes(&mut bytes, ANALYSIS_PLAN_REVISION.as_bytes());
     bytes.extend_from_slice(&analysis_plan_replay_digest.to_le_bytes());
+    bytes.extend_from_slice(&analysis_plan_commitment);
     bytes.extend_from_slice(&public_schema_commitment);
     bytes.extend_from_slice(&target_contract_commitment);
     bytes.extend_from_slice(&comparator_subject_commitment);
@@ -161,7 +187,7 @@ mod tests {
         )
         .unwrap();
         let corpus = V2DevelopmentFitCorpus::freeze(vec![record]).unwrap();
-        V2ComparatorCustodyReceipt::freeze(&corpus, selected, [0xA5_u8; 32])
+        V2ComparatorCustodyReceipt::freeze(&corpus, selected, [0xA5_u8; 32]).unwrap()
     }
 
     #[test]
@@ -173,6 +199,10 @@ mod tests {
         assert_eq!(
             pair.analysis_plan_replay_digest(),
             EUREKA_002_ANALYSIS_PLAN_V1.replay_digest()
+        );
+        assert_eq!(
+            pair.analysis_plan_commitment(),
+            EUREKA_002_ANALYSIS_PLAN_V1.cryptographic_commitment()
         );
         assert_ne!(pair.target_contract_commitment(), [0_u8; 32]);
         assert_ne!(pair.comparator_subject_commitment(), [0_u8; 32]);
@@ -187,6 +217,17 @@ mod tests {
         assert_eq!(
             validate_schema_pair(target_schema, comparator_schema),
             Err(V2PairedSubjectError::PublicSchemaMismatch)
+        );
+    }
+
+    #[test]
+    fn stale_analysis_plan_fails_closed_before_execution() {
+        let expected = EUREKA_002_ANALYSIS_PLAN_V1.cryptographic_commitment();
+        let mut stale = expected;
+        stale[0] ^= 0x01;
+        assert_eq!(
+            validate_analysis_plan_pair(expected, stale),
+            Err(V2PairedSubjectError::AnalysisPlanMismatch)
         );
     }
 
