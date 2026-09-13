@@ -10,26 +10,44 @@
 //! independently verifying upstream package profiles and separately attesting
 //! the complete deterministic final archive.
 
-use std::env;
-use std::fs;
-use std::io;
-use std::path::{Path, PathBuf};
-
-use symthaea_psych_bench::benchmarks::butlin::generate_gwt1_trusted_resolution_candidate_v1;
-
-fn required_path(name: &str) -> Result<PathBuf, io::Error> {
-    env::var_os(name)
-        .map(PathBuf::from)
-        .ok_or_else(|| io::Error::other(format!("missing required environment variable {name}")))
+#[cfg(not(feature = "symthaea-backend"))]
+fn main() {
+    eprintln!("gwt1_generate_trusted_resolution_candidate requires --features symthaea-backend");
+    std::process::exit(2);
 }
 
-fn write_json<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), Box<dyn std::error::Error>> {
-    let bytes = serde_json::to_vec(value)?;
-    fs::write(path, bytes)?;
-    Ok(())
+#[cfg(feature = "symthaea-backend")]
+fn main() {
+    if let Err(error) = trusted_main() {
+        eprintln!("trusted GWT-1 final-resolution candidate generation failed: {error}");
+        std::process::exit(2);
+    }
 }
 
-fn run() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg(feature = "symthaea-backend")]
+fn trusted_main() -> Result<(), Box<dyn std::error::Error>> {
+    use std::env;
+    use std::fs;
+    use std::io;
+    use std::path::{Path, PathBuf};
+
+    use symthaea_psych_bench::benchmarks::butlin::generate_gwt1_trusted_resolution_candidate_v1;
+
+    fn required_path(name: &str) -> Result<PathBuf, io::Error> {
+        env::var_os(name)
+            .map(PathBuf::from)
+            .ok_or_else(|| io::Error::other(format!("missing required environment variable {name}")))
+    }
+
+    fn write_json<T: serde::Serialize>(
+        path: &Path,
+        value: &T,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let bytes = serde_json::to_vec(value)?;
+        fs::write(path, bytes)?;
+        Ok(())
+    }
+
     let direct_evidence_dir = required_path("SYMTHAEA_GWT1_DIRECT_EVIDENCE_DIR")?;
     let promotion_capsule = required_path("GWT1_CAUSAL_PROMOTION_CAPSULE")?;
     let promotion_attestation_bundle =
@@ -71,11 +89,4 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     write_json(&output_dir.join("resolution_candidate.json"), &candidate)?;
 
     Ok(())
-}
-
-fn main() {
-    if let Err(error) = run() {
-        eprintln!("trusted GWT-1 final-resolution candidate generation failed: {error}");
-        std::process::exit(2);
-    }
 }
