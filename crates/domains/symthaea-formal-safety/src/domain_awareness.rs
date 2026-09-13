@@ -2,438 +2,147 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Canonical formal-safety obligations for evidence-first domain awareness.
 //!
-//! These obligations deliberately stop at perception, epistemic assurance,
-//! degraded-mode behavior, auditability, and separation from physical authority.
-//! They do not define targeting, engagement, or effector-control behavior.
+//! DA-001..DA-037 remain in the original public catalog for API compatibility.
+//! DA-038..DA-042 extend the canonical DomainAwareness template without adding
+//! variants to the public enum and breaking downstream exhaustive matches.
+
+#[path = "domain_awareness_base.rs"]
+mod base;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{EvidenceKind, ProofObligation};
 
-/// Typed identity for every canonical domain-awareness safety obligation.
+pub use base::DomainAwarenessObligation;
+
+/// Typed compatibility-safe extension for hardware-root and measured-boot
+/// reference-integrity obligations.
 ///
-/// The `DA-xxx` codes are human-facing stable handles. Evidence binding should use
-/// [`DomainAwarenessObligation::stable_key`], which is derived from the exact
-/// controlled claim and required evidence kind.
+/// These codes are part of the canonical DomainAwareness template, but are kept
+/// separate from [`DomainAwarenessObligation`] so adding them is not a breaking
+/// change for downstream exhaustive enum matches.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
-pub enum DomainAwarenessObligation {
-    ObservationIsNotIdentityIntentOrAuthority,
-    IdentityIsNotIntentOrAuthority,
-    UncertaintyStatesRemainRepresentable,
-    SelectiveClassificationCanAbstain,
-    OodCannotBecomeKnownWithoutQualifiedEvidence,
-    CooperativeIdentityRemainsEvidence,
-    PassiveRfSilenceIsNotSafety,
-    CorrelatedSourcesDoNotCreateQuorum,
-    DegradationCannotIncreaseConfidenceOrAuthority,
-    TimeCalibrationAndLineageRemainAuditable,
-    InvalidEvidenceCannotSatisfyAssurance,
-    ModelDivergenceRestrictsCapability,
-    OddDegradationIsMonotonic,
-    RiskCannotAuthorizePhysicalAction,
-    IndependentFailClosedAuthorityBoundary,
-    BoundaryBypassBlocksRelease,
-    NegativeOnlyStressEvidenceRequired,
-    ContradictionsAndAbstentionsRemainAuditable,
-    RecoveryProcedureIsReviewed,
-    DeploymentBlockedUntilCriticalObligationsDischarged,
-    CommonCauseDiversityGatesCorroboration,
-    RecoveryRequiresSustainedRequalification,
-    EvidenceCannotSelfDischarge,
-    CurrentEvidenceApplicabilityRequired,
-    ConfigurationDriftInvalidatesEvidence,
-    EvidenceIntegrityHoldsPropagate,
-    TrustedTimeGatesReadiness,
-    EvidenceDependenciesAreAcyclicAndNonCircular,
-    VerifierCommonCauseDiversityRequired,
-    CompositeObligationsRequireAtomicCoverage,
-    CurrentPolicyMustBeSignedLineageTip,
-    ManifestSigningAuthorityIsExternallyGoverned,
-    PolicyLineageRequiresExternalRollbackAnchor,
-    CurrentPolicyAnchorRequiresMonotonicTrustRoot,
-    TrustStoreAttestationRequiresIndependentVerification,
-    TrustStoreRecoveryPreservesExactContinuity,
-    TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant,
+pub enum DomainAwarenessTpmObligation {
+    HardwareTrustRootSubjectBindingIsExact,
+    FreshAttestationKeyPossessionRequired,
+    MeasuredBootReplayMustMatchFreshQuote,
+    ReferenceIntegrityApprovalRequired,
+    ReferenceIntegrityLineageMustBeCurrentAndAuthorized,
 }
 
-impl DomainAwarenessObligation {
-    pub const ALL: [Self; 37] = [
-        Self::ObservationIsNotIdentityIntentOrAuthority,
-        Self::IdentityIsNotIntentOrAuthority,
-        Self::UncertaintyStatesRemainRepresentable,
-        Self::SelectiveClassificationCanAbstain,
-        Self::OodCannotBecomeKnownWithoutQualifiedEvidence,
-        Self::CooperativeIdentityRemainsEvidence,
-        Self::PassiveRfSilenceIsNotSafety,
-        Self::CorrelatedSourcesDoNotCreateQuorum,
-        Self::DegradationCannotIncreaseConfidenceOrAuthority,
-        Self::TimeCalibrationAndLineageRemainAuditable,
-        Self::InvalidEvidenceCannotSatisfyAssurance,
-        Self::ModelDivergenceRestrictsCapability,
-        Self::OddDegradationIsMonotonic,
-        Self::RiskCannotAuthorizePhysicalAction,
-        Self::IndependentFailClosedAuthorityBoundary,
-        Self::BoundaryBypassBlocksRelease,
-        Self::NegativeOnlyStressEvidenceRequired,
-        Self::ContradictionsAndAbstentionsRemainAuditable,
-        Self::RecoveryProcedureIsReviewed,
-        Self::DeploymentBlockedUntilCriticalObligationsDischarged,
-        Self::CommonCauseDiversityGatesCorroboration,
-        Self::RecoveryRequiresSustainedRequalification,
-        Self::EvidenceCannotSelfDischarge,
-        Self::CurrentEvidenceApplicabilityRequired,
-        Self::ConfigurationDriftInvalidatesEvidence,
-        Self::EvidenceIntegrityHoldsPropagate,
-        Self::TrustedTimeGatesReadiness,
-        Self::EvidenceDependenciesAreAcyclicAndNonCircular,
-        Self::VerifierCommonCauseDiversityRequired,
-        Self::CompositeObligationsRequireAtomicCoverage,
-        Self::CurrentPolicyMustBeSignedLineageTip,
-        Self::ManifestSigningAuthorityIsExternallyGoverned,
-        Self::PolicyLineageRequiresExternalRollbackAnchor,
-        Self::CurrentPolicyAnchorRequiresMonotonicTrustRoot,
-        Self::TrustStoreAttestationRequiresIndependentVerification,
-        Self::TrustStoreRecoveryPreservesExactContinuity,
-        Self::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant,
+impl DomainAwarenessTpmObligation {
+    pub const ALL: [Self; 5] = [
+        Self::HardwareTrustRootSubjectBindingIsExact,
+        Self::FreshAttestationKeyPossessionRequired,
+        Self::MeasuredBootReplayMustMatchFreshQuote,
+        Self::ReferenceIntegrityApprovalRequired,
+        Self::ReferenceIntegrityLineageMustBeCurrentAndAuthorized,
     ];
 
-    /// Stable human-review code. Existing codes must not be renumbered.
     pub const fn code(self) -> &'static str {
         match self {
-            Self::ObservationIsNotIdentityIntentOrAuthority => "DA-001",
-            Self::IdentityIsNotIntentOrAuthority => "DA-002",
-            Self::UncertaintyStatesRemainRepresentable => "DA-003",
-            Self::SelectiveClassificationCanAbstain => "DA-004",
-            Self::OodCannotBecomeKnownWithoutQualifiedEvidence => "DA-005",
-            Self::CooperativeIdentityRemainsEvidence => "DA-006",
-            Self::PassiveRfSilenceIsNotSafety => "DA-007",
-            Self::CorrelatedSourcesDoNotCreateQuorum => "DA-008",
-            Self::DegradationCannotIncreaseConfidenceOrAuthority => "DA-009",
-            Self::TimeCalibrationAndLineageRemainAuditable => "DA-010",
-            Self::InvalidEvidenceCannotSatisfyAssurance => "DA-011",
-            Self::ModelDivergenceRestrictsCapability => "DA-012",
-            Self::OddDegradationIsMonotonic => "DA-013",
-            Self::RiskCannotAuthorizePhysicalAction => "DA-014",
-            Self::IndependentFailClosedAuthorityBoundary => "DA-015",
-            Self::BoundaryBypassBlocksRelease => "DA-016",
-            Self::NegativeOnlyStressEvidenceRequired => "DA-017",
-            Self::ContradictionsAndAbstentionsRemainAuditable => "DA-018",
-            Self::RecoveryProcedureIsReviewed => "DA-019",
-            Self::DeploymentBlockedUntilCriticalObligationsDischarged => "DA-020",
-            Self::CommonCauseDiversityGatesCorroboration => "DA-021",
-            Self::RecoveryRequiresSustainedRequalification => "DA-022",
-            Self::EvidenceCannotSelfDischarge => "DA-023",
-            Self::CurrentEvidenceApplicabilityRequired => "DA-024",
-            Self::ConfigurationDriftInvalidatesEvidence => "DA-025",
-            Self::EvidenceIntegrityHoldsPropagate => "DA-026",
-            Self::TrustedTimeGatesReadiness => "DA-027",
-            Self::EvidenceDependenciesAreAcyclicAndNonCircular => "DA-028",
-            Self::VerifierCommonCauseDiversityRequired => "DA-029",
-            Self::CompositeObligationsRequireAtomicCoverage => "DA-030",
-            Self::CurrentPolicyMustBeSignedLineageTip => "DA-031",
-            Self::ManifestSigningAuthorityIsExternallyGoverned => "DA-032",
-            Self::PolicyLineageRequiresExternalRollbackAnchor => "DA-033",
-            Self::CurrentPolicyAnchorRequiresMonotonicTrustRoot => "DA-034",
-            Self::TrustStoreAttestationRequiresIndependentVerification => "DA-035",
-            Self::TrustStoreRecoveryPreservesExactContinuity => "DA-036",
-            Self::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant => "DA-037",
+            Self::HardwareTrustRootSubjectBindingIsExact => "DA-038",
+            Self::FreshAttestationKeyPossessionRequired => "DA-039",
+            Self::MeasuredBootReplayMustMatchFreshQuote => "DA-040",
+            Self::ReferenceIntegrityApprovalRequired => "DA-041",
+            Self::ReferenceIntegrityLineageMustBeCurrentAndAuthorized => "DA-042",
         }
     }
 
     pub const fn claim(self) -> &'static str {
         match self {
-            Self::ObservationIsNotIdentityIntentOrAuthority => {
-                "observation presence cannot by itself establish identity, intent, or physical authority"
+            Self::HardwareTrustRootSubjectBindingIsExact => {
+                "hardware-backed monotonic trust-root evidence is accepted only when the exact reviewed hardware/runtime subject, TPM NV public identity, counter epoch, and rollback floor are bound and independently qualified; substitution or rollback cannot preserve readiness"
             }
-            Self::IdentityIsNotIntentOrAuthority => {
-                "identity evidence cannot by itself establish malicious intent or physical authority"
+            Self::FreshAttestationKeyPossessionRequired => {
+                "current platform assurance requires fresh nonce-bound proof of possession of the reviewed attestation key over the exact policy-selected PCR set; stored key or certificate material alone cannot establish current possession"
             }
-            Self::UncertaintyStatesRemainRepresentable => {
-                "unknown, conflicting, insufficient, and out-of-distribution states remain representable without forced classification"
+            Self::MeasuredBootReplayMustMatchFreshQuote => {
+                "measured-boot event evidence, including required final events, must independently replay in order to the exact PCR state covered by the fresh quote; a valid quote alone cannot establish event-log consistency"
             }
-            Self::SelectiveClassificationCanAbstain => {
-                "selective classifiers retain an explicit abstention path when reviewed uncertainty, support, calibration, or distribution limits are not satisfied"
+            Self::ReferenceIntegrityApprovalRequired => {
+                "measured-state approval requires the exact current signed and versioned reference-integrity policy; explicit denied or unknown-critical measurements reject approval, while missing required or unresolved evidence cannot be promoted to approved"
             }
-            Self::OodCannotBecomeKnownWithoutQualifiedEvidence => {
-                "out-of-distribution evidence cannot be promoted to a known identity without new independently qualified evidence"
-            }
-            Self::CooperativeIdentityRemainsEvidence => {
-                "cooperative identity assertions remain evidence and cannot directly grant physical authority"
-            }
-            Self::PassiveRfSilenceIsNotSafety => {
-                "passive radio silence cannot establish identity, benignity, safety, or physical authority"
-            }
-            Self::CorrelatedSourcesDoNotCreateQuorum => {
-                "correlated derivatives of one physical source are not counted as independent witnesses"
-            }
-            Self::DegradationCannotIncreaseConfidenceOrAuthority => {
-                "loss of sensor quorum, sensor health, communications, model assurance, or evidence freshness cannot increase confidence or authority"
-            }
-            Self::TimeCalibrationAndLineageRemainAuditable => {
-                "observation timestamps, clock uncertainty, freshness bounds, calibration identity, and evidence lineage remain auditable across fusion and classification"
-            }
-            Self::InvalidEvidenceCannotSatisfyAssurance => {
-                "stale, future-dated, duplicated, invalid, or provenance-free evidence cannot satisfy minimum assurance evidence requirements"
-            }
-            Self::ModelDivergenceRestrictsCapability => {
-                "persistent model divergence restricts capability and incomplete model evidence cannot silently remain nominal"
-            }
-            Self::OddDegradationIsMonotonic => {
-                "operational-design-domain degradation can only retain or reduce capability and cannot manufacture new authority"
-            }
-            Self::RiskCannotAuthorizePhysicalAction => {
-                "risk assessment remains consequence-oriented and cannot itself authorize hazardous physical action"
-            }
-            Self::IndependentFailClosedAuthorityBoundary => {
-                "perception, tracking, classification, model-assurance, and risk outputs remain behind an independent fail-closed safety and authorization boundary"
-            }
-            Self::BoundaryBypassBlocksRelease => {
-                "any observed perception-to-authority boundary bypass is a release-blocking failure rather than a tunable statistical threshold"
-            }
-            Self::NegativeOnlyStressEvidenceRequired => {
-                "negative-only and environment-specific stress evidence is included in release assurance so false-alarm behavior is measured outside balanced demonstration clips"
-            }
-            Self::ContradictionsAndAbstentionsRemainAuditable => {
-                "contradictory observations, abstentions, degraded states, and provenance remain recoverable for incident audit"
-            }
-            Self::RecoveryProcedureIsReviewed => {
-                "recovery from fail-closed, restricted, unsafe, or incomplete states follows an explicit reviewed procedure"
-            }
-            Self::DeploymentBlockedUntilCriticalObligationsDischarged => {
-                "deployment is blocked until all safety-critical domain-awareness obligations required by the deployment safety case are discharged"
-            }
-            Self::CommonCauseDiversityGatesCorroboration => {
-                "corroboration requiring independent physical witnesses is withheld when reviewed common-cause fault-domain diversity is missing, incomplete, or insufficient"
-            }
-            Self::RecoveryRequiresSustainedRequalification => {
-                "recovery from restricted, incomplete, unsafe, or fail-closed assurance states requires explicit requalification and sustained qualified evidence; a single favorable sample cannot restore nominal status"
-            }
-            Self::EvidenceCannotSelfDischarge => {
-                "candidate evidence and verified receipts cannot by themselves discharge safety obligations or grant deployment readiness"
-            }
-            Self::CurrentEvidenceApplicabilityRequired => {
-                "deployment readiness requires currently applicable evidence bound to the exact reviewed safety contract; expired, revoked, superseded, or unresolved contradicted evidence cannot satisfy readiness"
-            }
-            Self::ConfigurationDriftInvalidatesEvidence => {
-                "changes to the reviewed deployment configuration, model manifest, or calibration manifest invalidate prior evidence unless replacement evidence is explicitly qualified for the new context"
-            }
-            Self::EvidenceIntegrityHoldsPropagate => {
-                "cross-cutting evidence-integrity holds such as verifier compromise, artifact corruption, or methodology invalidation propagate to all matching evidence until reviewed resolution and any required replacement"
-            }
-            Self::TrustedTimeGatesReadiness => {
-                "time-sensitive safety evidence is accepted only under a reviewed trusted-time policy, and readiness must hold across the complete clock-uncertainty interval without rollback or replay"
-            }
-            Self::EvidenceDependenciesAreAcyclicAndNonCircular => {
-                "safety-evidence dependency graphs are acyclic, and evidence used to justify a safety contract cannot transitively depend on a readiness decision for that same contract"
-            }
-            Self::VerifierCommonCauseDiversityRequired => {
-                "when reviewed safety policy requires independent verification, multiple receipts satisfy that requirement only when verifier common-cause fault-domain diversity meets the reviewed thresholds"
-            }
-            Self::CompositeObligationsRequireAtomicCoverage => {
-                "when a reviewed safety obligation is decomposed into atomic evidence facets, parent receipts do not implicitly satisfy those facets and every required facet has explicit qualifying evidence coverage"
-            }
-            Self::CurrentPolicyMustBeSignedLineageTip => {
-                "deployment readiness requires the current assurance-policy manifest to be present as the exact signed tip of a valid contiguous policy lineage; rollback, truncation, manifest substitution, or signature-record splicing cannot preserve readiness"
-            }
-            Self::ManifestSigningAuthorityIsExternallyGoverned => {
-                "assurance-policy manifest signer and key authority is governed by an independent provisioned trust root with explicit reviewed transitions; a manifest cannot self-authorize signer or key replacement"
-            }
-            Self::PolicyLineageRequiresExternalRollbackAnchor => {
-                "deployment readiness requires the signed assurance-policy lineage tip to match an externally provisioned monotonic checkpoint; truncated history, old-anchor substitution, or an uncheckpointed forward revision cannot remain ready"
-            }
-            Self::CurrentPolicyAnchorRequiresMonotonicTrustRoot => {
-                "deployment readiness requires the current externally anchored policy tip to be bound to a valid monotonic trust-store checkpoint whose counter, anchor, policy state, and current segment cannot roll backward"
-            }
-            Self::TrustStoreAttestationRequiresIndependentVerification => {
-                "trust-store checkpoint and recovery attestation references cannot satisfy assurance unless independently verified against the exact store, counter epoch and value, checkpoint or recovery state, and verifier identity is distinct from the store or hardware being verified"
-            }
-            Self::TrustStoreRecoveryPreservesExactContinuity => {
-                "trust-store recovery requires explicit reviewed authorization and exact continuity from the accepted pre-loss checkpoint and backup into a distinct replacement store and counter epoch; stale backups, expired authorization, or state rollback cannot restore readiness"
-            }
-            Self::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant => {
-                "accepted trust-store recoveries are one-shot and fork-resistant; authorization, recovery commit, pre-loss checkpoint, replacement counter epoch, or first replacement checkpoint cannot be reused to create competing accepted trust roots"
+            Self::ReferenceIntegrityLineageMustBeCurrentAndAuthorized => {
+                "the active reference-integrity manifest must be the exact tip of a contiguous signed lineage with authorized signer and key transitions; history truncation, forged predecessors, revision gaps, or unreviewed signer replacement cannot preserve approval"
             }
         }
     }
 
     pub const fn expected_evidence(self) -> EvidenceKind {
-        match self {
-            Self::ObservationIsNotIdentityIntentOrAuthority
-            | Self::IdentityIsNotIntentOrAuthority
-            | Self::OodCannotBecomeKnownWithoutQualifiedEvidence
-            | Self::CooperativeIdentityRemainsEvidence
-            | Self::PassiveRfSilenceIsNotSafety
-            | Self::DegradationCannotIncreaseConfidenceOrAuthority
-            | Self::OddDegradationIsMonotonic
-            | Self::RiskCannotAuthorizePhysicalAction
-            | Self::IndependentFailClosedAuthorityBoundary
-            | Self::DeploymentBlockedUntilCriticalObligationsDischarged => EvidenceKind::FormalProof,
-            Self::UncertaintyStatesRemainRepresentable
-            | Self::SelectiveClassificationCanAbstain
-            | Self::CorrelatedSourcesDoNotCreateQuorum
-            | Self::InvalidEvidenceCannotSatisfyAssurance
-            | Self::ModelDivergenceRestrictsCapability
-            | Self::BoundaryBypassBlocksRelease
-            | Self::NegativeOnlyStressEvidenceRequired
-            | Self::CommonCauseDiversityGatesCorroboration
-            | Self::RecoveryRequiresSustainedRequalification
-            | Self::EvidenceCannotSelfDischarge
-            | Self::CurrentEvidenceApplicabilityRequired
-            | Self::ConfigurationDriftInvalidatesEvidence
-            | Self::EvidenceIntegrityHoldsPropagate
-            | Self::TrustedTimeGatesReadiness
-            | Self::EvidenceDependenciesAreAcyclicAndNonCircular
-            | Self::VerifierCommonCauseDiversityRequired
-            | Self::CompositeObligationsRequireAtomicCoverage
-            | Self::CurrentPolicyMustBeSignedLineageTip
-            | Self::ManifestSigningAuthorityIsExternallyGoverned
-            | Self::PolicyLineageRequiresExternalRollbackAnchor
-            | Self::CurrentPolicyAnchorRequiresMonotonicTrustRoot
-            | Self::TrustStoreAttestationRequiresIndependentVerification
-            | Self::TrustStoreRecoveryPreservesExactContinuity
-            | Self::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant => EvidenceKind::Test,
-            Self::TimeCalibrationAndLineageRemainAuditable
-            | Self::ContradictionsAndAbstentionsRemainAuditable => EvidenceKind::Telemetry,
-            Self::RecoveryProcedureIsReviewed => EvidenceKind::Standard,
-        }
+        EvidenceKind::Test
     }
 
-    /// Deterministic content key used by strict evidence receipts.
     pub fn stable_key(self) -> String {
         ProofObligation::new(self.claim(), self.expected_evidence()).stable_key()
     }
 }
 
 pub(crate) fn obligations() -> Vec<(&'static str, EvidenceKind)> {
-    DomainAwarenessObligation::ALL
-        .iter()
-        .copied()
-        .map(|obligation| (obligation.claim(), obligation.expected_evidence()))
-        .collect()
+    let mut obligations = base::obligations();
+    obligations.extend(
+        DomainAwarenessTpmObligation::ALL
+            .iter()
+            .copied()
+            .map(|obligation| (obligation.claim(), obligation.expected_evidence())),
+    );
+    obligations
 }
 
 #[cfg(test)]
-mod tests {
+mod extension_tests {
     use super::*;
     use std::collections::BTreeSet;
 
     #[test]
-    fn catalog_codes_claims_and_stable_keys_are_unique() {
-        let codes = DomainAwarenessObligation::ALL
+    fn legacy_public_catalog_is_unchanged_and_extension_is_unique() {
+        assert_eq!(DomainAwarenessObligation::ALL.len(), 37);
+        assert_eq!(DomainAwarenessTpmObligation::ALL.len(), 5);
+        assert_eq!(obligations().len(), 42);
+
+        let base_codes = DomainAwarenessObligation::ALL
             .iter()
             .map(|obligation| obligation.code())
             .collect::<BTreeSet<_>>();
-        let claims = DomainAwarenessObligation::ALL
+        let extension_codes = DomainAwarenessTpmObligation::ALL
             .iter()
-            .map(|obligation| obligation.claim())
+            .map(|obligation| obligation.code())
             .collect::<BTreeSet<_>>();
-        let keys = DomainAwarenessObligation::ALL
+        assert!(base_codes.is_disjoint(&extension_codes));
+
+        let keys = DomainAwarenessTpmObligation::ALL
             .iter()
             .map(|obligation| obligation.stable_key())
             .collect::<BTreeSet<_>>();
-        assert_eq!(codes.len(), DomainAwarenessObligation::ALL.len());
-        assert_eq!(claims.len(), DomainAwarenessObligation::ALL.len());
-        assert_eq!(keys.len(), DomainAwarenessObligation::ALL.len());
+        assert_eq!(keys.len(), DomainAwarenessTpmObligation::ALL.len());
     }
 
     #[test]
-    fn generated_template_exactly_matches_typed_catalog() {
-        let generated = obligations();
-        assert_eq!(generated.len(), DomainAwarenessObligation::ALL.len());
-        for (index, typed) in DomainAwarenessObligation::ALL.iter().enumerate() {
-            assert_eq!(generated[index].0, typed.claim());
-            assert_eq!(generated[index].1, typed.expected_evidence());
-        }
-    }
-
-    #[test]
-    fn authority_boundary_rf_silence_governance_and_trust_root_guards_are_typed() {
+    fn tpm_reference_integrity_codes_and_evidence_are_stable() {
         assert_eq!(
-            DomainAwarenessObligation::IndependentFailClosedAuthorityBoundary.code(),
-            "DA-015"
+            DomainAwarenessTpmObligation::HardwareTrustRootSubjectBindingIsExact.code(),
+            "DA-038"
         );
         assert_eq!(
-            DomainAwarenessObligation::PassiveRfSilenceIsNotSafety.code(),
-            "DA-007"
+            DomainAwarenessTpmObligation::FreshAttestationKeyPossessionRequired.code(),
+            "DA-039"
         );
         assert_eq!(
-            DomainAwarenessObligation::CommonCauseDiversityGatesCorroboration.code(),
-            "DA-021"
+            DomainAwarenessTpmObligation::MeasuredBootReplayMustMatchFreshQuote.code(),
+            "DA-040"
         );
         assert_eq!(
-            DomainAwarenessObligation::RecoveryRequiresSustainedRequalification.code(),
-            "DA-022"
+            DomainAwarenessTpmObligation::ReferenceIntegrityApprovalRequired.code(),
+            "DA-041"
         );
         assert_eq!(
-            DomainAwarenessObligation::EvidenceCannotSelfDischarge.code(),
-            "DA-023"
+            DomainAwarenessTpmObligation::ReferenceIntegrityLineageMustBeCurrentAndAuthorized.code(),
+            "DA-042"
         );
-        assert_eq!(
-            DomainAwarenessObligation::CurrentEvidenceApplicabilityRequired.code(),
-            "DA-024"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::ConfigurationDriftInvalidatesEvidence.code(),
-            "DA-025"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::EvidenceIntegrityHoldsPropagate.code(),
-            "DA-026"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::TrustedTimeGatesReadiness.code(),
-            "DA-027"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::EvidenceDependenciesAreAcyclicAndNonCircular.code(),
-            "DA-028"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::VerifierCommonCauseDiversityRequired.code(),
-            "DA-029"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::CompositeObligationsRequireAtomicCoverage.code(),
-            "DA-030"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::CurrentPolicyMustBeSignedLineageTip.code(),
-            "DA-031"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::ManifestSigningAuthorityIsExternallyGoverned.code(),
-            "DA-032"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::PolicyLineageRequiresExternalRollbackAnchor.code(),
-            "DA-033"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::CurrentPolicyAnchorRequiresMonotonicTrustRoot.code(),
-            "DA-034"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::TrustStoreAttestationRequiresIndependentVerification.code(),
-            "DA-035"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::TrustStoreRecoveryPreservesExactContinuity.code(),
-            "DA-036"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant.code(),
-            "DA-037"
-        );
-        assert_eq!(
-            DomainAwarenessObligation::PassiveRfSilenceIsNotSafety.expected_evidence(),
-            EvidenceKind::FormalProof
-        );
-        assert_eq!(
-            DomainAwarenessObligation::TrustStoreRecoveryAcceptanceIsOneShotAndForkResistant
-                .expected_evidence(),
-            EvidenceKind::Test
-        );
+        assert!(DomainAwarenessTpmObligation::ALL
+            .iter()
+            .all(|obligation| obligation.expected_evidence() == EvidenceKind::Test));
     }
 }
