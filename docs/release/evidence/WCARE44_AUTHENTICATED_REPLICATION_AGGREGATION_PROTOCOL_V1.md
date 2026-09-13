@@ -51,7 +51,10 @@ It requires:
 - valid SHA-256 syntax for bound subject/backend/policy identities;
 - valid token syntax for backend identifiers;
 - exact `evaluation_utc` shape;
+- optional `notes` fields, when present, to remain strings;
 - both WCARE-41 complete-builder-coverage and temporal-preregistration requirements fixed true;
+- the WCARE-41 `wcare40_frontdoor_sha256` to equal the exact WCARE-40 result's `wcare40_frontdoor_sha256`;
+- the WCARE-41 `wcare40_core_verifier_sha256` to equal the exact WCARE-40 result's `wcare40_core_verifier_sha256`;
 - exact builder-observation field census and typed status/subject-kind values;
 - exact temporal-observation field census and typed temporal status;
 - real JSON booleans for `verifier_execution_qualified` and `synthetic` rather than truthy strings or numbers;
@@ -60,9 +63,13 @@ It requires:
 - candidate-kernel exit code to agree with the candidate disposition;
 - every final-promotion field to remain false.
 
-Thus an observation attributed to a different child verifier than the one frozen in WCARE-41 is structurally invalid even at candidate stage.
+Thus Stage A2 establishes a closed attribution chain at the contract level:
 
-Stage A2 still does **not** establish that the supplied WCARE-42/WCARE-43 result or qualification receipt is authentic, nor that the child verifier actually executed. It only proves the candidate evidence is well-formed and attributed to the preregistered verifier identity.
+`exact WCARE-40 result verifier identities <- exact WCARE-41 authentication plan -> exact claimed WCARE-42/WCARE-43 verifier identities`
+
+A candidate cannot aggregate a WCARE-40 result from one verifier lineage while claiming a different WCARE-40 lineage in WCARE-41, and child observations attributed to a different verifier than the one frozen in WCARE-41 are structurally invalid.
+
+Stage A2 still does **not** establish that the supplied WCARE-42/WCARE-43 result or qualification receipt is authentic, nor that the child verifier actually executed. It only proves the candidate evidence is well-formed and attributed consistently to the preregistered verifier identities.
 
 ### Stage B — future child-verifier re-execution and promotion
 
@@ -91,6 +98,8 @@ The kernel binds exact bytes of:
 The exact SHA-256 sets of supplied provenance/relation receipts must equal the corresponding digest sets in the WCARE-40 result. Extra, missing, or duplicate receipt subjects are invalid.
 
 Every planned replica must have exactly one provenance receipt. Every unordered pair of planned replicas must have exactly one relation receipt.
+
+Stage A2 additionally verifies that WCARE-41's frozen WCARE-40 front-door/core-verifier identities match the exact WCARE-40 result before A1 interprets graph semantics.
 
 ## Recomputing the WCARE-40 baseline graph
 
@@ -262,7 +271,7 @@ Stage A may expose:
 - candidate temporal status;
 - candidate conjunction.
 
-Stage A also proves its supplied child observations are structurally complete and attributed to the exact child verifier identities frozen in WCARE-41. It does not prove those child verifiers actually executed or that the supplied child result/qualification receipts are genuine.
+Stage A also proves its supplied child observations are structurally complete and attributed to the exact child verifier identities frozen in WCARE-41, and that WCARE-41's WCARE-40 verifier identities match the exact WCARE-40 result. It does not prove those child verifiers actually executed or that the supplied child result/qualification receipts are genuine.
 
 Stage A must keep these final claims false:
 
