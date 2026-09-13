@@ -3,8 +3,8 @@
 
 use symthaea_assurance_core::{DigestSha256, StableId};
 use symthaea_assurance_subject::{
-    AiSubjectManifest, AiSurfaceKind, SubjectError, SurfaceBinding, SurfaceLocator, SurfaceProfile,
-    SurfaceState, UnavailabilityReason,
+    AiSubjectManifest, AiSurfaceKind, CommitmentMethod, MaterialCommitment, SubjectError,
+    SurfaceBinding, SurfaceLocator, SurfaceProfile, SurfaceState, UnavailabilityReason,
 };
 
 fn id(value: &str) -> StableId {
@@ -13,6 +13,10 @@ fn id(value: &str) -> StableId {
 
 fn digest(byte: char) -> DigestSha256 {
     DigestSha256::new(std::iter::repeat_n(byte, 64).collect::<String>()).unwrap()
+}
+
+fn commit(byte: char) -> MaterialCommitment {
+    MaterialCommitment::artifact_bytes(digest(byte))
 }
 
 fn locator(name: &str) -> SurfaceLocator {
@@ -36,11 +40,11 @@ fn exact_manifest() -> AiSubjectManifest {
         id("agent-a"),
         model_runtime_profile(),
         vec![
-            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(digest('a'))),
+            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(commit('a'))),
             binding(
                 AiSurfaceKind::Runtime,
                 "runtime-image",
-                SurfaceState::Known(digest('b')),
+                SurfaceState::Known(commit('b')),
             ),
         ],
     )
@@ -82,9 +86,9 @@ fn manifest_identity_is_binding_order_independent() {
             binding(
                 AiSurfaceKind::Runtime,
                 "runtime-image",
-                SurfaceState::Known(digest('b')),
+                SurfaceState::Known(commit('b')),
             ),
-            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(digest('a'))),
+            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(commit('a'))),
         ],
     )
     .unwrap();
@@ -147,7 +151,7 @@ fn completeness_states_are_identity_distinct() {
         .unwrap()
     };
 
-    let known = make(SurfaceState::Known(digest('a')));
+    let known = make(SurfaceState::Known(commit('a')));
     let unknown = make(SurfaceState::Unknown);
     let unavailable = make(SurfaceState::Unavailable(
         UnavailabilityReason::ProviderDoesNotExpose,
@@ -173,7 +177,7 @@ fn completeness_controls_material_identity_not_replayability() {
             binding(
                 AiSurfaceKind::Model,
                 "model-alias",
-                SurfaceState::Known(digest('a')),
+                SurfaceState::Known(commit('a')),
             ),
             binding(
                 AiSurfaceKind::DeploymentEnvelope,
@@ -220,16 +224,49 @@ fn immutable_commitment_change_changes_subject_identity() {
         id("agent-a"),
         model_runtime_profile(),
         vec![
-            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(digest('c'))),
+            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(commit('c'))),
             binding(
                 AiSurfaceKind::Runtime,
                 "runtime-image",
-                SurfaceState::Known(digest('b')),
+                SurfaceState::Known(commit('b')),
             ),
         ],
     )
     .unwrap();
     assert_ne!(left.manifest_id(), right.manifest_id());
+}
+
+#[test]
+fn commitment_method_is_bound_into_subject_identity() {
+    let profile = SurfaceProfile::new(id("model-only"), vec![AiSurfaceKind::Model]).unwrap();
+    let artifact_bytes = AiSubjectManifest::new(
+        id("agent-a"),
+        profile.clone(),
+        vec![binding(
+            AiSurfaceKind::Model,
+            "model-alias",
+            SurfaceState::Known(MaterialCommitment::new(
+                CommitmentMethod::ArtifactBytesSha256,
+                digest('a'),
+            )),
+        )],
+    )
+    .unwrap();
+    let provider_token = AiSubjectManifest::new(
+        id("agent-a"),
+        profile,
+        vec![binding(
+            AiSurfaceKind::Model,
+            "model-alias",
+            SurfaceState::Known(MaterialCommitment::new(
+                CommitmentMethod::ProviderRevisionTokenSha256,
+                digest('a'),
+            )),
+        )],
+    )
+    .unwrap();
+
+    assert_ne!(artifact_bytes.manifest_id(), provider_token.manifest_id());
 }
 
 #[test]
@@ -241,7 +278,7 @@ fn provider_alias_metadata_does_not_masquerade_as_same_subject() {
         vec![SurfaceBinding::new(
             AiSurfaceKind::Model,
             SurfaceLocator::new(Some(id("provider-a")), id("rolling-alias"), Some(id("v1"))),
-            SurfaceState::Known(digest('a')),
+            SurfaceState::Known(commit('a')),
         )],
     )
     .unwrap();
@@ -251,7 +288,7 @@ fn provider_alias_metadata_does_not_masquerade_as_same_subject() {
         vec![SurfaceBinding::new(
             AiSurfaceKind::Model,
             SurfaceLocator::new(Some(id("provider-a")), id("other-alias"), Some(id("v1"))),
-            SurfaceState::Known(digest('a')),
+            SurfaceState::Known(commit('a')),
         )],
     )
     .unwrap();
@@ -261,7 +298,7 @@ fn provider_alias_metadata_does_not_masquerade_as_same_subject() {
         vec![SurfaceBinding::new(
             AiSurfaceKind::Model,
             SurfaceLocator::new(Some(id("provider-a")), id("rolling-alias"), Some(id("v2"))),
-            SurfaceState::Known(digest('a')),
+            SurfaceState::Known(commit('a')),
         )],
     )
     .unwrap();
@@ -292,11 +329,11 @@ fn core_bridge_tracks_exact_assure001_identity() {
         id("agent-a"),
         model_runtime_profile(),
         vec![
-            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(digest('a'))),
+            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(commit('a'))),
             binding(
                 AiSurfaceKind::Runtime,
                 "runtime-image",
-                SurfaceState::Known(digest('c')),
+                SurfaceState::Known(commit('c')),
             ),
         ],
     )
