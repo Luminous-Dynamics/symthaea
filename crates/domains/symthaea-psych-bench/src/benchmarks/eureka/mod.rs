@@ -44,11 +44,15 @@ mod target_lineage;
 #[cfg(test)]
 mod transition_identity_tests;
 #[cfg(test)]
+mod v2_public_schema;
+#[cfg(test)]
 mod v2_construct;
 #[cfg(test)]
 mod v2_construct_independent_audit;
 #[cfg(test)]
 mod v2_construct_statistical_mutants;
+#[cfg(test)]
+mod v2_construct_schema_guard;
 
 pub use consequence::{
     ConsequenceMetrics, ConsequencePrediction, ConsequenceScore, ConsequenceScoringError,
