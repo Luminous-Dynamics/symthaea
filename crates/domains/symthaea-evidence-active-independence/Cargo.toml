@@ -1,0 +1,25 @@
+[package]
+name = "symthaea-evidence-active-independence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Exact-use composition of lifecycle-current verifier profiles and common-cause separation"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "evidence", "provenance"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-evidence-independence-completeness = { path = "../symthaea-evidence-independence-completeness" }
+symthaea-evidence-independence-graph = { path = "../symthaea-evidence-independence-graph" }
+symthaea-evidence-independence-lifecycle = { path = "../symthaea-evidence-independence-lifecycle" }
+symthaea-evidence-independence-provenance = { path = "../symthaea-evidence-independence-provenance" }
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+symthaea-evidence-verifier-diversity = { path = "../symthaea-evidence-verifier-diversity" }
