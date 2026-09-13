@@ -32,11 +32,11 @@ check_blob() {
 check_blob "docs/release/evidence/WCARE38_AUTHENTICATED_PANEL_PROTOCOL_V1.md" "ebffc2a6bf8f5114a6e852791ef881c4b0219bcf"
 check_blob "docs/release/evidence/WCARE38_AUTHENTICATED_PANEL_PLAN_SCHEMA_V1.json" "2b2650bf1b5b7269209e36415e5a74fcd77ed080"
 check_blob "docs/release/evidence/WCARE38_ATTESTATION_PACKAGE_MANIFEST_SCHEMA_V1.json" "a87ecc428c4974672a01f322367fba62735c0bd2"
-check_blob "docs/release/evidence/WCARE38_AUTHENTICATED_PANEL_RESULT_SCHEMA_V1.json" "41fa0921d8389e99d44f3c6d81ab3589554fd55f"
+check_blob "docs/release/evidence/WCARE38_AUTHENTICATED_PANEL_RESULT_SCHEMA_V1.json" "f374cd71a864eb179d68c815abf4e9b0420de9ca"
 check_blob "scripts/wcare38-qualify.py" "885b952a8a75fba59a75544429b0338fd0ff2519"
 check_blob "scripts/wcare38_qualify_authenticated_panel.py" "cf198d78e76eab05a64c3489bdd51f538f026a1d"
 check_blob "scripts/wcare38_monotonicity_selftest.py" "e9e82d13cfdef768cb5873359d77f98de465495a"
-check_blob "scripts/wcare38_adversarial_selftest.py" "297b91e94479c7cebcd9bdb9d4bf94e31ba99b4d"
+check_blob "scripts/wcare38_adversarial_selftest.py" "b522f8e81114ee9d41383e5409f6bf6c465c89df"
 
 if ! python3 scripts/wcare38_monotonicity_selftest.py >/tmp/wcare38-monotonicity-selftest.json 2>/tmp/wcare38-monotonicity-selftest.stderr; then
   emit "INVALID_PROTOCOL" "monotonicity_selftest_failed"
