@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-energy-benchmark-zero-exact"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Exact-candidate-universe wrapper for Energy Discovery Benchmark Zero."
+
+[dependencies]
+symthaea-energy-benchmark-zero = { path = "../../domains/symthaea-energy-benchmark-zero" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
