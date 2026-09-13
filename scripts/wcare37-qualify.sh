@@ -37,7 +37,7 @@ check_blob "docs/release/evidence/WCARE37_ATTESTATION_PROTOCOL_V1.md" "cbde37860
 check_blob "docs/release/evidence/WCARE37_ATTESTATION_ENVELOPE_SCHEMA_V1.json" "92f3113ad231b4af2b221acd8f6ebaa259e4df14"
 check_blob "docs/release/evidence/WCARE37_ISSUER_TRUST_POLICY_SCHEMA_V1.json" "ac8ee43b2c93c47bcb388c5bbf65dcea81de4ccd"
 check_blob "docs/release/evidence/WCARE37_ATTESTATION_RESULT_SCHEMA_V1.json" "f10bea5dc98fd27b01d543f19c542cb77b288f5c"
-check_blob "$MANIFEST" "309d44a1047548f3d9cec5a2de21126a905c2de1"
+check_blob "$MANIFEST" "a37383c830c2a63809bfb0a546d223981deabcc7"
 check_blob "tools/wcare37_attestation_verifier/src/main.rs" "72748afe656be7762a1a7c4a5ef69c73d7783624"
 
 # The exact standalone dependency graph is part of the theorem. Do not allow an
