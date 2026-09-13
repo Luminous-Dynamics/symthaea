@@ -27,6 +27,7 @@
   "network_authorized_stage_ids": ["source_acquisition"],
   "protected_files": [
     "scripts/ll009ag_common.py",
+    "scripts/ll009ag_git_subject.py",
     "scripts/ll009ag_campaign.py",
     "scripts/freeze_ll009ag_site01_campaign.py",
     "scripts/capture_ll009ag_environment.py",
