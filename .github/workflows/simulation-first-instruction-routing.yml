@@ -1,0 +1,104 @@
+name: Simulation First Instruction Routing
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-first-instruction-routing/**"
+      - "crates/bridges/symthaea-sim-first-instruction-deployment/**"
+      - "crates/bridges/symthaea-sim-deployment/**"
+      - "crates/bridges/symthaea-sim-worker-qualification/**"
+      - "crates/core/symthaea-extension-router/**"
+      - ".github/workflows/simulation-first-instruction-routing.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  first-instruction-routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-simulation-first-instruction-routing-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-first-instruction-routing/**', 'crates/bridges/symthaea-sim-first-instruction-deployment/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-first-instruction-routing-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-first-instruction-routing-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches first-instruction routing graph."
+          else
+            cat simulation-first-instruction-routing-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-first-instruction-routing-cargo-lock-patch
+          path: simulation-first-instruction-routing-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-sim-first-instruction-routing -- --check
+
+      - name: Check routing graph
+        run: cargo check --locked -p symthaea-sim-first-instruction-routing --all-targets
+
+      - name: Unit/doc tests
+        run: cargo test --locked -p symthaea-sim-first-instruction-routing
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-sim-first-instruction-routing --all-targets -- -D warnings
+
+      - name: Record exact routing subject
+        run: |
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "package_runtime=wasm_preserved_exactly"
+            echo "remote_runtime_rewrite=forbidden"
+            echo "canonical_request_bound_at_selection=true"
+            echo "routing_decision_bound_to_exact_admission=true"
+            echo "base_deployment_required=true"
+            echo "first_instruction_deployment_required=true"
+            echo "live_worker_qualification_required=true"
+            echo "release_receipt=not_minted_by_routing"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-first-instruction-routing-receipt.txt
+
+      - name: Upload routing evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-first-instruction-routing-evidence
+          path: simulation-first-instruction-routing-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
