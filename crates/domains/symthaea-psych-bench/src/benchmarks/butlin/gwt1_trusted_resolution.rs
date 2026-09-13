@@ -155,8 +155,8 @@ fn load_direct_evidence(
     })
 }
 
-fn canonical_base_report()
--> Result<ButlinIndicatorReport, Gwt1TrustedResolutionCandidateErrorV1> {
+fn canonical_base_report(
+) -> Result<ButlinIndicatorReport, Gwt1TrustedResolutionCandidateErrorV1> {
     let report = ButlinIndicatorSuite::evaluate(&BenchmarkConfig::default());
     let mut gwt1 = report
         .indicators
