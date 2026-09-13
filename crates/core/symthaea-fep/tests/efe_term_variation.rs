@@ -65,36 +65,21 @@ fn characterize_epistemic_term_is_action_invariant() {
     }
 }
 
-/// The pragmatic term DOES vary — but only by action parity, which is the separate
-/// (and previously reported) degeneracy in the transition construction:
-/// `generative_model.rs` sets `bias_direction = if action_idx % 2 == 0 { -1 } else { 1 }`.
-/// Recorded here so the two defects are not conflated: fixing parity would not fix
-/// the epistemic term, and vice versa.
+/// Generic construction has no action semantics, so the pragmatic term must not
+/// differ merely because candidate actions have different integer identities.
+/// Equality here records explicit ignorance, not evidence that real actions have
+/// identical consequences. Confirmed transition learning or caller-supplied domain
+/// priors may legitimately break this equality later.
 #[test]
-fn characterize_pragmatic_term_varies_only_by_action_parity() {
+fn generic_action_prior_gives_equal_pragmatic_values() {
     let (efe, model, state) = fixture();
     let scored = score_all(&efe, &model, &state, 0..NUM_ACTIONS);
 
-    let distinct: std::collections::BTreeSet<u64> =
-        scored.iter().map(|(_, _, _, p)| p.to_bits()).collect();
-
-    assert_eq!(
-        distinct.len(),
-        2,
-        "expected exactly 2 distinct pragmatic values across {NUM_ACTIONS} actions \
-         (one per action parity), got {}",
-        distinct.len()
-    );
-
+    let first = scored[0].3;
     for (action, _, _, pragmatic) in &scored {
-        let same_parity = scored
-            .iter()
-            .find(|(a, _, _, _)| a % 2 == action % 2)
-            .unwrap()
-            .3;
         assert_eq!(
-            *pragmatic, same_parity,
-            "action {action} broke parity grouping"
+            *pragmatic, first,
+            "generic action {action} acquired an unsupported action-specific pragmatic prior"
         );
     }
 }
