@@ -36,7 +36,7 @@ impl AcceptedAnalysisRequirementV1 {
             "acceptance_record_digest": acceptance_record_digest.as_str(),
             "criticality": "Blocking",
             "domain": "Civil",
-            "expected_evidence_kind": "Analysis",
+            "expected_evidence_kind": EvidenceKind::Analysis.canonical_name(),
             "logical_requirement_id": "REQ-STRESS",
             "schema": "symthaea.etk-accepted-requirement.v1",
             "statement": "stress remains below allowable",
@@ -66,7 +66,7 @@ impl AcceptedAnalysisRequirementV1 {
             "authority": "accepted-analysis-requirement-only",
             "criticality": "Blocking",
             "domain": "Civil",
-            "expected_evidence_kind": "Analysis",
+            "expected_evidence_kind": EvidenceKind::Analysis.canonical_name(),
             "logical_requirement_id": "REQ-STRESS",
             "max_bending_stress_pa": self.max_bending_stress_pa,
             "requirement_revision_id": self.revision_id.as_str(),
@@ -361,7 +361,7 @@ pub fn analytical_obligation_revision_v1(
     }
     let preimage = json!({
         "claim": obligation.claim.as_str(),
-        "expected_evidence_kind": "Analysis",
+        "expected_evidence_kind": EvidenceKind::Analysis.canonical_name(),
         "obligation_id": obligation.id.to_string(),
         "schema": "symthaea.etk-proof-obligation-snapshot.v1",
     });

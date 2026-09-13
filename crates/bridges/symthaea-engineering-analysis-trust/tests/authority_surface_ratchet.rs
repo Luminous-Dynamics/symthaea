@@ -94,6 +94,14 @@ fn context_must_be_derived_from_explicit_semantic_records() {
 }
 
 #[test]
+fn authority_critical_evidence_kind_names_come_from_formal_safety() {
+    let context = include_str!("../src/context.rs");
+
+    assert!(context.contains("EvidenceKind::Analysis.canonical_name()"));
+    assert!(!context.contains("\"expected_evidence_kind\": \"Analysis\""));
+}
+
+#[test]
 fn exact_input_equations_and_requirement_policy_link_cannot_silently_disappear() {
     let source = production_source();
 
