@@ -86,8 +86,8 @@ def abind(x:dict[str,Any],root:Path)->dict[str,Any]:
   if requirement=='required':raise CE(f'required artifact missing: {x["id"]}')
   return {'id':x['id'],'path':x['path'],'requirement':requirement,'availability':'absent_optional_diagnostic','dependencies':list(x['dependencies']),'self_hash_mode':x['self_hash_mode']}
  o={'id':x['id'],'path':x['path'],'requirement':requirement,'availability':'present','sha256':hf(p),'byte_count':p.stat().st_size,'dependencies':list(x['dependencies']),'self_hash_mode':x['self_hash_mode']}
- if x['self_hash_mode']=='canonical_receipt_sha256':
-  v=lj(p);o['verified_receipt_sha256']=vr(v);o['verified_receipt_schema']=req(v.get('schema_version'),f'{x["id"]} schema')
+ if x['self_hash_mode'] in {'ag_compact_receipt_sha256','ll009_indent2_receipt_sha256'}:
+  v=lj(p);o['verified_receipt_sha256']=vr(v,mode=x['self_hash_mode']);o['verified_receipt_schema']=req(v.get('schema_version'),f'{x["id"]} schema')
  return o
 
 def _verify_dependency_bindings(a:dict[str,dict[str,Any]],bound:dict[str,dict[str,Any]],root:Path)->None:
@@ -102,8 +102,8 @@ def _verify_dependency_bindings(a:dict[str,dict[str,Any]],bound:dict[str,dict[st
   for b in x['dependency_bindings']:
    dep=b['dependency_id'];parent=bound[dep]
    expected=parent.get('verified_receipt_sha256') if b['identity']=='receipt_sha256' else parent.get('sha256')
-   if not isinstance(expected,str):raise CE(f'{i}->{dep} requested unavailable identity {b["identity"]}')
-   got=_field_path(child_json,b['field_path'],f'{i}->{dep}')
+   expected=sha(expected,f'{i}->{dep} expected {b["identity"]}')
+   got=sha(_field_path(child_json,b['field_path'],f'{i}->{dep}'),f'{i}->{dep} observed {b["identity"]}')
    if got!=expected:raise CE(f'dependency binding mismatch {i}->{dep}: expected {expected}, got {got!r}')
    verified.append({'dependency_id':dep,'field_path':b['field_path'],'identity':b['identity'],'verified_value':expected})
   child['verified_dependency_bindings']=verified
@@ -152,4 +152,5 @@ def classify(p:dict[str,Any],assertion:dict[str,Any],present_ids:set[str])->dict
 
 def finalize(pre:dict[str,Any],frz:dict[str,Any],pp:Path,repo:Path,head:str,rt:Path,mp:Path,er:Path,ap:Path)->dict[str,Any]:
  p,a,bound,summary=verify_frz(frz,pre,pp,repo,head,rt,mp,er);av=va(lj(ap),p['study_id']);present={i for i,x in bound.items() if x['availability']=='present'};cl=classify(p,av,present)
+ cl=dict(cl);cl['promotion_status']='eligible' if summary['promotion_eligible'] else 'blocked_incomplete_declared';cl['effective_evidence_class']=cl['evidence_class'] if summary['promotion_eligible'] else None
  return receipt({'schema_version':FIN,'state':'FINALIZED','study_id':p['study_id'],'preparation_receipt_sha256':pre['receipt_sha256'],'freeze_receipt_sha256':frz['receipt_sha256'],'semantic_assertion':{'sha256':hf(ap),'byte_count':ap.stat().st_size,'canonical_payload_sha256':hb(cb(av))},'classification':cl,'campaign_completeness':summary['campaign_completeness'],'promotion_eligible':summary['promotion_eligible'],'not_yet_available_ids':summary['not_yet_available_ids'],'absent_optional_diagnostic_ids':summary['absent_optional_diagnostic_ids'],'artifact_count':len(a),'present_artifact_count':len(present),'numerical_recomputation_performed':False,'source_download_performed':False,'promotion_semantics':'policy-bounded explicit provenance only; incomplete_declared roots are integrity snapshots and are not promotable'})
