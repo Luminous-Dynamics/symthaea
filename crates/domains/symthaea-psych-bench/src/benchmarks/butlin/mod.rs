@@ -24,14 +24,19 @@ pub mod gwt1_causal_envelope;
 pub mod gwt1_causal_promotion_capsule;
 #[cfg(feature = "symthaea-backend")]
 pub mod gwt1_causal_resolution;
+#[cfg(feature = "symthaea-backend")]
+pub mod gwt1_causal_verified_promotion;
 pub mod gwt1_evidence_envelope;
 #[cfg(feature = "symthaea-backend")]
 pub mod gwt1_end_to_end;
+pub mod gwt1_promotion;
 pub mod gwt1_qualification;
 pub mod indicators;
 pub mod qualification_design;
 pub mod qualification_runtime;
 pub mod report;
+pub mod resolution_view;
+pub mod resolution_view_v2;
 
 #[cfg(feature = "symthaea-backend")]
 pub use gwt1_causal_envelope::{
@@ -56,6 +61,12 @@ pub use gwt1_causal_resolution::{
     Gwt1CausalQualificationResolutionV1, resolve_gwt1_causal_v1,
     run_gwt1_causal_evidence_v1,
 };
+#[cfg(feature = "symthaea-backend")]
+pub use gwt1_causal_verified_promotion::{
+    GWT1_CAUSAL_APPROVED_BUILDER_SHA_V1, GWT1_CAUSAL_APPROVED_PROMOTION_WORKFLOW_SHA_V1,
+    GWT1_CAUSAL_PROMOTION_WORKFLOW_V1, Gwt1CausalPromotionVerificationErrorV1,
+    VerifiedGwt1CausalPromotionV1, verify_gwt1_causal_promotion_package_v1,
+};
 pub use gwt1_evidence_envelope::{
     GWT1_EVIDENCE_ENVELOPE_SCHEMA_V1, GWT1_RAW_OBSERVATION_MEDIA_TYPE_V1,
     GWT1_RAW_OBSERVATION_SCHEMA_V1, Gwt1ArtifactIntegrityFailureV1,
@@ -66,6 +77,10 @@ pub use gwt1_evidence_envelope::{
 pub use gwt1_end_to_end::{
     Gwt1EndToEndErrorV1, Gwt1EndToEndEvidenceV1, Gwt1ExecutionIdentityV1,
     build_gwt1_evidence_v1, run_gwt1_end_to_end_v1,
+};
+pub use gwt1_promotion::{
+    GWT1_DIRECT_PROMOTION_POLICY_V1, Gwt1DirectPromotionDecisionV1,
+    Gwt1PromotionInputStatusV1, promote_direct_gwt1_v1,
 };
 pub use gwt1_qualification::{
     GWT1_MIN_TRAJECTORY_STEPS_V1, GWT1_PERTURBATIONS_V1, GWT1_QUALIFICATION_SCHEMA_V1,
@@ -88,4 +103,20 @@ pub use report::{
     AblationResult, ButlinEvidenceBundle, ButlinIndicatorReport, EffectEstimate,
     EvidenceAnnotation, EvidenceMergeError, EvidenceOutcome, IndicatorEvidence, ProbeQuality,
     RuntimeConsciousnessData, SupportTier, annotate_with_ablation_results,
+};
+pub use resolution_view::{
+    BUTLIN_RESOLVED_EVIDENCE_VIEW_SCHEMA_V1, ButlinResolvedEvidenceViewV1,
+    EvidenceArtifactIdentityV1, EvidenceAuthorityIdentityV1, EvidenceLineageIdentityV1,
+    EvidenceLineageKindV1, EvidenceOutcomeCountsV1, EvidenceResolutionViewErrorV1,
+    IndicatorOutcomeOverlayV1, base_report_blake3_v1,
+};
+#[cfg(feature = "symthaea-backend")]
+pub use resolution_view::{resolve_gwt1_causal_evidence_view_v1, resolve_gwt1_evidence_view_v1};
+pub use resolution_view_v2::{
+    BUTLIN_RESOLVED_EVIDENCE_VIEW_SCHEMA_V2, ButlinResolvedEvidenceViewV2,
+    EvidenceResolutionViewErrorV2, IndicatorEvidenceLineageV2,
+};
+#[cfg(feature = "symthaea-backend")]
+pub use resolution_view_v2::{
+    resolve_gwt1_causal_evidence_view_v2, resolve_gwt1_evidence_view_v2,
 };
