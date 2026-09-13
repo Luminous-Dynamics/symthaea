@@ -243,7 +243,7 @@ mod qualified {
                 "invalid:directed-cycle".into(),
                 true,
                 ReasoningOutcome::Abstained {
-                    reason: AbstentionReason::InvalidProblem,
+                    reason: AbstentionReason::Other("invalid-problem".into()),
                     answerability: 0.0,
                 },
             ),
