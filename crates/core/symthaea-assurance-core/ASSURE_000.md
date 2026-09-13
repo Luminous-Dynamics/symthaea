@@ -18,9 +18,10 @@ The kernel content-addresses:
 - `SubjectManifest` — canonical component order + optional deployment envelope;
 - `Claim` — exact subject, claim ID, statement, and scope;
 - `QualificationPlan` — exact claim, maximum support ceiling, and invalidation set;
-- `QualificationResult` — exact subject/claim/plan identity, evidence IDs, outcome, ceiling, and invalidation set.
+- `EvidenceArtifact` — exact subject/claim binding, evidence kind, artifact digest, and producer/executor/verifier/signer provenance;
+- `QualificationResult` — exact subject/claim/plan identity, evidence commitments, outcome, ceiling, and invalidation set.
 
-Evidence cannot be rebound to a different subject or claim. Duplicate evidence IDs fail closed rather than being silently deduplicated.
+Evidence cannot be rebound to a different subject or claim. Duplicate evidence IDs fail closed rather than being silently deduplicated. Changing evidence bytes or recorded provenance changes the evidence commitment and therefore changes the qualification-result identity.
 
 ## Positive support ladder
 
@@ -28,10 +29,25 @@ Evidence cannot be rebound to a different subject or claim. Duplicate evidence I
 - `Observed` requires observation evidence;
 - `CausallySupported` requires controlled-intervention evidence;
 - `FunctionallySupported` requires controlled-intervention plus functional-benchmark evidence;
-- `IndependentlyReproduced` additionally requires independent-reproduction evidence with a verifier distinct from producer and executor;
+- `Reproduced` additionally requires reproduction evidence whose verifier identity is distinct from the producer and executor identities;
 - `DeploymentQualified` additionally requires runtime-receipt evidence and an explicit deployment envelope.
 
 The ladder is not a generic score. Each successor tier has explicit predicates, and `QualificationPlan::maximum_support` is a hard claim ceiling.
+
+## Reproduction is not common-cause independence
+
+ASSURE-000 deliberately does **not** call identity-distinct reproduction `IndependentlyReproduced`.
+
+```text
+different verifier ID
+    != different organization
+    != different review process
+    != different verification toolchain
+    != different evidence source
+    != common-cause independence
+```
+
+Symthaea already has a stronger generic verifier-diversity model in PR #1912, where reviewed verifier profiles carry organization, review-process, toolchain, and evidence-source fault domains. ASSURE-000 does not duplicate that ontology. A later assurance layer must bind and evaluate those stronger independence facts before using independent-verification language.
 
 ## Negative and orthogonal findings
 
@@ -49,4 +65,4 @@ Qualification results retain an explicit invalidation set. Matching a declared c
 
 ## Deliberate nonclaims
 
-ASSURE-000 does not establish certification, compliance, agent safety, deployment authorization, independent audit, runtime isolation, red-team completeness, or regulatory conformity. It provides the semantic substrate later assurance campaigns can use to make narrower evidence-backed claims.
+ASSURE-000 does not establish certification, compliance, agent safety, deployment authorization, common-cause verifier independence, independent audit, runtime isolation, red-team completeness, or regulatory conformity. It provides the semantic substrate later assurance campaigns can use to make narrower evidence-backed claims.
