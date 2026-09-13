@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Validate content-addressed generic qualification subjects.
 
-V1 intentionally supports exact Git subjects only. Integration-train/catalog layers may resolve
-into one of these subjects, but are not mandatory parts of the universal qualification ontology.
+V1 supports exact Git subjects only. Integration-train/catalog layers may resolve into one of
+these subjects, but are not mandatory parts of the universal qualification ontology.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import integration_train_manifest as train
 SCHEMA = "symthaea.qualification-subject.v1"
 DOMAIN = b"symthaea.qualification-subject.v1\0"
 _KIND = "GitCommit"
-_OBJECT_ID = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+_OBJECT_FORMAT_LENGTH = {"sha1": 40, "sha256": 64}
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
@@ -50,10 +50,27 @@ def _require_string(value: Any, *, where: str) -> str:
     return value
 
 
-def _require_object_id(value: Any, *, where: str) -> str:
+def _require_object_format(value: Any, *, where: str) -> str:
     value = _require_string(value, where=where)
-    if _OBJECT_ID.fullmatch(value) is None:
-        raise train.TrainManifestError(f"{where}: expected 40- or 64-character lowercase Git object id")
+    if value not in _OBJECT_FORMAT_LENGTH:
+        raise train.TrainManifestError(f"{where}: expected one of {sorted(_OBJECT_FORMAT_LENGTH)}")
+    return value
+
+
+def _require_object_id(value: Any, *, where: str, object_format: str | None = None) -> str:
+    value = _require_string(value, where=where)
+    if object_format is None:
+        matches = [name for name, length in _OBJECT_FORMAT_LENGTH.items() if len(value) == length]
+        if len(matches) != 1:
+            raise train.TrainManifestError(f"{where}: object format is ambiguous or unsupported")
+        object_format = matches[0]
+    else:
+        object_format = _require_object_format(object_format, where=f"{where}.object_format")
+    expected = _OBJECT_FORMAT_LENGTH[object_format]
+    if len(value) != expected or any(char not in "0123456789abcdef" for char in value):
+        raise train.TrainManifestError(
+            f"{where}: expected {expected}-character lowercase {object_format} Git object id"
+        )
     return value
 
 
@@ -78,7 +95,7 @@ def normalize_subject(subject: Any, *, verify_declared_id: bool = True, require_
         raise train.TrainManifestError("qualification subject: expected object")
     _require_exact_keys(
         subject,
-        {"schema", "kind", "repository", "source_commit", "source_tree"},
+        {"schema", "kind", "repository", "object_format", "source_commit", "source_tree"},
         {"subject_id"},
         where="qualification subject",
     )
@@ -89,12 +106,14 @@ def normalize_subject(subject: Any, *, verify_declared_id: bool = True, require_
     if require_id and "subject_id" not in subject:
         raise train.TrainManifestError("qualification subject.subject_id: required but absent")
 
+    object_format = _require_object_format(subject["object_format"], where="qualification subject.object_format")
     normalized = {
         "schema": SCHEMA,
         "kind": _KIND,
         "repository": _require_repository(subject["repository"], where="qualification subject.repository"),
-        "source_commit": _require_object_id(subject["source_commit"], where="qualification subject.source_commit"),
-        "source_tree": _require_object_id(subject["source_tree"], where="qualification subject.source_tree"),
+        "object_format": object_format,
+        "source_commit": _require_object_id(subject["source_commit"], where="qualification subject.source_commit", object_format=object_format),
+        "source_tree": _require_object_id(subject["source_tree"], where="qualification subject.source_tree", object_format=object_format),
     }
     subject_id = _compute_subject_id(normalized)
     normalized["subject_id"] = subject_id
@@ -124,6 +143,11 @@ def validate_git_binding(subject: Any, repo: Path) -> None:
     repo = repo.resolve()
     if _run_git(repo, "rev-parse", "--is-inside-work-tree") != "true":
         raise train.TrainManifestError(f"repository is not a Git work tree: {repo}")
+    actual_format = _run_git(repo, "rev-parse", "--show-object-format")
+    if actual_format != normalized["object_format"]:
+        raise train.TrainManifestError(
+            f"qualification subject.object_format: repository uses {actual_format}, declared {normalized['object_format']}"
+        )
     _run_git(repo, "cat-file", "-e", f"{normalized['source_commit']}^{{commit}}")
     actual_tree = _run_git(repo, "rev-parse", f"{normalized['source_commit']}^{{tree}}")
     if actual_tree != normalized["source_tree"]:
