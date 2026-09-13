@@ -130,17 +130,75 @@ def main() -> int:
     if plan_created > evaluation_time:
         return emit_invalid("plan_created_after_evaluation_time")
 
-    root = Path(__file__).resolve().parent.parent
+    frontdoor = Path(__file__).resolve()
+    root = frontdoor.parent.parent
     w36_verifier = root / "scripts" / "wcare36_verify_independence.py"
     overlay_engine = root / "scripts" / "wcare38_qualify_authenticated_panel.py"
+    monotonicity_selftest = root / "scripts" / "wcare38_monotonicity_selftest.py"
     try:
+        frontdoor_sha = sha256_bytes(frontdoor.read_bytes())
         w36_verifier_sha = sha256_bytes(w36_verifier.read_bytes())
+        overlay_sha = sha256_bytes(overlay_engine.read_bytes())
+        monotonicity_selftest_sha = sha256_bytes(monotonicity_selftest.read_bytes())
     except OSError:
-        return emit_invalid("wcare36_verifier_unavailable")
-    if plan.get("wcare36_verifier_sha256") != w36_verifier_sha:
+        return emit_invalid("qualification_algorithm_subject_unavailable")
+
+    expected_algorithm_hashes = {
+        "wcare36_verifier_sha256": w36_verifier_sha,
+        "wcare38_frontdoor_sha256": frontdoor_sha,
+        "wcare38_overlay_sha256": overlay_sha,
+        "wcare38_monotonicity_selftest_sha256": monotonicity_selftest_sha,
+    }
+    for field, observed in expected_algorithm_hashes.items():
+        if plan.get(field) != observed:
+            return emit_invalid(
+                f"{field}_mismatch",
+                **{f"observed_{field}": observed},
+            )
+
+    try:
+        monotonicity = subprocess.run(
+            [sys.executable, str(monotonicity_selftest)],
+            cwd=root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=120,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        payload = {
+            "authority": "MeasurementOnly",
+            "protocol_version": PROTOCOL,
+            "disposition": "INFRASTRUCTURE_INDETERMINATE",
+            "detail": f"monotonicity_selftest_execution_failed:{type(exc).__name__}",
+            "wcare38_frontdoor_sha256": frontdoor_sha,
+            "wcare38_overlay_sha256": overlay_sha,
+            "wcare38_monotonicity_selftest_sha256": monotonicity_selftest_sha,
+            "wcare38_monotonicity_selftest_passed": False,
+            "runtime_authority_granted": False,
+        }
+        sys.stdout.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
+        return 3
+    try:
+        monotonicity_result = json.loads(monotonicity.stdout)
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return emit_invalid(
-            "wcare36_verifier_digest_mismatch",
-            observed_wcare36_verifier_sha256=w36_verifier_sha,
+            "monotonicity_selftest_nonjson_output",
+            wcare38_frontdoor_sha256=frontdoor_sha,
+            wcare38_overlay_sha256=overlay_sha,
+            wcare38_monotonicity_selftest_sha256=monotonicity_selftest_sha,
+        )
+    if (
+        monotonicity.returncode != 0
+        or not isinstance(monotonicity_result, dict)
+        or monotonicity_result.get("classification") != "PASS_MONOTONICITY_SELFTEST"
+        or monotonicity_result.get("authenticated_independence_can_exceed_baseline") is not False
+    ):
+        return emit_invalid(
+            "monotonicity_selftest_failed",
+            wcare38_frontdoor_sha256=frontdoor_sha,
+            wcare38_overlay_sha256=overlay_sha,
+            wcare38_monotonicity_selftest_sha256=monotonicity_selftest_sha,
         )
 
     baseline_command = [
@@ -171,6 +229,10 @@ def main() -> int:
             "detail": f"wcare36_verifier_execution_failed:{type(exc).__name__}",
             "wcare36_verifier_sha256": w36_verifier_sha,
             "wcare36_baseline_integrity_verified": False,
+            "wcare38_frontdoor_sha256": frontdoor_sha,
+            "wcare38_overlay_sha256": overlay_sha,
+            "wcare38_monotonicity_selftest_sha256": monotonicity_selftest_sha,
+            "wcare38_monotonicity_selftest_passed": True,
             "runtime_authority_granted": False,
         }
         sys.stdout.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
@@ -182,6 +244,9 @@ def main() -> int:
         return emit_invalid(
             "wcare36_verifier_nonjson_output",
             wcare36_verifier_sha256=w36_verifier_sha,
+            wcare38_frontdoor_sha256=frontdoor_sha,
+            wcare38_overlay_sha256=overlay_sha,
+            wcare38_monotonicity_selftest_sha256=monotonicity_selftest_sha,
         )
     if (
         baseline.returncode != 0
@@ -197,6 +262,9 @@ def main() -> int:
                 if isinstance(baseline_result, dict)
                 else None
             ),
+            wcare38_frontdoor_sha256=frontdoor_sha,
+            wcare38_overlay_sha256=overlay_sha,
+            wcare38_monotonicity_selftest_sha256=monotonicity_selftest_sha,
         )
 
     overlay_command = [
@@ -229,6 +297,10 @@ def main() -> int:
             "detail": f"wcare38_overlay_execution_failed:{type(exc).__name__}",
             "wcare36_verifier_sha256": w36_verifier_sha,
             "wcare36_baseline_integrity_verified": True,
+            "wcare38_frontdoor_sha256": frontdoor_sha,
+            "wcare38_overlay_sha256": overlay_sha,
+            "wcare38_monotonicity_selftest_sha256": monotonicity_selftest_sha,
+            "wcare38_monotonicity_selftest_passed": True,
             "runtime_authority_granted": False,
         }
         sys.stdout.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
@@ -241,12 +313,18 @@ def main() -> int:
             "wcare38_overlay_nonjson_output",
             wcare36_verifier_sha256=w36_verifier_sha,
             wcare36_baseline_integrity_verified=True,
+            wcare38_frontdoor_sha256=frontdoor_sha,
+            wcare38_overlay_sha256=overlay_sha,
+            wcare38_monotonicity_selftest_sha256=monotonicity_selftest_sha,
         )
     if not isinstance(result, dict):
         return emit_invalid(
             "wcare38_overlay_output_not_object",
             wcare36_verifier_sha256=w36_verifier_sha,
             wcare36_baseline_integrity_verified=True,
+            wcare38_frontdoor_sha256=frontdoor_sha,
+            wcare38_overlay_sha256=overlay_sha,
+            wcare38_monotonicity_selftest_sha256=monotonicity_selftest_sha,
         )
 
     if result.get("disposition") in QUALIFYING_DISPOSITIONS:
@@ -289,16 +367,23 @@ def main() -> int:
                 f"authentication_partition_or_manifest_invalid:{exc}",
                 wcare36_verifier_sha256=w36_verifier_sha,
                 wcare36_baseline_integrity_verified=True,
+                wcare38_frontdoor_sha256=frontdoor_sha,
+                wcare38_overlay_sha256=overlay_sha,
+                wcare38_monotonicity_selftest_sha256=monotonicity_selftest_sha,
             )
         result["provenance_authentication_partition_complete"] = True
         result["relation_authentication_partition_complete"] = True
         result["supplemental_attestation_subject_sha256s"] = supplemental
         result["supplemental_packages_contribute_weight"] = False
 
-    # The front door appends the exact baseline verifier evidence. The overlay
-    # remains responsible for the monotonic graph/authentication derivation.
+    # The front door appends exact algorithm evidence. The overlay remains
+    # responsible for the monotonic graph/authentication derivation.
     result["wcare36_verifier_sha256"] = w36_verifier_sha
     result["wcare36_baseline_integrity_verified"] = True
+    result["wcare38_frontdoor_sha256"] = frontdoor_sha
+    result["wcare38_overlay_sha256"] = overlay_sha
+    result["wcare38_monotonicity_selftest_sha256"] = monotonicity_selftest_sha
+    result["wcare38_monotonicity_selftest_passed"] = True
     sys.stdout.write(json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n")
 
     if result.get("disposition") == "AUTHENTICATED_PANEL_SUPPORTED":
