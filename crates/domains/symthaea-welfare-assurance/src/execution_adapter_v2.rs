@@ -4,9 +4,10 @@
 //!
 //! V1 executors remain unchanged. V2 is opt-in. Canonical Prepared digest computation and context
 //! validation happen before the durable write-ahead boundary. After generic live revalidation and
-//! domain preflight, the exact `PreparedInterventionExecution` is appended and persisted; only then
-//! does the adapter construct the already-verified `PreparedExecutionContextV2` and invoke the
-//! domain executor. No fallible context-construction step exists after Prepared durability.
+//! domain preflight, the exact `PreparedInterventionExecution` is appended and its persistence is
+//! attempted. Any acknowledgement ambiguity is returned as an explicit in-doubt outcome and the
+//! domain executor is not called. Only an accepted Prepared reference can produce the opaque V2
+//! context and reach domain execution.
 
 #![deny(unsafe_code)]
 
@@ -78,8 +79,9 @@ pub trait ReceiptedInterventionExecutorV2 {
         Ok(())
     }
 
-    /// Execute only after the generic Prepared record is durably persisted and exactly rebound into
-    /// `context`. Errors remain in-doubt because the adapter cannot assume downstream atomicity.
+    /// Execute only after the generic Prepared record has an accepted durable persistence reference
+    /// and is exactly rebound into `context`. Errors remain in doubt because the adapter cannot
+    /// assume downstream atomicity.
     fn execute_receipted_v2(
         &mut self,
         permit: &AssuredInterventionPermit,
@@ -137,16 +139,32 @@ where
             });
         }
 
-        let prepared_persistence_ref = self
+        // A persistence error does not prove the write failed: the backend may commit before an
+        // acknowledgement is lost. Treat both failure and an unusable success reference as explicit
+        // write-ahead ambiguity, and never call the domain executor in either case.
+        let prepared_persistence_ref = match self
             .persistence
             .persist_execution_journal(self.journal.events(), self.journal.head_hash())
-            .map_err(PreExecutionJournalV2Error::PreparedPersistence)?;
-        validate_ref(&prepared_persistence_ref)
-            .map_err(|_| PreExecutionJournalV2Error::InvalidPersistenceReference)?;
+        {
+            Ok(reference) => reference,
+            Err(error) => {
+                return Ok(JournaledExecutionOutcome::PreparedPersistenceInDoubt {
+                    error,
+                    prepared_digest,
+                });
+            }
+        };
+        if validate_ref(&prepared_persistence_ref).is_err() {
+            return Ok(
+                JournaledExecutionOutcome::PreparedPersistenceReferenceInDoubt {
+                    prepared_digest,
+                    prepared_persistence_ref,
+                },
+            );
+        }
 
-        // All digest/context verification completed before durability. The only fallible check after
-        // persistence is validation of the persistence boundary's own returned reference. Context
-        // construction below is intentionally infallible.
+        // All digest/context verification completed before durability. Context construction is
+        // intentionally infallible once the persistence boundary has returned an accepted reference.
         let context = PreparedExecutionContextV2::from_verified_durable(
             &self.prepared,
             prepared_digest,
@@ -301,8 +319,12 @@ where
 {
     #[error("could not append or precompute write-ahead execution record: {0}")]
     Journal(#[source] ExecutionJournalError),
+    /// Retained for API compatibility. Persistence-attempt failures are represented by
+    /// `JournaledExecutionOutcome::PreparedPersistenceInDoubt`.
     #[error("could not persist write-ahead execution journal: {0}")]
     PreparedPersistence(#[source] E),
+    /// Retained for API compatibility. Invalid success references are represented by
+    /// `JournaledExecutionOutcome::PreparedPersistenceReferenceInDoubt`.
     #[error("execution-journal persistence returned an invalid durable reference")]
     InvalidPersistenceReference,
     #[error("could not verify exact generic Prepared evidence before durability: {0}")]
