@@ -34,6 +34,9 @@
 //!   artifact lineage, explicitly scoped below any physical-QCD claim
 //! - **Pure-SU(3) campaign lineage**: one frozen sampler/RNG/chain/measurement/
 //!   benchmark subject plus separately authorized and validated execution records
+//! - **Static-potential supplement**: preregistered smearing, spatial geometry,
+//!   plateau windows, lattice-Coulomb basis and Cornell fit range bound to one
+//!   exact campaign before production execution authorization
 //! - **Scale evidence**: same-ensemble flow curves whose derived uncertainty
 //!   must bind joint resampling across the correlated flow-time trajectory
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
@@ -70,6 +73,7 @@ pub mod lattice_flow_scale_stability;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
 pub mod lattice_qualification_preregistration;
+pub mod lattice_static_potential_plan;
 mod lattice_su3_lie;
 pub mod lattice_topology_flow;
 pub mod lattice_topology_flow_rk3;
@@ -147,6 +151,15 @@ pub use lattice_qualification_preregistration::{
     QUALIFICATION_POLICY_MANIFEST_ID, EnsembleQualificationPolicyManifest,
     PredeclaredQualificationBinding, QualificationPreregistrationError,
     bind_predeclared_qualification_policy,
+};
+pub use lattice_static_potential_plan::{
+    EFFECTIVE_POTENTIAL_CONVENTION_ID, LATTICE_COULOMB_CONVENTION_ID,
+    LATTICE_CORNELL_CONVENTION_ID, OFF_AXIS_WILSON_CONVENTION_ID,
+    SPATIAL_APE_CONVENTION_ID, STATIC_POTENTIAL_ANALYSIS_PLAN_ID,
+    STATIC_POTENTIAL_SUPPLEMENT_AUTHORIZATION_SCOPE, StaticPotentialAnalysisPlan,
+    StaticPotentialPlanError, StaticPotentialPlateauWindow, StaticPotentialQualifiedSubject,
+    StaticPotentialSeparationPlan, StaticPotentialSupplementAuthorization,
+    authorize_static_potential_supplement,
 };
 pub use lattice_topology_flow::{
     LatticeTopologyFlowError, ReferenceFlowStepStats, clover_field_strength, clover_sum,
