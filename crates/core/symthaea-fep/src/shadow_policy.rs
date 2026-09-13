@@ -59,6 +59,8 @@ pub enum FepShadowPolicyUnavailableV1 {
     NonFiniteBeliefMean { index: usize, value: f64 },
     EmptyActionDomain,
     ModelActionCountMismatch { configured: usize, model: usize },
+    ModelStateDimensionMismatch { configured: usize, model: usize },
+    ModelObservationDimensionMismatch { configured: usize, model: usize },
     MissingTransitionEvidence,
     InvalidActionTemperature { value: f64 },
     NonFiniteLegacyScore { action: usize, value: f64 },
@@ -125,6 +127,18 @@ pub fn transition_evidence_source_state_v1(
 fn legacy_shadow_probabilities_v1(
     agent: &ActiveInferenceAgent,
 ) -> Result<Vec<LegacyShadowActionV1>, FepShadowPolicyUnavailableV1> {
+    if agent.config.state_dim != agent.model.state_dim {
+        return Err(FepShadowPolicyUnavailableV1::ModelStateDimensionMismatch {
+            configured: agent.config.state_dim,
+            model: agent.model.state_dim,
+        });
+    }
+    if agent.config.obs_dim != agent.model.obs_dim {
+        return Err(FepShadowPolicyUnavailableV1::ModelObservationDimensionMismatch {
+            configured: agent.config.obs_dim,
+            model: agent.model.obs_dim,
+        });
+    }
     if agent.config.num_actions == 0 {
         return Err(FepShadowPolicyUnavailableV1::EmptyActionDomain);
     }
