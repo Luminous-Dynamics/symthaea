@@ -26,15 +26,11 @@ pub struct RegenerativeRecoveryCoordinatePolicyV1 {
     pub evidence_binding: String,
     pub target_dependency_id: String,
     pub flow_kind: RegenerativeFlowKindV1,
-    /// Exact healthy flow rate that may be restored after degradation.
     pub qualified_units_per_period: u64,
-    /// Recovery reserve is intentionally outside the nominal closure-model subject.
     pub external_recovery_reserve_id: String,
     pub external_recovery_reserve_binding: String,
     pub external_recovery_reserve_units: u64,
     pub reserve_units_per_recovery: u64,
-    /// Evidence that recovery restores an already-qualified capability rather than
-    /// introducing a new production/recycling capability after failure.
     pub recovery_qualification_binding: String,
 }
 
@@ -45,6 +41,7 @@ pub struct RegenerativeRecoveryCoordinateReportV1 {
     pub policy_evidence_binding: String,
     pub recovery_qualification_binding: String,
     pub profile_id: String,
+    pub profile_evidence_binding: String,
     pub closure_model_id: String,
     pub closure_model_evidence_binding: String,
     pub flow_support_id: String,
@@ -57,11 +54,7 @@ pub struct RegenerativeRecoveryCoordinateReportV1 {
     pub external_recovery_reserve_units: u64,
     pub reserve_units_per_recovery: u64,
     pub role_support_dependency_ids: Vec<String>,
-    /// True because a successful report proves the external reserve does not
-    /// collide with any dependency identity in the nominal closure model.
     pub reserve_external_to_nominal_closure: bool,
-    /// Authorization bit for disturbance-conditioned claims that explicitly bind
-    /// this recovery coordinate. It does not alter nominal scalar H.
     pub disturbance_recovery_coordinate_qualified: bool,
 }
 
@@ -83,6 +76,8 @@ pub struct RegenerativeDisturbanceRecoveryAuthorizationV1 {
     pub recovery_policy_id: String,
     pub recovery_policy_evidence_binding: String,
     pub recovery_qualification_binding: String,
+    pub recovery_profile_id: String,
+    pub recovery_profile_evidence_binding: String,
     pub closure_model_id: String,
     pub flow_support_id: String,
     pub target_dependency_id: String,
@@ -127,8 +122,6 @@ pub enum RegenerativeRecoveryCoordinateError {
     DisturbanceDoesNotDegradeQualifiedFlow,
 }
 
-/// Qualify one explicit recovery coordinate against the exact healthy successor
-/// model and support graph while leaving that nominal subject unchanged.
 pub fn qualify_regenerative_recovery_coordinate(
     policy: &RegenerativeRecoveryCoordinatePolicyV1,
     profile: &RegenerativeLineageViabilityProfileV1,
@@ -149,9 +142,11 @@ pub fn qualify_regenerative_recovery_coordinate(
             dependency_id: policy.target_dependency_id.clone(),
         });
     }
-    if model.dependencies.iter().any(|dependency| {
-        dependency.dependency_id == policy.external_recovery_reserve_id
-    }) {
+    if model
+        .dependencies
+        .iter()
+        .any(|dependency| dependency.dependency_id == policy.external_recovery_reserve_id)
+    {
         return Err(
             RegenerativeRecoveryCoordinateError::ExternalRecoveryReserveCollidesWithModelDependency {
                 dependency_id: policy.external_recovery_reserve_id.clone(),
@@ -208,6 +203,7 @@ pub fn qualify_regenerative_recovery_coordinate(
         policy_evidence_binding: policy.evidence_binding.clone(),
         recovery_qualification_binding: policy.recovery_qualification_binding.clone(),
         profile_id: profile.profile_id.clone(),
+        profile_evidence_binding: profile.evidence_binding.clone(),
         closure_model_id: model.model_id.clone(),
         closure_model_evidence_binding: model.evidence_binding.clone(),
         flow_support_id: support.support_id.clone(),
@@ -225,9 +221,6 @@ pub fn qualify_regenerative_recovery_coordinate(
     })
 }
 
-/// Bind an explicit disturbance to a separately qualified recovery coordinate.
-/// This authorizes only a disturbance-conditioned recovery claim; it does not
-/// modify nominal lineage horizons or authorize any physical action.
 pub fn authorize_regenerative_disturbance_recovery(
     disturbance: &RegenerativeDisturbanceContextV1,
     recovery: &RegenerativeRecoveryCoordinateReportV1,
@@ -251,6 +244,8 @@ pub fn authorize_regenerative_disturbance_recovery(
         recovery_policy_id: recovery.policy_id.clone(),
         recovery_policy_evidence_binding: recovery.policy_evidence_binding.clone(),
         recovery_qualification_binding: recovery.recovery_qualification_binding.clone(),
+        recovery_profile_id: recovery.profile_id.clone(),
+        recovery_profile_evidence_binding: recovery.profile_evidence_binding.clone(),
         closure_model_id: recovery.closure_model_id.clone(),
         flow_support_id: recovery.flow_support_id.clone(),
         target_dependency_id: recovery.target_dependency_id.clone(),
