@@ -15,6 +15,8 @@ pub mod predictive;
 pub mod privacy;
 pub mod scrubber;
 pub mod system_state;
+pub mod system_state_identity;
+pub mod system_state_revision;
 pub mod telemetry;
 pub mod triage;
 pub mod types;
@@ -24,4 +26,12 @@ pub use system_state::{
     ObservationProvenanceV1, ObservationSourceKindV1, RelationId, RelationKindV1, StateValueV1,
     SystemEntityV1, SystemObservationV1, SystemRelationV1, SystemStateGraphError,
     SystemStateGraphV1,
+};
+pub use system_state_identity::{
+    SystemEntityRefV1, SystemEnvironmentIdV1, SystemObservationRefV1, SystemRelationRefV1,
+    SystemStateGraphScopeV1, SystemStateIdentityErrorV1,
+};
+pub use system_state_revision::{
+    SystemEntityRevisionRefV1, SystemGraphRevisionRefV1, SystemRelationRevisionRefV1,
+    SystemStateRevisionErrorV1, SystemStateRevisionScopeExtV1,
 };
