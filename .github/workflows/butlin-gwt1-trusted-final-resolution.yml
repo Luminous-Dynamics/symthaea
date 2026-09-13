@@ -358,7 +358,7 @@ jobs:
         run: |
           set -euo pipefail
           unset GH_HOST GH_ENTERPRISE_TOKEN
-          cargo run --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_generate_trusted_resolution_candidate
+          cargo run --locked -p symthaea-psych-bench --features trusted-resolution-authority --bin gwt1_generate_trusted_resolution_candidate
           test -s "$GWT1_FINAL_RESOLUTION_OUTPUT_DIR/base_report.json"
           test -s "$GWT1_FINAL_RESOLUTION_OUTPUT_DIR/resolved_view_v2.json"
           test -s "$GWT1_FINAL_RESOLUTION_OUTPUT_DIR/gwt1_evidence_disposition.json"
