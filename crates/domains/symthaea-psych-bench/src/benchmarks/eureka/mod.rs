@@ -53,6 +53,8 @@ mod v2_construct_independent_audit;
 mod v2_construct_statistical_mutants;
 #[cfg(test)]
 mod v2_target_contract;
+#[cfg(test)]
+mod v2_comparator_custody;
 
 pub use consequence::{
     ConsequenceMetrics, ConsequencePrediction, ConsequenceScore, ConsequenceScoringError,
