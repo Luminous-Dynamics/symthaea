@@ -9,6 +9,8 @@
 //! separate BLAKE3 commitment over the exact prediction-relevant state after the
 //! same transient reset used by held-out snapshotting.
 
+use std::fmt::Write as _;
+
 use crate::ActiveInferenceAgent;
 
 /// Revision of the canonical semantic byte grammar used for the commitment.
@@ -27,7 +29,11 @@ impl FrozenPredictionCommitment {
     }
 
     pub fn to_hex(self) -> String {
-        self.digest.iter().map(|byte| format!("{byte:02x}")).collect()
+        let mut output = String::with_capacity(64);
+        for byte in self.digest {
+            write!(&mut output, "{byte:02x}").expect("writing hex into String cannot fail");
+        }
+        output
     }
 }
 
@@ -41,7 +47,8 @@ impl FrozenPredictionCommitment {
 /// - the standardized belief state;
 /// - the standardized precision state;
 /// - reset free-energy-calculator state;
-/// - explicit absence of previous-state / pending-action history.
+/// - whether a TD learner remains present after reset;
+/// - explicit absence/presence of previous-state / pending-action history.
 ///
 /// It intentionally excludes stochastic action-selection RNG because EUREKA's
 /// prescribed-action path never calls `select_action()`. It also excludes
@@ -124,9 +131,13 @@ pub fn frozen_prediction_commitment(agent: &ActiveInferenceAgent) -> FrozenPredi
         push_f64(&mut bytes, *value);
     }
 
-    // Snapshot reset semantics require both to be absent before the first
-    // held-out observation. Encode them so an accidental future reset change
-    // cannot silently satisfy this v1 byte grammar.
+    // `perceive()` branches on whether a TD learner exists: its presence can
+    // suppress direct model learning even on the first observation.
+    bytes.push(u8::from(standardized.td_learner.is_some()));
+
+    // Snapshot reset semantics normally require both to be absent before the
+    // first held-out observation. Encode actual state so an accidental future
+    // reset change cannot silently satisfy this v1 byte grammar.
     bytes.push(u8::from(standardized.previous_state.is_some()));
     match standardized.last_action {
         Some(action) => {
@@ -241,6 +252,21 @@ mod tests {
         b.previous_state = Some(b.belief.clone());
         b.last_action = Some(2);
         assert_eq!(
+            frozen_prediction_commitment(&a),
+            frozen_prediction_commitment(&b)
+        );
+    }
+
+    #[test]
+    fn td_presence_after_reset_is_part_of_prediction_identity() {
+        let mut a = agent();
+        let mut b = a.clone();
+        a.config.enable_td_learning = false;
+        b.config.enable_td_learning = false;
+        a.td_learner = None;
+        // Deliberately leave b.td_learner present to model a stale state that
+        // current `reset()` does not clear when the config flag is false.
+        assert_ne!(
             frozen_prediction_commitment(&a),
             frozen_prediction_commitment(&b)
         );
