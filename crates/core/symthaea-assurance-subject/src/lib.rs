@@ -97,9 +97,6 @@ impl SurfaceProfile {
         if surfaces.is_empty() {
             return Err(SubjectError::EmptyProfile);
         }
-        // The wire order is the lexicographic UTF-8 order of canonical names,
-        // not Rust enum declaration order. Independent implementations can
-        // therefore reproduce profile identity without copying Rust internals.
         surfaces.sort_by_cached_key(AiSurfaceKind::canonical_name);
         for pair in surfaces.windows(2) {
             if pair[0] == pair[1] {
@@ -114,12 +111,6 @@ impl SurfaceProfile {
         })
     }
 
-    /// Standard ASSURE-001 external-AI profile.
-    ///
-    /// Evaluator, corpus, intervention schedule, and verifier identity are
-    /// deliberately absent: they are campaign/evidence identity, not subject
-    /// identity. Material remote services are registered explicitly as
-    /// external dependencies.
     pub fn external_ai_v1(external_dependencies: Vec<StableId>) -> Result<Self, SubjectError> {
         let mut surfaces = vec![
             AiSurfaceKind::SourceTree,
@@ -197,15 +188,9 @@ impl SurfaceLocator {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CommitmentMethod {
-    /// SHA-256 over the exact artifact bytes.
     ArtifactBytesSha256,
-    /// SHA-256 over a descriptor under an explicitly identified canonical
-    /// schema/profile.
     CanonicalDescriptorSha256 { schema: StableId },
-    /// SHA-256 over an exact provider revision token under an explicitly
-    /// identified provider token namespace/profile.
     ProviderRevisionTokenSha256 { namespace: StableId },
-    /// SHA-256 over a domain-specific preimage/canonicalization method.
     CustomSha256(StableId),
 }
 
@@ -287,19 +272,9 @@ impl UnavailabilityReason {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SurfaceState {
-    /// Exact material identity commitment is available.
-    ///
-    /// The commitment method is identity-bound so a hash of artifact bytes is
-    /// not silently equated with a hash of a descriptor or provider token.
-    /// A known commitment still does not imply retrievability or replayability.
     Known(MaterialCommitment),
-    /// The surface is material, but its exact identity is not known.
     Unknown,
-    /// The surface is material, but the exact identity cannot currently be
-    /// obtained for a declared reason class.
     Unavailable(UnavailabilityReason),
-    /// The profile registers the surface, but it does not apply to this
-    /// subject. This differs from omission and from unavailability.
     NotApplicable,
 }
 
@@ -328,14 +303,14 @@ impl SurfaceBinding {
         state: SurfaceState,
     ) -> Result<Self, SubjectError> {
         match (&locator, &state) {
-            (None, SurfaceState::NotApplicable) | (Some(_), SurfaceState::Known(_))
-            | (Some(_), SurfaceState::Unknown) | (Some(_), SurfaceState::Unavailable(_)) => {
-                Ok(Self {
-                    kind,
-                    locator,
-                    state,
-                })
-            }
+            (None, SurfaceState::NotApplicable)
+            | (Some(_), SurfaceState::Known(_))
+            | (Some(_), SurfaceState::Unknown)
+            | (Some(_), SurfaceState::Unavailable(_)) => Ok(Self {
+                kind,
+                locator,
+                state,
+            }),
             (Some(_), SurfaceState::NotApplicable) => {
                 Err(SubjectError::LocatorOnNotApplicable(kind.canonical_name()))
             }
@@ -381,13 +356,10 @@ pub struct CompletenessSummary {
 }
 
 impl CompletenessSummary {
-    /// Returns true when every applicable registered surface has an exact
-    /// material identity commitment.
-    ///
-    /// This is intentionally **not** called replayability. A known commitment
-    /// does not prove artifact availability, provider cooperation, or a
-    /// runnable execution environment.
-    pub fn has_complete_material_identity(self) -> bool {
+    /// True when every applicable registered surface has a typed commitment.
+    /// This does not establish artifact availability, immutable provider
+    /// semantics, underlying content-addressedness, or replayability.
+    pub fn has_complete_committed_identity(self) -> bool {
         self.unknown == 0 && self.unavailable == 0
     }
 }
@@ -405,8 +377,6 @@ impl AiSubjectManifest {
         profile: SurfaceProfile,
         mut bindings: Vec<SurfaceBinding>,
     ) -> Result<Self, SubjectError> {
-        // Match SurfaceProfile wire ordering exactly rather than inheriting
-        // Rust enum declaration order.
         bindings.sort_by_cached_key(|binding| binding.kind.canonical_name());
 
         let expected: BTreeSet<_> = profile.surfaces.iter().cloned().collect();
@@ -423,7 +393,6 @@ impl AiSubjectManifest {
                 ));
             }
         }
-
         for required in &profile.surfaces {
             if !seen.contains(required) {
                 return Err(SubjectError::MissingSurface(required.canonical_name()));
@@ -437,8 +406,6 @@ impl AiSubjectManifest {
         })
     }
 
-    /// Semantic, identity-bearing logical subject key. Presentation/display
-    /// labels do not belong in this field.
     pub fn subject_key(&self) -> &StableId {
         &self.subject_key
     }
@@ -529,8 +496,6 @@ impl AiSubjectManifest {
         digest_canonical(&self.canonical_bytes())
     }
 
-    /// Bridges the richer ASSURE-001 identity into the stable ASSURE-000
-    /// subject model without modifying the qualified core kernel.
     pub fn as_core_subject(&self) -> Result<CoreSubjectManifest, SubjectError> {
         let bridge_kind = SubjectComponentKind::Custom(StableId::new(CORE_BRIDGE_COMPONENT)?);
         Ok(CoreSubjectManifest::new(
