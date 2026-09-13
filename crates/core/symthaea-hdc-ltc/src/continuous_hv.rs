@@ -16,6 +16,14 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 /// Standard HDC dimension (2^14 = 16,384).
 pub const HDC_DIMENSION: usize = 16_384;
+const RNG_SEED_XOR: u64 = 0x9E37_79B9_7F4A_7C15;
+const RNG_ZERO_ESCAPE: u64 = 0xD1B5_4A32_D192_ED03;
+
+#[inline]
+fn seeded_xorshift_state(seed: u64) -> u64 {
+    let state = seed ^ RNG_SEED_XOR;
+    if state == 0 { RNG_ZERO_ESCAPE } else { state }
+}
 
 /// A real Hadamard-unitary HDC role vector.
 ///
@@ -40,7 +48,7 @@ impl UnitaryRole {
     /// Deterministically generate a bipolar role from `seed`.
     pub fn new(dim: usize, seed: u64) -> Self {
         let mut values = Vec::with_capacity(dim);
-        let mut state = seed ^ 0x9E3779B97F4A7C15;
+        let mut state = seeded_xorshift_state(seed);
 
         for _ in 0..dim {
             state ^= state << 13;
@@ -177,7 +185,7 @@ impl ContinuousHV {
     /// Create a deterministic random hypervector with values in [-1, 1].
     pub fn new_random(dim: usize, seed: u64) -> Self {
         let mut values = Vec::with_capacity(dim);
-        let mut state = seed ^ 0x9E3779B97F4A7C15;
+        let mut state = seeded_xorshift_state(seed);
 
         for _ in 0..dim {
             state ^= state << 13;
@@ -418,6 +426,18 @@ mod tests {
             ContinuousHV::new_random(1024, 42),
             ContinuousHV::new_random(1024, 42)
         );
+    }
+
+    #[test]
+    fn xorshift_absorbing_seed_is_remapped_for_roles_and_vectors() {
+        let pathological_seed = RNG_SEED_XOR;
+        let role = UnitaryRole::new(256, pathological_seed);
+        assert!(role.as_slice().iter().any(|value| *value == -1.0));
+        assert!(role.as_slice().iter().any(|value| *value == 1.0));
+
+        let vector = ContinuousHV::new_random(256, pathological_seed);
+        assert!(vector.values.iter().any(|value| *value != -1.0));
+        assert_eq!(vector, ContinuousHV::new_random(256, pathological_seed));
     }
 
     #[test]
