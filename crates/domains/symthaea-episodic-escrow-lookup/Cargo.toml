@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-episodic-escrow-lookup"
+version = "0.1.0"
+edition = "2024"
+description = "Read-only exact point lookup for persisted episodic quarantine escrow"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+bincode = { workspace = true }
+rusqlite = { workspace = true }
+symthaea-episodic-continuity = { path = "../symthaea-episodic-continuity" }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
+symthaea-memory = { path = "../symthaea-memory" }
+symthaea-welfare-assurance = { path = "../symthaea-welfare-assurance" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+tempfile = "3.8"
