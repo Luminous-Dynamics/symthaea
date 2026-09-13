@@ -27,25 +27,34 @@ The WCARE-40 plan is created before replica outcomes are inspected. It contains 
 - a stable `replica_id`;
 - a privacy-preserving builder identity commitment.
 
-Replica IDs and builder commitments must be unique as records, but multiple slots may intentionally carry the same builder identity commitment. Such retries remain useful replication attempts but do not become independent builder components merely because timestamps, capsule hashes, or nonces differ.
+Replica IDs must be unique. Multiple slots may intentionally carry the same builder identity commitment. Such retries remain useful replication attempts but do not become independent builder components merely because timestamps, capsule hashes, or nonces differ.
 
-Every expected slot must be accounted for. Missing expected slots produce `INFRASTRUCTURE_INDETERMINATE`; they are never silently removed from the denominator after results are known.
+Every expected slot must be accounted for. Missing expected executions produce `INFRASTRUCTURE_INDETERMINATE`; they are never silently removed from the denominator after results are known.
 
-Unexpected/supplemental capsules are invalid input to v1 rather than extra weight.
+Unexpected/supplemental execution artifacts are invalid input to v1 rather than extra weight.
 
-## Exact WCARE-39 subject
+## Exact WCARE-39 subject and re-verification
 
 The plan binds SHA-256 identities for the exact WCARE-39 protocol, runner, and integrity gate used by the campaign. The WCARE-40 verifier recomputes those repository file hashes before evaluating replicas.
 
-A supplied execution artifact is a qualified WCARE-39 replica only when it is a FINAL capsule with:
+Every preregistered slot has one builder provenance receipt whether or not execution succeeds. The receipt carries `execution_observed` plus nullable exact SHA-256 commitments for both WCARE-39 PREPARED and FINAL capsule bytes.
 
-- `protocol_version = wcare39-execution-capsule-v1`;
-- `capsule_phase = FINAL`;
-- `classification = QUALIFIED_EXECUTION`;
-- `environment_integrity = QUALIFIED`;
-- no drift fields.
+When `execution_observed = true`, both capsule digests must be present and both artifacts must be supplied. WCARE-40 then re-executes the exact plan-bound WCARE-39 runner in `compare PREPARED FINAL` mode and records the SHA-256 of that comparison receipt. A copied FINAL JSON cannot qualify merely because its own fields say `QUALIFIED_EXECUTION`.
 
-Qualified-environment capsules whose subject outcome is `PASS` or `FAIL` are subject-eligible replicas. `INVALID`, `INDETERMINATE`, or `NOT_RUN` remain visible but cannot support replication.
+A supplied execution lineage is a qualified WCARE-39 replica only when:
+
+- the re-executed WCARE-39 comparison returns `QUALIFIED_EXECUTION`;
+- PREPARED and FINAL use `protocol_version = wcare39-execution-capsule-v1`;
+- the supplied PREPARED artifact has `capsule_phase = PREPARED`;
+- the supplied FINAL artifact has `capsule_phase = FINAL`;
+- FINAL has `classification = QUALIFIED_EXECUTION`;
+- FINAL has `environment_integrity = QUALIFIED`;
+- FINAL has an empty drift set;
+- FINAL binds the exact supplied PREPARED bytes.
+
+Qualified-environment FINAL capsules whose subject outcome is `PASS` or `FAIL` are subject-eligible replicas. `INVALID`, `INDETERMINATE`, or `NOT_RUN` remain visible but cannot support replication.
+
+When `execution_observed = false`, both capsule digests must be null. That slot remains in the preregistered campaign and makes the campaign infrastructure-indeterminate rather than disappearing after outcomes are known.
 
 ## Same-subject requirement
 
@@ -78,11 +87,12 @@ A differing required evidence receipt yields `REPLICATION_CONTRADICTED`. Missing
 
 ## Builder provenance
 
-Each observed replica has one builder provenance receipt binding:
+Every preregistered replica slot has exactly one builder provenance receipt binding:
 
 - exact WCARE-40 plan SHA-256;
 - replica ID;
-- exact WCARE-39 capsule SHA-256;
+- whether an execution was observed;
+- exact WCARE-39 PREPARED and FINAL capsule SHA-256 values, or null/null when no execution was observed;
 - builder identity commitment;
 - organization commitment;
 - infrastructure/provider commitment;
@@ -92,7 +102,7 @@ Each observed replica has one builder provenance receipt binding:
 - provenance strength;
 - conflict-of-interest flag.
 
-The replica's builder identity commitment must equal the commitment preregistered for that slot.
+The builder identity commitment must equal the commitment preregistered for that slot.
 
 Provenance-strength labels are evidence metadata, not cryptographic authentication. WCARE-40 does **not** establish that an `ExternalVerified` or `InstitutionalAttestation` label is authentic. Authentication remains a separate future gate.
 
@@ -148,7 +158,7 @@ Any provenance or pairwise conflict-of-interest evidence prevents `REPLICATION_S
 ## Dispositions
 
 `REPLICATION_SUPPORTED`
-: every expected slot is observed; all slots produce subject-eligible qualified WCARE-39 executions; subject outcome and required receipt commitments agree; provenance/conflict policy is satisfied; and preregistered minimum qualified-replica and effective-component thresholds are met.
+: every expected slot has an observed, re-verified, subject-eligible qualified WCARE-39 execution; subject outcome and required receipt commitments agree; provenance/conflict policy is satisfied; and preregistered minimum qualified-replica and effective-component thresholds are met.
 
 `REPLICATION_LIMITED`
 : the campaign is complete enough to evaluate, but one or more support requirements are unmet without a direct PASS/FAIL or required-receipt contradiction.
@@ -157,10 +167,10 @@ Any provenance or pairwise conflict-of-interest evidence prevents `REPLICATION_S
 : qualified replicas disagree on PASS versus FAIL, or disagree on a preregistered required evidence-receipt commitment.
 
 `INFRASTRUCTURE_INDETERMINATE`
-: one or more preregistered replica slots are missing or infrastructure-indeterminate, preventing completion of the preregistered campaign.
+: one or more preregistered replica slots have no observed execution or an infrastructure-indeterminate WCARE-39 lineage, preventing completion of the preregistered campaign.
 
 `REPLICATION_INVALID`
-: malformed, duplicate, subject-mismatched, plan-mismatched, incomplete pair-census, forged shared-domain, unexpected-replica, or otherwise structurally invalid evidence.
+: malformed, duplicate, subject-mismatched, plan-mismatched, PREPARED/FINAL-mismatched, incomplete pair-census, forged shared-domain, unexpected-replica, or otherwise structurally invalid evidence.
 
 Known contradiction takes precedence over infrastructure indeterminacy because a missing third replica cannot erase an already observed contradiction.
 
