@@ -19,6 +19,8 @@ The standard external-AI profile covers source/image identity, model, system pro
 
 Provider aliases and stable URLs are locators, not immutable revisions. When an immutable commitment is unavailable, the subject remains explicitly incomplete rather than hashing an alias and pretending it is immutable.
 
+`CompletenessSummary::has_complete_material_identity()` means every applicable registered surface has an exact identity commitment. It does **not** mean the artifacts are retrievable or the system can be replayed; availability and execution evidence are separate later concerns.
+
 Raw secrets and credential bytes are not intended manifest material. Commit effective non-secret authority/policy/service identity instead; hashing low-entropy secrets is not a safe substitute.
 
 `AiSubjectManifest::as_core_subject()` bridges the entire ASSURE-001 manifest commitment into the qualified ASSURE-000 kernel without modifying that core semantic waist.
