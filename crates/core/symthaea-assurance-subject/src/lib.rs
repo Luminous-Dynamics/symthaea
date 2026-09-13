@@ -93,7 +93,10 @@ impl SurfaceProfile {
         if surfaces.is_empty() {
             return Err(SubjectError::EmptyProfile);
         }
-        surfaces.sort();
+        // The wire order is the lexicographic UTF-8 order of canonical names,
+        // not Rust enum declaration order. Independent implementations can
+        // therefore reproduce profile identity without copying Rust internals.
+        surfaces.sort_by_cached_key(AiSurfaceKind::canonical_name);
         for pair in surfaces.windows(2) {
             if pair[0] == pair[1] {
                 return Err(SubjectError::DuplicateProfileSurface(
@@ -349,7 +352,9 @@ impl AiSubjectManifest {
         profile: SurfaceProfile,
         mut bindings: Vec<SurfaceBinding>,
     ) -> Result<Self, SubjectError> {
-        bindings.sort_by(|left, right| left.kind.cmp(&right.kind));
+        // Match SurfaceProfile wire ordering exactly rather than inheriting
+        // Rust enum declaration order.
+        bindings.sort_by_cached_key(|binding| binding.kind.canonical_name());
 
         let expected: BTreeSet<_> = profile.surfaces.iter().cloned().collect();
         let mut seen = BTreeSet::new();
