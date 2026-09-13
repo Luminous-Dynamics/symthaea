@@ -54,7 +54,8 @@ jobs:
           observed="$(git rev-parse HEAD)"
           expected="${{ steps.subject.outputs.sha }}"
           test "$observed" = "$expected"
-          git status --porcelain=v1 --untracked-files=no --exit-code
+          tracked_changes="$(git status --porcelain=v1 --untracked-files=no)"
+          test -z "$tracked_changes"
           echo "Exact subject: $observed"
           echo "Tree: $(git rev-parse HEAD^{tree})"
 
