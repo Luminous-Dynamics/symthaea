@@ -1,0 +1,173 @@
+name: HYPERSPACE-003 Orthogonal Equivariance Capsule
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hyperspace-003-orthogonal-equivariance.yml'
+      - 'crates/core/symthaea-core/examples/hyperspace_003_orthogonal_equivariance.rs'
+      - 'crates/core/symthaea-core/src/state_space.rs'
+      - 'crates/core/symthaea-core/src/continuous_reachability.rs'
+      - 'crates/core/symthaea-core/src/hyperspace_benchmark.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: 9b7bf7c22b673aabdd735f8c15f4620a3e7fb2f0
+  PREREG_ISSUE: '2417'
+
+jobs:
+  orthogonal-equivariance:
+    name: Exact six-transform orthogonal basis-mixing control
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact source subject and parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/hyperspace-003
+          {
+            echo "schema=symthaea.hyperspace-003.environment.v1"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "parent_sha=$(git rev-parse HEAD^)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "runner_label=ubuntu-24.04"
+            echo "preregistration_issue=$PREREG_ISSUE"
+            echo "hyperspace_002q_head=$BASE_SHA"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+          } > artifacts/hyperspace-003/environment.txt
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Extend environment capsule
+        run: |
+          set -euo pipefail
+          cpu_model="$(awk -F: '/^model name/{sub(/^[[:space:]]+/, "", $2); print $2; exit}' /proc/cpuinfo || true)"
+          cpu_flags="$(awk -F: '/^flags/{sub(/^[[:space:]]+/, "", $2); print $2; exit}' /proc/cpuinfo || true)"
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "rustc_host=$(rustc -vV | sed -n 's/^host: //p')"
+            echo "rustc_commit=$(rustc -vV | sed -n 's/^commit-hash: //p')"
+            echo "llvm_version=$(rustc -vV | sed -n 's/^LLVM version: //p')"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "image_os=${ImageOS:-unknown}"
+            echo "image_version=${ImageVersion:-unknown}"
+            echo "kernel=$(uname -srmo)"
+            echo "libc=$(getconf GNU_LIBC_VERSION 2>/dev/null || echo unknown)"
+            echo "cpu_model=${cpu_model:-unknown}"
+            echo "cpu_flags_sha256=$(printf '%s' "$cpu_flags" | sha256sum | awk '{print $1}')"
+          } >> artifacts/hyperspace-003/environment.txt
+
+      - name: Compile exact orthogonal-equivariance reporter
+        run: |
+          cargo check --locked -p symthaea-core --no-default-features \
+            --example hyperspace_003_orthogonal_equivariance
+
+      - name: Produce machine-readable orthogonal-equivariance receipt
+        run: |
+          cargo run --locked -p symthaea-core --no-default-features \
+            --example hyperspace_003_orthogonal_equivariance -- \
+            --subject "$SUBJECT_SHA" \
+            --hyperspace-002q-head "$BASE_SHA" \
+            --output artifacts/hyperspace-003/report.json
+
+      - name: Hash complete evidence capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd artifacts/hyperspace-003
+          : > SHA256SUMS
+          for file in environment.txt report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Validate preregistered promotion gate
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path('artifacts/hyperspace-003/report.json').read_text())
+          assert report['schema'] == 'symthaea.hyperspace-003.orthogonal-equivariance.v1'
+          assert report['source_subject'] == os.environ['SUBJECT_SHA'].lower()
+          assert report['preregistration_issue'] == 2417
+          assert report['hyperspace_002q_head'] == os.environ['BASE_SHA']
+
+          env_lines = Path('artifacts/hyperspace-003/environment.txt').read_text().splitlines()
+          environment = dict(line.split('=', 1) for line in env_lines if '=' in line)
+          assert environment['subject_sha'] == os.environ['SUBJECT_SHA']
+          assert environment['parent_sha'] == os.environ['BASE_SHA']
+          assert environment['hyperspace_002q_head'] == os.environ['BASE_SHA']
+          assert environment['runner_label'] == 'ubuntu-24.04'
+          assert environment['tree_sha']
+          assert environment['cargo_lock_sha256']
+          assert environment['rustc']
+          assert environment['rustc_host']
+
+          control = report['control']
+          assert control['transform_count'] == 6
+          assert control['required_transform_count'] == 6
+          assert control['total_mismatches'] == 0
+          assert control['zero_mismatch_gate'] is True
+          assert len(control['transforms']) == 6
+          assert all(item['materially_mixes_w'] is True for item in control['transforms'])
+          assert all(item['mismatch_count'] == 0 for item in control['transforms'])
+          assert all(item['reference_h6_established'] is True for item in control['transforms'])
+          assert control['observed_maxima']['orthogonality_error'] <= control['numerical_policy']['orthogonality_tolerance']
+          assert control['observed_maxima']['roundtrip_error'] <= control['numerical_policy']['roundtrip_tolerance']
+          assert control['pass'] is True
+          assert report['verdict'] == 'PASS'
+
+          summary = Path(os.environ['GITHUB_STEP_SUMMARY'])
+          with summary.open('a') as f:
+              f.write('## HYPERSPACE-003 orthogonal basis-mixing control\n\n')
+              f.write(f"**Subject:** `{report['source_subject']}`\n\n")
+              f.write(f"**Exact parent:** `{environment['parent_sha']}`\n\n")
+              f.write(f"**Corpus:** `{control['corpus_identity']}`\n\n")
+              f.write(f"**Transforms:** `{control['transform_count']}/6`\n\n")
+              f.write(f"**Mismatches:** `{control['total_mismatches']}`\n\n")
+              f.write(f"**Max orthogonality error:** `{control['observed_maxima']['orthogonality_error']}`\n\n")
+              f.write(f"**Max roundtrip error:** `{control['observed_maxima']['roundtrip_error']}`\n\n")
+              f.write(f"**Verdict:** `{report['verdict']}`\n\n")
+              f.write('Synthetic evaluator/basis-equivariance result only; no physical extra-dimension claim.\n')
+          PY
+
+      - name: Upload evidence capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hyperspace-003-orthogonal-equivariance-${{ env.SUBJECT_SHA }}
+          path: artifacts/hyperspace-003/
+          if-no-files-found: error
+          retention-days: 90
