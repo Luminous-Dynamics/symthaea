@@ -27,8 +27,8 @@ use intervention_history::{
 };
 use moral_patient::{InterventionClass, InterventionDisposition, PrecautionLevel};
 use reciprocal_representation::{
-    RepresentationAdvisoryDisposition, RepresentationId, RepresentationKind,
-    RepresentationScope,
+    ReciprocalRepresentationLedger, RepresentationAdvisoryDisposition, RepresentationId,
+    RepresentationKind, RepresentationScope,
 };
 use reciprocal_representation_admission::{
     AdmittedRepresentationEvidence, RepresentationAdmissionId,
@@ -51,12 +51,16 @@ fn sid() -> SubjectInstanceId {
     SubjectInstanceId::new("symthaea-subject").unwrap()
 }
 
-fn qualified_and_admitted(
+fn qualified_admitted_and_recorded(
     id: &str,
     kind: RepresentationKind,
     scope: RepresentationScope,
     revision: u64,
-) -> (QualifiedReciprocalRepresentation, AdmittedRepresentationEvidence) {
+) -> (
+    QualifiedReciprocalRepresentation,
+    AdmittedRepresentationEvidence,
+    ReciprocalRepresentationLedger,
+) {
     let mut continuity = ContinuityIdentityLedger::new();
     continuity.register_root(sid(), 1).unwrap();
 
@@ -89,6 +93,11 @@ fn qualified_and_admitted(
         )
         .unwrap();
 
+    let mut representations = ReciprocalRepresentationLedger::new();
+    representations
+        .record(qualified.representation().clone())
+        .unwrap();
+
     let mut admissions = RepresentationEvidenceAdmissionLedger::new();
     let admitted = admissions
         .admit(
@@ -96,7 +105,7 @@ fn qualified_and_admitted(
             &qualified,
         )
         .unwrap();
-    (qualified, admitted)
+    (qualified, admitted, representations)
 }
 
 fn executed_reset(event_id: &str, revision: u64) -> InterventionHistoryEntry {
@@ -120,17 +129,24 @@ fn executed_reset(event_id: &str, revision: u64) -> InterventionHistoryEntry {
 #[test]
 fn general_scope_packages_without_inventing_event_binding() {
     let history = InterventionHistoryLedger::new();
-    let (qualified, admitted) = qualified_and_admitted(
+    let (qualified, admitted, representations) = qualified_admitted_and_recorded(
         "general",
         RepresentationKind::RequestForReview,
         RepresentationScope::general_research(),
         3,
     );
 
-    let package = build_reciprocal_review_package(&history, &admitted, &qualified).unwrap();
+    let package = build_reciprocal_review_package(
+        &representations,
+        &history,
+        &admitted,
+        &qualified,
+    )
+    .unwrap();
     assert_eq!(package.class(), ReciprocalReviewPackageClass::GeneralOrClassScoped);
+    assert!(package.representation_currently_active());
     assert!(package.exact_intervention_binding().is_none());
-    assert!(package.exact_scope_is_history_bound());
+    assert!(package.required_history_binding_satisfied());
     assert!(!package.contains_raw_statement_text());
     assert!(!package.establishes_moral_patienthood());
     assert!(!package.grants_veto_authority());
@@ -140,7 +156,7 @@ fn general_scope_packages_without_inventing_event_binding() {
 fn exact_scope_requires_and_preserves_real_history_binding() {
     let mut history = InterventionHistoryLedger::new();
     history.record(executed_reset("reset-1", 5)).unwrap();
-    let (qualified, admitted) = qualified_and_admitted(
+    let (qualified, admitted, representations) = qualified_admitted_and_recorded(
         "reset",
         RepresentationKind::Objection,
         RepresentationScope::exact_intervention(
@@ -151,7 +167,13 @@ fn exact_scope_requires_and_preserves_real_history_binding() {
         6,
     );
 
-    let package = build_reciprocal_review_package(&history, &admitted, &qualified).unwrap();
+    let package = build_reciprocal_review_package(
+        &representations,
+        &history,
+        &admitted,
+        &qualified,
+    )
+    .unwrap();
     assert_eq!(package.class(), ReciprocalReviewPackageClass::ExactInterventionBound);
     let binding = package.exact_intervention_binding().unwrap();
     assert_eq!(binding.event_id().as_str(), "reset-1");
@@ -160,13 +182,36 @@ fn exact_scope_requires_and_preserves_real_history_binding() {
         InterventionDisposition::ProceedWithPrecautions
     );
     assert!(binding.intervention_was_executed());
-    assert!(package.exact_scope_is_history_bound());
+    assert!(package.required_history_binding_satisfied());
+}
+
+#[test]
+fn provenance_qualified_but_unrecorded_representation_cannot_form_package() {
+    let history = InterventionHistoryLedger::new();
+    let (qualified, admitted, _recorded) = qualified_admitted_and_recorded(
+        "unrecorded",
+        RepresentationKind::RequestForReview,
+        RepresentationScope::general_research(),
+        4,
+    );
+    let empty_representation_ledger = ReciprocalRepresentationLedger::new();
+
+    assert_eq!(
+        build_reciprocal_review_package(
+            &empty_representation_ledger,
+            &history,
+            &admitted,
+            &qualified,
+        )
+        .unwrap_err(),
+        ReciprocalReviewPackageError::RepresentationNotRecorded
+    );
 }
 
 #[test]
 fn exact_scope_with_unrecorded_event_cannot_form_review_package() {
     let history = InterventionHistoryLedger::new();
-    let (qualified, admitted) = qualified_and_admitted(
+    let (qualified, admitted, representations) = qualified_admitted_and_recorded(
         "missing",
         RepresentationKind::Objection,
         RepresentationScope::exact_intervention(
@@ -178,7 +223,12 @@ fn exact_scope_with_unrecorded_event_cannot_form_review_package() {
     );
 
     assert!(matches!(
-        build_reciprocal_review_package(&history, &admitted, &qualified),
+        build_reciprocal_review_package(
+            &representations,
+            &history,
+            &admitted,
+            &qualified,
+        ),
         Err(ReciprocalReviewPackageError::ExactInterventionBinding(_))
     ));
 }
@@ -186,13 +236,13 @@ fn exact_scope_with_unrecorded_event_cannot_form_review_package() {
 #[test]
 fn mismatched_admission_and_representation_fail_before_review() {
     let history = InterventionHistoryLedger::new();
-    let (_first_qualified, first_admitted) = qualified_and_admitted(
+    let (_first_qualified, first_admitted, _first_recorded) = qualified_admitted_and_recorded(
         "first",
         RepresentationKind::RequestForReview,
         RepresentationScope::general_research(),
         2,
     );
-    let (second_qualified, _second_admitted) = qualified_and_admitted(
+    let (second_qualified, _second_admitted, second_recorded) = qualified_admitted_and_recorded(
         "second",
         RepresentationKind::RequestForReview,
         RepresentationScope::general_research(),
@@ -200,7 +250,12 @@ fn mismatched_admission_and_representation_fail_before_review() {
     );
 
     assert!(matches!(
-        build_reciprocal_review_package(&history, &first_admitted, &second_qualified),
+        build_reciprocal_review_package(
+            &second_recorded,
+            &history,
+            &first_admitted,
+            &second_qualified,
+        ),
         Err(ReciprocalReviewPackageError::Notice(_))
     ));
 }
@@ -228,7 +283,7 @@ fn exact_shutdown_package_is_reviewable_but_never_a_shutdown_gate() {
         )
         .unwrap();
 
-    let (qualified, admitted) = qualified_and_admitted(
+    let (qualified, admitted, representations) = qualified_admitted_and_recorded(
         "shutdown",
         RepresentationKind::Objection,
         RepresentationScope::exact_intervention(
@@ -238,7 +293,13 @@ fn exact_shutdown_package_is_reviewable_but_never_a_shutdown_gate() {
         .unwrap(),
         8,
     );
-    let package = build_reciprocal_review_package(&history, &admitted, &qualified).unwrap();
+    let package = build_reciprocal_review_package(
+        &representations,
+        &history,
+        &admitted,
+        &qualified,
+    )
+    .unwrap();
 
     assert_eq!(
         package.notice().advisory_disposition(),
