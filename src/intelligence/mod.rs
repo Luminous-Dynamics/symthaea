@@ -13,6 +13,7 @@ pub mod causal_consciousness;
 pub mod causal_discovery;
 pub mod nixos_causal;
 pub mod reasoning_evaluator;
+pub mod reasoning_evaluator_policy;
 pub mod reasoning_qualification;
 
 pub use causal_consciousness::{
@@ -24,6 +25,10 @@ pub use nixos_causal::NixOSCausalAnalyzer;
 pub use reasoning_evaluator::{
     aggregate_receipts, evaluate_episode, wilson_interval_95, CapabilitySlice, EpisodeJudgment,
     ProportionInterval, ReasoningEvaluatorError, TaskScore, REASONING_EVALUATOR_VERSION,
+};
+pub use reasoning_evaluator_policy::{
+    evaluate_episode_with_policy, ExactScoringPolicy,
+    REASONING_EVALUATOR_OUTCOME_SEMANTIC_VERSION,
 };
 pub use reasoning_qualification::{
     AbstentionReason, AssumptionRecord, EvidenceRef, QualificationMetric,
