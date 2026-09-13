@@ -1,6 +1,6 @@
 # LL-009AG — Frozen Site01 campaign root
 
-LL-009AG closes a reproducibility gap in the Site01 / Connecting Ridge lunar-terrain evidence chain. It does **not** create another terrain model, uncertainty formula, visibility result, or probability theorem. It freezes the exact campaign inputs and refuses to combine evidence after lineage drift.
+LL-009AG closes a reproducibility gap in the Site01 / Connecting Ridge lunar-terrain evidence chain. It does **not** create another terrain model, uncertainty formula, visibility result, calibration claim, or probability theorem. It freezes one exact campaign lineage and refuses to combine evidence after code, environment, source, or receipt drift.
 
 ## State theorem
 
@@ -8,75 +8,154 @@ The campaign is monotonic:
 
 `PREPARED -> FROZEN -> FINALIZED`
 
-`PREPARED` binds the exact repository head, campaign policy, protected scripts/configs, stage plan, and three independent runtime capsules (`acquisition`, `gis`, `analysis`). Environment or protected-input drift at this stage means the preparation is invalid and the campaign must be prepared again.
+`PREPARED` binds the exact repository head, campaign policy, protected execution/configuration files, stage plan, and three independent runtime capsules (`acquisition`, `gis`, `analysis`). Drift before evidence begins invalidates preparation and requires re-preparation.
 
-`FROZEN` is the point at which evidence begins. It binds an explicit evidence manifest, the exact present evidence-root file set, every present artifact's outer SHA-256 and byte count, canonical receipt self-hashes when requested, and verified dependency edges. After this transition, substitution or drift is fatal; evidence from different lineages must not be combined.
+`FROZEN` is the evidence-lineage boundary. It binds an explicit evidence manifest, every present artifact's exact file SHA-256 and byte count, any declared native receipt self-hash, the exact evidence-root file set, explicit availability state, and cryptographically verified dependency edges. After this transition, substitution or drift is fatal; evidence from a different prepared root cannot be mixed into the campaign.
 
-`FINALIZED` replays all PREPARED and FROZEN bindings, verifies the exact evidence-root file set, binds an explicit semantic assertion, and applies the policy's promotion ceiling. It does not recompute numerical terrain or visibility values.
+`FINALIZED` replays PREPARED and FROZEN exactly, binds a separate semantic assertion, and applies the checked policy's claim ceiling. It performs no terrain or visibility recomputation.
 
-## Explicit availability classes
+## Explicit availability
 
-Every logical artifact is declared as exactly one of:
+Manifest schema `ll009ag.evidence-manifest.v2` requires every logical artifact `requirement` to be exactly one of:
 
-- `required` — must exist and fully verify or the campaign fails;
-- `optional_diagnostic` — may be absent, but if present it must pass exactly the same hashing, self-hash, dependency, and closure checks as required evidence;
-- `not_yet_available` — an explicit future/missing evidence surface. It has no path and cannot silently masquerade as success.
+- `required` — the file must exist and fully verify;
+- `optional_diagnostic` — the file may be absent, but if present is frozen and verified exactly like required evidence;
+- `not_yet_available` — an explicit missing/future evidence surface. It has no path and cannot silently count as success.
 
-A campaign containing any `not_yet_available` node is `incomplete_declared` and has `promotion_eligible=false`. Such a campaign may still be FINALIZED as an immutable integrity snapshot, but that final root is not promotable scientific evidence. Missing optional diagnostics are recorded separately and do not become positive evidence.
+The evidence directory is closed over declared **present** files. Any undeclared regular file is an error. Missing required files are errors. Missing optional diagnostics are recorded explicitly. `not_yet_available` nodes are recorded explicitly and cannot be used as semantic basis.
 
-## No hidden discovery
+If at least one node is `not_yet_available`, FROZEN records:
 
-The evidence manifest is authoritative and explicit. Each present artifact supplies a logical artifact ID, a normalized relative path under the evidence root, exact logical dependencies, a requirement class, and a `self_hash_mode` of either `none` or `canonical_receipt_sha256`.
+- `campaign_completeness = incomplete_declared`;
+- `promotion_eligible = false`.
 
-LL-009AG never assigns a scientific role from a filename, glob, extension, or directory name. The presence of a field called `receipt_sha256` is not enough to opt an artifact into receipt verification; the manifest must explicitly declare the canonical self-hash mode.
+Such a campaign may still be FINALIZED as an immutable integrity snapshot, but FINALIZED records `effective_evidence_class = null` and `promotion_status = blocked_incomplete_declared`. This separates successful integrity sealing from scientific promotion.
 
-The evidence directory is closed over **present** evidence: every regular file must correspond to exactly one present manifest node. Symlinks and special files fail closed. Required missing files fail closed. Optional missing files and declared-unavailable nodes remain explicit manifest state rather than hidden filesystem inference.
+## Native receipt self-hashes
 
-## Dependency edges are evidence
+AG does not assume every LL-009 producer serializes JSON the way AG does. The manifest declares one of three `self_hash_mode` values per artifact:
 
-A declared DAG edge is not trusted by itself. Every present child must contain the exact identity of every declared parent at a reviewed JSON field path. The manifest declares one `dependency_binding` per parent using either:
+- `none` — no inner receipt self-hash is claimed;
+- `ag_compact_receipt_sha256` — AG's sorted compact canonical JSON plus trailing newline;
+- `ll009_indent2_receipt_sha256` — the established LL-009 sorted, indent-2 canonical JSON (`separators=(',', ': ')`) plus trailing newline, used by receipts such as AA and Z.
 
-- `receipt_sha256` — the parent's verified canonical receipt identity; or
-- `sha256` — the exact SHA-256 of the parent file bytes.
+The selected native contract is replayed against the child JSON before its `receipt_sha256` is accepted. Merely containing a field named `receipt_sha256` is never enough.
 
-For example:
+AG's own PREPARED/FROZEN/FINALIZED receipts use the compact AG canonicalization. Upstream scientific receipts keep their native contract.
+
+## Dependency edges are executable evidence
+
+A DAG edge is not accepted because the manifest says two files are related. Every **present child** must itself contain the exact identity of every declared present parent.
+
+Dependencies are named separately from their binding proofs. Each present child declares a dependency ID and exactly one reviewed binding for that parent:
 
 ```json
 {
-  "id": "visibility",
-  "path": "visibility.json",
-  "requirement": "required",
-  "dependencies": ["horizon"],
+  "dependencies": ["ll009y_horizon"],
   "dependency_bindings": [
     {
-      "dependency_id": "horizon",
-      "field_path": ["k_horizon_pack_sha256"],
-      "identity": "sha256"
+      "dependency_id": "ll009y_horizon",
+      "identity": "sha256",
+      "field_path": ["k_horizon_pack_sha256"]
     }
-  ],
-  "self_hash_mode": "canonical_receipt_sha256"
+  ]
 }
 ```
 
-The field path is data, not a heuristic. LL-009AG does not search a receipt for a plausible hash. A self-consistent child receipt that points to a different valid upstream object therefore fails closed.
+`identity` is either:
 
-A present artifact may not depend on an absent optional diagnostic or a `not_yet_available` node. Dependency cycles, duplicate logical IDs, duplicate paths, duplicate bindings, and incomplete binding coverage are rejected before evidence can freeze.
+- `sha256` — SHA-256 of the exact frozen parent bytes; or
+- `receipt_sha256` — the parent's verified native receipt self-hash.
 
-## Environment separation and capture
+`field_path` is an explicit ordered JSON-object key path. AG never searches a child receipt for a plausible-looking hash. It resolves the reviewed path, requires a 64-hex digest, computes the declared parent identity independently, and requires exact equality.
 
-The campaign deliberately requires three capsules rather than pretending one Python installation governs all stages:
+The FROZEN receipt records every accepted binding on the frozen child: parent ID, identity mode, reviewed field path, and the independently verified digest value. A self-consistent child receipt that references a different valid upstream object therefore fails closed.
 
-- `acquisition`: network/source-byte acquisition only;
-- `gis`: extraction, role binding, raster/materialization, cross-method terrain work;
-- `analysis`: horizon, uncertainty, visibility, semantic reconciliation, and finalization.
+A present child may not depend on an absent optional diagnostic or a `not_yet_available` node. Duplicate logical IDs, duplicate paths, duplicate parent edges, unknown parents, self-dependencies, and cycles are rejected before freeze.
 
-An environment capsule is not an arbitrary note. Schema `ll009ag.environment-capsule.v1` requires five runtime sections: `python`, `platform`, `packages`, `libraries`, and `environment`. Python identity includes implementation, exact version, and SHA-256 of the resolved interpreter executable. Platform identity includes system and machine. Package and native-library versions required by the profile are explicit policy obligations. Every determinism-sensitive environment variable named by policy must be present in the capsule, with an unset variable represented explicitly as JSON `null`.
+Example manifest fragment:
 
-The checked Site01 policy currently requires OpenSSL identity for acquisition; NumPy, Rasterio, GDAL and PROJ identity for GIS; NumPy for analysis; and profile-specific locale, timezone, Python-hash, GIS-data and numerical-thread environment variables. These are identity requirements, not an automatic assertion that any observed version is scientifically acceptable; upstream toolchain receipts/policies still govern their own promotion requirements.
+```json
+{
+  "schema_version": "ll009ag.evidence-manifest.v2",
+  "study_id": "ll009-site01-connecting-ridge-v1",
+  "artifacts": [
+    {
+      "id": "ll009q_clone_ensemble",
+      "requirement": "required",
+      "path": "q.json",
+      "dependencies": [],
+      "dependency_bindings": [],
+      "self_hash_mode": "ll009_indent2_receipt_sha256"
+    },
+    {
+      "id": "ll009z_visibility_reconciliation",
+      "requirement": "required",
+      "path": "z.json",
+      "dependencies": ["ll009q_clone_ensemble"],
+      "dependency_bindings": [
+        {
+          "dependency_id": "ll009q_clone_ensemble",
+          "identity": "sha256",
+          "field_path": ["q_receipt_sha256"]
+        }
+      ],
+      "self_hash_mode": "ll009_indent2_receipt_sha256"
+    },
+    {
+      "id": "future_joint_coupling_theorem",
+      "requirement": "not_yet_available",
+      "dependencies": [],
+      "dependency_bindings": [],
+      "self_hash_mode": "none"
+    }
+  ]
+}
+```
 
-`scripts/capture_ll009ag_environment.py` captures this information from the environment actually executing a stage. It performs no network access, probes only the versions required by the checked policy, hashes the active resolved Python executable, and uses no-clobber output semantics. A differing capsule cannot silently overwrite an earlier one.
+The example is structural only; the reviewed real Site01 manifest must use the exact fields actually exposed by each frozen producer.
 
-For example, execute each capture inside the environment that will actually run that profile:
+## Environment separation
+
+AG deliberately requires three environment capsules instead of pretending one Python installation governs every stage:
+
+- `acquisition` — source-byte acquisition/archive integrity;
+- `gis` — extraction, raster materialization, role binding, and cross-method terrain work;
+- `analysis` — horizon, uncertainty, visibility, semantic reconciliation, and stress analysis.
+
+Schema `ll009ag.environment-capsule.v1` binds Python implementation/version and SHA-256 of the resolved interpreter executable, platform identity, required package/native-library versions, and determinism-sensitive environment variables. Unset declared variables are represented explicitly as JSON `null`.
+
+`scripts/capture_ll009ag_environment.py` captures those values from the environment actually executing the profile and refuses to overwrite a differing capsule. Only the `source_acquisition` stage is network-authorized by the checked policy; numerical stages are offline.
+
+## Protected execution surface
+
+PREPARED protects the actual Site01 implementation surface, not merely AG's orchestration code. The checked policy enumerates K through AF scripts/configurations including NASA acquisition, raster materialization, Q/R uncertainty support, Product90 V/W/X semantics, Y hybrid composition, S/Z visibility semantics, Product104 SDEM work, AB/AC/AD cross-method audits, and AE/AF stress analysis.
+
+The dedicated workflow no longer treats an arbitrary file count as proof of coverage. It requires a named cross-section of the scientific stack to remain inside `protected_files`, verifies every protected path materializes on the exact checked head, then hashes all of them through the same PREPARED binding implementation.
+
+Changing the policy or protected surface changes the preparation root and requires a new campaign lineage.
+
+## Semantic ceiling
+
+The checked policy caps AG at `hybrid_scenario_sampled_visibility`. `risk_qualified_visibility` and `deterministic_visibility` remain disabled.
+
+AG does not create a joint Q × Product90 probability theorem, does not certify Product90 RMS as a true-second-moment upper bound, does not upgrade R spatial support, does not convert AE/AF stress lambda into a calibrated true multiplier, and does not treat Product104 SDEM as independent ground truth. No site-safety, delivered-power, RF-link, operations, or mission authority is inferred from terrain visibility receipts.
+
+Even a semantically valid Z basis cannot become an effective promoted class while the campaign contains a declared unavailable node.
+
+## Receipt schemas
+
+AG emits:
+
+- `ll009ag.campaign-preparation-receipt.v1`;
+- `ll009ag.campaign-freeze-receipt.v2`;
+- `ll009ag.campaign-finalization-receipt.v2`.
+
+PREPARED binds code/config/environment identity. FROZEN records explicit artifact states, exact present-file closure, native self-hash verification, campaign completeness, promotion eligibility, and every verified dependency edge. FINALIZED replays the entire frozen root and records both the asserted class and the effective class after completeness gating.
+
+## Real-campaign flow
+
+Capture each profile inside the environment that will actually run it:
 
 ```bash
 python scripts/capture_ll009ag_environment.py \
@@ -85,39 +164,14 @@ python scripts/capture_ll009ag_environment.py \
   --output campaign/runtime/acquisition.json
 ```
 
-Repeat separately for `gis` and `analysis` from their actual execution environments. Do not capture all three from one shell merely to satisfy the schema.
+Repeat separately for `gis` and `analysis`.
 
-The capsule bytes and canonical payload are both bound by the PREPARED receipt. Only `source_acquisition` is network-authorized by the checked-in campaign plan; numerical stages are explicitly offline.
-
-## Protected execution surface
-
-PREPARED does not merely protect AG's own orchestrator. The checked policy enumerates the exact materialized code/configuration surface used by the real Site01 evidence chain from K through AF, including NASA acquisition, GIS materialization, uncertainty semantics, clone/spatial-support logic, Product90 RMS envelopes, memberwise hybrid composition, S/Z visibility semantics, SDEM cross-method/calibration audits, and AE/AF stress analysis. The dedicated qualification workflow verifies every protected path exists on the exact checked head before AG logic can pass.
-
-The campaign policy itself is independently byte-hashed into PREPARED, so changing the protected-file list also invalidates preparation.
-
-## Semantic ceiling
-
-The checked-in campaign policy currently caps finalization at `hybrid_scenario_sampled_visibility`.
-
-Promotion to that class requires frozen artifact ID `ll009z_visibility_reconciliation` to appear in the final semantic assertion's explicit basis. `risk_qualified_visibility` and `deterministic_visibility` are disabled.
-
-This is intentional. LL-009AG does not create a joint Q × Product90 probability theorem, does not convert Product90 RMS into a certified true-second-moment bound, does not upgrade spatial support, and does not treat an SDEM as independent ground truth. An incomplete campaign root is non-promotable regardless of the semantic class carried by its present evidence.
-
-## Receipt schemas
-
-The three state receipts are `ll009ag.campaign-preparation-receipt.v1`, `ll009ag.campaign-freeze-receipt.v1`, and `ll009ag.campaign-finalization-receipt.v1`. Receipts use canonical JSON with sorted keys, compact separators, UTF-8, and a trailing newline. `receipt_sha256` is SHA-256 over the same canonical object with that field omitted.
-
-The FROZEN receipt records present, missing-optional, and declared-unavailable nodes separately, together with every successfully verified dependency binding. FINALIZED records `campaign_completeness` and `promotion_eligible` rather than inferring completeness from file presence.
-
-## Typical real-campaign flow
-
-After capturing the three profile environments, preparation requires the exact repository head plus explicit paths to those capsules:
+Prepare the exact repository subject:
 
 ```bash
 python scripts/freeze_ll009ag_site01_campaign.py prepare \
   --policy configs/lunar_transport/ll009ag_site01_campaign_v1.json \
-  --repo-root . \
-  --repo-head "$EXACT_HEAD" \
+  --repo-root . --repo-head "$EXACT_HEAD" \
   --runtime-root campaign/runtime \
   --env acquisition=acquisition.json \
   --env gis=gis.json \
@@ -125,7 +179,7 @@ python scripts/freeze_ll009ag_site01_campaign.py prepare \
   --output campaign/ll009ag-prepared.json
 ```
 
-After real evidence files have been produced and an explicit manifest reviewed, freeze them:
+After real evidence files and a reviewed v2 manifest exist, freeze them:
 
 ```bash
 python scripts/freeze_ll009ag_site01_campaign.py freeze \
@@ -138,7 +192,7 @@ python scripts/freeze_ll009ag_site01_campaign.py freeze \
   --output campaign/ll009ag-frozen.json
 ```
 
-Finalization consumes a separate reviewed semantic assertion and cannot exceed the checked-in policy ceiling:
+Finalization consumes a separate reviewed semantic assertion and cannot exceed the checked policy ceiling:
 
 ```bash
 python scripts/freeze_ll009ag_site01_campaign.py finalize \
@@ -153,10 +207,26 @@ python scripts/freeze_ll009ag_site01_campaign.py finalize \
   --output campaign/ll009ag-finalized.json
 ```
 
-`verify` repeats the entire replay from frozen inputs and requires canonical equality with the supplied FINALIZED receipt.
+`verify` deterministically replays the complete finalization and requires exact equality with the supplied FINALIZED receipt.
 
 ## Qualification scope
 
-The dedicated workflow compiles the AG tools, executes the environment-capture self-test, verifies that the complete checked protected-file surface exists, and runs a dependency-free synthetic state-machine campaign. The synthetic campaign checks deterministic PREPARED/FROZEN/FINALIZED replay; structured environment contracts; runtime and protected-tool drift; artifact substitution; exact receipt- and file-hash dependency bindings; valid-but-wrong upstream substitution; required, optional-diagnostic, and declared-unavailable handling; closed evidence-root enforcement; invalid inner receipt self-hashes; dependency cycles; missing bindings; unavailable semantic bases; missing semantic provenance; and attempted over-promotion.
+The dedicated AG workflow compiles the campaign tools, qualifies environment-capture logic, proves the named protected scientific surface remains frozen, and executes a dependency-free synthetic state-machine campaign.
 
-The workflow downloads no NASA source bytes and produces no scientific Site01 result. A green workflow therefore qualifies LL-009AG's campaign-control logic only; it is not evidence that the Product104 Connecting Ridge archive has been acquired, that a real SDEM has been role-bound, or that any visibility class stronger than the existing upstream evidence has been established.
+The synthetic campaign now exercises:
+
+- deterministic PREPARED/FROZEN/FINALIZED replay;
+- environment and protected-tool drift;
+- required, optional-diagnostic, and declared-unavailable states;
+- incomplete-campaign promotion blocking;
+- native upstream receipt self-hash semantics, including rejection under the wrong declared canonicalization;
+- receipt-hash and file-hash dependency edges;
+- a self-consistent child with the wrong embedded parent digest;
+- closed evidence-root enforcement;
+- receipt tampering;
+- dependency cycles;
+- absent-artifact semantic bases;
+- missing semantic provenance; and
+- attempted over-promotion.
+
+This qualification downloads no NASA source bytes and produces no scientific Site01 result. A green AG workflow would qualify campaign-control logic only. A real Site01 final root does not exist until the exact NASA source locks/bytes and every configured required scientific receipt have executed under one frozen lineage.
