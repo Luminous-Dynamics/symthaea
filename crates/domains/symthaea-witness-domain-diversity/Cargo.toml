@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-witness-domain-diversity"
+version = "0.1.0"
+edition = "2024"
+description = "Administrative-domain diversity verification for independently witnessed continuity checkpoints"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-mycelix-continuity-witness = { path = "../symthaea-mycelix-continuity-witness" }
+thiserror = { workspace = true }
