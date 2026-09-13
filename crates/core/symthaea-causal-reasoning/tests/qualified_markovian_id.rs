@@ -94,9 +94,5 @@ fn qualified_markovian_id_has_exact_repeat_identity() {
         .identify(&graph, &[0], &[1])
         .unwrap_or_else(|err| panic!("second identification must succeed: {err}"));
 
-    let first_json = serde_json::to_string(&first)
-        .unwrap_or_else(|err| panic!("first expression must serialize: {err}"));
-    let second_json = serde_json::to_string(&second)
-        .unwrap_or_else(|err| panic!("second expression must serialize: {err}"));
-    assert_eq!(first_json, second_json);
+    assert_eq!(format!("{first:?}"), format!("{second:?}"));
 }
