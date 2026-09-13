@@ -51,8 +51,6 @@ mod v2_construct;
 mod v2_construct_independent_audit;
 #[cfg(test)]
 mod v2_construct_statistical_mutants;
-#[cfg(test)]
-mod v2_construct_schema_guard;
 
 pub use consequence::{
     ConsequenceMetrics, ConsequencePrediction, ConsequenceScore, ConsequenceScoringError,
