@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-assurance-tpm-reference-crucible"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "End-to-end TPM and reference-integrity assurance composition for Symthaea"
+
+[dependencies]
+blake3.workspace = true
+serde.workspace = true
+symthaea-assurance-reference-integrity = { path = "../symthaea-assurance-reference-integrity" }
+symthaea-assurance-reference-integrity-lineage = { path = "../symthaea-assurance-reference-integrity-lineage" }
+symthaea-assurance-tpm2-attestation-possession = { path = "../symthaea-assurance-tpm2-attestation-possession" }
+symthaea-assurance-tpm2-measured-boot-replay = { path = "../symthaea-assurance-tpm2-measured-boot-replay" }
+symthaea-assurance-tpm2-platform-qualification = { path = "../symthaea-assurance-tpm2-platform-qualification" }
+symthaea-assurance-tpm2-tools-adapter = { path = "../../bridges/symthaea-assurance-tpm2-tools-adapter" }
