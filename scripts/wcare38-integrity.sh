@@ -36,6 +36,7 @@ check_blob "docs/release/evidence/WCARE38_AUTHENTICATED_PANEL_RESULT_SCHEMA_V1.j
 check_blob "scripts/wcare38-qualify.py" "885b952a8a75fba59a75544429b0338fd0ff2519"
 check_blob "scripts/wcare38_qualify_authenticated_panel.py" "cf198d78e76eab05a64c3489bdd51f538f026a1d"
 check_blob "scripts/wcare38_monotonicity_selftest.py" "e9e82d13cfdef768cb5873359d77f98de465495a"
+check_blob "scripts/wcare38_adversarial_selftest.py" "297b91e94479c7cebcd9bdb9d4bf94e31ba99b4d"
 
 if ! python3 scripts/wcare38_monotonicity_selftest.py >/tmp/wcare38-monotonicity-selftest.json 2>/tmp/wcare38-monotonicity-selftest.stderr; then
   emit "INVALID_PROTOCOL" "monotonicity_selftest_failed"
@@ -46,5 +47,14 @@ if ! grep -q '"classification":"PASS_MONOTONICITY_SELFTEST"' /tmp/wcare38-monoto
   exit 4
 fi
 
-emit "PASS_PROTOCOL_INTEGRITY" "exact_wcare38_bytes_and_monotonicity_selftest_match"
+if ! python3 scripts/wcare38_adversarial_selftest.py >/tmp/wcare38-adversarial-selftest.json 2>/tmp/wcare38-adversarial-selftest.stderr; then
+  emit "INVALID_PROTOCOL" "adversarial_source_selftest_failed"
+  exit 4
+fi
+if ! grep -q '"classification":"PASS_ADVERSARIAL_SOURCE_SELFTEST"' /tmp/wcare38-adversarial-selftest.json; then
+  emit "INVALID_PROTOCOL" "adversarial_source_selftest_did_not_report_pass"
+  exit 4
+fi
+
+emit "PASS_PROTOCOL_INTEGRITY" "exact_wcare38_bytes_and_adversarial_tests_match"
 exit 0
