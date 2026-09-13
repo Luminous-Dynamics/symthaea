@@ -80,6 +80,8 @@ mod v2_selected_comparator;
 mod v2_preheldout_custody;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_real_subject_adapters;
+#[cfg(all(test, feature = "symthaea-backend"))]
+mod v2_canary_authorization;
 #[cfg(test)]
 mod v2_preheldout_reachability_tests;
 #[cfg(test)]
