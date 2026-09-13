@@ -1,0 +1,155 @@
+name: HYPERSPACE-002 Robustness Capsule
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hyperspace-002-robustness.yml'
+      - 'crates/core/symthaea-core/examples/hyperspace_002_robustness.rs'
+      - 'crates/core/symthaea-core/src/state_space.rs'
+      - 'crates/core/symthaea-core/src/continuous_reachability.rs'
+      - 'crates/core/symthaea-core/src/sampling_reachability.rs'
+      - 'crates/core/symthaea-core/src/hyperspace_benchmark.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PRIMARY_HYPERSPACE_001_HEAD: 52c411aa7c89482e3aac66e0c15114f560afa835
+  PREREG_ISSUE: '2317'
+
+jobs:
+  robustness:
+    name: Preregistered coordinate-permutation robustness
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      # actions/checkout v4, resolved and frozen 2026-09-13.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact robustness subject
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/hyperspace-002
+          {
+            echo "schema=symthaea.hyperspace-002.environment.v1"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "primary_hyperspace_001_head=$PRIMARY_HYPERSPACE_001_HEAD"
+            echo "preregistration_issue=$PREREG_ISSUE"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+          } > artifacts/hyperspace-002/environment.txt
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Extend environment capsule
+        run: |
+          set -euo pipefail
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "rustc_host=$(rustc -vV | sed -n 's/^host: //p')"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+          } >> artifacts/hyperspace-002/environment.txt
+
+      - name: Compile robustness reporter
+        run: |
+          cargo check --locked -p symthaea-core --no-default-features \
+            --example hyperspace_002_robustness
+
+      - name: Execute preregistered robustness matrix
+        run: |
+          cargo run --locked -p symthaea-core --no-default-features \
+            --example hyperspace_002_robustness -- \
+            --subject "$SUBJECT_SHA" \
+            --output artifacts/hyperspace-002/report.json
+
+      - name: Hash robustness capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd artifacts/hyperspace-002
+          : > SHA256SUMS
+          for file in environment.txt report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Validate preregistered promotion gates
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path('artifacts/hyperspace-002/report.json').read_text())
+          assert report['schema'] == 'symthaea.hyperspace-002.robustness.v1'
+          assert report['source_subject'] == os.environ['SUBJECT_SHA'].lower()
+          assert report['preregistration_issue'] == 2317
+          assert report['primary_hyperspace_001_head'] == os.environ['PRIMARY_HYPERSPACE_001_HEAD']
+          assert report['primary_verdict_is_independent'] is True
+          assert report['combined_claim_requires_primary_pass'] is True
+          study = report['study']
+          assert study['seeds'] == [2, 3, 5, 7, 11, 13, 17, 19]
+          assert len(study['axes']) == 4
+          assert all(axis['blocked_false_feasible'] == 0 for axis in study['axes'])
+          assert all(axis['quality_failures'] == 0 for axis in study['axes'])
+          assert all(axis['execution_errors'] == 0 for axis in study['axes'])
+          assert all(axis['successes'] >= 6 for axis in study['axes'])
+          assert study['success_count_spread'] <= 2
+          assert study['representation_invariance_gate'] is True
+          assert study['pass'] is True
+          assert report['verdict'] == 'PASS'
+
+          summary = Path(os.environ['GITHUB_STEP_SUMMARY'])
+          with summary.open('a') as f:
+              f.write('## HYPERSPACE-002 preregistered robustness\n\n')
+              f.write(f"**Subject:** `{report['source_subject']}`\n\n")
+              f.write(f"**Preregistration:** `#{report['preregistration_issue']}`\n\n")
+              f.write(f"**Primary HYPERSPACE-001 dependency:** `{report['primary_hyperspace_001_head']}`\n\n")
+              f.write(f"**Robustness verdict:** `{report['verdict']}`\n\n")
+              f.write('| external w axis | successes / 8 | false feasible | quality failures | result |\n')
+              f.write('|---:|---:|---:|---:|---|\n')
+              for axis in study['axes']:
+                  result = 'PASS' if axis['pass'] else 'FAIL'
+                  f.write(
+                      f"| {axis['external_w_axis']} | {axis['successes']} | "
+                      f"{axis['blocked_false_feasible']} | {axis['quality_failures']} | {result} |\n"
+                  )
+              f.write(f"\nSuccess-count spread: `{study['success_count_spread']}` (gate <= 2).\n\n")
+              f.write('This result cannot overwrite or rescue the independent HYPERSPACE-001 primary verdict.\n')
+          PY
+
+      # actions/upload-artifact v4, resolved and frozen 2026-09-13.
+      - name: Upload robustness capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hyperspace-002-robustness-${{ env.SUBJECT_SHA }}
+          path: artifacts/hyperspace-002/
+          if-no-files-found: error
+          retention-days: 90
