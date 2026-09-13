@@ -1,8 +1,8 @@
 # Focused exact-head qualification for the generic research-integrity stack.
 #
 # This workflow proves only the software contracts of the research protocol,
-# result, and replication crates present in the qualified subject. It does not
-# replace repository-wide integration CI or establish any scientific claim.
+# result, analysis, and replication crates present in the qualified subject.
+# It does not replace repository-wide integration CI or establish any scientific claim.
 
 name: Research Integrity Qualification
 
@@ -11,6 +11,7 @@ on:
     paths:
       - 'crates/core/symthaea-research-protocol/**'
       - 'crates/core/symthaea-research-result/**'
+      - 'crates/core/symthaea-research-analysis/**'
       - 'crates/core/symthaea-research-replication/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -44,24 +45,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out exact subject
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.EXPECTED_SHA }}
-          fetch-depth: 2
-
-      - name: Assert exact subject identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          actual="$(git rev-parse HEAD)"
-          echo "expected_sha=${EXPECTED_SHA}"
-          echo "actual_sha=${actual}"
-          if [[ "${actual}" != "${EXPECTED_SHA}" ]]; then
-            echo "checkout identity mismatch" >&2
-            exit 1
-          fi
-
+      # Initialize before checkout so even checkout/infrastructure failures can
+      # still produce a typed receipt instead of disappearing without evidence.
       - name: Initialize qualification receipt state
         shell: bash
         run: |
@@ -72,8 +57,33 @@ jobs:
           : > "${RUNNER_TEMP}/research-integrity-commands"
           date -u +'%Y-%m-%dT%H:%M:%SZ' > "${RUNNER_TEMP}/research-integrity-started-at"
 
+      - name: Check out exact subject
+        id: checkout
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          fetch-depth: 2
+
+      - name: Assert exact subject identity
+        id: identity
+        if: steps.checkout.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "expected_sha=${EXPECTED_SHA}"
+          echo "actual_sha=${actual}"
+          if [[ "${actual}" != "${EXPECTED_SHA}" ]]; then
+            echo "InfrastructureUnavailable" > "${RUNNER_TEMP}/research-integrity-status"
+            echo "checkout identity mismatch: expected ${EXPECTED_SHA}, got ${actual}" > "${RUNNER_TEMP}/research-integrity-failure"
+            exit 1
+          fi
+
       - name: Install pinned Rust toolchain
         id: toolchain
+        if: steps.checkout.outcome == 'success' && steps.identity.outcome == 'success'
         continue-on-error: true
         uses: dtolnay/rust-toolchain@1.96.0
         with:
@@ -81,7 +91,7 @@ jobs:
 
       - name: Qualify present research-integrity packages
         id: qualification
-        if: steps.toolchain.outcome == 'success'
+        if: steps.checkout.outcome == 'success' && steps.identity.outcome == 'success' && steps.toolchain.outcome == 'success'
         continue-on-error: true
         shell: bash
         run: |
@@ -95,12 +105,10 @@ jobs:
           packages=()
           [[ -f crates/core/symthaea-research-protocol/Cargo.toml ]] && packages+=(symthaea-research-protocol)
           [[ -f crates/core/symthaea-research-result/Cargo.toml ]] && packages+=(symthaea-research-result)
+          [[ -f crates/core/symthaea-research-analysis/Cargo.toml ]] && packages+=(symthaea-research-analysis)
           [[ -f crates/core/symthaea-research-replication/Cargo.toml ]] && packages+=(symthaea-research-replication)
 
           if [[ ${#packages[@]} -eq 0 ]]; then
-            # This can happen on a manual dispatch before the first research
-            # crate lands, on this workflow's own bootstrap PR, or on an
-            # unrelated root dependency change. It is explicitly NOT a pass.
             echo "NotApplicableNoResearchIntegrityCrates" > "${status_file}"
             echo "no research-integrity package exists in exact subject ${EXPECTED_SHA}" > "${failure_file}"
             exit 0
@@ -145,6 +153,8 @@ jobs:
         if: always()
         shell: bash
         env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          IDENTITY_OUTCOME: ${{ steps.identity.outcome }}
           TOOLCHAIN_OUTCOME: ${{ steps.toolchain.outcome }}
           QUALIFICATION_OUTCOME: ${{ steps.qualification.outcome }}
         run: |
@@ -160,7 +170,13 @@ jobs:
           failure="qualification step did not produce a terminal status"
           [[ -f "${failure_file}" ]] && failure="$(cat "${failure_file}")"
 
-          if [[ "${status}" == "NotRun" && "${TOOLCHAIN_OUTCOME}" != "success" ]]; then
+          if [[ "${status}" == "NotRun" && "${CHECKOUT_OUTCOME}" != "success" ]]; then
+            status="InfrastructureUnavailable"
+            failure="exact-subject checkout failed before qualification"
+          elif [[ "${status}" == "NotRun" && "${IDENTITY_OUTCOME}" != "success" ]]; then
+            status="InfrastructureUnavailable"
+            failure="exact-subject identity assertion failed before qualification"
+          elif [[ "${status}" == "NotRun" && "${TOOLCHAIN_OUTCOME}" != "success" ]]; then
             status="InfrastructureUnavailable"
             failure="pinned Rust toolchain installation failed before qualification"
           elif [[ "${status}" == "NotRun" ]]; then
@@ -168,12 +184,21 @@ jobs:
             failure="qualification did not execute to a terminal disposition"
           fi
 
-          cargo_lock_digest="absent"
-          [[ -f Cargo.lock ]] && cargo_lock_digest="sha256:$(sha256sum Cargo.lock | awk '{print $1}')"
-          workflow_digest="sha256:$(sha256sum .github/workflows/research-integrity-qualification.yml | awk '{print $1}')"
-          subject_sha="$(git rev-parse HEAD)"
-          subject_tree="$(git rev-parse 'HEAD^{tree}')"
-          parent_sha="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          cargo_lock_digest="unavailable"
+          workflow_digest="unavailable"
+          actual_subject_sha=""
+          subject_tree=""
+          parent_sha=""
+          if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            actual_subject_sha="$(git rev-parse HEAD 2>/dev/null || true)"
+            subject_tree="$(git rev-parse 'HEAD^{tree}' 2>/dev/null || true)"
+            parent_sha="$(git rev-parse HEAD^ 2>/dev/null || true)"
+            [[ -f Cargo.lock ]] && cargo_lock_digest="sha256:$(sha256sum Cargo.lock | awk '{print $1}')"
+            if [[ -f .github/workflows/research-integrity-qualification.yml ]]; then
+              workflow_digest="sha256:$(sha256sum .github/workflows/research-integrity-qualification.yml | awk '{print $1}')"
+            fi
+          fi
+
           rustc_version="unavailable"
           if command -v rustc >/dev/null 2>&1; then
             rustc_version="$(rustc --version --verbose | tr '\n' ';')"
@@ -182,7 +207,7 @@ jobs:
           [[ -f "${started_file}" ]] && started_at="$(cat "${started_file}")"
           completed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
-          python3 - "${status}" "${failure}" "${cargo_lock_digest}" "${workflow_digest}" "${subject_sha}" "${subject_tree}" "${parent_sha}" "${rustc_version}" "${started_at}" "${completed_at}" "${packages_file}" "${commands_file}" "${TOOLCHAIN_OUTCOME}" "${QUALIFICATION_OUTCOME}" <<'PY'
+          python3 - "${status}" "${failure}" "${cargo_lock_digest}" "${workflow_digest}" "${EXPECTED_SHA}" "${actual_subject_sha}" "${subject_tree}" "${parent_sha}" "${rustc_version}" "${started_at}" "${completed_at}" "${packages_file}" "${commands_file}" "${CHECKOUT_OUTCOME}" "${IDENTITY_OUTCOME}" "${TOOLCHAIN_OUTCOME}" "${QUALIFICATION_OUTCOME}" <<'PY'
           import json
           import pathlib
           import sys
@@ -192,7 +217,8 @@ jobs:
               failure,
               cargo_lock_digest,
               workflow_digest,
-              subject_sha,
+              expected_subject_sha,
+              actual_subject_sha,
               subject_tree,
               parent_sha,
               rustc_version,
@@ -200,6 +226,8 @@ jobs:
               completed_at,
               packages_path,
               commands_path,
+              checkout_outcome,
+              identity_outcome,
               toolchain_outcome,
               qualification_outcome,
           ) = sys.argv[1:]
@@ -210,8 +238,9 @@ jobs:
 
           receipt = {
               "schema": "symthaea-research-integrity-qualification/v1",
-              "subject_sha": subject_sha,
-              "subject_tree": subject_tree,
+              "expected_subject_sha": expected_subject_sha,
+              "actual_subject_sha": actual_subject_sha or None,
+              "subject_tree": subject_tree or None,
               "parent_subject_sha": parent_sha or None,
               "cargo_lock_digest": cargo_lock_digest,
               "rust_toolchain": rustc_version,
@@ -221,6 +250,8 @@ jobs:
               "github_run_id": "${{ github.run_id }}",
               "github_run_attempt": "${{ github.run_attempt }}",
               "event_name": "${{ github.event_name }}",
+              "checkout_step_outcome": checkout_outcome,
+              "identity_step_outcome": identity_outcome,
               "toolchain_step_outcome": toolchain_outcome,
               "qualification_step_outcome": qualification_outcome,
               "qualification_started_at": started_at,
@@ -242,8 +273,9 @@ jobs:
           {
             echo "### Research Integrity Qualification"
             echo
-            echo "- Subject: \`${subject_sha}\`"
-            echo "- Tree: \`${subject_tree}\`"
+            echo "- Expected subject: \`${EXPECTED_SHA}\`"
+            echo "- Actual checkout: \`${actual_subject_sha:-unavailable}\`"
+            echo "- Tree: \`${subject_tree:-unavailable}\`"
             echo "- Disposition: **${status}**"
             echo "- This is focused software-contract evidence only; it is not whole-repository or scientific validation."
           } >> "${GITHUB_STEP_SUMMARY}"
