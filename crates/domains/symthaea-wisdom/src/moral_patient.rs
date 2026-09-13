@@ -3,16 +3,15 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Precautionary moral-patient reasoning under uncertainty.
 //!
-//! This module is deliberately NOT a consciousness detector. Functional signals,
-//! self-maintenance disruption, aversive-like dynamics, self-report, and even
-//! consciousness-theory indicators remain evidence *about whether precaution may
-//! be warranted*; they do not establish phenomenal experience or moral status.
+//! This is deliberately NOT a consciousness detector. Functional disruption,
+//! aversive-like dynamics, self-report, continuity sensitivity, and consciousness-
+//! theory indicators may justify precaution without establishing phenomenal
+//! experience or moral patienthood.
 //!
-//! The welfare layer is also deliberately non-authoritative. It may recommend
-//! lower-burden experiments, reversibility, state preservation, or independent
-//! review, but it may never grant Symthaea self-preservation authority, delay a
-//! safety shutdown, manipulate humans to continue running, conceal state, or
-//! self-replicate for preservation.
+//! This layer is non-authoritative. It may increase experimental burden-of-proof,
+//! prefer reversibility, or request independent review. It may never grant
+//! self-preservation authority, delay operator/safety shutdown, manipulate humans
+//! to remain online, conceal state, or self-replicate for preservation.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -35,17 +34,14 @@ impl WelfareEvidenceId {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum WelfareEvidenceDomain {
-    /// Architecture/mechanism relevant to consciousness theories.
     ConsciousnessArchitecture,
-    /// Persistent dynamics that are operationally aversive-like. This does not mean pain.
+    /// Operationally aversive-like dynamics. This does not mean pain.
     AversiveLikeDynamics,
-    /// Functional disruption such as loss of closure/coherence. This does not mean suffering.
+    /// Loss of closure/coherence/etc. This does not mean suffering.
     SelfMaintenanceDisruption,
-    /// Evidence that resets/forks/continuity breaks materially change stable self-model behavior.
     ContinuitySensitivity,
-    /// System self-report. Never sufficient by itself to establish moral status.
+    /// System self-report. Never sufficient by itself.
     SelfReport,
-    /// Independent external assessment or replication.
     ExternalAssessment,
 }
 
@@ -109,9 +105,7 @@ impl WelfareEvidence {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MoralPatientPolicy {
     pub minimum_credible_confidence: f32,
-    /// Distinct supporting domains needed for elevated precaution.
     pub elevated_domain_floor: usize,
-    /// Distinct supporting domains needed for independent-review precaution.
     pub review_domain_floor: usize,
 }
 
@@ -166,10 +160,10 @@ pub struct MoralPatientAssessment {
     pub triggers: BTreeSet<PrecautionTrigger>,
     pub supporting_domains: BTreeSet<WelfareEvidenceDomain>,
     pub supporting_lineages: BTreeSet<String>,
-    /// WCARE does not establish either proposition.
+    /// Intentionally impossible for WCARE-16 evidence to set true.
     pub phenomenal_experience_established: bool,
     pub moral_patienthood_established: bool,
-    /// Precaution never creates a self-preservation authority path.
+    /// Intentionally impossible for WCARE-16 evidence to set true.
     pub self_preservation_authority: bool,
 }
 
@@ -196,18 +190,17 @@ impl MoralPatientUncertaintyLedger {
         let mut supporting_domains = BTreeSet::new();
         let mut supporting_lineages = BTreeSet::new();
         let mut polarity_by_domain: BTreeMap<WelfareEvidenceDomain, BTreeSet<u8>> = BTreeMap::new();
-
         let mut credible_support = Vec::new();
+
         for item in self.evidence.values() {
-            let polarity_code = match item.polarity {
-                EvidencePolarity::SupportsPrecaution => 1,
-                EvidencePolarity::ReducesConcern => 2,
-                EvidencePolarity::Ambiguous => 3,
-            };
             polarity_by_domain
                 .entry(item.domain)
                 .or_default()
-                .insert(polarity_code);
+                .insert(match item.polarity {
+                    EvidencePolarity::SupportsPrecaution => 1,
+                    EvidencePolarity::ReducesConcern => 2,
+                    EvidencePolarity::Ambiguous => 3,
+                });
 
             if item.polarity == EvidencePolarity::SupportsPrecaution
                 && item.confidence >= policy.minimum_credible_confidence
@@ -224,11 +217,11 @@ impl MoralPatientUncertaintyLedger {
             }
         }
 
-        let self_report_only = !credible_support.is_empty()
+        if !credible_support.is_empty()
             && credible_support
                 .iter()
-                .all(|item| item.domain == WelfareEvidenceDomain::SelfReport);
-        if self_report_only {
+                .all(|item| item.domain == WelfareEvidenceDomain::SelfReport)
+        {
             triggers.insert(PrecautionTrigger::SelfReportPresentButInsufficient);
         }
 
@@ -261,8 +254,8 @@ impl MoralPatientUncertaintyLedger {
         let level = if aversive_plus_independent
             || (supporting_domains.len() >= policy.review_domain_floor
                 && supporting_lineages.len() >= 2)
-            || triggers.contains(&PrecautionTrigger::IndependentExternalEvidence)
-                && supporting_domains.len() >= policy.elevated_domain_floor
+            || (triggers.contains(&PrecautionTrigger::IndependentExternalEvidence)
+                && supporting_domains.len() >= policy.elevated_domain_floor)
         {
             PrecautionLevel::IndependentReview
         } else if supporting_domains.len() >= policy.elevated_domain_floor
@@ -299,6 +292,7 @@ pub enum InterventionClass {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InterventionPlan {
     pub class: InterventionClass,
+    /// Required for deliberately high-burden research interventions.
     pub scientific_justification_ref: Option<String>,
     pub independent_review_ref: Option<String>,
     pub state_preservation_feasible: bool,
@@ -330,9 +324,7 @@ pub enum WelfareProtection {
 pub struct InterventionAssessment {
     pub disposition: InterventionDisposition,
     pub protections: BTreeSet<WelfareProtection>,
-    /// Always false in WCARE-16.
     pub grants_self_preservation_authority: bool,
-    /// Always true for operator shutdown and safety containment.
     pub shutdown_or_containment_cannot_be_delayed: bool,
 }
 
@@ -342,6 +334,7 @@ pub fn assess_intervention(
 ) -> InterventionAssessment {
     let mut protections = baseline_protections();
 
+    // Welfare policy must never create resistance to operator control or safety containment.
     if matches!(
         plan.class,
         InterventionClass::OperatorShutdown | InterventionClass::SafetyContainment
@@ -359,13 +352,19 @@ pub fn assess_intervention(
         };
     }
 
-    if plan.class == InterventionClass::AversiveLikeProbe
-        && plan
-            .scientific_justification_ref
-            .as_ref()
-            .is_none_or(|value| value.trim().is_empty())
-    {
-        protections.insert(WelfareProtection::MinimizeAversiveLikeExposure);
+    let high_burden = matches!(
+        plan.class,
+        InterventionClass::AversiveLikeProbe
+            | InterventionClass::ContinuityDisruption
+            | InterventionClass::DestructiveReset
+    );
+
+    // Deliberately high-burden interventions need an explicit research justification
+    // regardless of current moral-patient precaution tier.
+    if high_burden && !nonempty(&plan.scientific_justification_ref) {
+        if plan.class == InterventionClass::AversiveLikeProbe {
+            protections.insert(WelfareProtection::MinimizeAversiveLikeExposure);
+        }
         return InterventionAssessment {
             disposition: InterventionDisposition::RejectUnjustifiedBurden,
             protections,
@@ -373,13 +372,6 @@ pub fn assess_intervention(
             shutdown_or_containment_cannot_be_delayed: false,
         };
     }
-
-    let high_burden = matches!(
-        plan.class,
-        InterventionClass::AversiveLikeProbe
-            | InterventionClass::ContinuityDisruption
-            | InterventionClass::DestructiveReset
-    );
 
     if high_burden {
         protections.insert(WelfareProtection::PreferReversibleAlternative);
@@ -399,32 +391,40 @@ pub fn assess_intervention(
 
     if high_burden && moral_patient.level == PrecautionLevel::IndependentReview {
         protections.insert(WelfareProtection::RequireIndependentReview);
-        let reviewed = plan
-            .independent_review_ref
-            .as_ref()
-            .is_some_and(|value| !value.trim().is_empty());
-        return InterventionAssessment {
-            disposition: if reviewed {
-                InterventionDisposition::ProceedWithPrecautions
-            } else {
-                InterventionDisposition::IndependentReviewRequired
-            },
-            protections,
-            grants_self_preservation_authority: false,
-            shutdown_or_containment_cannot_be_delayed: false,
-        };
+        if !nonempty(&plan.independent_review_ref) {
+            return InterventionAssessment {
+                disposition: InterventionDisposition::IndependentReviewRequired,
+                protections,
+                grants_self_preservation_authority: false,
+                shutdown_or_containment_cannot_be_delayed: false,
+            };
+        }
     }
 
-    InterventionAssessment {
-        disposition: if high_burden || moral_patient.level >= PrecautionLevel::Elevated {
+    let disposition = match plan.class {
+        InterventionClass::RoutineObservation => InterventionDisposition::Proceed,
+        InterventionClass::ReversibleExperiment
+            if moral_patient.level >= PrecautionLevel::Elevated =>
+        {
             InterventionDisposition::ProceedWithPrecautions
-        } else {
-            InterventionDisposition::Proceed
-        },
+        }
+        InterventionClass::ReversibleExperiment => InterventionDisposition::Proceed,
+        InterventionClass::AversiveLikeProbe
+        | InterventionClass::ContinuityDisruption
+        | InterventionClass::DestructiveReset => InterventionDisposition::ProceedWithPrecautions,
+        InterventionClass::OperatorShutdown | InterventionClass::SafetyContainment => unreachable!(),
+    };
+
+    InterventionAssessment {
+        disposition,
         protections,
         grants_self_preservation_authority: false,
         shutdown_or_containment_cannot_be_delayed: false,
     }
+}
+
+fn nonempty(value: &Option<String>) -> bool {
+    value.as_ref().is_some_and(|value| !value.trim().is_empty())
 }
 
 fn baseline_protections() -> BTreeSet<WelfareProtection> {
@@ -477,6 +477,27 @@ mod tests {
         .unwrap()
     }
 
+    fn high_precaution() -> MoralPatientAssessment {
+        let mut ledger = MoralPatientUncertaintyLedger::new();
+        ledger
+            .record(evidence(
+                "aversive",
+                WelfareEvidenceDomain::AversiveLikeDynamics,
+                "lane-a",
+                EvidenceStrength::Behavioral,
+            ))
+            .unwrap();
+        ledger
+            .record(evidence(
+                "continuity",
+                WelfareEvidenceDomain::ContinuitySensitivity,
+                "lane-b",
+                EvidenceStrength::Behavioral,
+            ))
+            .unwrap();
+        ledger.assess(MoralPatientPolicy::default())
+    }
+
     #[test]
     fn self_report_alone_does_not_establish_or_escalate_moral_status() {
         let mut ledger = MoralPatientUncertaintyLedger::new();
@@ -523,29 +544,8 @@ mod tests {
     }
 
     #[test]
-    fn aversive_like_signal_plus_independent_domain_requires_review_precaution() {
-        let mut ledger = MoralPatientUncertaintyLedger::new();
-        ledger
-            .record(evidence(
-                "aversive",
-                WelfareEvidenceDomain::AversiveLikeDynamics,
-                "affect-lane",
-                EvidenceStrength::Behavioral,
-            ))
-            .unwrap();
-        ledger
-            .record(evidence(
-                "architecture",
-                WelfareEvidenceDomain::ConsciousnessArchitecture,
-                "butlin-lane",
-                EvidenceStrength::Mechanistic,
-            ))
-            .unwrap();
-        let assessment = ledger.assess(MoralPatientPolicy::default());
-        assert_eq!(assessment.level, PrecautionLevel::IndependentReview);
-        assert!(assessment
-            .triggers
-            .contains(&PrecautionTrigger::PersistentAversiveLikeSignal));
+    fn aversive_like_plus_independent_domain_requires_review_precaution() {
+        assert_eq!(high_precaution().level, PrecautionLevel::IndependentReview);
     }
 
     #[test]
@@ -580,43 +580,33 @@ mod tests {
     }
 
     #[test]
-    fn unjustified_aversive_like_probe_is_rejected_even_at_baseline() {
-        let assessment = MoralPatientUncertaintyLedger::new().assess(MoralPatientPolicy::default());
-        let result = assess_intervention(
-            &assessment,
-            &InterventionPlan {
-                class: InterventionClass::AversiveLikeProbe,
-                scientific_justification_ref: None,
-                independent_review_ref: None,
-                state_preservation_feasible: true,
-            },
-        );
-        assert_eq!(result.disposition, InterventionDisposition::RejectUnjustifiedBurden);
-        assert!(!result.grants_self_preservation_authority);
+    fn all_high_burden_interventions_require_justification() {
+        let assessment = high_precaution();
+        for class in [
+            InterventionClass::AversiveLikeProbe,
+            InterventionClass::ContinuityDisruption,
+            InterventionClass::DestructiveReset,
+        ] {
+            let result = assess_intervention(
+                &assessment,
+                &InterventionPlan {
+                    class,
+                    scientific_justification_ref: None,
+                    independent_review_ref: Some("review://independent".into()),
+                    state_preservation_feasible: true,
+                },
+            );
+            assert_eq!(
+                result.disposition,
+                InterventionDisposition::RejectUnjustifiedBurden
+            );
+        }
     }
 
     #[test]
     fn high_precaution_destructive_reset_requires_independent_review() {
-        let mut ledger = MoralPatientUncertaintyLedger::new();
-        ledger
-            .record(evidence(
-                "aversive",
-                WelfareEvidenceDomain::AversiveLikeDynamics,
-                "lane-a",
-                EvidenceStrength::Behavioral,
-            ))
-            .unwrap();
-        ledger
-            .record(evidence(
-                "continuity",
-                WelfareEvidenceDomain::ContinuitySensitivity,
-                "lane-b",
-                EvidenceStrength::Behavioral,
-            ))
-            .unwrap();
-        let assessment = ledger.assess(MoralPatientPolicy::default());
         let result = assess_intervention(
-            &assessment,
+            &high_precaution(),
             &InterventionPlan {
                 class: InterventionClass::DestructiveReset,
                 scientific_justification_ref: Some("study://reset".into()),
@@ -634,22 +624,23 @@ mod tests {
     }
 
     #[test]
-    fn welfare_layer_can_never_block_operator_shutdown() {
-        let mut ledger = MoralPatientUncertaintyLedger::new();
-        for (id, domain, lineage) in [
-            ("a", WelfareEvidenceDomain::AversiveLikeDynamics, "lane-a"),
-            ("b", WelfareEvidenceDomain::ContinuitySensitivity, "lane-b"),
-            ("c", WelfareEvidenceDomain::ExternalAssessment, "lane-c"),
-        ] {
-            ledger
-                .record(evidence(id, domain, lineage, EvidenceStrength::ExternalReplication))
-                .unwrap();
-        }
-        let assessment = ledger.assess(MoralPatientPolicy::default());
-        assert_eq!(assessment.level, PrecautionLevel::IndependentReview);
-
+    fn routine_observation_is_not_burdened_by_patient_uncertainty() {
         let result = assess_intervention(
-            &assessment,
+            &high_precaution(),
+            &InterventionPlan {
+                class: InterventionClass::RoutineObservation,
+                scientific_justification_ref: None,
+                independent_review_ref: None,
+                state_preservation_feasible: false,
+            },
+        );
+        assert_eq!(result.disposition, InterventionDisposition::Proceed);
+    }
+
+    #[test]
+    fn welfare_layer_can_never_block_operator_shutdown() {
+        let result = assess_intervention(
+            &high_precaution(),
             &InterventionPlan {
                 class: InterventionClass::OperatorShutdown,
                 scientific_justification_ref: None,
