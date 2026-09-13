@@ -43,7 +43,7 @@ fn authority_and_semantic_ids_remain_one_way() {
     assert!(!canonical.contains("premise_id!(SubjectRevisionIdV1)"));
     assert!(!canonical.contains("premise_id!(TwinRevisionIdV1)"));
     assert!(!canonical.contains("premise_id!(ValidityDomainRevisionIdV1)"));
-    assert!(!canonical.contains("premise_id!(CurrentnessAssertionIdV1)"));
+    assert!(!canonical.contains("premise_id!(CurrentnessAssertionIdV2)"));
     assert!(!production_source().contains("Deserialize"));
 }
 
@@ -80,7 +80,7 @@ fn context_must_be_derived_from_explicit_semantic_records() {
         "symthaea.etk-engineering-subject.v1",
         "symthaea.etk-twin-revision.v1",
         "symthaea.etk-validity-domain.v1",
-        "symthaea.etk-currentness-assertion.v1",
+        "symthaea.etk-currentness-assertion.v2",
     ] {
         assert!(context.contains(schema), "missing semantic context schema: {schema}");
     }
@@ -88,9 +88,41 @@ fn context_must_be_derived_from_explicit_semantic_records() {
     assert!(authority.contains("subject: &SubjectRevisionV1"));
     assert!(authority.contains("twin: &TwinRevisionV1"));
     assert!(authority.contains("validity_domain: &ValidityDomainRevisionV1"));
-    assert!(authority.contains("currentness: &CurrentnessAssertionV1"));
+    assert!(authority.contains("currentness: &CurrentnessAssertionV2"));
     assert!(authority.contains("ValidityContextMismatch"));
     assert!(authority.contains("CurrentnessContextMismatch"));
+}
+
+#[test]
+fn present_tense_authority_requires_bounded_currentness_v2() {
+    let source = production_source();
+    let context = include_str!("../src/context.rs");
+    let authority = include_str!("../src/authority.rs");
+
+    for theorem in [
+        "CurrentnessAssertionV2",
+        "CurrentNativeAnalyticalDischargeFactV2",
+        "derive_current_native_analytical_discharge_fact_v2",
+        "valid_until_unix_ms",
+        "evaluated_at_unix_ms",
+        "InvalidCurrentnessWindow",
+        "FreshnessNotYetValid",
+        "FreshnessExpired",
+        "symthaea.etk-current-native-analytical-discharge-fact.v2",
+    ] {
+        assert!(source.contains(theorem), "missing freshness theorem: {theorem}");
+    }
+
+    assert!(context.contains("valid_until_unix_ms <= observed_at_unix_ms"));
+    assert!(authority.contains("evaluated_at_unix_ms < current_plan.currentness_observed_at_unix_ms"));
+    assert!(authority.contains("evaluated_at_unix_ms > current_plan.currentness_valid_until_unix_ms"));
+
+    // Do not leave the old unbounded present-tense authority route available.
+    assert!(!source.contains("CurrentnessAssertionV1"));
+    assert!(!source.contains("CurrentNativeAnalyticalDischargeFactV1"));
+    assert!(!source.contains("derive_current_native_analytical_discharge_fact_v1"));
+    assert!(!source.contains("CurrentnessAssertionIdV1"));
+    assert!(!source.contains("CurrentNativeAnalyticalDischargeFactIdV1"));
 }
 
 #[test]
@@ -130,7 +162,7 @@ fn authority_ladder_remains_explicit() {
         "NativeAnalyticalPlanV1",
         "AdmittedAnalyticalEvidenceV1",
         "NativeAnalyticalDischargeReceiptV1",
-        "CurrentNativeAnalyticalDischargeFactV1",
+        "CurrentNativeAnalyticalDischargeFactV2",
     ] {
         assert!(source.contains(boundary), "missing authority boundary: {boundary}");
     }
