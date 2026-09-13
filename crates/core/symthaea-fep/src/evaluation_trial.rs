@@ -12,6 +12,8 @@
 //! This type contains a trainable session internally only as an implementation
 //! detail. It exposes no session/agent accessor and no learning method.
 
+use std::fmt;
+
 use crate::prediction_session::{
     FepEvaluationSnapshot, FepPredictionSession, FepPredictionSessionError,
 };
@@ -25,10 +27,20 @@ pub const FEP_EVALUATION_TRIAL_REVISION: &str = "symthaea-fep-evaluation-trial-v
 /// The value is deliberately not `Clone`. [`predict_once`](Self::predict_once)
 /// consumes it, so one trial cannot carry transient inference state into a
 /// second evaluated world.
-#[derive(Debug)]
 pub struct FepEvaluationTrial {
     session: FepPredictionSession,
     snapshot_replay_digest: u64,
+}
+
+/// Deliberately redacted: formatting an evaluation capability must not dump the
+/// private trainable session or learned model state into logs.
+impl fmt::Debug for FepEvaluationTrial {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FepEvaluationTrial")
+            .field("revision", &FEP_EVALUATION_TRIAL_REVISION)
+            .field("snapshot_replay_digest", &self.snapshot_replay_digest)
+            .finish_non_exhaustive()
+    }
 }
 
 impl FepEvaluationTrial {
@@ -129,6 +141,17 @@ mod tests {
         let frozen = snapshot(4, 4);
         let trial = FepEvaluationTrial::from_snapshot(&frozen);
         assert_eq!(trial.snapshot_replay_digest(), frozen.replay_digest());
+    }
+
+    #[test]
+    fn debug_output_does_not_expose_private_session_state() {
+        let frozen = snapshot(4, 4);
+        let rendered = format!("{:?}", FepEvaluationTrial::from_snapshot(&frozen));
+        assert!(rendered.contains(FEP_EVALUATION_TRIAL_REVISION));
+        assert!(rendered.contains(&frozen.replay_digest().to_string()));
+        assert!(!rendered.contains("session"));
+        assert!(!rendered.contains("ActiveInferenceAgent"));
+        assert!(!rendered.contains("transition_matrices"));
     }
 
     #[test]
