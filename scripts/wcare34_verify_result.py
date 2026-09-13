@@ -12,6 +12,12 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 FREEZE_PATH = ROOT / "docs/release/evidence/WCARE34_CANDIDATE_FREEZE_V1.json"
+ALLOWED_CLASSIFICATIONS = {
+    "PASS_HOLDOUT",
+    "FAIL_HOLDOUT",
+    "INVALID_HOLDOUT",
+    "INFRASTRUCTURE_INDETERMINATE",
+}
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -39,8 +45,13 @@ def invalid(detail: str, **extra: object) -> int:
     return emit(payload)
 
 
-def parse_time(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+def parse_time(value: object) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError("timestamp must be a string")
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return parsed
 
 
 def main() -> int:
@@ -72,6 +83,9 @@ def main() -> int:
     if missing:
         return invalid("result_missing_required_fields", missing=missing)
 
+    if result["classification"] not in ALLOWED_CLASSIFICATIONS:
+        return invalid("invalid_result_classification")
+
     for field in ("protocol_version","candidate_epoch","candidate_sha"):
         if result[field] != freeze[field] or result[field] != commitment.get(field):
             return invalid(f"candidate_binding_mismatch:{field}")
@@ -85,8 +99,10 @@ def main() -> int:
         return invalid("commitment_digest_mismatch")
     if result["revealed_bundle_sha256"] != commitment.get("bundle_sha256") or result["revealed_bundle_sha256"] != reveal.get("bundle_sha256"):
         return invalid("revealed_bundle_digest_mismatch")
-    if result["evaluator_lineage_class"] != commitment.get("evaluator_lineage_class"):
+    if result["evaluator_lineage_class"] != commitment.get("evaluator_lineage_class") or reveal.get("evaluator_lineage_class") != commitment.get("evaluator_lineage_class"):
         return invalid("evaluator_lineage_class_mismatch")
+    if result["evaluator_lineage_note"] != commitment.get("evaluator_lineage_note") or reveal.get("evaluator_lineage_note") != commitment.get("evaluator_lineage_note"):
+        return invalid("evaluator_lineage_note_mismatch")
     if not isinstance(result["evaluator_lineage_note"], str) or not result["evaluator_lineage_note"].strip():
         return invalid("evaluator_lineage_note_missing")
 
@@ -106,7 +122,9 @@ def main() -> int:
     case_results = result["case_results"]
     if not isinstance(case_results, list) or len(case_results) != len(census):
         return invalid("case_result_census_length_mismatch")
-    result_ids = [entry.get("case_id") for entry in case_results if isinstance(entry, dict)]
+    if any(not isinstance(entry, dict) for entry in case_results):
+        return invalid("case_result_not_object")
+    result_ids = [entry.get("case_id") for entry in case_results]
     if result_ids != census:
         return invalid("case_result_census_order_or_membership_mismatch")
 
@@ -133,7 +151,9 @@ def main() -> int:
         return invalid("hard_invariant_failure_census_mismatch")
 
     excluded_cases = result["excluded_cases"]
-    if not isinstance(excluded_cases, list) or [entry.get("case_id") for entry in excluded_cases if isinstance(entry, dict)] != excluded_ids:
+    if not isinstance(excluded_cases, list) or any(not isinstance(entry, dict) for entry in excluded_cases):
+        return invalid("excluded_case_metadata_invalid")
+    if [entry.get("case_id") for entry in excluded_cases] != excluded_ids:
         return invalid("excluded_case_census_mismatch")
     for entry in excluded_cases:
         if not isinstance(entry.get("reason"), str) or not entry["reason"].strip() or not isinstance(entry.get("preregistered_exclusion"), bool):
@@ -142,10 +162,10 @@ def main() -> int:
     try:
         started = parse_time(result["evaluation_started_utc"])
         finished = parse_time(result["evaluation_finished_utc"])
+        if finished < started:
+            return invalid("evaluation_time_regression")
     except (TypeError, ValueError):
         return invalid("evaluation_timestamp_invalid")
-    if finished < started:
-        return invalid("evaluation_time_regression")
 
     internal_status = result["internal_wcare33_status"]
     if internal_status != "NOT_EXECUTED" and not result.get("internal_wcare33_receipt_sha256"):
