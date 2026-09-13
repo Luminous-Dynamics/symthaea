@@ -62,7 +62,7 @@ jobs:
           } > target/assure-000-lock/MANIFEST.txt
           cat target/assure-000-lock/MANIFEST.txt
       - name: Upload reconciled lock evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: assure-000-lock-${{ github.event.pull_request.head.sha || github.sha }}
           path: target/assure-000-lock/
