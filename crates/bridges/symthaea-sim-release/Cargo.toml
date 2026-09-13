@@ -18,6 +18,8 @@ symthaea-sim-deployment = { path = "../symthaea-sim-deployment" }
 symthaea-sim-deployment-routing = { path = "../symthaea-sim-deployment-routing" }
 symthaea-sim-digest = { path = "../symthaea-sim-digest" }
 symthaea-sim-extension-routing = { path = "../symthaea-sim-extension-routing" }
+symthaea-sim-first-instruction-deployment = { path = "../symthaea-sim-first-instruction-deployment" }
+symthaea-sim-first-instruction-routing = { path = "../symthaea-sim-first-instruction-routing" }
 symthaea-sim-worker = { path = "../symthaea-sim-worker" }
 symthaea-sim-worker-image = { path = "../symthaea-sim-worker-image" }
 symthaea-sim-worker-containment = { path = "../symthaea-sim-worker-containment" }
@@ -29,3 +31,5 @@ serde_json.workspace = true
 symthaea-extension-host = { path = "../symthaea-extension-host" }
 symthaea-extension-registry = { path = "../../core/symthaea-extension-registry" }
 symthaea-extension-simulation-backend = { path = "../symthaea-extension-simulation-backend" }
+symthaea-sim-first-instruction-worker = { path = "../symthaea-sim-first-instruction-worker" }
+symthaea-sim-worker-cgroup = { path = "../symthaea-sim-worker-cgroup" }
