@@ -87,8 +87,8 @@ impl ClockGovernanceEvaluationEnvelopeV1 {
         self.consensus_unix_ms
     }
 
-    /// Require a second-granularity validity interval to cover every possible
-    /// true time in the trusted millisecond envelope.
+    /// Require a finite second-granularity validity interval to cover every
+    /// possible true time in the trusted millisecond envelope.
     ///
     /// This function answers only the temporal question. Lifecycle status,
     /// purpose/usage, signature validity, and other semantic authority must be
@@ -98,13 +98,36 @@ impl ClockGovernanceEvaluationEnvelopeV1 {
         not_before_unix_s: u64,
         not_after_unix_s: u64,
     ) -> Result<(), ClockGovernanceTimeError> {
-        if not_before_unix_s >= not_after_unix_s {
-            return Err(ClockGovernanceTimeError::InvalidValidityWindow);
-        }
+        self.require_valid_across_optional_seconds_window(
+            not_before_unix_s,
+            Some(not_after_unix_s),
+        )
+    }
+
+    /// Require a second-granularity validity interval, optionally open-ended,
+    /// to cover every possible true time in the trusted millisecond envelope.
+    ///
+    /// Open-ended validity is needed for governed key records whose lifetime is
+    /// intentionally unbounded above. This method still answers only temporal
+    /// validity; lifecycle status and usage remain the consuming layer's job.
+    pub fn require_valid_across_optional_seconds_window(
+        &self,
+        not_before_unix_s: u64,
+        not_after_unix_s: Option<u64>,
+    ) -> Result<(), ClockGovernanceTimeError> {
         let not_before_ms = seconds_to_millis(not_before_unix_s)?;
-        let not_after_ms = seconds_to_millis(not_after_unix_s)?;
-        if not_before_ms > self.lower_unix_ms || not_after_ms <= self.upper_unix_ms {
+        if not_before_ms > self.lower_unix_ms {
             return Err(ClockGovernanceTimeError::NotValidAcrossEnvelope);
+        }
+
+        if let Some(not_after_unix_s) = not_after_unix_s {
+            if not_before_unix_s >= not_after_unix_s {
+                return Err(ClockGovernanceTimeError::InvalidValidityWindow);
+            }
+            let not_after_ms = seconds_to_millis(not_after_unix_s)?;
+            if not_after_ms <= self.upper_unix_ms {
+                return Err(ClockGovernanceTimeError::NotValidAcrossEnvelope);
+            }
         }
         Ok(())
     }
