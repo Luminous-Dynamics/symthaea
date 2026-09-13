@@ -4,47 +4,32 @@
 //! Independent target-blind audit for the EUREKA-002 V2 schedule design.
 //!
 //! This deliberately does not call the primary `v2_construct` generator or its
-//! validators. It independently reproduces only the public schedule contract so
-//! the construct capsule is not solely responsible for validating itself.
+//! validators. It independently reproduces only the schedule construction and
+//! public dynamics while consuming the one canonical public schema. The
+//! construct capsule is therefore not solely responsible for validating itself,
+//! but the audit also cannot drift into a second family/action/range grammar.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-const SCHEDULE_REVISION: &str = "EUREKA.002.V2.CONSTRUCT_SCHEDULE.prototype.v4";
-const STATE_CARDINALITY: u16 = 32;
-const MODES: u8 = 4;
-const ACTIONS: u8 = 4;
+use super::v2_public_schema::{
+    V2_ACTION_COUNT, V2_COUNT_CARDINALITY, V2_OBSERVATION_DIM, V2_PUBLIC_MODES_PER_FAMILY,
+    V2PublicFamily, V2PublicState, public_schema_commitment,
+};
+
+const SCHEDULE_REVISION: &str = "EUREKA.002.V2.CONSTRUCT_SCHEDULE.prototype.v5";
+const MAX_POSITIVE_FIELD_DELTA: u16 = 2;
+const PRE_STATE_CARDINALITY: u16 = V2_COUNT_CARDINALITY - MAX_POSITIVE_FIELD_DELTA;
 const PER_STRATUM: usize = 30;
 const DEV_PER_STRATUM: usize = 16;
 const CAL_PER_STRATUM: usize = 8;
 const HELD_PER_STRATUM: usize = 4;
 const EXT_PER_STRATUM: usize = 2;
+const STRATA: usize =
+    (V2_PUBLIC_MODES_PER_FAMILY as usize) * (V2_ACTION_COUNT as usize);
+const ROWS_PER_FAMILY: usize = STRATA * PER_STRATUM;
 const HISTOGRAM_BINS: usize = 8;
 const MAX_HISTOGRAM_TV_BPS: u16 = 5_500;
 const MIN_OCCUPIED_BINS: usize = 5;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum AuditFamily {
-    PublicFlowV2,
-    PublicRelayV2,
-}
-
-impl AuditFamily {
-    const ALL: [Self; 2] = [Self::PublicFlowV2, Self::PublicRelayV2];
-
-    const fn tag(self) -> u8 {
-        match self {
-            Self::PublicFlowV2 => 1,
-            Self::PublicRelayV2 => 2,
-        }
-    }
-
-    fn context(self, mode: u8) -> i32 {
-        match self {
-            Self::PublicFlowV2 => i32::from(mode),
-            Self::PublicRelayV2 => 4 + i32::from(mode),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum AuditPartition {
@@ -72,22 +57,34 @@ impl AuditPartition {
         }
     }
 
-    const fn expected_rows_per_family(self) -> usize {
+    const fn expected_per_stratum(self) -> usize {
         match self {
-            Self::Development => 256,
-            Self::Calibration => 128,
-            Self::HeldOut => 64,
-            Self::External => 32,
+            Self::Development => DEV_PER_STRATUM,
+            Self::Calibration => CAL_PER_STRATUM,
+            Self::HeldOut => HELD_PER_STRATUM,
+            Self::External => EXT_PER_STRATUM,
         }
+    }
+
+    const fn expected_rows_per_family(self) -> usize {
+        self.expected_per_stratum() * STRATA
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct AuditState([i32; 4]);
+struct AuditState([i32; V2_OBSERVATION_DIM]);
+
+impl AuditState {
+    fn public(fields: [i32; V2_OBSERVATION_DIM]) -> Result<Self, AuditError> {
+        V2PublicState::new(fields)
+            .map(|_| Self(fields))
+            .map_err(|_| AuditError::PublicSchema)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AuditRow {
-    family: AuditFamily,
+    family: V2PublicFamily,
     partition: AuditPartition,
     mode: u8,
     action: u8,
@@ -97,6 +94,7 @@ struct AuditRow {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AuditError {
+    PublicSchema,
     StateGenerationBudget,
     WrongCardinality,
     StratumImbalance,
@@ -114,9 +112,13 @@ fn transfer_one(values: &mut [i32; 3], from: usize, to: usize) {
     }
 }
 
-fn transition(family: AuditFamily, pre: AuditState, action: u8) -> AuditState {
+fn transition(
+    family: V2PublicFamily,
+    pre: AuditState,
+    action: u8,
+) -> Result<AuditState, AuditError> {
     match family {
-        AuditFamily::PublicFlowV2 => {
+        V2PublicFamily::PublicFlowV2 => {
             let [x, y, z, mode] = pre.0;
             let mut values = [x, y, z];
             match action {
@@ -124,46 +126,47 @@ fn transition(family: AuditFamily, pre: AuditState, action: u8) -> AuditState {
                 1 => transfer_one(&mut values, 0, 1),
                 2 => transfer_one(&mut values, 1, 2),
                 3 => transfer_one(&mut values, 2, 0),
-                _ => unreachable!(),
+                _ => return Err(AuditError::PublicSchema),
             }
             match mode {
                 0 => {}
                 1 => values[0] = values[0].saturating_add(1),
                 2 => transfer_one(&mut values, 0, 1),
                 3 => transfer_one(&mut values, 1, 2),
-                _ => unreachable!(),
+                _ => return Err(AuditError::PublicSchema),
             }
-            AuditState([values[0], values[1], values[2], mode])
+            AuditState::public([values[0], values[1], values[2], mode])
         }
-        AuditFamily::PublicRelayV2 => {
+        V2PublicFamily::PublicRelayV2 => {
             let [mut x, mut y, mut z, rule] = pre.0;
             match action {
                 0 => {}
                 1 => x = x.saturating_add(1),
                 2 => y = y.saturating_add(1),
                 3 => z = z.saturating_add(1),
-                _ => unreachable!(),
+                _ => return Err(AuditError::PublicSchema),
             }
             match rule {
                 4 => {}
                 5 => y = x,
                 6 => z = y,
                 7 => x = z,
-                _ => unreachable!(),
+                _ => return Err(AuditError::PublicSchema),
             }
-            AuditState([x, y, z, rule])
+            AuditState::public([x, y, z, rule])
         }
     }
 }
 
 fn mixed_state_digest(
-    family: AuditFamily,
+    family: V2PublicFamily,
     mode: u8,
     action: u8,
     ordinal: u32,
 ) -> blake3::Hash {
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, SCHEDULE_REVISION.as_bytes());
+    bytes.extend_from_slice(&public_schema_commitment());
     encode_bytes(&mut bytes, b"public-state");
     bytes.push(family.tag());
     bytes.push(mode);
@@ -173,7 +176,7 @@ fn mixed_state_digest(
 }
 
 fn independent_states(
-    family: AuditFamily,
+    family: V2PublicFamily,
     mode: u8,
     action: u8,
 ) -> Result<Vec<[i32; 3]>, AuditError> {
@@ -183,9 +186,9 @@ fn independent_states(
         let digest = mixed_state_digest(family, mode, action, ordinal);
         let bytes = digest.as_bytes();
         let triple = [
-            i32::from(u16::from_le_bytes([bytes[0], bytes[1]]) % STATE_CARDINALITY),
-            i32::from(u16::from_le_bytes([bytes[2], bytes[3]]) % STATE_CARDINALITY),
-            i32::from(u16::from_le_bytes([bytes[4], bytes[5]]) % STATE_CARDINALITY),
+            i32::from(u16::from_le_bytes([bytes[0], bytes[1]]) % PRE_STATE_CARDINALITY),
+            i32::from(u16::from_le_bytes([bytes[2], bytes[3]]) % PRE_STATE_CARDINALITY),
+            i32::from(u16::from_le_bytes([bytes[4], bytes[5]]) % PRE_STATE_CARDINALITY),
         ];
         if seen.insert(triple) {
             states.push(triple);
@@ -197,40 +200,37 @@ fn independent_states(
     Err(AuditError::StateGenerationBudget)
 }
 
-fn independent_schedule(family: AuditFamily) -> Result<Vec<AuditRow>, AuditError> {
-    let mut rows = Vec::with_capacity(480);
-    for mode in 0..MODES {
-        for action in 0..ACTIONS {
+fn independent_schedule(family: V2PublicFamily) -> Result<Vec<AuditRow>, AuditError> {
+    let mut rows = Vec::with_capacity(ROWS_PER_FAMILY);
+    for mode in 0..V2_PUBLIC_MODES_PER_FAMILY {
+        let context = family.context(mode).map_err(|_| AuditError::PublicSchema)?;
+        for action in 0..V2_ACTION_COUNT {
             let states = independent_states(family, mode, action)?;
             for partition in AuditPartition::ALL {
                 for index in partition.range() {
                     let triple = states[index];
-                    let pre = AuditState([
-                        triple[0],
-                        triple[1],
-                        triple[2],
-                        family.context(mode),
-                    ]);
+                    let pre = AuditState::public([triple[0], triple[1], triple[2], context])?;
+                    let post = transition(family, pre, action)?;
                     rows.push(AuditRow {
                         family,
                         partition,
                         mode,
                         action,
                         pre,
-                        post: transition(family, pre, action),
+                        post,
                     });
                 }
             }
         }
     }
-    if rows.len() != 480 {
+    if rows.len() != ROWS_PER_FAMILY {
         return Err(AuditError::WrongCardinality);
     }
     Ok(rows)
 }
 
 fn validate_structure(rows: &[AuditRow]) -> Result<(), AuditError> {
-    if rows.len() != 480 {
+    if rows.len() != ROWS_PER_FAMILY {
         return Err(AuditError::WrongCardinality);
     }
     for partition in AuditPartition::ALL {
@@ -238,9 +238,9 @@ fn validate_structure(rows: &[AuditRow]) -> Result<(), AuditError> {
         if partition_rows != partition.expected_rows_per_family() {
             return Err(AuditError::WrongCardinality);
         }
-        let expected_per_stratum = partition.expected_rows_per_family() / 16;
-        for mode in 0..MODES {
-            for action in 0..ACTIONS {
+        let expected_per_stratum = partition.expected_per_stratum();
+        for mode in 0..V2_PUBLIC_MODES_PER_FAMILY {
+            for action in 0..V2_ACTION_COUNT {
                 let count = rows
                     .iter()
                     .filter(|row| {
@@ -257,10 +257,11 @@ fn validate_structure(rows: &[AuditRow]) -> Result<(), AuditError> {
 }
 
 fn validate_sufficiency_and_novelty(rows: &[AuditRow]) -> Result<(), AuditError> {
-    let mut outcome_by_key = BTreeMap::<(AuditFamily, AuditState, u8), AuditState>::new();
-    let mut partition_by_key = BTreeMap::<(AuditFamily, AuditState, u8), AuditPartition>::new();
+    let mut outcome_by_key = BTreeMap::<(V2PublicFamily, AuditState, u8), AuditState>::new();
+    let mut partition_by_key =
+        BTreeMap::<(V2PublicFamily, AuditState, u8), AuditPartition>::new();
     let mut partition_by_transition =
-        BTreeMap::<(AuditFamily, AuditState, u8, AuditState), AuditPartition>::new();
+        BTreeMap::<(V2PublicFamily, AuditState, u8, AuditState), AuditPartition>::new();
 
     for row in rows {
         let key = (row.family, row.pre, row.action);
@@ -287,9 +288,9 @@ fn validate_sufficiency_and_novelty(rows: &[AuditRow]) -> Result<(), AuditError>
 fn histogram(rows: &[AuditRow], partition: AuditPartition, field: usize) -> [u32; HISTOGRAM_BINS] {
     let mut bins = [0_u32; HISTOGRAM_BINS];
     for row in rows.iter().filter(|row| row.partition == partition) {
-        let value = row.pre.0[field].clamp(0, i32::from(STATE_CARDINALITY - 1));
+        let value = row.pre.0[field].clamp(0, i32::from(PRE_STATE_CARDINALITY - 1));
         let bin = usize::try_from(value).expect("nonnegative V2 state") * HISTOGRAM_BINS
-            / usize::from(STATE_CARDINALITY);
+            / usize::from(PRE_STATE_CARDINALITY);
         bins[bin.min(HISTOGRAM_BINS - 1)] += 1;
     }
     bins
@@ -340,10 +341,19 @@ fn validate_distribution(rows: &[AuditRow]) -> Result<(), AuditError> {
     Ok(())
 }
 
+fn validate_actual_public_domain(rows: &[AuditRow]) -> Result<(), AuditError> {
+    for row in rows {
+        V2PublicState::new(row.pre.0).map_err(|_| AuditError::PublicSchema)?;
+        V2PublicState::new(row.post.0).map_err(|_| AuditError::PublicSchema)?;
+    }
+    Ok(())
+}
+
 fn audit(rows: &[AuditRow]) -> Result<(), AuditError> {
     validate_structure(rows)?;
     validate_sufficiency_and_novelty(rows)?;
     validate_distribution(rows)?;
+    validate_actual_public_domain(rows)?;
     Ok(())
 }
 
@@ -357,18 +367,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn independent_generator_passes_structure_novelty_and_histogram_gates() {
-        for family in AuditFamily::ALL {
+    fn independent_generator_passes_structure_novelty_histogram_and_domain_gates() {
+        for family in V2PublicFamily::ALL {
             let rows = independent_schedule(family).unwrap();
             audit(&rows).unwrap();
         }
     }
 
     #[test]
+    fn independent_generator_enforces_the_two_count_transition_margin() {
+        assert_eq!(MAX_POSITIVE_FIELD_DELTA, 2);
+        assert_eq!(PRE_STATE_CARDINALITY, V2_COUNT_CARDINALITY - 2);
+        for family in V2PublicFamily::ALL {
+            let rows = independent_schedule(family).unwrap();
+            assert!(rows.iter().all(|row| V2PublicState::new(row.pre.0).is_ok()));
+            assert!(rows.iter().all(|row| V2PublicState::new(row.post.0).is_ok()));
+        }
+    }
+
+    #[test]
     fn partition_is_not_an_input_to_public_state_generation() {
-        for family in AuditFamily::ALL {
-            for mode in 0..MODES {
-                for action in 0..ACTIONS {
+        for family in V2PublicFamily::ALL {
+            for mode in 0..V2_PUBLIC_MODES_PER_FAMILY {
+                for action in 0..V2_ACTION_COUNT {
                     let states = independent_states(family, mode, action).unwrap();
                     assert_eq!(states.len(), PER_STRATUM);
                     let dev = &states[AuditPartition::Development.range()];
@@ -388,7 +409,7 @@ mod tests {
 
     #[test]
     fn replaying_a_development_key_into_heldout_is_rejected() {
-        let mut rows = independent_schedule(AuditFamily::PublicFlowV2).unwrap();
+        let mut rows = independent_schedule(V2PublicFamily::PublicFlowV2).unwrap();
         let dev = rows
             .iter()
             .find(|row| row.partition == AuditPartition::Development)
@@ -409,7 +430,7 @@ mod tests {
 
     #[test]
     fn ambiguous_public_dynamics_are_rejected() {
-        let mut rows = independent_schedule(AuditFamily::PublicRelayV2).unwrap();
+        let mut rows = independent_schedule(V2PublicFamily::PublicRelayV2).unwrap();
         let source = rows[0].clone();
         let index = 1;
         rows[index].family = source.family;
@@ -428,13 +449,23 @@ mod tests {
     }
 
     #[test]
+    fn actual_post_state_outside_public_schema_is_rejected() {
+        let mut rows = independent_schedule(V2PublicFamily::PublicFlowV2).unwrap();
+        rows[0].post.0[0] = i32::from(V2_COUNT_CARDINALITY);
+        assert_eq!(
+            validate_actual_public_domain(&rows),
+            Err(AuditError::PublicSchema)
+        );
+    }
+
+    #[test]
     fn obvious_partition_coding_is_rejected_by_histogram_gate() {
-        let mut rows = independent_schedule(AuditFamily::PublicFlowV2).unwrap();
+        let mut rows = independent_schedule(V2PublicFamily::PublicFlowV2).unwrap();
         for row in rows
             .iter_mut()
             .filter(|row| row.partition == AuditPartition::HeldOut)
         {
-            row.pre.0[0] = 31;
+            row.pre.0[0] = i32::from(PRE_STATE_CARDINALITY - 1);
         }
         assert!(matches!(
             validate_distribution(&rows),
@@ -445,7 +476,7 @@ mod tests {
 
     #[test]
     fn removing_one_heldout_row_breaks_cardinality() {
-        let mut rows = independent_schedule(AuditFamily::PublicRelayV2).unwrap();
+        let mut rows = independent_schedule(V2PublicFamily::PublicRelayV2).unwrap();
         let index = rows
             .iter()
             .position(|row| row.partition == AuditPartition::HeldOut)
