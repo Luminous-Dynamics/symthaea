@@ -28,13 +28,38 @@ fn git_blob(root: &Path, relative: &str) -> String {
 fn wcare39_exact_review_unit_is_frozen() {
     let root = repo_root();
     for (path, expected) in [
-        ("docs/release/evidence/WCARE39_EXECUTION_CAPSULE_PROTOCOL_V1.md", "c196824cba4afd25ec6e59d6215a33e24a97cbb3"),
-        ("docs/release/evidence/WCARE39_EXECUTION_CAPSULE_SCHEMA_V1.json", "0d3936654d947062664999bbb59063e9f24f1b24"),
-        ("docs/release/evidence/WCARE39_COMMAND_PLAN_SCHEMA_V1.json", "e2b0a027daaf3518a21e36b5f6c97952879ad470"),
-        ("docs/release/evidence/WCARE39_EXECUTION_STATUS_SCHEMA_V1.json", "35afbd3c4dbd7e5bd765509ffb1839b543c228af"),
-        ("scripts/wcare39_execution_capsule.py", "17c43109a59047052737b39a5d12465b2d824eb1"),
-        ("scripts/wcare39_selftest.py", "42f0bc87ffafe3c359af7774f50545b80a17c8fe"),
-        ("scripts/wcare39-integrity.sh", "3ed04e6f3f4f1aa2067a141584ff855e65479d97"),
+        (
+            "docs/release/evidence/WCARE39_EXECUTION_CAPSULE_PROTOCOL_V1.md",
+            "af313132a55160a2db2423efacf5cd8a2c88f605",
+        ),
+        (
+            "docs/release/evidence/WCARE39_EXECUTION_CAPSULE_SCHEMA_V1.json",
+            "0d3936654d947062664999bbb59063e9f24f1b24",
+        ),
+        (
+            "docs/release/evidence/WCARE39_COMMAND_PLAN_SCHEMA_V1.json",
+            "e2b0a027daaf3518a21e36b5f6c97952879ad470",
+        ),
+        (
+            "docs/release/evidence/WCARE39_EXECUTION_STATUS_SCHEMA_V1.json",
+            "35afbd3c4dbd7e5bd765509ffb1839b543c228af",
+        ),
+        (
+            "scripts/wcare39_execution_capsule.py",
+            "17c43109a59047052737b39a5d12465b2d824eb1",
+        ),
+        (
+            "scripts/wcare39-qualify.sh",
+            "5a86b1055b1d9415d09679ccc7d06aca94de30e2",
+        ),
+        (
+            "scripts/wcare39_selftest.py",
+            "dd32058e770cd9014beced33e8ba34805a029ca3",
+        ),
+        (
+            "scripts/wcare39-integrity.sh",
+            "2561c81233b2955b163d40af49b61576029c68e8",
+        ),
     ] {
         assert_eq!(git_blob(&root, path), expected, "WCARE-39 byte drift: {path}");
     }
@@ -62,6 +87,7 @@ fn wcare39_synthetic_campaign_executes() {
         "\"missing_subject_drift_observed\":true",
         "\"wcare37_lock_blocker_preserved\":true",
         "\"sensitive_literal_rejected\":true",
+        "\"qualifier_exit_contract_verified\":true",
     ] {
         assert!(stdout.contains(marker), "missing self-test marker {marker}: {stdout}");
     }
