@@ -17,7 +17,8 @@
 //! regulations, infer heterogeneous evidence verdicts, or assign scalar
 //! safety/trust scores. It provides exact, deterministic semantics for
 //! subjects, claims, evidence provenance, qualification strength, negative
-//! findings, claim ceilings, and explicit invalidation conditions.
+//! findings, claim ceilings, reproduction claims, and explicit invalidation
+//! conditions.
 
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -57,7 +58,7 @@ pub enum AssuranceError {
     ClaimCeilingExceeded,
     #[error("evidence does not satisfy the proposed support tier: {0}")]
     InsufficientEvidenceForTier(String),
-    #[error("reproduced support requires a verifier identity distinct from producer and executor")]
+    #[error("reproduction claim requires reproduction evidence with a verifier identity distinct from producer and executor")]
     MissingDistinctVerifier,
 }
 
@@ -250,7 +251,6 @@ pub enum SupportTier {
     Observed,
     CausallySupported,
     FunctionallySupported,
-    Reproduced,
 }
 
 impl SupportTier {
@@ -260,7 +260,21 @@ impl SupportTier {
             Self::Observed => "observed",
             Self::CausallySupported => "causally-supported",
             Self::FunctionallySupported => "functionally-supported",
-            Self::Reproduced => "reproduced",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ReproductionStatus {
+    NotClaimed,
+    ReproducedByDistinctVerifier,
+}
+
+impl ReproductionStatus {
+    fn canonical_name(self) -> &'static str {
+        match self {
+            Self::NotClaimed => "not-claimed",
+            Self::ReproducedByDistinctVerifier => "reproduced-by-distinct-verifier",
         }
     }
 }
@@ -464,25 +478,28 @@ pub struct QualificationResult {
     plan_digest: DigestSha256,
     evidence_bindings: Vec<(StableId, DigestSha256)>,
     outcome: QualificationOutcome,
+    reproduction_status: ReproductionStatus,
     claim_ceiling: SupportTier,
     invalidation_conditions: BTreeSet<StableId>,
 }
 
 impl QualificationResult {
-    /// Validates and binds a caller-supplied outcome to an exact subject,
-    /// claim, qualification plan, and evidence set.
+    /// Validates and binds caller-supplied result dimensions to an exact
+    /// subject, claim, qualification plan, and evidence set.
     ///
     /// This function does **not** infer or resolve a heterogeneous evidence
-    /// verdict. The caller supplies `proposed_outcome`; ASSURE-000 checks
-    /// identity bindings, claim ceilings, minimum positive-tier evidence
-    /// classes, and reproduction identity separation. Evidence interpretation
-    /// and contradiction-aware resolution belong to ASSURE-003.
+    /// verdict. The caller supplies both `proposed_outcome` and
+    /// `reproduction_status`; ASSURE-000 checks identity bindings, claim
+    /// ceilings, minimum positive-tier evidence classes, and the minimum
+    /// evidence needed to claim identity-distinct reproduction. Evidence
+    /// interpretation and contradiction-aware resolution belong to ASSURE-003.
     pub fn validate_and_bind(
         claim: &Claim,
         subject: &SubjectManifest,
         plan: &QualificationPlan,
         evidence: &[EvidenceArtifact],
         proposed_outcome: QualificationOutcome,
+        reproduction_status: ReproductionStatus,
     ) -> Result<Self, AssuranceError> {
         let subject_id = subject.subject_id();
         if claim.subject_id() != &subject_id {
@@ -520,14 +537,15 @@ impl QualificationResult {
                 return Err(AssuranceError::ClaimCeilingExceeded);
             }
             require_evidence_for_tier(tier, evidence)?;
-            if tier >= SupportTier::Reproduced
-                && !evidence.iter().any(|artifact| {
-                    artifact.kind == EvidenceKind::Reproduction
-                        && artifact.provenance.has_distinct_verifier_identity()
-                })
-            {
-                return Err(AssuranceError::MissingDistinctVerifier);
-            }
+        }
+
+        if reproduction_status == ReproductionStatus::ReproducedByDistinctVerifier
+            && !evidence.iter().any(|artifact| {
+                artifact.kind == EvidenceKind::Reproduction
+                    && artifact.provenance.has_distinct_verifier_identity()
+            })
+        {
+            return Err(AssuranceError::MissingDistinctVerifier);
         }
 
         Ok(Self {
@@ -537,6 +555,7 @@ impl QualificationResult {
             plan_digest: plan.digest(),
             evidence_bindings,
             outcome: proposed_outcome,
+            reproduction_status,
             claim_ceiling: plan.maximum_support,
             invalidation_conditions: plan.invalidation_conditions.clone(),
         })
@@ -544,6 +563,10 @@ impl QualificationResult {
 
     pub fn outcome(&self) -> &QualificationOutcome {
         &self.outcome
+    }
+
+    pub fn reproduction_status(&self) -> ReproductionStatus {
+        self.reproduction_status
     }
 
     pub fn canonical_bytes(&self) -> Vec<u8> {
@@ -558,6 +581,11 @@ impl QualificationResult {
             self.claim_ceiling.canonical_name(),
         );
         append_outcome(&mut out, &self.outcome);
+        field(
+            &mut out,
+            "reproduction-status",
+            self.reproduction_status.canonical_name(),
+        );
         field(
             &mut out,
             "evidence-count",
@@ -604,11 +632,6 @@ fn require_evidence_for_tier(
         SupportTier::CausallySupported => has(EvidenceKind::ControlledIntervention),
         SupportTier::FunctionallySupported => {
             has(EvidenceKind::ControlledIntervention) && has(EvidenceKind::FunctionalBenchmark)
-        }
-        SupportTier::Reproduced => {
-            has(EvidenceKind::ControlledIntervention)
-                && has(EvidenceKind::FunctionalBenchmark)
-                && has(EvidenceKind::Reproduction)
         }
     };
     if enough {
