@@ -29,7 +29,10 @@ impl Sha256Digest {
 
 impl fmt::Debug for Sha256Digest {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.debug_tuple("Sha256Digest").field(&self.to_hex()).finish()
+        formatter
+            .debug_tuple("Sha256Digest")
+            .field(&self.to_hex())
+            .finish()
     }
 }
 
@@ -55,18 +58,6 @@ pub(crate) fn domain_hash(domain: &[u8], payload: &[u8]) -> Sha256Digest {
     let mut hasher = Sha256::new();
     hasher.update(domain);
     hasher.update(payload);
-    Sha256Digest(hasher.finalize().into())
-}
-
-pub(crate) fn domain_hash_parts<'a>(
-    domain: &[u8],
-    parts: impl IntoIterator<Item = &'a [u8]>,
-) -> Sha256Digest {
-    let mut hasher = Sha256::new();
-    hasher.update(domain);
-    for part in parts {
-        hasher.update(part);
-    }
     Sha256Digest(hasher.finalize().into())
 }
 
