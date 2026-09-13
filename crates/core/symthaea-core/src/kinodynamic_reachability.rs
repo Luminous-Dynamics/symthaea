@@ -23,6 +23,8 @@ use crate::state_space::{EuclideanSpace, StateSpace};
 pub const MAX_SINGLE_INTEGRATOR_REPLAY_TOLERANCE: f64 = 1.0e-6;
 /// Default absolute state replay tolerance for the analytic V1 fixture.
 pub const DEFAULT_SINGLE_INTEGRATOR_REPLAY_TOLERANCE: f64 = 1.0e-12;
+/// Maximum number of control segments accepted by independent single-integrator replay.
+pub const MAX_SINGLE_INTEGRATOR_REPLAY_SEGMENTS: usize = 16_384;
 
 /// Explicit dynamics semantics for a model.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -473,11 +475,11 @@ impl DynamicsReplayReceipt1D {
     pub fn segment_count(&self) -> usize {
         self.segment_count
     }
-    /// Largest absolute declared-vs-predicted state residual.
+    /// Largest absolute declared-vs-recomputed state residual.
     pub fn maximum_state_residual(&self) -> f64 {
         self.maximum_state_residual
     }
-    /// Replayed terminal state.
+    /// Globally recomputed terminal state.
     pub fn final_state(&self) -> f64 {
         self.final_state
     }
@@ -732,6 +734,15 @@ pub fn replay_single_integrator_trajectory(
     }
 
     let segments = trajectory.segments();
+    if segments.len() > MAX_SINGLE_INTEGRATOR_REPLAY_SEGMENTS {
+        return Err(KinodynamicError::InvalidTrajectory {
+            reason: format!(
+                "trajectory has {} control segments, exceeding replay bound {}",
+                segments.len(),
+                MAX_SINGLE_INTEGRATOR_REPLAY_SEGMENTS
+            ),
+        });
+    }
     let first = segments.first().expect("trajectory constructor forbids empty segments");
     if first.start_time().to_bits() != 0.0_f64.to_bits()
         || first.start_state().to_bits() != query.initial_state().to_bits()
@@ -744,7 +755,8 @@ pub fn replay_single_integrator_trajectory(
 
     let tolerance = query.replay_policy().absolute_state_tolerance();
     let mut previous_end_time = 0.0_f64;
-    let mut previous_end_state = query.initial_state();
+    let mut previous_declared_end_state = query.initial_state();
+    let mut replay_state = query.initial_state();
     let mut maximum_residual = 0.0_f64;
 
     for (index, segment) in segments.iter().enumerate() {
@@ -766,9 +778,17 @@ pub fn replay_single_integrator_trajectory(
                 reason: format!("segment {index} does not begin at the exact preceding plant time"),
             });
         }
-        if segment.start_state().to_bits() != previous_end_state.to_bits() {
+        if segment.start_state().to_bits() != previous_declared_end_state.to_bits() {
             return Err(KinodynamicError::InvalidTrajectory {
                 reason: format!("segment {index} does not begin at the exact preceding declared state"),
+            });
+        }
+        let start_residual = checked_abs_diff(segment.start_state(), replay_state)?;
+        if start_residual > tolerance {
+            return Err(KinodynamicError::InvalidTrajectory {
+                reason: format!(
+                    "segment {index} declared start residual {start_residual} exceeds replay tolerance {tolerance} from the globally recomputed state"
+                ),
             });
         }
         if segment.end_time() <= segment.start_time() {
@@ -787,18 +807,19 @@ pub fn replay_single_integrator_trajectory(
             });
         }
         let duration = checked_sub(segment.end_time(), segment.start_time())?;
-        let predicted_end = checked_affine_terminal(segment.start_state(), segment.control(), duration)?;
-        let residual = checked_abs_diff(predicted_end, segment.end_state())?;
-        if residual > tolerance {
+        let predicted_end = checked_affine_terminal(replay_state, segment.control(), duration)?;
+        let end_residual = checked_abs_diff(predicted_end, segment.end_state())?;
+        if end_residual > tolerance {
             return Err(KinodynamicError::InvalidTrajectory {
                 reason: format!(
-                    "segment {index} dynamics residual {residual} exceeds replay tolerance {tolerance}"
+                    "segment {index} dynamics residual {end_residual} exceeds replay tolerance {tolerance} from the globally recomputed state"
                 ),
             });
         }
-        maximum_residual = maximum_residual.max(residual);
+        maximum_residual = maximum_residual.max(start_residual).max(end_residual);
         previous_end_time = segment.end_time();
-        previous_end_state = segment.end_state();
+        previous_declared_end_state = segment.end_state();
+        replay_state = predicted_end;
     }
 
     if previous_end_time.to_bits() != query.plant_time().horizon_seconds().to_bits() {
@@ -806,15 +827,26 @@ pub fn replay_single_integrator_trajectory(
             reason: "trajectory final timestamp must equal the exact plant/model horizon".to_string(),
         });
     }
-    let final_residual = checked_abs_diff(previous_end_state, query.target_state())?;
-    if final_residual > tolerance {
+    let declared_terminal_residual =
+        checked_abs_diff(previous_declared_end_state, query.target_state())?;
+    if declared_terminal_residual > tolerance {
         return Err(KinodynamicError::InvalidTrajectory {
             reason: format!(
-                "trajectory terminal state residual {final_residual} exceeds replay tolerance {tolerance}"
+                "declared trajectory terminal state residual {declared_terminal_residual} exceeds replay tolerance {tolerance}"
             ),
         });
     }
-    maximum_residual = maximum_residual.max(final_residual);
+    let replay_terminal_residual = checked_abs_diff(replay_state, query.target_state())?;
+    if replay_terminal_residual > tolerance {
+        return Err(KinodynamicError::InvalidTrajectory {
+            reason: format!(
+                "globally replayed terminal state residual {replay_terminal_residual} exceeds replay tolerance {tolerance}"
+            ),
+        });
+    }
+    maximum_residual = maximum_residual
+        .max(declared_terminal_residual)
+        .max(replay_terminal_residual);
 
     let validator_identity = dynamics_replay_validator_identity(query.replay_policy().identity());
     Ok(DynamicsReplayReceipt1D {
@@ -824,7 +856,7 @@ pub fn replay_single_integrator_trajectory(
         validator_identity,
         segment_count: segments.len(),
         maximum_state_residual: maximum_residual,
-        final_state: previous_end_state,
+        final_state: replay_state,
     })
 }
 
@@ -982,8 +1014,9 @@ fn hash_infeasibility_certificate(
 
 fn dynamics_replay_validator_identity(policy_identity: [u8; 32]) -> [u8; 32] {
     let mut hasher = Hasher::new();
-    hasher.update(b"symthaea-single-integrator-dynamics-replay-validator-v1\0");
+    hasher.update(b"symthaea-single-integrator-dynamics-replay-validator-v2\0");
     hasher.update(&policy_identity);
+    hasher.update(&(MAX_SINGLE_INTEGRATOR_REPLAY_SEGMENTS as u64).to_le_bytes());
     *hasher.finalize().as_bytes()
 }
 
