@@ -1,0 +1,76 @@
+name: LL-009AF Single-Scan RMS Stress Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ll009af-single-scan-rms-stress.yml'
+      - 'configs/lunar_transport/ll009af_site01_single_scan_rms_stress_v1.json'
+      - 'scripts/ll009af_support.py'
+      - 'scripts/ll009af_engine.py'
+      - 'scripts/materialize_ll009af_single_scan_rms_stress.py'
+      - 'scripts/materialize_ll009ae_rms_stress_sensitivity.py'
+      - 'scripts/materialize_ll009y_memberwise_hybrid_horizon.py'
+      - 'scripts/generate_ll009s_semantic_visibility.py'
+      - 'scripts/materialize_ll009w_distribution_free_rms.py'
+      - 'docs/research/LUNAR_LAUNCHER_LL009AF_SINGLE_SCAN_RMS_STRESS.md'
+  workflow_dispatch:
+
+concurrency:
+  group: ll009af-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  logic-qualification:
+    name: Exact AE/AF/Y logic qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned numerical dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==1.26.4'
+
+      - name: Record qualification environment
+        run: |
+          python --version
+          python - <<'PY'
+          import numpy
+          print('numpy', numpy.__version__)
+          PY
+
+      - name: Compile exact evidence scripts
+        run: |
+          python -m py_compile \
+            scripts/materialize_ll009w_distribution_free_rms.py \
+            scripts/materialize_ll009y_memberwise_hybrid_horizon.py \
+            scripts/generate_ll009s_semantic_visibility.py \
+            scripts/materialize_ll009ae_rms_stress_sensitivity.py \
+            scripts/ll009af_support.py \
+            scripts/ll009af_engine.py \
+            scripts/materialize_ll009af_single_scan_rms_stress.py
+
+      - name: Qualify inherited Y ordering theorem
+        run: python scripts/materialize_ll009y_memberwise_hybrid_horizon.py --self-test
+
+      - name: Qualify AE reference sensitivity logic
+        run: python scripts/materialize_ll009ae_rms_stress_sensitivity.py --self-test
+
+      - name: Qualify AF intervention and AE-equivalence theorem
+        run: python scripts/materialize_ll009af_single_scan_rms_stress.py --self-test
+
+      - name: Assert production policy remains fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path('configs/lunar_transport/ll009af_site01_single_scan_rms_stress_v1.json').read_text())
+          assert p['raster_source_passes_required'] == 1
+          assert p['persist_stressed_rasters'] is False
+          assert p['baseline_reproduction'] == 'byte_exact_y_and_s_at_lambda_1'
+          assert p['stress_source'] == 'inherit_exact_ll009ae_policy'
+          print('LL-009AF policy invariants: PASS')
+          PY
