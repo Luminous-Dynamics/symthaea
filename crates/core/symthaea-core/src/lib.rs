@@ -76,6 +76,9 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Exact fixed-coordinate reduction for bounded Euclidean sampling planners.
+#[allow(missing_docs)]
+pub mod fixed_axis_sampling;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
@@ -86,6 +89,8 @@ pub mod hdc;
 pub mod hyperspace_benchmark;
 /// Deterministic HYPERSPACE-001 H0-H6 intervention campaign.
 pub mod hyperspace_campaign;
+/// Exact fixed-w target-planner intervention for HYPERSPACE-001 H3.
+pub mod hyperspace_fixed_axis;
 /// Fail-closed implicit equality manifolds, local projection, and tangent bases.
 pub mod implicit_manifold;
 /// Qualified local charts, overlap witnesses, and partial finite-atlas evidence.
