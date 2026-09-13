@@ -31,7 +31,7 @@ const MAX_CLAIM_LEN: usize = 16 * 1024;
 pub enum AssuranceError {
     #[error("identifier must not be empty")]
     EmptyIdentifier,
-    #[error("identifier exceeds {MAX_ID_LEN} bytes")]
+    #[error("identifier exceeds 256 bytes")]
     IdentifierTooLong,
     #[error("identifier contains a control character")]
     InvalidIdentifier,
@@ -39,7 +39,7 @@ pub enum AssuranceError {
     InvalidDigest,
     #[error("claim statement must not be empty")]
     EmptyClaimStatement,
-    #[error("claim statement exceeds {MAX_CLAIM_LEN} bytes")]
+    #[error("claim statement exceeds 16384 bytes")]
     ClaimStatementTooLong,
     #[error("subject manifest requires at least one component commitment")]
     EmptySubject,
@@ -390,6 +390,24 @@ impl EvidenceArtifact {
     pub fn kind(&self) -> &EvidenceKind {
         &self.kind
     }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut out = String::from("symthaea-assurance-evidence-v1\n");
+        field(&mut out, "evidence-id", self.evidence_id.as_str());
+        field(&mut out, "subject", self.subject_id.as_str());
+        field(&mut out, "claim", self.claim_digest.as_str());
+        field(&mut out, "kind", &self.kind.canonical_name());
+        field(&mut out, "artifact", self.artifact_digest.as_str());
+        field(&mut out, "producer", self.provenance.producer.as_str());
+        field(&mut out, "executor", self.provenance.executor.as_str());
+        optional_id(&mut out, "verifier", self.provenance.verifier.as_ref());
+        optional_id(&mut out, "signer", self.provenance.signer.as_ref());
+        out.into_bytes()
+    }
+
+    pub fn digest(&self) -> DigestSha256 {
+        digest_canonical(&self.canonical_bytes())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -442,7 +460,7 @@ pub struct QualificationResult {
     subject_id: DigestSha256,
     plan_id: StableId,
     plan_digest: DigestSha256,
-    evidence_ids: Vec<StableId>,
+    evidence_bindings: Vec<(StableId, DigestSha256)>,
     outcome: QualificationOutcome,
     claim_ceiling: SupportTier,
     invalidation_conditions: BTreeSet<StableId>,
@@ -468,7 +486,7 @@ impl QualificationResult {
             return Err(AssuranceError::EmptyEvidence);
         }
 
-        let mut evidence_ids = Vec::with_capacity(evidence.len());
+        let mut evidence_bindings = Vec::with_capacity(evidence.len());
         let mut seen_ids = BTreeSet::new();
         for artifact in evidence {
             if artifact.subject_id != subject_id {
@@ -482,9 +500,9 @@ impl QualificationResult {
                     artifact.evidence_id.as_str().to_owned(),
                 ));
             }
-            evidence_ids.push(artifact.evidence_id.clone());
+            evidence_bindings.push((artifact.evidence_id.clone(), artifact.digest()));
         }
-        evidence_ids.sort();
+        evidence_bindings.sort_by(|left, right| left.0.cmp(&right.0));
 
         if let QualificationOutcome::Supported(tier) = &proposed_outcome {
             let tier = *tier;
@@ -510,7 +528,7 @@ impl QualificationResult {
             subject_id,
             plan_id: plan.plan_id.clone(),
             plan_digest: plan.digest(),
-            evidence_ids,
+            evidence_bindings,
             outcome: proposed_outcome,
             claim_ceiling: plan.maximum_support,
             invalidation_conditions: plan.invalidation_conditions.clone(),
@@ -529,9 +547,14 @@ impl QualificationResult {
         field(&mut out, "plan-digest", self.plan_digest.as_str());
         field(&mut out, "claim-ceiling", self.claim_ceiling.canonical_name());
         append_outcome(&mut out, &self.outcome);
-        field(&mut out, "evidence-count", &self.evidence_ids.len().to_string());
-        for evidence_id in &self.evidence_ids {
-            field(&mut out, "evidence", evidence_id.as_str());
+        field(
+            &mut out,
+            "evidence-count",
+            &self.evidence_bindings.len().to_string(),
+        );
+        for (evidence_id, evidence_digest) in &self.evidence_bindings {
+            field(&mut out, "evidence-id", evidence_id.as_str());
+            field(&mut out, "evidence-digest", evidence_digest.as_str());
         }
         field(
             &mut out,
