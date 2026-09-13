@@ -29,6 +29,7 @@ pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_covariance;
 pub mod lattice_qcd;
+pub mod lattice_static_potential;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -45,6 +46,11 @@ pub use decay_widths::{
 };
 pub use lattice_covariance::{
     CorrelatedConstantFit, CovarianceError, correlated_constant_fit, sample_covariance,
+};
+pub use lattice_static_potential::{
+    DeclaredPlateauFit, EFFECTIVE_POTENTIAL_ANALYSIS_ID, EffectivePotentialSeries,
+    PlateauWindow, StaticPotentialError, WilsonLoopTrajectory, blocked_effective_potential,
+    fit_declared_plateau,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
