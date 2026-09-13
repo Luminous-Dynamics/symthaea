@@ -18,7 +18,7 @@
 //! measurable crosstalk question rather than an implicit timestamp heuristic.
 
 use crate::continuous_hv::UnitaryRole;
-use crate::temporal_phasor::{TemporalAlgebraError, TemporalAxis};
+use crate::temporal_phasor::{TemporalAlgebraError, TemporalAxis, TemporalPhasor};
 use std::fmt;
 
 const SERIES_EPSILON: f64 = 1e-12;
@@ -167,22 +167,14 @@ impl ValidityIntervalMemory {
         self.check_axis_and_role(axis, key)?;
         self.check_role(value)?;
         let point = axis.at(checkpoint as f64 + 0.5)?;
-        let association = key.compose(value);
-
-        let mut sum = 0.0_f64;
-        for i in 0..self.dim() {
-            let sign = association.as_slice()[i] as f64;
-            sum += sign * (point.real()[i] * self.real[i] + point.imag()[i] * self.imag[i]);
-        }
-        let score = sum / self.dim() as f64;
-        if score.is_finite() {
-            Ok(score)
-        } else {
-            Err(ValidityMemoryError::NonFiniteScore)
-        }
+        self.score_candidate_at_point(key, value, &point)
     }
 
     /// Cleanup against a fixed candidate codebook and report the winning margin.
+    ///
+    /// The temporal query phasor is constructed exactly once per cleanup. Candidate
+    /// competition then reuses that point, avoiding repeated trigonometric work and
+    /// making query cost one `O(D)` temporal-role construction plus `O(CD)` cleanup.
     pub fn cleanup(
         &self,
         axis: &TemporalAxis,
@@ -195,12 +187,17 @@ impl ValidityIntervalMemory {
                 count: candidates.len(),
             });
         }
+        self.check_axis_and_role(axis, key)?;
+        for candidate in candidates {
+            self.check_role(candidate)?;
+        }
+        let point = axis.at(checkpoint as f64 + 0.5)?;
 
         let mut best_index = 0usize;
         let mut best_score = f64::NEG_INFINITY;
         let mut second_score = f64::NEG_INFINITY;
         for (index, candidate) in candidates.iter().enumerate() {
-            let score = self.score_candidate(axis, key, candidate, checkpoint)?;
+            let score = self.score_candidate_at_point(key, candidate, &point)?;
             if score > best_score {
                 second_score = best_score;
                 best_score = score;
@@ -216,6 +213,34 @@ impl ValidityIntervalMemory {
             second_score,
             margin: best_score - second_score,
         })
+    }
+
+    fn score_candidate_at_point(
+        &self,
+        key: &UnitaryRole,
+        value: &UnitaryRole,
+        point: &TemporalPhasor,
+    ) -> Result<f64, ValidityMemoryError> {
+        self.check_role(key)?;
+        self.check_role(value)?;
+        if point.dim() != self.dim() {
+            return Err(ValidityMemoryError::DimensionMismatch {
+                expected: self.dim(),
+                actual: point.dim(),
+            });
+        }
+
+        let mut sum = 0.0_f64;
+        for i in 0..self.dim() {
+            let sign = (key.as_slice()[i] * value.as_slice()[i]) as f64;
+            sum += sign * (point.real()[i] * self.real[i] + point.imag()[i] * self.imag[i]);
+        }
+        let score = sum / self.dim() as f64;
+        if score.is_finite() {
+            Ok(score)
+        } else {
+            Err(ValidityMemoryError::NonFiniteScore)
+        }
     }
 
     fn check_axis_and_role(
@@ -277,6 +302,35 @@ mod tests {
             assert_eq!(result.best_index, expected, "checkpoint={checkpoint}");
             assert!(result.margin > 0.0, "checkpoint={checkpoint}, result={result:?}");
         }
+    }
+
+    #[test]
+    fn cleanup_and_direct_candidate_scores_are_identical() {
+        let dim = 1024;
+        let axis = TemporalAxis::new(dim, 11).unwrap();
+        let key = UnitaryRole::new(dim, 12);
+        let values = roles(4, dim, 20);
+        let mut memory = ValidityIntervalMemory::new(dim).unwrap();
+        memory.write_span(&axis, &key, &values[0], 0, 7).unwrap();
+        memory.write_span(&axis, &key, &values[1], 7, 15).unwrap();
+
+        let checkpoint = 9;
+        let direct = values
+            .iter()
+            .map(|value| memory.score_candidate(&axis, &key, value, checkpoint).unwrap())
+            .collect::<Vec<_>>();
+        let cleanup = memory.cleanup(&axis, &key, &values, checkpoint).unwrap();
+        let mut ranked = direct.clone();
+        ranked.sort_by(|a, b| b.total_cmp(a));
+        let expected_best = direct
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.total_cmp(b.1))
+            .map(|(index, _)| index)
+            .unwrap();
+        assert_eq!(cleanup.best_index, expected_best);
+        assert_eq!(cleanup.best_score.to_bits(), ranked[0].to_bits());
+        assert_eq!(cleanup.second_score.to_bits(), ranked[1].to_bits());
     }
 
     #[test]
