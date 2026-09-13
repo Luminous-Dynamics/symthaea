@@ -20,7 +20,9 @@
 //!   theorem-bearing HLS transition while leaving diagonal HLS intact as an
 //!   ablation baseline.
 //! - [`StateTrackingBenchmark`] defines a model-agnostic irregular-time,
-//!   compositional, historical state-tracking task for architecture ablations.
+//!   compositional, historical state-tracking task.
+//! - [`StateTrackingCodec`] and [`TrackingPrototypeReadout`] provide shared
+//!   representation/readout contracts for initial frozen-reservoir ablations.
 //!
 //! The legacy [`HdcLtcUnifiedNeuron`] remains available so the algebraic research
 //! path can be qualified without silently changing production behavior.
@@ -33,6 +35,8 @@ pub mod invariant_context;
 pub mod network;
 pub mod neuron;
 pub mod state_tracking_benchmark;
+pub mod state_tracking_codec;
+pub mod state_tracking_readout;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use contextual_holographic_liquid::{ContextualHlsError, ContextualHolographicLiquidCell};
@@ -46,3 +50,5 @@ pub use state_tracking_benchmark::{
     StateTrackingBenchmarkError, TrackingAnswer, TrackingEvent, TrackingEventKind, TrackingQuery,
     TrackingQueryKind, TrackingScore,
 };
+pub use state_tracking_codec::{StateTrackingCodec, TrackingCodecError};
+pub use state_tracking_readout::{TrackingPrototypeReadout, TrackingReadoutError};
