@@ -160,6 +160,29 @@ jobs:
       - name: Self-test monotonic anchor composition
         run: python3 scripts/test_rsk_monotonic_anchor.py -v
 
+      - name: Self-test Xenia witness trust context
+        run: python3 docs/architecture/replicator-safety/reference/test_rsk_xenia_witness_trust.py -v
+
+      - name: Self-test Xenia witness context admission
+        run: python3 docs/architecture/replicator-safety/reference/test_rsk_xenia_witness_admission.py -v
+
+      - name: Verify Xenia witness reference suites remain wired
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow='.github/workflows/rsk-safety.yml'
+          required_commands=(
+            'python3 docs/architecture/replicator-safety/reference/test_rsk_xenia_witness_trust.py -v'
+            'python3 docs/architecture/replicator-safety/reference/test_rsk_xenia_witness_admission.py -v'
+          )
+          for command in "${required_commands[@]}"; do
+            if ! grep -Fq "${command}" "${workflow}"; then
+              echo "ERROR: focused RSK workflow lost required witness reference suite: ${command}"
+              exit 1
+            fi
+          done
+          echo 'Focused RSK workflow retains both Xenia witness reference suites.'
+
       - name: Keep RSK reference crates non-publishable until admission
         shell: bash
         run: |
