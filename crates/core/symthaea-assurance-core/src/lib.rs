@@ -58,7 +58,9 @@ pub enum AssuranceError {
     ClaimCeilingExceeded,
     #[error("evidence does not satisfy the proposed support tier: {0}")]
     InsufficientEvidenceForTier(String),
-    #[error("reproduction claim requires reproduction evidence with a verifier identity distinct from producer and executor")]
+    #[error(
+        "reproduction claim requires reproduction evidence with a verifier identity distinct from producer and executor"
+    )]
     MissingDistinctVerifier,
 }
 
