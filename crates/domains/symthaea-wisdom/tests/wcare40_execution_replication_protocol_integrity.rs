@@ -63,7 +63,7 @@ fn wcare40_exact_review_unit_is_frozen() {
         ),
         (
             "docs/release/evidence/WCARE40_REPLICATION_RESULT_SCHEMA_V1.json",
-            "7c2f752527504c453a25bd4b3f04c586e3f69d3a",
+            "8b3a3978518fb5782e6e134b362fb34c89bc81ee",
         ),
         (
             "scripts/wcare40_verify_replication.py",
@@ -83,7 +83,7 @@ fn wcare40_exact_review_unit_is_frozen() {
         ),
         (
             "scripts/wcare40-integrity.sh",
-            "4cdf9f301228678c495f2307e3c99f2738765a42",
+            "a4a8e825ff61cf274663c25dd3c8ba1109ba673a",
         ),
     ] {
         assert_eq!(git_blob(&root, path), expected, "WCARE-40 byte drift: {path}");
