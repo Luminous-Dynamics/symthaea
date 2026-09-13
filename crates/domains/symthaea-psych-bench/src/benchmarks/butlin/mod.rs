@@ -21,6 +21,8 @@ pub mod ae2_empirical_runner;
 #[cfg(feature = "symthaea-backend")]
 pub mod gwt1_causal_envelope;
 #[cfg(feature = "symthaea-backend")]
+pub mod gwt1_causal_promotion_capsule;
+#[cfg(feature = "symthaea-backend")]
 pub mod gwt1_causal_resolution;
 pub mod gwt1_evidence_envelope;
 #[cfg(feature = "symthaea-backend")]
@@ -39,6 +41,13 @@ pub use gwt1_causal_envelope::{
     Gwt1CausalIdentityFailureV1, build_gwt1_causal_envelope_v1,
     describe_gwt1_causal_artifact_v1, resolve_gwt1_causal_envelope_v1,
     run_gwt1_causal_enveloped_evidence_v1,
+};
+#[cfg(feature = "symthaea-backend")]
+pub use gwt1_causal_promotion_capsule::{
+    GWT1_CAUSAL_PROMOTION_CAPSULE_SCHEMA_V1, GWT1_CAUSAL_PROMOTION_POLICY_V1,
+    GWT1_CAUSAL_TRUSTED_BUILDER_WORKFLOW_V1, GWT1_CAUSAL_TRUSTED_REPOSITORY_V1,
+    Gwt1CausalPromotionCapsuleFailureV1, Gwt1CausalPromotionCapsuleV1,
+    map_gwt1_causal_outcome_to_eligibility_v1, validate_gwt1_causal_promotion_capsule_v1,
 };
 #[cfg(feature = "symthaea-backend")]
 pub use gwt1_causal_resolution::{
