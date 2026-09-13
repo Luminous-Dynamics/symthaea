@@ -24,6 +24,21 @@ fn git_blob(root: &Path, relative: &str) -> String {
         .to_owned()
 }
 
+fn run_python(root: &Path, script: &str) -> String {
+    let output = Command::new("python3")
+        .arg(script)
+        .current_dir(root)
+        .output()
+        .unwrap_or_else(|error| panic!("run {script}: {error}"));
+    assert!(
+        output.status.success(),
+        "{script} failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).expect("python self-test stdout is utf-8")
+}
+
 #[test]
 fn wcare44_candidate_review_unit_is_frozen() {
     let root = repo_root();
@@ -49,12 +64,20 @@ fn wcare44_candidate_review_unit_is_frozen() {
             "c5e0f52e34c4753028a00cf6891c8725d04e6b9a",
         ),
         (
+            "scripts/wcare44_candidate_qualify.py",
+            "e8f1e9d9eb9dc90710d37acefc19504bb6401e66",
+        ),
+        (
             "scripts/wcare44_candidate_selftest.py",
             "1449466d0f237871360904c0228f12e8f7af2231",
         ),
         (
+            "scripts/wcare44_frontdoor_selftest.py",
+            "4ecf05516dfb96d40450ca3e90e81679499bd812",
+        ),
+        (
             "scripts/wcare44-integrity.sh",
-            "241a262e67bdc6b5d7f7c2377e313b4dd918658f",
+            "802355a79d0d211b46274df7c2aefe9a10fc511f",
         ),
     ] {
         assert_eq!(git_blob(&root, path), expected, "WCARE-44 byte drift: {path}");
@@ -62,7 +85,31 @@ fn wcare44_candidate_review_unit_is_frozen() {
 }
 
 #[test]
-fn wcare44_candidate_campaign_executes_without_final_promotion() {
+fn wcare44_candidate_and_frontdoor_campaigns_execute() {
+    let root = repo_root();
+    let candidate = run_python(&root, "scripts/wcare44_candidate_selftest.py");
+    for marker in [
+        "\"classification\":\"PASS_WCARE44_CANDIDATE_SELFTEST\"",
+        "\"full_candidate_conjunction_without_final_promotion_verified\":true",
+        "\"runtime_authority_granted\":false",
+    ] {
+        assert!(candidate.contains(marker), "candidate campaign missing {marker}: {candidate}");
+    }
+
+    let frontdoor = run_python(&root, "scripts/wcare44_frontdoor_selftest.py");
+    for marker in [
+        "\"classification\":\"PASS_WCARE44_FRONTDOOR_SELFTEST\"",
+        "\"wrong_builder_verifier_identity_rejected\":true",
+        "\"wrong_temporal_verifier_identity_rejected\":true",
+        "\"final_promotion_remains_blocked\":true",
+        "\"runtime_authority_granted\":false",
+    ] {
+        assert!(frontdoor.contains(marker), "frontdoor campaign missing {marker}: {frontdoor}");
+    }
+}
+
+#[test]
+fn wcare44_integrity_gate_preserves_non_promotion() {
     let root = repo_root();
     let output = Command::new("bash")
         .arg("scripts/wcare44-integrity.sh")
