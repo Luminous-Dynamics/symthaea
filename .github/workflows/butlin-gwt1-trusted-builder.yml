@@ -1,0 +1,403 @@
+name: Butlin GWT-1 Trusted Evidence Builder
+
+on:
+  workflow_call:
+    inputs:
+      evidence_subject_sha:
+        description: Exact repository commit whose four production specialists are under qualification
+        required: true
+        type: string
+
+# Reusable workflow permissions are also constrained by the caller. The future
+# caller must grant the signing job these permissions; the candidate-executing
+# job below explicitly receives read-only contents authority only.
+permissions: {}
+
+jobs:
+  qualify:
+    name: Execute candidate without signing authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      has_evidence: ${{ steps.bundle.outputs.has_evidence }}
+      artifact_name: ${{ steps.bundle.outputs.artifact_name }}
+
+    steps:
+      - name: Checkout exact evidence subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.evidence_subject_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove trusted evaluator lineage
+        shell: bash
+        env:
+          EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
+          TRUSTED_BUILDER_SHA: ${{ job.workflow_sha }}
+          TRUSTED_BUILDER_REPOSITORY: ${{ job.workflow_repository }}
+          TRUSTED_BUILDER_PATH: ${{ job.workflow_file_path }}
+        run: |
+          set -euo pipefail
+
+          test "$TRUSTED_BUILDER_REPOSITORY" = "$GITHUB_REPOSITORY"
+          test "$TRUSTED_BUILDER_PATH" = ".github/workflows/butlin-gwt1-trusted-builder.yml"
+          [[ "$EVIDENCE_SUBJECT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$TRUSTED_BUILDER_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EVIDENCE_SUBJECT_SHA"
+
+          git cat-file -e "${TRUSTED_BUILDER_SHA}^{commit}" 2>/dev/null \
+            || git fetch --no-tags origin "$TRUSTED_BUILDER_SHA"
+          git merge-base --is-ancestor "$TRUSTED_BUILDER_SHA" "$EVIDENCE_SUBJECT_SHA"
+
+          # V1 scientific-lineage rule: everything except the four actual
+          # specialist implementations is frozen to the trusted builder
+          # revision. Evaluator, resolver, dependencies, lockfile, toolchain,
+          # workspace configuration and all unrelated production code therefore
+          # cannot drift inside a promotable V1 evidence run.
+          allowed_subject_paths=(
+            "src/cognitive_loop/managers/drive_manager.rs"
+            "src/cognitive_loop/managers/memory_manager.rs"
+            "src/cognitive_loop/managers/learning_manager.rs"
+            "src/cognitive_loop/managers/perception_manager.rs"
+          )
+
+          mapfile -t changed_paths < <(
+            git diff --name-only --diff-filter=ACDMRTUXB \
+              "$TRUSTED_BUILDER_SHA" "$EVIDENCE_SUBJECT_SHA"
+          )
+
+          for path in "${changed_paths[@]}"; do
+            allowed=false
+            for candidate in "${allowed_subject_paths[@]}"; do
+              if [[ "$path" == "$candidate" ]]; then
+                allowed=true
+                break
+              fi
+            done
+            if [[ "$allowed" != true ]]; then
+              echo "Evidence lineage drift outside frozen GWT-1 subject: $path" >&2
+              exit 1
+            fi
+          done
+
+          tracked_changes="$(git status --porcelain=v1 --untracked-files=no)"
+          test -z "$tracked_changes"
+
+          echo "Trusted builder SHA: $TRUSTED_BUILDER_SHA"
+          echo "Evidence subject SHA: $EVIDENCE_SUBJECT_SHA"
+          printf 'Allowed changed paths:\n'
+          printf '  %s\n' "${changed_paths[@]}"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-trusted-gwt1-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-trusted-gwt1-
+
+      # Candidate source executes only in this read-only job. It has no OIDC or
+      # attestation permission and never shares a job with the signing step.
+      - name: Execute direct GWT-1 qualification
+        shell: bash
+        env:
+          SYMTHAEA_GWT1_EVIDENCE_DIR: target/gwt1-evidence
+        run: |
+          set -euo pipefail
+          cargo run -p symthaea-psych-bench \
+            --features symthaea-backend \
+            --bin gwt1_qualification
+
+      - name: Package isolated candidate evidence
+        id: bundle
+        if: always()
+        shell: bash
+        env:
+          EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
+          TRUSTED_BUILDER_SHA: ${{ job.workflow_sha }}
+          TRUSTED_BUILDER_REF: ${{ job.workflow_ref }}
+        run: |
+          set -euo pipefail
+          source_dir="target/gwt1-evidence"
+          stage_root="target/gwt1-bundle"
+          stage_dir="${stage_root}/gwt1-evidence"
+
+          # Candidate execution is not allowed to mutate tracked source. Any
+          # such mutation voids the evidence rather than being packaged.
+          test "$(git rev-parse HEAD)" = "$EVIDENCE_SUBJECT_SHA"
+          tracked_changes="$(git status --porcelain=v1 --untracked-files=no)"
+          if [[ -n "$tracked_changes" ]]; then
+            echo "Candidate execution mutated tracked source; evidence void." >&2
+            exit 1
+          fi
+
+          expected=(
+            raw_observations.json
+            evidence_envelope.json
+            resolution.json
+            outcome.txt
+          )
+          for file in "${expected[@]}"; do
+            if [[ ! -f "${source_dir}/${file}" ]]; then
+              echo "Missing evidence file: ${file}"
+              echo "has_evidence=false" >> "$GITHUB_OUTPUT"
+              echo "artifact_name=" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          rm -rf "$stage_root"
+          mkdir -p "$stage_dir"
+          for file in "${expected[@]}"; do
+            install -m 0644 "${source_dir}/${file}" "${stage_dir}/${file}"
+          done
+
+          jq -n \
+            --arg evidence_subject_sha "$EVIDENCE_SUBJECT_SHA" \
+            --arg trusted_builder_sha "$TRUSTED_BUILDER_SHA" \
+            --arg trusted_builder_ref "$TRUSTED_BUILDER_REF" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '{
+              schema: "butlin-gwt1-trusted-builder-provenance-v1",
+              evidence_subject_sha: $evidence_subject_sha,
+              trusted_builder_sha: $trusted_builder_sha,
+              trusted_builder_ref: $trusted_builder_ref,
+              repository: $repository,
+              run_id: $run_id,
+              run_attempt: $run_attempt,
+              permitted_subject_paths: [
+                "src/cognitive_loop/managers/drive_manager.rs",
+                "src/cognitive_loop/managers/memory_manager.rs",
+                "src/cognitive_loop/managers/learning_manager.rs",
+                "src/cognitive_loop/managers/perception_manager.rs"
+              ]
+            }' > "${stage_dir}/workflow_provenance.json"
+
+          expected+=(workflow_provenance.json)
+          (
+            cd "$stage_dir"
+            sha256sum "${expected[@]}" > SHA256SUMS
+          )
+
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -C "$stage_root" \
+            -cf - \
+            gwt1-evidence \
+            | gzip -n > target/gwt1-evidence.tar.gz
+
+          (
+            cd target
+            sha256sum gwt1-evidence.tar.gz > gwt1-evidence.tar.gz.sha256
+          )
+
+          artifact_name="gwt1-intermediate-unattested-${EVIDENCE_SUBJECT_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "has_evidence=true" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=${artifact_name}" >> "$GITHUB_OUTPUT"
+
+      # This artifact is transport between privilege-separated jobs only. Its
+      # name is intentionally explicit that it is NOT authoritative evidence.
+      - name: Upload unattested intermediate bundle
+        if: always() && steps.bundle.outputs.has_evidence == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.bundle.outputs.artifact_name }}
+          path: |
+            target/gwt1-evidence.tar.gz
+            target/gwt1-evidence.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  attest:
+    name: Independently verify and attest evidence
+    needs: qualify
+    if: always() && needs.qualify.outputs.has_evidence == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Download unattested intermediate bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.qualify.outputs.artifact_name }}
+          path: ${{ runner.temp }}/gwt1-intermediate
+
+      # This checkout is the reusable workflow's own immutable revision, not
+      # the candidate evidence subject. All verifier code executed below comes
+      # from this trusted builder revision.
+      - name: Checkout trusted evaluator revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify archive transport and exact contents
+        shell: bash
+        env:
+          PACKAGE_DIR: ${{ runner.temp }}/gwt1-intermediate
+        run: |
+          set -euo pipefail
+          cd "$PACKAGE_DIR"
+          sha256sum -c gwt1-evidence.tar.gz.sha256
+
+          cat > expected-files.txt <<'EOF'
+          gwt1-evidence/
+          gwt1-evidence/SHA256SUMS
+          gwt1-evidence/evidence_envelope.json
+          gwt1-evidence/outcome.txt
+          gwt1-evidence/raw_observations.json
+          gwt1-evidence/resolution.json
+          gwt1-evidence/workflow_provenance.json
+          EOF
+
+          tar -tzf gwt1-evidence.tar.gz | LC_ALL=C sort > observed-files.txt
+          LC_ALL=C sort -o expected-files.txt expected-files.txt
+          diff -u expected-files.txt observed-files.txt
+
+          rm -rf extracted
+          mkdir extracted
+          tar --no-same-owner -xzf gwt1-evidence.tar.gz -C extracted
+          (
+            cd extracted/gwt1-evidence
+            sha256sum -c SHA256SUMS
+          )
+
+      - name: Install pinned Rust toolchain for trusted verifier
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Derive trusted expected source identity
+        id: identity
+        shell: bash
+        env:
+          EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
+          TRUSTED_BUILDER_SHA: ${{ job.workflow_sha }}
+          TRUSTED_BUILDER_REF: ${{ job.workflow_ref }}
+          PACKAGE_DIR: ${{ runner.temp }}/gwt1-intermediate
+        run: |
+          set -euo pipefail
+          git cat-file -e "${EVIDENCE_SUBJECT_SHA}^{commit}" 2>/dev/null \
+            || git fetch --no-tags origin "$EVIDENCE_SUBJECT_SHA"
+
+          source_tree_sha="$(git rev-parse "${EVIDENCE_SUBJECT_SHA}^{tree}")"
+          drive_blob="$(git rev-parse "${EVIDENCE_SUBJECT_SHA}:src/cognitive_loop/managers/drive_manager.rs")"
+          memory_blob="$(git rev-parse "${EVIDENCE_SUBJECT_SHA}:src/cognitive_loop/managers/memory_manager.rs")"
+          learning_blob="$(git rev-parse "${EVIDENCE_SUBJECT_SHA}:src/cognitive_loop/managers/learning_manager.rs")"
+          perception_blob="$(git rev-parse "${EVIDENCE_SUBJECT_SHA}:src/cognitive_loop/managers/perception_manager.rs")"
+
+          identity_file="$RUNNER_TEMP/gwt1-expected-source-identity.json"
+          jq -n \
+            --arg source_commit_sha "$EVIDENCE_SUBJECT_SHA" \
+            --arg source_tree_sha "$source_tree_sha" \
+            --arg drive_blob "$drive_blob" \
+            --arg memory_blob "$memory_blob" \
+            --arg learning_blob "$learning_blob" \
+            --arg perception_blob "$perception_blob" \
+            '{
+              source_commit_sha: $source_commit_sha,
+              source_tree_sha: $source_tree_sha,
+              specialist_blob_shas: {
+                drive_manager: $drive_blob,
+                memory_manager: $memory_blob,
+                learning_manager: $learning_blob,
+                perception_manager: $perception_blob
+              }
+            }' > "$identity_file"
+
+          rustc --version --verbose > "$RUNNER_TEMP/gwt1-expected-toolchain.txt"
+
+          provenance="${PACKAGE_DIR}/extracted/gwt1-evidence/workflow_provenance.json"
+          jq -e \
+            --arg evidence_subject_sha "$EVIDENCE_SUBJECT_SHA" \
+            --arg trusted_builder_sha "$TRUSTED_BUILDER_SHA" \
+            --arg trusted_builder_ref "$TRUSTED_BUILDER_REF" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '.schema == "butlin-gwt1-trusted-builder-provenance-v1"
+              and .evidence_subject_sha == $evidence_subject_sha
+              and .trusted_builder_sha == $trusted_builder_sha
+              and .trusted_builder_ref == $trusted_builder_ref
+              and .repository == $repository
+              and .run_id == $run_id
+              and .run_attempt == $run_attempt' \
+            "$provenance" >/dev/null
+
+          echo "identity_file=$identity_file" >> "$GITHUB_OUTPUT"
+          echo "toolchain_file=$RUNNER_TEMP/gwt1-expected-toolchain.txt" >> "$GITHUB_OUTPUT"
+
+      # No candidate code executes in this job. The verifier binary is built
+      # from job.workflow_sha and only parses/recomputes the persisted evidence.
+      - name: Recompute evidence with trusted verifier
+        shell: bash
+        env:
+          SYMTHAEA_GWT1_EVIDENCE_DIR: ${{ runner.temp }}/gwt1-intermediate/extracted/gwt1-evidence
+          EXPECTED_GWT1_SOURCE_IDENTITY: ${{ steps.identity.outputs.identity_file }}
+          EXPECTED_GWT1_TOOLCHAIN: ${{ steps.identity.outputs.toolchain_file }}
+          EXPECTED_GWT1_EXECUTION_RUN_ID: ${{ github.run_id }}/${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          cargo run -p symthaea-psych-bench --bin gwt1_verify_evidence
+
+      - name: Generate trusted GitHub build-provenance attestation
+        id: attest
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ runner.temp }}/gwt1-intermediate/gwt1-evidence.tar.gz
+
+      - name: Verify and preserve trusted attestation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_DIR: ${{ runner.temp }}/gwt1-intermediate
+          ATTESTATION_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          TRUSTED_BUILDER_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$PACKAGE_DIR/attestation"
+          test -f "$ATTESTATION_BUNDLE"
+          cp "$ATTESTATION_BUNDLE" "$PACKAGE_DIR/attestation/attestation.json"
+
+          gh attestation verify "$PACKAGE_DIR/gwt1-evidence.tar.gz" \
+            --repo "$GITHUB_REPOSITORY" \
+            --bundle "$PACKAGE_DIR/attestation/attestation.json" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-trusted-builder.yml" \
+            --signer-digest "$TRUSTED_BUILDER_SHA" \
+            --deny-self-hosted-runners \
+            --format json \
+            > "$PACKAGE_DIR/attestation/verification.json"
+
+          sha256sum "$PACKAGE_DIR/attestation/attestation.json" \
+            > "$PACKAGE_DIR/attestation/attestation.json.sha256"
+
+      - name: Upload trusted attested evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gwt1-trusted-attested-${{ inputs.evidence_subject_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/gwt1-intermediate/gwt1-evidence.tar.gz
+            ${{ runner.temp }}/gwt1-intermediate/gwt1-evidence.tar.gz.sha256
+            ${{ runner.temp }}/gwt1-intermediate/attestation/
+          if-no-files-found: error
+          retention-days: 30
