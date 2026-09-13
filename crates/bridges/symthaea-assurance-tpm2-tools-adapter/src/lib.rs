@@ -18,6 +18,7 @@ pub use parser::{parse_nv_public, Tpm2NvPublicEvidence};
 #[cfg(target_os = "linux")]
 pub use system::SystemTpm2ToolsExecutor;
 
+const OBSERVATION_DIGEST_SCHEMA: &[u8] = b"symthaea-tpm2-nv-counter-observation-v1\0";
 const TPM_NV_HANDLE_PREFIX: u32 = 0x0100_0000;
 const TPM_NV_HANDLE_MASK: u32 = 0xff00_0000;
 pub const COUNTER_BYTES: usize = 8;
@@ -121,6 +122,27 @@ impl Tpm2NvCounterObservation {
             && self.public_evidence.validate(policy.nv_index)
             && valid_blake3_digest(&self.raw_counter_blake3)
             && !self.evidence_refs.is_empty()
+    }
+
+    pub fn observation_digest(&self) -> String {
+        let mut refs = self.evidence_refs.clone();
+        refs.sort();
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(OBSERVATION_DIGEST_SCHEMA);
+        push_field(&mut hasher, &self.adapter_id);
+        push_field(&mut hasher, &self.logical_store_id);
+        push_field(&mut hasher, &self.trust_store_ref);
+        push_field(&mut hasher, &self.counter_epoch);
+        push_field(&mut hasher, &format!("{:#x}", self.nv_index));
+        push_field(&mut hasher, &self.tcti);
+        push_field(&mut hasher, &self.counter_value.to_string());
+        push_field(&mut hasher, &self.observed_at_ms.to_string());
+        push_field(&mut hasher, &self.nvreadpublic_blake3);
+        push_field(&mut hasher, &self.nvread_blake3);
+        push_field(&mut hasher, &self.public_evidence.raw_public_output_blake3);
+        push_field(&mut hasher, &self.raw_counter_blake3);
+        for reference in refs { push_field(&mut hasher, &reference); }
+        format!("blake3:{}", hasher.finalize().to_hex())
     }
 
     pub const fn grants_physical_authority(&self) -> bool { false }
@@ -242,7 +264,7 @@ pub fn bind_observation_to_checkpoint(
     }
 
     let mut evidence_refs = context.evidence_refs.clone();
-    evidence_refs.push(format!("tpm2-counter:{}", observation.raw_counter_blake3));
+    evidence_refs.push(format!("tpm2-observation:{}", observation.observation_digest()));
     let checkpoint = TrustStoreCheckpoint {
         schema_version: "1".into(),
         checkpoint_id: context.checkpoint_id.clone(),
@@ -272,6 +294,11 @@ fn clean_success(run: &ToolExecution) -> Result<(), Tpm2AdapterError> {
     if run.exit_code != Some(0) { return Err(Tpm2AdapterError::ToolFailed); }
     if !run.stderr.is_empty() { return Err(Tpm2AdapterError::ToolEmittedStderr); }
     Ok(())
+}
+
+fn push_field(hasher: &mut blake3::Hasher, value: &str) {
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value.as_bytes());
 }
 
 pub(crate) fn blake3_digest(bytes: &[u8]) -> String {
