@@ -63,6 +63,9 @@
 
 /// Bounded winding/path-class witnesses for explicitly supported S1 and T2 spaces.
 pub mod bounded_topology;
+// MANIFOLD-006N N-A qualifies this crate-private kernel before any theorem consumes it.
+#[allow(dead_code)]
+mod certified_interval;
 /// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;

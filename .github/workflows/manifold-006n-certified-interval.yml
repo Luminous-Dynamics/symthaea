@@ -1,0 +1,200 @@
+name: MANIFOLD-006N Certified Interval Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/manifold-006n-certified-interval.yml'
+      - 'crates/core/symthaea-core/src/certified_interval.rs'
+      - 'crates/core/symthaea-core/src/lib.rs'
+      - 'scripts/qualification/manifold_006n_kernel_harness.rs'
+      - 'scripts/qualification/manifold_006n_kernel_oracle.py'
+      - 'crates/core/symthaea-core/tests/manifold_006c1_exact_oracle_vectors.rs'
+      - 'scripts/qualification/manifold_006c1_exact_oracle.py'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: f093487f6255d9fe070ecc58292130b6fec82e53
+  QUALIFIED_PARENT_ARTIFACT_SHA256: 0ef8561dfe6cf3c14bb75ea4967945f08782a252c9952a08900e0728ed85545a
+  QUALIFIED_PARENT_VECTOR_IDENTITY: 9a5c32e2aa9e61c95dea21e0445cf60fc4714a930d29066975f3e6c9ef092013
+
+jobs:
+  qualify:
+    name: Pre-migration certified interval kernel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          ref: ${{ env.SUBJECT_SHA }}
+          persist-credentials: false
+
+      - name: Bind exact N-A subject and qualified 006C1 parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/manifold-006n
+          {
+            echo "schema=symthaea.manifold-006n.environment.v1"
+            echo "phase=N-A-pre-migration-kernel-qualification"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "parent_sha=$(git rev-parse HEAD^)"
+            echo "qualified_parent_artifact_sha256=$QUALIFIED_PARENT_ARTIFACT_SHA256"
+            echo "qualified_parent_vector_identity=$QUALIFIED_PARENT_VECTOR_IDENTITY"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "runner_label=ubuntu-24.04"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+          } > artifacts/manifold-006n/environment.txt
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Extend environment capsule
+        run: |
+          set -euo pipefail
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "python=$(python3 --version 2>&1)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "kernel_source_sha256=$(sha256sum crates/core/symthaea-core/src/certified_interval.rs | awk '{print $1}')"
+            echo "kernel_harness_sha256=$(sha256sum scripts/qualification/manifold_006n_kernel_harness.rs | awk '{print $1}')"
+            echo "kernel_oracle_sha256=$(sha256sum scripts/qualification/manifold_006n_kernel_oracle.py | awk '{print $1}')"
+            echo "parent_oracle_sha256=$(sha256sum scripts/qualification/manifold_006c1_exact_oracle.py | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "image_os=${ImageOS:-unknown}"
+            echo "image_version=${ImageVersion:-unknown}"
+          } >> artifacts/manifold-006n/environment.txt
+
+      - name: Check exact core crate with staged private kernel
+        run: |
+          cargo check --locked -p symthaea-core --no-default-features
+
+      - name: Compile and run standalone kernel harness
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 scripts/qualification/manifold_006n_kernel_harness.rs \
+            -o artifacts/manifold-006n/kernel-harness
+          artifacts/manifold-006n/kernel-harness artifacts/manifold-006n/kernel-vectors.tsv
+          test -s artifacts/manifold-006n/kernel-vectors.tsv
+
+      - name: Run independent exact-rational kernel oracle
+        run: |
+          set -euo pipefail
+          python3 scripts/qualification/manifold_006n_kernel_oracle.py \
+            artifacts/manifold-006n/kernel-vectors.tsv \
+            artifacts/manifold-006n/kernel-oracle.json
+          test -s artifacts/manifold-006n/kernel-oracle.json
+
+      - name: Re-run qualified 006C1 theorem vector emitter unchanged
+        env:
+          MANIFOLD_006C1_VECTOR_PATH: ${{ github.workspace }}/artifacts/manifold-006n/parent-vectors.json
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-core --no-default-features \
+            --test manifold_006c1_exact_oracle_vectors
+          test -s artifacts/manifold-006n/parent-vectors.json
+
+      - name: Re-run independent 006C1 exact-rational oracle unchanged
+        run: |
+          set -euo pipefail
+          python3 scripts/qualification/manifold_006c1_exact_oracle.py \
+            artifacts/manifold-006n/parent-vectors.json \
+            artifacts/manifold-006n/parent-oracle.json
+          test -s artifacts/manifold-006n/parent-oracle.json
+
+      - name: Enforce parent semantic identity and oracle verdicts
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          kernel = json.loads(Path('artifacts/manifold-006n/kernel-oracle.json').read_text())
+          parent_vectors = json.loads(Path('artifacts/manifold-006n/parent-vectors.json').read_text())
+          parent_oracle = json.loads(Path('artifacts/manifold-006n/parent-oracle.json').read_text())
+          assert kernel['verdict'] == 'PASS'
+          assert kernel['production_runtime_authority'] is False
+          assert parent_vectors['vector_set_identity'] == os.environ['QUALIFIED_PARENT_VECTOR_IDENTITY']
+          assert parent_oracle['vector_set_identity'] == os.environ['QUALIFIED_PARENT_VECTOR_IDENTITY']
+          assert parent_oracle['verdict'] == 'PASS'
+          assert parent_oracle['promoted_positive_control_exactly_verified'] is True
+          PY
+
+      - name: Emit N-A qualification receipt
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          root = Path('artifacts/manifold-006n')
+          kernel_vectors = root.joinpath('kernel-vectors.tsv').read_bytes()
+          kernel_oracle_bytes = root.joinpath('kernel-oracle.json').read_bytes()
+          kernel_oracle = json.loads(kernel_oracle_bytes)
+          parent_vectors_bytes = root.joinpath('parent-vectors.json').read_bytes()
+          parent_vectors = json.loads(parent_vectors_bytes)
+          parent_oracle_bytes = root.joinpath('parent-oracle.json').read_bytes()
+          receipt = {
+              'schema': 'symthaea.manifold-006n.qualification.v1',
+              'phase': 'N-A-pre-migration-kernel-qualification',
+              'source_subject': os.environ['SUBJECT_SHA'].lower(),
+              'exact_parent': os.environ['BASE_SHA'].lower(),
+              'qualified_parent_artifact_sha256': os.environ['QUALIFIED_PARENT_ARTIFACT_SHA256'].lower(),
+              'core_check': 'PASS',
+              'standalone_kernel_harness': 'PASS',
+              'independent_kernel_exact_rational_oracle': 'PASS',
+              'kernel_vector_transport_sha256': hashlib.sha256(kernel_vectors).hexdigest(),
+              'kernel_vector_semantic_sha3_256': kernel_oracle['semantic_vector_sha3_256'],
+              'kernel_oracle_receipt_sha256': hashlib.sha256(kernel_oracle_bytes).hexdigest(),
+              'parent_theorem_vector_transport_sha256': hashlib.sha256(parent_vectors_bytes).hexdigest(),
+              'parent_theorem_vector_identity': parent_vectors['vector_set_identity'],
+              'parent_theorem_oracle_receipt_sha256': hashlib.sha256(parent_oracle_bytes).hexdigest(),
+              'parent_semantic_identity_unchanged': 'PASS',
+              'production_theorem_consumes_new_kernel': False,
+              'new_reachability_claim': False,
+              'claim_scope': 'pre-migration qualification of crate-private outward-certified binary64 interval kernel only',
+              'verdict': 'PASS',
+          }
+          root.joinpath('report.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          PY
+
+      - name: Hash qualification capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd artifacts/manifold-006n
+          rm -f kernel-harness
+          : > SHA256SUMS
+          for file in environment.txt kernel-vectors.tsv kernel-oracle.json parent-vectors.json parent-oracle.json report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Upload qualification capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: manifold-006n-certified-interval-${{ env.SUBJECT_SHA }}
+          path: artifacts/manifold-006n/
+          if-no-files-found: error
+          retention-days: 90
