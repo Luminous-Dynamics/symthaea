@@ -1,0 +1,135 @@
+name: Simulation Worker Cgroup V2
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-worker-cgroup/**"
+      - ".github/workflows/simulation-worker-cgroup-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  SYMTHAEA_CGROUP_V2_DELEGATED_ROOT: ${{ vars.SYMTHAEA_CGROUP_V2_DELEGATED_ROOT }}
+
+jobs:
+  cgroup-v2-lease:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 source subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          uname -a
+          test -r /sys/fs/cgroup/cgroup.controllers
+          cat /sys/fs/cgroup/cgroup.controllers
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-simulation-worker-cgroup-v2-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-worker-cgroup/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-worker-cgroup-v2-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-worker-cgroup-v2-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the cgroup-v2 graph."
+          else
+            cat simulation-worker-cgroup-v2-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-worker-cgroup-v2-cargo-lock-patch
+          path: simulation-worker-cgroup-v2-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-sim-worker-cgroup -- --check
+
+      - name: Check cgroup-v2 lease crate
+        run: cargo check --locked -p symthaea-sim-worker-cgroup --all-targets
+
+      - name: Test cgroup-v2 structural corpus
+        run: cargo test --locked -p symthaea-sim-worker-cgroup
+
+      - name: Strict Clippy cgroup-v2 lease crate
+        run: cargo clippy --locked -p symthaea-sim-worker-cgroup --all-targets -- -D warnings
+
+      - name: Execute explicit-root kernel placement probe when configured
+        shell: bash
+        run: |
+          if [[ -n "${SYMTHAEA_CGROUP_V2_DELEGATED_ROOT:-}" ]]; then
+            cargo run --locked -p symthaea-sim-worker-cgroup --bin symthaea-sim-cgroup-v2-probe \
+              | tee simulation-worker-cgroup-v2-kernel-probe.txt
+            grep -qx 'cgroup_v2_probe=pass' simulation-worker-cgroup-v2-kernel-probe.txt
+            echo 'kernel_probe=pass' | tee simulation-worker-cgroup-v2-kernel-status.txt
+          else
+            echo 'cgroup_v2_probe=not_run_no_explicit_resource_root' \
+              | tee simulation-worker-cgroup-v2-kernel-probe.txt
+            echo 'kernel_probe=not_established' \
+              | tee simulation-worker-cgroup-v2-kernel-status.txt
+          fi
+
+      - name: Record exact cgroup-v2 subject
+        run: |
+          kernel_probe="$(cut -d= -f2 simulation-worker-cgroup-v2-kernel-status.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "profile=symthaea.simulation.worker-cgroup.v2-v1"
+            echo "required_controllers=cpu,memory,pids"
+            echo "memory_limit_interface=memory.max"
+            echo "pid_limit_interface=pids.max"
+            echo "cpu_limit_interface=cpu.max"
+            echo "oom_group=required"
+            echo "placement_interface=cgroup.procs"
+            echo "fresh_leaf_required=true"
+            echo "root_and_leaf_device_inode_bound=true"
+            echo "serialized_evidence_recreates_authority=false"
+            echo "resource_root_source=explicit_host_configuration"
+            echo "delegation_origin_inferred_from_kernel=false"
+            echo "delegation_policy_attestation=not_established"
+            echo "kernel_probe=${kernel_probe}"
+            echo "supervisor_integration=not_established"
+            echo "atomic_from_first_instruction=not_established"
+            echo "resource_overlimit_adversarial_probe=not_established"
+            echo "rlimit_equivalence_claim=false"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-worker-cgroup-v2-receipt.txt
+
+      - name: Upload cgroup-v2 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-worker-cgroup-v2-evidence
+          path: |
+            simulation-worker-cgroup-v2-kernel-probe.txt
+            simulation-worker-cgroup-v2-kernel-status.txt
+            simulation-worker-cgroup-v2-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock

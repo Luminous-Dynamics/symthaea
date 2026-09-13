@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-sim-worker-cgroup"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Parent-owned cgroup v2 resource leases for Symthaea simulation workers"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[[bin]]
+name = "symthaea-sim-cgroup-v2-probe"
+path = "src/bin/symthaea-sim-cgroup-v2-probe.rs"
