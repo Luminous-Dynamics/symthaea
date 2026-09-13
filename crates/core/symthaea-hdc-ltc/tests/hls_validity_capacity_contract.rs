@@ -25,6 +25,21 @@ fn public_smoke_capacity_sweep_is_deterministic_and_accounted() {
         assert!(observation.accuracy.is_finite());
         assert!(observation.mean_margin.is_finite());
         assert!(observation.smallest_margin.is_finite());
+        assert!(observation.used_candidate_values <= observation.case.candidate_count);
+
+        let maximum_boundaries = observation
+            .spans_written
+            .saturating_sub(observation.case.key_count as u64);
+        assert!(observation.realized_semantic_changes <= maximum_boundaries);
+
+        for similarity in [
+            observation.max_abs_key_similarity,
+            observation.max_abs_candidate_similarity,
+            observation.max_abs_key_candidate_similarity,
+        ] {
+            assert!(similarity.is_finite());
+            assert!((0.0..=1.0).contains(&similarity));
+        }
     }
 }
 
