@@ -17,6 +17,7 @@ symthaea-extension-host = { path = "../symthaea-extension-host" }
 symthaea-extension-simulation-host = { path = "../symthaea-extension-simulation-host" }
 symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
 symthaea-sim-digest = { path = "../symthaea-sim-digest" }
+symthaea-sim-worker-cgroup = { path = "../symthaea-sim-worker-cgroup" }
 
 [[bin]]
 name = "symthaea-sim-worker"

@@ -3,19 +3,23 @@
 
 //! One-shot process boundary for simulation Component execution.
 //!
-//! This crate intentionally separates three claims:
+//! This crate intentionally separates four claims:
 //!
 //! 1. **wire correctness** — exact manifest bytes, Component bytes and one typed
 //!    request cross a length-bounded one-shot protocol;
 //! 2. **technical execution** — the child invokes `SimulationComponentHost` and
 //!    returns a technical result whose `SimulationEvidence` is still empty;
 //! 3. **process supervision** — on Linux, the parent applies conservative
-//!    rlimits, `PR_SET_NO_NEW_PRIVS`, an empty environment and a wall-clock kill.
+//!    rlimits, `PR_SET_NO_NEW_PRIVS`, an empty environment and a wall-clock kill;
+//! 4. **optional cgroup placement** — when an exact live cgroup-v2 lease is
+//!    supplied, the parent places and verifies the spawned PID before any
+//!    untrusted request-frame bytes are written to child stdin.
 //!
-//! This is not yet a complete hostile-code sandbox. In particular this tranche
-//! does not claim seccomp or network-namespace containment. Admission, signer
-//! trust, routing authority and engineering-evidence promotion remain outside
-//! the worker entirely.
+//! Cgroup placement after `spawn` is deliberately narrower than first-instruction
+//! containment. The exact qualified worker may execute trusted startup code before
+//! parent placement, but it cannot receive manifest/Component/request bytes until
+//! placement succeeds. Admission, signer trust, routing authority and engineering-
+//! evidence promotion remain outside the worker entirely.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
@@ -24,7 +28,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{self, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 use symthaea_extension_core::{ExtensionKind, ExtensionManifest, RuntimeKind};
@@ -34,15 +38,20 @@ use symthaea_extension_simulation_host::{
 };
 use symthaea_sim_bridge::{SimulationEvidence, SimulationRequest, SimulationResult};
 use symthaea_sim_digest::{canonical_output_sha256_v1, canonical_request_sha256_v1};
+use symthaea_sim_worker_cgroup::{CgroupV2Error, CgroupV2Evidence, CgroupV2Lease};
 use thiserror::Error;
 
 pub const WORKER_PROTOCOL_V1: &str = "symthaea.simulation.worker.v1";
 pub const SUPERVISOR_PROFILE_V1: &str = "symthaea.simulation.worker-supervisor.linux-rlimit-v1";
+pub const CGROUP_PLACEMENT_PROFILE_V1: &str =
+    "symthaea.simulation.worker-cgroup-placement.pre-input-v1";
 
 const REQUEST_MAGIC: &[u8; 8] = b"SYMWRQ01";
 const RESPONSE_MAGIC: &[u8; 8] = b"SYMWRS01";
 const FRAME_VERSION: u32 = 1;
 const MAX_WALL_TIME_MS: u64 = 24 * 60 * 60 * 1000;
+const CGROUP_PLACEMENT_DOMAIN_V1: &[u8] =
+    b"symthaea.simulation.worker-cgroup-placement.pre-input-v1\0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WorkerFrameLimits {
@@ -256,6 +265,51 @@ impl SupervisorLimits {
     }
 }
 
+/// Persistable observation that one exact worker PID was placed in one exact
+/// cgroup-v2 lease before the parent began writing the request frame.
+///
+/// This is evidence only. Deserializing it cannot move a process or recreate a
+/// live lease.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CgroupPlacementEvidence {
+    pub profile: String,
+    pub worker_pid: u32,
+    pub cgroup: CgroupV2Evidence,
+    pub placement_sha256: String,
+}
+
+impl CgroupPlacementEvidence {
+    fn new(worker_pid: u32, cgroup: CgroupV2Evidence) -> Result<Self, SupervisorError> {
+        if worker_pid == 0 {
+            return Err(SupervisorError::CgroupPlacementEvidenceInvalid);
+        }
+        cgroup.verify().map_err(SupervisorError::Cgroup)?;
+        let mut evidence = Self {
+            profile: CGROUP_PLACEMENT_PROFILE_V1.into(),
+            worker_pid,
+            cgroup,
+            placement_sha256: String::new(),
+        };
+        evidence.placement_sha256 = hex_digest(cgroup_placement_sha256_v1(&evidence));
+        evidence.verify()?;
+        Ok(evidence)
+    }
+
+    /// Verify internal structure/digests only. This does not re-establish that
+    /// the PID is currently alive or currently belongs to the cgroup.
+    pub fn verify(&self) -> Result<(), SupervisorError> {
+        if self.profile != CGROUP_PLACEMENT_PROFILE_V1 || self.worker_pid == 0 {
+            return Err(SupervisorError::CgroupPlacementEvidenceInvalid);
+        }
+        self.cgroup.verify().map_err(SupervisorError::Cgroup)?;
+        if self.placement_sha256 != hex_digest(cgroup_placement_sha256_v1(self)) {
+            return Err(SupervisorError::CgroupPlacementDigestMismatch);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct SupervisedWorker {
     executable: PathBuf,
@@ -295,7 +349,26 @@ impl SupervisedWorker {
         }
 
         #[cfg(target_os = "linux")]
-        self.execute_linux(manifest_bytes, component_bytes, request)
+        self.execute_linux(manifest_bytes, component_bytes, request, None)
+    }
+
+    /// Execute through one exact live cgroup-v2 lease. Placement and membership
+    /// verification complete before any untrusted frame bytes are written.
+    pub fn execute_in_cgroup(
+        &self,
+        manifest_bytes: &[u8],
+        component_bytes: &[u8],
+        request: &SimulationRequest,
+        cgroup: &CgroupV2Lease,
+    ) -> Result<SupervisedInvocation, SupervisorError> {
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = (manifest_bytes, component_bytes, request, cgroup);
+            return Err(SupervisorError::UnsupportedPlatform);
+        }
+
+        #[cfg(target_os = "linux")]
+        self.execute_linux(manifest_bytes, component_bytes, request, Some(cgroup))
     }
 
     #[cfg(target_os = "linux")]
@@ -304,6 +377,7 @@ impl SupervisedWorker {
         manifest_bytes: &[u8],
         component_bytes: &[u8],
         request: &SimulationRequest,
+        cgroup: Option<&CgroupV2Lease>,
     ) -> Result<SupervisedInvocation, SupervisorError> {
         self.limits.validate()?;
         let manifest: ExtensionManifest = serde_json::from_slice(manifest_bytes)
@@ -321,9 +395,9 @@ impl SupervisedWorker {
         let expected_request = canonical_request_sha256_v1(request)
             .map_err(|error| SupervisorError::Canonical(error.to_string()))?;
 
-        // Encode the bounded frame before spawning. The actual pipe write occurs
-        // on a separate thread so a child that never reads stdin cannot block
-        // the parent before wall-clock supervision begins.
+        // Encode before spawn, but do not write until after optional cgroup
+        // placement. A child that waits on stdin receives zero untrusted bytes
+        // outside the requested resource domain.
         let mut request_frame = Vec::new();
         write_request_frame(
             &mut request_frame,
@@ -342,9 +416,52 @@ impl SupervisedWorker {
         apply_linux_supervision(&mut command, self.limits);
 
         let mut child = command.spawn().map_err(SupervisorError::Spawn)?;
-        let mut stdin = child.stdin.take().ok_or(SupervisorError::MissingPipe("stdin"))?;
-        let stdout = child.stdout.take().ok_or(SupervisorError::MissingPipe("stdout"))?;
-        let stderr = child.stderr.take().ok_or(SupervisorError::MissingPipe("stderr"))?;
+        let cgroup_placement = if let Some(lease) = cgroup {
+            if let Err(error) = lease.place_pid(child.id()) {
+                terminate_child(&mut child);
+                return Err(SupervisorError::Cgroup(error));
+            }
+            let cgroup_evidence = match lease.evidence() {
+                Ok(evidence) => evidence,
+                Err(error) => {
+                    terminate_child(&mut child);
+                    return Err(SupervisorError::Cgroup(error));
+                }
+            };
+            match CgroupPlacementEvidence::new(child.id(), cgroup_evidence) {
+                Ok(evidence) => Some(evidence),
+                Err(error) => {
+                    terminate_child(&mut child);
+                    return Err(error);
+                }
+            }
+        } else {
+            None
+        };
+
+        // Taking pipe handles does not deliver data. The writer thread is
+        // deliberately created only after cgroup placement/evidence succeeds.
+        let mut stdin = match child.stdin.take() {
+            Some(pipe) => pipe,
+            None => {
+                terminate_child(&mut child);
+                return Err(SupervisorError::MissingPipe("stdin"));
+            }
+        };
+        let stdout = match child.stdout.take() {
+            Some(pipe) => pipe,
+            None => {
+                terminate_child(&mut child);
+                return Err(SupervisorError::MissingPipe("stdout"));
+            }
+        };
+        let stderr = match child.stderr.take() {
+            Some(pipe) => pipe,
+            None => {
+                terminate_child(&mut child);
+                return Err(SupervisorError::MissingPipe("stderr"));
+            }
+        };
 
         let input_writer = thread::spawn(move || -> io::Result<()> {
             stdin.write_all(&request_frame)?;
@@ -353,19 +470,24 @@ impl SupervisedWorker {
         });
         let stdout_limit = self.limits.max_stdout_bytes;
         let stderr_limit = self.limits.max_stderr_bytes;
-        let stdout_reader =
-            thread::spawn(move || read_limited(stdout, stdout_limit, "stdout"));
-        let stderr_reader =
-            thread::spawn(move || read_limited(stderr, stderr_limit, "stderr"));
+        let stdout_reader = thread::spawn(move || read_limited(stdout, stdout_limit, "stdout"));
+        let stderr_reader = thread::spawn(move || read_limited(stderr, stderr_limit, "stderr"));
 
         let deadline = Instant::now() + Duration::from_millis(self.limits.wall_time_ms);
         let status = loop {
-            if let Some(status) = child.try_wait().map_err(SupervisorError::Wait)? {
-                break status;
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) => {}
+                Err(error) => {
+                    terminate_child(&mut child);
+                    let _ = input_writer.join();
+                    let _ = stdout_reader.join();
+                    let _ = stderr_reader.join();
+                    return Err(SupervisorError::Wait(error));
+                }
             }
             if Instant::now() >= deadline {
-                let _ = child.kill();
-                let _ = child.wait();
+                terminate_child(&mut child);
                 let _ = input_writer.join();
                 let _ = stdout_reader.join();
                 let _ = stderr_reader.join();
@@ -415,11 +537,16 @@ impl SupervisedWorker {
             &manifest,
         )?;
 
+        if let Some(evidence) = &cgroup_placement {
+            evidence.verify()?;
+        }
+
         Ok(SupervisedInvocation {
             success,
             worker_sha256: worker_after,
             supervisor_profile: SUPERVISOR_PROFILE_V1,
             limits: self.limits,
+            cgroup_placement,
         })
     }
 }
@@ -430,6 +557,7 @@ pub struct SupervisedInvocation {
     worker_sha256: [u8; 32],
     supervisor_profile: &'static str,
     limits: SupervisorLimits,
+    cgroup_placement: Option<CgroupPlacementEvidence>,
 }
 
 impl SupervisedInvocation {
@@ -456,6 +584,10 @@ impl SupervisedInvocation {
     pub const fn limits(&self) -> SupervisorLimits {
         self.limits
     }
+
+    pub fn cgroup_placement(&self) -> Option<&CgroupPlacementEvidence> {
+        self.cgroup_placement.as_ref()
+    }
 }
 
 #[derive(Debug, Error)]
@@ -480,6 +612,12 @@ pub enum SupervisorError {
     Protocol(#[from] WorkerProtocolError),
     #[error("canonicalization failed: {0}")]
     Canonical(String),
+    #[error("cgroup-v2 worker placement failed: {0}")]
+    Cgroup(#[source] CgroupV2Error),
+    #[error("cgroup placement evidence is structurally invalid")]
+    CgroupPlacementEvidenceInvalid,
+    #[error("cgroup placement evidence digest does not match")]
+    CgroupPlacementDigestMismatch,
     #[error("failed while waiting for worker: {0}")]
     Wait(#[source] io::Error),
     #[error("failed writing worker input: {0}")]
@@ -512,6 +650,19 @@ pub enum SupervisorError {
     CommitmentMismatch(&'static str),
     #[error("worker attempted to mint simulation evidence")]
     WorkerMintedEvidence,
+}
+
+fn cgroup_placement_sha256_v1(evidence: &CgroupPlacementEvidence) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(CGROUP_PLACEMENT_DOMAIN_V1);
+    hasher.update(evidence.worker_pid.to_le_bytes());
+    hasher.update(evidence.cgroup.evidence_sha256.as_bytes());
+    hasher.finalize().into()
+}
+
+fn terminate_child(child: &mut Child) {
+    let _ = child.kill();
+    let _ = child.wait();
 }
 
 fn verify_success(

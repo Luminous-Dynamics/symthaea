@@ -1,0 +1,184 @@
+name: Simulation Worker Cgroup Supervisor
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-worker/**"
+      - "crates/bridges/symthaea-sim-worker-cgroup/**"
+      - "crates/bridges/symthaea-sim-worker-filesystem/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/simulation-worker-cgroup-supervisor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  SYMTHAEA_CGROUP_V2_DELEGATED_ROOT: ${{ vars.SYMTHAEA_CGROUP_V2_DELEGATED_ROOT }}
+
+jobs:
+  cgroup-supervisor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 source subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          uname -a
+          test -r /sys/fs/cgroup/cgroup.controllers
+          cat /sys/fs/cgroup/cgroup.controllers
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
+
+      - name: Cache Cargo and Component builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-simulation-worker-cgroup-supervisor-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-worker/**', 'crates/bridges/symthaea-sim-worker-cgroup/**', 'crates/bridges/symthaea-sim-worker-filesystem/**', 'examples/extensions/hello-simulation/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-worker-cgroup-supervisor-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-worker-cgroup-supervisor-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches the cgroup-supervisor graph."
+          else
+            cat simulation-worker-cgroup-supervisor-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-worker-cgroup-supervisor-cargo-lock-patch
+          path: simulation-worker-cgroup-supervisor-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Require standalone guest WIT parity
+        run: |
+          cmp crates/core/symthaea-extension-core/wit/extension-control.wit \
+              examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+              examples/extensions/hello-simulation/wit/simulation-provider.wit
+
+      - name: Build exact standalone simulation Component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum "$component" examples/extensions/hello-simulation/manifest.json
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-sim-worker -p symthaea-sim-worker-cgroup -- --check
+
+      - name: Check worker and cgroup lease crates
+        run: |
+          cargo check --locked -p symthaea-sim-worker --all-targets
+          cargo check --locked -p symthaea-sim-worker-cgroup --all-targets
+
+      - name: Test source corpora
+        run: |
+          cargo test --locked -p symthaea-sim-worker
+          cargo test --locked -p symthaea-sim-worker-cgroup
+
+      - name: Strict Clippy
+        run: |
+          cargo clippy --locked -p symthaea-sim-worker --all-targets -- -D warnings
+          cargo clippy --locked -p symthaea-sim-worker-cgroup --all-targets -- -D warnings
+
+      - name: Build exact contained and stall worker subjects
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-worker-filesystem \
+            --bin symthaea-sim-filesystem-worker
+          cargo build --locked \
+            -p symthaea-sim-worker \
+            --bin symthaea-sim-stall-worker
+          sha256sum \
+            target/debug/symthaea-sim-filesystem-worker \
+            target/debug/symthaea-sim-stall-worker
+
+      - name: Execute delegated cgroup supervisor corpus when configured
+        shell: bash
+        run: |
+          if [[ -n "${SYMTHAEA_CGROUP_V2_DELEGATED_ROOT:-}" ]]; then
+            cargo run --locked \
+              -p symthaea-sim-worker-cgroup \
+              --bin symthaea-sim-cgroup-v2-probe \
+              | tee cgroup-supervisor-lease-probe.txt
+            grep -qx 'cgroup_v2_probe=pass' cgroup-supervisor-lease-probe.txt
+
+            SYMTHAEA_CGROUP_WORKER_BIN="${GITHUB_WORKSPACE}/target/debug/symthaea-sim-filesystem-worker" \
+            SYMTHAEA_CGROUP_STALL_WORKER_BIN="${GITHUB_WORKSPACE}/target/debug/symthaea-sim-stall-worker" \
+              cargo test --locked \
+                -p symthaea-sim-worker \
+                --test cgroup_supervisor \
+                -- --ignored --test-threads=1
+            echo 'kernel_supervisor_probe=pass' | tee cgroup-supervisor-kernel-status.txt
+          else
+            echo 'cgroup_v2_probe=not_run_no_explicit_resource_root' \
+              | tee cgroup-supervisor-lease-probe.txt
+            echo 'kernel_supervisor_probe=not_established' \
+              | tee cgroup-supervisor-kernel-status.txt
+          fi
+
+      - name: Record exact cgroup-supervisor subject
+        run: |
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          kernel_probe="$(cut -d= -f2 cgroup-supervisor-kernel-status.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "manifest_sha256=$(sha256sum examples/extensions/hello-simulation/manifest.json | cut -d' ' -f1)"
+            echo "component_sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+            echo "contained_worker_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-worker | cut -d' ' -f1)"
+            echo "stall_worker_sha256=$(sha256sum target/debug/symthaea-sim-stall-worker | cut -d' ' -f1)"
+            echo "cgroup_profile=symthaea.simulation.worker-cgroup.v2-v1"
+            echo "placement_profile=symthaea.simulation.worker-cgroup-placement.pre-input-v1"
+            echo "placement_binds_worker_pid=true"
+            echo "placement_binds_cgroup_evidence_sha256=true"
+            echo "stdin_writer_created_after_placement=true"
+            echo "placement_failure_kills_and_waits_child=true"
+            echo "non_cgroup_execute_path_preserved=true"
+            echo "atomic_from_first_instruction=false"
+            echo "untrusted_input_before_placement=false"
+            echo "resource_root_source=explicit_host_configuration"
+            echo "delegation_origin_inferred_from_kernel=false"
+            echo "kernel_supervisor_probe=${kernel_probe}"
+            echo "rlimit_equivalence_claim=false"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-worker-cgroup-supervisor-receipt.txt
+
+      - name: Upload cgroup-supervisor evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-worker-cgroup-supervisor-evidence
+          path: |
+            cgroup-supervisor-lease-probe.txt
+            cgroup-supervisor-kernel-status.txt
+            simulation-worker-cgroup-supervisor-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
