@@ -9,9 +9,8 @@ use symthaea_fabrication_kernel::crypto_digest::Sha256Digest;
 use symthaea_psych_bench::moral_patient::ProtectionDisposition;
 use symthaea_welfare_assurance::execution_journal_anchor::{
     ExecutionJournalAnchorCommitOutcome, ExecutionJournalAnchorProtocolError,
-    ExecutionJournalAnchorSnapshot, ExecutionJournalHeadAnchor,
-    advance_execution_journal_anchor, bootstrap_execution_journal_anchor,
-    recover_execution_journal_with_anchor,
+    ExecutionJournalAnchorSnapshot, ExecutionJournalHeadAnchor, advance_execution_journal_anchor,
+    bootstrap_execution_journal_anchor, recover_execution_journal_with_anchor,
 };
 use symthaea_welfare_assurance::execution_recovery::{
     EXECUTION_JOURNAL_SCHEMA, InterventionExecutionJournal, PreparedInterventionExecution,
@@ -116,12 +115,9 @@ fn empty_journal_is_the_only_valid_zero_head_genesis_and_first_local_event_requi
     assert_eq!(recovered.anchor, genesis);
 
     journal.append_prepared(prepared()).unwrap();
-    let unanchored = recover_execution_journal_with_anchor(
-        journal.events().to_vec(),
-        &anchor,
-        NAMESPACE,
-    )
-    .unwrap_err();
+    let unanchored =
+        recover_execution_journal_with_anchor(journal.events().to_vec(), &anchor, NAMESPACE)
+            .unwrap_err();
     assert!(matches!(
         unanchored,
         ExecutionJournalAnchorProtocolError::EventCountMismatch {
@@ -138,12 +134,9 @@ fn empty_journal_is_the_only_valid_zero_head_genesis_and_first_local_event_requi
     assert_eq!(successor.head_hash, journal.head_hash());
     assert_eq!(successor.previous_commitment, genesis.commitment().unwrap());
 
-    let recovered = recover_execution_journal_with_anchor(
-        journal.events().to_vec(),
-        &anchor,
-        NAMESPACE,
-    )
-    .unwrap();
+    let recovered =
+        recover_execution_journal_with_anchor(journal.events().to_vec(), &anchor, NAMESPACE)
+            .unwrap();
     assert_eq!(recovered.anchor, successor);
     assert_eq!(recovered.journal.head_hash(), journal.head_hash());
 }
