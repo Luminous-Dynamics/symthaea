@@ -14,8 +14,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use symthaea::benchmarks::gwt1_specialist_qualification::{
     GWT1_RAW_OBSERVATION_SCHEMA_V1 as ROOT_GWT1_RAW_OBSERVATION_SCHEMA_V1,
-    Gwt1PerturbationRawV1, Gwt1RawObservationsV1, Gwt1RunnerErrorV1,
-    Gwt1SpecialistOutputMapV1, run_gwt1_specialist_qualification_v1,
+    GWT1_SPECIALIZATION_CONTRACT_V1 as ROOT_GWT1_SPECIALIZATION_CONTRACT_V1,
+    GWT1_TRAJECTORY_SCHEDULE_V1 as ROOT_GWT1_TRAJECTORY_SCHEDULE_V1,
+    GWT1_TRAJECTORY_STEPS_V1 as ROOT_GWT1_TRAJECTORY_STEPS_V1, Gwt1PerturbationRawV1,
+    Gwt1RawObservationsV1, Gwt1RunnerErrorV1, Gwt1SpecialistOutputMapV1,
+    run_gwt1_specialist_qualification_v1,
 };
 
 use super::gwt1_evidence_envelope::{
@@ -27,6 +30,41 @@ use super::gwt1_qualification::{
     GWT1_QUALIFICATION_SCHEMA_V1, GWT1_SPECIALISTS_V1, Gwt1PerturbationObservationV1,
     Gwt1SpecialistIdentityV1, Gwt1SpecialistQualificationReceiptV1,
 };
+
+const EXPECTED_SPECIALIZATION_CONTRACT_V1: &str = "gwt1-specialization-matrix-v1";
+const EXPECTED_TRAJECTORY_SCHEDULE_V1: &str = "gwt1-specialist-trajectory-v1-48";
+const EXPECTED_TRAJECTORY_STEPS_V1: u32 = 48;
+
+const EXPECTED_PERTURBATIONS_V1: [(&str, &str, &str, f64, f64); 4] = [
+    (
+        "drive-valence",
+        "valence",
+        "drive_manager",
+        0.0_f32 as f64,
+        0.80_f32 as f64,
+    ),
+    (
+        "memory-unified-psi",
+        "unified_psi",
+        "memory_manager",
+        0.40,
+        0.80,
+    ),
+    (
+        "learning-dissipative-health",
+        "dissipative_health",
+        "learning_manager",
+        0.80,
+        0.10,
+    ),
+    (
+        "perception-phenomenal-binding",
+        "phenomenal_binding",
+        "perception_manager",
+        0.50,
+        0.90,
+    ),
+];
 
 const IMPLEMENTATION_PATHS_V1: [(&str, &str); 4] = [
     (
@@ -66,8 +104,29 @@ pub struct Gwt1EndToEndEvidenceV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Gwt1EndToEndErrorV1 {
     Runner(String),
-    RawSchemaMismatch { observed: String, expected: String },
-    RawOutputCoverageMismatch { context: String, observed: Vec<String> },
+    RootContractDrift {
+        field: String,
+        observed: String,
+        expected: String,
+    },
+    RawContractMismatch {
+        field: String,
+        observed: String,
+        expected: String,
+    },
+    RawPerturbationContractMismatch {
+        perturbation_id: String,
+        field: String,
+    },
+    RawTrajectoryStepMismatch {
+        index: usize,
+        observed: u32,
+        expected: u32,
+    },
+    RawOutputCoverageMismatch {
+        context: String,
+        observed: Vec<String>,
+    },
     RawSerialization(String),
 }
 
@@ -84,6 +143,44 @@ fn canonical_specialists() -> BTreeSet<String> {
         .collect()
 }
 
+fn validate_root_contract_v1() -> Result<(), Gwt1EndToEndErrorV1> {
+    for (field, observed, expected) in [
+        (
+            "raw_observation_schema",
+            ROOT_GWT1_RAW_OBSERVATION_SCHEMA_V1,
+            GWT1_RAW_OBSERVATION_SCHEMA_V1,
+        ),
+        (
+            "specialization_contract",
+            ROOT_GWT1_SPECIALIZATION_CONTRACT_V1,
+            EXPECTED_SPECIALIZATION_CONTRACT_V1,
+        ),
+        (
+            "trajectory_schedule",
+            ROOT_GWT1_TRAJECTORY_SCHEDULE_V1,
+            EXPECTED_TRAJECTORY_SCHEDULE_V1,
+        ),
+    ] {
+        if observed != expected {
+            return Err(Gwt1EndToEndErrorV1::RootContractDrift {
+                field: field.to_string(),
+                observed: observed.to_string(),
+                expected: expected.to_string(),
+            });
+        }
+    }
+
+    if ROOT_GWT1_TRAJECTORY_STEPS_V1 != EXPECTED_TRAJECTORY_STEPS_V1 {
+        return Err(Gwt1EndToEndErrorV1::RootContractDrift {
+            field: "trajectory_steps".to_string(),
+            observed: ROOT_GWT1_TRAJECTORY_STEPS_V1.to_string(),
+            expected: EXPECTED_TRAJECTORY_STEPS_V1.to_string(),
+        });
+    }
+
+    Ok(())
+}
+
 fn validate_output_map(
     context: impl Into<String>,
     outputs: &Gwt1SpecialistOutputMapV1,
@@ -95,6 +192,103 @@ fn validate_output_map(
             observed: observed.into_iter().collect(),
         });
     }
+    Ok(())
+}
+
+fn validate_raw_contract_v1(raw: &Gwt1RawObservationsV1) -> Result<(), Gwt1EndToEndErrorV1> {
+    validate_root_contract_v1()?;
+
+    for (field, observed, expected) in [
+        (
+            "schema",
+            raw.schema.as_str(),
+            GWT1_RAW_OBSERVATION_SCHEMA_V1,
+        ),
+        (
+            "specialization_contract",
+            raw.specialization_contract.as_str(),
+            EXPECTED_SPECIALIZATION_CONTRACT_V1,
+        ),
+        (
+            "trajectory_schedule",
+            raw.trajectory_schedule.as_str(),
+            EXPECTED_TRAJECTORY_SCHEDULE_V1,
+        ),
+    ] {
+        if observed != expected {
+            return Err(Gwt1EndToEndErrorV1::RawContractMismatch {
+                field: field.to_string(),
+                observed: observed.to_string(),
+                expected: expected.to_string(),
+            });
+        }
+    }
+
+    if raw.trajectory.len() != EXPECTED_TRAJECTORY_STEPS_V1 as usize {
+        return Err(Gwt1EndToEndErrorV1::RawContractMismatch {
+            field: "trajectory_len".to_string(),
+            observed: raw.trajectory.len().to_string(),
+            expected: EXPECTED_TRAJECTORY_STEPS_V1.to_string(),
+        });
+    }
+
+    for (index, step) in raw.trajectory.iter().enumerate() {
+        let expected = index as u32;
+        if step.step != expected {
+            return Err(Gwt1EndToEndErrorV1::RawTrajectoryStepMismatch {
+                index,
+                observed: step.step,
+                expected,
+            });
+        }
+    }
+
+    let observed_ids: BTreeSet<&str> = raw.perturbations.iter().map(|p| p.id.as_str()).collect();
+    let expected_ids: BTreeSet<&str> = EXPECTED_PERTURBATIONS_V1
+        .iter()
+        .map(|(id, _, _, _, _)| *id)
+        .collect();
+    if raw.perturbations.len() != EXPECTED_PERTURBATIONS_V1.len() || observed_ids != expected_ids {
+        return Err(Gwt1EndToEndErrorV1::RawContractMismatch {
+            field: "perturbation_set".to_string(),
+            observed: format!("{:?}", observed_ids),
+            expected: format!("{:?}", expected_ids),
+        });
+    }
+
+    for (id, field, target, baseline, perturbed) in EXPECTED_PERTURBATIONS_V1 {
+        let observation = raw
+            .perturbations
+            .iter()
+            .find(|observation| observation.id == id)
+            .expect("validated perturbation set");
+
+        if observation.field != field {
+            return Err(Gwt1EndToEndErrorV1::RawPerturbationContractMismatch {
+                perturbation_id: id.to_string(),
+                field: "field".to_string(),
+            });
+        }
+        if observation.target_specialist != target {
+            return Err(Gwt1EndToEndErrorV1::RawPerturbationContractMismatch {
+                perturbation_id: id.to_string(),
+                field: "target_specialist".to_string(),
+            });
+        }
+        if observation.baseline_value.to_bits() != baseline.to_bits() {
+            return Err(Gwt1EndToEndErrorV1::RawPerturbationContractMismatch {
+                perturbation_id: id.to_string(),
+                field: "baseline_value".to_string(),
+            });
+        }
+        if observation.perturbed_value.to_bits() != perturbed.to_bits() {
+            return Err(Gwt1EndToEndErrorV1::RawPerturbationContractMismatch {
+                perturbation_id: id.to_string(),
+                field: "perturbed_value".to_string(),
+            });
+        }
+    }
+
     Ok(())
 }
 
@@ -123,14 +317,7 @@ fn derive_receipt(
     identity: &Gwt1ExecutionIdentityV1,
     raw: &Gwt1RawObservationsV1,
 ) -> Result<Gwt1SpecialistQualificationReceiptV1, Gwt1EndToEndErrorV1> {
-    if raw.schema != ROOT_GWT1_RAW_OBSERVATION_SCHEMA_V1
-        || raw.schema != GWT1_RAW_OBSERVATION_SCHEMA_V1
-    {
-        return Err(Gwt1EndToEndErrorV1::RawSchemaMismatch {
-            observed: raw.schema.clone(),
-            expected: GWT1_RAW_OBSERVATION_SCHEMA_V1.to_string(),
-        });
-    }
+    validate_raw_contract_v1(raw)?;
 
     validate_output_map("solo outputs", &raw.solo_panel.solo_outputs)?;
     validate_output_map("panel outputs", &raw.solo_panel.panel_outputs)?;
@@ -310,5 +497,47 @@ mod tests {
         identity.specialist_blob_shas.remove("memory_manager");
         let evidence = run_gwt1_end_to_end_v1(&identity).expect("end-to-end GWT-1 run");
         assert_eq!(evidence.resolution.outcome, Gwt1QualificationOutcomeV1::Inconclusive);
+    }
+
+    #[test]
+    fn wrong_contract_identity_is_rejected_before_receipt_construction() {
+        let mut raw = run_gwt1_specialist_qualification_v1().expect("GWT-1 runner");
+        raw.specialization_contract = "different-specialization-contract".to_string();
+        assert!(matches!(
+            build_gwt1_evidence_v1(&identity(), &raw),
+            Err(Gwt1EndToEndErrorV1::RawContractMismatch { field, .. })
+                if field == "specialization_contract"
+        ));
+    }
+
+    #[test]
+    fn reordered_or_duplicated_trajectory_step_is_rejected() {
+        let mut raw = run_gwt1_specialist_qualification_v1().expect("GWT-1 runner");
+        raw.trajectory[17].step = 16;
+        assert!(matches!(
+            build_gwt1_evidence_v1(&identity(), &raw),
+            Err(Gwt1EndToEndErrorV1::RawTrajectoryStepMismatch {
+                index: 17,
+                observed: 16,
+                expected: 17,
+            })
+        ));
+    }
+
+    #[test]
+    fn altered_perturbation_dose_is_rejected() {
+        let mut raw = run_gwt1_specialist_qualification_v1().expect("GWT-1 runner");
+        raw.perturbations
+            .iter_mut()
+            .find(|p| p.id == "memory-unified-psi")
+            .expect("memory perturbation")
+            .perturbed_value = 0.79;
+        assert!(matches!(
+            build_gwt1_evidence_v1(&identity(), &raw),
+            Err(Gwt1EndToEndErrorV1::RawPerturbationContractMismatch {
+                perturbation_id,
+                field,
+            }) if perturbation_id == "memory-unified-psi" && field == "perturbed_value"
+        ));
     }
 }
