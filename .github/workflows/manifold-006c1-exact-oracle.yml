@@ -1,0 +1,200 @@
+name: MANIFOLD-006C1 Exact Oracle Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/manifold-006c1-exact-oracle.yml'
+      - 'crates/core/symthaea-core/src/existential_reachability.rs'
+      - 'crates/core/symthaea-core/src/robust_reachability.rs'
+      - 'crates/core/symthaea-core/src/lib.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006c1_existential_reachability.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006c1_exact_oracle_vectors.rs'
+      - 'scripts/qualification/manifold_006c1_exact_oracle.py'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: e7d204b27ee1735ce7233f01ad4f2881b812e3e2
+  QUALIFIED_PARENT_ARTIFACT_SHA256: 0e67e736101e5c41415f5aca98be892249e113023ef038f6c913ff215e9659c9
+
+jobs:
+  qualify:
+    name: Independent exact-rational oracle and existential witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          ref: ${{ env.SUBJECT_SHA }}
+          persist-credentials: false
+
+      - name: Bind exact 006C1 subject and qualified 006C parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/manifold-006c1
+          {
+            echo "schema=symthaea.manifold-006c1.environment.v2"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "parent_sha=$(git rev-parse HEAD^)"
+            echo "qualified_parent_artifact_sha256=$QUALIFIED_PARENT_ARTIFACT_SHA256"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "runner_label=ubuntu-24.04"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+            echo "oracle_boundary=ieee754-binary64-u64-hex-to-python-fraction"
+            echo "vector_identity=sha3-256-domain-separated-semantic-v1"
+          } > artifacts/manifold-006c1/environment.txt
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Extend environment capsule
+        run: |
+          set -euo pipefail
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "rustc_host=$(rustc -vV | sed -n 's/^host: //p')"
+            echo "rustc_commit=$(rustc -vV | sed -n 's/^commit-hash: //p')"
+            echo "llvm_version=$(rustc -vV | sed -n 's/^LLVM version: //p')"
+            echo "python=$(python3 --version 2>&1)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "oracle_script_sha256=$(sha256sum scripts/qualification/manifold_006c1_exact_oracle.py | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "image_os=${ImageOS:-unknown}"
+            echo "image_version=${ImageVersion:-unknown}"
+          } >> artifacts/manifold-006c1/environment.txt
+
+      - name: Check exact core crate
+        run: |
+          cargo check --locked -p symthaea-core --no-default-features
+
+      - name: Run constructive existential witness corpus
+        run: |
+          cargo test --locked -p symthaea-core --no-default-features \
+            --test manifold_006c1_existential_reachability
+
+      - name: Emit deterministic theorem-level oracle vectors
+        env:
+          MANIFOLD_006C1_VECTOR_PATH: ${{ github.workspace }}/artifacts/manifold-006c1/vectors.json
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-core --no-default-features \
+            --test manifold_006c1_exact_oracle_vectors
+          test -s "${{ github.workspace }}/artifacts/manifold-006c1/vectors.json"
+          sha256sum "${{ github.workspace }}/artifacts/manifold-006c1/vectors.json" \
+            > "${{ github.workspace }}/artifacts/manifold-006c1/vectors.sha256"
+
+      - name: Run independent Python exact-rational oracle
+        run: |
+          set -euo pipefail
+          python3 scripts/qualification/manifold_006c1_exact_oracle.py \
+            artifacts/manifold-006c1/vectors.json \
+            artifacts/manifold-006c1/oracle.json
+          test -s artifacts/manifold-006c1/oracle.json
+
+      - name: Cross-check transport and semantic vector identities
+        run: |
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+
+          vectors_path = Path('artifacts/manifold-006c1/vectors.json')
+          vectors = vectors_path.read_bytes()
+          expected = Path('artifacts/manifold-006c1/vectors.sha256').read_text().split()[0]
+          actual = hashlib.sha256(vectors).hexdigest()
+          payload = json.loads(vectors)
+          oracle = json.loads(Path('artifacts/manifold-006c1/oracle.json').read_text())
+          assert actual == expected
+          assert oracle['vector_sha256'] == actual
+          assert oracle['vector_set_identity'] == payload['vector_set_identity']
+          assert oracle['semantic_identity_independently_recomputed'] is True
+          assert oracle['promoted_positive_control_exactly_verified'] is True
+          assert oracle['verdict'] == 'PASS'
+          assert oracle['production_runtime_authority'] is False
+          PY
+
+      - name: Emit qualification receipt
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          root = Path('artifacts/manifold-006c1')
+          vectors = root.joinpath('vectors.json').read_bytes()
+          vector_payload = json.loads(vectors)
+          oracle_bytes = root.joinpath('oracle.json').read_bytes()
+          oracle = json.loads(oracle_bytes)
+          receipt = {
+              'schema': 'symthaea.manifold-006c1.qualification.v3',
+              'source_subject': os.environ['SUBJECT_SHA'].lower(),
+              'exact_parent': os.environ['BASE_SHA'].lower(),
+              'qualified_parent_artifact_sha256': os.environ['QUALIFIED_PARENT_ARTIFACT_SHA256'].lower(),
+              'rust': '1.96.0',
+              'core_check': 'PASS',
+              'constructive_existential_witness_corpus': 'PASS',
+              'existential_vs_robust_verifier_domain_separation': 'PASS',
+              'candidate_rejection_infeasibility_authority': 'NONE',
+              'outer_enclosure_is_not_existential_authority': 'PASS',
+              'exact_rational_oracle': 'PASS',
+              'oracle_authority': 'qualification-only',
+              'oracle_boundary': 'ieee754-binary64-u64-hex',
+              'vector_transport_sha256': hashlib.sha256(vectors).hexdigest(),
+              'vector_set_identity': vector_payload['vector_set_identity'],
+              'vector_identity_algorithm': vector_payload['vector_identity_algorithm'],
+              'semantic_vector_identity_cross_language': 'PASS',
+              'promoted_positive_control_exact_rational_replay': 'PASS',
+              'oracle_receipt_sha256': hashlib.sha256(oracle_bytes).hexdigest(),
+              'envelope_vector_count': oracle['envelope_vector_count'],
+              'classification_vector_count': oracle['classification_vector_count'],
+              'decimal_rounding_trap': 'PASS',
+              'nonzero_underflow': 'PASS',
+              'power_of_two_exact_case': 'PASS',
+              'classification_noncontradiction': 'PASS',
+              'claim_scope': 'synthetic 1-D constructive existential terminal witness and independent exact-rational qualification only',
+              'verdict': 'PASS',
+          }
+          root.joinpath('report.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          PY
+
+      - name: Hash qualification capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd artifacts/manifold-006c1
+          : > SHA256SUMS
+          for file in environment.txt vectors.json vectors.sha256 oracle.json report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Upload qualification capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: manifold-006c1-exact-oracle-${{ env.SUBJECT_SHA }}
+          path: artifacts/manifold-006c1/
+          if-no-files-found: error
+          retention-days: 90
