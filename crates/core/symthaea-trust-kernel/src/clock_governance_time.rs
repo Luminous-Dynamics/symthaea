@@ -7,7 +7,7 @@
 //! temporal predicates that must hold for every possible true time inside it.
 
 use crate::clock_operational::{OperationalClockBasisIdV1, OperationalClockBasisV1};
-use crate::digest::{Sha256Digest, domain_hash};
+use crate::digest::{domain_hash, Sha256Digest};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -37,8 +37,6 @@ pub enum ClockGovernanceTimeError {
     InvalidEnvelope,
     InvalidValidityWindow,
     NotValidAcrossEnvelope,
-    InactiveAuthority,
-    UsageNotAllowed,
     ActivationMayBeInPast,
     ActivationMayBeTooLate,
     TimeScaleOverflow,
@@ -91,6 +89,10 @@ impl ClockGovernanceEvaluationEnvelopeV1 {
 
     /// Require a second-granularity validity interval to cover every possible
     /// true time in the trusted millisecond envelope.
+    ///
+    /// This function answers only the temporal question. Lifecycle status,
+    /// purpose/usage, signature validity, and other semantic authority must be
+    /// established from their actual governed records by the consuming adapter.
     pub fn require_valid_across_seconds_window(
         &self,
         not_before_unix_s: u64,
@@ -105,25 +107,6 @@ impl ClockGovernanceEvaluationEnvelopeV1 {
             return Err(ClockGovernanceTimeError::NotValidAcrossEnvelope);
         }
         Ok(())
-    }
-
-    /// Lifecycle helper for key/provider authority. Status and usage are
-    /// supplied by the caller's already-validated semantic record; temporal
-    /// eligibility is checked against the entire trusted interval.
-    pub fn require_authority_valid_across_seconds_window(
-        &self,
-        not_before_unix_s: u64,
-        not_after_unix_s: u64,
-        active: bool,
-        usage_allowed: bool,
-    ) -> Result<(), ClockGovernanceTimeError> {
-        if !active {
-            return Err(ClockGovernanceTimeError::InactiveAuthority);
-        }
-        if !usage_allowed {
-            return Err(ClockGovernanceTimeError::UsageNotAllowed);
-        }
-        self.require_valid_across_seconds_window(not_before_unix_s, not_after_unix_s)
     }
 
     /// Require an activation to be safe for *every* possible true current time
