@@ -183,8 +183,8 @@ pub fn evaluate_mass_balance(
     // Overlap expanded by the declared tolerance establishes only that some
     // admissible realization could conserve mass. Uncertainty never upgrades a
     // result to `ExactBalanced`.
-    let disjoint_beyond_tolerance = input_max_kg + tolerance_kg < output_min_kg
-        || output_max_kg + tolerance_kg < input_min_kg;
+    let disjoint_beyond_tolerance =
+        input_max_kg + tolerance_kg < output_min_kg || output_max_kg + tolerance_kg < input_min_kg;
     let status = if disjoint_beyond_tolerance {
         MassBalanceStatus::ImpossibleWithinBounds
     } else {
@@ -286,10 +286,10 @@ mod tests {
     #[test]
     fn exact_mismatch_obeys_declared_tolerance_only() {
         let fixture = process(&[(10.0, 10.0)], &[(9.9, 9.9)]);
-        let loose = evaluate_mass_balance(&fixture, MassBalanceTolerance::new(0.2, 0.0).unwrap())
-            .unwrap();
-        let tight = evaluate_mass_balance(&fixture, MassBalanceTolerance::new(0.01, 0.0).unwrap())
-            .unwrap();
+        let loose =
+            evaluate_mass_balance(&fixture, MassBalanceTolerance::new(0.2, 0.0).unwrap()).unwrap();
+        let tight =
+            evaluate_mass_balance(&fixture, MassBalanceTolerance::new(0.01, 0.0).unwrap()).unwrap();
         assert_eq!(loose.status, MassBalanceStatus::ExactBalanced);
         assert_eq!(tight.status, MassBalanceStatus::ExactUnbalanced);
     }
