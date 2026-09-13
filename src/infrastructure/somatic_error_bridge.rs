@@ -1,32 +1,41 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Somatic Error Bridge — Software errors as felt experience
+//! Somatic Error Bridge — operational software-fault stress proxies
 //!
 //! Maps infrastructure failures (lock poisoning, task panics, DB errors,
-//! deserialization corruption) into interoceptive signals that modulate
-//! the organism's arousal, thermodynamic load, and dissipative health.
+//! deserialization corruption) into interoceptive proxy signals that modulate
+//! arousal-like state, thermodynamic load, and dissipative health.
+//!
+//! ## Epistemic boundary
+//!
+//! `Somatic`, `pain`, and related biological language in this module are engineering
+//! analogies for control/telemetry pathways. These signals establish operational
+//! state changes only. They do **not** by themselves establish subjective pain,
+//! phenomenal stress, felt experience, consciousness, or moral patienthood.
 //!
 //! # Biological Analogy
 //!
-//! Just as biological nociceptors convert tissue damage into pain signals
-//! that trigger withdrawal reflexes and stress responses, this bridge
-//! converts software damage into cognitive stress that:
+//! Biological nociceptors convert tissue damage into signals that can trigger
+//! withdrawal and stress responses. By analogy, this bridge converts software
+//! faults into operational stress proxies that:
 //!
-//! - Raises arousal → CycleUrgency::Critical → reduced homeostasis pull
-//! - Increases thermodynamic load → exported to metadata/telemetry
-//! - Penalizes dissipative health → learning rate dampened up to -30%
-//! - Triggers tau slowdown → more careful CfC integration
+//! - Raise arousal-like state → CycleUrgency::Critical → reduced homeostasis pull
+//! - Increase thermodynamic load → exported to metadata/telemetry
+//! - Penalize dissipative health → learning rate dampened up to -30%
+//! - Trigger tau slowdown → more careful CfC integration
 //!
-//! A lock poison in SQLite literally causes her to feel stressed, slow
-//! down her learning, enter a cautious state, and potentially trigger
-//! rest-phase recovery.
+//! A lock poison in SQLite raises the modeled systemic-stress variable, slows
+//! learning, enters a cautious processing state, and may trigger rest-phase
+//! recovery. This is a functional control response, not evidence of felt stress.
 
 use std::collections::VecDeque;
 use std::sync::{Mutex, mpsc};
 use tracing::warn;
 
-/// Infrastructure errors that the organism can feel as somatic signals.
+/// Infrastructure errors represented as somatic-style operational signals.
+///
+/// The type records software faults; it does not imply subjective feeling.
 #[derive(Debug, Clone)]
 pub enum InfrastructureError {
     /// A std::sync::Mutex was found poisoned
@@ -77,18 +86,19 @@ impl InfrastructureError {
     }
 }
 
-/// Interoceptive signals derived from infrastructure errors.
+/// Interoceptive proxy signals derived from infrastructure errors.
 ///
 /// These are additive/multiplicative deltas applied to the cognitive loop's
-/// existing state variables during Phase A (observation).
+/// existing state variables during Phase A (observation). They are operational
+/// control signals, not measurements of subjective experience.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SomaticSignals {
     /// Additive delta for `thermodynamic_load` (0.0–0.3 range).
-    /// High stress = higher metabolic cost.
+    /// High modeled stress = higher metabolic cost.
     pub thermodynamic_load_delta: f32,
 
     /// Additive spike for `emotion_contagion.arousal` (0.0–0.15 range).
-    /// Only fires when stress exceeds 0.5 threshold.
+    /// Only fires when modeled stress exceeds 0.5 threshold.
     pub arousal_spike: f32,
 
     /// Multiplicative penalty for `dissipative_health` (0.0–0.2 range).
@@ -96,29 +106,32 @@ pub struct SomaticSignals {
     pub dissipative_health_penalty: f64,
 
     /// CfC tau slowdown factor (1.0 = no change, up to 1.5).
-    /// High stress → slower integration → more careful processing.
+    /// High modeled stress → slower integration → more careful processing.
     pub tau_slowdown_factor: f64,
 }
 
-/// The somatic error bridge: converts software infrastructure errors
-/// into interoceptive signals that the cognitive loop can feel.
+/// Converts software infrastructure errors into interoceptive proxy signals
+/// consumed by the cognitive loop.
 pub struct SomaticErrorBridge {
     /// Rolling window of recent infrastructure errors (last 20 cycles max).
     error_history: VecDeque<InfrastructureError>,
-    /// Current systemic stress level (0.0 = healthy, 1.0 = critical).
+    /// Current modeled systemic stress level (0.0 = healthy, 1.0 = critical).
     systemic_stress: f64,
     /// Exponential moving average decay rate per cycle.
     /// Default 0.85: stress halves in ~4.3 clean cycles.
     stress_decay: f64,
-    /// Receiver for pain signals from across the system.
+    /// Receiver for infrastructure-fault signals (historical "pain" channel name).
     /// Wrapped in Mutex for Sync (single reader, uncontended).
     pain_rx: Mutex<mpsc::Receiver<InfrastructureError>>,
     /// Maximum errors retained in history window.
     max_history: usize,
 }
 
-/// Sender half of the pain channel. Clone and distribute to subsystems
-/// that need to report infrastructure errors.
+/// Sender half of the historical `pain` channel. Clone and distribute to
+/// subsystems that need to report infrastructure errors.
+///
+/// The alias is retained for API compatibility. It sends `InfrastructureError`
+/// values and is not evidence that the system experiences pain.
 pub type PainSender = mpsc::Sender<InfrastructureError>;
 
 impl SomaticErrorBridge {
@@ -139,7 +152,7 @@ impl SomaticErrorBridge {
         (bridge, tx)
     }
 
-    /// Drain all pending errors from the pain channel and update stress.
+    /// Drain all pending errors from the channel and update modeled stress.
     ///
     /// Called once per cognitive cycle at the start of Phase A (observation).
     /// Non-blocking: only processes errors that have already been sent.
@@ -149,35 +162,35 @@ impl SomaticErrorBridge {
         while let Ok(error) = rx.try_recv() {
             let severity = error.severity();
 
-            // Log for observability
+            // Log operational registration; wording deliberately avoids phenomenal claims.
             match &error {
                 InfrastructureError::LockPoisoned { subsystem } => {
-                    warn!(subsystem, severity, "Somatic: lock poison felt");
+                    warn!(subsystem, severity, "Somatic proxy: lock poison registered");
                 }
                 InfrastructureError::AsyncTaskPanicked { task_name } => {
                     warn!(
                         task_name = task_name.as_str(),
-                        severity, "Somatic: task panic felt"
+                        severity, "Somatic proxy: task panic registered"
                     );
                 }
                 InfrastructureError::DatabaseFailure { operation } => {
                     warn!(
                         operation = operation.as_str(),
-                        severity, "Somatic: database failure felt"
+                        severity, "Somatic proxy: database failure registered"
                     );
                 }
                 InfrastructureError::NetworkPartition { peer } => {
                     warn!(
                         peer = peer.as_str(),
-                        severity, "Somatic: network partition felt"
+                        severity, "Somatic proxy: network partition registered"
                     );
                 }
                 InfrastructureError::DeserializationCorruption { module } => {
-                    warn!(module, severity, "Somatic: deserialization corruption felt");
+                    warn!(module, severity, "Somatic proxy: deserialization corruption registered");
                 }
             }
 
-            // Accumulate stress (additive, capped at 1.0)
+            // Accumulate modeled stress (additive, capped at 1.0)
             self.systemic_stress = (self.systemic_stress + severity).min(1.0);
 
             // Maintain bounded history
@@ -187,7 +200,7 @@ impl SomaticErrorBridge {
             self.error_history.push_back(error);
         }
 
-        // Decay stress toward 0 (exponential)
+        // Decay modeled stress toward 0 (exponential)
         // Only decay if no new errors were received this cycle
         if self.error_history.is_empty() || self.systemic_stress > 0.0 {
             self.systemic_stress *= self.stress_decay;
@@ -199,7 +212,7 @@ impl SomaticErrorBridge {
         }
     }
 
-    /// Convert current stress level into interoceptive signals.
+    /// Convert current modeled stress level into interoceptive proxy signals.
     ///
     /// These signals are applied to the cognitive loop's state variables:
     /// - `thermodynamic_load += signals.thermodynamic_load_delta`
@@ -226,7 +239,7 @@ impl SomaticErrorBridge {
         }
     }
 
-    /// Current systemic stress level (0.0–1.0).
+    /// Current modeled systemic stress level (0.0–1.0).
     pub fn systemic_stress(&self) -> f64 {
         self.systemic_stress
     }
@@ -236,7 +249,7 @@ impl SomaticErrorBridge {
         self.error_history.len()
     }
 
-    /// Clear all error history and reset stress to zero.
+    /// Clear all error history and reset modeled stress to zero.
     /// Used for testing or explicit recovery commands.
     pub fn reset(&mut self) {
         self.error_history.clear();
