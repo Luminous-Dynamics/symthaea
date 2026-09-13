@@ -1,4 +1,4 @@
-name: PIE-002 Claim Vocabulary Maintenance
+name: PIE-002 Rust Claim Vocabulary Maintenance
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  harden:
+  harden-rust:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -22,69 +22,20 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin feat/pie-002-utility-oracle candidate/pie-002-production-v1
-
-      - name: Harden independent oracle vocabulary
-        env:
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: |
-          set -euo pipefail
-          git switch -C pie-002-oracle-work origin/feat/pie-002-utility-oracle
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("scripts/pie-utility-accounting-oracle.py")
-          text = path.read_text()
-          replacements = {
-              "gross_continuous_power": "gross_average_power_screen",
-              "steady_cycle_continuous_power": "steady_cycle_average_power_screen",
-              "# Gross screens make no temporal recovery-credit assumption.": (
-                  "# Gross screens make no temporal recovery-credit assumption. The power result is\n"
-                  "        # a cycle-average demand screen against sustained capacity, not a time-resolved\n"
-                  "        # dispatch or load-profile proof."
-              ),
-          }
-          for old, new in replacements.items():
-              if old not in text:
-                  raise SystemExit(f"expected oracle token missing: {old}")
-              text = text.replace(old, new)
-          path.write_text(text)
-
-          doc = Path("docs/release/evidence/PIE_002_UTILITY_ORACLE.md")
-          d = doc.read_text()
-          marker = "## Electrical recovery bounds\n"
-          addition = (
-              "## Power-screen boundary\n\n"
-              "The reported gross and steady-cycle power feasibility fields are **cycle-average power screens** "
-              "derived from energy divided by declared batch duration and compared with declared sustained "
-              "capacity. They are not time-resolved load-profile, ramp-rate, dispatch, transient-stability, or "
-              "continuous-delivery proofs. Peak power remains a separate screen.\n\n"
-          )
-          if addition not in d:
-              if marker not in d:
-                  raise SystemExit("evidence-note insertion marker missing")
-              d = d.replace(marker, addition + marker, 1)
-          doc.write_text(d)
-          PY
-          python3 -m py_compile scripts/pie-utility-accounting-oracle.py
-          test "$(python3 scripts/pie-utility-accounting-oracle.py --self-test)" = ok
-          rm -rf scripts/__pycache__
-          git diff --check
-          git add scripts/pie-utility-accounting-oracle.py docs/release/evidence/PIE_002_UTILITY_ORACLE.md
-          git commit -m "refactor(pie): name average-power screens precisely"
-          git push origin HEAD:feat/pie-002-utility-oracle
+          git fetch origin candidate/pie-002-production-v1
 
       - name: Install Rust 1.96.0
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt,clippy
 
-      - name: Harden and format production utility vocabulary
+      - name: Harden, format, test, and publish production utility vocabulary
         run: |
           set -euo pipefail
           git switch -C pie-002-rust-work origin/candidate/pie-002-production-v1
           python3 - <<'PY'
           from pathlib import Path
+
           path = Path("crates/domains/symthaea-planetary-industry/src/utility_accounting.rs")
           text = path.read_text()
           replacements = {
@@ -94,25 +45,39 @@ jobs:
                   "/// Current/gross cycle-average-power screen against declared sustained capacity."
               ),
               "/// Separately named steady-cycle average-power screen.": (
-                  "/// Separately named steady-cycle cycle-average-power screen."
+                  "/// Steady-cycle cycle-average-power screen against declared sustained capacity."
               ),
           }
           for old, new in replacements.items():
               if old not in text:
                   raise SystemExit(f"expected Rust token missing: {old}")
               text = text.replace(old, new)
-          old = "/// Lower net energy\n/// is reported only under a separately named steady-cycle assumption after\n/// charge-power, delivery-fraction and discharge-power limits are applied."
-          new = "/// Lower net energy\n/// is reported only under a separately named steady-cycle assumption after\n/// charge-power, delivery-fraction and discharge-power limits are applied.\n/// Average-power screens are energy/duration checks against sustained capacity;\n/// they do not establish a time-resolved load profile or dispatch theorem."
+
+          old = (
+              "/// Gross/current-cycle screens never consume recovery credit. Lower net energy\n"
+              "/// is reported only under a separately named steady-cycle assumption after\n"
+              "/// charge-power, delivery-fraction and discharge-power limits are applied."
+          )
+          new = (
+              "/// Gross/current-cycle screens never consume recovery credit. Lower net energy\n"
+              "/// is reported only under a separately named steady-cycle assumption after\n"
+              "/// charge-power, delivery-fraction and discharge-power limits are applied.\n"
+              "/// Average-power screens are energy/duration checks against declared sustained\n"
+              "/// capacity; they do not establish a time-resolved load profile, ramp-rate,\n"
+              "/// dispatch, transient-stability, or continuous-delivery theorem."
+          )
           if old not in text:
-              raise SystemExit("Rust evaluator boundary text missing")
-          text = text.replace(old, new)
+              raise SystemExit("exact Rust evaluator boundary text missing")
+          text = text.replace(old, new, 1)
           path.write_text(text)
           PY
+
           cargo fmt -p symthaea-planetary-industry
           cargo check -p symthaea-planetary-industry --all-targets --locked
           cargo test -p symthaea-planetary-industry --all-targets --locked --no-fail-fast
           cargo clippy -p symthaea-planetary-industry --all-targets --locked -- -D warnings
           git diff --check
+
           git add crates/domains/symthaea-planetary-industry/src
           git commit -m "refactor(pie): make utility power-screen basis explicit"
           git push origin HEAD:candidate/pie-002-production-v1
