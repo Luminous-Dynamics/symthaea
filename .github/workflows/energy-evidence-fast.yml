@@ -147,6 +147,7 @@ jobs:
           name: energy-evidence-lock-diagnostic-${{ env.QUALIFICATION_HEAD_SHA }}
           path: |
             ${{ runner.temp }}/energy-evidence-fast/Cargo.lock.patch
+            ${{ runner.temp }}/energy-evidence-fast/Cargo.lock.resolved
             ${{ runner.temp }}/energy-evidence-fast/locked.err
           if-no-files-found: ignore
           retention-days: 14
