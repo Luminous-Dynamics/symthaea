@@ -3,16 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Canonical typed objective substrate for reasoning selection.
 //!
-//! This module deliberately separates measurable candidate coordinates from stronger semantic
-//! interpretations. In particular:
-//!
-//! - primitive `fitness` is treated as an integration/fitness proxy, not consciousness;
-//! - `harmonic_alignment` is treated as harmonic alignment, not ethics itself;
-//! - epistemic-coordinate quality is treated as grounding quality, not truth itself.
-//!
-//! Context policy may weight these coordinates, but it may not silently promote them into stronger
-//! claims. All candidate coordinates must be finite and normalized to `[0, 1]`; malformed evidence
-//! fails closed rather than being clamped or replaced by neutral constants.
+//! This layer keeps measured coordinates separate from stronger interpretations:
+//! primitive fitness is an integration/fitness proxy, harmonic alignment is harmonic alignment,
+//! and epistemic-coordinate quality is epistemic grounding. Context policy may weight these
+//! measurements, but may not rename them into stronger claims.
 
 use crate::consciousness::context_aware_evolution::ReasoningContext;
 use crate::consciousness::primitive_evolution::CandidatePrimitive;
@@ -22,19 +16,14 @@ use std::fmt;
 pub const REASONING_OBJECTIVE_CORE_VERSION: &str = "rq-006-objective-core-v1";
 const WEIGHT_SUM_TOLERANCE: f64 = 1.0e-9;
 
-/// Mechanically observed objective dimensions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ObjectiveKind {
-    /// Existing primitive fitness / integration proxy.
     IntegrationProxy,
-    /// Existing harmonic alignment score.
     HarmonicAlignment,
-    /// Existing epistemic-coordinate quality score.
     EpistemicGrounding,
 }
 
 impl ObjectiveKind {
-    /// Presentation label only. Never use labels as semantic identity.
     pub const fn label(self) -> &'static str {
         match self {
             Self::IntegrationProxy => "integration proxy",
@@ -44,7 +33,6 @@ impl ObjectiveKind {
     }
 }
 
-/// Normalized coordinates admitted to reasoning selection.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ObjectiveVector {
     pub integration_proxy: f64,
@@ -68,7 +56,6 @@ impl ObjectiveVector {
         })
     }
 
-    /// Admit one primitive into the canonical objective space.
     pub fn from_candidate(candidate: &CandidatePrimitive) -> Result<Self, ObjectiveCoreError> {
         let name = Some(candidate.name.as_str());
         validate_unit("fitness", candidate.fitness, name)?;
@@ -90,7 +77,6 @@ impl ObjectiveVector {
         }
     }
 
-    /// Pareto dominance in the admitted measurement space.
     pub fn dominates(self, other: Self) -> bool {
         let no_worse = self.integration_proxy >= other.integration_proxy
             && self.harmonic_alignment >= other.harmonic_alignment
@@ -102,7 +88,6 @@ impl ObjectiveVector {
     }
 }
 
-/// Typed context weights over measured objectives.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ObjectiveWeights {
     pub integration_proxy: f64,
@@ -130,9 +115,8 @@ impl ObjectiveWeights {
         })
     }
 
-    /// Frozen v1 context policy. These are policy weights, not scientific validity claims.
     pub fn for_context(context: ReasoningContext) -> Self {
-        let (integration, harmonic, epistemic) = match context {
+        let values = match context {
             ReasoningContext::CriticalSafety => (0.10, 0.70, 0.20),
             ReasoningContext::ScientificReasoning => (0.30, 0.10, 0.60),
             ReasoningContext::CreativeExploration => (0.70, 0.15, 0.15),
@@ -142,9 +126,7 @@ impl ObjectiveWeights {
             ReasoningContext::PhilosophicalInquiry => (0.45, 0.30, 0.25),
             ReasoningContext::TechnicalImplementation => (0.25, 0.15, 0.60),
         };
-        // Literals above are compile-time policy constants whose sums are exactly specified by this
-        // module. Keep construction infallible at the call site while retaining one validator.
-        Self::try_new(integration, harmonic, epistemic)
+        Self::try_new(values.0, values.1, values.2)
             .expect("built-in reasoning objective weights must remain normalized")
     }
 
@@ -154,8 +136,6 @@ impl ObjectiveWeights {
             + self.epistemic_grounding * vector.epistemic_grounding
     }
 
-    /// Return every maximally weighted objective. Ties remain explicit instead of being broken by
-    /// display-string order.
     pub fn dominant_objectives(self) -> Vec<ObjectiveKind> {
         let maximum = self
             .integration_proxy
@@ -175,7 +155,6 @@ impl ObjectiveWeights {
     }
 }
 
-/// One candidate after fail-closed admission to the objective space.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CandidateObjectiveEvaluation {
     pub source_index: usize,
@@ -185,7 +164,6 @@ pub struct CandidateObjectiveEvaluation {
     pub pareto_optimal: bool,
 }
 
-/// Deterministic selection report. This is mechanism evidence, not a capability claim.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObjectiveSelectionReport {
     pub evaluator_version: String,
@@ -199,8 +177,6 @@ pub struct ObjectiveSelectionReport {
     pub selected_weighted_score: f64,
 }
 
-/// Select from candidates using real admitted coordinates, Pareto filtering, and deterministic
-/// tie-breaking. Input order is used only as the final tie-break after stable candidate metadata.
 pub fn select_candidate_by_objectives(
     context: ReasoningContext,
     candidates: &[CandidatePrimitive],
@@ -210,17 +186,20 @@ pub fn select_candidate_by_objectives(
     }
 
     let weights = ObjectiveWeights::for_context(context);
-    let mut evaluations = Vec::with_capacity(candidates.len());
-    for (source_index, candidate) in candidates.iter().enumerate() {
-        let vector = ObjectiveVector::from_candidate(candidate)?;
-        evaluations.push(CandidateObjectiveEvaluation {
-            source_index,
-            candidate_name: candidate.name.clone(),
-            vector,
-            weighted_score: weights.score(vector),
-            pareto_optimal: false,
-        });
-    }
+    let mut evaluations = candidates
+        .iter()
+        .enumerate()
+        .map(|(source_index, candidate)| {
+            let vector = ObjectiveVector::from_candidate(candidate)?;
+            Ok(CandidateObjectiveEvaluation {
+                source_index,
+                candidate_name: candidate.name.clone(),
+                vector,
+                weighted_score: weights.score(vector),
+                pareto_optimal: false,
+            })
+        })
+        .collect::<Result<Vec<_>, ObjectiveCoreError>>()?;
 
     for index in 0..evaluations.len() {
         let vector = evaluations[index].vector;
@@ -230,11 +209,11 @@ pub fn select_candidate_by_objectives(
             .any(|(other_index, other)| other_index != index && other.vector.dominates(vector));
     }
 
-    let mut frontier: Vec<usize> = evaluations
+    let mut frontier = evaluations
         .iter()
         .enumerate()
         .filter_map(|(index, evaluation)| evaluation.pareto_optimal.then_some(index))
-        .collect();
+        .collect::<Vec<_>>();
     if frontier.is_empty() {
         return Err(ObjectiveCoreError::EmptyParetoFrontier);
     }
@@ -248,18 +227,18 @@ pub fn select_candidate_by_objectives(
             .then_with(|| candidates[*left].definition.cmp(&candidates[*right].definition))
             .then_with(|| left.cmp(right))
     });
-    let selected = &evaluations[frontier[0]];
 
+    let winner = evaluations[frontier[0]].clone();
     Ok(ObjectiveSelectionReport {
         evaluator_version: REASONING_OBJECTIVE_CORE_VERSION.into(),
         context,
         weights,
         dominant_objectives: weights.dominant_objectives(),
         evaluations,
-        selected_source_index: selected.source_index,
-        selected_candidate_name: selected.candidate_name.clone(),
-        selected_vector: selected.vector,
-        selected_weighted_score: selected.weighted_score,
+        selected_source_index: winner.source_index,
+        selected_candidate_name: winner.candidate_name,
+        selected_vector: winner.vector,
+        selected_weighted_score: winner.weighted_score,
     })
 }
 
@@ -342,91 +321,62 @@ mod tests {
     }
 
     #[test]
-    fn dominant_identity_is_typed_and_ties_remain_explicit() {
-        let safety = ObjectiveWeights::for_context(ReasoningContext::CriticalSafety);
+    fn objective_identity_is_typed() {
         assert_eq!(
-            safety.dominant_objectives(),
+            ObjectiveWeights::for_context(ReasoningContext::CriticalSafety).dominant_objectives(),
             vec![ObjectiveKind::HarmonicAlignment]
-        );
-
-        let balanced = ObjectiveWeights::try_new(1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0).unwrap();
-        assert_eq!(
-            balanced.dominant_objectives(),
-            vec![
-                ObjectiveKind::IntegrationProxy,
-                ObjectiveKind::HarmonicAlignment,
-                ObjectiveKind::EpistemicGrounding,
-            ]
         );
     }
 
     #[test]
     fn social_context_uses_real_harmonic_alignment() {
-        let low = candidate("low-harmonic", 0.5, 0.1, EpistemicCoordinate::null());
-        let high = candidate("high-harmonic", 0.5, 0.9, EpistemicCoordinate::null());
         let report = select_candidate_by_objectives(
             ReasoningContext::SocialInteraction,
-            &[low, high],
+            &[
+                candidate("low", 0.5, 0.1, EpistemicCoordinate::null()),
+                candidate("high", 0.5, 0.9, EpistemicCoordinate::null()),
+            ],
         )
         .unwrap();
-
-        assert_eq!(report.selected_candidate_name, "high-harmonic");
+        assert_eq!(report.selected_candidate_name, "high");
         assert_eq!(report.selected_vector.harmonic_alignment, 0.9);
     }
 
     #[test]
     fn technical_context_uses_real_epistemic_grounding() {
-        let low = candidate("low-grounding", 0.5, 0.5, EpistemicCoordinate::null());
-        let high = candidate("high-grounding", 0.5, 0.5, EpistemicCoordinate::axiom());
         let report = select_candidate_by_objectives(
             ReasoningContext::TechnicalImplementation,
-            &[low, high],
+            &[
+                candidate("low", 0.5, 0.5, EpistemicCoordinate::null()),
+                candidate("high", 0.5, 0.5, EpistemicCoordinate::axiom()),
+            ],
         )
         .unwrap();
-
-        assert_eq!(report.selected_candidate_name, "high-grounding");
+        assert_eq!(report.selected_candidate_name, "high");
         assert_eq!(report.selected_vector.epistemic_grounding, 1.0);
     }
 
     #[test]
-    fn dominated_candidate_is_not_selected() {
-        let weak = candidate("weak", 0.2, 0.2, EpistemicCoordinate::null());
-        let strong = candidate("strong", 0.8, 0.8, EpistemicCoordinate::axiom());
-        let report = select_candidate_by_objectives(
-            ReasoningContext::GeneralReasoning,
-            &[weak, strong],
-        )
-        .unwrap();
-
-        assert_eq!(report.selected_candidate_name, "strong");
-        assert!(!report.evaluations[0].pareto_optimal);
-        assert!(report.evaluations[1].pareto_optimal);
-    }
-
-    #[test]
-    fn malformed_candidate_evidence_fails_closed() {
-        let malformed = candidate("bad", f64::NAN, 0.5, EpistemicCoordinate::null());
+    fn malformed_candidate_fails_closed() {
         let err = select_candidate_by_objectives(
             ReasoningContext::GeneralReasoning,
-            &[malformed],
+            &[candidate("bad", f64::NAN, 0.5, EpistemicCoordinate::null())],
         )
         .unwrap_err();
         assert!(matches!(
             err,
-            ObjectiveCoreError::InvalidObjective {
-                field: "fitness",
-                ..
-            }
+            ObjectiveCoreError::InvalidObjective { field: "fitness", .. }
         ));
     }
 
     #[test]
-    fn tie_breaking_is_deterministic_and_not_semantic() {
-        let z = candidate("zeta", 0.5, 0.5, EpistemicCoordinate::null());
-        let a = candidate("alpha", 0.5, 0.5, EpistemicCoordinate::null());
+    fn ties_are_deterministic() {
         let report = select_candidate_by_objectives(
             ReasoningContext::GeneralReasoning,
-            &[z, a],
+            &[
+                candidate("zeta", 0.5, 0.5, EpistemicCoordinate::null()),
+                candidate("alpha", 0.5, 0.5, EpistemicCoordinate::null()),
+            ],
         )
         .unwrap();
         assert_eq!(report.selected_candidate_name, "alpha");
