@@ -146,6 +146,7 @@ pub mod hierarchical;
 pub mod markov_blanket;
 mod motor;
 mod td_learning;
+pub mod transition_information_gain;
 pub mod types;
 
 #[cfg(test)]
@@ -162,6 +163,12 @@ pub use types::{
 pub use td_learning::{
     EligibilityTraces, ModelConfidenceTracker, StateTransition, TemporalDifferenceLearner,
     TemporalDifferenceLearningConfig, TemporalDifferenceLearningStats,
+};
+
+pub use transition_information_gain::{
+    TRANSITION_PARAMETER_INFORMATION_GAIN_PSEUDOCOUNT_V1,
+    TRANSITION_PARAMETER_INFORMATION_GAIN_SCHEMA_V1, TransitionParameterInformationGainError,
+    dirichlet_transition_parameter_information_gain_nats_v1,
 };
 
 pub use generative_model::GenerativeModel;
