@@ -26,14 +26,15 @@ use symthaea::benchmarks::gwt1_causal_matched_sham::{
     Gwt1MatchedShamObservationsV1, Gwt1MatchedShamRowRawV1,
     run_gwt1_causal_matched_sham_v1,
 };
-use symthaea::benchmarks::gwt1_causal_verifier::recompute_gwt1_collector_v1;
+use symthaea::benchmarks::gwt1_causal_verifier::{
+    GWT1_REQUEST_CONSOLIDATION_FLAG_V1, recompute_gwt1_collector_v1,
+};
 use symthaea::benchmarks::gwt1_specialist_qualification::{
     GWT1_SPECIALIST_IDS_V1, Gwt1SubsystemOutputBitsV1,
 };
 
 pub const GWT1_CAUSAL_QUALIFICATION_SCHEMA_V1: &str =
     "butlin-gwt1-causal-qualification-v1";
-const REQUEST_CONSOLIDATION_FLAG_V1: u32 = 1 << 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -141,7 +142,7 @@ fn signature_present(
     match signature {
         Gwt1CausalSignatureV1::DriveValence => output.valence_delta != 0.0f32.to_bits(),
         Gwt1CausalSignatureV1::MemoryConsolidationFlag => {
-            output.flags & REQUEST_CONSOLIDATION_FLAG_V1 != 0
+            output.flags & GWT1_REQUEST_CONSOLIDATION_FLAG_V1 != 0
         }
         Gwt1CausalSignatureV1::LearningRate => output.lr_modulation != 1.0f64.to_bits(),
         Gwt1CausalSignatureV1::PerceptionConfidence => {
@@ -158,8 +159,8 @@ fn signature_changed(
     match signature {
         Gwt1CausalSignatureV1::DriveValence => baseline.valence_delta != lesion.valence_delta,
         Gwt1CausalSignatureV1::MemoryConsolidationFlag => {
-            (baseline.flags & REQUEST_CONSOLIDATION_FLAG_V1)
-                != (lesion.flags & REQUEST_CONSOLIDATION_FLAG_V1)
+            (baseline.flags & GWT1_REQUEST_CONSOLIDATION_FLAG_V1)
+                != (lesion.flags & GWT1_REQUEST_CONSOLIDATION_FLAG_V1)
         }
         Gwt1CausalSignatureV1::LearningRate => baseline.lr_modulation != lesion.lr_modulation,
         Gwt1CausalSignatureV1::PerceptionConfidence => {
