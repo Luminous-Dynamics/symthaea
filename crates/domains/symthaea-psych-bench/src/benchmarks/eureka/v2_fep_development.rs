@@ -8,6 +8,8 @@
 //! immediately consumes that snapshot into `FepHeldOutSubject`. No trainable
 //! FEP capability escapes the returned artifact.
 
+#![allow(dead_code)]
+
 use symthaea::cognitive_loop::CognitiveLoopService;
 use symthaea_fep::{
     ActionOutcome, FepHeldOutSubject, FepPredictionSessionError, FrozenPredictionCommitment,
@@ -243,8 +245,8 @@ fn run_plan(
             V2_FEP_DEVELOPMENT_MODALITY,
         )?;
         learning_count = learning_count.saturating_add(1);
-        family_histogram[family_index(row.family())] =
-            family_histogram[family_index(row.family())].saturating_add(1);
+        let family_slot = family_index(row.family());
+        family_histogram[family_slot] = family_histogram[family_slot].saturating_add(1);
         action_histogram[target_action] = action_histogram[target_action].saturating_add(1);
     }
 
@@ -377,7 +379,10 @@ fn encode_prediction_trace(
 
 fn prediction_trace_root(trace: &[u8]) -> [u8; 32] {
     let mut bytes = Vec::new();
-    encode_bytes(&mut bytes, b"EUREKA.002.V2.FEP_DEVELOPMENT_PREDICTION_TRACE.v1");
+    encode_bytes(
+        &mut bytes,
+        b"EUREKA.002.V2.FEP_DEVELOPMENT_PREDICTION_TRACE.v1",
+    );
     bytes.extend_from_slice(trace);
     *blake3::hash(&bytes).as_bytes()
 }
@@ -511,7 +516,11 @@ mod tests {
 
     #[test]
     fn training_source_has_no_confirmatory_execution_reachability() {
-        let source = include_str!("v2_fep_development.rs");
+        let whole_source = include_str!("v2_fep_development.rs");
+        let production_source = whole_source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("Development runner has a production section");
         for forbidden in [
             "materialize_canonical_corpora",
             "execute_calibration_selection",
@@ -520,7 +529,7 @@ mod tests {
             "score_consequence",
         ] {
             assert!(
-                !source.contains(forbidden),
+                !production_source.contains(forbidden),
                 "Development runner must not reach confirmatory/evaluation authority: {forbidden}"
             );
         }
