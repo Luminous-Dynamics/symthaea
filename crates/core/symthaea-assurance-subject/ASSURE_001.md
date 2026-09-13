@@ -22,6 +22,9 @@ unknown surface
 known commitment
     != retrievable artifact
     != replayable system
+
+same digest algorithm
+    != same commitment semantics
 ```
 
 ASSURE-001 defines the system-under-test identity used by later external AI/agent qualification campaigns. It is deliberately separate from ASSURE-000 so richer subject semantics cannot destabilize the qualified generic claim/evidence kernel.
@@ -52,7 +55,7 @@ Every registered surface must have exactly one binding. Omission fails closed ra
 Each binding carries one of four states:
 
 ```text
-Known(commitment)
+Known(material-commitment)
 Unknown
 Unavailable(reason-class)
 NotApplicable
@@ -60,7 +63,7 @@ NotApplicable
 
 These states are identity-distinct.
 
-`Known` means only that an exact SHA-256 commitment is available for the material identity being represented. It does **not** prove that a provider's description of those bytes/revision is truthful, that two different commitment schemes are semantically equivalent, that the committed artifact is retrievable, or that the upstream provider cannot equivocate. Those are evidence/attestation/availability questions for later assurance layers.
+`Known` means only that an exact typed material commitment is available for the identity being represented. It does **not** prove that a provider's description is truthful, that the committed artifact is retrievable, or that the upstream provider cannot equivocate. Those are evidence/attestation/availability questions for later assurance layers.
 
 `Unknown` means the surface applies but the exact material identity is not known.
 
@@ -69,6 +72,31 @@ These states are identity-distinct.
 `NotApplicable` means the registered surface genuinely does not apply to this subject. It is not a substitute for missing information.
 
 `CompletenessSummary::has_complete_material_identity()` is true only when every applicable registered surface is `Known`. This is an identity-completeness predicate, **not replayability**. Replayability additionally requires evidence that the committed artifacts/configuration can actually be obtained and executed under the relevant environment.
+
+## Commitment method is part of identity
+
+A SHA-256 digest is not self-describing. ASSURE-001 therefore binds the commitment method and digest together as `MaterialCommitment`.
+
+Initial methods are:
+
+```text
+ArtifactBytesSha256
+CanonicalDescriptorSha256
+ProviderRevisionTokenSha256
+Custom(method-id)
+```
+
+The same 32-byte digest under two different methods yields different manifest identity.
+
+`ArtifactBytesSha256` means SHA-256 over the exact artifact bytes.
+
+`CanonicalDescriptorSha256` is only cross-implementation meaningful when the descriptor schema and canonicalization algorithm are specified by the surrounding assurance contract. The enum name alone does not invent a canonical descriptor format.
+
+`ProviderRevisionTokenSha256` binds the exact provider revision token being claimed. It does **not** prove that the provider's token is immutable, content-addressed, or non-equivocating.
+
+`Custom(method-id)` is domain-separated by method identity; consumers must understand that method before inferring equivalence.
+
+This distinction prevents a hash of model bytes from being silently equated with a hash of a provider revision string merely because both use SHA-256.
 
 ## Provider aliases are not revisions
 
@@ -90,7 +118,7 @@ Locator metadata is bound into manifest identity because provider/name/version r
 
 Remote tools, MCP servers, hosted models, retrieval indices, policy services, and other remote dependencies can mutate behind stable names. Material external services therefore get their own registered surface identities.
 
-Adding or removing a registered dependency changes the profile identity. Changing its locator, completeness state, or exact commitment changes the manifest identity.
+Adding or removing a registered dependency changes the profile identity. Changing its locator, completeness state, commitment method, or digest changes the manifest identity.
 
 ## Secret boundary
 
@@ -135,6 +163,7 @@ ASSURE-001 does not establish:
 - provider truthfulness;
 - artifact retrievability or system replayability;
 - remote-service immutability when no immutable revision is available;
+- equivalence between differently specified commitment methods;
 - prompt secrecy;
 - credential safety beyond excluding raw-secret representation from the intended model;
 - evaluator/corpus identity;
