@@ -21,6 +21,8 @@
 mod accepted_clock_basis;
 mod clock;
 mod clock_bootstrap_authority;
+#[allow(unused_imports)]
+mod clock_continuous;
 mod clock_evaluation_permit;
 mod clock_successor;
 mod clock_witness;
@@ -45,6 +47,13 @@ pub use clock_bootstrap_authority::{
     ClockBootstrapAuthorityEvidenceV2, ClockBootstrapAuthorityVerifier, ClockBootstrapClaimV2,
     VerifiedClockBootstrapAuthorityIdV2, VerifiedClockBootstrapAuthorityV2,
     verify_clock_bootstrap_authority,
+};
+pub use clock_continuous::{
+    ACCEPTED_CLOCK_BASIS_V6_WIRE_SCHEMA, CONTINUOUS_CLOCK_BASIS_RUNTIME_SCHEMA,
+    ContinuousClockAuthorityKeyV1, ContinuousClockBasisIdV1, ContinuousClockBasisV1,
+    ContinuousClockError, ContinuousClockSuccessorPermitIdV1,
+    ContinuousClockSuccessorPermitV1, advance_continuous_clock_basis_v1,
+    bind_continuous_clock_basis_v1, derive_continuous_clock_successor_permit_v1,
 };
 pub use clock_evaluation_permit::{
     CLOCK_BOOTSTRAP_ANCHOR_SCHEMA, CLOCK_CONTINUITY_POLICY_SCHEMA,
