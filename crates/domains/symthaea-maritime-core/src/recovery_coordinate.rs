@@ -41,6 +41,7 @@ pub struct RegenerativeRecoveryCoordinatePolicyV1 {
 pub struct RegenerativeRecoveryCoordinateReportV1 {
     pub policy_id: String,
     pub policy_evidence_binding: String,
+    pub recovery_qualification_binding: String,
     pub profile_id: String,
     pub closure_model_id: String,
     pub closure_model_evidence_binding: String,
@@ -77,6 +78,7 @@ pub struct RegenerativeDisturbanceRecoveryAuthorizationV1 {
     pub disturbance_evidence_binding: String,
     pub recovery_policy_id: String,
     pub recovery_policy_evidence_binding: String,
+    pub recovery_qualification_binding: String,
     pub closure_model_id: String,
     pub flow_support_id: String,
     pub target_dependency_id: String,
@@ -116,7 +118,6 @@ pub enum RegenerativeRecoveryCoordinateError {
         required_units: u64,
         stockpile_units: u64,
     },
-    DisturbanceInvalid,
     DisturbanceRecoverySubjectMismatch,
     DisturbanceDoesNotDegradeQualifiedFlow,
 }
@@ -212,6 +213,7 @@ pub fn qualify_regenerative_recovery_coordinate(
     Ok(RegenerativeRecoveryCoordinateReportV1 {
         policy_id: policy.policy_id.clone(),
         policy_evidence_binding: policy.evidence_binding.clone(),
+        recovery_qualification_binding: policy.recovery_qualification_binding.clone(),
         profile_id: profile.profile_id.clone(),
         closure_model_id: model.model_id.clone(),
         closure_model_evidence_binding: model.evidence_binding.clone(),
@@ -253,6 +255,7 @@ pub fn authorize_regenerative_disturbance_recovery(
         disturbance_evidence_binding: disturbance.evidence_binding.clone(),
         recovery_policy_id: recovery.policy_id.clone(),
         recovery_policy_evidence_binding: recovery.policy_evidence_binding.clone(),
+        recovery_qualification_binding: recovery.recovery_qualification_binding.clone(),
         closure_model_id: recovery.closure_model_id.clone(),
         flow_support_id: recovery.flow_support_id.clone(),
         target_dependency_id: recovery.target_dependency_id.clone(),
