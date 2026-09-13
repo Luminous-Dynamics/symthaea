@@ -147,6 +147,7 @@ pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
 mod motor;
+pub mod shadow_identity;
 pub mod shadow_policy;
 pub mod state_information_gain;
 mod td_learning;
