@@ -1,13 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Additive V2 journal adapter for domain executors that must bind the exact generic Prepared digest.
+//! Additive V2 journal adapter for domain executors that must bind the exact generic Prepared event.
 //!
 //! V1 executors remain unchanged. V2 is opt-in. Canonical Prepared digest computation and context
 //! validation happen before the durable write-ahead boundary. After generic live revalidation and
-//! domain preflight, the exact `PreparedInterventionExecution` is appended and its persistence is
-//! attempted. Any acknowledgement ambiguity is returned as an explicit in-doubt outcome and the
-//! domain executor is not called. Only an accepted Prepared reference can produce the opaque V2
-//! context and reach domain execution.
+//! domain preflight, the exact `PreparedInterventionExecution` is appended, its journal-event hash
+//! is captured, and that exact head is persisted. Any acknowledgement ambiguity is returned as an
+//! explicit in-doubt outcome and the domain executor is not called. Only an accepted Prepared
+//! reference can produce the opaque V2 context and reach domain execution.
 
 #![deny(unsafe_code)]
 
@@ -79,7 +79,7 @@ pub trait ReceiptedInterventionExecutorV2 {
         Ok(())
     }
 
-    /// Execute only after the generic Prepared record has an accepted durable persistence reference
+    /// Execute only after the generic Prepared event has an accepted durable persistence reference
     /// and is exactly rebound into `context`. Errors remain in doubt because the adapter cannot
     /// assume downstream atomicity.
     fn execute_receipted_v2(
@@ -116,7 +116,7 @@ where
             return Ok(JournaledExecutionOutcome::PreflightRejected { error });
         }
 
-        // Compute and validate the exact correlation digest before any durable Prepared state exists.
+        // Compute and validate the exact payload digest before any durable Prepared state exists.
         // If serialization or record validation fails, this is still a clean pre-execution failure.
         let expected_prepared_digest = digest_prepared_execution(&self.prepared)
             .map_err(PreExecutionJournalV2Error::Journal)?;
@@ -138,13 +138,19 @@ where
                 actual: prepared_digest,
             });
         }
+        let prepared_event_hash = self.journal.head_hash();
+        if prepared_event_hash.0 == [0; 32] {
+            // The Prepared event was appended, but no persistence has been attempted yet. A zero
+            // event hash is therefore an internal journal invariant failure, not an in-doubt write.
+            return Err(PreExecutionJournalV2Error::PreparedEventHashInvariant);
+        }
 
         // A persistence error does not prove the write failed: the backend may commit before an
         // acknowledgement is lost. Treat both failure and an unusable success reference as explicit
         // write-ahead ambiguity, and never call the domain executor in either case.
         let prepared_persistence_ref = match self
             .persistence
-            .persist_execution_journal(self.journal.events(), self.journal.head_hash())
+            .persist_execution_journal(self.journal.events(), prepared_event_hash)
         {
             Ok(reference) => reference,
             Err(error) => {
@@ -163,11 +169,12 @@ where
             );
         }
 
-        // All digest/context verification completed before durability. Context construction is
+        // All digest/event/context verification completed before durability. Context construction is
         // intentionally infallible once the persistence boundary has returned an accepted reference.
-        let context = PreparedExecutionContextV2::from_verified_durable(
+        let context = PreparedExecutionContextV2::from_verified_durable_event_bound(
             &self.prepared,
             prepared_digest,
+            prepared_event_hash,
             prepared_persistence_ref.clone(),
         );
 
@@ -334,6 +341,8 @@ where
         expected: Sha256Digest,
         actual: Sha256Digest,
     },
+    #[error("generic execution journal produced a zero Prepared event hash")]
+    PreparedEventHashInvariant,
 }
 
 #[derive(Debug, Error)]

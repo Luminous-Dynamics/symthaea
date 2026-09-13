@@ -5,7 +5,7 @@
 //! This object carries correlation evidence only. It does not authorize a restore and cannot be
 //! constructed from a permit or arbitrary digest by external callers. The generic V2 execution
 //! adapter first produces `PreparedExecutionContextV2` from a durably persisted generic Prepared
-//! record; the domain restore layer may then derive this binding and commit its identity into
+//! event; the domain restore layer may then derive this binding and commit its identity into
 //! independently recoverable domain evidence without changing legacy quarantine-ledger wire types.
 
 #![deny(unsafe_code)]
@@ -26,6 +26,7 @@ pub struct RestorePreparedBindingV2 {
     execution_id: String,
     target_id: String,
     generic_prepared_digest: Sha256Digest,
+    generic_prepared_event_hash: Sha256Digest,
     generic_prepared_at_unix_s: u64,
     generic_prepared_persistence_ref: String,
 }
@@ -43,6 +44,7 @@ impl RestorePreparedBindingV2 {
             execution_id: context.execution_id().to_string(),
             target_id: context.target_id().to_string(),
             generic_prepared_digest: context.prepared_digest(),
+            generic_prepared_event_hash: context.prepared_event_hash(),
             generic_prepared_at_unix_s: context.prepared_at_unix_s(),
             generic_prepared_persistence_ref: context.prepared_persistence_ref().to_string(),
         };
@@ -64,6 +66,9 @@ impl RestorePreparedBindingV2 {
         if self.generic_prepared_digest.0 == [0; 32] {
             return Err(RestorePreparedBindingV2Error::ZeroPreparedDigest);
         }
+        if self.generic_prepared_event_hash.0 == [0; 32] {
+            return Err(RestorePreparedBindingV2Error::ZeroPreparedEventHash);
+        }
         if self.generic_prepared_at_unix_s > domain_observed_at_unix_s {
             return Err(RestorePreparedBindingV2Error::DomainObservationPredatesGenericPrepare {
                 generic_prepared_at_unix_s: self.generic_prepared_at_unix_s,
@@ -83,6 +88,10 @@ impl RestorePreparedBindingV2 {
 
     pub fn generic_prepared_digest(&self) -> Sha256Digest {
         self.generic_prepared_digest
+    }
+
+    pub fn generic_prepared_event_hash(&self) -> Sha256Digest {
+        self.generic_prepared_event_hash
     }
 
     pub fn generic_prepared_at_unix_s(&self) -> u64 {
@@ -118,6 +127,8 @@ pub enum RestorePreparedBindingV2Error {
     InvalidText { field: &'static str, value: String },
     #[error("generic Prepared digest must not be zero")]
     ZeroPreparedDigest,
+    #[error("generic Prepared journal-event hash must not be zero")]
+    ZeroPreparedEventHash,
     #[error(
         "domain restore observation predates generic Prepared time: generic={generic_prepared_at_unix_s}, domain={domain_observed_at_unix_s}"
     )]
@@ -167,9 +178,10 @@ mod tests {
         let prepared_digest = digest_prepared_execution(&prepared).unwrap();
         PreparedExecutionContextV2::verify_exact_prepared_digest(&prepared, prepared_digest)
             .unwrap();
-        PreparedExecutionContextV2::from_verified_durable(
+        PreparedExecutionContextV2::from_verified_durable_event_bound(
             &prepared,
             prepared_digest,
+            digest(90),
             "execution-journal:prepared:binding:v2".into(),
         )
     }
@@ -181,6 +193,7 @@ mod tests {
         assert_eq!(binding.execution_id(), context.execution_id());
         assert_eq!(binding.target_id(), context.target_id());
         assert_eq!(binding.generic_prepared_digest(), context.prepared_digest());
+        assert_eq!(binding.generic_prepared_event_hash(), context.prepared_event_hash());
         assert_eq!(
             binding.generic_prepared_at_unix_s(),
             context.prepared_at_unix_s()
