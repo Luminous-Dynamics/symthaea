@@ -3,22 +3,17 @@
 
 use crate::canonical::{
     AcceptanceRecordDigestV1, AnalysisConfigurationDigestV1, AnalysisRequirementRevisionIdV1,
-    AnalysisTrustErrorV1, CurrentnessAssertionIdV1, CurrentnessAttestationDigestV1,
-    ModelRevisionDigestV1, ObligationRevisionIdV1, Sha256DigestV1, SubjectRevisionIdV1,
-    SubjectStateDigestV1, TwinRevisionIdV1, TwinSchemaDigestV1, TwinStateDigestV1,
-    ValidityDimensionDigestV1, ValidityDomainRevisionIdV1, CURRENTNESS_DOMAIN_V1,
-    OBLIGATION_DOMAIN_V1, REQUIREMENT_DOMAIN_V1, SUBJECT_DOMAIN_V1, TWIN_DOMAIN_V1,
-    VALIDITY_DOMAIN_V1, canonical_text, domain_hash,
+    AnalysisTrustErrorV1, CurrentnessAssertionIdV2, CurrentnessAttestationDigestV1,
+    ModelRevisionDigestV1, ObligationRevisionIdV1, SubjectRevisionIdV1, SubjectStateDigestV1,
+    TwinRevisionIdV1, TwinSchemaDigestV1, TwinStateDigestV1, ValidityDimensionDigestV1,
+    ValidityDomainRevisionIdV1, CURRENTNESS_DOMAIN_V2, OBLIGATION_DOMAIN_V1,
+    REQUIREMENT_DOMAIN_V1, SUBJECT_DOMAIN_V1, TWIN_DOMAIN_V1, VALIDITY_DOMAIN_V1,
+    canonical_text, domain_hash,
 };
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use symthaea_formal_safety::{EvidenceKind, ProofObligation};
 
-/// Exact accepted service-stress requirement for the initial Civil canary.
-///
-/// This constructor fixes both the content-addressed proposition and a
-/// machine-readable 250 MPa service-stress bound. The acceptance-record digest
-/// is content addressed but not authenticated here.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AcceptedAnalysisRequirementV1 {
     revision_id: AnalysisRequirementRevisionIdV1,
@@ -76,8 +71,6 @@ impl AcceptedAnalysisRequirementV1 {
     }
 }
 
-/// Content-addressed subject state. The external state digest is a premise;
-/// this type proves only exact semantic binding, not provenance authenticity.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubjectRevisionV1 {
     revision_id: SubjectRevisionIdV1,
@@ -235,9 +228,6 @@ impl ValidityDomainRevisionV1 {
         for (name, digest) in &normalized {
             dimension_object.insert(name.clone(), Value::String(digest.as_str().to_string()));
         }
-        // Preserve the frozen ETK-3B schema field name. The value is a generic
-        // analysis-configuration digest here; renaming the wire field would be
-        // a protocol version change rather than a type-safety improvement.
         let preimage = json!({
             "dimensions": Value::Object(dimension_object),
             "model_revision_digest": model_revision_digest.as_str(),
@@ -289,45 +279,56 @@ impl ValidityDomainRevisionV1 {
     }
 }
 
+/// Bounded present-applicability assertion.
+///
+/// The attestation remains an unauthenticated content premise here, but the
+/// semantic identity cannot represent an unbounded validity interval.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CurrentnessAssertionV1 {
-    assertion_id: CurrentnessAssertionIdV1,
+pub struct CurrentnessAssertionV2 {
+    assertion_id: CurrentnessAssertionIdV2,
     twin_revision_id: TwinRevisionIdV1,
     validity_domain_revision_id: ValidityDomainRevisionIdV1,
     attestation_digest: CurrentnessAttestationDigestV1,
     observed_at_unix_ms: u64,
+    valid_until_unix_ms: u64,
 }
 
-impl CurrentnessAssertionV1 {
+impl CurrentnessAssertionV2 {
     pub fn new(
         twin: &TwinRevisionV1,
         validity_domain: &ValidityDomainRevisionV1,
         attestation_digest: CurrentnessAttestationDigestV1,
         observed_at_unix_ms: u64,
+        valid_until_unix_ms: u64,
     ) -> Result<Self, AnalysisTrustErrorV1> {
         if validity_domain.twin_revision_id() != twin.revision_id() {
             return Err(AnalysisTrustErrorV1::ValidityContextMismatch);
         }
+        if valid_until_unix_ms <= observed_at_unix_ms {
+            return Err(AnalysisTrustErrorV1::InvalidCurrentnessWindow);
+        }
         let preimage = json!({
             "attestation_digest": attestation_digest.as_str(),
             "observed_at_unix_ms": observed_at_unix_ms,
-            "schema": "symthaea.etk-currentness-assertion.v1",
+            "schema": "symthaea.etk-currentness-assertion.v2",
             "twin_revision_id": twin.revision_id().as_str(),
+            "valid_until_unix_ms": valid_until_unix_ms,
             "validity_domain_revision_id": validity_domain.revision_id().as_str(),
         });
         Ok(Self {
-            assertion_id: CurrentnessAssertionIdV1::from_digest(domain_hash(
-                CURRENTNESS_DOMAIN_V1,
+            assertion_id: CurrentnessAssertionIdV2::from_digest(domain_hash(
+                CURRENTNESS_DOMAIN_V2,
                 &preimage,
             )),
             twin_revision_id: twin.revision_id().clone(),
             validity_domain_revision_id: validity_domain.revision_id().clone(),
             attestation_digest,
             observed_at_unix_ms,
+            valid_until_unix_ms,
         })
     }
 
-    pub fn assertion_id(&self) -> &CurrentnessAssertionIdV1 {
+    pub fn assertion_id(&self) -> &CurrentnessAssertionIdV2 {
         &self.assertion_id
     }
 
@@ -339,20 +340,28 @@ impl CurrentnessAssertionV1 {
         &self.validity_domain_revision_id
     }
 
-    pub fn audit_record_v1(&self) -> Value {
+    pub fn observed_at_unix_ms(&self) -> u64 {
+        self.observed_at_unix_ms
+    }
+
+    pub fn valid_until_unix_ms(&self) -> u64 {
+        self.valid_until_unix_ms
+    }
+
+    pub fn audit_record_v2(&self) -> Value {
         json!({
             "attestation_digest": self.attestation_digest.as_str(),
-            "authority": "currentness-binding-only",
+            "authority": "bounded-currentness-binding-only",
             "currentness_assertion_id": self.assertion_id.as_str(),
             "observed_at_unix_ms": self.observed_at_unix_ms,
+            "schema": "symthaea.etk-currentness-assertion.v2",
             "twin_revision_id": self.twin_revision_id.as_str(),
+            "valid_until_unix_ms": self.valid_until_unix_ms,
             "validity_domain_revision_id": self.validity_domain_revision_id.as_str(),
         })
     }
 }
 
-/// Content-addressed Analysis proof-obligation semantics. Lifecycle state and
-/// evidence refs are intentionally excluded from the semantic snapshot.
 pub fn analytical_obligation_revision_v1(
     obligation: &ProofObligation,
 ) -> Result<ObligationRevisionIdV1, AnalysisTrustErrorV1> {

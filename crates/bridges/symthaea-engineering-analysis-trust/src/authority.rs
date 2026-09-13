@@ -8,14 +8,14 @@ use crate::analysis::{
 use crate::canonical::{
     ADMITTED_DOMAIN_V1, AdmittedAnalyticalEvidenceIdV1, AnalysisRequirementRevisionIdV1,
     AnalysisTrustErrorV1, AnalyticalInputRevisionIdV1, AnalyticalMethodRevisionIdV1,
-    AnalyticalPlanIdV1, AnalyticalPolicyRevisionIdV1, CurrentNativeAnalyticalDischargeFactIdV1,
-    CurrentnessAssertionIdV1, EQUATION_RELATIVE_TOLERANCE, FACT_DOMAIN_V1,
+    AnalyticalPlanIdV1, AnalyticalPolicyRevisionIdV1, CurrentNativeAnalyticalDischargeFactIdV2,
+    CurrentnessAssertionIdV2, EQUATION_RELATIVE_TOLERANCE, FACT_DOMAIN_V2,
     NativeAnalyticalDischargeReceiptIdV1, ObligationRevisionIdV1, PLAN_DOMAIN_V1,
     RECEIPT_DOMAIN_V1, SubjectRevisionIdV1, TwinRevisionIdV1, ValidityDomainRevisionIdV1,
     canonical_binary64_v1, domain_hash,
 };
 use crate::context::{
-    AcceptedAnalysisRequirementV1, CurrentnessAssertionV1, SubjectRevisionV1, TwinRevisionV1,
+    AcceptedAnalysisRequirementV1, CurrentnessAssertionV2, SubjectRevisionV1, TwinRevisionV1,
     ValidityDomainRevisionV1, analytical_obligation_revision_v1,
 };
 use serde_json::{Value, json};
@@ -32,7 +32,9 @@ pub struct NativeAnalyticalPlanV1 {
     subject_revision_id: SubjectRevisionIdV1,
     twin_revision_id: TwinRevisionIdV1,
     validity_domain_revision_id: ValidityDomainRevisionIdV1,
-    currentness_assertion_id: CurrentnessAssertionIdV1,
+    currentness_assertion_id: CurrentnessAssertionIdV2,
+    currentness_observed_at_unix_ms: u64,
+    currentness_valid_until_unix_ms: u64,
     method_revision_id: AnalyticalMethodRevisionIdV1,
     input_revision_id: AnalyticalInputRevisionIdV1,
     policy_revision_id: AnalyticalPolicyRevisionIdV1,
@@ -45,7 +47,7 @@ impl NativeAnalyticalPlanV1 {
         subject: &SubjectRevisionV1,
         twin: &TwinRevisionV1,
         validity_domain: &ValidityDomainRevisionV1,
-        currentness: &CurrentnessAssertionV1,
+        currentness: &CurrentnessAssertionV2,
         obligation: &ProofObligation,
         method: &AnalyticalMethodV1,
         input: &RectangularCantileverInputV1,
@@ -97,6 +99,8 @@ impl NativeAnalyticalPlanV1 {
             twin_revision_id: twin.revision_id().clone(),
             validity_domain_revision_id: validity_domain.revision_id().clone(),
             currentness_assertion_id: currentness.assertion_id().clone(),
+            currentness_observed_at_unix_ms: currentness.observed_at_unix_ms(),
+            currentness_valid_until_unix_ms: currentness.valid_until_unix_ms(),
             method_revision_id: method.revision_id().clone(),
             input_revision_id: input.revision_id().clone(),
             policy_revision_id: policy.revision_id().clone(),
@@ -127,8 +131,16 @@ impl NativeAnalyticalPlanV1 {
         &self.validity_domain_revision_id
     }
 
-    pub fn currentness_assertion_id(&self) -> &CurrentnessAssertionIdV1 {
+    pub fn currentness_assertion_id(&self) -> &CurrentnessAssertionIdV2 {
         &self.currentness_assertion_id
+    }
+
+    pub fn currentness_observed_at_unix_ms(&self) -> u64 {
+        self.currentness_observed_at_unix_ms
+    }
+
+    pub fn currentness_valid_until_unix_ms(&self) -> u64 {
+        self.currentness_valid_until_unix_ms
     }
 
     pub fn audit_record_v1(&self) -> Value {
@@ -137,6 +149,8 @@ impl NativeAnalyticalPlanV1 {
             "analytical_plan_id": self.plan_id.as_str(),
             "authority": "binding-plan-only",
             "currentness_assertion_id": self.currentness_assertion_id.as_str(),
+            "currentness_observed_at_unix_ms": self.currentness_observed_at_unix_ms,
+            "currentness_valid_until_unix_ms": self.currentness_valid_until_unix_ms,
             "input_revision_id": self.input_revision_id.as_str(),
             "method_revision_id": self.method_revision_id.as_str(),
             "obligation_id": self.obligation_id.as_str(),
@@ -319,10 +333,10 @@ pub fn issue_native_analytical_discharge_receipt_v1(
     })
 }
 
-#[must_use = "a current analytical fact is not complete requirement satisfaction"]
+#[must_use = "a bounded current analytical fact is not complete requirement satisfaction"]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CurrentNativeAnalyticalDischargeFactV1 {
-    fact_id: CurrentNativeAnalyticalDischargeFactIdV1,
+pub struct CurrentNativeAnalyticalDischargeFactV2 {
+    fact_id: CurrentNativeAnalyticalDischargeFactIdV2,
     analytical_plan_id: AnalyticalPlanIdV1,
     witness_receipt_id: NativeAnalyticalDischargeReceiptIdV1,
     requirement_revision_id: AnalysisRequirementRevisionIdV1,
@@ -330,11 +344,14 @@ pub struct CurrentNativeAnalyticalDischargeFactV1 {
     subject_revision_id: SubjectRevisionIdV1,
     twin_revision_id: TwinRevisionIdV1,
     validity_domain_revision_id: ValidityDomainRevisionIdV1,
-    currentness_assertion_id: CurrentnessAssertionIdV1,
+    currentness_assertion_id: CurrentnessAssertionIdV2,
+    currentness_observed_at_unix_ms: u64,
+    currentness_valid_until_unix_ms: u64,
+    evaluated_at_unix_ms: u64,
 }
 
-impl CurrentNativeAnalyticalDischargeFactV1 {
-    pub fn fact_id(&self) -> &CurrentNativeAnalyticalDischargeFactIdV1 {
+impl CurrentNativeAnalyticalDischargeFactV2 {
+    pub fn fact_id(&self) -> &CurrentNativeAnalyticalDischargeFactIdV2 {
         &self.fact_id
     }
 
@@ -354,14 +371,22 @@ impl CurrentNativeAnalyticalDischargeFactV1 {
         &self.obligation_revision_id
     }
 
-    pub fn audit_record_v1(&self) -> Value {
+    pub fn evaluated_at_unix_ms(&self) -> u64 {
+        self.evaluated_at_unix_ms
+    }
+
+    pub fn audit_record_v2(&self) -> Value {
         json!({
             "analytical_plan_id": self.analytical_plan_id.as_str(),
-            "authority": "current-analytical-discharge-only",
+            "authority": "bounded-current-analytical-discharge-only",
             "current_analytical_discharge_fact_id": self.fact_id.as_str(),
             "currentness_assertion_id": self.currentness_assertion_id.as_str(),
+            "currentness_observed_at_unix_ms": self.currentness_observed_at_unix_ms,
+            "currentness_valid_until_unix_ms": self.currentness_valid_until_unix_ms,
+            "evaluated_at_unix_ms": self.evaluated_at_unix_ms,
             "obligation_revision_id": self.obligation_revision_id.as_str(),
             "requirement_revision_id": self.requirement_revision_id.as_str(),
+            "schema": "symthaea.etk-current-native-analytical-discharge-fact.v2",
             "subject_revision_id": self.subject_revision_id.as_str(),
             "twin_revision_id": self.twin_revision_id.as_str(),
             "validity_domain_revision_id": self.validity_domain_revision_id.as_str(),
@@ -370,34 +395,45 @@ impl CurrentNativeAnalyticalDischargeFactV1 {
     }
 }
 
-pub fn derive_current_native_analytical_discharge_fact_v1(
+pub fn derive_current_native_analytical_discharge_fact_v2(
     current_plan: &NativeAnalyticalPlanV1,
     receipt: &NativeAnalyticalDischargeReceiptV1,
-) -> Result<CurrentNativeAnalyticalDischargeFactV1, AnalysisTrustErrorV1> {
+    evaluated_at_unix_ms: u64,
+) -> Result<CurrentNativeAnalyticalDischargeFactV2, AnalysisTrustErrorV1> {
     if receipt.analytical_plan_id != current_plan.plan_id
         || receipt.obligation_id != current_plan.obligation_id
         || receipt.obligation_revision_id != current_plan.obligation_revision_id
     {
         return Err(AnalysisTrustErrorV1::HistoricalPlan);
     }
+    if evaluated_at_unix_ms < current_plan.currentness_observed_at_unix_ms {
+        return Err(AnalysisTrustErrorV1::FreshnessNotYetValid);
+    }
+    if evaluated_at_unix_ms > current_plan.currentness_valid_until_unix_ms {
+        return Err(AnalysisTrustErrorV1::FreshnessExpired);
+    }
+
     let preimage = json!({
         "acceptance_policy_revision_id": current_plan.policy_revision_id.as_str(),
         "analytical_plan_id": current_plan.plan_id.as_str(),
         "currentness_assertion_id": current_plan.currentness_assertion_id.as_str(),
+        "currentness_observed_at_unix_ms": current_plan.currentness_observed_at_unix_ms,
+        "currentness_valid_until_unix_ms": current_plan.currentness_valid_until_unix_ms,
+        "evaluated_at_unix_ms": evaluated_at_unix_ms,
         "input_revision_id": current_plan.input_revision_id.as_str(),
         "method_revision_id": current_plan.method_revision_id.as_str(),
         "native_analytical_discharge_receipt_id": receipt.receipt_id.as_str(),
         "obligation_id": current_plan.obligation_id.as_str(),
         "obligation_revision_id": current_plan.obligation_revision_id.as_str(),
         "requirement_revision_id": current_plan.requirement_revision_id.as_str(),
-        "schema": "symthaea.etk-current-native-analytical-discharge-fact.v1",
+        "schema": "symthaea.etk-current-native-analytical-discharge-fact.v2",
         "subject_revision_id": current_plan.subject_revision_id.as_str(),
         "twin_revision_id": current_plan.twin_revision_id.as_str(),
         "validity_domain_revision_id": current_plan.validity_domain_revision_id.as_str(),
     });
-    Ok(CurrentNativeAnalyticalDischargeFactV1 {
-        fact_id: CurrentNativeAnalyticalDischargeFactIdV1::from_digest(domain_hash(
-            FACT_DOMAIN_V1,
+    Ok(CurrentNativeAnalyticalDischargeFactV2 {
+        fact_id: CurrentNativeAnalyticalDischargeFactIdV2::from_digest(domain_hash(
+            FACT_DOMAIN_V2,
             &preimage,
         )),
         analytical_plan_id: current_plan.plan_id.clone(),
@@ -408,6 +444,9 @@ pub fn derive_current_native_analytical_discharge_fact_v1(
         twin_revision_id: current_plan.twin_revision_id.clone(),
         validity_domain_revision_id: current_plan.validity_domain_revision_id.clone(),
         currentness_assertion_id: current_plan.currentness_assertion_id.clone(),
+        currentness_observed_at_unix_ms: current_plan.currentness_observed_at_unix_ms,
+        currentness_valid_until_unix_ms: current_plan.currentness_valid_until_unix_ms,
+        evaluated_at_unix_ms,
     })
 }
 

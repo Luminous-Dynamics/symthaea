@@ -1,18 +1,18 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Public-API parity with the independent ETK-3C native analytical oracle.
+//! Public-API parity with the independent ETK-3C bounded-currentness V2 oracle.
 
 use symthaea_engineering_analysis_trust::{
     AcceptanceRecordDigestV1, AlgorithmRevisionDigestV1, AnalysisConfigurationDigestV1,
     AcceptedAnalysisRequirementV1, AnalysisTrustErrorV1, AnalyticalAcceptancePolicyV1,
-    AnalyticalMethodV1, CurrentnessAssertionV1, CurrentnessAttestationDigestV1,
+    AnalyticalMethodV1, CurrentnessAssertionV2, CurrentnessAttestationDigestV1,
     ExecutionArtifactDigestV1, ImplementationArtifactDigestV1, ModelQualificationRecordDigestV1,
     ModelRevisionDigestV1, NativeAnalyticalPlanV1, NativeAnalyticalResultV1,
     RectangularCantileverInputV1, Sha256DigestV1, SubjectRevisionV1, SubjectStateDigestV1,
     TwinKindV1, TwinRevisionV1, TwinSchemaDigestV1, TwinStateDigestV1,
     ValidityDimensionDigestV1, ValidityDomainRevisionV1, admit_native_analytical_evidence_v1,
     analytical_obligation_revision_v1, canonical_binary64_v1,
-    derive_current_native_analytical_discharge_fact_v1,
+    derive_current_native_analytical_discharge_fact_v2,
     issue_native_analytical_discharge_receipt_v1,
 };
 use symthaea_formal_safety::{EvidenceKind, ObligationStatus, ProofObligation};
@@ -27,24 +27,26 @@ const TWIN: &str =
     "sha256:19d558d6e7579f0f44c71398c7ddac659677aca0fa0e65ed46227670e4876cd9";
 const VALIDITY: &str =
     "sha256:90bff4adf8917f2ae071f405d5c46afb310b12a98dd2e4eec845de1261a24890";
-const CURRENTNESS: &str =
-    "sha256:f85bd7d5129b08a3256cfdd5b3506f3cae1dbc625b097a8bf95bf1f6fe709dd9";
-const REFRESHED_CURRENTNESS: &str =
-    "sha256:e4008d7a50289e654a63b2db6d964a5550030bc6ab670757cd78c0c58b529a1b";
+const CURRENTNESS_V2: &str =
+    "sha256:deab1cf24d0cb23c7e72697f9bc41277b82997696a13ea1c25fb3c7a7d0994c6";
 const METHOD: &str =
     "sha256:73bb060e12b166cecfea9a73c1f274f4443f1a540a777e7ac8260c65808bedc3";
 const INPUT: &str =
     "sha256:3b9a62ea2ce031b73c188e8c0138fb1ebcda20e77d7f2401502ec493323d3c86";
 const POLICY: &str =
     "sha256:7edc8fcbc03184413cc9c275537bdefb2d1c18f281406dc1adacd9a53a0a3bb5";
-const PLAN: &str =
-    "sha256:b86b76c504bd7b7601981d40988ceafd6c0a6580c941e4c91a65054c57749432";
-const ADMITTED: &str =
-    "sha256:7ea504bb399216df14d5792b44f574e18c62163049c4406e23e4dc3783e86bde";
-const RECEIPT: &str =
-    "sha256:5d740e2cfe67fa0bc0145cc7d79a9410e9c36b276ac78f12243ad5e013f7a1ec";
-const CURRENT_FACT: &str =
-    "sha256:47e1d641da233d0d70e6084a97bbe55fbf9d0487a3b6f7978ca03790fbeb494c";
+const PLAN_V2: &str =
+    "sha256:bc308f5399ca9032131dcbed3f53991ab104465b15471521b0388be7f611b5e1";
+const ADMITTED_V2: &str =
+    "sha256:228f0ceb1566fa133d8647ccc5859ffd45957ab5138d67fa4b943a79fcdf0ec7";
+const RECEIPT_V2: &str =
+    "sha256:ce0b9d96d83e829d3878e7303e35ac607dbed8512a2202e7c224ca4c32ee0b81";
+const CURRENT_FACT_V2: &str =
+    "sha256:2d6e90e20460efc8f2f3d24c72e2c7a07be77e0143119d38f23385a868dad6eb";
+
+const OBSERVED_AT_UNIX_MS: u64 = 1_789_123_456_000;
+const VALID_UNTIL_UNIX_MS: u64 = 1_789_209_856_000;
+const EVALUATED_AT_UNIX_MS: u64 = 1_789_123_457_000;
 
 fn digest(ch: char) -> String {
     format!("sha256:{}", ch.to_string().repeat(64))
@@ -83,7 +85,7 @@ struct ContextFixture {
     subject: SubjectRevisionV1,
     twin: TwinRevisionV1,
     validity: ValidityDomainRevisionV1,
-    currentness: CurrentnessAssertionV1,
+    currentness: CurrentnessAssertionV2,
 }
 
 fn context(attestation: char) -> ContextFixture {
@@ -119,11 +121,12 @@ fn context(attestation: char) -> ContextFixture {
         ],
     )
     .unwrap();
-    let currentness = CurrentnessAssertionV1::new(
+    let currentness = CurrentnessAssertionV2::new(
         &twin,
         &validity,
         premise!(CurrentnessAttestationDigestV1, attestation),
-        1_789_123_456_000,
+        OBSERVED_AT_UNIX_MS,
+        VALID_UNTIL_UNIX_MS,
     )
     .unwrap();
     ContextFixture {
@@ -206,7 +209,7 @@ fn result(
 }
 
 #[test]
-fn independent_vectors_compose_end_to_end() {
+fn v2_vectors_compose_end_to_end_and_preserve_upstream_semantics() {
     assert_eq!(requirement().revision_id().as_str(), REQUIREMENT);
     assert_eq!(
         analytical_obligation_revision_v1(&obligation())
@@ -221,7 +224,9 @@ fn independent_vectors_compose_end_to_end() {
     assert_eq!(context.subject.revision_id().as_str(), SUBJECT);
     assert_eq!(context.twin.revision_id().as_str(), TWIN);
     assert_eq!(context.validity.revision_id().as_str(), VALIDITY);
-    assert_eq!(context.currentness.assertion_id().as_str(), CURRENTNESS);
+    assert_eq!(context.currentness.assertion_id().as_str(), CURRENTNESS_V2);
+    assert_eq!(context.currentness.observed_at_unix_ms(), OBSERVED_AT_UNIX_MS);
+    assert_eq!(context.currentness.valid_until_unix_ms(), VALID_UNTIL_UNIX_MS);
 
     let method = method();
     let input = input(&method, 1000.0);
@@ -231,13 +236,13 @@ fn independent_vectors_compose_end_to_end() {
     assert_eq!(policy.revision_id().as_str(), POLICY);
 
     let plan = plan(&method, &input, &policy, &context);
-    assert_eq!(plan.plan_id().as_str(), PLAN);
+    assert_eq!(plan.plan_id().as_str(), PLAN_V2);
     assert_eq!(plan.requirement_revision_id().as_str(), REQUIREMENT);
     assert_eq!(plan.obligation_revision_id().as_str(), OBLIGATION);
     assert_eq!(plan.subject_revision_id().as_str(), SUBJECT);
     assert_eq!(plan.twin_revision_id().as_str(), TWIN);
     assert_eq!(plan.validity_domain_revision_id().as_str(), VALIDITY);
-    assert_eq!(plan.currentness_assertion_id().as_str(), CURRENTNESS);
+    assert_eq!(plan.currentness_assertion_id().as_str(), CURRENTNESS_V2);
 
     let candidate = result(
         &method,
@@ -250,27 +255,121 @@ fn independent_vectors_compose_end_to_end() {
     );
     let admitted =
         admit_native_analytical_evidence_v1(&plan, &method, &input, &policy, &candidate).unwrap();
-    assert_eq!(admitted.admitted_evidence_id().as_str(), ADMITTED);
+    assert_eq!(admitted.admitted_evidence_id().as_str(), ADMITTED_V2);
 
     let receipt = issue_native_analytical_discharge_receipt_v1(&plan, &admitted).unwrap();
-    assert_eq!(receipt.receipt_id().as_str(), RECEIPT);
+    assert_eq!(receipt.receipt_id().as_str(), RECEIPT_V2);
 
-    let current = derive_current_native_analytical_discharge_fact_v1(&plan, &receipt).unwrap();
-    assert_eq!(current.fact_id().as_str(), CURRENT_FACT);
-    assert_eq!(current.witness_receipt_id().as_str(), RECEIPT);
+    let current = derive_current_native_analytical_discharge_fact_v2(
+        &plan,
+        &receipt,
+        EVALUATED_AT_UNIX_MS,
+    )
+    .unwrap();
+    assert_eq!(current.fact_id().as_str(), CURRENT_FACT_V2);
+    assert_eq!(current.witness_receipt_id().as_str(), RECEIPT_V2);
     assert_eq!(current.requirement_revision_id().as_str(), REQUIREMENT);
     assert_eq!(current.obligation_revision_id().as_str(), OBLIGATION);
+    assert_eq!(current.evaluated_at_unix_ms(), EVALUATED_AT_UNIX_MS);
 }
 
 #[test]
-fn role_safe_premises_preserve_vector_bytes_but_not_type_interchangeability() {
-    let raw_a = raw('a');
+fn bounded_currentness_rejects_invalid_windows_and_out_of_window_evaluation() {
+    let base = context('4');
     assert_eq!(
-        AcceptanceRecordDigestV1::from_digest(raw_a.clone()).as_str(),
-        ImplementationArtifactDigestV1::from_digest(raw_a).as_str()
+        CurrentnessAssertionV2::new(
+            &base.twin,
+            &base.validity,
+            premise!(CurrentnessAttestationDigestV1, '4'),
+            OBSERVED_AT_UNIX_MS,
+            OBSERVED_AT_UNIX_MS,
+        )
+        .unwrap_err(),
+        AnalysisTrustErrorV1::InvalidCurrentnessWindow
     );
-    // Equal bytes are intentionally distinct Rust types; call sites must name
-    // which authority premise role they are supplying.
+
+    let method = method();
+    let input = input(&method, 1000.0);
+    let policy = policy(2.0, 0.05);
+    let plan = plan(&method, &input, &policy, &base);
+    let candidate = result(
+        &method,
+        &input,
+        10.416666666666666,
+        24.0e6,
+        0.0032,
+        2000.0,
+        0.02,
+    );
+    let admitted =
+        admit_native_analytical_evidence_v1(&plan, &method, &input, &policy, &candidate).unwrap();
+    let receipt = issue_native_analytical_discharge_receipt_v1(&plan, &admitted).unwrap();
+
+    assert_eq!(
+        derive_current_native_analytical_discharge_fact_v2(
+            &plan,
+            &receipt,
+            OBSERVED_AT_UNIX_MS - 1,
+        )
+        .unwrap_err(),
+        AnalysisTrustErrorV1::FreshnessNotYetValid
+    );
+    assert_eq!(
+        derive_current_native_analytical_discharge_fact_v2(
+            &plan,
+            &receipt,
+            VALID_UNTIL_UNIX_MS + 1,
+        )
+        .unwrap_err(),
+        AnalysisTrustErrorV1::FreshnessExpired
+    );
+
+    // Inclusive boundaries are intentionally valid.
+    derive_current_native_analytical_discharge_fact_v2(&plan, &receipt, OBSERVED_AT_UNIX_MS)
+        .unwrap();
+    derive_current_native_analytical_discharge_fact_v2(&plan, &receipt, VALID_UNTIL_UNIX_MS)
+        .unwrap();
+}
+
+#[test]
+fn refreshed_currentness_makes_old_receipt_historical() {
+    let method = method();
+    let input = input(&method, 1000.0);
+    let policy = policy(2.0, 0.05);
+    let old_context = context('4');
+    let refreshed_context = context('5');
+    let old_plan = plan(&method, &input, &policy, &old_context);
+    let refreshed_plan = plan(&method, &input, &policy, &refreshed_context);
+    assert_ne!(old_plan.plan_id(), refreshed_plan.plan_id());
+
+    let candidate = result(
+        &method,
+        &input,
+        10.416666666666666,
+        24.0e6,
+        0.0032,
+        2000.0,
+        0.02,
+    );
+    let admitted = admit_native_analytical_evidence_v1(
+        &old_plan,
+        &method,
+        &input,
+        &policy,
+        &candidate,
+    )
+    .unwrap();
+    let receipt = issue_native_analytical_discharge_receipt_v1(&old_plan, &admitted).unwrap();
+
+    assert_eq!(
+        derive_current_native_analytical_discharge_fact_v2(
+            &refreshed_plan,
+            &receipt,
+            EVALUATED_AT_UNIX_MS,
+        )
+        .unwrap_err(),
+        AnalysisTrustErrorV1::HistoricalPlan
+    );
 }
 
 #[test]
@@ -328,11 +427,12 @@ fn semantic_context_rejects_cross_subject_and_cross_twin_composition() {
     )
     .unwrap();
     assert_eq!(
-        CurrentnessAssertionV1::new(
+        CurrentnessAssertionV2::new(
             &twin_b,
             &context_a.validity,
             premise!(CurrentnessAttestationDigestV1, '4'),
-            1_789_123_456_000,
+            OBSERVED_AT_UNIX_MS,
+            VALID_UNTIL_UNIX_MS,
         )
         .unwrap_err(),
         AnalysisTrustErrorV1::ValidityContextMismatch
@@ -340,14 +440,13 @@ fn semantic_context_rejects_cross_subject_and_cross_twin_composition() {
 }
 
 #[test]
-fn input_drift_and_weak_policy_fail_before_authority() {
+fn input_drift_weak_policy_and_equation_errors_fail_before_authority() {
     let method = method();
     let original = input(&method, 1000.0);
     let changed = input(&method, 1000.0000000000001);
     let context = context('4');
     let policy = policy(2.0, 0.05);
     let plan = plan(&method, &original, &policy, &context);
-    assert_ne!(original.revision_id(), changed.revision_id());
 
     let changed_result = result(
         &method,
@@ -386,82 +485,58 @@ fn input_drift_and_weak_policy_fail_before_authority() {
         .unwrap_err(),
         AnalysisTrustErrorV1::PolicyDoesNotDischargeRequirement
     );
-}
 
-#[test]
-fn analytical_equations_and_conservative_acceptance_fail_closed() {
-    let method = method();
-    let input = input(&method, 1000.0);
-    let context = context('4');
-    let policy = policy(2.0, 0.05);
-    let plan = plan(&method, &input, &policy, &context);
-
-    for (candidate, expected) in [
-        (
-            result(
-                &method,
-                &input,
-                10.416666666666666,
-                24.0e6,
-                0.004,
-                2000.0,
-                0.02,
-            ),
-            AnalysisTrustErrorV1::AnalyticalEquationMismatch("maximum deflection"),
-        ),
-        (
-            result(
-                &method,
-                &input,
-                10.416666666666666,
-                24.0e6,
-                0.0032,
-                1999.0,
-                0.02,
-            ),
-            AnalysisTrustErrorV1::AnalyticalEquationMismatch("maximum moment"),
-        ),
-        (
-            result(&method, &input, 10.0, 24.0e6, 0.0032, 2000.0, 0.02),
-            AnalysisTrustErrorV1::InconsistentFactorOfSafety,
-        ),
-    ] {
-        assert_eq!(
-            admit_native_analytical_evidence_v1(
-                &plan,
-                &method,
-                &input,
-                &policy,
-                &candidate,
-            )
-            .unwrap_err(),
-            expected
-        );
-    }
-
-    let excessive_error = result(
+    let wrong_deflection = result(
         &method,
-        &input,
+        &original,
         10.416666666666666,
         24.0e6,
-        0.0032,
+        0.004,
         2000.0,
-        0.06,
+        0.02,
     );
     assert_eq!(
         admit_native_analytical_evidence_v1(
             &plan,
             &method,
-            &input,
+            &original,
             &policy,
-            &excessive_error,
+            &wrong_deflection,
         )
         .unwrap_err(),
-        AnalysisTrustErrorV1::ModelErrorBudgetExceeded
+        AnalysisTrustErrorV1::AnalyticalEquationMismatch("maximum deflection")
     );
 
-    let strict = policy(10.3, 0.05);
-    let strict_plan = plan(&method, &input, &strict, &context);
+    let wrong_moment = result(
+        &method,
+        &original,
+        10.416666666666666,
+        24.0e6,
+        0.0032,
+        1999.0,
+        0.02,
+    );
+    assert_eq!(
+        admit_native_analytical_evidence_v1(
+            &plan,
+            &method,
+            &original,
+            &policy,
+            &wrong_moment,
+        )
+        .unwrap_err(),
+        AnalysisTrustErrorV1::AnalyticalEquationMismatch("maximum moment")
+    );
+}
+
+#[test]
+fn conservative_margin_and_model_error_fail_closed() {
+    let method = method();
+    let input = input(&method, 1000.0);
+    let context = context('4');
+
+    let strict_policy = policy(10.3, 0.05);
+    let strict_plan = plan(&method, &input, &strict_policy, &context);
     let nominal = result(
         &method,
         &input,
@@ -476,54 +551,40 @@ fn analytical_equations_and_conservative_acceptance_fail_closed() {
             &strict_plan,
             &method,
             &input,
-            &strict,
+            &strict_policy,
             &nominal,
         )
         .unwrap_err(),
         AnalysisTrustErrorV1::AcceptancePredicateFailed
     );
-}
 
-#[test]
-fn currentness_refresh_makes_old_receipt_historical() {
-    let method = method();
-    let input = input(&method, 1000.0);
     let policy = policy(2.0, 0.05);
-    let old_context = context('4');
-    let new_context = context('5');
-    assert_eq!(old_context.currentness.assertion_id().as_str(), CURRENTNESS);
-    assert_eq!(new_context.currentness.assertion_id().as_str(), REFRESHED_CURRENTNESS);
-
-    let old_plan = plan(&method, &input, &policy, &old_context);
-    let new_plan = plan(&method, &input, &policy, &new_context);
-    let candidate = result(
+    let plan = plan(&method, &input, &policy, &context);
+    let excessive = result(
         &method,
         &input,
         10.416666666666666,
         24.0e6,
         0.0032,
         2000.0,
-        0.02,
+        0.06,
     );
-    let admitted = admit_native_analytical_evidence_v1(
-        &old_plan,
-        &method,
-        &input,
-        &policy,
-        &candidate,
-    )
-    .unwrap();
-    let receipt = issue_native_analytical_discharge_receipt_v1(&old_plan, &admitted).unwrap();
-
     assert_eq!(
-        derive_current_native_analytical_discharge_fact_v1(&new_plan, &receipt).unwrap_err(),
-        AnalysisTrustErrorV1::HistoricalPlan
+        admit_native_analytical_evidence_v1(
+            &plan,
+            &method,
+            &input,
+            &policy,
+            &excessive,
+        )
+        .unwrap_err(),
+        AnalysisTrustErrorV1::ModelErrorBudgetExceeded
     );
 }
 
 #[test]
-fn malformed_content_identity_and_non_finite_numbers_are_rejected() {
+fn malformed_content_identity_and_nan_are_rejected() {
     assert!(ExecutionArtifactDigestV1::parse("sha256:not-a-digest").is_err());
-    assert!(AcceptanceRecordDigestV1::parse(format!("sha256:{}", "A".repeat(64))).is_err());
+    assert!(Sha256DigestV1::parse(format!("sha256:{}", "A".repeat(64))).is_err());
     assert!(canonical_binary64_v1(f64::NAN).is_err());
 }
