@@ -98,6 +98,8 @@ pub mod math;
 pub mod planar_configuration;
 /// Proof-strength reachability results and complete finite reference planning.
 pub mod reachability;
+/// Analytic bounded-disturbance robust terminal-set reachability.
+pub mod robust_reachability;
 /// Deterministic seeded bounded RRT with no infeasibility authority.
 pub mod sampling_reachability;
 /// Optional smooth-manifold refinement over planner-neutral metric spaces.

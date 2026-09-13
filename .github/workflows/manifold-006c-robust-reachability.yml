@@ -1,0 +1,133 @@
+name: MANIFOLD-006C Robust Reachability Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/manifold-006c-robust-reachability.yml'
+      - 'crates/core/symthaea-core/src/robust_reachability.rs'
+      - 'crates/core/symthaea-core/src/lib.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006c_robust_reachability.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: 247cdf2826d668621ef47ab87818dfd9be9c4cfe
+  QUALIFIED_PARENT_ARTIFACT_SHA256: 2bf547a3235cb7aa6a1b5e7add14ea8b33e793ab3bdb48bee74706078a6d73a4
+
+jobs:
+  qualify:
+    name: Analytic robust terminal-set theorem
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact 006C subject and qualified 006B parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/manifold-006c
+          {
+            echo "schema=symthaea.manifold-006c.environment.v1"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "parent_sha=$(git rev-parse HEAD^)"
+            echo "qualified_parent_artifact_sha256=$QUALIFIED_PARENT_ARTIFACT_SHA256"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "runner_label=ubuntu-24.04"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+          } > artifacts/manifold-006c/environment.txt
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Extend environment capsule
+        run: |
+          set -euo pipefail
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "rustc_host=$(rustc -vV | sed -n 's/^host: //p')"
+            echo "rustc_commit=$(rustc -vV | sed -n 's/^commit-hash: //p')"
+            echo "llvm_version=$(rustc -vV | sed -n 's/^LLVM version: //p')"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "image_os=${ImageOS:-unknown}"
+            echo "image_version=${ImageVersion:-unknown}"
+          } >> artifacts/manifold-006c/environment.txt
+
+      - name: Check exact core crate
+        run: |
+          cargo check --locked -p symthaea-core --no-default-features
+
+      - name: Run self-contained MANIFOLD-006C qualification corpus
+        run: |
+          cargo test --locked -p symthaea-core --no-default-features \
+            --test manifold_006c_robust_reachability
+
+      - name: Emit qualification receipt
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          receipt = {
+              'schema': 'symthaea.manifold-006c.qualification.v1',
+              'source_subject': os.environ['SUBJECT_SHA'].lower(),
+              'exact_parent': os.environ['BASE_SHA'].lower(),
+              'qualified_parent_artifact_sha256': os.environ['QUALIFIED_PARENT_ARTIFACT_SHA256'].lower(),
+              'rust': '1.96.0',
+              'core_check': 'PASS',
+              'robust_reachability_corpus': 'PASS',
+              'disturbance_quantifier': 'universal-adversarial',
+              'control_information_pattern': 'constant-open-loop-before-disturbance-realization',
+              'robust_vs_existential_separation': 'PASS',
+              'disturbance_widening_monotonicity': 'PASS',
+              'negative_authority': 'independently verified analytic robust-control separator only',
+              'claim_scope': 'synthetic analytic bounded-disturbance single-integrator robust terminal-set reachability only',
+              'verdict': 'PASS',
+          }
+          Path('artifacts/manifold-006c/report.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          PY
+
+      - name: Hash qualification capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd artifacts/manifold-006c
+          : > SHA256SUMS
+          for file in environment.txt report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Upload qualification capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: manifold-006c-robust-reachability-${{ env.SUBJECT_SHA }}
+          path: artifacts/manifold-006c/
+          if-no-files-found: error
+          retention-days: 90
