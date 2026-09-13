@@ -226,9 +226,6 @@ def main() -> int:
             wcare40_frontdoor_sha256=frontdoor_sha,
         )
 
-    result["wcare40_core_verifier_sha256"] = core_sha
-    result["wcare40_frontdoor_sha256"] = frontdoor_sha
-    sys.stdout.write(json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n")
     disposition = result.get("disposition")
     expected = {
         "REPLICATION_SUPPORTED": 0,
@@ -236,9 +233,19 @@ def main() -> int:
         "REPLICATION_LIMITED": 2,
         "INFRASTRUCTURE_INDETERMINATE": 3,
         "REPLICATION_INVALID": 4,
-    }.get(disposition, 4)
-    if completed.returncode != expected:
-        return 4
+    }.get(disposition)
+    if expected is None or completed.returncode != expected:
+        return invalid(
+            "wcare40_core_exit_disposition_mismatch",
+            wcare40_core_exit_code=completed.returncode,
+            wcare40_core_disposition=disposition,
+            wcare40_core_verifier_sha256=core_sha,
+            wcare40_frontdoor_sha256=frontdoor_sha,
+        )
+
+    result["wcare40_core_verifier_sha256"] = core_sha
+    result["wcare40_frontdoor_sha256"] = frontdoor_sha
+    sys.stdout.write(json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n")
     return expected
 
 
