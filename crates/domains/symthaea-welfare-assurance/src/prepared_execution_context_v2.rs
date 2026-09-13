@@ -5,7 +5,8 @@
 //! This is evidence correlation, not additional action authority. The public type has private
 //! fields and no public constructor. The V2 journal adapter verifies the exact generic Prepared
 //! digest before crossing the durable write-ahead boundary, then uses the crate-private infallible
-//! constructor only after the Prepared journal and its durable reference have been accepted.
+//! event-bound constructor only after the Prepared journal event and its durable reference have
+//! been accepted.
 
 #![deny(unsafe_code)]
 
@@ -18,22 +19,23 @@ use crate::execution_recovery::{
 
 const MAX_PREPARED_PERSISTENCE_REF_BYTES: usize = 2048;
 
-/// Opaque V2 correlation context for a generic execution-journal `Prepared` record.
+/// Opaque V2 correlation context for one exact generic execution-journal `Prepared` event.
 ///
 /// High-assurance domain executors may inspect the exact execution identity, target, canonical
-/// prepared digest, timestamp and durable reference, but external callers cannot construct this
-/// value from a permit, execution ID or arbitrary digest alone.
+/// Prepared payload digest, Prepared journal-event hash, timestamp and durable reference, but
+/// external callers cannot construct this value from a permit, execution ID or arbitrary digest.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedExecutionContextV2 {
     execution_id: String,
     target_id: String,
     prepared_digest: Sha256Digest,
+    prepared_event_hash: Sha256Digest,
     prepared_at_unix_s: u64,
     prepared_persistence_ref: String,
 }
 
 impl PreparedExecutionContextV2 {
-    /// Verify a caller-supplied digest against the exact generic write-ahead record.
+    /// Verify a caller-supplied digest against the exact generic write-ahead record payload.
     ///
     /// The V2 adapter performs this check before any Prepared persistence is attempted so a
     /// serialization/validation error cannot occur after the durable in-doubt boundary.
@@ -66,22 +68,43 @@ impl PreparedExecutionContextV2 {
         Ok(())
     }
 
-    /// Construct from materials already verified by the V2 journal adapter.
+    /// Construct from exact event-bound materials already verified by the V2 journal adapter.
     ///
     /// This is intentionally infallible: once the Prepared journal has been durably persisted,
     /// context construction must not introduce a new retry-shaped error path.
-    pub(crate) fn from_verified_durable(
+    pub(crate) fn from_verified_durable_event_bound(
         prepared: &PreparedInterventionExecution,
         prepared_digest: Sha256Digest,
+        prepared_event_hash: Sha256Digest,
         prepared_persistence_ref: String,
     ) -> Self {
         Self {
             execution_id: prepared.execution_id.clone(),
             target_id: prepared.target_id.clone(),
             prepared_digest,
+            prepared_event_hash,
             prepared_at_unix_s: prepared.prepared_at_unix_s,
             prepared_persistence_ref,
         }
+    }
+
+    /// Legacy unit-fixture constructor retained only under `cfg(test)`.
+    ///
+    /// It deliberately cannot exist in runtime builds. Tests written before event-lineage binding
+    /// can continue constructing a context without pretending their synthetic value came from a
+    /// persisted journal envelope.
+    #[cfg(test)]
+    pub(crate) fn from_verified_durable(
+        prepared: &PreparedInterventionExecution,
+        prepared_digest: Sha256Digest,
+        prepared_persistence_ref: String,
+    ) -> Self {
+        Self::from_verified_durable_event_bound(
+            prepared,
+            prepared_digest,
+            Sha256Digest([0xEE; 32]),
+            prepared_persistence_ref,
+        )
     }
 
     pub fn execution_id(&self) -> &str {
@@ -94,6 +117,11 @@ impl PreparedExecutionContextV2 {
 
     pub fn prepared_digest(&self) -> Sha256Digest {
         self.prepared_digest
+    }
+
+    /// Exact hash of the generic journal envelope carrying this Prepared record.
+    pub fn prepared_event_hash(&self) -> Sha256Digest {
+        self.prepared_event_hash
     }
 
     pub fn prepared_at_unix_s(&self) -> u64 {
@@ -152,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn verified_material_builds_read_only_context_without_post_persist_validation() {
+    fn verified_material_builds_read_only_event_bound_context() {
         let prepared = prepared();
         let prepared_digest = digest_prepared_execution(&prepared).unwrap();
         PreparedExecutionContextV2::verify_exact_prepared_digest(&prepared, prepared_digest)
@@ -161,21 +189,36 @@ mod tests {
             "execution-journal:prepared:v2:1",
         )
         .unwrap();
+        let prepared_event_hash = digest(90);
 
-        let context = PreparedExecutionContextV2::from_verified_durable(
+        let context = PreparedExecutionContextV2::from_verified_durable_event_bound(
             &prepared,
             prepared_digest,
+            prepared_event_hash,
             "execution-journal:prepared:v2:1".into(),
         );
 
         assert_eq!(context.execution_id(), prepared.execution_id);
         assert_eq!(context.target_id(), prepared.target_id);
         assert_eq!(context.prepared_digest(), prepared_digest);
+        assert_eq!(context.prepared_event_hash(), prepared_event_hash);
         assert_eq!(context.prepared_at_unix_s(), prepared.prepared_at_unix_s);
         assert_eq!(
             context.prepared_persistence_ref(),
             "execution-journal:prepared:v2:1"
         );
+    }
+
+    #[test]
+    fn legacy_fixture_constructor_is_test_only_and_marked_synthetic() {
+        let prepared = prepared();
+        let prepared_digest = digest_prepared_execution(&prepared).unwrap();
+        let context = PreparedExecutionContextV2::from_verified_durable(
+            &prepared,
+            prepared_digest,
+            "execution-journal:fixture:v2:1".into(),
+        );
+        assert_eq!(context.prepared_event_hash(), Sha256Digest([0xEE; 32]));
     }
 
     #[test]

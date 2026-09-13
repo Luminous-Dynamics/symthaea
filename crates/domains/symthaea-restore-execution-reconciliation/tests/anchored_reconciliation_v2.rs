@@ -13,7 +13,7 @@ use symthaea_episodic_continuity_anchor::{
 };
 use symthaea_fabrication_kernel::crypto_digest::Sha256Digest;
 use symthaea_memory::episodic_replay::{Episode, EpisodicMemory, EpisodicReplayConfig};
-use symthaea_psych_bench::moral_patient::{ProtectionDisposition};
+use symthaea_psych_bench::moral_patient::ProtectionDisposition;
 use symthaea_restore_execution_reconciliation::v2::{
     PreparedDigestBoundRestoreReconciliationOutcome, RestoreExecutionReconciliationV2Error,
     reconcile_anchored_persisted_restore_v2,
@@ -98,6 +98,7 @@ struct Fixture {
     content_id: EpisodeContentId,
     target_id: String,
     actual_prepared: PreparedInterventionExecution,
+    actual_prepared_event_hash: Sha256Digest,
     correlation_digest: Sha256Digest,
 }
 
@@ -130,6 +131,12 @@ fn prepared(authority_id: &str, target_id: String) -> PreparedInterventionExecut
     }
 }
 
+fn prepared_event_hash(prepared: &PreparedInterventionExecution) -> Sha256Digest {
+    let mut journal = InterventionExecutionJournal::new();
+    journal.append_prepared(prepared.clone()).unwrap();
+    journal.head_hash()
+}
+
 fn fixture() -> Fixture {
     let mut memory = EpisodicMemory::new(EpisodicReplayConfig::broad_capture());
     let instance_id = memory.store_if_significant_with_id(episode()).unwrap();
@@ -142,6 +149,7 @@ fn fixture() -> Fixture {
     let content_id = episode_content_id(&exact).unwrap();
     let target_id = episodic_instance_target_id(STORE, instance_id).unwrap();
     let actual_prepared = prepared("authority:restore:v2:actual", target_id.clone());
+    let actual_prepared_event_hash = prepared_event_hash(&actual_prepared);
 
     let envelope = PersistedEpisodicEnvelope::new(STORE, exact, 80, 1).unwrap();
     let mut store = SqliteEpisodicContinuityStore::in_memory().unwrap();
@@ -161,15 +169,16 @@ fn fixture() -> Fixture {
             format!("escrow:{instance_id}"),
         )
         .unwrap();
-    let restore_prepared_head = quarantine
+    let restore_prepared_event_hash = quarantine
         .append_restore_prepared(&target_id, instance_id, content_id, 110, EXECUTION)
         .unwrap();
     let correlation_digest = digest_persisted_restore_correlation_from_prepared_v2(
         &actual_prepared,
+        actual_prepared_event_hash,
         instance_id,
         content_id,
         120,
-        restore_prepared_head,
+        restore_prepared_event_hash,
     )
     .unwrap();
     quarantine
@@ -204,6 +213,7 @@ fn fixture() -> Fixture {
         content_id,
         target_id,
         actual_prepared,
+        actual_prepared_event_hash,
         correlation_digest,
     }
 }
@@ -215,9 +225,10 @@ fn recovered_prepared_journal(prepared: PreparedInterventionExecution) -> Interv
 }
 
 #[test]
-fn anchored_v2_correlation_closes_exact_prepared_without_retry() {
+fn anchored_v2_correlation_closes_exact_prepared_event_without_retry() {
     let fixture = fixture();
     let mut journal = recovered_prepared_journal(fixture.actual_prepared.clone());
+    assert_eq!(journal.head_hash(), fixture.actual_prepared_event_hash);
     assert_eq!(
         journal.automatic_retry_decision(EXECUTION),
         AutomaticRetryDecision::RefuseInDoubt
@@ -240,6 +251,11 @@ fn anchored_v2_correlation_closes_exact_prepared_without_retry() {
     let PreparedDigestBoundRestoreReconciliationOutcome::Completed { evidence, .. } = outcome else {
         panic!("expected strict V2 reconciliation completion");
     };
+    assert_eq!(evidence.generic_prepared_sequence, 0);
+    assert_eq!(
+        evidence.generic_prepared_event_hash,
+        fixture.actual_prepared_event_hash
+    );
     assert_eq!(
         evidence.expected_restore_correlation_digest,
         fixture.correlation_digest
@@ -265,6 +281,7 @@ fn substituted_prepared_authority_cannot_close_same_visible_restore_identity() {
     assert_ne!(substituted.authority_id, fixture.actual_prepared.authority_id);
 
     let mut journal = recovered_prepared_journal(substituted);
+    assert_ne!(journal.head_hash(), fixture.actual_prepared_event_hash);
     let mut persistence = JournalPersistence::default();
 
     let error = reconcile_anchored_persisted_restore_v2(

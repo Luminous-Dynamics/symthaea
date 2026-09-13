@@ -1,12 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Strict V2 post-crash reconciliation for prepared-digest-bound persisted restores.
+//! Strict post-crash reconciliation for Prepared-event-bound persisted restores.
 //!
 //! Historical V1 reconciliation remains available through the parent module. This module emits a
 //! stronger typed outcome only when the anchored domain `Restored.restore_result_digest` exactly
-//! equals an independently recomputed commitment to the recovered generic `Prepared` record and
-//! the exact matching domain `RestorePrepared` event. Merely matching execution ID, target,
-//! occurrence UUID and content is insufficient.
+//! equals an independently recomputed commitment to the recovered generic `Prepared` payload,
+//! its exact validated generic journal envelope, and the exact matching domain `RestorePrepared`
+//! event. Merely matching execution ID, target, occurrence UUID and content is insufficient.
 
 #![deny(unsafe_code)]
 
@@ -19,8 +19,8 @@ use symthaea_fabrication_kernel::crypto_digest::{Sha256, Sha256Digest};
 use symthaea_memory::episodic_replay::EpisodeInstanceId;
 use symthaea_welfare_assurance::execution_adapter::ExecutionJournalPersistence;
 use symthaea_welfare_assurance::execution_recovery::{
-    CompletedInterventionExecution, InterventionExecutionJournal, PreparedInterventionExecution,
-    digest_prepared_execution,
+    CompletedInterventionExecution, ExecutionJournalEnvelope, ExecutionJournalEvent,
+    InterventionExecutionJournal, PreparedInterventionExecution, digest_prepared_execution,
 };
 use symthaea_welfare_assurance::memory_identity::EpisodeContentId;
 use symthaea_welfare_assurance::memory_quarantine::episodic_instance_target_id;
@@ -37,17 +37,19 @@ use super::{
     exact_in_doubt_prepared, exact_restored_transition, hex_digest, valid_ref,
 };
 
-const RECONCILIATION_V2_RESULT_DOMAIN: &[u8] =
-    b"symthaea.welfare.persisted-episodic-restore-reconciliation.v2\0";
+// V3 because the terminal reconciliation digest now binds the generic Prepared envelope identity.
+const RECONCILIATION_V3_RESULT_DOMAIN: &[u8] =
+    b"symthaea.welfare.persisted-episodic-restore-reconciliation.v3\0";
 
 /// Evidence strength classification for an otherwise structurally matching restore.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RestoreCorrelationStrength {
-    /// Target/execution/occurrence/content/history checks may pass, but the domain result does not
-    /// carry the V2 exact-Prepared commitment. This includes historical V1 evidence.
-    IdentifierCorrelatedV1,
-    /// The anchored domain result exactly commits to the recovered generic Prepared digest and the
-    /// exact matching domain RestorePrepared event hash.
+    /// Structural identity may match, but exact Prepared-event correlation is not established.
+    /// This may represent historical evidence, another correlation scheme, substitution or damage;
+    /// callers must not infer which merely from a digest mismatch.
+    NotPreparedDigestBound,
+    /// The anchored domain result exactly commits to the recovered generic Prepared payload digest,
+    /// its exact generic journal-event hash, and the exact matching domain RestorePrepared hash.
     PreparedDigestBoundV2,
 }
 
@@ -55,12 +57,14 @@ pub enum RestoreCorrelationStrength {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedDigestBoundRestoreReconciliationEvidence {
     pub base: AnchoredRestoreReconciliationEvidence,
+    pub generic_prepared_sequence: u64,
+    pub generic_prepared_event_hash: Sha256Digest,
     pub restore_prepared_generation: u64,
     pub restore_prepared_event_hash: Sha256Digest,
     pub expected_restore_correlation_digest: Sha256Digest,
 }
 
-/// Strict V2 reconciliation never reports completion unless exact Prepared correlation is proven.
+/// Strict reconciliation never reports completion unless exact Prepared-event correlation is proven.
 #[derive(Debug)]
 pub enum PreparedDigestBoundRestoreReconciliationOutcome {
     Completed {
@@ -75,15 +79,21 @@ pub enum PreparedDigestBoundRestoreReconciliationOutcome {
     },
 }
 
+struct GenericPreparedTransition<'a> {
+    envelope: &'a ExecutionJournalEnvelope,
+    prepared: &'a PreparedInterventionExecution,
+}
+
 struct RestorePreparedTransition<'a> {
     envelope: &'a QuarantineLedgerEnvelope,
     prepared_at_unix_s: u64,
 }
 
-/// Classify one already-matched domain Restored result against one exact generic Prepared record
-/// and one exact domain RestorePrepared event hash.
+/// Classify one already-matched domain Restored result against one exact generic Prepared record,
+/// its exact generic journal-event hash, and one exact domain RestorePrepared event hash.
 pub fn classify_restore_correlation_v2(
     prepared: &PreparedInterventionExecution,
+    generic_prepared_event_hash: Sha256Digest,
     instance_id: EpisodeInstanceId,
     content_id: EpisodeContentId,
     restored_at_unix_s: u64,
@@ -92,6 +102,7 @@ pub fn classify_restore_correlation_v2(
 ) -> Result<(RestoreCorrelationStrength, Sha256Digest), PersistedRestoreCorrelationV2Error> {
     let expected = digest_persisted_restore_correlation_from_prepared_v2(
         prepared,
+        generic_prepared_event_hash,
         instance_id,
         content_id,
         restored_at_unix_s,
@@ -100,13 +111,13 @@ pub fn classify_restore_correlation_v2(
     let strength = if expected == actual_restore_result_digest {
         RestoreCorrelationStrength::PreparedDigestBoundV2
     } else {
-        RestoreCorrelationStrength::IdentifierCorrelatedV1
+        RestoreCorrelationStrength::NotPreparedDigestBound
     };
     Ok((strength, expected))
 }
 
 /// Close one in-doubt persisted-memory restore only when anchored evidence binds the exact generic
-/// Prepared record cryptographically.
+/// Prepared journal event cryptographically.
 ///
 /// This function never invokes a memory mutator. All structural, anchored-state and exact Prepared
 /// correlation checks complete before a terminal generic execution-journal record is appended.
@@ -130,6 +141,10 @@ where
     P: ExecutionJournalPersistence,
 {
     let prepared = exact_in_doubt_prepared::<A::Error>(journal, execution_id)?;
+    let generic_prepared = exact_generic_prepared_transition::<A::Error>(journal.events(), execution_id)?;
+    if generic_prepared.prepared != &prepared {
+        return Err(RestoreExecutionReconciliationV2Error::GenericPreparedStateMismatch);
+    }
     let prepared_digest = digest_prepared_execution(&prepared)
         .map_err(RestoreExecutionReconciliationError::Journal)?;
     if prepared.action != SubjectAffectingAction::MemoryModification {
@@ -200,6 +215,7 @@ where
 
     let (strength, expected_restore_correlation_digest) = classify_restore_correlation_v2(
         &prepared,
+        generic_prepared.envelope.event_hash,
         restored.instance_id,
         restored.content_id,
         restored.restored_at_unix_s,
@@ -265,9 +281,11 @@ where
         return Err(RestoreExecutionReconciliationError::MaterializedContentMismatch.into());
     }
 
-    let reconciliation_result_digest = digest_reconciliation_result_v2(
+    let reconciliation_result_digest = digest_reconciliation_result_v3(
         execution_id,
         prepared_digest,
+        generic_prepared.envelope.sequence,
+        generic_prepared.envelope.event_hash,
         &prepared.target_id,
         instance_id,
         expected_content_id,
@@ -300,12 +318,14 @@ where
     };
     let evidence = PreparedDigestBoundRestoreReconciliationEvidence {
         base,
+        generic_prepared_sequence: generic_prepared.envelope.sequence,
+        generic_prepared_event_hash: generic_prepared.envelope.event_hash,
         restore_prepared_generation: restore_prepared.envelope.generation,
         restore_prepared_event_hash: restore_prepared.envelope.event_hash,
         expected_restore_correlation_digest,
     };
     let evidence_ref = format!(
-        "symthaea-reconciliation:persisted-episodic-restore:v2:sha256:{}",
+        "symthaea-reconciliation:persisted-episodic-restore:v3:sha256:{}",
         hex_digest(reconciliation_result_digest)
     );
     let completed = CompletedInterventionExecution::new(
@@ -345,6 +365,31 @@ where
                 journal_head_hash,
             },
         ),
+    }
+}
+
+fn exact_generic_prepared_transition<'a, E>(
+    events: &'a [ExecutionJournalEnvelope],
+    execution_id: &str,
+) -> Result<GenericPreparedTransition<'a>, RestoreExecutionReconciliationV2Error<E>>
+where
+    E: StdError + Send + Sync + 'static,
+{
+    let matches: Vec<_> = events
+        .iter()
+        .filter_map(|envelope| match &envelope.event {
+            ExecutionJournalEvent::Prepared(prepared) if prepared.execution_id == execution_id => {
+                Some(GenericPreparedTransition { envelope, prepared })
+            }
+            _ => None,
+        })
+        .collect();
+    match matches.len() {
+        1 => Ok(matches.into_iter().next().expect("length checked")),
+        0 => Err(RestoreExecutionReconciliationV2Error::MissingGenericPreparedEnvelope),
+        actual => Err(RestoreExecutionReconciliationV2Error::AmbiguousGenericPreparedEnvelope {
+            actual,
+        }),
     }
 }
 
@@ -389,9 +434,11 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn digest_reconciliation_result_v2(
+fn digest_reconciliation_result_v3(
     execution_id: &str,
     prepared_digest: Sha256Digest,
+    generic_prepared_sequence: u64,
+    generic_prepared_event_hash: Sha256Digest,
     target_id: &str,
     instance_id: EpisodeInstanceId,
     content_id: EpisodeContentId,
@@ -407,9 +454,11 @@ fn digest_reconciliation_result_v2(
     reconciled_at_unix_s: u64,
 ) -> Sha256Digest {
     let mut hasher = Sha256::new();
-    hasher.update(RECONCILIATION_V2_RESULT_DOMAIN);
+    hasher.update(RECONCILIATION_V3_RESULT_DOMAIN);
     hash_text(&mut hasher, execution_id);
     hasher.update(&prepared_digest.0);
+    hasher.update(&generic_prepared_sequence.to_le_bytes());
+    hasher.update(&generic_prepared_event_hash.0);
     hash_text(&mut hasher, target_id);
     hasher.update(&instance_id.as_uuid().as_u128().to_le_bytes());
     hasher.update(&content_id.digest().0);
@@ -440,6 +489,12 @@ where
     Base(#[from] RestoreExecutionReconciliationError<E>),
     #[error(transparent)]
     Correlation(#[from] PersistedRestoreCorrelationV2Error),
+    #[error("validated execution journal has no Prepared envelope for the requested in-doubt execution")]
+    MissingGenericPreparedEnvelope,
+    #[error("validated execution journal has {actual} Prepared envelopes for the requested execution")]
+    AmbiguousGenericPreparedEnvelope { actual: usize },
+    #[error("generic Prepared recovery state disagrees with its validated journal envelope")]
+    GenericPreparedStateMismatch,
     #[error("anchored quarantine ledger has no exact RestorePrepared event for the V2 restore")]
     MissingRestorePreparedEvidence,
     #[error("anchored quarantine ledger has {actual} exact RestorePrepared events for the V2 restore")]
@@ -452,7 +507,7 @@ where
         domain_prepared_at_unix_s: u64,
         restored_at_unix_s: u64,
     },
-    #[error("anchored Restored result does not bind the exact recovered generic Prepared digest")]
+    #[error("anchored Restored result does not bind the exact recovered generic Prepared event")]
     PreparedCorrelationMismatch {
         expected: Sha256Digest,
         actual: Sha256Digest,
@@ -466,7 +521,9 @@ mod tests {
     use symthaea_core::intervention_interlock::WelfareConstraintLevel;
     use symthaea_memory::episodic_replay::{Episode, EpisodicMemory, EpisodicReplayConfig};
     use symthaea_psych_bench::moral_patient::ProtectionDisposition;
-    use symthaea_welfare_assurance::execution_recovery::EXECUTION_JOURNAL_SCHEMA;
+    use symthaea_welfare_assurance::execution_recovery::{
+        EXECUTION_JOURNAL_SCHEMA, InterventionExecutionJournal,
+    };
     use symthaea_welfare_assurance::memory_identity::episode_content_id;
     use symthaea_welfare_assurance::quarantine_state_ledger::EpisodicQuarantineStateLedger;
 
@@ -513,25 +570,34 @@ mod tests {
         (id, episode_content_id(&episode).unwrap())
     }
 
+    fn prepared_event_hash(prepared: &PreparedInterventionExecution) -> Sha256Digest {
+        let mut journal = InterventionExecutionJournal::new();
+        journal.append_prepared(prepared.clone()).unwrap();
+        journal.head_hash()
+    }
+
     #[test]
-    fn exact_prepared_digest_classifies_as_v2() {
+    fn exact_prepared_event_classifies_as_v2() {
         let prepared = prepared("authority:one");
+        let generic_event_hash = prepared_event_hash(&prepared);
         let (instance_id, content_id) = identity();
-        let event_hash = digest(80);
+        let domain_event_hash = digest(80);
         let result = digest_persisted_restore_correlation_from_prepared_v2(
             &prepared,
+            generic_event_hash,
             instance_id,
             content_id,
             120,
-            event_hash,
+            domain_event_hash,
         )
         .unwrap();
         let (strength, expected) = classify_restore_correlation_v2(
             &prepared,
+            generic_event_hash,
             instance_id,
             content_id,
             120,
-            event_hash,
+            domain_event_hash,
             result,
         )
         .unwrap();
@@ -540,32 +606,76 @@ mod tests {
     }
 
     #[test]
-    fn same_visible_identity_with_substituted_authority_is_only_legacy_correlated() {
+    fn same_visible_identity_with_substituted_authority_is_not_prepared_digest_bound() {
         let actual_prepared = prepared("authority:actual");
         let substituted_prepared = prepared("authority:substituted");
         assert_eq!(actual_prepared.execution_id, substituted_prepared.execution_id);
         assert_eq!(actual_prepared.target_id, substituted_prepared.target_id);
+        let actual_event_hash = prepared_event_hash(&actual_prepared);
+        let substituted_event_hash = prepared_event_hash(&substituted_prepared);
         let (instance_id, content_id) = identity();
-        let event_hash = digest(81);
+        let domain_event_hash = digest(81);
         let actual_result = digest_persisted_restore_correlation_from_prepared_v2(
             &actual_prepared,
+            actual_event_hash,
             instance_id,
             content_id,
             120,
-            event_hash,
+            domain_event_hash,
         )
         .unwrap();
         let (strength, expected_for_substitute) = classify_restore_correlation_v2(
             &substituted_prepared,
+            substituted_event_hash,
             instance_id,
             content_id,
             120,
-            event_hash,
+            domain_event_hash,
             actual_result,
         )
         .unwrap();
-        assert_eq!(strength, RestoreCorrelationStrength::IdentifierCorrelatedV1);
+        assert_eq!(strength, RestoreCorrelationStrength::NotPreparedDigestBound);
         assert_ne!(expected_for_substitute, actual_result);
+    }
+
+    #[test]
+    fn same_payload_at_different_generic_journal_position_is_not_prepared_digest_bound() {
+        let prepared = prepared("authority:journal-position");
+        let mut first = InterventionExecutionJournal::new();
+        first.append_prepared(prepared.clone()).unwrap();
+        let first_hash = first.head_hash();
+
+        let mut other = prepared("authority:other-prefix");
+        other.execution_id = "exec:other-prefix".into();
+        let mut second = InterventionExecutionJournal::new();
+        second.append_prepared(other).unwrap();
+        second.append_prepared(prepared.clone()).unwrap();
+        let second_hash = second.head_hash();
+        assert_ne!(first_hash, second_hash);
+
+        let (instance_id, content_id) = identity();
+        let domain_event_hash = digest(82);
+        let actual = digest_persisted_restore_correlation_from_prepared_v2(
+            &prepared,
+            first_hash,
+            instance_id,
+            content_id,
+            120,
+            domain_event_hash,
+        )
+        .unwrap();
+        let (strength, expected) = classify_restore_correlation_v2(
+            &prepared,
+            second_hash,
+            instance_id,
+            content_id,
+            120,
+            domain_event_hash,
+            actual,
+        )
+        .unwrap();
+        assert_eq!(strength, RestoreCorrelationStrength::NotPreparedDigestBound);
+        assert_ne!(expected, actual);
     }
 
     #[test]
