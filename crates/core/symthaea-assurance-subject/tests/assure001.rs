@@ -161,8 +161,8 @@ fn completeness_states_are_identity_distinct() {
 }
 
 #[test]
-fn completeness_controls_exact_replayability() {
-    let exact = AiSubjectManifest::new(
+fn completeness_controls_material_identity_not_replayability() {
+    let complete = AiSubjectManifest::new(
         id("agent-a"),
         SurfaceProfile::new(
             id("model-deployment"),
@@ -183,10 +183,10 @@ fn completeness_controls_exact_replayability() {
         ],
     )
     .unwrap();
-    let exact_summary = exact.completeness();
-    assert_eq!(exact_summary.known, 1);
-    assert_eq!(exact_summary.not_applicable, 1);
-    assert!(exact_summary.is_exactly_replayable());
+    let complete_summary = complete.completeness();
+    assert_eq!(complete_summary.known, 1);
+    assert_eq!(complete_summary.not_applicable, 1);
+    assert!(complete_summary.has_complete_material_identity());
 
     let unknown = AiSubjectManifest::new(
         id("agent-a"),
@@ -198,7 +198,7 @@ fn completeness_controls_exact_replayability() {
         )],
     )
     .unwrap();
-    assert!(!unknown.completeness().is_exactly_replayable());
+    assert!(!unknown.completeness().has_complete_material_identity());
 
     let unavailable = AiSubjectManifest::new(
         id("agent-a"),
@@ -210,7 +210,7 @@ fn completeness_controls_exact_replayability() {
         )],
     )
     .unwrap();
-    assert!(!unavailable.completeness().is_exactly_replayable());
+    assert!(!unavailable.completeness().has_complete_material_identity());
 }
 
 #[test]
