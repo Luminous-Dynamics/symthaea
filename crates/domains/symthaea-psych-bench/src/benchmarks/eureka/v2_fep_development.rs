@@ -164,7 +164,7 @@ pub(super) struct V2FepDevelopmentArtifact {
 }
 
 impl V2FepDevelopmentArtifact {
-    pub(super) const fn subject(&self) -> &FepHeldOutSubject {
+    pub(super) fn subject(&self) -> &FepHeldOutSubject {
         &self.subject
     }
 
@@ -191,24 +191,26 @@ fn run_plan(
     service: &CognitiveLoopService,
     plan: &V2DevelopmentPlan,
 ) -> Result<V2FepDevelopmentArtifact, V2FepDevelopmentError> {
-    let source_session = service.fep_prediction_session();
-    if source_session.observation_dim() != V2_OBSERVATION_DIM {
-        return Err(V2FepDevelopmentError::ObservationDimensionMismatch {
-            expected: V2_OBSERVATION_DIM,
-            actual: source_session.observation_dim(),
-        });
-    }
-    if source_session.action_count() < usize::from(V2_ACTION_COUNT) {
-        return Err(V2FepDevelopmentError::InsufficientActionCapacity {
-            required: usize::from(V2_ACTION_COUNT),
-            actual: source_session.action_count(),
-        });
-    }
-    let initial_snapshot = source_session.freeze_for_evaluation()?;
-    let initial_snapshot_replay_digest = initial_snapshot.replay_digest();
-    let initial_snapshot_commitment = initial_snapshot.commitment();
-    drop(initial_snapshot);
-    drop(source_session);
+    let (initial_snapshot_replay_digest, initial_snapshot_commitment) = {
+        let source_session = service.fep_prediction_session();
+        if source_session.observation_dim() != V2_OBSERVATION_DIM {
+            return Err(V2FepDevelopmentError::ObservationDimensionMismatch {
+                expected: V2_OBSERVATION_DIM,
+                actual: source_session.observation_dim(),
+            });
+        }
+        if source_session.action_count() < usize::from(V2_ACTION_COUNT) {
+            return Err(V2FepDevelopmentError::InsufficientActionCapacity {
+                required: usize::from(V2_ACTION_COUNT),
+                actual: source_session.action_count(),
+            });
+        }
+        let initial_snapshot = source_session.freeze_for_evaluation()?;
+        (
+            initial_snapshot.replay_digest(),
+            initial_snapshot.commitment(),
+        )
+    };
 
     let mut session = service.fep_prediction_session();
     let mut prediction_trace = Vec::new();
@@ -454,6 +456,7 @@ mod tests {
     #[test]
     fn canonical_runner_trains_exact_development_and_seals_subject() {
         let service = service();
+        let plan = materialize_development_plan().unwrap();
         let before = service
             .fep_prediction_session()
             .freeze_for_evaluation()
@@ -477,6 +480,16 @@ mod tests {
         assert_eq!(receipt.action_histogram(), [128, 128, 128, 128]);
         assert_ne!(receipt.prediction_trace_root(), [0_u8; 32]);
         assert_ne!(receipt.commitment(), [0_u8; 32]);
+        assert_eq!(receipt.development_plan_commitment(), plan.commitment());
+        assert_eq!(receipt.full_schedule_root(), plan.full_schedule_root());
+        assert_eq!(
+            receipt.development_corpus_commitment(),
+            plan.development_corpus().commitment()
+        );
+        assert_eq!(
+            receipt.development_order_root(),
+            plan.development_order_root()
+        );
         assert_eq!(
             artifact.subject().commitment(),
             receipt.learned_snapshot_commitment()
@@ -493,24 +506,6 @@ mod tests {
             receipt.initial_snapshot_commitment(),
             receipt.learned_snapshot_commitment(),
             "default production service has model learning enabled; canonical Development must change predictor identity"
-        );
-    }
-
-    #[test]
-    fn receipt_binds_exact_target_blind_development_plan() {
-        let service = service();
-        let plan = materialize_development_plan().unwrap();
-        let artifact = run_canonical_v2_fep_development(&service).unwrap();
-        let receipt = artifact.receipt();
-        assert_eq!(receipt.development_plan_commitment(), plan.commitment());
-        assert_eq!(receipt.full_schedule_root(), plan.full_schedule_root());
-        assert_eq!(
-            receipt.development_corpus_commitment(),
-            plan.development_corpus().commitment()
-        );
-        assert_eq!(
-            receipt.development_order_root(),
-            plan.development_order_root()
         );
     }
 
