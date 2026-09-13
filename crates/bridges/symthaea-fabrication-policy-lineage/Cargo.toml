@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-fabrication-policy-lineage"
+version = "0.1.0"
+edition = "2024"
+description = "Clock-governed durable policy currentness and active-waiver lineage for Symthaea fabrication"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-governance-bridge = { path = "../symthaea-fabrication-governance-bridge" }
+symthaea-fabrication-governance-runtime = { path = "../symthaea-fabrication-governance-runtime" }
+symthaea-fabrication-trust-bridge = { path = "../symthaea-fabrication-trust-bridge" }
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
