@@ -117,17 +117,60 @@ quantity_type!(MassKg, "Mass in kilograms.", "mass_kg");
 quantity_type!(EnergyJ, "Energy in joules.", "energy_j");
 quantity_type!(PowerW, "Power in watts.", "power_w");
 quantity_type!(DurationS, "Duration in seconds.", "duration_s");
-quantity_type!(TemperatureK, "Absolute temperature in kelvin.", "temperature_k");
+quantity_type!(
+    TemperatureK,
+    "Absolute temperature in kelvin.",
+    "temperature_k"
+);
 quantity_type!(PressurePa, "Absolute pressure in pascals.", "pressure_pa");
-quantity_type!(GravityMps2, "Acceleration magnitude in metres per second squared.", "gravity_m_s2");
+quantity_type!(
+    GravityMps2,
+    "Acceleration magnitude in metres per second squared.",
+    "gravity_m_s2"
+);
 
-range_type!(MassRangeKg, MassKg, "Inclusive mass range in kilograms.", "mass_kg");
-range_type!(EnergyRangeJ, EnergyJ, "Inclusive energy range in joules.", "energy_j");
-range_type!(PowerRangeW, PowerW, "Inclusive power range in watts.", "power_w");
-range_type!(DurationRangeS, DurationS, "Inclusive duration range in seconds.", "duration_s");
-range_type!(TemperatureRangeK, TemperatureK, "Inclusive temperature range in kelvin.", "temperature_k");
-range_type!(PressureRangePa, PressurePa, "Inclusive pressure range in pascals.", "pressure_pa");
-range_type!(GravityRangeMps2, GravityMps2, "Inclusive gravity range in m/s².", "gravity_m_s2");
+range_type!(
+    MassRangeKg,
+    MassKg,
+    "Inclusive mass range in kilograms.",
+    "mass_kg"
+);
+range_type!(
+    EnergyRangeJ,
+    EnergyJ,
+    "Inclusive energy range in joules.",
+    "energy_j"
+);
+range_type!(
+    PowerRangeW,
+    PowerW,
+    "Inclusive power range in watts.",
+    "power_w"
+);
+range_type!(
+    DurationRangeS,
+    DurationS,
+    "Inclusive duration range in seconds.",
+    "duration_s"
+);
+range_type!(
+    TemperatureRangeK,
+    TemperatureK,
+    "Inclusive temperature range in kelvin.",
+    "temperature_k"
+);
+range_type!(
+    PressureRangePa,
+    PressurePa,
+    "Inclusive pressure range in pascals.",
+    "pressure_pa"
+);
+range_type!(
+    GravityRangeMps2,
+    GravityMps2,
+    "Inclusive gravity range in m/s².",
+    "gravity_m_s2"
+);
 
 /// Planetary body associated with a resource or process constraint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
