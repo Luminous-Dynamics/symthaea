@@ -1,0 +1,86 @@
+{
+  "classification_ceiling": "hybrid_scenario_sampled_visibility",
+  "classification_order": [
+    "descriptive_geometry",
+    "empirical_sampled_visibility",
+    "hybrid_scenario_sampled_visibility",
+    "risk_qualified_visibility",
+    "deterministic_visibility"
+  ],
+  "network_authorized_stage_ids": [
+    "source_acquisition"
+  ],
+  "protected_files": [
+    "scripts/acquire_ll009aa_connecting_ridge_sdem.py",
+    "configs/lunar_transport/ll009aa_connecting_ridge_sdem_archive_v1.json",
+    "scripts/reconcile_ll009z_hybrid_visibility.py",
+    "configs/lunar_transport/ll009z_site01_hybrid_visibility_v1.json"
+  ],
+  "required_environment_profiles": [
+    "acquisition",
+    "gis",
+    "analysis"
+  ],
+  "schema_version": "ll009ag.site01-campaign-policy.v1",
+  "semantic_rules": {
+    "descriptive_geometry": {
+      "enabled": true,
+      "requires_all_artifact_ids": [
+        "ll009k_numeric_horizon"
+      ]
+    },
+    "deterministic_visibility": {
+      "enabled": false,
+      "requires_all_artifact_ids": []
+    },
+    "empirical_sampled_visibility": {
+      "enabled": true,
+      "requires_all_artifact_ids": [
+        "ll009q_clone_ensemble"
+      ]
+    },
+    "hybrid_scenario_sampled_visibility": {
+      "enabled": true,
+      "requires_all_artifact_ids": [
+        "ll009z_visibility_reconciliation"
+      ]
+    },
+    "risk_qualified_visibility": {
+      "enabled": false,
+      "requires_all_artifact_ids": []
+    }
+  },
+  "stage_plan": [
+    {
+      "environment_profile": "acquisition",
+      "id": "source_acquisition",
+      "may_access_network": true
+    },
+    {
+      "environment_profile": "gis",
+      "id": "exact_extraction_and_role_binding",
+      "may_access_network": false
+    },
+    {
+      "environment_profile": "gis",
+      "id": "terrain_and_calibration_audit",
+      "may_access_network": false
+    },
+    {
+      "environment_profile": "analysis",
+      "id": "horizon_and_visibility_analysis",
+      "may_access_network": false
+    },
+    {
+      "environment_profile": "analysis",
+      "id": "semantic_reconciliation",
+      "may_access_network": false
+    },
+    {
+      "environment_profile": "analysis",
+      "id": "campaign_finalization",
+      "may_access_network": false
+    }
+  ],
+  "study_id": "ll009-site01-connecting-ridge-v1"
+}
