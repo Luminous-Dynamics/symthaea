@@ -24,6 +24,7 @@ mod comparator_subject;
 mod fep_comparator_freeze;
 #[cfg(feature = "symthaea-backend")]
 mod fep_development;
+mod heldout_evidence_envelope;
 #[cfg(feature = "symthaea-backend")]
 mod heldout_seal;
 pub mod hidden_world;
