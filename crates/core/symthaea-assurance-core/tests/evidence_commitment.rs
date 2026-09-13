@@ -23,7 +23,6 @@ fn artifact_content_or_provenance_change_changes_result_identity() {
             kind: SubjectComponentKind::Model,
             digest: digest('a'),
         }],
-        None,
     )
     .unwrap();
     let claim = Claim::new(
