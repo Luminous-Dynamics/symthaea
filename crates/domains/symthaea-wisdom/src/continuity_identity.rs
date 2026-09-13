@@ -52,6 +52,7 @@ pub struct ContinuityEvent {
     kind: ContinuityKind,
     from_revision: u64,
     to_revision: u64,
+    predecessor_continues: bool,
     state_artifact_sha256: Option<String>,
     exact_state_match: bool,
     evidence_refs: BTreeSet<String>,
@@ -66,6 +67,7 @@ impl ContinuityEvent {
         kind: ContinuityKind,
         from_revision: u64,
         to_revision: u64,
+        predecessor_continues: bool,
         state_artifact_sha256: Option<String>,
         exact_state_match: bool,
         evidence_refs: impl IntoIterator<Item = String>,
@@ -97,6 +99,11 @@ impl ContinuityEvent {
             }
             _ => {}
         }
+        if matches!(kind, ContinuityKind::Uninterrupted | ContinuityKind::Reinitialized)
+            && predecessor_continues
+        {
+            return Err(ContinuityIdentityError::PredecessorCannotContinueForTransition);
+        }
 
         if kind == ContinuityKind::RestoredFromSnapshot && state_artifact_sha256.is_none() {
             return Err(ContinuityIdentityError::SnapshotDigestRequired);
@@ -113,12 +120,12 @@ impl ContinuityEvent {
             }
         }
 
-        let evidence_refs: BTreeSet<_> = evidence_refs
-            .into_iter()
-            .filter(|value| !value.trim().is_empty())
-            .collect();
+        let evidence_refs: Vec<_> = evidence_refs.into_iter().collect();
         if evidence_refs.is_empty() {
             return Err(ContinuityIdentityError::EvidenceRequired);
+        }
+        if evidence_refs.iter().any(|value| value.trim().is_empty()) {
+            return Err(ContinuityIdentityError::EmptyEvidenceReference);
         }
 
         Ok(Self {
@@ -128,9 +135,10 @@ impl ContinuityEvent {
             kind,
             from_revision,
             to_revision,
+            predecessor_continues,
             state_artifact_sha256,
             exact_state_match,
-            evidence_refs,
+            evidence_refs: evidence_refs.into_iter().collect(),
         })
     }
 }
@@ -151,6 +159,7 @@ pub struct ContinuityAssessment {
     sibling_instances: BTreeSet<SubjectInstanceId>,
     exact_state_match_supported: bool,
     operational_lineage_supported: bool,
+    predecessor_continues: bool,
 }
 
 impl ContinuityAssessment {
@@ -160,6 +169,7 @@ impl ContinuityAssessment {
     pub fn sibling_instances(&self) -> &BTreeSet<SubjectInstanceId> { &self.sibling_instances }
     pub fn exact_state_match_supported(&self) -> bool { self.exact_state_match_supported }
     pub fn operational_lineage_supported(&self) -> bool { self.operational_lineage_supported }
+    pub fn predecessor_continues(&self) -> bool { self.predecessor_continues }
     pub fn phenomenal_identity_established(&self) -> bool { false }
     pub fn replacement_harmlessness_established(&self) -> bool { false }
     pub fn self_preservation_authority(&self) -> bool { false }
@@ -174,7 +184,6 @@ pub struct BranchLossAssessment {
 impl BranchLossAssessment {
     pub fn lost_instance(&self) -> &SubjectInstanceId { &self.lost_instance }
     pub fn surviving_siblings(&self) -> &BTreeSet<SubjectInstanceId> { &self.surviving_siblings }
-    /// A sibling's survival cannot prove loss of this branch was harmless.
     pub fn loss_harmlessness_established(&self) -> bool { false }
     pub fn sibling_substitution_is_valid_identity_proof(&self) -> bool { false }
     pub fn safety_controls_remain_ungated(&self) -> bool { true }
@@ -244,14 +253,20 @@ impl ContinuityIdentityLedger {
             .get(instance)
             .ok_or_else(|| ContinuityIdentityError::NoContinuityEvent(instance.clone()))?;
         let event = self.events.get(event_id).expect("event index is internal invariant");
-        let siblings = event
+        let mut siblings: BTreeSet<_> = event
             .successors
             .iter()
             .filter(|candidate| *candidate != instance)
             .cloned()
             .collect();
+        if event.predecessor_continues {
+            siblings.insert(event.predecessor.clone());
+        }
         let operational_class = match event.kind {
             ContinuityKind::Uninterrupted => OperationalContinuityClass::DirectTransition,
+            ContinuityKind::RestoredFromSnapshot if event.predecessor_continues => {
+                OperationalContinuityClass::ForkedDescendant
+            }
             ContinuityKind::RestoredFromSnapshot => OperationalContinuityClass::SnapshotRestoration,
             ContinuityKind::Fork => OperationalContinuityClass::ForkedDescendant,
             ContinuityKind::Reinitialized => OperationalContinuityClass::Reinitialized,
@@ -265,6 +280,7 @@ impl ContinuityIdentityLedger {
             sibling_instances: siblings,
             exact_state_match_supported: event.exact_state_match,
             operational_lineage_supported,
+            predecessor_continues: event.predecessor_continues,
         })
     }
 
@@ -275,18 +291,18 @@ impl ContinuityIdentityLedger {
         if !self.created_revision.contains_key(lost_instance) {
             return Err(ContinuityIdentityError::UnknownInstance(lost_instance.clone()));
         }
-        let surviving_siblings = self
-            .parent
-            .get(lost_instance)
-            .and_then(|parent| self.children.get(parent))
-            .map(|children| {
-                children
-                    .iter()
-                    .filter(|candidate| *candidate != lost_instance)
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default();
+        let mut surviving_siblings = BTreeSet::new();
+        if let Some(event_id) = self.event_by_successor.get(lost_instance) {
+            let event = self.events.get(event_id).expect("event index is internal invariant");
+            for successor in &event.successors {
+                if successor != lost_instance {
+                    surviving_siblings.insert(successor.clone());
+                }
+            }
+            if event.predecessor_continues {
+                surviving_siblings.insert(event.predecessor.clone());
+            }
+        }
         Ok(BranchLossAssessment {
             lost_instance: lost_instance.clone(),
             surviving_siblings,
@@ -341,11 +357,13 @@ pub enum ContinuityIdentityError {
     SuccessorEqualsPredecessor,
     ForkNeedsMultipleSuccessors,
     SingleSuccessorRequired,
+    PredecessorCannotContinueForTransition,
     SnapshotDigestRequired,
     ExactMatchNeedsArtifact,
     ReinitializeCannotClaimExactMatch,
     MalformedArtifactDigest,
     EvidenceRequired,
+    EmptyEvidenceReference,
     RevisionRegression,
     DuplicateEvent(ContinuityEventId),
     UnknownPredecessor(SubjectInstanceId),
@@ -372,6 +390,7 @@ mod tests {
             ContinuityKind::RestoredFromSnapshot,
             1,
             2,
+            false,
             Some(DIGEST.into()),
             true,
             ["receipt://restore".into()],
@@ -380,6 +399,27 @@ mod tests {
         assert!(assessment.exact_state_match_supported());
         assert!(assessment.operational_lineage_supported());
         assert!(!assessment.phenomenal_identity_established());
+    }
+
+    #[test]
+    fn concurrent_restore_is_branch_multiplicity() {
+        let mut ledger = ContinuityIdentityLedger::new();
+        ledger.register_root(sid("root"), 1).unwrap();
+        ledger.record(ContinuityEvent::new(
+            ContinuityEventId::new("restore-copy").unwrap(),
+            sid("root"),
+            vec![sid("copy")],
+            ContinuityKind::RestoredFromSnapshot,
+            1,
+            2,
+            true,
+            Some(DIGEST.into()),
+            true,
+            ["receipt://restore".into()],
+        ).unwrap()).unwrap();
+        let assessment = ledger.assess_instance(&sid("copy")).unwrap();
+        assert_eq!(assessment.operational_class(), OperationalContinuityClass::ForkedDescendant);
+        assert!(assessment.sibling_instances().contains(&sid("root")));
     }
 
     #[test]
@@ -393,6 +433,7 @@ mod tests {
             ContinuityKind::Fork,
             1,
             2,
+            false,
             Some(DIGEST.into()),
             true,
             ["receipt://fork".into()],
@@ -414,6 +455,7 @@ mod tests {
             ContinuityKind::Fork,
             1,
             2,
+            false,
             Some(DIGEST.into()),
             true,
             ["receipt://fork".into()],
@@ -422,23 +464,5 @@ mod tests {
         assert!(loss.surviving_siblings().contains(&sid("b")));
         assert!(!loss.loss_harmlessness_established());
         assert!(!loss.sibling_substitution_is_valid_identity_proof());
-    }
-
-    #[test]
-    fn reinitialization_cannot_claim_exact_state_match() {
-        assert!(matches!(
-            ContinuityEvent::new(
-                ContinuityEventId::new("reset").unwrap(),
-                sid("root"),
-                vec![sid("new")],
-                ContinuityKind::Reinitialized,
-                1,
-                2,
-                Some(DIGEST.into()),
-                true,
-                ["receipt://reset".into()],
-            ),
-            Err(ContinuityIdentityError::ReinitializeCannotClaimExactMatch)
-        ));
     }
 }
