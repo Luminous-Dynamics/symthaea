@@ -45,7 +45,7 @@ fn wcare44_candidate_review_unit_is_frozen() {
     for (path, expected) in [
         (
             "docs/release/evidence/WCARE44_AUTHENTICATED_REPLICATION_AGGREGATION_PROTOCOL_V1.md",
-            "63807205013f632eb29abefe26f6f58586fdba9e",
+            "2c9a65f0cae32a4276f200e440cd643c43537888",
         ),
         (
             "docs/release/evidence/WCARE44_BUILDER_AUTH_OBSERVATION_SCHEMA_V1.json",
@@ -77,7 +77,7 @@ fn wcare44_candidate_review_unit_is_frozen() {
         ),
         (
             "scripts/wcare44-integrity.sh",
-            "802355a79d0d211b46274df7c2aefe9a10fc511f",
+            "f3e3a825d2b7e2c9ac73c93c0f70c4166c338b89",
         ),
     ] {
         assert_eq!(git_blob(&root, path), expected, "WCARE-44 byte drift: {path}");
