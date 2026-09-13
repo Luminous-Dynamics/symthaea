@@ -40,6 +40,7 @@ pub mod meta_cognition;
 pub mod ontology;
 pub mod perspective;
 pub mod practical_wisdom;
+pub mod relationship_safety;
 
 pub use authority_envelope::{
     AuthorityEnvelopeError, AuthorityEnvelopePolicy, AuthorityRestrictionReason,
@@ -77,6 +78,12 @@ pub use perspective::{
 pub use practical_wisdom::{
     DeliberationContext, PracticalWisdomAssessment, PracticalWisdomKernel, WisdomDisposition,
     WisdomReason,
+};
+pub use relationship_safety::{
+    EpistemicJudgmentRecord, JudgmentPosition, RelationshipRiskKind,
+    RelationshipRiskObservation, RelationshipSafetyAssessment, RelationshipSafetyCase,
+    RelationshipSafetyError, RelationshipSafetyFinding, RelationshipSafetyPolicy,
+    SocialCondition,
 };
 
 /// The core question each harmony asks of any situation
