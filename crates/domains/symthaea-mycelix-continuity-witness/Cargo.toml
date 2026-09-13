@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-mycelix-continuity-witness"
+version = "0.1.0"
+edition = "2024"
+description = "Fail-closed Mycelix witness + Xenia checkpoint verification for Symthaea continuity"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
+symthaea-xenia-continuity-anchor = { path = "../symthaea-xenia-continuity-anchor" }
+thiserror = { workspace = true }
