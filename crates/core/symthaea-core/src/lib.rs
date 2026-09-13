@@ -94,6 +94,8 @@ pub mod math;
 pub mod planar_configuration;
 /// Proof-strength reachability results and complete finite reference planning.
 pub mod reachability;
+/// Deterministic seeded bounded RRT with no infeasibility authority.
+pub mod sampling_reachability;
 /// Optional smooth-manifold refinement over planner-neutral metric spaces.
 pub mod smooth_manifold;
 /// Planner-neutral state-space, metric-space, product-space, and trajectory primitives.
