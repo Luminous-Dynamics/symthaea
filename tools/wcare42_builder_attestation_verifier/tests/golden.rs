@@ -37,12 +37,12 @@ mod verifier {
         }));
         let result = artifact(json!({
             "protocol_version": WCARE40_PROTOCOL,
-            "plan_sha256": plan.sha256,
+            "plan_sha256": plan.sha256.clone(),
             "disposition": "REPLICATION_SUPPORTED"
         }));
         let subject = artifact(json!({
             "protocol_version": WCARE40_PROTOCOL,
-            "plan_sha256": plan.sha256,
+            "plan_sha256": plan.sha256.clone(),
             "replica_id": "a",
             "provenance_strength": "ExternalVerified"
         }));
@@ -64,15 +64,15 @@ mod verifier {
         }));
         let envelope = json!({
             "protocol_version": PROTOCOL,
-            "wcare40_plan_sha256": plan.sha256,
+            "wcare40_plan_sha256": plan.sha256.clone(),
             "wcare40_result_sha256": "-",
             "subject_kind": "BuilderProvenance",
-            "subject_receipt_sha256": subject.sha256,
+            "subject_receipt_sha256": subject.sha256.clone(),
             "provenance_strength_claim": "ExternalVerified",
             "relation_evidence_strength_claim": "-",
             "issuer_key_id": "issuer.test",
             "issuer_public_key_ed25519_hex": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
-            "issuer_policy_sha256": policy.sha256,
+            "issuer_policy_sha256": policy.sha256.clone(),
             "issued_at_utc": "2026-09-13T12:00:00Z",
             "expires_at_utc": "2026-09-14T12:00:00Z",
             "nonce_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
@@ -141,7 +141,7 @@ mod verifier {
         let (plan, result, subject, policy, envelope) = subject_fixture();
         let altered_subject = artifact(json!({
             "protocol_version": WCARE40_PROTOCOL,
-            "plan_sha256": plan.sha256,
+            "plan_sha256": plan.sha256.clone(),
             "replica_id": "a",
             "provenance_strength": "OrganizerVerified"
         }));
