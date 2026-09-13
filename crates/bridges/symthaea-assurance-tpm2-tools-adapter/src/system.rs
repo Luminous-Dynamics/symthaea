@@ -1,6 +1,6 @@
 use std::process::{Command, Stdio};
 
-use crate::{blake3_digest, ToolExecution, Tpm2AdapterError, Tpm2ToolsExecutor};
+use crate::{ToolExecution, Tpm2AdapterError, Tpm2ToolsExecutor, blake3_digest};
 
 /// Shell-free Linux executor for an explicitly pinned `tpm2-tools` binary path.
 ///
@@ -17,7 +17,11 @@ impl Tpm2ToolsExecutor for SystemTpm2ToolsExecutor {
         Ok(blake3_digest(&bytes))
     }
 
-    fn execute(&self, executable: &str, args: &[String]) -> Result<ToolExecution, Tpm2AdapterError> {
+    fn execute(
+        &self,
+        executable: &str,
+        args: &[String],
+    ) -> Result<ToolExecution, Tpm2AdapterError> {
         let output = Command::new(executable)
             .args(args)
             .env_remove("TPM2TOOLS_TCTI")
