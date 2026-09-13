@@ -3,14 +3,15 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Evidence substrate for reasoning qualification.
 //!
-//! This module deliberately does **not** record private natural-language chain of thought.
-//! It records externally auditable facts about a reasoning episode: subject identity,
-//! benchmark/data lineage, evidence references, declared assumptions, executed operation
-//! summaries, answer/abstention, resource use, and evaluator receipts.
+//! This module stores externally auditable facts about a reasoning episode. It deliberately
+//! does not require or persist hidden natural-language chain of thought. The qualification
+//! surface is instead made from immutable subject/problem identity, evidence provenance,
+//! declared assumptions, executed operation summaries, answer/abstention, resource use, and
+//! evaluator receipts.
 //!
-//! Capability claims should progress through distinct states:
-//! implementation -> measurement -> qualification -> replication -> establishment.
-//! Merely constructing a reasoning mechanism is not evidence that the capability exists.
+//! Capability maturity is intentionally non-equivalent:
+//!
+//! `implemented != measured != qualified != replicated != established`.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -18,11 +19,11 @@ use std::fmt;
 /// Schema version for the canonical reasoning evidence record.
 pub const REASONING_EPISODE_SCHEMA_VERSION: u32 = 1;
 
-/// Identifier derived deterministically from the canonical episode contents.
+/// Identifier derived deterministically from canonical episode contents.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ReasoningEpisodeId(pub String);
 
-/// Broad domain used to slice qualification results without collapsing them into one score.
+/// Broad domain used to slice qualification results without inventing one intelligence scalar.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ReasoningDomain {
     Abstraction,
@@ -43,45 +44,34 @@ pub enum ReasoningDomain {
 /// Immutable reference to the problem and evaluation lineage used by an episode.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReasoningProblemRef {
-    /// Stable benchmark/suite name.
     pub benchmark: String,
-    /// Exact benchmark or generator version.
     pub benchmark_version: String,
-    /// Split or evidence partition (for example `train`, `public-eval`, `hidden-eval`).
     pub split: String,
-    /// Stable problem identifier within the benchmark/version.
     pub problem_id: String,
-    /// Content-addressed identity of the exact problem payload or generator receipt.
     pub problem_hash: String,
 }
 
 /// Reference to evidence consumed during reasoning.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvidenceRef {
-    /// Stable local/reference identifier.
     pub id: String,
-    /// Content hash or other immutable content identity.
     pub content_hash: String,
-    /// Provenance/source identity.
     pub provenance: String,
-    /// Evidence known to descend from the same source can share an independence group.
+    /// Known common-source descendants can share a group so they are not mistaken for
+    /// independent corroboration by higher-level evaluators.
     pub independence_group: Option<String>,
 }
 
-/// An explicit premise that was not directly established by supplied evidence.
+/// Explicit premise not directly established by supplied evidence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AssumptionRecord {
     pub id: String,
-    /// Public, auditable statement of the assumption; not a hidden reasoning transcript.
+    /// Public auditable statement, not a hidden reasoning transcript.
     pub statement: String,
-    /// Confidence that this assumption is warranted.
     pub confidence: f64,
 }
 
-/// A public operation-level trace entry.
-///
-/// This describes what operation was executed and its dependencies/results. It is not a
-/// request to persist hidden chain-of-thought text.
+/// Public operation-level trace entry.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReasoningDecisionRecord {
     pub operation: String,
@@ -111,8 +101,8 @@ pub enum ReasoningOutcome {
     },
     Abstained {
         reason: AbstentionReason,
-        /// Estimated probability that an answer could be responsibly asserted from the
-        /// available state. This is calibrated independently from answer correctness.
+        /// Estimated probability that an answer could responsibly be asserted from the
+        /// available state. It is not a substitute for correctness calibration.
         answerability: f64,
     },
 }
@@ -126,7 +116,7 @@ pub struct ResourceUsage {
     pub model_tokens: u64,
 }
 
-/// Canonical externally-auditable reasoning episode.
+/// Canonical externally auditable reasoning episode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReasoningEpisode {
     pub schema_version: u32,
@@ -141,8 +131,8 @@ pub struct ReasoningEpisode {
     pub resources: ResourceUsage,
 }
 
-/// One evaluator-produced metric. Metrics stay decomposed instead of being hidden behind a
-/// single "intelligence" scalar.
+/// One evaluator-produced metric. Metrics remain decomposed instead of being hidden behind an
+/// opaque composite intelligence score.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QualificationMetric {
     pub name: String,
@@ -159,7 +149,7 @@ pub struct ReasoningQualificationReceipt {
     pub evaluator_version: String,
     pub evaluation_lineage_hash: String,
     pub metrics: Vec<QualificationMetric>,
-    /// Optional exact correctness result when the task admits a binary ground truth.
+    /// Optional exact correctness result when the task admits binary ground truth.
     pub exact_correct: Option<bool>,
 }
 
@@ -168,20 +158,21 @@ pub enum QualificationValidationError {
     EmptyField(&'static str),
     UnsupportedSchemaVersion(u32),
     InvalidProbability(&'static str),
-    InvalidMetric(&'static str),
+    InvalidMetric(String),
     DuplicateEvidenceId(String),
     DuplicateAssumptionId(String),
     EmptyDecisionOperation,
     EmptyMetricName,
     DuplicateMetricName(String),
+    ReceiptIdMismatch,
 }
 
 impl fmt::Display for QualificationValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyField(field) => write!(f, "required field `{field}` is empty"),
-            Self::UnsupportedSchemaVersion(v) => {
-                write!(f, "unsupported reasoning episode schema version {v}")
+            Self::UnsupportedSchemaVersion(version) => {
+                write!(f, "unsupported reasoning episode schema version {version}")
             }
             Self::InvalidProbability(field) => {
                 write!(f, "probability `{field}` must be finite and within [0, 1]")
@@ -192,6 +183,7 @@ impl fmt::Display for QualificationValidationError {
             Self::EmptyDecisionOperation => write!(f, "decision operation must not be empty"),
             Self::EmptyMetricName => write!(f, "qualification metric name must not be empty"),
             Self::DuplicateMetricName(name) => write!(f, "duplicate metric name `{name}`"),
+            Self::ReceiptIdMismatch => write!(f, "qualification receipt identity does not match contents"),
         }
     }
 }
@@ -199,7 +191,6 @@ impl fmt::Display for QualificationValidationError {
 impl std::error::Error for QualificationValidationError {}
 
 impl ReasoningEpisode {
-    /// Build an episode with the current schema version.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         subject_revision: impl Into<String>,
@@ -228,7 +219,7 @@ impl ReasoningEpisode {
         Ok(episode)
     }
 
-    /// Validate persisted or newly-created episode state without rewriting it.
+    /// Validate persisted or newly created episode state without rewriting it.
     pub fn validate(&self) -> Result<(), QualificationValidationError> {
         if self.schema_version != REASONING_EPISODE_SCHEMA_VERSION {
             return Err(QualificationValidationError::UnsupportedSchemaVersion(
@@ -263,70 +254,72 @@ impl ReasoningEpisode {
             if decision.operation.trim().is_empty() {
                 return Err(QualificationValidationError::EmptyDecisionOperation);
             }
+            if let Some(verifier) = &decision.verifier {
+                require_nonempty("decision.verifier", verifier)?;
+            }
         }
 
-        self.outcome.validate()?;
-        Ok(())
+        self.outcome.validate()
     }
 
-    /// Deterministic content identity for an already validated episode.
+    /// Deterministic content identity for a validated episode.
     ///
-    /// Length-prefixing prevents ambiguous concatenations. Floating-point probabilities are
-    /// hashed by their IEEE-754 bit patterns after validation rejects NaN/infinity.
+    /// Length prefixes prevent ambiguous concatenation. Floating-point probabilities are hashed
+    /// by their IEEE-754 bit patterns after validation rejects NaN/infinity.
     pub fn id(&self) -> Result<ReasoningEpisodeId, QualificationValidationError> {
         self.validate()?;
-        let mut h = blake3::Hasher::new();
-        hash_u64(&mut h, self.schema_version as u64);
-        hash_str(&mut h, &self.subject_revision);
-        hash_str(&mut h, &self.configuration_id);
-        hash_domain(&mut h, &self.domain);
-        hash_problem(&mut h, &self.problem);
+        let mut hasher = blake3::Hasher::new();
+        hash_u64(&mut hasher, u64::from(self.schema_version));
+        hash_str(&mut hasher, &self.subject_revision);
+        hash_str(&mut hasher, &self.configuration_id);
+        hash_domain(&mut hasher, &self.domain);
+        hash_problem(&mut hasher, &self.problem);
 
-        hash_u64(&mut h, self.evidence.len() as u64);
-        for e in &self.evidence {
-            hash_str(&mut h, &e.id);
-            hash_str(&mut h, &e.content_hash);
-            hash_str(&mut h, &e.provenance);
-            hash_option_str(&mut h, e.independence_group.as_deref());
+        hash_usize(&mut hasher, self.evidence.len());
+        for evidence in &self.evidence {
+            hash_str(&mut hasher, &evidence.id);
+            hash_str(&mut hasher, &evidence.content_hash);
+            hash_str(&mut hasher, &evidence.provenance);
+            hash_option_str(&mut hasher, evidence.independence_group.as_deref());
         }
 
-        hash_u64(&mut h, self.assumptions.len() as u64);
-        for a in &self.assumptions {
-            hash_str(&mut h, &a.id);
-            hash_str(&mut h, &a.statement);
-            hash_u64(&mut h, a.confidence.to_bits());
+        hash_usize(&mut hasher, self.assumptions.len());
+        for assumption in &self.assumptions {
+            hash_str(&mut hasher, &assumption.id);
+            hash_str(&mut hasher, &assumption.statement);
+            hash_u64(&mut hasher, assumption.confidence.to_bits());
         }
 
-        hash_u64(&mut h, self.decisions.len() as u64);
-        for d in &self.decisions {
-            hash_str(&mut h, &d.operation);
-            hash_strings(&mut h, &d.input_refs);
-            hash_strings(&mut h, &d.output_refs);
-            hash_option_str(&mut h, d.verifier.as_deref());
+        hash_usize(&mut hasher, self.decisions.len());
+        for decision in &self.decisions {
+            hash_str(&mut hasher, &decision.operation);
+            hash_strings(&mut hasher, &decision.input_refs);
+            hash_strings(&mut hasher, &decision.output_refs);
+            hash_option_str(&mut hasher, decision.verifier.as_deref());
         }
 
         match &self.outcome {
             ReasoningOutcome::Asserted { value, confidence } => {
-                h.update(&[0]);
-                hash_str(&mut h, value);
-                hash_u64(&mut h, confidence.to_bits());
+                hasher.update(&[0]);
+                hash_str(&mut hasher, value);
+                hash_u64(&mut hasher, confidence.to_bits());
             }
             ReasoningOutcome::Abstained {
                 reason,
                 answerability,
             } => {
-                h.update(&[1]);
-                hash_abstention_reason(&mut h, reason);
-                hash_u64(&mut h, answerability.to_bits());
+                hasher.update(&[1]);
+                hash_abstention_reason(&mut hasher, reason);
+                hash_u64(&mut hasher, answerability.to_bits());
             }
         }
 
-        hash_u64(&mut h, self.resources.wall_time_us);
-        hash_u64(&mut h, self.resources.deliberation_steps);
-        hash_u64(&mut h, self.resources.tool_calls);
-        hash_u64(&mut h, self.resources.model_tokens);
+        hash_u64(&mut hasher, self.resources.wall_time_us);
+        hash_u64(&mut hasher, self.resources.deliberation_steps);
+        hash_u64(&mut hasher, self.resources.tool_calls);
+        hash_u64(&mut hasher, self.resources.model_tokens);
 
-        Ok(ReasoningEpisodeId(h.finalize().to_hex().to_string()))
+        Ok(ReasoningEpisodeId(hasher.finalize().to_hex().to_string()))
     }
 }
 
@@ -400,7 +393,6 @@ impl ReasoningQualificationReceipt {
             &metrics,
             exact_correct,
         );
-
         Ok(Self {
             receipt_id,
             episode_id,
@@ -412,6 +404,7 @@ impl ReasoningQualificationReceipt {
         })
     }
 
+    /// Validate both field semantics and the deterministic receipt binding.
     pub fn validate(&self) -> Result<(), QualificationValidationError> {
         require_nonempty("receipt.receipt_id", &self.receipt_id)?;
         require_nonempty("receipt.episode_id", &self.episode_id.0)?;
@@ -421,7 +414,20 @@ impl ReasoningQualificationReceipt {
             "receipt.evaluation_lineage_hash",
             &self.evaluation_lineage_hash,
         )?;
-        validate_metrics(&self.metrics)
+        validate_metrics(&self.metrics)?;
+
+        let expected = receipt_id(
+            &self.episode_id,
+            &self.evaluator,
+            &self.evaluator_version,
+            &self.evaluation_lineage_hash,
+            &self.metrics,
+            self.exact_correct,
+        );
+        if expected != self.receipt_id {
+            return Err(QualificationValidationError::ReceiptIdMismatch);
+        }
+        Ok(())
     }
 }
 
@@ -433,7 +439,7 @@ fn validate_metrics(metrics: &[QualificationMetric]) -> Result<(), Qualification
         }
         if !metric.value.is_finite() {
             return Err(QualificationValidationError::InvalidMetric(
-                metric.name.clone().leak(),
+                metric.name.clone(),
             ));
         }
         if !names.insert(metric.name.as_str()) {
@@ -453,23 +459,23 @@ fn receipt_id(
     metrics: &[QualificationMetric],
     exact_correct: Option<bool>,
 ) -> String {
-    let mut h = blake3::Hasher::new();
-    hash_str(&mut h, &episode_id.0);
-    hash_str(&mut h, evaluator);
-    hash_str(&mut h, evaluator_version);
-    hash_str(&mut h, evaluation_lineage_hash);
-    hash_u64(&mut h, metrics.len() as u64);
+    let mut hasher = blake3::Hasher::new();
+    hash_str(&mut hasher, &episode_id.0);
+    hash_str(&mut hasher, evaluator);
+    hash_str(&mut hasher, evaluator_version);
+    hash_str(&mut hasher, evaluation_lineage_hash);
+    hash_usize(&mut hasher, metrics.len());
     for metric in metrics {
-        hash_str(&mut h, &metric.name);
-        hash_u64(&mut h, metric.value.to_bits());
-        hash_str(&mut h, &metric.unit);
+        hash_str(&mut hasher, &metric.name);
+        hash_u64(&mut hasher, metric.value.to_bits());
+        hash_str(&mut hasher, &metric.unit);
     }
     match exact_correct {
-        None => h.update(&[0]),
-        Some(false) => h.update(&[1]),
-        Some(true) => h.update(&[2]),
+        None => hasher.update(&[0]),
+        Some(false) => hasher.update(&[1]),
+        Some(true) => hasher.update(&[2]),
     };
-    h.finalize().to_hex().to_string()
+    hasher.finalize().to_hex().to_string()
 }
 
 fn require_nonempty(
@@ -494,15 +500,15 @@ fn require_probability(
     }
 }
 
-fn hash_problem(h: &mut blake3::Hasher, problem: &ReasoningProblemRef) {
-    hash_str(h, &problem.benchmark);
-    hash_str(h, &problem.benchmark_version);
-    hash_str(h, &problem.split);
-    hash_str(h, &problem.problem_id);
-    hash_str(h, &problem.problem_hash);
+fn hash_problem(hasher: &mut blake3::Hasher, problem: &ReasoningProblemRef) {
+    hash_str(hasher, &problem.benchmark);
+    hash_str(hasher, &problem.benchmark_version);
+    hash_str(hasher, &problem.split);
+    hash_str(hasher, &problem.problem_id);
+    hash_str(hasher, &problem.problem_hash);
 }
 
-fn hash_domain(h: &mut blake3::Hasher, domain: &ReasoningDomain) {
+fn hash_domain(hasher: &mut blake3::Hasher, domain: &ReasoningDomain) {
     let (tag, custom) = match domain {
         ReasoningDomain::Abstraction => (0_u8, None),
         ReasoningDomain::Logic => (1, None),
@@ -518,13 +524,13 @@ fn hash_domain(h: &mut blake3::Hasher, domain: &ReasoningDomain) {
         ReasoningDomain::General => (11, None),
         ReasoningDomain::Custom(name) => (12, Some(name.as_str())),
     };
-    h.update(&[tag]);
+    hasher.update(&[tag]);
     if let Some(name) = custom {
-        hash_str(h, name);
+        hash_str(hasher, name);
     }
 }
 
-fn hash_abstention_reason(h: &mut blake3::Hasher, reason: &AbstentionReason) {
+fn hash_abstention_reason(hasher: &mut blake3::Hasher, reason: &AbstentionReason) {
     let (tag, custom) = match reason {
         AbstentionReason::InsufficientEvidence => (0_u8, None),
         AbstentionReason::Unidentified => (1, None),
@@ -534,38 +540,42 @@ fn hash_abstention_reason(h: &mut blake3::Hasher, reason: &AbstentionReason) {
         AbstentionReason::UnsafeToConclude => (5, None),
         AbstentionReason::Other(name) => (6, Some(name.as_str())),
     };
-    h.update(&[tag]);
+    hasher.update(&[tag]);
     if let Some(name) = custom {
-        hash_str(h, name);
+        hash_str(hasher, name);
     }
 }
 
-fn hash_strings(h: &mut blake3::Hasher, values: &[String]) {
-    hash_u64(h, values.len() as u64);
+fn hash_strings(hasher: &mut blake3::Hasher, values: &[String]) {
+    hash_usize(hasher, values.len());
     for value in values {
-        hash_str(h, value);
+        hash_str(hasher, value);
     }
 }
 
-fn hash_option_str(h: &mut blake3::Hasher, value: Option<&str>) {
+fn hash_option_str(hasher: &mut blake3::Hasher, value: Option<&str>) {
     match value {
         None => {
-            h.update(&[0]);
+            hasher.update(&[0]);
         }
         Some(value) => {
-            h.update(&[1]);
-            hash_str(h, value);
+            hasher.update(&[1]);
+            hash_str(hasher, value);
         }
     }
 }
 
-fn hash_str(h: &mut blake3::Hasher, value: &str) {
-    hash_u64(h, value.len() as u64);
-    h.update(value.as_bytes());
+fn hash_str(hasher: &mut blake3::Hasher, value: &str) {
+    hash_usize(hasher, value.len());
+    hasher.update(value.as_bytes());
 }
 
-fn hash_u64(h: &mut blake3::Hasher, value: u64) {
-    h.update(&value.to_le_bytes());
+fn hash_usize(hasher: &mut blake3::Hasher, value: usize) {
+    hash_u64(hasher, u64::try_from(value).unwrap_or(u64::MAX));
+}
+
+fn hash_u64(hasher: &mut blake3::Hasher, value: u64) {
+    hasher.update(&value.to_le_bytes());
 }
 
 #[cfg(test)]
@@ -583,7 +593,7 @@ mod tests {
     }
 
     fn sample_episode() -> ReasoningEpisode {
-        match ReasoningEpisode::new(
+        ReasoningEpisode::new(
             "subject-deadbeef",
             "baseline",
             ReasoningDomain::Logic,
@@ -615,10 +625,24 @@ mod tests {
                 tool_calls: 0,
                 model_tokens: 0,
             },
-        ) {
-            Ok(episode) => episode,
-            Err(err) => panic!("sample episode must validate: {err}"),
-        }
+        )
+        .unwrap_or_else(|err| panic!("sample episode must validate: {err}"))
+    }
+
+    fn sample_receipt() -> ReasoningQualificationReceipt {
+        ReasoningQualificationReceipt::new(
+            &sample_episode(),
+            "rq-evaluator",
+            "v1",
+            "sha256:evaluation-set",
+            vec![QualificationMetric {
+                name: "exact_accuracy".into(),
+                value: 1.0,
+                unit: "fraction".into(),
+            }],
+            Some(true),
+        )
+        .unwrap_or_else(|err| panic!("sample receipt must validate: {err}"))
     }
 
     #[test]
@@ -687,26 +711,20 @@ mod tests {
 
     #[test]
     fn receipt_is_deterministic_and_bound_to_episode() {
-        let episode = sample_episode();
-        let make = || {
-            ReasoningQualificationReceipt::new(
-                &episode,
-                "rq-evaluator",
-                "v1",
-                "sha256:evaluation-set",
-                vec![QualificationMetric {
-                    name: "exact_accuracy".into(),
-                    value: 1.0,
-                    unit: "fraction".into(),
-                }],
-                Some(true),
-            )
-        };
-
-        let left = make();
-        let right = make();
-        assert!(left.is_ok());
+        let left = sample_receipt();
+        let right = sample_receipt();
         assert_eq!(left, right);
+        assert!(left.validate().is_ok());
+    }
+
+    #[test]
+    fn receipt_detects_post_construction_tampering() {
+        let mut receipt = sample_receipt();
+        receipt.metrics[0].value = 0.0;
+        assert_eq!(
+            receipt.validate(),
+            Err(QualificationValidationError::ReceiptIdMismatch)
+        );
     }
 
     #[test]
@@ -750,7 +768,7 @@ mod tests {
         );
         assert!(matches!(
             non_finite,
-            Err(QualificationValidationError::InvalidMetric("score"))
+            Err(QualificationValidationError::InvalidMetric(ref name)) if name == "score"
         ));
     }
 }
