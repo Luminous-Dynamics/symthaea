@@ -21,6 +21,9 @@
 //!   limiter does not activate.
 //! - [`associative_query`] is a fixed, parameter-free HDC decoder that supplies
 //!   an exact current-state learning signal for those eligibility traces.
+//! - [`train_exact_episode`] accumulates those exact query gradients while
+//!   parameters remain frozen for a complete world, then applies one bounded
+//!   episode-end recurrent update.
 //! - [`InvariantContextMixer`] supplies O(KD) cross-dimensional magnitude
 //!   context without violating the full bipolar role symmetry.
 //! - [`ContextualHolographicLiquidCell`] composes invariant context with the
@@ -47,6 +50,7 @@ pub mod state_tracking_associative;
 pub mod state_tracking_benchmark;
 pub mod state_tracking_codec;
 pub mod state_tracking_eval;
+pub mod state_tracking_exact_training;
 pub mod state_tracking_readout;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
@@ -71,5 +75,9 @@ pub use state_tracking_codec::{StateTrackingCodec, TrackingCodecError};
 pub use state_tracking_eval::{
     FrozenTrackingEvalConfig, FrozenTrackingEvalError, FrozenTrackingEvalResult,
     FrozenTrackingReservoir, evaluate_frozen_reservoir,
+};
+pub use state_tracking_exact_training::{
+    AssociativeEpisodeMetrics, ExactEpisodeTrainingConfig, ExactEpisodeTrainingError,
+    ExactEpisodeTrainingReport, evaluate_associative_episode, train_exact_episode,
 };
 pub use state_tracking_readout::{TrackingPrototypeReadout, TrackingReadoutError};
