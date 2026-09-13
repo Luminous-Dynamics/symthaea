@@ -47,9 +47,8 @@ use reciprocal_intervention_binding::{
     bind_exact_intervention, ExactInterventionBindingError,
 };
 use reciprocal_representation::{
-    assess_representation, ReciprocalRepresentation, ReciprocalRepresentationError,
-    ReciprocalRepresentationLedger, RepresentationAdvisoryDisposition, RepresentationId,
-    RepresentationKind, RepresentationScope, RepresentationSourceClass,
+    ReciprocalRepresentation, ReciprocalRepresentationError, ReciprocalRepresentationLedger,
+    RepresentationId, RepresentationKind, RepresentationScope, RepresentationSourceClass,
 };
 use reciprocal_representation_admission::{
     AdmissionMultiplicity, RepresentationAdmissionError, RepresentationAdmissionId,
