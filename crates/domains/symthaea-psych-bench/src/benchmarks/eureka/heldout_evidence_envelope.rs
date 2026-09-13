@@ -448,6 +448,18 @@ impl InvalidHeldoutEvidenceRow {
         row.replay_digest = invalid_row_digest(&row);
         Ok(row)
     }
+
+    fn to_cross_family_row(&self) -> PairedAnalysisRow {
+        PairedAnalysisRow {
+            row_identity: self.replay_digest,
+            family: self.family,
+            partition: CorpusPartition::HeldOutEvaluation,
+            seed_identity: self.seed_identity,
+            disposition: self.disposition,
+            candidate: AnalysisMetricOutcome::InvalidNotScored,
+            comparator: AnalysisMetricOutcome::InvalidNotScored,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -505,13 +517,13 @@ impl CanonicalHeldoutEvidenceRow {
         }
     }
 
-    /// #2296 currently takes metric-bearing rows. Keep this adapter valid-only
-    /// so invalid infrastructure/evidence rows can never be encoded as fake
-    /// abstention or out-of-domain behavior.
-    pub(super) fn valid_cross_family_row(&self) -> Option<PairedAnalysisRow> {
+    /// Lossless analyzer projection for both valid and invalid evidence rows.
+    /// Invalid evidence uses the analyzer-only `InvalidNotScored` marker and
+    /// therefore remains distinct from legitimate abstention/OOD behavior.
+    pub(super) fn to_cross_family_row(&self) -> PairedAnalysisRow {
         match self {
-            Self::Completed(row) => Some(row.to_cross_family_row()),
-            Self::Invalid(_) => None,
+            Self::Completed(row) => row.to_cross_family_row(),
+            Self::Invalid(row) => row.to_cross_family_row(),
         }
     }
 }
@@ -1085,7 +1097,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid_row_has_no_fake_metric_outcome_or_valid_adapter() {
+    fn invalid_row_has_no_fake_metric_outcome_and_projects_nonmetric() {
         let invalid = CanonicalHeldoutEvidenceRow::Invalid(
             InvalidHeldoutEvidenceRow::freeze(InvalidHeldoutEvidenceInput {
                 family: EvidenceFamilyId::ResourceFlowV1,
@@ -1110,7 +1122,10 @@ mod tests {
         let projection = invalid.analysis_projection();
         assert_eq!(projection.candidate, None);
         assert_eq!(projection.comparator, None);
-        assert_eq!(invalid.valid_cross_family_row(), None);
+        let analysis = invalid.to_cross_family_row();
+        assert_eq!(analysis.disposition, CampaignRowDisposition::InfrastructureIndeterminate);
+        assert_eq!(analysis.candidate, AnalysisMetricOutcome::InvalidNotScored);
+        assert_eq!(analysis.comparator, AnalysisMetricOutcome::InvalidNotScored);
     }
 
     #[test]
