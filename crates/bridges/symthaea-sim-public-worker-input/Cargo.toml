@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-sim-public-worker-input"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Pre-spawn public simulation Component input envelope over the first-instruction rlimit worker"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+symthaea-extension-host = { path = "../symthaea-extension-host" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-sim-first-instruction-worker-rlimit = { path = "../symthaea-sim-first-instruction-worker-rlimit" }
+symthaea-sim-worker = { path = "../symthaea-sim-worker" }
+symthaea-sim-worker-cgroup = { path = "../symthaea-sim-worker-cgroup" }
+symthaea-sim-worker-image = { path = "../symthaea-sim-worker-image" }
