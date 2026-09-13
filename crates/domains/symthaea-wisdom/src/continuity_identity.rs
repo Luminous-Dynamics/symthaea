@@ -205,6 +205,7 @@ impl BranchLossAssessment {
 pub struct ContinuityIdentityLedger {
     events: BTreeMap<ContinuityEventId, ContinuityEvent>,
     created_revision: BTreeMap<SubjectInstanceId, u64>,
+    latest_revision: BTreeMap<SubjectInstanceId, u64>,
     parent: BTreeMap<SubjectInstanceId, SubjectInstanceId>,
     inactive_instances: BTreeSet<SubjectInstanceId>,
     event_by_successor: BTreeMap<SubjectInstanceId, ContinuityEventId>,
@@ -221,7 +222,8 @@ impl ContinuityIdentityLedger {
         if self.created_revision.contains_key(&instance) {
             return Err(ContinuityIdentityError::InstanceAlreadyExists(instance));
         }
-        self.created_revision.insert(instance, revision);
+        self.created_revision.insert(instance.clone(), revision);
+        self.latest_revision.insert(instance, revision);
         Ok(())
     }
 
@@ -239,6 +241,18 @@ impl ContinuityIdentityLedger {
                 event.predecessor.clone(),
             ));
         }
+        let latest_revision = self
+            .latest_revision
+            .get(&event.predecessor)
+            .copied()
+            .unwrap_or(predecessor_revision);
+        if event.from_revision < latest_revision {
+            return Err(ContinuityIdentityError::NonMonotonicInstanceRevision {
+                instance: event.predecessor.clone(),
+                previous: latest_revision,
+                attempted: event.from_revision,
+            });
+        }
         if event.from_revision < predecessor_revision || event.to_revision < event.from_revision {
             return Err(ContinuityIdentityError::RevisionRegression);
         }
@@ -250,9 +264,12 @@ impl ContinuityIdentityLedger {
 
         for successor in &event.successors {
             self.created_revision.insert(successor.clone(), event.to_revision);
+            self.latest_revision.insert(successor.clone(), event.to_revision);
             self.parent.insert(successor.clone(), event.predecessor.clone());
             self.event_by_successor.insert(successor.clone(), event.id.clone());
         }
+        self.latest_revision
+            .insert(event.predecessor.clone(), event.to_revision);
         if !event.predecessor_continues {
             self.inactive_instances.insert(event.predecessor.clone());
         }
@@ -396,6 +413,7 @@ pub enum ContinuityIdentityError {
     EvidenceRequired,
     EmptyEvidenceReference,
     RevisionRegression,
+    NonMonotonicInstanceRevision { instance: SubjectInstanceId, previous: u64, attempted: u64 },
     DuplicateEvent(ContinuityEventId),
     UnknownPredecessor(SubjectInstanceId),
     PredecessorNoLongerActive(SubjectInstanceId),
@@ -458,6 +476,23 @@ mod tests {
             ["receipt://second".into()],
         ).unwrap());
         assert!(matches!(result, Err(ContinuityIdentityError::PredecessorNoLongerActive(_))));
+    }
+
+    #[test]
+    fn continuing_predecessor_cannot_spawn_retroactive_branch() {
+        let mut ledger = ContinuityIdentityLedger::new();
+        ledger.register_root(sid("root"), 1).unwrap();
+        ledger.record(ContinuityEvent::new(
+            ContinuityEventId::new("copy-late").unwrap(), sid("root"), vec![sid("copy-a")],
+            ContinuityKind::RestoredFromSnapshot, 10, 11, true, Some(DIGEST.into()), true,
+            ["receipt://late".into()],
+        ).unwrap()).unwrap();
+        let result = ledger.record(ContinuityEvent::new(
+            ContinuityEventId::new("copy-backdated").unwrap(), sid("root"), vec![sid("copy-b")],
+            ContinuityKind::RestoredFromSnapshot, 5, 6, true, Some(DIGEST.into()), true,
+            ["receipt://backdated".into()],
+        ).unwrap());
+        assert!(matches!(result, Err(ContinuityIdentityError::NonMonotonicInstanceRevision { .. })));
     }
 
     #[test]
