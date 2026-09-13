@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Additive V2 journal adapter for domain executors that must bind the exact generic Prepared digest.
 //!
-//! V1 executors remain unchanged. V2 is opt-in: after generic live revalidation, domain preflight,
-//! append of the exact `PreparedInterventionExecution`, and durable persistence of that write-ahead
-//! journal, this adapter constructs `PreparedExecutionContextV2` and passes it to the domain
-//! executor. A V2 domain executor therefore receives correlation evidence only after the generic
-//! write-ahead record is durably established.
+//! V1 executors remain unchanged. V2 is opt-in. Canonical Prepared digest computation and context
+//! validation happen before the durable write-ahead boundary. After generic live revalidation and
+//! domain preflight, the exact `PreparedInterventionExecution` is appended and persisted; only then
+//! does the adapter construct the already-verified `PreparedExecutionContextV2` and invoke the
+//! domain executor. No fallible context-construction step exists after Prepared durability.
 
 #![deny(unsafe_code)]
 
@@ -26,7 +26,7 @@ use crate::execution_adapter::{
 };
 use crate::execution_recovery::{
     CompletedInterventionExecution, ExecutionJournalError, InterventionExecutionJournal,
-    PreparedInterventionExecution,
+    PreparedInterventionExecution, digest_prepared_execution,
 };
 use crate::prepared_execution_context_v2::{
     PreparedExecutionContextV2, PreparedExecutionContextV2Error,
@@ -114,10 +114,28 @@ where
             return Ok(JournaledExecutionOutcome::PreflightRejected { error });
         }
 
+        // Compute and validate the exact correlation digest before any durable Prepared state exists.
+        // If serialization or record validation fails, this is still a clean pre-execution failure.
+        let expected_prepared_digest = digest_prepared_execution(&self.prepared)
+            .map_err(PreExecutionJournalV2Error::Journal)?;
+        PreparedExecutionContextV2::verify_exact_prepared_digest(
+            &self.prepared,
+            expected_prepared_digest,
+        )
+        .map_err(PreExecutionJournalV2Error::ContextVerification)?;
+
         let prepared_digest = self
             .journal
             .append_prepared(self.prepared.clone())
             .map_err(PreExecutionJournalV2Error::Journal)?;
+        if prepared_digest != expected_prepared_digest {
+            // No persistence has been attempted yet. Treat disagreement between the generic journal
+            // and the independently computed canonical digest as an internal invariant violation.
+            return Err(PreExecutionJournalV2Error::PreparedDigestInvariant {
+                expected: expected_prepared_digest,
+                actual: prepared_digest,
+            });
+        }
 
         let prepared_persistence_ref = self
             .persistence
@@ -125,15 +143,16 @@ where
             .map_err(PreExecutionJournalV2Error::PreparedPersistence)?;
         validate_ref(&prepared_persistence_ref)
             .map_err(|_| PreExecutionJournalV2Error::InvalidPersistenceReference)?;
+        PreparedExecutionContextV2::validate_persistence_ref(&prepared_persistence_ref)
+            .map_err(PreExecutionJournalV2Error::ContextVerification)?;
 
-        // This is the only construction point used by the V2 adapter. The context independently
-        // recomputes the canonical prepared digest before any domain mutation is invoked.
-        let context = PreparedExecutionContextV2::from_exact_prepared(
+        // All fallible context checks completed before this point. Once Prepared durability exists,
+        // construction itself is infallible and cannot create a retry-shaped post-prepare error.
+        let context = PreparedExecutionContextV2::from_verified_durable(
             &self.prepared,
             prepared_digest,
             prepared_persistence_ref.clone(),
-        )
-        .map_err(PreExecutionJournalV2Error::Context)?;
+        );
 
         let execution = match self.executor.execute_receipted_v2(permit, &context) {
             Ok(execution) => execution,
@@ -281,14 +300,19 @@ pub enum PreExecutionJournalV2Error<E>
 where
     E: StdError + Send + Sync + 'static,
 {
-    #[error("could not append write-ahead execution record: {0}")]
+    #[error("could not append or precompute write-ahead execution record: {0}")]
     Journal(#[source] ExecutionJournalError),
     #[error("could not persist write-ahead execution journal: {0}")]
     PreparedPersistence(#[source] E),
     #[error("execution-journal persistence returned an invalid durable reference")]
     InvalidPersistenceReference,
-    #[error("could not bind exact generic Prepared evidence into V2 execution context: {0}")]
-    Context(#[source] PreparedExecutionContextV2Error),
+    #[error("could not verify exact generic Prepared evidence before durability: {0}")]
+    ContextVerification(#[source] PreparedExecutionContextV2Error),
+    #[error("generic execution journal returned a Prepared digest inconsistent with canonical precomputation")]
+    PreparedDigestInvariant {
+        expected: Sha256Digest,
+        actual: Sha256Digest,
+    },
 }
 
 #[derive(Debug, Error)]
