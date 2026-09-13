@@ -371,34 +371,40 @@ fn provider_alias_metadata_does_not_masquerade_as_same_subject() {
     let left = AiSubjectManifest::new(
         id("agent-a"),
         profile.clone(),
-        vec![SurfaceBinding::applicable(
-            AiSurfaceKind::Model,
-            SurfaceLocator::new(Some(id("provider-a")), id("rolling-alias"), Some(id("v1"))),
-            SurfaceState::Known(commit('a')),
-        )
-        .unwrap()],
+        vec![
+            SurfaceBinding::applicable(
+                AiSurfaceKind::Model,
+                SurfaceLocator::new(Some(id("provider-a")), id("rolling-alias"), Some(id("v1"))),
+                SurfaceState::Known(commit('a')),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let renamed = AiSubjectManifest::new(
         id("agent-a"),
         profile.clone(),
-        vec![SurfaceBinding::applicable(
-            AiSurfaceKind::Model,
-            SurfaceLocator::new(Some(id("provider-a")), id("other-alias"), Some(id("v1"))),
-            SurfaceState::Known(commit('a')),
-        )
-        .unwrap()],
+        vec![
+            SurfaceBinding::applicable(
+                AiSurfaceKind::Model,
+                SurfaceLocator::new(Some(id("provider-a")), id("other-alias"), Some(id("v1"))),
+                SurfaceState::Known(commit('a')),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
     let reversioned = AiSubjectManifest::new(
         id("agent-a"),
         profile,
-        vec![SurfaceBinding::applicable(
-            AiSurfaceKind::Model,
-            SurfaceLocator::new(Some(id("provider-a")), id("rolling-alias"), Some(id("v2"))),
-            SurfaceState::Known(commit('a')),
-        )
-        .unwrap()],
+        vec![
+            SurfaceBinding::applicable(
+                AiSurfaceKind::Model,
+                SurfaceLocator::new(Some(id("provider-a")), id("rolling-alias"), Some(id("v2"))),
+                SurfaceState::Known(commit('a')),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap();
 
