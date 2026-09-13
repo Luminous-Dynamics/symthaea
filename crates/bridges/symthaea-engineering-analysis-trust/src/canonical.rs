@@ -10,7 +10,7 @@ pub(crate) const REQUIREMENT_DOMAIN_V1: &[u8] = b"symthaea.etk-accepted-requirem
 pub(crate) const SUBJECT_DOMAIN_V1: &[u8] = b"symthaea.etk-engineering-subject.v1\0";
 pub(crate) const TWIN_DOMAIN_V1: &[u8] = b"symthaea.etk-twin-revision.v1\0";
 pub(crate) const VALIDITY_DOMAIN_V1: &[u8] = b"symthaea.etk-validity-domain.v1\0";
-pub(crate) const CURRENTNESS_DOMAIN_V1: &[u8] = b"symthaea.etk-currentness-assertion.v1\0";
+pub(crate) const CURRENTNESS_DOMAIN_V2: &[u8] = b"symthaea.etk-currentness-assertion.v2\0";
 pub(crate) const OBLIGATION_DOMAIN_V1: &[u8] = b"symthaea.etk-proof-obligation-snapshot.v1\0";
 pub(crate) const METHOD_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-method.v1\0";
 pub(crate) const INPUT_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-input.v1\0";
@@ -18,7 +18,7 @@ pub(crate) const POLICY_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-poli
 pub(crate) const PLAN_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-plan.v1\0";
 pub(crate) const ADMITTED_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-admitted-evidence.v1\0";
 pub(crate) const RECEIPT_DOMAIN_V1: &[u8] = b"symthaea.etk-native-analytical-discharge-receipt.v1\0";
-pub(crate) const FACT_DOMAIN_V1: &[u8] = b"symthaea.etk-current-native-analytical-discharge-fact.v1\0";
+pub(crate) const FACT_DOMAIN_V2: &[u8] = b"symthaea.etk-current-native-analytical-discharge-fact.v2\0";
 pub(crate) const EQUATION_RELATIVE_TOLERANCE: f64 = 1e-12;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -43,6 +43,12 @@ pub enum AnalysisTrustErrorV1 {
     ValidityContextMismatch,
     #[error("currentness assertion does not bind the supplied twin/validity revisions")]
     CurrentnessContextMismatch,
+    #[error("currentness validity window must satisfy valid_until > observed_at")]
+    InvalidCurrentnessWindow,
+    #[error("present-tense evaluation precedes the currentness observation")]
+    FreshnessNotYetValid,
+    #[error("present-tense evaluation occurs after the currentness assertion expired")]
+    FreshnessExpired,
     #[error("proof obligation does not expect Analysis evidence")]
     NotAnalysisObligation,
     #[error("analytical input was created for a different method revision")]
@@ -145,9 +151,7 @@ macro_rules! semantic_id {
     };
 }
 
-// Role-safe external premises. These are parseable because parsing establishes
-// syntax only, never authority. Keeping roles distinct prevents accidental
-// interchange of unrelated content identities at call sites.
+// Role-safe external premises. Parsing establishes syntax only, never authority.
 premise_id!(AcceptanceRecordDigestV1);
 premise_id!(SubjectStateDigestV1);
 premise_id!(TwinStateDigestV1);
@@ -164,7 +168,7 @@ premise_id!(ExecutionArtifactDigestV1);
 semantic_id!(SubjectRevisionIdV1);
 semantic_id!(TwinRevisionIdV1);
 semantic_id!(ValidityDomainRevisionIdV1);
-semantic_id!(CurrentnessAssertionIdV1);
+semantic_id!(CurrentnessAssertionIdV2);
 semantic_id!(AnalysisRequirementRevisionIdV1);
 semantic_id!(ObligationRevisionIdV1);
 semantic_id!(AnalyticalMethodRevisionIdV1);
@@ -173,7 +177,7 @@ semantic_id!(AnalyticalPolicyRevisionIdV1);
 semantic_id!(AnalyticalPlanIdV1);
 semantic_id!(AdmittedAnalyticalEvidenceIdV1);
 semantic_id!(NativeAnalyticalDischargeReceiptIdV1);
-semantic_id!(CurrentNativeAnalyticalDischargeFactIdV1);
+semantic_id!(CurrentNativeAnalyticalDischargeFactIdV2);
 
 /// Cross-language identity encoding for one finite IEEE-754 binary64 value.
 /// Signed zero is intentionally normalized.
