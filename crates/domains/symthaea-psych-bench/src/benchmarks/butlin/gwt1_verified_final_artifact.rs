@@ -80,6 +80,7 @@ pub enum Gwt1FinalArtifactReconstructionErrorV1 {
     MalformedFinalArchiveSha256 { observed: String },
     WrongStoredCandidateSchema { observed: String },
     WrongRecomputedCandidateSchema { observed: String },
+    EmptyRecomputedPromotionVerification,
     StoredCandidateBaseMismatch,
     StoredCandidateViewMismatch,
     StoredCandidateDispositionMismatch,
@@ -104,6 +105,10 @@ impl std::fmt::Display for Gwt1FinalArtifactReconstructionErrorV1 {
             Self::WrongRecomputedCandidateSchema { observed } => write!(
                 f,
                 "recomputed final-resolution candidate has unexpected schema {observed:?}"
+            ),
+            Self::EmptyRecomputedPromotionVerification => write!(
+                f,
+                "independent reconstruction did not retain its inner promotion-verification transcript"
             ),
             Self::StoredCandidateBaseMismatch => {
                 write!(f, "stored resolution candidate disagrees with stored base report")
@@ -196,6 +201,14 @@ pub(crate) fn verify_gwt1_final_reconstruction_v1(
             },
         );
     }
+    if recomputed_candidate
+        .promotion_attestation_verification_bytes()
+        .is_empty()
+    {
+        return Err(
+            Gwt1FinalArtifactReconstructionErrorV1::EmptyRecomputedPromotionVerification,
+        );
+    }
 
     if &stored_candidate.base_report != stored_base_report {
         return Err(Gwt1FinalArtifactReconstructionErrorV1::StoredCandidateBaseMismatch);
@@ -253,6 +266,88 @@ pub(crate) fn verify_gwt1_final_reconstruction_v1(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::benchmarks::butlin::gwt1_trusted_resolution::trusted_resolution_candidate_for_test;
+    use crate::benchmarks::butlin::resolution_view::{
+        EvidenceArtifactIdentityV1, EvidenceLineageIdentityV1, EvidenceLineageKindV1,
+        EvidenceOutcomeCountsV1, base_report_blake3_v1,
+    };
+    use crate::benchmarks::butlin::resolution_view_v2::{
+        BUTLIN_RESOLVED_EVIDENCE_VIEW_SCHEMA_V2, IndicatorEvidenceLineageV2,
+    };
+    use crate::benchmarks::butlin::ButlinIndicatorSuite;
+    use crate::harness::BenchmarkConfig;
+
+    fn fixture() -> (
+        ButlinIndicatorReport,
+        ButlinResolvedEvidenceViewV2,
+        Gwt1EvidenceDispositionSummaryV1,
+        Gwt1TrustedResolutionCandidateV1,
+        Gwt1TrustedResolutionCandidateV1,
+        Vec<u8>,
+    ) {
+        let base_report = ButlinIndicatorSuite::evaluate(&BenchmarkConfig::default());
+        let base_outcome = base_report
+            .indicators
+            .iter()
+            .find(|indicator| indicator.id == "GWT-1")
+            .expect("GWT-1 base indicator")
+            .outcome;
+        let direct = IndicatorEvidenceLineageV2 {
+            indicator_id: "GWT-1".to_string(),
+            base_outcome,
+            lineage_outcome: EvidenceOutcome::Supported(SupportTier::Observed),
+            resolved_outcome: EvidenceOutcome::Supported(SupportTier::Observed),
+            lineage: EvidenceLineageIdentityV1 {
+                kind: EvidenceLineageKindV1::DirectQualification,
+                method_id: "fixture-direct-v1".to_string(),
+                policy_id: Some("fixture-policy-v1".to_string()),
+                source_commit_sha: "a".repeat(40),
+                source_tree_sha: "b".repeat(40),
+                execution_run_id: "123/1".to_string(),
+                toolchain: "rustc fixture".to_string(),
+                artifact: EvidenceArtifactIdentityV1 {
+                    schema: "fixture-artifact-v1".to_string(),
+                    digest_algorithm: "blake3".to_string(),
+                    digest: "c".repeat(64),
+                    byte_len: 1,
+                },
+                authority: None,
+            },
+        };
+        let view = ButlinResolvedEvidenceViewV2 {
+            schema: BUTLIN_RESOLVED_EVIDENCE_VIEW_SCHEMA_V2.to_string(),
+            base_report_schema_version: base_report.schema_version,
+            base_report_blake3: base_report_blake3_v1(&base_report).expect("base digest"),
+            lineages: vec![direct],
+            resolved_counts: EvidenceOutcomeCountsV1 {
+                architectural_only: base_report.indicators.len() - 1,
+                observed: 1,
+                ..EvidenceOutcomeCountsV1::default()
+            },
+        };
+        let disposition = classify_gwt1_evidence_disposition_v1(&view).expect("disposition");
+        let internal_verification = br#"[{"verificationResult":{"signature":{"certificate":"fixture"}}}]"#.to_vec();
+        let stored_candidate = trusted_resolution_candidate_for_test(
+            base_report.clone(),
+            view.clone(),
+            disposition.clone(),
+            Vec::new(),
+        );
+        let recomputed_candidate = trusted_resolution_candidate_for_test(
+            base_report.clone(),
+            view.clone(),
+            disposition.clone(),
+            internal_verification.clone(),
+        );
+        (
+            base_report,
+            view,
+            disposition,
+            stored_candidate,
+            recomputed_candidate,
+            internal_verification,
+        )
+    }
 
     #[test]
     fn final_archive_digest_must_be_canonical_lower_hex() {
@@ -268,5 +363,91 @@ mod tests {
             GWT1_VERIFIED_FINAL_ARTIFACT_SCHEMA_V1,
             "butlin-gwt1-verified-final-artifact-v1"
         );
+    }
+
+    #[test]
+    fn exact_reconstruction_mints_read_only_token() {
+        let (base, view, disposition, stored, recomputed, transcript) = fixture();
+        let token = verify_gwt1_final_reconstruction_v1(
+            &"d".repeat(64),
+            &base,
+            &view,
+            &disposition,
+            &stored,
+            &transcript,
+            &recomputed,
+        )
+        .expect("exact reconstruction");
+        assert_eq!(token.final_archive_sha256(), "d".repeat(64));
+        assert_eq!(
+            token.resolved_gwt1_outcome(),
+            EvidenceOutcome::Supported(SupportTier::Observed)
+        );
+        assert!(!token.has_causal_contradiction());
+    }
+
+    #[test]
+    fn inner_verification_transcript_mismatch_fails_closed() {
+        let (base, view, disposition, stored, recomputed, _) = fixture();
+        assert!(matches!(
+            verify_gwt1_final_reconstruction_v1(
+                &"d".repeat(64),
+                &base,
+                &view,
+                &disposition,
+                &stored,
+                b"tampered",
+                &recomputed,
+            ),
+            Err(Gwt1FinalArtifactReconstructionErrorV1::InternalPromotionVerificationMismatch)
+        ));
+    }
+
+    #[test]
+    fn empty_recomputed_verification_transcript_fails_closed() {
+        let (base, view, disposition, stored, _, transcript) = fixture();
+        let recomputed = trusted_resolution_candidate_for_test(
+            base.clone(),
+            view.clone(),
+            disposition.clone(),
+            Vec::new(),
+        );
+        assert!(matches!(
+            verify_gwt1_final_reconstruction_v1(
+                &"d".repeat(64),
+                &base,
+                &view,
+                &disposition,
+                &stored,
+                &transcript,
+                &recomputed,
+            ),
+            Err(Gwt1FinalArtifactReconstructionErrorV1::EmptyRecomputedPromotionVerification)
+        ));
+    }
+
+    #[test]
+    fn independently_recomputed_view_mismatch_fails_closed() {
+        let (base, view, disposition, stored, _, transcript) = fixture();
+        let mut recomputed_view = view.clone();
+        recomputed_view.base_report_blake3 = "e".repeat(64);
+        let recomputed = trusted_resolution_candidate_for_test(
+            base.clone(),
+            recomputed_view,
+            disposition.clone(),
+            transcript.clone(),
+        );
+        assert!(matches!(
+            verify_gwt1_final_reconstruction_v1(
+                &"d".repeat(64),
+                &base,
+                &view,
+                &disposition,
+                &stored,
+                &transcript,
+                &recomputed,
+            ),
+            Err(Gwt1FinalArtifactReconstructionErrorV1::RecomputedViewMismatch)
+        ));
     }
 }
