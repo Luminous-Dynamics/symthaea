@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-assurance-tpm2-tools-adapter"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Read-only Linux TPM2-tools adapter for Symthaea monotonic trust-store assurance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "safety", "assurance", "rollback"]
+categories = ["hardware-support", "development-tools"]
+
+[dependencies]
+symthaea-assurance-policy-lineage-anchor = { path = "../../domains/symthaea-assurance-policy-lineage-anchor" }
+symthaea-assurance-trust-store = { path = "../../domains/symthaea-assurance-trust-store" }
+serde = { workspace = true }
+blake3 = { workspace = true }
