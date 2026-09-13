@@ -1,0 +1,89 @@
+name: Butlin GWT-1 Final Artifact Consumer Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-gwt1-final-consumer-contract.yml"
+      - "crates/domains/symthaea-psych-bench/Cargo.toml"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify opaque consumer reconstruction theorem
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Audit consumer authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          import pathlib
+          import re
+
+          root = pathlib.Path.cwd()
+          manifest = (root / "crates/domains/symthaea-psych-bench/Cargo.toml").read_text()
+          source = (root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs").read_text()
+          mod = (root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs").read_text()
+
+          assert 'trusted-resolution-consumer = ["trusted-resolution-authority"]' in manifest
+          assert '#[cfg(feature = "trusted-resolution-consumer")]' in mod
+          assert "pub struct VerifiedGwt1ResolvedArtifactV1" in source
+          assert "pub(crate) fn verify_gwt1_final_reconstruction_v1" in source
+          assert "pub fn verify_gwt1_final_reconstruction_v1" not in source
+          assert "derive(Debug, Clone)]\npub struct VerifiedGwt1ResolvedArtifactV1" in source
+          assert "Serialize" not in source.split("pub struct VerifiedGwt1ResolvedArtifactV1", 1)[0].split("#[derive", 1)[-1]
+          assert "FunctionallySupportedForbidden" in source
+          assert "InternalPromotionVerificationMismatch" in source
+          assert "classify_gwt1_evidence_disposition_v1" in source
+
+          forbidden = [
+              re.compile(r"attestation_verified\s*:\s*bool"),
+              re.compile(r"verified\s*:\s*bool"),
+              re.compile(r"pub\s+fn\s+new\s*\([^)]*VerifiedGwt1ResolvedArtifactV1", re.DOTALL),
+          ]
+          for pattern in forbidden:
+              assert not pattern.search(source), pattern.pattern
+          PY
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check consumer-owned Rust formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs
+
+      - name: Compile trusted consumer feature surface
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-consumer-contract-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-consumer-contract-target
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --features trusted-resolution-consumer
+
+      - name: Run consumer reconstruction unit tests
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-consumer-contract-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-consumer-contract-target
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench \
+            --features trusted-resolution-consumer \
+            gwt1_verified_final_artifact::tests
