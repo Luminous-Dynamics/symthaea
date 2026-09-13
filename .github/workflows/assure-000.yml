@@ -17,16 +17,25 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
-        with:
-          toolchain: 1.96.0
-          components: rustfmt, clippy
-      - name: Prove exact subject
+      - name: Install pinned Rust toolchain
         shell: bash
         run: |
           set -euo pipefail
-          echo "head=$(git rev-parse HEAD)"
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+      - name: Prove exact candidate subject
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$EXPECTED_HEAD" "$ACTUAL_HEAD"
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
           git diff --exit-code
       - name: Format
         run: cargo fmt --manifest-path crates/core/symthaea-assurance-core/Cargo.toml -- --check
