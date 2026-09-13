@@ -2,30 +2,172 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! # Continuous Hypervector
+//! # Continuous Hypervectors and Unitary Roles
 //!
-//! A portable, self-contained implementation of continuous-valued hypervectors
-//! for Hyperdimensional Computing (HDC).
+//! `ContinuousHV` stores arbitrary continuous-valued distributed state.
+//! `UnitaryRole` represents the narrower real Hadamard-unitary role algebra used
+//! when an HLS experiment requires reversible, norm-preserving association.
 //!
-//! Operations:
-//! - **Bind** (element-wise multiply): creates associations, result dissimilar to inputs
-//! - **Bundle** (element-wise average): creates superpositions, result similar to all inputs
-//! - **Permute** (cyclic shift): encodes sequence/position information
-//! - **Similarity** (cosine): measures relatedness in [-1, 1]
+//! Generic `ContinuousHV::bind()` is retained for compatibility. Multiplying two
+//! arbitrary continuous hypervectors is not generally unitary and therefore must
+//! not be assumed to preserve norm or support exact unbinding.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 /// Standard HDC dimension (2^14 = 16,384).
 pub const HDC_DIMENSION: usize = 16_384;
+const RNG_SEED_XOR: u64 = 0x9E37_79B9_7F4A_7C15;
+const RNG_ZERO_ESCAPE: u64 = 0xD1B5_4A32_D192_ED03;
+
+#[inline]
+fn seeded_xorshift_state(seed: u64) -> u64 {
+    let state = seed ^ RNG_SEED_XOR;
+    if state == 0 { RNG_ZERO_ESCAPE } else { state }
+}
+
+/// A real Hadamard-unitary HDC role vector.
+///
+/// Every component is exactly `-1.0` or `+1.0`. Consequently, applying a role
+/// to a continuous hypervector is an orthogonal diagonal transformation:
+///
+/// ```text
+/// B_r(x) = r ⊙ x
+/// ||B_r(x)||₂ = ||x||₂
+/// <B_r(x), B_r(y)> = <x, y>
+/// B_r(B_r(x)) = x
+/// ```
+///
+/// This type exists so reversible role binding is an explicit invariant rather
+/// than an accidental property of a particular random vector initialization.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnitaryRole {
+    values: Vec<f32>,
+}
+
+impl UnitaryRole {
+    /// Deterministically generate a bipolar role from `seed`.
+    pub fn new(dim: usize, seed: u64) -> Self {
+        let mut values = Vec::with_capacity(dim);
+        let mut state = seeded_xorshift_state(seed);
+
+        for _ in 0..dim {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            values.push(if state & (1u64 << 63) == 0 { -1.0 } else { 1.0 });
+        }
+
+        Self { values }
+    }
+
+    /// Construct a role from explicit values, rejecting any non-unitary entry.
+    pub fn try_from_values(values: Vec<f32>) -> Result<Self, String> {
+        if let Some((index, value)) = values
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, value)| *value != -1.0 && *value != 1.0)
+        {
+            return Err(format!(
+                "unitary role component at index {index} must be -1 or +1, got {value}"
+            ));
+        }
+        Ok(Self { values })
+    }
+
+    /// Number of role components.
+    #[inline]
+    pub fn dim(&self) -> usize {
+        self.values.len()
+    }
+
+    /// Read-only role components.
+    #[inline]
+    pub fn as_slice(&self) -> &[f32] {
+        &self.values
+    }
+
+    /// Apply this role to a continuous value/state hypervector.
+    #[inline]
+    pub fn bind(&self, value: &ContinuousHV) -> ContinuousHV {
+        assert_eq!(self.dim(), value.dim(), "Dimension mismatch");
+        ContinuousHV::from_values(
+            self.values
+                .iter()
+                .zip(value.values.iter())
+                .map(|(role, value)| role * value)
+                .collect(),
+        )
+    }
+
+    /// Recover a value bound by this same role.
+    ///
+    /// Real bipolar Hadamard roles are self-inverse, so unbinding is identical
+    /// to binding and is exact apart from ordinary IEEE signed-zero behavior.
+    #[inline]
+    pub fn unbind(&self, bound: &ContinuousHV) -> ContinuousHV {
+        self.bind(bound)
+    }
+
+    /// Compose two unitary roles. Closure is exact because ±1 × ±1 = ±1.
+    #[inline]
+    pub fn compose(&self, other: &Self) -> Self {
+        assert_eq!(self.dim(), other.dim(), "Dimension mismatch");
+        Self {
+            values: self
+                .values
+                .iter()
+                .zip(other.values.iter())
+                .map(|(a, b)| a * b)
+                .collect(),
+        }
+    }
+
+    /// Cyclically permute a role while preserving unitarity.
+    pub fn permute(&self, positions: usize) -> Self {
+        let dim = self.dim();
+        if dim == 0 {
+            return self.clone();
+        }
+        let shift = positions % dim;
+        if shift == 0 {
+            return self.clone();
+        }
+        let mut values = vec![1.0; dim];
+        for i in 0..dim {
+            values[(i + shift) % dim] = self.values[i];
+        }
+        Self { values }
+    }
+}
+
+impl Serialize for UnitaryRole {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.values.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for UnitaryRole {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let values = Vec::<f32>::deserialize(deserializer)?;
+        Self::try_from_values(values).map_err(de::Error::custom)
+    }
+}
 
 /// A continuous-valued hypervector using f32 components.
 ///
-/// Each component typically ranges in [-1, 1] though operations may
-/// produce values outside this range before normalization.
+/// Each component typically ranges in [-1, 1], though operations may produce
+/// values outside this range before normalization.
 ///
 /// # Memory
 ///
-/// 64 KB per vector at the default 16,384 dimensions (16,384 x 4 bytes).
+/// 64 KB per vector at the default 16,384 dimensions (16,384 × 4 bytes).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContinuousHV {
     /// Vector components.
@@ -41,19 +183,14 @@ impl ContinuousHV {
     }
 
     /// Create a deterministic random hypervector with values in [-1, 1].
-    ///
-    /// Uses xorshift64 seeded with a golden-ratio constant mix to avoid
-    /// the fixed point at seed=0.
     pub fn new_random(dim: usize, seed: u64) -> Self {
         let mut values = Vec::with_capacity(dim);
-        let mut state = seed ^ 0x9E3779B97F4A7C15;
+        let mut state = seeded_xorshift_state(seed);
 
         for _ in 0..dim {
             state ^= state << 13;
             state ^= state >> 7;
             state ^= state << 17;
-
-            // Map top 24 bits to [-1, 1] for full f32 mantissa precision.
             let normalized = ((state >> 40) as f32) * (2.0 / (1u64 << 24) as f32) - 1.0;
             values.push(normalized);
         }
@@ -79,17 +216,15 @@ impl ContinuousHV {
         self.values.len()
     }
 
-    /// Binding operation (element-wise multiplication).
+    /// Generic elementwise continuous binding.
     ///
-    /// Creates an association between two vectors. The result is
-    /// dissimilar to both inputs (for random HVs).
-    ///
-    /// # Panics
-    /// Panics if dimensions do not match.
+    /// This operation is useful as a learned/modulatory Hadamard product, but it
+    /// is **not generally unitary** when both operands have arbitrary continuous
+    /// magnitudes. Use [`UnitaryRole::bind`] for reversible HLS role binding.
     #[inline]
     pub fn bind(&self, other: &Self) -> Self {
         assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
-        let values: Vec<f32> = self
+        let values = self
             .values
             .iter()
             .zip(other.values.iter())
@@ -98,35 +233,31 @@ impl ContinuousHV {
         Self { values }
     }
 
-    /// Bundling operation (element-wise average).
+    /// Bundling operation (elementwise average).
     ///
-    /// Creates a superposition of vectors. The result is similar to all inputs.
-    ///
-    /// Returns a zero vector of `HDC_DIMENSION` if the slice is empty.
+    /// Creates a superposition similar to all inputs. Returns a zero vector of
+    /// `HDC_DIMENSION` if the slice is empty.
     #[inline]
     pub fn bundle(hvs: &[&Self]) -> Self {
         if hvs.is_empty() {
             return Self::new(HDC_DIMENSION);
         }
         let dim = hvs[0].values.len();
+        assert!(hvs.iter().all(|hv| hv.dim() == dim), "Dimension mismatch");
         let inv_n = 1.0 / hvs.len() as f32;
         let mut values = vec![0.0f32; dim];
         for hv in hvs {
-            for (acc, &v) in values.iter_mut().zip(hv.values.iter()) {
-                *acc += v;
+            for (acc, &value) in values.iter_mut().zip(hv.values.iter()) {
+                *acc += value;
             }
         }
-        for v in values.iter_mut() {
-            *v *= inv_n;
+        for value in &mut values {
+            *value *= inv_n;
         }
         Self { values }
     }
 
     /// Cosine similarity in [-1, 1].
-    ///
-    /// For random vectors: similarity is approximately 0.
-    /// For identical vectors: similarity = 1.
-    /// For opposite vectors: similarity = -1.
     #[inline]
     pub fn similarity(&self, other: &Self) -> f32 {
         assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
@@ -150,10 +281,6 @@ impl ContinuousHV {
     }
 
     /// Cyclic right shift by `positions` elements.
-    ///
-    /// Permutation is the standard HDC mechanism for encoding position
-    /// or sequence information. `permute(1)` followed by `bind` gives
-    /// non-commutative temporal binding.
     pub fn permute(&self, positions: usize) -> Self {
         let dim = self.values.len();
         if dim == 0 {
@@ -176,17 +303,15 @@ impl ContinuousHV {
         self.values.iter().map(|x| x * x).sum::<f32>().sqrt()
     }
 
-    /// Normalize to unit length.
-    ///
-    /// Returns a clone of self if the norm is near zero.
+    /// Normalize to unit length. Returns a clone if the norm is near zero.
     #[inline]
     pub fn normalize(&self) -> Self {
-        let n = self.norm();
-        if n < 1e-10 {
+        let norm = self.norm();
+        if norm < 1e-10 {
             return self.clone();
         }
         Self {
-            values: self.values.iter().map(|x| x / n).collect(),
+            values: self.values.iter().map(|x| x / norm).collect(),
         }
     }
 
@@ -201,8 +326,8 @@ impl ContinuousHV {
     /// In-place scale.
     #[inline]
     pub fn scale_in_place(&mut self, factor: f32) {
-        for v in self.values.iter_mut() {
-            *v *= factor;
+        for value in &mut self.values {
+            *value *= factor;
         }
     }
 
@@ -210,8 +335,8 @@ impl ContinuousHV {
     #[inline]
     pub fn add_scaled(&mut self, other: &Self, scale: f32) {
         debug_assert_eq!(self.values.len(), other.values.len());
-        for (s, &o) in self.values.iter_mut().zip(other.values.iter()) {
-            *s += o * scale;
+        for (value, &other_value) in self.values.iter_mut().zip(other.values.iter()) {
+            *value += other_value * scale;
         }
     }
 
@@ -220,12 +345,12 @@ impl ContinuousHV {
     pub fn lerp_in_place(&mut self, target: &Self, alpha: f32) {
         debug_assert_eq!(self.values.len(), target.values.len());
         let one_minus = 1.0 - alpha;
-        for (s, &t) in self.values.iter_mut().zip(target.values.iter()) {
-            *s = one_minus * *s + alpha * t;
+        for (value, &target_value) in self.values.iter_mut().zip(target.values.iter()) {
+            *value = one_minus * *value + alpha * target_value;
         }
     }
 
-    /// Element-wise addition, returning a new vector.
+    /// Elementwise addition.
     #[inline]
     pub fn add(&self, other: &Self) -> Self {
         assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
@@ -239,7 +364,7 @@ impl ContinuousHV {
         }
     }
 
-    /// Element-wise subtraction, returning a new vector.
+    /// Elementwise subtraction.
     #[inline]
     pub fn subtract(&self, other: &Self) -> Self {
         assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
@@ -253,7 +378,7 @@ impl ContinuousHV {
         }
     }
 
-    /// Raw dot product (inner product).
+    /// Raw dot product.
     #[inline]
     pub fn dot(&self, other: &Self) -> f32 {
         assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
@@ -264,160 +389,157 @@ impl ContinuousHV {
             .sum()
     }
 
-    /// Generate approximately orthogonal unit hypervectors via modified Gram-Schmidt.
-    ///
-    /// Each output vector has unit L2 norm and near-zero dot product with all others.
+    /// Generate approximately orthogonal unit hypervectors via modified
+    /// Gram-Schmidt. These are continuous basis vectors, not unitary roles.
     pub fn orthogonal_set(dim: usize, count: usize, seed: u64) -> Vec<Self> {
         if count == 0 {
             return Vec::new();
         }
         let mut result = Vec::with_capacity(count);
         for i in 0..count {
-            let mut v = Self::new_random(dim, seed.wrapping_add(i as u64 * 7919));
-            for prev in &result {
-                let proj_coeff = v.dot(prev);
-                for (vi, pi) in v.values.iter_mut().zip(prev.values.iter()) {
-                    *vi -= proj_coeff * pi;
+            let mut vector = Self::new_random(dim, seed.wrapping_add(i as u64 * 7919));
+            for previous in &result {
+                let projection = vector.dot(previous);
+                for (value, &basis) in vector.values.iter_mut().zip(previous.values.iter()) {
+                    *value -= projection * basis;
                 }
             }
-            let n = v.norm();
-            if n > 1e-10 {
-                for vi in v.values.iter_mut() {
-                    *vi /= n;
+            let norm = vector.norm();
+            if norm > 1e-10 {
+                for value in &mut vector.values {
+                    *value /= norm;
                 }
             }
-            result.push(v);
+            result.push(vector);
         }
         result
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tests
-// ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_creation_zero() {
-        let hv = ContinuousHV::new(128);
-        assert_eq!(hv.dim(), 128);
-        assert!(hv.values.iter().all(|&v| v == 0.0));
+    fn continuous_random_is_deterministic() {
+        assert_eq!(
+            ContinuousHV::new_random(1024, 42),
+            ContinuousHV::new_random(1024, 42)
+        );
     }
 
     #[test]
-    fn test_creation_random_deterministic() {
-        let a = ContinuousHV::new_random(1024, 42);
-        let b = ContinuousHV::new_random(1024, 42);
-        assert_eq!(a.values, b.values);
+    fn xorshift_absorbing_seed_is_remapped_for_roles_and_vectors() {
+        let pathological_seed = RNG_SEED_XOR;
+        let role = UnitaryRole::new(256, pathological_seed);
+        assert!(role.as_slice().iter().any(|value| *value == -1.0));
+        assert!(role.as_slice().iter().any(|value| *value == 1.0));
+
+        let vector = ContinuousHV::new_random(256, pathological_seed);
+        assert!(vector.values.iter().any(|value| *value != -1.0));
+        assert_eq!(vector, ContinuousHV::new_random(256, pathological_seed));
     }
 
     #[test]
-    fn test_random_values_in_range() {
-        let hv = ContinuousHV::new_random(HDC_DIMENSION, 99);
-        for &v in &hv.values {
-            assert!(v >= -1.0 && v <= 1.0, "Value {} out of range", v);
-        }
-    }
-
-    #[test]
-    fn test_bind_dissimilarity() {
+    fn generic_continuous_bind_remains_available() {
         let a = ContinuousHV::new_random(1024, 1);
         let b = ContinuousHV::new_random(1024, 2);
         let bound = a.bind(&b);
-        // Binding two random vectors should produce a vector dissimilar to both
         assert!(bound.similarity(&a).abs() < 0.15);
         assert!(bound.similarity(&b).abs() < 0.15);
     }
 
     #[test]
-    fn test_bundle_similarity() {
+    fn bundle_is_similar_to_members() {
         let a = ContinuousHV::new_random(1024, 10);
         let b = ContinuousHV::new_random(1024, 20);
         let bundled = ContinuousHV::bundle(&[&a, &b]);
-        // Bundle should be similar to both inputs
         assert!(bundled.similarity(&a) > 0.4);
         assert!(bundled.similarity(&b) > 0.4);
     }
 
     #[test]
-    fn test_permute_changes_vector() {
+    fn permutation_roundtrip_at_full_dimension() {
         let hv = ContinuousHV::new_random(128, 5);
-        let perm = hv.permute(1);
-        assert_ne!(hv.values, perm.values);
+        assert_eq!(hv, hv.permute(128));
     }
 
     #[test]
-    fn test_permute_roundtrip() {
-        let hv = ContinuousHV::new_random(128, 5);
-        let roundtrip = hv.permute(128);
-        assert_eq!(hv.values, roundtrip.values);
+    fn normalization_produces_unit_norm() {
+        let normed = ContinuousHV::new_random(256, 7).normalize();
+        assert!((normed.norm() - 1.0).abs() < 1e-5);
     }
 
     #[test]
-    fn test_normalize() {
-        let hv = ContinuousHV::new_random(256, 7);
-        let normed = hv.normalize();
-        let n = normed.norm();
-        assert!((n - 1.0).abs() < 1e-5, "Norm after normalize: {}", n);
-    }
-
-    #[test]
-    fn test_similarity_range() {
-        let a = ContinuousHV::new_random(512, 1);
-        let b = ContinuousHV::new_random(512, 2);
-        let sim = a.similarity(&b);
-        assert!(sim >= -1.0 && sim <= 1.0);
-        // Self-similarity should be 1.0
-        let self_sim = a.similarity(&a);
-        assert!((self_sim - 1.0).abs() < 1e-5);
-    }
-
-    #[test]
-    fn test_lerp_in_place() {
-        let mut a = ContinuousHV::new_random(64, 1);
-        let b = ContinuousHV::new_random(64, 2);
-        let original = a.clone();
-        a.lerp_in_place(&b, 0.5);
-        // Result should be between a and b
-        assert!(a.similarity(&original) > 0.4);
-        assert!(a.similarity(&b) > 0.4);
-    }
-
-    #[test]
-    fn test_add_scaled() {
-        let mut a = ContinuousHV::new(4);
-        a.values = vec![1.0, 2.0, 3.0, 4.0];
-        let b = ContinuousHV::from_values(vec![10.0, 20.0, 30.0, 40.0]);
-        a.add_scaled(&b, 0.1);
-        assert!((a.values[0] - 2.0).abs() < 1e-6);
-        assert!((a.values[3] - 8.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_orthogonal_set() {
+    fn orthogonal_set_is_low_interference() {
         let set = ContinuousHV::orthogonal_set(1024, 5, 42);
         assert_eq!(set.len(), 5);
-        // Each vector should be unit norm
-        for v in &set {
-            assert!((v.norm() - 1.0).abs() < 1e-4);
+        for vector in &set {
+            assert!((vector.norm() - 1.0).abs() < 1e-4);
         }
-        // Pairwise dot products should be near zero
         for i in 0..set.len() {
             for j in (i + 1)..set.len() {
-                let d = set[i].dot(&set[j]).abs();
-                assert!(d < 0.05, "Dot product {} between {} and {}", d, i, j);
+                assert!(set[i].dot(&set[j]).abs() < 0.05);
             }
         }
     }
 
     #[test]
-    fn test_serde_roundtrip() {
+    fn unitary_role_components_are_exactly_bipolar() {
+        let role = UnitaryRole::new(4096, 42);
+        assert!(role.as_slice().iter().all(|value| *value == -1.0 || *value == 1.0));
+    }
+
+    #[test]
+    fn unitary_binding_preserves_norm() {
+        let role = UnitaryRole::new(4096, 42);
+        let value = ContinuousHV::new_random(4096, 99);
+        let bound = role.bind(&value);
+        assert_eq!(bound.norm(), value.norm());
+    }
+
+    #[test]
+    fn unitary_binding_roundtrip_is_exact() {
+        let role = UnitaryRole::new(4096, 42);
+        let value = ContinuousHV::new_random(4096, 99);
+        let recovered = role.unbind(&role.bind(&value));
+        assert_eq!(recovered, value);
+    }
+
+    #[test]
+    fn same_role_preserves_dot_product_and_similarity() {
+        let role = UnitaryRole::new(4096, 42);
+        let a = ContinuousHV::new_random(4096, 100);
+        let b = ContinuousHV::new_random(4096, 101);
+        let bound_a = role.bind(&a);
+        let bound_b = role.bind(&b);
+        assert_eq!(bound_a.dot(&bound_b), a.dot(&b));
+        assert!((bound_a.similarity(&bound_b) - a.similarity(&b)).abs() < 1e-7);
+    }
+
+    #[test]
+    fn unitary_roles_are_closed_under_composition_and_permutation() {
+        let a = UnitaryRole::new(1024, 1);
+        let b = UnitaryRole::new(1024, 2);
+        let composed = a.compose(&b);
+        let permuted = composed.permute(17);
+        assert!(permuted.as_slice().iter().all(|value| *value == -1.0 || *value == 1.0));
+    }
+
+    #[test]
+    fn unitary_role_serialization_preserves_invariant() {
+        let role = UnitaryRole::new(64, 42);
+        let json = serde_json::to_string(&role).unwrap();
+        let restored: UnitaryRole = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, role);
+        assert!(serde_json::from_str::<UnitaryRole>("[1.0,0.5,-1.0]").is_err());
+    }
+
+    #[test]
+    fn continuous_serde_roundtrip() {
         let hv = ContinuousHV::new_random(64, 123);
         let json = serde_json::to_string(&hv).unwrap();
         let restored: ContinuousHV = serde_json::from_str(&json).unwrap();
-        assert_eq!(hv.values, restored.values);
+        assert_eq!(hv, restored);
     }
 }
