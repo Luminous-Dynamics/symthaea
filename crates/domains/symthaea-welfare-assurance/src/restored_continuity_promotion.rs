@@ -65,12 +65,29 @@ impl RestoredContinuityPromotionRequest {
         })
     }
 
-    pub fn store_target_id(&self) -> &str { &self.store_target_id }
-    pub fn target_id(&self) -> &str { &self.target_id }
-    pub fn instance_id(&self) -> EpisodeInstanceId { self.instance_id }
-    pub fn content_id(&self) -> EpisodeContentId { self.content_id }
-    pub fn execution_id(&self) -> &str { &self.execution_id }
-    pub fn restored_quarantine_head(&self) -> Sha256Digest { self.restored_quarantine_head }
+    pub fn store_target_id(&self) -> &str {
+        &self.store_target_id
+    }
+
+    pub fn target_id(&self) -> &str {
+        &self.target_id
+    }
+
+    pub fn instance_id(&self) -> EpisodeInstanceId {
+        self.instance_id
+    }
+
+    pub fn content_id(&self) -> EpisodeContentId {
+        self.content_id
+    }
+
+    pub fn execution_id(&self) -> &str {
+        &self.execution_id
+    }
+
+    pub fn restored_quarantine_head(&self) -> Sha256Digest {
+        self.restored_quarantine_head
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -113,7 +130,9 @@ impl VerifiedRestoredContinuityPromotion {
             return Err(RestoredContinuityPromotionError::AnchorDidNotAdvance);
         }
         if next_anchor_revision < 2 {
-            return Err(RestoredContinuityPromotionError::InvalidNextRevision(next_anchor_revision));
+            return Err(RestoredContinuityPromotionError::InvalidNextRevision(
+                next_anchor_revision,
+            ));
         }
         Ok(Self {
             store_target_id,
@@ -126,13 +145,33 @@ impl VerifiedRestoredContinuityPromotion {
         })
     }
 
-    pub fn store_target_id(&self) -> &str { &self.store_target_id }
-    pub fn restored_quarantine_head(&self) -> Sha256Digest { self.restored_quarantine_head }
-    pub fn previous_anchor_commitment(&self) -> Sha256Digest { self.previous_anchor_commitment }
-    pub fn next_anchor_commitment(&self) -> Sha256Digest { self.next_anchor_commitment }
-    pub fn next_anchor_revision(&self) -> u64 { self.next_anchor_revision }
-    pub fn continuity_manifest_digest(&self) -> Sha256Digest { self.continuity_manifest_digest }
-    pub fn anchor_reference(&self) -> &str { &self.anchor_reference }
+    pub fn store_target_id(&self) -> &str {
+        &self.store_target_id
+    }
+
+    pub fn restored_quarantine_head(&self) -> Sha256Digest {
+        self.restored_quarantine_head
+    }
+
+    pub fn previous_anchor_commitment(&self) -> Sha256Digest {
+        self.previous_anchor_commitment
+    }
+
+    pub fn next_anchor_commitment(&self) -> Sha256Digest {
+        self.next_anchor_commitment
+    }
+
+    pub fn next_anchor_revision(&self) -> u64 {
+        self.next_anchor_revision
+    }
+
+    pub fn continuity_manifest_digest(&self) -> Sha256Digest {
+        self.continuity_manifest_digest
+    }
+
+    pub fn anchor_reference(&self) -> &str {
+        &self.anchor_reference
+    }
 
     pub fn validate_for(
         &self,
@@ -167,17 +206,26 @@ impl RestoredContinuityPromotionFailure {
             detail = "restored continuity promotion failed".into();
         }
         if detail.len() > 2048 {
-            detail.truncate(2048);
+            let mut boundary = 2048;
+            while !detail.is_char_boundary(boundary) {
+                boundary -= 1;
+            }
+            detail.truncate(boundary);
         }
         Self { detail }
     }
 
-    pub fn detail(&self) -> &str { &self.detail }
+    pub fn detail(&self) -> &str {
+        &self.detail
+    }
 }
 
 impl fmt::Display for RestoredContinuityPromotionFailure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.detail) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.detail)
+    }
 }
+
 impl std::error::Error for RestoredContinuityPromotionFailure {}
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -218,7 +266,9 @@ mod tests {
     use symthaea_core::hdc::unified_hv::ContinuousHV;
     use symthaea_memory::episodic_replay::Episode;
 
-    fn digest(seed: u8) -> Sha256Digest { Sha256Digest([seed; 32]) }
+    fn digest(seed: u8) -> Sha256Digest {
+        Sha256Digest([seed; 32])
+    }
 
     fn content_id(seed: f32) -> EpisodeContentId {
         crate::memory_identity::episode_content_id(&Episode::new(
@@ -297,5 +347,12 @@ mod tests {
             ),
             Err(RestoredContinuityPromotionError::AnchorDidNotAdvance)
         );
+    }
+
+    #[test]
+    fn long_unicode_failure_detail_truncates_without_panicking() {
+        let failure = RestoredContinuityPromotionFailure::new("é".repeat(1500));
+        assert!(failure.detail().len() <= 2048);
+        assert!(failure.detail().is_char_boundary(failure.detail().len()));
     }
 }
