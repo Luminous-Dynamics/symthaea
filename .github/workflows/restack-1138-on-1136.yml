@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   restack:
-    if: "${{ github.event.head_commit.message == 'collapse exact #1138 restack history' }}"
+    if: "${{ github.event.head_commit.message == 'inherit repaired #1136 lock in #1138 restack' }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.ref_name }}
-          fetch-depth: 5
+          fetch-depth: 6
           persist-credentials: true
 
       - name: Prove frozen lineage and parent compatibility
@@ -42,8 +42,8 @@ jobs:
             'src/knowledge/support_adapter.rs'
           )
 
-          test "$(git rev-parse HEAD^^)" = "$new_base"
-          test "$(git rev-list --count "$new_base"..HEAD)" = '2'
+          test "$(git rev-parse HEAD^^^)" = "$new_base"
+          test "$(git rev-list --count "$new_base"..HEAD)" = '3'
           test "$(git diff --name-only "$new_base"..HEAD)" = "$workflow"
           git fetch --no-tags origin "$old_base" "$old_head"
           test "$(git merge-base "$old_base" "$old_head")" = "$old_base"
@@ -56,7 +56,12 @@ jobs:
             ! git cat-file -e "$old_base:$path" 2>/dev/null
             ! git cat-file -e "$new_base:$path" 2>/dev/null
           done
-          test "$(git rev-parse "$old_base:Cargo.lock")" = "$(git rev-parse "$new_base:Cargo.lock")"
+
+          # #1138 did not own a lock transition. The old child must equal its old
+          # parent lock, while this restack must inherit the independently repaired
+          # #1136 lock exactly rather than trying to restore stale parent bytes.
+          test "$(git rev-parse "$old_base:Cargo.lock")" = "$(git rev-parse "$old_head:Cargo.lock")"
+          test "$(git rev-parse "HEAD:Cargo.lock")" = "$(git rev-parse "$new_base:Cargo.lock")"
           test -z "$(git status --porcelain)"
 
       - name: Install repository Rust toolchain
@@ -146,6 +151,7 @@ jobs:
           git commit -m 'feat(support): converge IT support retrieval on global knowledge without merging authority'
           test "$(git rev-parse HEAD^)" = "$new_base"
           test "$(git rev-list --count "$new_base"..HEAD)" = '1'
+          test "$(git rev-parse "HEAD:Cargo.lock")" = "$(git rev-parse "$new_base:Cargo.lock")"
           for path in "${paths[@]}"; do
             test "$(git rev-parse "HEAD:$path")" = "$(git rev-parse "$old_head:$path")"
           done
