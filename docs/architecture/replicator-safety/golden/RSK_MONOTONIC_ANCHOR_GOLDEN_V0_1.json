@@ -1,0 +1,24 @@
+{
+  "schema": "symthaea.rsk.monotonic-anchor-golden.v1",
+  "source_registry_golden": "RSK_SCHEMA_REGISTRY_GOLDEN_V0_1.json",
+  "policy": {
+    "namespace": "rsk.schema-registry.rsk.test.registry",
+    "epoch": 1,
+    "allowed_provider_profiles": ["rsk.test.monotonic-anchor.v1"],
+    "allowed_provider_identities": ["anchor.alpha"],
+    "trust_snapshot_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "trusted_interval": {"start": 1100, "end": 1200},
+  "expected_registry_tracker_digest": "798b6606fac22ff5fd09b5baf3255bed88448ffbcd725959dbaa4618b9285c00",
+  "authenticated_anchor_evidence": {
+    "namespace": "rsk.schema-registry.rsk.test.registry",
+    "epoch": 1,
+    "counter": 1,
+    "anchored_state_digest": "798b6606fac22ff5fd09b5baf3255bed88448ffbcd725959dbaa4618b9285c00",
+    "provider_profile": "rsk.test.monotonic-anchor.v1",
+    "provider_identity": "anchor.alpha",
+    "trust_snapshot_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "issued_at": 1050,
+    "expires_at": 1900
+  }
+}

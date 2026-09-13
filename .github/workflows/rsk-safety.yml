@@ -18,6 +18,8 @@ on:
       - 'scripts/test_rsk_schema_adapter.py'
       - 'scripts/rsk_schema_registry.py'
       - 'scripts/test_rsk_schema_registry.py'
+      - 'scripts/rsk_monotonic_anchor.py'
+      - 'scripts/test_rsk_monotonic_anchor.py'
       - 'scripts/check-class-a-changes.sh'
       - 'docs/compliance/GOVERNANCE_CHARTER.md'
   push:
@@ -38,6 +40,8 @@ on:
       - 'scripts/test_rsk_schema_adapter.py'
       - 'scripts/rsk_schema_registry.py'
       - 'scripts/test_rsk_schema_registry.py'
+      - 'scripts/rsk_monotonic_anchor.py'
+      - 'scripts/test_rsk_monotonic_anchor.py'
       - 'scripts/check-class-a-changes.sh'
       - 'docs/compliance/GOVERNANCE_CHARTER.md'
   workflow_dispatch:
@@ -73,7 +77,7 @@ jobs:
           base_sha='${{ github.event.pull_request.base.sha }}'
           changed_files="$(git diff --name-only "${base_sha}"...HEAD)"
 
-          class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-semantics/|crates/domains/symthaea-replicator-ledger/|docs/architecture/replicator-safety/|\.github/workflows/rsk-safety\.yml$|scripts/rsk_qualification\.py$|scripts/test_rsk_qualification\.py$|scripts/verify_rsk_qualification\.py$|scripts/test_verify_rsk_qualification\.py$|scripts/rsk_semantic_schema\.py$|scripts/test_rsk_semantic_schema\.py$|scripts/rsk_schema_adapter\.py$|scripts/test_rsk_schema_adapter\.py$|scripts/rsk_schema_registry\.py$|scripts/test_rsk_schema_registry\.py$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
+          class_a_pattern='^(crates/domains/symthaea-replicator-safety/|crates/domains/symthaea-replicator-semantics/|crates/domains/symthaea-replicator-ledger/|docs/architecture/replicator-safety/|\.github/workflows/rsk-safety\.yml$|scripts/rsk_qualification\.py$|scripts/test_rsk_qualification\.py$|scripts/verify_rsk_qualification\.py$|scripts/test_verify_rsk_qualification\.py$|scripts/rsk_semantic_schema\.py$|scripts/test_rsk_semantic_schema\.py$|scripts/rsk_schema_adapter\.py$|scripts/test_rsk_schema_adapter\.py$|scripts/rsk_schema_registry\.py$|scripts/test_rsk_schema_registry\.py$|scripts/rsk_monotonic_anchor\.py$|scripts/test_rsk_monotonic_anchor\.py$|scripts/check-class-a-changes\.sh$|docs/compliance/GOVERNANCE_CHARTER\.md$)'
 
           if ! printf '%s\n' "${changed_files}" | grep -Eq "${class_a_pattern}"; then
             echo "No RSK Class A implementation/governance surface changed."
@@ -123,6 +127,8 @@ jobs:
             'scripts/test_rsk_schema_adapter.py'
             'scripts/rsk_schema_registry.py'
             'scripts/test_rsk_schema_registry.py'
+            'scripts/rsk_monotonic_anchor.py'
+            'scripts/test_rsk_monotonic_anchor.py'
             'scripts/check-class-a-changes.sh'
             'docs/compliance/GOVERNANCE_CHARTER.md'
           )
@@ -150,6 +156,9 @@ jobs:
 
       - name: Self-test schema registry state verifier
         run: python3 scripts/test_rsk_schema_registry.py -v
+
+      - name: Self-test monotonic anchor composition
+        run: python3 scripts/test_rsk_monotonic_anchor.py -v
 
       - name: Keep RSK reference crates non-publishable until admission
         shell: bash
