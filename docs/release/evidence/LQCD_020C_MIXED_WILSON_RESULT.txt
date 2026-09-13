@@ -1,0 +1,3 @@
+ok
+result_sha256=164c89ca9d3d2e6a4e28bfc6ab15c31c0f84ce32eb7860e8a7ed0fe6d29a777e
+{"alpha": 0.7, "ape_dependency_sha256": "074614e6c2bdba1949c9c6a3bf40458b00f6502c7dd3029ee201ae8eacb1d10c", "convention_id": "mixed_spatial_ape_temporal_unsmeared_wilson_v1", "dims": [3, 3, 3, 2], "gauge_invariance_max_error": 1.1102230246251565e-16, "identity_values": {"r1_t1": 1.0, "r2_t1": 1.0}, "mixed_loop_means": {"mu0_r1_t1": 0.9993772194252611, "mu0_r2_t1": 0.9990068485378498, "mu1_r1_t1": 0.999415081324206, "mu1_r2_t1": 0.999233962373143, "mu2_r1_t1": 0.9994521375611396, "mu2_r2_t1": 0.9993316815423768}, "temporal_source_is_original_error": 0.0}
