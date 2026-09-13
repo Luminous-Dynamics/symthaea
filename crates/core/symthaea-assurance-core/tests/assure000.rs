@@ -267,7 +267,10 @@ fn reproduction_accepts_distinct_verifier_identity_without_claiming_independence
         QualificationOutcome::Supported(SupportTier::Reproduced),
     )
     .unwrap();
-    assert_eq!(result.outcome().support_tier(), Some(SupportTier::Reproduced));
+    assert_eq!(
+        result.outcome().support_tier(),
+        Some(SupportTier::Reproduced)
+    );
 }
 
 #[test]
@@ -299,7 +302,10 @@ fn runtime_evidence_does_not_create_a_deployment_support_tier() {
         QualificationOutcome::Supported(SupportTier::Reproduced),
     )
     .unwrap();
-    assert_eq!(result.outcome().support_tier(), Some(SupportTier::Reproduced));
+    assert_eq!(
+        result.outcome().support_tier(),
+        Some(SupportTier::Reproduced)
+    );
 }
 
 #[test]
