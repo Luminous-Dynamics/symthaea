@@ -145,6 +145,7 @@ pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
 mod motor;
+pub mod state_information_gain;
 mod td_learning;
 pub mod transition_information_gain;
 pub mod types;
@@ -163,6 +164,11 @@ pub use types::{
 pub use td_learning::{
     EligibilityTraces, ModelConfidenceTracker, StateTransition, TemporalDifferenceLearner,
     TemporalDifferenceLearningConfig, TemporalDifferenceLearningStats,
+};
+
+pub use state_information_gain::{
+    HIDDEN_STATE_INFORMATION_GAIN_SCHEMA_V1, HiddenStateInformationGainError,
+    linear_gaussian_hidden_state_information_gain_nats_v1,
 };
 
 pub use transition_information_gain::{
