@@ -1,0 +1,164 @@
+name: Simulation Clone Execveat Cgroup Rlimit
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-clone-cgroup-exec-rlimit/**"
+      - "crates/bridges/symthaea-sim-clone-cgroup-exec/**"
+      - "crates/bridges/symthaea-sim-worker/**"
+      - "crates/bridges/symthaea-sim-worker-cgroup/**"
+      - "crates/bridges/symthaea-sim-worker-image/**"
+      - ".github/workflows/simulation-clone-execveat-cgroup-rlimit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  SYMTHAEA_CGROUP_V2_DELEGATED_ROOT: ${{ vars.SYMTHAEA_CGROUP_V2_DELEGATED_ROOT }}
+
+jobs:
+  clone-execveat-cgroup-rlimit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          test -r /sys/fs/cgroup/cgroup.controllers
+          uname -a
+          cat /sys/fs/cgroup/cgroup.controllers
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-simulation-clone-execveat-cgroup-rlimit-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-clone-cgroup-exec-rlimit/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-clone-execveat-cgroup-rlimit-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-clone-execveat-cgroup-rlimit-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches rlimit launcher graph."
+          else
+            cat simulation-clone-execveat-cgroup-rlimit-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-clone-execveat-cgroup-rlimit-cargo-lock-patch
+          path: simulation-clone-execveat-cgroup-rlimit-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Reconcile candidate pinned formatting
+        run: |
+          cargo fmt -p symthaea-sim-clone-cgroup-exec-rlimit
+          git diff -- crates/bridges/symthaea-sim-clone-cgroup-exec-rlimit \
+            > simulation-clone-execveat-cgroup-rlimit-rustfmt.patch
+          if git diff --quiet -- crates/bridges/symthaea-sim-clone-cgroup-exec-rlimit; then
+            echo "Source already matches Rust 1.96 rustfmt."
+          else
+            cat simulation-clone-execveat-cgroup-rlimit-rustfmt.patch
+          fi
+
+      - name: Upload candidate rustfmt patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-clone-execveat-cgroup-rlimit-rustfmt-patch
+          path: simulation-clone-execveat-cgroup-rlimit-rustfmt.patch
+          if-no-files-found: error
+
+      - name: Check launcher graph
+        run: cargo check --locked -p symthaea-sim-clone-cgroup-exec-rlimit --all-targets
+
+      - name: Unit and source tests
+        run: cargo test --locked -p symthaea-sim-clone-cgroup-exec-rlimit
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-sim-clone-cgroup-exec-rlimit --all-targets -- -D warnings
+
+      - name: Build exact post-exec probe target
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-clone-cgroup-exec-rlimit \
+            --bin symthaea-sim-clone-exec-rlimit-target
+          sha256sum target/debug/symthaea-sim-clone-exec-rlimit-target
+
+      - name: Execute exact rlimit/session kernel corpus when cgroup root is configured
+        run: |
+          if [[ -n "${SYMTHAEA_CGROUP_V2_DELEGATED_ROOT:-}" ]]; then
+            cargo test --locked \
+              -p symthaea-sim-clone-cgroup-exec-rlimit \
+              --test rlimit_exec \
+              -- --ignored --test-threads=1
+            echo 'kernel_rlimit_exec_probe=pass' | tee simulation-clone-execveat-cgroup-rlimit-kernel-status.txt
+          else
+            echo 'kernel_rlimit_exec_probe=not_established' | tee simulation-clone-execveat-cgroup-rlimit-kernel-status.txt
+          fi
+
+      - name: Record exact rlimit launcher subject
+        run: |
+          kernel_probe="$(cut -d= -f2 simulation-clone-execveat-cgroup-rlimit-kernel-status.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "target_sha256=$(sha256sum target/debug/symthaea-sim-clone-exec-rlimit-target | cut -d' ' -f1)"
+            echo "profile=symthaea.simulation.clone-into-cgroup.sealed-execveat-rlimit-v1"
+            echo "base_profile=symthaea.simulation.clone-into-cgroup.sealed-execveat-v1"
+            echo "base_verifier_must_accept=true"
+            echo "clone_into_cgroup=true"
+            echo "rlimit_as_before_exec=true"
+            echo "rlimit_cpu_before_exec=true"
+            echo "rlimit_fsize_before_exec=true"
+            echo "rlimit_nofile_before_exec=true"
+            echo "rlimit_nproc_before_exec=true"
+            echo "rlimit_core_zero_before_exec=true"
+            echo "setsid_before_exec=true"
+            echo "no_new_privs_before_exec=true"
+            echo "umask_0077_before_exec=true"
+            echo "post_exec_limits_probed=true"
+            echo "post_exec_session_probed=true"
+            echo "parent_wall_time_enforced_by_launcher=false"
+            echo "parent_output_limits_enforced_by_launcher=false"
+            echo "kernel_rlimit_exec_probe=${kernel_probe}"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-clone-execveat-cgroup-rlimit-receipt.txt
+
+      - name: Upload rlimit launcher evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-clone-execveat-cgroup-rlimit-evidence
+          path: |
+            simulation-clone-execveat-cgroup-rlimit-kernel-status.txt
+            simulation-clone-execveat-cgroup-rlimit-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed pinned formatting
+        run: git diff --exit-code -- crates/bridges/symthaea-sim-clone-cgroup-exec-rlimit
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
