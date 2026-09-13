@@ -37,6 +37,7 @@ class EvidenceArchiveAdmissionTests(unittest.TestCase):
             "canonical_gid": 0,
             "canonical_mtime": 0,
             "max_archive_bytes": 1024 * 1024,
+            "max_tar_stream_bytes": 64 * 1024,
             "max_member_bytes": 1024,
             "max_total_unpacked_bytes": 2048,
             "members": [
@@ -112,27 +113,34 @@ class EvidenceArchiveAdmissionTests(unittest.TestCase):
         profile = load_profile(self.profile_path)
         return admit_archive(profile, self.archive_path, self.output_path)
 
+    def _assert_output_uncommitted(self) -> None:
+        if self.output_path.exists():
+            self.assertEqual(list(self.output_path.iterdir()), [])
+
     def _assert_rejected(self, members: list[tuple[tarfile.TarInfo, bytes | None]]) -> None:
         self._write_archive(members)
         with self.assertRaises(ArchiveAdmissionError):
             self._admit()
+        self._assert_output_uncommitted()
 
     def test_valid_archive_is_admitted_and_extracted_exactly(self) -> None:
         self._write_archive(self._valid_members())
         result = self._admit()
         self.assertEqual(result["profile_id"], "test-evidence-v1")
         self.assertEqual(result["member_count"], 3)
+        self.assertGreater(result["tar_stream_bytes"], 0)
         self.assertEqual((self.output_path / "evidence/a.json").read_bytes(), b'{"ok":true}\n')
         self.assertEqual((self.output_path / "evidence/b.txt").read_bytes(), b"qualified\n")
+        self.assertFalse(any(path.name.startswith(".archive-admission-") for path in self.output_path.iterdir()))
 
-    def test_missing_required_member_is_rejected(self) -> None:
+    def test_missing_required_member_is_rejected_atomically(self) -> None:
         self._assert_rejected(self._valid_members()[:-1])
 
-    def test_unexpected_extra_member_is_rejected(self) -> None:
+    def test_unexpected_extra_member_is_rejected_atomically(self) -> None:
         members = self._valid_members() + [self._member("evidence/extra", data=b"x")]
         self._assert_rejected(members)
 
-    def test_duplicate_member_path_is_rejected(self) -> None:
+    def test_duplicate_member_path_is_rejected_atomically(self) -> None:
         members = self._valid_members() + [self._member("evidence/b.txt", data=b"again")]
         self._assert_rejected(members)
 
@@ -210,6 +218,15 @@ class EvidenceArchiveAdmissionTests(unittest.TestCase):
         self._write_archive(self._valid_members())
         with self.assertRaises(ArchiveAdmissionError):
             self._admit()
+        self._assert_output_uncommitted()
+
+    def test_decompressed_tar_stream_bound_is_enforced(self) -> None:
+        self.profile["max_tar_stream_bytes"] = 1
+        self._write_profile()
+        self._write_archive(self._valid_members())
+        with self.assertRaises(ArchiveAdmissionError):
+            self._admit()
+        self._assert_output_uncommitted()
 
     def test_nonempty_output_directory_is_rejected(self) -> None:
         self._write_archive(self._valid_members())
@@ -226,6 +243,20 @@ class EvidenceArchiveAdmissionTests(unittest.TestCase):
 
     def test_profile_member_cannot_escape_root(self) -> None:
         self.profile["members"][1]["path"] = "other/a.json"
+        self._write_profile()
+        with self.assertRaises(ArchiveAdmissionError):
+            load_profile(self.profile_path)
+
+    def test_profile_requires_declared_parent_directories(self) -> None:
+        self.profile["members"].append(
+            {
+                "path": "evidence/nested/value.json",
+                "kind": "file",
+                "mode": 0o644,
+                "allow_empty": False,
+                "max_bytes": 32,
+            }
+        )
         self._write_profile()
         with self.assertRaises(ArchiveAdmissionError):
             load_profile(self.profile_path)
