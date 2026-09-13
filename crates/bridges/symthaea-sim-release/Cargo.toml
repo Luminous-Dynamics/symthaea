@@ -14,9 +14,18 @@ symthaea-extension-admission = { path = "../../core/symthaea-extension-admission
 symthaea-extension-core = { path = "../../core/symthaea-extension-core" }
 symthaea-extension-router = { path = "../../core/symthaea-extension-router" }
 symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-sim-deployment = { path = "../symthaea-sim-deployment" }
+symthaea-sim-deployment-routing = { path = "../symthaea-sim-deployment-routing" }
 symthaea-sim-digest = { path = "../symthaea-sim-digest" }
 symthaea-sim-extension-routing = { path = "../symthaea-sim-extension-routing" }
+symthaea-sim-worker = { path = "../symthaea-sim-worker" }
+symthaea-sim-worker-image = { path = "../symthaea-sim-worker-image" }
+symthaea-sim-worker-containment = { path = "../symthaea-sim-worker-containment" }
+symthaea-sim-worker-filesystem = { path = "../symthaea-sim-worker-filesystem" }
+symthaea-sim-worker-qualification = { path = "../symthaea-sim-worker-qualification" }
 
 [dev-dependencies]
+serde_json.workspace = true
 symthaea-extension-host = { path = "../symthaea-extension-host" }
+symthaea-extension-registry = { path = "../../core/symthaea-extension-registry" }
 symthaea-extension-simulation-backend = { path = "../symthaea-extension-simulation-backend" }

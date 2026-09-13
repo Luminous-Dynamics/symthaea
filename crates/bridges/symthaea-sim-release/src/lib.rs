@@ -13,10 +13,12 @@
 //! - the complete normalized `SimulationEvidence`, and
 //! - the core selected routing decision.
 //!
-//! The receipt is minted only after [`LazySimulationRegistry::run`] has completed
-//! its post-execution currentness check, the release lineage has been validated,
-//! and the same exact [`ActiveAdmission`] passes one additional live currentness
-//! check immediately before receipt construction.
+//! Release finalization is deliberately independent of where the technical
+//! execution occurred. [`run_released`] keeps the original in-process routing
+//! path. [`release_routed_deployment`] accepts an unforgeable safe-Rust
+//! `RoutedDeploymentInvocation`, attaches host-owned execution lineage from its
+//! independently verified worker/deployment facts, and then applies the same
+//! private receipt theorem.
 //!
 //! A receipt is **audit evidence, not durable authority**. Policy/trust state may
 //! change immediately after issuance and must be checked again before any later
@@ -32,8 +34,11 @@ use symthaea_extension_admission::{
 use symthaea_extension_core::{ExtensionId, ExtensionManifest, RuntimeKind};
 use symthaea_extension_router::{RoutingConstraints, RoutingDecision};
 use symthaea_sim_bridge::{
-    ExecutionMode, SimulationEvidence, SimulationRequest, SimulationResult,
+    ExecutionMode, ExtensionComponentEvidence, SimulationEvidence, SimulationRequest,
+    SimulationResult,
 };
+use symthaea_sim_deployment::{BoundSimulationDeployment, SimulationDeploymentError};
+use symthaea_sim_deployment_routing::RoutedDeploymentInvocation;
 use symthaea_sim_digest::{
     CanonicalDigestError, SIMULATION_DIGEST_PROFILE_V1, canonical_output_sha256_v1,
     canonical_request_sha256_v1,
@@ -41,10 +46,24 @@ use symthaea_sim_digest::{
 use symthaea_sim_extension_routing::{
     LazySimulationError, LazySimulationRegistry, solver_capability,
 };
+use symthaea_sim_worker::{SUPERVISOR_PROFILE_V1, WORKER_PROTOCOL_V1};
+use symthaea_sim_worker_containment::WORKER_CONTAINMENT_PROFILE_V1;
+use symthaea_sim_worker_filesystem::WORKER_FILESYSTEM_PROFILE_V1;
+use symthaea_sim_worker_image::SEALED_WORKER_IMAGE_PROFILE_V1;
+use symthaea_sim_worker_qualification::{
+    ActiveWorkerQualification, WorkerQualificationCurrentnessSource, WorkerQualificationError,
+    WORKER_QUALIFICATION_PROFILE_V1,
+};
 use thiserror::Error;
 
 /// Versioned profile for the release receipt encoding and issuance semantics.
 pub const SIMULATION_RELEASE_PROFILE_V1: &str = "symthaea.simulation.release.v1";
+/// Stable backend identity for host-promoted contained Component execution.
+pub const CONTAINED_DEPLOYMENT_BACKEND_V1: &str =
+    "extension-component-contained-deployment-v1";
+/// Stable adapter identity for contained-deployment execution lineage promotion.
+pub const CONTAINED_DEPLOYMENT_RELEASE_ADAPTER_V1: &str =
+    "symthaea-sim-deployment-release-v1";
 
 const RELEASE_DOMAIN_V1: &[u8] = b"symthaea.simulation.release.v1\0";
 const EVIDENCE_DOMAIN_V1: &[u8] = b"symthaea.simulation.evidence.v1\0";
@@ -210,18 +229,32 @@ pub enum SimulationReleaseError {
     Execution(LazySimulationError),
     #[error(transparent)]
     Canonical(#[from] CanonicalDigestError),
+    #[error(transparent)]
+    Deployment(#[from] SimulationDeploymentError),
     #[error("selected provider disappeared from the registry: {0:?}")]
     SelectedProviderMissing(ExtensionId),
+    #[error("selected manifest identity does not match the routing decision")]
+    SelectedManifestMismatch,
     #[error("selected release admission is missing or duplicated")]
     SelectedAdmissionMissingOrDuplicate,
     #[error("selected release admission does not match the routed manifest/decision")]
     SelectedAdmissionMismatch,
-    #[error("release-finalization currentness failed: {0:?}")]
+    #[error("release-finalization admission currentness failed: {0:?}")]
     ReleaseCurrentness(AdmissionProblem),
+    #[error("release-finalization worker qualification currentness failed: {0}")]
+    ReleaseWorkerCurrentness(WorkerQualificationError),
+    #[error("routed invocation does not match the exact release deployment authority")]
+    ReleaseDeploymentMismatch,
     #[error("routing decision capability does not match the request solver")]
     CapabilityMismatch,
     #[error("released result request id does not match the request")]
     RequestIdMismatch,
+    #[error("routed invocation request digest does not match canonical request")]
+    RoutedRequestDigestMismatch,
+    #[error("contained worker attempted to mint simulation evidence")]
+    WorkerMintedEvidence,
+    #[error("contained worker technical lineage does not match routed authority: {0}")]
+    WorkerLineageMismatch(&'static str),
     #[error("wasm execution did not return ExtensionComponent evidence")]
     MissingWasmExecutionEvidence,
     #[error("non-wasm provider returned ExtensionComponent evidence")]
@@ -257,8 +290,8 @@ impl From<LazySimulationError> for SimulationReleaseError {
 ///
 /// `LazySimulationRegistry::run` already performs currentness checks before
 /// construction, immediately before execution, and after execution. This
-/// function adds a fourth check after result/decision/evidence agreement is
-/// established and immediately before the receipt is created.
+/// function preserves that path and delegates the common final release theorem
+/// to the private finalizer.
 pub fn run_released(
     registry: &LazySimulationRegistry,
     request: &SimulationRequest,
@@ -266,21 +299,184 @@ pub fn run_released(
     admissions: &[ActiveAdmission],
     currentness: &dyn AdmissionCurrentnessSource,
 ) -> Result<ReleasedSimulation, SimulationReleaseError> {
-    let request_sha256 = canonical_request_sha256_v1(request)?;
     let (result, decision) = registry.run(request, constraints, admissions, currentness)?;
+    let manifest = registry
+        .catalog()
+        .get(&decision.selected)
+        .ok_or_else(|| SimulationReleaseError::SelectedProviderMissing(decision.selected.clone()))?;
+    finalize_preexecuted_release(
+        request,
+        result,
+        decision,
+        manifest,
+        admissions,
+        currentness,
+        || Ok(()),
+    )
+}
+
+/// Attach host-owned execution lineage to a completed, deterministically routed
+/// contained deployment and mint the same release receipt as [`run_released`].
+///
+/// `RoutedDeploymentInvocation` has private fields and no public constructor or
+/// deserializer. Safe Rust can obtain one only through the route -> exact active
+/// admission -> exact deployment -> exact active worker qualification execution
+/// path. Release additionally requires the exact deployment and live worker
+/// qualification so both authorization domains can be rechecked immediately
+/// before receipt minting.
+#[allow(clippy::too_many_arguments)]
+pub fn release_routed_deployment(
+    request: &SimulationRequest,
+    routed: &RoutedDeploymentInvocation,
+    deployment: &BoundSimulationDeployment,
+    worker_qualification: &ActiveWorkerQualification,
+    worker_currentness: &dyn WorkerQualificationCurrentnessSource,
+    manifest: &ExtensionManifest,
+    admissions: &[ActiveAdmission],
+    currentness: &dyn AdmissionCurrentnessSource,
+) -> Result<ReleasedSimulation, SimulationReleaseError> {
+    let request_sha256 = canonical_request_sha256_v1(request)?;
+    if routed.request_sha256() != request_sha256 {
+        return Err(SimulationReleaseError::RoutedRequestDigestMismatch);
+    }
+
+    let decision = routed.decision();
+    let bound = routed.invocation();
+    if bound.deployment_sha256() != deployment.deployment_sha256() {
+        return Err(SimulationReleaseError::ReleaseDeploymentMismatch);
+    }
+
+    let selected_admission = exact_selected_admission(decision, manifest, admissions)?;
+    deployment.verify(selected_admission, worker_qualification)?;
+
+    let sealed = bound.invocation();
+    let supervised = sealed.invocation();
+    let worker = supervised.worker();
+    let technical = supervised.result();
+    if worker_qualification.worker_sha256() != supervised.worker_sha256()
+        || worker_qualification.qualification_evidence_sha256()
+            != bound.worker_qualification_evidence_sha256()
+    {
+        return Err(SimulationReleaseError::ReleaseDeploymentMismatch);
+    }
+
+    if technical.evidence != SimulationEvidence::default() {
+        return Err(SimulationReleaseError::WorkerMintedEvidence);
+    }
+
+    let output_sha256 = canonical_output_sha256_v1(technical)?;
+    let expected_manifest = hex_digest(decision.selected_manifest_sha256.0);
+    let expected_payload = hex_digest(decision.selected_payload_sha256.0);
+    let expected_request = hex_digest(request_sha256);
+    let expected_output = hex_digest(output_sha256);
+
+    require_worker_equal("extension id", &worker.extension_id, decision.selected.as_str())?;
+    require_worker_equal("extension version", &worker.extension_version, &manifest.version)?;
+    require_worker_equal("manifest digest", &worker.manifest_sha256, &expected_manifest)?;
+    require_worker_equal("component digest", &worker.component_sha256, &expected_payload)?;
+    require_worker_equal("request digest", &worker.request_sha256, &expected_request)?;
+    require_worker_equal("output digest", &worker.output_sha256, &expected_output)?;
+
+    let deployment_sha256 = hex_digest(bound.deployment_sha256());
+    let qualification_evidence_sha256 =
+        hex_digest(bound.worker_qualification_evidence_sha256());
+    let warnings_before = technical.warnings.clone();
+    let mut result = technical.clone();
+
+    let runtime_profile = format!(
+        "control={};simulation={};supervisor={};worker={};image={};process={};filesystem={};deployment={}",
+        worker.control_wasm_profile,
+        worker.simulation_wasm_profile,
+        SUPERVISOR_PROFILE_V1,
+        WORKER_PROTOCOL_V1,
+        SEALED_WORKER_IMAGE_PROFILE_V1,
+        WORKER_CONTAINMENT_PROFILE_V1,
+        WORKER_FILESYSTEM_PROFILE_V1,
+        deployment_sha256,
+    );
+    let adapter_version = format!(
+        "{};{};worker-qualification={};qualification-evidence={}",
+        worker.adapter_version,
+        CONTAINED_DEPLOYMENT_RELEASE_ADAPTER_V1,
+        WORKER_QUALIFICATION_PROFILE_V1,
+        qualification_evidence_sha256,
+    );
+
+    result.evidence = SimulationEvidence {
+        mode: ExecutionMode::ExtensionComponent,
+        backend: Some(CONTAINED_DEPLOYMENT_BACKEND_V1.into()),
+        extension: Some(ExtensionComponentEvidence {
+            extension_id: worker.extension_id.clone(),
+            extension_version: worker.extension_version.clone(),
+            manifest_sha256: worker.manifest_sha256.clone(),
+            component_sha256: worker.component_sha256.clone(),
+            runtime_profile,
+            digest_profile: SIMULATION_DIGEST_PROFILE_V1.into(),
+            request_sha256: worker.request_sha256.clone(),
+            output_sha256: worker.output_sha256.clone(),
+            wit_version: worker.wit_version.clone(),
+            adapter_version,
+        }),
+        ..SimulationEvidence::default()
+    };
+
+    // Warnings are provider-owned and included in the canonical output digest.
+    // This host boundary may attach execution evidence only.
+    if result.warnings != warnings_before {
+        return Err(SimulationReleaseError::WorkerLineageMismatch(
+            "provider warnings mutated",
+        ));
+    }
+    if result.is_engineering_evidence() {
+        return Err(SimulationReleaseError::ComponentPromotedToEngineeringEvidence);
+    }
+    if canonical_output_sha256_v1(&result)? != output_sha256 {
+        return Err(SimulationReleaseError::WorkerLineageMismatch(
+            "output changed while attaching evidence",
+        ));
+    }
+
+    finalize_preexecuted_release(
+        request,
+        result,
+        decision.clone(),
+        manifest,
+        admissions,
+        currentness,
+        || {
+            deployment.verify(selected_admission, worker_qualification)?;
+            worker_qualification
+                .recheck_currentness(worker_currentness)
+                .map_err(SimulationReleaseError::ReleaseWorkerCurrentness)?;
+            Ok(())
+        },
+    )
+}
+
+/// Private common final release theorem. Keeping this private is load-bearing:
+/// public callers must arrive through either `LazySimulationRegistry::run` or an
+/// unforgeable `RoutedDeploymentInvocation`, not arbitrary public structs.
+fn finalize_preexecuted_release(
+    request: &SimulationRequest,
+    result: SimulationResult,
+    decision: RoutingDecision,
+    manifest: &ExtensionManifest,
+    admissions: &[ActiveAdmission],
+    currentness: &dyn AdmissionCurrentnessSource,
+    before_mint: impl FnOnce() -> Result<(), SimulationReleaseError>,
+) -> Result<ReleasedSimulation, SimulationReleaseError> {
+    let request_sha256 = canonical_request_sha256_v1(request)?;
     let output_sha256 = canonical_output_sha256_v1(&result)?;
 
+    if manifest.id != decision.selected {
+        return Err(SimulationReleaseError::SelectedManifestMismatch);
+    }
     if decision.capability != solver_capability(request.solver) {
         return Err(SimulationReleaseError::CapabilityMismatch);
     }
     if result.request_id != request.id {
         return Err(SimulationReleaseError::RequestIdMismatch);
     }
-
-    let manifest = registry
-        .catalog()
-        .get(&decision.selected)
-        .ok_or_else(|| SimulationReleaseError::SelectedProviderMissing(decision.selected.clone()))?;
 
     validate_execution_lineage(
         manifest.runtime,
@@ -292,11 +488,11 @@ pub fn run_released(
     )?;
 
     let evidence_sha256 = evidence_sha256_v1(&result.evidence)?;
-
     let selected_admission = exact_selected_admission(&decision, manifest, admissions)?;
     selected_admission
         .recheck_currentness(currentness)
         .map_err(SimulationReleaseError::ReleaseCurrentness)?;
+    before_mint()?;
 
     let mut receipt = SimulationReleaseReceipt {
         selected_extension: decision.selected.as_str().to_owned(),
@@ -322,6 +518,17 @@ pub fn run_released(
     };
     release.verify(request)?;
     Ok(release)
+}
+
+fn require_worker_equal(
+    field: &'static str,
+    actual: &str,
+    expected: &str,
+) -> Result<(), SimulationReleaseError> {
+    if actual != expected {
+        return Err(SimulationReleaseError::WorkerLineageMismatch(field));
+    }
+    Ok(())
 }
 
 fn exact_selected_admission<'a>(
@@ -638,7 +845,12 @@ mod tests {
         };
         let first = evidence_sha256_v1(&base).unwrap();
         let mut changed = base;
-        changed.extension.as_mut().unwrap().adapter_version.push_str("-changed");
+        changed
+            .extension
+            .as_mut()
+            .unwrap()
+            .adapter_version
+            .push_str("-changed");
         let second = evidence_sha256_v1(&changed).unwrap();
         assert_ne!(first, second);
     }
