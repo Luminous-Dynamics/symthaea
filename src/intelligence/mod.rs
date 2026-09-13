@@ -11,6 +11,7 @@
 //! - Portable lane bundles and content-bound publication artifacts for capability evidence
 //! - Decomposed metacognitive calibration, abstention, assumption, and revision qualification
 //! - Public development probe for evidence-revision direction and epistemic remediation
+//! - Public development probe for meta-reasoning control-flow and state persistence
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -22,6 +23,7 @@ pub mod reasoning_capability_matrix;
 pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
+pub mod reasoning_meta_control_probe;
 pub mod reasoning_metacognition;
 pub mod reasoning_qualification;
 
@@ -56,6 +58,10 @@ pub use reasoning_evaluator_policy::{
 pub use reasoning_evidence_revision_probe::{
     run_evidence_revision_probe, ConflictActionObservation, EvidenceRevisionProbeReport,
     EVIDENCE_REVISION_PROBE_VERSION,
+};
+pub use reasoning_meta_control_probe::{
+    run_meta_control_probe, MetaControlObservation, MetaControlProbeReport,
+    META_CONTROL_PROBE_VERSION,
 };
 pub use reasoning_metacognition::{
     evaluate_metacognition, BinaryDetectionReport, ConfidenceRevisionDirection,
