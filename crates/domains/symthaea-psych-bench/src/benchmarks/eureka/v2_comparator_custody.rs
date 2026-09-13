@@ -21,7 +21,7 @@ use super::v2_public_schema::{
 pub(super) const V2_COMPARATOR_FIT_CORPUS_REVISION: &str =
     "EUREKA.002.V2.COMPARATOR_FIT_CORPUS.v2";
 pub(super) const V2_COMPARATOR_CUSTODY_REVISION: &str =
-    "EUREKA.002.V2.COMPARATOR_CUSTODY.v1";
+    "EUREKA.002.V2.COMPARATOR_CUSTODY.v2";
 pub(super) const V2_SHORTCUT_BASELINE_IMPLEMENTATION_REVISION: &str =
     "EUREKA.002.V2.SHORTCUT_BASELINES.v1";
 
@@ -54,6 +54,8 @@ pub(super) enum V2ComparatorCustodyError {
     NonDevelopmentFitEvidence,
     DuplicateCanonicalRowIdentity,
     DuplicateCanonicalTransition,
+    ZeroSelectionAuthorizationCommitment,
+    ComparatorNotPreregistered,
 }
 
 impl From<V2PublicSchemaError> for V2ComparatorCustodyError {
@@ -190,7 +192,16 @@ impl V2ComparatorCustodyReceipt {
         corpus: &V2DevelopmentFitCorpus,
         selected: ShortcutBaselineKind,
         selection_authorization_commitment: [u8; 32],
-    ) -> Self {
+    ) -> Result<Self, V2ComparatorCustodyError> {
+        if selection_authorization_commitment == [0_u8; 32] {
+            return Err(V2ComparatorCustodyError::ZeroSelectionAuthorizationCommitment);
+        }
+        if !EUREKA_002_ANALYSIS_PLAN_V1
+            .eligible_comparators
+            .contains(&selected)
+        {
+            return Err(V2ComparatorCustodyError::ComparatorNotPreregistered);
+        }
         let development_record_count =
             u32::try_from(corpus.records.len()).expect("V2 Development corpus fits u32");
         let analysis_plan_replay_digest = EUREKA_002_ANALYSIS_PLAN_V1.replay_digest();
@@ -202,7 +213,7 @@ impl V2ComparatorCustodyReceipt {
             development_record_count,
             analysis_plan_replay_digest,
         );
-        Self {
+        Ok(Self {
             schema_commitment: corpus.schema_commitment,
             fit_corpus_commitment: corpus.commitment,
             selected,
@@ -210,7 +221,7 @@ impl V2ComparatorCustodyReceipt {
             development_record_count,
             analysis_plan_replay_digest,
             commitment,
-        }
+        })
     }
 
     pub(super) const fn schema_commitment(self) -> [u8; 32] {
@@ -497,6 +508,19 @@ mod tests {
     }
 
     #[test]
+    fn zero_selection_authorization_cannot_mint_comparator_subject() {
+        let corpus = V2DevelopmentFitCorpus::freeze(development_records()).unwrap();
+        assert_eq!(
+            V2ComparatorCustodyReceipt::freeze(
+                &corpus,
+                ShortcutBaselineKind::NearestTransition,
+                [0_u8; 32],
+            ),
+            Err(V2ComparatorCustodyError::ZeroSelectionAuthorizationCommitment)
+        );
+    }
+
+    #[test]
     fn selected_kind_and_selection_authorization_bind_subject_identity() {
         let corpus = V2DevelopmentFitCorpus::freeze(development_records()).unwrap();
         let auth_a = [0xAA_u8; 32];
@@ -505,17 +529,20 @@ mod tests {
             &corpus,
             ShortcutBaselineKind::NearestTransition,
             auth_a,
-        );
+        )
+        .unwrap();
         let markov = V2ComparatorCustodyReceipt::freeze(
             &corpus,
             ShortcutBaselineKind::SimpleMarkov,
             auth_a,
-        );
+        )
+        .unwrap();
         let different_auth = V2ComparatorCustodyReceipt::freeze(
             &corpus,
             ShortcutBaselineKind::NearestTransition,
             auth_b,
-        );
+        )
+        .unwrap();
         assert_ne!(nearest.commitment(), markov.commitment());
         assert_ne!(nearest.commitment(), different_auth.commitment());
         assert_eq!(nearest.schema_commitment(), public_schema_commitment());
@@ -531,12 +558,14 @@ mod tests {
             &corpus,
             ShortcutBaselineKind::ActionMarginalDelta,
             auth,
-        );
+        )
+        .unwrap();
         let b = V2ComparatorCustodyReceipt::freeze(
             &corpus,
             ShortcutBaselineKind::ActionMarginalDelta,
             auth,
-        );
+        )
+        .unwrap();
         assert_eq!(a, b);
         assert_ne!(a.commitment(), [0_u8; 32]);
     }
