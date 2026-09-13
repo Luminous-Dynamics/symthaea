@@ -70,7 +70,6 @@ pub use resolution_view::{
     BUTLIN_RESOLVED_EVIDENCE_VIEW_SCHEMA_V1, ButlinResolvedEvidenceViewV1,
     EvidenceLineageIdentityV1, EvidenceLineageKindV1, EvidenceOutcomeCountsV1,
     EvidenceResolutionViewErrorV1, IndicatorOutcomeOverlayV1, base_report_blake3_v1,
-    resolve_evidence_view_v1,
 };
 #[cfg(feature = "symthaea-backend")]
-pub use resolution_view::gwt1_direct_overlay_v1;
+pub use resolution_view::resolve_gwt1_evidence_view_v1;
