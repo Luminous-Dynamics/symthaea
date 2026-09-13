@@ -1,0 +1,312 @@
+# Focused raw-head qualification for the Tier-1 energy-material evidence lineage.
+#
+# This workflow is intentionally additive. Repository-wide CI remains the
+# integration authority. This lane exists to get rapid compiler/test/lint signal
+# for the small evidence lineage without pretending that package-focused checks
+# qualify the entire Symthaea workspace.
+#
+# If Cargo.lock is stale, the lane continues with an *ephemeral unlocked*
+# diagnostic resolution so compiler/test failures are still observable. The
+# resolver-produced lock delta is preserved as a short-lived artifact, the
+# original lockfile is restored, and the job fails at the final gate. Unlocked
+# execution is diagnostic evidence only, never reproducible qualification.
+
+name: Energy Evidence Fast Lane
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-discovery/**'
+      - 'crates/domains/symthaea-energy-material-screening/**'
+      - 'crates/bridges/symthaea-energy-material-dossier/**'
+      - 'crates/bridges/symthaea-energy-material-candidate-version/**'
+      - 'crates/bridges/symthaea-energy-material-campaign/**'
+      - 'crates/bridges/symthaea-energy-evidence-envelope/**'
+      - 'crates/bridges/symthaea-energy-native-dossier/**'
+      - 'crates/bridges/symthaea-energy-native-campaign-admission/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/energy-evidence-fast.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_TARGET_DIR: target/energy-evidence-fast
+  QUALIFICATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  QUALIFICATION_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+  EVENT_SHA: ${{ github.sha }}
+  ENERGY_EVIDENCE_PACKAGES: >-
+    symthaea-discovery
+    symthaea-energy-material-screening
+    symthaea-energy-material-dossier
+    symthaea-energy-material-candidate-version
+    symthaea-energy-material-campaign
+    symthaea-energy-evidence-envelope
+    symthaea-energy-native-dossier
+    symthaea-energy-native-campaign-admission
+
+jobs:
+  energy-evidence:
+    name: Tier-1 energy evidence raw-head qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact raw-head subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Bind qualification subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          if [[ "$actual_head" != "$QUALIFICATION_HEAD_SHA" ]]; then
+            echo "ERROR: checked-out subject $actual_head != declared raw head $QUALIFICATION_HEAD_SHA" >&2
+            exit 1
+          fi
+          {
+            echo "## Energy Evidence Fast Lane subject"
+            echo
+            echo "- Raw head: \`$actual_head\`"
+            echo "- PR base: \`${QUALIFICATION_BASE_SHA:-n/a}\`"
+            echo "- Event SHA: \`$EVENT_SHA\`"
+            echo "- Rust toolchain policy: **1.96.0**"
+            echo "- Subject class: **raw PR head / package-focused**"
+            echo "- Full-workspace integration qualification: **not implied**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare exact PR base for governance comparison
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          actual_base="$(git rev-parse "origin/${GITHUB_BASE_REF}")"
+          if [[ "$actual_base" != "$QUALIFICATION_BASE_SHA" ]]; then
+            echo "ERROR: fetched base $actual_base != event base $QUALIFICATION_BASE_SHA" >&2
+            exit 1
+          fi
+
+      - name: Governance check
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-class-a-changes.sh --ci
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache focused Cargo state
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/energy-evidence-fast
+          key: ${{ runner.os }}-energy-evidence-fast-${{ hashFiles('Cargo.lock', 'crates/core/symthaea-discovery/Cargo.toml', 'crates/domains/symthaea-energy-material-screening/Cargo.toml', 'crates/bridges/symthaea-energy-material-dossier/Cargo.toml', 'crates/bridges/symthaea-energy-material-candidate-version/Cargo.toml', 'crates/bridges/symthaea-energy-material-campaign/Cargo.toml', 'crates/bridges/symthaea-energy-evidence-envelope/Cargo.toml', 'crates/bridges/symthaea-energy-native-dossier/Cargo.toml', 'crates/bridges/symthaea-energy-native-campaign-admission/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-energy-evidence-fast-
+
+      - name: Check locked dependency graph
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          cargo metadata --locked --format-version 1 \
+            >"$RUNNER_TEMP/energy-evidence-metadata.json" \
+            2>"$RUNNER_TEMP/energy-evidence-locked.err"
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            echo "locked_ok=true" >> "$GITHUB_OUTPUT"
+            echo "- Cargo.lock: **fresh under --locked**" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "locked_ok=false" >> "$GITHUB_OUTPUT"
+            cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.original"
+            echo "- Cargo.lock: **STALE — unlocked execution below is diagnostic only**" >> "$GITHUB_STEP_SUMMARY"
+            echo "Locked resolver failure:" >&2
+            cat "$RUNNER_TEMP/energy-evidence-locked.err" >&2
+          fi
+
+      - name: Format focused lineage
+        id: fmt
+        if: always() && steps.lock.outcome == 'success'
+        shell: bash
+        run: |
+          set -uo pipefail
+          overall=0
+          for package in $ENERGY_EVIDENCE_PACKAGES; do
+            echo "== cargo fmt -p $package -- --check =="
+            if ! cargo fmt -p "$package" -- --check; then overall=1; fi
+          done
+          exit "$overall"
+
+      - name: Test focused lineage
+        id: tests
+        if: always() && steps.lock.outcome == 'success'
+        shell: bash
+        run: |
+          set -uo pipefail
+          locked=()
+          if [[ "${{ steps.lock.outputs.locked_ok }}" == "true" ]]; then
+            locked+=(--locked)
+          else
+            echo "WARNING: running with ephemeral unlocked resolution for diagnostics only" >&2
+          fi
+          overall=0
+          for package in $ENERGY_EVIDENCE_PACKAGES; do
+            echo "== cargo test ${locked[*]} -p $package --all-targets =="
+            if ! cargo test "${locked[@]}" -p "$package" --all-targets; then overall=1; fi
+          done
+          exit "$overall"
+
+      - name: Strict Clippy focused lineage
+        id: clippy
+        if: always() && steps.lock.outcome == 'success'
+        shell: bash
+        run: |
+          set -uo pipefail
+          locked=()
+          if [[ "${{ steps.lock.outputs.locked_ok }}" == "true" ]]; then
+            locked+=(--locked)
+          else
+            echo "WARNING: running with ephemeral unlocked resolution for diagnostics only" >&2
+          fi
+          overall=0
+          for package in $ENERGY_EVIDENCE_PACKAGES; do
+            echo "== cargo clippy ${locked[*]} -p $package --all-targets -- -D warnings =="
+            if ! cargo clippy "${locked[@]}" -p "$package" --all-targets -- -D warnings; then overall=1; fi
+          done
+          exit "$overall"
+
+      - name: Record diagnostic lock delta
+        if: always() && steps.lock.outputs.locked_ok == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff -- Cargo.lock > "$RUNNER_TEMP/energy-evidence-Cargo.lock.patch" || true
+          lines="$(wc -l < "$RUNNER_TEMP/energy-evidence-Cargo.lock.patch" | tr -d ' ')"
+          {
+            echo
+            echo "### Unlocked resolver diagnostic"
+            echo
+            echo "- Cargo.lock patch lines produced transiently: **$lines**"
+            echo "- This patch was generated by Cargo under the pinned Rust 1.96.0 toolchain."
+            echo "- It is diagnostic input for lock reconciliation, **not** qualification evidence."
+            echo "- The checkout lockfile is restored before the final gate."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload resolver-produced lock diagnostic
+        if: always() && steps.lock.outputs.locked_ok == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: energy-evidence-lock-diagnostic-${{ env.QUALIFICATION_HEAD_SHA }}
+          path: |
+            ${{ runner.temp }}/energy-evidence-Cargo.lock.patch
+            ${{ runner.temp }}/energy-evidence-locked.err
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Restore original lockfile after diagnostic resolution
+        if: always() && steps.lock.outputs.locked_ok == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/Cargo.lock.original" Cargo.lock
+
+      - name: Verify exact subject remained unchanged
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_HEAD_SHA"
+          if ! git diff --quiet -- Cargo.lock; then
+            echo "ERROR: Cargo.lock differs after diagnostic restoration" >&2
+            git diff -- Cargo.lock >&2
+            exit 1
+          fi
+          echo "Raw-head subject remained bound to $QUALIFICATION_HEAD_SHA"
+
+      - name: Enforce reproducible qualification boundary
+        id: reproducibility
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.lock.outputs.locked_ok }}" != "true" ]]; then
+            echo "FAIL: focused compiler/test diagnostics may have run, but Cargo.lock was stale." >&2
+            echo "Resolve Cargo.lock under Rust 1.96.0 and rerun before claiming qualification." >&2
+            exit 1
+          fi
+          echo "Cargo.lock was fresh; focused results are eligible as package-level qualification evidence."
+
+      - name: Write machine-readable qualification receipt
+        if: always()
+        shell: bash
+        env:
+          LOCKED_OK: ${{ steps.lock.outputs.locked_ok }}
+          JOB_STATUS: ${{ job.status }}
+          FMT_OUTCOME: ${{ steps.fmt.outcome }}
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+          CLIPPY_OUTCOME: ${{ steps.clippy.outcome }}
+          REPRO_OUTCOME: ${{ steps.reproducibility.outcome }}
+        run: |
+          set -euo pipefail
+          export RUSTC_VERSION="$(rustc --version 2>/dev/null || echo unavailable)"
+          export CARGO_VERSION="$(cargo --version 2>/dev/null || echo unavailable)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          patch = Path(os.environ["RUNNER_TEMP"]) / "energy-evidence-Cargo.lock.patch"
+          patch_sha = hashlib.sha256(patch.read_bytes()).hexdigest() if patch.exists() else None
+          raw = os.environ.get("LOCKED_OK", "")
+          locked = True if raw == "true" else False if raw == "false" else None
+          receipt = {
+              "schema": "symthaea.energy-evidence-fast-lane.receipt.v0",
+              "head_sha": os.environ["QUALIFICATION_HEAD_SHA"],
+              "base_sha": os.environ.get("QUALIFICATION_BASE_SHA") or None,
+              "event_sha": os.environ["EVENT_SHA"],
+              "subject_class": "raw_pr_head_package_focused",
+              "full_workspace_qualification_implied": False,
+              "rustc_version": os.environ.get("RUSTC_VERSION"),
+              "cargo_version": os.environ.get("CARGO_VERSION"),
+              "cargo_lock_fresh": locked,
+              "job_status": os.environ.get("JOB_STATUS"),
+              "step_outcomes": {
+                  "fmt": os.environ.get("FMT_OUTCOME"),
+                  "tests": os.environ.get("TEST_OUTCOME"),
+                  "clippy": os.environ.get("CLIPPY_OUTCOME"),
+                  "reproducibility_gate": os.environ.get("REPRO_OUTCOME"),
+              },
+              "packages": os.environ["ENERGY_EVIDENCE_PACKAGES"].split(),
+              "diagnostic_lock_patch_sha256": patch_sha,
+              "authority_boundary": "Package-focused CI evidence only; not whole-workspace integration, scientific validity, candidate promotion, synthesis authority, safety certification, investment approval, or deployment authority.",
+          }
+          out = Path(os.environ["RUNNER_TEMP"]) / "energy-evidence-qualification-receipt.json"
+          out.write_text(json.dumps(receipt, sort_keys=True, indent=2) + "\n")
+          print(out.read_text())
+          PY
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: energy-evidence-fast-receipt-${{ env.QUALIFICATION_HEAD_SHA }}
+          path: ${{ runner.temp }}/energy-evidence-qualification-receipt.json
+          if-no-files-found: error
+          retention-days: 14
