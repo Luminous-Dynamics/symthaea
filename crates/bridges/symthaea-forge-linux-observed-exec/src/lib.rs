@@ -12,8 +12,9 @@
 //!
 //! A separate admission-capable entry point may run one caller-supplied pre-release admission
 //! operation after the first kernel gate and before release. That path re-observes the exact process
-//! afterward and requires stable process-start identity before model execution. The base entry point
-//! remains admission-free and preserves the original v1 execution proposition.
+//! afterward, requires stable process-start identity, then gives the admission one final verification
+//! hook before the existing pidfd/deadline release checks. The base entry point remains
+//! admission-free and preserves the original v1 execution proposition.
 //!
 //! This is stronger than a command-line recipe receipt, but remains deliberately narrower than a
 //! full hostile-code sandbox theorem: exact seccomp-filter semantics, Landlock, VM isolation,
@@ -178,6 +179,19 @@ pub trait PreReleaseAdmission {
         observation: &KernelSandboxObservation,
         gate: &KernelIsolationGate,
     ) -> Result<(), ObservedEvaluatorError>;
+
+    /// Optional final verification after the launcher has re-observed the exact sandbox process and
+    /// reissued the kernel isolation gate, but before the release byte exists. Existing admissions
+    /// inherit a no-op implementation; stronger external theorems can override this and bind their
+    /// own verification evidence without changing `PreReleaseAdmissionReceipt` v1 semantics.
+    fn verify_before_release(
+        &mut self,
+        _sandbox_pid: u32,
+        _observation: &KernelSandboxObservation,
+        _gate: &KernelIsolationGate,
+    ) -> Result<(), ObservedEvaluatorError> {
+        Ok(())
+    }
 }
 
 impl<F> PreReleaseAdmission for F
@@ -1363,6 +1377,25 @@ fn run_kernel_gated_evaluator_inner(
         observation = post_observation;
         gate = post_gate;
         admission_receipt = Some(receipt);
+    }
+
+    if let Some(admitter) = admission.as_deref_mut() {
+        if let Err(error) = admitter.verify_before_release(sandbox_pid, &observation, &gate) {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(error);
+        }
+        if Instant::now() >= gate_deadline {
+            teardown_after_pid(
+                &mut pidfd, &mut child, policy.teardown_timeout_ms(),
+                stdout_reader, stderr_reader, status_reader,
+            )?;
+            return Err(ObservedEvaluatorError::KernelGateTimeout {
+                last_error: "final admission verification crossed the frozen gate deadline".into(),
+            });
+        }
     }
 
     match pidfd.wait_exited(Duration::ZERO) {
