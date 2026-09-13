@@ -13,42 +13,26 @@ use std::collections::BTreeSet;
 use super::analysis_plan::{ANALYSIS_PLAN_REVISION, EUREKA_002_ANALYSIS_PLAN_V1};
 use super::baselines::ShortcutBaselineKind;
 use super::hidden_world::PublicAction;
+pub(super) use super::v2_evidence_identity::V2EvidencePartition as V2CorpusPartition;
+use super::v2_evidence_identity::{
+    V2EvidenceIdentityError, canonical_row_identity,
+    canonical_transition_semantics_bytes as derive_transition_semantics_bytes,
+};
 use super::v2_public_schema::{
-    V2PublicFamily, V2PublicSchemaError, V2PublicState, action_index,
-    public_schema_commitment,
+    V2PublicFamily, V2PublicSchemaError, V2PublicState, action_index, public_schema_commitment,
 };
 
 pub(super) const V2_COMPARATOR_FIT_CORPUS_REVISION: &str =
-    "EUREKA.002.V2.COMPARATOR_FIT_CORPUS.v2";
+    "EUREKA.002.V2.COMPARATOR_FIT_CORPUS.v3";
 pub(super) const V2_COMPARATOR_CUSTODY_REVISION: &str =
     "EUREKA.002.V2.COMPARATOR_CUSTODY.v3";
 pub(super) const V2_SHORTCUT_BASELINE_IMPLEMENTATION_REVISION: &str =
     "EUREKA.002.V2.SHORTCUT_BASELINES.v1";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(super) enum V2CorpusPartition {
-    Development,
-    Calibration,
-    HeldOut,
-    ExternalReplication,
-}
-
-impl V2CorpusPartition {
-    const fn tag(self) -> u8 {
-        match self {
-            Self::Development => 1,
-            Self::Calibration => 2,
-            Self::HeldOut => 3,
-            Self::ExternalReplication => 4,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum V2ComparatorCustodyError {
     PublicSchema(V2PublicSchemaError),
     EmptyFitCorpus,
-    ZeroCanonicalRowIdentity,
     FamilyContextMismatch,
     ContextChangedAcrossTransition,
     NonDevelopmentFitEvidence,
@@ -64,10 +48,22 @@ impl From<V2PublicSchemaError> for V2ComparatorCustodyError {
     }
 }
 
+impl From<V2EvidenceIdentityError> for V2ComparatorCustodyError {
+    fn from(value: V2EvidenceIdentityError) -> Self {
+        match value {
+            V2EvidenceIdentityError::PublicSchema(error) => Self::PublicSchema(error),
+            V2EvidenceIdentityError::FamilyContextMismatch => Self::FamilyContextMismatch,
+            V2EvidenceIdentityError::ContextChangedAcrossTransition => {
+                Self::ContextChangedAcrossTransition
+            }
+        }
+    }
+}
+
 /// Exact target/comparator-visible transition evidence.
 ///
-/// Hidden mechanism state, evaluator seed, oracle annotations, and model output
-/// are structurally absent from this record.
+/// Hidden mechanism state, evaluator seed, oracle annotations, model output,
+/// and caller-supplied row identity are structurally absent from construction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct V2PublicTransitionEvidence {
     family: V2PublicFamily,
@@ -82,21 +78,11 @@ impl V2PublicTransitionEvidence {
     pub(super) fn new(
         family: V2PublicFamily,
         partition: V2CorpusPartition,
-        row_identity: [u8; 32],
         pre: V2PublicState,
         action: PublicAction,
         post: V2PublicState,
     ) -> Result<Self, V2ComparatorCustodyError> {
-        if row_identity == [0_u8; 32] {
-            return Err(V2ComparatorCustodyError::ZeroCanonicalRowIdentity);
-        }
-        action_index(action)?;
-        if !pre.belongs_to(family) || !post.belongs_to(family) {
-            return Err(V2ComparatorCustodyError::FamilyContextMismatch);
-        }
-        if pre.context() != post.context() {
-            return Err(V2ComparatorCustodyError::ContextChangedAcrossTransition);
-        }
+        let row_identity = canonical_row_identity(family, partition, pre, action, post)?;
         Ok(Self {
             family,
             partition,
@@ -299,21 +285,14 @@ fn comparator_subject_commitment(
 
 /// Exact transition semantics excluding both row identity and partition.
 ///
-/// This key answers only whether two public transitions carry the same
-/// family/pre/action/post semantics. Partition remains bound separately in
-/// corpus/evidence commitments. Keeping it out of this key lets Development vs
-/// Calibration duplicate content fail locally even when their row IDs differ.
+/// Partition remains bound separately in corpus/evidence commitments. Keeping
+/// it out of this key lets Development vs Calibration duplicate content fail
+/// locally even when their canonical partition-derived row IDs differ.
 pub(super) fn canonical_transition_semantics_bytes(
     record: &V2PublicTransitionEvidence,
 ) -> Vec<u8> {
-    let mut bytes = Vec::new();
-    bytes.push(record.family.tag());
-    encode_state(&mut bytes, record.pre);
-    bytes.extend_from_slice(
-        &(action_index(record.action).expect("record action validated") as u64).to_le_bytes(),
-    );
-    encode_state(&mut bytes, record.post);
-    bytes
+    derive_transition_semantics_bytes(record.family, record.pre, record.action, record.post)
+        .expect("V2 evidence construction already validated transition semantics")
 }
 
 fn encode_record(bytes: &mut Vec<u8>, record: &V2PublicTransitionEvidence) {
@@ -343,19 +322,15 @@ mod tests {
     use super::*;
 
     fn record(
-        id: u8,
         partition: V2CorpusPartition,
         family: V2PublicFamily,
         pre: [i32; 4],
         action: PublicAction,
         post: [i32; 4],
     ) -> V2PublicTransitionEvidence {
-        let mut row_identity = [0_u8; 32];
-        row_identity[0] = id;
         V2PublicTransitionEvidence::new(
             family,
             partition,
-            row_identity,
             V2PublicState::new(pre).unwrap(),
             action,
             V2PublicState::new(post).unwrap(),
@@ -366,7 +341,6 @@ mod tests {
     fn development_records() -> Vec<V2PublicTransitionEvidence> {
         vec![
             record(
-                1,
                 V2CorpusPartition::Development,
                 V2PublicFamily::PublicFlowV2,
                 [3, 4, 5, 0],
@@ -374,7 +348,6 @@ mod tests {
                 [2, 5, 5, 0],
             ),
             record(
-                2,
                 V2CorpusPartition::Development,
                 V2PublicFamily::PublicRelayV2,
                 [7, 2, 1, 5],
@@ -382,7 +355,6 @@ mod tests {
                 [7, 7, 1, 5],
             ),
             record(
-                3,
                 V2CorpusPartition::Development,
                 V2PublicFamily::PublicFlowV2,
                 [8, 9, 4, 1],
@@ -390,6 +362,27 @@ mod tests {
                 [9, 9, 4, 1],
             ),
         ]
+    }
+
+    #[test]
+    fn evidence_constructor_derives_exact_canonical_row_identity() {
+        let evidence = record(
+            V2CorpusPartition::Development,
+            V2PublicFamily::PublicFlowV2,
+            [3, 4, 5, 0],
+            PublicAction::Pulse { slot: 0 },
+            [2, 5, 5, 0],
+        );
+        let expected = canonical_row_identity(
+            V2PublicFamily::PublicFlowV2,
+            V2CorpusPartition::Development,
+            V2PublicState::new([3, 4, 5, 0]).unwrap(),
+            PublicAction::Pulse { slot: 0 },
+            V2PublicState::new([2, 5, 5, 0]).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(evidence.row_identity(), expected);
+        assert_ne!(evidence.row_identity(), [0_u8; 32]);
     }
 
     #[test]
@@ -407,7 +400,6 @@ mod tests {
         let a = V2DevelopmentFitCorpus::freeze(development_records()).unwrap();
         let mut changed = development_records();
         changed[0] = record(
-            1,
             V2CorpusPartition::Development,
             V2PublicFamily::PublicFlowV2,
             [3, 4, 5, 0],
@@ -419,24 +411,10 @@ mod tests {
     }
 
     #[test]
-    fn zero_row_identity_fails_closed() {
+    fn family_context_mismatch_fails_closed_before_identity_is_minted() {
         let result = V2PublicTransitionEvidence::new(
             V2PublicFamily::PublicFlowV2,
             V2CorpusPartition::Development,
-            [0_u8; 32],
-            V2PublicState::new([1, 2, 3, 0]).unwrap(),
-            PublicAction::NoOp,
-            V2PublicState::new([1, 2, 3, 0]).unwrap(),
-        );
-        assert_eq!(result, Err(V2ComparatorCustodyError::ZeroCanonicalRowIdentity));
-    }
-
-    #[test]
-    fn family_context_mismatch_fails_closed() {
-        let result = V2PublicTransitionEvidence::new(
-            V2PublicFamily::PublicFlowV2,
-            V2CorpusPartition::Development,
-            [1_u8; 32],
             V2PublicState::new([1, 2, 3, 5]).unwrap(),
             PublicAction::NoOp,
             V2PublicState::new([1, 2, 3, 5]).unwrap(),
@@ -445,11 +423,10 @@ mod tests {
     }
 
     #[test]
-    fn changing_context_within_transition_fails_closed() {
+    fn changing_context_within_transition_fails_closed_before_identity_is_minted() {
         let result = V2PublicTransitionEvidence::new(
             V2PublicFamily::PublicFlowV2,
             V2CorpusPartition::Development,
-            [1_u8; 32],
             V2PublicState::new([1, 2, 3, 0]).unwrap(),
             PublicAction::NoOp,
             V2PublicState::new([1, 2, 3, 1]).unwrap(),
@@ -461,10 +438,9 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_row_identity_fails_closed() {
+    fn duplicate_canonical_row_fails_closed() {
         let mut records = development_records();
-        let duplicate = records[0].clone();
-        records.push(duplicate);
+        records.push(records[0].clone());
         assert_eq!(
             V2DevelopmentFitCorpus::freeze(records),
             Err(V2ComparatorCustodyError::DuplicateCanonicalRowIdentity)
@@ -472,7 +448,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_transition_under_different_identity_fails_closed() {
+    fn semantic_duplicate_still_fails_if_internal_identity_is_corrupted() {
         let mut records = development_records();
         let mut duplicate = records[0].clone();
         duplicate.row_identity = [0xA5_u8; 32];
@@ -491,7 +467,6 @@ mod tests {
             V2CorpusPartition::ExternalReplication,
         ] {
             let records = vec![record(
-                9,
                 partition,
                 V2PublicFamily::PublicFlowV2,
                 [1, 2, 3, 0],
@@ -510,7 +485,6 @@ mod tests {
         let result = V2PublicTransitionEvidence::new(
             V2PublicFamily::PublicFlowV2,
             V2CorpusPartition::Development,
-            [7_u8; 32],
             V2PublicState::new([1, 2, 3, 0]).unwrap(),
             PublicAction::Pulse { slot: 3 },
             V2PublicState::new([1, 2, 3, 0]).unwrap(),

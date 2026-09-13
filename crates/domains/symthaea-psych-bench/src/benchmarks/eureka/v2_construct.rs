@@ -19,6 +19,7 @@ use super::cross_family_analysis::{
 };
 use super::hidden_world::{CorpusPartition, PublicAction, PublicObservation, PublicValue};
 use super::promotion::PairedEstimateBps;
+use super::v2_evidence_identity::{V2EvidencePartition, canonical_row_identity};
 use super::v2_public_schema::{
     V2_ACTION_COUNT, V2_COUNT_CARDINALITY, V2_OBSERVATION_DIM, V2_PUBLIC_MODES_PER_FAMILY,
     V2PublicFamily, V2PublicState, action_from_index, public_schema_commitment,
@@ -26,8 +27,11 @@ use super::v2_public_schema::{
 
 const SCHEDULE_REVISION: &str = "EUREKA.002.V2.CONSTRUCT_SCHEDULE.prototype.v5";
 const JOINT_ORDER_REVISION: &str = "EUREKA.002.V2.JOINT_DEVELOPMENT_ORDER.prototype.v2";
-const MAX_POSITIVE_FIELD_DELTA: u16 = 2;
-const PRE_STATE_CARDINALITY: u16 = V2_COUNT_CARDINALITY - MAX_POSITIVE_FIELD_DELTA;
+/// Headroom between the maximum generated pre-channel value and the maximum
+/// canonical public count. This is not a same-field delta bound: Relay may copy
+/// a much larger neighboring value into a field.
+const MAX_REALIZED_VALUE_HEADROOM: u16 = 2;
+const PRE_STATE_CARDINALITY: u16 = V2_COUNT_CARDINALITY - MAX_REALIZED_VALUE_HEADROOM;
 const PER_STRATUM: usize = 30;
 const DEV_PER_STRATUM: usize = 16;
 const CAL_PER_STRATUM: usize = 8;
@@ -85,12 +89,12 @@ impl Partition {
         }
     }
 
-    const fn tag(self) -> u8 {
+    const fn evidence_partition(self) -> V2EvidencePartition {
         match self {
-            Self::Development => 1,
-            Self::Calibration => 2,
-            Self::HeldOut => 3,
-            Self::External => 4,
+            Self::Development => V2EvidencePartition::Development,
+            Self::Calibration => V2EvidencePartition::Calibration,
+            Self::HeldOut => V2EvidencePartition::HeldOut,
+            Self::External => V2EvidencePartition::ExternalReplication,
         }
     }
 }
@@ -337,22 +341,17 @@ fn schedule(family: V2PublicFamily) -> Result<Vec<Row>, ConstructError> {
                     let triple = states[index];
                     let pre = State::public([triple[0], triple[1], triple[2], context])?;
                     let post = transition(family, pre, action_index)?;
+                    let public_action = action(action_index)?;
+                    let identity = row_identity(family, partition, public_action, pre, post)?;
                     rows.push(Row {
                         family,
                         partition,
                         mode,
                         action_index,
-                        action: action(action_index)?,
+                        action: public_action,
                         pre,
                         post,
-                        identity: row_identity(
-                            family,
-                            partition,
-                            mode,
-                            action_index,
-                            pre,
-                            post,
-                        ),
+                        identity,
                     });
                 }
             }
@@ -367,10 +366,11 @@ fn schedule(family: V2PublicFamily) -> Result<Vec<Row>, ConstructError> {
 /// created per family × public-context × action, then partitioned by position.
 ///
 /// Generated pre-state counts use `0..PRE_STATE_CARDINALITY`, not the complete
-/// public domain. The two-count headroom is required because PublicFlowV2 can
-/// legitimately add +2 to one field in one transition (prescribed action +
-/// public mode rule). This guarantees every realized actual post-state remains
-/// inside the canonical `0..=31` public count range.
+/// public domain. With maximum generated pre-channel value 29, PublicFlowV2 can
+/// realize at most `max(pre channels) + 2`, while PublicRelayV2 can realize at
+/// most `max(pre channels) + 1`. Therefore every realized count remains inside
+/// the canonical `0..=31` range. This is a realized-value bound, not a
+/// same-field-delta claim: Relay may copy a much larger neighboring value.
 fn stratum_states(
     family: V2PublicFamily,
     mode: u8,
@@ -417,27 +417,14 @@ fn schedule_digest(
 fn row_identity(
     family: V2PublicFamily,
     partition: Partition,
-    mode: u8,
-    action_index: u8,
+    action: PublicAction,
     pre: State,
     post: State,
-) -> [u8; 32] {
-    let mut bytes = Vec::new();
-    encode_bytes(&mut bytes, b"EUREKA.002.V2.ROW.prototype.v5");
-    bytes.extend_from_slice(&public_schema_commitment());
-    bytes.push(family.tag());
-    bytes.push(partition.tag());
-    bytes.push(mode);
-    bytes.push(action_index);
-    encode_state(&mut bytes, pre);
-    encode_state(&mut bytes, post);
-    *blake3::hash(&bytes).as_bytes()
-}
-
-fn encode_state(bytes: &mut Vec<u8>, state: State) {
-    for value in state.fields() {
-        bytes.extend_from_slice(&value.to_le_bytes());
-    }
+) -> Result<[u8; 32], ConstructError> {
+    let pre = V2PublicState::new(pre.fields()).map_err(|_| ConstructError::PublicSchema)?;
+    let post = V2PublicState::new(post.fields()).map_err(|_| ConstructError::PublicSchema)?;
+    canonical_row_identity(family, partition.evidence_partition(), pre, action, post)
+        .map_err(|_| ConstructError::PublicSchema)
 }
 
 fn encode_bytes(bytes: &mut Vec<u8>, value: &[u8]) {
@@ -933,12 +920,31 @@ mod tests {
 
     #[test]
     fn generated_pre_state_margin_keeps_realized_actuals_inside_public_schema() {
-        assert_eq!(MAX_POSITIVE_FIELD_DELTA, 2);
+        assert_eq!(MAX_REALIZED_VALUE_HEADROOM, 2);
         assert_eq!(PRE_STATE_CARDINALITY, V2_COUNT_CARDINALITY - 2);
         for family in V2PublicFamily::ALL {
             for row in schedule(family).unwrap() {
                 assert!(V2PublicState::new(row.pre.fields()).is_ok());
                 assert!(V2PublicState::new(row.post.fields()).is_ok());
+            }
+        }
+    }
+
+    #[test]
+    fn construct_rows_use_shared_canonical_identity() {
+        for family in V2PublicFamily::ALL {
+            for row in schedule(family).unwrap().iter().take(64) {
+                let pre = V2PublicState::new(row.pre.fields()).unwrap();
+                let post = V2PublicState::new(row.post.fields()).unwrap();
+                let expected = canonical_row_identity(
+                    row.family,
+                    row.partition.evidence_partition(),
+                    pre,
+                    row.action,
+                    post,
+                )
+                .unwrap();
+                assert_eq!(row.identity, expected);
             }
         }
     }

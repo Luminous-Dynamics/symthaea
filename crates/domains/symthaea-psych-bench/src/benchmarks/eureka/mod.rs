@@ -46,6 +46,8 @@ mod transition_identity_tests;
 #[cfg(test)]
 mod v2_public_schema;
 #[cfg(test)]
+mod v2_evidence_identity;
+#[cfg(test)]
 mod v2_construct;
 #[cfg(test)]
 mod v2_construct_independent_audit;
