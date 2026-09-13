@@ -3,19 +3,21 @@
 #![cfg(target_os = "linux")]
 //! Cgroup-v2 resource admission for Forge's parent-observed evaluator launcher.
 //!
-//! This bridge composes three independently reviewable propositions rather than silently widening
-//! any of them:
+//! This bridge composes independently reviewable propositions rather than silently widening them:
 //!
 //! 1. `symthaea-forge-linux-observed-exec` proves the exact evaluator remained behind `block-fd`
 //!    through parent-observed kernel isolation and a verified pre-release admission seam;
 //! 2. `symthaea-forge-linux-cgroup-control` proves finite CPU/memory/PID limits were applied to the
 //!    exact host-visible sandbox PID in a delegated cgroup-v2 leaf;
 //! 3. `symthaea-forge-linux-cgroup-strict` proves swap was disabled, grouped OOM semantics were
-//!    requested, and the leaf reached `populated 0` before removal.
+//!    requested, and the leaf reached `populated 0` before removal;
+//! 4. `symthaea-forge-linux-cgroup-live-verify` independently re-reads the live controller values
+//!    and exact PID membership while the evaluator is still blocked.
 //!
-//! A successful receipt therefore means the resource admission happened before model release. It
-//! does not claim exact seccomp filter semantics, Landlock, VM isolation, kernel correctness, model
-//! quality, search-policy authority, algorithm superiority, or promotion authority.
+//! A successful v2 receipt therefore means resource admission/hardening happened before model
+//! release and the same state was re-observed before the admission callback completed. A later
+//! generic launcher verification hook can move the same live check to the literal final release
+//! boundary without changing the resource-control theorem itself.
 
 use serde::Serialize;
 use std::io;
@@ -28,6 +30,9 @@ use symthaea_forge::{
 use symthaea_forge_linux_cgroup_control::{
     apply_cgroup_v2_resource_policy, CgroupV2ResourceError, CgroupV2ResourcePolicy,
     CgroupV2ResourceReceipt,
+};
+use symthaea_forge_linux_cgroup_live_verify::{
+    verify_live_cgroup_v2, CgroupLiveVerificationReceipt, CgroupLiveVerifyError,
 };
 use symthaea_forge_linux_cgroup_strict::{
     harden_cgroup_v2_lease, StrictCgroupV2Error, StrictCgroupV2Lease, StrictCgroupV2Receipt,
@@ -51,6 +56,8 @@ pub enum CgroupObservedExecError {
     Resource(#[from] CgroupV2ResourceError),
     #[error(transparent)]
     Strict(#[from] StrictCgroupV2Error),
+    #[error(transparent)]
+    Live(#[from] CgroupLiveVerifyError),
     #[error("cgroup pre-release admission failed: {detail}")]
     AdmissionFailed { detail: String },
     #[error("cgroup admission completed but did not retain all required live evidence")]
@@ -78,6 +85,7 @@ pub struct CgroupResourceGatedExecutionReceipt {
     cgroup_policy_id: ContentId,
     base_receipt_id: ContentId,
     strict_receipt_id: ContentId,
+    live_verification_receipt_id: ContentId,
     teardown_receipt_id: ContentId,
     sandbox_host_pid: u32,
     post_observation_id: ContentId,
@@ -104,6 +112,9 @@ impl CgroupResourceGatedExecutionReceipt {
     pub fn strict_receipt_id(&self) -> &ContentId {
         &self.strict_receipt_id
     }
+    pub fn live_verification_receipt_id(&self) -> &ContentId {
+        &self.live_verification_receipt_id
+    }
     pub fn teardown_receipt_id(&self) -> &ContentId {
         &self.teardown_receipt_id
     }
@@ -129,6 +140,7 @@ impl CgroupResourceGatedExecutionReceipt {
         cgroup_policy: &CgroupV2ResourcePolicy,
         base: &CgroupV2ResourceReceipt,
         strict: &StrictCgroupV2Receipt,
+        live: &CgroupLiveVerificationReceipt,
         teardown: &StrictCgroupV2TeardownReceipt,
     ) -> Result<(), CgroupObservedExecError> {
         execution.validate_for(
@@ -143,6 +155,7 @@ impl CgroupResourceGatedExecutionReceipt {
         admission.validate_for(observation, gate)?;
         base.validate_for(cgroup_policy)?;
         strict.validate_for(cgroup_policy, base)?;
+        live.validate_for(cgroup_policy, base, strict)?;
         teardown.validate_for(strict, cgroup_policy, base)?;
 
         if self.execution_receipt_id != *execution.id()
@@ -152,10 +165,12 @@ impl CgroupResourceGatedExecutionReceipt {
             || self.cgroup_policy_id != *cgroup_policy.id()
             || self.base_receipt_id != *base.id()
             || self.strict_receipt_id != *strict.id()
+            || self.live_verification_receipt_id != *live.id()
             || self.teardown_receipt_id != *teardown.id()
             || self.sandbox_host_pid != execution.sandbox_host_pid()
             || self.sandbox_host_pid != admission.sandbox_host_pid()
             || self.sandbox_host_pid != base.host_pid()
+            || self.sandbox_host_pid != live.host_pid()
             || self.sandbox_host_pid != observation.host_pid()
             || self.post_observation_id != *observation.id()
             || self.post_observation_id != *admission.post_observation_id()
@@ -173,6 +188,7 @@ impl CgroupResourceGatedExecutionReceipt {
             &self.cgroup_policy_id,
             &self.base_receipt_id,
             &self.strict_receipt_id,
+            &self.live_verification_receipt_id,
             &self.teardown_receipt_id,
             self.sandbox_host_pid,
             &self.post_observation_id,
@@ -195,6 +211,7 @@ pub struct CgroupResourceGatedRun {
     admission: PreReleaseAdmissionReceipt,
     base_receipt: CgroupV2ResourceReceipt,
     strict_receipt: StrictCgroupV2Receipt,
+    live_verification: CgroupLiveVerificationReceipt,
     teardown_receipt: StrictCgroupV2TeardownReceipt,
     receipt: CgroupResourceGatedExecutionReceipt,
 }
@@ -221,6 +238,9 @@ impl CgroupResourceGatedRun {
     pub fn strict_receipt(&self) -> &StrictCgroupV2Receipt {
         &self.strict_receipt
     }
+    pub fn live_verification(&self) -> &CgroupLiveVerificationReceipt {
+        &self.live_verification
+    }
     pub fn teardown_receipt(&self) -> &StrictCgroupV2TeardownReceipt {
         &self.teardown_receipt
     }
@@ -235,6 +255,7 @@ struct CgroupAdmissionState<'a> {
     delegation_root: PathBuf,
     base_receipt: Option<CgroupV2ResourceReceipt>,
     strict_receipt: Option<StrictCgroupV2Receipt>,
+    live_verification: Option<CgroupLiveVerificationReceipt>,
     lease: Option<StrictCgroupV2Lease>,
     failure: Option<String>,
 }
@@ -246,6 +267,7 @@ impl<'a> CgroupAdmissionState<'a> {
             delegation_root: delegation_root.to_path_buf(),
             base_receipt: None,
             strict_receipt: None,
+            live_verification: None,
             lease: None,
             failure: None,
         }
@@ -299,8 +321,27 @@ impl PreReleaseAdmission for CgroupAdmissionState<'_> {
             return self.fail(detail);
         }
 
+        let live_verification = match verify_live_cgroup_v2(
+            self.policy,
+            &base_receipt,
+            &strict_receipt,
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                let cleanup = strict.kill_and_cleanup(30_000);
+                let detail = match cleanup {
+                    Ok(_) => format!("live cgroup re-verification failed: {error}"),
+                    Err(cleanup_error) => format!(
+                        "live cgroup re-verification failed: {error}; fail-closed cleanup also failed: {cleanup_error}"
+                    ),
+                };
+                return self.fail(detail);
+            }
+        };
+
         self.base_receipt = Some(base_receipt);
         self.strict_receipt = Some(strict_receipt);
+        self.live_verification = Some(live_verification);
         self.lease = Some(strict);
         Ok(())
     }
@@ -359,11 +400,12 @@ pub fn run_cgroup_resource_gated_evaluator(
     let state = (
         admission.base_receipt.take(),
         admission.strict_receipt.take(),
+        admission.live_verification.take(),
         admission.lease.take(),
     );
-    let (base_receipt, strict_receipt, lease) = match state {
-        (Some(base), Some(strict), Some(lease)) => (base, strict, lease),
-        (_, _, Some(lease)) => {
+    let (base_receipt, strict_receipt, live_verification, lease) = match state {
+        (Some(base), Some(strict), Some(live), Some(lease)) => (base, strict, live, lease),
+        (_, _, _, Some(lease)) => {
             return match lease.kill_and_cleanup(observed_policy.teardown_timeout_ms()) {
                 Ok(_) => Err(CgroupObservedExecError::AdmissionStateMissing),
                 Err(teardown_error) => Err(CgroupObservedExecError::ExecutionAndTeardownFailed {
@@ -384,6 +426,7 @@ pub fn run_cgroup_resource_gated_evaluator(
         cgroup_policy.id(),
         base_receipt.id(),
         strict_receipt.id(),
+        live_verification.id(),
         teardown_receipt.id(),
         execution.sandbox_host_pid(),
         observation.id(),
@@ -398,6 +441,7 @@ pub fn run_cgroup_resource_gated_evaluator(
         cgroup_policy_id: cgroup_policy.id().clone(),
         base_receipt_id: base_receipt.id().clone(),
         strict_receipt_id: strict_receipt.id().clone(),
+        live_verification_receipt_id: live_verification.id().clone(),
         teardown_receipt_id: teardown_receipt.id().clone(),
         sandbox_host_pid: execution.sandbox_host_pid(),
         post_observation_id: observation.id().clone(),
@@ -417,6 +461,7 @@ pub fn run_cgroup_resource_gated_evaluator(
         cgroup_policy,
         &base_receipt,
         &strict_receipt,
+        &live_verification,
         &teardown_receipt,
     )?;
 
@@ -428,6 +473,7 @@ pub fn run_cgroup_resource_gated_evaluator(
         admission: admission_receipt,
         base_receipt,
         strict_receipt,
+        live_verification,
         teardown_receipt,
         receipt,
     })
@@ -441,6 +487,7 @@ fn derive_execution_receipt_id(
     cgroup_policy_id: &ContentId,
     base_receipt_id: &ContentId,
     strict_receipt_id: &ContentId,
+    live_verification_receipt_id: &ContentId,
     teardown_receipt_id: &ContentId,
     sandbox_host_pid: u32,
     post_observation_id: &ContentId,
@@ -448,7 +495,7 @@ fn derive_execution_receipt_id(
     residual_descendant_kill_requested: bool,
 ) -> ContentId {
     ContentId::derive(
-        "symthaea.forge-cgroup-resource-gated-execution-receipt.v1",
+        "symthaea.forge-cgroup-resource-gated-execution-receipt.v2",
         [
             execution_receipt_id.as_str().as_bytes(),
             admission_receipt_id.as_str().as_bytes(),
@@ -456,6 +503,7 @@ fn derive_execution_receipt_id(
             cgroup_policy_id.as_str().as_bytes(),
             base_receipt_id.as_str().as_bytes(),
             strict_receipt_id.as_str().as_bytes(),
+            live_verification_receipt_id.as_str().as_bytes(),
             teardown_receipt_id.as_str().as_bytes(),
             sandbox_host_pid.to_be_bytes().as_slice(),
             post_observation_id.as_str().as_bytes(),
@@ -470,13 +518,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn execution_identity_separates_residual_descendant_kill() {
+    fn execution_identity_separates_live_verification_and_residual_kill() {
         let execution = ContentId::derive("test-execution", [b"execution".as_slice()]);
         let admission = ContentId::derive("test-admission", [b"admission".as_slice()]);
         let protocol = pre_release_admission_protocol_id();
         let policy = ContentId::derive("test-policy", [b"policy".as_slice()]);
         let base = ContentId::derive("test-base", [b"base".as_slice()]);
         let strict = ContentId::derive("test-strict", [b"strict".as_slice()]);
+        let live_a = ContentId::derive("test-live", [b"live-a".as_slice()]);
+        let live_b = ContentId::derive("test-live", [b"live-b".as_slice()]);
         let teardown = ContentId::derive("test-teardown", [b"teardown".as_slice()]);
         let observation = ContentId::derive("test-observation", [b"observation".as_slice()]);
         let gate = ContentId::derive("test-gate", [b"gate".as_slice()]);
@@ -487,6 +537,21 @@ mod tests {
             &policy,
             &base,
             &strict,
+            &live_a,
+            &teardown,
+            42,
+            &observation,
+            &gate,
+            false,
+        );
+        let changed_live = derive_execution_receipt_id(
+            &execution,
+            &admission,
+            &protocol,
+            &policy,
+            &base,
+            &strict,
+            &live_b,
             &teardown,
             42,
             &observation,
@@ -500,12 +565,14 @@ mod tests {
             &policy,
             &base,
             &strict,
+            &live_a,
             &teardown,
             42,
             &observation,
             &gate,
             true,
         );
+        assert_ne!(graceful, changed_live);
         assert_ne!(graceful, residual_kill);
     }
 }
