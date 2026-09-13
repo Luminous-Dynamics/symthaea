@@ -10,6 +10,7 @@ use std::collections::HashSet;
 
 use super::dag::{
     CausalDAG, CausalEstimand, CausalQuery, CausalQueryOutcome, IdentificationMethod,
+    UnidentifiedReason,
 };
 use super::discovery::{IVEstimator, IVValidity};
 use super::reasoner::CounterfactualReasoner;
@@ -17,9 +18,10 @@ use super::reasoner::CounterfactualReasoner;
 impl CounterfactualReasoner {
     /// Query a causal effect under strict supplied-DAG semantics.
     ///
-    /// A `CausalDAG` is a fully specified directed causal graph. If the intervention target X
+    /// A valid `CausalDAG` is a fully specified directed causal graph. If intervention target X
     /// has no directed path to outcome Y, intervening on X cannot change Y in that graph. The
     /// effect is therefore structurally identified as zero; it is not epistemically unknown.
+    /// Invalid cyclic inputs fail closed instead of being interpreted as DAG evidence.
     ///
     /// For descendant outcomes, this delegates to the existing identification engine so
     /// backdoor/frontdoor/do-calculus behavior remains unchanged.
@@ -27,6 +29,14 @@ impl CounterfactualReasoner {
         if dag.num_nodes() > 20 {
             // Preserve the legacy resource/qualification boundary before doing more graph work.
             return self.query(dag, query);
+        }
+
+        if has_directed_cycle(dag) {
+            return CausalQueryOutcome::Unidentified {
+                reason: UnidentifiedReason::CyclicGraph,
+                missing: vec!["Valid directed acyclic causal graph".into()],
+                suggestions: vec!["Resolve or explicitly model feedback before DAG identification".into()],
+            };
         }
 
         if !dag.has_path(query.treatment, query.outcome) {
@@ -44,8 +54,8 @@ impl CounterfactualReasoner {
                     ),
                 },
                 method: IdentificationMethod::DSeparation,
-                // This is a logical consequence of the supplied DAG, conditional on that DAG
-                // being the intended causal model. Graph uncertainty is a separate layer.
+                // Logical consequence of the supplied DAG. Uncertainty about whether the DAG is
+                // correct belongs in a separate graph/model-uncertainty layer.
                 confidence: 1.0,
             };
         }
@@ -85,8 +95,6 @@ impl IVEstimator {
 }
 
 /// Directed reachability while treating one node as blocked.
-///
-/// The source may not equal the blocked node; if the target is blocked, no avoiding path exists.
 fn directed_path_avoiding(dag: &CausalDAG, from: usize, to: usize, blocked: usize) -> bool {
     if from == blocked || to == blocked {
         return false;
@@ -110,10 +118,33 @@ fn directed_path_avoiding(dag: &CausalDAG, from: usize, to: usize, blocked: usiz
     false
 }
 
+fn has_directed_cycle(dag: &CausalDAG) -> bool {
+    // 0 = unseen, 1 = active DFS stack, 2 = complete.
+    let mut state = vec![0_u8; dag.num_nodes()];
+    for node in 0..dag.num_nodes() {
+        if state[node] == 0 && cycle_from(dag, node, &mut state) {
+            return true;
+        }
+    }
+    false
+}
+
+fn cycle_from(dag: &CausalDAG, node: usize, state: &mut [u8]) -> bool {
+    state[node] = 1;
+    for child in dag.children(node) {
+        match state[child] {
+            1 => return true,
+            0 if cycle_from(dag, child, state) => return true,
+            _ => {}
+        }
+    }
+    state[node] = 2;
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::counterfactual::identification::UnidentifiedReason;
 
     #[test]
     fn no_descendant_path_is_identified_structural_zero() {
@@ -151,6 +182,26 @@ mod tests {
             CounterfactualReasoner::new().query_semantic(&dag, &query),
             CausalQueryOutcome::Identified {
                 method: IdentificationMethod::DSeparation,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn cyclic_input_fails_closed_before_zero_inference() {
+        let dag = CausalDAG::new(
+            vec!["A".into(), "B".into(), "Y".into()],
+            vec![(0, 1), (1, 0)],
+        );
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 2,
+            conditioning: vec![],
+        };
+        assert!(matches!(
+            CounterfactualReasoner::new().query_semantic(&dag, &query),
+            CausalQueryOutcome::Unidentified {
+                reason: UnidentifiedReason::CyclicGraph,
                 ..
             }
         ));
