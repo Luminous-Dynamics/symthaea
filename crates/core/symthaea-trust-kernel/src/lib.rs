@@ -18,6 +18,7 @@
 
 #![deny(unsafe_code)]
 
+mod accepted_clock_basis;
 mod clock;
 mod clock_bootstrap_authority;
 mod clock_evaluation_permit;
@@ -27,6 +28,10 @@ mod digest;
 mod signature;
 mod trust;
 
+pub use accepted_clock_basis::{
+    ACCEPTED_CLOCK_BASIS_SCHEMA, AcceptedClockBasisError, AcceptedClockBasisIdV5,
+    AcceptedClockBasisV5, accept_bootstrap_clock_basis_v5,
+};
 pub use clock::{
     CLOCK_OBSERVATION_SCHEMA, ClockEpochTracker, ClockObservation, ClockObservationVerifier,
     ClockQuorumPolicy, ClockTrackingError, ClockViolation, VerifiedClockWindow,
