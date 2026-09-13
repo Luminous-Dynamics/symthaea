@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub const REASONING_CAPABILITY_ARTIFACT_SCHEMA_VERSION: u32 = 1;
+pub const REASONING_CAPABILITY_ARTIFACT_SERIALIZATION: &str = "serde-json-v1";
 const DIGEST_DOMAIN: &[u8] = b"symthaea:reasoning-capability-matrix-artifact:v1\0";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -28,6 +29,7 @@ pub struct ReasoningCapabilityArtifact {
 pub enum CapabilityArtifactError {
     UnsupportedArtifactSchema(u32),
     UnsupportedMatrixSchema(u32),
+    UnsupportedSerialization(String),
     EmptySubjectRevision,
     EmptyMatrix,
     SubjectRevisionMismatch { expected: String, found: String },
@@ -43,6 +45,9 @@ impl fmt::Display for CapabilityArtifactError {
             }
             Self::UnsupportedMatrixSchema(version) => {
                 write!(f, "unsupported capability matrix schema version {version}")
+            }
+            Self::UnsupportedSerialization(value) => {
+                write!(f, "unsupported capability artifact serialization `{value}`")
             }
             Self::EmptySubjectRevision => write!(f, "capability matrix subject revision is empty"),
             Self::EmptyMatrix => write!(f, "capability matrix contains no lanes"),
@@ -67,7 +72,7 @@ impl ReasoningCapabilityArtifact {
         let matrix_digest = matrix_digest(&matrix)?;
         Ok(Self {
             artifact_schema_version: REASONING_CAPABILITY_ARTIFACT_SCHEMA_VERSION,
-            serialization: "serde-json-v1".into(),
+            serialization: REASONING_CAPABILITY_ARTIFACT_SERIALIZATION.into(),
             matrix_digest,
             matrix,
         })
@@ -79,6 +84,11 @@ impl ReasoningCapabilityArtifact {
         if self.artifact_schema_version != REASONING_CAPABILITY_ARTIFACT_SCHEMA_VERSION {
             return Err(CapabilityArtifactError::UnsupportedArtifactSchema(
                 self.artifact_schema_version,
+            ));
+        }
+        if self.serialization != REASONING_CAPABILITY_ARTIFACT_SERIALIZATION {
+            return Err(CapabilityArtifactError::UnsupportedSerialization(
+                self.serialization.clone(),
             ));
         }
         validate_matrix_shape(&self.matrix)?;
@@ -130,10 +140,9 @@ fn matrix_digest(matrix: &ReasoningCapabilityMatrix) -> Result<String, Capabilit
 mod tests {
     use super::*;
     use crate::intelligence::{
-        build_capability_lane, build_capability_matrix, evaluate_episode, AbstentionReason,
-        CapabilityLaneDescriptor, ContaminationStatus, EpisodeJudgment, HoldoutPolicy,
-        ReasoningDomain, ReasoningEpisode, ReasoningOutcome, ReasoningProblemRef, ResourceBudget,
-        ResourceUsage,
+        build_capability_lane, build_capability_matrix, evaluate_episode, CapabilityLaneDescriptor,
+        ContaminationStatus, EpisodeJudgment, HoldoutPolicy, ReasoningDomain, ReasoningEpisode,
+        ReasoningOutcome, ReasoningProblemRef, ResourceBudget, ResourceUsage,
     };
 
     fn matrix() -> ReasoningCapabilityMatrix {
@@ -227,6 +236,19 @@ mod tests {
     }
 
     #[test]
+    fn serialization_relabel_is_rejected() {
+        let mut artifact = match ReasoningCapabilityArtifact::new(matrix()) {
+            Ok(value) => value,
+            Err(err) => panic!("artifact must validate: {err}"),
+        };
+        artifact.serialization = "something-else".into();
+        assert!(matches!(
+            artifact.validate(),
+            Err(CapabilityArtifactError::UnsupportedSerialization(_))
+        ));
+    }
+
+    #[test]
     fn empty_matrix_is_not_publishable() {
         let empty = ReasoningCapabilityMatrix {
             schema_version: REASONING_CAPABILITY_MATRIX_SCHEMA_VERSION,
@@ -237,11 +259,5 @@ mod tests {
             ReasoningCapabilityArtifact::new(empty),
             Err(CapabilityArtifactError::EmptyMatrix)
         ));
-    }
-
-    #[test]
-    fn abstention_type_remains_available_to_artifact_consumers() {
-        let reason = AbstentionReason::Unidentified;
-        assert!(matches!(reason, AbstentionReason::Unidentified));
     }
 }
