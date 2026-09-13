@@ -1,0 +1,90 @@
+name: LL-009AG Site01 Campaign Root Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/ll009ag_common.py'
+      - 'scripts/ll009ag_git_subject.py'
+      - 'scripts/ll009ag_campaign.py'
+      - 'scripts/freeze_ll009ag_site01_campaign.py'
+      - 'scripts/capture_ll009ag_environment.py'
+      - 'configs/lunar_transport/ll009ag_site01_campaign_v1.json'
+      - 'docs/research/LUNAR_LAUNCHER_LL009AG_SITE01_CAMPAIGN_ROOT.md'
+      - '.github/workflows/ll009ag-site01-campaign-root.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compile exact LL-009AG tools
+        run: python -m py_compile scripts/ll009ag_common.py scripts/ll009ag_git_subject.py scripts/ll009ag_campaign.py scripts/freeze_ll009ag_site01_campaign.py scripts/capture_ll009ag_environment.py
+      - name: Qualify environment capture logic
+        run: python scripts/capture_ll009ag_environment.py --self-test
+      - name: Verify checked policy protects the named campaign surface
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, 'scripts')
+          from ll009ag_common import pbind, vp
+
+          policy = vp(json.loads(Path('configs/lunar_transport/ll009ag_site01_campaign_v1.json').read_text()))
+          bound = pbind(policy, Path('.'))
+          protected = set(policy['protected_files'])
+          required_surface = {
+              'scripts/compose_ll009k_horizon_pack.py',
+              'scripts/materialize_ll009l_lola_cog.py',
+              'scripts/acquire_ll009n_nasa_rasters.py',
+              'scripts/materialize_ll009q_clone_horizon_ensemble.py',
+              'scripts/classify_ll009r_spatial_support.py',
+              'scripts/generate_ll009s_semantic_visibility.py',
+              'scripts/qualify_ll009v_product90_rms.py',
+              'scripts/materialize_ll009w_distribution_free_rms.py',
+              'scripts/materialize_ll009x_geometry_aware_rms.py',
+              'scripts/materialize_ll009y_memberwise_hybrid_horizon.py',
+              'scripts/reconcile_ll009z_hybrid_visibility.py',
+              'scripts/acquire_ll009aa_connecting_ridge_sdem.py',
+              'scripts/materialize_ll009ab_sdem_cross_method_audit.py',
+              'scripts/materialize_ll009ac_scale_matched_rms_audit.py',
+              'scripts/materialize_ll009ad_three_way_terrain_decomposition.py',
+              'scripts/materialize_ll009ae_rms_stress_sensitivity.py',
+              'scripts/materialize_ll009af_single_scan_rms_stress.py',
+              'scripts/ll009ag_common.py',
+              'scripts/ll009ag_git_subject.py',
+              'scripts/ll009ag_campaign.py',
+              'scripts/freeze_ll009ag_site01_campaign.py',
+              'scripts/capture_ll009ag_environment.py',
+              'configs/lunar_transport/ll009n_site01_nasa_sources_v1.json',
+              'configs/lunar_transport/ll009q_site01_ensemble_policy_v1.json',
+              'configs/lunar_transport/ll009r_site01_spatial_support_v1.json',
+              'configs/lunar_transport/ll009v_product90_rms_semantics_v1.json',
+              'configs/lunar_transport/ll009w_site01_distribution_free_rms_v1.json',
+              'configs/lunar_transport/ll009x_site01_geometry_aware_rms_v1.json',
+              'configs/lunar_transport/ll009y_site01_memberwise_hybrid_v1.json',
+              'configs/lunar_transport/ll009z_site01_hybrid_visibility_v1.json',
+              'configs/lunar_transport/ll009aa_connecting_ridge_sdem_archive_v1.json',
+              'configs/lunar_transport/ll009ac_site01_scale_matched_rms_v1.json',
+              'configs/lunar_transport/ll009ad_site01_three_way_decomposition_v1.json',
+              'configs/lunar_transport/ll009ae_site01_rms_stress_sensitivity_v1.json',
+              'configs/lunar_transport/ll009af_site01_single_scan_rms_stress_v1.json',
+          }
+          missing = sorted(required_surface - protected)
+          assert not missing, f'campaign policy stopped protecting required LL-009 surface: {missing}'
+          assert len(bound) == len(protected), 'protected surface failed exact materialization'
+          print('LL-009AG protected execution surface: PASS', len(bound), 'explicit files')
+          PY
+      - name: Execute dependency-free synthetic qualification
+        run: >-
+          python scripts/freeze_ll009ag_site01_campaign.py self-test
+          --policy configs/lunar_transport/ll009ag_site01_campaign_v1.json

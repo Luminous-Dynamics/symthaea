@@ -1,0 +1,94 @@
+{
+  "classification_ceiling": "hybrid_scenario_sampled_visibility",
+  "classification_order": [
+    "descriptive_geometry",
+    "empirical_sampled_visibility",
+    "hybrid_scenario_sampled_visibility",
+    "risk_qualified_visibility",
+    "deterministic_visibility"
+  ],
+  "environment_contracts": {
+    "acquisition": {
+      "required_environment_variables": ["PYTHONHASHSEED", "TZ", "LANG", "LC_ALL"],
+      "required_libraries": ["openssl"],
+      "required_packages": []
+    },
+    "analysis": {
+      "required_environment_variables": ["PYTHONHASHSEED", "TZ", "LANG", "LC_ALL", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"],
+      "required_libraries": [],
+      "required_packages": ["numpy"]
+    },
+    "gis": {
+      "required_environment_variables": ["PYTHONHASHSEED", "TZ", "LANG", "LC_ALL", "GDAL_DATA", "PROJ_DATA", "PROJ_LIB"],
+      "required_libraries": ["gdal", "proj"],
+      "required_packages": ["numpy", "rasterio"]
+    }
+  },
+  "network_authorized_stage_ids": ["source_acquisition"],
+  "protected_files": [
+    "scripts/ll009ag_common.py",
+    "scripts/ll009ag_git_subject.py",
+    "scripts/ll009ag_campaign.py",
+    "scripts/freeze_ll009ag_site01_campaign.py",
+    "scripts/capture_ll009ag_environment.py",
+    "scripts/compose_ll009k_horizon_pack.py",
+    "configs/lunar_transport/ll009l_raster_toolchain.json",
+    "scripts/materialize_ll009l_lola_cog.py",
+    "scripts/augment_ll009m_radial_uncertainty.py",
+    "configs/lunar_transport/ll009n_site01_nasa_sources_v1.json",
+    "scripts/acquire_ll009n_nasa_rasters.py",
+    "configs/lunar_transport/ll009o_site01_uncertainty_semantics_v1.json",
+    "scripts/classify_ll009o_uncertainty_semantics.py",
+    "configs/lunar_transport/ll009p_site01_reference_anchor_v1.json",
+    "scripts/materialize_ll009p_site_anchor.py",
+    "configs/lunar_transport/ll009q_site01_clone_family_v1.json",
+    "configs/lunar_transport/ll009q_site01_ensemble_policy_v1.json",
+    "scripts/generate_ll009q_clone_plan.py",
+    "scripts/materialize_ll009q_clone_horizon_ensemble.py",
+    "configs/lunar_transport/ll009r_site01_spatial_support_v1.json",
+    "scripts/audit_ll009r_nested_resolution.py",
+    "scripts/classify_ll009r_spatial_support.py",
+    "scripts/generate_ll009s_semantic_visibility.py",
+    "configs/lunar_transport/ll009v_product90_rms_semantics_v1.json",
+    "scripts/qualify_ll009v_product90_rms.py",
+    "configs/lunar_transport/ll009w_site01_distribution_free_rms_v1.json",
+    "scripts/materialize_ll009w_distribution_free_rms.py",
+    "configs/lunar_transport/ll009x_site01_geometry_aware_rms_v1.json",
+    "scripts/materialize_ll009x_geometry_aware_rms.py",
+    "configs/lunar_transport/ll009y_site01_memberwise_hybrid_v1.json",
+    "scripts/materialize_ll009y_memberwise_hybrid_horizon.py",
+    "configs/lunar_transport/ll009z_site01_hybrid_visibility_v1.json",
+    "scripts/reconcile_ll009z_hybrid_visibility.py",
+    "configs/lunar_transport/ll009aa_connecting_ridge_sdem_archive_v1.json",
+    "scripts/acquire_ll009aa_connecting_ridge_sdem.py",
+    "scripts/materialize_ll009ab_sdem_cross_method_audit.py",
+    "configs/lunar_transport/ll009ac_site01_scale_matched_rms_v1.json",
+    "scripts/materialize_ll009ac_scale_matched_rms_audit.py",
+    "configs/lunar_transport/ll009ad_site01_three_way_decomposition_v1.json",
+    "scripts/materialize_ll009ad_three_way_terrain_decomposition.py",
+    "configs/lunar_transport/ll009ae_site01_rms_stress_sensitivity_v1.json",
+    "scripts/materialize_ll009ae_rms_stress_sensitivity.py",
+    "configs/lunar_transport/ll009af_site01_single_scan_rms_stress_v1.json",
+    "scripts/ll009af_support.py",
+    "scripts/ll009af_engine.py",
+    "scripts/materialize_ll009af_single_scan_rms_stress.py"
+  ],
+  "required_environment_profiles": ["acquisition", "gis", "analysis"],
+  "schema_version": "ll009ag.site01-campaign-policy.v1",
+  "semantic_rules": {
+    "descriptive_geometry": {"enabled": true, "requires_all_artifact_ids": ["ll009k_numeric_horizon"]},
+    "deterministic_visibility": {"enabled": false, "requires_all_artifact_ids": []},
+    "empirical_sampled_visibility": {"enabled": true, "requires_all_artifact_ids": ["ll009q_clone_ensemble"]},
+    "hybrid_scenario_sampled_visibility": {"enabled": true, "requires_all_artifact_ids": ["ll009z_visibility_reconciliation"]},
+    "risk_qualified_visibility": {"enabled": false, "requires_all_artifact_ids": []}
+  },
+  "stage_plan": [
+    {"environment_profile": "acquisition", "id": "source_acquisition", "may_access_network": true},
+    {"environment_profile": "gis", "id": "exact_extraction_and_role_binding", "may_access_network": false},
+    {"environment_profile": "gis", "id": "terrain_and_calibration_audit", "may_access_network": false},
+    {"environment_profile": "analysis", "id": "horizon_and_visibility_analysis", "may_access_network": false},
+    {"environment_profile": "analysis", "id": "semantic_reconciliation", "may_access_network": false},
+    {"environment_profile": "analysis", "id": "campaign_finalization", "may_access_network": false}
+  ],
+  "study_id": "ll009-site01-connecting-ridge-v1"
+}
