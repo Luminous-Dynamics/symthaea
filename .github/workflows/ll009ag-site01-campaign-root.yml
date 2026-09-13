@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/ll009ag_common.py'
+      - 'scripts/ll009ag_git_subject.py'
       - 'scripts/ll009ag_campaign.py'
       - 'scripts/freeze_ll009ag_site01_campaign.py'
       - 'scripts/capture_ll009ag_environment.py'
@@ -20,11 +21,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
       - name: Compile exact LL-009AG tools
-        run: python -m py_compile scripts/ll009ag_common.py scripts/ll009ag_campaign.py scripts/freeze_ll009ag_site01_campaign.py scripts/capture_ll009ag_environment.py
+        run: python -m py_compile scripts/ll009ag_common.py scripts/ll009ag_git_subject.py scripts/ll009ag_campaign.py scripts/freeze_ll009ag_site01_campaign.py scripts/capture_ll009ag_environment.py
       - name: Qualify environment capture logic
         run: python scripts/capture_ll009ag_environment.py --self-test
       - name: Verify checked policy protects the named campaign surface
@@ -58,6 +61,7 @@ jobs:
               'scripts/materialize_ll009ae_rms_stress_sensitivity.py',
               'scripts/materialize_ll009af_single_scan_rms_stress.py',
               'scripts/ll009ag_common.py',
+              'scripts/ll009ag_git_subject.py',
               'scripts/ll009ag_campaign.py',
               'scripts/freeze_ll009ag_site01_campaign.py',
               'scripts/capture_ll009ag_environment.py',
