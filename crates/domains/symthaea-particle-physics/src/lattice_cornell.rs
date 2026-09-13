@@ -204,7 +204,7 @@ mod tests {
         assert!((fit.coulomb_coefficient - 0.242_730_226_285_588_2).abs() < 2.0e-12);
         assert!((fit.chi_square - 0.559_935_102_749_612_4).abs() < 2.0e-10);
         assert!((fit.chi_square_per_dof - 0.186_645_034_249_870_8).abs() < 2.0e-10);
-        assert_eq!(fit.separation_vectors, SEPARATIONS);
+        assert_eq!(fit.separation_vectors.as_slice(), &SEPARATIONS);
     }
 
     #[test]
