@@ -100,6 +100,24 @@ impl V2PublicTransitionEvidence {
     pub(super) const fn partition(&self) -> V2CorpusPartition {
         self.partition
     }
+
+    /// Read-only public semantics used by frozen comparator execution. These
+    /// accessors expose no mutation or alternate evidence-construction path.
+    pub(super) const fn family(&self) -> V2PublicFamily {
+        self.family
+    }
+
+    pub(super) const fn pre(&self) -> V2PublicState {
+        self.pre
+    }
+
+    pub(super) const fn action(&self) -> PublicAction {
+        self.action
+    }
+
+    pub(super) const fn post(&self) -> V2PublicState {
+        self.post
+    }
 }
 
 /// Canonically ordered Development-only fit evidence.
@@ -383,6 +401,15 @@ mod tests {
         .unwrap();
         assert_eq!(evidence.row_identity(), expected);
         assert_ne!(evidence.row_identity(), [0_u8; 32]);
+    }
+
+    #[test]
+    fn read_only_semantic_accessors_match_derived_evidence() {
+        let evidence = development_records().remove(0);
+        assert_eq!(evidence.family(), V2PublicFamily::PublicFlowV2);
+        assert_eq!(evidence.pre().fields(), [3, 4, 5, 0]);
+        assert_eq!(evidence.action(), PublicAction::Pulse { slot: 0 });
+        assert_eq!(evidence.post().fields(), [2, 5, 5, 0]);
     }
 
     #[test]
