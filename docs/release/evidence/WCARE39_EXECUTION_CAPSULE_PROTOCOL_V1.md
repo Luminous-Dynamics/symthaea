@@ -146,6 +146,20 @@ For every attempted stage record:
 
 Raw stdout/stderr are not embedded into the capsule, reducing accidental disclosure. Their byte commitments remain available for archive binding.
 
+## CI-facing qualifier contract
+
+`wcare39-qualify.sh` is the official automation-facing entry point. It resolves the exact WCARE-39 runner relative to the qualifier itself while evaluating the Git worktree from which the qualifier is invoked. This allows the frozen WCARE-39 implementation to evaluate an isolated checkout without requiring that checkout to contain another copy of the runner.
+
+The JSON capsule remains the authoritative scientific record. The shell exit status is an operational projection designed to prevent CI from treating a qualified environment as a passing subject:
+
+- `0` — `QUALIFIED_EXECUTION + PASS`;
+- `1` — `QUALIFIED_EXECUTION + FAIL` or `QUALIFIED_EXECUTION + INVALID`;
+- `2` — `ENVIRONMENT_DRIFT`;
+- `3` — `INFRASTRUCTURE_INDETERMINATE` or an unparseable/indeterminate wrapper result;
+- `4` — `INVALID_CAPSULE` or invalid qualifier invocation.
+
+The underlying runner may represent `QUALIFIED_EXECUTION + FAIL` as a scientifically valid capsule; the qualifier nevertheless returns 1 so automated promotion cannot go green on subject failure.
+
 ## Network and sandbox boundary
 
 Declared network and sandbox policies are recorded separately from observed enforcement.
@@ -196,9 +210,12 @@ The v1 implementation includes a dependency-free synthetic Git campaign that mus
 - dependency/worktree drift;
 - deletion of a bound subject file as drift;
 - automatic WCARE-37 standalone-lock blocking for a WCARE-38-like stage;
-- exact FINAL→PREPARED byte binding.
+- exact FINAL→PREPARED byte binding;
+- stale output-receipt rejection;
+- sensitive environment-literal rejection;
+- the qualifier's exact `0/1/2/3/4` automation exit contract.
 
-Passing the synthetic campaign validates runner invariants only; it does not qualify any real Symthaea evidence subject.
+Passing the synthetic campaign validates runner and qualifier invariants only; it does not qualify any real Symthaea evidence subject.
 
 ## Replica boundary
 
