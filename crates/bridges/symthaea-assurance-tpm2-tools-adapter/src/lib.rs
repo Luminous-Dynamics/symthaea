@@ -48,6 +48,8 @@ pub struct Tpm2ToolsAdapterPolicy {
     pub trust_store_ref: String,
     pub counter_epoch: String,
     pub nv_index: u32,
+    /// Exact TPM NV Name returned by `NV_ReadPublic`, normalized lowercase hex.
+    pub expected_nv_name: String,
     pub tcti: String,
     pub read_hierarchy: Tpm2ReadHierarchy,
     pub nvreadpublic_path: String,
@@ -66,6 +68,7 @@ impl Tpm2ToolsAdapterPolicy {
             && !self.trust_store_ref.trim().is_empty()
             && !self.counter_epoch.trim().is_empty()
             && self.nv_index & TPM_NV_HANDLE_MASK == TPM_NV_HANDLE_PREFIX
+            && valid_hex_name(&self.expected_nv_name)
             && matches!(
                 self.tcti.as_str(),
                 "device:/dev/tpmrm0" | "device:/dev/tpm0"
@@ -131,7 +134,9 @@ impl Tpm2NvCounterObservation {
             && self.counter_value >= policy.minimum_counter_value
             && self.nvreadpublic_blake3 == policy.expected_nvreadpublic_blake3
             && self.nvread_blake3 == policy.expected_nvread_blake3
-            && self.public_evidence.validate(policy.nv_index)
+            && self
+                .public_evidence
+                .validate(policy.nv_index, &policy.expected_nv_name)
             && valid_blake3_digest(&self.raw_counter_blake3)
             && !self.evidence_refs.is_empty()
             && self
@@ -155,6 +160,7 @@ impl Tpm2NvCounterObservation {
         push_field(&mut hasher, &self.observed_at_ms.to_string());
         push_field(&mut hasher, &self.nvreadpublic_blake3);
         push_field(&mut hasher, &self.nvread_blake3);
+        push_field(&mut hasher, &self.public_evidence.nv_name);
         push_field(
             &mut hasher,
             &self.public_evidence.raw_public_output_blake3,
@@ -190,6 +196,8 @@ pub enum Tpm2AdapterError {
     ToolEmittedStderr,
     InvalidPublicOutput,
     NvIndexNotPresent,
+    MissingNvName,
+    NvNameMismatch,
     MissingAttributes,
     MissingDataSize,
     NvIndexIsNotCounter,
@@ -229,6 +237,9 @@ pub fn read_tpm2_nv_counter(
     )?;
     clean_success(&public_run)?;
     let public_evidence = parse_nv_public(&public_run.stdout, policy.nv_index)?;
+    if public_evidence.nv_name != policy.expected_nv_name {
+        return Err(Tpm2AdapterError::NvNameMismatch);
+    }
 
     let read_run = executor.execute(
         &policy.nvread_path,
@@ -373,4 +384,11 @@ pub(crate) fn valid_blake3_digest(value: &str) -> bool {
     value.strip_prefix("blake3:").is_some_and(|digest| {
         digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
     })
+}
+
+fn valid_hex_name(value: &str) -> bool {
+    let value = value.trim();
+    value.len() >= 4
+        && value.len().is_multiple_of(2)
+        && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
