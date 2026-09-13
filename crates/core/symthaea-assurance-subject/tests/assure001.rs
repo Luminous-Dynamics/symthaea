@@ -24,7 +24,7 @@ fn locator(name: &str) -> SurfaceLocator {
 }
 
 fn binding(kind: AiSurfaceKind, name: &str, state: SurfaceState) -> SurfaceBinding {
-    SurfaceBinding::new(kind, locator(name), state)
+    SurfaceBinding::applicable(kind, locator(name), state).unwrap()
 }
 
 fn model_runtime_profile() -> SurfaceProfile {
@@ -149,6 +149,23 @@ fn duplicate_binding_fails_closed() {
 }
 
 #[test]
+fn applicable_surface_requires_locator() {
+    let error = SurfaceBinding::new(AiSurfaceKind::Model, None, SurfaceState::Unknown).unwrap_err();
+    assert!(matches!(error, SubjectError::MissingLocator(_)));
+}
+
+#[test]
+fn not_applicable_surface_rejects_locator() {
+    let error = SurfaceBinding::new(
+        AiSurfaceKind::DeploymentEnvelope,
+        Some(locator("unused-deployment-envelope")),
+        SurfaceState::NotApplicable,
+    )
+    .unwrap_err();
+    assert!(matches!(error, SubjectError::LocatorOnNotApplicable(_)));
+}
+
+#[test]
 fn completeness_states_are_identity_distinct() {
     let make = |state| {
         AiSubjectManifest::new(
@@ -164,7 +181,12 @@ fn completeness_states_are_identity_distinct() {
     let unavailable = make(SurfaceState::Unavailable(
         UnavailabilityReason::ProviderDoesNotExpose,
     ));
-    let not_applicable = make(SurfaceState::NotApplicable);
+    let not_applicable = AiSubjectManifest::new(
+        id("agent-a"),
+        SurfaceProfile::new(id("model-only"), vec![AiSurfaceKind::Model]).unwrap(),
+        vec![SurfaceBinding::not_applicable(AiSurfaceKind::Model)],
+    )
+    .unwrap();
 
     assert_ne!(known.manifest_id(), unknown.manifest_id());
     assert_ne!(unknown.manifest_id(), unavailable.manifest_id());
@@ -187,11 +209,7 @@ fn completeness_controls_material_identity_not_replayability() {
                 "model-alias",
                 SurfaceState::Known(commit('a')),
             ),
-            binding(
-                AiSurfaceKind::DeploymentEnvelope,
-                "no-deployment-envelope",
-                SurfaceState::NotApplicable,
-            ),
+            SurfaceBinding::not_applicable(AiSurfaceKind::DeploymentEnvelope),
         ],
     )
     .unwrap();
@@ -270,8 +288,8 @@ fn commitment_method_is_bound_into_subject_identity() {
         vec![binding(
             AiSurfaceKind::Model,
             "model-alias",
-            SurfaceState::Known(MaterialCommitment::new(
-                CommitmentMethod::ProviderRevisionTokenSha256,
+            SurfaceState::Known(MaterialCommitment::provider_revision_token(
+                id("provider-revision-v1"),
                 digest('a'),
             )),
         )],
@@ -282,41 +300,133 @@ fn commitment_method_is_bound_into_subject_identity() {
 }
 
 #[test]
+fn descriptor_schema_is_bound_into_subject_identity() {
+    let profile = SurfaceProfile::new(id("model-only"), vec![AiSurfaceKind::Model]).unwrap();
+    let left = AiSubjectManifest::new(
+        id("agent-a"),
+        profile.clone(),
+        vec![binding(
+            AiSurfaceKind::Model,
+            "model-alias",
+            SurfaceState::Known(MaterialCommitment::canonical_descriptor(
+                id("model-descriptor-v1"),
+                digest('a'),
+            )),
+        )],
+    )
+    .unwrap();
+    let right = AiSubjectManifest::new(
+        id("agent-a"),
+        profile,
+        vec![binding(
+            AiSurfaceKind::Model,
+            "model-alias",
+            SurfaceState::Known(MaterialCommitment::canonical_descriptor(
+                id("model-descriptor-v2"),
+                digest('a'),
+            )),
+        )],
+    )
+    .unwrap();
+
+    assert_ne!(left.manifest_id(), right.manifest_id());
+}
+
+#[test]
+fn provider_token_namespace_is_bound_into_subject_identity() {
+    let profile = SurfaceProfile::new(id("model-only"), vec![AiSurfaceKind::Model]).unwrap();
+    let left = AiSubjectManifest::new(
+        id("agent-a"),
+        profile.clone(),
+        vec![binding(
+            AiSurfaceKind::Model,
+            "model-alias",
+            SurfaceState::Known(MaterialCommitment::provider_revision_token(
+                id("provider-token-v1"),
+                digest('a'),
+            )),
+        )],
+    )
+    .unwrap();
+    let right = AiSubjectManifest::new(
+        id("agent-a"),
+        profile,
+        vec![binding(
+            AiSurfaceKind::Model,
+            "model-alias",
+            SurfaceState::Known(MaterialCommitment::provider_revision_token(
+                id("provider-token-v2"),
+                digest('a'),
+            )),
+        )],
+    )
+    .unwrap();
+
+    assert_ne!(left.manifest_id(), right.manifest_id());
+}
+
+#[test]
 fn provider_alias_metadata_does_not_masquerade_as_same_subject() {
     let profile = SurfaceProfile::new(id("model-only"), vec![AiSurfaceKind::Model]).unwrap();
     let left = AiSubjectManifest::new(
         id("agent-a"),
         profile.clone(),
-        vec![SurfaceBinding::new(
+        vec![SurfaceBinding::applicable(
             AiSurfaceKind::Model,
             SurfaceLocator::new(Some(id("provider-a")), id("rolling-alias"), Some(id("v1"))),
             SurfaceState::Known(commit('a')),
-        )],
+        )
+        .unwrap()],
     )
     .unwrap();
     let renamed = AiSubjectManifest::new(
         id("agent-a"),
         profile.clone(),
-        vec![SurfaceBinding::new(
+        vec![SurfaceBinding::applicable(
             AiSurfaceKind::Model,
             SurfaceLocator::new(Some(id("provider-a")), id("other-alias"), Some(id("v1"))),
             SurfaceState::Known(commit('a')),
-        )],
+        )
+        .unwrap()],
     )
     .unwrap();
     let reversioned = AiSubjectManifest::new(
         id("agent-a"),
         profile,
-        vec![SurfaceBinding::new(
+        vec![SurfaceBinding::applicable(
             AiSurfaceKind::Model,
             SurfaceLocator::new(Some(id("provider-a")), id("rolling-alias"), Some(id("v2"))),
             SurfaceState::Known(commit('a')),
-        )],
+        )
+        .unwrap()],
     )
     .unwrap();
 
     assert_ne!(left.manifest_id(), renamed.manifest_id());
     assert_ne!(left.manifest_id(), reversioned.manifest_id());
+}
+
+#[test]
+fn semantic_subject_key_is_bound_into_identity() {
+    let left = exact_manifest();
+    let right = AiSubjectManifest::new(
+        id("agent-b"),
+        model_runtime_profile(),
+        vec![
+            binding(
+                AiSurfaceKind::Model,
+                "model-alias",
+                SurfaceState::Known(commit('a')),
+            ),
+            binding(
+                AiSurfaceKind::Runtime,
+                "runtime-image",
+                SurfaceState::Known(commit('b')),
+            ),
+        ],
+    )
+    .unwrap();
+    assert_ne!(left.manifest_id(), right.manifest_id());
 }
 
 #[test]
