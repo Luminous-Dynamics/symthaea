@@ -6,17 +6,36 @@ if [[ "$#" -ne 2 ]]; then
   exit 4
 fi
 
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)" || {
+  printf '%s\n' '{"authority":"MeasurementOnly","protocol_version":"wcare39-execution-capsule-v1","classification":"INFRASTRUCTURE_INDETERMINATE","detail":"qualifier_script_directory_unavailable","runtime_authority_granted":false}'
+  exit 3
+}
+RUNNER="$SCRIPT_DIR/wcare39_execution_capsule.py"
+if [[ ! -f "$RUNNER" ]]; then
+  printf '%s\n' '{"authority":"MeasurementOnly","protocol_version":"wcare39-execution-capsule-v1","classification":"INFRASTRUCTURE_INDETERMINATE","detail":"wcare39_runner_unavailable","runtime_authority_granted":false}'
+  exit 3
+fi
+
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   printf '%s\n' '{"authority":"MeasurementOnly","protocol_version":"wcare39-execution-capsule-v1","classification":"INFRASTRUCTURE_INDETERMINATE","detail":"not_in_git_worktree","runtime_authority_granted":false}'
   exit 3
 }
 cd "$ROOT"
 
+PLAN="$1"
+EVIDENCE_DIR="$2"
+if [[ "$PLAN" != /* ]]; then
+  PLAN="$ROOT/$PLAN"
+fi
+if [[ "$EVIDENCE_DIR" != /* ]]; then
+  EVIDENCE_DIR="$ROOT/$EVIDENCE_DIR"
+fi
+
 RESULT="$(mktemp)"
 trap 'rm -f "$RESULT"' EXIT
 
 set +e
-python3 scripts/wcare39_execution_capsule.py run "$1" "$2" >"$RESULT"
+python3 "$RUNNER" run "$PLAN" "$EVIDENCE_DIR" >"$RESULT"
 RUNNER_STATUS=$?
 set -e
 cat "$RESULT"
