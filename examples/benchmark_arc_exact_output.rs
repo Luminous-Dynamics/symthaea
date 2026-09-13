@@ -108,6 +108,7 @@ struct ArcExactReport {
     split: String,
     configuration_id: String,
     task_limit: Option<usize>,
+    candidate_grammar_size: usize,
     task_files_seen: usize,
     test_cases_evaluated: usize,
     aggregate: CapabilitySlice,
@@ -145,15 +146,26 @@ fn run() -> Result<(), String> {
         .ok()
         .and_then(|value| value.parse::<usize>().ok());
 
-    let mut task_files: Vec<PathBuf> = fs::read_dir(&split_dir)
+    let mut task_files = Vec::new();
+    for entry in fs::read_dir(&split_dir)
         .map_err(|err| format!("failed to list {}: {err}", split_dir.display()))?
-        .filter_map(|entry| entry.ok())
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
-        .collect();
+    {
+        let entry = entry
+            .map_err(|err| format!("failed to read entry in {}: {err}", split_dir.display()))?;
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "json") {
+            task_files.push(path);
+        }
+    }
     task_files.sort();
     if let Some(limit) = max_tasks {
         task_files.truncate(limit);
+    }
+    if task_files.is_empty() {
+        return Err(format!(
+            "no ARC JSON task files selected from {}",
+            split_dir.display()
+        ));
     }
 
     println!("ARC exact-output qualification");
@@ -229,13 +241,13 @@ fn run() -> Result<(), String> {
                 } else {
                     (
                         ReasoningOutcome::Abstained {
-                            reason: AbstentionReason::ConflictingEvidence,
+                            reason: AbstentionReason::Unidentified,
                             answerability: 0.0,
                         },
                         false,
                         None,
                         format!(
-                            "exact-transform-search: {} training-consistent candidates imply {} distinct test predictions; abstain",
+                            "exact-transform-search: {} training-consistent candidates imply {} distinct test predictions; underdetermined, abstain",
                             solve.matching_candidates, solve.distinct_predictions
                         ),
                         vec![],
@@ -306,7 +318,8 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let aggregate = aggregate_receipts(&receipts);
+    let aggregate = aggregate_receipts(&receipts)
+        .map_err(|err| format!("receipt aggregation failed closed: {err}"))?;
     println!("test cases:     {}", aggregate.episodes);
     println!("coverage:       {:.3}", aggregate.coverage);
     match aggregate.exact_accuracy {
@@ -324,6 +337,7 @@ fn run() -> Result<(), String> {
         split,
         configuration_id: CONFIGURATION_ID.into(),
         task_limit: max_tasks,
+        candidate_grammar_size: candidates.len(),
         task_files_seen: task_files.len(),
         test_cases_evaluated: aggregate.episodes,
         aggregate,
@@ -513,9 +527,9 @@ fn solve(train: &[GridPair], test_input: &Grid, candidates: &[CandidateTransform
         }
     }
 
-    // Training-equivalent hypotheses are allowed to remain distinct, but they only justify an
-    // asserted answer when they are prediction-equivalent on the held-out input. This prevents
-    // canonical ordering from silently resolving genuine epistemic ambiguity.
+    // Training-equivalent hypotheses remain distinct, but they justify an asserted answer only
+    // when they are prediction-equivalent on the held-out input. Canonical candidate ordering
+    // must never resolve genuine underdetermination.
     let mut predictions: Vec<(Grid, CandidateTransform)> = Vec::new();
     for candidate in &matching {
         let prediction = apply_transform(test_input, *candidate);
@@ -523,8 +537,8 @@ fn solve(train: &[GridPair], test_input: &Grid, candidates: &[CandidateTransform
             predictions.push((prediction, *candidate));
         }
     }
-
-    let (prediction, selected) = if predictions.len() == 1 {
+    let distinct_predictions = predictions.len();
+    let (prediction, selected) = if distinct_predictions == 1 {
         let (grid, candidate) = predictions.remove(0);
         (Some(grid), Some(candidate))
     } else {
@@ -534,7 +548,7 @@ fn solve(train: &[GridPair], test_input: &Grid, candidates: &[CandidateTransform
     SolveResult {
         prediction,
         matching_candidates: matching.len(),
-        distinct_predictions: predictions.len().max(usize::from(selected.is_some())),
+        distinct_predictions,
         selected,
         candidates_checked,
     }
