@@ -139,6 +139,7 @@
 
 mod agent;
 mod bridge;
+mod evaluation_trial;
 pub mod free_energy;
 pub mod generative_model;
 pub mod haptic_semantic_binder;
@@ -176,6 +177,8 @@ pub use agent::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
 pub use motor::MotorSystem;
 
 pub use bridge::{CognitiveLoopFEPBridge, EnhancedFEPBridge};
+
+pub use evaluation_trial::{FEP_EVALUATION_TRIAL_REVISION, FepEvaluationTrial};
 
 pub use prediction_session::{
     FEP_PREDICTION_SNAPSHOT_REVISION, FepEvaluationSnapshot, FepPredictionSession,
