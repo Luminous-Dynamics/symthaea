@@ -89,6 +89,10 @@ fn trusted_main() -> Result<(), Box<dyn std::error::Error>> {
         &candidate.disposition,
     )?;
     write_json(&output_dir.join("resolution_candidate.json"), &candidate)?;
+    fs::write(
+        output_dir.join("promotion_internal_verification.json"),
+        candidate.promotion_attestation_verification_bytes(),
+    )?;
 
     Ok(())
 }
