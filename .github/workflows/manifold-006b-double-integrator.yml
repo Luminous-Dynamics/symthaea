@@ -1,0 +1,136 @@
+name: MANIFOLD-006B Double Integrator Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/manifold-006b-double-integrator.yml'
+      - 'crates/core/symthaea-core/src/double_integrator_reachability.rs'
+      - 'crates/core/symthaea-core/src/kinodynamic_reachability.rs'
+      - 'crates/core/symthaea-core/src/lib.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006b_double_integrator.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006b_replay_independence.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: 2c4c5414e3d605667d66d2cae6e116e5ff69cc4d
+  QUALIFIED_PARENT_ARTIFACT_SHA256: 04ff1adecb472d3ddbc247d3f5ce51d1a2578eddf2bcf990b60e75c298e3f4db
+
+jobs:
+  qualify:
+    name: Double-integrator analytic theorem and replay
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact subject and qualified MANIFOLD-006A parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/manifold-006b
+          {
+            echo "schema=symthaea.manifold-006b.environment.v1"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "parent_sha=$(git rev-parse HEAD^)"
+            echo "qualified_parent_artifact_sha256=$QUALIFIED_PARENT_ARTIFACT_SHA256"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "runner_label=ubuntu-24.04"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+          } > artifacts/manifold-006b/environment.txt
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Extend environment capsule
+        run: |
+          set -euo pipefail
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "rustc_host=$(rustc -vV | sed -n 's/^host: //p')"
+            echo "rustc_commit=$(rustc -vV | sed -n 's/^commit-hash: //p')"
+            echo "llvm_version=$(rustc -vV | sed -n 's/^LLVM version: //p')"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "image_os=${ImageOS:-unknown}"
+            echo "image_version=${ImageVersion:-unknown}"
+          } >> artifacts/manifold-006b/environment.txt
+
+      - name: Check exact core crate
+        run: |
+          cargo check --locked -p symthaea-core --no-default-features
+
+      - name: Run self-contained MANIFOLD-006B qualification corpus
+        run: |
+          cargo test --locked -p symthaea-core --no-default-features \
+            --test manifold_006b_double_integrator \
+            --test manifold_006b_replay_independence
+
+      - name: Emit qualification receipt
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          receipt = {
+              'schema': 'symthaea.manifold-006b.qualification.v1',
+              'source_subject': os.environ['SUBJECT_SHA'].lower(),
+              'exact_parent': os.environ['BASE_SHA'].lower(),
+              'qualified_parent_artifact_sha256': os.environ['QUALIFIED_PARENT_ARTIFACT_SHA256'].lower(),
+              'rust': '1.96.0',
+              'core_check': 'PASS',
+              'double_integrator_qualification_corpus': 'PASS',
+              'replay_independence_regression': 'PASS',
+              'global_replay_state_propagation': 'PASS',
+              'replay_segment_budget': 16384,
+              'reference_truth': 'closed-form bounded 1-D double-integrator terminal reachable slice',
+              'infeasibility_authority': 'independently replayed velocity-impulse or position-first-moment separator only',
+              'claim_scope': 'synthetic analytic bounded 1-D double-integrator reachability and globally propagated independent dynamics replay only',
+              'verdict': 'PASS',
+          }
+          Path('artifacts/manifold-006b/report.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          PY
+
+      - name: Hash qualification capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd artifacts/manifold-006b
+          : > SHA256SUMS
+          for file in environment.txt report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Upload qualification capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: manifold-006b-double-integrator-${{ env.SUBJECT_SHA }}
+          path: artifacts/manifold-006b/
+          if-no-files-found: error
+          retention-days: 90

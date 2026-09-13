@@ -70,6 +70,8 @@ pub mod consciousness_metrics;
 pub mod configuration_space;
 /// Tri-state continuous validity, analytic synthetic oracles, and path replay.
 pub mod continuous_reachability;
+/// Closed-form bounded double-integrator reachability and independent dynamics replay.
+pub mod double_integrator_reachability;
 /// Core consciousness state types and configuration.
 #[allow(missing_docs)]
 pub mod core;
