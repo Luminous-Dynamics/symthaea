@@ -1,0 +1,75 @@
+name: Butlin Evidence Archive Admission
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/evidence_archive_admission.py"
+      - ".github/scripts/test_evidence_archive_admission.py"
+      - ".github/workflows/butlin-evidence-archive-admission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify fail-closed archive admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Freeze stdlib-only and no-generic-extraction boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x /usr/bin/python3
+          test -x /usr/bin/grep
+
+          script=.github/scripts/evidence_archive_admission.py
+          test -f "$script"
+
+          # The validator must not delegate archive parsing/extraction to a
+          # subprocess or invoke TarFile.extract()/extractall(), because its
+          # central theorem is controlled copying of pre-admitted regular files.
+          if /usr/bin/grep -nE '(^|[^A-Za-z_])subprocess([^A-Za-z_]|$)' "$script"; then
+            echo "subprocess use is forbidden in archive admission" >&2
+            exit 1
+          fi
+          if /usr/bin/grep -nE '\.extractall[[:space:]]*\(' "$script"; then
+            echo "TarFile.extractall() is forbidden" >&2
+            exit 1
+          fi
+          if /usr/bin/grep -nE '\.extract[[:space:]]*\(' "$script"; then
+            echo "TarFile.extract() is forbidden" >&2
+            exit 1
+          fi
+
+      - name: Parse validator and adversarial corpus
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          for path in (
+              Path('.github/scripts/evidence_archive_admission.py'),
+              Path('.github/scripts/test_evidence_archive_admission.py'),
+          ):
+              ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+          PY
+
+      - name: Run adversarial archive-admission qualification
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 .github/scripts/test_evidence_archive_admission.py
