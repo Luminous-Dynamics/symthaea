@@ -12,6 +12,8 @@
 //!   structure constants, Casimir operators
 //! - **Lattice gauge primitives**: periodic SU(3) links, plaquettes, Wilson action,
 //!   Polyakov loops, and local gauge transformations
+//! - **Spatial APE operator construction**: synchronous spatial-only APE smearing
+//!   with deterministic SU(3) polar projection and untouched temporal links
 //!
 //! ## Natural Units
 //!
@@ -32,6 +34,7 @@ pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_qcd;
+pub mod lattice_spatial_smearing;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -50,6 +53,10 @@ pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
     su3_determinant_error, su3_diagonal, su3_identity, su3_mul, su3_trace,
     su3_unitarity_error, validate_su3,
+};
+pub use lattice_spatial_smearing::{
+    SPATIAL_APE_EHK_POLAR_ID, SpatialApeConfig, SpatialSmearingError, polar_project_su3,
+    spatial_ape_smear, spatial_ape_step, spatial_staple_sum,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
