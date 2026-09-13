@@ -23,6 +23,7 @@ WCARE-36 uses:
 - issuer commitments;
 - evidence digests;
 - typed provenance strength;
+- typed pairwise relation-evidence strength;
 - pairwise independence relations.
 
 Detailed verification material may remain private where necessary, provided its digest and issuer provenance are preserved.
@@ -68,37 +69,62 @@ Relations are:
 - `Unknown`
 - `ConflictOfInterest`
 
+Every relation also carries one relation-evidence strength:
+
+- `SelfDeclared`
+- `OrganizerAssessed`
+- `ExternalVerified`
+- `InstitutionalAttestation`
+- `ModelAssessment`
+
 Pair orientation has no semantic meaning. `(A,B)` and `(B,A)` are the same pair and duplicate pair receipts invalidate the evidence.
 
 A pair sharing the same lineage commitment cannot be classified `Independent`.
 
-A different process, model session, random seed, machine, fork, or account is not automatically an independent lineage.
+A different process, model session, random seed, machine, fork, account, or reviewer-record identifier is not automatically an independent lineage.
+
+A raw `Independent` label is not sufficient to separate reviewers into distinct effective evidence components. Independence only separates components when its evidence strength and both reviewers' lineage-provenance strengths satisfy the preregistered panel plan.
 
 ## Conservative effective independence
 
 Build an undirected graph over active reviewer identities.
 
-Add an edge for every relation except `Independent`:
+Always add an edge for:
 
 - `Related`
 - `SameLineage`
 - `Unknown`
 - `ConflictOfInterest`
 
-Also add an edge whenever two provenance receipts carry the same lineage commitment, regardless of the pairwise relation label.
+For a raw `Independent` relation, omit the edge only when all of the following are true:
 
-The number of connected components is the **effective independent component count**.
+1. the relation's evidence strength is listed in `accepted_independent_relation_strengths`;
+2. the left reviewer's provenance strength is listed in `accepted_lineage_provenance_strengths`;
+3. the right reviewer's provenance strength is listed in `accepted_lineage_provenance_strengths`;
+4. the two lineage commitments are distinct.
 
-This is deliberately conservative. Unknown provenance may reduce the independence claim, but it may never increase it.
+Otherwise the relation is a **downgraded independent pair**: the original `Independent` label remains visible in the evidence, but the pair remains connected for effective-independence counting.
 
-The component count is evidence about reviewer-lineage separation, not a count of moral truths or human persons.
+A raw `Independent` relation between equal lineage commitments is contradictory evidence and invalidates the WCARE-36 result rather than merely downgrading it.
+
+The number of connected components after this conservative graph construction is the **effective independent component count**.
+
+`distinct_lineage_count` reports all distinct lineage commitment strings present in the receipts. It is descriptive only.
+
+`qualified_distinct_lineage_count` counts distinct lineage commitments only among reviewers whose provenance strength is accepted by `accepted_lineage_provenance_strengths`. The preregistered minimum distinct-lineage requirement is evaluated against this qualified count, not the raw count.
+
+This is deliberately conservative. Unknown or weak provenance may reduce the independence claim, but it may never increase it. Self-declared lineage strings or weak independence assertions cannot manufacture stronger panel independence merely by being numerous.
+
+The component count is evidence about reviewer-lineage separation under the preregistered qualification policy, not a count of moral truths, unique human persons, or metaphysically independent minds.
 
 ## Panel independence plan
 
 Before independence qualification, preregister:
 
+- accepted relation-evidence strengths that may separate a raw `Independent` pair;
+- accepted reviewer-provenance strengths that may establish qualified lineage differentiation;
 - minimum effective independent components;
-- minimum distinct lineage commitments;
+- minimum qualified distinct lineage commitments;
 - minimum provenance-strength counts;
 - maximum allowed `Unknown` relation pairs;
 - whether conflict-of-interest findings are permitted;
@@ -116,9 +142,13 @@ The verifier must require:
 - no duplicate pair receipts;
 - no self-pairs;
 - exact receipt-digest censuses in the result;
-- exact recomputation of provenance-strength counts, relation counts, distinct lineages, unknown pairs, conflicts, and effective components.
+- exact recomputation of provenance-strength counts;
+- exact recomputation of raw relation counts and relation-evidence-strength counts;
+- exact recomputation of raw and qualified distinct-lineage counts;
+- exact counts of accepted and downgraded `Independent` pairs;
+- exact recomputation of unknown pairs, conflicts, effective components, and the component census.
 
-Missing pair evidence becomes invalid/limited evidence; it does not silently imply independence.
+Missing pair evidence becomes invalid evidence; it does not silently imply independence.
 
 ## Dispositions
 
@@ -145,7 +175,9 @@ A panel can be substantively informative while independence-limited. WCARE-36 qu
 
 ## Model reviewer boundary
 
-Model reviewers may contribute consistency, replication, and adversarial evidence, but multiple sessions from one related model/source lineage must not be inflated into multiple independent evidence components merely because the process IDs differ.
+Model reviewers may contribute consistency, replication, and adversarial evidence, but multiple sessions from one related model/source lineage must not be inflated into multiple independent evidence components merely because process IDs, prompts, random seeds, or session identifiers differ.
+
+A `ModelAssessment` relation receipt remains subject to the same preregistered accepted-strength policy as every other relation-evidence class.
 
 Model-review evidence does not automatically substitute for WCARE-35 human stakeholder or domain-expert requirements.
 
