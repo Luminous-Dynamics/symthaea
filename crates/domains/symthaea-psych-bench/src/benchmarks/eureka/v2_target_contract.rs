@@ -16,14 +16,14 @@ use super::hidden_world::{PublicAction, PublicValue};
 use super::target_contract::EurekaTargetScope;
 use super::v2_public_schema::{
     V2_CANONICAL_ACTIONS, V2_CONTEXT_DENOMINATOR, V2_COUNT_DENOMINATOR, V2_OBSERVATION_DIM,
-    V2_PUBLIC_SCHEMA_REVISION, V2_REQUIRED_ACTIONS, V2PublicSchemaError, V2PublicState,
-    action_index,
+    V2_REQUIRED_ACTIONS, V2PublicSchemaError, V2PublicState, action_index,
+    public_schema_commitment as canonical_public_schema_commitment,
 };
 
 pub(super) const V2_FEP_TARGET_ADAPTER_REVISION: &str =
     "EUREKA.002.V2.PRODUCTION_FEP_NORMALIZED_ADAPTER.v2";
 pub(super) const V2_FEP_TARGET_CONTRACT_REVISION: &str =
-    "EUREKA.002.V2.PRODUCTION_FEP_TARGET_CONTRACT.v2";
+    "EUREKA.002.V2.PRODUCTION_FEP_TARGET_CONTRACT.v3";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum V2TargetContractError {
@@ -130,6 +130,7 @@ impl V2FepAdapter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct V2FepTargetContract {
     scope: EurekaTargetScope,
+    public_schema_commitment: [u8; 32],
     learned_subject_commitment: FrozenPredictionCommitment,
     observation_dim: usize,
     action_count: usize,
@@ -154,15 +155,18 @@ impl V2FepTargetContract {
                 actual: subject.action_count(),
             });
         }
+        let public_schema_commitment = canonical_public_schema_commitment();
         let learned_subject_commitment = subject.commitment();
         let commitment = contract_commitment(
             EurekaTargetScope::ProductionFepComponentSnapshot,
+            public_schema_commitment,
             learned_subject_commitment,
             subject.observation_dim(),
             subject.action_count(),
         );
         Ok(Self {
             scope: EurekaTargetScope::ProductionFepComponentSnapshot,
+            public_schema_commitment,
             learned_subject_commitment,
             observation_dim: subject.observation_dim(),
             action_count: subject.action_count(),
@@ -172,6 +176,10 @@ impl V2FepTargetContract {
 
     pub(super) const fn scope(self) -> EurekaTargetScope {
         self.scope
+    }
+
+    pub(super) const fn public_schema_commitment(self) -> [u8; 32] {
+        self.public_schema_commitment
     }
 
     pub(super) const fn learned_subject_commitment(self) -> FrozenPredictionCommitment {
@@ -193,6 +201,7 @@ impl V2FepTargetContract {
 
 fn contract_commitment(
     scope: EurekaTargetScope,
+    public_schema_commitment: [u8; 32],
     learned_subject_commitment: FrozenPredictionCommitment,
     observation_dim: usize,
     action_count: usize,
@@ -200,18 +209,13 @@ fn contract_commitment(
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, V2_FEP_TARGET_CONTRACT_REVISION.as_bytes());
     encode_bytes(&mut bytes, V2_FEP_TARGET_ADAPTER_REVISION.as_bytes());
-    encode_bytes(&mut bytes, V2_PUBLIC_SCHEMA_REVISION.as_bytes());
+    bytes.extend_from_slice(&public_schema_commitment);
     bytes.push(match scope {
         EurekaTargetScope::ProductionFepComponentSnapshot => 1,
         EurekaTargetScope::FullCognitiveLoop => 2,
     });
     bytes.extend_from_slice(&(observation_dim as u64).to_le_bytes());
     bytes.extend_from_slice(&(action_count as u64).to_le_bytes());
-    bytes.extend_from_slice(&V2_COUNT_DENOMINATOR.to_le_bytes());
-    bytes.extend_from_slice(&V2_CONTEXT_DENOMINATOR.to_le_bytes());
-    for action in V2_CANONICAL_ACTIONS {
-        bytes.push(V2FepAdapter::encode_action(action).expect("canonical V2 action") as u8);
-    }
     bytes.extend_from_slice(learned_subject_commitment.as_bytes());
     *blake3::hash(&bytes).as_bytes()
 }
@@ -367,9 +371,10 @@ mod tests {
     }
 
     #[test]
-    fn contract_is_component_scoped_and_binds_learned_commitment() {
+    fn contract_is_component_scoped_and_binds_schema_and_learned_commitment() {
         let subject = heldout_subject();
         let learned = subject.commitment();
+        let schema = canonical_public_schema_commitment();
         let contract = V2FepTargetContract::from_heldout_subject(&subject).unwrap();
         assert_eq!(
             contract.scope(),
@@ -377,6 +382,7 @@ mod tests {
         );
         assert_eq!(contract.observation_dim(), V2_OBSERVATION_DIM);
         assert_eq!(contract.action_count(), V2_REQUIRED_ACTIONS);
+        assert_eq!(contract.public_schema_commitment(), schema);
         assert_eq!(contract.learned_subject_commitment(), learned);
         assert_ne!(contract.commitment(), [0_u8; 32]);
     }
@@ -403,6 +409,10 @@ mod tests {
         );
         let contract_a = V2FepTargetContract::from_heldout_subject(&subject_a).unwrap();
         let contract_b = V2FepTargetContract::from_heldout_subject(&subject_b).unwrap();
+        assert_eq!(
+            contract_a.public_schema_commitment(),
+            contract_b.public_schema_commitment()
+        );
         assert_ne!(
             contract_a.learned_subject_commitment(),
             contract_b.learned_subject_commitment()
