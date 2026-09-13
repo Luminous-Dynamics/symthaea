@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-evidence-independence-provenance"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Scoped cryptographic provenance for verifier independence profiles and graph evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "attestation", "provenance"]
+categories = ["science", "cryptography"]
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+symthaea-evidence-verifier-diversity = { path = "../symthaea-evidence-verifier-diversity" }
