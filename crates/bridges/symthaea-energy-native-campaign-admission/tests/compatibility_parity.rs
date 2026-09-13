@@ -6,8 +6,8 @@ use symthaea_discovery::{
 };
 use symthaea_energy_evidence_envelope::wrap_evidence_payload_json;
 use symthaea_energy_material_campaign::{
-    admit_campaign_result, freeze_campaign_manifest, CampaignAdmissionReceipt, EvidenceLanePlan,
-    SourceCommitment, Tier1CampaignManifest,
+    admit_campaign_result, freeze_campaign_manifest, CampaignAdmissionReceipt, CampaignError,
+    EvidenceLanePlan, SourceCommitment, Tier1CampaignManifest,
 };
 use symthaea_energy_material_candidate_version::{
     anchor_candidate, bind_dossier_to_candidate_version, ReceiptVersionAttestation,
@@ -19,7 +19,7 @@ use symthaea_energy_material_screening::{
     EnergyMaterialScreeningPolicy, EvidenceDimension, MetricContract,
 };
 use symthaea_energy_native_campaign_admission::{
-    admit_native_campaign_result, NativeCampaignAdmissionReceipt,
+    admit_native_campaign_result, NativeAdmissionError, NativeCampaignAdmissionReceipt,
 };
 use symthaea_energy_native_dossier::assemble_native_envelope_dossier;
 
@@ -28,13 +28,63 @@ const LINEAGE_SHA: &str =
 const OTHER_SHA: &str =
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mutation {
     Clean,
     WrongModel,
     MissingLineage,
     MissingRequiredEvidence,
     LowFidelity,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FailureClass {
+    Setup,
+    IncompleteScreening,
+    ModelIdentity,
+    SourceCommitment,
+    RequiredEvidenceKind,
+    Fidelity,
+    OtherAdmission,
+}
+
+impl Mutation {
+    fn expected_failure(self) -> Option<FailureClass> {
+        match self {
+            Self::Clean => None,
+            Self::WrongModel => Some(FailureClass::ModelIdentity),
+            Self::MissingLineage => Some(FailureClass::SourceCommitment),
+            Self::MissingRequiredEvidence => Some(FailureClass::RequiredEvidenceKind),
+            // The screening contract and admission minimum are intentionally the
+            // same threshold. A low-fidelity record therefore becomes incomplete
+            // before the campaign admission's defense-in-depth fidelity check.
+            Self::LowFidelity => Some(FailureClass::IncompleteScreening),
+        }
+    }
+}
+
+fn classify_compatibility(error: &CampaignError) -> FailureClass {
+    match error {
+        CampaignError::IncompleteDossier => FailureClass::IncompleteScreening,
+        CampaignError::ModelIdentityMismatch(_) => FailureClass::ModelIdentity,
+        CampaignError::SourceCommitmentMismatch(_) => FailureClass::SourceCommitment,
+        CampaignError::MissingRequiredEvidenceKind { .. } => FailureClass::RequiredEvidenceKind,
+        CampaignError::FidelityBelowPolicy { .. } => FailureClass::Fidelity,
+        _ => FailureClass::OtherAdmission,
+    }
+}
+
+fn classify_native(error: &NativeAdmissionError) -> FailureClass {
+    match error {
+        NativeAdmissionError::IncompleteDossier => FailureClass::IncompleteScreening,
+        NativeAdmissionError::ModelIdentityMismatch(_) => FailureClass::ModelIdentity,
+        NativeAdmissionError::SourceCommitmentMismatch(_) => FailureClass::SourceCommitment,
+        NativeAdmissionError::MissingRequiredEvidenceKind { .. } => {
+            FailureClass::RequiredEvidenceKind
+        }
+        NativeAdmissionError::FidelityBelowPolicy { .. } => FailureClass::Fidelity,
+        _ => FailureClass::OtherAdmission,
+    }
 }
 
 fn code(dimension: EvidenceDimension) -> u8 {
@@ -72,7 +122,11 @@ fn policy() -> EnergyMaterialScreeningPolicy {
                 unit: "score".into(),
                 direction: ObjectiveDirection::Minimize,
                 minimum_fidelity: FidelityLevel::Surrogate,
-                accepted_evidence_kinds: vec![EvidenceKind::Dataset],
+                // Literature is accepted by the generic screening contract so
+                // the MissingRequiredEvidence mutation reaches the campaign
+                // lane's stricter Dataset requirement instead of being stopped
+                // early as an incomplete screening dossier.
+                accepted_evidence_kinds: vec![EvidenceKind::Dataset, EvidenceKind::Literature],
             })
             .collect(),
         constraints: vec![],
@@ -158,7 +212,9 @@ fn compatibility_receipt_sha(dimension: EvidenceDimension) -> String {
     std::iter::repeat(nibble).take(64).collect()
 }
 
-fn run_compatibility(mutation: Mutation) -> Result<CampaignAdmissionReceipt, String> {
+fn run_compatibility(
+    mutation: Mutation,
+) -> Result<CampaignAdmissionReceipt, FailureClass> {
     let manifest = manifest();
     let candidate = candidate();
     let candidate_sha = manifest.candidate_anchor.candidate_sha256.clone();
@@ -202,14 +258,16 @@ fn run_compatibility(mutation: Mutation) -> Result<CampaignAdmissionReceipt, Str
         assertions,
         contributions,
     )
-    .map_err(|error| format!("assemble compatibility dossier: {error:?}"))?;
+    .map_err(|_| FailureClass::Setup)?;
     let bound = bind_dossier_to_candidate_version(candidate, dossier, attestations)
-        .map_err(|error| format!("bind compatibility dossier: {error:?}"))?;
+        .map_err(|_| FailureClass::Setup)?;
     admit_campaign_result(&manifest, &bound, vec![])
-        .map_err(|error| format!("compatibility admission: {error:?}"))
+        .map_err(|error| classify_compatibility(&error))
 }
 
-fn run_native(mutation: Mutation) -> Result<NativeCampaignAdmissionReceipt, String> {
+fn run_native(
+    mutation: Mutation,
+) -> Result<NativeCampaignAdmissionReceipt, FailureClass> {
     let manifest = manifest();
     let candidate_id = manifest.candidate_anchor.candidate.id.clone();
 
@@ -224,10 +282,8 @@ fn run_native(mutation: Mutation) -> Result<NativeCampaignAdmissionReceipt, Stri
             "campaign-admission-parity-fixture-v0",
             format!("{{\"dimension\":{}}}", code(dimension)),
         )
-        .map_err(|error| format!("wrap native envelope: {error:?}"))?;
-        let receipt_sha = envelope
-            .sha256()
-            .map_err(|error| format!("hash native envelope: {error:?}"))?;
+        .map_err(|_| FailureClass::Setup)?;
+        let receipt_sha = envelope.sha256().map_err(|_| FailureClass::Setup)?;
         assertions.push(IdentityAssertion {
             assertion_id: format!("native-identity-{}", code(dimension)),
             candidate_id: candidate_id.clone(),
@@ -240,9 +296,9 @@ fn run_native(mutation: Mutation) -> Result<NativeCampaignAdmissionReceipt, Stri
     }
 
     let dossier = assemble_native_envelope_dossier(&manifest, assertions, envelopes)
-        .map_err(|error| format!("assemble native dossier: {error:?}"))?;
+        .map_err(|_| FailureClass::Setup)?;
     admit_native_campaign_result(&manifest, &dossier, vec![])
-        .map_err(|error| format!("native admission: {error:?}"))
+        .map_err(|error| classify_native(&error))
 }
 
 #[test]
@@ -262,23 +318,25 @@ fn clean_campaign_is_accepted_by_both_admission_paths() {
 }
 
 #[test]
-fn compatibility_and_native_paths_reject_the_same_frozen_plan_violations() {
+fn compatibility_and_native_paths_fail_in_the_same_semantic_class() {
     for mutation in [
         Mutation::WrongModel,
         Mutation::MissingLineage,
         Mutation::MissingRequiredEvidence,
         Mutation::LowFidelity,
     ] {
+        let expected = mutation.expected_failure().unwrap();
         let compatibility = run_compatibility(mutation);
         let native = run_native(mutation);
         assert_eq!(
-            compatibility.is_ok(),
-            native.is_ok(),
-            "admission-path parity diverged for {mutation:?}: compatibility={compatibility:?}, native={native:?}"
+            compatibility,
+            Err(expected),
+            "compatibility path failed in the wrong semantic class for {mutation:?}"
         );
-        assert!(
-            compatibility.is_err(),
-            "corrupted campaign unexpectedly passed compatibility admission for {mutation:?}"
+        assert_eq!(
+            native,
+            Err(expected),
+            "native path failed in the wrong semantic class for {mutation:?}"
         );
     }
 }
