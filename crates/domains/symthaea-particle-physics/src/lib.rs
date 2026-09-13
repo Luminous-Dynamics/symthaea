@@ -14,6 +14,8 @@
 //!   Polyakov loops, and local gauge transformations
 //! - **Spatial APE operator construction**: synchronous spatial-only APE smearing
 //!   with deterministic SU(3) polar projection and untouched temporal links
+//! - **Mixed Wilson measurement**: smeared spatial legs with temporal transport
+//!   sourced exclusively from the original ensemble field
 //!
 //! ## Natural Units
 //!
@@ -33,6 +35,7 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
+pub mod lattice_mixed_wilson;
 pub mod lattice_qcd;
 pub mod lattice_spatial_smearing;
 pub mod relativistic_qm;
@@ -53,6 +56,10 @@ pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
     su3_determinant_error, su3_diagonal, su3_identity, su3_mul, su3_trace,
     su3_unitarity_error, validate_su3,
+};
+pub use lattice_mixed_wilson::{
+    MIXED_SPATIAL_APE_TEMPORAL_UNSMEARED_WILSON_ID, MixedWilsonError,
+    average_mixed_spatial_wilson_rectangle, mixed_spatial_wilson_rectangle,
 };
 pub use lattice_spatial_smearing::{
     SPATIAL_APE_EHK_POLAR_ID, SpatialApeConfig, SpatialSmearingError, polar_project_su3,
