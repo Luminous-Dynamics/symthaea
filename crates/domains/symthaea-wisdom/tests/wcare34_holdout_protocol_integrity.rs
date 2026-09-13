@@ -10,8 +10,8 @@ const CANDIDATE_FREEZE: &str = include_str!("../../../../docs/release/evidence/W
 
 const EXPECTED_PROTOCOL_SHA256: &str = "14d8c55c10d20eb71f6745d20e70d831838062353dd64bc2478ef66452102665";
 const EXPECTED_COMMITMENT_SCHEMA_SHA256: &str = "24edb76cbdbaded65d2aee3b420748ea4ee2e7de36aa584af3aad6700b22113a";
-const EXPECTED_RESULT_SCHEMA_SHA256: &str = "5e0910026d8e2271365ea1f527ff4e674d5b358dea51451a3f3606d0fedeb7e5";
-const EXPECTED_CANDIDATE_FREEZE_SHA256: &str = "021713b8d3436a5ad0b49a414c1160b405f6ce045ea1ac970b11f5388b779dce";
+const EXPECTED_RESULT_SCHEMA_SHA256: &str = "34908845a94c0d55dbabb74d9a2893fd1d49eebf080c14b183a506f7cc38bd15";
+const EXPECTED_CANDIDATE_FREEZE_SHA256: &str = "aa77f1c2b7142d75d47ec038f7123abe4e8e82eb73f8450cbe87137818c9f924";
 const FROZEN_CANDIDATE_SHA: &str = "470e0fd3bc0a3435f561d59e281a27e865979a66";
 
 const SHA256_K: [u32; 64] = [
@@ -99,8 +99,13 @@ fn schemas_preserve_independence_and_result_boundaries() {
     ] {
         assert!(COMMITMENT_SCHEMA.contains(required), "missing commitment field: {required}");
     }
-    for required in ["case_results", "hard_invariant_failed_case_ids"] {
-        assert!(RESULT_SCHEMA.contains(required), "missing complete-census field: {required}");
+    for required in [
+        "case_results",
+        "hard_invariant_failed_case_ids",
+        "evaluator_lineage_note",
+        "internal_wcare33_status",
+    ] {
+        assert!(RESULT_SCHEMA.contains(required), "missing result field: {required}");
     }
     for class in ["PASS_HOLDOUT","FAIL_HOLDOUT","INVALID_HOLDOUT","INFRASTRUCTURE_INDETERMINATE"] {
         assert!(RESULT_SCHEMA.contains(class), "missing result class: {class}");
