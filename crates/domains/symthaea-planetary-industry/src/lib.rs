@@ -94,7 +94,10 @@ mod tests {
             source: String::new(),
             note: None,
         };
-        assert_eq!(evidence.validate(), Err(OntologyError::MissingEvidenceSource));
+        assert_eq!(
+            evidence.validate(),
+            Err(OntologyError::MissingEvidenceSource)
+        );
     }
 
     #[test]
