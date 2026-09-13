@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-matbench-gap-comparison-freeze"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Pre-truth comparison freeze for Matbench Benchmark Zero policy ladders."
+
+[dependencies]
+symthaea-energy-benchmark-zero = { path = "../../domains/symthaea-energy-benchmark-zero" }
+symthaea-energy-benchmark-zero-exact = { path = "../symthaea-energy-benchmark-zero-exact" }
+symthaea-matbench-gap-exposure-plan = { path = "../symthaea-matbench-gap-exposure-plan" }
+symthaea-matbench-gap-baseline-screening = { path = "../symthaea-matbench-gap-baseline-screening" }
+symthaea-matbench-gap-learned-screening = { path = "../symthaea-matbench-gap-learned-screening" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
