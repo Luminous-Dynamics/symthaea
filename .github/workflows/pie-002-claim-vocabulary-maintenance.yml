@@ -43,9 +43,6 @@ jobs:
                   "        # a cycle-average demand screen against sustained capacity, not a time-resolved\n"
                   "        # dispatch or load-profile proof."
               ),
-              "# Steady-cycle screens are separately named because they assume energy": (
-                  "# Steady-cycle screens are separately named because they assume energy"
-              ),
           }
           for old, new in replacements.items():
               if old not in text:
@@ -55,7 +52,7 @@ jobs:
 
           doc = Path("docs/release/evidence/PIE_002_UTILITY_ORACLE.md")
           d = doc.read_text()
-          marker = "## Electrical recovery\n"
+          marker = "## Electrical recovery bounds\n"
           addition = (
               "## Power-screen boundary\n\n"
               "The reported gross and steady-cycle power feasibility fields are **cycle-average power screens** "
@@ -66,7 +63,7 @@ jobs:
           if addition not in d:
               if marker not in d:
                   raise SystemExit("evidence-note insertion marker missing")
-              d = d.replace(marker, addition + marker)
+              d = d.replace(marker, addition + marker, 1)
           doc.write_text(d)
           PY
           python3 -m py_compile scripts/pie-utility-accounting-oracle.py
