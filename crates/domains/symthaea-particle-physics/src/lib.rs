@@ -16,6 +16,8 @@
 //!   with deterministic SU(3) polar projection and untouched temporal links
 //! - **Mixed Wilson measurement**: smeared spatial legs with temporal transport
 //!   sourced exclusively from the original ensemble field
+//! - **Off-axis Wilson measurement**: explicit shortest-path-symmetrized spatial
+//!   transport with a caller-bounded path-count budget
 //!
 //! ## Natural Units
 //!
@@ -36,6 +38,7 @@ pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_gauge;
 pub mod lattice_mixed_wilson;
+pub mod lattice_off_axis_wilson;
 pub mod lattice_qcd;
 pub mod lattice_spatial_smearing;
 pub mod relativistic_qm;
@@ -60,6 +63,11 @@ pub use lattice_gauge::{
 pub use lattice_mixed_wilson::{
     MIXED_SPATIAL_APE_TEMPORAL_UNSMEARED_WILSON_ID, MixedWilsonError,
     average_mixed_spatial_wilson_rectangle, mixed_spatial_wilson_rectangle,
+};
+pub use lattice_off_axis_wilson::{
+    SHORTEST_PATH_SYMMETRIZED_OFF_AXIS_WILSON_ID, OffAxisWilsonError,
+    OffAxisWilsonMeasurement, average_off_axis_mixed_wilson_loop,
+    off_axis_mixed_wilson_loop, shortest_path_symmetrized_spatial_transporter,
 };
 pub use lattice_spatial_smearing::{
     SPATIAL_APE_EHK_POLAR_ID, SpatialApeConfig, SpatialSmearingError, polar_project_su3,
