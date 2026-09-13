@@ -7,6 +7,55 @@
     "risk_qualified_visibility",
     "deterministic_visibility"
   ],
+  "environment_contracts": {
+    "acquisition": {
+      "required_environment_variables": [
+        "PYTHONHASHSEED",
+        "TZ",
+        "LANG",
+        "LC_ALL"
+      ],
+      "required_libraries": [
+        "openssl"
+      ],
+      "required_packages": []
+    },
+    "analysis": {
+      "required_environment_variables": [
+        "PYTHONHASHSEED",
+        "TZ",
+        "LANG",
+        "LC_ALL",
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS"
+      ],
+      "required_libraries": [],
+      "required_packages": [
+        "numpy"
+      ]
+    },
+    "gis": {
+      "required_environment_variables": [
+        "PYTHONHASHSEED",
+        "TZ",
+        "LANG",
+        "LC_ALL",
+        "GDAL_DATA",
+        "PROJ_DATA",
+        "PROJ_LIB"
+      ],
+      "required_libraries": [
+        "gdal",
+        "proj"
+      ],
+      "required_packages": [
+        "numpy",
+        "rasterio"
+      ]
+    }
+  },
   "network_authorized_stage_ids": [
     "source_acquisition"
   ],
