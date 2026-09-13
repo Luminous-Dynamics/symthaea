@@ -1,0 +1,106 @@
+name: PIE-002C Thermal Approach Exact Subject Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002c-2f6014f0
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify frozen PIE-002C oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SUBJECT_SHA: 2f6014f01a14dc489da67d9657274060d822308e
+      EXPECTED_PARENT_SHA: ada0d92fce3f0ff10883061b0608edfd37b16317
+      EXPECTED_TREE_SHA: e1d74336d3117a6e7a2a54223641fdece2f92c34
+      SCRIPT_BLOB_SHA: f85137ca12eacfa92126cfc57a8f6508b6c03811
+      DOC_BLOB_SHA: cc01a2757d558d4b640d37f19ac6ba16d68de945
+      SCRIPT: scripts/pie-thermal-approach-oracle.py
+      DOC: docs/release/evidence/PIE_002C_THERMAL_APPROACH_ORACLE.md
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject lineage tree and scope
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$EXPECTED_TREE_SHA"
+          test "$(git hash-object "$SCRIPT")" = "$SCRIPT_BLOB_SHA"
+          test "$(git hash-object "$DOC")" = "$DOC_BLOB_SHA"
+          git diff --name-only "$EXPECTED_PARENT_SHA" "$SUBJECT_SHA" | sort > /tmp/actual.txt
+          printf '%s\n%s\n' "$DOC" "$SCRIPT" | sort > /tmp/expected.txt
+          diff -u /tmp/expected.txt /tmp/actual.txt
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+
+      - name: Record Python identity
+        run: python3 --version
+
+      - name: Record subject SHA-256 digests
+        run: sha256sum "$SCRIPT" "$DOC"
+
+      - name: Compile oracle syntax
+        id: compile
+        continue-on-error: true
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile "$SCRIPT"
+
+      - name: Execute oracle self-test
+        id: selftest
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          output="$(PYTHONDONTWRITEBYTECODE=1 python3 "$SCRIPT" --self-test)"
+          printf '%s\n' "$output"
+          test "$output" = ok
+
+      - name: Emit machine-readable receipt
+        if: always()
+        run: |
+          script_sha256="$(sha256sum "$SCRIPT" | awk '{print $1}')"
+          doc_sha256="$(sha256sum "$DOC" | awk '{print $1}')"
+          cat > pie-002c-qualification.json <<EOF
+          {
+            "schema": "symthaea.pie.exact-subject-qualification.v2",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$EXPECTED_PARENT_SHA",
+            "tree_sha": "$EXPECTED_TREE_SHA",
+            "python": "3.13.5",
+            "script_blob_sha1": "$SCRIPT_BLOB_SHA",
+            "doc_blob_sha1": "$DOC_BLOB_SHA",
+            "script_sha256": "$script_sha256",
+            "doc_sha256": "$doc_sha256",
+            "gates": {
+              "py_compile": "${{ steps.compile.outcome }}",
+              "self_test": "${{ steps.selftest.outcome }}"
+            },
+            "scope": "Independent synthetic thermal approach-temperature screening only; not thermodynamic closure, heat-exchanger qualification, process feasibility, or hardware authority."
+          }
+          EOF
+          cat pie-002c-qualification.json
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-002c-thermal-approach-exact-subject
+          path: pie-002c-qualification.json
+          if-no-files-found: error
+
+      - name: Enforce oracle gates
+        if: always()
+        run: |
+          test "${{ steps.compile.outcome }}" = success
+          test "${{ steps.selftest.outcome }}" = success
