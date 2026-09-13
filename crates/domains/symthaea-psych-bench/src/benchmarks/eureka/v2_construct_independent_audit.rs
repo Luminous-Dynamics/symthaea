@@ -5,20 +5,24 @@
 //!
 //! This deliberately does not call the primary `v2_construct` generator or its
 //! validators. It independently reproduces only the schedule construction and
-//! public dynamics while consuming the one canonical public schema. The
-//! construct capsule is therefore not solely responsible for validating itself,
-//! but the audit also cannot drift into a second family/action/range grammar.
+//! public dynamics while consuming the one canonical public schema and the one
+//! canonical evidence-identity primitive. The construct capsule is therefore
+//! not solely responsible for validating itself, while provenance identity
+//! remains single-sourced rather than drifting into a second hash grammar.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::v2_evidence_identity::{V2EvidencePartition, canonical_row_identity};
 use super::v2_public_schema::{
     V2_ACTION_COUNT, V2_COUNT_CARDINALITY, V2_OBSERVATION_DIM, V2_PUBLIC_MODES_PER_FAMILY,
-    V2PublicFamily, V2PublicState, public_schema_commitment,
+    V2PublicFamily, V2PublicState, action_from_index, public_schema_commitment,
 };
 
 const SCHEDULE_REVISION: &str = "EUREKA.002.V2.CONSTRUCT_SCHEDULE.prototype.v5";
-const MAX_POSITIVE_FIELD_DELTA: u16 = 2;
-const PRE_STATE_CARDINALITY: u16 = V2_COUNT_CARDINALITY - MAX_POSITIVE_FIELD_DELTA;
+/// Headroom between the maximum generated pre-channel value and the maximum
+/// canonical public count. It is not a same-field transition-delta bound.
+const MAX_REALIZED_VALUE_HEADROOM: u16 = 2;
+const PRE_STATE_CARDINALITY: u16 = V2_COUNT_CARDINALITY - MAX_REALIZED_VALUE_HEADROOM;
 const PER_STRATUM: usize = 30;
 const DEV_PER_STRATUM: usize = 16;
 const CAL_PER_STRATUM: usize = 8;
@@ -69,6 +73,15 @@ impl AuditPartition {
     const fn expected_rows_per_family(self) -> usize {
         self.expected_per_stratum() * STRATA
     }
+
+    const fn evidence_partition(self) -> V2EvidencePartition {
+        match self {
+            Self::Development => V2EvidencePartition::Development,
+            Self::Calibration => V2EvidencePartition::Calibration,
+            Self::HeldOut => V2EvidencePartition::HeldOut,
+            Self::External => V2EvidencePartition::ExternalReplication,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -90,6 +103,7 @@ struct AuditRow {
     action: u8,
     pre: AuditState,
     post: AuditState,
+    identity: [u8; 32],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,6 +117,7 @@ enum AuditError {
     CrossPartitionTransitionOverlap,
     HistogramDistributionDrift,
     SparsePartitionHistogram,
+    RowIdentityMismatch,
 }
 
 fn transfer_one(values: &mut [i32; 3], from: usize, to: usize) {
@@ -206,11 +221,25 @@ fn independent_schedule(family: V2PublicFamily) -> Result<Vec<AuditRow>, AuditEr
         let context = family.context(mode).map_err(|_| AuditError::PublicSchema)?;
         for action in 0..V2_ACTION_COUNT {
             let states = independent_states(family, mode, action)?;
+            let public_action = action_from_index(usize::from(action))
+                .map_err(|_| AuditError::PublicSchema)?;
             for partition in AuditPartition::ALL {
                 for index in partition.range() {
                     let triple = states[index];
                     let pre = AuditState::public([triple[0], triple[1], triple[2], context])?;
                     let post = transition(family, pre, action)?;
+                    let pre_public =
+                        V2PublicState::new(pre.0).map_err(|_| AuditError::PublicSchema)?;
+                    let post_public =
+                        V2PublicState::new(post.0).map_err(|_| AuditError::PublicSchema)?;
+                    let identity = canonical_row_identity(
+                        family,
+                        partition.evidence_partition(),
+                        pre_public,
+                        public_action,
+                        post_public,
+                    )
+                    .map_err(|_| AuditError::PublicSchema)?;
                     rows.push(AuditRow {
                         family,
                         partition,
@@ -218,6 +247,7 @@ fn independent_schedule(family: V2PublicFamily) -> Result<Vec<AuditRow>, AuditEr
                         action,
                         pre,
                         post,
+                        identity,
                     });
                 }
             }
@@ -349,11 +379,33 @@ fn validate_actual_public_domain(rows: &[AuditRow]) -> Result<(), AuditError> {
     Ok(())
 }
 
+fn validate_row_identity(rows: &[AuditRow]) -> Result<(), AuditError> {
+    for row in rows {
+        let pre = V2PublicState::new(row.pre.0).map_err(|_| AuditError::PublicSchema)?;
+        let post = V2PublicState::new(row.post.0).map_err(|_| AuditError::PublicSchema)?;
+        let action = action_from_index(usize::from(row.action))
+            .map_err(|_| AuditError::PublicSchema)?;
+        let expected = canonical_row_identity(
+            row.family,
+            row.partition.evidence_partition(),
+            pre,
+            action,
+            post,
+        )
+        .map_err(|_| AuditError::PublicSchema)?;
+        if expected != row.identity {
+            return Err(AuditError::RowIdentityMismatch);
+        }
+    }
+    Ok(())
+}
+
 fn audit(rows: &[AuditRow]) -> Result<(), AuditError> {
     validate_structure(rows)?;
     validate_sufficiency_and_novelty(rows)?;
     validate_distribution(rows)?;
     validate_actual_public_domain(rows)?;
+    validate_row_identity(rows)?;
     Ok(())
 }
 
@@ -367,22 +419,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn independent_generator_passes_structure_novelty_histogram_and_domain_gates() {
+    fn independent_generator_passes_structure_novelty_histogram_domain_and_identity_gates() {
         for family in V2PublicFamily::ALL {
             let rows = independent_schedule(family).unwrap();
             audit(&rows).unwrap();
+            assert!(rows.iter().all(|row| row.identity != [0_u8; 32]));
         }
     }
 
     #[test]
-    fn independent_generator_enforces_the_two_count_transition_margin() {
-        assert_eq!(MAX_POSITIVE_FIELD_DELTA, 2);
+    fn independent_generator_enforces_realized_value_headroom() {
+        assert_eq!(MAX_REALIZED_VALUE_HEADROOM, 2);
         assert_eq!(PRE_STATE_CARDINALITY, V2_COUNT_CARDINALITY - 2);
         for family in V2PublicFamily::ALL {
             let rows = independent_schedule(family).unwrap();
             assert!(rows.iter().all(|row| V2PublicState::new(row.pre.0).is_ok()));
             assert!(rows.iter().all(|row| V2PublicState::new(row.post.0).is_ok()));
         }
+    }
+
+    #[test]
+    fn corrupt_row_identity_is_rejected() {
+        let mut rows = independent_schedule(V2PublicFamily::PublicFlowV2).unwrap();
+        rows[0].identity[0] ^= 0x01;
+        assert_eq!(validate_row_identity(&rows), Err(AuditError::RowIdentityMismatch));
     }
 
     #[test]
