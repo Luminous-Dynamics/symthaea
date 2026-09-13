@@ -94,6 +94,8 @@ pub enum CampaignError {
     AdmissionNotAfterProduction,
     #[error("evidence ledger belongs to a different registration")]
     LedgerRegistrationMismatch,
+    #[error("duplicate evidence id in the admitted campaign ledger: {0}")]
+    DuplicateEvidenceId(String),
     #[error("duplicate evidence digest in the admitted campaign ledger")]
     DuplicateEvidenceDigest,
     #[error(transparent)]
@@ -274,7 +276,7 @@ impl CampaignPlanV1 {
     }
 
     fn registers_kind(&self, kind: &EvidenceKind) -> bool {
-        self.evidence_kinds.binary_search(kind).is_ok()
+        self.evidence_kinds.iter().any(|registered| registered == kind)
     }
 }
 
@@ -442,11 +444,7 @@ impl RegistrationStatementV1 {
             "predecessor-registration",
             self.predecessor_receipt.as_ref(),
         );
-        field(
-            &mut out,
-            "pre-evidence-count",
-            "0",
-        );
+        field(&mut out, "pre-evidence-count", "0");
         field(
             &mut out,
             "pre-evidence-root",
@@ -571,7 +569,7 @@ impl RegistrationWithdrawalV1 {
     ) -> Result<Self, CampaignError> {
         ordering.require_statement(&statement.digest())?;
         if statement.target_registration != target.digest()
-            || statement.campaign_nonce != *target.campaign_nonce()
+            || &statement.campaign_nonce != target.campaign_nonce()
         {
             return Err(CampaignError::UnknownWithdrawalTarget);
         }
@@ -806,6 +804,7 @@ pub struct CampaignEvidenceLedgerV1 {
     plan_digest: DigestSha256,
     evidence_root: DigestSha256,
     admitted_count: u64,
+    seen_evidence_ids: BTreeSet<StableId>,
     seen_evidence: BTreeSet<DigestSha256>,
 }
 
@@ -817,6 +816,7 @@ impl CampaignEvidenceLedgerV1 {
             plan_digest: current.receipt.plan_digest().clone(),
             evidence_root: current.receipt.empty_evidence_root().clone(),
             admitted_count: 0,
+            seen_evidence_ids: BTreeSet::new(),
             seen_evidence: BTreeSet::new(),
         }
     }
@@ -869,6 +869,11 @@ impl CampaignEvidenceLedgerV1 {
         if !plan.registers_kind(evidence.kind()) {
             return Err(CampaignError::UnregisteredEvidenceKind);
         }
+        if self.seen_evidence_ids.contains(evidence.evidence_id()) {
+            return Err(CampaignError::DuplicateEvidenceId(
+                evidence.evidence_id().as_str().to_owned(),
+            ));
+        }
 
         let evidence_digest = evidence.digest();
         if self.seen_evidence.contains(&evidence_digest) {
@@ -914,6 +919,7 @@ impl CampaignEvidenceLedgerV1 {
             evidence_root: evidence_root.clone(),
         };
 
+        self.seen_evidence_ids.insert(evidence.evidence_id().clone());
         self.seen_evidence.insert(evidence_digest);
         self.admitted_count = ordinal;
         self.evidence_root = evidence_root;
@@ -922,8 +928,8 @@ impl CampaignEvidenceLedgerV1 {
 
     fn require_current(&self, current: &CurrentRegistrationV1) -> Result<(), CampaignError> {
         if self.registration_digest != current.receipt.digest()
-            || self.campaign_nonce != *current.receipt.campaign_nonce()
-            || self.plan_digest != *current.receipt.plan_digest()
+            || &self.campaign_nonce != current.receipt.campaign_nonce()
+            || &self.plan_digest != current.receipt.plan_digest()
         {
             return Err(CampaignError::LedgerRegistrationMismatch);
         }
@@ -934,7 +940,7 @@ impl CampaignEvidenceLedgerV1 {
 fn canonical_evidence_kinds(
     mut kinds: Vec<EvidenceKind>,
 ) -> Result<Vec<EvidenceKind>, CampaignError> {
-    kinds.sort();
+    kinds.sort_by_cached_key(evidence_kind_name);
     for pair in kinds.windows(2) {
         if pair[0] == pair[1] {
             return Err(CampaignError::DuplicateEvidenceKind(
