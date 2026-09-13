@@ -7,6 +7,10 @@
 //! The codec is deliberately independent of any recurrent architecture. Every
 //! HLS/HDC-LTC ablation can therefore receive byte-for-byte identical event and
 //! query hypervectors.
+//!
+//! In addition to continuous event/query vectors, the codec exposes a
+//! deterministic **unitary query key**. That key can reversibly unbind an HDC
+//! associative memory without adding learned decoder parameters.
 
 use crate::continuous_hv::{ContinuousHV, UnitaryRole};
 use crate::state_tracking_benchmark::{
@@ -59,10 +63,16 @@ pub struct StateTrackingCodec {
     entity_symbols: Vec<ContinuousHV>,
     object_symbols: Vec<ContinuousHV>,
     location_symbols: Vec<ContinuousHV>,
+    entity_keys: Vec<UnitaryRole>,
+    object_keys: Vec<UnitaryRole>,
     entity_role: UnitaryRole,
     object_role: UnitaryRole,
     location_role: UnitaryRole,
     time_role: UnitaryRole,
+    query_entity_location_role: UnitaryRole,
+    query_object_owner_role: UnitaryRole,
+    query_object_location_role: UnitaryRole,
+    query_time_role: UnitaryRole,
     move_marker: ContinuousHV,
     transfer_marker: ContinuousHV,
     query_entity_location_marker: ContinuousHV,
@@ -94,10 +104,16 @@ impl StateTrackingCodec {
             entity_symbols: make_codebook(dim, config.entities, seed.wrapping_add(1_000_000)),
             object_symbols: make_codebook(dim, config.objects, seed.wrapping_add(2_000_000)),
             location_symbols: make_codebook(dim, config.locations, seed.wrapping_add(3_000_000)),
+            entity_keys: make_role_codebook(dim, config.entities, seed.wrapping_add(4_000_000)),
+            object_keys: make_role_codebook(dim, config.objects, seed.wrapping_add(5_000_000)),
             entity_role: UnitaryRole::new(dim, seed.wrapping_add(10)),
             object_role: UnitaryRole::new(dim, seed.wrapping_add(11)),
             location_role: UnitaryRole::new(dim, seed.wrapping_add(12)),
             time_role: UnitaryRole::new(dim, seed.wrapping_add(13)),
+            query_entity_location_role: UnitaryRole::new(dim, seed.wrapping_add(20)),
+            query_object_owner_role: UnitaryRole::new(dim, seed.wrapping_add(21)),
+            query_object_location_role: UnitaryRole::new(dim, seed.wrapping_add(22)),
+            query_time_role: UnitaryRole::new(dim, seed.wrapping_add(23)),
             move_marker: ContinuousHV::new_random(dim, seed.wrapping_add(100)),
             transfer_marker: ContinuousHV::new_random(dim, seed.wrapping_add(101)),
             query_entity_location_marker: ContinuousHV::new_random(dim, seed.wrapping_add(200)),
@@ -141,16 +157,7 @@ impl StateTrackingCodec {
         query: &TrackingQuery,
         asked_time: f64,
     ) -> Result<ContinuousHV, TrackingCodecError> {
-        if !asked_time.is_finite()
-            || !query.as_of_time.is_finite()
-            || asked_time < query.as_of_time
-        {
-            return Err(TrackingCodecError::InvalidQueryTime {
-                asked_time,
-                as_of_time: query.as_of_time,
-            });
-        }
-
+        validate_query_time(query, asked_time)?;
         let time = self.time_channel(encode_query_lag(asked_time - query.as_of_time));
         let (marker, target) = match query.kind {
             TrackingQueryKind::EntityLocation { entity } => (
@@ -167,6 +174,36 @@ impl StateTrackingCodec {
             ),
         };
         Ok(ContinuousHV::bundle(&[marker, &target, &time]))
+    }
+
+    /// Deterministic unitary key for HDC associative unbinding.
+    ///
+    /// The key composes query type, target identity, and a permuted log-lag role.
+    /// All factors are bipolar unitary roles, so the final key is exactly
+    /// self-inverse and norm preserving.
+    pub fn query_key(
+        &self,
+        query: &TrackingQuery,
+        asked_time: f64,
+    ) -> Result<UnitaryRole, TrackingCodecError> {
+        validate_query_time(query, asked_time)?;
+        let lag = asked_time - query.as_of_time;
+        let time_key = self.query_time_role.permute(lag_bucket(lag, self.dim));
+        let (kind_key, target_key) = match query.kind {
+            TrackingQueryKind::EntityLocation { entity } => (
+                &self.query_entity_location_role,
+                self.entity_key(entity)?,
+            ),
+            TrackingQueryKind::ObjectOwner { object } => (
+                &self.query_object_owner_role,
+                self.object_key(object)?,
+            ),
+            TrackingQueryKind::ObjectLocation { object } => (
+                &self.query_object_location_role,
+                self.object_key(object)?,
+            ),
+        };
+        Ok(kind_key.compose(target_key).compose(&time_key))
     }
 
     pub fn answer_symbol(
@@ -214,6 +251,18 @@ impl StateTrackingCodec {
             .ok_or(TrackingCodecError::LocationOutOfRange(id))
     }
 
+    fn entity_key(&self, id: EntityId) -> Result<&UnitaryRole, TrackingCodecError> {
+        self.entity_keys
+            .get(id as usize)
+            .ok_or(TrackingCodecError::EntityOutOfRange(id))
+    }
+
+    fn object_key(&self, id: ObjectId) -> Result<&UnitaryRole, TrackingCodecError> {
+        self.object_keys
+            .get(id as usize)
+            .ok_or(TrackingCodecError::ObjectOutOfRange(id))
+    }
+
     fn time_channel(&self, scalar: f32) -> ContinuousHV {
         ContinuousHV::from_values(
             self.time_role
@@ -225,9 +274,25 @@ impl StateTrackingCodec {
     }
 }
 
+fn validate_query_time(query: &TrackingQuery, asked_time: f64) -> Result<(), TrackingCodecError> {
+    if !asked_time.is_finite() || !query.as_of_time.is_finite() || asked_time < query.as_of_time {
+        return Err(TrackingCodecError::InvalidQueryTime {
+            asked_time,
+            as_of_time: query.as_of_time,
+        });
+    }
+    Ok(())
+}
+
 fn make_codebook(dim: usize, count: usize, seed: u64) -> Vec<ContinuousHV> {
     (0..count)
         .map(|index| ContinuousHV::new_random(dim, seed.wrapping_add(index as u64)))
+        .collect()
+}
+
+fn make_role_codebook(dim: usize, count: usize, seed: u64) -> Vec<UnitaryRole> {
+    (0..count)
+        .map(|index| UnitaryRole::new(dim, seed.wrapping_add(index as u64)))
         .collect()
 }
 
@@ -237,6 +302,14 @@ fn encode_event_dt(dt: f64) -> f32 {
 
 fn encode_query_lag(lag: f64) -> f32 {
     (lag.ln_1p() / 12.0).clamp(0.0, 1.0) as f32
+}
+
+fn lag_bucket(lag: f64, dim: usize) -> usize {
+    if dim <= 1 {
+        return 0;
+    }
+    let scaled = encode_query_lag(lag) as f64 * (dim - 1) as f64;
+    scaled.round().clamp(0.0, (dim - 1) as f64) as usize
 }
 
 fn nearest(query: &ContinuousHV, codebook: &[ContinuousHV]) -> usize {
@@ -289,6 +362,47 @@ mod tests {
             let symbol = codec.answer_symbol(query.expected).unwrap();
             assert_eq!(codec.decode_answer_symbol(symbol, query.kind), query.expected);
         }
+    }
+
+    #[test]
+    fn unitary_query_keys_are_deterministic_and_self_inverse() {
+        let (benchmark, codec) = fixture();
+        let query = &benchmark.queries[0];
+        let asked_time = benchmark.events[query.asked_after_event].time;
+        let a = codec.query_key(query, asked_time).unwrap();
+        let b = codec.query_key(query, asked_time).unwrap();
+        assert_eq!(a, b);
+        let value = ContinuousHV::new_random(512, 123);
+        assert_eq!(a.unbind(&a.bind(&value)), value);
+    }
+
+    #[test]
+    fn query_key_distinguishes_target_and_history() {
+        let (benchmark, codec) = fixture();
+        let historical = benchmark
+            .queries
+            .iter()
+            .find(|query| query.is_historical())
+            .unwrap();
+        let asked_time = benchmark.events[historical.asked_after_event].time;
+        let historical_key = codec.query_key(historical, asked_time).unwrap();
+
+        let mut current = historical.clone();
+        current.as_of_event = current.asked_after_event;
+        current.as_of_time = asked_time;
+        let current_key = codec.query_key(&current, asked_time).unwrap();
+        assert_ne!(historical_key, current_key);
+
+        let another = benchmark
+            .queries
+            .iter()
+            .find(|query| query.kind != historical.kind)
+            .unwrap();
+        let another_time = benchmark.events[another.asked_after_event].time;
+        assert_ne!(
+            historical_key,
+            codec.query_key(another, another_time).unwrap()
+        );
     }
 
     #[test]
