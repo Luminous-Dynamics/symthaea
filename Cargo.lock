@@ -18169,6 +18169,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-assurance-subject"
+version = "0.1.0"
+dependencies = [
+ "sha2 0.10.9",
+ "symthaea-assurance-core",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "symthaea-astronomy"
 version = "0.1.0"
 
