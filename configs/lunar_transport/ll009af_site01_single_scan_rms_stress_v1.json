@@ -1,0 +1,18 @@
+{
+  "schema_version": "ll009af.single-scan-rms-stress-policy.v1",
+  "semantics_class": "model_conditional_rms_stress_sensitivity_frontier",
+  "stress_source": "inherit_exact_ll009ae_policy",
+  "raster_source_passes_required": 1,
+  "intervention": "multiply_only_rms_m_in_ephemeral_float64_bin_copy",
+  "persist_stressed_rasters": false,
+  "baseline_reproduction": "byte_exact_y_and_s_at_lambda_1",
+  "production_ae_reference_requirement": "not_required_after_synthetic_equivalence_gate",
+  "l2_identity_relative_tolerance": 1e-12,
+  "l2_identity_absolute_tolerance": 1e-12,
+  "notes": [
+    "AF does not define a new stress ladder; it inherits the exact ordered lambda set from LL-009AE.",
+    "The exact LL-009Y materializer is executed once at lambda=1 under a non-mutating capture wrapper; captured per-bin records become the sole counterfactual substrate.",
+    "Every lambda/bin intervention is ephemeral, float64-exact, witnessed, and discarded after the inherited Y solver call.",
+    "Performance diagnostics are descriptive only and carry no scientific authority."
+  ]
+}
