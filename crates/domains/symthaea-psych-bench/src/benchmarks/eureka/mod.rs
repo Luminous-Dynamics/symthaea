@@ -28,6 +28,8 @@ mod heldout_seal;
 pub mod hidden_world;
 mod promotion;
 mod relay_triad;
+#[cfg(feature = "symthaea-backend")]
+mod relay_triad_development;
 mod selection;
 mod target_contract;
 mod target_lineage;
