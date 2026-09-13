@@ -18,6 +18,7 @@ pub mod canonical_memory_restart;
 pub mod evidence_context;
 pub mod execution_adapter;
 pub mod execution_adapter_v2;
+pub mod execution_journal_anchor;
 pub mod execution_recovery;
 pub mod memory_identity;
 pub mod memory_intervention;
