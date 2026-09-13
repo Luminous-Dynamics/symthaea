@@ -11,6 +11,9 @@
     "source_acquisition"
   ],
   "protected_files": [
+    "scripts/ll009ag_common.py",
+    "scripts/ll009ag_campaign.py",
+    "scripts/freeze_ll009ag_site01_campaign.py",
     "scripts/acquire_ll009aa_connecting_ridge_sdem.py",
     "configs/lunar_transport/ll009aa_connecting_ridge_sdem_archive_v1.json",
     "scripts/reconcile_ll009z_hybrid_visibility.py",
