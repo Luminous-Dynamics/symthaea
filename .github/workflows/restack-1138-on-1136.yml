@@ -1,0 +1,142 @@
+name: Restack 1138 On 1136
+
+on:
+  push:
+    branches:
+      - repair/restack-1138-on-1136-v1
+    paths:
+      - .github/workflows/restack-1138-on-1136.yml
+
+permissions:
+  contents: write
+
+jobs:
+  restack:
+    if: "${{ github.event.head_commit.message == 'stage exact #1138 on repaired #1136' }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact construction subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 4
+          persist-credentials: true
+
+      - name: Prove frozen lineage and parent compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          old_base='70bffa072aaa405565005c0b4085572ceb5deb07'
+          old_head='80fdd4f9129dd276d9965d10b54206dda1b6c1bb'
+          new_base='ae2ea9e6f4eabebf9d1d1782c0255ce740f2420d'
+          workflow='.github/workflows/restack-1138-on-1136.yml'
+          modified=(
+            'crates/domains/symthaea-support/src/federation.rs'
+            'crates/domains/symthaea-support/src/knowledge.rs'
+            'crates/domains/symthaea-support/src/lib.rs'
+            'src/knowledge/mod.rs'
+          )
+          added=(
+            'crates/domains/symthaea-support/src/knowledge_source.rs'
+            'src/knowledge/support_adapter.rs'
+          )
+
+          test "$(git rev-parse HEAD^)" = "$new_base"
+          test "$(git diff --name-only HEAD^..HEAD)" = "$workflow"
+          git fetch --no-tags origin "$old_base" "$old_head"
+          test "$(git merge-base "$old_base" "$old_head")" = "$old_base"
+          test "$(git rev-list --count "$old_base".."$old_head")" = '9'
+
+          for path in "${modified[@]}"; do
+            test "$(git rev-parse "$old_base:$path")" = "$(git rev-parse "$new_base:$path")"
+          done
+          for path in "${added[@]}"; do
+            ! git cat-file -e "$old_base:$path" 2>/dev/null
+            ! git cat-file -e "$new_base:$path" 2>/dev/null
+          done
+          test "$(git rev-parse "$old_base:Cargo.lock")" = "$(git rev-parse "$new_base:Cargo.lock")"
+          test -z "$(git status --porcelain)"
+
+      - name: Install repository Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test "$channel" = '1.96.0'
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Transplant exact semantic product
+        shell: bash
+        run: |
+          set -euo pipefail
+          old_head='80fdd4f9129dd276d9965d10b54206dda1b6c1bb'
+          paths=(
+            'crates/domains/symthaea-support/src/federation.rs'
+            'crates/domains/symthaea-support/src/knowledge.rs'
+            'crates/domains/symthaea-support/src/knowledge_source.rs'
+            'crates/domains/symthaea-support/src/lib.rs'
+            'src/knowledge/mod.rs'
+            'src/knowledge/support_adapter.rs'
+          )
+          for path in "${paths[@]}"; do
+            mkdir -p "$(dirname "$path")"
+            git show "$old_head:$path" > "$path"
+            test "$(git hash-object "$path")" = "$(git rev-parse "$old_head:$path")"
+          done
+          test -z "$(git diff --name-only HEAD -- Cargo.lock)"
+          mapfile -t changed < <(git diff --name-only HEAD | sort)
+          test "${#changed[@]}" -eq 6
+
+      - name: Focused locked qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo fmt -p symthaea-support -- --check
+          rustfmt --edition 2024 --check src/knowledge/mod.rs src/knowledge/support_adapter.rs
+          cargo check --locked -p symthaea-support
+          cargo test --locked -p symthaea-support --lib
+          cargo check --locked -p symthaea-support --features logparse-adapter
+          cargo check --locked -p symthaea --lib --no-default-features --features support
+
+      - name: Prove content equivalence and publish one semantic commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          new_base='ae2ea9e6f4eabebf9d1d1782c0255ce740f2420d'
+          old_head='80fdd4f9129dd276d9965d10b54206dda1b6c1bb'
+          old_target_head='80fdd4f9129dd276d9965d10b54206dda1b6c1bb'
+          workflow='.github/workflows/restack-1138-on-1136.yml'
+          paths=(
+            'crates/domains/symthaea-support/src/federation.rs'
+            'crates/domains/symthaea-support/src/knowledge.rs'
+            'crates/domains/symthaea-support/src/knowledge_source.rs'
+            'crates/domains/symthaea-support/src/lib.rs'
+            'src/knowledge/mod.rs'
+            'src/knowledge/support_adapter.rs'
+          )
+
+          for path in "${paths[@]}"; do
+            test "$(git hash-object "$path")" = "$(git rev-parse "$old_head:$path")"
+          done
+          test -z "$(git diff --name-only "$new_base" -- Cargo.lock)"
+          rm "$workflow"
+          git add -A
+          mapfile -t changed < <(git diff --cached --name-only | sort)
+          test "${#changed[@]}" -eq 6
+
+          git config user.name 'luminous-restack-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'feat(support): converge IT support retrieval on global knowledge without merging authority'
+          test "$(git rev-parse HEAD^)" = "$new_base"
+          test "$(git rev-list --count "$new_base"..HEAD)" = '1'
+          for path in "${paths[@]}"; do
+            test "$(git rev-parse "HEAD:$path")" = "$(git rev-parse "$old_head:$path")"
+          done
+
+          git push origin HEAD:refs/heads/feat/it-knowledge-convergence-v1 \
+            --force-with-lease=refs/heads/feat/it-knowledge-convergence-v1:$old_target_head
+          git push origin --delete repair/restack-1138-on-1136-v1
