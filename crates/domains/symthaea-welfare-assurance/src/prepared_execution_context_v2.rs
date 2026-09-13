@@ -20,12 +20,13 @@ const MAX_PREPARED_PERSISTENCE_REF_BYTES: usize = 2048;
 
 /// Opaque V2 correlation context for a generic execution-journal `Prepared` record.
 ///
-/// High-assurance domain executors may inspect the exact execution identity, canonical prepared
-/// digest, timestamp and durable reference, but external callers cannot construct this value from
-/// a permit, execution ID or arbitrary digest alone.
+/// High-assurance domain executors may inspect the exact execution identity, target, canonical
+/// prepared digest, timestamp and durable reference, but external callers cannot construct this
+/// value from a permit, execution ID or arbitrary digest alone.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedExecutionContextV2 {
     execution_id: String,
+    target_id: String,
     prepared_digest: Sha256Digest,
     prepared_at_unix_s: u64,
     prepared_persistence_ref: String,
@@ -76,6 +77,7 @@ impl PreparedExecutionContextV2 {
     ) -> Self {
         Self {
             execution_id: prepared.execution_id.clone(),
+            target_id: prepared.target_id.clone(),
             prepared_digest,
             prepared_at_unix_s: prepared.prepared_at_unix_s,
             prepared_persistence_ref,
@@ -84,6 +86,10 @@ impl PreparedExecutionContextV2 {
 
     pub fn execution_id(&self) -> &str {
         &self.execution_id
+    }
+
+    pub fn target_id(&self) -> &str {
+        &self.target_id
     }
 
     pub fn prepared_digest(&self) -> Sha256Digest {
@@ -163,6 +169,7 @@ mod tests {
         );
 
         assert_eq!(context.execution_id(), prepared.execution_id);
+        assert_eq!(context.target_id(), prepared.target_id);
         assert_eq!(context.prepared_digest(), prepared_digest);
         assert_eq!(context.prepared_at_unix_s(), prepared.prepared_at_unix_s);
         assert_eq!(

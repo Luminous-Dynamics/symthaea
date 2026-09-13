@@ -1,12 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Typed cross-ledger binding for V2 episodic restore preparation.
+//! Typed cross-ledger binding material for V2 episodic restore correlation.
 //!
 //! This object carries correlation evidence only. It does not authorize a restore and cannot be
 //! constructed from a permit or arbitrary digest by external callers. The generic V2 execution
 //! adapter first produces `PreparedExecutionContextV2` from a durably persisted generic Prepared
-//! record; the domain restore layer may then derive this binding and commit it into its own
-//! hash-chained `RestorePreparedV2` event.
+//! record; the domain restore layer may then derive this binding and commit its identity into
+//! independently recoverable domain evidence without changing legacy quarantine-ledger wire types.
 
 #![deny(unsafe_code)]
 
@@ -17,41 +17,45 @@ use thiserror::Error;
 use crate::prepared_execution_context_v2::PreparedExecutionContextV2;
 
 const MAX_EXECUTION_ID_BYTES: usize = 256;
+const MAX_TARGET_ID_BYTES: usize = 256;
 const MAX_PREPARED_PERSISTENCE_REF_BYTES: usize = 2048;
 
-/// Exact generic-Prepared evidence to be embedded by the domain restore write-ahead transition.
+/// Exact generic-Prepared evidence available to the domain restore boundary.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RestorePreparedBindingV2 {
     execution_id: String,
+    target_id: String,
     generic_prepared_digest: Sha256Digest,
     generic_prepared_at_unix_s: u64,
     generic_prepared_persistence_ref: String,
 }
 
 impl RestorePreparedBindingV2 {
-    /// Derive a domain-persistable correlation binding from the opaque V2 execution context.
+    /// Derive domain correlation material from the opaque V2 execution context.
     ///
-    /// `domain_prepared_at_unix_s` is the timestamp the quarantine ledger intends to record. It may
+    /// `domain_observed_at_unix_s` is the domain timestamp at which the binding is consumed. It may
     /// equal or follow the generic Prepared time, but cannot precede it.
     pub fn from_context(
         context: &PreparedExecutionContextV2,
-        domain_prepared_at_unix_s: u64,
+        domain_observed_at_unix_s: u64,
     ) -> Result<Self, RestorePreparedBindingV2Error> {
         let value = Self {
             execution_id: context.execution_id().to_string(),
+            target_id: context.target_id().to_string(),
             generic_prepared_digest: context.prepared_digest(),
             generic_prepared_at_unix_s: context.prepared_at_unix_s(),
             generic_prepared_persistence_ref: context.prepared_persistence_ref().to_string(),
         };
-        value.validate(domain_prepared_at_unix_s)?;
+        value.validate(domain_observed_at_unix_s)?;
         Ok(value)
     }
 
     pub fn validate(
         &self,
-        domain_prepared_at_unix_s: u64,
+        domain_observed_at_unix_s: u64,
     ) -> Result<(), RestorePreparedBindingV2Error> {
         validate_text("execution_id", &self.execution_id, MAX_EXECUTION_ID_BYTES)?;
+        validate_text("target_id", &self.target_id, MAX_TARGET_ID_BYTES)?;
         validate_text(
             "generic_prepared_persistence_ref",
             &self.generic_prepared_persistence_ref,
@@ -60,10 +64,10 @@ impl RestorePreparedBindingV2 {
         if self.generic_prepared_digest.0 == [0; 32] {
             return Err(RestorePreparedBindingV2Error::ZeroPreparedDigest);
         }
-        if self.generic_prepared_at_unix_s > domain_prepared_at_unix_s {
-            return Err(RestorePreparedBindingV2Error::DomainPreparePredatesGenericPrepare {
+        if self.generic_prepared_at_unix_s > domain_observed_at_unix_s {
+            return Err(RestorePreparedBindingV2Error::DomainObservationPredatesGenericPrepare {
                 generic_prepared_at_unix_s: self.generic_prepared_at_unix_s,
-                domain_prepared_at_unix_s,
+                domain_observed_at_unix_s,
             });
         }
         Ok(())
@@ -71,6 +75,10 @@ impl RestorePreparedBindingV2 {
 
     pub fn execution_id(&self) -> &str {
         &self.execution_id
+    }
+
+    pub fn target_id(&self) -> &str {
+        &self.target_id
     }
 
     pub fn generic_prepared_digest(&self) -> Sha256Digest {
@@ -111,11 +119,11 @@ pub enum RestorePreparedBindingV2Error {
     #[error("generic Prepared digest must not be zero")]
     ZeroPreparedDigest,
     #[error(
-        "domain RestorePreparedV2 time predates generic Prepared time: generic={generic_prepared_at_unix_s}, domain={domain_prepared_at_unix_s}"
+        "domain restore observation predates generic Prepared time: generic={generic_prepared_at_unix_s}, domain={domain_observed_at_unix_s}"
     )]
-    DomainPreparePredatesGenericPrepare {
+    DomainObservationPredatesGenericPrepare {
         generic_prepared_at_unix_s: u64,
-        domain_prepared_at_unix_s: u64,
+        domain_observed_at_unix_s: u64,
     },
 }
 
@@ -171,6 +179,7 @@ mod tests {
         let context = context();
         let binding = RestorePreparedBindingV2::from_context(&context, 110).unwrap();
         assert_eq!(binding.execution_id(), context.execution_id());
+        assert_eq!(binding.target_id(), context.target_id());
         assert_eq!(binding.generic_prepared_digest(), context.prepared_digest());
         assert_eq!(
             binding.generic_prepared_at_unix_s(),
@@ -183,14 +192,14 @@ mod tests {
     }
 
     #[test]
-    fn domain_prepare_cannot_predate_generic_prepare() {
+    fn domain_observation_cannot_predate_generic_prepare() {
         let context = context();
         let error = RestorePreparedBindingV2::from_context(&context, 99).unwrap_err();
         assert_eq!(
             error,
-            RestorePreparedBindingV2Error::DomainPreparePredatesGenericPrepare {
+            RestorePreparedBindingV2Error::DomainObservationPredatesGenericPrepare {
                 generic_prepared_at_unix_s: 100,
-                domain_prepared_at_unix_s: 99,
+                domain_observed_at_unix_s: 99,
             }
         );
     }
