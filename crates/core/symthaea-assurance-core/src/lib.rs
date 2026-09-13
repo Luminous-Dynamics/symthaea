@@ -17,8 +17,8 @@
 //! regulations, infer heterogeneous evidence verdicts, or assign scalar
 //! safety/trust scores. It provides exact, deterministic semantics for
 //! subjects, claims, evidence provenance, qualification strength, negative
-//! findings, claim ceilings, reproduction claims, and explicit invalidation
-//! conditions.
+//! findings, claim ceilings, reproduction-evidence status, and explicit
+//! invalidation conditions.
 
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -59,7 +59,7 @@ pub enum AssuranceError {
     #[error("evidence does not satisfy the proposed support tier: {0}")]
     InsufficientEvidenceForTier(String),
     #[error(
-        "reproduction claim requires reproduction evidence with a verifier identity distinct from producer and executor"
+        "reproduction-evidence status requires reproduction evidence with a verifier identity distinct from producer and executor"
     )]
     MissingDistinctVerifier,
 }
@@ -269,14 +269,14 @@ impl SupportTier {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReproductionStatus {
     NotClaimed,
-    ReproducedByDistinctVerifier,
+    EvidenceFromDistinctVerifier,
 }
 
 impl ReproductionStatus {
     fn canonical_name(self) -> &'static str {
         match self {
             Self::NotClaimed => "not-claimed",
-            Self::ReproducedByDistinctVerifier => "reproduced-by-distinct-verifier",
+            Self::EvidenceFromDistinctVerifier => "evidence-from-distinct-verifier",
         }
     }
 }
@@ -493,8 +493,9 @@ impl QualificationResult {
     /// verdict. The caller supplies both `proposed_outcome` and
     /// `reproduction_status`; ASSURE-000 checks identity bindings, claim
     /// ceilings, minimum positive-tier evidence classes, and the minimum
-    /// evidence needed to claim identity-distinct reproduction. Evidence
-    /// interpretation and contradiction-aware resolution belong to ASSURE-003.
+    /// evidence needed to record reproduction evidence from a distinct
+    /// verifier identity. Whether that evidence constitutes a successful
+    /// replication is a resolver-level question for ASSURE-003.
     pub fn validate_and_bind(
         claim: &Claim,
         subject: &SubjectManifest,
@@ -541,7 +542,7 @@ impl QualificationResult {
             require_evidence_for_tier(tier, evidence)?;
         }
 
-        if reproduction_status == ReproductionStatus::ReproducedByDistinctVerifier
+        if reproduction_status == ReproductionStatus::EvidenceFromDistinctVerifier
             && !evidence.iter().any(|artifact| {
                 artifact.kind == EvidenceKind::Reproduction
                     && artifact.provenance.has_distinct_verifier_identity()
@@ -612,14 +613,18 @@ impl QualificationResult {
         digest_canonical(&self.canonical_bytes())
     }
 
-    pub fn apply_invalidation(&mut self, condition: &StableId) -> bool {
+    /// Returns a new invalidated result when `condition` was declared by the
+    /// qualification plan. The original content-addressed result is unchanged.
+    /// ASSURE-004 will later add explicit predecessor/requalification lineage.
+    pub fn invalidated_by(&self, condition: &StableId) -> Option<Self> {
         if !self.invalidation_conditions.contains(condition) {
-            return false;
+            return None;
         }
-        self.outcome = QualificationOutcome::Negative(NegativeFinding::Invalidated {
+        let mut invalidated = self.clone();
+        invalidated.outcome = QualificationOutcome::Negative(NegativeFinding::Invalidated {
             reason: condition.clone(),
         });
-        true
+        Some(invalidated)
     }
 }
 
