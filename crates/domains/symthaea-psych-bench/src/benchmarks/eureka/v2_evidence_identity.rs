@@ -4,15 +4,19 @@
 //! Canonical evaluator-owned identity grammar for EUREKA-002 V2 evidence rows.
 //!
 //! Row identity is derived from canonical public transition provenance. Callers
-//! cannot supply arbitrary row-ID bytes. Semantic transition equality is kept
-//! separate from row identity so cross-partition duplication remains visible.
+//! cannot supply arbitrary row-ID bytes or a redundant mode label. Semantic
+//! transition equality is kept separate from row identity so cross-partition
+//! duplication remains visible.
 
 use super::hidden_world::PublicAction;
 use super::v2_public_schema::{
     V2PublicFamily, V2PublicSchemaError, V2PublicState, action_index, public_schema_commitment,
 };
 
-pub(super) const V2_ROW_IDENTITY_REVISION: &str = "EUREKA.002.V2.ROW_IDENTITY.v1";
+/// Byte-compatible with the already-frozen construct v5 row grammar. The
+/// important hardening is API-level: mode is derived from the validated public
+/// context instead of being caller supplied.
+pub(super) const V2_ROW_IDENTITY_REVISION: &str = "EUREKA.002.V2.ROW.prototype.v5";
 pub(super) const V2_TRANSITION_SEMANTICS_REVISION: &str =
     "EUREKA.002.V2.TRANSITION_SEMANTICS.v1";
 
@@ -50,6 +54,10 @@ impl From<V2PublicSchemaError> for V2EvidenceIdentityError {
 
 /// Derive the one canonical row identity from exact public transition
 /// provenance. No caller-supplied row identity or redundant mode label exists.
+///
+/// Serialization intentionally matches the construct v5 row bytes exactly:
+/// revision + schema + family + partition + derived mode + action-index byte +
+/// pre-state + post-state.
 pub(super) fn canonical_row_identity(
     family: V2PublicFamily,
     partition: V2EvidencePartition,
@@ -58,13 +66,16 @@ pub(super) fn canonical_row_identity(
     post: V2PublicState,
 ) -> Result<[u8; 32], V2EvidenceIdentityError> {
     validate_transition(family, pre, action, post)?;
+    let mode = derived_mode(family, pre);
+    let action_index = u8::try_from(action_index(action)?).expect("V2 action index fits u8");
 
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, V2_ROW_IDENTITY_REVISION.as_bytes());
     bytes.extend_from_slice(&public_schema_commitment());
     bytes.push(family.tag());
     bytes.push(partition.tag());
-    bytes.extend_from_slice(&(action_index(action)? as u64).to_le_bytes());
+    bytes.push(mode);
+    bytes.push(action_index);
     encode_state(&mut bytes, pre);
     encode_state(&mut bytes, post);
     Ok(*blake3::hash(&bytes).as_bytes())
@@ -104,6 +115,11 @@ fn validate_transition(
         return Err(V2EvidenceIdentityError::ContextChangedAcrossTransition);
     }
     Ok(())
+}
+
+fn derived_mode(family: V2PublicFamily, state: V2PublicState) -> u8 {
+    let (min_context, _) = family.context_bounds();
+    u8::try_from(state.context() - min_context).expect("validated family context maps to V2 mode")
 }
 
 fn encode_state(bytes: &mut Vec<u8>, state: V2PublicState) {
@@ -157,6 +173,27 @@ mod tests {
         assert_eq!(a, b);
         assert_ne!(a, [0_u8; 32]);
         assert_ne!(a, calibration);
+    }
+
+    #[test]
+    fn row_bytes_match_frozen_construct_v5_serialization_without_mode_input() {
+        let family = V2PublicFamily::PublicRelayV2;
+        let partition = V2EvidencePartition::HeldOut;
+        let pre = state([7, 2, 1, 6]);
+        let post = state([7, 7, 1, 6]);
+        let action = PublicAction::Pulse { slot: 1 };
+        let canonical = canonical_row_identity(family, partition, pre, action, post).unwrap();
+
+        let mut legacy_bytes = Vec::new();
+        encode_bytes(&mut legacy_bytes, b"EUREKA.002.V2.ROW.prototype.v5");
+        legacy_bytes.extend_from_slice(&public_schema_commitment());
+        legacy_bytes.push(family.tag());
+        legacy_bytes.push(partition.tag());
+        legacy_bytes.push(2); // Relay context 6 => mode 2, derived rather than supplied.
+        legacy_bytes.push(2); // Pulse slot 1 => canonical action index 2.
+        encode_state(&mut legacy_bytes, pre);
+        encode_state(&mut legacy_bytes, post);
+        assert_eq!(canonical, *blake3::hash(&legacy_bytes).as_bytes());
     }
 
     #[test]
