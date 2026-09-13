@@ -23,8 +23,10 @@
 //!    commutes with it;
 //! 3. the activation is odd, so `phi(r*z) = r*phi(z)` for `r in {-1,+1}`.
 //!
-//! This cell intentionally remains diagonal. Structured cross-dimensional HDC
-//! mixing is a separate research tranche so its contribution can be ablated.
+//! Importantly, the theorem is independent of the numerical values of the six
+//! trainable diagonal fields. `HlsParameters` therefore exposes those fields as
+//! one validated atomic snapshot so optimizers can train the dynamics without
+//! weakening the forward binding-equivariance law.
 
 use crate::config::fast_tanh;
 use crate::continuous_hv::{ContinuousHV, UnitaryRole};
@@ -87,12 +89,68 @@ impl Default for HlsConfig {
     }
 }
 
+/// Complete trainable parameter surface of the diagonal HLS cell.
+///
+/// Every field has exactly `dim` scalar parameters, so a cell contains `6 * dim`
+/// trainable recurrent scalars. The architecture-level binding-equivariance
+/// theorem holds for arbitrary finite values of these fields.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HlsParameters {
+    pub recurrent_weight: ContinuousHV,
+    pub input_weight: ContinuousHV,
+    pub tau_state_weight: ContinuousHV,
+    pub gate_state_weight: ContinuousHV,
+    pub gate_input_weight: ContinuousHV,
+    pub gate_bias: ContinuousHV,
+}
+
+impl HlsParameters {
+    /// Zero-valued parameter/delta snapshot of the requested dimension.
+    pub fn zeros(dim: usize) -> Self {
+        Self {
+            recurrent_weight: ContinuousHV::new(dim),
+            input_weight: ContinuousHV::new(dim),
+            tau_state_weight: ContinuousHV::new(dim),
+            gate_state_weight: ContinuousHV::new(dim),
+            gate_input_weight: ContinuousHV::new(dim),
+            gate_bias: ContinuousHV::new(dim),
+        }
+    }
+
+    pub fn scalar_count(&self) -> usize {
+        self.recurrent_weight
+            .dim()
+            .saturating_add(self.input_weight.dim())
+            .saturating_add(self.tau_state_weight.dim())
+            .saturating_add(self.gate_state_weight.dim())
+            .saturating_add(self.gate_input_weight.dim())
+            .saturating_add(self.gate_bias.dim())
+    }
+
+    pub fn l2_norm(&self) -> f32 {
+        let sum_sq = parameter_fields(self)
+            .into_iter()
+            .flat_map(|(_, field)| field.values.iter().copied())
+            .map(|value| value * value)
+            .sum::<f32>();
+        sum_sq.sqrt()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HlsError {
     ZeroDimension,
     InvalidTimescaleBounds,
     InvalidParameter(&'static str),
     DimensionMismatch { expected: usize, actual: usize },
+    ParameterDimensionMismatch {
+        field: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteParameter(&'static str),
+    InvalidParameterStep,
+    InvalidParameterBound,
     NonFiniteDt,
 }
 
@@ -108,6 +166,24 @@ impl fmt::Display for HlsError {
             Self::DimensionMismatch { expected, actual } => write!(
                 f,
                 "HLS dimension mismatch: expected {expected}, got {actual}"
+            ),
+            Self::ParameterDimensionMismatch {
+                field,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "HLS parameter field {field} dimension mismatch: expected {expected}, got {actual}"
+            ),
+            Self::NonFiniteParameter(field) => {
+                write!(f, "HLS parameter field {field} contains a non-finite value")
+            }
+            Self::InvalidParameterStep => {
+                write!(f, "HLS parameter update step size must be finite")
+            }
+            Self::InvalidParameterBound => write!(
+                f,
+                "HLS parameter update absolute bound must be finite and positive"
             ),
             Self::NonFiniteDt => write!(f, "HLS dt must be finite"),
         }
@@ -163,6 +239,104 @@ impl HolographicLiquidCell {
 
     pub fn update_count(&self) -> u64 {
         self.update_count
+    }
+
+    /// Exact trainable scalar count for this cell.
+    pub fn parameter_count(&self) -> usize {
+        self.config.dim.saturating_mul(6)
+    }
+
+    /// Clone the complete trainable parameter surface as one atomic snapshot.
+    pub fn parameters(&self) -> HlsParameters {
+        HlsParameters {
+            recurrent_weight: self.recurrent_weight.clone(),
+            input_weight: self.input_weight.clone(),
+            tau_state_weight: self.tau_state_weight.clone(),
+            gate_state_weight: self.gate_state_weight.clone(),
+            gate_input_weight: self.gate_input_weight.clone(),
+            gate_bias: self.gate_bias.clone(),
+        }
+    }
+
+    /// Atomically replace all trainable fields after complete validation.
+    ///
+    /// No field is mutated unless every field has the correct dimension and all
+    /// values are finite. Changing these numerical values does not alter the
+    /// architecture-level binding-equivariance proof.
+    pub fn set_parameters(&mut self, parameters: HlsParameters) -> Result<(), HlsError> {
+        validate_parameters(&parameters, self.config.dim)?;
+        self.recurrent_weight = parameters.recurrent_weight;
+        self.input_weight = parameters.input_weight;
+        self.tau_state_weight = parameters.tau_state_weight;
+        self.gate_state_weight = parameters.gate_state_weight;
+        self.gate_input_weight = parameters.gate_input_weight;
+        self.gate_bias = parameters.gate_bias;
+        Ok(())
+    }
+
+    /// Apply an optimizer-produced delta atomically with an explicit absolute
+    /// parameter bound.
+    ///
+    /// `next = clamp(current + step_size * delta, -max_abs, +max_abs)`.
+    /// The candidate snapshot is fully validated before it replaces live state.
+    pub fn apply_parameter_delta(
+        &mut self,
+        delta: &HlsParameters,
+        step_size: f32,
+        max_abs: f32,
+    ) -> Result<(), HlsError> {
+        if !step_size.is_finite() {
+            return Err(HlsError::InvalidParameterStep);
+        }
+        if !max_abs.is_finite() || max_abs <= 0.0 {
+            return Err(HlsError::InvalidParameterBound);
+        }
+        validate_parameters(delta, self.config.dim)?;
+
+        let mut next = self.parameters();
+        apply_delta_field(
+            "recurrent_weight",
+            &mut next.recurrent_weight,
+            &delta.recurrent_weight,
+            step_size,
+            max_abs,
+        )?;
+        apply_delta_field(
+            "input_weight",
+            &mut next.input_weight,
+            &delta.input_weight,
+            step_size,
+            max_abs,
+        )?;
+        apply_delta_field(
+            "tau_state_weight",
+            &mut next.tau_state_weight,
+            &delta.tau_state_weight,
+            step_size,
+            max_abs,
+        )?;
+        apply_delta_field(
+            "gate_state_weight",
+            &mut next.gate_state_weight,
+            &delta.gate_state_weight,
+            step_size,
+            max_abs,
+        )?;
+        apply_delta_field(
+            "gate_input_weight",
+            &mut next.gate_input_weight,
+            &delta.gate_input_weight,
+            step_size,
+            max_abs,
+        )?;
+        apply_delta_field(
+            "gate_bias",
+            &mut next.gate_bias,
+            &delta.gate_bias,
+            step_size,
+            max_abs,
+        )?;
+        self.set_parameters(next)
     }
 
     pub fn set_state(&mut self, state: ContinuousHV) -> Result<(), HlsError> {
@@ -283,6 +457,50 @@ impl HolographicLiquidCell {
     }
 }
 
+fn parameter_fields(parameters: &HlsParameters) -> [(&'static str, &ContinuousHV); 6] {
+    [
+        ("recurrent_weight", &parameters.recurrent_weight),
+        ("input_weight", &parameters.input_weight),
+        ("tau_state_weight", &parameters.tau_state_weight),
+        ("gate_state_weight", &parameters.gate_state_weight),
+        ("gate_input_weight", &parameters.gate_input_weight),
+        ("gate_bias", &parameters.gate_bias),
+    ]
+}
+
+fn validate_parameters(parameters: &HlsParameters, dim: usize) -> Result<(), HlsError> {
+    for (name, field) in parameter_fields(parameters) {
+        if field.dim() != dim {
+            return Err(HlsError::ParameterDimensionMismatch {
+                field: name,
+                expected: dim,
+                actual: field.dim(),
+            });
+        }
+        if field.values.iter().any(|value| !value.is_finite()) {
+            return Err(HlsError::NonFiniteParameter(name));
+        }
+    }
+    Ok(())
+}
+
+fn apply_delta_field(
+    name: &'static str,
+    target: &mut ContinuousHV,
+    delta: &ContinuousHV,
+    step_size: f32,
+    max_abs: f32,
+) -> Result<(), HlsError> {
+    for (value, update) in target.values.iter_mut().zip(delta.values.iter().copied()) {
+        let candidate = *value + step_size * update;
+        if !candidate.is_finite() {
+            return Err(HlsError::NonFiniteParameter(name));
+        }
+        *value = candidate.clamp(-max_abs, max_abs);
+    }
+    Ok(())
+}
+
 fn validate_config(config: &HlsConfig) -> Result<(), HlsError> {
     if config.dim == 0 {
         return Err(HlsError::ZeroDimension);
@@ -355,6 +573,85 @@ mod tests {
         }
         assert!(cell.state().norm().is_finite());
         assert!(cell.state().norm() <= cell.config().state_norm_limit + 1e-5);
+    }
+
+    #[test]
+    fn parameter_count_matches_snapshot() {
+        let cell = HolographicLiquidCell::try_new(test_config(), 42).unwrap();
+        assert_eq!(cell.parameter_count(), 6 * 512);
+        assert_eq!(cell.parameters().scalar_count(), cell.parameter_count());
+    }
+
+    #[test]
+    fn parameter_replacement_is_atomic_on_validation_failure() {
+        let mut cell = HolographicLiquidCell::try_new(test_config(), 42).unwrap();
+        let before = cell.parameters();
+        let mut malformed = before.clone();
+        malformed.input_weight.values.pop();
+        assert!(matches!(
+            cell.set_parameters(malformed),
+            Err(HlsError::ParameterDimensionMismatch {
+                field: "input_weight",
+                ..
+            })
+        ));
+        assert_eq!(cell.parameters(), before);
+    }
+
+    #[test]
+    fn arbitrary_finite_parameter_values_preserve_binding_equivariance() {
+        let mut cell = HolographicLiquidCell::try_new(test_config(), 42).unwrap();
+        let mut parameters = cell.parameters();
+        for (field_index, (_, field)) in parameter_fields(&parameters).into_iter().enumerate() {
+            // Read-only pass establishes deterministic field lengths before mutation.
+            assert_eq!(field.dim(), 512, "field {field_index}");
+        }
+        for (index, value) in parameters.recurrent_weight.values.iter_mut().enumerate() {
+            *value = ((index % 17) as f32 - 8.0) * 0.11;
+        }
+        for (index, value) in parameters.input_weight.values.iter_mut().enumerate() {
+            *value = ((index % 13) as f32 - 6.0) * 0.09;
+        }
+        for (index, value) in parameters.tau_state_weight.values.iter_mut().enumerate() {
+            *value = ((index % 11) as f32 - 5.0) * 0.17;
+        }
+        for (index, value) in parameters.gate_state_weight.values.iter_mut().enumerate() {
+            *value = ((index % 7) as f32 - 3.0) * 0.21;
+        }
+        for (index, value) in parameters.gate_input_weight.values.iter_mut().enumerate() {
+            *value = ((index % 19) as f32 - 9.0) * 0.07;
+        }
+        for (index, value) in parameters.gate_bias.values.iter_mut().enumerate() {
+            *value = ((index % 5) as f32 - 2.0) * 0.05;
+        }
+        cell.set_parameters(parameters).unwrap();
+        cell.set_state(ContinuousHV::new_random(512, 100)).unwrap();
+        let input = ContinuousHV::new_random(512, 101);
+        let role = UnitaryRole::new(512, 102);
+        let error = cell
+            .binding_equivariance_error(&role, &input, 0.137)
+            .unwrap();
+        assert!(error <= 1e-6, "trained-parameter equivariance error={error}");
+    }
+
+    #[test]
+    fn bounded_parameter_delta_clamps_candidate_without_partial_update() {
+        let mut cell = HolographicLiquidCell::try_new(test_config(), 42).unwrap();
+        let mut delta = HlsParameters::zeros(512);
+        delta.recurrent_weight.values.fill(100.0);
+        delta.gate_bias.values.fill(-100.0);
+        cell.apply_parameter_delta(&delta, 1.0, 0.25).unwrap();
+        let parameters = cell.parameters();
+        assert!(parameters
+            .recurrent_weight
+            .values
+            .iter()
+            .all(|value| value.abs() <= 0.25));
+        assert!(parameters
+            .gate_bias
+            .values
+            .iter()
+            .all(|value| value.abs() <= 0.25));
     }
 
     #[test]
