@@ -11,6 +11,7 @@ analytical = []
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
 symthaea-atelier = { path = "../symthaea-atelier" }
 symthaea-canvas = { path = "../symthaea-canvas" }
 serde = { workspace = true }
