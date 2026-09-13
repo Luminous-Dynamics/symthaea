@@ -13,7 +13,9 @@ use crate::contextual_holographic_liquid::{ContextualHlsError, ContextualHologra
 use crate::continuous_hv::ContinuousHV;
 use crate::holographic_liquid::{HlsError, HolographicLiquidCell};
 use crate::neuron::HdcLtcUnifiedNeuron;
-use crate::state_tracking_benchmark::{StateTrackingBenchmark, TrackingAnswer, TrackingQuery, TrackingScore};
+use crate::state_tracking_benchmark::{
+    StateTrackingBenchmark, TrackingAnswer, TrackingQuery, TrackingScore,
+};
 use crate::state_tracking_codec::{StateTrackingCodec, TrackingCodecError};
 use crate::state_tracking_readout::{TrackingPrototypeReadout, TrackingReadoutError};
 use std::convert::Infallible;
@@ -96,7 +98,7 @@ impl Default for FrozenTrackingEvalConfig {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FrozenTrackingEvalResult {
-    /// Accuracy using recurrent state concatenated with the query encoding.
+    /// Accuracy using independently normalized recurrent-state and query blocks.
     pub score: TrackingScore,
     /// Control accuracy using only query encoding and no recurrent state.
     pub query_only_score: TrackingScore,
@@ -166,6 +168,10 @@ impl From<TrackingReadoutError> for FrozenTrackingEvalError {
 
 /// Train shared diagnostic readouts on `train`, reset the frozen reservoir, and
 /// evaluate both reservoir+query and query-only controls on `test`.
+///
+/// The recurrent-state and query blocks are L2-normalized independently before
+/// concatenation. This prevents either source from dominating cosine geometry
+/// merely because its native representation has a larger norm.
 pub fn evaluate_frozen_reservoir<R>(
     reservoir: &R,
     train: &StateTrackingBenchmark,
@@ -177,11 +183,8 @@ where
 {
     ensure_compatible_benchmarks(train, test)?;
     let state_dim = reservoir.tracking_dim();
-    let codec = StateTrackingCodec::from_benchmark_config(
-        state_dim,
-        &train.config,
-        config.codec_seed,
-    )?;
+    let codec =
+        StateTrackingCodec::from_benchmark_config(state_dim, &train.config, config.codec_seed)?;
 
     let mut reservoir_readout =
         TrackingPrototypeReadout::from_benchmark_config(state_dim * 2, &train.config)?;
@@ -195,7 +198,7 @@ where
         train,
         &codec,
         |state, query_vector, query| {
-            let feature = concatenate(state, query_vector);
+            let feature = balanced_concatenate(state, query_vector);
             reservoir_readout.observe(&feature, query.expected)?;
             query_only_readout.observe(query_vector, query.expected)?;
             Ok(())
@@ -212,7 +215,7 @@ where
         test,
         &codec,
         |state, query_vector, query| {
-            let feature = concatenate(state, query_vector);
+            let feature = balanced_concatenate(state, query_vector);
             predictions.push(reservoir_readout.predict(&feature, query.kind)?);
             query_only_predictions.push(query_only_readout.predict(query_vector, query.kind)?);
             Ok(())
@@ -271,8 +274,19 @@ where
     Ok(())
 }
 
-fn concatenate(state: &ContinuousHV, query: &ContinuousHV) -> ContinuousHV {
-    assert_eq!(state.dim(), query.dim(), "tracking feature dimension mismatch");
+/// Concatenate state and query after normalizing each block independently.
+///
+/// If one block is exactly zero, `ContinuousHV::normalize()` leaves it zero;
+/// the non-zero block still receives unit norm. When both blocks are non-zero,
+/// each contributes exactly half of the concatenated squared norm.
+fn balanced_concatenate(state: &ContinuousHV, query: &ContinuousHV) -> ContinuousHV {
+    assert_eq!(
+        state.dim(),
+        query.dim(),
+        "tracking feature dimension mismatch"
+    );
+    let state = state.normalize();
+    let query = query.normalize();
     let mut values = Vec::with_capacity(state.dim() + query.dim());
     values.extend_from_slice(&state.values);
     values.extend_from_slice(&query.values);
@@ -315,6 +329,26 @@ mod tests {
             ..StateTrackingBenchmarkConfig::default()
         })
         .unwrap()
+    }
+
+    #[test]
+    fn balanced_feature_gives_equal_nonzero_block_norms() {
+        let state = ContinuousHV::from_values(vec![0.001, 0.002, 0.003, 0.004]);
+        let query = ContinuousHV::from_values(vec![1000.0, 2000.0, 3000.0, 4000.0]);
+        let feature = balanced_concatenate(&state, &query);
+        let split = state.dim();
+        let state_norm = feature.values[..split]
+            .iter()
+            .map(|value| value * value)
+            .sum::<f32>()
+            .sqrt();
+        let query_norm = feature.values[split..]
+            .iter()
+            .map(|value| value * value)
+            .sum::<f32>()
+            .sqrt();
+        assert!((state_norm - 1.0).abs() < 1e-6, "state block norm={state_norm}");
+        assert!((query_norm - 1.0).abs() < 1e-6, "query block norm={query_norm}");
     }
 
     #[test]
