@@ -29,7 +29,7 @@ check_blob() {
   fi
 }
 
-check_blob "docs/release/evidence/WCARE44_AUTHENTICATED_REPLICATION_AGGREGATION_PROTOCOL_V1.md" "63807205013f632eb29abefe26f6f58586fdba9e"
+check_blob "docs/release/evidence/WCARE44_AUTHENTICATED_REPLICATION_AGGREGATION_PROTOCOL_V1.md" "2c9a65f0cae32a4276f200e440cd643c43537888"
 check_blob "docs/release/evidence/WCARE44_BUILDER_AUTH_OBSERVATION_SCHEMA_V1.json" "f129ae7fef8d20856277a97f6f549b9313e98e8c"
 check_blob "docs/release/evidence/WCARE44_TEMPORAL_OBSERVATION_SCHEMA_V1.json" "2fabbb71170d0efe34e01a2166d197a44e056b3b"
 check_blob "docs/release/evidence/WCARE44_CANDIDATE_RESULT_SCHEMA_V1.json" "2db071910816c1354bc8e14a46e8118ea8052a97"
