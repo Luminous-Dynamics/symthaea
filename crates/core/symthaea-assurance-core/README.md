@@ -11,7 +11,7 @@ evidence exists
     != deployment authority
 ```
 
-The crate content-addresses exact subjects, claims, qualification plans, evidence commitments, and results; keeps evidence provenance explicit; preserves negative and inconclusive findings as first-class outcomes; enforces preregistered claim ceilings; and records explicit invalidation conditions. It deliberately exposes no scalar safety or trust score.
+The crate content-addresses exact subjects, claims, qualification plans, evidence commitments, and results; keeps evidence provenance explicit; preserves negative and inconclusive findings as first-class outcomes; enforces plan-bound claim ceilings; and records explicit invalidation conditions. It deliberately exposes no scalar safety or trust score.
 
 Positive support is an evidence ladder, not a numeric grade:
 
@@ -21,6 +21,8 @@ Higher tiers require explicit evidence classes. `Reproduced` requires reproducti
 
 Deployment is intentionally not another support tier. Runtime evidence may be admitted, but evidence strength does not itself establish deployment eligibility or authority. A richer subject/deployment envelope belongs to later assurance tranches.
 
+`QualificationResult::validate_and_bind` validates a **caller-supplied** outcome against exact subject/claim/plan/evidence bindings and minimum positive-tier predicates. It does not infer a verdict from heterogeneous evidence. Contradiction-aware evidence resolution is intentionally reserved for ASSURE-003, and temporal proof that a plan was preregistered before evidence production is intentionally reserved for ASSURE-002.
+
 Negative outcomes (`NotDemonstrated`, `Contradicted`, `Inconclusive`, `Expired`, `Invalidated`) remain orthogonal to the positive ladder.
 
-ASSURE-000 is not a certification engine, red-team runner, deployment authorizer, compliance mapper, logging proxy, runtime sandbox, or independent-audit authority. Later assurance tranches may consume external evidence and execute qualification campaigns on top of this kernel.
+ASSURE-000 is not a certification engine, evidence resolver, red-team runner, deployment authorizer, compliance mapper, logging proxy, runtime sandbox, or independent-audit authority. Later assurance tranches may consume external evidence and execute qualification campaigns on top of this kernel.
