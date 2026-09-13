@@ -1,0 +1,298 @@
+# Focused validation for symthaea-support changes.
+#
+# This workflow is intentionally additive: the repository-wide CI remains the
+# integration authority. This lane validates the *raw PR head* as a distinct
+# qualification subject; ordinary pull-request CI may instead validate GitHub's
+# synthetic merge ref. Those are complementary evidence classes, not aliases.
+
+name: Support Fast Lane
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-support/**'
+      - 'crates/core/symthaea-logparse/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/support-fast.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  QUALIFICATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  QUALIFICATION_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+  EVENT_SHA: ${{ github.sha }}
+
+jobs:
+  support:
+    name: symthaea-support raw-head qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact raw-head subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Bind qualification subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          if [[ "$actual_head" != "$QUALIFICATION_HEAD_SHA" ]]; then
+            echo "ERROR: checked-out subject $actual_head != declared raw head $QUALIFICATION_HEAD_SHA" >&2
+            exit 1
+          fi
+          lock_digest="$(sha256sum Cargo.lock | awk '{print $1}')"
+          manifest_digest="$(sha256sum crates/domains/symthaea-support/Cargo.toml | awk '{print $1}')"
+          workflow_digest="$(sha256sum .github/workflows/support-fast.yml | awk '{print $1}')"
+          echo "actual_head=$actual_head" >> "$GITHUB_OUTPUT"
+          echo "lock_digest=$lock_digest" >> "$GITHUB_OUTPUT"
+          echo "manifest_digest=$manifest_digest" >> "$GITHUB_OUTPUT"
+          echo "workflow_digest=$workflow_digest" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Support Fast Lane qualification subject"
+            echo
+            echo "- Raw head: \`$actual_head\`"
+            echo "- PR base: \`${QUALIFICATION_BASE_SHA:-n/a}\`"
+            echo "- Event SHA: \`$EVENT_SHA\`"
+            echo "- Cargo.lock SHA-256: \`$lock_digest\`"
+            echo "- support Cargo.toml SHA-256: \`$manifest_digest\`"
+            echo "- Workflow SHA-256: \`$workflow_digest\`"
+            echo "- Subject class: **raw PR head / package-focused**"
+            echo "- Integration/full-repository qualification: **not implied by this lane**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare PR base for governance comparison
+        id: base
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          actual_base="$(git rev-parse "origin/${GITHUB_BASE_REF}")"
+          if [[ "$actual_base" != "$QUALIFICATION_BASE_SHA" ]]; then
+            echo "ERROR: fetched base $actual_base != event base $QUALIFICATION_BASE_SHA" >&2
+            exit 1
+          fi
+
+      - name: Governance check
+        id: governance
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-class-a-changes.sh --ci
+
+      - name: Install Rust toolchain
+        id: toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record toolchain
+        id: toolchain-info
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc -Vv
+          cargo -V
+          echo "rustc_version=$(rustc -V | tr -d '\n')" >> "$GITHUB_OUTPUT"
+          echo "cargo_version=$(cargo -V | tr -d '\n')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache focused Cargo state
+        id: cache
+        continue-on-error: true
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/support-fast
+          key: ${{ runner.os }}-support-fast-${{ hashFiles('Cargo.lock', 'crates/domains/symthaea-support/Cargo.toml', 'crates/core/symthaea-logparse/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-support-fast-
+
+      - name: Format symthaea-support
+        id: format
+        continue-on-error: true
+        run: cargo fmt -p symthaea-support -- --check
+
+      - name: Test symthaea-support defaults
+        id: default-tests
+        continue-on-error: true
+        env:
+          CARGO_TARGET_DIR: target/support-fast
+        run: cargo test --locked -p symthaea-support --all-targets
+
+      - name: Clippy symthaea-support defaults
+        id: clippy
+        continue-on-error: true
+        env:
+          CARGO_TARGET_DIR: target/support-fast
+        run: cargo clippy --locked -p symthaea-support --all-targets -- -D warnings
+
+      - name: Test optional logparse adapter
+        id: logparse-tests
+        continue-on-error: true
+        env:
+          CARGO_TARGET_DIR: target/support-fast
+        run: cargo test --locked -p symthaea-support --all-targets --features logparse-adapter
+
+      - name: Check root support integration
+        id: root-check
+        continue-on-error: true
+        env:
+          CARGO_TARGET_DIR: target/support-fast
+        run: cargo check --locked -p symthaea --no-default-features --features support
+
+      - name: Verify tracked source immutability and subject binding
+        id: immutability
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_HEAD_SHA"
+          if ! git diff --quiet -- .; then
+            echo "ERROR: qualification steps modified tracked source files" >&2
+            git diff -- .
+            exit 1
+          fi
+          echo "Raw-head subject remained bound to $QUALIFICATION_HEAD_SHA"
+
+      - name: Write machine-readable qualification receipt
+        id: receipt
+        if: always()
+        env:
+          SUBJECT_OUTCOME: ${{ steps.subject.outcome }}
+          BASE_OUTCOME: ${{ steps.base.outcome }}
+          GOVERNANCE_OUTCOME: ${{ steps.governance.outcome }}
+          TOOLCHAIN_OUTCOME: ${{ steps.toolchain.outcome }}
+          TOOLCHAIN_INFO_OUTCOME: ${{ steps.toolchain-info.outcome }}
+          CACHE_OUTCOME: ${{ steps.cache.outcome }}
+          FORMAT_OUTCOME: ${{ steps.format.outcome }}
+          DEFAULT_TESTS_OUTCOME: ${{ steps.default-tests.outcome }}
+          CLIPPY_OUTCOME: ${{ steps.clippy.outcome }}
+          LOGPARSE_TESTS_OUTCOME: ${{ steps.logparse-tests.outcome }}
+          ROOT_CHECK_OUTCOME: ${{ steps.root-check.outcome }}
+          IMMUTABILITY_OUTCOME: ${{ steps.immutability.outcome }}
+          LOCK_DIGEST: ${{ steps.subject.outputs.lock_digest }}
+          MANIFEST_DIGEST: ${{ steps.subject.outputs.manifest_digest }}
+          WORKFLOW_DIGEST: ${{ steps.subject.outputs.workflow_digest }}
+          RUSTC_VERSION: ${{ steps.toolchain-info.outputs.rustc_version }}
+          CARGO_VERSION: ${{ steps.toolchain-info.outputs.cargo_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/support-fast/qualification
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          outcomes = {
+              "subject_binding": os.environ.get("SUBJECT_OUTCOME", "unknown"),
+              "base_binding": os.environ.get("BASE_OUTCOME", "unknown"),
+              "governance": os.environ.get("GOVERNANCE_OUTCOME", "unknown"),
+              "toolchain_install": os.environ.get("TOOLCHAIN_OUTCOME", "unknown"),
+              "toolchain_info": os.environ.get("TOOLCHAIN_INFO_OUTCOME", "unknown"),
+              "cache": os.environ.get("CACHE_OUTCOME", "unknown"),
+              "format": os.environ.get("FORMAT_OUTCOME", "unknown"),
+              "default_tests": os.environ.get("DEFAULT_TESTS_OUTCOME", "unknown"),
+              "clippy": os.environ.get("CLIPPY_OUTCOME", "unknown"),
+              "logparse_tests": os.environ.get("LOGPARSE_TESTS_OUTCOME", "unknown"),
+              "root_support_check": os.environ.get("ROOT_CHECK_OUTCOME", "unknown"),
+              "immutability": os.environ.get("IMMUTABILITY_OUTCOME", "unknown"),
+          }
+          required_names = ["format", "default_tests", "clippy", "logparse_tests", "root_support_check", "immutability"]
+          qualification = "PASS" if all(outcomes[name] == "success" for name in required_names) else "NOT_ESTABLISHED"
+          receipt = {
+              "schema_version": "symthaea-ci-qualification-receipt-v1",
+              "qualification_status": qualification,
+              "subject": {
+                  "class": "raw_pr_head_package_focused",
+                  "repository": os.environ.get("GITHUB_REPOSITORY"),
+                  "head_sha": os.environ.get("QUALIFICATION_HEAD_SHA"),
+                  "base_sha": os.environ.get("QUALIFICATION_BASE_SHA") or None,
+                  "event_sha": os.environ.get("EVENT_SHA"),
+                  "head_ref": os.environ.get("GITHUB_HEAD_REF") or None,
+                  "base_ref": os.environ.get("GITHUB_BASE_REF") or None,
+              },
+              "run": {
+                  "workflow": os.environ.get("GITHUB_WORKFLOW"),
+                  "run_id": os.environ.get("GITHUB_RUN_ID"),
+                  "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+                  "event_name": os.environ.get("GITHUB_EVENT_NAME"),
+              },
+              "digests": {
+                  "cargo_lock_sha256": os.environ.get("LOCK_DIGEST") or None,
+                  "package_manifest_sha256": os.environ.get("MANIFEST_DIGEST") or None,
+                  "workflow_sha256": os.environ.get("WORKFLOW_DIGEST") or None,
+              },
+              "toolchain": {
+                  "policy": "Rust 1.96.0",
+                  "rustc": os.environ.get("RUSTC_VERSION") or None,
+                  "cargo": os.environ.get("CARGO_VERSION") or None,
+              },
+              "gates": outcomes,
+              "scope": {
+                  "package": "symthaea-support",
+                  "optional_logparse_adapter_tested": True,
+                  "root_support_integration_checked": True,
+                  "full_repository_integration_implied": False,
+              },
+          }
+          path = Path("target/support-fast/qualification/receipt.json")
+          path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          print(path.read_text())
+          PY
+          qualification="$(python3 -c 'import json; print(json.load(open("target/support-fast/qualification/receipt.json"))["qualification_status"])')"
+          {
+            echo
+            echo "## Structured qualification result"
+            echo
+            echo "- Qualification status: **$qualification**"
+            echo "- Receipt schema: \`symthaea-ci-qualification-receipt-v1\`"
+            echo "- Individual gate outcomes are retained; this is not a universal integration verdict."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload qualification receipt
+        if: always() && steps.receipt.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: support-qualification-${{ env.QUALIFICATION_HEAD_SHA }}
+          path: target/support-fast/qualification/receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce required qualification gates
+        if: always()
+        env:
+          FORMAT_OUTCOME: ${{ steps.format.outcome }}
+          DEFAULT_TESTS_OUTCOME: ${{ steps.default-tests.outcome }}
+          CLIPPY_OUTCOME: ${{ steps.clippy.outcome }}
+          LOGPARSE_TESTS_OUTCOME: ${{ steps.logparse-tests.outcome }}
+          ROOT_CHECK_OUTCOME: ${{ steps.root-check.outcome }}
+          IMMUTABILITY_OUTCOME: ${{ steps.immutability.outcome }}
+          RECEIPT_OUTCOME: ${{ steps.receipt.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          for outcome in "$FORMAT_OUTCOME" "$DEFAULT_TESTS_OUTCOME" "$CLIPPY_OUTCOME" "$LOGPARSE_TESTS_OUTCOME" "$ROOT_CHECK_OUTCOME" "$IMMUTABILITY_OUTCOME" "$RECEIPT_OUTCOME"; do
+            if [[ "$outcome" != "success" ]]; then
+              failed=1
+            fi
+          done
+          if [[ "$failed" -ne 0 ]]; then
+            echo "Required raw-head qualification gates are not all successful." >&2
+            exit 1
+          fi
