@@ -10,12 +10,12 @@ const PLAN_SCHEMA: &str = include_str!("../../../../docs/release/evidence/WCARE3
 const RESULT_SCHEMA: &str = include_str!("../../../../docs/release/evidence/WCARE36_PANEL_INDEPENDENCE_RESULT_SCHEMA_V1.json");
 const VERIFIER: &str = include_str!("../../../../scripts/wcare36_verify_independence.py");
 
-const EXPECTED_PROTOCOL_SHA256: &str = "25ccf97a777a1b3c84966601d544f4a66a38089bbd17b2a21fbdc6946fdf305c";
+const EXPECTED_PROTOCOL_SHA256: &str = "00deecb4a2600880a081ab94d57bd75af7f3b2258eb8ab420a631f0f826e177e";
 const EXPECTED_PROVENANCE_SCHEMA_SHA256: &str = "eed7df38d5219957b3e8e7a6e8fe2aeaddbae8b7fb14a7b0db3204f38afaba37";
-const EXPECTED_RELATION_SCHEMA_SHA256: &str = "bd0775e467641c2732532d27085ccaa943c270e0246c65318ff32961231d8b50";
-const EXPECTED_PLAN_SCHEMA_SHA256: &str = "7783235923308942199201d0c4b7a05dc5e31ba741ddf313ab68a1d3ab781037";
-const EXPECTED_RESULT_SCHEMA_SHA256: &str = "430c9e399d12ba0e7b1a979f176bae290ee41873f83d0d3e379c5d3d72b8cf39";
-const EXPECTED_VERIFIER_SHA256: &str = "d3073e8d7a243dfed01a8e2cb6f963b675926bfba2c44ef59b7b1f7415d68813";
+const EXPECTED_RELATION_SCHEMA_SHA256: &str = "8a58c9dde4c0cbcd0d4155e629428f978b44c794fa1362e8104173dd98b75a64";
+const EXPECTED_PLAN_SCHEMA_SHA256: &str = "4709e5c42244369d12b8e513d77d16a74c0fb8bb138c9d3180e141d9e752b7eb";
+const EXPECTED_RESULT_SCHEMA_SHA256: &str = "8647d324e70269a4cd17b7cd92ed5684eb838e075b230fa53c4ae516fc95c6f4";
+const EXPECTED_VERIFIER_SHA256: &str = "bd57e0f4671afed7a2d4c5815ceeb6c5151cb8f6fada9371f3c6b04b5e94c2e8";
 
 const K: [u32;64]=[
 0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
@@ -47,12 +47,14 @@ fn wcare36_protocol_bytes_are_frozen(){
 #[test]
 fn wcare36_preserves_conservative_independence_boundaries(){
  assert!(PROTOCOL.contains("Reviewer headcount and independent evidentiary weight are separate quantities"));
- assert!(PROTOCOL.contains("Unknown provenance may reduce the independence claim, but it may never increase it"));
+ assert!(PROTOCOL.contains("downgraded independent pair"));
+ assert!(PROTOCOL.contains("Unknown or weak provenance may reduce the independence claim, but it may never increase it"));
  for s in ["lineage_commitment_sha256","provenance_strength","conflict_of_interest"]{assert!(PROVENANCE_SCHEMA.contains(s),"missing provenance boundary: {s}")}
- for s in ["Independent","Related","SameLineage","Unknown","ConflictOfInterest"]{assert!(RELATION_SCHEMA.contains(s),"missing relation class: {s}")}
- for s in ["minimum_effective_independent_components","minimum_distinct_lineages","maximum_unknown_relation_pairs","require_no_conflict_of_interest"]{assert!(PLAN_SCHEMA.contains(s),"missing plan boundary: {s}")}
- for s in ["INDEPENDENCE_SUPPORTED","INDEPENDENCE_LIMITED","independence_component_census","requirements_met","unknown_pairs_within_limit"]{assert!(RESULT_SCHEMA.contains(s),"missing result boundary: {s}")}
+ for s in ["Independent","Related","SameLineage","Unknown","ConflictOfInterest","relation_evidence_strength"]{assert!(RELATION_SCHEMA.contains(s),"missing relation boundary: {s}")}
+ for s in ["accepted_independent_relation_strengths","accepted_lineage_provenance_strengths","minimum_effective_independent_components","minimum_distinct_lineages","maximum_unknown_relation_pairs","require_no_conflict_of_interest"]{assert!(PLAN_SCHEMA.contains(s),"missing plan boundary: {s}")}
+ for s in ["INDEPENDENCE_SUPPORTED","INDEPENDENCE_LIMITED","qualified_distinct_lineage_count","accepted_independent_pair_count","downgraded_independent_pair_count","relation_evidence_strength_counts","independence_component_census","requirements_met"]{assert!(RESULT_SCHEMA.contains(s),"missing result boundary: {s}")}
  assert!(VERIFIER.contains("same_lineage_pair_marked_independent"));
  assert!(VERIFIER.contains("incomplete_or_extra_relation_census"));
+ assert!(VERIFIER.contains("downgraded_independent_pair_count_mismatch"));
  assert!(VERIFIER.contains("reviewer_headcount_equals_independent_evidence_count"));
 }
