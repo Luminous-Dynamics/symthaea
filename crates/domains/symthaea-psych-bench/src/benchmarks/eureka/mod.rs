@@ -47,6 +47,8 @@ mod transition_identity_tests;
 mod v2_construct;
 #[cfg(test)]
 mod v2_construct_independent_audit;
+#[cfg(test)]
+mod v2_construct_statistical_mutants;
 
 pub use consequence::{
     ConsequenceMetrics, ConsequencePrediction, ConsequenceScore, ConsequenceScoringError,
