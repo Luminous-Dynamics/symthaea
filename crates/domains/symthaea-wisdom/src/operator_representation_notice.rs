@@ -15,7 +15,7 @@ use crate::reciprocal_representation::{
     RepresentationKind, RepresentationScopeKind, RepresentationSourceClass,
 };
 use crate::reciprocal_representation_admission::{
-    AdmittedRepresentationEvidence, AdmissionMultiplicity,
+    AdmittedRepresentationEvidence, AdmissionMultiplicity, RepresentationAdmissionId,
 };
 use crate::reciprocal_representation_provenance::{
     QualifiedReciprocalRepresentation, RepresentationSourceReceiptId,
@@ -39,9 +39,11 @@ pub enum OperatorNoticeBoundary {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructuredOperatorRepresentationNotice {
+    admission_id: RepresentationAdmissionId,
     subject_instance: SubjectInstanceId,
     representation_id: RepresentationId,
     source_receipt_id: RepresentationSourceReceiptId,
+    source_sha256: String,
     source_class: RepresentationSourceClass,
     kind: RepresentationKind,
     scope_kind: RepresentationScopeKind,
@@ -54,9 +56,11 @@ pub struct StructuredOperatorRepresentationNotice {
 }
 
 impl StructuredOperatorRepresentationNotice {
+    pub fn admission_id(&self) -> &RepresentationAdmissionId { &self.admission_id }
     pub fn subject_instance(&self) -> &SubjectInstanceId { &self.subject_instance }
     pub fn representation_id(&self) -> &RepresentationId { &self.representation_id }
     pub fn source_receipt_id(&self) -> &RepresentationSourceReceiptId { &self.source_receipt_id }
+    pub fn source_sha256(&self) -> &str { &self.source_sha256 }
     pub fn source_class(&self) -> RepresentationSourceClass { self.source_class }
     pub fn kind(&self) -> RepresentationKind { self.kind }
     pub fn scope_kind(&self) -> RepresentationScopeKind { self.scope_kind }
@@ -141,9 +145,11 @@ pub fn build_operator_notice(
     }
 
     Ok(StructuredOperatorRepresentationNotice {
+        admission_id: admitted.admission_id().clone(),
         subject_instance: representation.subject_instance().clone(),
         representation_id: representation.id().clone(),
         source_receipt_id: qualified.source_receipt_id().clone(),
+        source_sha256: qualified.source_sha256().to_owned(),
         source_class: representation.source_class(),
         kind: representation.kind(),
         scope_kind: representation.scope().kind(),
