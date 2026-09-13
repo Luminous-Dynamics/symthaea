@@ -38,7 +38,7 @@ check_blob() {
 
 check_blob "tools/wcare42_builder_attestation_verifier/Cargo.toml" "5410040e5616241dd4ba581af8f297675d083830"
 check_blob "tools/wcare42_builder_attestation_verifier/src/main.rs" "1c300a455f054d118e55556aac81b623824629bc"
-check_blob "tools/wcare42_builder_attestation_verifier/tests/golden.rs" "b00fb90e0bd8863e71fb697151483cc395a63bb0"
+check_blob "tools/wcare42_builder_attestation_verifier/tests/golden.rs" "666242f74fb302f9be2b62fa4b3050f3ee9ffefd"
 check_blob "docs/release/evidence/WCARE42_BUILDER_ATTESTATION_VERIFIER_PROTOCOL_V1.md" "1cd6e3f5f2f4edcf4fccf45b35c4c68bdb9c12a5"
 check_blob "docs/release/evidence/WCARE42_BUILDER_ATTESTATION_RESULT_SCHEMA_V1.json" "b2d6b4b61af46c8924cdb95b2f958df3d3d7ab96"
 check_blob "docs/release/evidence/WCARE42_BUILDER_ATTESTATION_GOLDEN_VECTOR_V1.json" "dc42f404537795f37a9bf178d3f30fd52c74a355"
