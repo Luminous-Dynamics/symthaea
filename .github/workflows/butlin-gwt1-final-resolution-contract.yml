@@ -1,0 +1,128 @@
+name: Butlin GWT-1 Final Resolution Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/evidence-profiles/gwt1-final-resolution-v1.json"
+      - ".github/scripts/evidence_archive_admission.py"
+      - ".github/workflows/butlin-gwt1-trusted-final-resolution.yml"
+      - ".github/workflows/butlin-gwt1-final-resolution-contract.yml"
+      - "crates/domains/symthaea-psych-bench/Cargo.toml"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_causal_verified_promotion.rs"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_trusted_resolution.rs"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs"
+      - "crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_trusted_resolution_candidate.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify final-resolution authority contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Audit frozen archive profile and authority source boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          import importlib.util
+          import pathlib
+          import re
+
+          root = pathlib.Path.cwd()
+          engine_path = root / ".github/scripts/evidence_archive_admission.py"
+          profile_path = root / ".github/evidence-profiles/gwt1-final-resolution-v1.json"
+          workflow_path = root / ".github/workflows/butlin-gwt1-trusted-final-resolution.yml"
+          verified_path = root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_causal_verified_promotion.rs"
+          facade_path = root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_trusted_resolution.rs"
+          binary_path = root / "crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_trusted_resolution_candidate.rs"
+          manifest_path = root / "crates/domains/symthaea-psych-bench/Cargo.toml"
+
+          spec = importlib.util.spec_from_file_location("archive_admission", engine_path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(module)
+          profile = module.load_profile(profile_path)
+          assert profile["schema"] == "butlin-evidence-archive-admission-profile-v1"
+          assert profile["profile_id"] == "gwt1-final-resolution-archive-v1"
+          assert profile["root"] == "gwt1-final-resolution"
+          assert len(profile["members"]) == 60, len(profile["members"])
+          assert len({item["path"] for item in profile["members"]}) == 60
+          assert any(item["path"].endswith("authority/promotion/internal_verification.json") for item in profile["members"])
+          assert any(item["path"].endswith("archive_admission_engine.py") for item in profile["members"])
+          assert any(item["path"].endswith("archive_admission_profile.json") for item in profile["members"])
+
+          workflow = workflow_path.read_text()
+          assert "--features trusted-resolution-authority" in workflow
+          assert "--features symthaea-backend --bin gwt1_generate_trusted_resolution_candidate" not in workflow
+          assert "gwt1-final-resolution-archive-v1" in workflow
+          assert "promotion_internal_verification.json" in workflow
+          assert "internal_token_verification_sha256" in workflow
+          assert ".member_count==60" in workflow
+          assert "--signer-digest \"$RESOLUTION_WORKFLOW_SHA\"" in workflow
+          assert "--deny-self-hosted-runners" in workflow
+          assert "persist-credentials: false" in workflow
+          assert "ubuntu-latest" not in workflow
+          assert "actions/cache" not in workflow
+
+          verified = verified_path.read_text()
+          assert "pub(crate) fn verify_gwt1_causal_promotion_package_v1" in verified
+          assert "pub fn verify_gwt1_causal_promotion_package_v1" not in verified
+          assert "promotion_attestation_verification_bytes: Vec<u8>" in verified
+          assert "pub(crate) fn promotion_attestation_verification_bytes" in verified
+
+          facade = facade_path.read_text()
+          assert "#[serde(skip)]" in facade
+          assert "promotion_attestation_verification_bytes" in facade
+          binary = binary_path.read_text()
+          assert 'feature = "trusted-resolution-authority"' in binary
+          assert "promotion_internal_verification.json" in binary
+          manifest = manifest_path.read_text()
+          assert 'trusted-resolution-authority = ["symthaea-backend"]' in manifest
+
+          # Fail if someone later reintroduces a generic public bool-style gate.
+          forbidden = re.compile(r"promote\s*\([^)]*attestation_verified\s*:\s*bool", re.DOTALL)
+          for path in (verified_path, facade_path):
+              assert not forbidden.search(path.read_text()), path
+          PY
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check psych-bench formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+
+      - name: Compile trusted final-resolution adapter
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-final-contract-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-final-contract-target
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench \
+            --features trusted-resolution-authority \
+            --bin gwt1_generate_trusted_resolution_candidate
+
+      - name: Run final-resolution candidate unit tests
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-final-contract-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-final-contract-target
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench \
+            --features trusted-resolution-authority \
+            gwt1_trusted_resolution::tests
