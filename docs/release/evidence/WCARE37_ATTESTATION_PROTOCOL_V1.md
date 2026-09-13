@@ -50,7 +50,7 @@ The canonical message is UTF-8 and MUST be constructed exactly as these LF-termi
 `subject_receipt_sha256=<64-lower-hex>`
 `reviewer_identity_commitment_sha256=<64-lower-hex|->`
 `provenance_strength_claim=<SelfDeclared|OrganizerVerified|ExternalVerified|InstitutionalAttestation|ModelSessionProvenance|->`
-`relation_evidence_strength_claim=<SelfDeclared|OrganizerVerified|ExternalVerified|InstitutionalAttestation|ModelSessionProvenance|->`
+`relation_evidence_strength_claim=<SelfDeclared|OrganizerAssessed|ExternalVerified|InstitutionalAttestation|ModelAssessment|->`
 `issuer_key_id=<token>`
 `issuer_policy_id=<token>`
 `issued_at_utc=<canonical UTC>`
@@ -93,7 +93,7 @@ A preregistered trust policy contains issuer-key entries with:
 
 A valid self-signature proves control of the corresponding private key only. It does not establish that the key belongs to an independent organization or is trusted for any scope.
 
-A key authorized only for `OrganizerVerified` cannot mint `ExternalVerified` or `InstitutionalAttestation` provenance.
+A key authorized only for `OrganizerVerified` cannot mint `ExternalVerified` or `InstitutionalAttestation` provenance. A relation assessor authorized only for `OrganizerAssessed` cannot mint `ExternalVerified` or `InstitutionalAttestation` relation evidence.
 
 ## Historical validity, rotation and revocation
 
