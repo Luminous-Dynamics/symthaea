@@ -34,6 +34,8 @@
 //!   artifact lineage, explicitly scoped below any physical-QCD claim
 //! - **Pure-SU(3) campaign lineage**: one frozen sampler/RNG/chain/measurement/
 //!   benchmark subject plus separately authorized and validated execution records
+//! - **Center-symmetry diagnostics**: center-invariant Polyakov alignment plus
+//!   explicit `Z3` sector occupancy and mobility under caller-declared policy
 //! - **Scale evidence**: same-ensemble flow curves whose derived uncertainty
 //!   must bind joint resampling across the correlated flow-time trajectory
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
@@ -60,6 +62,7 @@ pub mod general_relativity;
 pub mod lattice_analysis_authority;
 pub mod lattice_campaign_authority;
 pub mod lattice_campaign_manifest;
+pub mod lattice_center_symmetry;
 pub mod lattice_ensemble_promotion;
 pub mod lattice_flow_block_adequacy;
 pub mod lattice_flow_energy;
@@ -104,6 +107,12 @@ pub use lattice_campaign_manifest::{
     CampaignBenchmarkPlan, CampaignChainPlan, CampaignChainRunRecord, CampaignFlowPlan,
     CampaignInitialCondition, CampaignManifestError, PureSu3CampaignManifest,
     PureSu3CampaignRunRecord, WilsonRectangleSpec,
+};
+pub use lattice_center_symmetry::{
+    Z3_CENTER_DIAGNOSTIC_ID, CenterSectorChainDiagnostics, CenterSectorMobilityAssessment,
+    CenterSectorMobilityPolicy, CenterSymmetryError, PolyakovChainTrace, Z3CenterSector,
+    assess_center_sector_mobility, center_align_polyakov, classify_z3_center_sector,
+    diagnose_center_sector_chain,
 };
 pub use lattice_ensemble_promotion::{
     ENSEMBLE_SCALE_PROMOTION_ASSESSMENT_ID, EnsembleScalePromotionAssessment,
