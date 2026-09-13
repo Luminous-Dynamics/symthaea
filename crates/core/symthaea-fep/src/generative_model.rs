@@ -15,6 +15,85 @@ use super::types::{HiddenState, Observation};
 /// confirmed transition learning provides evidence that their dynamics differ.
 const DEFAULT_STATE_PERSISTENCE_PRIOR: f64 = 0.7;
 
+/// Schema identity for [`ActionTransitionPriorV1`].
+pub const ACTION_TRANSITION_PRIOR_SCHEMA_V1: u16 = 1;
+
+/// Numerical tolerance for validating stochastic transition rows.
+const TRANSITION_ROW_SUM_TOLERANCE: f64 = 1e-9;
+
+/// Versioned caller-supplied prior for one generic FEP action.
+///
+/// The generic core deliberately does not infer semantic meaning from `action`.
+/// Owning domains bind their typed action identity to the raw action slot and may
+/// use this schema to supply explicit transition dynamics. Applying the prior is
+/// atomic: every field is validated before any model state changes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ActionTransitionPriorV1 {
+    /// Must equal [`ACTION_TRANSITION_PRIOR_SCHEMA_V1`].
+    pub schema_version: u16,
+    /// Row-stochastic `[from_state][to_state]` transition matrix.
+    pub transition_matrix: Vec<Vec<f64>>,
+    /// Finite additive bias applied to each predicted next-state dimension.
+    pub transition_bias: Vec<f64>,
+}
+
+impl ActionTransitionPriorV1 {
+    /// Construct a V1 prior with the canonical schema identity.
+    pub fn new(transition_matrix: Vec<Vec<f64>>, transition_bias: Vec<f64>) -> Self {
+        Self {
+            schema_version: ACTION_TRANSITION_PRIOR_SCHEMA_V1,
+            transition_matrix,
+            transition_bias,
+        }
+    }
+}
+
+/// Fail-closed validation errors for caller-supplied action dynamics.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ActionTransitionPriorError {
+    UnsupportedSchemaVersion {
+        expected: u16,
+        actual: u16,
+    },
+    ActionOutOfRange {
+        action: usize,
+        num_actions: usize,
+    },
+    InternalActionStorageMismatch {
+        expected: usize,
+        transition_matrices: usize,
+        transition_biases: usize,
+    },
+    MatrixRowCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    MatrixColumnCountMismatch {
+        row: usize,
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteMatrixValue {
+        row: usize,
+        column: usize,
+    },
+    ProbabilityOutOfRange {
+        row: usize,
+        column: usize,
+    },
+    RowNotNormalized {
+        row: usize,
+        sum: f64,
+    },
+    BiasLengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteBiasValue {
+        index: usize,
+    },
+}
+
 /// Generative model: P(o, s) = P(o|s) * P(s)
 ///
 /// The generative model defines how hidden states generate observations
@@ -139,6 +218,111 @@ impl GenerativeModel {
             num_actions,
             learning_rate: 0.01,
         }
+    }
+
+    /// Validate and atomically install explicit dynamics for one action.
+    ///
+    /// This is the preferred fail-closed path for new domain integrations. The
+    /// owning domain remains responsible for binding `action` to a stable typed
+    /// semantic identity; the generic FEP core validates only the model contract.
+    pub fn apply_action_transition_prior_v1(
+        &mut self,
+        action: usize,
+        prior: ActionTransitionPriorV1,
+    ) -> Result<(), ActionTransitionPriorError> {
+        self.validate_action_transition_prior_v1(action, &prior)?;
+
+        self.transition_matrices[action] = prior.transition_matrix;
+        self.transition_bias[action] = prior.transition_bias;
+        Ok(())
+    }
+
+    fn validate_action_transition_prior_v1(
+        &self,
+        action: usize,
+        prior: &ActionTransitionPriorV1,
+    ) -> Result<(), ActionTransitionPriorError> {
+        if prior.schema_version != ACTION_TRANSITION_PRIOR_SCHEMA_V1 {
+            return Err(ActionTransitionPriorError::UnsupportedSchemaVersion {
+                expected: ACTION_TRANSITION_PRIOR_SCHEMA_V1,
+                actual: prior.schema_version,
+            });
+        }
+
+        if action >= self.num_actions {
+            return Err(ActionTransitionPriorError::ActionOutOfRange {
+                action,
+                num_actions: self.num_actions,
+            });
+        }
+
+        if self.transition_matrices.len() != self.num_actions
+            || self.transition_bias.len() != self.num_actions
+        {
+            return Err(ActionTransitionPriorError::InternalActionStorageMismatch {
+                expected: self.num_actions,
+                transition_matrices: self.transition_matrices.len(),
+                transition_biases: self.transition_bias.len(),
+            });
+        }
+
+        if prior.transition_matrix.len() != self.state_dim {
+            return Err(ActionTransitionPriorError::MatrixRowCountMismatch {
+                expected: self.state_dim,
+                actual: prior.transition_matrix.len(),
+            });
+        }
+
+        for (row_index, row) in prior.transition_matrix.iter().enumerate() {
+            if row.len() != self.state_dim {
+                return Err(ActionTransitionPriorError::MatrixColumnCountMismatch {
+                    row: row_index,
+                    expected: self.state_dim,
+                    actual: row.len(),
+                });
+            }
+
+            for (column_index, value) in row.iter().copied().enumerate() {
+                if !value.is_finite() {
+                    return Err(ActionTransitionPriorError::NonFiniteMatrixValue {
+                        row: row_index,
+                        column: column_index,
+                    });
+                }
+                if !(0.0..=1.0).contains(&value) {
+                    return Err(ActionTransitionPriorError::ProbabilityOutOfRange {
+                        row: row_index,
+                        column: column_index,
+                    });
+                }
+            }
+
+            let row_sum: f64 = row.iter().sum();
+            if (row_sum - 1.0).abs() > TRANSITION_ROW_SUM_TOLERANCE {
+                return Err(ActionTransitionPriorError::RowNotNormalized {
+                    row: row_index,
+                    sum: row_sum,
+                });
+            }
+        }
+
+        if prior.transition_bias.len() != self.state_dim {
+            return Err(ActionTransitionPriorError::BiasLengthMismatch {
+                expected: self.state_dim,
+                actual: prior.transition_bias.len(),
+            });
+        }
+
+        if let Some((index, _)) = prior
+            .transition_bias
+            .iter()
+            .enumerate()
+            .find(|(_, value)| !value.is_finite())
+        {
+            return Err(ActionTransitionPriorError::NonFiniteBiasValue { index });
+        }
+
+        Ok(())
     }
 
     /// Predict observation given hidden state: E[o|s]
@@ -321,8 +505,12 @@ impl GenerativeModel {
     /// analogue of [`GenerativeModel::inject_priors`]'s Passport Route, letting
     /// `predict_next_state` represent genuine growth/decay that a bias-free
     /// multiplicative transition matrix cannot (see `transition_bias`'s doc for
-    /// why this was needed). No-op if `action` is out of range or `bias`'s
-    /// length doesn't match `state_dim`.
+    /// why this was needed).
+    ///
+    /// This compatibility method keeps its historical silent-no-op behavior for
+    /// invalid shapes. New integrations that need auditable prior provenance
+    /// should prefer [`Self::apply_action_transition_prior_v1`], which validates
+    /// the matrix and bias together and returns a typed error on failure.
     pub fn set_transition_bias(&mut self, action: usize, bias: Vec<f64>) {
         if bias.len() == self.state_dim
             && let Some(slot) = self.transition_bias.get_mut(action)
