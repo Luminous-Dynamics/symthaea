@@ -20,6 +20,7 @@
 
 mod clock;
 mod clock_bootstrap_authority;
+mod clock_evaluation_permit;
 mod clock_witness;
 mod continuity;
 mod digest;
@@ -38,6 +39,15 @@ pub use clock_bootstrap_authority::{
     ClockBootstrapAuthorityEvidenceV2, ClockBootstrapAuthorityVerifier, ClockBootstrapClaimV2,
     VerifiedClockBootstrapAuthorityIdV2, VerifiedClockBootstrapAuthorityV2,
     verify_clock_bootstrap_authority,
+};
+pub use clock_evaluation_permit::{
+    CLOCK_BOOTSTRAP_ANCHOR_SCHEMA, CLOCK_CONTINUITY_POLICY_SCHEMA,
+    CLOCK_EVALUATION_PERMIT_SCHEMA, CLOCK_EVALUATION_POLICY_SCHEMA,
+    CLOCK_QUORUM_POLICY_SCHEMA, ClockAuthorityKeyV1, ClockBootstrapAnchorIdV2,
+    ClockContinuityPolicyRevisionIdV1, ClockContinuityPolicyRevisionV1,
+    ClockEvaluationPermitError, ClockEvaluationPermitIdV4, ClockEvaluationPermitV4,
+    ClockEvaluationPolicyIdV4, ClockEvaluationPolicyV4, ClockQuorumPolicyRevisionIdV1,
+    ClockQuorumPolicyRevisionV1, derive_bootstrap_clock_evaluation_permit_v4,
 };
 pub use clock_witness::{
     AcceptedClockObservationV1, CLOCK_WINDOW_EVALUATION_WITNESS_SCHEMA, ClockSignerV1,
