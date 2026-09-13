@@ -14,10 +14,10 @@
 //!
 //! This crate is intentionally domain-neutral and non-authoritative. It does
 //! not run evaluations, certify systems, authorize deployments, interpret
-//! regulations, or assign scalar safety/trust scores. It provides exact,
-//! deterministic semantics for subjects, claims, evidence provenance,
-//! qualification strength, negative findings, claim ceilings, and explicit
-//! invalidation conditions.
+//! regulations, infer heterogeneous evidence verdicts, or assign scalar
+//! safety/trust scores. It provides exact, deterministic semantics for
+//! subjects, claims, evidence provenance, qualification strength, negative
+//! findings, claim ceilings, and explicit invalidation conditions.
 
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -469,7 +469,15 @@ pub struct QualificationResult {
 }
 
 impl QualificationResult {
-    pub fn resolve(
+    /// Validates and binds a caller-supplied outcome to an exact subject,
+    /// claim, qualification plan, and evidence set.
+    ///
+    /// This function does **not** infer or resolve a heterogeneous evidence
+    /// verdict. The caller supplies `proposed_outcome`; ASSURE-000 checks
+    /// identity bindings, claim ceilings, minimum positive-tier evidence
+    /// classes, and reproduction identity separation. Evidence interpretation
+    /// and contradiction-aware resolution belong to ASSURE-003.
+    pub fn validate_and_bind(
         claim: &Claim,
         subject: &SubjectManifest,
         plan: &QualificationPlan,
