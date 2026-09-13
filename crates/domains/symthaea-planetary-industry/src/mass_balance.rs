@@ -108,6 +108,20 @@ pub struct MassBalanceReport {
     pub all_streams_exact: bool,
 }
 
+fn checked_sum(
+    values: impl Iterator<Item = f64>,
+    label: &'static str,
+) -> Result<f64, OntologyError> {
+    let mut total = 0.0;
+    for value in values {
+        total += value;
+        if !total.is_finite() {
+            return Err(OntologyError::InvalidQuantity(label));
+        }
+    }
+    Ok(total)
+}
+
 /// Evaluate bulk-mass closure for one process definition.
 ///
 /// Every `ProcessInput` and every `ProcessOutput` participates, regardless of
@@ -120,35 +134,55 @@ pub fn evaluate_mass_balance(
     process.validate()?;
     tolerance.validate()?;
 
-    let input_min_kg: f64 = process
-        .inputs
-        .iter()
-        .map(|stream| stream.mass_kg.min.value())
-        .sum();
-    let input_max_kg: f64 = process
-        .inputs
-        .iter()
-        .map(|stream| stream.mass_kg.max.value())
-        .sum();
-    let output_min_kg: f64 = process
-        .outputs
-        .iter()
-        .map(|stream| stream.mass_kg.min.value())
-        .sum();
-    let output_max_kg: f64 = process
-        .outputs
-        .iter()
-        .map(|stream| stream.mass_kg.max.value())
-        .sum();
+    let input_min_kg = checked_sum(
+        process
+            .inputs
+            .iter()
+            .map(|stream| stream.mass_kg.min.value()),
+        "mass_balance_input_min_total",
+    )?;
+    let input_max_kg = checked_sum(
+        process
+            .inputs
+            .iter()
+            .map(|stream| stream.mass_kg.max.value()),
+        "mass_balance_input_max_total",
+    )?;
+    let output_min_kg = checked_sum(
+        process
+            .outputs
+            .iter()
+            .map(|stream| stream.mass_kg.min.value()),
+        "mass_balance_output_min_total",
+    )?;
+    let output_max_kg = checked_sum(
+        process
+            .outputs
+            .iter()
+            .map(|stream| stream.mass_kg.max.value()),
+        "mass_balance_output_max_total",
+    )?;
 
     let reference_mass = input_max_kg.max(output_max_kg);
-    let tolerance_kg = tolerance
-        .absolute_kg()
-        .max(tolerance.relative_fraction() * reference_mass);
+    let relative_tolerance_kg = tolerance.relative_fraction() * reference_mass;
+    if !relative_tolerance_kg.is_finite() {
+        return Err(OntologyError::InvalidQuantity(
+            "mass_balance_effective_tolerance",
+        ));
+    }
+    let tolerance_kg = tolerance.absolute_kg().max(relative_tolerance_kg);
+    if !tolerance_kg.is_finite() {
+        return Err(OntologyError::InvalidQuantity(
+            "mass_balance_effective_tolerance",
+        ));
+    }
 
     // Reference-oracle sign convention: output - input.
     let residual_min_kg = output_min_kg - input_max_kg;
     let residual_max_kg = output_max_kg - input_min_kg;
+    if !residual_min_kg.is_finite() || !residual_max_kg.is_finite() {
+        return Err(OntologyError::InvalidQuantity("mass_balance_residual"));
+    }
 
     let all_streams_exact = process
         .inputs
@@ -161,6 +195,9 @@ pub fn evaluate_mass_balance(
 
     if all_streams_exact {
         let exact_residual_kg = output_min_kg - input_min_kg;
+        if !exact_residual_kg.is_finite() {
+            return Err(OntologyError::InvalidQuantity("mass_balance_residual"));
+        }
         let status = if exact_residual_kg.abs() <= tolerance_kg {
             MassBalanceStatus::ExactBalanced
         } else {
@@ -180,11 +217,12 @@ pub fn evaluate_mass_balance(
         });
     }
 
-    // Overlap expanded by the declared tolerance establishes only that some
-    // admissible realization could conserve mass. Uncertainty never upgrades a
-    // result to `ExactBalanced`.
+    // The residual interval is output-input. It is disjoint from zero beyond the
+    // declared tolerance exactly when the entire interval lies above +tolerance
+    // or below -tolerance. Comparing residual bounds avoids overflow-prone
+    // additions such as input_max + tolerance.
     let disjoint_beyond_tolerance =
-        input_max_kg + tolerance_kg < output_min_kg || output_max_kg + tolerance_kg < input_min_kg;
+        residual_min_kg > tolerance_kg || residual_max_kg < -tolerance_kg;
     let status = if disjoint_beyond_tolerance {
         MassBalanceStatus::ImpossibleWithinBounds
     } else {
@@ -362,6 +400,34 @@ mod tests {
         .unwrap();
         assert_eq!(report.status, MassBalanceStatus::ExactBalanced);
         assert!((report.tolerance_kg - 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn aggregate_mass_overflow_fails_closed() {
+        let fixture = process(
+            &[(f64::MAX, f64::MAX), (f64::MAX, f64::MAX)],
+            &[(1.0, 1.0)],
+        );
+        assert_eq!(
+            evaluate_mass_balance(&fixture, MassBalanceTolerance::zero()),
+            Err(OntologyError::InvalidQuantity(
+                "mass_balance_input_min_total"
+            ))
+        );
+    }
+
+    #[test]
+    fn effective_relative_tolerance_overflow_fails_closed() {
+        let fixture = process(&[(f64::MAX, f64::MAX)], &[(f64::MAX, f64::MAX)]);
+        assert_eq!(
+            evaluate_mass_balance(
+                &fixture,
+                MassBalanceTolerance::new(0.0, f64::MAX).unwrap(),
+            ),
+            Err(OntologyError::InvalidQuantity(
+                "mass_balance_effective_tolerance"
+            ))
+        );
     }
 
     #[test]
