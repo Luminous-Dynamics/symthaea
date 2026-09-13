@@ -13,3 +13,6 @@ symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default
 symthaea-memory = { path = "../symthaea-memory" }
 symthaea-welfare-assurance = { path = "../symthaea-welfare-assurance" }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+symthaea-psych-bench = { path = "../symthaea-psych-bench" }
