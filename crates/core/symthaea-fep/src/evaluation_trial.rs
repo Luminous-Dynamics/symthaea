@@ -1,16 +1,18 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! One-shot prediction-only evaluation capability for frozen FEP snapshots.
+//! Prediction-only evaluation capabilities for frozen FEP snapshots.
 //!
 //! [`FepPredictionSession`] intentionally supports learning because Development
 //! and other training workflows need `learn_from_actual`. Confirmatory
 //! evaluation needs a narrower capability: start from one immutable
 //! [`FepEvaluationSnapshot`], observe one public input, predict one prescribed
-//! action, and then lose the capability.
+//! action, and then lose the trial capability.
 //!
-//! This type contains a trainable session internally only as an implementation
-//! detail. It exposes no session/agent accessor and no learning method.
+//! [`FepHeldOutSubject`] is the runner-facing ownership boundary. It consumes a
+//! frozen snapshot and exposes only fresh one-shot [`FepEvaluationTrial`] values;
+//! callers cannot recover the snapshot, agent, or trainable session through the
+//! held-out subject API.
 
 use std::fmt;
 
@@ -21,6 +23,8 @@ use crate::types::ActionOutcome;
 
 /// API revision for the prediction-only frozen-snapshot evaluation boundary.
 pub const FEP_EVALUATION_TRIAL_REVISION: &str = "symthaea-fep-evaluation-trial-v1";
+/// API revision for the sealed held-out subject ownership boundary.
+pub const FEP_HELDOUT_SUBJECT_REVISION: &str = "symthaea-fep-heldout-subject-v1";
 
 /// Fresh one-shot prediction capability derived from a frozen FEP snapshot.
 ///
@@ -76,6 +80,67 @@ impl FepEvaluationTrial {
     ) -> Result<ActionOutcome, FepPredictionSessionError> {
         self.session.observe(observation, precision, modality)?;
         self.session.predict(action)
+    }
+}
+
+/// Runner-facing immutable held-out subject.
+///
+/// Construction consumes the frozen snapshot. This type is deliberately not
+/// `Clone` and provides no method that returns the snapshot, agent, or trainable
+/// [`FepPredictionSession`]. The only prediction authority it grants is creation
+/// of independent one-shot [`FepEvaluationTrial`] capabilities.
+///
+/// This is defense in depth rather than cryptographic custody: code that still
+/// possesses some other clone of a snapshot could create a trainable session
+/// through the legacy snapshot API. EUREKA's held-out runner must therefore own
+/// only this type, and its static reachability audit must reject direct imports
+/// of `FepEvaluationSnapshot` and `FepPredictionSession`.
+pub struct FepHeldOutSubject {
+    snapshot: FepEvaluationSnapshot,
+}
+
+impl fmt::Debug for FepHeldOutSubject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FepHeldOutSubject")
+            .field("revision", &FEP_HELDOUT_SUBJECT_REVISION)
+            .field("state_dim", &self.state_dim())
+            .field("observation_dim", &self.observation_dim())
+            .field("action_count", &self.action_count())
+            .field("snapshot_replay_digest", &self.snapshot_replay_digest())
+            .field("snapshot", &"<redacted>")
+            .finish()
+    }
+}
+
+impl FepHeldOutSubject {
+    /// Consume one standardized frozen snapshot into held-out-only authority.
+    pub fn seal(snapshot: FepEvaluationSnapshot) -> Self {
+        Self { snapshot }
+    }
+
+    pub fn state_dim(&self) -> usize {
+        self.snapshot.state_dim()
+    }
+
+    pub fn observation_dim(&self) -> usize {
+        self.snapshot.observation_dim()
+    }
+
+    pub fn action_count(&self) -> usize {
+        self.snapshot.action_count()
+    }
+
+    /// Existing deterministic replay ID of the learned snapshot.
+    ///
+    /// This remains explicitly non-cryptographic. EUREKA scientific subject
+    /// attestation must use the stronger commitment introduced separately.
+    pub fn snapshot_replay_digest(&self) -> u64 {
+        self.snapshot.replay_digest()
+    }
+
+    /// Mint one fresh prediction-only trial from the sealed learned subject.
+    pub fn trial(&self) -> FepEvaluationTrial {
+        FepEvaluationTrial::from_snapshot(&self.snapshot)
     }
 }
 
@@ -137,21 +202,48 @@ mod tests {
     }
 
     #[test]
-    fn source_snapshot_identity_is_retained_without_becoming_attestation() {
-        let frozen = snapshot(4, 4);
-        let trial = FepEvaluationTrial::from_snapshot(&frozen);
-        assert_eq!(trial.snapshot_replay_digest(), frozen.replay_digest());
+    fn sealed_subject_mints_independent_trials_without_exposing_training_surface() {
+        let subject = FepHeldOutSubject::seal(snapshot(4, 4));
+        assert_eq!(subject.observation_dim(), 4);
+        assert_eq!(subject.action_count(), 4);
+        let observation = [4.0, 3.0, 2.0, 1.0];
+        let a = subject
+            .trial()
+            .predict_once(&observation, 1.0, "heldout", 3)
+            .unwrap();
+        let b = subject
+            .trial()
+            .predict_once(&observation, 1.0, "heldout", 3)
+            .unwrap();
+        assert_eq!(a.action, b.action);
+        assert_eq!(a.predicted_next_state.mean, b.predicted_next_state.mean);
+        assert_eq!(a.expected_observation, b.expected_observation);
     }
 
     #[test]
-    fn debug_output_does_not_expose_private_session_state() {
+    fn debug_output_redacts_trainable_state() {
         let frozen = snapshot(4, 4);
-        let rendered = format!("{:?}", FepEvaluationTrial::from_snapshot(&frozen));
-        assert!(rendered.contains(FEP_EVALUATION_TRIAL_REVISION));
-        assert!(rendered.contains(&frozen.replay_digest().to_string()));
-        assert!(!rendered.contains("session"));
-        assert!(!rendered.contains("ActiveInferenceAgent"));
-        assert!(!rendered.contains("transition_matrices"));
+        let trial = FepEvaluationTrial::from_snapshot(&frozen);
+        let trial_debug = format!("{trial:?}");
+        assert!(trial_debug.contains(FEP_EVALUATION_TRIAL_REVISION));
+        assert!(!trial_debug.contains("ActiveInferenceAgent"));
+        assert!(!trial_debug.contains("transition_matrices"));
+
+        let subject = FepHeldOutSubject::seal(frozen);
+        let subject_debug = format!("{subject:?}");
+        assert!(subject_debug.contains(FEP_HELDOUT_SUBJECT_REVISION));
+        assert!(subject_debug.contains("<redacted>"));
+        assert!(!subject_debug.contains("likelihood_matrix"));
+        assert!(!subject_debug.contains("transition_matrices"));
+    }
+
+    #[test]
+    fn source_snapshot_identity_is_retained_without_becoming_attestation() {
+        let frozen = snapshot(4, 4);
+        let digest = frozen.replay_digest();
+        let subject = FepHeldOutSubject::seal(frozen);
+        assert_eq!(subject.snapshot_replay_digest(), digest);
+        assert_eq!(subject.trial().snapshot_replay_digest(), digest);
     }
 
     #[test]
