@@ -32,34 +32,50 @@ fn only_welfare_restart_adapter_calls_exact_uuid_batch_constructor_in_production
 }
 
 #[test]
-fn exact_point_restore_has_no_production_caller_before_governed_restore_adapter_exists() {
+fn only_governed_persisted_restore_adapter_calls_exact_point_restore_in_production() {
     let root = repository_root();
     let mut offenders = Vec::new();
+    let mut approved_callers = Vec::new();
     visit_rust_sources(&root.join("crates"), &mut |path, source| {
         if is_test_source(path) || is_import_mechanism(path) {
             return;
         }
         if source.contains(POINT_RESTORE_CALL) {
-            offenders.push(path.to_path_buf());
+            let expected = path.ends_with(
+                "crates/domains/symthaea-welfare-assurance/src/persisted_memory_restore.rs",
+            );
+            if expected {
+                approved_callers.push(path.to_path_buf());
+            } else {
+                offenders.push(path.to_path_buf());
+            }
         }
     });
+    assert_eq!(
+        approved_callers.len(),
+        1,
+        "exact persisted point restore must have exactly one governed production caller: {approved_callers:#?}"
+    );
     assert!(
         offenders.is_empty(),
-        "exact persisted point restore gained an unapproved production caller: {offenders:#?}"
+        "exact persisted point restore bypasses governed welfare adapter: {offenders:#?}"
     );
 }
 
 #[test]
-fn approved_restart_adapter_never_routes_through_fresh_uuid_insertion() {
-    let source = fs::read_to_string(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/canonical_memory_restart.rs"),
-    )
-    .unwrap();
-    for forbidden in [".store_if_significant(", ".store_if_significant_with_id("] {
-        assert!(
-            !source.contains(forbidden),
-            "approved restart adapter must not call fresh-UUID insertion API {forbidden:?}"
-        );
+fn approved_restart_adapters_never_route_through_fresh_uuid_insertion() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for relative in [
+        "src/canonical_memory_restart.rs",
+        "src/persisted_memory_restore.rs",
+    ] {
+        let source = fs::read_to_string(manifest_dir.join(relative)).unwrap();
+        for forbidden in [".store_if_significant(", ".store_if_significant_with_id("] {
+            assert!(
+                !source.contains(forbidden),
+                "approved restart adapter {relative:?} must not call fresh-UUID insertion API {forbidden:?}"
+            );
+        }
     }
 }
 
