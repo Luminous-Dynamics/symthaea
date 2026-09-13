@@ -40,13 +40,13 @@ POSITIVE_STATE = "EnvironmentSelectionResolutionVerifiedOnly"
 _STORE_PATH = re.compile(r"^/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[A-Za-z0-9+._?=-]+$")
 _SHA256_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
 
-NON_CLAIMS = [
+NON_CLAIMS = sorted([
     "does not prove recursive Nix store closure contents or references",
     "does not prove qualification tool executable bytes or version outputs",
     "does not prove the qualification recipe executed",
     "does not authenticate the capture/execution provider",
     "does not establish externally anchored chronology",
-]
+])
 
 
 def _run(repo: Path, argv: list[str]) -> str:
