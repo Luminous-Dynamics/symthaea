@@ -16,6 +16,8 @@
 //! - Canonical typed objective selection over measured primitive coordinates
 //! - Two-phase longitudinal metacognitive state with pre-outcome freezing
 //! - Canonical per-subject reasoning orchestration with plasticity held at baseline
+//! - Evidence-backed competing-context assessment with ambiguity-preserving robust selection
+//! - Canonical kernel V2 with robust multi-context selection and content-bound decisions
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -24,10 +26,12 @@ pub mod nixos_causal;
 pub mod reasoning_capability_artifact;
 pub mod reasoning_capability_bundle;
 pub mod reasoning_capability_matrix;
+pub mod reasoning_context_competition;
 pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
 pub mod reasoning_kernel;
+pub mod reasoning_kernel_v2;
 pub mod reasoning_meta_control_probe;
 pub mod reasoning_meta_state;
 pub mod reasoning_metacognition;
@@ -55,6 +59,12 @@ pub use reasoning_capability_matrix::{
     ObservedResources, ReasoningCapabilityMatrix, ResourceBudget,
     REASONING_CAPABILITY_MATRIX_SCHEMA_VERSION,
 };
+pub use reasoning_context_competition::{
+    assess_and_select, assess_contexts, select_candidate_robustly, ContextAssessmentReport,
+    ContextCompetitionError, ContextCompetitionPolicy, ContextHypothesis, ContextResolution,
+    PerContextCandidateScore, RobustCandidateEvaluation, RobustContextSelectionReport,
+    CONTEXT_COMPETITION_VERSION,
+};
 pub use reasoning_evaluator::{
     aggregate_receipts, evaluate_episode, wilson_interval_95, CapabilitySlice, EpisodeJudgment,
     ProportionInterval, ReasoningEvaluatorError, TaskScore, REASONING_EVALUATOR_VERSION,
@@ -71,6 +81,11 @@ pub use reasoning_kernel::{
     CanonicalReasoningDecision, CanonicalReasoningInput, CanonicalReasoningKernel,
     CanonicalSubjectCheckpoint, ReasoningKernelError, BASELINE_PLASTICITY_MULTIPLIER,
     CANONICAL_REASONING_KERNEL_VERSION,
+};
+pub use reasoning_kernel_v2::{
+    CanonicalReasoningDecisionV2, CanonicalReasoningInputV2, CanonicalReasoningKernelV2,
+    CanonicalSubjectCheckpointV2, ReasoningKernelV2Error,
+    CANONICAL_REASONING_BASELINE_PLASTICITY, CANONICAL_REASONING_KERNEL_V2_VERSION,
 };
 pub use reasoning_meta_control_probe::{
     run_meta_control_probe, MetaControlObservation, MetaControlProbeReport,
