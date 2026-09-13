@@ -24,6 +24,20 @@ jobs:
           python-version: '3.13'
       - name: Compile exact LL-009AG tools
         run: python -m py_compile scripts/ll009ag_common.py scripts/ll009ag_campaign.py scripts/freeze_ll009ag_site01_campaign.py
+      - name: Verify checked policy protects only materialized files
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, 'scripts')
+          from ll009ag_common import pbind, vp
+          policy = vp(json.loads(Path('configs/lunar_transport/ll009ag_site01_campaign_v1.json').read_text()))
+          bound = pbind(policy, Path('.'))
+          assert len(bound) == len(policy['protected_files'])
+          assert len(bound) >= 40, 'campaign execution surface unexpectedly shrank'
+          print('LL-009AG protected execution surface: PASS', len(bound), 'files')
+          PY
       - name: Execute dependency-free synthetic qualification
         run: >-
           python scripts/freeze_ll009ag_site01_campaign.py self-test
