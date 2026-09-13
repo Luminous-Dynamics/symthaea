@@ -8,13 +8,14 @@
 //! - Causal consciousness integration (HSIC, attention, LTC bridge)
 //! - Evidence-first reasoning qualification records, evaluation, and receipts
 //! - Cross-domain capability matrix with explicit holdout, contamination, and resource policy
-//! - Content-bound publication artifact for capability evidence
+//! - Portable lane bundles and content-bound publication artifacts for capability evidence
 
 pub mod athena;
 pub mod causal_consciousness;
 pub mod causal_discovery;
 pub mod nixos_causal;
 pub mod reasoning_capability_artifact;
+pub mod reasoning_capability_bundle;
 pub mod reasoning_capability_matrix;
 pub mod reasoning_evaluator;
 pub mod reasoning_qualification;
@@ -28,6 +29,10 @@ pub use nixos_causal::NixOSCausalAnalyzer;
 pub use reasoning_capability_artifact::{
     CapabilityArtifactError, ReasoningCapabilityArtifact,
     REASONING_CAPABILITY_ARTIFACT_SCHEMA_VERSION, REASONING_CAPABILITY_ARTIFACT_SERIALIZATION,
+};
+pub use reasoning_capability_bundle::{
+    CapabilityLaneBundle, CapabilityLaneBundleError,
+    REASONING_CAPABILITY_LANE_BUNDLE_SCHEMA_VERSION,
 };
 pub use reasoning_capability_matrix::{
     build_capability_lane, build_capability_matrix, BaselineMetric, CapabilityLaneDescriptor,
