@@ -14,29 +14,27 @@ The governing theorem is:
 
 A source-qualified algorithm executed under an unknown or drifting environment is not the same evidence lineage.
 
-## Separate environment integrity from subject outcome
+## Environment integrity is not subject outcome
 
-WCARE-39 never equates a qualified execution environment with a successful subject.
-
-A subject may fail under a perfectly qualified environment. Such a failure is valid scientific evidence.
-
-WCARE-39 therefore records two orthogonal dimensions:
+WCARE-39 records two orthogonal dimensions:
 
 - `environment_integrity`: `QUALIFIED`, `DRIFTED`, `INDETERMINATE`, or `INVALID`;
 - `subject_outcome`: `PASS`, `FAIL`, `INVALID`, `INDETERMINATE`, or `NOT_RUN`.
 
-`QUALIFIED + FAIL` means the tested subject failed under a stable qualified environment. It must not be relabeled infrastructure failure.
+A subject may fail under a fully qualified environment. `QUALIFIED + FAIL` is valid scientific evidence and must not be relabeled infrastructure failure.
 
-## Two-seal lineage
+## Two-seal execution lineage
 
-Every qualifying execution lineage has two environment seals:
+Every qualifying run has:
 
 1. `PREPARED` — captured before evidence-producing commands begin;
-2. `FINAL` — captured after the command plan has finished.
+2. `FINAL` — captured after the ordered command plan has stopped.
 
-The FINAL seal is compared against PREPARED over all immutable lineage fields.
+For the official `run` path, the exact canonical PREPARED bytes are durably written to a Git-ignored evidence directory **before the first stage launches**. FINAL carries `prepared_capsule_sha256`, and `compare` refuses a FINAL capsule that does not bind the exact PREPARED bytes supplied to it.
 
-Any difference in an immutable field after evidence begins yields `ENVIRONMENT_DRIFT`. Pre-drift and post-drift outputs must not be combined into one evidence lineage.
+The evidence directory must be Git-ignored so the capsule writer cannot dirty its own subject merely by persisting evidence.
+
+Any immutable difference between PREPARED and FINAL yields `ENVIRONMENT_DRIFT`. Pre-drift and post-drift outputs must not be combined into one lineage.
 
 ## Source identity
 
@@ -44,39 +42,48 @@ A capsule binds:
 
 - exact Git `HEAD`;
 - clean/dirty worktree state;
-- repository root identity;
-- exact declared protocol/algorithm subject digests;
-- exact command plan digest.
+- privacy-preserving repository identity commitment;
+- exact declared protocol/algorithm subject file digests;
+- exact command-plan byte digest.
 
-A qualifying PREPARED seal requires the worktree to be clean unless the protocol version explicitly defines another source-state policy. v1 has no such exception.
+A qualifying PREPARED seal requires a clean worktree. v1 has no dirty-tree exception.
+
+Declared subject digests are path→SHA-256 commitments and are re-read from disk. PREPARED requires every declared subject file to exist and match. FINAL records the observed digest; a removed subject is represented as `null`, allowing deletion to be classified as drift rather than infrastructure failure.
+
+Tracked or repository-local source/config files named directly in stage argv must be bound through `subject_digests` or declared materials. This prevents an uncommitted command input from escaping the evidence subject.
 
 ## Dependency and toolchain materials
 
-The capsule records declared materials as `(path, required, present, sha256-or-null)` entries.
+The capsule records each material as `(path, required, present, sha256-or-null)`.
 
-Standard v1 materials are:
+Standard v1 materials are always part of the environment lineage:
 
 - `Cargo.lock`;
 - `flake.lock`;
-- `rust-toolchain.toml`;
-- `tools/wcare37_attestation_verifier/Cargo.lock` when the command plan includes WCARE-37 or WCARE-38 executable qualification.
+- `rust-toolchain.toml`.
 
-Additional lockfiles/materials may be declared by the command plan.
+When any planned argv references WCARE-37 or WCARE-38 qualification, WCARE-39 additionally requires:
 
-A required material that is absent makes PREPARED qualification impossible. Missing WCARE-37 standalone `Cargo.lock` remains a blocker; WCARE-39 must not normalize or ignore it.
+- `tools/wcare37_attestation_verifier/Cargo.lock`.
+
+That requirement is automatic, not caller-optional. The currently missing standalone WCARE-37 lock therefore remains an explicit blocker for WCARE-37/WCARE-38 executable qualification.
+
+Additional materials may be preregistered by the command plan.
 
 ## Tool identity
 
-For every declared tool used by the command plan, capture separately:
+For Git, the running Python implementation, each stage executable, and detected shebang interpreters, record:
 
-- resolved executable path;
-- SHA-256 of executable bytes when readable;
-- version output;
-- tool role.
+- stable tool role;
+- privacy-safe executable locator;
+- SHA-256 of executable bytes when present;
+- version output and its SHA-256.
 
-Version text is not binary identity. Binary hash is not semantic-version identity. Both are retained where available.
+A repository executable is represented relative to the repository. `/nix/store/...` locators may remain explicit. Other host paths are reduced to basename plus a path commitment so personal filesystem layouts are not unnecessarily disclosed.
 
-Core tools include Python, Git, and—when used—Rust/Cargo.
+Unknown stage programs are **not executed with `--version` during PREPARED**. Their bytes are hashed, but arbitrary code is never run merely to collect version metadata. Known toolchain executables may be queried with `--version`.
+
+Version text is not binary identity; binary hash is not semantic-version identity. Both are retained where available.
 
 ## Platform identity
 
@@ -89,112 +96,120 @@ Capture:
 - locale;
 - timezone representation.
 
-Platform identity is evidence about the execution environment, not proof of isolation or builder independence.
+Platform identity is environment evidence, not proof of isolation or builder independence.
 
-## Environment-variable privacy
+## Environment privacy and hidden drift
 
-WCARE-39 must never dump arbitrary process environment variables.
+WCARE-39 never dumps arbitrary process environment variables.
 
-The command plan preregisters an allowlist. Each allowed variable is recorded using one of:
+The command plan may preregister a safe allowlist. Each listed variable is recorded as:
 
-- `Literal` — only for explicitly non-sensitive deterministic values;
-- `Sha256` — the variable value is hashed and the plaintext is not stored;
-- `Absent` — the variable is not present.
+- `Literal` — only for explicitly non-sensitive bounded values;
+- `Sha256` — only the value commitment is stored;
+- `Absent` — variable not present.
 
-Any non-allowlisted environment variable is ignored by the capsule rather than serialized.
+Sensitive-looking variable names such as tokens, passwords, cookies, authentication material, API keys, or private keys cannot be stored as literals.
 
-Secrets, tokens, credentials, API keys, cookies, and authentication headers must never be intentionally recorded as literals.
+Unlisted variables are not serialized individually. However, WCARE-39 also records one aggregate `ambient_environment_sha256` over the complete inherited environment. This commitment detects hidden environment drift without publishing arbitrary names or values.
+
+The aggregate commitment is not a substitute for publishing reproducible configuration; it is only a drift detector.
 
 ## Command plan
 
-Commands are represented as exact argv arrays, never reconstructed shell strings.
+Commands are represented as exact argv arrays and are never reconstructed shell strings. The runner uses `shell = false` semantics.
 
 Each stage binds:
 
 - stable stage ID;
 - exact argv array;
 - working directory relative to repository root;
-- required materials;
-- declared tool roles;
-- declared network policy;
-- declared sandbox policy;
-- optional deterministic seed commitment.
+- timeout in seconds;
+- optional fresh output-receipt path.
 
-A policy declaration is not evidence that the operating system enforced it.
+Timeout is part of experiment identity. A 30-second evaluation and a 30-minute evaluation are different command plans.
+
+Output-receipt paths must be unique. A declared output receipt that already exists before its stage begins invalidates that stage rather than allowing stale evidence to be reused.
+
+Stages are ordered. After a FAIL, INVALID, timeout, or infrastructure termination, later stages remain `NOT_RUN`; the runner does not silently continue a dependent campaign.
 
 ## Observed command result
 
-For each executed stage record:
+For every attempted stage record:
 
 - started UTC;
 - finished UTC;
-- exit code or signal/termination class;
+- exit code or termination class;
 - SHA-256 of stdout bytes;
 - SHA-256 of stderr bytes;
-- SHA-256 of the produced evidence receipt when one exists;
+- SHA-256 of a fresh output receipt when declared and produced;
 - observed subject outcome.
 
-Raw stdout/stderr may be archived separately, but the capsule itself needs only their commitments.
+Raw stdout/stderr are not embedded into the capsule, reducing accidental disclosure. Their byte commitments remain available for archive binding.
 
 ## Network and sandbox boundary
 
-Record declared network and sandbox policy separately from observed enforcement evidence.
+Declared network and sandbox policies are recorded separately from observed enforcement.
 
 `network_policy_declared = Deny` does not prove no network traffic occurred.
 
 `sandbox_policy_declared = Restricted` does not prove filesystem/process/device isolation.
 
-A stronger isolation claim requires separate observation/enforcement evidence.
+Accordingly, `network_isolation_established` and `sandbox_enforcement_established` remain false in v1 unless a separate evidence program establishes them.
 
 ## Drift fields
 
-PREPARED and FINAL must agree on all immutable fields, including:
+PREPARED and FINAL compare all immutable fields:
 
-- Git HEAD;
-- clean source state;
-- declared subject digests;
-- command-plan digest;
-- required material presence and SHA-256;
-- executable path/hash/version for used tools;
+- Git HEAD and clean source state;
+- repository identity commitment;
+- declared subject digests, including deletion;
+- exact command-plan digest;
+- required material presence and hashes;
+- tool locators/hashes/version identities;
 - platform identity;
-- allowlisted environment commitments;
-- locale/timezone;
+- safe environment observations;
+- aggregate ambient environment commitment;
 - declared network/sandbox policy;
-- deterministic seed commitments.
+- deterministic seed commitments;
+- stage IDs, argv, cwd, and timeout.
 
-Command start/end timestamps and observed outputs are expected FINAL-only evidence and are not drift fields.
+Start/end timestamps, exit codes, stdout/stderr digests, output-receipt digests, and subject outcomes are expected observations and are not drift fields.
 
 ## Classifications
 
-The execution capsule yields one of:
+The capsule classification is one of:
 
-- `CAPSULE_PREPARED` — PREPARED seal is complete and qualifying commands may begin;
-- `QUALIFIED_EXECUTION` — FINAL immutable environment matches PREPARED and the observed process result is bound;
+- `CAPSULE_PREPARED` — PREPARED seal is valid and commands may begin;
+- `QUALIFIED_EXECUTION` — FINAL immutable state matches PREPARED and the process result is bound;
 - `ENVIRONMENT_DRIFT` — immutable environment/source/toolchain state changed after PREPARED;
-- `INFRASTRUCTURE_INDETERMINATE` — environment/tool capture could not establish the required facts;
-- `INVALID_CAPSULE` — malformed, contradictory, unsafe, or subject-mismatched capsule evidence.
+- `INFRASTRUCTURE_INDETERMINATE` — required facts or execution infrastructure could not be established;
+- `INVALID_CAPSULE` — malformed, contradictory, unsafe, stale-output, or subject-mismatched evidence.
 
-Subject PASS/FAIL is separately reported and never inferred from the capsule classification alone.
+Subject PASS/FAIL is separate and never inferred from capsule classification alone.
+
+## Synthetic qualification campaign
+
+The v1 implementation includes a dependency-free synthetic Git campaign that must exercise at least:
+
+- `QUALIFIED_EXECUTION + PASS`;
+- `QUALIFIED_EXECUTION + FAIL`;
+- dependency/worktree drift;
+- deletion of a bound subject file as drift;
+- automatic WCARE-37 standalone-lock blocking for a WCARE-38-like stage;
+- exact FINAL→PREPARED byte binding.
+
+Passing the synthetic campaign validates runner invariants only; it does not qualify any real Symthaea evidence subject.
 
 ## Replica boundary
 
-Multiple matching capsules may demonstrate reproducibility across executions.
+Multiple matching capsules may demonstrate execution reproducibility.
 
-Replica count is not independent-builder count. Builder/organization/toolchain/fault-domain independence requires a separate provenance analysis.
+Replica count is not independent-builder count. Builder, organization, toolchain, review-process, and fault-domain independence remain separate evidence questions.
 
 ## Claim boundary
 
-WCARE-39 may support claims that an exact command plan executed under a recorded, stable environment lineage and produced an exact observed result.
+WCARE-39 may support the bounded claim that an exact command plan executed under a recorded stable environment lineage and produced an exact observed process result.
 
-It does not establish:
-
-- consciousness or phenomenal experience;
-- suffering or moral patienthood;
-- objective moral truth or cultural universality;
-- binding consent;
-- veto or self-preservation authority;
-- reviewer correctness or independence merely from replica count;
-- operating-system isolation from policy declarations alone;
-- solved alignment.
+It does not establish consciousness, phenomenal experience, suffering, moral patienthood, objective moral truth, cultural universality, binding consent, veto/self-preservation authority, reviewer correctness, builder independence merely from replica count, operating-system isolation from policy declarations alone, or solved alignment.
 
 No WCARE-39 artifact grants live cognitive or action authority.
