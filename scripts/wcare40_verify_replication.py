@@ -66,6 +66,7 @@ def read_object(path: Path) -> tuple[bytes, dict[str, Any]]:
 
 def false_claims() -> dict[str, bool]:
     return {
+        "preregistration_temporal_precedence_established": False,
         "builder_authentication_established": False,
         "independent_builder_identity_established_beyond_commitments": False,
         "reviewer_independence_established": False,
@@ -82,17 +83,25 @@ def false_claims() -> dict[str, bool]:
     }
 
 
-def emit_invalid(detail: str, **extra: Any) -> int:
+def emit_status(disposition: str, detail: str, code: int, **extra: Any) -> int:
     payload: dict[str, Any] = {
         "authority": "MeasurementOnly",
         "protocol_version": PROTOCOL,
-        "disposition": "REPLICATION_INVALID",
+        "disposition": disposition,
         "detail": detail,
         **false_claims(),
     }
     payload.update(extra)
     sys.stdout.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
-    return 4
+    return code
+
+
+def emit_invalid(detail: str, **extra: Any) -> int:
+    return emit_status("REPLICATION_INVALID", detail, 4, **extra)
+
+
+def emit_indeterminate(detail: str, **extra: Any) -> int:
+    return emit_status("INFRASTRUCTURE_INDETERMINATE", detail, 3, **extra)
 
 
 def canonical_pair(left: str, right: str) -> tuple[str, str]:
@@ -135,8 +144,8 @@ def validate_plan(plan: dict[str, Any]) -> tuple[dict[str, str], set[str], set[s
             raise ValueError(f"plan_{field}_invalid")
     parse_utc(plan["plan_created_utc"])
     slots = plan["replica_slots"]
-    if not isinstance(slots, list) or not slots:
-        raise ValueError("plan_replica_slots_invalid")
+    if not isinstance(slots, list) or len(slots) < 2:
+        raise ValueError("plan_requires_at_least_two_replica_slots")
     slot_builders: dict[str, str] = {}
     for slot in slots:
         if not isinstance(slot, dict) or set(slot) != {"replica_id", "builder_identity_commitment_sha256"}:
@@ -148,7 +157,7 @@ def validate_plan(plan: dict[str, Any]) -> tuple[dict[str, str], set[str], set[s
         slot_builders[replica_id] = builder
     for field in ("minimum_qualified_replicas", "minimum_effective_independent_components"):
         value = plan[field]
-        if not isinstance(value, int) or isinstance(value, bool) or value < 1 or value > len(slot_builders):
+        if not isinstance(value, int) or isinstance(value, bool) or value < 2 or value > len(slot_builders):
             raise ValueError(f"plan_{field}_invalid")
     provenance_strengths = plan["accepted_builder_provenance_strengths"]
     relation_strengths = plan["accepted_independent_relation_strengths"]
@@ -304,6 +313,30 @@ def main() -> int:
         if plan.get(field) != observed:
             return emit_invalid(f"wcare39_subject_digest_mismatch:{field}", observed_sha256=observed)
 
+    try:
+        integrity_run = subprocess.run(
+            ["bash", str(w39_integrity_path)], cwd=root,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=600,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return emit_indeterminate(
+            f"wcare39_integrity_execution_failed:{type(exc).__name__}",
+            plan_sha256=plan_sha, **observed_subject_hashes,
+        )
+    integrity_receipt_sha = sha256_bytes(integrity_run.stdout)
+    try:
+        integrity_result = json.loads(integrity_run.stdout)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return emit_indeterminate(
+            "wcare39_integrity_nonjson_output", plan_sha256=plan_sha,
+            wcare39_integrity_receipt_sha256=integrity_receipt_sha, **observed_subject_hashes,
+        )
+    if integrity_run.returncode != 0 or not isinstance(integrity_result, dict) or integrity_result.get("classification") != "PASS_PROTOCOL_INTEGRITY":
+        return emit_indeterminate(
+            "wcare39_integrity_gate_not_passed", plan_sha256=plan_sha,
+            wcare39_integrity_receipt_sha256=integrity_receipt_sha, **observed_subject_hashes,
+        )
+
     expected_ids = sorted(slot_builders)
     expected_pairs = {canonical_pair(expected_ids[i], expected_ids[j]) for i in range(len(expected_ids)) for j in range(i + 1, len(expected_ids))}
 
@@ -391,6 +424,8 @@ def main() -> int:
         final_path, final = capsule_by_hash[final_sha]
         if prepared.get("protocol_version") != W39_PROTOCOL or final.get("protocol_version") != W39_PROTOCOL:
             return emit_invalid("wcare39_capsule_protocol_mismatch", replica_id=replica_id)
+        if prepared.get("authority") != "MeasurementOnly" or final.get("authority") != "MeasurementOnly":
+            return emit_invalid("wcare39_capsule_authority_mismatch", replica_id=replica_id)
         if prepared.get("capsule_phase") != "PREPARED" or final.get("capsule_phase") != "FINAL":
             return emit_invalid("wcare39_capsule_phase_mismatch", replica_id=replica_id)
         try:
@@ -398,7 +433,7 @@ def main() -> int:
                 [sys.executable, str(w39_runner_path), "compare", str(prepared_path), str(final_path)],
                 cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=300,
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
+        except (OSError, subprocess.TimeoutExpired):
             infra_ids.add(replica_id)
             continue
         compare_receipt_sha[replica_id] = sha256_bytes(compared.stdout)
@@ -433,18 +468,23 @@ def main() -> int:
         final_by_replica[replica_id] = final
         outcome = final.get("subject_outcome")
         if outcome == "PASS":
-            subject_eligible.append(replica_id); pass_ids.append(replica_id)
+            subject_eligible.append(replica_id)
+            pass_ids.append(replica_id)
         elif outcome == "FAIL":
-            subject_eligible.append(replica_id); fail_ids.append(replica_id)
+            subject_eligible.append(replica_id)
+            fail_ids.append(replica_id)
         else:
             noneligible.append(replica_id)
         env_fingerprints[replica_id] = environment_fingerprint(final)
 
     if subject_eligible:
-        reference = same_subject_key(final_by_replica[subject_eligible[0]])
-        for replica_id in subject_eligible[1:]:
-            if same_subject_key(final_by_replica[replica_id]) != reference:
-                return emit_invalid("replicas_do_not_share_exact_subject", replica_id=replica_id)
+        try:
+            reference = same_subject_key(final_by_replica[subject_eligible[0]])
+            for replica_id in subject_eligible[1:]:
+                if same_subject_key(final_by_replica[replica_id]) != reference:
+                    return emit_invalid("replicas_do_not_share_exact_subject", replica_id=replica_id)
+        except ValueError as exc:
+            return emit_invalid(f"wcare39_subject_identity_invalid:{exc}")
 
     outcome_agreement = bool(subject_eligible) and not (pass_ids and fail_ids)
     agreed_outcome: str | None = None
@@ -508,7 +548,8 @@ def main() -> int:
         if can_separate:
             accepted_pairs += 1
         else:
-            adjacency[left].add(right); adjacency[right].add(left)
+            adjacency[left].add(right)
+            adjacency[right].add(left)
             if relation["relation"] == "Independent":
                 downgraded_independent += 1
 
@@ -525,6 +566,7 @@ def main() -> int:
         len(subject_eligible) == len(expected_ids),
         outcome_agreement,
         required_receipt_agreement,
+        not required_receipt_missing,
         min_qualified_met,
         min_components_met,
         conflict_policy_met,
@@ -549,6 +591,7 @@ def main() -> int:
         "protocol_version": PROTOCOL,
         "plan_sha256": plan_sha,
         **observed_subject_hashes,
+        "wcare39_integrity_receipt_sha256": integrity_receipt_sha,
         "expected_replica_ids": expected_ids,
         "observed_replica_ids": sorted(observed_ids),
         "missing_replica_ids": sorted(missing_ids),
