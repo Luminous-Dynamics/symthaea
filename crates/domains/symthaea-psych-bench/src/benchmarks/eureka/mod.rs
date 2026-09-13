@@ -29,6 +29,7 @@ mod heldout_evidence_envelope;
 mod heldout_seal;
 pub mod hidden_world;
 mod promotion;
+mod qualification_receipt;
 mod relay_triad;
 #[cfg(feature = "symthaea-backend")]
 mod relay_triad_comparator;
