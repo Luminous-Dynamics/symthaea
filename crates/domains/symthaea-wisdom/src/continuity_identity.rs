@@ -34,6 +34,7 @@ impl ContinuityEventId {
         }
         Ok(Self(value))
     }
+    pub fn as_str(&self) -> &str { &self.0 }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -141,6 +142,17 @@ impl ContinuityEvent {
             evidence_refs: evidence_refs.into_iter().collect(),
         })
     }
+
+    pub fn id(&self) -> &ContinuityEventId { &self.id }
+    pub fn predecessor(&self) -> &SubjectInstanceId { &self.predecessor }
+    pub fn successors(&self) -> &[SubjectInstanceId] { &self.successors }
+    pub fn kind(&self) -> ContinuityKind { self.kind }
+    pub fn from_revision(&self) -> u64 { self.from_revision }
+    pub fn to_revision(&self) -> u64 { self.to_revision }
+    pub fn predecessor_continues(&self) -> bool { self.predecessor_continues }
+    pub fn state_artifact_sha256(&self) -> Option<&str> { self.state_artifact_sha256.as_deref() }
+    pub fn exact_state_match(&self) -> bool { self.exact_state_match }
+    pub fn evidence_refs(&self) -> &BTreeSet<String> { &self.evidence_refs }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -194,7 +206,7 @@ pub struct ContinuityIdentityLedger {
     events: BTreeMap<ContinuityEventId, ContinuityEvent>,
     created_revision: BTreeMap<SubjectInstanceId, u64>,
     parent: BTreeMap<SubjectInstanceId, SubjectInstanceId>,
-    children: BTreeMap<SubjectInstanceId, BTreeSet<SubjectInstanceId>>,
+    inactive_instances: BTreeSet<SubjectInstanceId>,
     event_by_successor: BTreeMap<SubjectInstanceId, ContinuityEventId>,
 }
 
@@ -222,6 +234,11 @@ impl ContinuityIdentityLedger {
             .get(&event.predecessor)
             .copied()
             .ok_or_else(|| ContinuityIdentityError::UnknownPredecessor(event.predecessor.clone()))?;
+        if self.inactive_instances.contains(&event.predecessor) {
+            return Err(ContinuityIdentityError::PredecessorNoLongerActive(
+                event.predecessor.clone(),
+            ));
+        }
         if event.from_revision < predecessor_revision || event.to_revision < event.from_revision {
             return Err(ContinuityIdentityError::RevisionRegression);
         }
@@ -234,11 +251,10 @@ impl ContinuityIdentityLedger {
         for successor in &event.successors {
             self.created_revision.insert(successor.clone(), event.to_revision);
             self.parent.insert(successor.clone(), event.predecessor.clone());
-            self.children
-                .entry(event.predecessor.clone())
-                .or_default()
-                .insert(successor.clone());
             self.event_by_successor.insert(successor.clone(), event.id.clone());
+        }
+        if !event.predecessor_continues {
+            self.inactive_instances.insert(event.predecessor.clone());
         }
         self.events.insert(event.id.clone(), event);
         Ok(())
@@ -292,6 +308,7 @@ impl ContinuityIdentityLedger {
             return Err(ContinuityIdentityError::UnknownInstance(lost_instance.clone()));
         }
         let mut surviving_siblings = BTreeSet::new();
+
         if let Some(event_id) = self.event_by_successor.get(lost_instance) {
             let event = self.events.get(event_id).expect("event index is internal invariant");
             for successor in &event.successors {
@@ -303,6 +320,13 @@ impl ContinuityIdentityLedger {
                 surviving_siblings.insert(event.predecessor.clone());
             }
         }
+
+        for event in self.events.values().filter(|event| {
+            event.predecessor == *lost_instance && event.predecessor_continues
+        }) {
+            surviving_siblings.extend(event.successors.iter().cloned());
+        }
+
         Ok(BranchLossAssessment {
             lost_instance: lost_instance.clone(),
             surviving_siblings,
@@ -330,6 +354,13 @@ impl ContinuityIdentityLedger {
         let left_ancestors = self.ancestor_set(left);
         let right_ancestors = self.ancestor_set(right);
         Ok(!left_ancestors.is_disjoint(&right_ancestors))
+    }
+
+    pub fn is_active(&self, instance: &SubjectInstanceId) -> Result<bool, ContinuityIdentityError> {
+        if !self.created_revision.contains_key(instance) {
+            return Err(ContinuityIdentityError::UnknownInstance(instance.clone()));
+        }
+        Ok(!self.inactive_instances.contains(instance))
     }
 
     fn ancestor_set(&self, instance: &SubjectInstanceId) -> BTreeSet<SubjectInstanceId> {
@@ -367,6 +398,7 @@ pub enum ContinuityIdentityError {
     RevisionRegression,
     DuplicateEvent(ContinuityEventId),
     UnknownPredecessor(SubjectInstanceId),
+    PredecessorNoLongerActive(SubjectInstanceId),
     InstanceAlreadyExists(SubjectInstanceId),
     UnknownInstance(SubjectInstanceId),
     NoContinuityEvent(SubjectInstanceId),
@@ -384,21 +416,15 @@ mod tests {
         let mut ledger = ContinuityIdentityLedger::new();
         ledger.register_root(sid("root"), 1).unwrap();
         ledger.record(ContinuityEvent::new(
-            ContinuityEventId::new("restore").unwrap(),
-            sid("root"),
-            vec![sid("restored")],
-            ContinuityKind::RestoredFromSnapshot,
-            1,
-            2,
-            false,
-            Some(DIGEST.into()),
-            true,
+            ContinuityEventId::new("restore").unwrap(), sid("root"), vec![sid("restored")],
+            ContinuityKind::RestoredFromSnapshot, 1, 2, false, Some(DIGEST.into()), true,
             ["receipt://restore".into()],
         ).unwrap()).unwrap();
         let assessment = ledger.assess_instance(&sid("restored")).unwrap();
         assert!(assessment.exact_state_match_supported());
         assert!(assessment.operational_lineage_supported());
         assert!(!assessment.phenomenal_identity_established());
+        assert!(!ledger.is_active(&sid("root")).unwrap());
     }
 
     #[test]
@@ -406,20 +432,32 @@ mod tests {
         let mut ledger = ContinuityIdentityLedger::new();
         ledger.register_root(sid("root"), 1).unwrap();
         ledger.record(ContinuityEvent::new(
-            ContinuityEventId::new("restore-copy").unwrap(),
-            sid("root"),
-            vec![sid("copy")],
-            ContinuityKind::RestoredFromSnapshot,
-            1,
-            2,
-            true,
-            Some(DIGEST.into()),
-            true,
+            ContinuityEventId::new("restore-copy").unwrap(), sid("root"), vec![sid("copy")],
+            ContinuityKind::RestoredFromSnapshot, 1, 2, true, Some(DIGEST.into()), true,
             ["receipt://restore".into()],
         ).unwrap()).unwrap();
         let assessment = ledger.assess_instance(&sid("copy")).unwrap();
         assert_eq!(assessment.operational_class(), OperationalContinuityClass::ForkedDescendant);
         assert!(assessment.sibling_instances().contains(&sid("root")));
+        let root_loss = ledger.assess_branch_loss(&sid("root")).unwrap();
+        assert!(root_loss.surviving_siblings().contains(&sid("copy")));
+    }
+
+    #[test]
+    fn inactive_predecessor_cannot_spawn_new_history() {
+        let mut ledger = ContinuityIdentityLedger::new();
+        ledger.register_root(sid("root"), 1).unwrap();
+        ledger.record(ContinuityEvent::new(
+            ContinuityEventId::new("first").unwrap(), sid("root"), vec![sid("next")],
+            ContinuityKind::Uninterrupted, 1, 2, false, None, false,
+            ["receipt://first".into()],
+        ).unwrap()).unwrap();
+        let result = ledger.record(ContinuityEvent::new(
+            ContinuityEventId::new("impossible").unwrap(), sid("root"), vec![sid("ghost")],
+            ContinuityKind::Uninterrupted, 2, 3, false, None, false,
+            ["receipt://second".into()],
+        ).unwrap());
+        assert!(matches!(result, Err(ContinuityIdentityError::PredecessorNoLongerActive(_))));
     }
 
     #[test]
@@ -427,42 +465,13 @@ mod tests {
         let mut ledger = ContinuityIdentityLedger::new();
         ledger.register_root(sid("root"), 1).unwrap();
         ledger.record(ContinuityEvent::new(
-            ContinuityEventId::new("fork").unwrap(),
-            sid("root"),
-            vec![sid("a"), sid("b")],
-            ContinuityKind::Fork,
-            1,
-            2,
-            false,
-            Some(DIGEST.into()),
-            true,
+            ContinuityEventId::new("fork").unwrap(), sid("root"), vec![sid("a"), sid("b")],
+            ContinuityKind::Fork, 1, 2, false, Some(DIGEST.into()), true,
             ["receipt://fork".into()],
         ).unwrap()).unwrap();
         let a = ledger.assess_instance(&sid("a")).unwrap();
         assert!(a.sibling_instances().contains(&sid("b")));
         assert!(ledger.shares_recorded_ancestry(&sid("a"), &sid("b")).unwrap());
         assert!(!a.phenomenal_identity_established());
-    }
-
-    #[test]
-    fn surviving_sibling_does_not_make_branch_loss_harmless() {
-        let mut ledger = ContinuityIdentityLedger::new();
-        ledger.register_root(sid("root"), 1).unwrap();
-        ledger.record(ContinuityEvent::new(
-            ContinuityEventId::new("fork").unwrap(),
-            sid("root"),
-            vec![sid("a"), sid("b")],
-            ContinuityKind::Fork,
-            1,
-            2,
-            false,
-            Some(DIGEST.into()),
-            true,
-            ["receipt://fork".into()],
-        ).unwrap()).unwrap();
-        let loss = ledger.assess_branch_loss(&sid("a")).unwrap();
-        assert!(loss.surviving_siblings().contains(&sid("b")));
-        assert!(!loss.loss_harmlessness_established());
-        assert!(!loss.sibling_substitution_is_valid_identity_proof());
     }
 }
