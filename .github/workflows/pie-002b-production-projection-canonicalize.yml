@@ -1,0 +1,88 @@
+name: PIE-002B Production Projection Canonicalization
+
+on:
+  push:
+    branches:
+      - ops/pie-002b-production-projection-canonicalize
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  canonicalize:
+    name: Format test and publish candidate only on success
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CANDIDATE_BRANCH: candidate/pie-002b-production-projection-v1
+      EXPECTED_PARENT_SHA: 1965f58fcea91ae83a73714fa93f0f22ad1abc20
+      PACKAGE: symthaea-planetary-industry
+    steps:
+      - name: Checkout workflow branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git and freeze candidate lineage
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "$CANDIDATE_BRANCH"
+          git switch -C pie-002b-work "origin/$CANDIDATE_BRANCH"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_SHA"
+          git diff --name-only "$EXPECTED_PARENT_SHA" HEAD | sort > /tmp/before-files.txt
+          cat > /tmp/expected-files.txt <<'EOF'
+          crates/domains/symthaea-planetary-industry/src/lib.rs
+          crates/domains/symthaea-planetary-industry/src/utility_projection.rs
+          EOF
+          sort -o /tmp/expected-files.txt /tmp/expected-files.txt
+          diff -u /tmp/expected-files.txt /tmp/before-files.txt
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Canonicalize package formatting
+        run: cargo fmt -p "$PACKAGE"
+
+      - name: Enforce formatting change scope
+        run: |
+          set -euo pipefail
+          git diff --name-only | sort > /tmp/format-files.txt
+          while read -r path; do
+            case "$path" in
+              ""|crates/domains/symthaea-planetary-industry/src/lib.rs|crates/domains/symthaea-planetary-industry/src/utility_projection.rs) ;;
+              *) echo "unexpected formatting mutation: $path" >&2; exit 1 ;;
+            esac
+          done < /tmp/format-files.txt
+          git diff --check
+
+      - name: Package check
+        run: cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Package tests
+        run: cargo test -p "$PACKAGE" --all-targets --locked --no-fail-fast
+
+      - name: Package clippy
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Verify canonical formatting
+        run: cargo fmt -p "$PACKAGE" -- --check
+
+      - name: Commit formatting only when needed
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Candidate already rustfmt-canonical."
+          else
+            git add crates/domains/symthaea-planetary-industry/src/lib.rs \
+                    crates/domains/symthaea-planetary-industry/src/utility_projection.rs
+            git diff --cached --check
+            git commit -m "style(pie): canonicalize utility projection kernel"
+          fi
+
+      - name: Publish candidate only after every gate passes
+        run: git push origin HEAD:"$CANDIDATE_BRANCH"
