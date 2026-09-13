@@ -178,7 +178,10 @@ pub use motor::MotorSystem;
 
 pub use bridge::{CognitiveLoopFEPBridge, EnhancedFEPBridge};
 
-pub use evaluation_trial::{FEP_EVALUATION_TRIAL_REVISION, FepEvaluationTrial};
+pub use evaluation_trial::{
+    FEP_EVALUATION_TRIAL_REVISION, FEP_HELDOUT_SUBJECT_REVISION, FepEvaluationTrial,
+    FepHeldOutSubject,
+};
 
 pub use prediction_session::{
     FEP_PREDICTION_SNAPSHOT_REVISION, FepEvaluationSnapshot, FepPredictionSession,
