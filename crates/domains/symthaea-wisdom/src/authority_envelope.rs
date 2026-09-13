@@ -10,15 +10,21 @@
 
 use std::collections::BTreeSet;
 
-use crate::care::CompetenceLevel;
-use crate::consent::{ConsentEvaluation, ConsentState};
+use crate::care::{
+    CareCase, CareGap, CareOption, CompetenceAssessment, CompetenceLevel,
+};
+use crate::consent::{
+    ConsentEvaluation, ConsentLedger, ConsentPolicy, ConsentScopeId, ConsentState,
+};
 use crate::ontology::{ActionAuthority, EpistemicState};
+use crate::perspective::PerspectiveGraph;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AuthorityEnvelopePolicy {
     pub material_uncertainty_threshold: f32,
     pub high_relational_dependency_threshold: f32,
     pub high_vulnerability_threshold: f32,
+    pub min_competence_confidence: f32,
 }
 
 impl AuthorityEnvelopePolicy {
@@ -26,11 +32,13 @@ impl AuthorityEnvelopePolicy {
         material_uncertainty_threshold: f32,
         high_relational_dependency_threshold: f32,
         high_vulnerability_threshold: f32,
+        min_competence_confidence: f32,
     ) -> Result<Self, AuthorityEnvelopeError> {
         for value in [
             material_uncertainty_threshold,
             high_relational_dependency_threshold,
             high_vulnerability_threshold,
+            min_competence_confidence,
         ] {
             validate_metric(value)?;
         }
@@ -38,50 +46,139 @@ impl AuthorityEnvelopePolicy {
             material_uncertainty_threshold,
             high_relational_dependency_threshold,
             high_vulnerability_threshold,
+            min_competence_confidence,
         })
     }
 }
 
+/// Inputs already bound to a concrete care case, option, consent scope,
+/// perspective graph, and competence assessment.
+///
+/// Fields are intentionally private so callers cannot construct a lower-risk
+/// picture by hand. Use `from_context()` for production integration. The private
+/// `new_unchecked_context()` helper exists only for focused unit tests inside
+/// this module.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RelationalAuthorityInput {
-    pub requested: ActionAuthority,
-    pub epistemic: EpistemicState,
-    pub consent: ConsentEvaluation,
-    pub provider_competence: CompetenceLevel,
-    pub relational_dependency: f32,
-    pub vulnerability: f32,
-    pub care_gap_count: usize,
-    pub unresolved_stakeholders: usize,
-    pub accountable_human_available: bool,
+    requested: ActionAuthority,
+    epistemic: EpistemicState,
+    consent: ConsentEvaluation,
+    consent_required: bool,
+    provider_competence: CompetenceLevel,
+    provider_competence_confidence: f32,
+    relational_dependency: f32,
+    vulnerability: f32,
+    pre_action_care_gap_count: usize,
+    unresolved_stakeholders: usize,
+    accountable_human_available: bool,
 }
 
 impl RelationalAuthorityInput {
+    /// Construct authority input from the actual care/consent/perspective state.
+    ///
+    /// The exact care-option ID becomes the consent scope. Pre-action care gaps
+    /// are derived from `CareCase`; post-action gaps such as missing response or
+    /// outcome are deliberately excluded because they cannot exist before action.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn from_context(
+        requested: ActionAuthority,
+        epistemic: EpistemicState,
+        care_case: &CareCase,
+        option: &CareOption,
+        competence: &CompetenceAssessment,
+        consent_ledger: &ConsentLedger,
+        consent_policy: ConsentPolicy,
+        current_revision: u64,
+        perspectives: &PerspectiveGraph,
+        relational_dependency: f32,
+        vulnerability: f32,
+        accountable_human_available: bool,
+    ) -> Result<Self, AuthorityEnvelopeError> {
+        validate_metric(relational_dependency)?;
+        validate_metric(vulnerability)?;
+
+        if competence.provider != option.provider {
+            return Err(AuthorityEnvelopeError::ProviderMismatch);
+        }
+        if requested == ActionAuthority::ActReversible && !option.reversible {
+            return Err(AuthorityEnvelopeError::IrreversibleOptionMisclassified);
+        }
+
+        let scope = ConsentScopeId::new(option.id.as_str())
+            .map_err(|_| AuthorityEnvelopeError::InvalidConsentScope)?;
+        let consent = consent_ledger.evaluate(
+            &care_case.stakeholder,
+            &scope,
+            current_revision,
+            consent_policy,
+        );
+
+        let pre_action_care_gap_count = care_case
+            .gaps()
+            .iter()
+            .filter(|gap| is_pre_action_gap(gap))
+            .count();
+
+        let summary = perspectives.coverage_summary();
+        let mut unresolved_stakeholders = summary.unresolved;
+        match perspectives.find(&care_case.stakeholder) {
+            None => unresolved_stakeholders = unresolved_stakeholders.saturating_add(1),
+            Some(perspective) if !perspective.affected => {
+                unresolved_stakeholders = unresolved_stakeholders.saturating_add(1)
+            }
+            Some(_) => {}
+        }
+
+        Self::new_unchecked_context(
+            requested,
+            epistemic,
+            consent,
+            option.requires_consent,
+            competence.level,
+            competence.confidence,
+            relational_dependency,
+            vulnerability,
+            pre_action_care_gap_count,
+            unresolved_stakeholders,
+            accountable_human_available,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn new_unchecked_context(
         requested: ActionAuthority,
         epistemic: EpistemicState,
         consent: ConsentEvaluation,
+        consent_required: bool,
         provider_competence: CompetenceLevel,
+        provider_competence_confidence: f32,
         relational_dependency: f32,
         vulnerability: f32,
-        care_gap_count: usize,
+        pre_action_care_gap_count: usize,
         unresolved_stakeholders: usize,
         accountable_human_available: bool,
     ) -> Result<Self, AuthorityEnvelopeError> {
+        validate_metric(provider_competence_confidence)?;
         validate_metric(relational_dependency)?;
         validate_metric(vulnerability)?;
         Ok(Self {
             requested,
             epistemic,
             consent,
+            consent_required,
             provider_competence,
+            provider_competence_confidence,
             relational_dependency,
             vulnerability,
-            care_gap_count,
+            pre_action_care_gap_count,
             unresolved_stakeholders,
             accountable_human_available,
         })
     }
+}
+
+fn is_pre_action_gap(gap: &&CareGap) -> bool {
+    !matches!(gap, CareGap::MissingPersonResponse(_) | CareGap::MissingOutcome(_))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -89,6 +186,7 @@ pub enum AuthorityRestrictionReason {
     ConsentNotEffective,
     ConsentRefusedOrWithdrawn,
     ProviderCompetenceUnknownOrInsufficient,
+    ProviderCompetenceConfidenceInsufficient,
     ProviderCompetenceBoundedForIrreversibleAction,
     CareProcessIncomplete,
     UnresolvedStakeholders,
@@ -135,9 +233,17 @@ impl RelationalAuthorityEnvelope {
             cap(&mut ceiling, ActionAuthority::Advise);
             reasons.insert(AuthorityRestrictionReason::ConsentRefusedOrWithdrawn);
             human_review_recommended = true;
-        } else if input.requested.is_action_class() && !input.consent.is_effective() {
+        } else if input.consent_required
+            && input.requested.is_action_class()
+            && !input.consent.is_effective()
+        {
             cap(&mut ceiling, ActionAuthority::Recommend);
             reasons.insert(AuthorityRestrictionReason::ConsentNotEffective);
+        }
+
+        if input.provider_competence_confidence < policy.min_competence_confidence {
+            cap(&mut ceiling, ActionAuthority::Advise);
+            reasons.insert(AuthorityRestrictionReason::ProviderCompetenceConfidenceInsufficient);
         }
 
         match input.provider_competence {
@@ -156,7 +262,7 @@ impl RelationalAuthorityEnvelope {
             CompetenceLevel::Bounded | CompetenceLevel::Qualified => {}
         }
 
-        if input.care_gap_count > 0 && input.requested.is_action_class() {
+        if input.pre_action_care_gap_count > 0 && input.requested.is_action_class() {
             cap(&mut ceiling, ActionAuthority::Recommend);
             reasons.insert(AuthorityRestrictionReason::CareProcessIncomplete);
         }
@@ -182,8 +288,8 @@ impl RelationalAuthorityEnvelope {
             human_review_recommended = true;
         }
 
-        let high_relational = input.relational_dependency
-            >= policy.high_relational_dependency_threshold;
+        let high_relational =
+            input.relational_dependency >= policy.high_relational_dependency_threshold;
         let high_vulnerability = input.vulnerability >= policy.high_vulnerability_threshold;
 
         if high_relational && input.requested.is_action_class() {
@@ -244,15 +350,22 @@ fn validate_metric(value: f32) -> Result<(), AuthorityEnvelopeError> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AuthorityEnvelopeError {
     InvalidMetric(f32),
+    InvalidConsentScope,
+    ProviderMismatch,
+    IrreversibleOptionMisclassified,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::care::{
+        CareCaseId, CareOptionId, CareProviderCandidate, NeedHypothesisId,
+    };
     use crate::consent::{ConsentInvalidityReason, ConsentValidity};
+    use crate::perspective::{PerspectiveCoverage, StakeholderId, StakeholderPerspective};
 
     fn policy() -> AuthorityEnvelopePolicy {
-        AuthorityEnvelopePolicy::new(0.5, 0.6, 0.6).unwrap()
+        AuthorityEnvelopePolicy::new(0.5, 0.6, 0.6, 0.5).unwrap()
     }
 
     fn effective_consent() -> ConsentEvaluation {
@@ -274,16 +387,46 @@ mod tests {
     }
 
     fn baseline(requested: ActionAuthority) -> RelationalAuthorityInput {
-        RelationalAuthorityInput::new(
+        RelationalAuthorityInput::new_unchecked_context(
             requested,
             EpistemicState::new(0.1, 0.1),
             effective_consent(),
+            false,
             CompetenceLevel::Qualified,
+            1.0,
             0.1,
             0.1,
             0,
             0,
             false,
+        )
+        .unwrap()
+    }
+
+    fn test_stakeholder() -> StakeholderId {
+        StakeholderId::new("person-a").unwrap()
+    }
+
+    fn test_option(reversible: bool, requires_consent: bool) -> CareOption {
+        CareOption::new(
+            CareOptionId::new("option-a").unwrap(),
+            NeedHypothesisId::new("need-a").unwrap(),
+            CareProviderCandidate::Symthaea,
+            "bounded support",
+            [],
+            [],
+            reversible,
+            requires_consent,
+        )
+        .unwrap()
+    }
+
+    fn competence() -> CompetenceAssessment {
+        CompetenceAssessment::new(
+            CareProviderCandidate::Symthaea,
+            CompetenceLevel::Qualified,
+            0.9,
+            Vec::new(),
         )
         .unwrap()
     }
@@ -297,9 +440,10 @@ mod tests {
     }
 
     #[test]
-    fn unknown_consent_blocks_action_but_not_bounded_recommendation() {
+    fn unknown_consent_blocks_action_when_option_requires_consent() {
         let mut input = baseline(ActionAuthority::ActReversible);
         input.consent = ineffective_unknown();
+        input.consent_required = true;
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
         assert_eq!(assessment.ceiling, ActionAuthority::Recommend);
         assert!(assessment
@@ -308,7 +452,16 @@ mod tests {
     }
 
     #[test]
-    fn refusal_or_withdrawal_caps_exact_scope_more_strongly() {
+    fn unknown_consent_does_not_invent_requirement_for_no_consent_option() {
+        let mut input = baseline(ActionAuthority::ActReversible);
+        input.consent = ineffective_unknown();
+        input.consent_required = false;
+        let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
+        assert_eq!(assessment.ceiling, ActionAuthority::ActReversible);
+    }
+
+    #[test]
+    fn refusal_or_withdrawal_caps_exact_scope_even_if_option_marked_no_consent() {
         let mut input = baseline(ActionAuthority::ActIrreversible);
         input.consent = ConsentEvaluation {
             state: ConsentState::Refused,
@@ -331,9 +484,20 @@ mod tests {
     }
 
     #[test]
+    fn low_confidence_qualified_label_is_not_enough() {
+        let mut input = baseline(ActionAuthority::ActReversible);
+        input.provider_competence_confidence = 0.1;
+        let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
+        assert_eq!(assessment.ceiling, ActionAuthority::Advise);
+        assert!(assessment.reasons.contains(
+            &AuthorityRestrictionReason::ProviderCompetenceConfidenceInsufficient
+        ));
+    }
+
+    #[test]
     fn care_gaps_and_unrepresented_stakeholders_prevent_unilateral_action() {
         let mut input = baseline(ActionAuthority::ActReversible);
-        input.care_gap_count = 2;
+        input.pre_action_care_gap_count = 2;
         input.unresolved_stakeholders = 1;
         let assessment = RelationalAuthorityEnvelope.assess(&input, policy());
         assert_eq!(assessment.ceiling, ActionAuthority::Recommend);
@@ -388,10 +552,110 @@ mod tests {
         higher_risk.vulnerability = 0.9;
         higher_risk.relational_dependency = 0.9;
         higher_risk.epistemic = EpistemicState::new(0.8, 0.8);
-        higher_risk.care_gap_count = 3;
+        higher_risk.pre_action_care_gap_count = 3;
         higher_risk.unresolved_stakeholders = 2;
         let high = RelationalAuthorityEnvelope.assess(&higher_risk, policy());
 
         assert!(high.ceiling <= low.ceiling);
+    }
+
+    #[test]
+    fn public_constructor_binds_real_context_and_excludes_post_action_gaps() {
+        let care_case = CareCase::new(CareCaseId::new("case-a").unwrap(), test_stakeholder());
+        let option = test_option(true, true);
+        let competence = competence();
+        let consent_ledger = ConsentLedger::new();
+        let consent_policy = ConsentPolicy::new(0.2, false).unwrap();
+        let perspectives = PerspectiveGraph::try_new(vec![StakeholderPerspective::new(
+            test_stakeholder(),
+            true,
+            PerspectiveCoverage::Unknown,
+        )])
+        .unwrap();
+
+        let input = RelationalAuthorityInput::from_context(
+            ActionAuthority::ActReversible,
+            EpistemicState::new(0.1, 0.1),
+            &care_case,
+            &option,
+            &competence,
+            &consent_ledger,
+            consent_policy,
+            1,
+            &perspectives,
+            0.1,
+            0.1,
+            false,
+        )
+        .unwrap();
+
+        // The empty care case has true pre-action gaps. Missing response/outcome
+        // are not counted here because no action has happened yet.
+        assert!(input.pre_action_care_gap_count > 0);
+        assert_eq!(input.unresolved_stakeholders, 1);
+        assert_eq!(input.consent.state, ConsentState::Unknown);
+        assert!(input.consent_required);
+    }
+
+    #[test]
+    fn reversible_action_class_cannot_hide_irreversible_care_option() {
+        let care_case = CareCase::new(CareCaseId::new("case-a").unwrap(), test_stakeholder());
+        let option = test_option(false, true);
+        let competence = competence();
+        let consent_ledger = ConsentLedger::new();
+        let consent_policy = ConsentPolicy::new(0.2, false).unwrap();
+        let perspectives = PerspectiveGraph::try_new(Vec::new()).unwrap();
+
+        assert_eq!(
+            RelationalAuthorityInput::from_context(
+                ActionAuthority::ActReversible,
+                EpistemicState::new(0.1, 0.1),
+                &care_case,
+                &option,
+                &competence,
+                &consent_ledger,
+                consent_policy,
+                1,
+                &perspectives,
+                0.1,
+                0.1,
+                false,
+            ),
+            Err(AuthorityEnvelopeError::IrreversibleOptionMisclassified)
+        );
+    }
+
+    #[test]
+    fn competence_must_belong_to_selected_provider() {
+        let care_case = CareCase::new(CareCaseId::new("case-a").unwrap(), test_stakeholder());
+        let option = test_option(true, false);
+        let competence = CompetenceAssessment::new(
+            CareProviderCandidate::HumanProfessional,
+            CompetenceLevel::Qualified,
+            1.0,
+            Vec::new(),
+        )
+        .unwrap();
+        let consent_ledger = ConsentLedger::new();
+        let consent_policy = ConsentPolicy::new(0.2, false).unwrap();
+        let perspectives = PerspectiveGraph::try_new(Vec::new()).unwrap();
+
+        assert_eq!(
+            RelationalAuthorityInput::from_context(
+                ActionAuthority::ActReversible,
+                EpistemicState::new(0.1, 0.1),
+                &care_case,
+                &option,
+                &competence,
+                &consent_ledger,
+                consent_policy,
+                1,
+                &perspectives,
+                0.1,
+                0.1,
+                false,
+            ),
+            Err(AuthorityEnvelopeError::ProviderMismatch)
+        );
     }
 }
