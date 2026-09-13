@@ -22,6 +22,7 @@ mod accepted_clock_basis;
 mod clock;
 mod clock_bootstrap_authority;
 mod clock_evaluation_permit;
+mod clock_successor;
 mod clock_witness;
 mod continuity;
 mod digest;
@@ -53,6 +54,13 @@ pub use clock_evaluation_permit::{
     ClockEvaluationPermitError, ClockEvaluationPermitIdV4, ClockEvaluationPermitV4,
     ClockEvaluationPolicyIdV4, ClockEvaluationPolicyV4, ClockQuorumPolicyRevisionIdV1,
     ClockQuorumPolicyRevisionV1, derive_bootstrap_clock_evaluation_permit_v4,
+};
+pub use clock_successor::{
+    ACCEPTED_CLOCK_SUCCESSOR_BASIS_SCHEMA, CLOCK_SUCCESSOR_EVALUATION_PERMIT_SCHEMA,
+    AcceptedClockBasisIdV6, AcceptedClockBasisV6, ClockSuccessorAuthorityContextV1,
+    ClockSuccessorError, ClockSuccessorEvaluationPermitIdV1, ClockSuccessorEvaluationPermitV1,
+    SuccessorClockAuthorityKeyV1, accept_successor_clock_basis_v6,
+    bind_clock_successor_authority_context_v1, derive_clock_successor_evaluation_permit_v1,
 };
 pub use clock_witness::{
     AcceptedClockObservationV1, CLOCK_WINDOW_EVALUATION_WITNESS_SCHEMA, ClockSignerV1,
