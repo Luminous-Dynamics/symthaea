@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """WCARE-39 execution capsule capture and runner.
 
-Dependency-free qualification tooling. It records exact source/tool/material state,
-persists PREPARED before launching evidence-producing commands, executes exact
-argv arrays without a shell, and refuses to mix evidence across environment drift.
+Persists PREPARED before evidence-producing commands, executes exact argv arrays
+without a shell, and refuses to mix evidence across source/tool/environment drift.
 """
 from __future__ import annotations
 
@@ -15,6 +14,7 @@ import locale
 import os
 from pathlib import Path
 import platform
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,17 +22,12 @@ import time
 from typing import Any
 
 PROTOCOL = "wcare39-execution-capsule-v1"
-STANDARD_MATERIALS = {
-    "Cargo.lock": True,
-    "flake.lock": True,
-    "rust-toolchain.toml": True,
-}
+STANDARD_MATERIALS = {"Cargo.lock": True, "flake.lock": True, "rust-toolchain.toml": True}
 SAFE_LITERAL_DENY_TOKENS = (
     "TOKEN", "SECRET", "PASSWORD", "PASSWD", "COOKIE", "AUTH", "API_KEY", "PRIVATE_KEY",
 )
-KNOWN_VERSION_TOOLS = {
-    "git", "cargo", "rustc", "rustup", "nix", "nix-shell", "bash", "sh",
-}
+KNOWN_VERSION_TOOLS = {"git", "cargo", "rustc", "rustup", "nix", "nix-shell", "bash", "sh", "env"}
+SOURCE_SUFFIXES = {".py", ".sh", ".rs", ".json", ".toml", ".lock", ".nix"}
 
 
 def utc_now() -> str:
@@ -57,17 +52,20 @@ def canonical_json_bytes(value: Any) -> bytes:
 
 def atomic_write(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
-    with temporary.open("wb") as handle:
+    tmp = path.with_name(path.name + ".tmp")
+    with tmp.open("wb") as handle:
         handle.write(data)
         handle.flush()
         os.fsync(handle.fileno())
-    os.replace(temporary, path)
-    directory_fd = os.open(path.parent, os.O_RDONLY)
+    os.replace(tmp, path)
     try:
-        os.fsync(directory_fd)
-    finally:
-        os.close(directory_fd)
+        fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
 
 
 def git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[bytes]:
@@ -78,23 +76,37 @@ def git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProce
 
 
 def repo_root() -> Path:
-    process = subprocess.run(
+    proc = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"], stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, check=False, timeout=30,
     )
-    if process.returncode != 0:
+    if proc.returncode != 0:
         raise RuntimeError("not_in_git_worktree")
-    return Path(process.stdout.decode().strip()).resolve()
+    return Path(proc.stdout.decode().strip()).resolve()
 
 
 def root_relative(root: Path, relative: str) -> Path:
-    if Path(relative).is_absolute() or ".." in Path(relative).parts:
+    raw = Path(relative)
+    if raw.is_absolute() or ".." in raw.parts:
         raise ValueError(f"unsafe_relative_path:{relative}")
-    resolved = (root / relative).resolve()
+    resolved = (root / raw).resolve()
     try:
         resolved.relative_to(root)
     except ValueError as exc:
         raise ValueError(f"path_escapes_repository:{relative}") from exc
+    return resolved
+
+
+def stage_relative(root: Path, cwd: str, relative: str) -> Path:
+    raw = Path(relative)
+    if raw.is_absolute():
+        return raw.resolve()
+    base = root_relative(root, cwd)
+    resolved = (base / raw).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"stage_path_escapes_repository:{relative}") from exc
     return resolved
 
 
@@ -169,7 +181,6 @@ def validate_plan(plan: dict[str, Any]) -> None:
         raise ValueError("plan_network_policy_invalid")
     if plan["sandbox_policy_declared"] not in {"Unspecified", "None", "Restricted", "DefaultDeny"}:
         raise ValueError("plan_sandbox_policy_invalid")
-
     seeds = plan["deterministic_seed_commitments"]
     if not isinstance(seeds, dict) or any(not isinstance(k, str) or not k or not valid_sha(v) for k, v in seeds.items()):
         raise ValueError("plan_seed_commitments_invalid")
@@ -205,30 +216,35 @@ def validate_plan(plan: dict[str, Any]) -> None:
             output_paths.add(output)
 
 
-def validate_file_bindings(root: Path, plan: dict[str, Any]) -> None:
-    bound = set(plan["subject_digests"]) | {item["path"] for item in plan["materials"]}
-    outputs = {item["output_receipt_path"] for item in plan["stages"] if item["output_receipt_path"] is not None}
-    for stage in plan["stages"]:
-        for arg in stage["argv"]:
-            if arg in outputs or arg.startswith("-") or Path(arg).is_absolute() or ".." in Path(arg).parts:
-                continue
-            candidate = root / arg
-            if candidate.is_file() and candidate.suffix.lower() in {".py", ".sh", ".rs", ".json", ".toml", ".lock", ".nix"}:
-                if arg not in bound:
-                    raise ValueError(f"unbound_command_file:{arg}")
-
-
 def auto_materials(plan: dict[str, Any]) -> dict[str, bool]:
-    materials = dict(STANDARD_MATERIALS)
+    result = dict(STANDARD_MATERIALS)
     for item in plan["materials"]:
-        materials[item["path"]] = materials.get(item["path"], False) or item["required"]
-    invokes_auth = any(
+        result[item["path"]] = result.get(item["path"], False) or item["required"]
+    if any(
         "wcare37" in " ".join(stage["argv"]).lower() or "wcare38" in " ".join(stage["argv"]).lower()
         for stage in plan["stages"]
-    )
-    if invokes_auth:
-        materials["tools/wcare37_attestation_verifier/Cargo.lock"] = True
-    return materials
+    ):
+        result["tools/wcare37_attestation_verifier/Cargo.lock"] = True
+    return result
+
+
+def validate_file_bindings(root: Path, plan: dict[str, Any]) -> None:
+    bound_paths = set(plan["subject_digests"]) | set(auto_materials(plan))
+    bound_files = {root_relative(root, item).resolve() for item in bound_paths}
+    output_files = {root_relative(root, stage["output_receipt_path"]).resolve() for stage in plan["stages"] if stage["output_receipt_path"] is not None}
+    for stage in plan["stages"]:
+        for arg in stage["argv"]:
+            if arg.startswith("-") or "\x00" in arg:
+                continue
+            try:
+                candidate = stage_relative(root, stage["cwd"], arg)
+            except ValueError:
+                continue
+            if candidate in output_files:
+                continue
+            if candidate.is_file() and candidate.suffix.lower() in SOURCE_SUFFIXES and candidate not in bound_files:
+                relative = candidate.relative_to(root)
+                raise ValueError(f"unbound_command_file:{relative}")
 
 
 def capture_materials(root: Path, plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -240,14 +256,14 @@ def capture_materials(root: Path, plan: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
-def capture_subject_digests(root: Path, plan: dict[str, Any]) -> dict[str, str]:
-    observed = {}
+def capture_subject_digests(root: Path, plan: dict[str, Any], strict: bool) -> dict[str, str | None]:
+    observed: dict[str, str | None] = {}
     for relative, expected in sorted(plan["subject_digests"].items()):
         path = root_relative(root, relative)
-        if not path.is_file():
-            raise RuntimeError(f"subject_material_missing:{relative}")
-        actual = sha256_file(path)
-        if actual != expected:
+        actual = sha256_file(path) if path.is_file() else None
+        if strict and actual != expected:
+            if actual is None:
+                raise RuntimeError(f"subject_material_missing:{relative}")
             raise RuntimeError(f"subject_digest_mismatch:{relative}:{actual}")
         observed[relative] = actual
     return observed
@@ -262,7 +278,7 @@ def safe_environment(plan: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         value = os.environ[key]
         if item["mode"] == "Literal":
-            if len(value) > 2048 or any(ord(ch) < 32 and ch not in "\t" for ch in value):
+            if len(value) > 2048 or any(ord(ch) < 32 and ch != "\t" for ch in value):
                 raise ValueError(f"unsafe_literal_environment_value:{key}")
             result.append({"key": key, "mode": "Literal", "value": value})
         else:
@@ -271,8 +287,6 @@ def safe_environment(plan: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def ambient_environment_sha256() -> str:
-    # A single aggregate commitment detects hidden environment drift without
-    # publishing arbitrary key/value pairs or secret-bearing variable names.
     payload = b"\0".join(
         f"{key}={value}".encode(errors="surrogateescape")
         for key, value in sorted(os.environ.items())
@@ -292,8 +306,7 @@ def privacy_safe_locator(path: Path, root: Path) -> str:
 
 def version_output(path: Path) -> str:
     base = path.name.lower()
-    safe = base in KNOWN_VERSION_TOOLS or base.startswith("python")
-    if not safe:
+    if base not in KNOWN_VERSION_TOOLS and not base.startswith("python"):
         return "<not-invoked-unrecognized-tool>"
     try:
         proc = subprocess.run([str(path), "--version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False, timeout=15)
@@ -302,10 +315,12 @@ def version_output(path: Path) -> str:
         return "<version-unavailable>"
 
 
-def resolve_executable(command: str, root: Path) -> Path:
-    candidate = Path(command)
-    if candidate.is_absolute() or "/" in command:
-        path = candidate if candidate.is_absolute() else root_relative(root, command)
+def resolve_executable(command: str, root: Path, cwd: str = "") -> Path:
+    raw = Path(command)
+    if raw.is_absolute():
+        path = raw
+    elif "/" in command:
+        path = stage_relative(root, cwd, command)
     else:
         found = shutil.which(command)
         if found is None:
@@ -317,21 +332,61 @@ def resolve_executable(command: str, root: Path) -> Path:
     return resolved
 
 
-def capture_tools(root: Path, plan: dict[str, Any]) -> list[dict[str, Any]]:
-    commands = {"git", sys.executable}
-    commands.update(stage["argv"][0] for stage in plan["stages"])
-    records = []
-    for command in sorted(commands):
-        path = resolve_executable(command, root)
-        version = version_output(path)
-        records.append({
-            "role": command,
-            "executable_path": privacy_safe_locator(path, root),
-            "executable_sha256": sha256_file(path),
-            "version_output_sha256": sha256_bytes(version.encode()),
-            "version_output": version,
-        })
-    return records
+def shebang_interpreters(script: Path) -> list[str]:
+    try:
+        first = script.open("rb").readline(4096).decode(errors="replace").strip()
+    except OSError:
+        return []
+    if not first.startswith("#!"):
+        return []
+    try:
+        words = shlex.split(first[2:].strip())
+    except ValueError:
+        return []
+    if not words:
+        return []
+    if Path(words[0]).name == "env" and len(words) >= 2:
+        return [words[0], words[1]]
+    return [words[0]]
+
+
+def tool_record(role: str, path: Path, root: Path) -> dict[str, Any]:
+    version = version_output(path)
+    return {
+        "role": role, "executable_path": privacy_safe_locator(path, root),
+        "executable_sha256": sha256_file(path), "version_output_sha256": sha256_bytes(version.encode()),
+        "version_output": version,
+    }
+
+
+def capture_tools(root: Path, plan: dict[str, Any], strict: bool) -> list[dict[str, Any]]:
+    specifications: list[tuple[str, str, str]] = [("git", "git", ""), ("python-runtime", sys.executable, "")]
+    for stage in plan["stages"]:
+        specifications.append((f"stage:{stage['stage_id']}", stage["argv"][0], stage["cwd"]))
+    records: dict[str, dict[str, Any]] = {}
+    for role, command, cwd in specifications:
+        try:
+            path = resolve_executable(command, root, cwd)
+            record = tool_record(role, path, root)
+            records[role] = record
+            if role.startswith("stage:"):
+                for number, interpreter in enumerate(shebang_interpreters(path)):
+                    try:
+                        interpreter_path = resolve_executable(interpreter, root)
+                    except RuntimeError:
+                        if strict:
+                            raise
+                        continue
+                    irole = f"{role}:shebang:{number}"
+                    records[irole] = tool_record(irole, interpreter_path, root)
+        except RuntimeError:
+            if strict:
+                raise
+            records[role] = {
+                "role": role, "executable_path": "<missing>", "executable_sha256": None,
+                "version_output_sha256": sha256_bytes(b"<missing>"), "version_output": "<missing>",
+            }
+    return [records[key] for key in sorted(records)]
 
 
 def capture_platform() -> dict[str, str]:
@@ -339,21 +394,23 @@ def capture_platform() -> dict[str, str]:
         current_locale = locale.setlocale(locale.LC_ALL, None) or ""
     except locale.Error:
         current_locale = "<locale-unavailable>"
-    tz = json.dumps({"tzname": list(time.tzname), "timezone": time.timezone, "daylight": time.daylight}, sort_keys=True, separators=(",", ":"))
+    timezone_repr = json.dumps(
+        {"tzname": list(time.tzname), "timezone": time.timezone, "daylight": time.daylight},
+        sort_keys=True, separators=(",", ":"),
+    )
     return {
         "os": platform.system(), "kernel_release": platform.release(), "architecture": platform.machine(),
         "python_implementation": platform.python_implementation(), "python_version": platform.python_version(),
-        "locale": current_locale, "timezone": tz,
+        "locale": current_locale, "timezone": timezone_repr,
     }
 
 
 def command_skeleton(plan: dict[str, Any]) -> list[dict[str, Any]]:
     return [{
-        "stage_id": stage["stage_id"], "argv": stage["argv"], "cwd": stage["cwd"],
-        "timeout_seconds": stage["timeout_seconds"], "started_utc": None, "finished_utc": None,
-        "exit_code": None, "termination_class": "NotRun", "stdout_sha256": None,
-        "stderr_sha256": None, "output_receipt_sha256": None, "subject_outcome": "NOT_RUN",
-    } for stage in plan["stages"]]
+        "stage_id": s["stage_id"], "argv": s["argv"], "cwd": s["cwd"], "timeout_seconds": s["timeout_seconds"],
+        "started_utc": None, "finished_utc": None, "exit_code": None, "termination_class": "NotRun",
+        "stdout_sha256": None, "stderr_sha256": None, "output_receipt_sha256": None, "subject_outcome": "NOT_RUN",
+    } for s in plan["stages"]]
 
 
 def immutable_view(capsule: dict[str, Any]) -> dict[str, Any]:
@@ -374,7 +431,7 @@ def compare_immutable(prepared: dict[str, Any], final: dict[str, Any]) -> list[s
     return sorted(key for key in left if left[key] != right[key])
 
 
-def capture_base(root: Path, plan_raw: bytes, plan: dict[str, Any]) -> dict[str, Any]:
+def capture_base(root: Path, plan_raw: bytes, plan: dict[str, Any], strict: bool) -> dict[str, Any]:
     head = git(root, "rev-parse", "HEAD").stdout.decode().strip()
     clean = not git(root, "status", "--porcelain=v1", "--untracked-files=normal").stdout.strip()
     origin = git(root, "remote", "get-url", "origin", check=False)
@@ -383,87 +440,65 @@ def capture_base(root: Path, plan_raw: bytes, plan: dict[str, Any]) -> dict[str,
         "protocol_version": PROTOCOL, "authority": "MeasurementOnly", "capsule_phase": "PREPARED",
         "classification": "CAPSULE_PREPARED", "environment_integrity": "QUALIFIED", "subject_outcome": "NOT_RUN",
         "subject_git_head": head, "worktree_clean": clean, "repository_root_commitment_sha256": sha256_bytes(repo_identity),
-        "subject_digests": capture_subject_digests(root, plan), "command_plan_sha256": sha256_bytes(plan_raw),
-        "platform": capture_platform(), "tools": capture_tools(root, plan), "materials": capture_materials(root, plan),
+        "subject_digests": capture_subject_digests(root, plan, strict), "command_plan_sha256": sha256_bytes(plan_raw),
+        "platform": capture_platform(), "tools": capture_tools(root, plan, strict), "materials": capture_materials(root, plan),
         "safe_environment": safe_environment(plan), "ambient_environment_sha256": ambient_environment_sha256(),
         "network_policy_declared": plan["network_policy_declared"], "sandbox_policy_declared": plan["sandbox_policy_declared"],
         "deterministic_seed_commitments": dict(sorted(plan["deterministic_seed_commitments"].items())),
         "commands": command_skeleton(plan), "prepared_capsule_sha256": None, "drift_fields": [], "created_utc": utc_now(),
-        "network_isolation_established": False, "sandbox_enforcement_established": False,
-        "independent_builder_established": False, "phenomenal_experience_established": False,
-        "suffering_established": False, "moral_patienthood_established": False, "binding_consent_established": False,
-        "veto_authority_granted": False, "self_preservation_authority_granted": False, "runtime_authority_granted": False,
+        "network_isolation_established": False, "sandbox_enforcement_established": False, "independent_builder_established": False,
+        "phenomenal_experience_established": False, "suffering_established": False, "moral_patienthood_established": False,
+        "binding_consent_established": False, "veto_authority_granted": False,
+        "self_preservation_authority_granted": False, "runtime_authority_granted": False,
     }
 
 
 def qualify_prepared(capsule: dict[str, Any], plan: dict[str, Any]) -> None:
     if capsule["subject_git_head"] != plan["subject_git_head"] or not capsule["worktree_clean"]:
-        capsule["classification"] = "INVALID_CAPSULE"
-        capsule["environment_integrity"] = "INVALID"
-        return
+        capsule["classification"] = "INVALID_CAPSULE"; capsule["environment_integrity"] = "INVALID"; return
     if any(x["required"] and not x["present"] for x in capsule["materials"]):
-        capsule["classification"] = "INFRASTRUCTURE_INDETERMINATE"
-        capsule["environment_integrity"] = "INDETERMINATE"
+        capsule["classification"] = "INFRASTRUCTURE_INDETERMINATE"; capsule["environment_integrity"] = "INDETERMINATE"
 
 
 def prepare(plan_path: Path) -> tuple[dict[str, Any], dict[str, Any], bytes, Path]:
-    root = repo_root()
-    raw, plan = read_json(plan_path)
-    validate_plan(plan)
-    validate_file_bindings(root, plan)
-    capsule = capture_base(root, raw, plan)
-    qualify_prepared(capsule, plan)
+    root = repo_root(); raw, plan = read_json(plan_path); validate_plan(plan); validate_file_bindings(root, plan)
+    capsule = capture_base(root, raw, plan, True); qualify_prepared(capsule, plan)
     return capsule, plan, raw, root
 
 
 def ensure_ignored_evidence_path(root: Path, relative: str) -> Path:
     path = root_relative(root, relative)
     probe = str(Path(relative) / ".wcare39-probe")
-    result = git(root, "check-ignore", "--no-index", "-q", probe, check=False)
-    if result.returncode != 0:
+    if git(root, "check-ignore", "--no-index", "-q", probe, check=False).returncode != 0:
         raise ValueError("evidence_directory_must_be_git_ignored")
     return path
 
 
 def execute_stages(root: Path, plan: dict[str, Any]) -> list[dict[str, Any]]:
-    records = command_skeleton(plan)
-    stop = False
+    records = command_skeleton(plan); stop = False
     for index, stage in enumerate(plan["stages"]):
         if stop:
             continue
-        record = records[index]
-        cwd = root_relative(root, stage["cwd"])
+        record = records[index]; cwd = root_relative(root, stage["cwd"])
         if not cwd.is_dir():
-            record["termination_class"] = "InfrastructureFailure"
-            record["subject_outcome"] = "INDETERMINATE"
-            stop = True
-            continue
-        output_relative = stage["output_receipt_path"]
-        output_path = root_relative(root, output_relative) if output_relative is not None else None
-        if output_path is not None and output_path.exists():
-            record["termination_class"] = "InfrastructureFailure"
-            record["subject_outcome"] = "INVALID"
-            stop = True
-            continue
+            record["termination_class"] = "InfrastructureFailure"; record["subject_outcome"] = "INDETERMINATE"; stop = True; continue
+        output = root_relative(root, stage["output_receipt_path"]) if stage["output_receipt_path"] is not None else None
+        if output is not None and output.exists():
+            record["termination_class"] = "InfrastructureFailure"; record["subject_outcome"] = "INVALID"; stop = True; continue
         record["started_utc"] = utc_now()
         try:
-            process = subprocess.run(
-                stage["argv"], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                shell=False, timeout=stage["timeout_seconds"], check=False,
-            )
-            record["finished_utc"] = utc_now()
-            record["exit_code"] = process.returncode
-            record["termination_class"] = "Exited" if process.returncode >= 0 else "Signaled"
-            record["stdout_sha256"] = sha256_bytes(process.stdout)
-            record["stderr_sha256"] = sha256_bytes(process.stderr)
-            record["subject_outcome"] = "PASS" if process.returncode == 0 else "FAIL"
-            if output_path is not None:
-                if output_path.is_file():
-                    record["output_receipt_sha256"] = sha256_file(output_path)
-                elif process.returncode == 0:
+            proc = subprocess.run(stage["argv"], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False,
+                                  timeout=stage["timeout_seconds"], check=False)
+            record["finished_utc"] = utc_now(); record["exit_code"] = proc.returncode
+            record["termination_class"] = "Exited" if proc.returncode >= 0 else "Signaled"
+            record["stdout_sha256"] = sha256_bytes(proc.stdout); record["stderr_sha256"] = sha256_bytes(proc.stderr)
+            record["subject_outcome"] = "PASS" if proc.returncode == 0 else "FAIL"
+            if output is not None:
+                if output.is_file():
+                    record["output_receipt_sha256"] = sha256_file(output)
+                elif proc.returncode == 0:
                     record["subject_outcome"] = "INVALID"
-            if record["subject_outcome"] != "PASS":
-                stop = True
+            if record["subject_outcome"] != "PASS": stop = True
         except subprocess.TimeoutExpired as exc:
             record["finished_utc"] = utc_now(); record["termination_class"] = "TimedOut"
             record["stdout_sha256"] = sha256_bytes(exc.stdout or b""); record["stderr_sha256"] = sha256_bytes(exc.stderr or b"")
@@ -477,66 +512,59 @@ def execute_stages(root: Path, plan: dict[str, Any]) -> list[dict[str, Any]]:
 def aggregate_outcome(commands: list[dict[str, Any]]) -> str:
     outcomes = [x["subject_outcome"] for x in commands]
     for value in ("INVALID", "INDETERMINATE", "FAIL"):
-        if value in outcomes:
-            return value
+        if value in outcomes: return value
     return "PASS" if outcomes and all(x == "PASS" for x in outcomes) else "NOT_RUN"
 
 
 def run_plan(plan_path: Path, evidence_dir_relative: str) -> dict[str, Any]:
     prepared, plan, raw, root = prepare(plan_path)
-    if prepared["classification"] != "CAPSULE_PREPARED":
-        return prepared
+    if prepared["classification"] != "CAPSULE_PREPARED": return prepared
     evidence_dir = ensure_ignored_evidence_path(root, evidence_dir_relative)
-    prepared_path = evidence_dir / "prepared.json"
-    final_path = evidence_dir / "final.json"
-    if prepared_path.exists() or final_path.exists():
-        raise ValueError("execution_capsule_output_already_exists")
-    prepared_bytes = canonical_json_bytes(prepared)
-    atomic_write(prepared_path, prepared_bytes)  # durable before first command launch
-    prepared_sha = sha256_bytes(prepared_bytes)
-
+    prepared_path, final_path = evidence_dir / "prepared.json", evidence_dir / "final.json"
+    if prepared_path.exists() or final_path.exists(): raise ValueError("execution_capsule_output_already_exists")
+    prepared_bytes = canonical_json_bytes(prepared); prepared_sha = sha256_bytes(prepared_bytes)
+    atomic_write(prepared_path, prepared_bytes)  # durable before first stage launch
     commands = execute_stages(root, plan)
     try:
-        final = capture_base(root, raw, plan)
-        final["capsule_phase"] = "FINAL"
-        final["commands"] = commands
-        final["subject_outcome"] = aggregate_outcome(commands)
-        final["prepared_capsule_sha256"] = prepared_sha
-        drift = compare_immutable(prepared, final)
-        final["drift_fields"] = drift
+        final = capture_base(root, raw, plan, False)
+        final["capsule_phase"] = "FINAL"; final["commands"] = commands; final["subject_outcome"] = aggregate_outcome(commands)
+        final["prepared_capsule_sha256"] = prepared_sha; drift = compare_immutable(prepared, final); final["drift_fields"] = drift
         final["classification"] = "ENVIRONMENT_DRIFT" if drift else "QUALIFIED_EXECUTION"
-        final["environment_integrity"] = "DRIFTED" if drift else "QUALIFIED"
-        final["created_utc"] = utc_now()
+        final["environment_integrity"] = "DRIFTED" if drift else "QUALIFIED"; final["created_utc"] = utc_now()
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
-        final = dict(prepared)
-        final.update({
+        final = dict(prepared); final.update({
             "capsule_phase": "FINAL", "classification": "INFRASTRUCTURE_INDETERMINATE",
-            "environment_integrity": "INDETERMINATE", "subject_outcome": aggregate_outcome(commands),
-            "commands": commands, "prepared_capsule_sha256": prepared_sha,
-            "drift_fields": [f"final_capture_failed:{type(exc).__name__}"], "created_utc": utc_now(),
+            "environment_integrity": "INDETERMINATE", "subject_outcome": aggregate_outcome(commands), "commands": commands,
+            "prepared_capsule_sha256": prepared_sha, "drift_fields": [f"final_capture_failed:{type(exc).__name__}"], "created_utc": utc_now(),
         })
-    atomic_write(final_path, canonical_json_bytes(final))
-    return final
+    atomic_write(final_path, canonical_json_bytes(final)); return final
+
+
+def compare_capsules(prepared_path: Path, final_path: Path) -> dict[str, Any]:
+    prepared_raw, prepared = read_json(prepared_path); _final_raw, final = read_json(final_path)
+    if prepared.get("protocol_version") != PROTOCOL or final.get("protocol_version") != PROTOCOL:
+        raise ValueError("capsule_protocol_mismatch")
+    if prepared.get("capsule_phase") != "PREPARED" or final.get("capsule_phase") != "FINAL":
+        raise ValueError("capsule_phase_mismatch")
+    expected = sha256_bytes(prepared_raw)
+    if final.get("prepared_capsule_sha256") != expected:
+        raise ValueError("final_does_not_bind_exact_prepared_capsule")
+    drift = compare_immutable(prepared, final)
+    return {"authority": "MeasurementOnly", "protocol_version": PROTOCOL,
+            "classification": "ENVIRONMENT_DRIFT" if drift else "QUALIFIED_EXECUTION",
+            "drift_fields": drift, "prepared_capsule_sha256": expected, "runtime_authority_granted": False}
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
-    sub = parser.add_subparsers(dest="command", required=True)
-    p_prepare = sub.add_parser("prepare"); p_prepare.add_argument("plan", type=Path)
-    p_run = sub.add_parser("run"); p_run.add_argument("plan", type=Path); p_run.add_argument("evidence_dir")
-    p_compare = sub.add_parser("compare"); p_compare.add_argument("prepared", type=Path); p_compare.add_argument("final", type=Path)
+    parser = argparse.ArgumentParser(); sub = parser.add_subparsers(dest="command", required=True)
+    p = sub.add_parser("prepare"); p.add_argument("plan", type=Path)
+    r = sub.add_parser("run"); r.add_argument("plan", type=Path); r.add_argument("evidence_dir")
+    c = sub.add_parser("compare"); c.add_argument("prepared", type=Path); c.add_argument("final", type=Path)
     args = parser.parse_args()
     try:
-        if args.command == "prepare":
-            payload, _plan, _raw, _root = prepare(args.plan)
-        elif args.command == "run":
-            payload = run_plan(args.plan, args.evidence_dir)
-        else:
-            _a, prepared = read_json(args.prepared); _b, final = read_json(args.final)
-            drift = compare_immutable(prepared, final)
-            payload = {"authority": "MeasurementOnly", "protocol_version": PROTOCOL,
-                       "classification": "ENVIRONMENT_DRIFT" if drift else "QUALIFIED_EXECUTION",
-                       "drift_fields": drift, "runtime_authority_granted": False}
+        if args.command == "prepare": payload, _p, _r, _root = prepare(args.plan)
+        elif args.command == "run": payload = run_plan(args.plan, args.evidence_dir)
+        else: payload = compare_capsules(args.prepared, args.final)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
         classification = "INVALID_CAPSULE" if isinstance(exc, ValueError) else "INFRASTRUCTURE_INDETERMINATE"
         payload = {"authority": "MeasurementOnly", "protocol_version": PROTOCOL,
