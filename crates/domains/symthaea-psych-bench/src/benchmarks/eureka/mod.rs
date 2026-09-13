@@ -69,7 +69,13 @@ mod v2_fep_development;
 #[cfg(test)]
 mod v2_fep_development_reachability_tests;
 #[cfg(test)]
-mod v2_paired_subject;
+mod v2_heldout_plan;
+#[cfg(test)]
+mod v2_selected_comparator;
+#[cfg(all(test, feature = "symthaea-backend"))]
+mod v2_preheldout_custody;
+#[cfg(test)]
+mod v2_preheldout_reachability_tests;
 #[cfg(test)]
 #[allow(dead_code)]
 mod v2_selection_authorization;
