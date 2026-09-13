@@ -32,6 +32,7 @@
     "scripts/freeze_ll009ag_site01_campaign.py",
     "scripts/capture_ll009ag_environment.py",
     "scripts/ll009ah_checkpoint.py",
+    "scripts/ll009ai_stage_runner.py",
     "scripts/compose_ll009k_horizon_pack.py",
     "configs/lunar_transport/ll009l_raster_toolchain.json",
     "scripts/materialize_ll009l_lola_cog.py",
