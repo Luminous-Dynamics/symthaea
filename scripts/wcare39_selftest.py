@@ -94,12 +94,30 @@ def main() -> int:
         root = Path(temp)
         head = init_repo(root)
 
-        code, passed = execute(root, plan(root, head, "pass_stage.py", "target/pass-receipt.json"), "pass")
+        pass_plan = plan(root, head, "pass_stage.py", "target/pass-receipt.json")
+        code, passed = execute(root, pass_plan, "pass")
         assert code == 0, passed
         assert passed["classification"] == "QUALIFIED_EXECUTION" and passed["environment_integrity"] == "QUALIFIED", passed
         assert passed["subject_outcome"] == "PASS", passed
         assert passed["commands"][0]["output_receipt_sha256"] == sha(root / "target/pass-receipt.json")
         assert_prepared_binding(root, "pass", passed)
+
+        # Exact PREPARED binding is mandatory: a copied FINAL cannot point at another seal.
+        prepared_path = root / "target/pass-capsule/prepared.json"
+        tampered_final_path = root / "target/tampered-final.json"
+        tampered_final = json.loads((root / "target/pass-capsule/final.json").read_text())
+        tampered_final["prepared_capsule_sha256"] = "0" * 64
+        tampered_final_path.write_text(json.dumps(tampered_final, sort_keys=True, separators=(",", ":")) + "\n")
+        tampered = run([sys.executable, str(RUNNER), "compare", str(prepared_path), str(tampered_final_path)], root, check=False)
+        assert tampered.returncode == 4, tampered.stdout
+        assert json.loads(tampered.stdout)["classification"] == "INVALID_CAPSULE"
+
+        # Existing output must never be reused as if this stage produced it.
+        code, stale = execute(root, pass_plan, "stale-output")
+        assert code == 0, stale
+        assert stale["classification"] == "QUALIFIED_EXECUTION", stale
+        assert stale["subject_outcome"] == "INVALID", stale
+        assert stale["commands"][0]["output_receipt_sha256"] is None, stale
 
         code, failed = execute(root, plan(root, head, "fail_stage.py", None), "fail")
         assert code == 0, failed
@@ -128,16 +146,26 @@ def main() -> int:
         material = {item["path"]: item for item in blocked["materials"]}
         lock = material["tools/wcare37_attestation_verifier/Cargo.lock"]
         assert lock["required"] is True and lock["present"] is False, blocked
-        assert not (root / "target" / "wcare38-lock-capsule" / "prepared.json").exists()
+        assert not (root / "target/wcare38-lock-capsule/prepared.json").exists()
+
+        secret_plan = plan(root, head, "fail_stage.py", None)
+        secret_plan["safe_environment"] = [{"key": "API_TOKEN", "mode": "Literal"}]
+        code, secret = execute(root, secret_plan, "secret-literal")
+        assert code == 4, secret
+        assert secret["classification"] == "INVALID_CAPSULE", secret
+        assert "sensitive_environment_literal_forbidden" in secret["detail"], secret
 
     print(json.dumps({
         "authority": "MeasurementOnly",
         "classification": "PASS_WCARE39_SELFTEST",
         "qualified_pass_observed": True,
         "qualified_subject_failure_observed": True,
+        "stale_output_rejected": True,
+        "prepared_binding_tamper_rejected": True,
         "environment_drift_observed": True,
         "missing_subject_drift_observed": True,
         "wcare37_lock_blocker_preserved": True,
+        "sensitive_literal_rejected": True,
         "runtime_authority_granted": False,
     }, sort_keys=True, separators=(",", ":")))
     return 0
