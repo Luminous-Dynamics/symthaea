@@ -189,7 +189,11 @@ impl SubjectManifest {
         let mut out = String::from("symthaea-assurance-subject-v1\n");
         field(&mut out, "name", self.subject_name.as_str());
         optional_id(&mut out, "deployment-envelope", self.deployment_envelope());
-        field(&mut out, "component-count", &self.components.len().to_string());
+        field(
+            &mut out,
+            "component-count",
+            &self.components.len().to_string(),
+        );
         for component in &self.components {
             field(&mut out, "component-kind", &component.kind.canonical_name());
             field(&mut out, "component-digest", component.digest.as_str());
@@ -437,7 +441,11 @@ impl QualificationPlan {
         let mut out = String::from("symthaea-assurance-plan-v1\n");
         field(&mut out, "plan-id", self.plan_id.as_str());
         field(&mut out, "claim", self.claim_digest.as_str());
-        field(&mut out, "maximum-support", self.maximum_support.canonical_name());
+        field(
+            &mut out,
+            "maximum-support",
+            self.maximum_support.canonical_name(),
+        );
         field(
             &mut out,
             "invalidation-count",
@@ -545,7 +553,11 @@ impl QualificationResult {
         field(&mut out, "subject", self.subject_id.as_str());
         field(&mut out, "plan-id", self.plan_id.as_str());
         field(&mut out, "plan-digest", self.plan_digest.as_str());
-        field(&mut out, "claim-ceiling", self.claim_ceiling.canonical_name());
+        field(
+            &mut out,
+            "claim-ceiling",
+            self.claim_ceiling.canonical_name(),
+        );
         append_outcome(&mut out, &self.outcome);
         field(
             &mut out,
