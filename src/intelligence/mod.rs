@@ -13,6 +13,7 @@
 //! - Public development probe for evidence-revision direction and epistemic remediation
 //! - Public development probe for meta-reasoning control-flow and state persistence
 //! - Public development probe for context-optimizer objective plumbing
+//! - Canonical typed objective selection over measured primitive coordinates
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -26,6 +27,7 @@ pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
 pub mod reasoning_meta_control_probe;
 pub mod reasoning_metacognition;
+pub mod reasoning_objective_core;
 pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
 
@@ -70,6 +72,11 @@ pub use reasoning_metacognition::{
     ConfidenceRevisionObservation, CorrectnessPrediction, MetacognitionEvaluationError,
     MetacognitionReport, SelectiveRiskPoint, WeakAssumptionObservation,
     METACOGNITION_EVALUATOR_VERSION,
+};
+pub use reasoning_objective_core::{
+    select_candidate_by_objectives, CandidateObjectiveEvaluation, ObjectiveCoreError,
+    ObjectiveKind, ObjectiveSelectionReport, ObjectiveVector,
+    ObjectiveWeights as CanonicalObjectiveWeights, REASONING_OBJECTIVE_CORE_VERSION,
 };
 pub use reasoning_objective_plumbing_probe::{
     run_objective_plumbing_probe, ObjectivePlumbingObservation,
