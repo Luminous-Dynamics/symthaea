@@ -1,0 +1,132 @@
+name: CI Blocker Isolation af92a463
+
+on:
+  push:
+    branches:
+      - qualify/ci-blockers-af92a463
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wasm-bindgen-locked-install:
+    name: Prove wasm-bindgen-cli locked install
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      SUBJECT_SHA: af92a46351e0dbf76c88faf3e7b4b2c1536daf03
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 1
+
+      - name: Verify exact subject identity
+        run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install pinned wasm-bindgen CLI with published lockfile
+        id: install
+        continue-on-error: true
+        run: cargo install wasm-bindgen-cli --version 0.2.108 --locked
+
+      - name: Verify installed CLI identity
+        id: verify
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: wasm-bindgen --version | tee wasm-bindgen-version.txt
+
+      - name: Emit receipt
+        if: always()
+        run: |
+          version="unavailable"
+          if [ -f wasm-bindgen-version.txt ]; then version="$(cat wasm-bindgen-version.txt)"; fi
+          cat > wasm-bindgen-locked-install-receipt.json <<EOF
+          {
+            "schema": "symthaea.ci.blocker-isolation.v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "hypothesis": "cargo install wasm-bindgen-cli --version 0.2.108 --locked avoids current transitive dependency drift",
+            "install_outcome": "${{ steps.install.outcome }}",
+            "verify_outcome": "${{ steps.verify.outcome }}",
+            "installed_version": "$version"
+          }
+          EOF
+          cat wasm-bindgen-locked-install-receipt.json
+
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-bindgen-locked-install-receipt
+          path: wasm-bindgen-locked-install-receipt.json
+          if-no-files-found: error
+
+      - name: Enforce proof result
+        if: always()
+        run: |
+          test "${{ steps.install.outcome }}" = success
+          test "${{ steps.verify.outcome }}" = success
+
+  muse-theory-isolation:
+    name: Isolate Muse theory test result
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SUBJECT_SHA: af92a46351e0dbf76c88faf3e7b4b2c1536daf03
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 1
+
+      - name: Verify exact subject identity
+        run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev
+
+      - name: Run Muse theory library tests only
+        id: theory
+        continue-on-error: true
+        run: cargo test -p symthaea-muse --lib --features theory --locked
+
+      - name: Emit receipt
+        if: always()
+        run: |
+          cat > muse-theory-isolation-receipt.json <<EOF
+          {
+            "schema": "symthaea.ci.blocker-isolation.v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "command": "cargo test -p symthaea-muse --lib --features theory --locked",
+            "outcome": "${{ steps.theory.outcome }}",
+            "scope": "Direct isolated reproduction only; no claim about unrelated CI jobs."
+          }
+          EOF
+          cat muse-theory-isolation-receipt.json
+
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-theory-isolation-receipt
+          path: muse-theory-isolation-receipt.json
+          if-no-files-found: error
+
+      - name: Preserve isolated failure as job failure
+        if: always()
+        run: test "${{ steps.theory.outcome }}" = success
