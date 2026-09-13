@@ -14,6 +14,9 @@
 //!   sample size, blocking errors, acceptance diagnostics, classical split-R-hat,
 //!   rank-normalized/folded split-R-hat, and uncertainty-aware independent-chain
 //!   comparisons
+//! - **Topology diagnostics**: versioned topological-charge lineage, separate
+//!   Q/Q² autocorrelation, sector ambiguity/tunneling histories and raw lattice-unit
+//!   connected susceptibility without automatic adequacy thresholds
 //!
 //! ## Natural Units
 //!
@@ -34,6 +37,7 @@ pub mod general_relativity;
 pub mod lattice_convergence;
 pub mod lattice_qcd;
 pub mod lattice_statistics;
+pub mod lattice_topology;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -55,6 +59,10 @@ pub use lattice_convergence::{
 pub use lattice_statistics::{
     ChainDiagnostics, LatticeStatisticsError, acceptance_rate, analyze_scalar_chain,
     blocking_standard_error, integrated_autocorrelation_time, sample_mean, sample_variance,
+};
+pub use lattice_topology::{
+    SectorOccupancy, TopologyAutocorrelationDiagnostic, TopologyDefinitionLineage,
+    TopologyDiagnostics, TopologyDiagnosticsError, TopologySample, analyze_topology_history,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
