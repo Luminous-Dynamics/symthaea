@@ -52,7 +52,7 @@ pub enum CampaignError {
     ZeroOrderingSequence,
     #[error("ordering receipt does not bind the expected statement")]
     OrderingStatementMismatch,
-    #[error("ordering receipts are from incomparable source/epoch lineages")]
+    #[error("ordering receipts are from incomparable source/profile/epoch lineages")]
     IncomparableOrderingLineage,
     #[error("ordering sequence is not strictly later than its predecessor")]
     NonIncreasingOrderingSequence,
@@ -88,6 +88,8 @@ pub enum CampaignError {
     EvidenceProductionStatementMismatch,
     #[error("evidence is not preregistered for the current plan: {0:?}")]
     EvidenceNotPreregistered(EvidenceTimingClass),
+    #[error("evidence production is not strictly later than the admitted ledger head")]
+    EvidenceProductionNotAfterLedgerHead,
     #[error("evidence admission statement does not bind the exact current ledger state")]
     EvidenceAdmissionStatementMismatch,
     #[error("evidence admission ordering is not strictly later than production")]
@@ -283,6 +285,7 @@ impl CampaignPlanV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderingReceiptV1 {
     source: StableId,
+    validation_profile: StableId,
     epoch: u64,
     sequence: u64,
     statement_digest: DigestSha256,
@@ -292,6 +295,7 @@ pub struct OrderingReceiptV1 {
 impl OrderingReceiptV1 {
     pub fn new(
         source: StableId,
+        validation_profile: StableId,
         epoch: u64,
         sequence: u64,
         statement_digest: DigestSha256,
@@ -305,6 +309,7 @@ impl OrderingReceiptV1 {
         }
         Ok(Self {
             source,
+            validation_profile,
             epoch,
             sequence,
             statement_digest,
@@ -314,6 +319,10 @@ impl OrderingReceiptV1 {
 
     pub fn source(&self) -> &StableId {
         &self.source
+    }
+
+    pub fn validation_profile(&self) -> &StableId {
+        &self.validation_profile
     }
 
     pub fn epoch(&self) -> u64 {
@@ -331,6 +340,11 @@ impl OrderingReceiptV1 {
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut out = String::from("symthaea-assurance-ordering-receipt-v1\n");
         field(&mut out, "source", self.source.as_str());
+        field(
+            &mut out,
+            "validation-profile",
+            self.validation_profile.as_str(),
+        );
         field(&mut out, "epoch", &self.epoch.to_string());
         field(&mut out, "sequence", &self.sequence.to_string());
         field(&mut out, "statement", self.statement_digest.as_str());
@@ -355,7 +369,10 @@ impl OrderingReceiptV1 {
     }
 
     fn require_later_than(&self, earlier: &Self) -> Result<(), CampaignError> {
-        if self.source != earlier.source || self.epoch != earlier.epoch {
+        if self.source != earlier.source
+            || self.validation_profile != earlier.validation_profile
+            || self.epoch != earlier.epoch
+        {
             return Err(CampaignError::IncomparableOrderingLineage);
         }
         if self.sequence <= earlier.sequence {
@@ -739,7 +756,10 @@ pub fn classify_evidence_timing(
     }
 
     let registration = current.receipt.ordering();
-    if production.source() != registration.source() || production.epoch() != registration.epoch() {
+    if production.source() != registration.source()
+        || production.validation_profile() != registration.validation_profile()
+        || production.epoch() != registration.epoch()
+    {
         return Ok(EvidenceTimingClass::IncomparableOrderingLineage);
     }
     if production.sequence() <= registration.sequence() {
@@ -804,6 +824,7 @@ pub struct CampaignEvidenceLedgerV1 {
     plan_digest: DigestSha256,
     evidence_root: DigestSha256,
     admitted_count: u64,
+    last_ordering: OrderingReceiptV1,
     seen_evidence_ids: BTreeSet<StableId>,
     seen_evidence: BTreeSet<DigestSha256>,
 }
@@ -816,6 +837,7 @@ impl CampaignEvidenceLedgerV1 {
             plan_digest: current.receipt.plan_digest().clone(),
             evidence_root: current.receipt.empty_evidence_root().clone(),
             admitted_count: 0,
+            last_ordering: current.receipt.ordering().clone(),
             seen_evidence_ids: BTreeSet::new(),
             seen_evidence: BTreeSet::new(),
         }
@@ -836,6 +858,14 @@ impl CampaignEvidenceLedgerV1 {
         production: &OrderingReceiptV1,
     ) -> Result<DigestSha256, CampaignError> {
         self.require_current(current)?;
+        production
+            .require_later_than(&self.last_ordering)
+            .map_err(|error| match error {
+                CampaignError::NonIncreasingOrderingSequence => {
+                    CampaignError::EvidenceProductionNotAfterLedgerHead
+                }
+                other => other,
+            })?;
         let mut out = String::from("symthaea-assurance-evidence-admission-statement-v1\n");
         field(&mut out, "registration", self.registration_digest.as_str());
         field(&mut out, "campaign-nonce", self.campaign_nonce.as_str());
@@ -847,6 +877,11 @@ impl CampaignEvidenceLedgerV1 {
         );
         field(&mut out, "evidence", evidence.digest().as_str());
         field(&mut out, "prior-root", self.evidence_root.as_str());
+        field(
+            &mut out,
+            "previous-ordering",
+            self.last_ordering.digest().as_str(),
+        );
         field(&mut out, "production-ordering", production.digest().as_str());
         Ok(digest_canonical(out.as_bytes()))
     }
@@ -923,6 +958,7 @@ impl CampaignEvidenceLedgerV1 {
         self.seen_evidence.insert(evidence_digest);
         self.admitted_count = ordinal;
         self.evidence_root = evidence_root;
+        self.last_ordering = admission.clone();
         Ok(result)
     }
 
