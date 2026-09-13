@@ -90,6 +90,8 @@ pub mod metric_field;
 pub mod math;
 /// Planar SO(2)/SE(2) configuration geometry built on the shared circle factor.
 pub mod planar_configuration;
+/// Proof-strength reachability results and complete finite reference planning.
+pub mod reachability;
 /// Optional smooth-manifold refinement over planner-neutral metric spaces.
 pub mod smooth_manifold;
 /// Planner-neutral state-space, metric-space, product-space, and trajectory primitives.
