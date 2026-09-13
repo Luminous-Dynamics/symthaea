@@ -1,0 +1,127 @@
+name: PIE-002D Production Exact Subject Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002d-production-b6a1aed7
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify PIE-002D production utility binding
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SUBJECT_SHA: b6a1aed7538e416d45b24151d6b9347d2ef4e08d
+      PARENT_SHA: 0212804ae03f9db538332e72cde7a1d2743edbeb
+      SUBJECT_TREE: 8d658d8dadca4602ec4cac793325a8d96b325d01
+      PACKAGE: symthaea-planetary-industry
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject, lineage, tree, and file scope
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SUBJECT_TREE"
+          mapfile -t files < <(git diff --name-only "$PARENT_SHA" "$SUBJECT_SHA" | sort)
+          printf '%s\n' "${files[@]}"
+          test "${#files[@]}" -eq 2
+          test "${files[0]}" = "crates/domains/symthaea-planetary-industry/src/lib.rs"
+          test "${files[1]}" = "crates/domains/symthaea-planetary-industry/src/utility_binding.rs"
+
+      - name: Record subject file digests
+        run: |
+          sha256sum \
+            crates/domains/symthaea-planetary-industry/src/lib.rs \
+            crates/domains/symthaea-planetary-industry/src/utility_binding.rs \
+            | tee pie-002d-production-files.sha256
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Record toolchain
+        run: |
+          rustc --version --verbose
+          cargo --version
+          cargo fmt --version
+          cargo clippy --version
+
+      - name: Package rustfmt
+        id: fmt
+        continue-on-error: true
+        run: cargo fmt -p "$PACKAGE" -- --check
+
+      - name: Package check
+        id: check
+        continue-on-error: true
+        run: cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Package tests
+        id: test
+        continue-on-error: true
+        run: cargo test -p "$PACKAGE" --all-targets --locked --no-fail-fast
+
+      - name: Package clippy
+        id: clippy
+        continue-on-error: true
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Diff hygiene
+        id: diff
+        continue-on-error: true
+        run: git diff --check "$PARENT_SHA" "$SUBJECT_SHA"
+
+      - name: Emit machine-readable qualification receipt
+        if: always()
+        run: |
+          cat > pie-002d-production-qualification.json <<EOF
+          {
+            "schema": "symthaea.pie.exact-subject-qualification.v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$PARENT_SHA",
+            "tree_sha": "$SUBJECT_TREE",
+            "package": "$PACKAGE",
+            "rust_toolchain": "1.96.0",
+            "gates": {
+              "rustfmt": "${{ steps.fmt.outcome }}",
+              "check_all_targets_locked": "${{ steps.check.outcome }}",
+              "test_all_targets_locked": "${{ steps.test.outcome }}",
+              "clippy_all_targets_deny_warnings_locked": "${{ steps.clippy.outcome }}",
+              "git_diff_check": "${{ steps.diff.outcome }}"
+            },
+            "scope": "Projection-to-accounting binding only; not utility feasibility, recovery realizability, storage dispatch, thermal/cooling feasibility, process performance, equipment qualification, economics, or execution authority."
+          }
+          EOF
+          cat pie-002d-production-qualification.json
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-002d-production-exact-subject-qualification
+          path: |
+            pie-002d-production-qualification.json
+            pie-002d-production-files.sha256
+          if-no-files-found: error
+
+      - name: Enforce all package gates
+        if: always()
+        run: |
+          test "${{ steps.fmt.outcome }}" = success
+          test "${{ steps.check.outcome }}" = success
+          test "${{ steps.test.outcome }}" = success
+          test "${{ steps.clippy.outcome }}" = success
+          test "${{ steps.diff.outcome }}" = success
