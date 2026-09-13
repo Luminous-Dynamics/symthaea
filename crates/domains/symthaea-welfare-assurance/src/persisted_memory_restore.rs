@@ -384,11 +384,10 @@ where
             .validate_for(&promotion_request)
             .map_err(PersistedEpisodicRestoreExecutionError::PromotionEvidence)?;
 
-        // No fallible state transition follows this assignment. The candidate already passed exact
-        // memory validation, local Restored is durable, and the complete continuity state has been
-        // independently promoted.
-        *self.memory = candidate.memory;
-
+        // Prepare every fallible terminal evidence object before touching canonical live memory.
+        // If evidence construction fails, the independently anchored durable state remains ahead of
+        // the ephemeral heap and the generic execution journal remains in-doubt. Once the heap swap
+        // occurs below, this executor performs no operation that can return an error.
         let receipt = PersistedEpisodicRestoreReceipt {
             target_id: permit.target_id().to_string(),
             instance_id: self.instance_id,
@@ -414,13 +413,17 @@ where
             "symthaea-memory:persisted-episodic-restore:v2:sha256:{}",
             hex_digest(result_digest)
         );
-        ReceiptedExecution::new(
+        let receipted = ReceiptedExecution::new(
             receipt,
             self.completed_at_unix_s,
             result_digest,
             evidence_ref,
         )
-        .map_err(PersistedEpisodicRestoreExecutionError::Observation)
+        .map_err(PersistedEpisodicRestoreExecutionError::Observation)?;
+
+        // Infallible promotion of the already-validated candidate. No fallible Result path follows.
+        *self.memory = candidate.memory;
+        Ok(receipted)
     }
 }
 
