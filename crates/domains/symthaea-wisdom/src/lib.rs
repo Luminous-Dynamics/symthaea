@@ -87,9 +87,10 @@ pub use practical_wisdom::{
     WisdomReason,
 };
 pub use relationship_safety::{
-    EpistemicJudgment, EpistemicPosition, RelationshipRiskKind, RelationshipRiskObservation,
+    EpistemicJudgmentRecord, JudgmentPosition, RelationshipRiskKind,
+    RelationshipRiskObservation, RelationshipSafetyAssessment, RelationshipSafetyCase,
     RelationshipSafetyError, RelationshipSafetyFinding, RelationshipSafetyPolicy,
-    RelationshipSafetyReport, RelationshipSafetyShadowEvaluator, SocialCondition,
+    SocialCondition,
 };
 
 /// The core question each harmony asks of any situation
@@ -160,17 +161,28 @@ impl WisdomState {
         uncertainty: f32,
         coherence: f32,
     ) {
+        // High prediction error → boost Wisdom (what don't I know?)
         if prediction_error > 0.5 {
             self.harmonics.boost(ActiveHarmonic::Wisdom, 0.1);
         }
+
+        // High uncertainty → boost Play (what haven't I tried?)
         if uncertainty > 0.6 {
             self.harmonics.boost(ActiveHarmonic::Play, 0.1);
         }
+
+        // Low coherence → boost Coherence (does this hang together?)
         if coherence < 0.4 {
             self.harmonics.boost(ActiveHarmonic::Coherence, 0.15);
         }
+
+        // Update autopoietic monitoring
         self.autopoiesis.record_cycle(prediction_error, coherence);
+
+        // Update meta-cognitive model
         self.meta_cognition.update_self_model(prediction_error);
+
+        // Decay back toward balance
         self.harmonics.decay_toward_balance(0.02);
     }
 }
@@ -196,7 +208,9 @@ mod tests {
     fn test_high_prediction_error_boosts_wisdom() {
         let mut wisdom = init_wisdom();
         let initial_wisdom = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
-        wisdom.update_from_experience(0.8, 0.3, 0.7);
+
+        wisdom.update_from_experience(0.8, 0.3, 0.7); // High prediction error
+
         let final_wisdom = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
         assert!(final_wisdom > initial_wisdom);
     }
@@ -205,7 +219,9 @@ mod tests {
     fn test_low_coherence_boosts_coherence_harmony() {
         let mut wisdom = init_wisdom();
         let initial = wisdom.harmonics.get(ActiveHarmonic::Coherence);
-        wisdom.update_from_experience(0.3, 0.3, 0.2);
+
+        wisdom.update_from_experience(0.3, 0.3, 0.2); // Low coherence
+
         let final_val = wisdom.harmonics.get(ActiveHarmonic::Coherence);
         assert!(final_val > initial);
     }
@@ -229,7 +245,9 @@ mod tests {
     #[test]
     fn test_dominant_mode_starts_balanced() {
         let wisdom = init_wisdom();
+        // When balanced, dominant returns Coherence (first in iteration)
         let _ = wisdom.dominant_mode();
+        // Should not panic and should be a valid harmonic
     }
 
     #[test]
@@ -251,7 +269,9 @@ mod tests {
     fn test_high_uncertainty_boosts_play() {
         let mut wisdom = init_wisdom();
         let initial_play = wisdom.harmonics.get(ActiveHarmonic::Play);
-        wisdom.update_from_experience(0.3, 0.8, 0.7);
+
+        wisdom.update_from_experience(0.3, 0.8, 0.7); // High uncertainty
+
         let final_play = wisdom.harmonics.get(ActiveHarmonic::Play);
         assert!(final_play > initial_play);
     }
@@ -262,6 +282,7 @@ mod tests {
         for _ in 0..100 {
             wisdom.update_from_experience(0.9, 0.9, 0.1);
         }
+        // All harmonics should stay in [0, 1]
         for h in ActiveHarmonic::all() {
             let val = wisdom.harmonics.get(h);
             assert!(
@@ -276,14 +297,22 @@ mod tests {
     #[test]
     fn test_no_triggers_decays_toward_balance() {
         let mut wisdom = init_wisdom();
+        // Boost wisdom manually
         wisdom.harmonics.boost(ActiveHarmonic::Wisdom, 0.3);
         let boosted = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
         assert!(boosted > 0.5);
+
+        // Update with no triggers (low error, low uncertainty, high coherence)
         for _ in 0..50 {
             wisdom.update_from_experience(0.1, 0.1, 0.9);
         }
         let after = wisdom.harmonics.get(ActiveHarmonic::Wisdom);
-        assert!(after < boosted, "Should decay toward 0.5: was {}, now {}", boosted, after);
+        assert!(
+            after < boosted,
+            "Should decay toward 0.5: was {}, now {}",
+            boosted,
+            after
+        );
     }
 
     #[test]
