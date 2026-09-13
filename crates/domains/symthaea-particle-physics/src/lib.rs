@@ -30,6 +30,7 @@ pub mod general_relativity;
 pub mod lattice_cornell;
 pub mod lattice_covariance;
 pub mod lattice_linear_gls;
+pub mod lattice_potential_fit_family;
 pub mod lattice_qcd;
 pub mod relativistic_qm;
 pub mod renormalization;
@@ -53,6 +54,11 @@ pub use lattice_covariance::{
     CorrelatedConstantFit, CovarianceError, correlated_constant_fit, sample_covariance,
 };
 pub use lattice_linear_gls::{CorrelatedLinearFit, correlated_linear_fit};
+pub use lattice_potential_fit_family::{
+    LATTICE_POTENTIAL_FIT_FAMILY_ID, LatticePotentialFitFamily, PotentialFitFamilyError,
+    PotentialFitMember, UNIVERSAL_IR_COULOMB_COEFFICIENT,
+    fit_declared_lattice_potential_family,
+};
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
     qcd_beta, qed_beta,
