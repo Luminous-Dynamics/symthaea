@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """Framed V2 identities for generic qualification admission.
 
-V2 deliberately requires the full qualification-profile preimage. A V3 admission request
-contains the exact subject bytes but only a profile ID/name/locator, so the profile theorem
-must be independently resolved before V2 work identity can exist.
+V2 deliberately requires the full qualification-profile preimage and the complete recipe
+preimages that define that profile theorem. A V3 admission request contains the exact subject
+bytes but only a profile ID/name/locator, so the theorem must be independently resolved before
+V2 work identity can exist.
 
 This module does not reinterpret V3 admission IDs. It validates the complete V3 request,
-validates the resolved V1 profile record, derives framed V2 root IDs from their semantic
-preimages, and only then derives V2 admission identities.
+validates the resolved V1 profile record and exact recipe set, derives framed V2 root IDs from
+their semantic preimages, and only then derives V2 admission identities.
 
 The two V2 identities remain distinct:
 
     QualificationAdmissionSubjectIdV2
-        = exact qualification subject semantics + exact qualification profile semantics
+        = exact qualification subject semantics + exact resolved qualification profile semantics
 
     QualificationAdmissionRequestIdV2
         = work identity + request/provenance metadata
@@ -32,6 +33,7 @@ import integration_train_manifest as train
 import qualification_admission_v3 as admission_v3
 import qualification_framing_v1 as framing
 import qualification_profile as profile_mod
+import qualification_recipe_v1 as recipe_mod
 import qualification_semantic_ids_v2 as semantic_v2
 
 SCHEMA = "symthaea.qualification-admission-identities.v2"
@@ -43,10 +45,12 @@ def _encoded_text_set(values: list[str]) -> bytes:
     return framing.encode_set(framing.encode_text(value) for value in values)
 
 
-def _resolve(admission: Any, profile_value: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+def _resolve(
+    admission: Any, profile_value: Any, recipes: list[Any]
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
     # require_ids=True prevents a malformed/incomplete V3 request from being silently upgraded.
     request = admission_v3.normalize_request(admission, require_ids=True)
-    profile = profile_mod.normalize_profile(profile_value, require_id=True)
+    profile, resolved_recipes = semantic_v2.resolve_profile_recipes(profile_value, recipes)
 
     expected = request["qualification_profile"]
     if profile["profile_id"] != expected["profile_id"]:
@@ -57,15 +61,19 @@ def _resolve(admission: Any, profile_value: Any) -> tuple[dict[str, Any], dict[s
         raise train.TrainManifestError(
             "admission v2 migration: resolved profile name does not match V3 locator"
         )
-    return request, profile
+    return request, profile, resolved_recipes
 
 
-def derive_admission_identities_v2(admission: Any, profile_value: Any) -> dict[str, str]:
+def derive_admission_identities_v2(
+    admission: Any, profile_value: Any, recipes: list[Any]
+) -> dict[str, str]:
     """Validate all V1/V3 preimages and derive framed V2 work/request identities."""
 
-    request, profile = _resolve(admission, profile_value)
+    request, profile, resolved_recipes = _resolve(admission, profile_value, recipes)
     qualification_subject_id_v2 = semantic_v2.compute_subject_id_v2(request["subject"])
-    qualification_profile_id_v2 = semantic_v2.compute_profile_id_v2(profile)
+    qualification_profile_id_v2 = semantic_v2.compute_profile_id_v2(
+        profile, resolved_recipes
+    )
     admission_subject_id_v2 = framing.semantic_sha256_id(
         SUBJECT_ID_DOMAIN,
         [
@@ -100,6 +108,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("admission", type=Path, help="complete V3 admission JSON")
     parser.add_argument("profile", type=Path, help="resolved complete V1 qualification profile JSON")
+    parser.add_argument(
+        "--recipe",
+        type=Path,
+        action="append",
+        required=True,
+        help="exact recipe manifest; repeat once for every profile recipe",
+    )
     return parser
 
 
@@ -132,10 +147,11 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         admission = _load_json(args.admission)
-        # Reuse the profile module's bounded, duplicate-key-rejecting loader rather than
-        # defining a second profile-file parsing contract in the migration bridge.
+        # Reuse each schema owner's bounded duplicate-key-rejecting loader rather than
+        # defining parallel parsing contracts in the migration bridge.
         profile = profile_mod.load_profile(args.profile, require_id=True)
-        result = derive_admission_identities_v2(admission, profile)
+        recipes = [recipe_mod.load_recipe(path, require_id=True) for path in args.recipe]
+        result = derive_admission_identities_v2(admission, profile, recipes)
     except train.TrainManifestError as error:
         print(f"qualification admission v2 migration invalid: {error}")
         return 2
