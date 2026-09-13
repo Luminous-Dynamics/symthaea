@@ -20,11 +20,11 @@ routing=load("qualification_routing")
 coverage=load("qualification_route_admission")
 
 
-def oid(c): return c*40
+def oid(c,fmt="sha1"): return c*(40 if fmt=="sha1" else 64)
 def ident(c): return "sha256:"+c*64
 
-def subj(commit="a",tree="b"):
-    raw={"schema":subject.SCHEMA,"kind":"GitCommit","repository":"Luminous-Dynamics/symthaea","source_commit":oid(commit),"source_tree":oid(tree)}
+def subj(commit="a",tree="b",fmt="sha1"):
+    raw={"schema":subject.SCHEMA,"kind":"GitCommit","repository":"Luminous-Dynamics/symthaea","object_format":fmt,"source_commit":oid(commit,fmt),"source_tree":oid(tree,fmt)}
     out=subject.normalize_subject(raw,verify_declared_id=False); raw["subject_id"]=out["subject_id"]; return raw
 
 def adm(profile_id=None,reason="qualify",branch="evidence/profile-v1",path="docs/profile.json",source=None):
@@ -33,7 +33,8 @@ def adm(profile_id=None,reason="qualify",branch="evidence/profile-v1",path="docs
 
 def route(ids=None,disposition=None,source=None,recipe="d"):
     src=source or subj(); ids=ids if ids is not None else [ident("c")]; disposition=disposition or routing.FOCUSED
-    raw={"schema":routing.SCHEMA,"subject_id":src["subject_id"],"source_commit":src["source_commit"],"base_commit":oid("e"),"merge_base":oid("f"),"changed_paths_sha256":ident("a"),"router_recipe_id":"git-blob-sha1:"+oid(recipe),"disposition":disposition,"required_profile_ids":ids,"reason":"complete diff maps to exact profile set"}
+    fmt=src["object_format"]
+    raw={"schema":routing.SCHEMA,"subject_id":src["subject_id"],"object_format":fmt,"source_commit":src["source_commit"],"base_commit":oid("e",fmt),"merge_base":oid("f",fmt),"changed_paths_format":routing.CHANGED_PATHS_FORMAT,"changed_paths_sha256":ident("a"),"router_recipe_id":"git-blob-sha1:"+oid(recipe),"disposition":disposition,"required_profile_ids":ids,"reason":"complete diff maps to exact profile set"}
     out=routing.normalize_decision(raw,verify_declared_id=False); raw["decision_id"]=out["decision_id"]; return raw
 
 
@@ -50,12 +51,20 @@ def test_request_provenance_changes_but_work_identity_does_not():
     assert first["admission_subject_id"]==second["admission_subject_id"]
 
 
-def test_changed_profile_or_commit_changes_work_identity():
+def test_changed_profile_commit_or_object_format_changes_work_identity():
     first=adm()
     changed_profile=adm(profile_id=ident("9"))
     changed_commit=adm(source=subj(commit="9",tree="b"))
+    sha256_subject=adm(source=subj(commit="a",tree="b",fmt="sha256"))
     assert first["admission_subject_id"]!=changed_profile["admission_subject_id"]
     assert first["admission_subject_id"]!=changed_commit["admission_subject_id"]
+    assert first["admission_subject_id"]!=sha256_subject["admission_subject_id"]
+
+
+def test_object_format_length_mismatch_fails_closed():
+    raw=subj(); raw["source_commit"]="a"*64
+    with pytest.raises(train.TrainManifestError,match="40-character"):
+        subject.normalize_subject(raw,verify_declared_id=False)
 
 
 def test_subject_declared_identity_mismatch_fails_closed():
@@ -67,6 +76,12 @@ def test_routing_profile_set_semantics_fail_closed():
     with pytest.raises(train.TrainManifestError): route([],routing.FOCUSED)
     with pytest.raises(train.TrainManifestError): route([ident("c")],routing.FULL)
     with pytest.raises(train.TrainManifestError): route([ident("c"),ident("c")],routing.FOCUSED)
+
+
+def test_changed_paths_format_is_frozen_not_just_digest():
+    raw=route(); raw["changed_paths_format"]="newline-path-list/v0"
+    with pytest.raises(train.TrainManifestError,match="changed_paths_format"):
+        routing.normalize_decision(raw,verify_declared_id=False)
 
 
 def test_router_recipe_changes_decision_identity():
