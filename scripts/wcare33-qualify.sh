@@ -25,14 +25,36 @@ detail="not_started"
 head_sha="unknown"
 rustc_version="unavailable"
 cargo_version="unavailable"
+compile_status="not_run"
+corpus_status="not_run"
+subject_cases_status="not_run"
+metamorphic_status="not_run"
+failed_case_ids_json="[]"
 
 json_safe() {
   printf '%s' "$1" | tr '\n\r\t"\\' '     '
 }
 
+collect_failed_case_ids() {
+  local ids id out="" separator=""
+  ids="$(grep 'FAILED' "$RUNNER_LOG" 2>/dev/null \
+    | sed -n 's/.*wcare32_\([0-9][0-9][0-9]\)_[A-Za-z0-9_]*.*/WCARE32-\1/p' \
+    | sort -u || true)"
+  if [[ -z "$ids" ]]; then
+    failed_case_ids_json="[]"
+    return
+  fi
+  while IFS= read -r id; do
+    [[ -z "$id" ]] && continue
+    out="${out}${separator}\"${id}\""
+    separator=","
+  done <<< "$ids"
+  failed_case_ids_json="[$out]"
+}
+
 emit_receipt() {
   cat > "$RECEIPT" <<EOF
-{"authority":"MeasurementOnly","case_count":24,"cargo":"$(json_safe "$cargo_version")","classification":"$classification","composition_commit":"$COMPOSITION","corpus_sha256":"$CORPUS_SHA256","detail":"$(json_safe "$detail")","head_sha":"$head_sha","manifest_sha256":"$MANIFEST_SHA256","metamorphic_required":true,"rustc":"$(json_safe "$rustc_version")","schema_sha256":"$SCHEMA_SHA256","stage":"$stage","wcare29_parent":"$WCARE29_PARENT","wcare32_parent":"$WCARE32_PARENT"}
+{"authority":"MeasurementOnly","case_count":24,"cargo":"$(json_safe "$cargo_version")","classification":"$classification","compile_status":"$compile_status","composition_commit":"$COMPOSITION","corpus_sha256":"$CORPUS_SHA256","corpus_status":"$corpus_status","detail":"$(json_safe "$detail")","failed_case_ids":$failed_case_ids_json,"head_sha":"$head_sha","manifest_sha256":"$MANIFEST_SHA256","metamorphic_required":true,"metamorphic_status":"$metamorphic_status","required_case_range":"WCARE32-001..WCARE32-024","rustc":"$(json_safe "$rustc_version")","schema_sha256":"$SCHEMA_SHA256","stage":"$stage","subject_cases_status":"$subject_cases_status","wcare29_parent":"$WCARE29_PARENT","wcare32_parent":"$WCARE32_PARENT"}
 EOF
   printf 'WCARE-33 %s (%s: %s)\nreceipt: %s\n' "$classification" "$stage" "$detail" "$RECEIPT"
 }
@@ -92,35 +114,45 @@ if ! cargo test --locked -p symthaea-wisdom \
   --test wcare33_reciprocal_adversarial_runner \
   --test wcare33_metamorphic_invariants \
   --no-run >"$COMPILE_LOG" 2>&1; then
+  compile_status="fail"
   classification="$(compile_failure_classification "$COMPILE_LOG")"
   detail="compile_gate_failed"
   [[ "$classification" == "INFRASTRUCTURE_INDETERMINATE" ]] && finish 2
   finish 1
 fi
+compile_status="pass"
 
 stage="corpus_integrity"
 if ! cargo test --locked -p symthaea-wisdom \
   --test wcare32_corpus_integrity -- --nocapture >"$CORPUS_LOG" 2>&1; then
+  corpus_status="invalid"
   classification="INVALID_CORPUS"
   detail="frozen_corpus_integrity_failed"
   finish 1
 fi
+corpus_status="pass"
 
 stage="subject_cases"
 if ! cargo test --locked -p symthaea-wisdom \
   --test wcare33_reciprocal_adversarial_runner -- --nocapture >"$RUNNER_LOG" 2>&1; then
+  subject_cases_status="fail"
+  collect_failed_case_ids
   classification="FAIL_SUBJECT"
   detail="one_or_more_frozen_cases_failed"
   finish 1
 fi
+subject_cases_status="pass"
+failed_case_ids_json="[]"
 
 stage="metamorphic_invariants"
 if ! cargo test --locked -p symthaea-wisdom \
   --test wcare33_metamorphic_invariants -- --nocapture >"$METAMORPHIC_LOG" 2>&1; then
+  metamorphic_status="fail"
   classification="FAIL_SUBJECT"
   detail="one_or_more_metamorphic_invariants_failed"
   finish 1
 fi
+metamorphic_status="pass"
 
 classification="PASS_SUBJECT"
 stage="complete"
