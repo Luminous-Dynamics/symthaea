@@ -21,7 +21,7 @@ use super::v2_comparator_custody::{
     V2DevelopmentFitCorpus, V2PublicTransitionEvidence, canonical_transition_semantics_bytes,
 };
 use super::v2_public_schema::{
-    V2_OBSERVATION_DIM, V2PublicFamily, V2PublicState, action_index, public_schema_commitment,
+    V2_OBSERVATION_DIM, V2PublicFamily, V2PublicState, public_schema_commitment,
 };
 
 pub(super) const V2_CALIBRATION_EVIDENCE_REVISION: &str =
