@@ -19,6 +19,7 @@ on:
       - 'docs/compliance/adr/ADR-035-rsk-lockfile-repair-worktree-purity.md'
       - 'docs/compliance/adr/ADR-036-rsk-lockfile-repair-intent-freeze.md'
       - 'docs/compliance/adr/ADR-037-rsk-lockfile-repair-action-pins.md'
+      - 'docs/compliance/adr/ADR-038-rsk-lockfile-repair-runner-provenance.md'
   workflow_dispatch:
 
 permissions:
@@ -31,7 +32,7 @@ concurrency:
 jobs:
   lockfile-repair-diagnostic:
     name: RSK Cargo.lock repair diagnostic (non-admissible)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -86,6 +87,7 @@ jobs:
           echo 'A committed candidate must be byte-idempotent under the pinned Cargo toolchain.'
           echo 'A committed candidate may not change dependency-intent inputs relative to the PR base.'
           echo 'No repository path other than Cargo.lock may change.'
+          echo 'Hosted-runner image identity is recorded as provenance, not treated as a trust grant.'
           echo 'Normal RSK qualification must still pass later with --locked.'
 
       - name: Require clean exact-head checkout
@@ -128,6 +130,17 @@ jobs:
           dtolnay/rust-toolchain ebb3d1676050bfd0971c36c1e215b5751473994d 1.96.0
           actions/upload-artifact ea165f8d65b6e75b540449e92b4886f43607fa02 v4
           EOF
+          {
+            printf 'runs_on=ubuntu-24.04\n'
+            printf 'RUNNER_OS=%s\n' "${RUNNER_OS:-unknown}"
+            printf 'RUNNER_ARCH=%s\n' "${RUNNER_ARCH:-unknown}"
+            printf 'ImageOS=%s\n' "${ImageOS:-unknown}"
+            printf 'ImageVersion=%s\n' "${ImageVersion:-unknown}"
+            uname -a
+            cat /etc/os-release
+            git --version
+            python3 --version
+          } > "${out}/runner-environment.txt" 2>&1
           sha256sum \
             "${out}/Cargo.lock.base" \
             "${out}/Cargo.lock.head" \
@@ -143,6 +156,7 @@ jobs:
             'Commit-verification mode requires the committed head to remain byte-identical after Cargo.' \
             'Commit-verification mode also requires dependency-intent inputs to match the PR base.' \
             'No repository path other than Cargo.lock may change.' \
+            'Hosted-runner image metadata is provenance only.' \
             > "${out}/README.txt"
 
       - name: Freeze dependency intent for committed lockfile candidate
