@@ -4,9 +4,9 @@
 //!
 //! The adapter is invoked only after the durable evidence-bound permit has passed all live
 //! revalidation. A concrete mutator may apply a read-only domain preflight before any `Prepared`
-//! event is written. Only then does the adapter persist write-ahead state and call the mutator.
-//! A successful mutation whose completion journal cannot be persisted is returned as an explicit
-//! in-doubt outcome rather than a generic retryable error.
+//! event is written. Only then does the adapter attempt to persist write-ahead state and call the
+//! mutator. Once Prepared persistence has been attempted, acknowledgement failure is represented as
+//! explicit in-doubt evidence rather than a retry-shaped pre-execution error.
 
 use std::error::Error as StdError;
 
@@ -31,7 +31,9 @@ const MAX_EXECUTION_REF_BYTES: usize = 2048;
 
 /// Persistence boundary for the append-only execution journal.
 ///
-/// Implementations must durably commit the exact event stream and head hash before returning.
+/// Implementations must durably commit the exact event stream and head hash before returning
+/// success. An error does not prove that no commit occurred: a backend may commit and then lose its
+/// acknowledgement. Callers therefore treat every failed Prepared-persistence attempt as in doubt.
 pub trait ExecutionJournalPersistence {
     type Error: StdError + Send + Sync + 'static;
 
@@ -99,13 +101,24 @@ pub trait ReceiptedInterventionExecutor {
 
 /// Outcomes from the journaled mutator boundary.
 ///
-/// `PreflightRejected` occurs before any write-ahead state or mutation. Once `Prepared` is durable,
-/// only `Completed` has durable terminal evidence; every other post-prepare variant requires
-/// reconciliation and must not be converted into an automatic retry.
+/// `PreflightRejected` occurs before any write-ahead state or mutation. Prepared-persistence
+/// variants mean the domain mutator was never called, but the write-ahead record may nevertheless
+/// be durable and therefore requires reconciliation rather than retry. Once domain execution is
+/// attempted, only `Completed` has durable terminal evidence; every other variant is in doubt.
 #[derive(Debug)]
 pub enum JournaledExecutionOutcome<O, EE, PE> {
     PreflightRejected {
         error: EE,
+    },
+    /// A Prepared persistence attempt returned an error. The backend may still have committed.
+    PreparedPersistenceInDoubt {
+        error: PE,
+        prepared_digest: Sha256Digest,
+    },
+    /// Prepared persistence reported success but returned a noncanonical/unusable reference.
+    PreparedPersistenceReferenceInDoubt {
+        prepared_digest: Sha256Digest,
+        prepared_persistence_ref: String,
     },
     Completed {
         output: O,
@@ -145,8 +158,33 @@ impl<O, EE, PE> JournaledExecutionOutcome<O, EE, PE> {
         matches!(self, Self::Completed { .. })
     }
 
+    /// Whether the downstream domain mutator was called.
+    ///
+    /// Prepared-persistence ambiguity deliberately returns `false`: no domain mutation was
+    /// attempted. That does **not** mean retry is safe; use `requires_reconciliation()` for that.
     pub fn mutation_was_attempted(&self) -> bool {
-        !matches!(self, Self::PreflightRejected { .. })
+        matches!(
+            self,
+            Self::Completed { .. }
+                | Self::ExecutorInDoubt { .. }
+                | Self::CompletionJournalInDoubt { .. }
+                | Self::CompletionPersistenceInDoubt { .. }
+                | Self::CompletionPersistenceReferenceInDoubt { .. }
+        )
+    }
+
+    /// Whether the outcome lacks durable terminal evidence and must be reconciled before any
+    /// operator considers a retry or replacement execution.
+    pub fn requires_reconciliation(&self) -> bool {
+        matches!(
+            self,
+            Self::PreparedPersistenceInDoubt { .. }
+                | Self::PreparedPersistenceReferenceInDoubt { .. }
+                | Self::ExecutorInDoubt { .. }
+                | Self::CompletionJournalInDoubt { .. }
+                | Self::CompletionPersistenceInDoubt { .. }
+                | Self::CompletionPersistenceReferenceInDoubt { .. }
+        )
     }
 }
 
@@ -183,13 +221,28 @@ where
             .map_err(PreExecutionJournalError::Journal)?;
 
         // This persistence occurs inside the executor boundary: all live permit and domain
-        // preflight checks have passed, but the downstream mutator has not yet been called.
-        let prepared_persistence_ref = self
+        // preflight checks have passed, but the downstream mutator has not yet been called. Any
+        // acknowledgement failure is ambiguous because the backend may have committed first.
+        let prepared_persistence_ref = match self
             .persistence
             .persist_execution_journal(self.journal.events(), self.journal.head_hash())
-            .map_err(PreExecutionJournalError::PreparedPersistence)?;
-        validate_ref(&prepared_persistence_ref)
-            .map_err(|_| PreExecutionJournalError::InvalidPersistenceReference)?;
+        {
+            Ok(reference) => reference,
+            Err(error) => {
+                return Ok(JournaledExecutionOutcome::PreparedPersistenceInDoubt {
+                    error,
+                    prepared_digest,
+                });
+            }
+        };
+        if validate_ref(&prepared_persistence_ref).is_err() {
+            return Ok(
+                JournaledExecutionOutcome::PreparedPersistenceReferenceInDoubt {
+                    prepared_digest,
+                    prepared_persistence_ref,
+                },
+            );
+        }
 
         let execution = match self.executor.execute_receipted(permit) {
             Ok(execution) => execution,
@@ -348,8 +401,12 @@ where
 {
     #[error("could not append write-ahead execution record: {0}")]
     Journal(#[source] ExecutionJournalError),
+    /// Retained for public API compatibility. Persistence-attempt failures are now represented by
+    /// `JournaledExecutionOutcome::PreparedPersistenceInDoubt` instead.
     #[error("could not persist write-ahead execution journal: {0}")]
     PreparedPersistence(#[source] E),
+    /// Retained for public API compatibility. Invalid success references are now represented by
+    /// `JournaledExecutionOutcome::PreparedPersistenceReferenceInDoubt` instead.
     #[error("execution-journal persistence returned an invalid durable reference")]
     InvalidPersistenceReference,
 }
@@ -386,7 +443,7 @@ mod tests {
     }
 
     #[test]
-    fn only_completed_outcome_reports_durable_terminal_evidence() {
+    fn outcome_semantics_distinguish_mutation_from_reconciliation_need() {
         let completed: JournaledExecutionOutcome<(), (), ()> =
             JournaledExecutionOutcome::Completed {
                 output: (),
@@ -397,13 +454,24 @@ mod tests {
             };
         assert!(completed.has_durable_terminal_evidence());
         assert!(completed.mutation_was_attempted());
+        assert!(!completed.requires_reconciliation());
 
         let rejected: JournaledExecutionOutcome<(), (), ()> =
             JournaledExecutionOutcome::PreflightRejected { error: () };
         assert!(!rejected.has_durable_terminal_evidence());
         assert!(!rejected.mutation_was_attempted());
+        assert!(!rejected.requires_reconciliation());
 
-        let in_doubt: JournaledExecutionOutcome<(), (), ()> =
+        let prepared_in_doubt: JournaledExecutionOutcome<(), (), ()> =
+            JournaledExecutionOutcome::PreparedPersistenceReferenceInDoubt {
+                prepared_digest: Sha256Digest([3; 32]),
+                prepared_persistence_ref: "bad prepared ref".into(),
+            };
+        assert!(!prepared_in_doubt.has_durable_terminal_evidence());
+        assert!(!prepared_in_doubt.mutation_was_attempted());
+        assert!(prepared_in_doubt.requires_reconciliation());
+
+        let post_mutation_in_doubt: JournaledExecutionOutcome<(), (), ()> =
             JournaledExecutionOutcome::CompletionPersistenceReferenceInDoubt {
                 output: (),
                 completed: CompletedInterventionExecution {
@@ -417,7 +485,8 @@ mod tests {
                 prepared_digest: Sha256Digest([3; 32]),
                 prepared_persistence_ref: "prepared:1".into(),
             };
-        assert!(!in_doubt.has_durable_terminal_evidence());
-        assert!(in_doubt.mutation_was_attempted());
+        assert!(!post_mutation_in_doubt.has_durable_terminal_evidence());
+        assert!(post_mutation_in_doubt.mutation_was_attempted());
+        assert!(post_mutation_in_doubt.requires_reconciliation());
     }
 }
