@@ -9,11 +9,11 @@
 
 use super::reasoning_context_competition::{
     assess_and_select, ContextCompetitionError, ContextCompetitionPolicy, ContextHypothesis,
-    RobustContextSelectionReport,
+    ContextResolution, RobustContextSelectionReport,
 };
 use super::reasoning_meta_state::{
     MetaCommitReport, MetaEpistemicState, MetaEpisodeObservation, MetaOutcomeFeedback,
-    MetaStateAuthority, MetaStateCheckpoint, MetaStateError, MetaSupportSignals,
+    MetaSignalRevision, MetaStateAuthority, MetaStateCheckpoint, MetaStateError, MetaSupportSignals,
     OutcomeCommitReport,
 };
 use crate::consciousness::primitive_evolution::CandidatePrimitive;
@@ -87,7 +87,6 @@ impl CanonicalReasoningKernelV2 {
                 history_capacity,
             ));
         }
-        // Re-run constructor validation instead of trusting a deserialized/public struct.
         let context_policy = ContextCompetitionPolicy::try_new(
             context_policy.minimum_support,
             context_policy.ambiguity_band,
@@ -310,26 +309,27 @@ fn compute_decision_commitment(decision: &CanonicalReasoningDecisionV2) -> Strin
     hash_str(&mut hasher, &decision.subject_id);
     hash_str(&mut hasher, &decision.episode_id);
     hash_u64(&mut hasher, decision.sequence);
+
+    let assessment = &decision.context_selection.assessment;
+    hash_u64(&mut hasher, assessment.policy.minimum_support.to_bits());
+    hash_u64(&mut hasher, assessment.policy.ambiguity_band.to_bits());
+    hash_u64(&mut hasher, context_rank(assessment.primary_context) as u64);
+    hash_u64(&mut hasher, assessment.top_support.to_bits());
+    hash_optional_f64(&mut hasher, assessment.second_support);
+    hash_optional_f64(&mut hasher, assessment.margin);
     hash_u64(
         &mut hasher,
-        context_rank(decision.context_selection.assessment.primary_context) as u64,
+        match assessment.resolution {
+            ContextResolution::Resolved => 0,
+            ContextResolution::Ambiguous => 1,
+        },
     );
-    hash_u64(
-        &mut hasher,
-        decision.context_selection.assessment.top_support.to_bits(),
-    );
-    hash_u64(
-        &mut hasher,
-        decision.context_selection.assessment.active_contexts.len() as u64,
-    );
-    for context in &decision.context_selection.assessment.active_contexts {
+    hash_u64(&mut hasher, assessment.active_contexts.len() as u64);
+    for context in &assessment.active_contexts {
         hash_u64(&mut hasher, context_rank(*context) as u64);
     }
-    hash_u64(
-        &mut hasher,
-        decision.context_selection.assessment.hypotheses.len() as u64,
-    );
-    for hypothesis in &decision.context_selection.assessment.hypotheses {
+    hash_u64(&mut hasher, assessment.hypotheses.len() as u64);
+    for hypothesis in &assessment.hypotheses {
         hash_u64(&mut hasher, context_rank(hypothesis.context) as u64);
         hash_u64(&mut hasher, hypothesis.support.to_bits());
         hash_str(&mut hasher, &hypothesis.source);
@@ -338,11 +338,37 @@ fn compute_decision_commitment(decision: &CanonicalReasoningDecisionV2) -> Strin
             hash_str(&mut hasher, evidence_ref);
         }
     }
-    hash_str(&mut hasher, &decision.selected_candidate.name);
-    hash_str(&mut hasher, &decision.selected_candidate.definition);
+
+    hash_u64(
+        &mut hasher,
+        decision.context_selection.evaluations.len() as u64,
+    );
+    for evaluation in &decision.context_selection.evaluations {
+        hash_u64(&mut hasher, evaluation.source_index as u64);
+        hash_str(&mut hasher, &evaluation.candidate_name);
+        hash_u64(&mut hasher, evaluation.vector.integration_proxy.to_bits());
+        hash_u64(&mut hasher, evaluation.vector.harmonic_alignment.to_bits());
+        hash_u64(&mut hasher, evaluation.vector.epistemic_grounding.to_bits());
+        hash_u64(&mut hasher, evaluation.worst_case_score.to_bits());
+        hash_u64(&mut hasher, evaluation.mean_score.to_bits());
+        hash_bool(&mut hasher, evaluation.pareto_optimal);
+        hash_u64(&mut hasher, evaluation.context_scores.len() as u64);
+        for score in &evaluation.context_scores {
+            hash_u64(&mut hasher, context_rank(score.context) as u64);
+            hash_u64(&mut hasher, score.weights.integration_proxy.to_bits());
+            hash_u64(&mut hasher, score.weights.harmonic_alignment.to_bits());
+            hash_u64(&mut hasher, score.weights.epistemic_grounding.to_bits());
+            hash_u64(&mut hasher, score.weighted_score.to_bits());
+        }
+    }
+
     hash_u64(
         &mut hasher,
         decision.context_selection.selected_source_index as u64,
+    );
+    hash_str(
+        &mut hasher,
+        &decision.context_selection.selected_candidate_name,
     );
     hash_u64(
         &mut hasher,
@@ -364,23 +390,75 @@ fn compute_decision_commitment(decision: &CanonicalReasoningDecisionV2) -> Strin
         &mut hasher,
         decision.context_selection.selected_mean_score.to_bits(),
     );
+
+    hash_str(&mut hasher, &decision.selected_candidate.name);
+    hash_str(&mut hasher, &decision.selected_candidate.definition);
+    hash_str(
+        &mut hasher,
+        &format!("{:?}", decision.selected_candidate.tier),
+    );
+    hash_bytes(&mut hasher, &decision.selected_candidate.encoding.0);
+    hash_u64(&mut hasher, decision.selected_candidate.fitness.to_bits());
     hash_u64(
         &mut hasher,
-        decision.meta_commit.current_signals.context_support.to_bits(),
+        decision.selected_candidate.harmonic_alignment.to_bits(),
     );
-    hash_u64(
+    hash_str(
         &mut hasher,
-        decision.meta_commit.current_signals.strategy_support.to_bits(),
+        &format!("{:?}", decision.selected_candidate.epistemic_coordinate),
     );
-    hash_u64(
-        &mut hasher,
-        decision.meta_commit.current_signals.selection_support.to_bits(),
-    );
+
+    hash_str(&mut hasher, &decision.meta_commit.subject_id);
+    hash_str(&mut hasher, &decision.meta_commit.episode_id);
+    hash_u64(&mut hasher, decision.meta_commit.sequence);
+    hash_signals(&mut hasher, decision.meta_commit.current_signals);
+    match decision.meta_commit.previous_signals {
+        Some(signals) => {
+            hash_bool(&mut hasher, true);
+            hash_signals(&mut hasher, signals);
+        }
+        None => hash_bool(&mut hasher, false),
+    }
+    match decision.meta_commit.revision {
+        Some(revision) => {
+            hash_bool(&mut hasher, true);
+            hash_revision(&mut hasher, revision);
+        }
+        None => hash_bool(&mut hasher, false),
+    }
+    hash_u64(&mut hasher, decision.meta_commit.retained_records as u64);
+    hash_u64(&mut hasher, decision.meta_commit.unresolved_records as u64);
     hash_u64(
         &mut hasher,
         decision.applied_plasticity_multiplier.to_bits(),
     );
     hasher.finalize().to_hex().to_string()
+}
+
+fn hash_signals(hasher: &mut blake3::Hasher, signals: MetaSupportSignals) {
+    hash_u64(hasher, signals.context_support.to_bits());
+    hash_u64(hasher, signals.strategy_support.to_bits());
+    hash_u64(hasher, signals.selection_support.to_bits());
+}
+
+fn hash_revision(hasher: &mut blake3::Hasher, revision: MetaSignalRevision) {
+    hash_u64(hasher, revision.context_support_delta.to_bits());
+    hash_u64(hasher, revision.strategy_support_delta.to_bits());
+    hash_u64(hasher, revision.selection_support_delta.to_bits());
+}
+
+fn hash_optional_f64(hasher: &mut blake3::Hasher, value: Option<f64>) {
+    match value {
+        Some(value) => {
+            hash_bool(hasher, true);
+            hash_u64(hasher, value.to_bits());
+        }
+        None => hash_bool(hasher, false),
+    }
+}
+
+fn hash_bool(hasher: &mut blake3::Hasher, value: bool) {
+    hasher.update(&[u8::from(value)]);
 }
 
 fn hash_str(hasher: &mut blake3::Hasher, value: &str) {
@@ -494,11 +572,20 @@ mod tests {
     }
 
     #[test]
-    fn tampered_decision_fails_commitment_validation() {
+    fn tampered_winner_fails_commitment_validation() {
         let mut kernel = CanonicalReasoningKernelV2::new(8).unwrap();
         let mut decision = kernel.reason(input("agent-a", "ep-0", 0)).unwrap();
         assert!(decision.validate_commitment());
         decision.selected_candidate.name = "tampered".into();
+        assert!(!decision.validate_commitment());
+    }
+
+    #[test]
+    fn tampered_losing_candidate_evaluation_fails_commitment_validation() {
+        let mut kernel = CanonicalReasoningKernelV2::new(8).unwrap();
+        let mut decision = kernel.reason(input("agent-a", "ep-0", 0)).unwrap();
+        assert!(decision.validate_commitment());
+        decision.context_selection.evaluations[0].candidate_name = "tampered-loser".into();
         assert!(!decision.validate_commitment());
     }
 
