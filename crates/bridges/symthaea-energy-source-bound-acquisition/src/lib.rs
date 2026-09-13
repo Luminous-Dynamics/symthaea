@@ -16,11 +16,13 @@ use std::collections::BTreeSet;
 use symthaea_energy_material_campaign::{
     admit_campaign_result, AcquisitionDeclaration, CampaignAdmissionReceipt, CampaignError,
     SourceCommitment, Tier1CampaignManifest,
+    CAPABILITY_CLASSIFICATION as COMPATIBILITY_CAPABILITY_CLASSIFICATION,
 };
 use symthaea_energy_material_candidate_version::CandidateVersionBoundDossier;
 use symthaea_energy_material_screening::EvidenceDimension;
 use symthaea_energy_native_campaign_admission::{
     admit_native_campaign_result, NativeAdmissionError, NativeCampaignAdmissionReceipt,
+    CAPABILITY_CLASSIFICATION as NATIVE_CAPABILITY_CLASSIFICATION,
 };
 use symthaea_energy_native_dossier::NativeEnvelopeDossier;
 use thiserror::Error;
@@ -126,12 +128,17 @@ impl SourceBoundCompatibilityAdmissionReceipt {
             "compatibility admission",
         )?;
         validate_declaration_structure(&self.acquisition_declarations)?;
+        validate_compatibility_inner(&self.compatibility_admission)?;
         if self.compatibility_admission.campaign_manifest_sha256
             != self.campaign_manifest_sha256
         {
             return Err(SourceBoundAdmissionError::InvalidReceipt(
                 "inner compatibility admission belongs to a different campaign".into(),
             ));
+        }
+        let expected_v0 = v0_declarations(&self.acquisition_declarations);
+        if self.compatibility_admission.acquisition_declarations != expected_v0 {
+            return Err(SourceBoundAdmissionError::InnerDeclarationMismatch);
         }
         let expected = self.compatibility_admission.sha256()?;
         if self.compatibility_admission_sha256 != expected {
@@ -188,10 +195,20 @@ impl SourceBoundNativeAdmissionReceipt {
         validate_sha256(&self.campaign_manifest_sha256, "campaign manifest")?;
         validate_sha256(&self.native_admission_sha256, "native admission")?;
         validate_declaration_structure(&self.acquisition_declarations)?;
+        self.native_admission.validate()?;
+        if self.native_admission.capability_classification != NATIVE_CAPABILITY_CLASSIFICATION {
+            return Err(SourceBoundAdmissionError::InvalidReceipt(
+                "inner native admission capability classification was altered".into(),
+            ));
+        }
         if self.native_admission.campaign_manifest_sha256 != self.campaign_manifest_sha256 {
             return Err(SourceBoundAdmissionError::InvalidReceipt(
                 "inner native admission belongs to a different campaign".into(),
             ));
+        }
+        let expected_v0 = v0_declarations(&self.acquisition_declarations);
+        if self.native_admission.acquisition_declarations != expected_v0 {
+            return Err(SourceBoundAdmissionError::InnerDeclarationMismatch);
         }
         let expected = self.native_admission.sha256()?;
         if self.native_admission_sha256 != expected {
@@ -229,11 +246,8 @@ pub fn admit_source_bound_compatibility(
     declarations: Vec<SourceBoundAcquisitionDeclaration>,
 ) -> Result<SourceBoundCompatibilityAdmissionReceipt, SourceBoundAdmissionError> {
     let declarations = canonical_source_bound_declarations(manifest, declarations)?;
-    let v0 = declarations
-        .iter()
-        .map(SourceBoundAcquisitionDeclaration::to_v0)
-        .collect();
-    let compatibility_admission = admit_campaign_result(manifest, dossier, v0)?;
+    let compatibility_admission =
+        admit_campaign_result(manifest, dossier, v0_declarations(&declarations))?;
     let receipt = SourceBoundCompatibilityAdmissionReceipt {
         schema: "symthaea.energy-material.source-bound-compatibility-admission.v1".into(),
         capability_classification: CAPABILITY_CLASSIFICATION.into(),
@@ -252,11 +266,8 @@ pub fn admit_source_bound_native(
     declarations: Vec<SourceBoundAcquisitionDeclaration>,
 ) -> Result<SourceBoundNativeAdmissionReceipt, SourceBoundAdmissionError> {
     let declarations = canonical_source_bound_declarations(manifest, declarations)?;
-    let v0 = declarations
-        .iter()
-        .map(SourceBoundAcquisitionDeclaration::to_v0)
-        .collect();
-    let native_admission = admit_native_campaign_result(manifest, dossier, v0)?;
+    let native_admission =
+        admit_native_campaign_result(manifest, dossier, v0_declarations(&declarations))?;
     let receipt = SourceBoundNativeAdmissionReceipt {
         schema: "symthaea.energy-material.source-bound-native-admission.v1".into(),
         capability_classification: CAPABILITY_CLASSIFICATION.into(),
@@ -356,6 +367,41 @@ fn validate_declaration_structure(
     Ok(())
 }
 
+fn validate_compatibility_inner(
+    admission: &CampaignAdmissionReceipt,
+) -> Result<(), SourceBoundAdmissionError> {
+    if admission.schema != "symthaea.energy-material.campaign-admission.v0"
+        || admission.capability_classification != COMPATIBILITY_CAPABILITY_CLASSIFICATION
+    {
+        return Err(SourceBoundAdmissionError::InvalidReceipt(
+            "inner compatibility admission schema/capability classification was altered".into(),
+        ));
+    }
+    for (name, digest) in [
+        ("compatibility campaign manifest", admission.campaign_manifest_sha256.as_str()),
+        ("candidate-bound dossier", admission.candidate_bound_dossier_sha256.as_str()),
+        ("candidate", admission.candidate_sha256.as_str()),
+        ("screening policy", admission.screening_policy_sha256.as_str()),
+    ] {
+        validate_sha256(digest, name)?;
+    }
+    if admission.admitted_dimensions.as_slice() != EvidenceDimension::ALL.as_slice() {
+        return Err(SourceBoundAdmissionError::InvalidReceipt(
+            "inner compatibility admission must contain all seven canonical dimensions".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn v0_declarations(
+    declarations: &[SourceBoundAcquisitionDeclaration],
+) -> Vec<AcquisitionDeclaration> {
+    declarations
+        .iter()
+        .map(SourceBoundAcquisitionDeclaration::to_v0)
+        .collect()
+}
+
 #[derive(Debug, Error)]
 pub enum SourceBoundAdmissionError {
     #[error("invalid source-bound acquisition declaration: {0}")]
@@ -374,6 +420,8 @@ pub enum SourceBoundAdmissionError {
     AcquisitionSourceIdentityMismatch(EvidenceDimension),
     #[error("acquisition query differs from frozen campaign for dimension {0:?}")]
     AcquisitionQueryMismatch(EvidenceDimension),
+    #[error("inner admission acquisition declarations differ from source-bound downgrade")]
+    InnerDeclarationMismatch,
     #[error("inner admission digest mismatch: expected {expected}, got {actual}")]
     InnerAdmissionDigestMismatch { expected: String, actual: String },
     #[error("source-bound admission receipt does not replay exactly from supplied inputs")]
