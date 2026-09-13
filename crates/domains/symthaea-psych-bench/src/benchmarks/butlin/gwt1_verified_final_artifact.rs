@@ -22,7 +22,6 @@ use super::gwt1_trusted_resolution::{
     GWT1_TRUSTED_RESOLUTION_CANDIDATE_SCHEMA_V1, Gwt1TrustedResolutionCandidateV1,
 };
 use super::report::{ButlinIndicatorReport, EvidenceOutcome, SupportTier};
-use super::resolution_view::EvidenceLineageKindV1;
 use super::resolution_view_v2::ButlinResolvedEvidenceViewV2;
 
 pub const GWT1_VERIFIED_FINAL_ARTIFACT_SCHEMA_V1: &str =
@@ -157,11 +156,6 @@ fn gwt1_claims_functional_support(view: &ButlinResolvedEvidenceViewV2) -> bool {
                 == EvidenceOutcome::Supported(SupportTier::FunctionallySupported)
                 || lineage.resolved_outcome
                     == EvidenceOutcome::Supported(SupportTier::FunctionallySupported))
-    }) || view.lineages.iter().any(|lineage| {
-        lineage.indicator_id == "GWT-1"
-            && lineage.lineage.kind == EvidenceLineageKindV1::CausalQualification
-            && lineage.resolved_outcome
-                == EvidenceOutcome::Supported(SupportTier::FunctionallySupported)
     })
 }
 
@@ -203,13 +197,13 @@ pub(crate) fn verify_gwt1_final_reconstruction_v1(
         );
     }
 
-    if stored_candidate.base_report != *stored_base_report {
+    if &stored_candidate.base_report != stored_base_report {
         return Err(Gwt1FinalArtifactReconstructionErrorV1::StoredCandidateBaseMismatch);
     }
-    if stored_candidate.resolved_view != *stored_resolved_view {
+    if &stored_candidate.resolved_view != stored_resolved_view {
         return Err(Gwt1FinalArtifactReconstructionErrorV1::StoredCandidateViewMismatch);
     }
-    if stored_candidate.disposition != *stored_disposition {
+    if &stored_candidate.disposition != stored_disposition {
         return Err(
             Gwt1FinalArtifactReconstructionErrorV1::StoredCandidateDispositionMismatch,
         );
@@ -217,19 +211,19 @@ pub(crate) fn verify_gwt1_final_reconstruction_v1(
 
     let rederived_disposition = classify_gwt1_evidence_disposition_v1(stored_resolved_view)
         .map_err(Gwt1FinalArtifactReconstructionErrorV1::StoredDispositionInvalid)?;
-    if rederived_disposition != *stored_disposition {
+    if &rederived_disposition != stored_disposition {
         return Err(
             Gwt1FinalArtifactReconstructionErrorV1::StoredCandidateDispositionMismatch,
         );
     }
 
-    if recomputed_candidate.base_report != *stored_base_report {
+    if &recomputed_candidate.base_report != stored_base_report {
         return Err(Gwt1FinalArtifactReconstructionErrorV1::RecomputedBaseMismatch);
     }
-    if recomputed_candidate.resolved_view != *stored_resolved_view {
+    if &recomputed_candidate.resolved_view != stored_resolved_view {
         return Err(Gwt1FinalArtifactReconstructionErrorV1::RecomputedViewMismatch);
     }
-    if recomputed_candidate.disposition != *stored_disposition {
+    if &recomputed_candidate.disposition != stored_disposition {
         return Err(Gwt1FinalArtifactReconstructionErrorV1::RecomputedDispositionMismatch);
     }
     if recomputed_candidate.promotion_attestation_verification_bytes()
