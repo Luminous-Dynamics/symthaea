@@ -8,11 +8,11 @@ license = "AGPL-3.0-or-later"
 [dependencies]
 symthaea-episodic-continuity = { path = "../symthaea-episodic-continuity" }
 symthaea-episodic-continuity-anchor = { path = "../symthaea-episodic-continuity-anchor" }
+symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
 symthaea-welfare-assurance = { path = "../symthaea-welfare-assurance" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
-symthaea-fabrication-kernel = { path = "../symthaea-fabrication-kernel", default-features = false }
 symthaea-memory = { path = "../symthaea-memory" }
 tempfile = "3"
