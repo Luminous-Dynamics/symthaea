@@ -1,8 +1,8 @@
 # ADR-031: Execute Xenia witness trust reference suites in focused RSK CI
 
-- **Status**: Accepted
-- **Change Class**: A
-- **Scope**: Replicator Safety Kernel qualification only
+**Status**: Accepted
+**Change Class**: A
+**Scope**: Replicator Safety Kernel qualification only
 
 ## Decision
 
