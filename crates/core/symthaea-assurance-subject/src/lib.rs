@@ -44,6 +44,10 @@ pub enum SubjectError {
     MissingSurface(String),
     #[error("subject binding is not registered by the profile: {0}")]
     UnexpectedSurface(String),
+    #[error("applicable subject surface requires a locator: {0}")]
+    MissingLocator(String),
+    #[error("not-applicable subject surface must not carry a locator: {0}")]
+    LocatorOnNotApplicable(String),
     #[error(transparent)]
     Core(#[from] CoreAssuranceError),
 }
@@ -195,25 +199,27 @@ impl SurfaceLocator {
 pub enum CommitmentMethod {
     /// SHA-256 over the exact artifact bytes.
     ArtifactBytesSha256,
-    /// SHA-256 over a separately specified canonical descriptor. The
-    /// descriptor schema/version must be part of the surrounding assurance
-    /// contract before this method can imply cross-implementation equality.
-    CanonicalDescriptorSha256,
-    /// SHA-256 over an exact provider revision token. This binds the token,
-    /// but does not prove that the provider treats the token as immutable.
-    ProviderRevisionTokenSha256,
-    /// Domain-specific method identifier. Consumers must understand the
-    /// method semantics before treating two commitments as equivalent.
-    Custom(StableId),
+    /// SHA-256 over a descriptor under an explicitly identified canonical
+    /// schema/profile.
+    CanonicalDescriptorSha256 { schema: StableId },
+    /// SHA-256 over an exact provider revision token under an explicitly
+    /// identified provider token namespace/profile.
+    ProviderRevisionTokenSha256 { namespace: StableId },
+    /// SHA-256 over a domain-specific preimage/canonicalization method.
+    CustomSha256(StableId),
 }
 
 impl CommitmentMethod {
     fn canonical_name(&self) -> String {
         match self {
             Self::ArtifactBytesSha256 => "artifact-bytes-sha256".into(),
-            Self::CanonicalDescriptorSha256 => "canonical-descriptor-sha256".into(),
-            Self::ProviderRevisionTokenSha256 => "provider-revision-token-sha256".into(),
-            Self::Custom(id) => format!("custom:{}", id.as_str()),
+            Self::CanonicalDescriptorSha256 { schema } => {
+                format!("canonical-descriptor-sha256:{}", schema.as_str())
+            }
+            Self::ProviderRevisionTokenSha256 { namespace } => {
+                format!("provider-revision-token-sha256:{}", namespace.as_str())
+            }
+            Self::CustomSha256(id) => format!("custom-sha256:{}", id.as_str()),
         }
     }
 }
@@ -231,6 +237,24 @@ impl MaterialCommitment {
 
     pub fn artifact_bytes(digest: DigestSha256) -> Self {
         Self::new(CommitmentMethod::ArtifactBytesSha256, digest)
+    }
+
+    pub fn canonical_descriptor(schema: StableId, digest: DigestSha256) -> Self {
+        Self::new(
+            CommitmentMethod::CanonicalDescriptorSha256 { schema },
+            digest,
+        )
+    }
+
+    pub fn provider_revision_token(namespace: StableId, digest: DigestSha256) -> Self {
+        Self::new(
+            CommitmentMethod::ProviderRevisionTokenSha256 { namespace },
+            digest,
+        )
+    }
+
+    pub fn custom_sha256(method_id: StableId, digest: DigestSha256) -> Self {
+        Self::new(CommitmentMethod::CustomSha256(method_id), digest)
     }
 
     pub fn method(&self) -> &CommitmentMethod {
@@ -293,16 +317,45 @@ impl SurfaceState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SurfaceBinding {
     kind: AiSurfaceKind,
-    locator: SurfaceLocator,
+    locator: Option<SurfaceLocator>,
     state: SurfaceState,
 }
 
 impl SurfaceBinding {
-    pub fn new(kind: AiSurfaceKind, locator: SurfaceLocator, state: SurfaceState) -> Self {
+    pub fn new(
+        kind: AiSurfaceKind,
+        locator: Option<SurfaceLocator>,
+        state: SurfaceState,
+    ) -> Result<Self, SubjectError> {
+        match (&locator, &state) {
+            (None, SurfaceState::NotApplicable) | (Some(_), SurfaceState::Known(_))
+            | (Some(_), SurfaceState::Unknown) | (Some(_), SurfaceState::Unavailable(_)) => {
+                Ok(Self {
+                    kind,
+                    locator,
+                    state,
+                })
+            }
+            (Some(_), SurfaceState::NotApplicable) => {
+                Err(SubjectError::LocatorOnNotApplicable(kind.canonical_name()))
+            }
+            (None, _) => Err(SubjectError::MissingLocator(kind.canonical_name())),
+        }
+    }
+
+    pub fn applicable(
+        kind: AiSurfaceKind,
+        locator: SurfaceLocator,
+        state: SurfaceState,
+    ) -> Result<Self, SubjectError> {
+        Self::new(kind, Some(locator), state)
+    }
+
+    pub fn not_applicable(kind: AiSurfaceKind) -> Self {
         Self {
             kind,
-            locator,
-            state,
+            locator: None,
+            state: SurfaceState::NotApplicable,
         }
     }
 
@@ -310,8 +363,8 @@ impl SurfaceBinding {
         &self.kind
     }
 
-    pub fn locator(&self) -> &SurfaceLocator {
-        &self.locator
+    pub fn locator(&self) -> Option<&SurfaceLocator> {
+        self.locator.as_ref()
     }
 
     pub fn state(&self) -> &SurfaceState {
@@ -341,14 +394,14 @@ impl CompletenessSummary {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AiSubjectManifest {
-    subject_name: StableId,
+    subject_key: StableId,
     profile: SurfaceProfile,
     bindings: Vec<SurfaceBinding>,
 }
 
 impl AiSubjectManifest {
     pub fn new(
-        subject_name: StableId,
+        subject_key: StableId,
         profile: SurfaceProfile,
         mut bindings: Vec<SurfaceBinding>,
     ) -> Result<Self, SubjectError> {
@@ -378,14 +431,16 @@ impl AiSubjectManifest {
         }
 
         Ok(Self {
-            subject_name,
+            subject_key,
             profile,
             bindings,
         })
     }
 
-    pub fn subject_name(&self) -> &StableId {
-        &self.subject_name
+    /// Semantic, identity-bearing logical subject key. Presentation/display
+    /// labels do not belong in this field.
+    pub fn subject_key(&self) -> &StableId {
+        &self.subject_key
     }
 
     pub fn profile(&self) -> &SurfaceProfile {
@@ -417,7 +472,7 @@ impl AiSubjectManifest {
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut out = String::from("symthaea-assurance-ai-subject-v1\n");
         field(&mut out, "schema", ASSURE_SUBJECT_SCHEMA);
-        field(&mut out, "subject-name", self.subject_name.as_str());
+        field(&mut out, "subject-key", self.subject_key.as_str());
         field(&mut out, "profile-id", self.profile.profile_id.as_str());
         field(&mut out, "profile-digest", self.profile.digest().as_str());
         field(
@@ -431,13 +486,19 @@ impl AiSubjectManifest {
         field(&mut out, "binding-count", &self.bindings.len().to_string());
         for binding in &self.bindings {
             field(&mut out, "surface-kind", &binding.kind.canonical_name());
-            optional_id(&mut out, "provider", binding.locator.provider.as_ref());
-            field(&mut out, "name", binding.locator.name.as_str());
-            optional_id(
-                &mut out,
-                "declared-version",
-                binding.locator.declared_version.as_ref(),
-            );
+            if let Some(locator) = &binding.locator {
+                optional_id(&mut out, "provider", locator.provider.as_ref());
+                field(&mut out, "name", locator.name.as_str());
+                optional_id(
+                    &mut out,
+                    "declared-version",
+                    locator.declared_version.as_ref(),
+                );
+            } else {
+                field(&mut out, "provider", "");
+                field(&mut out, "name", "");
+                field(&mut out, "declared-version", "");
+            }
             field(&mut out, "state", binding.state.canonical_name());
             match &binding.state {
                 SurfaceState::Known(commitment) => {
@@ -473,7 +534,7 @@ impl AiSubjectManifest {
     pub fn as_core_subject(&self) -> Result<CoreSubjectManifest, SubjectError> {
         let bridge_kind = SubjectComponentKind::Custom(StableId::new(CORE_BRIDGE_COMPONENT)?);
         Ok(CoreSubjectManifest::new(
-            self.subject_name.clone(),
+            self.subject_key.clone(),
             vec![SubjectComponent {
                 kind: bridge_kind,
                 digest: self.manifest_id(),
