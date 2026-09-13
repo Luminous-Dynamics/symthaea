@@ -22,19 +22,12 @@ pub(super) const V2_HELDOUT_ROWS_PER_FAMILY: usize = 64;
 pub(super) const V2_HELDOUT_ROWS_TOTAL: usize = 128;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum V2HeldOutPlanError {
-    Materialization(V2ScheduleMaterializationError),
+enum V2HeldOutPlanError {
     WrongTotalCount,
     NonHeldOutRow,
     FamilyImbalance,
     ActionImbalance,
     DuplicateRowIdentity,
-}
-
-impl From<V2ScheduleMaterializationError> for V2HeldOutPlanError {
-    fn from(value: V2ScheduleMaterializationError) -> Self {
-        Self::Materialization(value)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,7 +56,8 @@ impl V2HeldOutPlan {
     }
 }
 
-pub(super) fn materialize_heldout_plan() -> Result<V2HeldOutPlan, V2HeldOutPlanError> {
+pub(super) fn materialize_heldout_plan(
+) -> Result<V2HeldOutPlan, V2ScheduleMaterializationError> {
     let mut rows = Vec::with_capacity(V2_HELDOUT_ROWS_TOTAL);
     for family in V2PublicFamily::ALL {
         rows.extend(
@@ -74,6 +68,7 @@ pub(super) fn materialize_heldout_plan() -> Result<V2HeldOutPlan, V2HeldOutPlanE
     }
     let full_schedule_root = canonical_schedule_root(&materialize_all_rows()?);
     freeze_heldout_rows(rows, full_schedule_root)
+        .map_err(|_| V2ScheduleMaterializationError::WrongCardinality)
 }
 
 fn freeze_heldout_rows(
