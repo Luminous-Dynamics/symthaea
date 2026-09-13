@@ -25,7 +25,6 @@ const RELATION_STRENGTHS: &[&str] = &[
 
 #[derive(Clone)]
 struct Artifact {
-    bytes: Vec<u8>,
     json: Value,
     sha256: String,
 }
@@ -54,7 +53,6 @@ fn load(path: &Path) -> Result<Artifact, String> {
         .map_err(|e| format!("parse JSON {}: {e}", path.display()))?;
     Ok(Artifact {
         sha256: sha256_hex(&bytes),
-        bytes,
         json,
     })
 }
@@ -197,24 +195,28 @@ fn subject_binding(
     w35: &Artifact,
     subject: &Artifact,
 ) -> Result<bool, String> {
-    if field(envelope, "wcare36_result_sha256")? != w36.sha256
-        || field(envelope, "wcare35_result_sha256")? != w35.sha256
-        || field(envelope, "subject_receipt_sha256")? != subject.sha256
-        || field(policy.json.as_ref(), "wcare36_result_sha256")? != w36.sha256
-        || field(policy.json.as_ref(), "wcare35_result_sha256")? != w35.sha256
+    if field(envelope, "wcare36_result_sha256")? != w36.sha256.as_str()
+        || field(envelope, "wcare35_result_sha256")? != w35.sha256.as_str()
+        || field(envelope, "subject_receipt_sha256")? != subject.sha256.as_str()
+        || field(&policy.json, "wcare36_result_sha256")? != w36.sha256.as_str()
+        || field(&policy.json, "wcare35_result_sha256")? != w35.sha256.as_str()
     {
         return Ok(false);
     }
-    if field(envelope, "issuer_policy_id")? != field(policy.json.as_ref(), "issuer_policy_id")? {
+    if field(envelope, "issuer_policy_id")? != field(&policy.json, "issuer_policy_id")? {
         return Ok(false);
     }
     if subject.json.get("protocol_version").and_then(Value::as_str) != Some(PROVENANCE_PROTOCOL) {
         return Ok(false);
     }
-    if subject.json.get("wcare35_result_sha256").and_then(Value::as_str) != Some(&w35.sha256) {
+    if subject.json.get("wcare35_result_sha256").and_then(Value::as_str)
+        != Some(w35.sha256.as_str())
+    {
         return Ok(false);
     }
-    if w36.json.get("wcare35_result_sha256").and_then(Value::as_str) != Some(&w35.sha256) {
+    if w36.json.get("wcare35_result_sha256").and_then(Value::as_str)
+        != Some(w35.sha256.as_str())
+    {
         return Ok(false);
     }
 
@@ -363,11 +365,8 @@ fn run() -> Result<i32, String> {
 
     let issued = parse_utc(field(&envelope.json, "issued_at_utc")?)?;
     let expires = field(&envelope.json, "expires_at_utc")?;
-    checks.attestation_current_at_evaluation = if expires == "-" {
-        true
-    } else {
-        evaluation_time < parse_utc(expires)?
-    };
+    checks.attestation_current_at_evaluation = evaluation_time >= issued
+        && (expires == "-" || evaluation_time < parse_utc(expires)?);
     if !checks.attestation_current_at_evaluation {
         emit_result(
             &envelope,
@@ -379,7 +378,11 @@ fn run() -> Result<i32, String> {
             issuer_key_id,
             &checks,
             "ATTESTATION_REJECTED",
-            "attestation_expired_at_evaluation_time",
+            if evaluation_time < issued {
+                "evaluation_precedes_attestation_issue_time"
+            } else {
+                "attestation_expired_at_evaluation_time"
+            },
         );
         return Ok(1);
     }
@@ -421,11 +424,25 @@ fn run() -> Result<i32, String> {
         if checks.issuer_key_present {
             let valid_from = parse_utc(field(entry, "valid_from_utc")?)?;
             let valid_until = field(entry, "valid_until_utc")?;
+            if valid_until != "-" && parse_utc(valid_until)? <= valid_from {
+                emit_result(
+                    &envelope,
+                    &policy,
+                    &w36,
+                    &w35,
+                    &subject,
+                    Some(canonical_sha),
+                    issuer_key_id,
+                    &checks,
+                    "ATTESTATION_REJECTED",
+                    "invalid_key_validity_interval",
+                );
+                return Ok(1);
+            }
             checks.key_valid_at_issue_time = issued >= valid_from
                 && (valid_until == "-" || issued < parse_utc(valid_until)?);
             let revoked = field(entry, "revocation_effective_utc")?;
-            checks.revocation_policy_satisfied =
-                revoked == "-" || issued < parse_utc(revoked)?;
+            checks.revocation_policy_satisfied = revoked == "-" || issued < parse_utc(revoked)?;
 
             let scope = field(&envelope.json, "subject_receipt_kind")?;
             checks.scope_authorized = array_contains(entry, "allowed_attestation_scopes", scope);
@@ -548,9 +565,6 @@ mod tests {
         let public_key = hex::encode(signing_key.verifying_key().as_bytes());
         let mut envelope = base_envelope(&public_key);
         envelope["expires_at_utc"] = Value::String("2026-09-13T16:00:00Z".into());
-        assert_eq!(
-            canonical_message(&envelope).unwrap_err(),
-            "expiry_not_after_issue_time"
-        );
+        assert_eq!(canonical_message(&envelope).unwrap_err(), "expiry_not_after_issue_time");
     }
 }
