@@ -1,0 +1,84 @@
+name: PIE-002B Projection Oracle Exact Subject Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002b-projection-dd3c5b80
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Execute frozen PIE-002B projection oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SUBJECT_SHA: dd3c5b80457a001c66a26551056f1521e99db303
+      ORACLE: scripts/pie-process-utility-projection-oracle.py
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 1
+
+      - name: Verify exact subject identity
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$SUBJECT_SHA" "$actual"
+          test "$actual" = "$SUBJECT_SHA"
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+
+      - name: Record Python identity
+        run: python3 --version
+
+      - name: Compile oracle syntax
+        id: syntax
+        continue-on-error: true
+        run: python3 -m py_compile "$ORACLE"
+
+      - name: Execute oracle self-test
+        id: selftest
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          output="$(python3 "$ORACLE" --self-test)"
+          printf '%s\n' "$output"
+          test "$output" = ok
+
+      - name: Emit machine-readable receipt
+        if: always()
+        run: |
+          cat > pie-002b-projection-oracle-qualification.json <<EOF
+          {
+            "schema": "symthaea.pie.oracle-qualification.v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "oracle": "$ORACLE",
+            "python": "3.13.5",
+            "syntax": "${{ steps.syntax.outcome }}",
+            "self_test": "${{ steps.selftest.outcome }}",
+            "scope": "Independent process-utility projection reference only; not electrical supply, thermal, cooling, process-performance, production Rust, or control-authority qualification."
+          }
+          EOF
+          cat pie-002b-projection-oracle-qualification.json
+
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-002b-projection-oracle-exact-subject-qualification
+          path: pie-002b-projection-oracle-qualification.json
+          if-no-files-found: error
+
+      - name: Enforce oracle gates
+        if: always()
+        run: |
+          test "${{ steps.syntax.outcome }}" = success
+          test "${{ steps.selftest.outcome }}" = success
