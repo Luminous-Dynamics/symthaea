@@ -1,68 +1,89 @@
 # symthaea-research-result
 
-Immutable result manifests for evidence-bearing Symthaea research.
+Immutable result manifests and endpoint-bound evidence validation for Symthaea research.
 
 ## Purpose
 
-`symthaea-research-protocol` freezes what an experiment said it would test and binds an exact run to source/data/environment/seed lineage. This crate closes the other end of that chain: it records what the run actually produced without allowing inconvenient primary outcomes, deviations, amendments, or null findings to disappear.
+`symthaea-research-protocol` freezes what an experiment said it would test and binds an exact run to source/data/environment/seed lineage. This crate records what the run actually produced without allowing inconvenient outcomes, missing values, deviations, amendments, or endpoint records to silently disappear.
 
-## Core invariants
+The V1 result manifest remains a historical content-addressed evidence format. V2 is additive: it binds that exact V1 result to the canonical typed confirmatory protocol/run identity from `symthaea-research-protocol` and applies stricter endpoint/evidence validation without redefining V1 digests.
 
-### Primary metrics cannot disappear
+## V1 invariants
 
-Every preregistered `MetricRole::Primary` must have one `MetricResult` entry. That entry may be:
+Every preregistered primary metric must have a `MetricResult` entry. An entry may be Numeric, Boolean, Categorical, Missing, or NotComputed. Missing data are therefore represented explicitly rather than omitted.
 
-- a numeric/boolean/categorical observation;
-- `Missing { reason }`;
-- `NotComputed { reason }`.
+Claims reference reported metric/artifact identities rather than carrying ungrounded prose alone. Exploratory hypotheses cannot be relabeled confirmatory. Post-unblinding amendments and primary-analysis deviations downgrade the overall interpretation, while invalidation requires invalidated claim interpretations.
 
-Missing data are therefore represented as missing data, not silently removed from the result surface.
+At least one digested Analysis artifact is required and the V1 manifest has a versioned BLAKE3 identity over the exact recorded result contents.
 
-### Claims are references, not free prose
+## V2 endpoint-bound result
 
-A `ResultClaim` must reference at least one reported metric or digested result artifact. Metric, hypothesis, and artifact ids are checked against the frozen protocol/result manifest.
+`ConfirmatoryResearchResultV2` preserves the exact V1 result identity and additionally binds:
 
-### Exploratory remains exploratory
+- the canonical V2 confirmatory-protocol digest;
+- the canonical V2 run-binding digest;
+- exact endpoint-to-terminal-claim bindings;
+- frozen metric value schemas;
+- exact endpoint hypothesis and metric input order;
+- analysis-output references for externally frozen analysis rules when a confirmatory positive/negative/null conclusion is claimed.
 
-Claims against preregistered exploratory hypotheses cannot be labeled confirmatory. If the parent protocol reports a post-unblinding amendment or a deviation affecting the primary analysis, confirmatory claims are rejected.
+A V2 object represents a campaign that began under a confirmatory endpoint contract. It does **not** imply that the final campaign interpretation remained confirmatory. A legitimate post-unblinding amendment, primary-analysis deviation, or invalidation remains representable and must preserve the corresponding Exploratory/Invalidated claim interpretation.
 
-### Null is a result
+This distinction is intentional:
 
-`ClaimDisposition::NullResult` and `Inconclusive` are first-class outcomes. The crate contains no API that converts absence of improvement into absence of a result record.
+```text
+confirmatory preregistration
+!= confirmatory final interpretation
+```
 
-### Artifact provenance is explicit
+## Complete endpoint boundary
 
-The manifest requires at least one digested `Analysis` artifact and can bind raw outputs, metrics, tables, figures, models, forecast ledgers, verification records, and logs.
+`CompleteEndpointResearchResultV2` is the stronger validation witness intended for consumers that require selection-complete endpoint evidence.
 
-### Result identity is content-addressed
+It adds two interpretation-independent rules:
 
-`ResearchResultManifest` carries a versioned BLAKE3 digest over the exact run registration, protocol digest, amendments, deviations, interpretation, artifacts, metric outcomes, and claims.
+1. every frozen V2 endpoint receives exactly one terminal claim binding, including safety and secondary endpoints;
+2. a required metric recorded as Missing or NotComputed cannot support `ConsistentWithHypothesis`, `InconsistentWithHypothesis`, or `NullResult`, whether the terminal claim is Confirmatory or Exploratory.
 
-Mutation after construction is detectable with `verify_digest()`.
+The wrapper does not mint a new digest. The inner V2 result remains the evidence identity; the wrapper is a stronger validation boundary over that identity. Imported/deserialized wrappers must call `validate_against` again.
+
+## Direct vs external decision rules
+
+For direct Boolean/Categorical decision rules, a genuinely confirmatory claim disposition must agree with the observed endpoint value. Missing/NotComputed evidence may only produce an absence-compatible disposition such as Inconclusive or NotEvaluated.
+
+For `ExternalFrozenAnalysisRule`, the generic result layer does not pretend to be a statistical engine. Confirmatory positive/negative/null conclusions require a bound Analysis output artifact, while the protocol separately commits the exact external rule identity and artifact digest.
+
+Important non-equivalence:
+
+```text
+frozen analysis-rule identity
++ result Analysis artifact
+!= proof the rule was faithfully executed
+```
+
+A later execution/verification receipt should close that theorem. Until then this layer establishes identity, typed inputs, endpoint completeness, and output binding—not faithful statistical execution.
+
+## Event-lineage boundary
+
+This crate validates every supplied amendment/deviation but does not prove that the supplied event census is complete or current. The append-only event-lineage/current-head theorem tracked separately by the research-integrity work remains required before a caller can claim complete protocol-history custody.
 
 ## Non-claims
 
-This crate does not establish that:
+This crate does not establish scientific truth, construct validity, statistical validity, causal identification, independent replication, faithful execution of an external analysis rule, amendment/deviation census completeness, operating-system custody, software qualification, deployment validity, or authority to act.
 
-- a claim is scientifically true;
-- a p-value or effect estimate is valid;
-- a model is causal;
-- a result generalizes beyond its study population/regime;
-- a confirmatory result is independently replicated;
-- one metric should dominate another;
-- a scientific conclusion grants authority to act.
-
-Those remain separate evidence, replication, value, governance, and authority questions.
+A successful source-level test or digest check is not executable qualification.
 
 ## Intended first consumers
 
-- Wetland Watch / semantic-downlink experiments;
+- Alignment Crucible / hostile-agent causal experiments;
+- Planetary Perception / Wetland Watch;
+- semantic-downlink experiments;
 - hidden-world subsurface inference;
 - Futures Laboratory physical-world extensions;
-- consciousness/recurrence evidence campaigns;
+- cognition/recurrence evidence campaigns;
 - Symtropy/Symthaea controlled experiments.
 
-## Required gates
+## Required package gates
 
 ```bash
 cargo fmt --all -- --check
