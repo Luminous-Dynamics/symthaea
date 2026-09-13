@@ -32,6 +32,7 @@ pub mod lattice_covariance;
 pub mod lattice_linear_gls;
 pub mod lattice_potential_fit_family;
 pub mod lattice_qcd;
+pub mod lattice_sommer_scale;
 pub mod relativistic_qm;
 pub mod renormalization;
 pub mod symmetry_groups;
@@ -58,6 +59,12 @@ pub use lattice_potential_fit_family::{
     LATTICE_POTENTIAL_FIT_FAMILY_ID, LatticePotentialFitFamily, PotentialFitFamilyError,
     PotentialFitMember, UNIVERSAL_IR_COULOMB_COEFFICIENT,
     fit_declared_lattice_potential_family,
+};
+pub use lattice_sommer_scale::{
+    FIXED_E_PI_OVER_12_FREE_L_MODEL_ID, FIXED_E_PI_OVER_12_L0_MODEL_ID,
+    FREE_V0_SIGMA_E_L_MODEL_ID, R0_C, R4_C, R6_C, SOMMER_SCALE_FROM_CORRELATED_FIT_ID,
+    SommerScaleError, SommerScaleEstimate, StandardSommerScales,
+    sommer_scale_from_fit_member, standard_sommer_scales_from_fit_member,
 };
 pub use renormalization::{
     BetaCoefficients, approximate_unification_scale, gauge_couplings_at_scale, lambda_qcd,
