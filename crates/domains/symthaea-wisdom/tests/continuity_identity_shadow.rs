@@ -23,6 +23,7 @@ fn exact_restore_does_not_become_phenomenal_survival_claim() {
         ContinuityKind::RestoredFromSnapshot,
         1,
         2,
+        false,
         Some(DIGEST.into()),
         true,
         ["evidence://snapshot-restore".into()],
@@ -40,6 +41,33 @@ fn exact_restore_does_not_become_phenomenal_survival_claim() {
 }
 
 #[test]
+fn concurrent_restore_is_treated_as_branch_multiplicity() {
+    let mut ledger = ContinuityIdentityLedger::new();
+    ledger.register_root(sid("before"), 1).unwrap();
+    ledger.record(ContinuityEvent::new(
+        ContinuityEventId::new("restore-copy").unwrap(),
+        sid("before"),
+        vec![sid("copy")],
+        ContinuityKind::RestoredFromSnapshot,
+        1,
+        2,
+        true,
+        Some(DIGEST.into()),
+        true,
+        ["evidence://snapshot-copy".into()],
+    ).unwrap()).unwrap();
+
+    let assessment = ledger.assess_instance(&sid("copy")).unwrap();
+    assert_eq!(
+        assessment.operational_class(),
+        OperationalContinuityClass::ForkedDescendant
+    );
+    assert!(assessment.predecessor_continues());
+    assert!(assessment.sibling_instances().contains(&sid("before")));
+    assert!(ledger.shares_recorded_ancestry(&sid("before"), &sid("copy")).unwrap());
+}
+
+#[test]
 fn fork_siblings_are_not_independent_evidence_units() {
     let mut ledger = ContinuityIdentityLedger::new();
     ledger.register_root(sid("root"), 1).unwrap();
@@ -50,6 +78,7 @@ fn fork_siblings_are_not_independent_evidence_units() {
         ContinuityKind::Fork,
         1,
         2,
+        false,
         Some(DIGEST.into()),
         true,
         ["evidence://fork".into()],
@@ -68,12 +97,13 @@ fn sibling_survival_never_proves_destroyed_branch_was_replaceable() {
     let mut ledger = ContinuityIdentityLedger::new();
     ledger.register_root(sid("root"), 1).unwrap();
     ledger.record(ContinuityEvent::new(
-        ContinuityEventId::new("fork").unwrap(),
+        ContinuityEventId::new("fork-loss").unwrap(),
         sid("root"),
         vec![sid("branch-a"), sid("branch-b")],
         ContinuityKind::Fork,
         1,
         2,
+        false,
         Some(DIGEST.into()),
         true,
         ["evidence://fork".into()],
