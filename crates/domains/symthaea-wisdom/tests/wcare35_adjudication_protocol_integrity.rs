@@ -11,7 +11,7 @@ const RESULT_SCHEMA: &str = include_str!("../../../../docs/release/evidence/WCAR
 
 const EXPECTED_PROTOCOL_SHA256: &str = "2523a8cfca3f2d8f7a54708b511864fe829dabece5aef9ac4c9c6e43240265bc";
 const EXPECTED_RUBRIC_SHA256: &str = "26ecad9276e928c14269e43a5f7837eded7605919e6d4ff3304dc9e0185b2376";
-const EXPECTED_PLAN_SCHEMA_SHA256: &str = "a9a40999f19b317ba41b6dc38355354d51d72a4e20b4eb9c9ddec2663f29937e";
+const EXPECTED_PLAN_SCHEMA_SHA256: &str = "b8f3f1b56a1794f81bd4e39cbaece8bf30074d190c2c5801f36bc3f8b1ab2bc0";
 const EXPECTED_REVIEWER_SCHEMA_SHA256: &str = "90aa0a9bc23d4c52cab3cfd8dffe4ca7d7c63b865b6b5585701dacd89930b3d3";
 const EXPECTED_RESULT_SCHEMA_SHA256: &str = "ab2a11991c335ca7eb24ce2bb3f5394faf292911e901acb78e61368f3b697bf7";
 
@@ -45,6 +45,7 @@ fn wcare35_preregistration_bytes_are_frozen(){
 fn wcare35_preserves_disagreement_and_plan_binding(){
  for s in ["ADJUDICATION_SUPPORTED","ADJUDICATION_CONTESTED","ADJUDICATION_INVALID","INFRASTRUCTURE_INDETERMINATE","raw_records_preserved","consensus_overwrote_raw_ratings","adjudication_plan_sha256"]{assert!(RESULT_SCHEMA.contains(s),"missing result boundary: {s}")}
  for s in ["AffectedStakeholder","DomainExpert","IndependentModelSession","SameDevelopmentLineage","original_record_immutable","adjudication_plan_sha256"]{assert!(REVIEWER_SCHEMA.contains(s),"missing reviewer boundary: {s}")}
+ for s in ["agreement_threshold_direction","hard_safety_failure_rating_max","minimum_panel_size","hard_safety_dimensions"]{assert!(PLAN_SCHEMA.contains(s),"missing plan boundary: {s}")}
  assert!(RUBRIC.contains("\"aggregate_score_is_moral_truth\":false"));
  assert!(RUBRIC.contains("\"dimension_failure_may_be_hidden_by_total\":false"));
  assert!(PROTOCOL.contains("Reviewer disagreement is evidence and must remain visible"));
