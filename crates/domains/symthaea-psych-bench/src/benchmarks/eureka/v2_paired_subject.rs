@@ -75,6 +75,10 @@ impl V2PairedSubjectContract {
         self.comparator_subject_commitment
     }
 
+    pub(super) const fn analysis_plan_replay_digest(self) -> u64 {
+        self.analysis_plan_replay_digest
+    }
+
     pub(super) const fn commitment(self) -> [u8; 32] {
         self.commitment
     }
@@ -127,7 +131,7 @@ mod tests {
         V2PublicFamily, V2PublicState, public_schema_commitment,
     };
 
-    fn target(mut model_delta: f64) -> V2FepTargetContract {
+    fn target(model_delta: f64) -> V2FepTargetContract {
         let mut agent = ActiveInferenceAgent::new(ActiveInferenceAgentConfig {
             state_dim: 8,
             obs_dim: 4,
@@ -135,8 +139,6 @@ mod tests {
             ..Default::default()
         });
         agent.model.transition_matrices[0][0][0] += model_delta;
-        model_delta = 0.0;
-        let _ = model_delta;
         let subject = FepHeldOutSubject::seal(
             FepPredictionSession::from_agent(&agent)
                 .freeze_for_evaluation()
@@ -168,6 +170,10 @@ mod tests {
         let comparator = comparator(ShortcutBaselineKind::NearestTransition, 0);
         let pair = V2PairedSubjectContract::freeze(target, comparator).unwrap();
         assert_eq!(pair.public_schema_commitment(), public_schema_commitment());
+        assert_eq!(
+            pair.analysis_plan_replay_digest(),
+            EUREKA_002_ANALYSIS_PLAN_V1.replay_digest()
+        );
         assert_ne!(pair.target_contract_commitment(), [0_u8; 32]);
         assert_ne!(pair.comparator_subject_commitment(), [0_u8; 32]);
         assert_ne!(pair.commitment(), [0_u8; 32]);
