@@ -10,6 +10,7 @@
 //! - Cross-domain capability matrix with explicit holdout, contamination, and resource policy
 //! - Portable lane bundles and content-bound publication artifacts for capability evidence
 //! - Decomposed metacognitive calibration, abstention, assumption, and revision qualification
+//! - Public development probe for evidence-revision direction and epistemic remediation
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -20,6 +21,7 @@ pub mod reasoning_capability_bundle;
 pub mod reasoning_capability_matrix;
 pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
+pub mod reasoning_evidence_revision_probe;
 pub mod reasoning_metacognition;
 pub mod reasoning_qualification;
 
@@ -50,6 +52,10 @@ pub use reasoning_evaluator::{
 pub use reasoning_evaluator_policy::{
     evaluate_episode_with_policy, ExactScoringPolicy,
     REASONING_EVALUATOR_OUTCOME_SEMANTIC_VERSION,
+};
+pub use reasoning_evidence_revision_probe::{
+    run_evidence_revision_probe, ConflictActionObservation, EvidenceRevisionProbeReport,
+    EVIDENCE_REVISION_PROBE_VERSION,
 };
 pub use reasoning_metacognition::{
     evaluate_metacognition, BinaryDetectionReport, ConfidenceRevisionDirection,
