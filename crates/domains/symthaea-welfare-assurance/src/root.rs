@@ -14,6 +14,7 @@ mod permit;
 pub use permit::*;
 
 pub mod authority_evidence_binding;
+pub mod canonical_memory_restart;
 pub mod evidence_context;
 pub mod execution_adapter;
 pub mod execution_recovery;
