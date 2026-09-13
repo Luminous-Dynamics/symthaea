@@ -1,0 +1,140 @@
+name: Simulation Clone Execveat Cgroup
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-clone-cgroup-exec/**"
+      - "crates/bridges/symthaea-sim-worker-cgroup/**"
+      - "crates/bridges/symthaea-sim-worker-image/**"
+      - ".github/workflows/simulation-clone-execveat-cgroup.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  SYMTHAEA_CGROUP_V2_DELEGATED_ROOT: ${{ vars.SYMTHAEA_CGROUP_V2_DELEGATED_ROOT }}
+
+jobs:
+  sealed-execveat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 execveat subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          test -r /sys/fs/cgroup/cgroup.controllers
+          uname -a
+          cat /sys/fs/cgroup/cgroup.controllers
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-simulation-clone-execveat-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-clone-cgroup-exec/**', 'crates/bridges/symthaea-sim-worker-cgroup/**', 'crates/bridges/symthaea-sim-worker-image/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-clone-execveat-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-clone-execveat-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches clone-execveat graph."
+          else
+            cat simulation-clone-execveat-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-clone-execveat-cargo-lock-patch
+          path: simulation-clone-execveat-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-sim-clone-cgroup-exec -- --check
+
+      - name: Check and test source corpus
+        run: |
+          cargo check --locked -p symthaea-sim-clone-cgroup-exec --all-targets
+          cargo test --locked -p symthaea-sim-clone-cgroup-exec
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-sim-clone-cgroup-exec --all-targets -- -D warnings
+
+      - name: Build exact exec target
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-clone-cgroup-exec \
+            --bin symthaea-sim-clone-exec-target
+          sha256sum target/debug/symthaea-sim-clone-exec-target
+
+      - name: Execute sealed execveat kernel corpus when configured
+        shell: bash
+        run: |
+          if [[ -n "${SYMTHAEA_CGROUP_V2_DELEGATED_ROOT:-}" ]]; then
+            cargo test --locked \
+              -p symthaea-sim-clone-cgroup-exec \
+              --test sealed_exec \
+              -- --ignored --test-threads=1
+            echo 'kernel_sealed_execveat_probe=pass' \
+              | tee clone-execveat-kernel-status.txt
+          else
+            echo 'kernel_sealed_execveat_probe=not_established' \
+              | tee clone-execveat-kernel-status.txt
+          fi
+
+      - name: Record exact sealed exec subject
+        run: |
+          kernel_probe="$(cut -d= -f2 clone-execveat-kernel-status.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "target_sha256=$(sha256sum target/debug/symthaea-sim-clone-exec-target | cut -d' ' -f1)"
+            echo "profile=symthaea.simulation.clone-into-cgroup.sealed-execveat-v1"
+            echo "clone_abi=clone3_CLONE_INTO_CGROUP"
+            echo "exec_abi=execveat_AT_EMPTY_PATH"
+            echo "exec_success_evidence=CLOEXEC_status_pipe_EOF"
+            echo "exact_executable_evidence=proc_pid_exe_sha256"
+            echo "source_path_replacement_after_seal_tested=true"
+            echo "no_new_privs_before_exec=true"
+            echo "executable_fd_closed_on_exec=true"
+            echo "born_in_target_cgroup=true_if_kernel_probe_passes"
+            echo "post_exec_membership_verified=true_if_kernel_probe_passes"
+            echo "inherited_parent_memory_recharged=false"
+            echo "simulation_worker_protocol_execution=not_established"
+            echo "wasmtime_execution=not_established"
+            echo "kernel_sealed_execveat_probe=${kernel_probe}"
+            echo "delegation_origin_inferred_from_kernel=false"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-clone-execveat-cgroup-receipt.txt
+
+      - name: Upload sealed execveat evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-clone-execveat-cgroup-evidence
+          path: |
+            clone-execveat-kernel-status.txt
+            simulation-clone-execveat-cgroup-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
