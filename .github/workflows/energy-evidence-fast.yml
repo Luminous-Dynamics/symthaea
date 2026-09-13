@@ -1,0 +1,169 @@
+# Focused raw-head qualification for the Tier-1 energy-material evidence lineage.
+#
+# This workflow is intentionally additive. Repository-wide CI remains the
+# integration authority. The qualification algorithm itself lives in
+# scripts/qualify-energy-evidence.sh so local and GitHub execution use one
+# implementation.
+
+name: Energy Evidence Fast Lane
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-discovery/**'
+      - 'crates/domains/symthaea-energy-material-screening/**'
+      - 'crates/bridges/symthaea-energy-material-dossier/**'
+      - 'crates/bridges/symthaea-energy-material-candidate-version/**'
+      - 'crates/bridges/symthaea-energy-material-campaign/**'
+      - 'crates/bridges/symthaea-energy-evidence-envelope/**'
+      - 'crates/bridges/symthaea-energy-native-dossier/**'
+      - 'crates/bridges/symthaea-energy-native-campaign-admission/**'
+      - 'scripts/qualify-energy-evidence.sh'
+      - 'scripts/verify-energy-evidence-receipt.py'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/energy-evidence-fast.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_TARGET_DIR: target/energy-evidence-fast
+  QUALIFICATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  QUALIFICATION_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+  EVENT_SHA: ${{ github.sha }}
+
+jobs:
+  energy-evidence:
+    name: Tier-1 energy evidence raw-head qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact raw-head subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Bind qualification subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          test "$actual_head" = "$QUALIFICATION_HEAD_SHA"
+          {
+            echo "## Energy Evidence Fast Lane subject"
+            echo
+            echo "- Raw head: \`$actual_head\`"
+            echo "- PR base: \`${QUALIFICATION_BASE_SHA:-n/a}\`"
+            echo "- Event SHA: \`$EVENT_SHA\`"
+            echo "- Rust toolchain policy: **1.96.0**"
+            echo "- Subject class: **raw PR head / package-focused**"
+            echo "- Full-workspace integration qualification: **not implied**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pin immutable PR base for governance comparison
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git cat-file -e "${QUALIFICATION_BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$QUALIFICATION_BASE_SHA"
+          fi
+          test "$(git rev-parse "${QUALIFICATION_BASE_SHA}^{commit}")" = "$QUALIFICATION_BASE_SHA"
+          git update-ref "refs/remotes/origin/${GITHUB_BASE_REF}" "$QUALIFICATION_BASE_SHA"
+          test "$(git rev-parse "refs/remotes/origin/${GITHUB_BASE_REF}")" = "$QUALIFICATION_BASE_SHA"
+
+      - name: Governance check
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-class-a-changes.sh --ci
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache focused Cargo state
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/energy-evidence-fast
+          key: ${{ runner.os }}-energy-evidence-fast-${{ hashFiles('Cargo.lock', 'scripts/qualify-energy-evidence.sh', 'crates/core/symthaea-discovery/Cargo.toml', 'crates/domains/symthaea-energy-material-screening/Cargo.toml', 'crates/bridges/symthaea-energy-material-dossier/Cargo.toml', 'crates/bridges/symthaea-energy-material-candidate-version/Cargo.toml', 'crates/bridges/symthaea-energy-material-campaign/Cargo.toml', 'crates/bridges/symthaea-energy-evidence-envelope/Cargo.toml', 'crates/bridges/symthaea-energy-native-dossier/Cargo.toml', 'crates/bridges/symthaea-energy-native-campaign-admission/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-energy-evidence-fast-
+
+      - name: Run shared exact-head qualification harness
+        id: qualification
+        shell: bash
+        run: bash scripts/qualify-energy-evidence.sh
+
+      - name: Verify emitted receipt invariants
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/energy-evidence-fast"
+          if [[ -f "$evidence_dir/qualification-receipt.json" ]]; then
+            python3 scripts/verify-energy-evidence-receipt.py \
+              "$evidence_dir/qualification-receipt.json"
+          else
+            echo "No receipt to verify; qualification failed before receipt emission."
+          fi
+
+      - name: Summarize qualification receipt
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/energy-evidence-fast"
+          if [[ -f "$evidence_dir/qualification-receipt.json" ]]; then
+            {
+              echo
+              echo "### Machine-readable qualification receipt"
+              echo
+              echo '```json'
+              cat "$evidence_dir/qualification-receipt.json"
+              echo '```'
+              echo
+              echo '```text'
+              cat "$evidence_dir/qualification-receipt.sha256"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No qualification receipt was produced (preflight/toolchain failure)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: energy-evidence-fast-receipt-${{ env.QUALIFICATION_HEAD_SHA }}
+          path: |
+            ${{ runner.temp }}/energy-evidence-fast/qualification-receipt.json
+            ${{ runner.temp }}/energy-evidence-fast/qualification-receipt.sha256
+            ${{ runner.temp }}/energy-evidence-fast/fmt.tsv
+            ${{ runner.temp }}/energy-evidence-fast/tests.tsv
+            ${{ runner.temp }}/energy-evidence-fast/clippy.tsv
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload resolver-produced lock diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: energy-evidence-lock-diagnostic-${{ env.QUALIFICATION_HEAD_SHA }}
+          path: |
+            ${{ runner.temp }}/energy-evidence-fast/Cargo.lock.patch
+            ${{ runner.temp }}/energy-evidence-fast/Cargo.lock.resolved
+            ${{ runner.temp }}/energy-evidence-fast/locked.err
+          if-no-files-found: ignore
+          retention-days: 14
