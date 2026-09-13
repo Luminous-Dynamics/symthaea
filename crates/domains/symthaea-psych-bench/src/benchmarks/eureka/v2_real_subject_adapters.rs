@@ -1,34 +1,35 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Source-only adapters from sealed real subjects into the qualified V2J
-//! prediction-freeze protocol.
+//! Source-only adapters from sealed real subjects into the qualified V2
+//! prospective prediction protocol.
 //!
-//! This module deliberately defines no 128-row runner and no evaluator reveal.
-//! It proves only that already-sealed production subjects can produce canonical
-//! `ConsequencePrediction` values from a pre-outcome `V2HeldOutTicket` while
-//! preserving exact campaign, subject, action, and adapter-semantics lineage.
+//! This module deliberately defines no row loop and no evaluator reveal. It
+//! proves only that already-sealed production subjects can produce canonical
+//! `ConsequencePrediction` values from pre-outcome `V2ProspectiveTicket` values
+//! while preserving exact campaign, subject, action, domain, and adapter-source
+//! lineage.
 
 #![allow(dead_code)]
 
 use symthaea_fep::{FepHeldOutSubject, FepPredictionSessionError, FrozenPredictionCommitment};
 
 use super::consequence::ConsequencePrediction;
-use super::v2_heldout_reveal_protocol::V2HeldOutTicket;
 use super::v2_preheldout_custody::{
     V2PreHeldOutCampaignCapability, V2PreHeldOutManifest,
 };
+use super::v2_prospective_ticket::V2ProspectiveTicket;
 use super::v2_selected_comparator::V2SelectedComparatorSubject;
 use super::v2_target_contract::{V2FepAdapter, V2TargetContractError};
 
 pub(super) const V2_REAL_TARGET_ADAPTER_REVISION: &str =
-    "EUREKA.002.V2.REAL_TARGET_ADAPTER.v1";
+    "EUREKA.002.V2.REAL_TARGET_ADAPTER.v2";
 pub(super) const V2_REAL_COMPARATOR_ADAPTER_REVISION: &str =
-    "EUREKA.002.V2.REAL_COMPARATOR_ADAPTER.v1";
+    "EUREKA.002.V2.REAL_COMPARATOR_ADAPTER.v2";
 pub(super) const V2_REAL_ADAPTER_SOURCE_COMMITMENT_REVISION: &str =
-    "EUREKA.002.V2.REAL_ADAPTER_SOURCE.v1";
+    "EUREKA.002.V2.REAL_ADAPTER_SOURCE.v2";
 pub(super) const V2_REAL_ADAPTER_PAIR_REVISION: &str =
-    "EUREKA.002.V2.REAL_ADAPTER_PAIR.v1";
+    "EUREKA.002.V2.REAL_ADAPTER_PAIR.v2";
 
 #[derive(Debug)]
 pub(super) enum V2RealSubjectAdapterError {
@@ -81,7 +82,7 @@ impl<'a> V2RealTargetAdapter<'a> {
 
     pub(super) fn predict_ticket(
         &self,
-        ticket: V2HeldOutTicket,
+        ticket: V2ProspectiveTicket,
     ) -> Result<ConsequencePrediction, V2RealSubjectAdapterError> {
         if ticket.campaign_manifest_commitment() != self.campaign_manifest_commitment {
             return Err(V2RealSubjectAdapterError::TicketCampaignMismatch);
@@ -91,10 +92,12 @@ impl<'a> V2RealTargetAdapter<'a> {
         }
         let observation = V2FepAdapter::encode_state(ticket.pre());
         let action = V2FepAdapter::encode_action(ticket.action())?;
-        let outcome = self
-            .subject
-            .trial()
-            .predict_once(&observation, 1.0, "eureka-v2-heldout", action)?;
+        let outcome = self.subject.trial().predict_once(
+            &observation,
+            1.0,
+            ticket.domain().fep_modality(),
+            action,
+        )?;
         let prediction = V2FepAdapter::prediction_from_outcome(ticket.action(), &outcome)?;
         if prediction.action != ticket.action() {
             return Err(V2RealSubjectAdapterError::TargetActionMismatch);
@@ -136,7 +139,7 @@ impl<'a> V2RealComparatorAdapter<'a> {
 
     pub(super) fn predict_ticket(
         &self,
-        ticket: V2HeldOutTicket,
+        ticket: V2ProspectiveTicket,
     ) -> Result<ConsequencePrediction, V2RealSubjectAdapterError> {
         if ticket.campaign_manifest_commitment() != self.campaign_manifest_commitment {
             return Err(V2RealSubjectAdapterError::TicketCampaignMismatch);
@@ -163,9 +166,7 @@ impl<'a> V2RealComparatorAdapter<'a> {
 }
 
 /// One typed binding of both real prediction-only subjects to one exact
-/// non-Clone pre-HeldOut campaign capability and the exact adapter semantics
-/// that translate their outputs into V2J predictions. No campaign runner is
-/// provided here.
+/// non-Clone pre-HeldOut campaign capability and exact adapter semantics.
 pub(super) struct V2RealSubjectAdapterPair<'a> {
     target: V2RealTargetAdapter<'a>,
     comparator: V2RealComparatorAdapter<'a>,
@@ -282,9 +283,20 @@ mod tests {
         ] {
             assert!(
                 !source.contains(forbidden),
-                "adapter layer must not become a HeldOut campaign runner: {forbidden}"
+                "adapter layer must not become a campaign runner: {forbidden}"
             );
         }
+    }
+
+    #[test]
+    fn prediction_surface_is_partition_neutral() {
+        let source = include_str!("v2_real_subject_adapters.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap();
+        assert!(source.contains("V2ProspectiveTicket"));
+        assert!(!source.contains("V2HeldOutTicket"));
+        assert!(source.contains("ticket.domain().fep_modality()"));
     }
 
     #[test]
