@@ -19,6 +19,7 @@
 //! - Evidence-backed competing-context assessment with ambiguity-preserving robust selection
 //! - Canonical kernel V2 with robust multi-context selection and content-bound decisions
 //! - Automatic RQ episode publication from validated canonical decisions
+//! - Live measurement-only shadowing of the production meta-reasoner through canonical V2
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -40,6 +41,7 @@ pub mod reasoning_metacognition;
 pub mod reasoning_objective_core;
 pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
+pub mod reasoning_shadow_meta;
 
 pub use causal_consciousness::{
     CausalAnalysisResult, CausalAttention, CausalConsciousness, CausalLTCBridge, GridSearchResult,
@@ -123,4 +125,7 @@ pub use reasoning_qualification::{
     QualificationValidationError, ReasoningDecisionRecord, ReasoningDomain, ReasoningEpisode,
     ReasoningEpisodeId, ReasoningOutcome, ReasoningProblemRef, ReasoningQualificationReceipt,
     ResourceUsage, REASONING_EPISODE_SCHEMA_VERSION,
+};
+pub use reasoning_shadow_meta::{
+    ShadowMetaObservation, ShadowMetaStats, ShadowQualifiedMetaReasoner, LIVE_META_SHADOW_VERSION,
 };
