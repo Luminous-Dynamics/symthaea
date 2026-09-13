@@ -1,0 +1,92 @@
+name: Butlin GWT-1 Exact-Head Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-gwt1-qualification.yml"
+      - "src/cognitive_loop/managers/drive_manager.rs"
+      - "src/cognitive_loop/managers/memory_manager.rs"
+      - "src/cognitive_loop/managers/learning_manager.rs"
+      - "src/cognitive_loop/managers/perception_manager.rs"
+      - "src/cognitive_loop/subsystem_trait.rs"
+      - "src/benchmarks/gwt1_specialist_qualification.rs"
+      - "src/benchmarks/mod.rs"
+      - "crates/domains/symthaea-psych-bench/Cargo.toml"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_*.rs"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs"
+      - "crates/domains/symthaea-psych-bench/src/bin/gwt1_qualification.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gwt1-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Direct GWT-1 qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Resolve exact evidence subject
+        id: subject
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout exact evidence subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.subject.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Prove checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          observed="$(git rev-parse HEAD)"
+          expected="${{ steps.subject.outputs.sha }}"
+          test "$observed" = "$expected"
+          git status --porcelain=v1 --untracked-files=no --exit-code
+          echo "Exact subject: $observed"
+          echo "Tree: $(git rev-parse HEAD^{tree})"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-gwt1-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-gwt1-
+
+      - name: Execute direct GWT-1 evidence pipeline
+        shell: bash
+        env:
+          SYMTHAEA_GWT1_EVIDENCE_DIR: target/gwt1-evidence
+        run: |
+          set -euo pipefail
+          cargo run -p symthaea-psych-bench \
+            --features symthaea-backend \
+            --bin gwt1_qualification
+
+      - name: Upload raw observations and resolved evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gwt1-evidence-${{ steps.subject.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/gwt1-evidence/
+          if-no-files-found: warn
+          retention-days: 30
