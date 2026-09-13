@@ -1,0 +1,455 @@
+# Focused raw-head candidate qualification for the versioned cyber ontology bridge.
+#
+# This workflow is additive. It executes PR-head code in the ordinary low-trust
+# pull_request context. Its positive receipt is therefore candidate/conformance
+# evidence until a separately trusted/base-owned witness admits the recipe.
+# Repository-wide CI remains separate integration evidence.
+
+name: Cyber Ontology Fast Lane
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-cyber-ontology/**'
+      - 'crates/domains/symthaea-support/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.cargo/**'
+      - 'scripts/check-class-a-changes.sh'
+      - '.github/workflows/cyber-ontology-fast.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  QUALIFICATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  QUALIFICATION_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+  EVENT_SHA: ${{ github.sha }}
+
+jobs:
+  cyber-ontology:
+    name: symthaea-cyber-ontology raw-head candidate qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact raw-head subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Bind qualification subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          actual_tree="$(git rev-parse HEAD^{tree})"
+          if [[ "$actual_head" != "$QUALIFICATION_HEAD_SHA" ]]; then
+            echo "ERROR: checked-out subject $actual_head != declared raw head $QUALIFICATION_HEAD_SHA" >&2
+            exit 1
+          fi
+          if [[ -n "$(git status --porcelain=v1)" ]]; then
+            echo "ERROR: qualification checkout is dirty before execution" >&2
+            git status --porcelain=v1 >&2
+            exit 1
+          fi
+
+          lock_digest="$(sha256sum Cargo.lock | awk '{print $1}')"
+          manifest_digest="$(sha256sum crates/domains/symthaea-cyber-ontology/Cargo.toml | awk '{print $1}')"
+          support_manifest_digest="$(sha256sum crates/domains/symthaea-support/Cargo.toml | awk '{print $1}')"
+          workflow_digest="$(sha256sum .github/workflows/cyber-ontology-fast.yml | awk '{print $1}')"
+
+          echo "actual_head=$actual_head" >> "$GITHUB_OUTPUT"
+          echo "actual_tree=$actual_tree" >> "$GITHUB_OUTPUT"
+          echo "lock_digest=$lock_digest" >> "$GITHUB_OUTPUT"
+          echo "manifest_digest=$manifest_digest" >> "$GITHUB_OUTPUT"
+          echo "support_manifest_digest=$support_manifest_digest" >> "$GITHUB_OUTPUT"
+          echo "workflow_digest=$workflow_digest" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Cyber Ontology Fast Lane subject"
+            echo
+            echo "- Checked-out raw head: \`$actual_head\`"
+            echo "- Checked-out tree: \`$actual_tree\`"
+            echo "- PR base: \`${QUALIFICATION_BASE_SHA:-n/a}\`"
+            echo "- Provider event SHA: \`$EVENT_SHA\`"
+            echo "- Cargo.lock SHA-256: \`$lock_digest\`"
+            echo "- cyber-ontology manifest SHA-256: \`$manifest_digest\`"
+            echo "- support manifest SHA-256: \`$support_manifest_digest\`"
+            echo "- workflow SHA-256: \`$workflow_digest\`"
+            echo "- Subject class: **raw PR head / package-focused**"
+            echo "- Recipe trust: **candidate recipe self-execution / conformance only**"
+            echo "- Full-repository or trusted-recipe qualification: **not implied**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prepare PR base for governance comparison
+        id: base
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          actual_base="$(git rev-parse "origin/${GITHUB_BASE_REF}")"
+          if [[ "$actual_base" != "$QUALIFICATION_BASE_SHA" ]]; then
+            echo "ERROR: fetched base $actual_base != event base $QUALIFICATION_BASE_SHA" >&2
+            exit 1
+          fi
+
+      - name: Governance check
+        id: governance
+        if: github.event_name == 'pull_request'
+        run: bash scripts/check-class-a-changes.sh --ci
+
+      - name: Install Rust toolchain
+        id: toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record toolchain
+        id: toolchain-info
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc -Vv
+          cargo -V
+          rustfmt -V
+          cargo clippy -V
+          echo "rustc_version=$(rustc -V | tr -d '\n')" >> "$GITHUB_OUTPUT"
+          echo "cargo_version=$(cargo -V | tr -d '\n')" >> "$GITHUB_OUTPUT"
+          echo "rustfmt_version=$(rustfmt -V | tr -d '\n')" >> "$GITHUB_OUTPUT"
+          echo "clippy_version=$(cargo clippy -V | tr -d '\n')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache focused Cargo state
+        id: cache
+        continue-on-error: true
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/cyber-ontology-fast
+          key: ${{ runner.os }}-cyber-ontology-fast-${{ hashFiles('Cargo.lock', 'crates/domains/symthaea-cyber-ontology/Cargo.toml', 'crates/domains/symthaea-support/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cyber-ontology-fast-
+
+      - name: Format cyber ontology
+        id: format
+        continue-on-error: true
+        run: cargo fmt -p symthaea-cyber-ontology -- --check
+
+      - name: Compile exact support dependency surface
+        id: support-check
+        continue-on-error: true
+        env:
+          CARGO_TARGET_DIR: target/cyber-ontology-fast
+        run: cargo check --locked -p symthaea-support --all-targets
+
+      - name: Test cyber ontology
+        id: tests
+        continue-on-error: true
+        env:
+          CARGO_TARGET_DIR: target/cyber-ontology-fast
+        run: cargo test --locked -p symthaea-cyber-ontology --all-targets
+
+      - name: Clippy cyber ontology
+        id: clippy
+        continue-on-error: true
+        env:
+          CARGO_TARGET_DIR: target/cyber-ontology-fast
+        run: cargo clippy --locked -p symthaea-cyber-ontology --all-targets -- -D warnings
+
+      - name: Verify tracked source immutability and subject binding
+        id: immutability
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_HEAD_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.subject.outputs.actual_tree }}"
+          if [[ -n "$(git status --porcelain=v1)" ]]; then
+            echo "ERROR: qualification steps modified tracked source files" >&2
+            git status --porcelain=v1 >&2
+            git diff -- . >&2 || true
+            exit 1
+          fi
+
+      - name: Write append-only qualification attempt record
+        id: attempt
+        if: always()
+        env:
+          SUBJECT_OUTCOME: ${{ steps.subject.outcome }}
+          BASE_OUTCOME: ${{ steps.base.outcome }}
+          GOVERNANCE_OUTCOME: ${{ steps.governance.outcome }}
+          TOOLCHAIN_OUTCOME: ${{ steps.toolchain.outcome }}
+          TOOLCHAIN_INFO_OUTCOME: ${{ steps.toolchain-info.outcome }}
+          CACHE_OUTCOME: ${{ steps.cache.outcome }}
+          FORMAT_OUTCOME: ${{ steps.format.outcome }}
+          SUPPORT_CHECK_OUTCOME: ${{ steps.support-check.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          CLIPPY_OUTCOME: ${{ steps.clippy.outcome }}
+          IMMUTABILITY_OUTCOME: ${{ steps.immutability.outcome }}
+          TREE_SHA: ${{ steps.subject.outputs.actual_tree }}
+          LOCK_DIGEST: ${{ steps.subject.outputs.lock_digest }}
+          MANIFEST_DIGEST: ${{ steps.subject.outputs.manifest_digest }}
+          SUPPORT_MANIFEST_DIGEST: ${{ steps.subject.outputs.support_manifest_digest }}
+          WORKFLOW_DIGEST: ${{ steps.subject.outputs.workflow_digest }}
+          RUSTC_VERSION: ${{ steps.toolchain-info.outputs.rustc_version }}
+          CARGO_VERSION: ${{ steps.toolchain-info.outputs.cargo_version }}
+          RUSTFMT_VERSION: ${{ steps.toolchain-info.outputs.rustfmt_version }}
+          CLIPPY_VERSION: ${{ steps.toolchain-info.outputs.clippy_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/cyber-ontology-fast/qualification
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          outcomes = {
+              "subject_binding": os.environ.get("SUBJECT_OUTCOME", "unknown"),
+              "base_binding": os.environ.get("BASE_OUTCOME", "unknown"),
+              "governance": os.environ.get("GOVERNANCE_OUTCOME", "unknown"),
+              "toolchain_install": os.environ.get("TOOLCHAIN_OUTCOME", "unknown"),
+              "toolchain_info": os.environ.get("TOOLCHAIN_INFO_OUTCOME", "unknown"),
+              "cache": os.environ.get("CACHE_OUTCOME", "unknown"),
+              "format": os.environ.get("FORMAT_OUTCOME", "unknown"),
+              "support_check": os.environ.get("SUPPORT_CHECK_OUTCOME", "unknown"),
+              "tests": os.environ.get("TESTS_OUTCOME", "unknown"),
+              "clippy": os.environ.get("CLIPPY_OUTCOME", "unknown"),
+              "immutability": os.environ.get("IMMUTABILITY_OUTCOME", "unknown"),
+          }
+          setup_ok = (
+              outcomes["subject_binding"] == "success"
+              and outcomes["base_binding"] in {"success", "skipped"}
+              and outcomes["governance"] in {"success", "skipped"}
+              and outcomes["toolchain_install"] == "success"
+              and outcomes["toolchain_info"] == "success"
+          )
+          required = ["format", "support_check", "tests", "clippy", "immutability"]
+          failed = [name for name in required if outcomes[name] != "success"]
+          positive_eligible = setup_ok and not failed
+
+          if not setup_ok:
+              terminal = "SetupOrGovernanceFailure"
+          elif not failed:
+              terminal = "Passed"
+          elif len(failed) > 1:
+              terminal = "MultipleRequiredGateFailures"
+          else:
+              terminal = {
+                  "format": "FormattingFailed",
+                  "support_check": "CompileFailed",
+                  "tests": "TestsFailed",
+                  "clippy": "ClippyFailed",
+                  "immutability": "SubjectIntegrityFailed",
+              }[failed[0]]
+
+          attempt = {
+              "schema_version": "symthaea.ci-qualification-attempt.v1",
+              "terminal_disposition": terminal,
+              "positive_receipt_eligible": positive_eligible,
+              "failed_required_gates": failed,
+              "subject": {
+                  "class": "raw_pr_head_package_focused",
+                  "repository": os.environ.get("GITHUB_REPOSITORY"),
+                  "checked_out_commit_sha": os.environ.get("QUALIFICATION_HEAD_SHA"),
+                  "checked_out_tree_sha": os.environ.get("TREE_SHA") or None,
+                  "pr_head_sha": os.environ.get("QUALIFICATION_HEAD_SHA"),
+                  "pr_base_sha": os.environ.get("QUALIFICATION_BASE_SHA") or None,
+                  "provider_event_sha": os.environ.get("EVENT_SHA"),
+              },
+              "provider_attempt": {
+                  "workflow": os.environ.get("GITHUB_WORKFLOW"),
+                  "run_id": os.environ.get("GITHUB_RUN_ID"),
+                  "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+                  "event_name": os.environ.get("GITHUB_EVENT_NAME"),
+                  "runner_os": os.environ.get("RUNNER_OS"),
+                  "runner_arch": os.environ.get("RUNNER_ARCH"),
+              },
+              "recipe_trust": {
+                  "class": "candidate_recipe_self_execution",
+                  "ordinary_qualification_authority": False,
+                  "note": "Requires separately trusted/base-owned witness before ordinary qualification authority is claimed.",
+              },
+              "digests": {
+                  "cargo_lock_sha256": os.environ.get("LOCK_DIGEST") or None,
+                  "package_manifest_sha256": os.environ.get("MANIFEST_DIGEST") or None,
+                  "support_manifest_sha256": os.environ.get("SUPPORT_MANIFEST_DIGEST") or None,
+                  "workflow_sha256": os.environ.get("WORKFLOW_DIGEST") or None,
+              },
+              "toolchain": {
+                  "policy": "Rust 1.96.0",
+                  "rustc": os.environ.get("RUSTC_VERSION") or None,
+                  "cargo": os.environ.get("CARGO_VERSION") or None,
+                  "rustfmt": os.environ.get("RUSTFMT_VERSION") or None,
+                  "clippy": os.environ.get("CLIPPY_VERSION") or None,
+                  "environment_class": "github_hosted_provider_selected",
+                  "reproducible_environment_claimed": False,
+              },
+              "gates": outcomes,
+              "scope": {
+                  "package": "symthaea-cyber-ontology",
+                  "support_dependency_compiled": True,
+                  "full_repository_integration_implied": False,
+              },
+          }
+          out = Path("target/cyber-ontology-fast/qualification/attempt.json")
+          out.write_text(json.dumps(attempt, indent=2, sort_keys=True) + "\n")
+          PY
+          sha256sum target/cyber-ontology-fast/qualification/attempt.json \
+            > target/cyber-ontology-fast/qualification/attempt.json.sha256
+          eligible="$(python3 -c 'import json; print(str(json.load(open("target/cyber-ontology-fast/qualification/attempt.json"))["positive_receipt_eligible"]).lower())')"
+          disposition="$(python3 -c 'import json; print(json.load(open("target/cyber-ontology-fast/qualification/attempt.json"))["terminal_disposition"])')"
+          echo "positive_eligible=$eligible" >> "$GITHUB_OUTPUT"
+          echo "terminal_disposition=$disposition" >> "$GITHUB_OUTPUT"
+          echo "attempt_sha256=$(cut -d' ' -f1 target/cyber-ontology-fast/qualification/attempt.json.sha256)" >> "$GITHUB_OUTPUT"
+          {
+            echo
+            echo "## Qualification attempt"
+            echo
+            echo "- Terminal disposition: **$disposition**"
+            echo "- Positive receipt eligible: **$eligible**"
+            echo "- Attempt schema: \`symthaea.ci-qualification-attempt.v1\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload qualification attempt evidence
+        id: upload-attempt
+        if: always() && steps.attempt.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyber-ontology-attempt-${{ env.QUALIFICATION_HEAD_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            target/cyber-ontology-fast/qualification/attempt.json
+            target/cyber-ontology-fast/qualification/attempt.json.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Write positive candidate qualification receipt
+        id: positive-receipt
+        if: always() && steps.attempt.outcome == 'success' && steps.attempt.outputs.positive_eligible == 'true'
+        env:
+          TREE_SHA: ${{ steps.subject.outputs.actual_tree }}
+          LOCK_DIGEST: ${{ steps.subject.outputs.lock_digest }}
+          MANIFEST_DIGEST: ${{ steps.subject.outputs.manifest_digest }}
+          SUPPORT_MANIFEST_DIGEST: ${{ steps.subject.outputs.support_manifest_digest }}
+          WORKFLOW_DIGEST: ${{ steps.subject.outputs.workflow_digest }}
+          RUSTC_VERSION: ${{ steps.toolchain-info.outputs.rustc_version }}
+          CARGO_VERSION: ${{ steps.toolchain-info.outputs.cargo_version }}
+          RUSTFMT_VERSION: ${{ steps.toolchain-info.outputs.rustfmt_version }}
+          CLIPPY_VERSION: ${{ steps.toolchain-info.outputs.clippy_version }}
+          ATTEMPT_SHA256: ${{ steps.attempt.outputs.attempt_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = {
+              "schema_version": "symthaea.ci-focused-candidate-qualification-receipt.v1",
+              "disposition": "Passed",
+              "subject": {
+                  "class": "raw_pr_head_package_focused",
+                  "repository": os.environ.get("GITHUB_REPOSITORY"),
+                  "checked_out_commit_sha": os.environ.get("QUALIFICATION_HEAD_SHA"),
+                  "checked_out_tree_sha": os.environ.get("TREE_SHA"),
+                  "pr_base_sha": os.environ.get("QUALIFICATION_BASE_SHA") or None,
+              },
+              "attempt_sha256": os.environ.get("ATTEMPT_SHA256"),
+              "recipe_trust": {
+                  "class": "candidate_recipe_self_execution",
+                  "authority_class": "conformance_only_until_base_owned_witness",
+              },
+              "digests": {
+                  "cargo_lock_sha256": os.environ.get("LOCK_DIGEST"),
+                  "package_manifest_sha256": os.environ.get("MANIFEST_DIGEST"),
+                  "support_manifest_sha256": os.environ.get("SUPPORT_MANIFEST_DIGEST"),
+                  "workflow_sha256": os.environ.get("WORKFLOW_DIGEST"),
+              },
+              "toolchain": {
+                  "policy": "Rust 1.96.0",
+                  "rustc": os.environ.get("RUSTC_VERSION"),
+                  "cargo": os.environ.get("CARGO_VERSION"),
+                  "rustfmt": os.environ.get("RUSTFMT_VERSION"),
+                  "clippy": os.environ.get("CLIPPY_VERSION"),
+                  "environment_class": "github_hosted_provider_selected",
+              },
+              "required_passed_gates": [
+                  "subject_binding",
+                  "base_binding_or_not_applicable",
+                  "governance_or_not_applicable",
+                  "toolchain_install",
+                  "format",
+                  "support_check",
+                  "tests",
+                  "clippy",
+                  "immutability",
+              ],
+              "scope": {
+                  "package": "symthaea-cyber-ontology",
+                  "full_repository_integration_implied": False,
+                  "trusted_recipe_admission_implied": False,
+              },
+          }
+          out = Path("target/cyber-ontology-fast/qualification/positive-receipt.json")
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          PY
+          sha256sum target/cyber-ontology-fast/qualification/positive-receipt.json \
+            > target/cyber-ontology-fast/qualification/positive-receipt.json.sha256
+          {
+            echo
+            echo "## Positive candidate qualification receipt"
+            echo
+            echo "- Disposition: **Passed**"
+            echo "- Authority class: **conformance only until base-owned witness**"
+            echo "- Receipt schema: \`symthaea.ci-focused-candidate-qualification-receipt.v1\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload positive candidate qualification receipt
+        id: upload-positive
+        if: always() && steps.positive-receipt.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyber-ontology-positive-receipt-${{ env.QUALIFICATION_HEAD_SHA }}
+          path: |
+            target/cyber-ontology-fast/qualification/positive-receipt.json
+            target/cyber-ontology-fast/qualification/positive-receipt.json.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce candidate qualification theorem
+        if: always()
+        env:
+          ATTEMPT_OUTCOME: ${{ steps.attempt.outcome }}
+          ATTEMPT_UPLOAD_OUTCOME: ${{ steps.upload-attempt.outcome }}
+          POSITIVE_ELIGIBLE: ${{ steps.attempt.outputs.positive_eligible }}
+          POSITIVE_RECEIPT_OUTCOME: ${{ steps.positive-receipt.outcome }}
+          POSITIVE_UPLOAD_OUTCOME: ${{ steps.upload-positive.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$ATTEMPT_OUTCOME" != "success" || "$ATTEMPT_UPLOAD_OUTCOME" != "success" ]]; then
+            echo "Qualification attempt evidence was not successfully retained." >&2
+            exit 1
+          fi
+          if [[ "$POSITIVE_ELIGIBLE" != "true" ]]; then
+            echo "Required candidate qualification gates did not all pass." >&2
+            exit 1
+          fi
+          if [[ "$POSITIVE_RECEIPT_OUTCOME" != "success" || "$POSITIVE_UPLOAD_OUTCOME" != "success" ]]; then
+            echo "Positive candidate receipt was not successfully produced and retained." >&2
+            exit 1
+          fi
