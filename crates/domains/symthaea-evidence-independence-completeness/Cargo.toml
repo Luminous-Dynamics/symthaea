@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-evidence-independence-completeness"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Relation-scoped completeness overlay for verifier independence assurance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "evidence", "provenance"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-evidence-independence-graph = { path = "../symthaea-evidence-independence-graph" }
+symthaea-evidence-verifier-diversity = { path = "../symthaea-evidence-verifier-diversity" }
