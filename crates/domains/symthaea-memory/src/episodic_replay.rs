@@ -238,7 +238,7 @@ impl Episode {
         self
     }
 
-    /// Set neuromodulator bath state at encoding for state-dependent retrieval.
+    /// Set neuromodulator bath state at encoding for state-dependent memory retrieval.
     /// Science: Godden & Baddeley (1975) — state-dependent memory.
     pub fn with_bath_state(mut self, state: [f32; 9]) -> Self {
         self.bath_state_at_encoding = Some(state);
@@ -1767,3 +1767,5 @@ mod tests {
         assert!(result.episodes_replayed > 0);
     }
 }
+
+pub mod persisted_import;
