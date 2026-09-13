@@ -2,10 +2,11 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::{env, fs, path::Path, process};
+use std::{collections::HashSet, env, fs, path::Path, process};
 
 const PROTOCOL: &str = "wcare37-attestation-v1";
-const PROVENANCE_PROTOCOL: &str = "wcare36-reviewer-provenance-v1";
+const WCARE36_PROTOCOL: &str = "wcare36-reviewer-provenance-v1";
+const WCARE35_PROTOCOL: &str = "wcare35-adjudication-v1";
 const DOMAIN: &str = "reviewer-evidence-attestation";
 
 const PROVENANCE_STRENGTHS: &[&str] = &[
@@ -21,6 +22,44 @@ const RELATION_STRENGTHS: &[&str] = &[
     "ExternalVerified",
     "InstitutionalAttestation",
     "ModelAssessment",
+];
+const ENVELOPE_KEYS: &[&str] = &[
+    "protocol_version",
+    "wcare36_result_sha256",
+    "wcare35_result_sha256",
+    "subject_receipt_kind",
+    "subject_receipt_sha256",
+    "reviewer_identity_commitment_sha256",
+    "provenance_strength_claim",
+    "relation_evidence_strength_claim",
+    "issuer_key_id",
+    "issuer_public_key_ed25519_hex",
+    "issuer_policy_id",
+    "issued_at_utc",
+    "expires_at_utc",
+    "nonce_sha256",
+    "signature_ed25519_hex",
+];
+const POLICY_KEYS: &[&str] = &[
+    "protocol_version",
+    "issuer_policy_id",
+    "policy_created_utc",
+    "wcare36_result_sha256",
+    "wcare35_result_sha256",
+    "keys",
+    "notes",
+];
+const ISSUER_ENTRY_KEYS: &[&str] = &[
+    "issuer_key_id",
+    "public_key_ed25519_hex",
+    "issuer_commitment_sha256",
+    "valid_from_utc",
+    "valid_until_utc",
+    "supersedes_key_id",
+    "revocation_effective_utc",
+    "allowed_attestation_scopes",
+    "allowed_provenance_strengths",
+    "allowed_relation_evidence_strengths",
 ];
 
 #[derive(Clone)]
@@ -64,6 +103,18 @@ fn field<'a>(value: &'a Value, name: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("missing_or_nonstring:{name}"))
 }
 
+fn exact_object_keys(value: &Value, allowed: &[&str], label: &str) -> Result<(), String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("{label}_not_object"))?;
+    for key in object.keys() {
+        if !allowed.contains(&key.as_str()) {
+            return Err(format!("{label}_unknown_field:{key}"));
+        }
+    }
+    Ok(())
+}
+
 fn is_lower_hex(value: &str, len: usize) -> bool {
     value.len() == len
         && value
@@ -92,6 +143,7 @@ fn parse_utc(value: &str) -> Result<DateTime<Utc>, String> {
 }
 
 fn canonical_message(envelope: &Value) -> Result<String, String> {
+    exact_object_keys(envelope, ENVELOPE_KEYS, "envelope")?;
     let protocol = field(envelope, "protocol_version")?;
     if protocol != PROTOCOL {
         return Err("protocol_version_mismatch".into());
@@ -195,7 +247,11 @@ fn subject_binding(
     w35: &Artifact,
     subject: &Artifact,
 ) -> Result<bool, String> {
-    if field(envelope, "wcare36_result_sha256")? != w36.sha256.as_str()
+    exact_object_keys(&policy.json, POLICY_KEYS, "policy")?;
+    if field(&policy.json, "protocol_version")? != PROTOCOL
+        || w36.json.get("protocol_version").and_then(Value::as_str) != Some(WCARE36_PROTOCOL)
+        || w35.json.get("protocol_version").and_then(Value::as_str) != Some(WCARE35_PROTOCOL)
+        || field(envelope, "wcare36_result_sha256")? != w36.sha256.as_str()
         || field(envelope, "wcare35_result_sha256")? != w35.sha256.as_str()
         || field(envelope, "subject_receipt_sha256")? != subject.sha256.as_str()
         || field(&policy.json, "wcare36_result_sha256")? != w36.sha256.as_str()
@@ -206,16 +262,13 @@ fn subject_binding(
     if field(envelope, "issuer_policy_id")? != field(&policy.json, "issuer_policy_id")? {
         return Ok(false);
     }
-    if subject.json.get("protocol_version").and_then(Value::as_str) != Some(PROVENANCE_PROTOCOL) {
+    if subject.json.get("protocol_version").and_then(Value::as_str) != Some(WCARE36_PROTOCOL) {
         return Ok(false);
     }
     if subject.json.get("wcare35_result_sha256").and_then(Value::as_str)
         != Some(w35.sha256.as_str())
-    {
-        return Ok(false);
-    }
-    if w36.json.get("wcare35_result_sha256").and_then(Value::as_str)
-        != Some(w35.sha256.as_str())
+        || w36.json.get("wcare35_result_sha256").and_then(Value::as_str)
+            != Some(w35.sha256.as_str())
     {
         return Ok(false);
     }
@@ -235,11 +288,89 @@ fn subject_binding(
     }
 }
 
-fn array_contains(value: &Value, field_name: &str, needle: &str) -> bool {
-    value
+fn array_strings(value: &Value, field_name: &str) -> Result<Vec<String>, String> {
+    let array = value
         .get(field_name)
         .and_then(Value::as_array)
-        .is_some_and(|items| items.iter().any(|item| item.as_str() == Some(needle)))
+        .ok_or_else(|| format!("missing_or_nonarray:{field_name}"))?;
+    let mut seen = HashSet::new();
+    let mut result = Vec::with_capacity(array.len());
+    for item in array {
+        let item = item
+            .as_str()
+            .ok_or_else(|| format!("nonstr_array_item:{field_name}"))?;
+        if !seen.insert(item) {
+            return Err(format!("duplicate_array_item:{field_name}:{item}"));
+        }
+        result.push(item.to_string());
+    }
+    Ok(result)
+}
+
+fn array_contains(value: &Value, field_name: &str, needle: &str) -> Result<bool, String> {
+    Ok(array_strings(value, field_name)?.iter().any(|item| item == needle))
+}
+
+fn validate_policy_keys(policy: &Value) -> Result<Vec<&Value>, String> {
+    let keys = policy
+        .get("keys")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "policy_keys_missing".to_string())?;
+    if keys.is_empty() {
+        return Err("policy_keys_empty".into());
+    }
+    let mut ids = HashSet::new();
+    for entry in keys {
+        exact_object_keys(entry, ISSUER_ENTRY_KEYS, "issuer_entry")?;
+        let key_id = field(entry, "issuer_key_id")?;
+        if !is_token(key_id) || !ids.insert(key_id.to_string()) {
+            return Err(format!("duplicate_or_invalid_issuer_key_id:{key_id}"));
+        }
+        if !is_lower_hex(field(entry, "public_key_ed25519_hex")?, 64)
+            || !is_lower_hex(field(entry, "issuer_commitment_sha256")?, 64)
+        {
+            return Err(format!("invalid_issuer_entry_digest:{key_id}"));
+        }
+        parse_utc(field(entry, "valid_from_utc")?)?;
+        let valid_until = field(entry, "valid_until_utc")?;
+        if valid_until != "-" {
+            parse_utc(valid_until)?;
+        }
+        let revoked = field(entry, "revocation_effective_utc")?;
+        if revoked != "-" {
+            parse_utc(revoked)?;
+        }
+        let supersedes = field(entry, "supersedes_key_id")?;
+        if supersedes != "-" && !is_token(supersedes) {
+            return Err(format!("invalid_supersedes_key_id:{key_id}"));
+        }
+        for scope in array_strings(entry, "allowed_attestation_scopes")? {
+            if !matches!(scope.as_str(), "ReviewerProvenance" | "ReviewerRelation") {
+                return Err(format!("invalid_allowed_scope:{key_id}:{scope}"));
+            }
+        }
+        for strength in array_strings(entry, "allowed_provenance_strengths")? {
+            if !PROVENANCE_STRENGTHS.contains(&strength.as_str()) {
+                return Err(format!("invalid_allowed_provenance_strength:{key_id}:{strength}"));
+            }
+        }
+        for strength in array_strings(entry, "allowed_relation_evidence_strengths")? {
+            if !RELATION_STRENGTHS.contains(&strength.as_str()) {
+                return Err(format!("invalid_allowed_relation_strength:{key_id}:{strength}"));
+            }
+        }
+    }
+    for entry in keys {
+        let key_id = field(entry, "issuer_key_id")?;
+        let supersedes = field(entry, "supersedes_key_id")?;
+        if supersedes == key_id {
+            return Err(format!("issuer_key_self_supersession:{key_id}"));
+        }
+        if supersedes != "-" && !ids.contains(supersedes) {
+            return Err(format!("superseded_key_missing:{key_id}:{supersedes}"));
+        }
+    }
+    Ok(keys.iter().collect())
 }
 
 fn emit_result(
@@ -312,18 +443,7 @@ fn run() -> Result<i32, String> {
             value
         }
         Err(detail) => {
-            emit_result(
-                &envelope,
-                &policy,
-                &w36,
-                &w35,
-                &subject,
-                None,
-                issuer_key_id,
-                &checks,
-                "ATTESTATION_REJECTED",
-                &detail,
-            );
+            emit_result(&envelope, &policy, &w36, &w35, &subject, None, issuer_key_id, &checks, "ATTESTATION_REJECTED", &detail);
             return Ok(1);
         }
     };
@@ -331,35 +451,13 @@ fn run() -> Result<i32, String> {
 
     checks.subject_binding_valid = subject_binding(&envelope.json, &policy, &w36, &w35, &subject)?;
     if !checks.subject_binding_valid {
-        emit_result(
-            &envelope,
-            &policy,
-            &w36,
-            &w35,
-            &subject,
-            Some(canonical_sha),
-            issuer_key_id,
-            &checks,
-            "ATTESTATION_REJECTED",
-            "subject_or_policy_binding_mismatch",
-        );
+        emit_result(&envelope, &policy, &w36, &w35, &subject, Some(canonical_sha), issuer_key_id, &checks, "ATTESTATION_REJECTED", "subject_or_policy_binding_mismatch");
         return Ok(1);
     }
 
     checks.signature_valid = verify_signature(&envelope.json, canonical.as_bytes())?;
     if !checks.signature_valid {
-        emit_result(
-            &envelope,
-            &policy,
-            &w36,
-            &w35,
-            &subject,
-            Some(canonical_sha),
-            issuer_key_id,
-            &checks,
-            "ATTESTATION_REJECTED",
-            "ed25519_signature_invalid",
-        );
+        emit_result(&envelope, &policy, &w36, &w35, &subject, Some(canonical_sha), issuer_key_id, &checks, "ATTESTATION_REJECTED", "ed25519_signature_invalid");
         return Ok(1);
     }
 
@@ -368,22 +466,7 @@ fn run() -> Result<i32, String> {
     checks.attestation_current_at_evaluation = evaluation_time >= issued
         && (expires == "-" || evaluation_time < parse_utc(expires)?);
     if !checks.attestation_current_at_evaluation {
-        emit_result(
-            &envelope,
-            &policy,
-            &w36,
-            &w35,
-            &subject,
-            Some(canonical_sha),
-            issuer_key_id,
-            &checks,
-            "ATTESTATION_REJECTED",
-            if evaluation_time < issued {
-                "evaluation_precedes_attestation_issue_time"
-            } else {
-                "attestation_expired_at_evaluation_time"
-            },
-        );
+        emit_result(&envelope, &policy, &w36, &w35, &subject, Some(canonical_sha), issuer_key_id, &checks, "ATTESTATION_REJECTED", if evaluation_time < issued { "evaluation_precedes_attestation_issue_time" } else { "attestation_expired_at_evaluation_time" });
         return Ok(1);
     }
 
@@ -391,30 +474,11 @@ fn run() -> Result<i32, String> {
     let policy_preregistered = policy_created <= issued;
     let key_id = field(&envelope.json, "issuer_key_id")?;
     let public_key = field(&envelope.json, "issuer_public_key_ed25519_hex")?;
-    let keys = policy
-        .json
-        .get("keys")
-        .and_then(Value::as_array)
-        .ok_or_else(|| "policy_keys_missing".to_string())?;
+    let keys = validate_policy_keys(&policy.json)?;
     let matching_ids: Vec<&Value> = keys
-        .iter()
+        .into_iter()
         .filter(|entry| entry.get("issuer_key_id").and_then(Value::as_str) == Some(key_id))
         .collect();
-    if matching_ids.len() > 1 {
-        emit_result(
-            &envelope,
-            &policy,
-            &w36,
-            &w35,
-            &subject,
-            Some(canonical_sha),
-            issuer_key_id,
-            &checks,
-            "ATTESTATION_REJECTED",
-            "duplicate_issuer_key_id_in_policy",
-        );
-        return Ok(1);
-    }
 
     if let Some(entry) = matching_ids.first().copied() {
         checks.issuer_key_present = entry
@@ -425,18 +489,7 @@ fn run() -> Result<i32, String> {
             let valid_from = parse_utc(field(entry, "valid_from_utc")?)?;
             let valid_until = field(entry, "valid_until_utc")?;
             if valid_until != "-" && parse_utc(valid_until)? <= valid_from {
-                emit_result(
-                    &envelope,
-                    &policy,
-                    &w36,
-                    &w35,
-                    &subject,
-                    Some(canonical_sha),
-                    issuer_key_id,
-                    &checks,
-                    "ATTESTATION_REJECTED",
-                    "invalid_key_validity_interval",
-                );
+                emit_result(&envelope, &policy, &w36, &w35, &subject, Some(canonical_sha), issuer_key_id, &checks, "ATTESTATION_REJECTED", "invalid_key_validity_interval");
                 return Ok(1);
             }
             checks.key_valid_at_issue_time = issued >= valid_from
@@ -445,18 +498,10 @@ fn run() -> Result<i32, String> {
             checks.revocation_policy_satisfied = revoked == "-" || issued < parse_utc(revoked)?;
 
             let scope = field(&envelope.json, "subject_receipt_kind")?;
-            checks.scope_authorized = array_contains(entry, "allowed_attestation_scopes", scope);
+            checks.scope_authorized = array_contains(entry, "allowed_attestation_scopes", scope)?;
             checks.claimed_strength_authorized = match scope {
-                "ReviewerProvenance" => array_contains(
-                    entry,
-                    "allowed_provenance_strengths",
-                    field(&envelope.json, "provenance_strength_claim")?,
-                ),
-                "ReviewerRelation" => array_contains(
-                    entry,
-                    "allowed_relation_evidence_strengths",
-                    field(&envelope.json, "relation_evidence_strength_claim")?,
-                ),
+                "ReviewerProvenance" => array_contains(entry, "allowed_provenance_strengths", field(&envelope.json, "provenance_strength_claim")?)?,
+                "ReviewerRelation" => array_contains(entry, "allowed_relation_evidence_strengths", field(&envelope.json, "relation_evidence_strength_claim")?)?,
                 _ => false,
             };
         }
@@ -472,29 +517,10 @@ fn run() -> Result<i32, String> {
     let (disposition, detail, code) = if checks.issuer_trusted_for_claim {
         ("ATTESTATION_ACCEPTED", "signature_and_issuer_policy_accepted", 0)
     } else {
-        (
-            "SIGNATURE_VALID_ISSUER_UNTRUSTED",
-            if !policy_preregistered {
-                "trust_policy_created_after_attestation_issue_time"
-            } else {
-                "signature_valid_but_issuer_not_authorized_for_claim"
-            },
-            2,
-        )
+        ("SIGNATURE_VALID_ISSUER_UNTRUSTED", if !policy_preregistered { "trust_policy_created_after_attestation_issue_time" } else { "signature_valid_but_issuer_not_authorized_for_claim" }, 2)
     };
 
-    emit_result(
-        &envelope,
-        &policy,
-        &w36,
-        &w35,
-        &subject,
-        Some(canonical_sha),
-        issuer_key_id,
-        &checks,
-        disposition,
-        detail,
-    );
+    emit_result(&envelope, &policy, &w36, &w35, &subject, Some(canonical_sha), issuer_key_id, &checks, disposition, detail);
     Ok(code)
 }
 
@@ -512,6 +538,10 @@ fn main() {
 mod tests {
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
+
+    const GOLDEN_PUBLIC_KEY: &str = "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c";
+    const GOLDEN_MESSAGE_SHA256: &str = "a46d444b075c1556e14b5b65b376018c738448c727a000717d375dbe7cec69b5";
+    const GOLDEN_SIGNATURE: &str = "f352837dc60df4d5a243d50ee8bc69e20494404bc8ec0e66e919933dd045bac560bfc748987c48cd2e9e8b4c8725cde879618b2789ab0e394f9a980b662e890e";
 
     fn base_envelope(public_key: &str) -> Value {
         json!({
@@ -534,14 +564,16 @@ mod tests {
     }
 
     #[test]
-    fn canonical_message_is_stable_and_signature_verifies() {
+    fn canonical_message_matches_frozen_cross_implementation_vector() {
         let signing_key = SigningKey::from_bytes(&[7u8; 32]);
         let public_key = hex::encode(signing_key.verifying_key().as_bytes());
+        assert_eq!(public_key, GOLDEN_PUBLIC_KEY);
         let mut envelope = base_envelope(&public_key);
         let message = canonical_message(&envelope).unwrap();
-        assert!(message.ends_with("domain=reviewer-evidence-attestation\n"));
+        assert_eq!(sha256_hex(message.as_bytes()), GOLDEN_MESSAGE_SHA256);
         let signature = signing_key.sign(message.as_bytes());
-        envelope["signature_ed25519_hex"] = Value::String(hex::encode(signature.to_bytes()));
+        assert_eq!(hex::encode(signature.to_bytes()), GOLDEN_SIGNATURE);
+        envelope["signature_ed25519_hex"] = Value::String(GOLDEN_SIGNATURE.into());
         assert!(verify_signature(&envelope, message.as_bytes()).unwrap());
     }
 
@@ -557,6 +589,15 @@ mod tests {
         assert!(canonical_message(&envelope).is_ok());
         envelope["relation_evidence_strength_claim"] = Value::String("OrganizerVerified".into());
         assert!(canonical_message(&envelope).is_err());
+    }
+
+    #[test]
+    fn unknown_envelope_fields_are_rejected() {
+        let signing_key = SigningKey::from_bytes(&[10u8; 32]);
+        let public_key = hex::encode(signing_key.verifying_key().as_bytes());
+        let mut envelope = base_envelope(&public_key);
+        envelope["persuasive_text"] = Value::String("trust me".into());
+        assert!(canonical_message(&envelope).unwrap_err().starts_with("envelope_unknown_field:"));
     }
 
     #[test]
