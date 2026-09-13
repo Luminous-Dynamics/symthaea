@@ -1,9 +1,9 @@
 # Focused validation for symthaea-support changes.
 #
 # This workflow is intentionally additive: the repository-wide CI remains the
-# integration authority. The purpose of this lane is to provide timely exact-head
-# compiler/test evidence for the IT-support domain without spending dozens of
-# unrelated workspace runners on every support-only iteration.
+# integration authority. This lane validates the *raw PR head* as a distinct
+# qualification subject; ordinary pull-request CI may instead validate GitHub's
+# synthetic merge ref. Those are complementary evidence classes, not aliases.
 
 name: Support Fast Lane
 
@@ -17,6 +17,9 @@ on:
       - '.github/workflows/support-fast.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -24,16 +27,62 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  QUALIFICATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  QUALIFICATION_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+  EVENT_SHA: ${{ github.sha }}
 
 jobs:
   support:
-    name: symthaea-support focused qualification
+    name: symthaea-support raw-head qualification
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact raw-head subject
+        uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+
+      - name: Bind qualification subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          if [[ "$actual_head" != "$QUALIFICATION_HEAD_SHA" ]]; then
+            echo "ERROR: checked-out subject $actual_head != declared raw head $QUALIFICATION_HEAD_SHA" >&2
+            exit 1
+          fi
+
+          echo "Qualification subject (raw head): $actual_head"
+          echo "PR base subject: ${QUALIFICATION_BASE_SHA:-n/a}"
+          echo "GitHub event SHA (often synthetic merge ref for PR events): $EVENT_SHA"
+          echo "Rust toolchain policy: 1.96.0"
+
+          {
+            echo "## Support Fast Lane qualification subject"
+            echo
+            echo "- Raw head: \`$actual_head\`"
+            echo "- PR base: \`${QUALIFICATION_BASE_SHA:-n/a}\`"
+            echo "- Event SHA: \`$EVENT_SHA\`"
+            echo "- Subject class: **raw PR head / package-focused**"
+            echo "- Integration/full-repository qualification: **not implied by this lane**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The governance script compares HEAD with origin/$GITHUB_BASE_REF. With an
+      # explicit raw-head checkout, ensure that base ref exists locally rather than
+      # relying on checkout's pull-request merge-ref behavior.
+      - name: Prepare PR base for governance comparison
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          actual_base="$(git rev-parse "origin/${GITHUB_BASE_REF}")"
+          if [[ "$actual_base" != "$QUALIFICATION_BASE_SHA" ]]; then
+            echo "ERROR: fetched base $actual_base != event base $QUALIFICATION_BASE_SHA" >&2
+            exit 1
+          fi
 
       # Preserve the repository's existing Class A/B governance boundary even
       # when this focused lane is used for authority/security work in support.
@@ -81,3 +130,10 @@ jobs:
         env:
           CARGO_TARGET_DIR: target/support-fast
         run: cargo check -p symthaea --no-default-features --features support
+
+      - name: Verify subject did not move
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFICATION_HEAD_SHA"
+          echo "Raw-head subject remained bound to $QUALIFICATION_HEAD_SHA"
