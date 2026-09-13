@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-sim-first-instruction-worker-rlimit"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Bounded simulation-worker protocol over first-instruction cgroup children with exact pre-exec rlimits"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+symthaea-extension-core = { path = "../../core/symthaea-extension-core" }
+symthaea-extension-host = { path = "../symthaea-extension-host" }
+symthaea-extension-simulation-host = { path = "../symthaea-extension-simulation-host" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-sim-clone-cgroup-exec-rlimit = { path = "../symthaea-sim-clone-cgroup-exec-rlimit" }
+symthaea-sim-digest = { path = "../symthaea-sim-digest" }
+symthaea-sim-worker = { path = "../symthaea-sim-worker" }
+symthaea-sim-worker-cgroup = { path = "../symthaea-sim-worker-cgroup" }
+symthaea-sim-worker-containment = { path = "../symthaea-sim-worker-containment" }
+symthaea-sim-worker-filesystem = { path = "../symthaea-sim-worker-filesystem" }
+symthaea-sim-worker-image = { path = "../symthaea-sim-worker-image" }
