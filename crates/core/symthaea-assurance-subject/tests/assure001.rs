@@ -40,7 +40,11 @@ fn exact_manifest() -> AiSubjectManifest {
         id("agent-a"),
         model_runtime_profile(),
         vec![
-            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(commit('a'))),
+            binding(
+                AiSurfaceKind::Model,
+                "model-alias",
+                SurfaceState::Known(commit('a')),
+            ),
             binding(
                 AiSurfaceKind::Runtime,
                 "runtime-image",
@@ -88,7 +92,11 @@ fn manifest_identity_is_binding_order_independent() {
                 "runtime-image",
                 SurfaceState::Known(commit('b')),
             ),
-            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(commit('a'))),
+            binding(
+                AiSurfaceKind::Model,
+                "model-alias",
+                SurfaceState::Known(commit('a')),
+            ),
         ],
     )
     .unwrap();
@@ -224,7 +232,11 @@ fn immutable_commitment_change_changes_subject_identity() {
         id("agent-a"),
         model_runtime_profile(),
         vec![
-            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(commit('c'))),
+            binding(
+                AiSurfaceKind::Model,
+                "model-alias",
+                SurfaceState::Known(commit('c')),
+            ),
             binding(
                 AiSurfaceKind::Runtime,
                 "runtime-image",
@@ -323,13 +335,20 @@ fn duplicate_external_dependency_registration_fails_closed() {
 #[test]
 fn core_bridge_tracks_exact_assure001_identity() {
     let left = exact_manifest();
-    assert_eq!(left.core_subject_id().unwrap(), left.core_subject_id().unwrap());
+    assert_eq!(
+        left.core_subject_id().unwrap(),
+        left.core_subject_id().unwrap()
+    );
 
     let changed = AiSubjectManifest::new(
         id("agent-a"),
         model_runtime_profile(),
         vec![
-            binding(AiSurfaceKind::Model, "model-alias", SurfaceState::Known(commit('a'))),
+            binding(
+                AiSurfaceKind::Model,
+                "model-alias",
+                SurfaceState::Known(commit('a')),
+            ),
             binding(
                 AiSurfaceKind::Runtime,
                 "runtime-image",
