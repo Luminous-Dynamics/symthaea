@@ -19,6 +19,8 @@
 //! - [`ContextualHolographicLiquidCell`] composes invariant context with the
 //!   theorem-bearing HLS transition while leaving diagonal HLS intact as an
 //!   ablation baseline.
+//! - [`StateTrackingBenchmark`] defines a model-agnostic irregular-time,
+//!   compositional, historical state-tracking task for architecture ablations.
 //!
 //! The legacy [`HdcLtcUnifiedNeuron`] remains available so the algebraic research
 //! path can be qualified without silently changing production behavior.
@@ -30,6 +32,7 @@ pub mod holographic_liquid;
 pub mod invariant_context;
 pub mod network;
 pub mod neuron;
+pub mod state_tracking_benchmark;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use contextual_holographic_liquid::{ContextualHlsError, ContextualHolographicLiquidCell};
@@ -38,3 +41,8 @@ pub use holographic_liquid::{HlsActivation, HlsConfig, HlsError, HolographicLiqu
 pub use invariant_context::{ContextMixerError, InvariantContextMixer};
 pub use network::{HdcLtcUnifiedNetwork, StepTimingConfig};
 pub use neuron::HdcLtcUnifiedNeuron;
+pub use state_tracking_benchmark::{
+    EntityId, LocationId, ObjectId, StateTrackingBenchmark, StateTrackingBenchmarkConfig,
+    StateTrackingBenchmarkError, TrackingAnswer, TrackingEvent, TrackingEventKind, TrackingQuery,
+    TrackingQueryKind, TrackingScore,
+};
