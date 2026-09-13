@@ -8,6 +8,7 @@ use symthaea_assurance_trust_store::{TrustStoreBackendKind, TrustStoreProfile};
 
 const PUBLIC_TOOL: &[u8] = b"fake-tpm2-nvreadpublic-binary";
 const READ_TOOL: &[u8] = b"fake-tpm2-nvread-binary";
+const NV_NAME: &str = "000bdeadbeef";
 
 fn digest(bytes: &[u8]) -> String {
     format!("blake3:{}", blake3::hash(bytes).to_hex())
@@ -26,7 +27,8 @@ struct FakeExecutor {
 impl Default for FakeExecutor {
     fn default() -> Self {
         Self {
-            public_stdout: public_yaml("ownerread|ownerwrite|nt=counter", 8).into_bytes(),
+            public_stdout: public_yaml(NV_NAME, "ownerread|ownerwrite|nt=counter", 8)
+                .into_bytes(),
             read_stdout: 42_u64.to_be_bytes().to_vec(),
             public_stderr: vec![],
             read_stderr: vec![],
@@ -78,9 +80,9 @@ impl Tpm2ToolsExecutor for FakeExecutor {
     }
 }
 
-fn public_yaml(attributes: &str, size: usize) -> String {
+fn public_yaml(name: &str, attributes: &str, size: usize) -> String {
     format!(
-        "0x1500016:\n  name: 000bdeadbeef\n  hash algorithm:\n    friendly: sha256\n    value: 0xb\n  attributes:\n    friendly: {attributes}\n    value: 0x20040004\n  size: {size}\n  authorization policy:\n"
+        "0x1500016:\n  name: {name}\n  hash algorithm:\n    friendly: sha256\n    value: 0xb\n  attributes:\n    friendly: {attributes}\n    value: 0x20040004\n  size: {size}\n  authorization policy:\n"
     )
 }
 
@@ -92,6 +94,7 @@ fn policy() -> Tpm2ToolsAdapterPolicy {
         trust_store_ref: "trust-store:tpm2:node-1".into(),
         counter_epoch: "epoch:tpm2:1".into(),
         nv_index: 0x0150_0016,
+        expected_nv_name: NV_NAME.into(),
         tcti: "device:/dev/tpmrm0".into(),
         read_hierarchy: Tpm2ReadHierarchy::Owner,
         nvreadpublic_path: "/nix/store/public/bin/tpm2_nvreadpublic".into(),
@@ -139,14 +142,27 @@ fn exact_counter_read_produces_observation() {
     let observation = read_tpm2_nv_counter(&policy(), 10_000, &FakeExecutor::default()).unwrap();
     assert_eq!(observation.counter_value, 42);
     assert_eq!(observation.public_evidence.data_size, 8);
+    assert_eq!(observation.public_evidence.nv_name, NV_NAME);
     assert!(observation.observation_digest().starts_with("blake3:"));
     assert!(!observation.grants_physical_authority());
 }
 
 #[test]
+fn public_name_substitution_is_rejected() {
+    let fake = FakeExecutor {
+        public_stdout: public_yaml("000bfeedface", "ownerread|nt=counter", 8).into_bytes(),
+        ..FakeExecutor::default()
+    };
+    assert_eq!(
+        read_tpm2_nv_counter(&policy(), 10_000, &fake),
+        Err(Tpm2AdapterError::NvNameMismatch)
+    );
+}
+
+#[test]
 fn non_counter_index_is_rejected() {
     let fake = FakeExecutor {
-        public_stdout: public_yaml("ownerread|ownerwrite|ordinary", 8).into_bytes(),
+        public_stdout: public_yaml(NV_NAME, "ownerread|ownerwrite|ordinary", 8).into_bytes(),
         ..FakeExecutor::default()
     };
     assert_eq!(
@@ -158,7 +174,7 @@ fn non_counter_index_is_rejected() {
 #[test]
 fn wrong_size_and_short_read_are_rejected() {
     let wrong_size = FakeExecutor {
-        public_stdout: public_yaml("ownerread|nt=counter", 32).into_bytes(),
+        public_stdout: public_yaml(NV_NAME, "ownerread|nt=counter", 32).into_bytes(),
         ..FakeExecutor::default()
     };
     assert_eq!(
