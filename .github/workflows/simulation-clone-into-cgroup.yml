@@ -1,0 +1,143 @@
+name: Simulation Clone Into Cgroup
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-clone-cgroup/**"
+      - "crates/bridges/symthaea-sim-worker-cgroup/**"
+      - ".github/workflows/simulation-clone-into-cgroup.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  SYMTHAEA_CGROUP_V2_DELEGATED_ROOT: ${{ vars.SYMTHAEA_CGROUP_V2_DELEGATED_ROOT }}
+
+jobs:
+  clone-into-cgroup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 clone3 subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          test -r /sys/fs/cgroup/cgroup.controllers
+          uname -a
+          cat /sys/fs/cgroup/cgroup.controllers
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-simulation-clone-into-cgroup-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-clone-cgroup/**', 'crates/bridges/symthaea-sim-worker-cgroup/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-clone-into-cgroup-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-clone-into-cgroup-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches clone-into-cgroup graph."
+          else
+            cat simulation-clone-into-cgroup-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-clone-into-cgroup-cargo-lock-patch
+          path: simulation-clone-into-cgroup-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Check formatting
+        run: cargo fmt -p symthaea-sim-clone-cgroup -- --check
+
+      - name: Check and test source corpus
+        run: |
+          cargo check --locked -p symthaea-sim-clone-cgroup --all-targets
+          cargo test --locked -p symthaea-sim-clone-cgroup
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-sim-clone-cgroup --all-targets -- -D warnings
+
+      - name: Build exact kernel probe
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-clone-cgroup \
+            --bin symthaea-sim-clone-cgroup-probe
+          sha256sum target/debug/symthaea-sim-clone-cgroup-probe
+
+      - name: Execute first-instruction placement probe when configured
+        shell: bash
+        run: |
+          if [[ -n "${SYMTHAEA_CGROUP_V2_DELEGATED_ROOT:-}" ]]; then
+            cargo run --locked \
+              -p symthaea-sim-clone-cgroup \
+              --bin symthaea-sim-clone-cgroup-probe \
+              | tee clone-into-cgroup-probe.txt
+            grep -qx 'clone_into_cgroup_probe=pass' clone-into-cgroup-probe.txt
+            grep -qx 'child_ready_observed=true' clone-into-cgroup-probe.txt
+            grep -qx 'birth_membership_observed=true' clone-into-cgroup-probe.txt
+            echo 'kernel_clone_into_cgroup_probe=pass' \
+              | tee clone-into-cgroup-kernel-status.txt
+          else
+            echo 'clone_into_cgroup_probe=not_run_no_explicit_resource_root' \
+              | tee clone-into-cgroup-probe.txt
+            echo 'kernel_clone_into_cgroup_probe=not_established' \
+              | tee clone-into-cgroup-kernel-status.txt
+          fi
+
+      - name: Record exact clone3 subject
+        run: |
+          kernel_probe="$(cut -d= -f2 clone-into-cgroup-kernel-status.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "probe_sha256=$(sha256sum target/debug/symthaea-sim-clone-cgroup-probe | cut -d' ' -f1)"
+            echo "profile=symthaea.simulation.clone-into-cgroup.first-instruction-v1"
+            echo "linux_abi=clone3_CLONE_INTO_CGROUP"
+            echo "target_leaf_required_empty=true"
+            echo "child_rust_allocator_after_clone=false"
+            echo "child_rust_locks_after_clone=false"
+            echo "child_raw_syscalls_only=true"
+            echo "membership_verified_while_child_blocked=true"
+            echo "post_creation_pid_migration=false"
+            echo "kernel_clone_into_cgroup_probe=${kernel_probe}"
+            echo "inherited_parent_memory_recharged=false"
+            echo "worker_exec_in_target_cgroup=not_established"
+            echo "sealed_worker_composition=not_established"
+            echo "delegation_origin_inferred_from_kernel=false"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-clone-into-cgroup-receipt.txt
+
+      - name: Upload clone3 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-clone-into-cgroup-evidence
+          path: |
+            clone-into-cgroup-probe.txt
+            clone-into-cgroup-kernel-status.txt
+            simulation-clone-into-cgroup-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
