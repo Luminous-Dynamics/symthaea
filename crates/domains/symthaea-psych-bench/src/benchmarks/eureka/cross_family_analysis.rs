@@ -82,6 +82,12 @@ pub(super) enum AnalysisMetricOutcome {
     Scored(RawConsequenceCounts),
     Abstained,
     OutOfDomain,
+    /// Evidence row exists, but no model metric may be inferred from it.
+    ///
+    /// This is required for leakage, lineage, scorer, execution, and
+    /// infrastructure failures so invalidity cannot masquerade as model
+    /// abstention or out-of-domain behavior.
+    InvalidNotScored,
 }
 
 /// One paired HeldOut row. Candidate and comparator share one evaluator-owned
@@ -375,7 +381,7 @@ fn validate_rows(rows: &[PairedAnalysisRow]) -> Result<(), CrossFamilyAnalysisEr
         if !family_seed_ids.insert((row.family, row.seed_identity)) {
             return Err(CrossFamilyAnalysisError::DuplicateFamilySeed);
         }
-        if !candidate_matches_disposition(row.disposition, row.candidate) {
+        if !outcomes_match_disposition(row.disposition, row.candidate, row.comparator) {
             return Err(CrossFamilyAnalysisError::CandidateDispositionMismatch);
         }
         for outcome in [row.candidate, row.comparator] {
@@ -400,19 +406,32 @@ fn validate_rows(rows: &[PairedAnalysisRow]) -> Result<(), CrossFamilyAnalysisEr
     Ok(())
 }
 
-fn candidate_matches_disposition(
+fn outcomes_match_disposition(
     disposition: CampaignRowDisposition,
     candidate: AnalysisMetricOutcome,
+    comparator: AnalysisMetricOutcome,
 ) -> bool {
     match disposition {
-        CampaignRowDisposition::ValidScored => matches!(candidate, AnalysisMetricOutcome::Scored(_)),
-        CampaignRowDisposition::ValidAbstained => candidate == AnalysisMetricOutcome::Abstained,
-        CampaignRowDisposition::ValidOutOfDomain => candidate == AnalysisMetricOutcome::OutOfDomain,
+        CampaignRowDisposition::ValidScored => {
+            matches!(candidate, AnalysisMetricOutcome::Scored(_))
+                && comparator != AnalysisMetricOutcome::InvalidNotScored
+        }
+        CampaignRowDisposition::ValidAbstained => {
+            candidate == AnalysisMetricOutcome::Abstained
+                && comparator != AnalysisMetricOutcome::InvalidNotScored
+        }
+        CampaignRowDisposition::ValidOutOfDomain => {
+            candidate == AnalysisMetricOutcome::OutOfDomain
+                && comparator != AnalysisMetricOutcome::InvalidNotScored
+        }
         CampaignRowDisposition::InvalidLeakage
         | CampaignRowDisposition::InvalidLineageMismatch
         | CampaignRowDisposition::ScorerFailure
         | CampaignRowDisposition::TargetExecutionFailure
-        | CampaignRowDisposition::InfrastructureIndeterminate => true,
+        | CampaignRowDisposition::InfrastructureIndeterminate => {
+            candidate == AnalysisMetricOutcome::InvalidNotScored
+                && comparator == AnalysisMetricOutcome::InvalidNotScored
+        }
     }
 }
 
@@ -799,6 +818,7 @@ fn encode_outcome(bytes: &mut Vec<u8>, outcome: AnalysisMetricOutcome) {
         }
         AnalysisMetricOutcome::Abstained => bytes.push(2),
         AnalysisMetricOutcome::OutOfDomain => bytes.push(3),
+        AnalysisMetricOutcome::InvalidNotScored => bytes.push(4),
     }
 }
 
@@ -1120,6 +1140,46 @@ mod tests {
         assert_eq!(
             analyze_cross_family_v1(&rows),
             Err(CrossFamilyAnalysisError::InvalidRawCounts)
+        );
+    }
+
+    #[test]
+    fn invalid_row_is_retained_without_metric_behavior() {
+        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 17_000);
+        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 18_000));
+        rows[0].disposition = CampaignRowDisposition::InfrastructureIndeterminate;
+        rows[0].candidate = AnalysisMetricOutcome::InvalidNotScored;
+        rows[0].comparator = AnalysisMetricOutcome::InvalidNotScored;
+
+        let result = analyze_cross_family_v1(&rows).unwrap();
+        assert_eq!(result.family_summaries[0].row_count, 64);
+        assert_eq!(result.family_summaries[0].invalid_rows.infrastructure, 1);
+        assert_eq!(result.final_disposition, ScientificDisposition::Inconclusive);
+    }
+
+    #[test]
+    fn invalid_row_cannot_masquerade_as_abstention_or_ood() {
+        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 19_000);
+        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 20_000));
+        rows[0].disposition = CampaignRowDisposition::InfrastructureIndeterminate;
+        rows[0].candidate = AnalysisMetricOutcome::Abstained;
+        rows[0].comparator = AnalysisMetricOutcome::OutOfDomain;
+
+        assert_eq!(
+            analyze_cross_family_v1(&rows),
+            Err(CrossFamilyAnalysisError::CandidateDispositionMismatch)
+        );
+    }
+
+    #[test]
+    fn valid_row_cannot_use_invalid_nonmetric_marker() {
+        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 21_000);
+        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 22_000));
+        rows[0].candidate = AnalysisMetricOutcome::InvalidNotScored;
+
+        assert_eq!(
+            analyze_cross_family_v1(&rows),
+            Err(CrossFamilyAnalysisError::CandidateDispositionMismatch)
         );
     }
 }
