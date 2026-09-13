@@ -1,0 +1,140 @@
+name: Continuity Actuation Evidence Runtime Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/continuity-actuation-evidence-runtime.yml'
+      - 'scripts/qualify-continuity-actuation-evidence-runtime.sh'
+      - 'crates/core/symthaea-continuity/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+  workflow_dispatch:
+
+concurrency:
+  group: continuity-actuation-evidence-runtime-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+  RUNTIME_SUBJECT_SHA: b1dd08e54bc111f66f197434b72bd92e8add4366
+  CARGO_TERM_COLOR: never
+
+jobs:
+  qualify-continuity-runtime:
+    name: Exact symthaea-continuity runtime subject
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact qualifier head with subject ancestry
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify immutable workflow actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/continuity-actuation-evidence-runtime.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/continuity-actuation-evidence-runtime.yml)" -eq 1
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/continuity-actuation-evidence-runtime.yml; then
+            echo 'mutable GitHub Action tag found' >&2
+            exit 1
+          fi
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test "$channel" = "1.96.0"
+          rustup toolchain install "$channel" \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy \
+            --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+          rustc --version
+          cargo --version
+
+      - name: Qualify frozen continuity runtime subject
+        env:
+          QUALIFIER_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          CONTINUITY_RUNTIME_RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v4.tsv
+        run: bash scripts/qualify-continuity-actuation-evidence-runtime.sh
+
+      - name: Publish classified receipt digest
+        if: always()
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v4.tsv
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RECEIPT" ]]; then
+            echo 'No continuity runtime qualification receipt was produced.'
+            {
+              echo
+              echo '### Continuity runtime qualification'
+              echo '- status: `NO_RECEIPT`'
+              echo '- interpretation: qualifier did not reach its receipt boundary; inspect workflow setup as infrastructure/qualifier failure.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          digest="$(sha256sum "$RECEIPT" | awk '{print $1}')"
+          schema="$(awk -F '\t' '$1 == "schema" { print $2 }' "$RECEIPT")"
+          evidence_semantics="$(awk -F '\t' '$1 == "evidence_semantics" { print $2 }' "$RECEIPT")"
+          supersedes="$(awk -F '\t' '$1 == "supersedes" { print $2 }' "$RECEIPT")"
+          inheritance_mode="$(awk -F '\t' '$1 == "inheritance_mode" { print $2 }' "$RECEIPT")"
+          inheritance_eligible="$(awk -F '\t' '$1 == "inheritance_eligible" { print $2 }' "$RECEIPT")"
+          status="$(awk -F '\t' '$1 == "status" { print $2 }' "$RECEIPT")"
+          failure_class="$(awk -F '\t' '$1 == "failure_class" { print $2 }' "$RECEIPT")"
+          phase="$(awk -F '\t' '$1 == "phase" { print $2 }' "$RECEIPT")"
+          scope="$(awk -F '\t' '$1 == "qualification_scope" { print $2 }' "$RECEIPT")"
+          subject="$(awk -F '\t' '$1 == "runtime_subject_sha" { print $2 }' "$RECEIPT")"
+          qualifier="$(awk -F '\t' '$1 == "qualifier_sha" { print $2 }' "$RECEIPT")"
+          reason="$(awk -F '\t' '$1 == "reason" { sub(/^[^\t]*\t/, ""); print }' "$RECEIPT")"
+
+          test "$schema" = 'symthaea-continuity-actuation-evidence-runtime-qualification-v4'
+          test "$evidence_semantics" = 'append_only'
+          test "$supersedes" = 'none'
+          test "$inheritance_mode" = 'exact_identity_only'
+          if [[ "$status" == 'PASS' ]]; then
+            test "$inheritance_eligible" = 'YES'
+          else
+            test "$inheritance_eligible" = 'NO'
+          fi
+
+          echo "continuity-actuation-evidence-runtime receipt_sha256=$digest status=$status failure_class=$failure_class phase=$phase scope=$scope subject=$subject qualifier=$qualifier inheritance_eligible=$inheritance_eligible"
+          {
+            echo
+            echo '### Continuity runtime qualification'
+            echo "- receipt SHA-256: \`$digest\`"
+            echo "- frozen runtime subject: \`$subject\`"
+            echo "- qualifier: \`$qualifier\`"
+            echo "- qualification scope: \`$scope\`"
+            echo "- status: \`$status\`"
+            echo "- failure class: \`$failure_class\`"
+            echo "- phase: \`$phase\`"
+            echo "- evidence semantics: \`$evidence_semantics\`"
+            echo "- supersedes: \`$supersedes\`"
+            echo "- inheritance mode: \`$inheritance_mode\`"
+            echo "- inheritance eligible: \`$inheritance_eligible\`"
+            echo "- reason: $reason"
+            echo '- receipt is workflow-witnessed and not independently signed.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: continuity-actuation-evidence-runtime-v4-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/continuity-actuation-evidence-runtime-v4.tsv
+          if-no-files-found: warn
+          retention-days: 14
