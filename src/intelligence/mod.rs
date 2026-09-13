@@ -16,6 +16,7 @@
 //! - Canonical typed objective selection over measured primitive coordinates
 //! - Two-phase longitudinal metacognitive state with pre-outcome freezing
 //! - Canonical per-subject reasoning orchestration with plasticity held at baseline
+//! - Evidence-backed competing-context assessment with ambiguity-preserving robust selection
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -24,6 +25,7 @@ pub mod nixos_causal;
 pub mod reasoning_capability_artifact;
 pub mod reasoning_capability_bundle;
 pub mod reasoning_capability_matrix;
+pub mod reasoning_context_competition;
 pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
@@ -54,6 +56,12 @@ pub use reasoning_capability_matrix::{
     CapabilityLaneReport, CapabilityMatrixError, ContaminationStatus, HoldoutPolicy,
     ObservedResources, ReasoningCapabilityMatrix, ResourceBudget,
     REASONING_CAPABILITY_MATRIX_SCHEMA_VERSION,
+};
+pub use reasoning_context_competition::{
+    assess_and_select, assess_contexts, select_candidate_robustly, ContextAssessmentReport,
+    ContextCompetitionError, ContextCompetitionPolicy, ContextHypothesis, ContextResolution,
+    PerContextCandidateScore, RobustCandidateEvaluation, RobustContextSelectionReport,
+    CONTEXT_COMPETITION_VERSION,
 };
 pub use reasoning_evaluator::{
     aggregate_receipts, evaluate_episode, wilson_interval_95, CapabilitySlice, EpisodeJudgment,
