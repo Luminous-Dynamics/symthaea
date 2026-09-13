@@ -1,0 +1,217 @@
+name: Restack 1155 On Fabrication Persistence
+
+on:
+  push:
+    branches:
+      - repair/restack-1155-on-fabrication-persistence-v1
+    paths:
+      - .github/workflows/restack-1155-on-fabrication-persistence.yml
+
+permissions:
+  contents: write
+
+jobs:
+  restack:
+    if: "${{ github.event.head_commit.message == 'stage exact #1155 on persistence-qualified parent' }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact construction subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 4
+          persist-credentials: true
+
+      - name: Prove frozen old and new lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          root='04b7d3182bdea0ec647b6c1ee4511901807415fb'
+          old_head='004b3a4968fe1106a1e6603e9fe405c339cd9fda'
+          new_parent='f687a55efc6b6bbfb7808a683c7b40e30149c090'
+          fixture_parent='7022812c49841a052bd0156f55b363ce84929b90'
+          workflow='.github/workflows/restack-1155-on-fabrication-persistence.yml'
+
+          test "$(git rev-parse HEAD^)" = "$new_parent"
+          test "$(git diff --name-only HEAD^..HEAD)" = "$workflow"
+          test "$(git rev-parse "$new_parent^")" = "$fixture_parent"
+          test "$(git rev-parse "$fixture_parent^")" = "$root"
+
+          git fetch --no-tags --depth=2 origin "$old_head"
+          test "$(git rev-parse "$old_head^")" = "$root"
+          test "$(git rev-list --count "$root".."$old_head")" = '1'
+
+          # Persistence prerequisites do not own any migration file or lock edge.
+          unchanged=(
+            'Cargo.lock'
+            'crates/core/symthaea-evidence-plane/src/lib.rs'
+            'crates/domains/symthaea-fabrication-kernel/Cargo.toml'
+            'crates/domains/symthaea-fabrication-kernel/src/lib.rs'
+          )
+          for path in "${unchanged[@]}"; do
+            test "$(git rev-parse "$root:$path")" = "$(git rev-parse "$new_parent:$path")"
+          done
+          ! git cat-file -e "$root:.github/workflows/evidence-plane-shared-digest-migration.yml" 2>/dev/null
+          ! git cat-file -e "$new_parent:.github/workflows/evidence-plane-shared-digest-migration.yml" 2>/dev/null
+          ! git cat-file -e "$root:crates/domains/symthaea-fabrication-kernel/tests/crypto_digest_compatibility.rs" 2>/dev/null
+          ! git cat-file -e "$new_parent:crates/domains/symthaea-fabrication-kernel/tests/crypto_digest_compatibility.rs" 2>/dev/null
+          test -z "$(git status --porcelain)"
+
+      - name: Install repository Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test "$channel" = '1.96.0'
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Reconstruct exact migration product on new parent
+        shell: bash
+        run: |
+          set -euo pipefail
+          old_head='004b3a4968fe1106a1e6603e9fe405c339cd9fda'
+          old_parent='04b7d3182bdea0ec647b6c1ee4511901807415fb'
+          new_parent='f687a55efc6b6bbfb7808a683c7b40e30149c090'
+          exact=(
+            'Cargo.lock'
+            'crates/core/symthaea-evidence-plane/src/lib.rs'
+            'crates/domains/symthaea-fabrication-kernel/Cargo.toml'
+            'crates/domains/symthaea-fabrication-kernel/src/lib.rs'
+            'crates/domains/symthaea-fabrication-kernel/tests/crypto_digest_compatibility.rs'
+          )
+          for path in "${exact[@]}"; do
+            mkdir -p "$(dirname "$path")"
+            git show "$old_head:$path" > "$path"
+            test "$(git hash-object "$path")" = "$(git rev-parse "$old_head:$path")"
+          done
+
+          git show "$old_head:.github/workflows/evidence-plane-shared-digest-migration.yml" > /tmp/migration.yml
+          python3 - <<'PY'
+          from pathlib import Path
+          old = '04b7d3182bdea0ec647b6c1ee4511901807415fb'
+          new = 'f687a55efc6b6bbfb7808a683c7b40e30149c090'
+          src = Path('/tmp/migration.yml').read_text()
+          if src.count(old) != 1:
+              raise SystemExit(f'expected one exact parent assertion, got {src.count(old)}')
+          out = src.replace(old, new)
+          Path('.github/workflows/evidence-plane-shared-digest-migration.yml').write_text(out)
+          PY
+
+          mapfile -t changed < <(git diff --name-only HEAD | sort)
+          expected=(
+            '.github/workflows/evidence-plane-shared-digest-migration.yml'
+            'Cargo.lock'
+            'crates/core/symthaea-evidence-plane/src/lib.rs'
+            'crates/domains/symthaea-fabrication-kernel/Cargo.toml'
+            'crates/domains/symthaea-fabrication-kernel/src/lib.rs'
+            'crates/domains/symthaea-fabrication-kernel/tests/crypto_digest_compatibility.rs'
+          )
+          test "${#changed[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do test "${changed[$i]}" = "${expected[$i]}"; done
+
+      - name: Re-prove exact lock transition
+        shell: python
+        run: |
+          from copy import deepcopy
+          from pathlib import Path
+          import subprocess
+          import tomllib
+
+          base = 'f687a55efc6b6bbfb7808a683c7b40e30149c090'
+          before = tomllib.loads(subprocess.check_output(['git', 'show', f'{base}:Cargo.lock'], text=True))
+          after = tomllib.loads(Path('Cargo.lock').read_text())
+
+          def package(lock, name):
+              matches = [p for p in lock['package'] if p.get('name') == name]
+              assert len(matches) == 1, (name, matches)
+              return matches[0]
+
+          old = package(before, 'symthaea-fabrication-kernel')
+          new = package(after, 'symthaea-fabrication-kernel')
+          expected_deps = sorted(old.get('dependencies', []) + ['symthaea-evidence-plane'])
+          assert sorted(new.get('dependencies', [])) == expected_deps, (old, new)
+
+          normalized = deepcopy(after)
+          target = package(normalized, 'symthaea-fabrication-kernel')
+          target['dependencies'] = [d for d in target.get('dependencies', []) if d != 'symthaea-evidence-plane']
+          assert normalized == before, 'Cargo.lock changed beyond exact fabrication -> evidence-plane edge'
+
+      - name: Re-run migration qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo fmt -p symthaea-evidence-plane -p symthaea-fabrication-kernel -- --check
+          cargo test --locked -p symthaea-evidence-plane --test crypto_digest_extraction
+          cargo test --locked -p symthaea-evidence-plane --lib
+          cargo test --locked -p symthaea-fabrication-kernel --test crypto_digest_compatibility
+          cargo test --locked -p symthaea-fabrication-kernel --lib
+          cargo test --locked -p symthaea-fabrication-kernel --test durable_gateway_pipeline
+          cargo test --locked -p symthaea-fabrication-kernel --test governed_release_pipeline
+          cargo test --locked -p symthaea-fabrication-kernel --test operational_release_pipeline
+          cargo test --locked -p symthaea-fabrication-kernel --test upgrade_operational_pipeline
+
+      - name: Preserve changed-file scoped Clippy theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --locked -p symthaea-evidence-plane --lib --no-deps \
+            --message-format=json > /tmp/evidence-shared-digest-clippy.json
+          cargo clippy --locked -p symthaea-fabrication-kernel \
+            --lib --test crypto_digest_compatibility --no-deps \
+            --message-format=json > /tmp/fabrication-shared-digest-clippy.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          owned = {
+              'crates/core/symthaea-evidence-plane/src/lib.rs',
+              'crates/domains/symthaea-fabrication-kernel/src/lib.rs',
+              'crates/domains/symthaea-fabrication-kernel/tests/crypto_digest_compatibility.rs',
+          }
+          failures = []
+          for path in [Path('/tmp/evidence-shared-digest-clippy.json'), Path('/tmp/fabrication-shared-digest-clippy.json')]:
+              for raw in path.read_text().splitlines():
+                  try: event = json.loads(raw)
+                  except json.JSONDecodeError: continue
+                  if event.get('reason') != 'compiler-message': continue
+                  msg = event.get('message', {})
+                  if msg.get('level') != 'warning': continue
+                  primary = [s for s in msg.get('spans', []) if s.get('is_primary')]
+                  if any(s.get('file_name') in owned for s in primary):
+                      failures.append(msg.get('rendered') or msg.get('message', 'Clippy warning'))
+          if failures:
+              raise SystemExit('owned-file Clippy warnings:\n' + '\n'.join(failures))
+          PY
+
+      - name: Collapse and publish exact one-commit migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          new_parent='f687a55efc6b6bbfb7808a683c7b40e30149c090'
+          old_head='004b3a4968fe1106a1e6603e9fe405c339cd9fda'
+          temp='.github/workflows/restack-1155-on-fabrication-persistence.yml'
+          rm "$temp"
+          git config user.name 'luminous-restack-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git reset --soft "$new_parent"
+          git add -A
+          mapfile -t changed < <(git diff --cached --name-only "$new_parent" | sort)
+          expected=(
+            '.github/workflows/evidence-plane-shared-digest-migration.yml'
+            'Cargo.lock'
+            'crates/core/symthaea-evidence-plane/src/lib.rs'
+            'crates/domains/symthaea-fabrication-kernel/Cargo.toml'
+            'crates/domains/symthaea-fabrication-kernel/src/lib.rs'
+            'crates/domains/symthaea-fabrication-kernel/tests/crypto_digest_compatibility.rs'
+          )
+          test "${#changed[@]}" -eq 6
+          for i in "${!expected[@]}"; do test "${changed[$i]}" = "${expected[$i]}"; done
+          git commit -m 'refactor(evidence): share qualified SHA-256 implementation'
+          test "$(git rev-parse HEAD^)" = "$new_parent"
+          test "$(git rev-list --count "$new_parent"..HEAD)" = '1'
+          git push origin HEAD:refs/heads/feat/evidence-plane-shared-digest-migration-v1 \
+            --force-with-lease=refs/heads/feat/evidence-plane-shared-digest-migration-v1:$old_head
+          git push origin --delete repair/restack-1155-on-fabrication-persistence-v1
