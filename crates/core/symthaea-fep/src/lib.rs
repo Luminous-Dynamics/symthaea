@@ -139,6 +139,7 @@
 
 mod agent;
 mod bridge;
+pub mod efe_diagnostics;
 pub mod free_energy;
 pub mod generative_model;
 pub mod haptic_semantic_binder;
@@ -164,6 +165,11 @@ pub use types::{
 pub use td_learning::{
     EligibilityTraces, ModelConfidenceTracker, StateTransition, TemporalDifferenceLearner,
     TemporalDifferenceLearningConfig, TemporalDifferenceLearningStats,
+};
+
+pub use efe_diagnostics::{
+    EXPECTED_FREE_ENERGY_DIAGNOSTIC_SCHEMA_V1, ExpectedFreeEnergyDecompositionV1,
+    ExpectedFreeEnergyDiagnosticError, expected_free_energy_decomposition_v1,
 };
 
 pub use state_information_gain::{
