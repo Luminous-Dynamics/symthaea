@@ -12,12 +12,15 @@
 use super::hidden_world::PublicAction;
 
 pub(super) const V2_PUBLIC_SCHEMA_REVISION: &str = "EUREKA.002.V2.PUBLIC_SCHEMA.v1";
-pub(super) const V2_COUNT_DENOMINATOR: i32 = 31;
-pub(super) const V2_CONTEXT_DENOMINATOR: i32 = 7;
-pub(super) const V2_OBSERVATION_DIM: usize = 4;
-pub(super) const V2_REQUIRED_ACTIONS: usize = 4;
-pub(super) const V2_PUBLIC_MODES_PER_FAMILY: u8 = 4;
+pub(super) const V2_COUNT_CARDINALITY: u16 = 32;
+pub(super) const V2_COUNT_DENOMINATOR: i32 = V2_COUNT_CARDINALITY as i32 - 1;
+pub(super) const V2_CONTEXT_CARDINALITY: u8 = 8;
+pub(super) const V2_CONTEXT_DENOMINATOR: i32 = V2_CONTEXT_CARDINALITY as i32 - 1;
 pub(super) const V2_COUNT_CHANNELS: usize = 3;
+pub(super) const V2_OBSERVATION_DIM: usize = V2_COUNT_CHANNELS + 1;
+pub(super) const V2_ACTION_COUNT: u8 = 4;
+pub(super) const V2_REQUIRED_ACTIONS: usize = V2_ACTION_COUNT as usize;
+pub(super) const V2_PUBLIC_MODES_PER_FAMILY: u8 = 4;
 
 pub(super) const V2_CANONICAL_ACTIONS: [PublicAction; V2_REQUIRED_ACTIONS] = [
     PublicAction::NoOp,
@@ -79,7 +82,7 @@ impl V2PublicState {
                 return Err(V2PublicSchemaError::CountOutOfRange { index, value });
             }
         }
-        let context = fields[3];
+        let context = fields[V2_COUNT_CHANNELS];
         if !(0..=V2_CONTEXT_DENOMINATOR).contains(&context) {
             return Err(V2PublicSchemaError::ContextOutOfRange { value: context });
         }
@@ -91,7 +94,7 @@ impl V2PublicState {
     }
 
     pub(super) const fn context(self) -> i32 {
-        self.fields[3]
+        self.fields[V2_COUNT_CHANNELS]
     }
 
     pub(super) const fn belongs_to(self, family: V2PublicFamily) -> bool {
@@ -130,9 +133,62 @@ pub(super) const fn action_from_index(
     }
 }
 
+/// Collision-resistant identity of the complete target-visible V2 grammar.
+///
+/// This commitment deliberately excludes partitioning, scheduling, evaluator
+/// state, target identity, and outcomes. Those layers bind this commitment
+/// rather than adding their own copies of public-schema semantics.
+pub(super) fn public_schema_commitment() -> [u8; 32] {
+    let mut bytes = Vec::new();
+    encode_bytes(&mut bytes, V2_PUBLIC_SCHEMA_REVISION.as_bytes());
+    bytes.extend_from_slice(&V2_COUNT_CARDINALITY.to_le_bytes());
+    bytes.extend_from_slice(&V2_COUNT_DENOMINATOR.to_le_bytes());
+    bytes.push(V2_CONTEXT_CARDINALITY);
+    bytes.extend_from_slice(&V2_CONTEXT_DENOMINATOR.to_le_bytes());
+    bytes.extend_from_slice(&(V2_COUNT_CHANNELS as u64).to_le_bytes());
+    bytes.extend_from_slice(&(V2_OBSERVATION_DIM as u64).to_le_bytes());
+    bytes.push(V2_ACTION_COUNT);
+    bytes.push(V2_PUBLIC_MODES_PER_FAMILY);
+
+    for family in V2PublicFamily::ALL {
+        bytes.push(family.tag());
+        let (min, max) = family.context_bounds();
+        bytes.extend_from_slice(&min.to_le_bytes());
+        bytes.extend_from_slice(&max.to_le_bytes());
+    }
+
+    for action in V2_CANONICAL_ACTIONS {
+        let index = action_index(action).expect("canonical action must map");
+        bytes.extend_from_slice(&(index as u64).to_le_bytes());
+        match action {
+            PublicAction::NoOp => bytes.push(0),
+            PublicAction::Pulse { slot } => {
+                bytes.push(1);
+                bytes.push(slot);
+            }
+            _ => unreachable!("canonical V2 action vocabulary is frozen"),
+        }
+    }
+
+    *blake3::hash(&bytes).as_bytes()
+}
+
+fn encode_bytes(bytes: &mut Vec<u8>, value: &[u8]) {
+    bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(value);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cardinalities_and_denominators_are_consistent() {
+        assert_eq!(i32::from(V2_COUNT_CARDINALITY) - 1, V2_COUNT_DENOMINATOR);
+        assert_eq!(i32::from(V2_CONTEXT_CARDINALITY) - 1, V2_CONTEXT_DENOMINATOR);
+        assert_eq!(usize::from(V2_ACTION_COUNT), V2_REQUIRED_ACTIONS);
+        assert_eq!(V2_COUNT_CHANNELS + 1, V2_OBSERVATION_DIM);
+    }
 
     #[test]
     fn family_context_bands_are_disjoint_complete_and_named_accurately() {
@@ -184,5 +240,13 @@ mod tests {
             V2PublicState::new([0, 0, 0, 8]),
             Err(V2PublicSchemaError::ContextOutOfRange { value: 8 })
         );
+    }
+
+    #[test]
+    fn public_schema_commitment_is_deterministic_and_nonzero() {
+        let a = public_schema_commitment();
+        let b = public_schema_commitment();
+        assert_eq!(a, b);
+        assert_ne!(a, [0_u8; 32]);
     }
 }
