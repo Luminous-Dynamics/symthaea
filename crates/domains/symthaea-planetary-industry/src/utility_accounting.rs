@@ -10,9 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    DurationRangeS, EnergyRangeJ, OntologyError, PowerRangeW, TemperatureRangeK,
-};
+use crate::{DurationRangeS, EnergyRangeJ, OntologyError, PowerRangeW, TemperatureRangeK};
 
 /// Conservative demand-versus-capacity classification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,10 +112,10 @@ pub struct ElectricalUtilityReport {
     pub gross_energy_capacity: UtilityFeasibility,
     /// Separately named steady-cycle energy-capacity screen.
     pub steady_cycle_energy_capacity: UtilityFeasibility,
-    /// Current/gross sustained-power screen with no temporal recovery credit.
-    pub gross_continuous_power: UtilityFeasibility,
-    /// Separately named steady-cycle average-power screen.
-    pub steady_cycle_continuous_power: UtilityFeasibility,
+    /// Current/gross cycle-average-power screen against declared sustained capacity.
+    pub gross_average_power_screen: UtilityFeasibility,
+    /// Steady-cycle cycle-average-power screen against declared sustained capacity.
+    pub steady_cycle_average_power_screen: UtilityFeasibility,
     /// Gross peak-power screen.
     pub peak_power: UtilityFeasibility,
 }
@@ -314,6 +312,9 @@ fn energy_over_duration(
 /// Gross/current-cycle screens never consume recovery credit. Lower net energy
 /// is reported only under a separately named steady-cycle assumption after
 /// charge-power, delivery-fraction and discharge-power limits are applied.
+/// Average-power screens are energy/duration checks against declared sustained
+/// capacity; they do not establish a time-resolved load profile, ramp-rate,
+/// dispatch, transient-stability, or continuous-delivery theorem.
 pub fn evaluate_electrical_utility(
     case: &ElectricalUtilityCase,
 ) -> Result<ElectricalUtilityReport, OntologyError> {
@@ -396,11 +397,11 @@ pub fn evaluate_electrical_utility(
             net_steady_cycle_energy_j,
             case.available_energy_capacity_j,
         )?,
-        gross_continuous_power: power_feasibility(
+        gross_average_power_screen: power_feasibility(
             gross_average_power_w,
             case.available_continuous_power_w,
         )?,
-        steady_cycle_continuous_power: power_feasibility(
+        steady_cycle_average_power_screen: power_feasibility(
             net_steady_cycle_average_power_w,
             case.available_continuous_power_w,
         )?,
@@ -419,19 +420,14 @@ pub fn evaluate_thermal_utility(
     supply.energy_j.validate()?;
     validate_positive_temperature(supply.source_temperature_k, "source_temperature_k")?;
     demand.energy_j.validate()?;
-    validate_positive_temperature(
-        demand.required_temperature_k,
-        "required_temperature_k",
-    )?;
+    validate_positive_temperature(demand.required_temperature_k, "required_temperature_k")?;
 
     let energy_state = energy_feasibility(demand.energy_j, supply.energy_j)?;
     let temperature_state = if supply.source_temperature_k.min.value()
         >= demand.required_temperature_k.max.value()
     {
         UtilityFeasibility::Guaranteed
-    } else if supply.source_temperature_k.max.value()
-        < demand.required_temperature_k.min.value()
-    {
+    } else if supply.source_temperature_k.max.value() < demand.required_temperature_k.min.value() {
         UtilityFeasibility::Impossible
     } else {
         UtilityFeasibility::Possible
@@ -499,12 +495,9 @@ mod tests {
         case.peak_power_w = PowerRangeW::new(150.0, 150.0).unwrap();
         case.available_continuous_power_w = PowerRangeW::new(20.0, 20.0).unwrap();
         let report = evaluate_electrical_utility(&case).unwrap();
+        assert_eq!(report.gross_energy_capacity, UtilityFeasibility::Guaranteed);
         assert_eq!(
-            report.gross_energy_capacity,
-            UtilityFeasibility::Guaranteed
-        );
-        assert_eq!(
-            report.gross_continuous_power,
+            report.gross_average_power_screen,
             UtilityFeasibility::Guaranteed
         );
         assert_eq!(report.peak_power, UtilityFeasibility::Impossible);
@@ -608,11 +601,11 @@ mod tests {
             UtilityFeasibility::Guaranteed
         );
         assert_eq!(
-            report.gross_continuous_power,
+            report.gross_average_power_screen,
             UtilityFeasibility::Impossible
         );
         assert_eq!(
-            report.steady_cycle_continuous_power,
+            report.steady_cycle_average_power_screen,
             UtilityFeasibility::Guaranteed
         );
     }
@@ -630,10 +623,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(
-            report.energy_feasibility,
-            UtilityFeasibility::Guaranteed
-        );
+        assert_eq!(report.energy_feasibility, UtilityFeasibility::Guaranteed);
         assert_eq!(
             report.temperature_compatibility,
             UtilityFeasibility::Impossible
