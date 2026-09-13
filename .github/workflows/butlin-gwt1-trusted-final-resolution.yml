@@ -203,6 +203,8 @@ jobs:
           TRUSTED_PROFILE: ${{ github.workspace }}/.github/evidence-profiles/gwt1-direct-evidence-v1.json
           APPROVED_DIRECT_BUILDER_SHA: 6eaf73a20047b99120e59eb96f48ae0e194e2c80
           TRUSTED_GH_ARCHIVE_SHA256: "e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be"
+          TRUSTED_GH_BINARY_SHA256: ${{ steps.trusted_gh.outputs.gh_binary_sha256 }}
+          TRUSTED_GH_VERSION_OUTPUT_SHA256: ${{ steps.trusted_gh.outputs.version_output_sha256 }}
           EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
           DIRECT_RUN_ID: ${{ inputs.direct_run_id }}
           DIRECT_RUN_ATTEMPT: ${{ inputs.direct_run_attempt }}
@@ -219,9 +221,9 @@ jobs:
           /usr/bin/cmp -s "$TRUSTED_ENGINE" "$DIRECT_DIR/archive_admission_engine.py"
           /usr/bin/cmp -s "$TRUSTED_PROFILE" "$DIRECT_DIR/archive_admission_profile.json"
           /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg builder_sha "$APPROVED_DIRECT_BUILDER_SHA" \
-            --arg dist_sha "$TRUSTED_GH_ARCHIVE_SHA256" --arg archive_sha "$archive_sha256" --arg engine_sha "$engine_sha256" \
-            --arg profile_sha "$profile_sha256" --arg result_sha "$preserved_result_sha256" \
-            '.schema=="butlin-gwt1-direct-attestation-verifier-profile-v2" and .repository==$repository and .trusted_builder_sha==$builder_sha and .verifier=="github-cli" and .verifier_version=="2.100.0" and .distribution_sha256==$dist_sha and .configuration_policy=="isolated-gh-config-v1" and .archive_admission_profile_id=="gwt1-direct-evidence-archive-v1" and .archive_admission_engine_sha256==$engine_sha and .archive_admission_profile_sha256==$profile_sha and .archive_admission_result_sha256==$result_sha and .deny_self_hosted_runners==true and .evidence_archive_sha256==$archive_sha' \
+            --arg dist_sha "$TRUSTED_GH_ARCHIVE_SHA256" --arg binary_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" \
+            --arg archive_sha "$archive_sha256" --arg engine_sha "$engine_sha256" --arg profile_sha "$profile_sha256" --arg result_sha "$preserved_result_sha256" \
+            '.schema=="butlin-gwt1-direct-attestation-verifier-profile-v2" and .repository==$repository and .trusted_builder_sha==$builder_sha and .verifier=="github-cli" and .verifier_version=="2.100.0" and .distribution_sha256==$dist_sha and .executable_sha256==$binary_sha and .version_output_sha256==$version_sha and .configuration_policy=="isolated-gh-config-v1" and .archive_admission_profile_id=="gwt1-direct-evidence-archive-v1" and .archive_admission_engine_sha256==$engine_sha and .archive_admission_profile_sha256==$profile_sha and .archive_admission_result_sha256==$result_sha and .deny_self_hosted_runners==true and .evidence_archive_sha256==$archive_sha' \
             "$DIRECT_DIR/direct_verifier_profile.json" >/dev/null
           /usr/bin/jq -e --arg archive_sha "$archive_sha256" \
             '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-direct-evidence-archive-v1" and .archive_sha256==$archive_sha and .archive_bytes>0 and .tar_stream_bytes>0 and .member_count==7 and .total_unpacked_bytes>0' \
@@ -231,8 +233,9 @@ jobs:
           /usr/bin/python3 "$TRUSTED_ENGINE" --profile "$TRUSTED_PROFILE" --archive "$DIRECT_DIR/gwt1-evidence.tar.gz" \
             --output-dir "$DIRECT_DIR/final-input/extracted" > "$DIRECT_DIR/final-input/archive-admission.json"
           (cd "$DIRECT_DIR/final-input/extracted/gwt1-evidence" && /usr/bin/sha256sum -c SHA256SUMS)
-          /usr/bin/jq -e --arg subject "$EVIDENCE_SUBJECT_SHA" --arg run_id "$DIRECT_RUN_ID" --arg run_attempt "$DIRECT_RUN_ATTEMPT" \
-            '.schema=="butlin-gwt1-trusted-builder-provenance-v1" and .evidence_subject_sha==$subject and .run_id==$run_id and .run_attempt==$run_attempt' \
+          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg subject "$EVIDENCE_SUBJECT_SHA" --arg builder_sha "$APPROVED_DIRECT_BUILDER_SHA" \
+            --arg run_id "$DIRECT_RUN_ID" --arg run_attempt "$DIRECT_RUN_ATTEMPT" \
+            '.schema=="butlin-gwt1-trusted-builder-provenance-v1" and .repository==$repository and .evidence_subject_sha==$subject and .trusted_builder_sha==$builder_sha and .run_id==$run_id and .run_attempt==$run_attempt' \
             "$DIRECT_DIR/final-input/extracted/gwt1-evidence/workflow_provenance.json" >/dev/null
           echo "archive_sha256=$archive_sha256" >> "$GITHUB_OUTPUT"
           echo "engine_sha256=$engine_sha256" >> "$GITHUB_OUTPUT"
@@ -255,6 +258,15 @@ jobs:
             promotion_capsule.json
             promotion_verifier_profile.json
             promotion_provenance.json
+            archive_admission.json
+            archive_admission_profile.json
+            archive_admission_engine.py
+            upstream/causal_builder_verifier_profile.json
+            upstream/causal_builder_verifier_profile_verification.json
+            upstream/causal_archive_verification.json
+            upstream/causal_builder_archive_admission.json
+            upstream/causal_builder_archive_admission_profile.json
+            upstream/causal_builder_archive_admission_engine.py
             SHA256SUMS
             attestation/attestation.json
             attestation/attestation.json.sha256
@@ -312,14 +324,16 @@ jobs:
           PROMOTION_DIR: ${{ runner.temp }}/gwt1-final-promotion
           APPROVED_PROMOTION_WORKFLOW_SHA: b5b693f3162ac4c66d00e2391f77a6e86a84a788
           TRUSTED_GH_ARCHIVE_SHA256: "e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be"
+          TRUSTED_GH_BINARY_SHA256: ${{ steps.trusted_gh.outputs.gh_binary_sha256 }}
+          TRUSTED_GH_VERSION_OUTPUT_SHA256: ${{ steps.trusted_gh.outputs.version_output_sha256 }}
           EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
         run: |
           set -euo pipefail
           capsule_sha256="$(/usr/bin/sha256sum "$PROMOTION_DIR/promotion_capsule.json" | /usr/bin/awk '{print $1}')"
           profile_sha256="$(/usr/bin/sha256sum "$PROMOTION_DIR/promotion_verifier_profile.json" | /usr/bin/awk '{print $1}')"
           /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg promotion_sha "$APPROVED_PROMOTION_WORKFLOW_SHA" \
-            --arg dist_sha "$TRUSTED_GH_ARCHIVE_SHA256" --arg capsule_sha "$capsule_sha256" \
-            '.schema=="butlin-gwt1-attestation-verifier-profile-v2" and .repository==$repository and .promotion_workflow_sha==$promotion_sha and .verifier=="github-cli" and .verifier_version=="2.100.0" and .distribution_sha256==$dist_sha and .configuration_policy=="isolated-gh-config-v1" and .deny_self_hosted_runners==true and .capsule_sha256==$capsule_sha' \
+            --arg dist_sha "$TRUSTED_GH_ARCHIVE_SHA256" --arg binary_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" --arg capsule_sha "$capsule_sha256" \
+            '.schema=="butlin-gwt1-attestation-verifier-profile-v2" and .repository==$repository and .promotion_workflow_sha==$promotion_sha and .verifier=="github-cli" and .verifier_version=="2.100.0" and .distribution_sha256==$dist_sha and .executable_sha256==$binary_sha and .version_output_sha256==$version_sha and .configuration_policy=="isolated-gh-config-v1" and .deny_self_hosted_runners==true and .capsule_sha256==$capsule_sha' \
             "$PROMOTION_DIR/promotion_verifier_profile.json" >/dev/null
           /usr/bin/jq -e --arg subject "$EVIDENCE_SUBJECT_SHA" '.evidence_subject.source_commit_sha==$subject' "$PROMOTION_DIR/promotion_capsule.json" >/dev/null
           echo "capsule_sha256=$capsule_sha256" >> "$GITHUB_OUTPUT"
@@ -388,11 +402,40 @@ jobs:
           set -euo pipefail
           stage="$PACKAGE_ROOT/gwt1-final-resolution"
           rm -rf "$PACKAGE_ROOT"
-          mkdir -p "$stage/authority/direct" "$stage/authority/promotion"
+          mkdir -p "$stage/authority/direct" "$stage/authority/promotion" "$stage/sources/direct" "$stage/sources/promotion/upstream" "$stage/environment"
+
           /usr/bin/install -m 0644 "$CANDIDATE_DIR/base_report.json" "$stage/base_report.json"
           /usr/bin/install -m 0644 "$CANDIDATE_DIR/resolved_view_v2.json" "$stage/resolved_view_v2.json"
           /usr/bin/install -m 0644 "$CANDIDATE_DIR/gwt1_evidence_disposition.json" "$stage/gwt1_evidence_disposition.json"
           /usr/bin/install -m 0644 "$CANDIDATE_DIR/resolution_candidate.json" "$stage/resolution_candidate.json"
+
+          # Preserve exact direct source bytes for replay after Actions artifact expiry.
+          /usr/bin/install -m 0644 "$DIRECT_DIR/gwt1-evidence.tar.gz" "$stage/sources/direct/gwt1-evidence.tar.gz"
+          /usr/bin/install -m 0644 "$DIRECT_DIR/gwt1-evidence.tar.gz.sha256" "$stage/sources/direct/gwt1-evidence.tar.gz.sha256"
+          /usr/bin/install -m 0644 "$DIRECT_DIR/archive_admission.json" "$stage/sources/direct/archive_admission.json"
+          /usr/bin/install -m 0644 "$DIRECT_DIR/archive_admission_profile.json" "$stage/sources/direct/archive_admission_profile.json"
+          /usr/bin/install -m 0644 "$DIRECT_DIR/archive_admission_engine.py" "$stage/sources/direct/archive_admission_engine.py"
+          /usr/bin/install -m 0644 "$DIRECT_DIR/direct_verifier_profile.json" "$stage/sources/direct/direct_verifier_profile.json"
+          /usr/bin/install -m 0644 "$DIRECT_DIR/direct_verifier_profile.json.sha256" "$stage/sources/direct/direct_verifier_profile.json.sha256"
+
+          # Preserve the complete non-attestation promotion source package.
+          /usr/bin/install -m 0644 "$PROMOTION_DIR/promotion_capsule.json" "$stage/sources/promotion/promotion_capsule.json"
+          /usr/bin/install -m 0644 "$PROMOTION_DIR/promotion_verifier_profile.json" "$stage/sources/promotion/promotion_verifier_profile.json"
+          /usr/bin/install -m 0644 "$PROMOTION_DIR/promotion_provenance.json" "$stage/sources/promotion/promotion_provenance.json"
+          /usr/bin/install -m 0644 "$PROMOTION_DIR/archive_admission.json" "$stage/sources/promotion/archive_admission.json"
+          /usr/bin/install -m 0644 "$PROMOTION_DIR/archive_admission_profile.json" "$stage/sources/promotion/archive_admission_profile.json"
+          /usr/bin/install -m 0644 "$PROMOTION_DIR/archive_admission_engine.py" "$stage/sources/promotion/archive_admission_engine.py"
+          /usr/bin/install -m 0644 "$PROMOTION_DIR/SHA256SUMS" "$stage/sources/promotion/SHA256SUMS"
+          for name in \
+            causal_builder_verifier_profile.json \
+            causal_builder_verifier_profile_verification.json \
+            causal_archive_verification.json \
+            causal_builder_archive_admission.json \
+            causal_builder_archive_admission_profile.json \
+            causal_builder_archive_admission_engine.py; do
+            /usr/bin/install -m 0644 "$PROMOTION_DIR/upstream/$name" "$stage/sources/promotion/upstream/$name"
+          done
+
           /usr/bin/install -m 0644 "$DIRECT_DIR/direct_verifier_profile.json" "$stage/authority/direct/direct_verifier_profile.json"
           /usr/bin/install -m 0644 "$DIRECT_DIR/final-input/archive-verification.json" "$stage/authority/direct/fresh_archive_verification.json"
           /usr/bin/install -m 0644 "$DIRECT_DIR/final-input/profile-verification.json" "$stage/authority/direct/fresh_profile_verification.json"
@@ -429,11 +472,28 @@ jobs:
             '{schema:$schema,repository:$repository,resolution_workflow_sha:$workflow_sha,resolution_workflow_ref:$workflow_ref,base_report_blake3:$base_report_blake3,rust_toolchain_sha256:$toolchain_sha,approved_direct_builder_sha:$direct_builder_sha,approved_causal_builder_sha:$causal_builder_sha,approved_promotion_workflow_sha:$promotion_sha}' \
             > "$stage/resolution_provenance.json"
 
+          /usr/bin/python3 --version > "$stage/environment/python-version.txt" 2>&1
+          /usr/bin/tar --version > "$stage/environment/tar-version.txt"
+          /usr/bin/gzip --version > "$stage/environment/gzip-version.txt"
+          /usr/bin/sha256sum --version > "$stage/environment/sha256sum-version.txt"
+          /usr/bin/jq --version > "$stage/environment/jq-version.txt"
+          /usr/bin/jq -n \
+            --arg schema butlin-gwt1-final-runner-environment-v1 \
+            --arg image_os "${ImageOS:-unknown}" --arg image_version "${ImageVersion:-unknown}" --arg runner_arch "${RUNNER_ARCH:-unknown}" \
+            --arg python_sha "$(/usr/bin/sha256sum /usr/bin/python3 | /usr/bin/awk '{print $1}')" \
+            --arg tar_sha "$(/usr/bin/sha256sum /usr/bin/tar | /usr/bin/awk '{print $1}')" \
+            --arg gzip_sha "$(/usr/bin/sha256sum /usr/bin/gzip | /usr/bin/awk '{print $1}')" \
+            --arg sha256sum_sha "$(/usr/bin/sha256sum /usr/bin/sha256sum | /usr/bin/awk '{print $1}')" \
+            --arg jq_sha "$(/usr/bin/sha256sum /usr/bin/jq | /usr/bin/awk '{print $1}')" \
+            '{schema:$schema,image_os:$image_os,image_version:$image_version,runner_arch:$runner_arch,python3_sha256:$python_sha,tar_sha256:$tar_sha,gzip_sha256:$gzip_sha,sha256sum_sha256:$sha256sum_sha,jq_sha256:$jq_sha}' \
+            > "$stage/environment/runner-environment.json"
+          runner_environment_sha="$(/usr/bin/sha256sum "$stage/environment/runner-environment.json" | /usr/bin/awk '{print $1}')"
+
           /usr/bin/jq -n --arg schema butlin-gwt1-final-attestation-verifier-profile-v1 --arg repository "$GITHUB_REPOSITORY" --arg workflow_sha "$RESOLUTION_WORKFLOW_SHA" \
-            --arg executable_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" \
+            --arg executable_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" --arg runner_environment_sha "$runner_environment_sha" \
             --arg direct_archive_verify "$DIRECT_ARCHIVE_VERIFICATION_SHA256" --arg direct_profile_verify "$DIRECT_PROFILE_VERIFICATION_SHA256" \
             --arg promotion_capsule_verify "$PROMOTION_CAPSULE_VERIFICATION_SHA256" --arg promotion_profile_verify "$PROMOTION_PROFILE_VERIFICATION_SHA256" \
-            '{schema:$schema,repository:$repository,resolution_workflow_sha:$workflow_sha,verifier:"github-cli",verifier_version:"2.100.0",distribution_sha256:"e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be",executable_sha256:$executable_sha,version_output_sha256:$version_sha,configuration_policy:"isolated-gh-config-v1",deny_self_hosted_runners:true,direct_archive_verification_sha256:$direct_archive_verify,direct_profile_verification_sha256:$direct_profile_verify,promotion_capsule_verification_sha256:$promotion_capsule_verify,promotion_profile_verification_sha256:$promotion_profile_verify}' \
+            '{schema:$schema,repository:$repository,resolution_workflow_sha:$workflow_sha,verifier:"github-cli",verifier_version:"2.100.0",distribution_sha256:"e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be",executable_sha256:$executable_sha,version_output_sha256:$version_sha,configuration_policy:"isolated-gh-config-v1",deny_self_hosted_runners:true,runner_environment_sha256:$runner_environment_sha,direct_archive_verification_sha256:$direct_archive_verify,direct_profile_verification_sha256:$direct_profile_verify,promotion_capsule_verification_sha256:$promotion_capsule_verify,promotion_profile_verification_sha256:$promotion_profile_verify}' \
             > "$stage/final_verifier_profile.json"
 
           (
