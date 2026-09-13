@@ -45,6 +45,8 @@ mod target_lineage;
 mod transition_identity_tests;
 #[cfg(test)]
 mod v2_construct;
+#[cfg(test)]
+mod v2_construct_independent_audit;
 
 pub use consequence::{
     ConsequenceMetrics, ConsequencePrediction, ConsequenceScore, ConsequenceScoringError,
