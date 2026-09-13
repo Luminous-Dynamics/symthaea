@@ -3,10 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Canonical family-neutral paired HeldOut evidence envelope for EUREKA-002S.
 //!
-//! This module is evidence transport only. It does not construct worlds,
-//! execute a target/comparator, fit a model, or decide a scientific result.
-//! Both future family runners must commit predictions prospectively and then
-//! use this envelope to derive both scores from the same realized transition.
+//! Evidence transport only: this module constructs no world, executes no target
+//! or comparator, fits no model, and decides no scientific disposition. Future
+//! family runners must commit both predictions before outcome realization and
+//! use this envelope to derive both scores from the same public transition.
 //!
 //! Parent issue: <https://github.com/Luminous-Dynamics/symthaea/issues/2302>
 
@@ -39,6 +39,23 @@ impl PredictionRole {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ProspectivePredictionInput {
+    pub role: PredictionRole,
+    pub family: EvidenceFamilyId,
+    pub authorization_digest: u64,
+    pub subject_digest: u64,
+    pub profile_index: u32,
+    pub seed_identity: u64,
+    pub profile_digest: u64,
+    pub world_digest: u64,
+    pub sealed_action: PublicAction,
+    pub sealed_target_action_index: u16,
+    pub pre_state: PublicObservation,
+    pub prediction: ConsequencePrediction,
+    pub ordinal: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ProspectivePredictionCommitment {
     pub role: PredictionRole,
     pub family: EvidenceFamilyId,
@@ -57,23 +74,6 @@ pub(super) struct ProspectivePredictionCommitment {
     pub replay_digest: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ProspectivePredictionInput {
-    pub role: PredictionRole,
-    pub family: EvidenceFamilyId,
-    pub authorization_digest: u64,
-    pub subject_digest: u64,
-    pub profile_index: u32,
-    pub seed_identity: u64,
-    pub profile_digest: u64,
-    pub world_digest: u64,
-    pub sealed_action: PublicAction,
-    pub sealed_target_action_index: u16,
-    pub pre_state: PublicObservation,
-    pub prediction: ConsequencePrediction,
-    pub ordinal: u64,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum HeldoutEvidenceEnvelopeError {
     PredictionActionMismatch,
@@ -81,6 +81,7 @@ pub(super) enum HeldoutEvidenceEnvelopeError {
     CommitmentFamilyMismatch,
     AnalysisPlanMismatch,
     AuthorizationMismatch,
+    SubjectMismatch,
     ProfileIndexMismatch,
     SeedIdentityMismatch,
     ProfileDigestMismatch,
@@ -88,12 +89,11 @@ pub(super) enum HeldoutEvidenceEnvelopeError {
     SealedActionMismatch,
     TargetActionIndexMismatch,
     PreStateMismatch,
+    CommitmentDigestMismatch,
     PredictionNotProspective,
     Scoring(ConsequenceScoringError),
     MetricCountOverflow,
     InvalidDisposition,
-    InvalidRowContainsMetricEvidence,
-    ValidRowMissingMetricEvidence,
 }
 
 impl ProspectivePredictionCommitment {
@@ -139,20 +139,13 @@ pub(super) struct EnvelopeRawConsequenceCounts {
 impl EnvelopeRawConsequenceCounts {
     fn from_metrics(metrics: ConsequenceMetrics) -> Result<Self, HeldoutEvidenceEnvelopeError> {
         Ok(Self {
-            field_count: u16::try_from(metrics.field_count)
-                .map_err(|_| HeldoutEvidenceEnvelopeError::MetricCountOverflow)?,
-            actual_changed: u16::try_from(metrics.actual_changed)
-                .map_err(|_| HeldoutEvidenceEnvelopeError::MetricCountOverflow)?,
-            true_positive_changes: u16::try_from(metrics.true_positive_changes)
-                .map_err(|_| HeldoutEvidenceEnvelopeError::MetricCountOverflow)?,
-            false_positive_changes: u16::try_from(metrics.false_positive_changes)
-                .map_err(|_| HeldoutEvidenceEnvelopeError::MetricCountOverflow)?,
-            missed_changes: u16::try_from(metrics.missed_changes)
-                .map_err(|_| HeldoutEvidenceEnvelopeError::MetricCountOverflow)?,
-            correct_changed_values: u16::try_from(metrics.correct_changed_values)
-                .map_err(|_| HeldoutEvidenceEnvelopeError::MetricCountOverflow)?,
-            correct_unchanged_values: u16::try_from(metrics.correct_unchanged_values)
-                .map_err(|_| HeldoutEvidenceEnvelopeError::MetricCountOverflow)?,
+            field_count: checked_u16(metrics.field_count)?,
+            actual_changed: checked_u16(metrics.actual_changed)?,
+            true_positive_changes: checked_u16(metrics.true_positive_changes)?,
+            false_positive_changes: checked_u16(metrics.false_positive_changes)?,
+            missed_changes: checked_u16(metrics.missed_changes)?,
+            correct_changed_values: checked_u16(metrics.correct_changed_values)?,
+            correct_unchanged_values: checked_u16(metrics.correct_unchanged_values)?,
         })
     }
 
@@ -197,6 +190,26 @@ impl EnvelopeMetricOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct CompletedHeldoutEvidenceInput {
+    pub family: EvidenceFamilyId,
+    pub authorization_digest: u64,
+    pub target_subject_digest: u64,
+    pub comparator_subject_digest: u64,
+    pub profile_index: u32,
+    pub seed_identity: u64,
+    pub profile_digest: u64,
+    pub world_digest: u64,
+    pub sealed_action: PublicAction,
+    pub sealed_target_action_index: u16,
+    pub pre_state: PublicObservation,
+    pub target_prediction_commitment: ProspectivePredictionCommitment,
+    pub comparator_prediction_commitment: ProspectivePredictionCommitment,
+    pub post_state: PublicObservation,
+    pub transition_digest: u64,
+    pub transition_ordinal: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct CompletedHeldoutEvidenceRow {
     pub schema_revision: &'static str,
     pub family: EvidenceFamilyId,
@@ -223,26 +236,6 @@ pub(super) struct CompletedHeldoutEvidenceRow {
     pub replay_digest: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct CompletedHeldoutEvidenceInput {
-    pub family: EvidenceFamilyId,
-    pub authorization_digest: u64,
-    pub target_subject_digest: u64,
-    pub comparator_subject_digest: u64,
-    pub profile_index: u32,
-    pub seed_identity: u64,
-    pub profile_digest: u64,
-    pub world_digest: u64,
-    pub sealed_action: PublicAction,
-    pub sealed_target_action_index: u16,
-    pub pre_state: PublicObservation,
-    pub target_prediction_commitment: ProspectivePredictionCommitment,
-    pub comparator_prediction_commitment: ProspectivePredictionCommitment,
-    pub post_state: PublicObservation,
-    pub transition_digest: u64,
-    pub transition_ordinal: u64,
-}
-
 impl CompletedHeldoutEvidenceRow {
     pub(super) fn complete(
         input: CompletedHeldoutEvidenceInput,
@@ -260,7 +253,7 @@ impl CompletedHeldoutEvidenceRow {
             input.sealed_action,
             input.sealed_target_action_index,
             &input.pre_state,
-            input.transition_ordinal,
+            Some(input.transition_ordinal),
         )?;
         validate_commitment(
             &input.comparator_prediction_commitment,
@@ -275,7 +268,7 @@ impl CompletedHeldoutEvidenceRow {
             input.sealed_action,
             input.sealed_target_action_index,
             &input.pre_state,
-            input.transition_ordinal,
+            Some(input.transition_ordinal),
         )?;
 
         let target_score = score_consequence(
@@ -342,6 +335,26 @@ impl CompletedHeldoutEvidenceRow {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct InvalidHeldoutEvidenceInput {
+    pub family: EvidenceFamilyId,
+    pub authorization_digest: u64,
+    pub target_subject_digest: u64,
+    pub comparator_subject_digest: u64,
+    pub profile_index: u32,
+    pub seed_identity: u64,
+    pub profile_digest: u64,
+    pub world_digest: u64,
+    pub sealed_action: PublicAction,
+    pub sealed_target_action_index: u16,
+    pub pre_state: Option<PublicObservation>,
+    pub target_prediction_commitment: Option<ProspectivePredictionCommitment>,
+    pub comparator_prediction_commitment: Option<ProspectivePredictionCommitment>,
+    pub transition_digest: Option<u64>,
+    pub transition_ordinal: Option<u64>,
+    pub disposition: CampaignRowDisposition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct InvalidHeldoutEvidenceRow {
     pub schema_revision: &'static str,
     pub family: EvidenceFamilyId,
@@ -365,26 +378,6 @@ pub(super) struct InvalidHeldoutEvidenceRow {
     pub replay_digest: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct InvalidHeldoutEvidenceInput {
-    pub family: EvidenceFamilyId,
-    pub authorization_digest: u64,
-    pub target_subject_digest: u64,
-    pub comparator_subject_digest: u64,
-    pub profile_index: u32,
-    pub seed_identity: u64,
-    pub profile_digest: u64,
-    pub world_digest: u64,
-    pub sealed_action: PublicAction,
-    pub sealed_target_action_index: u16,
-    pub pre_state: Option<PublicObservation>,
-    pub target_prediction_commitment: Option<ProspectivePredictionCommitment>,
-    pub comparator_prediction_commitment: Option<ProspectivePredictionCommitment>,
-    pub transition_digest: Option<u64>,
-    pub transition_ordinal: Option<u64>,
-    pub disposition: CampaignRowDisposition,
-}
-
 impl InvalidHeldoutEvidenceRow {
     pub(super) fn freeze(
         input: InvalidHeldoutEvidenceInput,
@@ -392,47 +385,42 @@ impl InvalidHeldoutEvidenceRow {
         if !is_invalid_disposition(input.disposition) {
             return Err(HeldoutEvidenceEnvelopeError::InvalidDisposition);
         }
-        for commitment in [
-            input.target_prediction_commitment.as_ref(),
-            input.comparator_prediction_commitment.as_ref(),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            if commitment.family != input.family {
-                return Err(HeldoutEvidenceEnvelopeError::CommitmentFamilyMismatch);
-            }
-            if commitment.authorization_digest != input.authorization_digest {
-                return Err(HeldoutEvidenceEnvelopeError::AuthorizationMismatch);
-            }
-            if commitment.profile_index != input.profile_index {
-                return Err(HeldoutEvidenceEnvelopeError::ProfileIndexMismatch);
-            }
-            if commitment.seed_identity != input.seed_identity {
-                return Err(HeldoutEvidenceEnvelopeError::SeedIdentityMismatch);
-            }
-            if commitment.profile_digest != input.profile_digest {
-                return Err(HeldoutEvidenceEnvelopeError::ProfileDigestMismatch);
-            }
-            if commitment.world_digest != input.world_digest {
-                return Err(HeldoutEvidenceEnvelopeError::WorldDigestMismatch);
-            }
-            if commitment.sealed_action != input.sealed_action {
-                return Err(HeldoutEvidenceEnvelopeError::SealedActionMismatch);
-            }
-            if commitment.sealed_target_action_index != input.sealed_target_action_index {
-                return Err(HeldoutEvidenceEnvelopeError::TargetActionIndexMismatch);
-            }
-            if let Some(pre) = input.pre_state.as_ref() {
-                if commitment.pre_state != *pre {
-                    return Err(HeldoutEvidenceEnvelopeError::PreStateMismatch);
-                }
-            }
-            if let Some(transition_ordinal) = input.transition_ordinal {
-                if commitment.ordinal >= transition_ordinal {
-                    return Err(HeldoutEvidenceEnvelopeError::PredictionNotProspective);
-                }
-            }
+
+        if let Some(commitment) = input.target_prediction_commitment.as_ref() {
+            let pre = input.pre_state.as_ref().unwrap_or(&commitment.pre_state);
+            validate_commitment(
+                commitment,
+                PredictionRole::Target,
+                input.family,
+                input.authorization_digest,
+                input.target_subject_digest,
+                input.profile_index,
+                input.seed_identity,
+                input.profile_digest,
+                input.world_digest,
+                input.sealed_action,
+                input.sealed_target_action_index,
+                pre,
+                input.transition_ordinal,
+            )?;
+        }
+        if let Some(commitment) = input.comparator_prediction_commitment.as_ref() {
+            let pre = input.pre_state.as_ref().unwrap_or(&commitment.pre_state);
+            validate_commitment(
+                commitment,
+                PredictionRole::Comparator,
+                input.family,
+                input.authorization_digest,
+                input.comparator_subject_digest,
+                input.profile_index,
+                input.seed_identity,
+                input.profile_digest,
+                input.world_digest,
+                input.sealed_action,
+                input.sealed_target_action_index,
+                pre,
+                input.transition_ordinal,
+            )?;
         }
 
         let mut row = Self {
@@ -517,10 +505,9 @@ impl CanonicalHeldoutEvidenceRow {
         }
     }
 
-    /// #2296 currently accepts metric outcomes directly. This adapter is
-    /// intentionally valid-row-only so invalid evidence can never be encoded as
-    /// a fake abstention/OOD placeholder. A follow-up input-type evolution will
-    /// make #2296 consume `CanonicalAnalysisProjection` directly.
+    /// #2296 currently takes metric-bearing rows. Keep this adapter valid-only
+    /// so invalid infrastructure/evidence rows can never be encoded as fake
+    /// abstention or out-of-domain behavior.
     pub(super) fn valid_cross_family_row(&self) -> Option<PairedAnalysisRow> {
         match self {
             Self::Completed(row) => Some(row.to_cross_family_row()),
@@ -540,7 +527,7 @@ fn metric_projection(outcome: EnvelopeMetricOutcome) -> CanonicalAnalysisMetricO
 #[allow(clippy::too_many_arguments)]
 fn validate_commitment(
     commitment: &ProspectivePredictionCommitment,
-    role: PredictionRole,
+    expected_role: PredictionRole,
     family: EvidenceFamilyId,
     authorization_digest: u64,
     subject_digest: u64,
@@ -551,9 +538,9 @@ fn validate_commitment(
     sealed_action: PublicAction,
     sealed_target_action_index: u16,
     pre_state: &PublicObservation,
-    transition_ordinal: u64,
+    transition_ordinal: Option<u64>,
 ) -> Result<(), HeldoutEvidenceEnvelopeError> {
-    if commitment.role != role {
+    if commitment.role != expected_role {
         return Err(HeldoutEvidenceEnvelopeError::WrongPredictionRole);
     }
     if commitment.family != family {
@@ -566,7 +553,7 @@ fn validate_commitment(
         return Err(HeldoutEvidenceEnvelopeError::AuthorizationMismatch);
     }
     if commitment.subject_digest != subject_digest {
-        return Err(HeldoutEvidenceEnvelopeError::AuthorizationMismatch);
+        return Err(HeldoutEvidenceEnvelopeError::SubjectMismatch);
     }
     if commitment.profile_index != profile_index {
         return Err(HeldoutEvidenceEnvelopeError::ProfileIndexMismatch);
@@ -592,11 +579,13 @@ fn validate_commitment(
     if commitment.prediction.action != sealed_action {
         return Err(HeldoutEvidenceEnvelopeError::PredictionActionMismatch);
     }
-    if commitment.ordinal >= transition_ordinal {
-        return Err(HeldoutEvidenceEnvelopeError::PredictionNotProspective);
-    }
     if prediction_commitment_digest(commitment) != commitment.replay_digest {
-        return Err(HeldoutEvidenceEnvelopeError::AnalysisPlanMismatch);
+        return Err(HeldoutEvidenceEnvelopeError::CommitmentDigestMismatch);
+    }
+    if let Some(transition_ordinal) = transition_ordinal {
+        if commitment.ordinal >= transition_ordinal {
+            return Err(HeldoutEvidenceEnvelopeError::PredictionNotProspective);
+        }
     }
     Ok(())
 }
@@ -612,11 +601,15 @@ fn is_invalid_disposition(disposition: CampaignRowDisposition) -> bool {
     )
 }
 
+fn checked_u16(value: usize) -> Result<u16, HeldoutEvidenceEnvelopeError> {
+    u16::try_from(value).map_err(|_| HeldoutEvidenceEnvelopeError::MetricCountOverflow)
+}
+
 fn prediction_commitment_digest(commitment: &ProspectivePredictionCommitment) -> u64 {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"eureka.002s.prediction-commitment.v1\0");
     bytes.push(commitment.role.tag());
-    bytes.push(commitment.family.tag());
+    encode_family(&mut bytes, commitment.family);
     bytes.extend_from_slice(&commitment.analysis_plan_digest.to_le_bytes());
     bytes.extend_from_slice(&commitment.authorization_digest.to_le_bytes());
     bytes.extend_from_slice(&commitment.subject_digest.to_le_bytes());
@@ -636,7 +629,7 @@ fn completed_row_digest(row: &CompletedHeldoutEvidenceRow) -> u64 {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"eureka.002s.completed-row.v1\0");
     encode_str(&mut bytes, row.schema_revision);
-    bytes.push(row.family.tag());
+    encode_family(&mut bytes, row.family);
     bytes.push(partition_tag(row.partition));
     bytes.extend_from_slice(&row.analysis_plan_digest.to_le_bytes());
     bytes.extend_from_slice(&row.authorization_digest.to_le_bytes());
@@ -664,7 +657,7 @@ fn invalid_row_digest(row: &InvalidHeldoutEvidenceRow) -> u64 {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"eureka.002s.invalid-row.v1\0");
     encode_str(&mut bytes, row.schema_revision);
-    bytes.push(row.family.tag());
+    encode_family(&mut bytes, row.family);
     bytes.push(partition_tag(row.partition));
     bytes.extend_from_slice(&row.analysis_plan_digest.to_le_bytes());
     bytes.extend_from_slice(&row.authorization_digest.to_le_bytes());
@@ -683,6 +676,10 @@ fn invalid_row_digest(row: &InvalidHeldoutEvidenceRow) -> u64 {
     encode_optional_u64(&mut bytes, row.transition_ordinal);
     bytes.push(disposition_tag(row.disposition));
     fnv1a64(&bytes)
+}
+
+fn encode_family(bytes: &mut Vec<u8>, family: EvidenceFamilyId) {
+    encode_str(bytes, family.stable_id());
 }
 
 fn encode_prediction(bytes: &mut Vec<u8>, prediction: &ConsequencePrediction) {
@@ -834,7 +831,10 @@ mod tests {
         }
     }
 
-    fn pred(action: PublicAction, values: impl IntoIterator<Item = PublicValue>) -> ConsequencePrediction {
+    fn pred(
+        action: PublicAction,
+        values: impl IntoIterator<Item = PublicValue>,
+    ) -> ConsequencePrediction {
         ConsequencePrediction {
             action,
             outcome: PredictionOutcome::Predicted {
@@ -933,23 +933,18 @@ mod tests {
     }
 
     #[test]
-    fn same_completed_row_has_same_identity_and_subject_changes_identity() {
+    fn same_completed_row_has_same_identity_and_subject_is_bound() {
         let a = completed_row();
         let b = completed_row();
         assert_eq!(a.replay_digest, b.replay_digest);
-
-        let mut input = b.clone();
-        input.target_subject_digest = 999;
-        // Row identity binds the subject digest even if a caller tampers with a
-        // detached copy; canonical construction would reject a mismatched
-        // commitment before this state could be minted.
-        assert_ne!(completed_row_digest(&input), a.replay_digest);
+        let mut tampered = b.clone();
+        tampered.target_subject_digest = 999;
+        assert_ne!(completed_row_digest(&tampered), a.replay_digest);
     }
 
     #[test]
     fn prediction_must_name_the_exact_sealed_action() {
-        let action = PublicAction::NoOp;
-        let err = ProspectivePredictionCommitment::freeze(ProspectivePredictionInput {
+        let result = ProspectivePredictionCommitment::freeze(ProspectivePredictionInput {
             role: PredictionRole::Target,
             family: EvidenceFamilyId::RelayTriadV1,
             authorization_digest: 1,
@@ -958,20 +953,27 @@ mod tests {
             seed_identity: 3,
             profile_digest: 4,
             world_digest: 5,
-            sealed_action: action,
+            sealed_action: PublicAction::NoOp,
             sealed_target_action_index: 0,
             pre_state: obs(0, [PublicValue::Bit(false); 3]),
-            prediction: pred(PublicAction::Pulse { slot: 0 }, [PublicValue::Bit(false); 3]),
+            prediction: pred(
+                PublicAction::Pulse { slot: 0 },
+                [PublicValue::Bit(false); 3],
+            ),
             ordinal: 1,
-        })
-        .unwrap_err();
-        assert_eq!(err, HeldoutEvidenceEnvelopeError::PredictionActionMismatch);
+        });
+        assert_eq!(
+            result,
+            Err(HeldoutEvidenceEnvelopeError::PredictionActionMismatch)
+        );
     }
 
     #[test]
     fn prediction_ordinals_must_precede_transition_realization() {
         let mut row = completed_row();
         row.target_prediction_commitment.ordinal = row.transition_ordinal;
+        row.target_prediction_commitment.replay_digest =
+            prediction_commitment_digest(&row.target_prediction_commitment);
         assert_eq!(
             validate_commitment(
                 &row.target_prediction_commitment,
@@ -986,7 +988,7 @@ mod tests {
                 row.sealed_action,
                 row.sealed_target_action_index,
                 &row.pre_state,
-                row.transition_ordinal,
+                Some(row.transition_ordinal),
             ),
             Err(HeldoutEvidenceEnvelopeError::PredictionNotProspective)
         );
@@ -1010,7 +1012,6 @@ mod tests {
         assert_eq!(comparator.true_positive_changes, 0);
         assert_eq!(comparator.missed_changes, 2);
         assert_eq!(comparator.correct_changed_values, 0);
-
         let analysis = row.to_cross_family_row();
         assert_eq!(analysis.row_identity, row.replay_digest);
         assert_eq!(analysis.partition, CorpusPartition::HeldOutEvaluation);
@@ -1084,7 +1085,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid_row_has_no_fake_metric_outcome() {
+    fn invalid_row_has_no_fake_metric_outcome_or_valid_adapter() {
         let invalid = CanonicalHeldoutEvidenceRow::Invalid(
             InvalidHeldoutEvidenceRow::freeze(InvalidHeldoutEvidenceInput {
                 family: EvidenceFamilyId::ResourceFlowV1,
@@ -1110,5 +1111,42 @@ mod tests {
         assert_eq!(projection.candidate, None);
         assert_eq!(projection.comparator, None);
         assert_eq!(invalid.valid_cross_family_row(), None);
+    }
+
+    #[test]
+    fn invalid_row_rejects_role_swapped_commitment() {
+        let target = commitment(
+            PredictionRole::Comparator,
+            101,
+            PublicAction::NoOp,
+            pred(
+                PublicAction::NoOp,
+                [
+                    PublicValue::Count(0),
+                    PublicValue::Count(2),
+                    PublicValue::Count(8),
+                ],
+            ),
+            1,
+        );
+        let result = InvalidHeldoutEvidenceRow::freeze(InvalidHeldoutEvidenceInput {
+            family: EvidenceFamilyId::ResourceFlowV1,
+            authorization_digest: 11,
+            target_subject_digest: 101,
+            comparator_subject_digest: 202,
+            profile_index: 7,
+            seed_identity: 77,
+            profile_digest: 22,
+            world_digest: 33,
+            sealed_action: PublicAction::NoOp,
+            sealed_target_action_index: 2,
+            pre_state: Some(target.pre_state.clone()),
+            target_prediction_commitment: Some(target),
+            comparator_prediction_commitment: None,
+            transition_digest: None,
+            transition_ordinal: None,
+            disposition: CampaignRowDisposition::TargetExecutionFailure,
+        });
+        assert_eq!(result, Err(HeldoutEvidenceEnvelopeError::WrongPredictionRole));
     }
 }
