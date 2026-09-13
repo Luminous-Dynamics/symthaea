@@ -18,6 +18,7 @@
 //! - Canonical per-subject reasoning orchestration with plasticity held at baseline
 //! - Evidence-backed competing-context assessment with ambiguity-preserving robust selection
 //! - Canonical kernel V2 with robust multi-context selection and content-bound decisions
+//! - Automatic RQ episode publication from validated canonical decisions
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -27,6 +28,7 @@ pub mod reasoning_capability_artifact;
 pub mod reasoning_capability_bundle;
 pub mod reasoning_capability_matrix;
 pub mod reasoning_context_competition;
+pub mod reasoning_episode_emitter;
 pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
@@ -64,6 +66,10 @@ pub use reasoning_context_competition::{
     ContextCompetitionError, ContextCompetitionPolicy, ContextHypothesis, ContextResolution,
     PerContextCandidateScore, RobustCandidateEvaluation, RobustContextSelectionReport,
     CONTEXT_COMPETITION_VERSION,
+};
+pub use reasoning_episode_emitter::{
+    emit_reasoning_episode, EmittedReasoningEpisode, EpisodeEmissionError,
+    ReasoningEpisodePublicationInput, CANONICAL_RQ_EMITTER_VERSION,
 };
 pub use reasoning_evaluator::{
     aggregate_receipts, evaluate_episode, wilson_interval_95, CapabilitySlice, EpisodeJudgment,
