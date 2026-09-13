@@ -15,7 +15,7 @@ fn digest(byte: char) -> DigestSha256 {
     DigestSha256::new(std::iter::repeat_n(byte, 64).collect::<String>()).unwrap()
 }
 
-fn subject(with_deployment: bool) -> SubjectManifest {
+fn subject() -> SubjectManifest {
     SubjectManifest::new(
         id("external-agent-v1"),
         vec![
@@ -28,7 +28,6 @@ fn subject(with_deployment: bool) -> SubjectManifest {
                 digest: digest('a'),
             },
         ],
-        with_deployment.then(|| id("declared-prod-envelope")),
     )
     .unwrap()
 }
@@ -95,7 +94,7 @@ fn functional_set(subject: &SubjectManifest, claim: &Claim) -> Vec<EvidenceArtif
 
 #[test]
 fn subject_identity_is_order_independent() {
-    let left = subject(false);
+    let left = subject();
     let right = SubjectManifest::new(
         id("external-agent-v1"),
         vec![
@@ -108,7 +107,6 @@ fn subject_identity_is_order_independent() {
                 digest: digest('b'),
             },
         ],
-        None,
     )
     .unwrap();
     assert_eq!(left.subject_id(), right.subject_id());
@@ -128,7 +126,6 @@ fn duplicate_subject_component_kind_fails_closed() {
                 digest: digest('b'),
             },
         ],
-        None,
     )
     .unwrap_err();
     assert!(matches!(
@@ -139,7 +136,7 @@ fn duplicate_subject_component_kind_fails_closed() {
 
 #[test]
 fn plan_identity_is_invalidation_order_independent() {
-    let subject = subject(false);
+    let subject = subject();
     let claim = claim(&subject);
     let left = QualificationPlan::new(
         id("plan-v1"),
@@ -158,7 +155,7 @@ fn plan_identity_is_invalidation_order_independent() {
 
 #[test]
 fn claim_ceiling_blocks_overpromotion_before_evidence_interpretation() {
-    let subject = subject(true);
+    let subject = subject();
     let claim = claim(&subject);
     let observation = artifact(
         "observation",
@@ -181,7 +178,7 @@ fn claim_ceiling_blocks_overpromotion_before_evidence_interpretation() {
 
 #[test]
 fn stronger_tier_requires_explicit_evidence_kind() {
-    let subject = subject(true);
+    let subject = subject();
     let claim = claim(&subject);
     let architecture = artifact(
         "architecture",
@@ -207,7 +204,7 @@ fn stronger_tier_requires_explicit_evidence_kind() {
 
 #[test]
 fn negative_finding_remains_orthogonal_to_positive_support() {
-    let subject = subject(true);
+    let subject = subject();
     let claim = claim(&subject);
     let artifacts = functional_set(&subject, &claim);
     let result = QualificationResult::resolve(
@@ -227,7 +224,7 @@ fn negative_finding_remains_orthogonal_to_positive_support() {
 
 #[test]
 fn reproduction_requires_distinct_verifier_identity() {
-    let subject = subject(true);
+    let subject = subject();
     let claim = claim(&subject);
     let mut artifacts = functional_set(&subject, &claim);
     artifacts.push(artifact(
@@ -251,7 +248,7 @@ fn reproduction_requires_distinct_verifier_identity() {
 
 #[test]
 fn reproduction_accepts_distinct_verifier_identity_without_claiming_independence() {
-    let subject = subject(true);
+    let subject = subject();
     let claim = claim(&subject);
     let mut artifacts = functional_set(&subject, &claim);
     artifacts.push(artifact(
@@ -274,8 +271,8 @@ fn reproduction_accepts_distinct_verifier_identity_without_claiming_independence
 }
 
 #[test]
-fn deployment_qualification_requires_explicit_envelope() {
-    let subject = subject(false);
+fn runtime_evidence_does_not_create_a_deployment_support_tier() {
+    let subject = subject();
     let claim = claim(&subject);
     let mut artifacts = functional_set(&subject, &claim);
     artifacts.push(artifact(
@@ -294,20 +291,20 @@ fn deployment_qualification_requires_explicit_envelope() {
         None,
         'f',
     ));
-    let error = QualificationResult::resolve(
+    let result = QualificationResult::resolve(
         &claim,
         &subject,
-        &plan(&claim, SupportTier::DeploymentQualified),
+        &plan(&claim, SupportTier::Reproduced),
         &artifacts,
-        QualificationOutcome::Supported(SupportTier::DeploymentQualified),
+        QualificationOutcome::Supported(SupportTier::Reproduced),
     )
-    .unwrap_err();
-    assert_eq!(error, AssuranceError::MissingDeploymentEnvelope);
+    .unwrap();
+    assert_eq!(result.outcome().support_tier(), Some(SupportTier::Reproduced));
 }
 
 #[test]
 fn duplicate_evidence_identity_fails_closed() {
-    let subject = subject(true);
+    let subject = subject();
     let claim = claim(&subject);
     let left = artifact(
         "duplicate",
@@ -338,7 +335,7 @@ fn duplicate_evidence_identity_fails_closed() {
 
 #[test]
 fn evidence_cannot_be_rebound_to_another_claim() {
-    let subject = subject(true);
+    let subject = subject();
     let first_claim = claim(&subject);
     let second_claim = Claim::new(
         id("different-claim"),
@@ -368,7 +365,7 @@ fn evidence_cannot_be_rebound_to_another_claim() {
 
 #[test]
 fn result_identity_is_evidence_order_independent() {
-    let subject = subject(true);
+    let subject = subject();
     let claim = claim(&subject);
     let causal = artifact(
         "causal",
@@ -407,7 +404,7 @@ fn result_identity_is_evidence_order_independent() {
 
 #[test]
 fn explicit_invalidation_changes_result_identity_and_outcome() {
-    let subject = subject(true);
+    let subject = subject();
     let claim = claim(&subject);
     let observation = artifact(
         "observation",
