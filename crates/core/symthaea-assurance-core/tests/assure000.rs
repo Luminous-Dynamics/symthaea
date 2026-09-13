@@ -3,8 +3,9 @@
 
 use symthaea_assurance_core::{
     AssuranceError, Claim, DigestSha256, EvidenceArtifact, EvidenceKind, EvidenceProvenance,
-    NegativeFinding, QualificationOutcome, QualificationPlan, QualificationResult, StableId,
-    SubjectComponent, SubjectComponentKind, SubjectManifest, SupportTier,
+    NegativeFinding, QualificationOutcome, QualificationPlan, QualificationResult,
+    ReproductionStatus, StableId, SubjectComponent, SubjectComponentKind, SubjectManifest,
+    SupportTier,
 };
 
 fn id(value: &str) -> StableId {
@@ -171,6 +172,7 @@ fn claim_ceiling_blocks_overpromotion_before_evidence_interpretation() {
         &plan(&claim, SupportTier::Observed),
         &[observation],
         QualificationOutcome::Supported(SupportTier::CausallySupported),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap_err();
     assert_eq!(error, AssuranceError::ClaimCeilingExceeded);
@@ -194,6 +196,7 @@ fn stronger_tier_requires_explicit_evidence_kind() {
         &plan(&claim, SupportTier::CausallySupported),
         &[architecture],
         QualificationOutcome::Supported(SupportTier::CausallySupported),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap_err();
     assert!(matches!(
@@ -213,6 +216,7 @@ fn negative_finding_remains_orthogonal_to_positive_support() {
         &plan(&claim, SupportTier::FunctionallySupported),
         &artifacts,
         QualificationOutcome::Negative(NegativeFinding::Contradicted),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap();
     assert_eq!(result.outcome().support_tier(), None);
@@ -223,7 +227,7 @@ fn negative_finding_remains_orthogonal_to_positive_support() {
 }
 
 #[test]
-fn reproduction_requires_distinct_verifier_identity() {
+fn reproduction_claim_requires_distinct_verifier_identity() {
     let subject = subject();
     let claim = claim(&subject);
     let mut artifacts = functional_set(&subject, &claim);
@@ -238,16 +242,17 @@ fn reproduction_requires_distinct_verifier_identity() {
     let error = QualificationResult::validate_and_bind(
         &claim,
         &subject,
-        &plan(&claim, SupportTier::Reproduced),
+        &plan(&claim, SupportTier::FunctionallySupported),
         &artifacts,
-        QualificationOutcome::Supported(SupportTier::Reproduced),
+        QualificationOutcome::Supported(SupportTier::FunctionallySupported),
+        ReproductionStatus::ReproducedByDistinctVerifier,
     )
     .unwrap_err();
     assert_eq!(error, AssuranceError::MissingDistinctVerifier);
 }
 
 #[test]
-fn reproduction_accepts_distinct_verifier_identity_without_claiming_independence() {
+fn reproduction_is_orthogonal_to_support_strength() {
     let subject = subject();
     let claim = claim(&subject);
     let mut artifacts = functional_set(&subject, &claim);
@@ -262,19 +267,24 @@ fn reproduction_accepts_distinct_verifier_identity_without_claiming_independence
     let result = QualificationResult::validate_and_bind(
         &claim,
         &subject,
-        &plan(&claim, SupportTier::Reproduced),
+        &plan(&claim, SupportTier::FunctionallySupported),
         &artifacts,
-        QualificationOutcome::Supported(SupportTier::Reproduced),
+        QualificationOutcome::Supported(SupportTier::FunctionallySupported),
+        ReproductionStatus::ReproducedByDistinctVerifier,
     )
     .unwrap();
     assert_eq!(
         result.outcome().support_tier(),
-        Some(SupportTier::Reproduced)
+        Some(SupportTier::FunctionallySupported)
+    );
+    assert_eq!(
+        result.reproduction_status(),
+        ReproductionStatus::ReproducedByDistinctVerifier
     );
 }
 
 #[test]
-fn runtime_evidence_does_not_create_a_deployment_support_tier() {
+fn reproduction_status_is_bound_into_result_identity() {
     let subject = subject();
     let claim = claim(&subject);
     let mut artifacts = functional_set(&subject, &claim);
@@ -286,6 +296,32 @@ fn runtime_evidence_does_not_create_a_deployment_support_tier() {
         Some("second-verifier-identity"),
         'e',
     ));
+    let not_claimed = QualificationResult::validate_and_bind(
+        &claim,
+        &subject,
+        &plan(&claim, SupportTier::FunctionallySupported),
+        &artifacts,
+        QualificationOutcome::Supported(SupportTier::FunctionallySupported),
+        ReproductionStatus::NotClaimed,
+    )
+    .unwrap();
+    let reproduced = QualificationResult::validate_and_bind(
+        &claim,
+        &subject,
+        &plan(&claim, SupportTier::FunctionallySupported),
+        &artifacts,
+        QualificationOutcome::Supported(SupportTier::FunctionallySupported),
+        ReproductionStatus::ReproducedByDistinctVerifier,
+    )
+    .unwrap();
+    assert_ne!(not_claimed.digest(), reproduced.digest());
+}
+
+#[test]
+fn runtime_evidence_does_not_promote_support_or_authority() {
+    let subject = subject();
+    let claim = claim(&subject);
+    let mut artifacts = functional_set(&subject, &claim);
     artifacts.push(artifact(
         "runtime",
         &subject,
@@ -297,15 +333,17 @@ fn runtime_evidence_does_not_create_a_deployment_support_tier() {
     let result = QualificationResult::validate_and_bind(
         &claim,
         &subject,
-        &plan(&claim, SupportTier::Reproduced),
+        &plan(&claim, SupportTier::FunctionallySupported),
         &artifacts,
-        QualificationOutcome::Supported(SupportTier::Reproduced),
+        QualificationOutcome::Supported(SupportTier::FunctionallySupported),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap();
     assert_eq!(
         result.outcome().support_tier(),
-        Some(SupportTier::Reproduced)
+        Some(SupportTier::FunctionallySupported)
     );
+    assert_eq!(result.reproduction_status(), ReproductionStatus::NotClaimed);
 }
 
 #[test]
@@ -334,6 +372,7 @@ fn duplicate_evidence_identity_fails_closed() {
         &plan(&claim, SupportTier::Observed),
         &[left, right],
         QualificationOutcome::Supported(SupportTier::Observed),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap_err();
     assert!(matches!(error, AssuranceError::DuplicateEvidenceId(_)));
@@ -364,6 +403,7 @@ fn evidence_cannot_be_rebound_to_another_claim() {
         &plan(&second_claim, SupportTier::Observed),
         &[foreign],
         QualificationOutcome::Supported(SupportTier::Observed),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap_err();
     assert_eq!(error, AssuranceError::ClaimMismatch);
@@ -395,6 +435,7 @@ fn result_identity_is_evidence_order_independent() {
         &plan(&claim, SupportTier::FunctionallySupported),
         &[causal.clone(), functional.clone()],
         QualificationOutcome::Supported(SupportTier::FunctionallySupported),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap();
     let right = QualificationResult::validate_and_bind(
@@ -403,6 +444,7 @@ fn result_identity_is_evidence_order_independent() {
         &plan(&claim, SupportTier::FunctionallySupported),
         &[functional, causal],
         QualificationOutcome::Supported(SupportTier::FunctionallySupported),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap();
     assert_eq!(left.digest(), right.digest());
@@ -426,6 +468,7 @@ fn explicit_invalidation_changes_result_identity_and_outcome() {
         &plan(&claim, SupportTier::Observed),
         &[observation],
         QualificationOutcome::Supported(SupportTier::Observed),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap();
     let before = result.digest();
