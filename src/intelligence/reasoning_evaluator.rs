@@ -86,7 +86,7 @@ pub fn evaluate_episode(
         }
     }
 
-    let asserted = matches!(episode.outcome, ReasoningOutcome::Asserted { .. });
+    let asserted = matches!(&episode.outcome, ReasoningOutcome::Asserted { .. });
     let mut metrics = vec![QualificationMetric {
         name: "coverage".into(),
         value: if asserted { 1.0 } else { 0.0 },
