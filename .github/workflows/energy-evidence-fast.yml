@@ -38,7 +38,6 @@ env:
   QUALIFICATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   QUALIFICATION_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
   EVENT_SHA: ${{ github.sha }}
-  ENERGY_EVIDENCE_DIR: ${{ runner.temp }}/energy-evidence-fast
 
 jobs:
   energy-evidence:
@@ -109,17 +108,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f "$ENERGY_EVIDENCE_DIR/qualification-receipt.json" ]]; then
+          evidence_dir="$RUNNER_TEMP/energy-evidence-fast"
+          if [[ -f "$evidence_dir/qualification-receipt.json" ]]; then
             {
               echo
               echo "### Machine-readable qualification receipt"
               echo
               echo '```json'
-              cat "$ENERGY_EVIDENCE_DIR/qualification-receipt.json"
+              cat "$evidence_dir/qualification-receipt.json"
               echo '```'
               echo
               echo '```text'
-              cat "$ENERGY_EVIDENCE_DIR/qualification-receipt.sha256"
+              cat "$evidence_dir/qualification-receipt.sha256"
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           else
