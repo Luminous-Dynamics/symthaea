@@ -14,7 +14,7 @@ use super::hidden_world::PublicAction;
 use super::v2_corpus_schedule::V2ScheduleMaterializationError;
 use super::v2_heldout_plan::{V2HeldOutPlan, materialize_heldout_plan};
 use super::v2_preheldout_custody::V2PreHeldOutCampaignCapability;
-use super::v2_public_schema::{V2PublicFamily, V2PublicState};
+use super::v2_public_schema::{V2PublicFamily, V2PublicState, action_index};
 use super::v2_real_subject_adapters::{
     V2RealSubjectAdapterError, V2RealSubjectAdapterPair,
 };
@@ -26,8 +26,6 @@ pub(super) const V2_CANARY_AUTHORIZATION_REVISION: &str =
 pub(super) const V2_CANARY_SOURCE_COMMITMENT_REVISION: &str =
     "EUREKA.002.V2.CANARY_AUTHORIZATION_SOURCE.v1";
 
-/// Canary observations are plumbing evidence only. This type is intentionally
-/// distinct from any final-HeldOut scientific evidence/disposition type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum V2CanaryEvidenceClass {
     PlumbingOnlyNonConfirmatory,
@@ -108,6 +106,7 @@ pub(super) struct V2CanaryAuthorization {
     adapter_pair_commitment: [u8; 32],
     adapter_source_commitment: [u8; 32],
     authorization_source_commitment: [u8; 32],
+    selection_commitment: [u8; 32],
     full_schedule_root: [u8; 32],
     heldout_ordered_root: [u8; 32],
     row_index: u16,
@@ -135,6 +134,10 @@ impl V2CanaryAuthorization {
         self.adapter_source_commitment
     }
 
+    pub(super) const fn selection_commitment(&self) -> [u8; 32] {
+        self.selection_commitment
+    }
+
     pub(super) const fn row_index(&self) -> u16 {
         self.row_index
     }
@@ -160,8 +163,6 @@ impl V2CanaryAuthorization {
     }
 }
 
-/// Freeze one non-confirmatory canary authorization from the exact campaign.
-/// This binds real-subject adapter identity but performs no prediction.
 pub(super) fn freeze_canary_authorization(
     campaign: &V2PreHeldOutCampaignCapability,
 ) -> Result<V2CanaryAuthorization, V2CanaryAuthorizationError> {
@@ -176,6 +177,7 @@ pub(super) fn freeze_canary_authorization(
 
     // Selection occurs before and independently of any real-subject binding.
     let selection_basis = V2CanarySelectionBasis::from_plan(&plan)?;
+    let selection_commitment = canary_selection_commitment(selection_basis);
     let row_index = select_canary_row(selection_basis)?;
     let row = plan
         .ordered_rows()
@@ -194,6 +196,7 @@ pub(super) fn freeze_canary_authorization(
         adapter_pair.commitment(),
         adapter_pair.adapter_source_commitment(),
         authorization_source_commitment,
+        selection_commitment,
         selection_basis,
         row_index,
         row.row_identity(),
@@ -208,6 +211,7 @@ pub(super) fn freeze_canary_authorization(
         adapter_pair_commitment: adapter_pair.commitment(),
         adapter_source_commitment: adapter_pair.adapter_source_commitment(),
         authorization_source_commitment,
+        selection_commitment,
         full_schedule_root: selection_basis.full_schedule_root(),
         heldout_ordered_root: selection_basis.heldout_ordered_root(),
         row_index,
@@ -219,20 +223,24 @@ pub(super) fn freeze_canary_authorization(
     })
 }
 
+fn canary_selection_commitment(basis: V2CanarySelectionBasis) -> [u8; 32] {
+    let mut bytes = Vec::new();
+    encode_bytes(&mut bytes, V2_CANARY_SELECTION_REVISION.as_bytes());
+    bytes.extend_from_slice(&basis.full_schedule_root);
+    bytes.extend_from_slice(&basis.heldout_ordered_root);
+    bytes.extend_from_slice(&basis.row_count.to_le_bytes());
+    *blake3::hash(&bytes).as_bytes()
+}
+
 fn select_canary_row(
     basis: V2CanarySelectionBasis,
 ) -> Result<u16, V2CanaryAuthorizationError> {
     if basis.row_count == 0 {
         return Err(V2CanaryAuthorizationError::InvalidHeldOutRowCount);
     }
-    let mut bytes = Vec::new();
-    encode_bytes(&mut bytes, V2_CANARY_SELECTION_REVISION.as_bytes());
-    bytes.extend_from_slice(&basis.full_schedule_root);
-    bytes.extend_from_slice(&basis.heldout_ordered_root);
-    bytes.extend_from_slice(&basis.row_count.to_le_bytes());
-    let digest = blake3::hash(&bytes);
+    let digest = canary_selection_commitment(basis);
     let mut prefix = [0_u8; 8];
-    prefix.copy_from_slice(&digest.as_bytes()[..8]);
+    prefix.copy_from_slice(&digest[..8]);
     let selected = u64::from_le_bytes(prefix) % u64::from(basis.row_count);
     u16::try_from(selected).map_err(|_| V2CanaryAuthorizationError::RowIndexOutOfRange)
 }
@@ -259,6 +267,7 @@ fn canary_authorization_commitment(
     adapter_pair_commitment: [u8; 32],
     adapter_source_commitment: [u8; 32],
     authorization_source_commitment: [u8; 32],
+    selection_commitment: [u8; 32],
     selection_basis: V2CanarySelectionBasis,
     row_index: u16,
     row_identity: [u8; 32],
@@ -274,6 +283,7 @@ fn canary_authorization_commitment(
     bytes.extend_from_slice(&adapter_pair_commitment);
     bytes.extend_from_slice(&adapter_source_commitment);
     bytes.extend_from_slice(&authorization_source_commitment);
+    bytes.extend_from_slice(&selection_commitment);
     bytes.extend_from_slice(&selection_basis.full_schedule_root);
     bytes.extend_from_slice(&selection_basis.heldout_ordered_root);
     bytes.extend_from_slice(&selection_basis.row_count.to_le_bytes());
@@ -286,7 +296,7 @@ fn canary_authorization_commitment(
 }
 
 fn encode_family(bytes: &mut Vec<u8>, family: V2PublicFamily) {
-    encode_bytes(bytes, family.stable_id().as_bytes());
+    bytes.push(family.tag());
 }
 
 fn encode_state(bytes: &mut Vec<u8>, state: V2PublicState) {
@@ -296,7 +306,8 @@ fn encode_state(bytes: &mut Vec<u8>, state: V2PublicState) {
 }
 
 fn encode_action(bytes: &mut Vec<u8>, action: PublicAction) {
-    encode_bytes(bytes, format!("{action:?}").as_bytes());
+    let index = action_index(action).expect("canonical HeldOut action must belong to V2 schema");
+    bytes.extend_from_slice(&(index as u64).to_le_bytes());
 }
 
 fn encode_bytes(bytes: &mut Vec<u8>, value: &[u8]) {
@@ -316,25 +327,27 @@ mod tests {
         let second = select_canary_row(basis).unwrap();
         assert_eq!(first, second);
         assert!(usize::from(first) < plan.ordered_rows().len());
+        assert_ne!(canary_selection_commitment(basis), [0_u8; 32]);
     }
 
     #[test]
-    fn selection_changes_when_schedule_identity_changes() {
+    fn selection_commitment_binds_schedule_identity_without_probabilistic_modulo_assumption() {
         let plan = materialize_heldout_plan().unwrap();
         let canonical = V2CanarySelectionBasis::from_plan(&plan).unwrap();
-        let canonical_index = select_canary_row(canonical).unwrap();
+        let canonical_commitment = canary_selection_commitment(canonical);
 
         let mut changed_full = canonical;
         changed_full.full_schedule_root[0] ^= 0x40;
-        let changed_full_index = select_canary_row(changed_full).unwrap();
+        assert_ne!(
+            canonical_commitment,
+            canary_selection_commitment(changed_full)
+        );
 
         let mut changed_heldout = canonical;
         changed_heldout.heldout_ordered_root[31] ^= 0x01;
-        let changed_heldout_index = select_canary_row(changed_heldout).unwrap();
-
-        assert!(
-            canonical_index != changed_full_index || canonical_index != changed_heldout_index,
-            "at least one independent schedule mutation must alter deterministic canary selection"
+        assert_ne!(
+            canonical_commitment,
+            canary_selection_commitment(changed_heldout)
         );
     }
 
@@ -366,6 +379,34 @@ mod tests {
     }
 
     #[test]
+    fn selector_body_depends_only_on_selection_basis_and_its_commitment() {
+        let source = include_str!("v2_canary_authorization.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap();
+        let start = source.find("fn select_canary_row(").unwrap();
+        let tail = &source[start..];
+        let end = tail
+            .find("\n}\n\npub(super) fn canary_authorization_source_commitment")
+            .unwrap();
+        let body = &tail[..end];
+        assert!(body.contains("canary_selection_commitment(basis)"));
+        for forbidden in [
+            "campaign",
+            "manifest",
+            "subject",
+            "comparator",
+            "prediction",
+            "post",
+            "outcome",
+            "score",
+            "rand",
+        ] {
+            assert!(!body.contains(forbidden), "selector leaked: {forbidden}");
+        }
+    }
+
+    #[test]
     fn authorization_source_has_no_real_execution_or_promotion_path() {
         let source = include_str!("v2_canary_authorization.rs")
             .split("#[cfg(test)]")
@@ -381,6 +422,7 @@ mod tests {
             "ScientificDisposition",
             "for row",
             "0..128",
+            ".post()",
         ] {
             assert!(
                 !source.contains(forbidden),
