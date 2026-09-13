@@ -18,6 +18,11 @@ import subprocess
 import sys
 
 PROTOCOL = "wcare38-authenticated-panel-v1"
+QUALIFYING_DISPOSITIONS = {
+    "AUTHENTICATED_PANEL_SUPPORTED",
+    "AUTHENTICATED_PANEL_LIMITED",
+    "INFRASTRUCTURE_INDETERMINATE",
+}
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -62,6 +67,40 @@ def emit_invalid(detail: str, **extra: object) -> int:
     payload.update(extra)
     sys.stdout.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
     return 4
+
+
+def sha_set(result: dict, field: str) -> set[str]:
+    value = result.get(field)
+    if not isinstance(value, list) or len(value) != len(set(value)):
+        raise ValueError(f"{field}_not_unique_array")
+    output: set[str] = set()
+    for item in value:
+        if (
+            not isinstance(item, str)
+            or len(item) != 64
+            or any(ch not in "0123456789abcdef" for ch in item)
+        ):
+            raise ValueError(f"{field}_contains_invalid_sha256")
+        output.add(item)
+    return output
+
+
+def verify_partition(
+    result: dict,
+    required_field: str,
+    authenticated_field: str,
+    unauthenticated_field: str,
+    indeterminate_field: str,
+) -> set[str]:
+    required = sha_set(result, required_field)
+    authenticated = sha_set(result, authenticated_field)
+    unauthenticated = sha_set(result, unauthenticated_field)
+    indeterminate = sha_set(result, indeterminate_field)
+    if authenticated & unauthenticated or authenticated & indeterminate or unauthenticated & indeterminate:
+        raise ValueError(f"{required_field}_authentication_states_overlap")
+    if authenticated | unauthenticated | indeterminate != required:
+        raise ValueError(f"{required_field}_authentication_partition_incomplete")
+    return required
 
 
 def main() -> int:
@@ -209,6 +248,52 @@ def main() -> int:
             wcare36_verifier_sha256=w36_verifier_sha,
             wcare36_baseline_integrity_verified=True,
         )
+
+    if result.get("disposition") in QUALIFYING_DISPOSITIONS:
+        try:
+            required_provenance = verify_partition(
+                result,
+                "required_provenance_receipt_sha256s",
+                "authenticated_provenance_receipt_sha256s",
+                "unauthenticated_provenance_receipt_sha256s",
+                "indeterminate_provenance_receipt_sha256s",
+            )
+            required_relations = verify_partition(
+                result,
+                "required_relation_receipt_sha256s",
+                "authenticated_relation_receipt_sha256s",
+                "unauthenticated_relation_receipt_sha256s",
+                "indeterminate_relation_receipt_sha256s",
+            )
+            _manifest_raw, manifest = load_object(args.attestation_manifest)
+            entries = manifest.get("entries")
+            if not isinstance(entries, list):
+                raise ValueError("manifest_entries_not_array")
+            manifest_subjects: list[str] = []
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    raise ValueError("manifest_entry_not_object")
+                subject = entry.get("subject_receipt_sha256")
+                if (
+                    not isinstance(subject, str)
+                    or len(subject) != 64
+                    or any(ch not in "0123456789abcdef" for ch in subject)
+                ):
+                    raise ValueError("manifest_subject_invalid_sha256")
+                manifest_subjects.append(subject)
+            if len(manifest_subjects) != len(set(manifest_subjects)):
+                raise ValueError("manifest_subject_duplicate")
+            supplemental = sorted(set(manifest_subjects) - required_provenance - required_relations)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+            return emit_invalid(
+                f"authentication_partition_or_manifest_invalid:{exc}",
+                wcare36_verifier_sha256=w36_verifier_sha,
+                wcare36_baseline_integrity_verified=True,
+            )
+        result["provenance_authentication_partition_complete"] = True
+        result["relation_authentication_partition_complete"] = True
+        result["supplemental_attestation_subject_sha256s"] = supplemental
+        result["supplemental_packages_contribute_weight"] = False
 
     # The front door appends the exact baseline verifier evidence. The overlay
     # remains responsible for the monotonic graph/authentication derivation.
