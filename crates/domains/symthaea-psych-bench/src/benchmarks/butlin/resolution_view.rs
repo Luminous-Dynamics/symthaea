@@ -10,6 +10,11 @@
 //!
 //! The resolved view is cryptographically bound to the exact serialized base
 //! report and recomputes tier counts without mutating the report itself.
+//!
+//! Crucially, the generic overlay resolver is private. Public callers cannot
+//! submit an arbitrary `IndicatorOutcomeOverlayV1` and ask first-party code to
+//! bless its tier counts. Each public resolver must start from the actual typed
+//! evidence object for its method and construct the overlay internally.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -96,7 +101,8 @@ pub struct ButlinResolvedEvidenceViewV1 {
     pub schema: String,
     pub base_report_schema_version: u32,
     pub base_report_blake3: String,
-    /// Deterministic indicator-id ordering.
+    /// Deterministic indicator-id ordering. These are derived records, not
+    /// authority-bearing inputs to a public generic resolver.
     pub overlays: Vec<IndicatorOutcomeOverlayV1>,
     pub resolved_counts: EvidenceOutcomeCountsV1,
 }
@@ -188,6 +194,15 @@ fn validate_lineage(
     {
         return Err(invalid("policy_id"));
     }
+    if overlay.lineage.kind == EvidenceLineageKindV1::DirectQualification
+        && matches!(
+            overlay.resolved_outcome,
+            EvidenceOutcome::Supported(SupportTier::CausallySupported)
+                | EvidenceOutcome::Supported(SupportTier::FunctionallySupported)
+        )
+    {
+        return Err(invalid("resolved_outcome"));
+    }
     if !is_hex_len(&overlay.lineage.source_commit_sha, 40) {
         return Err(invalid("source_commit_sha"));
     }
@@ -221,13 +236,10 @@ pub fn base_report_blake3_v1(
     Ok(blake3::hash(&bytes).to_hex().to_string())
 }
 
-/// Resolve independent evidence overlays without mutating the base report.
-///
-/// Each overlay is bound to the base outcome it was constructed against. A
-/// stale overlay therefore cannot silently be applied to a newer report. The
-/// returned tier counts are computed from resolved outcomes only; the base
-/// report's own counts and scalar diagnostics remain untouched.
-pub fn resolve_evidence_view_v1(
+/// Internal-only generic resolver. Public callers must use a method-specific
+/// resolver that starts from its typed evidence object and constructs overlays
+/// after independently verifying that evidence.
+fn resolve_validated_overlays_v1(
     report: &ButlinIndicatorReport,
     mut overlays: Vec<IndicatorOutcomeOverlayV1>,
 ) -> Result<ButlinResolvedEvidenceViewV1, EvidenceResolutionViewErrorV1> {
@@ -289,7 +301,7 @@ pub fn resolve_evidence_view_v1(
 }
 
 #[cfg(feature = "symthaea-backend")]
-pub fn gwt1_direct_overlay_v1(
+fn gwt1_direct_overlay_v1(
     report: &ButlinIndicatorReport,
     evidence: &super::gwt1_end_to_end::Gwt1EndToEndEvidenceV1,
 ) -> Result<IndicatorOutcomeOverlayV1, EvidenceResolutionViewErrorV1> {
@@ -306,7 +318,10 @@ pub fn gwt1_direct_overlay_v1(
         });
     }
 
-    let mut matches = report.indicators.iter().filter(|indicator| indicator.id == "GWT-1");
+    let mut matches = report
+        .indicators
+        .iter()
+        .filter(|indicator| indicator.id == "GWT-1");
     let base = matches
         .next()
         .ok_or_else(|| EvidenceResolutionViewErrorV1::UnknownIndicator {
@@ -343,12 +358,26 @@ pub fn gwt1_direct_overlay_v1(
     Ok(overlay)
 }
 
+/// Resolve the exact direct GWT-1 evidence object into a non-destructive view
+/// over the supplied base report.
+///
+/// This is the only public V1 route that can add a GWT-1 direct-qualification
+/// overlay. It recomputes the envelope resolution from the raw bytes, applies
+/// the frozen conservative promotion policy, binds source/artifact provenance,
+/// and leaves the base report's scalar diagnostic lineage unchanged.
+#[cfg(feature = "symthaea-backend")]
+pub fn resolve_gwt1_evidence_view_v1(
+    report: &ButlinIndicatorReport,
+    evidence: &super::gwt1_end_to_end::Gwt1EndToEndEvidenceV1,
+) -> Result<ButlinResolvedEvidenceViewV1, EvidenceResolutionViewErrorV1> {
+    let overlay = gwt1_direct_overlay_v1(report, evidence)?;
+    resolve_validated_overlays_v1(report, vec![overlay])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::benchmarks::butlin::report::{
-        EvidenceAnnotation, IndicatorEvidence,
-    };
+    use crate::benchmarks::butlin::report::{EvidenceAnnotation, IndicatorEvidence};
 
     fn indicator(id: &str, outcome: EvidenceOutcome) -> IndicatorEvidence {
         IndicatorEvidence {
@@ -400,7 +429,7 @@ mod tests {
     fn overlay_recomputes_counts_without_mutating_base_report() {
         let base = report();
         let original = base.clone();
-        let view = resolve_evidence_view_v1(
+        let view = resolve_validated_overlays_v1(
             &base,
             vec![overlay(EvidenceOutcome::Supported(SupportTier::Observed))],
         )
@@ -415,11 +444,24 @@ mod tests {
     }
 
     #[test]
+    fn direct_qualification_cannot_claim_causal_or_functional_support() {
+        for forbidden in [
+            EvidenceOutcome::Supported(SupportTier::CausallySupported),
+            EvidenceOutcome::Supported(SupportTier::FunctionallySupported),
+        ] {
+            assert!(matches!(
+                resolve_validated_overlays_v1(&report(), vec![overlay(forbidden)]),
+                Err(EvidenceResolutionViewErrorV1::InvalidLineageIdentity { .. })
+            ));
+        }
+    }
+
+    #[test]
     fn stale_overlay_cannot_attach_to_changed_base_outcome() {
         let mut stale = overlay(EvidenceOutcome::Supported(SupportTier::Observed));
         stale.base_outcome = EvidenceOutcome::Contradicted;
         assert!(matches!(
-            resolve_evidence_view_v1(&report(), vec![stale]),
+            resolve_validated_overlays_v1(&report(), vec![stale]),
             Err(EvidenceResolutionViewErrorV1::BaseOutcomeMismatch { .. })
         ));
     }
@@ -428,7 +470,7 @@ mod tests {
     fn duplicate_overlay_is_rejected() {
         let item = overlay(EvidenceOutcome::Supported(SupportTier::Observed));
         assert!(matches!(
-            resolve_evidence_view_v1(&report(), vec![item.clone(), item]),
+            resolve_validated_overlays_v1(&report(), vec![item.clone(), item]),
             Err(EvidenceResolutionViewErrorV1::DuplicateOverlay { .. })
         ));
     }
@@ -438,7 +480,7 @@ mod tests {
         let mut item = overlay(EvidenceOutcome::Supported(SupportTier::Observed));
         item.indicator_id = "UNKNOWN".to_string();
         assert!(matches!(
-            resolve_evidence_view_v1(&report(), vec![item]),
+            resolve_validated_overlays_v1(&report(), vec![item]),
             Err(EvidenceResolutionViewErrorV1::UnknownIndicator { .. })
         ));
     }
@@ -448,7 +490,7 @@ mod tests {
         let mut item = overlay(EvidenceOutcome::Supported(SupportTier::Observed));
         item.lineage.raw_artifact_blake3 = "NOT-A-DIGEST".to_string();
         assert!(matches!(
-            resolve_evidence_view_v1(&report(), vec![item]),
+            resolve_validated_overlays_v1(&report(), vec![item]),
             Err(EvidenceResolutionViewErrorV1::InvalidLineageIdentity { .. })
         ));
     }
