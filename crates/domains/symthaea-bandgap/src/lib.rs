@@ -24,6 +24,7 @@
 
 pub mod bandgap_baseline;
 mod benchmark;
+pub mod composition_only;
 pub mod features;
 pub mod ml_bandgap;
 pub mod periodic_table;
