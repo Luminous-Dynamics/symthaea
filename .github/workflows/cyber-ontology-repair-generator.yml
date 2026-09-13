@@ -1,0 +1,121 @@
+name: Cyber Ontology One-Shot Repair Generator
+
+on:
+  push:
+    branches:
+      - feat/cyber-ontology-bridge-v1
+    paths:
+      - .github/workflows/cyber-ontology-repair-generator.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: "${{ github.event.head_commit.message == 'chore(cyber): quote one-shot workflow condition' }}"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact staged subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 4
+          persist-credentials: true
+
+      - name: Prove one-shot ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed_subject='f5e5ae6bbb4caed758599ebc8b6c45ed410ae76c'
+          git merge-base --is-ancestor "$failed_subject" HEAD
+          mapfile -t staged_only < <(git diff --name-only "$failed_subject"..HEAD | sort)
+          test "${#staged_only[@]}" -eq 1
+          test "${staged_only[0]}" = '.github/workflows/cyber-ontology-repair-generator.yml'
+          test "$(git status --porcelain)" = ""
+
+      - name: Install repository Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test "$channel" = "1.96.0"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+
+      - name: Generate only the evidenced repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo fmt -p symthaea-cyber-ontology
+          cargo metadata --format-version 1 >/dev/null
+          python3 - <<'PY'
+          import collections
+          import json
+          import tomllib
+
+          def load(path):
+              with open(path, 'rb') as handle:
+                  return tomllib.load(handle)
+
+          before = load('/tmp/Cargo.lock.before')
+          after = load('Cargo.lock')
+          if before.get('version') != after.get('version'):
+              raise SystemExit('Cargo.lock format version changed')
+
+          def freeze(package):
+              return json.dumps(package, sort_keys=True, separators=(',', ':'))
+
+          old = collections.Counter(freeze(p) for p in before.get('package', []))
+          new = collections.Counter(freeze(p) for p in after.get('package', []))
+          removed = old - new
+          added = new - old
+          if removed:
+              raise SystemExit(f'existing Cargo.lock package entries changed/removed: {list(removed.elements())[:2]}')
+          added_entries = [json.loads(value) for value in added.elements()]
+          if len(added_entries) != 1:
+              raise SystemExit(f'expected exactly one new Cargo.lock package entry, got {len(added_entries)}')
+          package = added_entries[0]
+          if package.get('name') != 'symthaea-cyber-ontology':
+              raise SystemExit(f'unexpected new package: {package.get("name")!r}')
+          with open('Cargo.toml', 'rb') as handle:
+              expected_version = tomllib.load(handle)['workspace']['package']['version']
+          if package.get('version') != expected_version:
+              raise SystemExit(f'cyber package version mismatch: {package.get("version")!r} != {expected_version!r}')
+          if package.get('source') is not None or package.get('checksum') is not None:
+              raise SystemExit('workspace cyber package unexpectedly has source/checksum')
+          deps = package.get('dependencies', [])
+          expected_names = {'blake3', 'serde', 'serde_json', 'symthaea-support'}
+          actual_names = {value.split(' ', 1)[0] for value in deps}
+          if actual_names != expected_names or len(deps) != len(expected_names):
+              raise SystemExit(f'unexpected cyber lock dependencies: {deps!r}')
+          print('lock delta validated: one new symthaea-cyber-ontology workspace package only')
+          PY
+          cargo metadata --locked --format-version 1 >/dev/null
+          cargo fmt -p symthaea-cyber-ontology -- --check
+          git diff --check
+          mapfile -t changed < <(git diff --name-only | sort)
+          expected=(Cargo.lock crates/domains/symthaea-cyber-ontology/src/lib.rs)
+          test "${#changed[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do
+            test "${changed[$i]}" = "${expected[$i]}"
+          done
+
+      - name: Self-delete and commit successor subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/cyber-ontology-repair-generator.yml
+          git add Cargo.lock crates/domains/symthaea-cyber-ontology/src/lib.rs
+          git add -u .github/workflows/cyber-ontology-repair-generator.yml
+          mapfile -t staged < <(git diff --cached --name-only | sort)
+          expected=(.github/workflows/cyber-ontology-repair-generator.yml Cargo.lock crates/domains/symthaea-cyber-ontology/src/lib.rs)
+          test "${#staged[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do
+            test "${staged[$i]}" = "${expected[$i]}"
+          done
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(cyber): repair exact qualification subject'
+          git push origin HEAD:feat/cyber-ontology-bridge-v1
