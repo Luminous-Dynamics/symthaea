@@ -22,11 +22,11 @@ The governing distinctions are:
 
 No WCARE-44 artifact grants runtime authority.
 
-## Two-stage architecture
+## Three-layer architecture
 
-WCARE-44 deliberately has two stages.
+WCARE-44 deliberately separates graph mathematics, candidate-contract validation, and final child-verifier promotion.
 
-### Stage A — pure candidate kernel
+### Stage A1 — pure candidate kernel
 
 The candidate kernel:
 
@@ -38,16 +38,43 @@ The candidate kernel:
 - computes candidate authenticated components;
 - keeps builder-authentication and temporal-preregistration candidate dimensions separate.
 
-The candidate kernel does **not** establish that its child-verifier observations are genuine. Therefore it cannot set final WCARE-44 establishment booleans.
+The pure candidate kernel does **not** establish that its child-verifier observations are genuine. Therefore it cannot set final WCARE-44 establishment booleans.
 
-### Stage B — future strict front door
+### Stage A2 — strict candidate-contract front door
 
-A qualifying WCARE-44 front door must independently establish the exact WCARE-42 and WCARE-43 verifier lineages before it may promote candidate dimensions into final establishment claims.
+The strict Stage-A front door exists in v1 and runs before the candidate kernel. It validates the exact candidate input contract without claiming that the child verifier actually executed.
 
-It must not trust precomputed `ATTESTATION_ACCEPTED`, `ESTABLISHED`, or `verifier_execution_qualified = true` fields merely because they appear in supplied JSON.
+It requires:
 
-Until that front door exists and executes successfully:
+- exact WCARE-41 authentication-plan field census with no unknown/missing fields;
+- exact WCARE-41 backend field census for builder and temporal verifier entries;
+- valid SHA-256 syntax for bound subject/backend/policy identities;
+- valid token syntax for backend identifiers;
+- exact `evaluation_utc` shape;
+- both WCARE-41 complete-builder-coverage and temporal-preregistration requirements fixed true;
+- exact builder-observation field census and typed status/subject-kind values;
+- exact temporal-observation field census and typed temporal status;
+- real JSON booleans for `verifier_execution_qualified` and `synthetic` rather than truthy strings or numbers;
+- every `wcare42_verifier_sha256` to equal the exact WCARE-41 preregistered builder-verifier executable SHA-256;
+- every `wcare43_verifier_sha256` to equal the exact WCARE-41 preregistered temporal-verifier executable SHA-256;
+- candidate-kernel exit code to agree with the candidate disposition;
+- every final-promotion field to remain false.
 
+Thus an observation attributed to a different child verifier than the one frozen in WCARE-41 is structurally invalid even at candidate stage.
+
+Stage A2 still does **not** establish that the supplied WCARE-42/WCARE-43 result or qualification receipt is authentic, nor that the child verifier actually executed. It only proves the candidate evidence is well-formed and attributed to the preregistered verifier identity.
+
+### Stage B — future child-verifier re-execution and promotion
+
+A qualifying WCARE-44 Stage-B front door must independently re-execute or otherwise establish the exact WCARE-42 and WCARE-43 verifier lineages before it may promote candidate dimensions into final establishment claims.
+
+It must not trust precomputed `ATTESTATION_ACCEPTED`, `ESTABLISHED`, `verifier_execution_qualified = true`, verifier hashes, result hashes, or qualification-receipt hashes merely because they appear in supplied JSON.
+
+Until Stage B exists and executes successfully:
+
+- `child_verifier_lineage_established = false`;
+- `wcare42_executable_qualification_established = false`;
+- `wcare43_external_execution_lineage_established = false`;
 - `builder_authentication_established = false`;
 - `preregistration_temporal_precedence_established = false`;
 - `authenticated_preregistered_replication_established = false`.
@@ -102,7 +129,7 @@ A candidate observation binds:
 - whether executable qualification is claimed;
 - whether the observation is synthetic.
 
-The Stage-A kernel treats these as **candidate inputs only**.
+The strict Stage-A front door requires the purported WCARE-42 verifier SHA-256 to equal the exact builder-verifier executable SHA-256 frozen in the WCARE-41 authentication plan. This is attribution consistency, not proof of execution.
 
 An observation may preserve candidate separation only when all of the following are supplied:
 
@@ -141,14 +168,14 @@ and every WCARE-40 connected component must be wholly contained within exactly o
 
 The frozen WCARE-41 authentication plan requires complete builder-attestation coverage.
 
-For the Stage-A candidate this means every exact WCARE-40 builder-provenance and builder-relation receipt named by the WCARE-40 result must have one candidate accepted, execution-qualified, non-synthetic observation.
+For the Stage-A candidate this means every exact WCARE-40 builder-provenance and builder-relation receipt named by the WCARE-40 result must have one candidate accepted, execution-qualified, non-synthetic observation attributed to the exact WCARE-41 preregistered builder verifier.
 
 `candidate_builder_authentication_requirements_met` additionally requires:
 
 - complete candidate coverage; and
 - candidate authenticated effective components meeting the WCARE-40 plan's minimum effective independent-component threshold.
 
-This is still not `builder_authentication_established`; only the future Stage-B front door can make that promotion.
+This is still not `builder_authentication_established`; only Stage B can make that promotion.
 
 ## Candidate temporal observation
 
@@ -162,6 +189,8 @@ The temporal observation binds:
 - whether executable qualification is claimed;
 - whether the source policy/result is synthetic.
 
+The strict Stage-A front door requires the purported WCARE-43 verifier SHA-256 to equal the exact temporal-verifier executable SHA-256 frozen in the WCARE-41 authentication plan. This is attribution consistency, not proof of execution.
+
 The Stage-A candidate temporal requirement is met only when:
 
 - status is `ESTABLISHED`;
@@ -171,7 +200,7 @@ The Stage-A candidate temporal requirement is met only when:
 
 That candidate state cannot change the builder graph or component count.
 
-The future Stage-B front door must independently establish the WCARE-43 execution lineage before setting final temporal precedence true.
+Stage B must independently establish the WCARE-43 execution lineage before setting final temporal precedence true.
 
 ## Orthogonality
 
@@ -188,6 +217,8 @@ Therefore:
 ## Invalid and indeterminate child states
 
 A structurally invalid WCARE-40 subject makes WCARE-44 invalid.
+
+A structurally invalid Stage-A authentication plan or observation makes the Stage-A front door invalid before candidate semantics are interpreted.
 
 Candidate builder observations classify each exact receipt independently as:
 
@@ -221,7 +252,7 @@ WCARE-43 synthetic fixtures may exercise WCARE-44 candidate composition. They ca
 
 ## Stage-A result boundary
 
-The Stage-A result may expose:
+Stage A may expose:
 
 - recomputed WCARE-40 components;
 - candidate authenticated components;
@@ -231,11 +262,16 @@ The Stage-A result may expose:
 - candidate temporal status;
 - candidate conjunction.
 
-But Stage A must keep these final claims false:
+Stage A also proves its supplied child observations are structurally complete and attributed to the exact child verifier identities frozen in WCARE-41. It does not prove those child verifiers actually executed or that the supplied child result/qualification receipts are genuine.
 
-- `builder_authentication_established`;
-- `preregistration_temporal_precedence_established`;
-- `authenticated_preregistered_replication_established`;
+Stage A must keep these final claims false:
+
+- child-verifier lineage established;
+- WCARE-42 executable qualification established;
+- WCARE-43 external execution lineage established;
+- builder authentication established;
+- preregistration temporal precedence established;
+- authenticated preregistered replication established;
 - subject correctness;
 - reviewer independence;
 - runtime authority.
