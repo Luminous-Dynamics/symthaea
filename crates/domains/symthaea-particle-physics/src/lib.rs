@@ -27,6 +27,7 @@ pub mod cross_sections;
 pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
+pub mod lattice_cornell;
 pub mod lattice_covariance;
 pub mod lattice_linear_gls;
 pub mod lattice_qcd;
@@ -43,6 +44,10 @@ pub use cross_sections::{
 pub use decay_widths::{
     DecayChannel, muon_decay_width, muon_lifetime, pion_lifetime, top_decay_width,
     w_boson_channels, w_total_width, z_total_width,
+};
+pub use lattice_cornell::{
+    LATTICE_CORNELL_GLS_ID, LatticeCornellError, LatticeCornellFit, LatticeCornellPoint,
+    fit_declared_lattice_cornell,
 };
 pub use lattice_covariance::{
     CorrelatedConstantFit, CovarianceError, correlated_constant_fit, sample_covariance,
