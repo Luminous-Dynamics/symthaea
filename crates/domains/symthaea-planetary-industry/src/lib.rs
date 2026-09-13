@@ -17,12 +17,14 @@ mod mass_balance;
 mod process;
 mod types;
 mod utility_accounting;
+mod utility_projection;
 
 pub use graph::*;
 pub use mass_balance::*;
 pub use process::*;
 pub use types::*;
 pub use utility_accounting::*;
+pub use utility_projection::*;
 
 #[cfg(test)]
 mod tests {
