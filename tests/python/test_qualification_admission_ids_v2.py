@@ -23,6 +23,7 @@ profile = load("qualification_profile")
 subject = load("qualification_subject")
 admission_v3 = load("qualification_admission_v3")
 framing = load("qualification_framing_v1")
+recipe = load("qualification_recipe_v1")
 semantic_v2 = load("qualification_semantic_ids_v2")
 admission_v2 = load("qualification_admission_ids_v2")
 
@@ -59,6 +60,52 @@ def v1_profile(non_claim="does not authorize merge"):
     return raw
 
 
+def recipe_preimages():
+    values = [
+        {
+            "schema": recipe.SCHEMA,
+            "recipe_name": "research.format.v1",
+            "legacy_recipe_ref": "git-blob-sha1:" + "1" * 40,
+            "execution_model": recipe.EXECUTION_MODEL,
+            "environment_contract": recipe.ENVIRONMENT_CONTRACT,
+            "steps": [
+                {
+                    "step_name": "rustfmt",
+                    "working_directory": ".",
+                    "argv": ["cargo", "fmt", "--all", "--", "--check"],
+                    "environment_overrides": [],
+                    "stdin_policy": recipe.STDIN_POLICY,
+                    "acceptable_exit_codes": [0],
+                }
+            ],
+            "non_claims": ["does not prove semantic correctness"],
+        },
+        {
+            "schema": recipe.SCHEMA,
+            "recipe_name": "research.test.v1",
+            "legacy_recipe_ref": "sha256:" + "2" * 64,
+            "execution_model": recipe.EXECUTION_MODEL,
+            "environment_contract": recipe.ENVIRONMENT_CONTRACT,
+            "steps": [
+                {
+                    "step_name": "tests",
+                    "working_directory": ".",
+                    "argv": ["cargo", "test", "--locked", "-p", "symthaea-research-protocol"],
+                    "environment_overrides": [
+                        {"name": "CARGO_TERM_COLOR", "value": "never"}
+                    ],
+                    "stdin_policy": recipe.STDIN_POLICY,
+                    "acceptable_exit_codes": [0],
+                }
+            ],
+            "non_claims": ["does not prove scientific validity"],
+        },
+    ]
+    for value in values:
+        value["recipe_id"] = recipe.compute_recipe_id(value)
+    return values
+
+
 def v3_admission(
     profile_value=None,
     *,
@@ -89,19 +136,21 @@ def v3_admission(
 
 def test_admission_v2_golden_identities():
     p = v1_profile()
-    result = admission_v2.derive_admission_identities_v2(v3_admission(p), p)
+    recipes = recipe_preimages()
+    result = admission_v2.derive_admission_identities_v2(v3_admission(p), p, recipes)
     assert result == {
         "schema": admission_v2.SCHEMA,
         "qualification_subject_id_v2": "sha256:a9df781b45453a8e147478d4341b1f2fbb92abf347d34a4d2dcbd460a5cd871f",
-        "qualification_profile_id_v2": "sha256:6e0cbabf84cf2f1c0e297bc4fce214007a83bb51443956fb4148c89e2755d15e",
-        "admission_subject_id_v2": "sha256:1de5af4bba23eb93b8f70547a06ee3bdbef4407b98f04b4036fb1d4c9f7ac97c",
-        "admission_request_id_v2": "sha256:87ee171102e5d6a86d9663fd7a0d0f7673da4c10124e65bdb1458ca101340232",
+        "qualification_profile_id_v2": "sha256:6d712ce2517000d4e1d76b6b11d20349a59efcd10eb2e0fa7e8d599b8fdd1572",
+        "admission_subject_id_v2": "sha256:23f1dd6b4fc1aee8cef47953bf0512a7600b614b904025422209f8195370de49",
+        "admission_request_id_v2": "sha256:d353eeef51767f741e0bd95ec98a84a4a1d515d2b0e9a3d473770b327e1157ca",
     }
 
 
 def test_request_provenance_changes_but_v2_work_identity_does_not():
     p = v1_profile()
-    first = admission_v2.derive_admission_identities_v2(v3_admission(p), p)
+    recipes = recipe_preimages()
+    first = admission_v2.derive_admission_identities_v2(v3_admission(p), p, recipes)
     second = admission_v2.derive_admission_identities_v2(
         v3_admission(
             p,
@@ -111,6 +160,7 @@ def test_request_provenance_changes_but_v2_work_identity_does_not():
             evidence_refs=["issue:2318"],
         ),
         p,
+        recipes,
     )
     assert first["admission_subject_id_v2"] == second["admission_subject_id_v2"]
     assert first["admission_request_id_v2"] != second["admission_request_id_v2"]
@@ -121,7 +171,17 @@ def test_profile_preimage_mismatch_fails_closed():
     admission = v3_admission(p)
     different = v1_profile(non_claim="does not authorize deployment")
     with pytest.raises(train.TrainManifestError, match="profile bytes"):
-        admission_v2.derive_admission_identities_v2(admission, different)
+        admission_v2.derive_admission_identities_v2(
+            admission, different, recipe_preimages()
+        )
+
+
+def test_missing_recipe_preimage_fails_closed():
+    p = v1_profile()
+    with pytest.raises(train.TrainManifestError, match="coverage mismatch"):
+        admission_v2.derive_admission_identities_v2(
+            v3_admission(p), p, recipe_preimages()[:1]
+        )
 
 
 def test_bad_declared_v3_admission_id_cannot_be_laundered_into_v2():
@@ -129,27 +189,40 @@ def test_bad_declared_v3_admission_id_cannot_be_laundered_into_v2():
     admission = v3_admission(p)
     admission["admission_id"] = "sha256:" + "0" * 64
     with pytest.raises(train.TrainManifestError, match="admission_id"):
-        admission_v2.derive_admission_identities_v2(admission, p)
+        admission_v2.derive_admission_identities_v2(admission, p, recipe_preimages())
 
 
-def test_changed_profile_semantics_change_v2_work_identity():
+def test_changed_profile_or_recipe_semantics_change_v2_work_identity():
     baseline_profile = v1_profile()
+    baseline_recipes = recipe_preimages()
     baseline = admission_v2.derive_admission_identities_v2(
-        v3_admission(baseline_profile), baseline_profile
+        v3_admission(baseline_profile), baseline_profile, baseline_recipes
     )
 
     changed_profile = v1_profile(non_claim="does not authorize deployment")
     changed = admission_v2.derive_admission_identities_v2(
-        v3_admission(changed_profile), changed_profile
+        v3_admission(changed_profile), changed_profile, recipe_preimages()
     )
     assert baseline["qualification_profile_id_v2"] != changed["qualification_profile_id_v2"]
     assert baseline["admission_subject_id_v2"] != changed["admission_subject_id_v2"]
+
+    changed_recipes = recipe_preimages()
+    changed_recipes[0].pop("recipe_id")
+    changed_recipes[0]["steps"][0]["argv"].append("--verbose")
+    changed_recipes[0]["recipe_id"] = recipe.compute_recipe_id(changed_recipes[0])
+    changed_recipe_result = admission_v2.derive_admission_identities_v2(
+        v3_admission(baseline_profile), baseline_profile, changed_recipes
+    )
+    assert baseline["qualification_profile_id_v2"] != changed_recipe_result["qualification_profile_id_v2"]
+    assert baseline["admission_subject_id_v2"] != changed_recipe_result["admission_subject_id_v2"]
 
 
 def test_v2_work_identity_is_not_v3_json_identity():
     p = v1_profile()
     admission = v3_admission(p)
-    result = admission_v2.derive_admission_identities_v2(admission, p)
+    result = admission_v2.derive_admission_identities_v2(
+        admission, p, recipe_preimages()
+    )
     assert result["admission_subject_id_v2"] != admission["admission_subject_id"]
     assert result["admission_request_id_v2"] != admission["admission_id"]
 
