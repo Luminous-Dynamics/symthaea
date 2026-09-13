@@ -28,6 +28,7 @@
 //! | [`gwt1_specialist_qualification`] | Structured direct GWT-1 specialist observations |
 //! | [`gwt1_causal_lesion`] | Selective GWT-1 specialist lesion + output-rescue observations |
 //! | [`gwt1_causal_matched_sham`] | Same-omission neutral-target control for GWT-1 causal evidence |
+//! | [`gwt1_causal_verifier`] | Narrow production-collector recomputation facade |
 
 pub mod causal_tower;
 pub mod cognitive_loop_validation;
@@ -36,6 +37,7 @@ pub mod gwt1_causal_lesion;
 pub mod gwt1_causal_matched_sham;
 #[cfg(test)]
 mod gwt1_causal_specificity_tests;
+pub mod gwt1_causal_verifier;
 pub mod gwt1_specialist_qualification;
 pub mod unified_architecture;
 pub mod unified_causal_understanding;
