@@ -14,6 +14,7 @@ PROTOCOL = "wcare44-authenticated-replication-aggregation-v1"
 WCARE41 = "wcare41-authenticated-preregistration-v1"
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 TOKEN = re.compile(r"^[A-Za-z0-9._:-]+$")
+UTC20 = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 
 AUTH_KEYS = {
     "protocol_version", "wcare40_plan_sha256", "wcare40_result_sha256",
@@ -72,10 +73,11 @@ def exact_keys(value: dict[str, Any], allowed: set[str], required: set[str], lab
         raise InvalidContract(f"{label}_missing_fields:{','.join(missing)}")
 
 
-def sha_field(value: dict[str, Any], field: str, label: str) -> None:
+def sha_field(value: dict[str, Any], field: str, label: str) -> str:
     item = value.get(field)
     if not isinstance(item, str) or not HEX64.fullmatch(item):
         raise InvalidContract(f"{label}_invalid_sha256:{field}")
+    return item
 
 
 def bool_field(value: dict[str, Any], field: str, label: str) -> None:
@@ -83,7 +85,7 @@ def bool_field(value: dict[str, Any], field: str, label: str) -> None:
         raise InvalidContract(f"{label}_invalid_boolean:{field}")
 
 
-def validate_backend(value: Any, label: str) -> None:
+def validate_backend(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise InvalidContract(f"{label}_not_object")
     exact_keys(value, BACKEND_KEYS, BACKEND_KEYS, label)
@@ -92,9 +94,10 @@ def validate_backend(value: Any, label: str) -> None:
         raise InvalidContract(f"{label}_invalid_backend_id")
     sha_field(value, "executable_sha256", label)
     sha_field(value, "policy_sha256", label)
+    return value
 
 
-def validate_auth_plan(path: str) -> None:
+def validate_auth_plan(path: str) -> dict[str, Any]:
     value = load_object(path, "wcare41_authentication_plan")
     exact_keys(value, AUTH_KEYS, AUTH_REQUIRED, "wcare41_authentication_plan")
     if value.get("protocol_version") != WCARE41:
@@ -110,9 +113,13 @@ def validate_auth_plan(path: str) -> None:
         raise InvalidContract("wcare41_complete_builder_coverage_not_true")
     if value.get("require_temporal_preregistration") is not True:
         raise InvalidContract("wcare41_temporal_preregistration_not_true")
+    evaluation_utc = value.get("evaluation_utc")
+    if not isinstance(evaluation_utc, str) or not UTC20.fullmatch(evaluation_utc):
+        raise InvalidContract("wcare41_authentication_plan_invalid_evaluation_utc")
+    return value
 
 
-def validate_builder_observation(path: str) -> None:
+def validate_builder_observation(path: str, expected_verifier_sha256: str) -> None:
     value = load_object(path, "builder_observation")
     exact_keys(value, BUILDER_KEYS, BUILDER_REQUIRED, "builder_observation")
     if value.get("protocol_version") != PROTOCOL:
@@ -126,11 +133,13 @@ def validate_builder_observation(path: str) -> None:
         "wcare42_verifier_sha256", "wcare42_qualification_receipt_sha256",
     ):
         sha_field(value, field, "builder_observation")
+    if value.get("wcare42_verifier_sha256") != expected_verifier_sha256:
+        raise InvalidContract("builder_observation_verifier_sha256_not_preregistered")
     bool_field(value, "verifier_execution_qualified", "builder_observation")
     bool_field(value, "synthetic", "builder_observation")
 
 
-def validate_temporal_observation(path: str) -> None:
+def validate_temporal_observation(path: str, expected_verifier_sha256: str) -> None:
     value = load_object(path, "temporal_observation")
     exact_keys(value, TEMPORAL_KEYS, TEMPORAL_REQUIRED, "temporal_observation")
     if value.get("protocol_version") != PROTOCOL:
@@ -142,6 +151,8 @@ def validate_temporal_observation(path: str) -> None:
         "wcare43_result_sha256", "wcare43_verifier_sha256",
     ):
         sha_field(value, field, "temporal_observation")
+    if value.get("wcare43_verifier_sha256") != expected_verifier_sha256:
+        raise InvalidContract("temporal_observation_verifier_sha256_not_preregistered")
     bool_field(value, "verifier_execution_qualified", "temporal_observation")
     bool_field(value, "synthetic", "temporal_observation")
 
@@ -158,10 +169,12 @@ def invalid(detail: str) -> tuple[dict[str, Any], int]:
 def main() -> int:
     args = kernel.parser().parse_args()
     try:
-        validate_auth_plan(args.wcare41_authentication_plan)
+        auth_plan = validate_auth_plan(args.wcare41_authentication_plan)
+        builder_verifier_sha256 = auth_plan["builder_verifier"]["executable_sha256"]
+        temporal_verifier_sha256 = auth_plan["temporal_verifier"]["executable_sha256"]
         for path in args.builder_observation:
-            validate_builder_observation(path)
-        validate_temporal_observation(args.temporal_observation)
+            validate_builder_observation(path, builder_verifier_sha256)
+        validate_temporal_observation(args.temporal_observation, temporal_verifier_sha256)
         result, code = kernel.evaluate(args)
         expected = {
             "CANDIDATE_MEASURED": 0,
