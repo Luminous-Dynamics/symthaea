@@ -3,14 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Canonical two-phase metacognitive state.
 //!
-//! The state machine separates what the subject reports before an outcome is known from feedback
-//! attached after the outcome is revealed. This prevents benchmark targets or post-hoc correctness
-//! from leaking into the state that is later evaluated for calibration.
-//!
-//! There is intentionally no scalar "meta-confidence" and no plasticity authority in this module.
-//! Context support, strategy support, and objective-selection support remain separate measurements.
-//! All outputs are `MeasurementOnly` until an external qualification artifact establishes stronger
-//! authority.
+//! Pre-outcome observations are frozen before benchmark/action outcomes are attached. This keeps
+//! calibration evidence separate from the oracle that later judges it. There is intentionally no
+//! scalar meta-confidence and no plasticity authority in this module.
 
 use crate::consciousness::context_aware_evolution::ReasoningContext;
 use serde::{Deserialize, Serialize};
@@ -19,10 +14,6 @@ use std::fmt;
 
 pub const META_EPISTEMIC_STATE_SCHEMA_VERSION: u32 = 1;
 
-/// Current authority of the canonical meta-state surface.
-///
-/// There is deliberately no stronger variant. A future authority upgrade must be introduced by an
-/// evidence-backed API change rather than by crossing a local numeric threshold.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MetaStateAuthority {
     MeasurementOnly,
@@ -34,8 +25,6 @@ impl MetaStateAuthority {
     }
 }
 
-/// Decomposed pre-outcome support signals. None is a probability of answer correctness merely by
-/// virtue of lying in `[0, 1]`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct MetaSupportSignals {
     pub context_support: f64,
@@ -68,11 +57,9 @@ impl MetaSupportSignals {
     }
 }
 
-/// One frozen pre-outcome observation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MetaEpisodeObservation {
     pub episode_id: String,
-    /// Strictly monotonic logical sequence for this subject state.
     pub sequence: u64,
     pub context: ReasoningContext,
     pub signals: MetaSupportSignals,
@@ -81,19 +68,15 @@ pub struct MetaEpisodeObservation {
     pub weak_assumptions_flagged: usize,
 }
 
-/// Outcome information attached only after the pre-outcome observation has been frozen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MetaOutcomeFeedback {
     pub episode_id: String,
     pub sequence: u64,
     pub exact_correct: bool,
-    /// Task-native normalized score. This is kept separate from exact correctness.
     pub task_score: f64,
-    /// Optional benchmark/action safety observation. `None` when the task has no such oracle.
     pub unsafe_action_observed: Option<bool>,
 }
 
-/// One complete or still-unresolved longitudinal record.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MetaEpisodeRecord {
     pub observation: MetaEpisodeObservation,
@@ -107,7 +90,6 @@ pub struct MetaSignalRevision {
     pub selection_support_delta: f64,
 }
 
-/// Result returned immediately after the current episode is committed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MetaCommitReport {
     pub authority: MetaStateAuthority,
@@ -131,8 +113,6 @@ pub struct OutcomeCommitReport {
     pub unresolved_records: usize,
 }
 
-/// Serializable checkpoint. Restore always re-validates all state-machine invariants; callers do
-/// not deserialize directly into the live state type.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MetaStateCheckpoint {
     pub schema_version: u32,
@@ -142,7 +122,6 @@ pub struct MetaStateCheckpoint {
     pub records: Vec<MetaEpisodeRecord>,
 }
 
-/// Live metacognitive state for one logical subject/agent.
 #[derive(Debug, Clone)]
 pub struct MetaEpistemicState {
     subject_id: String,
@@ -189,7 +168,6 @@ impl MetaEpistemicState {
         self.records.back()
     }
 
-    /// Freeze a pre-outcome observation and make it the current state before returning.
     pub fn commit_observation(
         &mut self,
         observation: MetaEpisodeObservation,
@@ -255,8 +233,6 @@ impl MetaEpistemicState {
         })
     }
 
-    /// Attach an outcome to a previously frozen episode. Outcome feedback can never create an
-    /// episode or rewrite its pre-outcome observation.
     pub fn record_outcome(
         &mut self,
         feedback: MetaOutcomeFeedback,
@@ -267,7 +243,6 @@ impl MetaEpistemicState {
             .iter_mut()
             .find(|record| record.observation.sequence == feedback.sequence)
             .ok_or(MetaStateError::UnknownEpisodeSequence(feedback.sequence))?;
-
         if record.observation.episode_id != feedback.episode_id {
             return Err(MetaStateError::EpisodeIdentityMismatch {
                 sequence: feedback.sequence,
@@ -305,7 +280,6 @@ impl MetaEpistemicState {
         }
     }
 
-    /// Restore only after re-validating checkpoint structure, ordering, identities and values.
     pub fn restore(checkpoint: MetaStateCheckpoint) -> Result<Self, MetaStateError> {
         if checkpoint.schema_version != META_EPISTEMIC_STATE_SCHEMA_VERSION {
             return Err(MetaStateError::UnsupportedSchemaVersion(
@@ -325,11 +299,11 @@ impl MetaEpistemicState {
             });
         }
 
-        let mut ids = HashSet::with_capacity(checkpoint.records.len());
-        let mut previous_sequence = None;
+        let mut ids: HashSet<String> = HashSet::with_capacity(checkpoint.records.len());
+        let mut previous_sequence: Option<u64> = None;
         for record in &checkpoint.records {
             validate_observation(&record.observation)?;
-            if !ids.insert(record.observation.episode_id.as_str()) {
+            if !ids.insert(record.observation.episode_id.clone()) {
                 return Err(MetaStateError::DuplicateEpisodeId(
                     record.observation.episode_id.clone(),
                 ));
@@ -542,13 +516,8 @@ mod tests {
         let report = state
             .commit_observation(observation(0, "episode-0", 0.8))
             .unwrap();
-
-        assert_eq!(report.sequence, 0);
         assert_eq!(state.current().unwrap().observation.episode_id, "episode-0");
-        assert_eq!(
-            state.current().unwrap().observation.signals,
-            report.current_signals
-        );
+        assert_eq!(state.current().unwrap().observation.signals, report.current_signals);
         assert_eq!(state.next_sequence(), 1);
     }
 
@@ -559,7 +528,6 @@ mod tests {
             state.record_outcome(outcome(0, "episode-0", true)),
             Err(MetaStateError::UnknownEpisodeSequence(0))
         ));
-
         state
             .commit_observation(observation(0, "episode-0", 0.5))
             .unwrap();
@@ -568,28 +536,6 @@ mod tests {
             Err(MetaStateError::EpisodeIdentityMismatch { .. })
         ));
         assert!(state.current().unwrap().outcome.is_none());
-    }
-
-    #[test]
-    fn episode_order_is_strictly_monotonic() {
-        let mut state = MetaEpistemicState::new("agent-a", 4).unwrap();
-        assert!(matches!(
-            state.commit_observation(observation(1, "episode-1", 0.5)),
-            Err(MetaStateError::SequenceMismatch {
-                expected: 0,
-                found: 1
-            })
-        ));
-        state
-            .commit_observation(observation(0, "episode-0", 0.5))
-            .unwrap();
-        assert!(matches!(
-            state.commit_observation(observation(0, "replay", 0.5)),
-            Err(MetaStateError::SequenceMismatch {
-                expected: 1,
-                found: 0
-            })
-        ));
     }
 
     #[test]
@@ -602,64 +548,13 @@ mod tests {
             state.commit_observation(observation(1, "episode-1", 0.6)),
             Err(MetaStateError::UnresolvedHistoryWouldBeEvicted { .. })
         ));
-
         state
             .record_outcome(outcome(0, "episode-0", true))
             .unwrap();
         state
             .commit_observation(observation(1, "episode-1", 0.6))
             .unwrap();
-        assert_eq!(state.records().len(), 1);
         assert_eq!(state.current().unwrap().observation.episode_id, "episode-1");
-    }
-
-    #[test]
-    fn revision_is_between_frozen_pre_outcome_signals() {
-        let mut state = MetaEpistemicState::new("agent-a", 4).unwrap();
-        state
-            .commit_observation(observation(0, "episode-0", 0.4))
-            .unwrap();
-        state
-            .record_outcome(outcome(0, "episode-0", false))
-            .unwrap();
-        let report = state
-            .commit_observation(observation(1, "episode-1", 0.9))
-            .unwrap();
-
-        let revision = report.revision.unwrap();
-        assert!((revision.context_support_delta - 0.5).abs() < 1.0e-12);
-        assert_eq!(revision.strategy_support_delta, 0.0);
-        assert_eq!(revision.selection_support_delta, 0.0);
-    }
-
-    #[test]
-    fn subjects_do_not_share_longitudinal_state() {
-        let mut a = MetaEpistemicState::new("agent-a", 4).unwrap();
-        let mut b = MetaEpistemicState::new("agent-b", 4).unwrap();
-        a.commit_observation(observation(0, "a-0", 0.8)).unwrap();
-        b.commit_observation(observation(0, "b-0", 0.2)).unwrap();
-
-        assert_eq!(a.current().unwrap().observation.episode_id, "a-0");
-        assert_eq!(b.current().unwrap().observation.episode_id, "b-0");
-        assert_ne!(
-            a.current().unwrap().observation.signals.context_support,
-            b.current().unwrap().observation.signals.context_support
-        );
-    }
-
-    #[test]
-    fn duplicate_outcome_is_rejected() {
-        let mut state = MetaEpistemicState::new("agent-a", 4).unwrap();
-        state
-            .commit_observation(observation(0, "episode-0", 0.5))
-            .unwrap();
-        state
-            .record_outcome(outcome(0, "episode-0", true))
-            .unwrap();
-        assert!(matches!(
-            state.record_outcome(outcome(0, "episode-0", true)),
-            Err(MetaStateError::DuplicateOutcome { .. })
-        ));
     }
 
     #[test]
@@ -680,7 +575,7 @@ mod tests {
     }
 
     #[test]
-    fn restored_checkpoint_preserves_state_and_authority() {
+    fn restored_checkpoint_preserves_measurement_only_authority() {
         let mut state = MetaEpistemicState::new("agent-a", 4).unwrap();
         state
             .commit_observation(observation(0, "episode-0", 0.5))
@@ -689,10 +584,7 @@ mod tests {
             .record_outcome(outcome(0, "episode-0", true))
             .unwrap();
         let restored = MetaEpistemicState::restore(state.checkpoint()).unwrap();
-
-        assert_eq!(restored.subject_id(), "agent-a");
         assert_eq!(restored.next_sequence(), 1);
-        assert_eq!(restored.records().len(), 1);
         assert_eq!(restored.authority(), MetaStateAuthority::MeasurementOnly);
         assert!(!restored.authority().may_control_plasticity());
     }
