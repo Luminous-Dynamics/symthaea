@@ -25,7 +25,7 @@ pub type EntityId = u16;
 pub type ObjectId = u16;
 pub type LocationId = u16;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TrackingEventKind {
     MoveEntity { entity: EntityId, to: LocationId },
     TransferObject { object: ObjectId, to: EntityId },
@@ -38,7 +38,7 @@ pub struct TrackingEvent {
     pub kind: TrackingEventKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TrackingQueryKind {
     EntityLocation { entity: EntityId },
     ObjectOwner { object: ObjectId },
