@@ -14,6 +14,8 @@
 //!   Polyakov loops, and local gauge transformations
 //! - **Reproducible SU(3) sampling**: pinned ChaCha8 streams, shared subgroup
 //!   force semantics, Kennedy-Pendleton heat-bath, and overrelaxation cycles
+//! - **Canonical gauge persistence**: versioned big-endian IEEE-754 link bytes
+//!   with exact site/link/matrix ordering for checkpoint/configuration identity
 //! - **Spatial APE operator construction**: synchronous spatial-only APE smearing
 //!   with deterministic SU(3) polar projection and untouched temporal links
 //! - **Mixed/off-axis Wilson measurement**: original temporal links plus APE
@@ -43,6 +45,7 @@ pub mod general_relativity;
 pub mod lattice_bresenham_wilson;
 pub mod lattice_cubic_wilson;
 pub mod lattice_gauge;
+pub mod lattice_gauge_encoding;
 pub mod lattice_hb_or_sweep;
 pub mod lattice_heatbath;
 pub mod lattice_heatbath_su3;
@@ -84,6 +87,10 @@ pub use lattice_gauge::{
     LatticeGaugeError, Site4, Su3Matrix, WilsonGaugeField, su3_dagger, su3_determinant,
     su3_determinant_error, su3_diagonal, su3_identity, su3_mul, su3_trace,
     su3_unitarity_error, validate_su3,
+};
+pub use lattice_gauge_encoding::{
+    GaugeFieldEncodingError, WILSON_GAUGE_FIELD_ENCODING_ID, WILSON_GAUGE_FIELD_TAG,
+    decode_wilson_gauge_field, encode_wilson_gauge_field,
 };
 pub use lattice_hb_or_sweep::{
     HeatbathOverrelaxationError, HeatbathOverrelaxationSchedule,
