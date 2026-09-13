@@ -40,7 +40,8 @@ pub use gwt1_end_to_end::{
     build_gwt1_evidence_v1, run_gwt1_end_to_end_v1,
 };
 pub use gwt1_promotion::{
-    GWT1_DIRECT_PROMOTION_POLICY_V1, Gwt1DirectPromotionDecisionV1, promote_direct_gwt1_v1,
+    GWT1_DIRECT_PROMOTION_POLICY_V1, Gwt1DirectPromotionDecisionV1,
+    Gwt1PromotionInputStatusV1, promote_direct_gwt1_v1,
 };
 pub use gwt1_qualification::{
     GWT1_MIN_TRAJECTORY_STEPS_V1, GWT1_PERTURBATIONS_V1, GWT1_QUALIFICATION_SCHEMA_V1,
