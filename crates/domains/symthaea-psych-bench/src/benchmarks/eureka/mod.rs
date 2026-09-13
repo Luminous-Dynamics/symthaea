@@ -56,6 +56,8 @@ mod v2_target_contract;
 #[cfg(test)]
 #[allow(dead_code)]
 mod v2_comparator_custody;
+#[cfg(test)]
+mod v2_paired_subject;
 
 pub use consequence::{
     ConsequenceMetrics, ConsequencePrediction, ConsequenceScore, ConsequenceScoringError,
