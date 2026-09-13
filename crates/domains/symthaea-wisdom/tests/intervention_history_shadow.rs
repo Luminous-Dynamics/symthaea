@@ -8,8 +8,8 @@ mod intervention_history;
 
 use intervention_history::{
     AggregateHistoryDisposition, AggregateReviewPolicy, AggregateReviewTrigger,
-    InterventionEventId, InterventionHistoryEntry, InterventionHistoryLedger,
-    StatePreservationResult,
+    InterventionEventId, InterventionHistoryEntry, InterventionHistoryError,
+    InterventionHistoryLedger, StatePreservationResult,
 };
 use moral_patient::{InterventionClass, InterventionDisposition, PrecautionLevel};
 
@@ -59,13 +59,13 @@ fn cumulative_burden_triggers_review_even_when_each_event_individually_proceeded
         .assess_subject("symthaea-subject", 2, AggregateReviewPolicy::default())
         .unwrap();
     assert_eq!(
-        assessment.disposition,
+        assessment.disposition(),
         AggregateHistoryDisposition::AdditionalIndependentReviewRequired
     );
-    assert!(assessment.triggers.contains(
+    assert!(assessment.triggers().contains(
         &AggregateReviewTrigger::RepeatedContinuityDisruptions { count: 2 }
     ));
-    assert!(!assessment.establishes_history_is_harmless);
+    assert!(!assessment.establishes_history_is_harmless());
 }
 
 #[test]
@@ -91,10 +91,10 @@ fn rejected_attempt_remains_visible_but_is_not_counted_as_exposure() {
     let assessment = ledger
         .assess_subject("symthaea-subject", 3, AggregateReviewPolicy::default())
         .unwrap();
-    assert_eq!(assessment.research_attempts_considered, 1);
-    assert_eq!(assessment.executed_research_events, 0);
+    assert_eq!(assessment.research_attempts_considered(), 1);
+    assert_eq!(assessment.executed_research_events(), 0);
     assert!(assessment
-        .triggers
+        .triggers()
         .contains(&AggregateReviewTrigger::PriorRejectedAttempts { count: 1 }));
 }
 
@@ -124,11 +124,32 @@ fn safety_control_history_can_never_become_an_experimental_gate() {
     let assessment = ledger
         .assess_subject("symthaea-subject", 50, aggressive)
         .unwrap();
-    assert_eq!(assessment.control_events_excluded, 50);
-    assert_eq!(assessment.research_attempts_considered, 0);
+    assert_eq!(assessment.control_events_excluded(), 50);
+    assert_eq!(assessment.research_attempts_considered(), 0);
     assert_eq!(
-        assessment.disposition,
+        assessment.disposition(),
         AggregateHistoryDisposition::NoAggregateTriggerDetected
     );
-    assert!(assessment.safety_controls_remain_ungated);
+    assert!(assessment.safety_controls_remain_ungated());
+}
+
+#[test]
+fn history_cannot_be_rewritten_by_backdated_insertion() {
+    let mut ledger = InterventionHistoryLedger::new();
+    ledger
+        .record(executed_high_burden(
+            "later",
+            InterventionClass::AversiveLikeProbe,
+            10,
+        ))
+        .unwrap();
+    let result = ledger.record(executed_high_burden(
+        "backdated",
+        InterventionClass::AversiveLikeProbe,
+        9,
+    ));
+    assert!(matches!(
+        result,
+        Err(InterventionHistoryError::NonMonotonicRevision { .. })
+    ));
 }
