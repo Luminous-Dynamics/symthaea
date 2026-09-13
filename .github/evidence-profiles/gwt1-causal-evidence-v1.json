@@ -1,0 +1,68 @@
+{
+  "schema": "butlin-evidence-archive-admission-profile-v1",
+  "profile_id": "gwt1-causal-evidence-archive-v1",
+  "root": "gwt1-causal-evidence",
+  "canonical_uid": 0,
+  "canonical_gid": 0,
+  "canonical_mtime": 0,
+  "max_archive_bytes": 67108864,
+  "max_tar_stream_bytes": 201326592,
+  "max_member_bytes": 67108864,
+  "max_total_unpacked_bytes": 167772160,
+  "members": [
+    {
+      "path": "gwt1-causal-evidence",
+      "kind": "directory",
+      "mode": 493
+    },
+    {
+      "path": "gwt1-causal-evidence/SHA256SUMS",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 16384
+    },
+    {
+      "path": "gwt1-causal-evidence/causal_evidence_envelope.json",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 16777216
+    },
+    {
+      "path": "gwt1-causal-evidence/causal_observations.json",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 67108864
+    },
+    {
+      "path": "gwt1-causal-evidence/matched_sham_observations.json",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 67108864
+    },
+    {
+      "path": "gwt1-causal-evidence/outcome.txt",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 1024
+    },
+    {
+      "path": "gwt1-causal-evidence/resolution.json",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 4194304
+    },
+    {
+      "path": "gwt1-causal-evidence/workflow_provenance.json",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 65536
+    }
+  ]
+}

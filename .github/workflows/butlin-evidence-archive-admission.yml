@@ -1,0 +1,104 @@
+name: Butlin Evidence Archive Admission
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/evidence_archive_admission.py"
+      - ".github/scripts/test_evidence_archive_admission.py"
+      - ".github/evidence-profiles/*.json"
+      - ".github/workflows/butlin-evidence-archive-admission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify fail-closed archive admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Parse sources and freeze no-shell/no-generic-extraction boundary
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          test -x /usr/bin/python3
+          /usr/bin/python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          validator_path = Path('.github/scripts/evidence_archive_admission.py')
+          test_path = Path('.github/scripts/test_evidence_archive_admission.py')
+
+          validator_tree = ast.parse(
+              validator_path.read_text(encoding='utf-8'),
+              filename=str(validator_path),
+          )
+          ast.parse(test_path.read_text(encoding='utf-8'), filename=str(test_path))
+
+          forbidden_imports = {'subprocess'}
+          forbidden_calls = {'extract', 'extractall'}
+
+          for node in ast.walk(validator_tree):
+              if isinstance(node, ast.Import):
+                  for alias in node.names:
+                      if alias.name.split('.')[0] in forbidden_imports:
+                          raise SystemExit(f'forbidden import: {alias.name}')
+              elif isinstance(node, ast.ImportFrom):
+                  if (node.module or '').split('.')[0] in forbidden_imports:
+                      raise SystemExit(f'forbidden import-from: {node.module}')
+              elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                  if node.func.attr in forbidden_calls:
+                      raise SystemExit(f'forbidden tar extraction call: {node.func.attr}')
+
+          print('archive admission AST boundary qualified')
+          PY
+
+      - name: Validate frozen direct and causal admission profiles
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONPATH: .github/scripts
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+          from evidence_archive_admission import load_profile
+
+          profile_root = Path('.github/evidence-profiles')
+          expected = {
+              profile_root / 'gwt1-direct-evidence-v1.json',
+              profile_root / 'gwt1-causal-evidence-v1.json',
+          }
+          observed = set(profile_root.glob('*.json'))
+          if observed != expected:
+              raise SystemExit(
+                  f'archive profile set mismatch: missing={sorted(map(str, expected-observed))} '
+                  f'extra={sorted(map(str, observed-expected))}'
+              )
+
+          profile_ids = set()
+          for path in sorted(observed):
+              profile = load_profile(path.resolve(strict=True))
+              profile_id = profile['profile_id']
+              if profile_id in profile_ids:
+                  raise SystemExit(f'duplicate archive profile_id: {profile_id}')
+              profile_ids.add(profile_id)
+              print(f'qualified profile {profile_id}: {path}')
+          PY
+
+      - name: Run adversarial archive-admission qualification
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 .github/scripts/test_evidence_archive_admission.py
