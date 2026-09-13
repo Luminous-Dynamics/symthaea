@@ -446,7 +446,7 @@ fn duplicate_evidence_cannot_be_admitted_twice() {
                 &second_admission,
             )
             .unwrap_err(),
-        CampaignError::DuplicateEvidenceDigest
+        CampaignError::DuplicateEvidenceId("evidence-a".into())
     );
 }
 
