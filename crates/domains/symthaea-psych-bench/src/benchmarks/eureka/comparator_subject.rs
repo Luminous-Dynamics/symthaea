@@ -8,8 +8,7 @@
 //! the exact fitted baseline predictor that a future HeldOut runner may query.
 
 use super::baselines::{
-    BaselineFitCorpus, CorpusError, FittedShortcutBaselines, PublicTransitionRecord,
-    ShortcutBaselineKind,
+    BaselineFitCorpus, CorpusError, FittedShortcutBaselines, ShortcutBaselineKind,
 };
 use super::consequence::ConsequencePrediction;
 use super::fep_comparator_freeze::ComparatorFreezeArtifact;
@@ -196,7 +195,7 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::benchmarks::eureka::baselines::TransitionRecorder;
+    use crate::benchmarks::eureka::baselines::{PublicTransitionRecord, TransitionRecorder};
     use crate::benchmarks::eureka::hidden_world::WorldBuildProfile;
 
     fn development_records() -> Vec<PublicTransitionRecord> {
