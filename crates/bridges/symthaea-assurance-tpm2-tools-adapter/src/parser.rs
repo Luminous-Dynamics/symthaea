@@ -5,14 +5,16 @@ use crate::{COUNTER_BYTES, Tpm2AdapterError, blake3_digest, valid_blake3_digest}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tpm2NvPublicEvidence {
     pub nv_index: u32,
+    pub nv_name: String,
     pub attributes_friendly: String,
     pub data_size: usize,
     pub raw_public_output_blake3: String,
 }
 
 impl Tpm2NvPublicEvidence {
-    pub fn validate(&self, expected_index: u32) -> bool {
+    pub fn validate(&self, expected_index: u32, expected_name: &str) -> bool {
         self.nv_index == expected_index
+            && self.nv_name == expected_name
             && self.data_size == COUNTER_BYTES
             && attributes_declare_counter(&self.attributes_friendly)
             && valid_blake3_digest(&self.raw_public_output_blake3)
@@ -28,6 +30,7 @@ pub fn parse_nv_public(
     let mut found = false;
     let mut in_expected = false;
     let mut in_attributes = false;
+    let mut nv_name = None;
     let mut attributes = None;
     let mut size = None;
 
@@ -42,6 +45,13 @@ pub fn parse_nv_public(
             continue;
         }
         if !in_expected {
+            continue;
+        }
+        if let Some(value) = trimmed.strip_prefix("name:") {
+            let normalized = value.trim().to_ascii_lowercase();
+            if !normalized.is_empty() {
+                nv_name = Some(normalized);
+            }
             continue;
         }
         if trimmed == "attributes:" {
@@ -63,6 +73,7 @@ pub fn parse_nv_public(
     if !found {
         return Err(Tpm2AdapterError::NvIndexNotPresent);
     }
+    let nv_name = nv_name.ok_or(Tpm2AdapterError::MissingNvName)?;
     let attributes = attributes.ok_or(Tpm2AdapterError::MissingAttributes)?;
     if !attributes_declare_counter(&attributes) {
         return Err(Tpm2AdapterError::NvIndexIsNotCounter);
@@ -74,6 +85,7 @@ pub fn parse_nv_public(
 
     Ok(Tpm2NvPublicEvidence {
         nv_index: expected_index,
+        nv_name,
         attributes_friendly: attributes,
         data_size: size,
         raw_public_output_blake3: blake3_digest(stdout),
@@ -91,15 +103,17 @@ fn attributes_declare_counter(attributes: &str) -> bool {
 mod tests {
     use super::*;
 
-    fn yaml_with_handle(handle: &str, attributes: &str, size: usize) -> Vec<u8> {
+    const NAME: &str = "000bdeadbeef";
+
+    fn yaml_with_handle(handle: &str, name: &str, attributes: &str, size: usize) -> Vec<u8> {
         format!(
-            "{handle}:\n  name: 000bdeadbeef\n  hash algorithm:\n    friendly: sha256\n    value: 0xb\n  attributes:\n    friendly: {attributes}\n    value: 0x20040004\n  size: {size}\n  authorization policy:\n"
+            "{handle}:\n  name: {name}\n  hash algorithm:\n    friendly: sha256\n    value: 0xb\n  attributes:\n    friendly: {attributes}\n    value: 0x20040004\n  size: {size}\n  authorization policy:\n"
         )
         .into_bytes()
     }
 
     fn yaml(attributes: &str, size: usize) -> Vec<u8> {
-        yaml_with_handle("0x1500016", attributes, size)
+        yaml_with_handle("0x1500016", NAME, attributes, size)
     }
 
     #[test]
@@ -110,17 +124,27 @@ mod tests {
         )
         .unwrap();
         assert_eq!(parsed.data_size, 8);
-        assert!(parsed.validate(0x0150_0016));
+        assert_eq!(parsed.nv_name, NAME);
+        assert!(parsed.validate(0x0150_0016, NAME));
     }
 
     #[test]
     fn leading_zero_handle_format_is_equivalent() {
         let parsed = parse_nv_public(
-            &yaml_with_handle("0x01500016", "ownerread|nt=counter", 8),
+            &yaml_with_handle("0x01500016", NAME, "ownerread|nt=counter", 8),
             0x0150_0016,
         )
         .unwrap();
         assert_eq!(parsed.nv_index, 0x0150_0016);
+    }
+
+    #[test]
+    fn missing_name_is_rejected() {
+        let without_name = b"0x1500016:\n  attributes:\n    friendly: ownerread|nt=counter\n  size: 8\n";
+        assert_eq!(
+            parse_nv_public(without_name, 0x0150_0016),
+            Err(Tpm2AdapterError::MissingNvName)
+        );
     }
 
     #[test]
