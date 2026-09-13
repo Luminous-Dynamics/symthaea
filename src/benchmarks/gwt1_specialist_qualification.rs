@@ -17,6 +17,7 @@ use rayon::{ThreadPoolBuilder, join};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Barrier, mpsc};
+use std::time::Duration;
 
 pub const GWT1_RAW_OBSERVATION_SCHEMA_V1: &str = "butlin-gwt1-raw-observations-v1";
 pub const GWT1_SPECIALIZATION_CONTRACT_V1: &str = "gwt1-specialization-matrix-v1";
@@ -28,6 +29,7 @@ pub const GWT1_SPECIALIST_IDS_V1: [&str; 4] = [
     "learning_manager",
     "perception_manager",
 ];
+const GWT1_CONCURRENCY_RESULT_TIMEOUT_V1: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Gwt1SubsystemOutputBitsV1 {
@@ -104,7 +106,8 @@ pub struct Gwt1RawObservationsV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Gwt1RunnerErrorV1 {
     ThreadPoolBuild(String),
-    ConcurrentTaskChannelClosed,
+    ConcurrentTaskTimeout { completed: u32 },
+    ConcurrentTaskChannelClosed { completed: u32 },
 }
 
 #[derive(Default)]
@@ -376,12 +379,19 @@ fn run_concurrency() -> Result<Gwt1ConcurrencyRawV1, Gwt1RunnerErrorV1> {
 
     let mut completed_specialists = BTreeSet::new();
     let mut worker_names = BTreeMap::new();
-    for _ in 0..4 {
-        let (id, worker) = rx
-            .recv()
-            .map_err(|_| Gwt1RunnerErrorV1::ConcurrentTaskChannelClosed)?;
-        completed_specialists.insert(id.to_string());
-        worker_names.insert(id.to_string(), worker);
+    for completed in 0..4_u32 {
+        match rx.recv_timeout(GWT1_CONCURRENCY_RESULT_TIMEOUT_V1) {
+            Ok((id, worker)) => {
+                completed_specialists.insert(id.to_string());
+                worker_names.insert(id.to_string(), worker);
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                return Err(Gwt1RunnerErrorV1::ConcurrentTaskTimeout { completed });
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                return Err(Gwt1RunnerErrorV1::ConcurrentTaskChannelClosed { completed });
+            }
+        }
     }
 
     Ok(Gwt1ConcurrencyRawV1 {
