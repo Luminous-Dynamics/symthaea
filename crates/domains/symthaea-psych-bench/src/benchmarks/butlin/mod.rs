@@ -21,6 +21,7 @@ pub mod ae2_empirical_runner;
 pub mod gwt1_evidence_envelope;
 #[cfg(feature = "symthaea-backend")]
 pub mod gwt1_end_to_end;
+pub mod gwt1_promotion;
 pub mod gwt1_qualification;
 pub mod indicators;
 pub mod qualification_design;
@@ -37,6 +38,9 @@ pub use gwt1_evidence_envelope::{
 pub use gwt1_end_to_end::{
     Gwt1EndToEndErrorV1, Gwt1EndToEndEvidenceV1, Gwt1ExecutionIdentityV1,
     build_gwt1_evidence_v1, run_gwt1_end_to_end_v1,
+};
+pub use gwt1_promotion::{
+    GWT1_DIRECT_PROMOTION_POLICY_V1, Gwt1DirectPromotionDecisionV1, promote_direct_gwt1_v1,
 };
 pub use gwt1_qualification::{
     GWT1_MIN_TRAJECTORY_STEPS_V1, GWT1_PERTURBATIONS_V1, GWT1_QUALIFICATION_SCHEMA_V1,
