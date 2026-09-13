@@ -56,6 +56,14 @@ The commitment binds at minimum:
 
 The hidden bundle may be encrypted or stored privately, but secrecy technology is not itself evidence of evaluator independence.
 
+## Canonical commitment inputs
+
+The commitment hashes exact bytes, not parsed semantic equivalence.
+
+For the ordered case census, use a UTF-8 file with exactly one stable case ID per line, LF (`\n`) line endings, no blank lines, no duplicate IDs, and one final LF. Order is significant. `case_id_commitment_sha256` is the SHA-256 of those exact bytes, and `case_count` is the number of lines.
+
+The holdout bundle, scoring specification, and adjudication specification are likewise committed as exact byte files. Reformatting, key reordering, newline conversion, metadata insertion, or any other byte change after commitment produces a different object and invalidates the commitment unless a new holdout epoch is created before reveal.
+
 ## Evaluator lineage
 
 Every result must classify the evaluator lineage as exactly one of:
