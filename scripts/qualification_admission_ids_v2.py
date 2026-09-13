@@ -60,18 +60,6 @@ def _resolve(admission: Any, profile_value: Any) -> tuple[dict[str, Any], dict[s
     return request, profile
 
 
-def _subject_id_v2(request: dict[str, Any], profile: dict[str, Any]) -> str:
-    qualification_subject_id_v2 = semantic_v2.compute_subject_id_v2(request["subject"])
-    qualification_profile_id_v2 = semantic_v2.compute_profile_id_v2(profile)
-    return framing.semantic_sha256_id(
-        SUBJECT_ID_DOMAIN,
-        [
-            ("qualification_subject_id_v2", framing.encode_text(qualification_subject_id_v2)),
-            ("qualification_profile_id_v2", framing.encode_text(qualification_profile_id_v2)),
-        ],
-    )
-
-
 def derive_admission_identities_v2(admission: Any, profile_value: Any) -> dict[str, str]:
     """Validate all V1/V3 preimages and derive framed V2 work/request identities."""
 
@@ -115,9 +103,27 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise train.TrainManifestError(f"duplicate JSON object key: {key!r}")
+        result[key] = value
+    return result
+
+
 def _load_json(path: Path) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        if path.stat().st_size > train.MAX_MANIFEST_BYTES:
+            raise train.TrainManifestError(
+                f"{path}: migration input exceeds {train.MAX_MANIFEST_BYTES} bytes"
+            )
+        return json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_object_without_duplicate_keys,
+        )
+    except train.TrainManifestError:
+        raise
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise train.TrainManifestError(f"{path}: {error}") from error
 
@@ -125,7 +131,11 @@ def _load_json(path: Path) -> Any:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        result = derive_admission_identities_v2(_load_json(args.admission), _load_json(args.profile))
+        admission = _load_json(args.admission)
+        # Reuse the profile module's bounded, duplicate-key-rejecting loader rather than
+        # defining a second profile-file parsing contract in the migration bridge.
+        profile = profile_mod.load_profile(args.profile, require_id=True)
+        result = derive_admission_identities_v2(admission, profile)
     except train.TrainManifestError as error:
         print(f"qualification admission v2 migration invalid: {error}")
         return 2
