@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-fabrication-trust-bridge"
+version = "0.1.0"
+edition = "2024"
+description = "Interval-safe bridge from Symthaea trust-kernel clock authority into fabrication governance"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
