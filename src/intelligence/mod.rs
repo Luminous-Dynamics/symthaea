@@ -12,6 +12,7 @@
 //! - Decomposed metacognitive calibration, abstention, assumption, and revision qualification
 //! - Public development probe for evidence-revision direction and epistemic remediation
 //! - Public development probe for meta-reasoning control-flow and state persistence
+//! - Public development probe for context-optimizer objective plumbing
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -25,6 +26,7 @@ pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
 pub mod reasoning_meta_control_probe;
 pub mod reasoning_metacognition;
+pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
 
 pub use causal_consciousness::{
@@ -68,6 +70,10 @@ pub use reasoning_metacognition::{
     ConfidenceRevisionObservation, CorrectnessPrediction, MetacognitionEvaluationError,
     MetacognitionReport, SelectiveRiskPoint, WeakAssumptionObservation,
     METACOGNITION_EVALUATOR_VERSION,
+};
+pub use reasoning_objective_plumbing_probe::{
+    run_objective_plumbing_probe, ObjectivePlumbingObservation,
+    ObjectivePlumbingProbeReport, OBJECTIVE_PLUMBING_PROBE_VERSION,
 };
 pub use reasoning_qualification::{
     AbstentionReason, AssumptionRecord, EvidenceRef, QualificationMetric,
