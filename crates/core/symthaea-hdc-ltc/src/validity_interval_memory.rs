@@ -334,6 +334,46 @@ mod tests {
     }
 
     #[test]
+    fn analytic_span_matches_explicit_checkpoint_sum_at_large_offset() {
+        let dim = 1024;
+        let axis = TemporalAxis::new(dim, 15).unwrap();
+        let key = UnitaryRole::new(dim, 16);
+        let value = UnitaryRole::new(dim, 17);
+        let start = 1_000_000u64;
+        let end = start + 257;
+
+        let mut analytic = ValidityIntervalMemory::new(dim).unwrap();
+        analytic.write_span(&axis, &key, &value, start, end).unwrap();
+
+        let mut explicit = ValidityIntervalMemory::new(dim).unwrap();
+        for checkpoint in start..end {
+            explicit
+                .write_span(&axis, &key, &value, checkpoint, checkpoint + 1)
+                .unwrap();
+        }
+
+        let max_abs_error = analytic
+            .real
+            .iter()
+            .zip(&analytic.imag)
+            .zip(explicit.real.iter().zip(&explicit.imag))
+            .flat_map(|((&analytic_real, &analytic_imag), (&explicit_real, &explicit_imag))| {
+                [
+                    (analytic_real - explicit_real).abs(),
+                    (analytic_imag - explicit_imag).abs(),
+                ]
+            })
+            .fold(0.0_f64, f64::max);
+
+        assert!(
+            max_abs_error < 1e-6,
+            "analytic Dirichlet span diverged from explicit checkpoint sum: {max_abs_error}"
+        );
+        assert_eq!(analytic.spans_written(), 1);
+        assert_eq!(explicit.spans_written(), 257);
+    }
+
+    #[test]
     fn independent_keys_do_not_share_history() {
         let dim = 4096;
         let axis = TemporalAxis::new(dim, 20).unwrap();
