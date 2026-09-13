@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{blake3_digest, valid_blake3_digest, COUNTER_BYTES, Tpm2AdapterError};
+use crate::{COUNTER_BYTES, Tpm2AdapterError, blake3_digest, valid_blake3_digest};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tpm2NvPublicEvidence {
@@ -23,7 +23,8 @@ pub fn parse_nv_public(
     stdout: &[u8],
     expected_index: u32,
 ) -> Result<Tpm2NvPublicEvidence, Tpm2AdapterError> {
-    let text = std::str::from_utf8(stdout).map_err(|_| Tpm2AdapterError::InvalidPublicOutput)?;
+    let text =
+        std::str::from_utf8(stdout).map_err(|_| Tpm2AdapterError::InvalidPublicOutput)?;
     let mut found = false;
     let mut in_expected = false;
     let mut in_attributes = false;
@@ -103,8 +104,11 @@ mod tests {
 
     #[test]
     fn exact_counter_metadata_parses() {
-        let parsed = parse_nv_public(&yaml("ownerread|ownerwrite|nt=counter", 8), 0x0150_0016)
-            .unwrap();
+        let parsed = parse_nv_public(
+            &yaml("ownerread|ownerwrite|nt=counter", 8),
+            0x0150_0016,
+        )
+        .unwrap();
         assert_eq!(parsed.data_size, 8);
         assert!(parsed.validate(0x0150_0016));
     }
