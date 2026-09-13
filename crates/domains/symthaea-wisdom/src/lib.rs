@@ -36,6 +36,7 @@ pub mod autopoiesis;
 pub mod care;
 pub mod consent;
 pub mod evidence_ledger;
+pub mod evaluation_contract;
 pub mod harmonics;
 pub mod meta_cognition;
 pub mod ontology;
@@ -69,6 +70,10 @@ pub use evidence_ledger::{
     DecisionReviewReason, DeliberationEvidenceLedger, EvidenceLedgerError,
     EvidenceObservation, EvidenceRelation, FactClaim, FactClaimId, FactConflict, FactLedger,
     NormativeClaim, NormativeClaimId, NormativeConflict, NormativeLedger,
+};
+pub use evaluation_contract::{
+    covered_dimensions, scenario_ids, EvidenceTier, EvaluationDimension, GateClass,
+    ScenarioFamily, ScenarioSpec, WCARE_V1_ANTI_METRICS, WCARE_V1_SCENARIOS,
 };
 pub use harmonics::{
     ActiveHarmonic, HarmonicMode, HarmonicProfile, HarmonicQuestion, ReasoningBias,
