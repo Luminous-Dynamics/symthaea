@@ -24,7 +24,10 @@ use super::super::types::{EffectiveDimSource, RecurrentMaskEvent};
 /// introduced by #2083; configuration drift therefore fails closed instead of
 /// manufacturing action identity.
 #[cfg(any(feature = "jepa", test))]
-fn jepa_predecessor_action(committed_action: Option<usize>, configured_actions: usize) -> Option<u8> {
+fn jepa_predecessor_action(
+    committed_action: Option<usize>,
+    configured_actions: usize,
+) -> Option<u8> {
     if configured_actions != InternalRegulationAction::ALL.len() {
         return None;
     }
@@ -257,6 +260,7 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
+
         // ODE trajectory planning: simulate forward trajectories via Dormand-Prince
         // to compute expected free energy over future horizons.
         // Friston (2010): genuine active inference requires planning through simulation.
