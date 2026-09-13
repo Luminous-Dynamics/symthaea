@@ -26,10 +26,12 @@
 //! | [`unified_architecture`] | End-to-end architecture validation |
 //! | [`fep_temporal_benchmark`] | Free-energy principle temporal dynamics |
 //! | [`gwt1_specialist_qualification`] | Structured direct GWT-1 specialist observations |
+//! | [`gwt1_causal_lesion`] | Selective GWT-1 specialist lesion + output-rescue observations |
 
 pub mod causal_tower;
 pub mod cognitive_loop_validation;
 pub mod fep_temporal_benchmark;
+pub mod gwt1_causal_lesion;
 pub mod gwt1_specialist_qualification;
 pub mod unified_architecture;
 pub mod unified_causal_understanding;
