@@ -33,7 +33,7 @@ check_blob() {
   fi
 }
 
-check_blob "docs/release/evidence/WCARE37_ATTESTATION_PROTOCOL_V1.md" "cbde37860e957856943ffbd3d27ad7fdff39fe2a"
+check_blob "docs/release/evidence/WCARE37_ATTESTATION_PROTOCOL_V1.md" "ba4eacd2d26be6a694c1363495df7b110ba822d8"
 check_blob "docs/release/evidence/WCARE37_ATTESTATION_ENVELOPE_SCHEMA_V1.json" "92f3113ad231b4af2b221acd8f6ebaa259e4df14"
 check_blob "docs/release/evidence/WCARE37_ISSUER_TRUST_POLICY_SCHEMA_V1.json" "ac8ee43b2c93c47bcb388c5bbf65dcea81de4ccd"
 check_blob "docs/release/evidence/WCARE37_ATTESTATION_RESULT_SCHEMA_V1.json" "f10bea5dc98fd27b01d543f19c542cb77b288f5c"
