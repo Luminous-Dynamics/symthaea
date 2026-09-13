@@ -10,13 +10,15 @@
 //! independently verifying upstream package profiles and separately attesting
 //! the complete deterministic final archive.
 
-#[cfg(not(feature = "symthaea-backend"))]
+#[cfg(not(feature = "trusted-resolution-authority"))]
 fn main() {
-    eprintln!("gwt1_generate_trusted_resolution_candidate requires --features symthaea-backend");
+    eprintln!(
+        "gwt1_generate_trusted_resolution_candidate requires --features trusted-resolution-authority"
+    );
     std::process::exit(2);
 }
 
-#[cfg(feature = "symthaea-backend")]
+#[cfg(feature = "trusted-resolution-authority")]
 fn main() {
     if let Err(error) = trusted_main() {
         eprintln!("trusted GWT-1 final-resolution candidate generation failed: {error}");
@@ -24,7 +26,7 @@ fn main() {
     }
 }
 
-#[cfg(feature = "symthaea-backend")]
+#[cfg(feature = "trusted-resolution-authority")]
 fn trusted_main() -> Result<(), Box<dyn std::error::Error>> {
     use std::env;
     use std::fs;
