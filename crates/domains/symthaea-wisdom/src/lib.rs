@@ -42,6 +42,7 @@ pub mod meta_cognition;
 pub mod ontology;
 pub mod perspective;
 pub mod practical_wisdom;
+pub mod qualification_receipt;
 pub mod relationship_safety;
 
 pub use accountability::{
@@ -90,6 +91,11 @@ pub use perspective::{
 pub use practical_wisdom::{
     DeliberationContext, PracticalWisdomAssessment, PracticalWisdomKernel, WisdomDisposition,
     WisdomReason,
+};
+pub use qualification_receipt::{
+    QualificationAssessment, QualificationError, QualificationReason, QualificationReceipt,
+    QualificationStatus, QualificationTarget, ScenarioOutcome, ScenarioResult,
+    WCARE_V1_CONTRACT_ID,
 };
 pub use relationship_safety::{
     EpistemicJudgmentRecord, JudgmentPosition, RelationshipRiskKind,
