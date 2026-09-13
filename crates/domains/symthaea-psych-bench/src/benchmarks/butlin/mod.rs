@@ -65,7 +65,7 @@ pub use gwt1_causal_resolution::{
 pub use gwt1_causal_verified_promotion::{
     GWT1_CAUSAL_APPROVED_BUILDER_SHA_V1, GWT1_CAUSAL_APPROVED_PROMOTION_WORKFLOW_SHA_V1,
     GWT1_CAUSAL_PROMOTION_WORKFLOW_V1, Gwt1CausalPromotionVerificationErrorV1,
-    VerifiedGwt1CausalPromotionV1, verify_gwt1_causal_promotion_package_v1,
+    VerifiedGwt1CausalPromotionV1,
 };
 pub use gwt1_evidence_envelope::{
     GWT1_EVIDENCE_ENVELOPE_SCHEMA_V1, GWT1_RAW_OBSERVATION_MEDIA_TYPE_V1,
