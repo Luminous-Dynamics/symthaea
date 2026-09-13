@@ -25,7 +25,6 @@ const MAX_TARGET_BYTES: usize = 256;
 const MAX_EXECUTION_ID_BYTES: usize = 256;
 const MAX_REF_BYTES: usize = 2048;
 
-/// Exact locally durable state that must be independently anchored before live promotion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RestoredContinuityPromotionRequest {
     store_target_id: String,
@@ -66,36 +65,14 @@ impl RestoredContinuityPromotionRequest {
         })
     }
 
-    pub fn store_target_id(&self) -> &str {
-        &self.store_target_id
-    }
-
-    pub fn target_id(&self) -> &str {
-        &self.target_id
-    }
-
-    pub fn instance_id(&self) -> EpisodeInstanceId {
-        self.instance_id
-    }
-
-    pub fn content_id(&self) -> EpisodeContentId {
-        self.content_id
-    }
-
-    pub fn execution_id(&self) -> &str {
-        &self.execution_id
-    }
-
-    pub fn restored_quarantine_head(&self) -> Sha256Digest {
-        self.restored_quarantine_head
-    }
+    pub fn store_target_id(&self) -> &str { &self.store_target_id }
+    pub fn target_id(&self) -> &str { &self.target_id }
+    pub fn instance_id(&self) -> EpisodeInstanceId { self.instance_id }
+    pub fn content_id(&self) -> EpisodeContentId { self.content_id }
+    pub fn execution_id(&self) -> &str { &self.execution_id }
+    pub fn restored_quarantine_head(&self) -> Sha256Digest { self.restored_quarantine_head }
 }
 
-/// Independently verified evidence that the restored continuity state advanced monotonically.
-///
-/// Construction validates shape only. Implementations of [`RestoredContinuityPromotionBarrier`]
-/// are responsible for cryptographically/monotonically proving these values against the deployment's
-/// trusted anchor protocol before returning them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerifiedRestoredContinuityPromotion {
     store_target_id: String,
@@ -136,9 +113,7 @@ impl VerifiedRestoredContinuityPromotion {
             return Err(RestoredContinuityPromotionError::AnchorDidNotAdvance);
         }
         if next_anchor_revision < 2 {
-            return Err(RestoredContinuityPromotionError::InvalidNextRevision(
-                next_anchor_revision,
-            ));
+            return Err(RestoredContinuityPromotionError::InvalidNextRevision(next_anchor_revision));
         }
         Ok(Self {
             store_target_id,
@@ -151,35 +126,14 @@ impl VerifiedRestoredContinuityPromotion {
         })
     }
 
-    pub fn store_target_id(&self) -> &str {
-        &self.store_target_id
-    }
+    pub fn store_target_id(&self) -> &str { &self.store_target_id }
+    pub fn restored_quarantine_head(&self) -> Sha256Digest { self.restored_quarantine_head }
+    pub fn previous_anchor_commitment(&self) -> Sha256Digest { self.previous_anchor_commitment }
+    pub fn next_anchor_commitment(&self) -> Sha256Digest { self.next_anchor_commitment }
+    pub fn next_anchor_revision(&self) -> u64 { self.next_anchor_revision }
+    pub fn continuity_manifest_digest(&self) -> Sha256Digest { self.continuity_manifest_digest }
+    pub fn anchor_reference(&self) -> &str { &self.anchor_reference }
 
-    pub fn restored_quarantine_head(&self) -> Sha256Digest {
-        self.restored_quarantine_head
-    }
-
-    pub fn previous_anchor_commitment(&self) -> Sha256Digest {
-        self.previous_anchor_commitment
-    }
-
-    pub fn next_anchor_commitment(&self) -> Sha256Digest {
-        self.next_anchor_commitment
-    }
-
-    pub fn next_anchor_revision(&self) -> u64 {
-        self.next_anchor_revision
-    }
-
-    pub fn continuity_manifest_digest(&self) -> Sha256Digest {
-        self.continuity_manifest_digest
-    }
-
-    pub fn anchor_reference(&self) -> &str {
-        &self.anchor_reference
-    }
-
-    /// Rebind returned evidence to the exact locally durable restore request.
     pub fn validate_for(
         &self,
         request: &RestoredContinuityPromotionRequest,
@@ -194,11 +148,6 @@ impl VerifiedRestoredContinuityPromotion {
     }
 }
 
-/// Fail-closed promotion barrier between locally durable `Restored` and canonical live activation.
-///
-/// Implementations must not return `Ok` until the resulting complete continuity state has been
-/// independently accepted by the deployment's monotonic/trusted anchor. A failure must leave live
-/// canonical memory unchanged; the caller will surface execution as reconciliation-required.
 pub trait RestoredContinuityPromotionBarrier {
     fn commit_restored_continuity(
         &mut self,
@@ -206,10 +155,6 @@ pub trait RestoredContinuityPromotionBarrier {
     ) -> Result<VerifiedRestoredContinuityPromotion, RestoredContinuityPromotionFailure>;
 }
 
-/// Opaque barrier failure used across the dependency boundary.
-///
-/// Concrete adapters should preserve detailed typed/source errors in their own logs/evidence and
-/// expose a bounded non-empty diagnostic here. Welfare policy must not reinterpret backend errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RestoredContinuityPromotionFailure {
     detail: String,
@@ -227,17 +172,12 @@ impl RestoredContinuityPromotionFailure {
         Self { detail }
     }
 
-    pub fn detail(&self) -> &str {
-        &self.detail
-    }
+    pub fn detail(&self) -> &str { &self.detail }
 }
 
 impl fmt::Display for RestoredContinuityPromotionFailure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.detail)
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.detail) }
 }
-
 impl std::error::Error for RestoredContinuityPromotionFailure {}
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -275,9 +215,19 @@ fn validate_text(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_core::hdc::unified_hv::ContinuousHV;
+    use symthaea_memory::episodic_replay::Episode;
 
-    fn digest(seed: u8) -> Sha256Digest {
-        Sha256Digest([seed; 32])
+    fn digest(seed: u8) -> Sha256Digest { Sha256Digest([seed; 32]) }
+
+    fn content_id(seed: f32) -> EpisodeContentId {
+        crate::memory_identity::episode_content_id(&Episode::new(
+            ContinuousHV::from_vec(vec![seed; 8]),
+            ContinuousHV::from_vec(vec![seed + 0.5; 8]),
+            0.8,
+            10,
+        ))
+        .unwrap()
     }
 
     #[test]
@@ -287,7 +237,7 @@ mod tests {
             "symthaea:self:episodic-memory",
             format!("symthaea:self:episodic-memory:instance:{instance}"),
             instance,
-            EpisodeContentId::from_digest(digest(7)),
+            content_id(0.7),
             "exec:restore:1",
             digest(8),
         )
@@ -312,7 +262,7 @@ mod tests {
             "symthaea:self:episodic-memory",
             format!("symthaea:self:episodic-memory:instance:{instance}"),
             instance,
-            EpisodeContentId::from_digest(digest(7)),
+            content_id(0.7),
             "exec:restore:1",
             digest(8),
         )
