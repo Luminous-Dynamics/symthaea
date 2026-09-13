@@ -387,6 +387,20 @@ impl ContinuityIdentityLedger {
         Ok(!self.inactive_instances.contains(instance))
     }
 
+    /// Immutable creation revision for a recorded runtime instance.
+    ///
+    /// This is an operational lineage fact only. It does not establish phenomenal birth,
+    /// identity persistence, or moral status.
+    pub fn created_revision(
+        &self,
+        instance: &SubjectInstanceId,
+    ) -> Result<u64, ContinuityIdentityError> {
+        self.created_revision
+            .get(instance)
+            .copied()
+            .ok_or_else(|| ContinuityIdentityError::UnknownInstance(instance.clone()))
+    }
+
     fn ancestor_set(&self, instance: &SubjectInstanceId) -> BTreeSet<SubjectInstanceId> {
         let mut result = BTreeSet::new();
         let mut cursor = Some(instance.clone());
