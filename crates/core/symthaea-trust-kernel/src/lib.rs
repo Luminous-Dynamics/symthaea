@@ -21,6 +21,7 @@
 mod accepted_clock_basis;
 mod clock;
 mod clock_bootstrap_authority;
+#[allow(unused_imports)]
 mod clock_continuous;
 mod clock_evaluation_permit;
 mod clock_successor;
