@@ -11,7 +11,8 @@
 //! grammar of exact grid transformations (identity, reflections, rotations, translations,
 //! color replacement, and geometry+color composition). A transform is eligible only if it
 //! exactly reproduces every supplied training output. If no candidate survives, the solver
-//! abstains. The test target is never passed to the solver.
+//! abstains. If surviving candidates disagree on the test output, the solver also abstains.
+//! The test target is never passed to the solver.
 //!
 //! Required environment:
 //! - `SYMTHAEA_SUBJECT_REVISION`: exact code revision being qualified
@@ -26,7 +27,7 @@
 use serde::Serialize;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 use symthaea::hdc::grid_encoder::GridEncoder;
 use symthaea::intelligence::{
@@ -82,6 +83,7 @@ struct CandidateTransform {
 struct SolveResult {
     prediction: Option<Grid>,
     matching_candidates: usize,
+    distinct_predictions: usize,
     selected: Option<CandidateTransform>,
     candidates_checked: u64,
 }
@@ -92,6 +94,7 @@ struct TaskResult {
     exact_correct: bool,
     asserted: bool,
     matching_candidates: usize,
+    distinct_predictions: usize,
     selected_transform: Option<String>,
     episode_id: String,
     receipt_id: String,
@@ -104,6 +107,7 @@ struct ArcExactReport {
     dataset_version: String,
     split: String,
     configuration_id: String,
+    task_limit: Option<usize>,
     task_files_seen: usize,
     test_cases_evaluated: usize,
     aggregate: CapabilitySlice,
@@ -164,29 +168,19 @@ fn run() -> Result<(), String> {
 
     let mut receipts = Vec::new();
     let mut task_results = Vec::new();
-    let mut parsed_files = 0usize;
 
     for path in &task_files {
-        let raw = match fs::read(path) {
-            Ok(value) => value,
-            Err(err) => {
-                eprintln!("skip {}: {err}", path.display());
-                continue;
-            }
-        };
-        let task = match parse_task(&raw) {
-            Ok(value) => value,
-            Err(err) => {
-                eprintln!("skip {}: {err}", path.display());
-                continue;
-            }
-        };
-        parsed_files += 1;
+        // Qualification fails closed: a selected task may not silently disappear because its
+        // file could not be read or parsed.
+        let raw = fs::read(path)
+            .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
+        let task = parse_task(&raw)
+            .map_err(|err| format!("failed to parse {}: {err}", path.display()))?;
 
         let file_stem = path
             .file_stem()
             .and_then(|value| value.to_str())
-            .unwrap_or("unknown-task");
+            .ok_or_else(|| format!("task filename is not valid UTF-8: {}", path.display()))?;
         let raw_hash = blake3::hash(&raw).to_hex().to_string();
         let evidence = training_evidence(&task.train, file_stem)?;
 
@@ -199,35 +193,54 @@ fn run() -> Result<(), String> {
             let problem_id = format!("{file_stem}#test-{test_index}");
             let problem_hash = scoped_problem_hash(&raw_hash, test_index);
 
-            let (outcome, asserted, selected_name) = match (&solve.prediction, solve.selected) {
-                (Some(prediction), selected) => {
+            let (outcome, asserted, selected_name, operation, output_refs) =
+                if let Some(prediction) = &solve.prediction {
                     let value = serde_json::to_string(prediction)
                         .map_err(|err| format!("failed to encode prediction: {err}"))?;
+                    // Conservative initial proxy: hypothesis ambiguity lowers confidence even
+                    // when all surviving hypotheses happen to agree on this particular test grid.
+                    // RQ-006 is responsible for empirical confidence calibration.
                     let confidence = 1.0 / solve.matching_candidates.max(1) as f64;
+                    let selected_name = solve.selected.map(transform_name);
+                    let operation = format!(
+                        "exact-transform-search: {} training-consistent candidates, one distinct test prediction; assert {}",
+                        solve.matching_candidates,
+                        selected_name.as_deref().unwrap_or("canonical candidate")
+                    );
                     (
                         ReasoningOutcome::Asserted { value, confidence },
                         true,
-                        selected.map(transform_name),
+                        selected_name,
+                        operation,
+                        vec!["predicted-grid".into()],
                     )
-                }
-                (None, _) => (
-                    ReasoningOutcome::Abstained {
-                        reason: AbstentionReason::Unidentified,
-                        answerability: 0.0,
-                    },
-                    false,
-                    None,
-                ),
-            };
-
-            let decision = if let Some(name) = &selected_name {
-                format!(
-                    "exact-transform-search: {} matching candidates; selected {name}",
-                    solve.matching_candidates
-                )
-            } else {
-                "exact-transform-search: no training-consistent candidate; abstain".into()
-            };
+                } else if solve.matching_candidates == 0 {
+                    (
+                        ReasoningOutcome::Abstained {
+                            reason: AbstentionReason::Unidentified,
+                            answerability: 0.0,
+                        },
+                        false,
+                        None,
+                        "exact-transform-search: no training-consistent candidate; abstain"
+                            .into(),
+                        vec![],
+                    )
+                } else {
+                    (
+                        ReasoningOutcome::Abstained {
+                            reason: AbstentionReason::ConflictingEvidence,
+                            answerability: 0.0,
+                        },
+                        false,
+                        None,
+                        format!(
+                            "exact-transform-search: {} training-consistent candidates imply {} distinct test predictions; abstain",
+                            solve.matching_candidates, solve.distinct_predictions
+                        ),
+                        vec![],
+                    )
+                };
 
             let episode = ReasoningEpisode::new(
                 &subject_revision,
@@ -243,9 +256,9 @@ fn run() -> Result<(), String> {
                 evidence.clone(),
                 vec![],
                 vec![ReasoningDecisionRecord {
-                    operation: decision,
+                    operation,
                     input_refs: evidence.iter().map(|item| item.id.clone()).collect(),
-                    output_refs: vec!["predicted-grid".into()],
+                    output_refs,
                     verifier: Some("exact-grid-equality-v1".into()),
                 }],
                 outcome,
@@ -284,6 +297,7 @@ fn run() -> Result<(), String> {
                 exact_correct,
                 asserted,
                 matching_candidates: solve.matching_candidates,
+                distinct_predictions: solve.distinct_predictions,
                 selected_transform: selected_name,
                 episode_id: episode_id.0,
                 receipt_id: receipt.receipt_id.clone(),
@@ -309,7 +323,8 @@ fn run() -> Result<(), String> {
         dataset_version,
         split,
         configuration_id: CONFIGURATION_ID.into(),
-        task_files_seen: parsed_files,
+        task_limit: max_tasks,
+        task_files_seen: task_files.len(),
         test_cases_evaluated: aggregate.episodes,
         aggregate,
         tasks: task_results,
@@ -382,12 +397,19 @@ fn parse_grid(value: &serde_json::Value) -> Result<Grid, String> {
     let rows = value
         .as_array()
         .ok_or_else(|| "grid must be an array".to_string())?;
+    if rows.is_empty() {
+        return Err("grid must contain at least one row".into());
+    }
+
     let mut grid = Vec::with_capacity(rows.len());
     let mut width = None;
     for row in rows {
         let cells = row
             .as_array()
             .ok_or_else(|| "grid row must be an array".to_string())?;
+        if cells.is_empty() {
+            return Err("grid rows must contain at least one cell".into());
+        }
         if let Some(expected) = width {
             if cells.len() != expected {
                 return Err("grid must be rectangular".into());
@@ -432,7 +454,7 @@ fn training_evidence(train: &[GridPair], task_id: &str) -> Result<Vec<EvidenceRe
 fn scoped_problem_hash(raw_hash: &str, test_index: usize) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(raw_hash.as_bytes());
-    hasher.update(&(test_index as u64).to_le_bytes());
+    hasher.update(&u64::try_from(test_index).unwrap_or(u64::MAX).to_le_bytes());
     hasher.finalize().to_hex().to_string()
 }
 
@@ -491,10 +513,28 @@ fn solve(train: &[GridPair], test_input: &Grid, candidates: &[CandidateTransform
         }
     }
 
-    let selected = matching.first().copied();
+    // Training-equivalent hypotheses are allowed to remain distinct, but they only justify an
+    // asserted answer when they are prediction-equivalent on the held-out input. This prevents
+    // canonical ordering from silently resolving genuine epistemic ambiguity.
+    let mut predictions: Vec<(Grid, CandidateTransform)> = Vec::new();
+    for candidate in &matching {
+        let prediction = apply_transform(test_input, *candidate);
+        if !predictions.iter().any(|(known, _)| known == &prediction) {
+            predictions.push((prediction, *candidate));
+        }
+    }
+
+    let (prediction, selected) = if predictions.len() == 1 {
+        let (grid, candidate) = predictions.remove(0);
+        (Some(grid), Some(candidate))
+    } else {
+        (None, None)
+    };
+
     SolveResult {
-        prediction: selected.map(|candidate| apply_transform(test_input, candidate)),
+        prediction,
         matching_candidates: matching.len(),
+        distinct_predictions: predictions.len().max(usize::from(selected.is_some())),
         selected,
         candidates_checked,
     }
@@ -544,13 +584,15 @@ mod tests {
 
     #[test]
     fn solver_never_needs_test_target_to_predict_reflection() {
-        let input = vec![vec![1, 0, 2], vec![0, 3, 0]];
-        let output = GridEncoder::reflect_x(&input);
-        let train = vec![pair(input.clone(), output)];
+        let train_input = vec![vec![1, 0, 2], vec![0, 3, 0]];
+        let train_output = GridEncoder::reflect_x(&train_input);
+        let test_input = vec![vec![4, 0, 1], vec![2, 3, 0]];
+        let train = vec![pair(train_input, train_output)];
         let candidates = canonical_candidates();
-        let result = solve(&train, &input, &candidates);
-        assert_eq!(result.prediction, Some(GridEncoder::reflect_x(&input)));
+        let result = solve(&train, &test_input, &candidates);
+        assert_eq!(result.prediction, Some(GridEncoder::reflect_x(&test_input)));
         assert!(result.matching_candidates >= 1);
+        assert_eq!(result.distinct_predictions, 1);
     }
 
     #[test]
@@ -562,6 +604,20 @@ mod tests {
         let result = solve(&train, &input, &candidates);
         assert!(result.prediction.is_none());
         assert_eq!(result.matching_candidates, 0);
+        assert_eq!(result.distinct_predictions, 0);
+    }
+
+    #[test]
+    fn solver_abstains_when_training_consistent_hypotheses_disagree_on_test() {
+        let symmetric = vec![vec![1, 0, 1], vec![2, 3, 2]];
+        let train = vec![pair(symmetric.clone(), symmetric)];
+        let test_input = vec![vec![1, 2, 0], vec![3, 4, 5]];
+        let candidates = canonical_candidates();
+        let result = solve(&train, &test_input, &candidates);
+        assert!(result.matching_candidates > 1);
+        assert!(result.distinct_predictions > 1);
+        assert!(result.prediction.is_none());
+        assert!(result.selected.is_none());
     }
 
     #[test]
