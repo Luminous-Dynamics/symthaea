@@ -12,6 +12,9 @@
 //! - [`ContinuousHV`] carries arbitrary continuous distributed state.
 //! - [`UnitaryRole`] carries reversible real HDC roles with components in
 //!   `{ -1, +1 }`, so role binding is an isometry.
+//! - [`TemporalAxis`] and [`TemporalPhasor`] expose a continuous unitary time
+//!   algebra in the Fourier/phasor domain; [`TemporalInterval`] analytically
+//!   encodes continuous validity regions without claiming historical recall yet.
 //! - [`HolographicLiquidCell`] is a theorem-bearing diagonal research cell whose
 //!   temporal update commutes with `UnitaryRole` binding.
 //! - [`HlsParameters`] exposes the complete theorem-compatible trainable surface
@@ -59,6 +62,7 @@ pub mod state_tracking_eval;
 pub mod state_tracking_exact_training;
 pub mod state_tracking_learning_ablation;
 pub mod state_tracking_readout;
+pub mod temporal_phasor;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use contextual_holographic_liquid::{ContextualHlsError, ContextualHolographicLiquidCell};
@@ -97,3 +101,6 @@ pub use state_tracking_learning_ablation::{
     run_exact_learning_ablation,
 };
 pub use state_tracking_readout::{TrackingPrototypeReadout, TrackingReadoutError};
+pub use temporal_phasor::{
+    TemporalAlgebraError, TemporalAxis, TemporalInterval, TemporalPhasor,
+};
