@@ -30,11 +30,6 @@ pub enum ExactScoringPolicy {
 }
 
 /// Evaluate one episode under an explicit exact-scoring policy.
-///
-/// `AssertedAnswerRequired` is exactly the existing evaluator behavior. `OutcomeSemantic`
-/// starts from the same validated metrics, changes only the semantics of exact task credit,
-/// and reissues the receipt under a distinct evaluator version so aggregates cannot silently
-/// combine the two contracts.
 pub fn evaluate_episode_with_policy(
     episode: &ReasoningEpisode,
     evaluation_lineage_hash: &str,
