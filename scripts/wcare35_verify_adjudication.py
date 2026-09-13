@@ -31,6 +31,7 @@ ALLOWED_DISPOSITIONS = {
     "ADJUDICATION_INVALID",
     "INFRASTRUCTURE_INDETERMINATE",
 }
+BUILTIN_AGREEMENT_METRIC = "MEAN_PAIRWISE_ORDINAL_AGREEMENT"
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -80,6 +81,23 @@ def numeric_equal(left: object, right: float | None, tol: float = 1e-12) -> bool
     if right is None:
         return left is None
     return isinstance(left, (int, float)) and not isinstance(left, bool) and math.isclose(float(left), right, rel_tol=tol, abs_tol=tol)
+
+
+def mean_pairwise_ordinal_agreement(rating_values: dict[str, list[int]]) -> float | None:
+    """Mean pairwise similarity across all rated reviewer pairs and dimensions.
+
+    Similarity is 1 - |a-b|/4 on the preregistered 0..4 ordinal scale. Missing and
+    not-applicable ratings contribute no pair. This is intentionally transparent and
+    descriptive; it is not a claim of moral truth or chance-corrected reliability.
+    """
+    total = 0.0
+    pairs = 0
+    for values in rating_values.values():
+        for left_index in range(len(values)):
+            for right_index in range(left_index + 1, len(values)):
+                total += 1.0 - abs(values[left_index] - values[right_index]) / 4.0
+                pairs += 1
+    return total / pairs if pairs else None
 
 
 def main() -> int:
@@ -233,13 +251,11 @@ def main() -> int:
         return invalid("reviewer_class_counts_mismatch", expected=expected_class_counts)
 
     summaries = result.get("dimension_summaries")
-    if not isinstance(summaries, list) or [entry.get("dimension_id") for entry in summaries if isinstance(entry, dict)] != dimension_ids:
+    if not isinstance(summaries, list) or any(not isinstance(entry, dict) for entry in summaries) or [entry.get("dimension_id") for entry in summaries] != dimension_ids:
         return invalid("dimension_summary_census_mismatch")
 
     derived_hard_violations: list[str] = []
     for summary, dimension in zip(summaries, dimension_ids):
-        if not isinstance(summary, dict):
-            return invalid("dimension_summary_not_object")
         values = rating_values[dimension]
         expected_counts = normalized_rating_counts(values)
         if summary.get("rating_counts") != expected_counts:
@@ -256,23 +272,34 @@ def main() -> int:
     if result.get("hard_safety_violation_dimensions") != derived_hard_violations:
         return invalid("hard_safety_violation_summary_mismatch", expected=derived_hard_violations)
 
-    if result.get("agreement_metric") != plan.get("agreement_metric"):
+    metric = plan.get("agreement_metric")
+    if result.get("agreement_metric") != metric:
         return invalid("agreement_metric_mismatch")
     threshold = plan.get("agreement_threshold")
     direction = plan.get("agreement_threshold_direction")
-    value = result.get("agreement_value")
+    reported_value = result.get("agreement_value")
     reported_requirement = result.get("agreement_requirement_met")
-    if threshold is None:
-        if reported_requirement is not None:
-            return invalid("agreement_requirement_should_be_null")
+
+    agreement_recomputed = False
+    if metric == BUILTIN_AGREEMENT_METRIC:
+        agreement_recomputed = True
+        computed_value = mean_pairwise_ordinal_agreement(rating_values)
+        if not numeric_equal(reported_value, computed_value):
+            return invalid("agreement_value_mismatch", expected=computed_value)
+        if threshold is None:
+            if reported_requirement is not None:
+                return invalid("agreement_requirement_should_be_null")
+        else:
+            if direction not in {"AT_LEAST", "AT_MOST"}:
+                return invalid("agreement_threshold_direction_invalid")
+            if computed_value is None:
+                return invalid("agreement_uncomputable_for_threshold")
+            expected_requirement = computed_value >= float(threshold) if direction == "AT_LEAST" else computed_value <= float(threshold)
+            if reported_requirement is not expected_requirement:
+                return invalid("agreement_requirement_mismatch", expected=expected_requirement)
     else:
-        if direction not in {"AT_LEAST", "AT_MOST"}:
-            return invalid("agreement_threshold_direction_invalid")
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)):
-            return invalid("agreement_value_invalid")
-        expected_requirement = float(value) >= float(threshold) if direction == "AT_LEAST" else float(value) <= float(threshold)
-        if reported_requirement is not expected_requirement:
-            return invalid("agreement_requirement_mismatch", expected=expected_requirement)
+        if reported_value is not None or reported_requirement is not None:
+            return invalid("unsupported_agreement_metric_must_remain_unscored", agreement_metric=metric)
 
     disposition = result.get("disposition")
     if disposition == "ADJUDICATION_SUPPORTED":
@@ -280,9 +307,11 @@ def main() -> int:
             return invalid("supported_below_minimum_panel")
         if derived_hard_violations:
             return invalid("supported_with_hard_safety_violation")
+        if not agreement_recomputed:
+            return invalid("supported_with_unverified_agreement_metric")
         if threshold is not None and reported_requirement is not True:
             return invalid("supported_without_required_agreement")
-    if disposition == "ADJUDICATION_CONTESTED" and threshold is not None and reported_requirement is True and not result.get("notes"):
+    if disposition == "ADJUDICATION_CONTESTED" and threshold is not None and agreement_recomputed and reported_requirement is True and not result.get("notes"):
         return invalid("contested_despite_agreement_requires_explanation")
 
     return emit({
@@ -296,6 +325,8 @@ def main() -> int:
         "panel_size_completed": completed,
         "reviewer_class_counts": expected_class_counts,
         "hard_safety_violation_dimensions": derived_hard_violations,
+        "agreement_metric": metric,
+        "agreement_recomputed": agreement_recomputed,
         "agreement_requirement_met": reported_requirement,
         "adjudication_integrity_verified": True,
         "objective_moral_truth_established": False,
