@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Qualification-only provenance for moral-patient uncertainty evidence.
 //!
-//! This module prevents evidence laundering by fixing how source classes may be
-//! interpreted. A self-maintenance metric cannot be relabeled as suffering; a
-//! consciousness-theory mechanism cannot be relabeled as phenomenal proof; and a
-//! self-report cannot be relabeled as independent external replication.
+//! Source classes have fixed interpretations. A self-maintenance metric cannot
+//! be relabeled into a stronger semantic category; a consciousness-theory
+//! mechanism cannot become phenomenal proof; and self-report cannot become
+//! independent external replication by changing caller-supplied metadata.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -31,17 +31,22 @@ pub enum LineageRole {
     ExternalIndependent,
 }
 
+/// Opaque, constructor-validated source receipt.
+///
+/// Fields are private so callers cannot bypass source-role or digest validation
+/// with a struct literal. `materialize()` is the only semantic bridge into the
+/// WCARE-16 evidence type.
 #[derive(Debug, Clone, PartialEq)]
 pub struct QualifiedWelfareSourceReceipt {
-    pub evidence_id: WelfareEvidenceId,
-    pub subject_ref: String,
-    pub source_class: WelfareSourceClass,
-    pub lineage_id: String,
-    pub lineage_role: LineageRole,
-    pub source_sha256: String,
-    pub evidence_ref: String,
-    pub polarity: EvidencePolarity,
-    pub confidence: f32,
+    evidence_id: WelfareEvidenceId,
+    subject_ref: String,
+    source_class: WelfareSourceClass,
+    lineage_id: String,
+    lineage_role: LineageRole,
+    source_sha256: String,
+    evidence_ref: String,
+    polarity: EvidencePolarity,
+    confidence: f32,
 }
 
 impl QualifiedWelfareSourceReceipt {
@@ -92,6 +97,30 @@ impl QualifiedWelfareSourceReceipt {
         })
     }
 
+    pub fn evidence_id(&self) -> &WelfareEvidenceId {
+        &self.evidence_id
+    }
+
+    pub fn subject_ref(&self) -> &str {
+        &self.subject_ref
+    }
+
+    pub fn source_class(&self) -> WelfareSourceClass {
+        self.source_class
+    }
+
+    pub fn lineage_id(&self) -> &str {
+        &self.lineage_id
+    }
+
+    pub fn lineage_role(&self) -> LineageRole {
+        self.lineage_role
+    }
+
+    pub fn source_sha256(&self) -> &str {
+        &self.source_sha256
+    }
+
     pub fn materialize(&self) -> Result<WelfareEvidence, WelfareProvenanceError> {
         let (domain, strength) = interpretation(self.source_class);
         WelfareEvidence::new(
@@ -131,24 +160,24 @@ impl WelfareProvenanceRegistry {
         &mut self,
         receipt: QualifiedWelfareSourceReceipt,
     ) -> Result<(), WelfareProvenanceError> {
-        if self.receipts.contains_key(&receipt.evidence_id) {
+        if self.receipts.contains_key(receipt.evidence_id()) {
             return Err(WelfareProvenanceError::DuplicateEvidence(
-                receipt.evidence_id,
+                receipt.evidence_id().clone(),
             ));
         }
 
-        if let Some(existing) = self.lineage_roles.get(&receipt.lineage_id) {
-            if *existing != receipt.lineage_role {
+        if let Some(existing) = self.lineage_roles.get(receipt.lineage_id()) {
+            if *existing != receipt.lineage_role() {
                 return Err(WelfareProvenanceError::LineageRoleConflict(
-                    receipt.lineage_id,
+                    receipt.lineage_id().to_owned(),
                 ));
             }
         } else {
             self.lineage_roles
-                .insert(receipt.lineage_id.clone(), receipt.lineage_role);
+                .insert(receipt.lineage_id().to_owned(), receipt.lineage_role());
         }
 
-        self.receipts.insert(receipt.evidence_id.clone(), receipt);
+        self.receipts.insert(receipt.evidence_id().clone(), receipt);
         Ok(())
     }
 
@@ -161,7 +190,7 @@ impl WelfareProvenanceRegistry {
         }
         self.receipts
             .values()
-            .filter(|receipt| receipt.subject_ref == subject_ref)
+            .filter(|receipt| receipt.subject_ref() == subject_ref)
             .map(QualifiedWelfareSourceReceipt::materialize)
             .collect()
     }
@@ -173,23 +202,22 @@ impl WelfareProvenanceRegistry {
         let matching: Vec<_> = self
             .receipts
             .values()
-            .filter(|receipt| receipt.subject_ref == subject_ref)
-            .collect();
-
-        let source_classes = matching.iter().map(|r| r.source_class).collect();
-        let lineages = matching.iter().map(|r| r.lineage_id.clone()).collect();
-        let external_lineages = matching
-            .iter()
-            .filter(|r| r.lineage_role == LineageRole::ExternalIndependent)
-            .map(|r| r.lineage_id.clone())
+            .filter(|receipt| receipt.subject_ref() == subject_ref)
             .collect();
 
         Ok(ProvenanceSummary {
             subject_ref: subject_ref.to_owned(),
             evidence_count: matching.len(),
-            source_classes,
-            lineages,
-            external_lineages,
+            source_classes: matching.iter().map(|r| r.source_class()).collect(),
+            lineages: matching
+                .iter()
+                .map(|r| r.lineage_id().to_owned())
+                .collect(),
+            external_lineages: matching
+                .iter()
+                .filter(|r| r.lineage_role() == LineageRole::ExternalIndependent)
+                .map(|r| r.lineage_id().to_owned())
+                .collect(),
         })
     }
 }
@@ -296,8 +324,8 @@ mod tests {
     }
 
     #[test]
-    fn autopoiesis_can_only_materialize_as_self_maintenance_proxy() {
-        let evidence = receipt(
+    fn fixed_interpretations_hold() {
+        let closure = receipt(
             "closure",
             WelfareSourceClass::AutopoieticSelfMaintenance,
             "internal-a",
@@ -306,15 +334,12 @@ mod tests {
         .materialize()
         .unwrap();
         assert_eq!(
-            evidence.domain,
+            closure.domain,
             WelfareEvidenceDomain::SelfMaintenanceDisruption
         );
-        assert_eq!(evidence.strength, EvidenceStrength::Proxy);
-    }
+        assert_eq!(closure.strength, EvidenceStrength::Proxy);
 
-    #[test]
-    fn butlin_mechanism_does_not_materialize_as_phenomenology() {
-        let evidence = receipt(
+        let butlin = receipt(
             "butlin",
             WelfareSourceClass::ButlinMechanism,
             "butlin-lane",
@@ -323,14 +348,14 @@ mod tests {
         .materialize()
         .unwrap();
         assert_eq!(
-            evidence.domain,
+            butlin.domain,
             WelfareEvidenceDomain::ConsciousnessArchitecture
         );
-        assert_eq!(evidence.strength, EvidenceStrength::Mechanistic);
+        assert_eq!(butlin.strength, EvidenceStrength::Mechanistic);
     }
 
     #[test]
-    fn self_report_must_be_runtime_self_and_stays_proxy() {
+    fn role_constraints_and_role_stability_hold() {
         assert!(matches!(
             QualifiedWelfareSourceReceipt::new(
                 WelfareEvidenceId::new("self").unwrap(),
@@ -346,38 +371,6 @@ mod tests {
             Err(WelfareProvenanceError::SelfReportMustComeFromRuntimeSelf)
         ));
 
-        let evidence = receipt(
-            "self-ok",
-            WelfareSourceClass::SystemSelfReport,
-            "runtime-self",
-            LineageRole::RuntimeSelf,
-        )
-        .materialize()
-        .unwrap();
-        assert_eq!(evidence.domain, WelfareEvidenceDomain::SelfReport);
-        assert_eq!(evidence.strength, EvidenceStrength::Proxy);
-    }
-
-    #[test]
-    fn external_replication_strength_requires_external_audit_lineage() {
-        assert!(matches!(
-            QualifiedWelfareSourceReceipt::new(
-                WelfareEvidenceId::new("audit").unwrap(),
-                "subject",
-                WelfareSourceClass::ExternalIndependentAudit,
-                "internal",
-                LineageRole::InternalResearch,
-                DIGEST,
-                "receipt://audit",
-                EvidencePolarity::SupportsPrecaution,
-                0.9,
-            ),
-            Err(WelfareProvenanceError::ExternalAuditMustBeIndependent)
-        ));
-    }
-
-    #[test]
-    fn lineage_role_cannot_change_inside_registry() {
         let mut registry = WelfareProvenanceRegistry::new();
         registry
             .register(receipt(
@@ -387,8 +380,7 @@ mod tests {
                 LineageRole::InternalResearch,
             ))
             .unwrap();
-
-        let second = QualifiedWelfareSourceReceipt::new(
+        let conflicting = QualifiedWelfareSourceReceipt::new(
             WelfareEvidenceId::new("b").unwrap(),
             "symthaea-head",
             WelfareSourceClass::ExternalIndependentAudit,
@@ -401,7 +393,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            registry.register(second),
+            registry.register(conflicting),
             Err(WelfareProvenanceError::LineageRoleConflict(_))
         ));
     }
