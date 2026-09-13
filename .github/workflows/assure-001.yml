@@ -21,9 +21,6 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
-    outputs:
-      source_gates_passed: ${{ steps.source-gates.outputs.passed }}
-      lock_changed: ${{ steps.lock-state.outputs.changed }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -82,125 +79,9 @@ jobs:
         run: cargo test --manifest-path crates/core/symthaea-assurance-subject/Cargo.toml
       - name: Strict Clippy
         run: cargo clippy --manifest-path crates/core/symthaea-assurance-subject/Cargo.toml --all-targets -- -D warnings
-      - name: Mark source gates passed
-        id: source-gates
-        shell: bash
-        run: echo 'passed=true' >> "$GITHUB_OUTPUT"
-      - name: Record lock state
-        id: lock-state
-        shell: bash
-        run: |
-          if git diff --quiet -- Cargo.lock; then
-            echo 'changed=false' >> "$GITHUB_OUTPUT"
-          else
-            echo 'changed=true' >> "$GITHUB_OUTPUT"
-          fi
       - name: Require committed lock parity
         shell: bash
         run: |
           set -euo pipefail
           git diff -- Cargo.lock
           git diff --exit-code -- Cargo.lock
-
-  reconcile-lock:
-    needs: qualify
-    if: >-
-      always() &&
-      needs.qualify.result == 'failure' &&
-      needs.qualify.outputs.source_gates_passed == 'true' &&
-      needs.qualify.outputs.lock_changed == 'true' &&
-      github.event_name == 'pull_request' &&
-      github.repository == 'Luminous-Dynamics/symthaea' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.head_ref == 'feat/assure-001-subject-manifest' &&
-      github.actor == 'Tristan-Stoltz-ERC'
-    permissions:
-      actions: read
-      contents: write
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Download exact lock evidence
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: assure-001-lock-${{ github.event.pull_request.head.sha }}
-          path: target/assure-001-lock
-      - name: Verify and commit only the reviewed ASSURE-001 lock stanza
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-          HEAD_REF: ${{ github.head_ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPOSITORY: ${{ github.repository }}
-          EXPECTED_LOCK_SHA256: 4f52905a028c2e1ba3d34d63d322b9058856fc8c197733b4f1efe121a38fa29b
-        run: |
-          set -euo pipefail
-          ARTIFACT_DIR=target/assure-001-lock
-          test -f "$ARTIFACT_DIR/Cargo.lock"
-          test -f "$ARTIFACT_DIR/MANIFEST.txt"
-          grep -Fx "candidate_head=$EXPECTED_HEAD" "$ARTIFACT_DIR/MANIFEST.txt"
-          LOCK_SHA256="$(sha256sum "$ARTIFACT_DIR/Cargo.lock" | cut -d' ' -f1)"
-          test "$LOCK_SHA256" = "$EXPECTED_LOCK_SHA256"
-          grep -Fx "lock_sha256=$LOCK_SHA256" "$ARTIFACT_DIR/MANIFEST.txt"
-
-          CURRENT_HEAD="$(curl -fsSL \
-            -H 'Accept: application/vnd.github+json' \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "$GITHUB_API_URL/repos/$REPOSITORY/pulls/$PR_NUMBER" \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin)["head"]["sha"])')"
-          test "$CURRENT_HEAD" = "$EXPECTED_HEAD"
-
-          curl -fsSL \
-            -H 'Accept: application/vnd.github+json' \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "$GITHUB_API_URL/repos/$REPOSITORY/contents/Cargo.lock?ref=$EXPECTED_HEAD" \
-            > /tmp/current-lock.json
-
-          python3 - <<'PY'
-          import base64
-          import json
-          import os
-          from pathlib import Path
-
-          current = json.loads(Path('/tmp/current-lock.json').read_text())
-          old = base64.b64decode(current['content'])
-          new = Path('target/assure-001-lock/Cargo.lock').read_bytes()
-
-          anchor = b'''[[package]]\nname = "symthaea-astronomy"\nversion = "0.1.0"\n'''
-          subject = b'''[[package]]\nname = "symthaea-assurance-subject"\nversion = "0.1.0"\ndependencies = [\n "sha2 0.10.9",\n "symthaea-assurance-core",\n "thiserror 1.0.69",\n]\n\n'''
-
-          if subject in old:
-              raise SystemExit('ASSURE-001 lock stanza already present unexpectedly')
-          if old.count(anchor) != 1:
-              raise SystemExit('unexpected symthaea-astronomy lock anchor')
-          expected = old.replace(anchor, subject + anchor, 1)
-          if expected != new:
-              raise SystemExit('generated Cargo.lock differs from the exact reviewed ASSURE-001 transformation')
-
-          payload = {
-              'message': 'chore(assurance): reconcile ASSURE-001 workspace lockfile',
-              'content': base64.b64encode(new).decode('ascii'),
-              'sha': current['sha'],
-              'branch': os.environ['HEAD_REF'],
-          }
-          Path('/tmp/update-lock.json').write_text(json.dumps(payload))
-          PY
-
-          curl -fsSL -X PUT \
-            -H 'Accept: application/vnd.github+json' \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            -H 'Content-Type: application/json' \
-            --data-binary @/tmp/update-lock.json \
-            "$GITHUB_API_URL/repos/$REPOSITORY/contents/Cargo.lock" \
-            > /tmp/update-lock-response.json
-
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          response = json.loads(Path('/tmp/update-lock-response.json').read_text())
-          print('lock_commit=' + response['commit']['sha'])
-          print('lock_blob=' + response['content']['sha'])
-          PY
