@@ -1,0 +1,147 @@
+name: HYPERSPACE-001 Evidence Capsule
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hyperspace-001-evidence.yml'
+      - 'crates/core/symthaea-core/src/state_space.rs'
+      - 'crates/core/symthaea-core/src/continuous_reachability.rs'
+      - 'crates/core/symthaea-core/src/sampling_reachability.rs'
+      - 'crates/core/symthaea-core/src/fixed_axis_sampling.rs'
+      - 'crates/core/symthaea-core/src/hyperspace_benchmark.rs'
+      - 'crates/core/symthaea-core/src/hyperspace_campaign.rs'
+      - 'crates/core/symthaea-core/src/hyperspace_fixed_axis.rs'
+      - 'crates/core/symthaea-core/examples/hyperspace_001_qualify.rs'
+      - 'crates/core/symthaea-core/tests/hyperspace_access_threshold.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # pull_request GITHUB_SHA is normally a synthetic merge commit. Scientific
+  # evidence is bound to the reviewed feature head; manual runs use github.sha.
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  evidence:
+    name: Exact synthetic R3/R4 qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # actions/checkout v4, resolved and frozen 2026-09-13.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact source subject
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/hyperspace-001
+          {
+            echo "schema=symthaea.hyperspace-001.environment.v1"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+          } > artifacts/hyperspace-001/environment.txt
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Extend environment capsule
+        run: |
+          set -euo pipefail
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "rustc_host=$(rustc -vV | sed -n 's/^host: //p')"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+          } >> artifacts/hyperspace-001/environment.txt
+
+      - name: Compile evidence reporter
+        run: |
+          cargo check --locked -p symthaea-core --no-default-features \
+            --example hyperspace_001_qualify
+
+      - name: Run exact access-threshold regression
+        run: |
+          cargo test --locked -p symthaea-core --no-default-features \
+            --test hyperspace_access_threshold -- --nocapture
+
+      - name: Produce machine-readable HYPERSPACE receipt
+        run: |
+          cargo run --locked -p symthaea-core --no-default-features \
+            --example hyperspace_001_qualify -- \
+            --subject "$SUBJECT_SHA" \
+            --output artifacts/hyperspace-001/report.json
+
+      - name: Hash complete evidence capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd artifacts/hyperspace-001
+          : > SHA256SUMS
+          for file in environment.txt report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Validate strict promotion gates
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('artifacts/hyperspace-001/report.json')
+          report = json.loads(path.read_text())
+          assert report['schema'] == 'symthaea.hyperspace-001.evidence.v1'
+          assert report['source_subject'] == os.environ['SUBJECT_SHA'].lower()
+          assert report['campaign']['pass'] is True
+          assert report['fixed_w_h3']['pass'] is True
+          assert report['access_threshold']['pass'] is True
+          assert report['verdict'] == 'PASS'
+
+          summary = Path(os.environ['GITHUB_STEP_SUMMARY'])
+          gates = report['campaign']['gates']
+          with summary.open('a') as f:
+              f.write('## HYPERSPACE-001 exact-subject qualification\n\n')
+              f.write(f"**Subject:** `{report['source_subject']}`\n\n")
+              f.write(f"**Verdict:** `{report['verdict']}`\n\n")
+              f.write('| Gate | Result |\n|---|---|\n')
+              for name, passed in gates.items():
+                  f.write(f"| `{name}` | {'PASS' if passed else 'FAIL'} |\n")
+              f.write(f"| `fixed_w_h3` | {'PASS' if report['fixed_w_h3']['pass'] else 'FAIL'} |\n")
+              f.write(f"| `access_threshold` | {'PASS' if report['access_threshold']['pass'] else 'FAIL'} |\n")
+              f.write('\nClaim scope: synthetic Euclidean navigation competence only; not evidence for physically accessible extra dimensions.\n')
+          PY
+
+      # actions/upload-artifact v4, resolved and frozen 2026-09-13.
+      - name: Upload evidence capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hyperspace-001-evidence-${{ env.SUBJECT_SHA }}
+          path: artifacts/hyperspace-001/
+          if-no-files-found: error
+          retention-days: 90
