@@ -7,12 +7,32 @@ use std::time::Instant;
 
 use super::super::CognitiveLoopService;
 use super::super::feedback_state::Priority;
+#[cfg(any(feature = "jepa", test))]
+use super::super::fep_module::InternalRegulationAction;
 use super::super::helpers;
 use super::super::phase_results::PerceptionPhaseResult;
 #[cfg(feature = "cpg")]
 use super::super::thresholds::CPG_SYNC_TAU_FLOOR;
 use super::super::thresholds::*;
 use super::super::types::{EffectiveDimSource, RecurrentMaskEvent};
+
+/// Resolve the immediately preceding committed cognitive-loop FEP action for JEPA.
+///
+/// Presence comes from the generic FEP agent's learning-commitment slot rather
+/// than the legacy zero-filled `last_action_idx` compatibility field. The live
+/// cognitive-loop action domain is deliberately closed to the four typed actions
+/// introduced by #2083; configuration drift therefore fails closed instead of
+/// manufacturing action identity.
+#[cfg(any(feature = "jepa", test))]
+fn jepa_predecessor_action(committed_action: Option<usize>, configured_actions: usize) -> Option<u8> {
+    if configured_actions != InternalRegulationAction::ALL.len() {
+        return None;
+    }
+
+    committed_action
+        .and_then(|index| InternalRegulationAction::try_from(index).ok())
+        .map(|action| action.raw_index() as u8)
+}
 
 impl CognitiveLoopService {
     /// Apply a fixed-suffix lesion to the CfC recurrent state and record what
@@ -237,7 +257,6 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
-
         // ODE trajectory planning: simulate forward trajectories via Dormand-Prince
         // to compute expected free energy over future horizons.
         // Friston (2010): genuine active inference requires planning through simulation.
@@ -536,17 +555,32 @@ impl CognitiveLoopService {
             next_vec.resize(jepa_dim, 0.0);
             let next_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(next_vec);
 
-            // Use last cycle's FEP action (stored on fep module after each FEP step).
-            // CfC planning runs before this cycle's FEP, so we use the previous action.
-            // This is correct: JEPA predicts "given what I did last, what state am I in now?"
-            let action = self.fep.last_action_idx;
-            let lr = self.config.cfc_config.learning_rate;
+            // CfC planning runs before this cycle's FEP step. Condition JEPA only
+            // on an action that the generic FEP agent actually committed on the
+            // preceding cycle and that belongs to the exact four-action typed
+            // cognitive-loop domain. Cold start, reset, configuration drift, and
+            // rejected out-of-domain selections therefore produce no fabricated
+            // action-conditioned training example.
+            let previous_action = jepa_predecessor_action(
+                self.fep.agent.last_action,
+                self.fep.agent.config.num_actions,
+            );
 
-            // Train step: forward + backward + EMA update (inline — latent ops are cheap)
-            let _jepa_loss = jepa.train_step(&current_hv, &next_hv, action, lr);
+            if let Some(action) = previous_action {
+                let lr = self.config.cfc_config.learning_rate;
 
-            // Track energy cost in substrate manager
-            self.substrate_manager.jepa_energy += jepa.config().energy_cost_per_forward;
+                // Train step: forward + backward + EMA update (inline — latent ops are cheap)
+                let _jepa_loss = jepa.train_step(&current_hv, &next_hv, action, lr);
+
+                // Charge energy only when the JEPA training step actually executes.
+                self.substrate_manager.jepa_energy += jepa.config().energy_cost_per_forward;
+            } else {
+                tracing::trace!(
+                    committed_action = ?self.fep.agent.last_action,
+                    configured_actions = self.fep.agent.config.num_actions,
+                    "JEPA action-conditioned training skipped: no valid committed FEP predecessor"
+                );
+            }
         }
 
         // Return the buffer to CLS for reuse next cycle (zero-alloc swap)
@@ -735,5 +769,33 @@ impl CognitiveLoopService {
             arousal_recovery_active,
             arousal_recovery_tau_factor,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::jepa_predecessor_action;
+
+    #[test]
+    fn jepa_predecessor_requires_real_commitment() {
+        assert_eq!(jepa_predecessor_action(None, 4), None);
+    }
+
+    #[test]
+    fn jepa_predecessor_preserves_all_typed_actions() {
+        for action in 0..4 {
+            assert_eq!(jepa_predecessor_action(Some(action), 4), Some(action as u8));
+        }
+    }
+
+    #[test]
+    fn jepa_predecessor_rejects_out_of_domain_commitment() {
+        assert_eq!(jepa_predecessor_action(Some(4), 4), None);
+    }
+
+    #[test]
+    fn jepa_predecessor_fails_closed_on_action_domain_drift() {
+        assert_eq!(jepa_predecessor_action(Some(0), 5), None);
+        assert_eq!(jepa_predecessor_action(Some(3), 3), None);
     }
 }
