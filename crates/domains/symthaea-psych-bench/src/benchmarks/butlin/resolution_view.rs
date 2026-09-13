@@ -289,15 +289,22 @@ fn validate_lineage(
             if overlay.lineage.authority.is_some() {
                 return Err(invalid_lineage(&overlay.indicator_id, "authority"));
             }
-            if overlay.lineage_outcome != overlay.resolved_outcome {
-                return Err(invalid_lineage(&overlay.indicator_id, "resolved_outcome"));
-            }
-            if matches!(
-                overlay.lineage_outcome,
-                EvidenceOutcome::Supported(SupportTier::CausallySupported)
-                    | EvidenceOutcome::Supported(SupportTier::FunctionallySupported)
-            ) {
-                return Err(invalid_lineage(&overlay.indicator_id, "lineage_outcome"));
+            match overlay.lineage_outcome {
+                EvidenceOutcome::Supported(SupportTier::Observed) => {
+                    if overlay.resolved_outcome != EvidenceOutcome::Supported(SupportTier::Observed) {
+                        return Err(invalid_lineage(&overlay.indicator_id, "resolved_outcome"));
+                    }
+                }
+                EvidenceOutcome::Supported(_) => {
+                    return Err(invalid_lineage(&overlay.indicator_id, "lineage_outcome"));
+                }
+                EvidenceOutcome::NotDemonstrated
+                | EvidenceOutcome::Contradicted
+                | EvidenceOutcome::Inconclusive => {
+                    if overlay.resolved_outcome != overlay.base_outcome {
+                        return Err(invalid_lineage(&overlay.indicator_id, "resolved_outcome"));
+                    }
+                }
             }
         }
         EvidenceLineageKindV1::CausalQualification => {
@@ -446,12 +453,18 @@ fn gwt1_direct_overlay_v1(
     let promotion = promote_direct_gwt1_v1(&recomputed);
     let receipt = &evidence.envelope.receipt;
     let raw = &evidence.envelope.raw_observations;
+    let lineage_outcome = promotion.evidence_outcome;
+    let resolved_outcome = if lineage_outcome == EvidenceOutcome::Supported(SupportTier::Observed) {
+        lineage_outcome
+    } else {
+        base.outcome
+    };
 
     let overlay = IndicatorOutcomeOverlayV1 {
         indicator_id: "GWT-1".to_string(),
         base_outcome: base.outcome,
-        lineage_outcome: promotion.evidence_outcome,
-        resolved_outcome: promotion.evidence_outcome,
+        lineage_outcome,
+        resolved_outcome,
         lineage: EvidenceLineageIdentityV1 {
             kind: EvidenceLineageKindV1::DirectQualification,
             method_id: receipt.schema.clone(),
@@ -551,8 +564,8 @@ pub fn resolve_gwt1_evidence_view_v1(
 ///
 /// Positive causal support requires both an independently recomputed direct
 /// `Observed` result and an opaque cryptographically verified causal promotion
-/// token. Negative causal science remains visible in `lineage_outcome` but does
-/// not erase a valid lower-tier result.
+/// token. Negative higher-tier results remain visible in `lineage_outcome` but
+/// do not erase independently established lower-tier support.
 #[cfg(feature = "symthaea-backend")]
 pub fn resolve_gwt1_causal_evidence_view_v1(
     report: &ButlinIndicatorReport,
@@ -671,6 +684,20 @@ mod tests {
     }
 
     #[test]
+    fn direct_null_does_not_erase_architectural_support() {
+        let direct = overlay(
+            EvidenceLineageKindV1::DirectQualification,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            EvidenceOutcome::NotDemonstrated,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+        );
+        let view = resolve_validated_overlays_v1(&report(), vec![direct])
+            .expect("resolved direct null");
+        assert_eq!(view.resolved_counts.architectural_only, 1);
+        assert_eq!(view.overlays[0].lineage_outcome, EvidenceOutcome::NotDemonstrated);
+    }
+
+    #[test]
     fn causal_null_does_not_erase_direct_observed() {
         let direct = overlay(
             EvidenceLineageKindV1::DirectQualification,
@@ -691,17 +718,36 @@ mod tests {
     }
 
     #[test]
-    fn causal_negative_cannot_overwrite_lower_tier() {
+    fn direct_negative_cannot_overwrite_lower_tier() {
         let item = overlay(
-            EvidenceLineageKindV1::CausalQualification,
-            EvidenceOutcome::Supported(SupportTier::Observed),
+            EvidenceLineageKindV1::DirectQualification,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
             EvidenceOutcome::Contradicted,
             EvidenceOutcome::Contradicted,
         );
         assert!(matches!(
             resolve_validated_overlays_v1(&report(), vec![item]),
             Err(EvidenceResolutionViewErrorV1::InvalidLineageIdentity { .. })
-                | Err(EvidenceResolutionViewErrorV1::LineageInputMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn causal_negative_cannot_overwrite_lower_tier() {
+        let direct = overlay(
+            EvidenceLineageKindV1::DirectQualification,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            EvidenceOutcome::Supported(SupportTier::Observed),
+            EvidenceOutcome::Supported(SupportTier::Observed),
+        );
+        let causal = overlay(
+            EvidenceLineageKindV1::CausalQualification,
+            EvidenceOutcome::Supported(SupportTier::Observed),
+            EvidenceOutcome::Contradicted,
+            EvidenceOutcome::Contradicted,
+        );
+        assert!(matches!(
+            resolve_validated_overlays_v1(&report(), vec![direct, causal]),
+            Err(EvidenceResolutionViewErrorV1::InvalidLineageIdentity { .. })
         ));
     }
 
@@ -756,12 +802,18 @@ mod backend_tests {
         Gwt1CausalQualificationOutcomeV1, Gwt1ExecutionIdentityV1,
     };
 
-    fn direct_overlay(outcome: EvidenceOutcome) -> IndicatorOutcomeOverlayV1 {
+    fn direct_overlay(lineage_outcome: EvidenceOutcome) -> IndicatorOutcomeOverlayV1 {
+        let base_outcome = EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly);
+        let resolved_outcome = if lineage_outcome == EvidenceOutcome::Supported(SupportTier::Observed) {
+            lineage_outcome
+        } else {
+            base_outcome
+        };
         IndicatorOutcomeOverlayV1 {
             indicator_id: "GWT-1".to_string(),
-            base_outcome: EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
-            lineage_outcome: outcome,
-            resolved_outcome: outcome,
+            base_outcome,
+            lineage_outcome,
+            resolved_outcome,
             lineage: EvidenceLineageIdentityV1 {
                 kind: EvidenceLineageKindV1::DirectQualification,
                 method_id: "direct-v1".to_string(),
