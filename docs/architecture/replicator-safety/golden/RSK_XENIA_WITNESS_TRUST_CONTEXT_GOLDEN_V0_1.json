@@ -1,0 +1,84 @@
+{
+  "schema": "symthaea.rsk.xenia-witness-trust-context-golden.v1",
+  "source_xenia_pr": 336,
+  "source_xenia_head": "792cbebafcb37b4f91024444d1aa4cebb3295093",
+  "anchor_policy": {
+    "namespace": "rsk.schema-registry.rsk.test.registry",
+    "epoch": 1,
+    "allowed_provider_profiles": ["rsk.test.monotonic-anchor.v1"],
+    "allowed_provider_identities": ["anchor.alpha"],
+    "trust_snapshot_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "expected_anchor_policy_digest": "1ae5e3ea586ad59798febd03e7fa882215042d83ce72e821a760163a98ac094f",
+  "trust_context": {
+    "schema": "symthaea.rsk.xenia-witness-trust-context.v1",
+    "anchor_policy_digest": "1ae5e3ea586ad59798febd03e7fa882215042d83ce72e821a760163a98ac094f",
+    "xenia_profile": "xenia.state-witness.v1",
+    "key_fingerprint_algorithm": "blake3-256",
+    "minimum_key_quorum": 3,
+    "minimum_signer_identities": 2,
+    "minimum_failure_domains": 2,
+    "allowed_signature_profiles": ["ed25519-rfc8032"],
+    "signer_lifecycle_policy_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "failure_domain_policy_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "trust_snapshot_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "principals": [
+      {
+        "signer_id": "witness.alpha",
+        "key_id": "witness.alpha.key.1",
+        "role": "external-witness",
+        "failure_domain": "operator.alpha",
+        "signature_profile": "ed25519-rfc8032",
+        "public_key_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+        "lifecycle": "active",
+        "valid_from": 1000,
+        "valid_until": 2000
+      },
+      {
+        "signer_id": "witness.alpha",
+        "key_id": "witness.alpha.key.2",
+        "role": "external-witness",
+        "failure_domain": "operator.alpha",
+        "signature_profile": "ed25519-rfc8032",
+        "public_key_fingerprint": "3333333333333333333333333333333333333333333333333333333333333333",
+        "lifecycle": "active",
+        "valid_from": 1000,
+        "valid_until": 2000
+      },
+      {
+        "signer_id": "witness.beta",
+        "key_id": "witness.beta.key.1",
+        "role": "external-witness",
+        "failure_domain": "operator.beta",
+        "signature_profile": "ed25519-rfc8032",
+        "public_key_fingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+        "lifecycle": "active",
+        "valid_from": 1000,
+        "valid_until": 2000
+      }
+    ]
+  },
+  "expected_trust_context_digest": "0d92ac49462b95c8240ca19dc165ba18f15cf77d3dda68ef9d3ff2b5c0d9942f",
+  "trusted_interval": {"start": 1100, "end": 1200},
+  "verified_xenia_keys": [
+    {
+      "signature_profile": "ed25519-rfc8032",
+      "public_key_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "signature_profile": "ed25519-rfc8032",
+      "public_key_fingerprint": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "signature_profile": "ed25519-rfc8032",
+      "public_key_fingerprint": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "expected_verified_key_ids": [
+    "witness.alpha.key.1",
+    "witness.alpha.key.2",
+    "witness.beta.key.1"
+  ],
+  "expected_verified_signer_ids": ["witness.alpha", "witness.beta"],
+  "expected_verified_failure_domains": ["operator.alpha", "operator.beta"]
+}
