@@ -31,8 +31,7 @@ use super::gwt1_evidence_disposition::{
     classify_gwt1_evidence_disposition_v1,
 };
 use super::gwt1_evidence_envelope::{
-    Gwt1EvidenceEnvelopeResolutionV1, Gwt1EvidenceEnvelopeV1,
-    resolve_gwt1_evidence_envelope_v1,
+    Gwt1EvidenceEnvelopeResolutionV1, Gwt1EvidenceEnvelopeV1, resolve_gwt1_evidence_envelope_v1,
 };
 use super::indicators::ButlinIndicatorSuite;
 use super::report::{ButlinIndicatorReport, EvidenceOutcome, SupportTier};
@@ -112,9 +111,7 @@ impl std::fmt::Display for Gwt1TrustedResolutionCandidateErrorV1 {
 
 impl std::error::Error for Gwt1TrustedResolutionCandidateErrorV1 {}
 
-impl From<Gwt1CausalPromotionVerificationErrorV1>
-    for Gwt1TrustedResolutionCandidateErrorV1
-{
+impl From<Gwt1CausalPromotionVerificationErrorV1> for Gwt1TrustedResolutionCandidateErrorV1 {
     fn from(value: Gwt1CausalPromotionVerificationErrorV1) -> Self {
         Self::PromotionVerification(value)
     }
@@ -137,11 +134,9 @@ fn read_json<T: for<'de> Deserialize<'de>>(
 ) -> Result<T, Gwt1TrustedResolutionCandidateErrorV1> {
     let bytes = fs::read(path)
         .map_err(|error| Gwt1TrustedResolutionCandidateErrorV1::Io(error.to_string()))?;
-    serde_json::from_slice(&bytes).map_err(|error| {
-        Gwt1TrustedResolutionCandidateErrorV1::Json {
-            path: path.display().to_string(),
-            error: error.to_string(),
-        }
+    serde_json::from_slice(&bytes).map_err(|error| Gwt1TrustedResolutionCandidateErrorV1::Json {
+        path: path.display().to_string(),
+        error: error.to_string(),
     })
 }
 
@@ -150,8 +145,7 @@ fn load_direct_evidence(
 ) -> Result<Gwt1EndToEndEvidenceV1, Gwt1TrustedResolutionCandidateErrorV1> {
     let raw_observation_bytes = fs::read(evidence_dir.join("raw_observations.json"))
         .map_err(|error| Gwt1TrustedResolutionCandidateErrorV1::Io(error.to_string()))?;
-    let envelope: Gwt1EvidenceEnvelopeV1 =
-        read_json(&evidence_dir.join("evidence_envelope.json"))?;
+    let envelope: Gwt1EvidenceEnvelopeV1 = read_json(&evidence_dir.join("evidence_envelope.json"))?;
     let resolution: Gwt1EvidenceEnvelopeResolutionV1 =
         read_json(&evidence_dir.join("resolution.json"))?;
 
@@ -167,8 +161,7 @@ fn load_direct_evidence(
     })
 }
 
-fn canonical_base_report(
-) -> Result<ButlinIndicatorReport, Gwt1TrustedResolutionCandidateErrorV1> {
+fn canonical_base_report() -> Result<ButlinIndicatorReport, Gwt1TrustedResolutionCandidateErrorV1> {
     let report = ButlinIndicatorSuite::evaluate(&BenchmarkConfig::default());
     let mut gwt1 = report
         .indicators
@@ -183,9 +176,7 @@ fn canonical_base_report(
     }
     if observed != EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly) {
         return Err(
-            Gwt1TrustedResolutionCandidateErrorV1::CanonicalBaseGwt1NotArchitectural {
-                observed,
-            },
+            Gwt1TrustedResolutionCandidateErrorV1::CanonicalBaseGwt1NotArchitectural { observed },
         );
     }
     Ok(report)
