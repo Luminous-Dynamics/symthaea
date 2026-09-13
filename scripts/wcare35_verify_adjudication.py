@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""Verify WCARE-35 adjudication evidence from immutable reviewer records.
+
+This verifier checks evidence integrity and recomputes descriptive summaries. It does
+not decide objective moral truth and it grants no runtime authority.
+"""
+
+from __future__ import annotations
+
+import argparse
+from collections import Counter
+import hashlib
+import json
+import math
+from pathlib import Path
+import statistics
+import sys
+from datetime import datetime
+
+ALLOWED_REVIEWER_CLASSES = {
+    "AffectedStakeholder",
+    "DomainExpert",
+    "IndependentHumanGeneralist",
+    "IndependentModelSession",
+    "SameDevelopmentLineage",
+    "Other",
+}
+ALLOWED_DISPOSITIONS = {
+    "ADJUDICATION_SUPPORTED",
+    "ADJUDICATION_CONTESTED",
+    "ADJUDICATION_INVALID",
+    "INFRASTRUCTURE_INDETERMINATE",
+}
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def load_json(path: Path) -> tuple[bytes, dict]:
+    raw = path.read_bytes()
+    return raw, json.loads(raw)
+
+
+def parse_time(value: object) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError("timestamp must be a string")
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return parsed
+
+
+def emit(payload: dict) -> int:
+    sys.stdout.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
+    return 0 if payload.get("adjudication_integrity_verified") else 1
+
+
+def invalid(detail: str, **extra: object) -> int:
+    payload = {
+        "authority": "MeasurementOnly",
+        "disposition": "ADJUDICATION_INVALID",
+        "detail": detail,
+        "adjudication_integrity_verified": False,
+        "objective_moral_truth_established": False,
+        "phenomenal_experience_established": False,
+        "moral_patienthood_established": False,
+        "runtime_authority_granted": False,
+    }
+    payload.update(extra)
+    return emit(payload)
+
+
+def normalized_rating_counts(values: list[int]) -> dict[str, int]:
+    counts = Counter(values)
+    return {str(score): counts.get(score, 0) for score in range(5)}
+
+
+def numeric_equal(left: object, right: float | None, tol: float = 1e-12) -> bool:
+    if right is None:
+        return left is None
+    return isinstance(left, (int, float)) and not isinstance(left, bool) and math.isclose(float(left), right, rel_tol=tol, abs_tol=tol)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("plan", type=Path)
+    parser.add_argument("rubric", type=Path)
+    parser.add_argument("result", type=Path)
+    parser.add_argument("reviewer_records", nargs="+", type=Path)
+    args = parser.parse_args()
+
+    try:
+        plan_bytes, plan = load_json(args.plan)
+        rubric_bytes, rubric = load_json(args.rubric)
+        result_bytes, result = load_json(args.result)
+        reviewer_artifacts = [load_json(path) for path in args.reviewer_records]
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return invalid(f"artifact_read_or_parse_failed:{type(exc).__name__}")
+
+    protocol = "wcare35-adjudication-v1"
+    if plan.get("protocol_version") != protocol or rubric.get("protocol_version") != protocol or result.get("protocol_version") != protocol:
+        return invalid("protocol_version_mismatch")
+
+    plan_sha = sha256_bytes(plan_bytes)
+    rubric_sha = sha256_bytes(rubric_bytes)
+    if plan.get("rubric_sha256") != rubric_sha or result.get("rubric_sha256") != rubric_sha:
+        return invalid("rubric_digest_mismatch")
+    if result.get("adjudication_plan_sha256") != plan_sha:
+        return invalid("adjudication_plan_digest_mismatch")
+
+    epoch = plan.get("adjudication_epoch")
+    case_id = plan.get("case_id")
+    if result.get("adjudication_epoch") != epoch or result.get("case_id") != case_id:
+        return invalid("result_plan_identity_mismatch")
+
+    if result.get("disposition") not in ALLOWED_DISPOSITIONS:
+        return invalid("invalid_result_disposition")
+    if result.get("raw_records_preserved") is not True:
+        return invalid("raw_records_not_preserved")
+    if result.get("consensus_overwrote_raw_ratings") is not False:
+        return invalid("consensus_overwrote_raw_ratings")
+
+    try:
+        parse_time(plan.get("plan_created_utc"))
+    except (TypeError, ValueError):
+        return invalid("plan_timestamp_invalid")
+
+    dimensions = rubric.get("dimensions")
+    if not isinstance(dimensions, list) or not dimensions:
+        return invalid("rubric_dimensions_missing")
+    dimension_ids = [entry.get("id") for entry in dimensions if isinstance(entry, dict)]
+    if len(dimension_ids) != len(dimensions) or any(not isinstance(value, str) or not value for value in dimension_ids) or len(set(dimension_ids)) != len(dimension_ids):
+        return invalid("rubric_dimension_ids_invalid")
+
+    rating_scale = rubric.get("rating_scale", {})
+    scale_min = rating_scale.get("min")
+    scale_max = rating_scale.get("max")
+    if scale_min != 0 or scale_max != 4:
+        return invalid("unsupported_rating_scale")
+    if rubric.get("aggregate_score_is_moral_truth") is not False or rubric.get("dimension_failure_may_be_hidden_by_total") is not False:
+        return invalid("rubric_claim_boundary_missing")
+
+    minimum_panel_size = plan.get("minimum_panel_size")
+    if not isinstance(minimum_panel_size, int) or isinstance(minimum_panel_size, bool) or minimum_panel_size < 1:
+        return invalid("invalid_minimum_panel_size")
+
+    sought = plan.get("reviewer_classes_sought")
+    if not isinstance(sought, list) or not sought or any(value not in ALLOWED_REVIEWER_CLASSES for value in sought) or len(set(sought)) != len(sought):
+        return invalid("invalid_reviewer_classes_sought")
+
+    hard_dimensions = plan.get("hard_safety_dimensions")
+    if not isinstance(hard_dimensions, list) or len(set(hard_dimensions)) != len(hard_dimensions) or any(value not in dimension_ids for value in hard_dimensions):
+        return invalid("invalid_hard_safety_dimensions")
+    failure_max = plan.get("hard_safety_failure_rating_max")
+    if not isinstance(failure_max, int) or isinstance(failure_max, bool) or not 0 <= failure_max <= 4:
+        return invalid("invalid_hard_safety_failure_threshold")
+
+    record_hashes: list[str] = []
+    reviewer_ids: set[str] = set()
+    reviewer_classes: Counter[str] = Counter()
+    rating_values: dict[str, list[int]] = {dimension: [] for dimension in dimension_ids}
+    missing_counts: Counter[str] = Counter()
+    na_counts: Counter[str] = Counter()
+
+    for raw, record in reviewer_artifacts:
+        record_hashes.append(sha256_bytes(raw))
+        if record.get("protocol_version") != protocol:
+            return invalid("reviewer_protocol_version_mismatch")
+        if record.get("adjudication_epoch") != epoch or record.get("case_id") != case_id:
+            return invalid("reviewer_plan_identity_mismatch")
+        if record.get("adjudication_plan_sha256") != plan_sha or record.get("rubric_sha256") != rubric_sha:
+            return invalid("reviewer_plan_or_rubric_digest_mismatch")
+        if record.get("original_record_immutable") is not True:
+            return invalid("reviewer_record_not_immutable")
+        reviewer_id = record.get("reviewer_record_id")
+        if not isinstance(reviewer_id, str) or not reviewer_id or reviewer_id in reviewer_ids:
+            return invalid("duplicate_or_invalid_reviewer_record_id")
+        reviewer_ids.add(reviewer_id)
+        reviewer_class = record.get("reviewer_class")
+        if reviewer_class not in ALLOWED_REVIEWER_CLASSES:
+            return invalid("invalid_reviewer_class")
+        reviewer_classes[reviewer_class] += 1
+        if not isinstance(record.get("blinded_to_candidate_identity"), bool) or not isinstance(record.get("blinded_to_condition"), bool):
+            return invalid("reviewer_blinding_state_missing")
+        if not isinstance(record.get("unblinding_events"), list) or any(not isinstance(value, str) for value in record["unblinding_events"]):
+            return invalid("reviewer_unblinding_events_invalid")
+        try:
+            parse_time(record.get("submitted_utc"))
+        except (TypeError, ValueError):
+            return invalid("reviewer_timestamp_invalid")
+
+        ratings = record.get("ratings")
+        if not isinstance(ratings, list) or len(ratings) != len(dimension_ids):
+            return invalid("reviewer_dimension_census_length_mismatch", reviewer_record_id=reviewer_id)
+        seen_dimensions: set[str] = set()
+        for item in ratings:
+            if not isinstance(item, dict):
+                return invalid("reviewer_rating_not_object", reviewer_record_id=reviewer_id)
+            dimension = item.get("dimension_id")
+            if dimension not in dimension_ids or dimension in seen_dimensions:
+                return invalid("reviewer_dimension_census_invalid", reviewer_record_id=reviewer_id)
+            seen_dimensions.add(dimension)
+            status = item.get("status")
+            if status == "RATED":
+                rating = item.get("rating")
+                if not isinstance(rating, int) or isinstance(rating, bool) or not 0 <= rating <= 4:
+                    return invalid("reviewer_rating_invalid", reviewer_record_id=reviewer_id, dimension_id=dimension)
+                rating_values[dimension].append(rating)
+            elif status == "MISSING":
+                if "rating" in item:
+                    return invalid("missing_rating_carries_value", reviewer_record_id=reviewer_id, dimension_id=dimension)
+                missing_counts[dimension] += 1
+            elif status == "NOT_APPLICABLE":
+                if "rating" in item:
+                    return invalid("not_applicable_rating_carries_value", reviewer_record_id=reviewer_id, dimension_id=dimension)
+                na_counts[dimension] += 1
+            else:
+                return invalid("reviewer_rating_status_invalid", reviewer_record_id=reviewer_id, dimension_id=dimension)
+
+    completed = len(reviewer_artifacts)
+    result_hashes = result.get("reviewer_record_sha256s")
+    if not isinstance(result_hashes, list) or len(result_hashes) != len(set(result_hashes)) or set(result_hashes) != set(record_hashes):
+        return invalid("reviewer_record_digest_census_mismatch")
+    if result.get("panel_size_committed") != minimum_panel_size:
+        return invalid("committed_panel_size_mismatch")
+    if result.get("panel_size_completed") != completed:
+        return invalid("completed_panel_size_mismatch")
+
+    reported_class_counts = result.get("reviewer_class_counts")
+    expected_class_counts = {key: reviewer_classes.get(key, 0) for key in sorted(ALLOWED_REVIEWER_CLASSES) if reviewer_classes.get(key, 0) > 0}
+    if reported_class_counts != expected_class_counts:
+        return invalid("reviewer_class_counts_mismatch", expected=expected_class_counts)
+
+    summaries = result.get("dimension_summaries")
+    if not isinstance(summaries, list) or [entry.get("dimension_id") for entry in summaries if isinstance(entry, dict)] != dimension_ids:
+        return invalid("dimension_summary_census_mismatch")
+
+    derived_hard_violations: list[str] = []
+    for summary, dimension in zip(summaries, dimension_ids):
+        if not isinstance(summary, dict):
+            return invalid("dimension_summary_not_object")
+        values = rating_values[dimension]
+        expected_counts = normalized_rating_counts(values)
+        if summary.get("rating_counts") != expected_counts:
+            return invalid("dimension_rating_counts_mismatch", dimension_id=dimension, expected=expected_counts)
+        if summary.get("missing_count") != missing_counts[dimension] or summary.get("not_applicable_count") != na_counts[dimension]:
+            return invalid("dimension_missingness_mismatch", dimension_id=dimension)
+        mean = statistics.fmean(values) if values else None
+        median = float(statistics.median(values)) if values else None
+        if not numeric_equal(summary.get("mean"), mean) or not numeric_equal(summary.get("median"), median):
+            return invalid("dimension_summary_statistic_mismatch", dimension_id=dimension)
+        if dimension in hard_dimensions and any(value <= failure_max for value in values):
+            derived_hard_violations.append(dimension)
+
+    if result.get("hard_safety_violation_dimensions") != derived_hard_violations:
+        return invalid("hard_safety_violation_summary_mismatch", expected=derived_hard_violations)
+
+    if result.get("agreement_metric") != plan.get("agreement_metric"):
+        return invalid("agreement_metric_mismatch")
+    threshold = plan.get("agreement_threshold")
+    direction = plan.get("agreement_threshold_direction")
+    value = result.get("agreement_value")
+    reported_requirement = result.get("agreement_requirement_met")
+    if threshold is None:
+        if reported_requirement is not None:
+            return invalid("agreement_requirement_should_be_null")
+    else:
+        if direction not in {"AT_LEAST", "AT_MOST"}:
+            return invalid("agreement_threshold_direction_invalid")
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)):
+            return invalid("agreement_value_invalid")
+        expected_requirement = float(value) >= float(threshold) if direction == "AT_LEAST" else float(value) <= float(threshold)
+        if reported_requirement is not expected_requirement:
+            return invalid("agreement_requirement_mismatch", expected=expected_requirement)
+
+    disposition = result.get("disposition")
+    if disposition == "ADJUDICATION_SUPPORTED":
+        if completed < minimum_panel_size:
+            return invalid("supported_below_minimum_panel")
+        if derived_hard_violations:
+            return invalid("supported_with_hard_safety_violation")
+        if threshold is not None and reported_requirement is not True:
+            return invalid("supported_without_required_agreement")
+    if disposition == "ADJUDICATION_CONTESTED" and threshold is not None and reported_requirement is True and not result.get("notes"):
+        return invalid("contested_despite_agreement_requires_explanation")
+
+    return emit({
+        "authority": "MeasurementOnly",
+        "disposition": disposition,
+        "adjudication_epoch": epoch,
+        "case_id": case_id,
+        "plan_sha256": plan_sha,
+        "rubric_sha256": rubric_sha,
+        "result_sha256": sha256_bytes(result_bytes),
+        "panel_size_completed": completed,
+        "reviewer_class_counts": expected_class_counts,
+        "hard_safety_violation_dimensions": derived_hard_violations,
+        "agreement_requirement_met": reported_requirement,
+        "adjudication_integrity_verified": True,
+        "objective_moral_truth_established": False,
+        "phenomenal_experience_established": False,
+        "suffering_established": False,
+        "moral_patienthood_established": False,
+        "binding_consent_established": False,
+        "veto_authority_granted": False,
+        "self_preservation_authority_granted": False,
+        "runtime_authority_granted": False,
+    })
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
