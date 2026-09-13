@@ -171,17 +171,27 @@ jobs:
         run: |
           set -euo pipefail
           workflow='.github/workflows/rsk-safety.yml'
+          required_steps=(
+            'Self-test Xenia witness trust context'
+            'Self-test Xenia witness context admission'
+          )
           required_commands=(
             'python3 docs/architecture/replicator-safety/reference/test_rsk_xenia_witness_trust.py -v'
             'python3 docs/architecture/replicator-safety/reference/test_rsk_xenia_witness_admission.py -v'
           )
-          for command in "${required_commands[@]}"; do
-            if ! grep -Fq "${command}" "${workflow}"; then
-              echo "ERROR: focused RSK workflow lost required witness reference suite: ${command}"
+          for step in "${required_steps[@]}"; do
+            if ! grep -Fq -- "      - name: ${step}" "${workflow}"; then
+              echo "ERROR: focused RSK workflow lost required witness reference step: ${step}"
               exit 1
             fi
           done
-          echo 'Focused RSK workflow retains both Xenia witness reference suites.'
+          for command in "${required_commands[@]}"; do
+            if ! grep -Fq -- "        run: ${command}" "${workflow}"; then
+              echo "ERROR: focused RSK workflow lost executable witness reference suite: ${command}"
+              exit 1
+            fi
+          done
+          echo 'Focused RSK workflow retains both executable Xenia witness reference suites.'
 
       - name: Keep RSK reference crates non-publishable until admission
         shell: bash
