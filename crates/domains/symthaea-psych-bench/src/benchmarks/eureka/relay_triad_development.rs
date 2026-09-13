@@ -195,11 +195,7 @@ pub(super) fn run_relay_triad_development_profiles(
         if prediction.action != target_action {
             return Err(RelayDevelopmentError::TargetActionMismatch);
         }
-        encode_prediction(
-            &mut prediction_bytes,
-            profile_digest,
-            &prediction,
-        );
+        encode_prediction(&mut prediction_bytes, profile_digest, &prediction);
         prediction_count = prediction_count.saturating_add(1);
 
         let realization = evaluator.execute_qualified_action(public_action);
@@ -442,13 +438,13 @@ mod tests {
             .freeze_for_evaluation()
             .unwrap()
             .replay_digest();
-        assert_eq!(
+        assert!(matches!(
             run_relay_triad_development_profiles(
                 &service,
                 &subset(CorpusPartition::Calibration, 1),
             ),
             Err(RelayDevelopmentError::WrongPartition)
-        );
+        ));
         let after = service
             .fep_prediction_session()
             .freeze_for_evaluation()
@@ -462,10 +458,10 @@ mod tests {
         let service = service();
         let mut profiles = subset(CorpusPartition::Development, 1);
         profiles[0].schedule_revision = "not-relay-v1";
-        assert_eq!(
+        assert!(matches!(
             run_relay_triad_development_profiles(&service, &profiles),
             Err(RelayDevelopmentError::WrongScheduleRevision)
-        );
+        ));
     }
 
     #[test]
