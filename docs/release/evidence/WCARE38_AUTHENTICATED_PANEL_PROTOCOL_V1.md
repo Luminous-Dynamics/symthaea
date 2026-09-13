@@ -14,6 +14,25 @@ The governing theorem is:
 
 Authentication may preserve or downgrade a WCARE-36 panel claim. It may never create a new qualified lineage, accepted independent edge, effective component, or stronger disposition than WCARE-36 already established.
 
+## Exact proof procedure
+
+A WCARE-38 plan binds the exact SHA-256 identities of:
+
+- the WCARE-35 adjudication result;
+- the WCARE-36 independence plan;
+- the WCARE-36 independence result;
+- the exact WCARE-36 verifier algorithm;
+- the exact WCARE-37 protocol and qualifier;
+- the WCARE-38 front-door qualifier;
+- the WCARE-38 authentication-overlay engine;
+- the WCARE-38 monotonicity self-test.
+
+The plan must exist no later than the declared evaluation time. Changing any bound algorithm or subject creates a different WCARE-38 evaluation subject.
+
+The official front door first executes the exact bound monotonicity self-test, then re-executes the exact WCARE-36 verifier over the exact WCARE-36 plan/result/provenance/relation evidence. Authentication overlay work is permitted only after the baseline verifier reports `independence_integrity_verified = true`.
+
+This means WCARE-38 does not trust a caller-supplied WCARE-36 result merely because its counts look plausible.
+
 ## Immutable inputs
 
 A WCARE-38 epoch binds exact SHA-256 identities for:
@@ -23,7 +42,8 @@ A WCARE-38 epoch binds exact SHA-256 identities for:
 - WCARE-36 independence result;
 - every WCARE-36 provenance receipt;
 - every WCARE-36 relation receipt;
-- the WCARE-37 protocol/verifier lineage used to authenticate required receipts.
+- the WCARE-37 protocol/verifier lineage used to authenticate required receipts;
+- the WCARE-38 proof algorithms named above.
 
 WCARE-35 ratings and WCARE-36 receipts remain immutable evidence. WCARE-38 appends an authentication overlay only.
 
@@ -48,7 +68,7 @@ An `Independent` relation receipt requires WCARE-37 authentication if WCARE-36 w
 
 Other receipts remain preserved as supplemental/raw evidence but cannot gain additional weight from WCARE-38.
 
-## Authentication admission
+## Authentication admission and exact partitions
 
 For each required receipt, WCARE-38 records exactly one derived authentication state:
 
@@ -56,9 +76,13 @@ For each required receipt, WCARE-38 records exactly one derived authentication s
 - `Unauthenticated` — no accepted attestation exists, or only untrusted/rejected/expired/wrong-subject evidence exists;
 - `Indeterminate` — WCARE-37 execution infrastructure could not produce a conclusion.
 
+The official WCARE-38 front door verifies that the three state sets are pairwise disjoint and that their union equals the exact required receipt census, separately for provenance and relation evidence. An overlap, omission, or extra subject invalidates qualification.
+
 Multiple accepted attestations for the same receipt do not multiply its evidentiary weight. Authentication is a predicate on the exact receipt, not a vote count.
 
 One WCARE-37 attestation may authenticate only the exact `subject_receipt_sha256` bound into its signed envelope.
+
+The package manifest may contain supplemental packages for WCARE-36 receipts that do not require authentication. Those subjects are explicitly censused in the final result and `supplemental_packages_contribute_weight` is always false. Supplemental packages cannot alter lineage, edge, component, or provenance-strength counts.
 
 ## Recomputed authenticated lineage evidence
 
@@ -100,10 +124,14 @@ Any violation is `AUTHENTICATION_INVALID`, never a stronger result.
 
 WCARE-36 `INDEPENDENCE_LIMITED` is an upper bound: WCARE-38 cannot promote it to supported.
 
+The exact bound monotonicity self-test exhaustively evaluates authentication-subset states on a synthetic four-reviewer graph and verifies that removing one authenticated reviewer or relation never increases any of the four authenticated-evidence metrics. Passing this algorithm-level test is required before real-panel evaluation begins. It is not evidence about any real panel by itself.
+
 ## Supported disposition
 
 `AUTHENTICATED_PANEL_SUPPORTED` requires:
 
+- the exact WCARE-36 verifier re-established baseline integrity;
+- the exact WCARE-38 monotonicity self-test passed;
 - WCARE-36 disposition was `INDEPENDENCE_SUPPORTED`;
 - all evidence structure and exact censuses are valid;
 - no required receipt is `Indeterminate`;
@@ -111,7 +139,8 @@ WCARE-36 `INDEPENDENCE_LIMITED` is an upper bound: WCARE-38 cannot promote it to
 - authenticated qualified distinct lineages meet the original WCARE-36 minimum;
 - authenticated provenance-strength counts meet the original WCARE-36 minimums;
 - WCARE-36 unknown-pair and conflict gates remain satisfied;
-- every monotonicity invariant holds.
+- every monotonicity invariant holds;
+- required authentication partitions are complete and disjoint.
 
 If evidence is structurally valid but these stronger authenticated requirements are not met, the result is `AUTHENTICATED_PANEL_LIMITED`.
 
