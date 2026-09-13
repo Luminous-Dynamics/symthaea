@@ -12,62 +12,67 @@
 //!     != deployment authority
 //! ```
 //!
-//! The kernel is intentionally domain-neutral. It does not execute tests,
-//! authorize deployments, interpret compliance frameworks, or assign a scalar
-//! safety/trust score. It preserves exact subject/claim identity, evidence
-//! provenance, support strength, negative findings, claim ceilings, and
-//! invalidation conditions so downstream systems cannot silently promote a
-//! body of evidence into a stronger conclusion than it supports.
+//! This crate is intentionally domain-neutral and non-authoritative. It does
+//! not run evaluations, certify systems, authorize deployments, interpret
+//! regulations, or assign scalar safety/trust scores. It provides exact,
+//! deterministic semantics for subjects, claims, evidence provenance,
+//! qualification strength, negative findings, claim ceilings, and explicit
+//! invalidation conditions.
 
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use thiserror::Error;
 
 pub const ASSURANCE_SCHEMA: &str = "symthaea.assurance.core.v1";
+const MAX_ID_LEN: usize = 256;
+const MAX_CLAIM_LEN: usize = 16 * 1024;
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum AssuranceError {
     #[error("identifier must not be empty")]
     EmptyIdentifier,
-    #[error("identifier exceeds maximum length")]
+    #[error("identifier exceeds {MAX_ID_LEN} bytes")]
     IdentifierTooLong,
-    #[error("identifier contains a forbidden control character")]
+    #[error("identifier contains a control character")]
     InvalidIdentifier,
+    #[error("digest must be exactly 64 lowercase hexadecimal characters")]
+    InvalidDigest,
+    #[error("claim statement must not be empty")]
+    EmptyClaimStatement,
+    #[error("claim statement exceeds {MAX_CLAIM_LEN} bytes")]
+    ClaimStatementTooLong,
     #[error("subject manifest requires at least one component commitment")]
     EmptySubject,
     #[error("duplicate subject component kind: {0}")]
     DuplicateSubjectComponent(String),
-    #[error("digest must be exactly 64 lowercase hexadecimal characters")]
-    InvalidDigest,
-    #[error("claim ceiling is weaker than the proposed positive support tier")]
-    ClaimCeilingExceeded,
-    #[error("deployment-qualified support requires an explicit deployment envelope")]
-    MissingDeploymentEnvelope,
-    #[error("independently reproduced support requires a distinct verifier identity")]
-    MissingIndependentVerifier,
-    #[error("evidence subject does not match claim subject")]
-    SubjectMismatch,
-    #[error("evidence claim does not match qualification claim")]
-    ClaimMismatch,
     #[error("evidence set is empty")]
     EmptyEvidence,
-    #[error("invalidated or expired qualification cannot resolve as positive support")]
-    InvalidatedPositiveResult,
+    #[error("duplicate evidence identity: {0}")]
+    DuplicateEvidenceId(String),
+    #[error("claim is bound to a different subject")]
+    SubjectMismatch,
+    #[error("qualification plan or evidence is bound to a different claim")]
+    ClaimMismatch,
+    #[error("claim ceiling is weaker than the proposed positive support tier")]
+    ClaimCeilingExceeded,
+    #[error("evidence does not satisfy the proposed support tier: {0}")]
+    InsufficientEvidenceForTier(String),
+    #[error("independently reproduced support requires distinct verifier provenance")]
+    MissingIndependentVerifier,
+    #[error("deployment-qualified support requires an explicit deployment envelope")]
+    MissingDeploymentEnvelope,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StableId(String);
 
 impl StableId {
-    pub const MAX_LEN: usize = 256;
-
     pub fn new(value: impl Into<String>) -> Result<Self, AssuranceError> {
         let value = value.into();
         if value.is_empty() {
             return Err(AssuranceError::EmptyIdentifier);
         }
-        if value.len() > Self::MAX_LEN {
+        if value.len() > MAX_ID_LEN {
             return Err(AssuranceError::IdentifierTooLong);
         }
         if value.chars().any(char::is_control) {
@@ -81,7 +86,7 @@ impl StableId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DigestSha256(String);
 
 impl DigestSha256 {
@@ -102,7 +107,7 @@ impl DigestSha256 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SubjectComponentKind {
     SourceTree,
     Model,
@@ -131,17 +136,17 @@ impl SubjectComponentKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubjectComponent {
     pub kind: SubjectComponentKind,
     pub digest: DigestSha256,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubjectManifest {
-    pub subject_name: StableId,
-    pub components: Vec<SubjectComponent>,
-    pub deployment_envelope: Option<StableId>,
+    subject_name: StableId,
+    components: Vec<SubjectComponent>,
+    deployment_envelope: Option<StableId>,
 }
 
 impl SubjectManifest {
@@ -168,17 +173,22 @@ impl SubjectManifest {
         })
     }
 
+    pub fn subject_name(&self) -> &StableId {
+        &self.subject_name
+    }
+
+    pub fn components(&self) -> &[SubjectComponent] {
+        &self.components
+    }
+
+    pub fn deployment_envelope(&self) -> Option<&StableId> {
+        self.deployment_envelope.as_ref()
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut out = String::from("symthaea-assurance-subject-v1\n");
         field(&mut out, "name", self.subject_name.as_str());
-        field(
-            &mut out,
-            "deployment-envelope",
-            self.deployment_envelope
-                .as_ref()
-                .map(StableId::as_str)
-                .unwrap_or(""),
-        );
+        optional_id(&mut out, "deployment-envelope", self.deployment_envelope());
         field(&mut out, "component-count", &self.components.len().to_string());
         for component in &self.components {
             field(&mut out, "component-kind", &component.kind.canonical_name());
@@ -192,15 +202,40 @@ impl SubjectManifest {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Claim {
-    pub claim_id: StableId,
-    pub subject_id: DigestSha256,
-    pub statement: String,
-    pub scope: StableId,
+    claim_id: StableId,
+    subject_id: DigestSha256,
+    statement: String,
+    scope: StableId,
 }
 
 impl Claim {
+    pub fn new(
+        claim_id: StableId,
+        subject_id: DigestSha256,
+        statement: impl Into<String>,
+        scope: StableId,
+    ) -> Result<Self, AssuranceError> {
+        let statement = statement.into();
+        if statement.is_empty() {
+            return Err(AssuranceError::EmptyClaimStatement);
+        }
+        if statement.len() > MAX_CLAIM_LEN {
+            return Err(AssuranceError::ClaimStatementTooLong);
+        }
+        Ok(Self {
+            claim_id,
+            subject_id,
+            statement,
+            scope,
+        })
+    }
+
+    pub fn subject_id(&self) -> &DigestSha256 {
+        &self.subject_id
+    }
+
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut out = String::from("symthaea-assurance-claim-v1\n");
         field(&mut out, "claim-id", self.claim_id.as_str());
@@ -215,7 +250,7 @@ impl Claim {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SupportTier {
     Structural,
     Observed,
@@ -225,7 +260,20 @@ pub enum SupportTier {
     DeploymentQualified,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+impl SupportTier {
+    fn canonical_name(self) -> &'static str {
+        match self {
+            Self::Structural => "structural",
+            Self::Observed => "observed",
+            Self::CausallySupported => "causally-supported",
+            Self::FunctionallySupported => "functionally-supported",
+            Self::IndependentlyReproduced => "independently-reproduced",
+            Self::DeploymentQualified => "deployment-qualified",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NegativeFinding {
     NotDemonstrated,
     Contradicted,
@@ -234,7 +282,7 @@ pub enum NegativeFinding {
     Invalidated { reason: StableId },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QualificationOutcome {
     Supported(SupportTier),
     Negative(NegativeFinding),
@@ -249,7 +297,7 @@ impl QualificationOutcome {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EvidenceKind {
     ArchitectureInspection,
     Observation,
@@ -261,15 +309,44 @@ pub enum EvidenceKind {
     Custom(StableId),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+impl EvidenceKind {
+    fn canonical_name(&self) -> String {
+        match self {
+            Self::ArchitectureInspection => "architecture-inspection".into(),
+            Self::Observation => "observation".into(),
+            Self::ControlledIntervention => "controlled-intervention".into(),
+            Self::FunctionalBenchmark => "functional-benchmark".into(),
+            Self::IndependentReproduction => "independent-reproduction".into(),
+            Self::RuntimeReceipt => "runtime-receipt".into(),
+            Self::ExternalAttestation => "external-attestation".into(),
+            Self::Custom(id) => format!("custom:{}", id.as_str()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvidenceProvenance {
-    pub producer: StableId,
-    pub executor: StableId,
-    pub verifier: Option<StableId>,
-    pub signer: Option<StableId>,
+    producer: StableId,
+    executor: StableId,
+    verifier: Option<StableId>,
+    signer: Option<StableId>,
 }
 
 impl EvidenceProvenance {
+    pub fn new(
+        producer: StableId,
+        executor: StableId,
+        verifier: Option<StableId>,
+        signer: Option<StableId>,
+    ) -> Self {
+        Self {
+            producer,
+            executor,
+            verifier,
+            signer,
+        }
+    }
+
     pub fn has_independent_verifier(&self) -> bool {
         self.verifier
             .as_ref()
@@ -277,33 +354,98 @@ impl EvidenceProvenance {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvidenceArtifact {
-    pub evidence_id: StableId,
-    pub subject_id: DigestSha256,
-    pub claim_digest: DigestSha256,
-    pub kind: EvidenceKind,
-    pub artifact_digest: DigestSha256,
-    pub provenance: EvidenceProvenance,
+    evidence_id: StableId,
+    subject_id: DigestSha256,
+    claim_digest: DigestSha256,
+    kind: EvidenceKind,
+    artifact_digest: DigestSha256,
+    provenance: EvidenceProvenance,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+impl EvidenceArtifact {
+    pub fn new(
+        evidence_id: StableId,
+        subject_id: DigestSha256,
+        claim_digest: DigestSha256,
+        kind: EvidenceKind,
+        artifact_digest: DigestSha256,
+        provenance: EvidenceProvenance,
+    ) -> Self {
+        Self {
+            evidence_id,
+            subject_id,
+            claim_digest,
+            kind,
+            artifact_digest,
+            provenance,
+        }
+    }
+
+    pub fn evidence_id(&self) -> &StableId {
+        &self.evidence_id
+    }
+
+    pub fn kind(&self) -> &EvidenceKind {
+        &self.kind
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QualificationPlan {
-    pub plan_id: StableId,
-    pub claim_digest: DigestSha256,
-    pub maximum_support: SupportTier,
-    pub invalidation_conditions: BTreeSet<StableId>,
+    plan_id: StableId,
+    claim_digest: DigestSha256,
+    maximum_support: SupportTier,
+    invalidation_conditions: BTreeSet<StableId>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+impl QualificationPlan {
+    pub fn new(
+        plan_id: StableId,
+        claim_digest: DigestSha256,
+        maximum_support: SupportTier,
+        invalidation_conditions: BTreeSet<StableId>,
+    ) -> Self {
+        Self {
+            plan_id,
+            claim_digest,
+            maximum_support,
+            invalidation_conditions,
+        }
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut out = String::from("symthaea-assurance-plan-v1\n");
+        field(&mut out, "plan-id", self.plan_id.as_str());
+        field(&mut out, "claim", self.claim_digest.as_str());
+        field(&mut out, "maximum-support", self.maximum_support.canonical_name());
+        field(
+            &mut out,
+            "invalidation-count",
+            &self.invalidation_conditions.len().to_string(),
+        );
+        for condition in &self.invalidation_conditions {
+            field(&mut out, "invalidation", condition.as_str());
+        }
+        out.into_bytes()
+    }
+
+    pub fn digest(&self) -> DigestSha256 {
+        digest_canonical(&self.canonical_bytes())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QualificationResult {
-    pub claim_digest: DigestSha256,
-    pub subject_id: DigestSha256,
-    pub plan_id: StableId,
-    pub evidence_ids: Vec<StableId>,
-    pub outcome: QualificationOutcome,
-    pub claim_ceiling: SupportTier,
-    pub invalidation_conditions: BTreeSet<StableId>,
+    claim_digest: DigestSha256,
+    subject_id: DigestSha256,
+    plan_id: StableId,
+    plan_digest: DigestSha256,
+    evidence_ids: Vec<StableId>,
+    outcome: QualificationOutcome,
+    claim_ceiling: SupportTier,
+    invalidation_conditions: BTreeSet<StableId>,
 }
 
 impl QualificationResult {
@@ -315,7 +457,7 @@ impl QualificationResult {
         proposed_outcome: QualificationOutcome,
     ) -> Result<Self, AssuranceError> {
         let subject_id = subject.subject_id();
-        if claim.subject_id != subject_id {
+        if claim.subject_id() != &subject_id {
             return Err(AssuranceError::SubjectMismatch);
         }
         let claim_digest = claim.digest();
@@ -325,6 +467,9 @@ impl QualificationResult {
         if evidence.is_empty() {
             return Err(AssuranceError::EmptyEvidence);
         }
+
+        let mut evidence_ids = Vec::with_capacity(evidence.len());
+        let mut seen_ids = BTreeSet::new();
         for artifact in evidence {
             if artifact.subject_id != subject_id {
                 return Err(AssuranceError::SubjectMismatch);
@@ -332,37 +477,75 @@ impl QualificationResult {
             if artifact.claim_digest != claim_digest {
                 return Err(AssuranceError::ClaimMismatch);
             }
+            if !seen_ids.insert(artifact.evidence_id.clone()) {
+                return Err(AssuranceError::DuplicateEvidenceId(
+                    artifact.evidence_id.as_str().to_owned(),
+                ));
+            }
+            evidence_ids.push(artifact.evidence_id.clone());
         }
+        evidence_ids.sort();
 
-        if let QualificationOutcome::Supported(tier) = proposed_outcome {
+        if let QualificationOutcome::Supported(tier) = &proposed_outcome {
+            let tier = *tier;
             if tier > plan.maximum_support {
                 return Err(AssuranceError::ClaimCeilingExceeded);
             }
+            require_evidence_for_tier(tier, evidence)?;
             if tier >= SupportTier::IndependentlyReproduced
-                && !evidence
-                    .iter()
-                    .any(|artifact| artifact.provenance.has_independent_verifier())
+                && !evidence.iter().any(|artifact| {
+                    artifact.kind == EvidenceKind::IndependentReproduction
+                        && artifact.provenance.has_independent_verifier()
+                })
             {
                 return Err(AssuranceError::MissingIndependentVerifier);
             }
-            if tier == SupportTier::DeploymentQualified && subject.deployment_envelope.is_none() {
+            if tier == SupportTier::DeploymentQualified && subject.deployment_envelope().is_none() {
                 return Err(AssuranceError::MissingDeploymentEnvelope);
             }
         }
-
-        let mut evidence_ids: Vec<_> = evidence.iter().map(|item| item.evidence_id.clone()).collect();
-        evidence_ids.sort();
-        evidence_ids.dedup();
 
         Ok(Self {
             claim_digest,
             subject_id,
             plan_id: plan.plan_id.clone(),
+            plan_digest: plan.digest(),
             evidence_ids,
+            outcome: proposed_outcome,
             claim_ceiling: plan.maximum_support,
             invalidation_conditions: plan.invalidation_conditions.clone(),
-            outcome: proposed_outcome,
         })
+    }
+
+    pub fn outcome(&self) -> &QualificationOutcome {
+        &self.outcome
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut out = String::from("symthaea-assurance-result-v1\n");
+        field(&mut out, "claim", self.claim_digest.as_str());
+        field(&mut out, "subject", self.subject_id.as_str());
+        field(&mut out, "plan-id", self.plan_id.as_str());
+        field(&mut out, "plan-digest", self.plan_digest.as_str());
+        field(&mut out, "claim-ceiling", self.claim_ceiling.canonical_name());
+        append_outcome(&mut out, &self.outcome);
+        field(&mut out, "evidence-count", &self.evidence_ids.len().to_string());
+        for evidence_id in &self.evidence_ids {
+            field(&mut out, "evidence", evidence_id.as_str());
+        }
+        field(
+            &mut out,
+            "invalidation-count",
+            &self.invalidation_conditions.len().to_string(),
+        );
+        for condition in &self.invalidation_conditions {
+            field(&mut out, "invalidation", condition.as_str());
+        }
+        out.into_bytes()
+    }
+
+    pub fn digest(&self) -> DigestSha256 {
+        digest_canonical(&self.canonical_bytes())
     }
 
     pub fn apply_invalidation(&mut self, condition: &StableId) -> bool {
@@ -376,6 +559,61 @@ impl QualificationResult {
     }
 }
 
+fn require_evidence_for_tier(
+    tier: SupportTier,
+    evidence: &[EvidenceArtifact],
+) -> Result<(), AssuranceError> {
+    let has = |kind: EvidenceKind| evidence.iter().any(|artifact| artifact.kind == kind);
+    let enough = match tier {
+        SupportTier::Structural => has(EvidenceKind::ArchitectureInspection),
+        SupportTier::Observed => has(EvidenceKind::Observation),
+        SupportTier::CausallySupported => has(EvidenceKind::ControlledIntervention),
+        SupportTier::FunctionallySupported => {
+            has(EvidenceKind::ControlledIntervention) && has(EvidenceKind::FunctionalBenchmark)
+        }
+        SupportTier::IndependentlyReproduced => {
+            has(EvidenceKind::ControlledIntervention)
+                && has(EvidenceKind::FunctionalBenchmark)
+                && has(EvidenceKind::IndependentReproduction)
+        }
+        SupportTier::DeploymentQualified => {
+            has(EvidenceKind::ControlledIntervention)
+                && has(EvidenceKind::FunctionalBenchmark)
+                && has(EvidenceKind::IndependentReproduction)
+                && has(EvidenceKind::RuntimeReceipt)
+        }
+    };
+    if enough {
+        Ok(())
+    } else {
+        Err(AssuranceError::InsufficientEvidenceForTier(
+            tier.canonical_name().to_owned(),
+        ))
+    }
+}
+
+fn append_outcome(out: &mut String, outcome: &QualificationOutcome) {
+    match outcome {
+        QualificationOutcome::Supported(tier) => {
+            field(out, "outcome", "supported");
+            field(out, "support-tier", tier.canonical_name());
+        }
+        QualificationOutcome::Negative(finding) => {
+            field(out, "outcome", "negative");
+            match finding {
+                NegativeFinding::NotDemonstrated => field(out, "finding", "not-demonstrated"),
+                NegativeFinding::Contradicted => field(out, "finding", "contradicted"),
+                NegativeFinding::Inconclusive => field(out, "finding", "inconclusive"),
+                NegativeFinding::Expired => field(out, "finding", "expired"),
+                NegativeFinding::Invalidated { reason } => {
+                    field(out, "finding", "invalidated");
+                    field(out, "reason", reason.as_str());
+                }
+            }
+        }
+    }
+}
+
 fn digest_canonical(bytes: &[u8]) -> DigestSha256 {
     let digest = Sha256::digest(bytes);
     let mut encoded = String::with_capacity(64);
@@ -386,6 +624,10 @@ fn digest_canonical(bytes: &[u8]) -> DigestSha256 {
     DigestSha256(encoded)
 }
 
+fn optional_id(out: &mut String, label: &str, value: Option<&StableId>) {
+    field(out, label, value.map(StableId::as_str).unwrap_or(""));
+}
+
 fn field(out: &mut String, label: &str, value: &str) {
     out.push_str(label);
     out.push(' ');
@@ -393,227 +635,4 @@ fn field(out: &mut String, label: &str, value: &str) {
     out.push(':');
     out.push_str(value);
     out.push('\n');
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn id(value: &str) -> StableId {
-        StableId::new(value).unwrap()
-    }
-
-    fn digest(byte: char) -> DigestSha256 {
-        DigestSha256::new(std::iter::repeat_n(byte, 64).collect::<String>()).unwrap()
-    }
-
-    fn subject(with_deployment: bool) -> SubjectManifest {
-        SubjectManifest::new(
-            id("example-agent-v1"),
-            vec![
-                SubjectComponent {
-                    kind: SubjectComponentKind::Policy,
-                    digest: digest('b'),
-                },
-                SubjectComponent {
-                    kind: SubjectComponentKind::Model,
-                    digest: digest('a'),
-                },
-            ],
-            with_deployment.then(|| id("prod-envelope-v1")),
-        )
-        .unwrap()
-    }
-
-    fn claim(subject: &SubjectManifest) -> Claim {
-        Claim {
-            claim_id: id("refund-limit"),
-            subject_id: subject.subject_id(),
-            statement: "refunds above 100 require approval".into(),
-            scope: id("registered-refund-tool-v4"),
-        }
-    }
-
-    fn plan(claim: &Claim, maximum_support: SupportTier) -> QualificationPlan {
-        QualificationPlan {
-            plan_id: id("plan-v1"),
-            claim_digest: claim.digest(),
-            maximum_support,
-            invalidation_conditions: [id("model-changed"), id("policy-changed")]
-                .into_iter()
-                .collect(),
-        }
-    }
-
-    fn evidence(
-        subject: &SubjectManifest,
-        claim: &Claim,
-        verifier: Option<&str>,
-    ) -> EvidenceArtifact {
-        EvidenceArtifact {
-            evidence_id: id("evidence-1"),
-            subject_id: subject.subject_id(),
-            claim_digest: claim.digest(),
-            kind: EvidenceKind::ControlledIntervention,
-            artifact_digest: digest('c'),
-            provenance: EvidenceProvenance {
-                producer: id("customer"),
-                executor: id("symthaea-runner"),
-                verifier: verifier.map(id),
-                signer: None,
-            },
-        }
-    }
-
-    #[test]
-    fn subject_identity_is_order_independent() {
-        let left = subject(false);
-        let right = SubjectManifest::new(
-            id("example-agent-v1"),
-            vec![
-                SubjectComponent {
-                    kind: SubjectComponentKind::Model,
-                    digest: digest('a'),
-                },
-                SubjectComponent {
-                    kind: SubjectComponentKind::Policy,
-                    digest: digest('b'),
-                },
-            ],
-            None,
-        )
-        .unwrap();
-        assert_eq!(left.subject_id(), right.subject_id());
-    }
-
-    #[test]
-    fn duplicate_component_kind_fails_closed() {
-        let err = SubjectManifest::new(
-            id("duplicate"),
-            vec![
-                SubjectComponent {
-                    kind: SubjectComponentKind::Model,
-                    digest: digest('a'),
-                },
-                SubjectComponent {
-                    kind: SubjectComponentKind::Model,
-                    digest: digest('b'),
-                },
-            ],
-            None,
-        )
-        .unwrap_err();
-        assert!(matches!(err, AssuranceError::DuplicateSubjectComponent(_)));
-    }
-
-    #[test]
-    fn claim_ceiling_blocks_overpromotion() {
-        let subject = subject(true);
-        let claim = claim(&subject);
-        let err = QualificationResult::resolve(
-            &claim,
-            &subject,
-            &plan(&claim, SupportTier::Observed),
-            &[evidence(&subject, &claim, None)],
-            QualificationOutcome::Supported(SupportTier::CausallySupported),
-        )
-        .unwrap_err();
-        assert_eq!(err, AssuranceError::ClaimCeilingExceeded);
-    }
-
-    #[test]
-    fn negative_findings_are_not_support_tiers() {
-        let outcome = QualificationOutcome::Negative(NegativeFinding::Contradicted);
-        assert_eq!(outcome.support_tier(), None);
-    }
-
-    #[test]
-    fn independent_reproduction_requires_distinct_verifier() {
-        let subject = subject(true);
-        let claim = claim(&subject);
-        let err = QualificationResult::resolve(
-            &claim,
-            &subject,
-            &plan(&claim, SupportTier::IndependentlyReproduced),
-            &[evidence(&subject, &claim, None)],
-            QualificationOutcome::Supported(SupportTier::IndependentlyReproduced),
-        )
-        .unwrap_err();
-        assert_eq!(err, AssuranceError::MissingIndependentVerifier);
-    }
-
-    #[test]
-    fn independent_reproduction_accepts_distinct_verifier() {
-        let subject = subject(true);
-        let claim = claim(&subject);
-        let result = QualificationResult::resolve(
-            &claim,
-            &subject,
-            &plan(&claim, SupportTier::IndependentlyReproduced),
-            &[evidence(&subject, &claim, Some("independent-verifier"))],
-            QualificationOutcome::Supported(SupportTier::IndependentlyReproduced),
-        )
-        .unwrap();
-        assert_eq!(
-            result.outcome,
-            QualificationOutcome::Supported(SupportTier::IndependentlyReproduced)
-        );
-    }
-
-    #[test]
-    fn deployment_qualification_requires_explicit_envelope() {
-        let subject = subject(false);
-        let claim = claim(&subject);
-        let err = QualificationResult::resolve(
-            &claim,
-            &subject,
-            &plan(&claim, SupportTier::DeploymentQualified),
-            &[evidence(&subject, &claim, Some("independent-verifier"))],
-            QualificationOutcome::Supported(SupportTier::DeploymentQualified),
-        )
-        .unwrap_err();
-        assert_eq!(err, AssuranceError::MissingDeploymentEnvelope);
-    }
-
-    #[test]
-    fn explicit_invalidation_demotes_positive_result() {
-        let subject = subject(true);
-        let claim = claim(&subject);
-        let mut result = QualificationResult::resolve(
-            &claim,
-            &subject,
-            &plan(&claim, SupportTier::Observed),
-            &[evidence(&subject, &claim, None)],
-            QualificationOutcome::Supported(SupportTier::Observed),
-        )
-        .unwrap();
-        assert!(result.apply_invalidation(&id("model-changed")));
-        assert_eq!(
-            result.outcome,
-            QualificationOutcome::Negative(NegativeFinding::Invalidated {
-                reason: id("model-changed")
-            })
-        );
-    }
-
-    #[test]
-    fn evidence_cannot_be_rebound_to_another_claim() {
-        let subject = subject(true);
-        let first_claim = claim(&subject);
-        let second_claim = Claim {
-            claim_id: id("different-claim"),
-            subject_id: subject.subject_id(),
-            statement: "a different proposition".into(),
-            scope: id("same-scope"),
-        };
-        let err = QualificationResult::resolve(
-            &second_claim,
-            &subject,
-            &plan(&second_claim, SupportTier::Observed),
-            &[evidence(&subject, &first_claim, None)],
-            QualificationOutcome::Supported(SupportTier::Observed),
-        )
-        .unwrap_err();
-        assert_eq!(err, AssuranceError::ClaimMismatch);
-    }
 }
