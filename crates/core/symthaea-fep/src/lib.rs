@@ -140,6 +140,7 @@
 mod agent;
 mod bridge;
 pub mod efe_diagnostics;
+pub mod efe_policy_probe;
 pub mod free_energy;
 pub mod generative_model;
 pub mod haptic_semantic_binder;
