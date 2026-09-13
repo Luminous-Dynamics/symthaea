@@ -36,6 +36,8 @@
 //!   benchmark subject plus separately authorized and validated execution records
 //! - **Center-symmetry diagnostics**: center-invariant Polyakov alignment plus
 //!   explicit `Z3` sector occupancy and mobility under caller-declared policy
+//! - **Center-mobility preregistration**: campaign-bound supplemental policy
+//!   frozen before production authorization and bound to the exact chain population
 //! - **Scale evidence**: same-ensemble flow curves whose derived uncertainty
 //!   must bind joint resampling across the correlated flow-time trajectory
 //! - **Flowed-topology lineage**: version-stable operator/flow identities with
@@ -61,6 +63,7 @@ pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_analysis_authority;
 pub mod lattice_campaign_authority;
+pub mod lattice_campaign_center_qualification;
 pub mod lattice_campaign_manifest;
 pub mod lattice_center_symmetry;
 pub mod lattice_ensemble_promotion;
@@ -101,6 +104,12 @@ pub use lattice_campaign_authority::{
     QUALIFIED_CAMPAIGN_EXECUTION_RECEIPT_SCOPE, CampaignAuthorityError,
     CampaignExecutionAuthorization, QualifiedCampaignExecutionReceipt,
     authorize_campaign_scientific_execution, bind_qualified_campaign_execution,
+};
+pub use lattice_campaign_center_qualification::{
+    CAMPAIGN_CENTER_QUALIFICATION_EVIDENCE_ID, CAMPAIGN_CENTER_QUALIFICATION_SUPPLEMENT_ID,
+    AuthorizedCampaignCenterQualification, BoundCampaignCenterQualificationEvidence,
+    CampaignCenterQualificationError, CampaignCenterQualificationSupplement,
+    authorize_campaign_center_qualification, bind_campaign_center_qualification_evidence,
 };
 pub use lattice_campaign_manifest::{
     PURE_SU3_CAMPAIGN_MANIFEST_ID, PURE_SU3_CAMPAIGN_RUN_ID, WILSON_PURE_GAUGE_ACTION_ID,
