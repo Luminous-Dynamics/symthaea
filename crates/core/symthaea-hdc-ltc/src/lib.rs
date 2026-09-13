@@ -6,20 +6,25 @@
 //!
 //! Hyperdimensional recurrent state with solver-free liquid-time evolution.
 //!
-//! The crate deliberately separates four research surfaces:
+//! The crate deliberately separates the research surfaces needed to test HLS
+//! claims independently:
 //!
 //! - [`ContinuousHV`] carries arbitrary continuous distributed state.
 //! - [`UnitaryRole`] carries reversible real HDC roles with components in
 //!   `{ -1, +1 }`, so role binding is an isometry.
-//! - [`HolographicLiquidCell`] is a theorem-bearing research cell whose temporal
-//!   update commutes with `UnitaryRole` binding.
+//! - [`HolographicLiquidCell`] is a theorem-bearing diagonal research cell whose
+//!   temporal update commutes with `UnitaryRole` binding.
 //! - [`InvariantContextMixer`] supplies O(KD) cross-dimensional magnitude
 //!   context without violating the full bipolar role symmetry.
+//! - [`ContextualHolographicLiquidCell`] composes invariant context with the
+//!   theorem-bearing HLS transition while leaving diagonal HLS intact as an
+//!   ablation baseline.
 //!
 //! The legacy [`HdcLtcUnifiedNeuron`] remains available so the algebraic research
 //! path can be qualified without silently changing production behavior.
 
 pub mod config;
+pub mod contextual_holographic_liquid;
 pub mod continuous_hv;
 pub mod holographic_liquid;
 pub mod invariant_context;
@@ -27,6 +32,7 @@ pub mod network;
 pub mod neuron;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
+pub use contextual_holographic_liquid::{ContextualHlsError, ContextualHolographicLiquidCell};
 pub use continuous_hv::{ContinuousHV, HDC_DIMENSION, UnitaryRole};
 pub use holographic_liquid::{HlsActivation, HlsConfig, HlsError, HolographicLiquidCell};
 pub use invariant_context::{ContextMixerError, InvariantContextMixer};
