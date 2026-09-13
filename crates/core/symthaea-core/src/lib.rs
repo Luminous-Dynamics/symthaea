@@ -84,6 +84,8 @@ pub mod genesis;
 pub mod hdc;
 /// Analytic R3/R4 finite-w shell evaluator for HYPERSPACE-001.
 pub mod hyperspace_benchmark;
+/// Deterministic HYPERSPACE-001 H0-H6 intervention campaign.
+pub mod hyperspace_campaign;
 /// Fail-closed implicit equality manifolds, local projection, and tangent bases.
 pub mod implicit_manifold;
 /// Qualified local charts, overlap witnesses, and partial finite-atlas evidence.
