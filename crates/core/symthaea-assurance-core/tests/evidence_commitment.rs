@@ -3,8 +3,8 @@
 
 use symthaea_assurance_core::{
     Claim, DigestSha256, EvidenceArtifact, EvidenceKind, EvidenceProvenance, QualificationOutcome,
-    QualificationPlan, QualificationResult, StableId, SubjectComponent, SubjectComponentKind,
-    SubjectManifest, SupportTier,
+    QualificationPlan, QualificationResult, ReproductionStatus, StableId, SubjectComponent,
+    SubjectComponentKind, SubjectManifest, SupportTier,
 };
 
 fn id(value: &str) -> StableId {
@@ -55,6 +55,7 @@ fn artifact_content_or_provenance_change_changes_result_identity() {
         &plan,
         &[make(digest('b'), "producer-a")],
         QualificationOutcome::Supported(SupportTier::Observed),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap();
     let changed_bytes = QualificationResult::validate_and_bind(
@@ -63,6 +64,7 @@ fn artifact_content_or_provenance_change_changes_result_identity() {
         &plan,
         &[make(digest('c'), "producer-a")],
         QualificationOutcome::Supported(SupportTier::Observed),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap();
     let changed_provenance = QualificationResult::validate_and_bind(
@@ -71,6 +73,7 @@ fn artifact_content_or_provenance_change_changes_result_identity() {
         &plan,
         &[make(digest('b'), "producer-b")],
         QualificationOutcome::Supported(SupportTier::Observed),
+        ReproductionStatus::NotClaimed,
     )
     .unwrap();
 
