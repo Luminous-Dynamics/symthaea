@@ -20,6 +20,8 @@ use super::v2_public_schema::{V2_OBSERVATION_DIM, V2PublicFamily, V2PublicState}
 
 pub(super) const V2_FROZEN_COMPARATOR_SUBJECT_REVISION: &str =
     "EUREKA.002.V2.FROZEN_COMPARATOR_SUBJECT.v1";
+pub(super) const V2_COMPARATOR_IMPLEMENTATION_COMMITMENT_REVISION: &str =
+    "EUREKA.002.V2.COMPARATOR_IMPLEMENTATION_COMMITMENT.v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct FrozenFitRow {
@@ -47,6 +49,7 @@ impl From<&V2PublicTransitionEvidence> for FrozenFitRow {
 pub(super) struct V2FrozenComparatorSubject {
     schema_commitment: [u8; 32],
     fit_corpus_commitment: [u8; 32],
+    implementation_commitment: [u8; 32],
     records: Vec<FrozenFitRow>,
     commitment: [u8; 32],
 }
@@ -54,14 +57,17 @@ pub(super) struct V2FrozenComparatorSubject {
 impl V2FrozenComparatorSubject {
     pub(super) fn freeze(corpus: &V2DevelopmentFitCorpus) -> Self {
         let records: Vec<_> = corpus.records().iter().map(FrozenFitRow::from).collect();
+        let implementation_commitment = comparator_implementation_commitment();
         let commitment = subject_commitment(
             corpus.schema_commitment(),
             corpus.commitment(),
+            implementation_commitment,
             records.len(),
         );
         Self {
             schema_commitment: corpus.schema_commitment(),
             fit_corpus_commitment: corpus.commitment(),
+            implementation_commitment,
             records,
             commitment,
         }
@@ -73,6 +79,10 @@ impl V2FrozenComparatorSubject {
 
     pub(super) const fn fit_corpus_commitment(&self) -> [u8; 32] {
         self.fit_corpus_commitment
+    }
+
+    pub(super) const fn implementation_commitment(&self) -> [u8; 32] {
+        self.implementation_commitment
     }
 
     pub(super) const fn commitment(&self) -> [u8; 32] {
@@ -195,6 +205,22 @@ impl V2FrozenComparatorSubject {
     }
 }
 
+pub(super) fn comparator_implementation_commitment() -> [u8; 32] {
+    let mut bytes = Vec::new();
+    encode_bytes(
+        &mut bytes,
+        V2_COMPARATOR_IMPLEMENTATION_COMMITMENT_REVISION.as_bytes(),
+    );
+    encode_bytes(
+        &mut bytes,
+        V2_SHORTCUT_BASELINE_IMPLEMENTATION_REVISION.as_bytes(),
+    );
+    for kind in ShortcutBaselineKind::ALL {
+        encode_bytes(&mut bytes, kind.stable_id().as_bytes());
+    }
+    *blake3::hash(&bytes).as_bytes()
+}
+
 fn choose_mode<T: Copy + Ord>(counts: &BTreeMap<T, u32>) -> Option<T> {
     counts
         .iter()
@@ -219,14 +245,12 @@ fn distance(left: V2PublicState, right: V2PublicState) -> u64 {
 fn subject_commitment(
     schema_commitment: [u8; 32],
     fit_corpus_commitment: [u8; 32],
+    implementation_commitment: [u8; 32],
     record_count: usize,
 ) -> [u8; 32] {
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, V2_FROZEN_COMPARATOR_SUBJECT_REVISION.as_bytes());
-    encode_bytes(
-        &mut bytes,
-        V2_SHORTCUT_BASELINE_IMPLEMENTATION_REVISION.as_bytes(),
-    );
+    bytes.extend_from_slice(&implementation_commitment);
     bytes.extend_from_slice(&schema_commitment);
     bytes.extend_from_slice(&fit_corpus_commitment);
     bytes.extend_from_slice(&(record_count as u64).to_le_bytes());
@@ -291,6 +315,10 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.schema_commitment(), corpus.schema_commitment());
         assert_eq!(a.fit_corpus_commitment(), corpus.commitment());
+        assert_eq!(
+            a.implementation_commitment(),
+            comparator_implementation_commitment()
+        );
         assert_ne!(a.commitment(), [0_u8; 32]);
 
         let changed = V2DevelopmentFitCorpus::freeze(vec![record(
@@ -304,6 +332,14 @@ mod tests {
             a.commitment(),
             V2FrozenComparatorSubject::freeze(&changed).commitment()
         );
+    }
+
+    #[test]
+    fn implementation_identity_is_nonzero_and_deterministic() {
+        let a = comparator_implementation_commitment();
+        let b = comparator_implementation_commitment();
+        assert_eq!(a, b);
+        assert_ne!(a, [0_u8; 32]);
     }
 
     #[test]
@@ -386,10 +422,7 @@ mod tests {
         let prediction = subject.predict(
             ShortcutBaselineKind::SimpleMarkov,
             V2PublicFamily::PublicFlowV2,
-            V2PublicState::new([99, 2, 3, 0]).err().map_or_else(
-                || unreachable!("99 is outside public schema"),
-                |_| V2PublicState::new([7, 7, 7, 0]).unwrap(),
-            ),
+            V2PublicState::new([7, 7, 7, 0]).unwrap(),
             PublicAction::Pulse { slot: 0 },
         );
         assert_eq!(prediction.outcome, PredictionOutcome::AbstainInsufficientEvidence);
