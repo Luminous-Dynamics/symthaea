@@ -188,11 +188,13 @@ impl StateTrackingBenchmark {
         validate_config(&config)?;
         let mut rng = XorShift64::new(config.seed);
 
+        // Initial latent world is seed-dependent. This prevents a query-only
+        // readout from learning one fixed modulo mapping across train/test seeds.
         let initial_entity_locations = (0..config.entities)
-            .map(|entity| (entity % config.locations) as LocationId)
+            .map(|_| rng.index(config.locations) as LocationId)
             .collect::<Vec<_>>();
         let initial_object_owners = (0..config.objects)
-            .map(|object| (object % config.entities) as EntityId)
+            .map(|_| rng.index(config.entities) as EntityId)
             .collect::<Vec<_>>();
 
         let mut events = Vec::with_capacity(config.events);
@@ -335,7 +337,6 @@ impl StateTrackingBenchmark {
             )?;
 
             if asked_after > 0 && rng.next_f64() < self.config.historical_query_rate {
-                // Strictly retrospective: index is always in [0, asked_after).
                 let as_of = rng.index(asked_after);
                 let historical_object = rng.index(self.config.objects) as ObjectId;
                 self.push_query(
@@ -431,7 +432,6 @@ fn validate_config(
         ("objects", config.objects),
         ("locations", config.locations),
     ] {
-        // A u16 id can represent 65,536 distinct values: 0..=65,535.
         if count > u16::MAX as usize + 1 {
             return Err(StateTrackingBenchmarkError::TooManyIds(name));
         }
@@ -464,11 +464,7 @@ fn sample_log_uniform(rng: &mut XorShift64, min: f64, max: f64) -> f64 {
 }
 
 fn ratio(correct: usize, total: usize) -> f64 {
-    if total == 0 {
-        0.0
-    } else {
-        correct as f64 / total as f64
-    }
+    if total == 0 { 0.0 } else { correct as f64 / total as f64 }
 }
 
 #[derive(Debug, Clone)]
@@ -480,13 +476,7 @@ impl XorShift64 {
     fn new(seed: u64) -> Self {
         let mixed = seed ^ 0x9E3779B97F4A7C15;
         Self {
-            // Xorshift has an absorbing all-zero state. Remap that one seed to a
-            // fixed non-zero state so every u64 seed remains usable.
-            state: if mixed == 0 {
-                0xD1B54A32D192ED03
-            } else {
-                mixed
-            },
+            state: if mixed == 0 { 0xD1B54A32D192ED03 } else { mixed },
         }
     }
 
@@ -497,9 +487,7 @@ impl XorShift64 {
         self.state
     }
 
-    fn next_bool(&mut self) -> bool {
-        self.next_u64() & 1 == 1
-    }
+    fn next_bool(&mut self) -> bool { self.next_u64() & 1 == 1 }
 
     fn next_f64(&mut self) -> f64 {
         let bits = self.next_u64() >> 11;
@@ -518,23 +506,39 @@ mod tests {
 
     #[test]
     fn generation_is_deterministic() {
-        let config = StateTrackingBenchmarkConfig {
-            events: 200,
-            ..StateTrackingBenchmarkConfig::default()
-        };
+        let config = StateTrackingBenchmarkConfig { events: 200, ..Default::default() };
         let a = StateTrackingBenchmark::generate(config.clone()).unwrap();
         let b = StateTrackingBenchmark::generate(config).unwrap();
         assert_eq!(a.events, b.events);
         assert_eq!(a.queries, b.queries);
+        assert_eq!(a.initial_entity_locations, b.initial_entity_locations);
+        assert_eq!(a.initial_object_owners, b.initial_object_owners);
+    }
+
+    #[test]
+    fn disjoint_seeds_randomize_initial_world() {
+        let a = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
+            seed: 1,
+            events: 32,
+            ..Default::default()
+        })
+        .unwrap();
+        let b = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
+            seed: 2,
+            events: 32,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_ne!(a.initial_entity_locations, b.initial_entity_locations);
+        assert_ne!(a.initial_object_owners, b.initial_object_owners);
     }
 
     #[test]
     fn pathological_zero_xorshift_seed_remains_live() {
-        let seed = 0x9E3779B97F4A7C15;
         let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
-            seed,
+            seed: 0x9E3779B97F4A7C15,
             events: 32,
-            ..StateTrackingBenchmarkConfig::default()
+            ..Default::default()
         })
         .unwrap();
         assert!(benchmark.events.windows(2).all(|pair| pair[1].time > pair[0].time));
@@ -546,14 +550,10 @@ mod tests {
             events: 1000,
             min_dt: 1e-3,
             max_dt: 1e2,
-            ..StateTrackingBenchmarkConfig::default()
+            ..Default::default()
         })
         .unwrap();
-        let dts = benchmark
-            .events
-            .windows(2)
-            .map(|pair| pair[1].time - pair[0].time)
-            .collect::<Vec<_>>();
+        let dts = benchmark.events.windows(2).map(|pair| pair[1].time - pair[0].time).collect::<Vec<_>>();
         assert!(dts.iter().all(|dt| *dt > 0.0));
         let min = dts.iter().copied().fold(f64::INFINITY, f64::min);
         let max = dts.iter().copied().fold(0.0_f64, f64::max);
@@ -565,16 +565,11 @@ mod tests {
         let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
             events: 250,
             query_every: 5,
-            ..StateTrackingBenchmarkConfig::default()
+            ..Default::default()
         })
         .unwrap();
         for query in &benchmark.queries {
-            assert_eq!(
-                benchmark
-                    .oracle_answer(query.as_of_event, &query.kind)
-                    .unwrap(),
-                query.expected
-            );
+            assert_eq!(benchmark.oracle_answer(query.as_of_event, &query.kind).unwrap(), query.expected);
         }
     }
 
@@ -584,18 +579,12 @@ mod tests {
             events: 500,
             query_every: 5,
             historical_query_rate: 1.0,
-            ..StateTrackingBenchmarkConfig::default()
+            ..Default::default()
         })
         .unwrap();
-        let historical = benchmark
-            .queries
-            .iter()
-            .filter(|query| query.is_historical())
-            .collect::<Vec<_>>();
+        let historical = benchmark.queries.iter().filter(|query| query.is_historical()).collect::<Vec<_>>();
         assert!(!historical.is_empty());
-        assert!(historical
-            .iter()
-            .all(|query| query.as_of_event < query.asked_after_event));
+        assert!(historical.iter().all(|query| query.as_of_event < query.asked_after_event));
     }
 
     #[test]
@@ -603,13 +592,10 @@ mod tests {
         let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
             events: 100,
             query_every: 5,
-            ..StateTrackingBenchmarkConfig::default()
+            ..Default::default()
         })
         .unwrap();
-        assert!(benchmark
-            .queries
-            .iter()
-            .any(|query| matches!(query.kind, TrackingQueryKind::ObjectLocation { .. })));
+        assert!(benchmark.queries.iter().any(|query| matches!(query.kind, TrackingQueryKind::ObjectLocation { .. })));
     }
 
     #[test]
@@ -617,14 +603,10 @@ mod tests {
         let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
             events: 100,
             historical_query_rate: 1.0,
-            ..StateTrackingBenchmarkConfig::default()
+            ..Default::default()
         })
         .unwrap();
-        let predictions = benchmark
-            .queries
-            .iter()
-            .map(|query| query.expected)
-            .collect::<Vec<_>>();
+        let predictions = benchmark.queries.iter().map(|query| query.expected).collect::<Vec<_>>();
         let score = benchmark.score(&predictions).unwrap();
         assert_eq!(score.accuracy(), 1.0);
         assert_eq!(score.current_accuracy(), 1.0);
