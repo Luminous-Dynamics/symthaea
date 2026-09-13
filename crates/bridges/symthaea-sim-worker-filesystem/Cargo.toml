@@ -1,0 +1,26 @@
+[package]
+name = "symthaea-sim-worker-filesystem"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Landlock filesystem content confinement for supervised Symthaea simulation workers"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+libc.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+symthaea-extension-simulation-host = { path = "../symthaea-extension-simulation-host" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-sim-digest = { path = "../symthaea-sim-digest" }
+symthaea-sim-worker = { path = "../symthaea-sim-worker" }
+symthaea-sim-worker-containment = { path = "../symthaea-sim-worker-containment" }
+symthaea-sim-worker-image = { path = "../symthaea-sim-worker-image" }
+
+[[bin]]
+name = "symthaea-sim-filesystem-worker"
+path = "src/bin/symthaea-sim-filesystem-worker.rs"
+
+[[bin]]
+name = "symthaea-sim-filesystem-probe"
+path = "src/bin/symthaea-sim-filesystem-probe.rs"
