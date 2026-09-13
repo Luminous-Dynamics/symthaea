@@ -18,30 +18,34 @@ use super::baselines::ShortcutBaselineKind;
 use super::hidden_world::PublicAction;
 use super::v2_comparator_custody::{
     V2ComparatorCustodyError, V2ComparatorCustodyReceipt, V2CorpusPartition,
-    V2DevelopmentFitCorpus, V2PublicTransitionEvidence,
+    V2DevelopmentFitCorpus, V2PublicTransitionEvidence, canonical_transition_semantics_bytes,
 };
 use super::v2_public_schema::{
     V2_OBSERVATION_DIM, V2PublicFamily, V2PublicState, action_index, public_schema_commitment,
 };
 
 pub(super) const V2_CALIBRATION_EVIDENCE_REVISION: &str =
-    "EUREKA.002.V2.CALIBRATION_EVIDENCE.v1";
+    "EUREKA.002.V2.CALIBRATION_EVIDENCE.v2";
 pub(super) const V2_CALIBRATION_CORPUS_REVISION: &str =
-    "EUREKA.002.V2.CALIBRATION_CORPUS.v1";
+    "EUREKA.002.V2.CALIBRATION_CORPUS.v2";
 pub(super) const V2_COMPARATOR_CALIBRATION_RECEIPT_REVISION: &str =
-    "EUREKA.002.V2.COMPARATOR_CALIBRATION_RECEIPT.v1";
+    "EUREKA.002.V2.COMPARATOR_CALIBRATION_RECEIPT.v2";
+pub(super) const V2_SELECTION_IMPLEMENTATION_REVISION: &str =
+    "EUREKA.002.V2.COMPARATOR_SELECTION_IMPLEMENTATION.v1";
 pub(super) const V2_SELECTION_AUTHORIZATION_REVISION: &str =
-    "EUREKA.002.V2.COMPARATOR_SELECTION_AUTHORIZATION.v1";
+    "EUREKA.002.V2.COMPARATOR_SELECTION_AUTHORIZATION.v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum V2SelectionAuthorizationError {
     CanonicalEvidence(V2ComparatorCustodyError),
     EmptyCalibrationCorpus,
     DevelopmentCalibrationIdentityOverlap,
+    DevelopmentCalibrationTransitionOverlap,
     DuplicateCalibrationRowIdentity,
     DuplicateCalibrationTransition,
     StatusCountMismatch,
     ChangeBearingCountExceedsScored,
+    ChangeBearingCountsInconsistent,
     ChangedFieldCountsExceedCapacity,
     MissingComparatorReceipt,
     DuplicateComparatorReceipt,
@@ -60,13 +64,13 @@ impl From<V2ComparatorCustodyError> for V2SelectionAuthorizationError {
 /// Canonical Calibration transition evidence.
 ///
 /// The constructor delegates public-schema/family/action/context admissibility
-/// to the same canonical transition type used by Development custody. It then
-/// stores exact canonical bytes needed for Calibration deduplication and BLAKE3
-/// corpus identity without exposing mutable fields.
+/// to the same canonical transition type used by Development custody. The
+/// transition semantic key deliberately excludes partition and row identity so
+/// exact public-transition reuse can be detected across Development/Calibration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct V2CalibrationEvidence {
     row_identity: [u8; 32],
-    transition_bytes: Vec<u8>,
+    transition_semantics_bytes: Vec<u8>,
     canonical_bytes: Vec<u8>,
 }
 
@@ -80,7 +84,7 @@ impl V2CalibrationEvidence {
     ) -> Result<Self, V2SelectionAuthorizationError> {
         // Reuse the exact canonical admissibility theorem. Calibration is fixed
         // by construction and cannot be caller-relabeled as HeldOut/External.
-        let _validated = V2PublicTransitionEvidence::new(
+        let validated = V2PublicTransitionEvidence::new(
             family,
             V2CorpusPartition::Calibration,
             row_identity,
@@ -88,13 +92,7 @@ impl V2CalibrationEvidence {
             action,
             post,
         )?;
-
-        let mut transition_bytes = Vec::new();
-        transition_bytes.push(family.tag());
-        transition_bytes.push(2); // canonical V2 Calibration partition tag
-        encode_state(&mut transition_bytes, pre);
-        transition_bytes.extend_from_slice(&(action_index(action).expect("validated action") as u64).to_le_bytes());
-        encode_state(&mut transition_bytes, post);
+        let transition_semantics_bytes = canonical_transition_semantics_bytes(&validated);
 
         let mut canonical_bytes = Vec::new();
         encode_bytes(
@@ -102,12 +100,13 @@ impl V2CalibrationEvidence {
             V2_CALIBRATION_EVIDENCE_REVISION.as_bytes(),
         );
         canonical_bytes.extend_from_slice(&public_schema_commitment());
+        canonical_bytes.push(2); // canonical V2 Calibration partition tag
         canonical_bytes.extend_from_slice(&row_identity);
-        canonical_bytes.extend_from_slice(&transition_bytes);
+        canonical_bytes.extend_from_slice(&transition_semantics_bytes);
 
         Ok(Self {
             row_identity,
-            transition_bytes,
+            transition_semantics_bytes,
             canonical_bytes,
         })
     }
@@ -118,7 +117,8 @@ impl V2CalibrationEvidence {
 }
 
 /// Canonically ordered Calibration-only corpus bound to one exact Development
-/// fit corpus. Disjointness is checked before any selection decision is minted.
+/// fit corpus. Both identity and exact public-transition semantic disjointness
+/// are checked before any selection decision is minted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct V2CalibrationCorpus {
     records: Vec<V2CalibrationEvidence>,
@@ -141,6 +141,11 @@ impl V2CalibrationCorpus {
             .iter()
             .map(V2PublicTransitionEvidence::row_identity)
             .collect();
+        let development_transitions: BTreeSet<Vec<u8>> = development
+            .records()
+            .iter()
+            .map(canonical_transition_semantics_bytes)
+            .collect();
         let mut seen_ids = BTreeSet::new();
         let mut seen_transitions = BTreeSet::new();
         for record in &records {
@@ -149,10 +154,15 @@ impl V2CalibrationCorpus {
                     V2SelectionAuthorizationError::DevelopmentCalibrationIdentityOverlap,
                 );
             }
+            if development_transitions.contains(&record.transition_semantics_bytes) {
+                return Err(
+                    V2SelectionAuthorizationError::DevelopmentCalibrationTransitionOverlap,
+                );
+            }
             if !seen_ids.insert(record.row_identity) {
                 return Err(V2SelectionAuthorizationError::DuplicateCalibrationRowIdentity);
             }
-            if !seen_transitions.insert(record.transition_bytes.clone()) {
+            if !seen_transitions.insert(record.transition_semantics_bytes.clone()) {
                 return Err(V2SelectionAuthorizationError::DuplicateCalibrationTransition);
             }
         }
@@ -235,9 +245,21 @@ impl V2ComparatorCalibrationReceipt {
         if change_bearing_scored_trials > scored_trials {
             return Err(V2SelectionAuthorizationError::ChangeBearingCountExceedsScored);
         }
-        let changed_event_total = true_positive_changes
-            .saturating_add(false_positive_changes)
-            .saturating_add(missed_changes);
+
+        let actual_changed_fields = true_positive_changes.saturating_add(missed_changes);
+        let max_actual_changed_fields = u64::from(change_bearing_scored_trials)
+            .saturating_mul(u64::try_from(V2_OBSERVATION_DIM).expect("V2 dimension fits u64"));
+        let change_bearing_consistent = if change_bearing_scored_trials == 0 {
+            actual_changed_fields == 0
+        } else {
+            actual_changed_fields >= u64::from(change_bearing_scored_trials)
+                && actual_changed_fields <= max_actual_changed_fields
+        };
+        if !change_bearing_consistent {
+            return Err(V2SelectionAuthorizationError::ChangeBearingCountsInconsistent);
+        }
+
+        let changed_event_total = actual_changed_fields.saturating_add(false_positive_changes);
         let max_events = u64::from(scored_trials)
             .saturating_mul(u64::try_from(V2_OBSERVATION_DIM).expect("V2 dimension fits u64"));
         if changed_event_total > max_events {
@@ -517,6 +539,7 @@ fn selection_commitment(
 ) -> [u8; 32] {
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, V2_SELECTION_AUTHORIZATION_REVISION.as_bytes());
+    encode_bytes(&mut bytes, V2_SELECTION_IMPLEMENTATION_REVISION.as_bytes());
     encode_bytes(&mut bytes, ANALYSIS_PLAN_REVISION.as_bytes());
     bytes.extend_from_slice(&analysis_plan_replay_digest.to_le_bytes());
     bytes.extend_from_slice(&analysis_plan_commitment);
@@ -556,12 +579,6 @@ fn encode_receipt(bytes: &mut Vec<u8>, receipt: &V2ComparatorCalibrationReceipt)
     bytes.extend_from_slice(&receipt.micro_f1_numerator.to_le_bytes());
     bytes.extend_from_slice(&receipt.micro_f1_denominator.to_le_bytes());
     bytes.push(u8::from(receipt.eligible));
-}
-
-fn encode_state(bytes: &mut Vec<u8>, state: V2PublicState) {
-    for value in state.fields() {
-        bytes.extend_from_slice(&value.to_le_bytes());
-    }
 }
 
 fn encode_bytes(bytes: &mut Vec<u8>, value: &[u8]) {
@@ -675,6 +692,25 @@ mod tests {
     }
 
     #[test]
+    fn development_calibration_semantic_overlap_under_different_id_fails_closed() {
+        let development = development();
+        let mut row_identity = [0_u8; 32];
+        row_identity[0] = 99;
+        let overlap = V2CalibrationEvidence::new(
+            V2PublicFamily::PublicFlowV2,
+            row_identity,
+            V2PublicState::new([3, 4, 5, 0]).unwrap(),
+            PublicAction::Pulse { slot: 0 },
+            V2PublicState::new([2, 5, 5, 0]).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            V2CalibrationCorpus::freeze(&development, vec![overlap]),
+            Err(V2SelectionAuthorizationError::DevelopmentCalibrationTransitionOverlap)
+        );
+    }
+
+    #[test]
     fn duplicate_calibration_transition_under_different_id_fails_closed() {
         let development = development();
         let a = calibration_record(11, 0);
@@ -683,8 +719,9 @@ mod tests {
         let mut canonical = Vec::new();
         encode_bytes(&mut canonical, V2_CALIBRATION_EVIDENCE_REVISION.as_bytes());
         canonical.extend_from_slice(&public_schema_commitment());
+        canonical.push(2);
         canonical.extend_from_slice(&b.row_identity);
-        canonical.extend_from_slice(&b.transition_bytes);
+        canonical.extend_from_slice(&b.transition_semantics_bytes);
         b.canonical_bytes = canonical;
         assert_eq!(
             V2CalibrationCorpus::freeze(&development, vec![a, b]),
@@ -724,6 +761,20 @@ mod tests {
                 1,
             ),
             Err(V2SelectionAuthorizationError::StatusCountMismatch)
+        );
+        assert_eq!(
+            V2ComparatorCalibrationReceipt::from_raw_counts(
+                ShortcutBaselineKind::NearestTransition,
+                2,
+                2,
+                0,
+                0,
+                0,
+                1,
+                0,
+                0,
+            ),
+            Err(V2SelectionAuthorizationError::ChangeBearingCountsInconsistent)
         );
     }
 
@@ -780,6 +831,20 @@ mod tests {
             authorize_selection(&development, &calibration, duplicate),
             Err(V2SelectionAuthorizationError::DuplicateComparatorReceipt)
         );
+    }
+
+    #[test]
+    fn changing_raw_counts_changes_selection_authorization_commitment() {
+        let development = development();
+        let calibration = calibration(&development);
+        let first = authorize_selection(&development, &calibration, complete_receipts()).unwrap();
+        let mut changed = complete_receipts();
+        changed[0] = receipt(ShortcutBaselineKind::ActionMarginalDelta, 3, 2, 1);
+        let second = authorize_selection(&development, &calibration, changed).unwrap();
+        let (V2ComparatorSelectionOutcome::Selected(first), V2ComparatorSelectionOutcome::Selected(second)) = (first, second) else {
+            panic!("fixtures must remain selected");
+        };
+        assert_ne!(first.commitment(), second.commitment());
     }
 
     #[test]
