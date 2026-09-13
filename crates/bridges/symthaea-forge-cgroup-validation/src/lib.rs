@@ -6,8 +6,8 @@
 //! This bridge does not implement another scorer or another sandbox. It composes the existing
 //! deterministic kernel-gated validation theorem with the stronger cgroup-gated execution theorem,
 //! so validation/holdout evidence can retain proof that the exact evaluator was admitted to the
-//! frozen cgroup-v2 resource policy before model release and that its cgroup reached `populated 0`
-//! before the execution evidence was promoted into validation evidence.
+//! frozen cgroup-v2 resource policy, live resource state was re-read while blocked, and the cgroup
+//! reached `populated 0` before execution evidence was promoted into validation evidence.
 
 use serde::Serialize;
 use symthaea_algorithms::ContentId;
@@ -83,6 +83,7 @@ impl CgroupGatedModelValidationReceipt {
             cgroup_policy,
             cgroup_run.base_receipt(),
             cgroup_run.strict_receipt(),
+            cgroup_run.live_verification(),
             cgroup_run.teardown_receipt(),
         )?;
         let kernel_validation_receipt = KernelGatedModelValidationReceipt::record_brier(
@@ -166,6 +167,7 @@ impl CgroupGatedModelValidationReceipt {
             cgroup_policy,
             cgroup_run.base_receipt(),
             cgroup_run.strict_receipt(),
+            cgroup_run.live_verification(),
             cgroup_run.teardown_receipt(),
         )?;
         self.kernel_validation_receipt.validate_for(
