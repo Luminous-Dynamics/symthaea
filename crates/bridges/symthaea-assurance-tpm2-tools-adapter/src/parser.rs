@@ -24,7 +24,6 @@ pub fn parse_nv_public(
     expected_index: u32,
 ) -> Result<Tpm2NvPublicEvidence, Tpm2AdapterError> {
     let text = std::str::from_utf8(stdout).map_err(|_| Tpm2AdapterError::InvalidPublicOutput)?;
-    let expected_handle = format!("{expected_index:#x}");
     let mut found = false;
     let mut in_expected = false;
     let mut in_attributes = false;
@@ -34,8 +33,9 @@ pub fn parse_nv_public(
     for line in text.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("0x") && trimmed.ends_with(':') {
-            let handle = trimmed.trim_end_matches(':').to_ascii_lowercase();
-            in_expected = handle == expected_handle;
+            let raw = trimmed.trim_end_matches(':').trim_start_matches("0x");
+            let parsed = u32::from_str_radix(raw, 16).ok();
+            in_expected = parsed == Some(expected_index);
             found |= in_expected;
             in_attributes = false;
             continue;
@@ -90,11 +90,15 @@ fn attributes_declare_counter(attributes: &str) -> bool {
 mod tests {
     use super::*;
 
-    fn yaml(attributes: &str, size: usize) -> Vec<u8> {
+    fn yaml_with_handle(handle: &str, attributes: &str, size: usize) -> Vec<u8> {
         format!(
-            "0x1500016:\n  name: 000bdeadbeef\n  hash algorithm:\n    friendly: sha256\n    value: 0xb\n  attributes:\n    friendly: {attributes}\n    value: 0x20040004\n  size: {size}\n  authorization policy:\n"
+            "{handle}:\n  name: 000bdeadbeef\n  hash algorithm:\n    friendly: sha256\n    value: 0xb\n  attributes:\n    friendly: {attributes}\n    value: 0x20040004\n  size: {size}\n  authorization policy:\n"
         )
         .into_bytes()
+    }
+
+    fn yaml(attributes: &str, size: usize) -> Vec<u8> {
+        yaml_with_handle("0x1500016", attributes, size)
     }
 
     #[test]
@@ -103,6 +107,16 @@ mod tests {
             .unwrap();
         assert_eq!(parsed.data_size, 8);
         assert!(parsed.validate(0x0150_0016));
+    }
+
+    #[test]
+    fn leading_zero_handle_format_is_equivalent() {
+        let parsed = parse_nv_public(
+            &yaml_with_handle("0x01500016", "ownerread|nt=counter", 8),
+            0x0150_0016,
+        )
+        .unwrap();
+        assert_eq!(parsed.nv_index, 0x0150_0016);
     }
 
     #[test]
