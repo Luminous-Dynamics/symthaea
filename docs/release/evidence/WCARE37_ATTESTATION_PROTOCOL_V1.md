@@ -32,6 +32,7 @@ Each attestation binds:
 - issuer key ID;
 - issuer Ed25519 public key;
 - issuer policy ID;
+- exact issuer trust-policy SHA-256;
 - issued-at UTC timestamp;
 - optional expiry UTC timestamp;
 - nonce SHA-256;
@@ -55,6 +56,7 @@ The canonical message is UTF-8 and MUST be constructed exactly as these LF-termi
 `issuer_key_id=<token>`
 `issuer_public_key_ed25519_hex=<64-lower-hex>`
 `issuer_policy_id=<token>`
+`issuer_policy_sha256=<64-lower-hex>`
 `issued_at_utc=<canonical UTC>`
 `expires_at_utc=<canonical UTC|->`
 `nonce_sha256=<64-lower-hex>`
@@ -95,6 +97,8 @@ A preregistered trust policy contains issuer-key entries with:
 - allowed provenance strengths;
 - allowed relation-evidence strengths.
 
+The signer commits to the exact trust-policy SHA-256 in the signed envelope. Replacing that policy with different bytes under the same policy ID invalidates subject binding.
+
 A trust match requires both key ID and public key to match the registry entry. Reusing a trusted key ID with a different public key is untrusted, not a key rotation.
 
 A valid self-signature proves control of the corresponding private key only. It does not establish that the key belongs to an independent organization or is trusted for any scope.
@@ -115,7 +119,7 @@ Rotation/supersession never changes the bytes of old attestations.
 
 ## Subject/replay binding
 
-An attestation is accepted only when all exact subject digests match the artifacts being qualified. A signature from one WCARE-35/WCARE-36 panel cannot be replayed onto another panel or receipt.
+An attestation is accepted only when all exact subject digests and the exact trust-policy digest match the artifacts being qualified. A signature from one WCARE-35/WCARE-36 panel cannot be replayed onto another panel or receipt, and a signature under one trust policy cannot be replayed under a more permissive policy with the same ID.
 
 For `ReviewerProvenance`, the signed reviewer identity commitment and provenance-strength claim MUST equal the exact WCARE-36 provenance receipt fields.
 
@@ -132,11 +136,11 @@ WCARE-37 yields exactly one primary disposition:
 - `ATTESTATION_REJECTED`
 - `INFRASTRUCTURE_INDETERMINATE`
 
-`ATTESTATION_ACCEPTED` requires valid canonical bytes, valid signature, exact subject binding, exact trusted key match, key validity, non-revoked issue time, current attestation when current evidence is required, and scope/strength authorization.
+`ATTESTATION_ACCEPTED` requires valid canonical bytes, valid signature, exact subject/policy binding, exact trusted key match, key validity, non-revoked issue time, current attestation when current evidence is required, and scope/strength authorization.
 
-`SIGNATURE_VALID_ISSUER_UNTRUSTED` means the Ed25519 signature is valid and the exact subject binding is valid, but the trust registry does not authorize that exact key/key-ID pair for the claimed scope/strength or valid issue time.
+`SIGNATURE_VALID_ISSUER_UNTRUSTED` means the Ed25519 signature is valid and the exact subject/policy binding is valid, but the trust registry does not authorize that exact key/key-ID pair for the claimed scope/strength or valid issue time.
 
-`ATTESTATION_REJECTED` covers malformed/canonicalization-invalid envelopes, invalid signatures, subject mismatch, replay, impossible expiry ordering, or other evidence-integrity failure.
+`ATTESTATION_REJECTED` covers malformed/canonicalization-invalid envelopes, invalid signatures, subject or policy mismatch, replay, impossible expiry ordering, or other evidence-integrity failure.
 
 ## Claim boundary
 
