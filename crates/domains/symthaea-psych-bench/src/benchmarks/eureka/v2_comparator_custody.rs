@@ -144,7 +144,7 @@ impl V2DevelopmentFitCorpus {
             if !seen_ids.insert(record.row_identity) {
                 return Err(V2ComparatorCustodyError::DuplicateCanonicalRowIdentity);
             }
-            if !seen_transitions.insert(canonical_transition_bytes(record)) {
+            if !seen_transitions.insert(canonical_transition_semantics_bytes(record)) {
                 return Err(V2ComparatorCustodyError::DuplicateCanonicalTransition);
             }
         }
@@ -297,15 +297,17 @@ fn comparator_subject_commitment(
     *blake3::hash(&bytes).as_bytes()
 }
 
-/// Exact transition bytes excluding the row identity.
+/// Exact transition semantics excluding both row identity and partition.
 ///
-/// This is used only for duplicate-content rejection. It is intentionally an
-/// exact byte key rather than a hash so custody does not depend on collision
-/// assumptions merely to notice duplicate fit evidence.
-fn canonical_transition_bytes(record: &V2PublicTransitionEvidence) -> Vec<u8> {
+/// This key answers only whether two public transitions carry the same
+/// family/pre/action/post semantics. Partition remains bound separately in
+/// corpus/evidence commitments. Keeping it out of this key lets Development vs
+/// Calibration duplicate content fail locally even when their row IDs differ.
+pub(super) fn canonical_transition_semantics_bytes(
+    record: &V2PublicTransitionEvidence,
+) -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.push(record.family.tag());
-    bytes.push(record.partition.tag());
     encode_state(&mut bytes, record.pre);
     bytes.extend_from_slice(
         &(action_index(record.action).expect("record action validated") as u64).to_le_bytes(),
