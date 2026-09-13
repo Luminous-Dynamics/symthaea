@@ -23,6 +23,7 @@ const SHADOW_SUBJECT_ID: &str = "cognitive-loop-meta-reasoner";
 const SHADOW_EVIDENCE_REF: &str = "live-input";
 const SHADOW_CONTEXT_SOURCE: &str = "legacy-meta-context-reflection-shadow-v1";
 const SHADOW_HISTORY_CAPACITY: usize = 100;
+const OBJECTIVE_SPREAD_EPSILON: f64 = 1.0e-12;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ShadowMetaStats {
@@ -31,8 +32,27 @@ pub struct ShadowMetaStats {
     pub rejected: u64,
     pub resolved_contexts: u64,
     pub ambiguous_contexts: u64,
+    pub informative_commits: u64,
+    pub uninformative_commits: u64,
     pub selection_agreements: u64,
     pub selection_disagreements: u64,
+    pub informative_agreements: u64,
+    pub informative_disagreements: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ObjectiveSpread {
+    pub integration_proxy: f64,
+    pub harmonic_alignment: f64,
+    pub epistemic_grounding: f64,
+}
+
+impl ObjectiveSpread {
+    pub fn informative(self) -> bool {
+        self.integration_proxy > OBJECTIVE_SPREAD_EPSILON
+            || self.harmonic_alignment > OBJECTIVE_SPREAD_EPSILON
+            || self.epistemic_grounding > OBJECTIVE_SPREAD_EPSILON
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -46,6 +66,11 @@ pub struct ShadowMetaObservation {
     pub legacy_selected_candidate: String,
     pub canonical_selected_candidate: Option<String>,
     pub selection_agreement: Option<bool>,
+    /// `true` only when at least one canonical objective dimension actually varies across the
+    /// admitted candidate set. Agreement/disagreement on an all-identical set is tie behavior,
+    /// not evidence that one selector made a better substantive choice.
+    pub selection_informative: Option<bool>,
+    pub objective_spread: Option<ObjectiveSpread>,
     pub legacy_meta_confidence: f64,
     pub legacy_context_confidence: f64,
     pub decision_commitment: Option<String>,
@@ -146,15 +171,48 @@ impl ShadowQualifiedMetaReasoner {
                     }
                 }
 
+                let spread = objective_spread(&decision.context_selection.evaluations);
+                let selection_informative = spread.informative();
+                if selection_informative {
+                    self.stats.informative_commits = self.stats.informative_commits.saturating_add(1);
+                } else {
+                    self.stats.uninformative_commits =
+                        self.stats.uninformative_commits.saturating_add(1);
+                }
+
                 let canonical_selected_candidate = decision.selected_candidate.name.clone();
                 let selection_agreement = canonical_selected_candidate == legacy_selected_candidate;
                 if selection_agreement {
                     self.stats.selection_agreements =
                         self.stats.selection_agreements.saturating_add(1);
+                    if selection_informative {
+                        self.stats.informative_agreements =
+                            self.stats.informative_agreements.saturating_add(1);
+                    }
                 } else {
                     self.stats.selection_disagreements =
                         self.stats.selection_disagreements.saturating_add(1);
+                    if selection_informative {
+                        self.stats.informative_disagreements =
+                            self.stats.informative_disagreements.saturating_add(1);
+                    }
                 }
+
+                tracing::debug!(
+                    target: "symthaea::reasoning_shadow",
+                    attempt,
+                    canonical_sequence = decision.sequence,
+                    active_contexts = decision.context_selection.assessment.active_contexts.len(),
+                    selection_informative,
+                    selection_agreement,
+                    legacy_selected = %legacy_selected_candidate,
+                    canonical_selected = %canonical_selected_candidate,
+                    committed = self.stats.committed,
+                    rejected = self.stats.rejected,
+                    informative_agreements = self.stats.informative_agreements,
+                    informative_disagreements = self.stats.informative_disagreements,
+                    "canonical V2 live meta shadow committed"
+                );
 
                 self.last_observation = Some(ShadowMetaObservation {
                     shadow_version: LIVE_META_SHADOW_VERSION.into(),
@@ -166,6 +224,8 @@ impl ShadowQualifiedMetaReasoner {
                     legacy_selected_candidate,
                     canonical_selected_candidate: Some(canonical_selected_candidate),
                     selection_agreement: Some(selection_agreement),
+                    selection_informative: Some(selection_informative),
+                    objective_spread: Some(spread),
                     legacy_meta_confidence,
                     legacy_context_confidence,
                     decision_commitment: Some(decision.decision_commitment.clone()),
@@ -174,6 +234,18 @@ impl ShadowQualifiedMetaReasoner {
             }
             Err(err) => {
                 self.stats.rejected = self.stats.rejected.saturating_add(1);
+                tracing::debug!(
+                    target: "symthaea::reasoning_shadow",
+                    attempt,
+                    canonical_sequence = sequence,
+                    legacy_selected = %legacy_selected_candidate,
+                    legacy_meta_confidence,
+                    legacy_context_confidence,
+                    committed = self.stats.committed,
+                    rejected = self.stats.rejected,
+                    error = %err,
+                    "canonical V2 live meta shadow rejected measurement"
+                );
                 self.last_observation = Some(ShadowMetaObservation {
                     shadow_version: LIVE_META_SHADOW_VERSION.into(),
                     attempt,
@@ -184,6 +256,8 @@ impl ShadowQualifiedMetaReasoner {
                     legacy_selected_candidate,
                     canonical_selected_candidate: None,
                     selection_agreement: None,
+                    selection_informative: None,
+                    objective_spread: None,
                     legacy_meta_confidence,
                     legacy_context_confidence,
                     decision_commitment: None,
@@ -191,6 +265,42 @@ impl ShadowQualifiedMetaReasoner {
                 });
             }
         }
+    }
+}
+
+fn objective_spread(
+    evaluations: &[super::reasoning_context_competition::RobustCandidateEvaluation],
+) -> ObjectiveSpread {
+    if evaluations.is_empty() {
+        return ObjectiveSpread {
+            integration_proxy: 0.0,
+            harmonic_alignment: 0.0,
+            epistemic_grounding: 0.0,
+        };
+    }
+
+    let first = evaluations[0].vector;
+    let mut min_integration = first.integration_proxy;
+    let mut max_integration = first.integration_proxy;
+    let mut min_harmonic = first.harmonic_alignment;
+    let mut max_harmonic = first.harmonic_alignment;
+    let mut min_epistemic = first.epistemic_grounding;
+    let mut max_epistemic = first.epistemic_grounding;
+
+    for evaluation in &evaluations[1..] {
+        let vector = evaluation.vector;
+        min_integration = min_integration.min(vector.integration_proxy);
+        max_integration = max_integration.max(vector.integration_proxy);
+        min_harmonic = min_harmonic.min(vector.harmonic_alignment);
+        max_harmonic = max_harmonic.max(vector.harmonic_alignment);
+        min_epistemic = min_epistemic.min(vector.epistemic_grounding);
+        max_epistemic = max_epistemic.max(vector.epistemic_grounding);
+    }
+
+    ObjectiveSpread {
+        integration_proxy: max_integration - min_integration,
+        harmonic_alignment: max_harmonic - min_harmonic,
+        epistemic_grounding: max_epistemic - min_epistemic,
     }
 }
 
@@ -228,14 +338,23 @@ mod tests {
     use symthaea_core::hdc::primitive_system::PrimitiveTier;
 
     fn candidate(name: &str) -> CandidatePrimitive {
+        candidate_with_scores(name, 0.5, 0.6, EpistemicCoordinate::axiom())
+    }
+
+    fn candidate_with_scores(
+        name: &str,
+        fitness: f64,
+        harmonic_alignment: f64,
+        epistemic_coordinate: EpistemicCoordinate,
+    ) -> CandidatePrimitive {
         CandidatePrimitive {
             name: name.into(),
             tier: PrimitiveTier::Physical,
             definition: format!("fixture-{name}"),
-            fitness: 0.5,
+            fitness,
             encoding: BinaryHV::random(name.len() as u64 + 1400),
-            epistemic_coordinate: EpistemicCoordinate::axiom(),
-            harmonic_alignment: 0.6,
+            epistemic_coordinate,
+            harmonic_alignment,
         }
     }
 
@@ -263,12 +382,57 @@ mod tests {
         let observation = reasoner.last_shadow_observation().unwrap();
         assert!(!observation.committed);
         assert!(observation.selection_agreement.is_none());
+        assert!(observation.selection_informative.is_none());
+    }
+
+    #[test]
+    fn identical_objective_vectors_are_classified_uninformative() {
+        let mut reasoner = reasoner();
+        let mut chain = ReasoningChain::new(BinaryHV::random(1501));
+        reasoner
+            .meta_reason(
+                "evidence experiment research theory scientific",
+                vec![candidate("a"), candidate("b")],
+                &mut chain,
+            )
+            .unwrap();
+        let observation = reasoner.last_shadow_observation().unwrap();
+        assert_eq!(observation.selection_informative, Some(false));
+        assert_eq!(reasoner.shadow_stats().uninformative_commits, 1);
+        assert_eq!(reasoner.shadow_stats().informative_commits, 0);
+    }
+
+    #[test]
+    fn objective_spread_marks_substantive_comparison() {
+        let mut reasoner = reasoner();
+        let mut chain = ReasoningChain::new(BinaryHV::random(1502));
+        reasoner
+            .meta_reason(
+                "evidence experiment research theory scientific",
+                vec![
+                    candidate_with_scores("weak", 0.5, 0.2, EpistemicCoordinate::null()),
+                    candidate_with_scores("strong", 0.5, 0.8, EpistemicCoordinate::axiom()),
+                ],
+                &mut chain,
+            )
+            .unwrap();
+        let observation = reasoner.last_shadow_observation().unwrap();
+        assert_eq!(observation.selection_informative, Some(true));
+        let spread = observation.objective_spread.unwrap();
+        assert!(spread.harmonic_alignment > 0.0);
+        assert!(spread.epistemic_grounding > 0.0);
+        assert_eq!(reasoner.shadow_stats().informative_commits, 1);
+        assert_eq!(
+            reasoner.shadow_stats().informative_agreements
+                + reasoner.shadow_stats().informative_disagreements,
+            1
+        );
     }
 
     #[test]
     fn strong_scientific_context_commits_shadow_longitudinally() {
         let mut reasoner = reasoner();
-        let mut chain = ReasoningChain::new(BinaryHV::random(1501));
+        let mut chain = ReasoningChain::new(BinaryHV::random(1503));
         let first = reasoner.meta_reason(
             "evidence experiment research theory scientific",
             vec![candidate("a"), candidate("b")],
@@ -283,7 +447,7 @@ mod tests {
         assert!(observation.canonical_selected_candidate.is_some());
         assert!(observation.selection_agreement.is_some());
 
-        let mut second_chain = ReasoningChain::new(BinaryHV::random(1502));
+        let mut second_chain = ReasoningChain::new(BinaryHV::random(1504));
         let second = reasoner.meta_reason(
             "evidence experiment research theory scientific",
             vec![candidate("a"), candidate("b")],
@@ -302,7 +466,7 @@ mod tests {
     #[test]
     fn mixed_strong_safety_scientific_context_can_remain_ambiguous() {
         let mut reasoner = reasoner();
-        let mut chain = ReasoningChain::new(BinaryHV::random(1503));
+        let mut chain = ReasoningChain::new(BinaryHV::random(1505));
         let result = reasoner.meta_reason(
             "safety harm dangerous evidence experiment research theory",
             vec![candidate("a"), candidate("b")],
