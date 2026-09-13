@@ -9,7 +9,7 @@ evidence exists
     != deployment authority
 ```
 
-ASSURE-000 defines a domain-neutral vocabulary for exact subject identity, claims, evidence provenance, support strength, negative findings, reproduction claims, claim ceilings, and invalidation conditions.
+ASSURE-000 defines a domain-neutral vocabulary for exact subject identity, claims, evidence provenance, support strength, negative findings, reproduction-evidence status, claim ceilings, and invalidation conditions.
 
 ## Deterministic identities
 
@@ -19,7 +19,7 @@ The kernel content-addresses:
 - `Claim` — exact subject, claim ID, statement, and declared scope label;
 - `QualificationPlan` — exact claim, maximum support ceiling, and invalidation set;
 - `EvidenceArtifact` — exact subject/claim binding, evidence kind, artifact digest, and producer/executor/verifier/signer provenance;
-- `QualificationResult` — exact subject/claim/plan identity, evidence commitments, support outcome, reproduction status, ceiling, and invalidation set.
+- `QualificationResult` — exact subject/claim/plan identity, evidence commitments, support outcome, reproduction-evidence status, ceiling, and invalidation set.
 
 Evidence cannot be rebound to a different subject or claim. Duplicate evidence IDs fail closed rather than being silently deduplicated. Changing evidence bytes or recorded provenance changes the evidence commitment and therefore changes the qualification-result identity.
 
@@ -34,22 +34,24 @@ The positive support ladder is intentionally narrow:
 
 The ladder is not a generic score. Each successor tier has explicit predicates, and `QualificationPlan::maximum_support` is a hard claim ceiling.
 
-## Reproduction is orthogonal to support
+## Reproduction evidence is orthogonal to support
 
-Reproduction is not treated as a fifth support tier. A structural, observational, causal, or functional result can in principle be reproduced; reproduction therefore describes another axis of the result rather than a stronger point on the support ladder.
+Reproduction evidence is not treated as a fifth support tier. A structural, observational, causal, or functional result can in principle be reproduced; the presence of reproduction evidence therefore describes another axis of the result rather than a stronger point on the support ladder.
 
 ASSURE-000 exposes:
 
 ```text
 ReproductionStatus::NotClaimed
-ReproductionStatus::ReproducedByDistinctVerifier
+ReproductionStatus::EvidenceFromDistinctVerifier
 ```
 
-The latter requires an admitted `Reproduction` evidence artifact whose verifier identity differs from both producer and executor. The reproduction status is independently bound into the result digest.
+`EvidenceFromDistinctVerifier` requires an admitted `Reproduction` evidence artifact whose verifier identity differs from both producer and executor. That status is independently bound into the result digest.
 
-## Reproduction is not common-cause independence
+Crucially, ASSURE-000 does **not** infer that the reproduction succeeded or semantically matched the original result. Successful replication, failed replication, and contradiction-aware interpretation require a resolver that can compare heterogeneous evidence; those semantics belong to ASSURE-003.
 
-Identity-distinct reproduction is deliberately not called independent verification.
+## Reproduction evidence is not common-cause independence
+
+Identity-distinct reproduction evidence is deliberately not called independent verification.
 
 ```text
 different verifier ID
@@ -76,7 +78,7 @@ A runtime receipt may be admitted as evidence, but its presence does not create 
 
 ## Outcome binding is not evidence resolution
 
-`QualificationResult::validate_and_bind` accepts caller-supplied result dimensions and validates them against exact identities, claim ceilings, evidence classes, and reproduction predicates. It does not infer a heterogeneous evidence verdict or establish that a plan existed before evidence production.
+`QualificationResult::validate_and_bind` accepts caller-supplied result dimensions and validates them against exact identities, claim ceilings, evidence classes, and reproduction-evidence predicates. It does not infer a heterogeneous evidence verdict or establish that a plan existed before evidence production.
 
 Those stronger theorems are intentionally deferred:
 
@@ -93,10 +95,16 @@ Those stronger theorems are intentionally deferred:
 
 These are intentionally not placed below `Structural` on one ordinal scale. A contradiction is not a weak positive result, and inconclusive evidence is not a scientific refutation.
 
-## Invalidation
+## Invalidation preserves historical values
 
-Qualification results retain an explicit invalidation set. Matching a declared condition changes the result to `Negative(Invalidated { ... })` and therefore changes the result identity. ASSURE-004 will later add predecessor/requalification lineage; ASSURE-000 deliberately does not imply that a mutated result preserves historical qualification authority.
+Qualification results retain an explicit invalidation set. `QualificationResult::invalidated_by` returns a **new** result with `Negative(Invalidated { ... })` when the supplied condition was declared by the plan. The original content-addressed result remains unchanged, preserving its prior digest and outcome.
+
+ASSURE-004 will later add explicit predecessor/currentness/requalification lineage. ASSURE-000 deliberately does not claim that returning a new invalidated value by itself proves when the invalidating event occurred or which result is currently authoritative.
+
+## Qualification environment
+
+ASSURE-000 declares Rust 1.96 as its minimum supported toolchain because that is the exact toolchain exercised by its focused qualification lane. The workflow proves exact candidate HEAD, formatting, compilation/check, tests, strict Clippy, and committed root-lock parity. The qualification workflow is read-only; lock drift fails closed rather than granting PR execution standing repository-write authority.
 
 ## Deliberate nonclaims
 
-ASSURE-000 does not establish certification, compliance, agent safety, preregistration, heterogeneous evidence resolution, deployment eligibility, deployment authorization, common-cause verifier independence, independent audit, runtime isolation, red-team completeness, or regulatory conformity. It provides the semantic substrate later assurance campaigns can use to make narrower evidence-backed claims.
+ASSURE-000 does not establish certification, compliance, agent safety, preregistration, heterogeneous evidence resolution, successful replication, deployment eligibility, deployment authorization, common-cause verifier independence, independent audit, runtime isolation, red-team completeness, or regulatory conformity. It provides the semantic substrate later assurance campaigns can use to make narrower evidence-backed claims.
