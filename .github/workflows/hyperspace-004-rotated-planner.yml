@@ -1,0 +1,200 @@
+name: HYPERSPACE-004 Rotated Planner Capsule
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hyperspace-004-rotated-planner.yml'
+      - 'crates/core/symthaea-core/examples/hyperspace_004_rotated_planner.rs'
+      - 'crates/core/symthaea-core/examples/hyperspace_support/orthogonal.rs'
+      - 'crates/core/symthaea-core/src/state_space.rs'
+      - 'crates/core/symthaea-core/src/continuous_reachability.rs'
+      - 'crates/core/symthaea-core/src/sampling_reachability.rs'
+      - 'crates/core/symthaea-core/src/hyperspace_benchmark.rs'
+      - 'crates/core/symthaea-core/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: 8d588e50ce68b16b6d888a9e3919fbf9c261569c
+  H003R_ARTIFACT_DIGEST: sha256:77dc89358ebdcf28438b89834cb611cb27aa56e3060da9280bb809300e9d6faa
+  HISTORICAL_H003_SUBJECT: 962c3b72350251713c54b7b6328960a2a6f35595
+  PREREG_ISSUE: '2435'
+
+jobs:
+  rotated-planner:
+    name: Blind six-basis seeded-RRT discovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact source subject and qualified H003R parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/hyperspace-004
+          {
+            echo "schema=symthaea.hyperspace-004.environment.v1"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "parent_sha=$(git rev-parse HEAD^)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "qualified_hyperspace_003r_head=$BASE_SHA"
+            echo "qualified_hyperspace_003r_artifact_digest=$H003R_ARTIFACT_DIGEST"
+            echo "historical_hyperspace_003_subject=$HISTORICAL_H003_SUBJECT"
+            echo "historical_hyperspace_003_verdict=FAIL"
+            echo "runner_label=ubuntu-24.04"
+            echo "preregistration_issue=$PREREG_ISSUE"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+          } > artifacts/hyperspace-004/environment.txt
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Extend environment capsule
+        run: |
+          set -euo pipefail
+          cpu_model="$(awk -F: '/^model name/{sub(/^[[:space:]]+/, "", $2); print $2; exit}' /proc/cpuinfo || true)"
+          cpu_flags="$(awk -F: '/^flags/{sub(/^[[:space:]]+/, "", $2); print $2; exit}' /proc/cpuinfo || true)"
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "rustc_host=$(rustc -vV | sed -n 's/^host: //p')"
+            echo "rustc_commit=$(rustc -vV | sed -n 's/^commit-hash: //p')"
+            echo "llvm_version=$(rustc -vV | sed -n 's/^LLVM version: //p')"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "image_os=${ImageOS:-unknown}"
+            echo "image_version=${ImageVersion:-unknown}"
+            echo "kernel=$(uname -srmo)"
+            echo "libc=$(getconf GNU_LIBC_VERSION 2>/dev/null || echo unknown)"
+            echo "cpu_model=${cpu_model:-unknown}"
+            echo "cpu_flags_sha256=$(printf '%s' "$cpu_flags" | sha256sum | awk '{print $1}')"
+          } >> artifacts/hyperspace-004/environment.txt
+
+      - name: Compile exact rotated-planner reporter
+        run: |
+          cargo check --locked -p symthaea-core --no-default-features \
+            --example hyperspace_004_rotated_planner
+
+      - name: Execute preregistered blind rotated-planner matrix
+        run: |
+          cargo run --locked -p symthaea-core --no-default-features \
+            --example hyperspace_004_rotated_planner -- \
+            --subject "$SUBJECT_SHA" \
+            --output artifacts/hyperspace-004/report.json
+
+      - name: Hash complete evidence capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd artifacts/hyperspace-004
+          : > SHA256SUMS
+          for file in environment.txt report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Validate preregistered promotion gates
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path('artifacts/hyperspace-004/report.json').read_text())
+          assert report['schema'] == 'symthaea.hyperspace-004.rotated-planner.v1'
+          assert report['source_subject'] == os.environ['SUBJECT_SHA'].lower()
+          assert report['preregistration_issue'] == 2435
+          assert report['qualified_hyperspace_003r_head'] == os.environ['BASE_SHA']
+          assert report['qualified_hyperspace_003r_artifact_digest'] == os.environ['H003R_ARTIFACT_DIGEST']
+          assert report['historical_hyperspace_003_subject'] == os.environ['HISTORICAL_H003_SUBJECT']
+          assert report['historical_hyperspace_003_verdict'] == 'FAIL'
+          assert report['target_receives_canonical_witness'] is False
+          assert report['target_receives_privileged_w_axis'] is False
+
+          env_lines = Path('artifacts/hyperspace-004/environment.txt').read_text().splitlines()
+          environment = dict(line.split('=', 1) for line in env_lines if '=' in line)
+          assert environment['subject_sha'] == os.environ['SUBJECT_SHA']
+          assert environment['parent_sha'] == os.environ['BASE_SHA']
+          assert environment['qualified_hyperspace_003r_head'] == os.environ['BASE_SHA']
+          assert environment['qualified_hyperspace_003r_artifact_digest'] == os.environ['H003R_ARTIFACT_DIGEST']
+          assert environment['historical_hyperspace_003_subject'] == os.environ['HISTORICAL_H003_SUBJECT']
+          assert environment['historical_hyperspace_003_verdict'] == 'FAIL'
+          assert environment['runner_label'] == 'ubuntu-24.04'
+          assert environment['tree_sha']
+          assert environment['cargo_lock_sha256']
+          assert environment['rustc']
+
+          study = report['study']
+          expected_ids = [
+              'd474e7d71d5485fb81f2e454dc3193b29422e847a77ae941bfb4daad6a5ce306',
+              '1901563cb777ec6dc29c7ac4e7ce1a30a4dfb35dbe57704d096d0012a9012fcc',
+              '4ac03922725954f6e3c77bdc55e445f14fecc51913f88c0d90d8a8adae66d411',
+              'f2ff21fae9cdab4f673ddc75de8686c1533f9241101577eaf62df237aad9834f',
+              '3faa3203f60abed024b7cb14d860674100c37f2f5a901cbdae231069ba9e48ba',
+              '4b9e1f13c37d68d35b0b8bd1cf4eaac948e90956a32f786f667f83a0103b0382',
+          ]
+          assert study['transform_count'] == 6
+          assert study['required_transform_count'] == 6
+          assert study['seeds'] == [2,3,5,7,11,13,17,19]
+          assert study['success_count_spread'] <= 2
+          assert study['spread_gate'] is True
+          assert len(study['transforms']) == 6
+          for item, expected in zip(study['transforms'], expected_ids):
+              assert item['feasible_transform_identity'] == expected
+              assert item['expected_feasible_transform_identity'] == expected
+              assert item['successes'] >= 6
+              assert item['quality_failures'] == 0
+              assert item['blocked_false_feasible'] == 0
+              assert item['execution_errors'] == 0
+              assert item['pass'] is True
+              assert len(item['feasible_sampling_min_bits']) == 4
+              assert len(item['feasible_sampling_max_bits']) == 4
+              assert len(item['blocked_sampling_min_bits']) == 4
+              assert len(item['blocked_sampling_max_bits']) == 4
+          assert study['pass'] is True
+          assert report['verdict'] == 'PASS'
+
+          summary = Path(os.environ['GITHUB_STEP_SUMMARY'])
+          with summary.open('a') as f:
+              f.write('## HYPERSPACE-004 blind rotated-basis planner discovery\n\n')
+              f.write(f"**Subject:** `{report['source_subject']}`\n\n")
+              f.write(f"**Qualified H003R parent:** `{environment['parent_sha']}`\n\n")
+              f.write(f"**Historical H003:** `{report['historical_hyperspace_003_subject']}` = `FAIL`\n\n")
+              f.write(f"**Success counts:** `{study['success_counts']}`\n\n")
+              f.write(f"**Success spread:** `{study['success_count_spread']}`\n\n")
+              f.write(f"**Verdict:** `{report['verdict']}`\n\n")
+              f.write('Planner failure remains Unknown; canonical blocked certificates retain impossibility authority.\n')
+          PY
+
+      - name: Upload evidence capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hyperspace-004-rotated-planner-${{ env.SUBJECT_SHA }}
+          path: artifacts/hyperspace-004/
+          if-no-files-found: error
+          retention-days: 90
