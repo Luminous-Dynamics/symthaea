@@ -56,6 +56,12 @@ use symthaea_sim_worker_qualification::{
 };
 use thiserror::Error;
 
+mod first_instruction_release;
+pub use first_instruction_release::{
+    FIRST_INSTRUCTION_DEPLOYMENT_BACKEND_V1, FIRST_INSTRUCTION_DEPLOYMENT_RELEASE_ADAPTER_V1,
+    release_routed_first_instruction,
+};
+
 /// Versioned profile for the release receipt encoding and issuance semantics.
 pub const SIMULATION_RELEASE_PROFILE_V1: &str = "symthaea.simulation.release.v1";
 /// Stable backend identity for host-promoted contained Component execution.
