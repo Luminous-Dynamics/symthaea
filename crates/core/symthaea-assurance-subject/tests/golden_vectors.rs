@@ -32,24 +32,26 @@ fn canonical_subject_golden_vector_v1() {
         id("golden-agent"),
         profile,
         vec![
-            SurfaceBinding::new(
+            SurfaceBinding::applicable(
                 AiSurfaceKind::Model,
                 SurfaceLocator::new(Some(id("provider-a")), id("rolling-model"), Some(id("v7"))),
                 SurfaceState::Unavailable(UnavailabilityReason::ProviderDoesNotExpose),
-            ),
-            SurfaceBinding::new(
+            )
+            .unwrap(),
+            SurfaceBinding::applicable(
                 AiSurfaceKind::Custom(id("aaa")),
                 SurfaceLocator::new(None, id("custom-surface"), None),
                 SurfaceState::Known(MaterialCommitment::artifact_bytes(digest(
                     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
                 ))),
-            ),
+            )
+            .unwrap(),
         ],
     )
     .unwrap();
 
     assert_eq!(
         manifest.manifest_id().as_str(),
-        "7ed1d417bf78b112ccd732ad8223156dea317c8ecfaf971e05301e86171a9e17"
+        "efda53d9699a301565b35a5c6dc46991d92d0f49f29c14dbefa37d9942a367a3"
     );
 }
