@@ -18,7 +18,7 @@ import json
 import math
 from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Iterable
 
 
 class MassBalanceStatus(str, Enum):
@@ -80,14 +80,28 @@ class MassBalanceReport:
     all_streams_exact: bool
 
 
+def _checked_sum(values: Iterable[float], label: str) -> float:
+    """Sum non-negative finite values and reject aggregate floating overflow."""
+    total = 0.0
+    for value in values:
+        total += value
+        if not math.isfinite(total):
+            raise ValueError(f"{label} must remain finite after aggregation")
+    return total
+
+
 def _sum_intervals(streams: list[MassInterval]) -> MassInterval:
     if not streams:
         raise ValueError("at least one mass stream is required")
     for stream in streams:
         stream.validate()
     return MassInterval(
-        min_kg=sum(stream.min_kg for stream in streams),
-        max_kg=sum(stream.max_kg for stream in streams),
+        min_kg=_checked_sum(
+            (stream.min_kg for stream in streams), "aggregate minimum mass"
+        ),
+        max_kg=_checked_sum(
+            (stream.max_kg for stream in streams), "aggregate maximum mass"
+        ),
     )
 
 
@@ -102,18 +116,24 @@ def evaluate_mass_balance(
     total_out = _sum_intervals(outputs)
 
     reference_mass = max(total_in.max_kg, total_out.max_kg)
-    tolerance_kg = max(
-        tolerance.absolute_kg,
-        tolerance.relative_fraction * reference_mass,
-    )
+    relative_tolerance_kg = tolerance.relative_fraction * reference_mass
+    if not math.isfinite(relative_tolerance_kg):
+        raise ValueError("effective relative mass-balance tolerance must be finite")
+    tolerance_kg = max(tolerance.absolute_kg, relative_tolerance_kg)
+    if not math.isfinite(tolerance_kg):
+        raise ValueError("effective mass-balance tolerance must be finite")
 
     # output - input
     residual_min = total_out.min_kg - total_in.max_kg
     residual_max = total_out.max_kg - total_in.min_kg
+    if not (math.isfinite(residual_min) and math.isfinite(residual_max)):
+        raise ValueError("mass-balance residual bounds must remain finite")
 
     all_exact = all(stream.is_point for stream in inputs + outputs)
     if all_exact:
         exact_residual = total_out.min_kg - total_in.min_kg
+        if not math.isfinite(exact_residual):
+            raise ValueError("exact mass-balance residual must remain finite")
         status = (
             MassBalanceStatus.EXACT_BALANCED
             if abs(exact_residual) <= tolerance_kg
@@ -132,11 +152,12 @@ def evaluate_mass_balance(
             all_streams_exact=True,
         )
 
-    # Interval overlap expanded by declared tolerance only establishes that
-    # conservation could be satisfied by some admissible realization.
+    # The residual interval is output-input. It is disjoint from zero beyond the
+    # declared tolerance exactly when the entire interval lies above +tolerance
+    # or below -tolerance. Comparing residual bounds avoids overflow-prone
+    # additions such as input_max + tolerance.
     disjoint_beyond_tolerance = (
-        total_in.max_kg + tolerance_kg < total_out.min_kg
-        or total_out.max_kg + tolerance_kg < total_in.min_kg
+        residual_min > tolerance_kg or residual_max < -tolerance_kg
     )
     status = (
         MassBalanceStatus.IMPOSSIBLE_WITHIN_BOUNDS
@@ -260,6 +281,33 @@ def self_test() -> None:
     )
     assert rel.status == MassBalanceStatus.EXACT_BALANCED.value
     assert abs(rel.tolerance_kg - 2.0) < 1e-12
+
+    # Aggregate floating-point overflow must fail closed rather than creating an
+    # infinite total that could accidentally satisfy a comparison.
+    overflow_cases = [
+        lambda: evaluate_mass_balance(
+            [
+                MassInterval(float.fromhex("0x1.fffffffffffffp+1023"), float.fromhex("0x1.fffffffffffffp+1023")),
+                MassInterval(float.fromhex("0x1.fffffffffffffp+1023"), float.fromhex("0x1.fffffffffffffp+1023")),
+            ],
+            [MassInterval(1.0, 1.0)],
+            zero,
+        ),
+        lambda: evaluate_mass_balance(
+            [MassInterval(float.fromhex("0x1.fffffffffffffp+1023"), float.fromhex("0x1.fffffffffffffp+1023"))],
+            [MassInterval(float.fromhex("0x1.fffffffffffffp+1023"), float.fromhex("0x1.fffffffffffffp+1023"))],
+            MassBalanceTolerance(
+                relative_fraction=float.fromhex("0x1.fffffffffffffp+1023")
+            ),
+        ),
+    ]
+    for case in overflow_cases:
+        try:
+            case()
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("floating-point overflow must fail closed")
 
     # Malformed inputs fail closed.
     malformed = [
