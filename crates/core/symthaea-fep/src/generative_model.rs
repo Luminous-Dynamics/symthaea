@@ -7,6 +7,14 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{HiddenState, Observation};
 
+/// Default state-persistence mass for an action-neutral transition prior.
+///
+/// The remaining probability mass is distributed uniformly across all other
+/// states. This is a prior over state persistence, not an action-semantic prior:
+/// every action receives the exact same matrix until caller-supplied structure or
+/// confirmed transition learning provides evidence that their dynamics differ.
+const DEFAULT_STATE_PERSISTENCE_PRIOR: f64 = 0.7;
+
 /// Generative model: P(o, s) = P(o|s) * P(s)
 ///
 /// The generative model defines how hidden states generate observations
@@ -65,7 +73,37 @@ pub struct GenerativeModel {
 }
 
 impl GenerativeModel {
-    /// Create new generative model
+    /// Build the generic transition prior used when the caller has supplied no
+    /// action-specific dynamics knowledge.
+    ///
+    /// Every row is stochastic. State persistence receives a fixed prior mass;
+    /// the remaining mass is spread uniformly across all other states. Crucially,
+    /// this function has no action-index input: generic construction cannot infer
+    /// semantics from parity, ordering, or any other property of an integer action
+    /// identifier.
+    fn neutral_action_transition_prior(state_dim: usize) -> Vec<Vec<f64>> {
+        match state_dim {
+            0 => Vec::new(),
+            1 => vec![vec![1.0]],
+            _ => {
+                let off_diagonal =
+                    (1.0 - DEFAULT_STATE_PERSISTENCE_PRIOR) / (state_dim - 1) as f64;
+                let mut transition = vec![vec![off_diagonal; state_dim]; state_dim];
+                for (i, row) in transition.iter_mut().enumerate() {
+                    row[i] = DEFAULT_STATE_PERSISTENCE_PRIOR;
+                }
+                transition
+            }
+        }
+    }
+
+    /// Create a new generative model.
+    ///
+    /// With no caller-supplied action dynamics, every action begins from the
+    /// same action-neutral transition prior. Initial equivalence therefore means
+    /// explicit epistemic ignorance, not an inferred relationship between action
+    /// indices. Confirmed transition learning remains action-specific and may
+    /// subsequently differentiate the matrices.
     pub fn new(state_dim: usize, obs_dim: usize, num_actions: usize) -> Self {
         // Initialize likelihood matrix (near-diagonal with some spread)
         let mut likelihood_matrix = vec![vec![0.0; obs_dim]; state_dim];
@@ -81,26 +119,12 @@ impl GenerativeModel {
             }
         }
 
-        // Initialize transition matrices (one per action)
-        let mut transition_matrices = Vec::with_capacity(num_actions);
-        for action_idx in 0..num_actions {
-            let mut transition = vec![vec![0.0; state_dim]; state_dim];
-            for i in 0..state_dim {
-                // Self-transition
-                transition[i][i] = 0.7;
-                // Action-dependent bias
-                let bias_direction = if action_idx % 2 == 0 { -1 } else { 1 };
-                let next_i = ((i as isize + bias_direction).max(0) as usize).min(state_dim - 1);
-                transition[i][next_i] += 0.2;
-                // Small transitions to other states
-                for j in 0..state_dim {
-                    if j != i && j != next_i {
-                        transition[i][j] = 0.1 / (state_dim - 2).max(1) as f64;
-                    }
-                }
-            }
-            transition_matrices.push(transition);
-        }
+        // Generic action priors are deliberately permutation-neutral. A caller
+        // with real domain knowledge may later supply explicit transition
+        // structure; absent that evidence, action index arithmetic carries no
+        // semantics.
+        let neutral_transition = Self::neutral_action_transition_prior(state_dim);
+        let transition_matrices = vec![neutral_transition; num_actions];
 
         Self {
             likelihood_matrix,
