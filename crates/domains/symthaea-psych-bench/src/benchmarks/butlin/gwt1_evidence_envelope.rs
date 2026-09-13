@@ -16,6 +16,7 @@ use super::gwt1_qualification::{
 };
 
 pub const GWT1_EVIDENCE_ENVELOPE_SCHEMA_V1: &str = "butlin-gwt1-evidence-envelope-v1";
+pub const GWT1_RAW_OBSERVATION_SCHEMA_V1: &str = "butlin-gwt1-raw-observations-v1";
 pub const GWT1_RAW_OBSERVATION_MEDIA_TYPE_V1: &str = "application/json";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,7 +38,7 @@ pub struct Gwt1EvidenceEnvelopeV1 {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Gwt1ArtifactIntegrityFailureV1 {
     InvalidEnvelopeSchema { observed: String },
-    MissingRawObservationSchema,
+    InvalidRawObservationSchema { observed: String },
     InvalidMediaType { observed: String },
     InvalidDigestFormat { observed: String },
     RawObservationLengthMismatch { declared: u64, observed: u64 },
@@ -62,12 +63,9 @@ pub fn raw_observation_blake3(raw_observations: &[u8]) -> String {
     blake3::hash(raw_observations).to_hex().to_string()
 }
 
-pub fn describe_raw_observations_v1(
-    schema: impl Into<String>,
-    raw_observations: &[u8],
-) -> Gwt1RawObservationArtifactV1 {
+pub fn describe_raw_observations_v1(raw_observations: &[u8]) -> Gwt1RawObservationArtifactV1 {
     Gwt1RawObservationArtifactV1 {
-        schema: schema.into(),
+        schema: GWT1_RAW_OBSERVATION_SCHEMA_V1.to_string(),
         media_type: GWT1_RAW_OBSERVATION_MEDIA_TYPE_V1.to_string(),
         byte_len: raw_observations.len() as u64,
         blake3: raw_observation_blake3(raw_observations),
@@ -88,8 +86,10 @@ pub fn resolve_gwt1_evidence_envelope_v1(
         });
     }
 
-    if envelope.raw_observations.schema.trim().is_empty() {
-        artifact_failures.push(MissingRawObservationSchema);
+    if envelope.raw_observations.schema != GWT1_RAW_OBSERVATION_SCHEMA_V1 {
+        artifact_failures.push(InvalidRawObservationSchema {
+            observed: envelope.raw_observations.schema.clone(),
+        });
     }
 
     if envelope.raw_observations.media_type != GWT1_RAW_OBSERVATION_MEDIA_TYPE_V1 {
@@ -194,10 +194,7 @@ mod tests {
     fn canonical_envelope(raw: &[u8]) -> Gwt1EvidenceEnvelopeV1 {
         Gwt1EvidenceEnvelopeV1 {
             schema: GWT1_EVIDENCE_ENVELOPE_SCHEMA_V1.to_string(),
-            raw_observations: describe_raw_observations_v1(
-                "butlin-gwt1-raw-observations-v1",
-                raw,
-            ),
+            raw_observations: describe_raw_observations_v1(raw),
             receipt: canonical_receipt(),
         }
     }
@@ -230,6 +227,19 @@ mod tests {
         envelope.raw_observations.byte_len += 1;
         let resolution = resolve_gwt1_evidence_envelope_v1(&envelope, raw);
         assert_eq!(resolution.outcome, Gwt1QualificationOutcomeV1::Inconclusive);
+    }
+
+    #[test]
+    fn raw_schema_is_frozen() {
+        let raw = b"canonical raw bytes";
+        let mut envelope = canonical_envelope(raw);
+        envelope.raw_observations.schema = "other-schema".to_string();
+        let resolution = resolve_gwt1_evidence_envelope_v1(&envelope, raw);
+        assert_eq!(resolution.outcome, Gwt1QualificationOutcomeV1::Inconclusive);
+        assert!(resolution.artifact_failures.iter().any(|failure| matches!(
+            failure,
+            Gwt1ArtifactIntegrityFailureV1::InvalidRawObservationSchema { .. }
+        )));
     }
 
     #[test]
