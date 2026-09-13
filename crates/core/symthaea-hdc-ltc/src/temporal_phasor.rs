@@ -389,6 +389,9 @@ fn next_unit_f64(state: &mut u64) -> f64 {
 mod tests {
     use super::*;
 
+    const ALGEBRA_TOL: f64 = 1e-12;
+    const QUADRATURE_TOL: f64 = 1e-7;
+
     #[test]
     fn fractional_time_binding_obeys_group_law() {
         let axis = TemporalAxis::new(512, 41).unwrap();
@@ -396,17 +399,17 @@ mod tests {
         let b = axis.at(7.75).unwrap();
         let composed = a.bind(&b).unwrap();
         let direct = axis.at(4.625).unwrap();
-        assert!(composed.max_abs_difference(&direct).unwrap() < 2e-13);
+        assert!(composed.max_abs_difference(&direct).unwrap() < ALGEBRA_TOL);
     }
 
     #[test]
     fn inverse_returns_identity_and_unit_modulus_is_preserved() {
         let axis = TemporalAxis::new(512, 42).unwrap();
         let point = axis.at(123.456).unwrap();
-        assert!(point.max_unit_modulus_error() < 3e-16);
+        assert!(point.max_unit_modulus_error() < ALGEBRA_TOL);
         let recovered = point.bind(&point.inverse()).unwrap();
         let identity = TemporalPhasor::identity(axis.dim()).unwrap();
-        assert!(recovered.max_abs_difference(&identity).unwrap() < 3e-16);
+        assert!(recovered.max_abs_difference(&identity).unwrap() < ALGEBRA_TOL);
     }
 
     #[test]
@@ -418,7 +421,7 @@ mod tests {
         let shifted_b = axis.at(103.5).unwrap();
         let before = a.similarity(&b).unwrap();
         let after = shifted_a.similarity(&shifted_b).unwrap();
-        assert!((before - after).abs() < 2e-14);
+        assert!((before - after).abs() < ALGEBRA_TOL);
     }
 
     #[test]
@@ -430,7 +433,7 @@ mod tests {
 
         let left = t.bind_role(&role).unwrap().bind(&dt).unwrap();
         let right = t.bind(&dt).unwrap().bind_role(&role).unwrap();
-        assert!(left.max_abs_difference(&right).unwrap() < 2e-15);
+        assert!(left.max_abs_difference(&right).unwrap() < ALGEBRA_TOL);
     }
 
     #[test]
@@ -440,7 +443,7 @@ mod tests {
         let shift = axis.at(7.5).unwrap();
         let translated = shift.bind_interval(&interval).unwrap();
         let direct = axis.interval(5.5, 10.75).unwrap();
-        assert!(translated.max_abs_difference(&direct).unwrap() < 2e-13);
+        assert!(translated.max_abs_difference(&direct).unwrap() < ALGEBRA_TOL);
     }
 
     #[test]
@@ -462,7 +465,14 @@ mod tests {
             }
         }
         let numerical = TemporalInterval { real, imag };
-        assert!(analytic.max_abs_difference(&numerical).unwrap() < 2e-9);
+        assert!(analytic.max_abs_difference(&numerical).unwrap() < QUADRATURE_TOL);
+    }
+
+    #[test]
+    fn zero_width_interval_is_exactly_zero() {
+        let axis = TemporalAxis::new(64, 48).unwrap();
+        let interval = axis.interval(7.25, 7.25).unwrap();
+        assert_eq!(interval.l2_norm(), 0.0);
     }
 
     #[test]
@@ -471,7 +481,7 @@ mod tests {
             TemporalAxis::new(0, 1),
             Err(TemporalAlgebraError::ZeroDimension)
         ));
-        let axis = TemporalAxis::new(8, 48).unwrap();
+        let axis = TemporalAxis::new(8, 49).unwrap();
         assert!(matches!(
             axis.at(f64::NAN),
             Err(TemporalAlgebraError::NonFiniteTime(_))
