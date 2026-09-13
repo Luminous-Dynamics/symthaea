@@ -247,6 +247,19 @@ impl RepresentationProvenanceRegistry {
             ));
         }
 
+        let subject_created_revision = continuity
+            .created_revision(&receipt.subject_instance)
+            .map_err(|_| RepresentationProvenanceError::UnknownSubjectInstance(
+                receipt.subject_instance.clone(),
+            ))?;
+        if receipt.logical_revision < subject_created_revision {
+            return Err(RepresentationProvenanceError::SourceReceiptPredatesSubject {
+                subject_instance: receipt.subject_instance.clone(),
+                subject_created_revision,
+                receipt_revision: receipt.logical_revision,
+            });
+        }
+
         let statement_evidence_ref = statement_evidence_ref.into();
         if statement_evidence_ref.trim().is_empty() {
             return Err(RepresentationProvenanceError::EmptyStatementEvidenceReference);
@@ -361,6 +374,11 @@ pub enum RepresentationProvenanceError {
     UnknownReceipt(RepresentationSourceReceiptId),
     UnknownSubjectInstance(SubjectInstanceId),
     InactiveSubjectInstance(SubjectInstanceId),
+    SourceReceiptPredatesSubject {
+        subject_instance: SubjectInstanceId,
+        subject_created_revision: u64,
+        receipt_revision: u64,
+    },
     ContinuityLookupFailed,
     SemanticRepresentationRejected(ReciprocalRepresentationError),
 }
