@@ -4,11 +4,11 @@
 use crate::canonical::{
     AcceptanceRecordDigestV1, AnalysisConfigurationDigestV1, AnalysisRequirementRevisionIdV1,
     AnalysisTrustErrorV1, CurrentnessAssertionIdV2, CurrentnessAttestationDigestV1,
-    ModelRevisionDigestV1, ObligationRevisionIdV1, Sha256DigestV1, SubjectRevisionIdV1,
-    SubjectStateDigestV1, TwinRevisionIdV1, TwinSchemaDigestV1, TwinStateDigestV1,
-    ValidityDimensionDigestV1, ValidityDomainRevisionIdV1, CURRENTNESS_DOMAIN_V2,
-    OBLIGATION_DOMAIN_V1, REQUIREMENT_DOMAIN_V1, SUBJECT_DOMAIN_V1, TWIN_DOMAIN_V1,
-    VALIDITY_DOMAIN_V1, canonical_text, domain_hash,
+    ModelRevisionDigestV1, ObligationRevisionIdV1, SubjectRevisionIdV1, SubjectStateDigestV1,
+    TwinRevisionIdV1, TwinSchemaDigestV1, TwinStateDigestV1, ValidityDimensionDigestV1,
+    ValidityDomainRevisionIdV1, CURRENTNESS_DOMAIN_V2, OBLIGATION_DOMAIN_V1,
+    REQUIREMENT_DOMAIN_V1, SUBJECT_DOMAIN_V1, TWIN_DOMAIN_V1, VALIDITY_DOMAIN_V1,
+    canonical_text, domain_hash,
 };
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
