@@ -25,15 +25,15 @@ use super::v2_public_schema::{
 };
 
 pub(super) const V2_CALIBRATION_EVIDENCE_REVISION: &str =
-    "EUREKA.002.V2.CALIBRATION_EVIDENCE.v2";
+    "EUREKA.002.V2.CALIBRATION_EVIDENCE.v3";
 pub(super) const V2_CALIBRATION_CORPUS_REVISION: &str =
-    "EUREKA.002.V2.CALIBRATION_CORPUS.v2";
+    "EUREKA.002.V2.CALIBRATION_CORPUS.v3";
 pub(super) const V2_COMPARATOR_CALIBRATION_RECEIPT_REVISION: &str =
     "EUREKA.002.V2.COMPARATOR_CALIBRATION_RECEIPT.v2";
 pub(super) const V2_SELECTION_IMPLEMENTATION_REVISION: &str =
-    "EUREKA.002.V2.COMPARATOR_SELECTION_IMPLEMENTATION.v1";
+    "EUREKA.002.V2.COMPARATOR_SELECTION_IMPLEMENTATION.v2";
 pub(super) const V2_SELECTION_AUTHORIZATION_REVISION: &str =
-    "EUREKA.002.V2.COMPARATOR_SELECTION_AUTHORIZATION.v2";
+    "EUREKA.002.V2.COMPARATOR_SELECTION_AUTHORIZATION.v3";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum V2SelectionAuthorizationError {
@@ -63,10 +63,10 @@ impl From<V2ComparatorCustodyError> for V2SelectionAuthorizationError {
 
 /// Canonical Calibration transition evidence.
 ///
-/// The constructor delegates public-schema/family/action/context admissibility
-/// to the same canonical transition type used by Development custody. The
-/// transition semantic key deliberately excludes partition and row identity so
-/// exact public-transition reuse can be detected across Development/Calibration.
+/// Row identity is derived internally from exact transition provenance and the
+/// fixed Calibration partition. The semantic key deliberately excludes
+/// partition and row identity so exact public-transition reuse can be detected
+/// across Development/Calibration despite their different canonical row IDs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct V2CalibrationEvidence {
     row_identity: [u8; 32],
@@ -77,21 +77,18 @@ pub(super) struct V2CalibrationEvidence {
 impl V2CalibrationEvidence {
     pub(super) fn new(
         family: V2PublicFamily,
-        row_identity: [u8; 32],
         pre: V2PublicState,
         action: PublicAction,
         post: V2PublicState,
     ) -> Result<Self, V2SelectionAuthorizationError> {
-        // Reuse the exact canonical admissibility theorem. Calibration is fixed
-        // by construction and cannot be caller-relabeled as HeldOut/External.
         let validated = V2PublicTransitionEvidence::new(
             family,
             V2CorpusPartition::Calibration,
-            row_identity,
             pre,
             action,
             post,
         )?;
+        let row_identity = validated.row_identity();
         let transition_semantics_bytes = canonical_transition_semantics_bytes(&validated);
 
         let mut canonical_bytes = Vec::new();
@@ -100,7 +97,7 @@ impl V2CalibrationEvidence {
             V2_CALIBRATION_EVIDENCE_REVISION.as_bytes(),
         );
         canonical_bytes.extend_from_slice(&public_schema_commitment());
-        canonical_bytes.push(2); // canonical V2 Calibration partition tag
+        canonical_bytes.push(V2CorpusPartition::Calibration.tag());
         canonical_bytes.extend_from_slice(&row_identity);
         canonical_bytes.extend_from_slice(&transition_semantics_bytes);
 
@@ -590,13 +587,10 @@ fn encode_bytes(bytes: &mut Vec<u8>, value: &[u8]) {
 mod tests {
     use super::*;
 
-    fn development_record(id: u8, offset: i32) -> V2PublicTransitionEvidence {
-        let mut row_identity = [0_u8; 32];
-        row_identity[0] = id;
+    fn development_record(offset: i32) -> V2PublicTransitionEvidence {
         V2PublicTransitionEvidence::new(
             V2PublicFamily::PublicFlowV2,
             V2CorpusPartition::Development,
-            row_identity,
             V2PublicState::new([3 + offset, 4, 5, 0]).unwrap(),
             PublicAction::Pulse { slot: 0 },
             V2PublicState::new([2 + offset, 5, 5, 0]).unwrap(),
@@ -605,19 +599,12 @@ mod tests {
     }
 
     fn development() -> V2DevelopmentFitCorpus {
-        V2DevelopmentFitCorpus::freeze(vec![
-            development_record(1, 0),
-            development_record(2, 1),
-        ])
-        .unwrap()
+        V2DevelopmentFitCorpus::freeze(vec![development_record(0), development_record(1)]).unwrap()
     }
 
-    fn calibration_record(id: u8, offset: i32) -> V2CalibrationEvidence {
-        let mut row_identity = [0_u8; 32];
-        row_identity[0] = id;
+    fn calibration_record(offset: i32) -> V2CalibrationEvidence {
         V2CalibrationEvidence::new(
             V2PublicFamily::PublicFlowV2,
-            row_identity,
             V2PublicState::new([8 + offset, 3, 2, 0]).unwrap(),
             PublicAction::Pulse { slot: 1 },
             V2PublicState::new([8 + offset, 2, 3, 0]).unwrap(),
@@ -628,7 +615,7 @@ mod tests {
     fn calibration(development: &V2DevelopmentFitCorpus) -> V2CalibrationCorpus {
         V2CalibrationCorpus::freeze(
             development,
-            vec![calibration_record(11, 0), calibration_record(12, 1)],
+            vec![calibration_record(0), calibration_record(1)],
         )
         .unwrap()
     }
@@ -655,16 +642,31 @@ mod tests {
     }
 
     #[test]
+    fn calibration_evidence_derives_partition_bound_identity() {
+        let calibration = calibration_record(0);
+        let development_same_semantics = V2PublicTransitionEvidence::new(
+            V2PublicFamily::PublicFlowV2,
+            V2CorpusPartition::Development,
+            V2PublicState::new([8, 3, 2, 0]).unwrap(),
+            PublicAction::Pulse { slot: 1 },
+            V2PublicState::new([8, 2, 3, 0]).unwrap(),
+        )
+        .unwrap();
+        assert_ne!(calibration.row_identity(), [0_u8; 32]);
+        assert_ne!(calibration.row_identity(), development_same_semantics.row_identity());
+    }
+
+    #[test]
     fn calibration_corpus_commitment_is_order_invariant() {
         let development = development();
         let forward = V2CalibrationCorpus::freeze(
             &development,
-            vec![calibration_record(11, 0), calibration_record(12, 1)],
+            vec![calibration_record(0), calibration_record(1)],
         )
         .unwrap();
         let reverse = V2CalibrationCorpus::freeze(
             &development,
-            vec![calibration_record(12, 1), calibration_record(11, 0)],
+            vec![calibration_record(1), calibration_record(0)],
         )
         .unwrap();
         assert_eq!(forward.commitment(), reverse.commitment());
@@ -673,18 +675,17 @@ mod tests {
     }
 
     #[test]
-    fn development_calibration_identity_overlap_fails_closed() {
+    fn defensive_development_calibration_identity_overlap_fails_closed() {
         let development = development();
-        let mut row_identity = [0_u8; 32];
-        row_identity[0] = 1;
-        let overlap = V2CalibrationEvidence::new(
-            V2PublicFamily::PublicFlowV2,
-            row_identity,
-            V2PublicState::new([9, 3, 2, 0]).unwrap(),
-            PublicAction::NoOp,
-            V2PublicState::new([9, 3, 2, 0]).unwrap(),
-        )
-        .unwrap();
+        let mut overlap = calibration_record(3);
+        overlap.row_identity = development.records()[0].row_identity();
+        let mut canonical = Vec::new();
+        encode_bytes(&mut canonical, V2_CALIBRATION_EVIDENCE_REVISION.as_bytes());
+        canonical.extend_from_slice(&public_schema_commitment());
+        canonical.push(V2CorpusPartition::Calibration.tag());
+        canonical.extend_from_slice(&overlap.row_identity);
+        canonical.extend_from_slice(&overlap.transition_semantics_bytes);
+        overlap.canonical_bytes = canonical;
         assert_eq!(
             V2CalibrationCorpus::freeze(&development, vec![overlap]),
             Err(V2SelectionAuthorizationError::DevelopmentCalibrationIdentityOverlap)
@@ -692,18 +693,16 @@ mod tests {
     }
 
     #[test]
-    fn development_calibration_semantic_overlap_under_different_id_fails_closed() {
+    fn development_calibration_semantic_overlap_with_partition_distinct_ids_fails_closed() {
         let development = development();
-        let mut row_identity = [0_u8; 32];
-        row_identity[0] = 99;
         let overlap = V2CalibrationEvidence::new(
             V2PublicFamily::PublicFlowV2,
-            row_identity,
             V2PublicState::new([3, 4, 5, 0]).unwrap(),
             PublicAction::Pulse { slot: 0 },
             V2PublicState::new([2, 5, 5, 0]).unwrap(),
         )
         .unwrap();
+        assert_ne!(overlap.row_identity(), development.records()[0].row_identity());
         assert_eq!(
             V2CalibrationCorpus::freeze(&development, vec![overlap]),
             Err(V2SelectionAuthorizationError::DevelopmentCalibrationTransitionOverlap)
@@ -711,15 +710,15 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_calibration_transition_under_different_id_fails_closed() {
+    fn duplicate_calibration_transition_still_fails_if_internal_identity_is_corrupted() {
         let development = development();
-        let a = calibration_record(11, 0);
+        let a = calibration_record(0);
         let mut b = a.clone();
         b.row_identity = [0xA5_u8; 32];
         let mut canonical = Vec::new();
         encode_bytes(&mut canonical, V2_CALIBRATION_EVIDENCE_REVISION.as_bytes());
         canonical.extend_from_slice(&public_schema_commitment());
-        canonical.push(2);
+        canonical.push(V2CorpusPartition::Calibration.tag());
         canonical.extend_from_slice(&b.row_identity);
         canonical.extend_from_slice(&b.transition_semantics_bytes);
         b.canonical_bytes = canonical;
@@ -786,7 +785,11 @@ mod tests {
         let mut reverse_receipts = complete_receipts();
         reverse_receipts.reverse();
         let reverse = authorize_selection(&development, &calibration, reverse_receipts).unwrap();
-        let (V2ComparatorSelectionOutcome::Selected(forward), V2ComparatorSelectionOutcome::Selected(reverse)) = (forward, reverse) else {
+        let (
+            V2ComparatorSelectionOutcome::Selected(forward),
+            V2ComparatorSelectionOutcome::Selected(reverse),
+        ) = (forward, reverse)
+        else {
             panic!("fixture must select comparator");
         };
         assert_eq!(forward.selected(), ShortcutBaselineKind::NearestTransition);
@@ -841,7 +844,11 @@ mod tests {
         let mut changed = complete_receipts();
         changed[0] = receipt(ShortcutBaselineKind::ActionMarginalDelta, 3, 2, 1);
         let second = authorize_selection(&development, &calibration, changed).unwrap();
-        let (V2ComparatorSelectionOutcome::Selected(first), V2ComparatorSelectionOutcome::Selected(second)) = (first, second) else {
+        let (
+            V2ComparatorSelectionOutcome::Selected(first),
+            V2ComparatorSelectionOutcome::Selected(second),
+        ) = (first, second)
+        else {
             panic!("fixtures must remain selected");
         };
         assert_ne!(first.commitment(), second.commitment());
@@ -880,7 +887,7 @@ mod tests {
         assert_eq!(custody.fit_corpus_commitment(), development.commitment());
         assert_ne!(custody.commitment(), [0_u8; 32]);
 
-        let other = V2DevelopmentFitCorpus::freeze(vec![development_record(9, 4)]).unwrap();
+        let other = V2DevelopmentFitCorpus::freeze(vec![development_record(4)]).unwrap();
         assert_eq!(
             freeze_comparator_custody_from_authorization(&other, &authorization),
             Err(V2SelectionAuthorizationError::FitCorpusCommitmentMismatch)
