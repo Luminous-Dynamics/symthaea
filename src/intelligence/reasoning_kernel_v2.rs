@@ -47,6 +47,10 @@ pub struct CanonicalReasoningDecisionV2 {
     pub subject_id: String,
     pub episode_id: String,
     pub sequence: u64,
+    /// Exact pre-outcome/publication parity fields frozen by the kernel.
+    pub abstained: bool,
+    pub evidence_items: usize,
+    pub weak_assumptions_flagged: usize,
     pub context_selection: RobustContextSelectionReport,
     pub selected_candidate: CandidatePrimitive,
     pub meta_commit: MetaCommitReport,
@@ -169,6 +173,9 @@ impl CanonicalReasoningKernelV2 {
             subject_id: input.subject_id,
             episode_id: input.episode_id,
             sequence: input.sequence,
+            abstained: input.abstained,
+            evidence_items: input.evidence_items,
+            weak_assumptions_flagged: input.weak_assumptions_flagged,
             context_selection,
             selected_candidate,
             meta_commit,
@@ -309,6 +316,9 @@ fn compute_decision_commitment(decision: &CanonicalReasoningDecisionV2) -> Strin
     hash_str(&mut hasher, &decision.subject_id);
     hash_str(&mut hasher, &decision.episode_id);
     hash_u64(&mut hasher, decision.sequence);
+    hash_bool(&mut hasher, decision.abstained);
+    hash_u64(&mut hasher, decision.evidence_items as u64);
+    hash_u64(&mut hasher, decision.weak_assumptions_flagged as u64);
 
     let assessment = &decision.context_selection.assessment;
     hash_u64(&mut hasher, assessment.policy.minimum_support.to_bits());
@@ -549,6 +559,8 @@ mod tests {
         assert_eq!(decision.selected_candidate.name, "robust");
         assert_eq!(decision.context_selection.assessment.active_contexts.len(), 2);
         assert_eq!(decision.applied_plasticity_multiplier, 1.0);
+        assert_eq!(decision.evidence_items, 1);
+        assert!(!decision.abstained);
         assert!(decision.validate_commitment());
         assert_eq!(kernel.subject_state("agent-a").unwrap().next_sequence(), 1);
     }
@@ -586,6 +598,14 @@ mod tests {
         let mut decision = kernel.reason(input("agent-a", "ep-0", 0)).unwrap();
         assert!(decision.validate_commitment());
         decision.context_selection.evaluations[0].candidate_name = "tampered-loser".into();
+        assert!(!decision.validate_commitment());
+    }
+
+    #[test]
+    fn publication_parity_tamper_fails_commitment_validation() {
+        let mut kernel = CanonicalReasoningKernelV2::new(8).unwrap();
+        let mut decision = kernel.reason(input("agent-a", "ep-0", 0)).unwrap();
+        decision.evidence_items = 2;
         assert!(!decision.validate_commitment());
     }
 
