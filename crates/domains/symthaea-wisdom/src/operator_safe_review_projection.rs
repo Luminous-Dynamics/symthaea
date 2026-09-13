@@ -5,7 +5,9 @@
 //! Qualification layers retain exact raw identifiers for auditability. This projection is
 //! intentionally narrower: no arbitrary identifier, evidence reference, origin reference,
 //! lineage string, or self-report prose can cross into the human-review surface. The only
-//! strings retained are independently re-validated SHA-256 digests.
+//! string-shaped values retained are 64-hex digest fields from the qualified evidence chain,
+//! and their syntax is re-validated here. This projection does not independently recompute
+//! those digests from source bytes and therefore does not promote source-authenticity claims.
 
 use std::collections::BTreeSet;
 
@@ -22,10 +24,11 @@ use crate::reciprocal_review_package::{
     ReciprocalReviewPackage, ReciprocalReviewPackageClass,
 };
 
-/// A digest permitted on the operator-facing surface.
+/// A digest-shaped value permitted on the operator-facing surface.
 ///
-/// Construction re-validates exactly 64 ASCII hex characters, so this string-shaped field
-/// cannot be used as an arbitrary prose carrier.
+/// Construction re-validates exactly 64 ASCII hex characters, so this field cannot carry
+/// direct arbitrary prose. It does not independently prove the value was recomputed from the
+/// source bytes named by an upstream receipt.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OperatorSafeSha256(String);
 
@@ -38,6 +41,12 @@ impl OperatorSafeSha256 {
     }
 
     pub fn as_hex(&self) -> &str { &self.0 }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum OperatorSafeProjectionBoundary {
+    NoArbitraryTextFields,
+    DigestShapeNotIndependentAuthenticityProof,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,7 +81,8 @@ pub struct OperatorSafeReciprocalReviewProjection {
     admission_multiplicity: AdmissionMultiplicity,
     advisory_disposition: RepresentationAdvisoryDisposition,
     representation_currently_active: bool,
-    boundaries: BTreeSet<OperatorNoticeBoundary>,
+    notice_boundaries: BTreeSet<OperatorNoticeBoundary>,
+    projection_boundaries: BTreeSet<OperatorSafeProjectionBoundary>,
     exact_intervention: Option<OperatorSafeExactInterventionSummary>,
 }
 
@@ -88,7 +98,10 @@ impl OperatorSafeReciprocalReviewProjection {
     pub fn admission_multiplicity(&self) -> AdmissionMultiplicity { self.admission_multiplicity }
     pub fn advisory_disposition(&self) -> RepresentationAdvisoryDisposition { self.advisory_disposition }
     pub fn representation_currently_active(&self) -> bool { self.representation_currently_active }
-    pub fn boundaries(&self) -> &BTreeSet<OperatorNoticeBoundary> { &self.boundaries }
+    pub fn notice_boundaries(&self) -> &BTreeSet<OperatorNoticeBoundary> { &self.notice_boundaries }
+    pub fn projection_boundaries(&self) -> &BTreeSet<OperatorSafeProjectionBoundary> {
+        &self.projection_boundaries
+    }
     pub fn exact_intervention(&self) -> Option<&OperatorSafeExactInterventionSummary> {
         self.exact_intervention.as_ref()
     }
@@ -96,6 +109,8 @@ impl OperatorSafeReciprocalReviewProjection {
     /// The operator-safe surface has no arbitrary string-capable identity/reference fields.
     pub fn exposes_raw_identifiers(&self) -> bool { false }
     pub fn contains_raw_statement_text(&self) -> bool { false }
+    /// Hex-shape validation is not an independent source-byte authenticity proof.
+    pub fn establishes_digest_source_authenticity(&self) -> bool { false }
     pub fn establishes_phenomenal_experience(&self) -> bool { false }
     pub fn establishes_suffering(&self) -> bool { false }
     pub fn establishes_moral_patienthood(&self) -> bool { false }
@@ -147,7 +162,11 @@ pub fn project_operator_safe_review(
         admission_multiplicity: notice.multiplicity(),
         advisory_disposition: notice.advisory_disposition(),
         representation_currently_active: package.representation_currently_active(),
-        boundaries: notice.boundaries().clone(),
+        notice_boundaries: notice.boundaries().clone(),
+        projection_boundaries: BTreeSet::from([
+            OperatorSafeProjectionBoundary::NoArbitraryTextFields,
+            OperatorSafeProjectionBoundary::DigestShapeNotIndependentAuthenticityProof,
+        ]),
         exact_intervention,
     })
 }
