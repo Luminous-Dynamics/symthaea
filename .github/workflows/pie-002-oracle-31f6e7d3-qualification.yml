@@ -1,0 +1,75 @@
+name: PIE-002 Oracle Naming-Corrected Exact Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002-oracle-31f6e7d3
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SUBJECT_SHA: 31f6e7d32e65843f0cdfc9043607751565a5b769
+      ORACLE: scripts/pie-utility-accounting-oracle.py
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 1
+      - name: Verify exact subject identity
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$SUBJECT_SHA" "$actual"
+          test "$actual" = "$SUBJECT_SHA"
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+      - name: Record Python identity
+        run: python3 --version
+      - name: Compile oracle syntax
+        id: syntax
+        continue-on-error: true
+        run: python3 -m py_compile "$ORACLE"
+      - name: Execute oracle self-test
+        id: selftest
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          output="$(python3 "$ORACLE" --self-test)"
+          printf '%s\n' "$output"
+          test "$output" = ok
+      - name: Emit machine-readable receipt
+        if: always()
+        run: |
+          cat > pie-002-oracle-31f6e7d3.json <<EOF
+          {
+            "schema": "symthaea.pie.oracle-qualification.v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "oracle": "$ORACLE",
+            "python": "3.13.5",
+            "syntax": "${{ steps.syntax.outcome }}",
+            "self_test": "${{ steps.selftest.outcome }}",
+            "scope": "Independent PIE-002 reference execution only; average-power screens are not time-resolved dispatch/load-profile proofs and this is not production Rust or physical-process qualification."
+          }
+          EOF
+          cat pie-002-oracle-31f6e7d3.json
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-002-oracle-31f6e7d3-exact-qualification
+          path: pie-002-oracle-31f6e7d3.json
+          if-no-files-found: error
+      - name: Enforce oracle gates
+        if: always()
+        run: |
+          test "${{ steps.syntax.outcome }}" = success
+          test "${{ steps.selftest.outcome }}" = success
