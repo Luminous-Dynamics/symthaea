@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-matbench-gap-baseline-screening"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Truth-blind baseline screening policies for the frozen Matbench composition universe."
+
+[dependencies]
+symthaea-bandgap = { path = "../../domains/symthaea-bandgap" }
+symthaea-energy-benchmark-zero = { path = "../../domains/symthaea-energy-benchmark-zero" }
+symthaea-matbench-gap-exposure-plan = { path = "../symthaea-matbench-gap-exposure-plan" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
