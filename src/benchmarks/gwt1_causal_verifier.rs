@@ -10,12 +10,19 @@
 
 use std::collections::BTreeSet;
 
-use crate::cognitive_loop::subsystem_trait::{OutputCollector, SubsystemOutput};
+use crate::cognitive_loop::subsystem_trait::{
+    OutputCollector, SubsystemOutput, output_flags,
+};
 
 use super::gwt1_causal_lesion::Gwt1IntegratedOutputBitsV1;
 use super::gwt1_specialist_qualification::{
     GWT1_SPECIALIST_IDS_V1, Gwt1SpecialistOutputMapV1, Gwt1SubsystemOutputBitsV1,
 };
+
+/// Exact production bit used by `SubsystemOutput` to request consolidation.
+/// Exported through the benchmark facade so evidence code never duplicates the
+/// cognitive-loop-private flag layout.
+pub const GWT1_REQUEST_CONSOLIDATION_FLAG_V1: u32 = output_flags::REQUEST_CONSOLIDATION;
 
 fn bits_to_output(bits: &Gwt1SubsystemOutputBitsV1) -> SubsystemOutput {
     SubsystemOutput {
@@ -77,5 +84,10 @@ mod tests {
             assert_eq!(rescue.0, row.rescue.recorded_contributors);
             assert_eq!(rescue.1, row.rescue.integrated);
         }
+    }
+
+    #[test]
+    fn consolidation_flag_is_bound_to_production_layout() {
+        assert_eq!(GWT1_REQUEST_CONSOLIDATION_FLAG_V1, 1 << 1);
     }
 }
