@@ -33,15 +33,15 @@ const MAX_EXECUTION_ID_BYTES: usize = 256;
 
 /// Compute the V2 correlation commitment at the live execution boundary.
 ///
-/// `restore_prepared_head` is the quarantine-ledger head after the domain `RestorePrepared` event
-/// was durably accepted and therefore becomes the `previous_hash` of the following `Restored`
-/// envelope. That equality is what makes the same commitment independently recoverable later.
+/// `restore_prepared_event_hash` is the hash returned when the exact domain `RestorePrepared`
+/// event is appended. It identifies that write-ahead event directly; unrelated later ledger events
+/// may interleave without changing the correlation theorem.
 pub fn digest_persisted_restore_correlation_from_context_v2(
     context: &PreparedExecutionContextV2,
     instance_id: EpisodeInstanceId,
     content_id: EpisodeContentId,
     restored_at_unix_s: u64,
-    restore_prepared_head: Sha256Digest,
+    restore_prepared_event_hash: Sha256Digest,
 ) -> Result<Sha256Digest, PersistedRestoreCorrelationV2Error> {
     let binding = RestorePreparedBindingV2::from_context(context, restored_at_unix_s)?;
     digest_from_parts(
@@ -52,21 +52,21 @@ pub fn digest_persisted_restore_correlation_from_context_v2(
         instance_id,
         content_id,
         restored_at_unix_s,
-        restore_prepared_head,
+        restore_prepared_event_hash,
     )
 }
 
 /// Independently recompute the same V2 correlation commitment during post-crash reconciliation.
 ///
 /// No execution-side binding object is trusted here. The exact Prepared digest is recomputed from
-/// the recovered generic journal record, while `restore_prepared_head` comes from the anchored
-/// `Restored` envelope's `previous_hash`.
+/// the recovered generic journal record, while `restore_prepared_event_hash` is taken from the
+/// uniquely matching anchored domain `RestorePrepared` envelope.
 pub fn digest_persisted_restore_correlation_from_prepared_v2(
     prepared: &PreparedInterventionExecution,
     instance_id: EpisodeInstanceId,
     content_id: EpisodeContentId,
     restored_at_unix_s: u64,
-    restore_prepared_head: Sha256Digest,
+    restore_prepared_event_hash: Sha256Digest,
 ) -> Result<Sha256Digest, PersistedRestoreCorrelationV2Error> {
     prepared.validate()?;
     let prepared_digest = digest_prepared_execution(prepared)?;
@@ -78,7 +78,7 @@ pub fn digest_persisted_restore_correlation_from_prepared_v2(
         instance_id,
         content_id,
         restored_at_unix_s,
-        restore_prepared_head,
+        restore_prepared_event_hash,
     )
 }
 
@@ -91,15 +91,15 @@ fn digest_from_parts(
     instance_id: EpisodeInstanceId,
     content_id: EpisodeContentId,
     restored_at_unix_s: u64,
-    restore_prepared_head: Sha256Digest,
+    restore_prepared_event_hash: Sha256Digest,
 ) -> Result<Sha256Digest, PersistedRestoreCorrelationV2Error> {
     validate_text("execution_id", execution_id, MAX_EXECUTION_ID_BYTES)?;
     validate_text("target_id", target_id, MAX_TARGET_ID_BYTES)?;
     if prepared_digest.0 == [0; 32] {
         return Err(PersistedRestoreCorrelationV2Error::ZeroPreparedDigest);
     }
-    if restore_prepared_head.0 == [0; 32] {
-        return Err(PersistedRestoreCorrelationV2Error::ZeroRestorePreparedHead);
+    if restore_prepared_event_hash.0 == [0; 32] {
+        return Err(PersistedRestoreCorrelationV2Error::ZeroRestorePreparedEventHash);
     }
     if restored_at_unix_s < prepared_at_unix_s {
         return Err(PersistedRestoreCorrelationV2Error::RestoredBeforeGenericPrepare {
@@ -117,7 +117,7 @@ fn digest_from_parts(
     hasher.update(&instance_id.as_uuid().as_u128().to_le_bytes());
     hasher.update(&content_id.digest().0);
     hasher.update(&restored_at_unix_s.to_le_bytes());
-    hasher.update(&restore_prepared_head.0);
+    hasher.update(&restore_prepared_event_hash.0);
     Ok(hasher.finalize())
 }
 
@@ -154,8 +154,8 @@ pub enum PersistedRestoreCorrelationV2Error {
     InvalidText { field: &'static str, value: String },
     #[error("generic Prepared digest must not be zero")]
     ZeroPreparedDigest,
-    #[error("restore-prepared quarantine head must not be zero")]
-    ZeroRestorePreparedHead,
+    #[error("restore-prepared event hash must not be zero")]
+    ZeroRestorePreparedEventHash,
     #[error(
         "Restored transition predates generic Prepared: prepared={prepared_at_unix_s}, restored={restored_at_unix_s}"
     )]
@@ -235,14 +235,14 @@ mod tests {
         let prepared = prepared("authority:correlation:v2");
         let context = context(&prepared);
         let (instance_id, content_id) = identity();
-        let previous_head = digest(80);
+        let event_hash = digest(80);
 
         let execution = digest_persisted_restore_correlation_from_context_v2(
             &context,
             instance_id,
             content_id,
             120,
-            previous_head,
+            event_hash,
         )
         .unwrap();
         let reconciliation = digest_persisted_restore_correlation_from_prepared_v2(
@@ -250,7 +250,7 @@ mod tests {
             instance_id,
             content_id,
             120,
-            previous_head,
+            event_hash,
         )
         .unwrap();
 
@@ -264,14 +264,14 @@ mod tests {
         assert_eq!(first.execution_id, second.execution_id);
         assert_eq!(first.target_id, second.target_id);
         let (instance_id, content_id) = identity();
-        let previous_head = digest(81);
+        let event_hash = digest(81);
 
         let first_digest = digest_persisted_restore_correlation_from_prepared_v2(
             &first,
             instance_id,
             content_id,
             120,
-            previous_head,
+            event_hash,
         )
         .unwrap();
         let second_digest = digest_persisted_restore_correlation_from_prepared_v2(
@@ -279,7 +279,7 @@ mod tests {
             instance_id,
             content_id,
             120,
-            previous_head,
+            event_hash,
         )
         .unwrap();
 
@@ -287,8 +287,8 @@ mod tests {
     }
 
     #[test]
-    fn changing_preceding_quarantine_head_changes_commitment() {
-        let prepared = prepared("authority:head-binding");
+    fn changing_restore_prepared_event_hash_changes_commitment() {
+        let prepared = prepared("authority:event-binding");
         let (instance_id, content_id) = identity();
         let first = digest_persisted_restore_correlation_from_prepared_v2(
             &prepared,
@@ -314,13 +314,13 @@ mod tests {
         let prepared = prepared("authority:identity-binding");
         let (first_instance, first_content) = identity();
         let (second_instance, second_content) = identity();
-        let head = digest(84);
+        let event_hash = digest(84);
         let first = digest_persisted_restore_correlation_from_prepared_v2(
             &prepared,
             first_instance,
             first_content,
             120,
-            head,
+            event_hash,
         )
         .unwrap();
         let second = digest_persisted_restore_correlation_from_prepared_v2(
@@ -328,14 +328,14 @@ mod tests {
             second_instance,
             second_content,
             120,
-            head,
+            event_hash,
         )
         .unwrap();
         assert_ne!(first, second);
     }
 
     #[test]
-    fn restored_time_regression_and_zero_previous_head_fail_closed() {
+    fn restored_time_regression_and_zero_event_hash_fail_closed() {
         let prepared = prepared("authority:time-binding");
         let (instance_id, content_id) = identity();
         assert!(matches!(
@@ -356,7 +356,7 @@ mod tests {
                 120,
                 Sha256Digest([0; 32]),
             ),
-            Err(PersistedRestoreCorrelationV2Error::ZeroRestorePreparedHead)
+            Err(PersistedRestoreCorrelationV2Error::ZeroRestorePreparedEventHash)
         ));
     }
 }
