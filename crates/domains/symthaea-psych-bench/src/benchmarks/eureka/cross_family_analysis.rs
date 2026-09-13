@@ -5,7 +5,7 @@
 //!
 //! This is a pure interpretation layer. It does not construct worlds, execute a
 //! target/comparator, fit a model, or create fresh evidence. Raw integer counts
-//! from already-frozen paired rows are authoritative.
+//! from already-frozen paired HeldOut rows are authoritative.
 //!
 //! Parent issue: <https://github.com/Luminous-Dynamics/symthaea/issues/2265>
 
@@ -13,13 +13,12 @@ use std::collections::HashSet;
 
 use super::analysis_plan::{CampaignRowDisposition, EUREKA_002_ANALYSIS_PLAN_V1};
 use super::constitution::ScientificDisposition;
-use super::promotion::{
-    PairedEstimateBps, PromotionEvidenceSummary, evaluate_v1,
-};
+use super::hidden_world::CorpusPartition;
+use super::promotion::{PairedEstimateBps, PromotionEvidenceSummary, evaluate_v1};
 
 pub(super) const CROSS_FAMILY_ANALYSIS_REVISION: &str =
     "EUREKA.002R.CROSS_FAMILY_ANALYSIS.v1";
-/// At least 95% of fixed bootstrap replicates must define a metric interval.
+/// At least 95% of the fixed bootstrap replicates must define a metric interval.
 pub(super) const MIN_VALID_BOOTSTRAP_BPS: u16 = 9_500;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -46,6 +45,10 @@ impl EvidenceFamilyId {
     }
 }
 
+/// Integer consequence counts retained by one already-scored competitor.
+///
+/// The changed and unchanged partitions are exhaustive. This prevents malformed
+/// summaries from silently manufacturing accuracy through impossible counts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct RawConsequenceCounts {
     pub field_count: u16,
@@ -66,9 +69,11 @@ impl RawConsequenceCounts {
         self.true_positive_changes
             .saturating_add(self.missed_changes)
             == self.actual_changed
-            && self.false_positive_changes <= unchanged
+            && self
+                .false_positive_changes
+                .saturating_add(self.correct_unchanged_values)
+                == unchanged
             && self.correct_changed_values <= self.true_positive_changes
-            && self.correct_unchanged_values <= unchanged
     }
 }
 
@@ -79,10 +84,13 @@ pub(super) enum AnalysisMetricOutcome {
     OutOfDomain,
 }
 
+/// One paired HeldOut row. Candidate and comparator share one evaluator-owned
+/// transition identity and may never be resampled independently.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct PairedAnalysisRow {
     pub row_identity: u64,
     pub family: EvidenceFamilyId,
+    pub partition: CorpusPartition,
     pub seed_identity: u64,
     pub disposition: CampaignRowDisposition,
     pub candidate: AnalysisMetricOutcome,
@@ -93,6 +101,7 @@ pub(super) struct PairedAnalysisRow {
 pub(super) enum CrossFamilyAnalysisError {
     Empty,
     MissingRequiredFamily,
+    WrongPartition,
     DuplicateRowIdentity,
     DuplicateFamilySeed,
     CandidateDispositionMismatch,
@@ -122,6 +131,7 @@ impl InvalidRowCounts {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct FamilyAnalysisSummary {
     pub family: EvidenceFamilyId,
+    pub paired_row_root: u64,
     pub row_count: u32,
     pub unique_seed_count: u32,
     pub candidate_coverage_bps: u16,
@@ -144,6 +154,8 @@ pub(super) struct CrossFamilyAnalysisReceipt {
     pub bootstrap_resamples: u32,
     pub confidence_level_bps: u16,
     pub minimum_valid_bootstrap_bps: u16,
+    pub overall_valid_f1_bootstrap_replicates: u32,
+    pub overall_valid_value_bootstrap_replicates: u32,
     pub overall_changed_field_f1: Option<PairedEstimateBps>,
     pub overall_changed_value_accuracy: Option<PairedEstimateBps>,
     pub overall_no_change_preservation_delta_bps: Option<i16>,
@@ -188,11 +200,21 @@ pub(super) fn analyze_cross_family_v1(
     if rows.is_empty() {
         return Err(CrossFamilyAnalysisError::Empty);
     }
-    validate_rows(rows)?;
 
-    let mut family_rows = Vec::new();
+    // Canonicalize before *all* downstream analysis, not only hashing. This
+    // makes the fixed-seed bootstrap a pure function of evidence bytes rather
+    // than caller iteration order.
+    let mut canonical_rows = rows.to_vec();
+    canonical_rows.sort_by_key(|row| (row.family, row.seed_identity, row.row_identity));
+    validate_rows(&canonical_rows)?;
+
+    let mut family_rows = Vec::with_capacity(EvidenceFamilyId::ALL.len());
     for family in EvidenceFamilyId::ALL {
-        let subset: Vec<_> = rows.iter().copied().filter(|row| row.family == family).collect();
+        let subset: Vec<_> = canonical_rows
+            .iter()
+            .copied()
+            .filter(|row| row.family == family)
+            .collect();
         if subset.is_empty() {
             return Err(CrossFamilyAnalysisError::MissingRequiredFamily);
         }
@@ -200,14 +222,16 @@ pub(super) fn analyze_cross_family_v1(
     }
 
     let plan = EUREKA_002_ANALYSIS_PLAN_V1;
-    let mut summaries = Vec::with_capacity(2);
-    let mut bootstrap_sets = Vec::with_capacity(2);
+    let mut summaries = Vec::with_capacity(EvidenceFamilyId::ALL.len());
+    let mut bootstrap_sets = Vec::with_capacity(EvidenceFamilyId::ALL.len());
 
     for (family, subset) in &family_rows {
         let point = compute_point_deltas(subset.iter().copied());
         let bootstrap = bootstrap_family(*family, subset, plan.bootstrap_resamples, plan.bootstrap_seed);
         let f1_values: Vec<_> = bootstrap.iter().filter_map(|point| point.f1).collect();
         let value_values: Vec<_> = bootstrap.iter().filter_map(|point| point.value).collect();
+        let f1_valid = f1_values.len() as u32;
+        let value_valid = value_values.len() as u32;
         let f1 = point.f1.and_then(|point_delta| {
             bootstrap_interval(
                 point_delta,
@@ -224,25 +248,39 @@ pub(super) fn analyze_cross_family_v1(
                 plan.confidence_level_bps,
             )
         });
-        summaries.push(build_family_summary(*family, subset, f1, value, point.no_change));
+        summaries.push(build_family_summary(
+            *family,
+            subset,
+            f1,
+            value,
+            point.no_change,
+            f1_valid,
+            value_valid,
+        ));
         bootstrap_sets.push(bootstrap);
     }
 
+    // V1 recognizes exactly two families, each with equal weight. Row count may
+    // never allow one family to dominate the overall effect.
     let overall_f1_point = mean_defined_i16(
-        summaries[0].changed_field_f1.map(|e| e.point_delta_bps),
-        summaries[1].changed_field_f1.map(|e| e.point_delta_bps),
+        summaries[0].changed_field_f1.map(|estimate| estimate.point_delta_bps),
+        summaries[1].changed_field_f1.map(|estimate| estimate.point_delta_bps),
     );
     let overall_value_point = mean_defined_i16(
-        summaries[0].changed_value_accuracy.map(|e| e.point_delta_bps),
-        summaries[1].changed_value_accuracy.map(|e| e.point_delta_bps),
+        summaries[0]
+            .changed_value_accuracy
+            .map(|estimate| estimate.point_delta_bps),
+        summaries[1]
+            .changed_value_accuracy
+            .map(|estimate| estimate.point_delta_bps),
     );
     let overall_no_change = mean_defined_i16(
         summaries[0].no_change_preservation_delta_bps,
         summaries[1].no_change_preservation_delta_bps,
     );
 
-    let mut overall_f1_bootstrap = Vec::new();
-    let mut overall_value_bootstrap = Vec::new();
+    let mut overall_f1_bootstrap = Vec::with_capacity(plan.bootstrap_resamples as usize);
+    let mut overall_value_bootstrap = Vec::with_capacity(plan.bootstrap_resamples as usize);
     for index in 0..plan.bootstrap_resamples as usize {
         if let (Some(a), Some(b)) = (bootstrap_sets[0][index].f1, bootstrap_sets[1][index].f1) {
             overall_f1_bootstrap.push(mean_i16(a, b));
@@ -254,6 +292,8 @@ pub(super) fn analyze_cross_family_v1(
             overall_value_bootstrap.push(mean_i16(a, b));
         }
     }
+    let overall_valid_f1_bootstrap_replicates = overall_f1_bootstrap.len() as u32;
+    let overall_valid_value_bootstrap_replicates = overall_value_bootstrap.len() as u32;
 
     let overall_f1 = overall_f1_point.and_then(|point| {
         bootstrap_interval(
@@ -302,12 +342,14 @@ pub(super) fn analyze_cross_family_v1(
     let mut receipt = CrossFamilyAnalysisReceipt {
         revision: CROSS_FAMILY_ANALYSIS_REVISION,
         analysis_plan_digest: plan.replay_digest(),
-        raw_paired_row_root: raw_row_root(rows),
+        raw_paired_row_root: paired_row_root(b"eureka.002r.raw-paired-rows.v1\0", &canonical_rows),
         family_summaries: summaries,
         bootstrap_seed: plan.bootstrap_seed,
         bootstrap_resamples: plan.bootstrap_resamples,
         confidence_level_bps: plan.confidence_level_bps,
         minimum_valid_bootstrap_bps: MIN_VALID_BOOTSTRAP_BPS,
+        overall_valid_f1_bootstrap_replicates,
+        overall_valid_value_bootstrap_replicates,
         overall_changed_field_f1: overall_f1,
         overall_changed_value_accuracy: overall_value,
         overall_no_change_preservation_delta_bps: overall_no_change,
@@ -324,6 +366,9 @@ fn validate_rows(rows: &[PairedAnalysisRow]) -> Result<(), CrossFamilyAnalysisEr
     let mut row_ids = HashSet::new();
     let mut family_seed_ids = HashSet::new();
     for row in rows {
+        if row.partition != CorpusPartition::HeldOutEvaluation {
+            return Err(CrossFamilyAnalysisError::WrongPartition);
+        }
         if !row_ids.insert(row.row_identity) {
             return Err(CrossFamilyAnalysisError::DuplicateRowIdentity);
         }
@@ -377,22 +422,23 @@ fn build_family_summary(
     f1: Option<PairedEstimateBps>,
     value: Option<PairedEstimateBps>,
     no_change: Option<i16>,
+    valid_f1_bootstrap_replicates: u32,
+    valid_value_bootstrap_replicates: u32,
 ) -> FamilyAnalysisSummary {
     let total = rows.len() as u64;
-    let valid = |row: &&PairedAnalysisRow| is_valid_disposition(row.disposition);
     let candidate_scored = rows
         .iter()
-        .filter(valid)
+        .filter(|row| is_valid_disposition(row.disposition))
         .filter(|row| matches!(row.candidate, AnalysisMetricOutcome::Scored(_)))
         .count() as u64;
     let comparator_scored = rows
         .iter()
-        .filter(valid)
+        .filter(|row| is_valid_disposition(row.disposition))
         .filter(|row| matches!(row.comparator, AnalysisMetricOutcome::Scored(_)))
         .count() as u64;
-    let invalid_rows = invalid_counts(rows);
     FamilyAnalysisSummary {
         family,
+        paired_row_root: paired_row_root(b"eureka.002r.family-paired-rows.v1\0", rows),
         row_count: rows.len() as u32,
         unique_seed_count: rows.len() as u32,
         candidate_coverage_bps: ratio_u16_bps(candidate_scored, total),
@@ -400,13 +446,9 @@ fn build_family_summary(
         changed_field_f1: f1,
         changed_value_accuracy: value,
         no_change_preservation_delta_bps: no_change,
-        invalid_rows,
-        valid_f1_bootstrap_replicates: f1
-            .map(|_| EUREKA_002_ANALYSIS_PLAN_V1.bootstrap_resamples)
-            .unwrap_or(0),
-        valid_value_bootstrap_replicates: value
-            .map(|_| EUREKA_002_ANALYSIS_PLAN_V1.bootstrap_resamples)
-            .unwrap_or(0),
+        invalid_rows: invalid_counts(rows),
+        valid_f1_bootstrap_replicates,
+        valid_value_bootstrap_replicates,
     }
 }
 
@@ -452,7 +494,7 @@ fn is_valid_disposition(disposition: CampaignRowDisposition) -> bool {
     )
 }
 
-fn compute_point_deltas<'a>(rows: impl Iterator<Item = PairedAnalysisRow> + 'a) -> PointDeltas {
+fn compute_point_deltas(rows: impl Iterator<Item = PairedAnalysisRow>) -> PointDeltas {
     let mut accumulator = MetricAccumulator::default();
     for row in rows {
         accumulate_row(&mut accumulator, row);
@@ -460,7 +502,7 @@ fn compute_point_deltas<'a>(rows: impl Iterator<Item = PairedAnalysisRow> + 'a) 
     deltas_from_accumulator(accumulator)
 }
 
-fn accumulate_row(acc: &mut MetricAccumulator, row: PairedAnalysisRow) {
+fn accumulate_row(accumulator: &mut MetricAccumulator, row: PairedAnalysisRow) {
     if !is_valid_disposition(row.disposition) {
         return;
     }
@@ -476,30 +518,51 @@ fn accumulate_row(acc: &mut MetricAccumulator, row: PairedAnalysisRow) {
     {
         return;
     }
+
     if candidate.actual_changed > 0 {
-        acc.candidate_tp += u64::from(candidate.true_positive_changes);
-        acc.candidate_fp += u64::from(candidate.false_positive_changes);
-        acc.candidate_missed += u64::from(candidate.missed_changes);
-        acc.comparator_tp += u64::from(comparator.true_positive_changes);
-        acc.comparator_fp += u64::from(comparator.false_positive_changes);
-        acc.comparator_missed += u64::from(comparator.missed_changes);
-        acc.candidate_correct_changed += u64::from(candidate.correct_changed_values);
-        acc.comparator_correct_changed += u64::from(comparator.correct_changed_values);
-        acc.changed_truth += u64::from(candidate.actual_changed);
+        accumulator.candidate_tp += u64::from(candidate.true_positive_changes);
+        accumulator.candidate_fp += u64::from(candidate.false_positive_changes);
+        accumulator.candidate_missed += u64::from(candidate.missed_changes);
+        accumulator.comparator_tp += u64::from(comparator.true_positive_changes);
+        accumulator.comparator_fp += u64::from(comparator.false_positive_changes);
+        accumulator.comparator_missed += u64::from(comparator.missed_changes);
+        accumulator.candidate_correct_changed += u64::from(candidate.correct_changed_values);
+        accumulator.comparator_correct_changed += u64::from(comparator.correct_changed_values);
+        accumulator.changed_truth += u64::from(candidate.actual_changed);
     } else {
-        acc.candidate_correct_no_change += u64::from(candidate.correct_unchanged_values);
-        acc.comparator_correct_no_change += u64::from(comparator.correct_unchanged_values);
-        acc.no_change_truth += u64::from(candidate.field_count);
+        accumulator.candidate_correct_no_change += u64::from(candidate.correct_unchanged_values);
+        accumulator.comparator_correct_no_change += u64::from(comparator.correct_unchanged_values);
+        accumulator.no_change_truth += u64::from(candidate.field_count);
     }
 }
 
-fn deltas_from_accumulator(acc: MetricAccumulator) -> PointDeltas {
-    let candidate_f1 = f1_bps(acc.candidate_tp, acc.candidate_fp, acc.candidate_missed);
-    let comparator_f1 = f1_bps(acc.comparator_tp, acc.comparator_fp, acc.comparator_missed);
-    let candidate_value = ratio_i16_bps(acc.candidate_correct_changed, acc.changed_truth);
-    let comparator_value = ratio_i16_bps(acc.comparator_correct_changed, acc.changed_truth);
-    let candidate_no_change = ratio_i16_bps(acc.candidate_correct_no_change, acc.no_change_truth);
-    let comparator_no_change = ratio_i16_bps(acc.comparator_correct_no_change, acc.no_change_truth);
+fn deltas_from_accumulator(accumulator: MetricAccumulator) -> PointDeltas {
+    let candidate_f1 = f1_bps(
+        accumulator.candidate_tp,
+        accumulator.candidate_fp,
+        accumulator.candidate_missed,
+    );
+    let comparator_f1 = f1_bps(
+        accumulator.comparator_tp,
+        accumulator.comparator_fp,
+        accumulator.comparator_missed,
+    );
+    let candidate_value = ratio_i16_bps(
+        accumulator.candidate_correct_changed,
+        accumulator.changed_truth,
+    );
+    let comparator_value = ratio_i16_bps(
+        accumulator.comparator_correct_changed,
+        accumulator.changed_truth,
+    );
+    let candidate_no_change = ratio_i16_bps(
+        accumulator.candidate_correct_no_change,
+        accumulator.no_change_truth,
+    );
+    let comparator_no_change = ratio_i16_bps(
+        accumulator.comparator_correct_no_change,
+        accumulator.no_change_truth,
+    );
     PointDeltas {
         f1: subtract_defined(candidate_f1, comparator_f1),
         value: subtract_defined(candidate_value, comparator_value),
@@ -516,12 +579,12 @@ fn bootstrap_family(
     let mut output = Vec::with_capacity(resamples as usize);
     for replicate in 0..resamples {
         let mut rng = SplitMix64::new(bootstrap_replicate_seed(seed, family, replicate));
-        let mut acc = MetricAccumulator::default();
+        let mut accumulator = MetricAccumulator::default();
         for _ in 0..rows.len() {
             let index = (rng.next_u64() % rows.len() as u64) as usize;
-            accumulate_row(&mut acc, rows[index]);
+            accumulate_row(&mut accumulator, rows[index]);
         }
-        let point = deltas_from_accumulator(acc);
+        let point = deltas_from_accumulator(accumulator);
         output.push(BootstrapPoint {
             f1: point.f1,
             value: point.value,
@@ -530,16 +593,19 @@ fn bootstrap_family(
     output
 }
 
+/// Fixed percentile interval. Lower index uses floor on `(n-1) * alpha` and
+/// upper index uses ceil on `(n-1) * (1-alpha)`. This is deliberately explicit
+/// so a statistics-library quantile convention cannot silently change evidence.
 fn bootstrap_interval(
     point_delta_bps: i16,
     values: &[i16],
     requested_resamples: u32,
     confidence_level_bps: u16,
 ) -> Option<PairedEstimateBps> {
-    let min_valid = ((u64::from(requested_resamples) * u64::from(MIN_VALID_BOOTSTRAP_BPS)
+    let minimum_valid = ((u64::from(requested_resamples) * u64::from(MIN_VALID_BOOTSTRAP_BPS)
         + 9_999)
         / 10_000) as usize;
-    if values.len() < min_valid || values.is_empty() {
+    if values.len() < minimum_valid || values.is_empty() {
         return None;
     }
     let mut sorted = values.to_vec();
@@ -556,12 +622,14 @@ fn bootstrap_interval(
     })
 }
 
+/// This gate may only preserve or weaken the disposition returned by the frozen
+/// #2100 policy. It cannot manufacture `Supported`, `Null`, or `Negative`.
 fn apply_consistency_gate(
     base: ScientificDisposition,
     families: &[FamilyAnalysisSummary],
 ) -> ScientificDisposition {
     let plan = EUREKA_002_ANALYSIS_PLAN_V1;
-    let floor = -(plan.no_change_preservation_max_regression_bps as i16);
+    let no_change_floor = -(plan.no_change_preservation_max_regression_bps as i16);
     if families.iter().any(|family| {
         family.candidate_coverage_bps < plan.candidate_min_coverage_bps
             || family.comparator_coverage_bps < plan.comparator_min_coverage_bps
@@ -579,16 +647,24 @@ fn apply_consistency_gate(
             let consistent = families.iter().all(|family| {
                 family.changed_field_f1.unwrap().point_delta_bps > 0
                     && family.changed_value_accuracy.unwrap().point_delta_bps > 0
-                    && family.no_change_preservation_delta_bps.unwrap() >= floor
+                    && family.no_change_preservation_delta_bps.unwrap() >= no_change_floor
             });
-            if consistent { base } else { ScientificDisposition::Mixed }
+            if consistent {
+                base
+            } else {
+                ScientificDisposition::Mixed
+            }
         }
         ScientificDisposition::Negative => {
             let consistent = families.iter().all(|family| {
                 family.changed_field_f1.unwrap().point_delta_bps < 0
                     && family.changed_value_accuracy.unwrap().point_delta_bps < 0
             });
-            if consistent { base } else { ScientificDisposition::Mixed }
+            if consistent {
+                base
+            } else {
+                ScientificDisposition::Mixed
+            }
         }
         ScientificDisposition::Null => {
             let f1_margin = i32::from(plan.changed_field_f1_margin_bps);
@@ -597,22 +673,25 @@ fn apply_consistency_gate(
                 i32::from(family.changed_field_f1.unwrap().point_delta_bps).abs() < f1_margin
                     && i32::from(family.changed_value_accuracy.unwrap().point_delta_bps).abs()
                         < value_margin
-                    && family.no_change_preservation_delta_bps.unwrap() >= floor
+                    && family.no_change_preservation_delta_bps.unwrap() >= no_change_floor
             });
-            if consistent { base } else { ScientificDisposition::Mixed }
+            if consistent {
+                base
+            } else {
+                ScientificDisposition::Mixed
+            }
         }
         ScientificDisposition::Mixed | ScientificDisposition::Inconclusive => base,
     }
 }
 
-fn raw_row_root(rows: &[PairedAnalysisRow]) -> u64 {
-    let mut ordered = rows.to_vec();
-    ordered.sort_by_key(|row| (row.family, row.seed_identity, row.row_identity));
+fn paired_row_root(domain: &[u8], rows: &[PairedAnalysisRow]) -> u64 {
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(b"eureka.002r.raw-paired-rows.v1\0");
-    bytes.extend_from_slice(&(ordered.len() as u64).to_le_bytes());
-    for row in ordered {
+    bytes.extend_from_slice(domain);
+    bytes.extend_from_slice(&(rows.len() as u64).to_le_bytes());
+    for row in rows {
         bytes.push(row.family.tag());
+        bytes.push(partition_tag(row.partition));
         bytes.extend_from_slice(&row.seed_identity.to_le_bytes());
         bytes.extend_from_slice(&row.row_identity.to_le_bytes());
         bytes.push(disposition_tag(row.disposition));
@@ -635,6 +714,8 @@ fn analysis_receipt_digest(receipt: &CrossFamilyAnalysisReceipt) -> u64 {
     bytes.extend_from_slice(&receipt.bootstrap_resamples.to_le_bytes());
     bytes.extend_from_slice(&receipt.confidence_level_bps.to_le_bytes());
     bytes.extend_from_slice(&receipt.minimum_valid_bootstrap_bps.to_le_bytes());
+    bytes.extend_from_slice(&receipt.overall_valid_f1_bootstrap_replicates.to_le_bytes());
+    bytes.extend_from_slice(&receipt.overall_valid_value_bootstrap_replicates.to_le_bytes());
     encode_estimate(&mut bytes, receipt.overall_changed_field_f1);
     encode_estimate(&mut bytes, receipt.overall_changed_value_accuracy);
     encode_optional_i16(
@@ -649,6 +730,8 @@ fn analysis_receipt_digest(receipt: &CrossFamilyAnalysisReceipt) -> u64 {
 
 fn encode_family_summary(bytes: &mut Vec<u8>, family: &FamilyAnalysisSummary) {
     bytes.push(family.family.tag());
+    encode_str(bytes, family.family.stable_id());
+    bytes.extend_from_slice(&family.paired_row_root.to_le_bytes());
     bytes.extend_from_slice(&family.row_count.to_le_bytes());
     bytes.extend_from_slice(&family.unique_seed_count.to_le_bytes());
     bytes.extend_from_slice(&family.candidate_coverage_bps.to_le_bytes());
@@ -716,6 +799,15 @@ fn encode_outcome(bytes: &mut Vec<u8>, outcome: AnalysisMetricOutcome) {
         }
         AnalysisMetricOutcome::Abstained => bytes.push(2),
         AnalysisMetricOutcome::OutOfDomain => bytes.push(3),
+    }
+}
+
+fn partition_tag(partition: CorpusPartition) -> u8 {
+    match partition {
+        CorpusPartition::Development => 1,
+        CorpusPartition::Calibration => 2,
+        CorpusPartition::HeldOutEvaluation => 3,
+        CorpusPartition::ExternalReplication => 4,
     }
 }
 
@@ -887,6 +979,34 @@ mod tests {
                 PairedAnalysisRow {
                     row_identity: row_base + index,
                     family,
+                    partition: CorpusPartition::HeldOutEvaluation,
+                    seed_identity: index,
+                    disposition: CampaignRowDisposition::ValidScored,
+                    candidate,
+                    comparator,
+                }
+            })
+            .collect()
+    }
+
+    fn heterogeneous_rows(family: EvidenceFamilyId, row_base: u64) -> Vec<PairedAnalysisRow> {
+        (0..64_u64)
+            .map(|index| {
+                let (candidate, comparator) = if index % 2 == 0 {
+                    (
+                        AnalysisMetricOutcome::Scored(changed_counts(index % 4 == 0)),
+                        AnalysisMetricOutcome::Scored(changed_counts(false)),
+                    )
+                } else {
+                    (
+                        AnalysisMetricOutcome::Scored(no_change_counts()),
+                        AnalysisMetricOutcome::Scored(no_change_counts()),
+                    )
+                };
+                PairedAnalysisRow {
+                    row_identity: row_base + index,
+                    family,
+                    partition: CorpusPartition::HeldOutEvaluation,
                     seed_identity: index,
                     disposition: CampaignRowDisposition::ValidScored,
                     candidate,
@@ -906,6 +1026,8 @@ mod tests {
         assert_eq!(result.base_disposition, ScientificDisposition::Supported);
         assert_eq!(result.final_disposition, ScientificDisposition::Supported);
         assert_eq!(result.bootstrap_resamples, 10_000);
+        assert_eq!(result.overall_valid_f1_bootstrap_replicates, 10_000);
+        assert_eq!(result.overall_valid_value_bootstrap_replicates, 10_000);
     }
 
     #[test]
@@ -918,9 +1040,63 @@ mod tests {
     }
 
     #[test]
+    fn analysis_is_order_invariant_before_bootstrap_not_only_before_hashing() {
+        let mut rows = heterogeneous_rows(EvidenceFamilyId::ResourceFlowV1, 5_000);
+        rows.extend(heterogeneous_rows(EvidenceFamilyId::RelayTriadV1, 6_000));
+        let canonical = analyze_cross_family_v1(&rows).unwrap();
+        rows.rotate_left(19);
+        rows.reverse();
+        let permuted = analyze_cross_family_v1(&rows).unwrap();
+        assert_eq!(canonical, permuted);
+    }
+
+    #[test]
+    fn actual_valid_bootstrap_count_is_retained_when_metric_is_undefined() {
+        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 7_000);
+        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 8_000));
+        for row in &mut rows {
+            row.candidate = AnalysisMetricOutcome::Scored(no_change_counts());
+            row.comparator = AnalysisMetricOutcome::Scored(no_change_counts());
+        }
+        let result = analyze_cross_family_v1(&rows).unwrap();
+        assert_eq!(result.family_summaries[0].valid_f1_bootstrap_replicates, 0);
+        assert_eq!(result.family_summaries[0].valid_value_bootstrap_replicates, 0);
+        assert_eq!(result.overall_valid_f1_bootstrap_replicates, 0);
+        assert_eq!(result.overall_valid_value_bootstrap_replicates, 0);
+        assert_eq!(result.overall_changed_field_f1, None);
+        assert_eq!(result.final_disposition, ScientificDisposition::Inconclusive);
+    }
+
+    #[test]
+    fn low_coverage_in_one_family_cannot_be_hidden_by_equal_weight_average() {
+        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 9_000);
+        let relay_start = rows.len();
+        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 10_000));
+        for row in rows.iter_mut().skip(relay_start).take(7) {
+            row.disposition = CampaignRowDisposition::ValidAbstained;
+            row.candidate = AnalysisMetricOutcome::Abstained;
+        }
+        let result = analyze_cross_family_v1(&rows).unwrap();
+        assert!(result.promotion_summary.candidate_coverage_bps >= 9_000);
+        assert!(result.family_summaries[1].candidate_coverage_bps < 9_000);
+        assert_eq!(result.final_disposition, ScientificDisposition::Inconclusive);
+    }
+
+    #[test]
+    fn non_heldout_rows_fail_closed() {
+        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 11_000);
+        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 12_000));
+        rows[0].partition = CorpusPartition::ExternalReplication;
+        assert_eq!(
+            analyze_cross_family_v1(&rows),
+            Err(CrossFamilyAnalysisError::WrongPartition)
+        );
+    }
+
+    #[test]
     fn duplicate_family_seed_fails_closed() {
-        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 5_000);
-        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 6_000));
+        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 13_000);
+        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 14_000));
         rows[1].seed_identity = rows[0].seed_identity;
         assert_eq!(
             analyze_cross_family_v1(&rows),
@@ -929,29 +1105,15 @@ mod tests {
     }
 
     #[test]
-    fn analysis_receipt_is_order_invariant_and_deterministic() {
-        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 7_000);
-        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 8_000));
-        let a = analyze_cross_family_v1(&rows).unwrap();
-        rows.reverse();
-        let b = analyze_cross_family_v1(&rows).unwrap();
-        assert_eq!(a.raw_paired_row_root, b.raw_paired_row_root);
-        assert_eq!(a.overall_changed_field_f1, b.overall_changed_field_f1);
-        assert_eq!(a.overall_changed_value_accuracy, b.overall_changed_value_accuracy);
-        assert_eq!(a.final_disposition, b.final_disposition);
-        assert_eq!(a.replay_digest, b.replay_digest);
-    }
-
-    #[test]
     fn malformed_raw_counts_are_not_repaired() {
-        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 9_000);
-        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 10_000));
+        let mut rows = family_rows(EvidenceFamilyId::ResourceFlowV1, true, false, 15_000);
+        rows.extend(family_rows(EvidenceFamilyId::RelayTriadV1, true, false, 16_000));
         rows[0].candidate = AnalysisMetricOutcome::Scored(RawConsequenceCounts {
             field_count: 3,
             actual_changed: 1,
             true_positive_changes: 1,
-            false_positive_changes: 0,
-            missed_changes: 1,
+            false_positive_changes: 1,
+            missed_changes: 0,
             correct_changed_values: 1,
             correct_unchanged_values: 2,
         });
