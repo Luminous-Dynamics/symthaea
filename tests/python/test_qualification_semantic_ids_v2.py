@@ -20,6 +20,7 @@ train = load("integration_train_manifest")
 profile = load("qualification_profile")
 subject = load("qualification_subject")
 framing = load("qualification_framing_v1")
+recipe = load("qualification_recipe_v1")
 semantic = load("qualification_semantic_ids_v2")
 
 
@@ -55,6 +56,52 @@ def v1_profile():
     return raw
 
 
+def recipe_preimages():
+    values = [
+        {
+            "schema": recipe.SCHEMA,
+            "recipe_name": "research.format.v1",
+            "legacy_recipe_ref": "git-blob-sha1:" + "1" * 40,
+            "execution_model": recipe.EXECUTION_MODEL,
+            "environment_contract": recipe.ENVIRONMENT_CONTRACT,
+            "steps": [
+                {
+                    "step_name": "rustfmt",
+                    "working_directory": ".",
+                    "argv": ["cargo", "fmt", "--all", "--", "--check"],
+                    "environment_overrides": [],
+                    "stdin_policy": recipe.STDIN_POLICY,
+                    "acceptable_exit_codes": [0],
+                }
+            ],
+            "non_claims": ["does not prove semantic correctness"],
+        },
+        {
+            "schema": recipe.SCHEMA,
+            "recipe_name": "research.test.v1",
+            "legacy_recipe_ref": "sha256:" + "2" * 64,
+            "execution_model": recipe.EXECUTION_MODEL,
+            "environment_contract": recipe.ENVIRONMENT_CONTRACT,
+            "steps": [
+                {
+                    "step_name": "tests",
+                    "working_directory": ".",
+                    "argv": ["cargo", "test", "--locked", "-p", "symthaea-research-protocol"],
+                    "environment_overrides": [
+                        {"name": "CARGO_TERM_COLOR", "value": "never"}
+                    ],
+                    "stdin_policy": recipe.STDIN_POLICY,
+                    "acceptable_exit_codes": [0],
+                }
+            ],
+            "non_claims": ["does not prove scientific validity"],
+        },
+    ]
+    for value in values:
+        value["recipe_id"] = recipe.compute_recipe_id(value)
+    return values
+
+
 def test_subject_v2_golden_identity_and_frame():
     value = v1_subject()
     assert semantic.compute_subject_id_v2(value) == (
@@ -71,9 +118,9 @@ def test_subject_v2_golden_identity_and_frame():
     )
 
 
-def test_profile_v2_golden_identity():
-    assert semantic.compute_profile_id_v2(v1_profile()) == (
-        "sha256:6e0cbabf84cf2f1c0e297bc4fce214007a83bb51443956fb4148c89e2755d15e"
+def test_profile_v2_golden_identity_requires_recipe_preimages():
+    assert semantic.compute_profile_id_v2(v1_profile(), recipe_preimages()) == (
+        "sha256:6d712ce2517000d4e1d76b6b11d20349a59efcd10eb2e0fa7e8d599b8fdd1572"
     )
 
 
@@ -81,7 +128,9 @@ def test_v2_does_not_reinterpret_v1_id_namespace():
     subject_value = v1_subject()
     profile_value = v1_profile()
     assert semantic.compute_subject_id_v2(subject_value) != subject_value["subject_id"]
-    assert semantic.compute_profile_id_v2(profile_value) != profile_value["profile_id"]
+    assert semantic.compute_profile_id_v2(
+        profile_value, recipe_preimages()
+    ) != profile_value["profile_id"]
 
 
 def test_subject_semantic_changes_change_v2_identity():
@@ -105,18 +154,37 @@ def test_bad_declared_v1_profile_id_cannot_be_laundered_into_v2():
     value = v1_profile()
     value["profile_id"] = "sha256:" + "0" * 64
     with pytest.raises(train.TrainManifestError, match="profile_id"):
-        semantic.compute_profile_id_v2(value)
+        semantic.compute_profile_id_v2(value, recipe_preimages())
 
 
-def test_profile_semantic_changes_change_v2_identity():
-    baseline = semantic.compute_profile_id_v2(v1_profile())
+def test_missing_extra_and_duplicate_recipe_preimages_fail_closed():
+    recipes = recipe_preimages()
+    with pytest.raises(train.TrainManifestError, match="coverage mismatch"):
+        semantic.compute_profile_id_v2(v1_profile(), recipes[:1])
 
-    changed = v1_profile()
-    changed.pop("profile_id")
-    changed["non_claims"] = ["does not authorize deployment"]
-    assert semantic.compute_profile_id_v2(changed) != baseline
+    extra = dict(recipes[0])
+    extra.pop("recipe_id")
+    extra["legacy_recipe_ref"] = "sha256:" + "3" * 64
+    extra["recipe_id"] = recipe.compute_recipe_id(extra)
+    with pytest.raises(train.TrainManifestError, match="coverage mismatch"):
+        semantic.compute_profile_id_v2(v1_profile(), recipes + [extra])
 
-    changed = v1_profile()
-    changed.pop("profile_id")
-    changed["required_recipe_ids"] = ["git-blob-sha1:" + "1" * 40]
-    assert semantic.compute_profile_id_v2(changed) != baseline
+    duplicate = dict(recipes[0])
+    with pytest.raises(train.TrainManifestError, match="duplicate recipe preimage"):
+        semantic.compute_profile_id_v2(v1_profile(), recipes + [duplicate])
+
+
+def test_profile_and_recipe_semantic_changes_change_v2_identity():
+    recipes = recipe_preimages()
+    baseline = semantic.compute_profile_id_v2(v1_profile(), recipes)
+
+    changed_profile = v1_profile()
+    changed_profile.pop("profile_id")
+    changed_profile["non_claims"] = ["does not authorize deployment"]
+    assert semantic.compute_profile_id_v2(changed_profile, recipes) != baseline
+
+    changed_recipes = recipe_preimages()
+    changed_recipes[0].pop("recipe_id")
+    changed_recipes[0]["steps"][0]["argv"].append("--verbose")
+    changed_recipes[0]["recipe_id"] = recipe.compute_recipe_id(changed_recipes[0])
+    assert semantic.compute_profile_id_v2(v1_profile(), changed_recipes) != baseline
