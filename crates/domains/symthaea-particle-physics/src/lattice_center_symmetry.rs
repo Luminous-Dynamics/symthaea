@@ -2,17 +2,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! `Z_3` center-symmetry diagnostics for pure-SU(3) Polyakov-loop histories.
 //!
-//! A raw complex Polyakov loop is not center invariant: two otherwise compatible
-//! pure-gauge chains may occupy different symmetry-related center orientations.
-//! This module therefore keeps three concepts separate:
-//!
-//! 1. center-invariant/aligned observables used for ordinary scalar diagnostics;
-//! 2. categorical center-sector occupancy/mobility;
-//! 3. caller-declared mobility policy.
-//!
-//! No universal transition-count or magnitude threshold is encoded here.
+//! Raw complex Polyakov components are not center invariant. This module keeps
+//! scalar center-invariant observables, categorical center-sector mobility, and
+//! caller-declared acceptance policy separate.
 
 use crate::symmetry_groups::Complex;
+use std::collections::BTreeSet;
 
 pub const Z3_CENTER_DIAGNOSTIC_ID: &str = "pure_su3_z3_center_diagnostics_v1";
 
@@ -58,8 +53,7 @@ pub struct CenterSectorChainDiagnostics {
     pub ambiguous_count: usize,
     /// Counts ordered as `[0, +2pi/3, -2pi/3]`.
     pub sector_counts: [usize; 3],
-    /// Changes between consecutive classified samples. An ambiguous sample breaks
-    /// continuity and therefore cannot manufacture a sector transition.
+    /// Ambiguous samples break continuity and cannot manufacture transitions.
     pub sector_transition_count: usize,
     pub maximum_classified_sector_dwell: usize,
     pub maximum_ambiguous_run: usize,
@@ -69,12 +63,8 @@ pub struct CenterSectorChainDiagnostics {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CenterSectorMobilityPolicy {
-    /// Samples below this magnitude are unclassified rather than assigned an
-    /// unstable phase sector.
     pub minimum_polyakov_magnitude: f64,
-    /// Caller-declared minimum classified fraction for each chain.
     pub minimum_classified_fraction: f64,
-    /// Caller-declared minimum retained-sample sector changes for each chain.
     pub minimum_sector_transitions_per_chain: usize,
 }
 
@@ -94,6 +84,8 @@ pub struct CenterSectorMobilityAssessment {
 pub enum CenterSymmetryError {
     InvalidMinimumMagnitude(f64),
     InvalidMinimumClassifiedFraction(f64),
+    NonFinitePolyakovValue,
+    EmptyTraceSet,
     EmptyChainId { index: usize },
     DuplicateChainId(String),
     EmptyChainSamples { chain_id: String },
@@ -124,12 +116,13 @@ pub fn classify_z3_center_sector(
         return Err(CenterSymmetryError::InvalidMinimumMagnitude(minimum_magnitude));
     }
     if !value.re.is_finite() || !value.im.is_finite() {
-        return Ok(None);
+        return Err(CenterSymmetryError::NonFinitePolyakovValue);
     }
     let magnitude = complex_magnitude(value);
-    if magnitude < minimum_magnitude {
+    if magnitude <= minimum_magnitude {
         return Ok(None);
     }
+
     let phase = value.im.atan2(value.re);
     let mut best = Z3CenterSector::ZeroPhase;
     let mut best_distance = f64::INFINITY;
@@ -143,9 +136,7 @@ pub fn classify_z3_center_sector(
     Ok(Some(best))
 }
 
-/// Rotate a classified Polyakov loop into the zero-phase center sector. Samples
-/// below the declared magnitude floor remain `None` rather than acquiring an
-/// unstable center orientation.
+/// Rotate a classified Polyakov loop into the zero-phase center sector.
 pub fn center_align_polyakov(
     value: Complex,
     minimum_magnitude: f64,
@@ -154,8 +145,10 @@ pub fn center_align_polyakov(
         return Ok(None);
     };
     let phase = -sector.phase();
-    let rotation = Complex::new(phase.cos(), phase.sin());
-    Ok(Some(complex_mul(value, rotation)))
+    Ok(Some(complex_mul(
+        value,
+        Complex::new(phase.cos(), phase.sin()),
+    )))
 }
 
 pub fn diagnose_center_sector_chain(
@@ -196,26 +189,20 @@ pub fn diagnose_center_sector_chain(
                 classified_count += 1;
                 sector_counts[sector.index()] += 1;
                 ambiguous_run = 0;
-
                 match previous_sector {
-                    Some(previous) if previous == sector => {
-                        current_dwell += 1;
-                    }
+                    Some(previous) if previous == sector => current_dwell += 1,
                     Some(_) => {
                         sector_transition_count += 1;
                         current_dwell = 1;
                     }
-                    None => {
-                        current_dwell = 1;
-                    }
+                    None => current_dwell = 1,
                 }
                 maximum_classified_sector_dwell =
                     maximum_classified_sector_dwell.max(current_dwell);
                 previous_sector = Some(sector);
-
-                if let Some(aligned) = center_align_polyakov(sample, minimum_magnitude)? {
-                    aligned_real_sum += aligned.re;
-                }
+                aligned_real_sum += center_align_polyakov(sample, minimum_magnitude)?
+                    .expect("classified sample must center-align")
+                    .re;
             }
             None => {
                 ambiguous_count += 1;
@@ -247,6 +234,9 @@ pub fn assess_center_sector_mobility(
     traces: &[PolyakovChainTrace],
     policy: &CenterSectorMobilityPolicy,
 ) -> Result<CenterSectorMobilityAssessment, CenterSymmetryError> {
+    if traces.is_empty() {
+        return Err(CenterSymmetryError::EmptyTraceSet);
+    }
     if !policy.minimum_polyakov_magnitude.is_finite() || policy.minimum_polyakov_magnitude < 0.0 {
         return Err(CenterSymmetryError::InvalidMinimumMagnitude(
             policy.minimum_polyakov_magnitude,
@@ -260,7 +250,7 @@ pub fn assess_center_sector_mobility(
         ));
     }
 
-    let mut seen = std::collections::BTreeSet::new();
+    let mut seen = BTreeSet::new();
     let mut chains = Vec::with_capacity(traces.len());
     for (index, trace) in traces.iter().enumerate() {
         if trace.chain_id.trim().is_empty() {
@@ -282,8 +272,6 @@ pub fn assess_center_sector_mobility(
     let every_chain_meets_transition_count = chains.iter().all(|chain| {
         chain.sector_transition_count >= policy.minimum_sector_transitions_per_chain
     });
-    let meets_declared_policy =
-        every_chain_meets_classified_fraction && every_chain_meets_transition_count;
 
     Ok(CenterSectorMobilityAssessment {
         diagnostic_id: Z3_CENTER_DIAGNOSTIC_ID,
@@ -293,7 +281,8 @@ pub fn assess_center_sector_mobility(
         chains,
         every_chain_meets_classified_fraction,
         every_chain_meets_transition_count,
-        meets_declared_policy,
+        meets_declared_policy: every_chain_meets_classified_fraction
+            && every_chain_meets_transition_count,
     })
 }
 
@@ -320,10 +309,17 @@ mod tests {
     }
 
     #[test]
-    fn global_center_rotation_preserves_center_invariant_observables() {
+    fn zero_magnitude_is_ambiguous_even_with_zero_floor() {
+        assert_eq!(
+            classify_z3_center_sector(Complex::new(0.0, 0.0), 0.0).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn global_center_rotation_preserves_invariant_observables() {
         let value = Complex::new(0.31, -0.27);
-        let center_rotation = center(Z3CenterSector::PositivePhase, 1.0);
-        let rotated = complex_mul(value, center_rotation);
+        let rotated = complex_mul(value, center(Z3CenterSector::PositivePhase, 1.0));
         let aligned_a = center_align_polyakov(value, 0.0).unwrap().unwrap();
         let aligned_b = center_align_polyakov(rotated, 0.0).unwrap().unwrap();
         assert!((complex_magnitude(value) - complex_magnitude(rotated)).abs() < 1.0e-15);
@@ -336,7 +332,7 @@ mod tests {
     }
 
     #[test]
-    fn ambiguous_sample_breaks_transition_continuity() {
+    fn ambiguity_breaks_transition_continuity() {
         let trace = PolyakovChainTrace {
             chain_id: "chain".into(),
             samples: vec![
@@ -353,7 +349,7 @@ mod tests {
 
     #[test]
     fn reproduces_lqcd_019b_frozen_sector_counts() {
-        let cold_sectors = [
+        let cold = [
             Z3CenterSector::ZeroPhase,
             Z3CenterSector::ZeroPhase,
             Z3CenterSector::NegativePhase,
@@ -379,7 +375,7 @@ mod tests {
             Z3CenterSector::NegativePhase,
             Z3CenterSector::NegativePhase,
         ];
-        let disordered_sectors = [
+        let disordered = [
             Z3CenterSector::NegativePhase,
             Z3CenterSector::NegativePhase,
             Z3CenterSector::NegativePhase,
@@ -408,22 +404,22 @@ mod tests {
         let traces = [
             PolyakovChainTrace {
                 chain_id: "cold".into(),
-                samples: cold_sectors.into_iter().map(|sector| center(sector, 0.5)).collect(),
+                samples: cold.into_iter().map(|s| center(s, 0.5)).collect(),
             },
             PolyakovChainTrace {
                 chain_id: "disordered".into(),
-                samples: disordered_sectors
-                    .into_iter()
-                    .map(|sector| center(sector, 0.5))
-                    .collect(),
+                samples: disordered.into_iter().map(|s| center(s, 0.5)).collect(),
             },
         ];
-        let policy = CenterSectorMobilityPolicy {
-            minimum_polyakov_magnitude: 0.1,
-            minimum_classified_fraction: 1.0,
-            minimum_sector_transitions_per_chain: 0,
-        };
-        let assessment = assess_center_sector_mobility(&traces, &policy).unwrap();
+        let assessment = assess_center_sector_mobility(
+            &traces,
+            &CenterSectorMobilityPolicy {
+                minimum_polyakov_magnitude: 0.1,
+                minimum_classified_fraction: 1.0,
+                minimum_sector_transitions_per_chain: 0,
+            },
+        )
+        .unwrap();
         assert_eq!(assessment.chains[0].sector_counts, [2, 0, 22]);
         assert_eq!(assessment.chains[0].sector_transition_count, 1);
         assert_eq!(assessment.chains[0].maximum_classified_sector_dwell, 22);
@@ -473,6 +469,19 @@ mod tests {
         )
         .unwrap();
         assert!(!stricter.meets_declared_policy);
-        assert!(!stricter.every_chain_meets_transition_count);
+    }
+
+    #[test]
+    fn empty_trace_set_fails_closed() {
+        let err = assess_center_sector_mobility(
+            &[],
+            &CenterSectorMobilityPolicy {
+                minimum_polyakov_magnitude: 0.1,
+                minimum_classified_fraction: 1.0,
+                minimum_sector_transitions_per_chain: 0,
+            },
+        )
+        .unwrap_err();
+        assert_eq!(err, CenterSymmetryError::EmptyTraceSet);
     }
 }
