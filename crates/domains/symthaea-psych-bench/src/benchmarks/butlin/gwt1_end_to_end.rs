@@ -113,7 +113,7 @@ fn changed_specialists(
     Ok(GWT1_SPECIALISTS_V1
         .iter()
         .filter(|id| {
-            perturbation.baseline_outputs.get(**id) != perturbation.perturbed_outputs.get(**id)
+            perturbation.baseline_outputs.get(*id) != perturbation.perturbed_outputs.get(*id)
         })
         .map(|id| (*id).to_string())
         .collect())
@@ -233,15 +233,14 @@ pub fn build_gwt1_evidence_v1(
     raw: &Gwt1RawObservationsV1,
 ) -> Result<Gwt1EndToEndEvidenceV1, Gwt1EndToEndErrorV1> {
     let receipt = derive_receipt(identity, raw)?;
-    let raw_observation_bytes =
-        serde_json::to_vec(raw).map_err(|error| Gwt1EndToEndErrorV1::RawSerialization(error.to_string()))?;
+    let raw_observation_bytes = serde_json::to_vec(raw)
+        .map_err(|error| Gwt1EndToEndErrorV1::RawSerialization(error.to_string()))?;
     let envelope = Gwt1EvidenceEnvelopeV1 {
         schema: GWT1_EVIDENCE_ENVELOPE_SCHEMA_V1.to_string(),
         raw_observations: describe_raw_observations_v1(&raw_observation_bytes),
         receipt,
     };
-    let resolution =
-        resolve_gwt1_evidence_envelope_v1(&envelope, &raw_observation_bytes);
+    let resolution = resolve_gwt1_evidence_envelope_v1(&envelope, &raw_observation_bytes);
 
     Ok(Gwt1EndToEndEvidenceV1 {
         raw_observation_bytes,
