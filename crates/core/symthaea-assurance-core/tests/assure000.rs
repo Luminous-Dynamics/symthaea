@@ -165,7 +165,7 @@ fn claim_ceiling_blocks_overpromotion_before_evidence_interpretation() {
         None,
         'c',
     );
-    let error = QualificationResult::resolve(
+    let error = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::Observed),
@@ -188,7 +188,7 @@ fn stronger_tier_requires_explicit_evidence_kind() {
         None,
         'c',
     );
-    let error = QualificationResult::resolve(
+    let error = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::CausallySupported),
@@ -207,7 +207,7 @@ fn negative_finding_remains_orthogonal_to_positive_support() {
     let subject = subject();
     let claim = claim(&subject);
     let artifacts = functional_set(&subject, &claim);
-    let result = QualificationResult::resolve(
+    let result = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::FunctionallySupported),
@@ -235,7 +235,7 @@ fn reproduction_requires_distinct_verifier_identity() {
         None,
         'e',
     ));
-    let error = QualificationResult::resolve(
+    let error = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::Reproduced),
@@ -259,7 +259,7 @@ fn reproduction_accepts_distinct_verifier_identity_without_claiming_independence
         Some("second-verifier-identity"),
         'e',
     ));
-    let result = QualificationResult::resolve(
+    let result = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::Reproduced),
@@ -294,7 +294,7 @@ fn runtime_evidence_does_not_create_a_deployment_support_tier() {
         None,
         'f',
     ));
-    let result = QualificationResult::resolve(
+    let result = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::Reproduced),
@@ -328,7 +328,7 @@ fn duplicate_evidence_identity_fails_closed() {
         None,
         'd',
     );
-    let error = QualificationResult::resolve(
+    let error = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::Observed),
@@ -358,7 +358,7 @@ fn evidence_cannot_be_rebound_to_another_claim() {
         None,
         'c',
     );
-    let error = QualificationResult::resolve(
+    let error = QualificationResult::validate_and_bind(
         &second_claim,
         &subject,
         &plan(&second_claim, SupportTier::Observed),
@@ -389,7 +389,7 @@ fn result_identity_is_evidence_order_independent() {
         None,
         'd',
     );
-    let left = QualificationResult::resolve(
+    let left = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::FunctionallySupported),
@@ -397,7 +397,7 @@ fn result_identity_is_evidence_order_independent() {
         QualificationOutcome::Supported(SupportTier::FunctionallySupported),
     )
     .unwrap();
-    let right = QualificationResult::resolve(
+    let right = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::FunctionallySupported),
@@ -420,7 +420,7 @@ fn explicit_invalidation_changes_result_identity_and_outcome() {
         None,
         'c',
     );
-    let mut result = QualificationResult::resolve(
+    let mut result = QualificationResult::validate_and_bind(
         &claim,
         &subject,
         &plan(&claim, SupportTier::Observed),
