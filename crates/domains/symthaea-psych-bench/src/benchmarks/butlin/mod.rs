@@ -27,6 +27,7 @@ pub mod indicators;
 pub mod qualification_design;
 pub mod qualification_runtime;
 pub mod report;
+pub mod resolution_view;
 
 pub use gwt1_evidence_envelope::{
     GWT1_EVIDENCE_ENVELOPE_SCHEMA_V1, GWT1_RAW_OBSERVATION_MEDIA_TYPE_V1,
@@ -65,3 +66,10 @@ pub use report::{
     EvidenceAnnotation, EvidenceMergeError, EvidenceOutcome, IndicatorEvidence, ProbeQuality,
     RuntimeConsciousnessData, SupportTier, annotate_with_ablation_results,
 };
+pub use resolution_view::{
+    BUTLIN_RESOLVED_EVIDENCE_VIEW_SCHEMA_V1, ButlinResolvedEvidenceViewV1,
+    EvidenceLineageIdentityV1, EvidenceLineageKindV1, EvidenceOutcomeCountsV1,
+    EvidenceResolutionViewErrorV1, IndicatorOutcomeOverlayV1, base_report_blake3_v1,
+};
+#[cfg(feature = "symthaea-backend")]
+pub use resolution_view::resolve_gwt1_evidence_view_v1;
