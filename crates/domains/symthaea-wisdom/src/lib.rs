@@ -31,6 +31,7 @@
 #![deny(unsafe_code)]
 
 pub mod autopoiesis;
+pub mod care;
 pub mod evidence_ledger;
 pub mod harmonics;
 pub mod meta_cognition;
@@ -39,6 +40,12 @@ pub mod perspective;
 pub mod practical_wisdom;
 
 pub use autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
+pub use care::{
+    AttentivenessRecord, CareCase, CareCaseId, CareError, CareGap, CareOption, CareOptionId,
+    CareOutcome, CareProviderCandidate, CompetenceAssessment, CompetenceLevel, NeedHypothesis,
+    NeedHypothesisId, NeedProvenance, OutcomeDirection, PersonResponse, ResponsibilityCandidate,
+    ResponsivenessRecord,
+};
 pub use evidence_ledger::{
     Claim, Conflict, DecisionDependencyLedger, DecisionId, DecisionRecord,
     DecisionReviewReason, DeliberationEvidenceLedger, EvidenceLedgerError,
