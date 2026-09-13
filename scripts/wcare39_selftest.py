@@ -11,6 +11,7 @@ import tempfile
 
 HERE = Path(__file__).resolve().parent
 RUNNER = HERE / "wcare39_execution_capsule.py"
+QUALIFIER = HERE / "wcare39-qualify.sh"
 PROTOCOL = "wcare39-execution-capsule-v1"
 
 
@@ -65,16 +66,31 @@ def plan(root: Path, head: str, script: str, output: str | None) -> dict:
     }
 
 
-def execute(root: Path, plan_value: dict, name: str) -> tuple[int, dict]:
+def write_plan(root: Path, plan_value: dict, name: str) -> Path:
     target = root / "target"
     target.mkdir(exist_ok=True)
     plan_path = target / f"{name}-plan.json"
     plan_path.write_text(json.dumps(plan_value, sort_keys=True, separators=(",", ":")) + "\n")
+    return plan_path
+
+
+def execute(root: Path, plan_value: dict, name: str) -> tuple[int, dict]:
+    plan_path = write_plan(root, plan_value, name)
     proc = run([sys.executable, str(RUNNER), "run", str(plan_path), f"target/{name}-capsule"], root, check=False)
     try:
         result = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
         raise AssertionError(f"non-json runner output for {name}: {proc.stdout!r} {proc.stderr!r}") from exc
+    return proc.returncode, result
+
+
+def execute_qualifier(root: Path, plan_value: dict, name: str) -> tuple[int, dict]:
+    plan_path = write_plan(root, plan_value, f"qualifier-{name}")
+    proc = run(["bash", str(QUALIFIER), str(plan_path), f"target/qualifier-{name}-capsule"], root, check=False)
+    try:
+        result = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise AssertionError(f"non-json qualifier output for {name}: {proc.stdout!r} {proc.stderr!r}") from exc
     return proc.returncode, result
 
 
@@ -155,6 +171,26 @@ def main() -> int:
         assert secret["classification"] == "INVALID_CAPSULE", secret
         assert "sensitive_environment_literal_forbidden" in secret["detail"], secret
 
+        # The CI-facing qualifier must preserve subject outcome in its exit status.
+        (root / "target/pass-receipt.json").unlink(missing_ok=True)
+        qcode, qpass = execute_qualifier(root, pass_plan, "pass")
+        assert qcode == 0 and qpass["classification"] == "QUALIFIED_EXECUTION" and qpass["subject_outcome"] == "PASS", qpass
+
+        qcode, qfail = execute_qualifier(root, plan(root, head, "fail_stage.py", None), "fail")
+        assert qcode == 1 and qfail["classification"] == "QUALIFIED_EXECUTION" and qfail["subject_outcome"] == "FAIL", qfail
+
+        qcode, qdrift = execute_qualifier(root, plan(root, head, "drift_stage.py", None), "drift")
+        assert qcode == 2 and qdrift["classification"] == "ENVIRONMENT_DRIFT", qdrift
+        run(["git", "reset", "--hard", "-q", "HEAD"], root)
+
+        qcode, qindeterminate = execute_qualifier(root, plan(root, head, "wcare38_dummy.py", None), "indeterminate")
+        assert qcode == 3 and qindeterminate["classification"] == "INFRASTRUCTURE_INDETERMINATE", qindeterminate
+
+        qsecret_plan = plan(root, head, "fail_stage.py", None)
+        qsecret_plan["safe_environment"] = [{"key": "API_TOKEN", "mode": "Literal"}]
+        qcode, qinvalid = execute_qualifier(root, qsecret_plan, "invalid")
+        assert qcode == 4 and qinvalid["classification"] == "INVALID_CAPSULE", qinvalid
+
     print(json.dumps({
         "authority": "MeasurementOnly",
         "classification": "PASS_WCARE39_SELFTEST",
@@ -166,6 +202,7 @@ def main() -> int:
         "missing_subject_drift_observed": True,
         "wcare37_lock_blocker_preserved": True,
         "sensitive_literal_rejected": True,
+        "qualifier_exit_contract_verified": True,
         "runtime_authority_granted": False,
     }, sort_keys=True, separators=(",", ":")))
     return 0
