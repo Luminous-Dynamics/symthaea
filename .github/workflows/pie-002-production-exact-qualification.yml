@@ -1,0 +1,135 @@
+name: PIE-002 Production Exact Subject Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002-production-1965f58f
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify clean PIE-002 production subject
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SUBJECT_SHA: 1965f58fcea91ae83a73714fa93f0f22ad1abc20
+      EXPECTED_PARENT_SHA: b5d2a0a48665926beb398b60c6f58b8cfbe13401
+      EXPECTED_TREE_SHA: c288ad1dccd5fc12aae59788f81e924f782f5b6f
+      PACKAGE: symthaea-planetary-industry
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject, lineage, tree, and file scope
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          parent="$(git rev-parse HEAD^)"
+          tree="$(git rev-parse HEAD^{tree})"
+          printf 'expected_subject=%s\nactual_subject=%s\n' "$SUBJECT_SHA" "$actual"
+          printf 'expected_parent=%s\nactual_parent=%s\n' "$EXPECTED_PARENT_SHA" "$parent"
+          printf 'expected_tree=%s\nactual_tree=%s\n' "$EXPECTED_TREE_SHA" "$tree"
+          test "$actual" = "$SUBJECT_SHA"
+          test "$parent" = "$EXPECTED_PARENT_SHA"
+          test "$tree" = "$EXPECTED_TREE_SHA"
+          git diff --name-only "$EXPECTED_PARENT_SHA" "$SUBJECT_SHA" | sort > /tmp/changed-files.txt
+          cat > /tmp/expected-files.txt <<'EOF'
+          crates/domains/symthaea-planetary-industry/src/lib.rs
+          crates/domains/symthaea-planetary-industry/src/utility_accounting.rs
+          EOF
+          sort -o /tmp/expected-files.txt /tmp/expected-files.txt
+          diff -u /tmp/expected-files.txt /tmp/changed-files.txt
+
+      - name: Record subject file digests
+        run: |
+          sha256sum \
+            crates/domains/symthaea-planetary-industry/src/lib.rs \
+            crates/domains/symthaea-planetary-industry/src/utility_accounting.rs
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Record toolchain
+        run: |
+          rustc --version --verbose
+          cargo --version
+          cargo fmt --version
+          cargo clippy --version
+
+      - name: Package rustfmt
+        id: fmt
+        continue-on-error: true
+        run: cargo fmt -p "$PACKAGE" -- --check
+
+      - name: Package check
+        id: check
+        continue-on-error: true
+        run: cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Package tests
+        id: test
+        continue-on-error: true
+        run: cargo test -p "$PACKAGE" --all-targets --locked --no-fail-fast
+
+      - name: Package clippy
+        id: clippy
+        continue-on-error: true
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Emit machine-readable qualification receipt
+        if: always()
+        run: |
+          lib_sha256="$(sha256sum crates/domains/symthaea-planetary-industry/src/lib.rs | awk '{print $1}')"
+          utility_sha256="$(sha256sum crates/domains/symthaea-planetary-industry/src/utility_accounting.rs | awk '{print $1}')"
+          cat > pie-002-production-qualification.json <<EOF
+          {
+            "schema": "symthaea.pie.exact-subject-qualification.v2",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$EXPECTED_PARENT_SHA",
+            "tree_sha": "$EXPECTED_TREE_SHA",
+            "package": "$PACKAGE",
+            "rust_toolchain": "1.96.0",
+            "changed_files": [
+              "crates/domains/symthaea-planetary-industry/src/lib.rs",
+              "crates/domains/symthaea-planetary-industry/src/utility_accounting.rs"
+            ],
+            "file_sha256": {
+              "lib.rs": "$lib_sha256",
+              "utility_accounting.rs": "$utility_sha256"
+            },
+            "gates": {
+              "rustfmt": "${{ steps.fmt.outcome }}",
+              "check_all_targets_locked": "${{ steps.check.outcome }}",
+              "test_all_targets_locked": "${{ steps.test.outcome }}",
+              "clippy_all_targets_deny_warnings_locked": "${{ steps.clippy.outcome }}"
+            },
+            "scope": "Package-scoped executable qualification of exactly one PIE-002 commit over qualified PIE-001. Does not imply repository-wide CI health, thermodynamic proof, process feasibility, or hardware authority."
+          }
+          EOF
+          cat pie-002-production-qualification.json
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-002-production-exact-subject-qualification
+          path: pie-002-production-qualification.json
+          if-no-files-found: error
+
+      - name: Enforce all package gates
+        if: always()
+        run: |
+          test "${{ steps.fmt.outcome }}" = success
+          test "${{ steps.check.outcome }}" = success
+          test "${{ steps.test.outcome }}" = success
+          test "${{ steps.clippy.outcome }}" = success
