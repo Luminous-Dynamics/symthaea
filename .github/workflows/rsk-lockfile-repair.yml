@@ -18,6 +18,7 @@ on:
       - 'docs/compliance/adr/ADR-034-rsk-lockfile-repair-lineage.md'
       - 'docs/compliance/adr/ADR-035-rsk-lockfile-repair-worktree-purity.md'
       - 'docs/compliance/adr/ADR-036-rsk-lockfile-repair-intent-freeze.md'
+      - 'docs/compliance/adr/ADR-037-rsk-lockfile-repair-action-pins.md'
   workflow_dispatch:
 
 permissions:
@@ -33,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -76,7 +77,7 @@ jobs:
         run: python3 scripts/test_rsk_lockfile_repair_lineage.py -v
 
       - name: Install pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
 
       - name: State evidence boundary
         run: |
@@ -122,6 +123,11 @@ jobs:
           git rev-parse HEAD > "${out}/subject-head.txt"
           rustc --version --verbose > "${out}/rustc-version.txt"
           cargo --version --verbose > "${out}/cargo-version.txt"
+          cat > "${out}/action-pins.txt" <<'EOF'
+          actions/checkout 11d5960a326750d5838078e36cf38b85af677262 v4
+          dtolnay/rust-toolchain ebb3d1676050bfd0971c36c1e215b5751473994d 1.96.0
+          actions/upload-artifact ea165f8d65b6e75b540449e92b4886f43607fa02 v4
+          EOF
           sha256sum \
             "${out}/Cargo.lock.base" \
             "${out}/Cargo.lock.head" \
@@ -220,7 +226,7 @@ jobs:
 
       - name: Upload non-admissible lockfile repair evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: rsk-lockfile-repair-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/rsk-lockfile-repair/**
