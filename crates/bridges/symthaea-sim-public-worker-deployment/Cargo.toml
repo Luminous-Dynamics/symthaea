@@ -1,0 +1,26 @@
+[package]
+name = "symthaea-sim-public-worker-deployment"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Authority-preserving deployment binding for the frozen public simulation-worker execution profile"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+symthaea-extension-admission = { path = "../../core/symthaea-extension-admission" }
+symthaea-extension-core = { path = "../../core/symthaea-extension-core" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-sim-deployment = { path = "../symthaea-sim-deployment" }
+symthaea-sim-extension-routing = { path = "../symthaea-sim-extension-routing" }
+symthaea-sim-public-worker-execution = { path = "../symthaea-sim-public-worker-execution" }
+symthaea-sim-public-worker-input = { path = "../symthaea-sim-public-worker-input" }
+symthaea-sim-worker = { path = "../symthaea-sim-worker" }
+symthaea-sim-worker-cgroup = { path = "../symthaea-sim-worker-cgroup" }
+symthaea-sim-worker-containment = { path = "../symthaea-sim-worker-containment" }
+symthaea-sim-worker-filesystem = { path = "../symthaea-sim-worker-filesystem" }
+symthaea-sim-worker-image = { path = "../symthaea-sim-worker-image" }
+symthaea-sim-worker-qualification = { path = "../symthaea-sim-worker-qualification" }
