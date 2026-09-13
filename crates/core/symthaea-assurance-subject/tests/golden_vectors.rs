@@ -34,11 +34,7 @@ fn canonical_subject_golden_vector_v1() {
         vec![
             SurfaceBinding::new(
                 AiSurfaceKind::Model,
-                SurfaceLocator::new(
-                    Some(id("provider-a")),
-                    id("rolling-model"),
-                    Some(id("v7")),
-                ),
+                SurfaceLocator::new(Some(id("provider-a")), id("rolling-model"), Some(id("v7"))),
                 SurfaceState::Unavailable(UnavailabilityReason::ProviderDoesNotExpose),
             ),
             SurfaceBinding::new(
