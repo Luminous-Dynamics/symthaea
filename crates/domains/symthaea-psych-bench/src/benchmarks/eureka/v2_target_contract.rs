@@ -9,7 +9,11 @@
 //! a fixed, lossless-on-grid bridge into the production FEP's 4-D observation
 //! interface.
 
-use symthaea_fep::{ActionOutcome, FepHeldOutSubject, FrozenPredictionCommitment};
+use symthaea_fep::{
+    ActionOutcome, FEP_EVALUATION_TRIAL_REVISION, FEP_FROZEN_PREDICTION_COMMITMENT_REVISION,
+    FEP_HELDOUT_SUBJECT_REVISION, FEP_PREDICTION_SNAPSHOT_REVISION, FepHeldOutSubject,
+    FrozenPredictionCommitment,
+};
 
 use super::consequence::{ConsequencePrediction, PredictionOutcome};
 use super::hidden_world::{PublicAction, PublicValue};
@@ -22,8 +26,10 @@ use super::v2_public_schema::{
 
 pub(super) const V2_FEP_TARGET_ADAPTER_REVISION: &str =
     "EUREKA.002.V2.PRODUCTION_FEP_NORMALIZED_ADAPTER.v2";
+pub(super) const V2_FEP_CUSTODY_SEMANTICS_REVISION: &str =
+    "EUREKA.002.V2.FEP_CUSTODY_SEMANTICS.v1";
 pub(super) const V2_FEP_TARGET_CONTRACT_REVISION: &str =
-    "EUREKA.002.V2.PRODUCTION_FEP_TARGET_CONTRACT.v3";
+    "EUREKA.002.V2.PRODUCTION_FEP_TARGET_CONTRACT.v4";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum V2TargetContractError {
@@ -131,6 +137,7 @@ impl V2FepAdapter {
 pub(super) struct V2FepTargetContract {
     scope: EurekaTargetScope,
     public_schema_commitment: [u8; 32],
+    fep_custody_commitment: [u8; 32],
     learned_subject_commitment: FrozenPredictionCommitment,
     observation_dim: usize,
     action_count: usize,
@@ -156,10 +163,12 @@ impl V2FepTargetContract {
             });
         }
         let public_schema_commitment = canonical_public_schema_commitment();
+        let fep_custody_commitment = fep_custody_semantics_commitment();
         let learned_subject_commitment = subject.commitment();
         let commitment = contract_commitment(
             EurekaTargetScope::ProductionFepComponentSnapshot,
             public_schema_commitment,
+            fep_custody_commitment,
             learned_subject_commitment,
             subject.observation_dim(),
             subject.action_count(),
@@ -167,6 +176,7 @@ impl V2FepTargetContract {
         Ok(Self {
             scope: EurekaTargetScope::ProductionFepComponentSnapshot,
             public_schema_commitment,
+            fep_custody_commitment,
             learned_subject_commitment,
             observation_dim: subject.observation_dim(),
             action_count: subject.action_count(),
@@ -180,6 +190,10 @@ impl V2FepTargetContract {
 
     pub(super) const fn public_schema_commitment(self) -> [u8; 32] {
         self.public_schema_commitment
+    }
+
+    pub(super) const fn fep_custody_commitment(self) -> [u8; 32] {
+        self.fep_custody_commitment
     }
 
     pub(super) const fn learned_subject_commitment(self) -> FrozenPredictionCommitment {
@@ -199,9 +213,28 @@ impl V2FepTargetContract {
     }
 }
 
+fn fep_custody_semantics_commitment() -> [u8; 32] {
+    fep_custody_semantics_commitment_from([
+        FEP_PREDICTION_SNAPSHOT_REVISION,
+        FEP_FROZEN_PREDICTION_COMMITMENT_REVISION,
+        FEP_HELDOUT_SUBJECT_REVISION,
+        FEP_EVALUATION_TRIAL_REVISION,
+    ])
+}
+
+fn fep_custody_semantics_commitment_from(revisions: [&str; 4]) -> [u8; 32] {
+    let mut bytes = Vec::new();
+    encode_bytes(&mut bytes, V2_FEP_CUSTODY_SEMANTICS_REVISION.as_bytes());
+    for revision in revisions {
+        encode_bytes(&mut bytes, revision.as_bytes());
+    }
+    *blake3::hash(&bytes).as_bytes()
+}
+
 fn contract_commitment(
     scope: EurekaTargetScope,
     public_schema_commitment: [u8; 32],
+    fep_custody_commitment: [u8; 32],
     learned_subject_commitment: FrozenPredictionCommitment,
     observation_dim: usize,
     action_count: usize,
@@ -210,6 +243,7 @@ fn contract_commitment(
     encode_bytes(&mut bytes, V2_FEP_TARGET_CONTRACT_REVISION.as_bytes());
     encode_bytes(&mut bytes, V2_FEP_TARGET_ADAPTER_REVISION.as_bytes());
     bytes.extend_from_slice(&public_schema_commitment);
+    bytes.extend_from_slice(&fep_custody_commitment);
     bytes.push(match scope {
         EurekaTargetScope::ProductionFepComponentSnapshot => 1,
         EurekaTargetScope::FullCognitiveLoop => 2,
@@ -371,10 +405,11 @@ mod tests {
     }
 
     #[test]
-    fn contract_is_component_scoped_and_binds_schema_and_learned_commitment() {
+    fn contract_is_component_scoped_and_binds_schema_custody_and_learned_commitment() {
         let subject = heldout_subject();
         let learned = subject.commitment();
         let schema = canonical_public_schema_commitment();
+        let custody = fep_custody_semantics_commitment();
         let contract = V2FepTargetContract::from_heldout_subject(&subject).unwrap();
         assert_eq!(
             contract.scope(),
@@ -383,8 +418,26 @@ mod tests {
         assert_eq!(contract.observation_dim(), V2_OBSERVATION_DIM);
         assert_eq!(contract.action_count(), V2_REQUIRED_ACTIONS);
         assert_eq!(contract.public_schema_commitment(), schema);
+        assert_eq!(contract.fep_custody_commitment(), custody);
         assert_eq!(contract.learned_subject_commitment(), learned);
+        assert_ne!(contract.fep_custody_commitment(), [0_u8; 32]);
         assert_ne!(contract.commitment(), [0_u8; 32]);
+    }
+
+    #[test]
+    fn custody_semantics_identity_changes_when_any_fep_revision_changes() {
+        let baseline = [
+            FEP_PREDICTION_SNAPSHOT_REVISION,
+            FEP_FROZEN_PREDICTION_COMMITMENT_REVISION,
+            FEP_HELDOUT_SUBJECT_REVISION,
+            FEP_EVALUATION_TRIAL_REVISION,
+        ];
+        let original = fep_custody_semantics_commitment_from(baseline);
+        for index in 0..baseline.len() {
+            let mut changed = baseline;
+            changed[index] = "changed-revision";
+            assert_ne!(original, fep_custody_semantics_commitment_from(changed));
+        }
     }
 
     #[test]
@@ -412,6 +465,10 @@ mod tests {
         assert_eq!(
             contract_a.public_schema_commitment(),
             contract_b.public_schema_commitment()
+        );
+        assert_eq!(
+            contract_a.fep_custody_commitment(),
+            contract_b.fep_custody_commitment()
         );
         assert_ne!(
             contract_a.learned_subject_commitment(),
