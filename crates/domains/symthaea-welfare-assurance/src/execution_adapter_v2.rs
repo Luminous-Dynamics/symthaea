@@ -143,11 +143,10 @@ where
             .map_err(PreExecutionJournalV2Error::PreparedPersistence)?;
         validate_ref(&prepared_persistence_ref)
             .map_err(|_| PreExecutionJournalV2Error::InvalidPersistenceReference)?;
-        PreparedExecutionContextV2::validate_persistence_ref(&prepared_persistence_ref)
-            .map_err(PreExecutionJournalV2Error::ContextVerification)?;
 
-        // All fallible context checks completed before this point. Once Prepared durability exists,
-        // construction itself is infallible and cannot create a retry-shaped post-prepare error.
+        // All digest/context verification completed before durability. The only fallible check after
+        // persistence is validation of the persistence boundary's own returned reference. Context
+        // construction below is intentionally infallible.
         let context = PreparedExecutionContextV2::from_verified_durable(
             &self.prepared,
             prepared_digest,
