@@ -184,3 +184,6 @@ pub use muse_manager::{MuseManager, MuseTelemetry};
 pub mod hypervisor_manager;
 #[cfg(feature = "hypervisor")]
 pub use hypervisor_manager::{HypervisorManager, HypervisorTelemetry, SupervisoryEvent};
+
+#[cfg(test)]
+mod gwt1_specialist_independence;
