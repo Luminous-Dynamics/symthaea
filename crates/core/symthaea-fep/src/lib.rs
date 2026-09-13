@@ -135,16 +135,18 @@
 //!   Active Inference: A Process Theory.
 //! - Parr, T., Pezzulo, G., & Friston, K. J. (2022). Active Inference: The Free Energy
 //!   Principle in Mind, Brain, and Behavior.
-//! - Sutton, R.S. & Barto, A.G. (2018). Reinforcement Learning: An Introduction (2nd ed.)
+//! - Sutton, R.S. & Barto, R.G. (2018). Reinforcement Learning: An Introduction (2nd ed.)
 
 mod agent;
 mod bridge;
+mod evaluation_trial;
 pub mod free_energy;
 pub mod generative_model;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
 mod motor;
+mod prediction_commitment;
 pub mod prediction_session;
 mod td_learning;
 pub mod types;
@@ -176,6 +178,16 @@ pub use agent::{ActiveInferenceAgent, ActiveInferenceAgentConfig};
 pub use motor::MotorSystem;
 
 pub use bridge::{CognitiveLoopFEPBridge, EnhancedFEPBridge};
+
+pub use evaluation_trial::{
+    FEP_EVALUATION_TRIAL_REVISION, FEP_HELDOUT_SUBJECT_REVISION, FepEvaluationTrial,
+    FepHeldOutSubject,
+};
+
+pub use prediction_commitment::{
+    FEP_FROZEN_PREDICTION_COMMITMENT_REVISION, FrozenPredictionCommitment,
+    frozen_prediction_commitment,
+};
 
 pub use prediction_session::{
     FEP_PREDICTION_SNAPSHOT_REVISION, FepEvaluationSnapshot, FepPredictionSession,

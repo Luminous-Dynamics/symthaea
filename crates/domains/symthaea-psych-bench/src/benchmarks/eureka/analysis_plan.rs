@@ -271,9 +271,20 @@ pub(super) const EUREKA_002_ANALYSIS_PLAN_V1: Eureka002AnalysisPlanV1 =
     };
 
 impl Eureka002AnalysisPlanV1 {
-    /// Deterministic replay/evidence identity. This is not cryptographic
-    /// authentication and is not a trusted external timestamp.
+    /// Deterministic replay/evidence identity. This remains for compatibility
+    /// and compact fixture identities; it is not collision-resistant scientific
+    /// attestation and is not a trusted external timestamp.
     pub(super) fn replay_digest(&self) -> u64 {
+        fnv1a64(&self.canonical_bytes())
+    }
+
+    /// Collision-resistant identity over the exact same canonical semantic byte
+    /// grammar as `replay_digest`.
+    pub(super) fn cryptographic_commitment(&self) -> [u8; 32] {
+        *blake3::hash(&self.canonical_bytes()).as_bytes()
+    }
+
+    fn canonical_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         encode_str(&mut bytes, self.revision);
         encode_str(&mut bytes, self.claim_id);
@@ -331,7 +342,7 @@ impl Eureka002AnalysisPlanV1 {
         for non_claim in self.explicit_non_claims {
             encode_str(&mut bytes, non_claim);
         }
-        fnv1a64(&bytes)
+        bytes
     }
 }
 
@@ -505,18 +516,23 @@ mod tests {
     }
 
     #[test]
-    fn replay_identity_is_deterministic_and_sensitive_to_primary_margin() {
+    fn replay_and_crypto_identities_share_one_semantic_grammar() {
         let plan = EUREKA_002_ANALYSIS_PLAN_V1;
-        let a = plan.replay_digest();
-        let b = plan.replay_digest();
-        assert_eq!(a, b);
-        assert_ne!(a, 0);
+        let replay_a = plan.replay_digest();
+        let replay_b = plan.replay_digest();
+        let crypto_a = plan.cryptographic_commitment();
+        let crypto_b = plan.cryptographic_commitment();
+        assert_eq!(replay_a, replay_b);
+        assert_eq!(crypto_a, crypto_b);
+        assert_ne!(replay_a, 0);
+        assert_ne!(crypto_a, [0_u8; 32]);
 
         let changed = Eureka002AnalysisPlanV1 {
             changed_field_f1_margin_bps: plan.changed_field_f1_margin_bps + 1,
             ..plan
         };
-        assert_ne!(a, changed.replay_digest());
+        assert_ne!(replay_a, changed.replay_digest());
+        assert_ne!(crypto_a, changed.cryptographic_commitment());
     }
 
     #[test]

@@ -9,6 +9,9 @@
 //! caller owns the meaning of observation channels and action indices.
 
 use super::agent::ActiveInferenceAgent;
+use super::prediction_commitment::{
+    FrozenPredictionCommitment, frozen_prediction_commitment,
+};
 use super::types::{ActionOutcome, Observation, PerceptionResult};
 
 /// Replay-identity revision for frozen prescribed-action prediction models.
@@ -60,6 +63,15 @@ impl FepPredictionSession {
 
     pub fn action_count(&self) -> usize {
         self.agent.config.num_actions
+    }
+
+    /// Collision-resistant identity of the standardized predictor that would
+    /// be produced by [`Self::freeze_for_evaluation`].
+    ///
+    /// This is separate from the compact `u64` replay digest and is intended to
+    /// be carried into scientific subject custody.
+    pub fn frozen_prediction_commitment(&self) -> FrozenPredictionCommitment {
+        frozen_prediction_commitment(&self.agent)
     }
 
     /// Incorporate one exact observation through the production perception
@@ -152,12 +164,14 @@ impl FepPredictionSession {
         if self.pending_action.is_some() {
             return Err(FepPredictionSessionError::PredictionAlreadyPending);
         }
+        let commitment = self.frozen_prediction_commitment();
         let mut agent = self.agent.clone();
         agent.reset();
         let replay_digest = prediction_replay_digest(&agent);
         Ok(FepEvaluationSnapshot {
             agent,
             replay_digest,
+            commitment,
         })
     }
 
@@ -201,6 +215,7 @@ impl FepPredictionSession {
 pub struct FepEvaluationSnapshot {
     agent: ActiveInferenceAgent,
     replay_digest: u64,
+    commitment: FrozenPredictionCommitment,
 }
 
 impl FepEvaluationSnapshot {
@@ -222,7 +237,16 @@ impl FepEvaluationSnapshot {
         self.replay_digest
     }
 
+    /// Collision-resistant commitment to the standardized learned predictor.
+    pub fn commitment(&self) -> FrozenPredictionCommitment {
+        self.commitment
+    }
+
     /// Start one independent held-out trial from the exact frozen model.
+    ///
+    /// EUREKA confirmatory runners should prefer the narrower
+    /// `FepHeldOutSubject` capability rather than retaining direct access to
+    /// this trainable-session thaw API.
     pub fn session(&self) -> FepPredictionSession {
         FepPredictionSession::from_agent(&self.agent)
     }
@@ -423,6 +447,7 @@ mod tests {
         session
             .observe(&[0.7, 0.2, 0.4], 1.0, "development")
             .unwrap();
+        let expected_commitment = session.frozen_prediction_commitment();
         let snapshot = session.freeze_for_evaluation().unwrap();
 
         let mut a = snapshot.session();
@@ -433,10 +458,12 @@ mod tests {
         let b_outcome = b.predict(2).unwrap();
         assert_eq!(a_outcome.expected_observation, b_outcome.expected_observation);
         assert_eq!(snapshot.replay_digest(), snapshot.clone().replay_digest());
+        assert_eq!(snapshot.commitment(), expected_commitment);
+        assert_eq!(snapshot.commitment(), snapshot.clone().commitment());
     }
 
     #[test]
-    fn model_change_changes_frozen_replay_identity() {
+    fn model_change_changes_frozen_replay_and_cryptographic_identity() {
         let a = agent();
         let mut b = a.clone();
         b.model.transition_matrices[0][0][0] += 0.01;
@@ -447,6 +474,7 @@ mod tests {
             .freeze_for_evaluation()
             .unwrap();
         assert_ne!(snapshot_a.replay_digest(), snapshot_b.replay_digest());
+        assert_ne!(snapshot_a.commitment(), snapshot_b.commitment());
     }
 
     #[test]
