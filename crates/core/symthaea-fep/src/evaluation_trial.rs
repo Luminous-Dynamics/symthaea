@@ -16,6 +16,7 @@
 
 use std::fmt;
 
+use crate::prediction_commitment::FrozenPredictionCommitment;
 use crate::prediction_session::{
     FepEvaluationSnapshot, FepPredictionSession, FepPredictionSessionError,
 };
@@ -34,6 +35,7 @@ pub const FEP_HELDOUT_SUBJECT_REVISION: &str = "symthaea-fep-heldout-subject-v1"
 pub struct FepEvaluationTrial {
     session: FepPredictionSession,
     snapshot_replay_digest: u64,
+    snapshot_commitment: FrozenPredictionCommitment,
 }
 
 /// Deliberately redacted: formatting an evaluation capability must not dump the
@@ -43,6 +45,7 @@ impl fmt::Debug for FepEvaluationTrial {
         f.debug_struct("FepEvaluationTrial")
             .field("revision", &FEP_EVALUATION_TRIAL_REVISION)
             .field("snapshot_replay_digest", &self.snapshot_replay_digest)
+            .field("snapshot_commitment", &self.snapshot_commitment.to_hex())
             .finish_non_exhaustive()
     }
 }
@@ -55,16 +58,20 @@ impl FepEvaluationTrial {
         Self {
             session: snapshot.session(),
             snapshot_replay_digest: snapshot.replay_digest(),
+            snapshot_commitment: snapshot.commitment(),
         }
     }
 
     /// Deterministic compatibility/replay identity of the source snapshot.
     ///
-    /// This remains the existing non-cryptographic snapshot replay digest. It
-    /// must not be promoted to cryptographic subject attestation; stronger
-    /// evidence custody is a separate concern.
+    /// This remains the existing non-cryptographic snapshot replay digest.
     pub fn snapshot_replay_digest(&self) -> u64 {
         self.snapshot_replay_digest
+    }
+
+    /// Collision-resistant identity of the exact standardized learned subject.
+    pub fn snapshot_commitment(&self) -> FrozenPredictionCommitment {
+        self.snapshot_commitment
     }
 
     /// Observe one exact input and produce one prescribed-action prediction.
@@ -90,7 +97,7 @@ impl FepEvaluationTrial {
 /// [`FepPredictionSession`]. The only prediction authority it grants is creation
 /// of independent one-shot [`FepEvaluationTrial`] capabilities.
 ///
-/// This is defense in depth rather than cryptographic custody: code that still
+/// This is defense in depth rather than global API revocation: code that still
 /// possesses some other clone of a snapshot could create a trainable session
 /// through the legacy snapshot API. EUREKA's held-out runner must therefore own
 /// only this type, and its static reachability audit must reject direct imports
@@ -107,6 +114,7 @@ impl fmt::Debug for FepHeldOutSubject {
             .field("observation_dim", &self.observation_dim())
             .field("action_count", &self.action_count())
             .field("snapshot_replay_digest", &self.snapshot_replay_digest())
+            .field("snapshot_commitment", &self.commitment().to_hex())
             .field("snapshot", &"<redacted>")
             .finish()
     }
@@ -131,11 +139,13 @@ impl FepHeldOutSubject {
     }
 
     /// Existing deterministic replay ID of the learned snapshot.
-    ///
-    /// This remains explicitly non-cryptographic. EUREKA scientific subject
-    /// attestation must use the stronger commitment introduced separately.
     pub fn snapshot_replay_digest(&self) -> u64 {
         self.snapshot.replay_digest()
+    }
+
+    /// Collision-resistant scientific identity of the learned predictor.
+    pub fn commitment(&self) -> FrozenPredictionCommitment {
+        self.snapshot.commitment()
     }
 
     /// Mint one fresh prediction-only trial from the sealed learned subject.
@@ -203,12 +213,16 @@ mod tests {
 
     #[test]
     fn sealed_subject_mints_independent_trials_without_exposing_training_surface() {
-        let subject = FepHeldOutSubject::seal(snapshot(4, 4));
+        let frozen = snapshot(4, 4);
+        let commitment = frozen.commitment();
+        let subject = FepHeldOutSubject::seal(frozen);
         assert_eq!(subject.observation_dim(), 4);
         assert_eq!(subject.action_count(), 4);
+        assert_eq!(subject.commitment(), commitment);
         let observation = [4.0, 3.0, 2.0, 1.0];
-        let a = subject
-            .trial()
+        let first_trial = subject.trial();
+        assert_eq!(first_trial.snapshot_commitment(), commitment);
+        let a = first_trial
             .predict_once(&observation, 1.0, "heldout", 3)
             .unwrap();
         let b = subject
@@ -226,24 +240,30 @@ mod tests {
         let trial = FepEvaluationTrial::from_snapshot(&frozen);
         let trial_debug = format!("{trial:?}");
         assert!(trial_debug.contains(FEP_EVALUATION_TRIAL_REVISION));
+        assert!(trial_debug.contains(&frozen.commitment().to_hex()));
         assert!(!trial_debug.contains("ActiveInferenceAgent"));
         assert!(!trial_debug.contains("transition_matrices"));
 
         let subject = FepHeldOutSubject::seal(frozen);
         let subject_debug = format!("{subject:?}");
         assert!(subject_debug.contains(FEP_HELDOUT_SUBJECT_REVISION));
+        assert!(subject_debug.contains(&subject.commitment().to_hex()));
         assert!(subject_debug.contains("<redacted>"));
         assert!(!subject_debug.contains("likelihood_matrix"));
         assert!(!subject_debug.contains("transition_matrices"));
     }
 
     #[test]
-    fn source_snapshot_identity_is_retained_without_becoming_attestation() {
+    fn replay_and_cryptographic_subject_identities_are_retained() {
         let frozen = snapshot(4, 4);
-        let digest = frozen.replay_digest();
+        let replay_digest = frozen.replay_digest();
+        let commitment = frozen.commitment();
         let subject = FepHeldOutSubject::seal(frozen);
-        assert_eq!(subject.snapshot_replay_digest(), digest);
-        assert_eq!(subject.trial().snapshot_replay_digest(), digest);
+        assert_eq!(subject.snapshot_replay_digest(), replay_digest);
+        assert_eq!(subject.commitment(), commitment);
+        let trial = subject.trial();
+        assert_eq!(trial.snapshot_replay_digest(), replay_digest);
+        assert_eq!(trial.snapshot_commitment(), commitment);
     }
 
     #[test]
