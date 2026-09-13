@@ -1,0 +1,23 @@
+{
+  "schema": "symthaea.qualification-profile.v1",
+  "profile_name": "research.integrity.focused.v1",
+  "required_recipe_ids": [
+    "git-blob-sha1:46f787073ebbd37b2a466d2d1db6c2a804adf25e"
+  ],
+  "owned_surface_rules": [
+    "crates/core/symthaea-research-analysis/**",
+    "crates/core/symthaea-research-protocol/**",
+    "crates/core/symthaea-research-replication/**",
+    "crates/core/symthaea-research-result/**"
+  ],
+  "required_cross_cutting_rules": [
+    "Cargo.lock changes require exact regenerated workspace lock",
+    "workflow/toolchain/dependency changes create a new qualification subject"
+  ],
+  "fallback_policy": "FULL_CI_REQUIRED_ON_UNKNOWN_OR_AMBIGUOUS",
+  "non_claims": [
+    "does not establish scientific validity",
+    "does not replace full repository integration qualification"
+  ],
+  "profile_id": "sha256:c33e4fbdc091e4859ab034201e02597eed66952feea8065df22b1b50287a03d2"
+}
