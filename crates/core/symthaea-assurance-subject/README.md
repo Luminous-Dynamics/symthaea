@@ -2,20 +2,9 @@
 
 ASSURE-001 defines exact multi-surface system-under-test identity for external AI and agent qualification.
 
-Its central rule is that product/provider labels are not sufficient subject identity:
+A product/provider label is not a sufficient subject identity. The manifest uses a semantic `subject_key`, a canonical `SurfaceProfile`, and exactly one `SurfaceBinding` per registered material surface. Presentation/display labels stay outside canonical identity.
 
-```text
-same product name
-    != same model
-    != same prompt
-    != same authority
-    != same runtime
-    != same qualified subject
-```
-
-The manifest uses a semantic `subject_key`, a canonical `SurfaceProfile`, and exactly one `SurfaceBinding` per registered material surface. Presentation/display labels belong outside canonical identity.
-
-Every surface is `Known(material-commitment)`, `Unknown`, `Unavailable(reason)`, or `NotApplicable`. Omission fails closed. Applicable states require a locator; `NotApplicable` is locator-free, preventing arbitrary routing metadata from changing identity for a declared absence.
+Every surface is `Known(material-commitment)`, `Unknown`, `Unavailable(reason)`, or `NotApplicable`. Omission fails closed. Applicable states require a locator; `NotApplicable` is locator-free so irrelevant routing metadata cannot alter identity for a declared absence.
 
 Known commitments bind both SHA-256 and the preimage interpretation:
 
@@ -26,16 +15,14 @@ Known commitments bind both SHA-256 and the preimage interpretation:
 
 The same digest under different methods, descriptor schemas, or provider-token namespaces is a different material commitment.
 
-The standard external-AI profile covers source/image identity, model, system prompt, tool authority, policy, runtime, deployment envelope, and explicitly named external dependencies. Evaluator/corpus/campaign identity is intentionally excluded and belongs to later qualification-plan/evidence layers.
+`CompletenessSummary::has_complete_committed_identity()` means every applicable registered surface has a typed commitment. It does **not** establish that provider tokens uniquely fix underlying bytes, artifacts are retrievable, or the system is replayable.
 
-Provider aliases and stable URLs are locators, not immutable revisions. When an immutable commitment is unavailable, the subject remains explicitly incomplete rather than hashing an alias and pretending it is immutable.
+The standard external-AI profile covers source/image identity, model, system prompt, tool authority, policy, runtime, deployment envelope, and explicitly named external dependencies. Evaluator/corpus/campaign identity is intentionally excluded.
 
-`CompletenessSummary::has_complete_material_identity()` means every applicable registered surface has an exact identity commitment. It does **not** mean the artifacts are retrievable or the system can be replayed; availability and execution evidence are separate later concerns.
+Provider aliases and stable URLs are locators, not immutable revisions. Raw secrets and credential bytes are not manifest material; hashing low-entropy secrets is not a safe substitute.
 
 Canonical surface ordering is language-neutral lexicographic UTF-8 ordering of explicit wire names. Golden vectors freeze cross-implementation profile and manifest digests.
 
-Raw secrets and credential bytes are not manifest material. Commit effective non-secret authority/policy/service identity instead; hashing low-entropy secrets is not a safe substitute.
-
-`AiSubjectManifest::as_core_subject()` bridges the entire ASSURE-001 manifest commitment into the qualified ASSURE-000 kernel without modifying that core semantic waist.
+`AiSubjectManifest::as_core_subject()` bridges the complete ASSURE-001 manifest commitment into the qualified ASSURE-000 kernel without modifying that semantic waist.
 
 See `ASSURE_001.md` for the complete theorem and nonclaims.
