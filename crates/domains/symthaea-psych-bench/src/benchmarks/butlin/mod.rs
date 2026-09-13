@@ -26,6 +26,7 @@ pub mod gwt1_causal_promotion_capsule;
 pub mod gwt1_causal_resolution;
 #[cfg(feature = "symthaea-backend")]
 pub mod gwt1_causal_verified_promotion;
+pub mod gwt1_evidence_disposition;
 pub mod gwt1_evidence_envelope;
 #[cfg(feature = "symthaea-backend")]
 pub mod gwt1_end_to_end;
@@ -66,6 +67,11 @@ pub use gwt1_causal_verified_promotion::{
     GWT1_CAUSAL_APPROVED_BUILDER_SHA_V1, GWT1_CAUSAL_APPROVED_PROMOTION_WORKFLOW_SHA_V1,
     GWT1_CAUSAL_PROMOTION_WORKFLOW_V1, Gwt1CausalPromotionVerificationErrorV1,
     VerifiedGwt1CausalPromotionV1, verify_gwt1_causal_promotion_package_v1,
+};
+pub use gwt1_evidence_disposition::{
+    GWT1_EVIDENCE_DISPOSITION_SCHEMA_V1, Gwt1EvidenceDispositionErrorV1,
+    Gwt1EvidenceDispositionSummaryV1, Gwt1EvidenceDispositionV1,
+    classify_gwt1_evidence_disposition_v1,
 };
 pub use gwt1_evidence_envelope::{
     GWT1_EVIDENCE_ENVELOPE_SCHEMA_V1, GWT1_RAW_OBSERVATION_MEDIA_TYPE_V1,
