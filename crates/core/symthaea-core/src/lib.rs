@@ -78,6 +78,8 @@ pub mod core;
 /// Shared embodiment types: MotorSafetyLevel, EmbodimentBridge trait, telemetry.
 #[allow(missing_docs)]
 pub mod embodiment;
+/// Success-only constructive existential terminal reachability witnesses.
+pub mod existential_reachability;
 /// System bootstrap and initialization.
 #[allow(missing_docs)]
 pub mod genesis;
