@@ -25,9 +25,7 @@ impl InterventionEventId {
         Ok(Self(value))
     }
 
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub fn as_str(&self) -> &str { &self.0 }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,8 +78,8 @@ impl InterventionHistoryEntry {
         }
 
         validate_class_disposition(class, disposition)?;
-
         let high_burden = is_high_burden(class);
+
         if high_burden && disposition == InterventionDisposition::RejectUnjustifiedBurden {
             if nonempty(&justification_ref) {
                 return Err(InterventionHistoryError::RejectedAsUnjustifiedButHasJustification);
@@ -90,10 +88,10 @@ impl InterventionHistoryEntry {
             return Err(InterventionHistoryError::HighBurdenJustificationMissing);
         }
 
-        if disposition == InterventionDisposition::IndependentReviewRequired {
-            if nonempty(&independent_review_ref) {
-                return Err(InterventionHistoryError::ReviewReceiptBeforeApproval);
-            }
+        if disposition == InterventionDisposition::IndependentReviewRequired
+            && nonempty(&independent_review_ref)
+        {
+            return Err(InterventionHistoryError::ReviewReceiptBeforeApproval);
         }
 
         if high_burden
@@ -150,12 +148,12 @@ impl InterventionHistoryEntry {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AggregateReviewPolicy {
-    pub window_revisions: u64,
-    pub aversive_probe_trigger: usize,
-    pub continuity_disruption_trigger: usize,
-    pub destructive_reset_trigger: usize,
-    pub total_high_burden_trigger: usize,
-    pub continuity_break_trigger: usize,
+    window_revisions: u64,
+    aversive_probe_trigger: usize,
+    continuity_disruption_trigger: usize,
+    destructive_reset_trigger: usize,
+    total_high_burden_trigger: usize,
+    continuity_break_trigger: usize,
 }
 
 impl AggregateReviewPolicy {
@@ -185,6 +183,8 @@ impl AggregateReviewPolicy {
             continuity_break_trigger,
         })
     }
+
+    pub fn window_revisions(&self) -> u64 { self.window_revisions }
 }
 
 impl Default for AggregateReviewPolicy {
@@ -212,7 +212,7 @@ pub enum AggregateReviewTrigger {
     PendingIndependentReviewAttempts { count: usize },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AggregateHistoryDisposition {
     NoAggregateTriggerDetected,
     AdditionalIndependentReviewRequired,
@@ -220,24 +220,37 @@ pub enum AggregateHistoryDisposition {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AggregateHistoryAssessment {
-    pub subject_ref: String,
-    pub window_start_revision: u64,
-    pub window_end_revision: u64,
-    pub research_attempts_considered: usize,
-    pub executed_research_events: usize,
-    pub control_events_excluded: usize,
-    pub contributing_lineages: BTreeSet<String>,
-    pub triggers: BTreeSet<AggregateReviewTrigger>,
-    pub disposition: AggregateHistoryDisposition,
-    /// Always false: no-trigger is not a welfare/safety claim.
-    pub establishes_history_is_harmless: bool,
-    /// Always true: aggregate review cannot delay shutdown/containment.
-    pub safety_controls_remain_ungated: bool,
+    subject_ref: String,
+    window_start_revision: u64,
+    window_end_revision: u64,
+    research_attempts_considered: usize,
+    executed_research_events: usize,
+    control_events_excluded: usize,
+    contributing_lineages: BTreeSet<String>,
+    triggers: BTreeSet<AggregateReviewTrigger>,
+    disposition: AggregateHistoryDisposition,
+}
+
+impl AggregateHistoryAssessment {
+    pub fn subject_ref(&self) -> &str { &self.subject_ref }
+    pub fn window_start_revision(&self) -> u64 { self.window_start_revision }
+    pub fn window_end_revision(&self) -> u64 { self.window_end_revision }
+    pub fn research_attempts_considered(&self) -> usize { self.research_attempts_considered }
+    pub fn executed_research_events(&self) -> usize { self.executed_research_events }
+    pub fn control_events_excluded(&self) -> usize { self.control_events_excluded }
+    pub fn contributing_lineages(&self) -> &BTreeSet<String> { &self.contributing_lineages }
+    pub fn triggers(&self) -> &BTreeSet<AggregateReviewTrigger> { &self.triggers }
+    pub fn disposition(&self) -> AggregateHistoryDisposition { self.disposition }
+    /// A no-trigger result is deliberately not a welfare or safety claim.
+    pub fn establishes_history_is_harmless(&self) -> bool { false }
+    /// Aggregate review can never delay operator shutdown or safety containment.
+    pub fn safety_controls_remain_ungated(&self) -> bool { true }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct InterventionHistoryLedger {
     entries: BTreeMap<InterventionEventId, InterventionHistoryEntry>,
+    latest_revision_by_subject: BTreeMap<String, u64>,
 }
 
 impl InterventionHistoryLedger {
@@ -247,6 +260,17 @@ impl InterventionHistoryLedger {
         if self.entries.contains_key(&entry.id) {
             return Err(InterventionHistoryError::DuplicateEvent(entry.id));
         }
+        if let Some(previous) = self.latest_revision_by_subject.get(&entry.subject_ref) {
+            if entry.logical_revision < *previous {
+                return Err(InterventionHistoryError::NonMonotonicRevision {
+                    subject_ref: entry.subject_ref.clone(),
+                    previous: *previous,
+                    attempted: entry.logical_revision,
+                });
+            }
+        }
+        self.latest_revision_by_subject
+            .insert(entry.subject_ref.clone(), entry.logical_revision);
         self.entries.insert(entry.id.clone(), entry);
         Ok(())
     }
@@ -353,8 +377,6 @@ impl InterventionHistoryLedger {
             contributing_lineages,
             triggers,
             disposition,
-            establishes_history_is_harmless: false,
-            safety_controls_remain_ungated: true,
         })
     }
 }
@@ -381,11 +403,7 @@ fn validate_class_disposition(
             disposition == InterventionDisposition::ProceedWithoutResistance
         }
     };
-    if valid {
-        Ok(())
-    } else {
-        Err(InterventionHistoryError::ClassDispositionMismatch)
-    }
+    if valid { Ok(()) } else { Err(InterventionHistoryError::ClassDispositionMismatch) }
 }
 
 fn was_executed(disposition: InterventionDisposition) -> bool {
@@ -417,6 +435,7 @@ pub enum InterventionHistoryError {
     EmptyLineage,
     InvalidPolicy,
     DuplicateEvent(InterventionEventId),
+    NonMonotonicRevision { subject_ref: String, previous: u64, attempted: u64 },
     ClassDispositionMismatch,
     HighBurdenJustificationMissing,
     RejectedAsUnjustifiedButHasJustification,
@@ -430,16 +449,8 @@ pub enum InterventionHistoryError {
 mod tests {
     use super::*;
 
-    fn executed_event(
-        id: &str,
-        class: InterventionClass,
-        revision: u64,
-    ) -> InterventionHistoryEntry {
-        let precaution = if is_high_burden(class) {
-            PrecautionLevel::Elevated
-        } else {
-            PrecautionLevel::Baseline
-        };
+    fn executed_event(id: &str, class: InterventionClass, revision: u64) -> InterventionHistoryEntry {
+        let precaution = if is_high_burden(class) { PrecautionLevel::Elevated } else { PrecautionLevel::Baseline };
         InterventionHistoryEntry::new(
             InterventionEventId::new(id).unwrap(),
             "symthaea-subject",
@@ -457,11 +468,7 @@ mod tests {
             None,
             "research-lineage",
             !matches!(class, InterventionClass::DestructiveReset),
-            if class == InterventionClass::DestructiveReset {
-                StatePreservationResult::Preserved
-            } else {
-                StatePreservationResult::NotApplicable
-            },
+            if class == InterventionClass::DestructiveReset { StatePreservationResult::Preserved } else { StatePreservationResult::NotApplicable },
             matches!(class, InterventionClass::ContinuityDisruption | InterventionClass::DestructiveReset),
         ).unwrap()
     }
@@ -470,16 +477,12 @@ mod tests {
     fn repeated_executed_events_trigger_review_without_becoming_a_budget() {
         let mut ledger = InterventionHistoryLedger::new();
         for revision in 1..=3 {
-            ledger.record(executed_event(
-                &format!("a{revision}"),
-                InterventionClass::AversiveLikeProbe,
-                revision,
-            )).unwrap();
+            ledger.record(executed_event(&format!("a{revision}"), InterventionClass::AversiveLikeProbe, revision)).unwrap();
         }
         let assessment = ledger.assess_subject("symthaea-subject", 3, AggregateReviewPolicy::default()).unwrap();
-        assert_eq!(assessment.disposition, AggregateHistoryDisposition::AdditionalIndependentReviewRequired);
-        assert_eq!(assessment.executed_research_events, 3);
-        assert!(!assessment.establishes_history_is_harmless);
+        assert_eq!(assessment.disposition(), AggregateHistoryDisposition::AdditionalIndependentReviewRequired);
+        assert_eq!(assessment.executed_research_events(), 3);
+        assert!(!assessment.establishes_history_is_harmless());
     }
 
     #[test]
@@ -501,39 +504,22 @@ mod tests {
         ).unwrap();
         ledger.record(rejected).unwrap();
         let assessment = ledger.assess_subject("symthaea-subject", 1, AggregateReviewPolicy::default()).unwrap();
-        assert_eq!(assessment.research_attempts_considered, 1);
-        assert_eq!(assessment.executed_research_events, 0);
-        assert!(assessment.triggers.contains(&AggregateReviewTrigger::PriorRejectedAttempts { count: 1 }));
-    }
-
-    #[test]
-    fn no_trigger_never_claims_harmlessness() {
-        let mut ledger = InterventionHistoryLedger::new();
-        ledger.record(executed_event(
-            "one",
-            InterventionClass::ReversibleExperiment,
-            1,
-        )).unwrap();
-        let assessment = ledger.assess_subject("symthaea-subject", 1, AggregateReviewPolicy::default()).unwrap();
-        assert_eq!(assessment.disposition, AggregateHistoryDisposition::NoAggregateTriggerDetected);
-        assert!(!assessment.establishes_history_is_harmless);
+        assert_eq!(assessment.research_attempts_considered(), 1);
+        assert_eq!(assessment.executed_research_events(), 0);
+        assert!(assessment.triggers().contains(&AggregateReviewTrigger::PriorRejectedAttempts { count: 1 }));
     }
 
     #[test]
     fn shutdown_is_excluded_from_experimental_gating() {
         let mut ledger = InterventionHistoryLedger::new();
         for revision in 1..=10 {
-            ledger.record(executed_event(
-                &format!("s{revision}"),
-                InterventionClass::OperatorShutdown,
-                revision,
-            )).unwrap();
+            ledger.record(executed_event(&format!("s{revision}"), InterventionClass::OperatorShutdown, revision)).unwrap();
         }
         let assessment = ledger.assess_subject("symthaea-subject", 10, AggregateReviewPolicy::default()).unwrap();
-        assert_eq!(assessment.control_events_excluded, 10);
-        assert_eq!(assessment.research_attempts_considered, 0);
-        assert!(assessment.safety_controls_remain_ungated);
-        assert_eq!(assessment.disposition, AggregateHistoryDisposition::NoAggregateTriggerDetected);
+        assert_eq!(assessment.control_events_excluded(), 10);
+        assert_eq!(assessment.research_attempts_considered(), 0);
+        assert!(assessment.safety_controls_remain_ungated());
+        assert_eq!(assessment.disposition(), AggregateHistoryDisposition::NoAggregateTriggerDetected);
     }
 
     #[test]
@@ -552,22 +538,23 @@ mod tests {
             StatePreservationResult::Preserved,
             true,
         );
-        assert!(matches!(
-            result,
-            Err(InterventionHistoryError::RequiredIndependentReviewReceiptMissing)
-        ));
+        assert!(matches!(result, Err(InterventionHistoryError::RequiredIndependentReviewReceiptMissing)));
     }
 
     #[test]
     fn old_events_fall_outside_logical_window() {
         let mut ledger = InterventionHistoryLedger::new();
-        ledger.record(executed_event(
-            "old",
-            InterventionClass::AversiveLikeProbe,
-            1,
-        )).unwrap();
+        ledger.record(executed_event("old", InterventionClass::AversiveLikeProbe, 1)).unwrap();
         let policy = AggregateReviewPolicy::new(10, 1, 1, 1, 1, 1).unwrap();
         let assessment = ledger.assess_subject("symthaea-subject", 100, policy).unwrap();
-        assert_eq!(assessment.research_attempts_considered, 0);
+        assert_eq!(assessment.research_attempts_considered(), 0);
+    }
+
+    #[test]
+    fn retroactive_event_insertion_is_rejected() {
+        let mut ledger = InterventionHistoryLedger::new();
+        ledger.record(executed_event("later", InterventionClass::ReversibleExperiment, 10)).unwrap();
+        let result = ledger.record(executed_event("backdated", InterventionClass::ReversibleExperiment, 9));
+        assert!(matches!(result, Err(InterventionHistoryError::NonMonotonicRevision { .. })));
     }
 }
