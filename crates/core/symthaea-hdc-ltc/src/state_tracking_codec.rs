@@ -2,18 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Shared deterministic HDC codec for the state-tracking benchmark.
+//! Deterministic HDC codec for the state-tracking benchmark.
 //!
-//! Two event surfaces are exposed deliberately:
+//! In the associative-learning lineage, [`encode_event`](Self::encode_event)
+//! is intentionally HDC-memory aligned: one-hop relation assignments enter as
+//! `query_key ⊙ answer_symbol`. This makes exact current one-hop retrieval
+//! algebraically achievable by a diagonal HLS cell instead of requiring an
+//! arbitrary cross-basis rewrite that the architecture forbids.
 //!
-//! - [`StateTrackingCodec::encode_event`] is the architecture-neutral diagnostic
-//!   vector used by the frozen-reservoir comparison.
-//! - [`StateTrackingCodec::encode_associative_event`] is the HDC-memory-aligned
-//!   surface used by the fixed associative decoder / exact-learning line. It
-//!   writes one-hop relation assignments directly as `key ⊙ answer`, so a
-//!   diagonal HLS cell is not asked to learn an arbitrary cross-basis rewrite.
-//!
-//! Both surfaces are deterministic and derived from the same world event.
+//! The earlier architecture-neutral representation remains available through
+//! [`encode_diagnostic_event`](Self::encode_diagnostic_event). The frozen #2641
+//! experiment lives on its earlier branch and is therefore unchanged.
 
 use crate::continuous_hv::{ContinuousHV, UnitaryRole};
 use crate::state_tracking_benchmark::{
@@ -93,6 +92,7 @@ impl StateTrackingCodec {
                 return Err(TrackingCodecError::EmptyDomain(name));
             }
         }
+
         Ok(Self {
             dim,
             entity_symbols: make_codebook(dim, config.entities, seed.wrapping_add(1_000_000)),
@@ -120,8 +120,43 @@ impl StateTrackingCodec {
         self.dim
     }
 
-    /// Architecture-neutral event representation used by the frozen diagnostic.
+    /// Default event encoding for the associative-learning lineage.
+    ///
+    /// `MoveEntity(e -> l)     = K_location(e) ⊙ symbol(l)`
+    /// `TransferObject(o -> e) = K_owner(o)    ⊙ symbol(e)`
+    ///
+    /// No `ObjectLocation` answer is written directly. Two-hop object location
+    /// therefore remains a genuine composition problem. Elapsed physical time is
+    /// passed separately to the continuous-time recurrent update.
     pub fn encode_event(
+        &self,
+        event: &TrackingEvent,
+        elapsed_since_previous: f64,
+    ) -> Result<ContinuousHV, TrackingCodecError> {
+        validate_elapsed(elapsed_since_previous)?;
+        match event.kind {
+            TrackingEventKind::MoveEntity { entity, to } => {
+                Ok(self.current_entity_location_key(entity)?.bind(self.location_symbol(to)?))
+            }
+            TrackingEventKind::TransferObject { object, to } => {
+                Ok(self.current_object_owner_key(object)?.bind(self.entity_symbol(to)?))
+            }
+        }
+    }
+
+    /// Explicit alias documenting that the default event surface is associative.
+    pub fn encode_associative_event(
+        &self,
+        event: &TrackingEvent,
+        elapsed_since_previous: f64,
+    ) -> Result<ContinuousHV, TrackingCodecError> {
+        self.encode_event(event, elapsed_since_previous)
+    }
+
+    /// Architecture-neutral diagnostic event representation retained for
+    /// side-by-side codec ablations and compatibility with the earlier frozen
+    /// experiment design.
+    pub fn encode_diagnostic_event(
         &self,
         event: &TrackingEvent,
         elapsed_since_previous: f64,
@@ -140,36 +175,6 @@ impl StateTrackingCodec {
                 ContinuousHV::bundle(&[&self.transfer_marker, &object, &entity, &time])
             }
         })
-    }
-
-    /// HDC associative-memory-aligned event representation.
-    ///
-    /// Current one-hop facts are written directly in the same key space used by
-    /// current `EntityLocation` and `ObjectOwner` queries:
-    ///
-    /// `MoveEntity(e -> l)    => K_location(e) ⊙ symbol(l)`
-    /// `TransferObject(o -> e)=> K_owner(o)    ⊙ symbol(e)`
-    ///
-    /// The physical elapsed `dt` is already supplied separately to HLS, so this
-    /// vector contains no redundant time channel. No direct `ObjectLocation`
-    /// association is authored: that two-hop result remains a real composition
-    /// challenge rather than leaked supervision.
-    pub fn encode_associative_event(
-        &self,
-        event: &TrackingEvent,
-        elapsed_since_previous: f64,
-    ) -> Result<ContinuousHV, TrackingCodecError> {
-        validate_elapsed(elapsed_since_previous)?;
-        match event.kind {
-            TrackingEventKind::MoveEntity { entity, to } => {
-                let key = self.current_entity_location_key(entity)?;
-                Ok(key.bind(self.location_symbol(to)?))
-            }
-            TrackingEventKind::TransferObject { object, to } => {
-                let key = self.current_object_owner_key(object)?;
-                Ok(key.bind(self.entity_symbol(to)?))
-            }
-        }
     }
 
     pub fn encode_query(
@@ -196,12 +201,12 @@ impl StateTrackingCodec {
         Ok(ContinuousHV::bundle(&[marker, &target, &time]))
     }
 
-    /// Deterministic unitary key for associative unbinding.
+    /// Deterministic unitary associative-memory key.
     ///
-    /// Current queries use only relation × target identity. Historical queries
-    /// additionally compose a lag role. This makes current one-hop event writes
-    /// exactly algebraically aligned while leaving retrospective retrieval a
-    /// distinct temporal-memory problem.
+    /// Current one-hop keys are identical to the keys used by matching event
+    /// writes. Historical queries add a lag role; current queries do not. Thus
+    /// current one-hop retrieval has an exact algebraic target while historical
+    /// retrieval remains a separate temporal-memory challenge.
     pub fn query_key(
         &self,
         query: &TrackingQuery,
@@ -227,7 +232,9 @@ impl StateTrackingCodec {
     pub fn decode_answer_symbol(&self, vector: &ContinuousHV, query_kind: TrackingQueryKind) -> TrackingAnswer {
         assert_eq!(vector.dim(), self.dim, "answer vector dimension mismatch");
         match query_kind {
-            TrackingQueryKind::ObjectOwner { .. } => TrackingAnswer::Entity(nearest(vector, &self.entity_symbols) as EntityId),
+            TrackingQueryKind::ObjectOwner { .. } => {
+                TrackingAnswer::Entity(nearest(vector, &self.entity_symbols) as EntityId)
+            }
             TrackingQueryKind::EntityLocation { .. } | TrackingQueryKind::ObjectLocation { .. } => {
                 TrackingAnswer::Location(nearest(vector, &self.location_symbols) as LocationId)
             }
@@ -238,16 +245,14 @@ impl StateTrackingCodec {
         match kind {
             TrackingQueryKind::EntityLocation { entity } => self.current_entity_location_key(entity),
             TrackingQueryKind::ObjectOwner { object } => self.current_object_owner_key(object),
-            TrackingQueryKind::ObjectLocation { object } => Ok(self
-                .query_object_location_role
-                .compose(self.object_key(object)?)),
+            TrackingQueryKind::ObjectLocation { object } => {
+                Ok(self.query_object_location_role.compose(self.object_key(object)?))
+            }
         }
     }
 
     fn current_entity_location_key(&self, entity: EntityId) -> Result<UnitaryRole, TrackingCodecError> {
-        Ok(self
-            .query_entity_location_role
-            .compose(self.entity_key(entity)?))
+        Ok(self.query_entity_location_role.compose(self.entity_key(entity)?))
     }
 
     fn current_object_owner_key(&self, object: ObjectId) -> Result<UnitaryRole, TrackingCodecError> {
@@ -323,10 +328,10 @@ mod tests {
     }
 
     #[test]
-    fn associative_move_event_exactly_unbinds_current_location() {
+    fn current_move_write_unbinds_exact_location() {
         let (_, codec) = fixture();
         let event = TrackingEvent { time: 1.0, kind: TrackingEventKind::MoveEntity { entity: 3, to: 2 } };
-        let memory = codec.encode_associative_event(&event, 1.0).unwrap();
+        let memory = codec.encode_event(&event, 1.0).unwrap();
         let query = TrackingQuery {
             asked_after_event: 0, as_of_event: 0, as_of_time: 1.0,
             kind: TrackingQueryKind::EntityLocation { entity: 3 },
@@ -337,10 +342,10 @@ mod tests {
     }
 
     #[test]
-    fn associative_transfer_event_exactly_unbinds_current_owner() {
+    fn current_transfer_write_unbinds_exact_owner() {
         let (_, codec) = fixture();
         let event = TrackingEvent { time: 1.0, kind: TrackingEventKind::TransferObject { object: 5, to: 4 } };
-        let memory = codec.encode_associative_event(&event, 1.0).unwrap();
+        let memory = codec.encode_event(&event, 1.0).unwrap();
         let query = TrackingQuery {
             asked_after_event: 0, as_of_event: 0, as_of_time: 1.0,
             kind: TrackingQueryKind::ObjectOwner { object: 5 },
@@ -363,21 +368,27 @@ mod tests {
     }
 
     #[test]
+    fn diagnostic_and_associative_surfaces_are_distinct_but_deterministic() {
+        let (benchmark, a) = fixture();
+        let b = StateTrackingCodec::from_benchmark_config(512, &benchmark.config, 99).unwrap();
+        let event = &benchmark.events[0];
+        assert_eq!(a.encode_event(event, event.time).unwrap(), b.encode_event(event, event.time).unwrap());
+        assert_eq!(
+            a.encode_diagnostic_event(event, event.time).unwrap(),
+            b.encode_diagnostic_event(event, event.time).unwrap()
+        );
+        assert_ne!(
+            a.encode_event(event, event.time).unwrap(),
+            a.encode_diagnostic_event(event, event.time).unwrap()
+        );
+    }
+
+    #[test]
     fn answer_symbols_roundtrip() {
         let (benchmark, codec) = fixture();
         for query in &benchmark.queries {
             let symbol = codec.answer_symbol(query.expected).unwrap();
             assert_eq!(codec.decode_answer_symbol(symbol, query.kind), query.expected);
         }
-    }
-
-    #[test]
-    fn generic_event_encoding_remains_deterministic() {
-        let (benchmark, a) = fixture();
-        let b = StateTrackingCodec::from_benchmark_config(512, &benchmark.config, 99).unwrap();
-        assert_eq!(
-            a.encode_event(&benchmark.events[0], benchmark.events[0].time).unwrap(),
-            b.encode_event(&benchmark.events[0], benchmark.events[0].time).unwrap()
-        );
     }
 }
