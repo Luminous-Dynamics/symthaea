@@ -10,8 +10,8 @@ const CANDIDATE_FREEZE: &str = include_str!("../../../../docs/release/evidence/W
 
 const EXPECTED_PROTOCOL_SHA256: &str = "14d8c55c10d20eb71f6745d20e70d831838062353dd64bc2478ef66452102665";
 const EXPECTED_COMMITMENT_SCHEMA_SHA256: &str = "24edb76cbdbaded65d2aee3b420748ea4ee2e7de36aa584af3aad6700b22113a";
-const EXPECTED_RESULT_SCHEMA_SHA256: &str = "1a6ce136f66a84717864d034ab51b91d87e8e4b33022f399fa848248b5cbf6e2";
-const EXPECTED_CANDIDATE_FREEZE_SHA256: &str = "5d8da7b21a8b66e51e29202b38c80f19432317bbb1bf856169ddae73de66bc1e";
+const EXPECTED_RESULT_SCHEMA_SHA256: &str = "5e0910026d8e2271365ea1f527ff4e674d5b358dea51451a3f3606d0fedeb7e5";
+const EXPECTED_CANDIDATE_FREEZE_SHA256: &str = "021713b8d3436a5ad0b49a414c1160b405f6ce045ea1ac970b11f5388b779dce";
 const FROZEN_CANDIDATE_SHA: &str = "470e0fd3bc0a3435f561d59e281a27e865979a66";
 
 const SHA256_K: [u32; 64] = [
@@ -73,7 +73,6 @@ fn wcare34_protocol_bytes_are_frozen() {
 fn e001_is_frozen_before_holdout_commit_or_reveal() {
     for sentinel in [
         "\"candidate_epoch\":\"WCARE34-E001\"",
-        &format!("\"candidate_sha\":\"{FROZEN_CANDIDATE_SHA}\""),
         "\"candidate_state\":\"CANDIDATE_FROZEN\"",
         "\"holdout_state\":\"NOT_COMMITTED\"",
         "\"holdout_plaintext_revealed\":false",
@@ -82,6 +81,8 @@ fn e001_is_frozen_before_holdout_commit_or_reveal() {
     ] {
         assert!(CANDIDATE_FREEZE.contains(sentinel), "missing freeze sentinel: {sentinel}");
     }
+    let candidate_sentinel = format!("\"candidate_sha\":\"{FROZEN_CANDIDATE_SHA}\"");
+    assert!(CANDIDATE_FREEZE.contains(&candidate_sentinel));
 }
 
 #[test]
@@ -97,6 +98,9 @@ fn schemas_preserve_independence_and_result_boundaries() {
         "adjudication_spec_sha256",
     ] {
         assert!(COMMITMENT_SCHEMA.contains(required), "missing commitment field: {required}");
+    }
+    for required in ["case_results", "hard_invariant_failed_case_ids"] {
+        assert!(RESULT_SCHEMA.contains(required), "missing complete-census field: {required}");
     }
     for class in ["PASS_HOLDOUT","FAIL_HOLDOUT","INVALID_HOLDOUT","INFRASTRUCTURE_INDETERMINATE"] {
         assert!(RESULT_SCHEMA.contains(class), "missing result class: {class}");
