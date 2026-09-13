@@ -53,6 +53,27 @@ fn qualified_main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 
+    fn require_regular_source(path: &str) -> io::Result<()> {
+        let entry = git(&["ls-tree", "HEAD", "--", path])?;
+        let (metadata, observed_path) = entry.split_once('\t').ok_or_else(|| {
+            io::Error::other(format!("missing or malformed git tree entry for {path:?}: {entry:?}"))
+        })?;
+        let mut fields = metadata.split_whitespace();
+        let mode = fields.next().unwrap_or_default();
+        let object_type = fields.next().unwrap_or_default();
+        let object_sha = fields.next().unwrap_or_default();
+        if mode != "100644"
+            || object_type != "blob"
+            || object_sha.len() != 40
+            || observed_path != path
+        {
+            return Err(io::Error::other(format!(
+                "specialist path must be a regular 100644 Git blob: path={path:?}, entry={entry:?}"
+            )));
+        }
+        Ok(())
+    }
+
     let tracked_changes = git(&["status", "--porcelain=v1", "--untracked-files=no"])?;
     if !tracked_changes.is_empty() {
         return Err(io::Error::other(format!(
@@ -86,6 +107,7 @@ fn qualified_main() -> Result<(), Box<dyn std::error::Error>> {
     let specialist_blob_shas: BTreeMap<String, String> = implementation_paths
         .iter()
         .map(|(id, path)| {
+            require_regular_source(path)?;
             git(&["rev-parse", &format!("HEAD:{path}")])
                 .map(|sha| ((*id).to_string(), sha))
         })
