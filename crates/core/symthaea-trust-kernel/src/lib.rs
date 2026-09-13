@@ -22,6 +22,7 @@ mod accepted_clock_basis;
 mod clock;
 mod clock_bootstrap_authority;
 mod clock_evaluation_permit;
+mod clock_governance_time;
 mod clock_operational;
 mod clock_witness;
 mod continuity;
@@ -54,6 +55,11 @@ pub use clock_evaluation_permit::{
     ClockEvaluationPermitError, ClockEvaluationPermitIdV4, ClockEvaluationPermitV4,
     ClockEvaluationPolicyIdV4, ClockEvaluationPolicyV4, ClockQuorumPolicyRevisionIdV1,
     ClockQuorumPolicyRevisionV1, derive_bootstrap_clock_evaluation_permit_v4,
+};
+pub use clock_governance_time::{
+    CLOCK_GOVERNANCE_EVALUATION_ENVELOPE_SCHEMA, ClockGovernanceEvaluationEnvelopeIdV1,
+    ClockGovernanceEvaluationEnvelopeV1, ClockGovernanceTimeError,
+    derive_clock_governance_evaluation_envelope_v1,
 };
 pub use clock_operational::{
     OPERATIONAL_CLOCK_BASIS_SCHEMA, OPERATIONAL_CLOCK_SUCCESSOR_PERMIT_SCHEMA,
