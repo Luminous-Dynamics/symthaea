@@ -18,12 +18,19 @@
 pub mod ablation;
 #[cfg(feature = "symthaea-backend")]
 pub mod ae2_empirical_runner;
+pub mod gwt1_evidence_envelope;
 pub mod gwt1_qualification;
 pub mod indicators;
 pub mod qualification_design;
 pub mod qualification_runtime;
 pub mod report;
 
+pub use gwt1_evidence_envelope::{
+    GWT1_EVIDENCE_ENVELOPE_SCHEMA_V1, GWT1_RAW_OBSERVATION_MEDIA_TYPE_V1,
+    Gwt1ArtifactIntegrityFailureV1, Gwt1EvidenceEnvelopeResolutionV1, Gwt1EvidenceEnvelopeV1,
+    Gwt1RawObservationArtifactV1, describe_raw_observations_v1, raw_observation_blake3,
+    resolve_gwt1_evidence_envelope_v1,
+};
 pub use gwt1_qualification::{
     GWT1_MIN_TRAJECTORY_STEPS_V1, GWT1_PERTURBATIONS_V1, GWT1_QUALIFICATION_SCHEMA_V1,
     GWT1_REQUIRED_WORKERS_V1, GWT1_SPECIALISTS_V1, Gwt1PerturbationObservationV1,
