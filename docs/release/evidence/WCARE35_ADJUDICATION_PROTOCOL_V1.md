@@ -99,6 +99,10 @@ Consensus discussion may append a new adjudication artifact but may never:
 
 Corrections are append-only and must point to the superseded record while preserving it.
 
+For panel statistics, a valid correction chain contributes exactly one active record: the unique leaf that is not superseded by a later correction. Every superseded record remains in the raw evidence census and remains hash-bound by the result. Branching correction chains, cycles, missing superseded records, or reviewer-class changes within one correction chain invalidate the adjudication rather than creating extra panel votes.
+
+The final result therefore binds both the complete raw reviewer-record hash census and the active reviewer-record hash census used for statistics. A correction can replace a reviewer's active record, but it can never erase the earlier record from evidence.
+
 ## Agreement and disagreement
 
 The preregistration chooses an agreement metric appropriate to the scale. Krippendorff's alpha is a recommended default when applicable because it supports multiple reviewers and missing values, but the protocol does not make one statistic universal.
