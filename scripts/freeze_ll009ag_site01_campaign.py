@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,json,sys,tempfile
+import argparse,json,shutil,subprocess,sys,tempfile
 from pathlib import Path
 from ll009ag_common import *
 from ll009ag_campaign import prepare,verify_pre,vm,abind,freeze,verify_frz,va,classify,finalize
@@ -14,6 +14,13 @@ def native_receipt(v:dict)->dict:
  if 'receipt_sha256' in v:raise CE('native receipt payload already hashed')
  o=dict(v);o['receipt_sha256']=hb((json.dumps(v,sort_keys=True,indent=2,separators=(',',': '))+'\n').encode());return o
 
+def _git(repo:Path,*args:str)->str:
+ exe=shutil.which('git')
+ if not exe:raise CE('git missing from AG self-test environment')
+ try:cp=subprocess.run([exe,'-C',str(repo),*args],check=True,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+ except subprocess.CalledProcessError as e:raise CE(f'synthetic git command failed: {args!r}: {e.stderr.strip()}') from e
+ return cp.stdout.strip()
+
 def selftest(policy_path:Path):
  cp=vp(lj(policy_path))
  if cp['classification_ceiling']!='hybrid_scenario_sampled_visibility':raise CE('checked policy ceiling changed unexpectedly')
@@ -23,12 +30,17 @@ def selftest(policy_path:Path):
    'stage_plan':[{'id':'acquire','environment_profile':'acquisition','may_access_network':True},{'id':'gis','environment_profile':'gis','may_access_network':False},{'id':'analysis','environment_profile':'analysis','may_access_network':False}],
    'network_authorized_stage_ids':['acquire'],'environment_contracts':{k:{'required_packages':['numpy'] if k in ('gis','analysis') else [],'required_libraries':['openssl'] if k=='acquisition' else (['gdal','proj'] if k=='gis' else []),'required_environment_variables':['PYTHONHASHSEED','TZ']} for k in ['acquisition','gis','analysis']},'classification_order':['descriptive_geometry','empirical_sampled_visibility','hybrid_scenario_sampled_visibility','risk_qualified_visibility','deterministic_visibility'],
    'classification_ceiling':'hybrid_scenario_sampled_visibility','semantic_rules':{'descriptive_geometry':{'enabled':True,'requires_all_artifact_ids':['q']},'empirical_sampled_visibility':{'enabled':True,'requires_all_artifact_ids':['q']},'hybrid_scenario_sampled_visibility':{'enabled':True,'requires_all_artifact_ids':['z']},'risk_qualified_visibility':{'enabled':False,'requires_all_artifact_ids':[]},'deterministic_visibility':{'enabled':False,'requires_all_artifact_ids':[]}}}
-  pp=r/'policy.json';wj(pp,pol);(repo/'tool.py').write_text('fixed\n')
+  pp=repo/'policy.json';wj(pp,pol);(repo/'tool.py').write_text('fixed\n')
+  _git(repo,'init','-q');_git(repo,'config','user.email','ll009ag@example.invalid');_git(repo,'config','user.name','LL-009AG Synthetic');_git(repo,'add','policy.json','tool.py');_git(repo,'commit','-qm','synthetic AG campaign subject')
+  head=_git(repo,'rev-parse','HEAD')
+  if len(head) not in (40,64):raise CE('synthetic Git HEAD has unexpected object-id length')
   em={}
   for k in ['acquisition','gis','analysis']:
    em[k]=k+'.json';wj(rt/em[k],{'schema_version':E,'profile':k,'runtime':{'python':{'implementation':'cpython','version':'3.13.0','executable_sha256':'a'*64},'platform':{'system':'Linux','machine':'x86_64'},'packages':({'numpy':'1.26.4'} if k in ('gis','analysis') else {}),'libraries':({'openssl':'OpenSSL synthetic'} if k=='acquisition' else ({'gdal':'3.9.0','proj':'9.4.0'} if k=='gis' else {})),'environment':{'PYTHONHASHSEED':None,'TZ':'UTC'}}})
-  head='1'*64;pre=prepare(pp,repo,head,rt,em)
+  pre=prepare(pp,repo,head,rt,em)
   if pre!=prepare(pp,repo,head,rt,em):raise CE('PREPARED not deterministic')
+  if pre['repo_subject']['head_commit_oid']!=head or not pre['repo_subject']['head_tree_oid']:raise CE('PREPARED did not bind real Git commit/tree')
+  wrong_head=('0' if head[0]!='0' else '1')+head[1:];expect('false declared Git head',lambda:prepare(pp,repo,wrong_head,rt,em))
 
   q=native_receipt({'schema_version':'q.v1','value':1})
   z=native_receipt({'schema_version':'z.v1','upstream':q['receipt_sha256']})
@@ -49,7 +61,7 @@ def selftest(policy_path:Path):
   if fi['promotion_eligible'] is not False or fi['campaign_completeness']!='incomplete_declared' or fi['classification']['effective_evidence_class'] is not None:raise CE('FINALIZED incorrectly promoted incomplete campaign')
 
   old=(rt/'analysis.json').read_bytes();wj(rt/'analysis.json',{'schema_version':E,'profile':'analysis','runtime':{'python':{'implementation':'cpython','version':'drift','executable_sha256':'a'*64},'platform':{'system':'Linux','machine':'x86_64'},'packages':{'numpy':'1.26.4'},'libraries':{},'environment':{'PYTHONHASHSEED':None,'TZ':'UTC'}}});expect('environment drift before freeze',lambda:verify_pre(pre,pp,repo,head,rt));(rt/'analysis.json').write_bytes(old)
-  oldt=(repo/'tool.py').read_bytes();(repo/'tool.py').write_text('drift\n');expect('tool drift before freeze',lambda:verify_pre(pre,pp,repo,head,rt));(repo/'tool.py').write_bytes(oldt)
+  oldt=(repo/'tool.py').read_bytes();(repo/'tool.py').write_text('drift\n');expect('protected worktree drift',lambda:verify_pre(pre,pp,repo,head,rt));(repo/'tool.py').write_bytes(oldt)
 
   oldz=(er/'z.json').read_bytes();wj(er/'z.json',native_receipt({'schema_version':'z.v1','upstream':q['receipt_sha256'],'changed':True}));expect('artifact substitution after freeze',lambda:verify_frz(fr,pre,pp,repo,head,rt,mp,er));(er/'z.json').write_bytes(oldz)
   (er/'extra').write_text('x');expect('extra evidence file',lambda:verify_frz(fr,pre,pp,repo,head,rt,mp,er));(er/'extra').unlink()
@@ -75,10 +87,10 @@ def selftest(policy_path:Path):
   bad={'schema_version':A,'study_id':'synthetic','evidence_class':'risk_qualified_visibility','basis_artifact_ids':['z']};expect('over-promotion',lambda:classify(pol,va(bad,'synthetic'),{'q','z'}))
   wrong={'schema_version':A,'study_id':'synthetic','evidence_class':'hybrid_scenario_sampled_visibility','basis_artifact_ids':['q']};expect('missing provenance',lambda:classify(pol,va(wrong,'synthetic'),{'q','z'}))
   future_basis={'schema_version':A,'study_id':'synthetic','evidence_class':'descriptive_geometry','basis_artifact_ids':['future']};expect('unavailable semantic basis',lambda:classify(pol,va(future_basis,'synthetic'),{'q','z'}))
- print('LL-009AG self-test PASS: deterministic replay; native receipt hashes; exact dependency bindings; required/optional/unavailable handling; environment contracts; drift, substitution, closure, self-hash tamper, cycles, and semantic over-promotion fail closed')
+ print('LL-009AG self-test PASS: real Git subject/tree; deterministic replay; native receipt hashes; exact dependency bindings; required/optional/unavailable handling; environment contracts; drift, substitution, closure, self-hash tamper, cycles, and semantic over-promotion fail closed')
 
 def rr(p:Path,sch:str):v=lj(p);vr(v,sch);return v
-def common(x):x.add_argument('--policy',type=Path,required=True);x.add_argument('--repo-root',type=Path,required=True);x.add_argument('--repo-head',required=True);x.add_argument('--runtime-root',type=Path,required=True)
+def common(x):x.add_argument('--policy',type=Path,required=True);x.add_argument('--repo-root',type=Path,required=True);x.add_argument('--repo-head',required=True,help='actual Git HEAD object ID (SHA-1 or SHA-256 according to repository object format)');x.add_argument('--runtime-root',type=Path,required=True)
 def parser():
  p=argparse.ArgumentParser(description='LL-009AG frozen Site01 campaign root; no downloads or scientific recomputation');sp=p.add_subparsers(dest='cmd',required=True)
  x=sp.add_parser('prepare');common(x);x.add_argument('--env',action='append',default=[]);x.add_argument('--output',type=Path,required=True)
@@ -91,7 +103,7 @@ def main()->int:
  a=parser().parse_args()
  try:
   if a.cmd=='self-test':selftest(a.policy);return 0
-  if a.cmd=='prepare':o=prepare(a.policy,a.repo_root,a.repo_head,a.runtime_root,envmap(a.env));wj(a.output,o);print('PREPARED',o['receipt_sha256']);return 0
+  if a.cmd=='prepare':o=prepare(a.policy,a.repo_root,a.repo_head,a.runtime_root,envmap(a.env));wj(a.output,o);print('PREPARED',o['receipt_sha256'],o['repo_subject']['head_commit_oid'],o['repo_subject']['head_tree_oid']);return 0
   pre=rr(a.preparation,PRE)
   if a.cmd=='freeze':o=freeze(pre,a.policy,a.repo_root,a.repo_head,a.runtime_root,a.manifest,a.evidence_root);wj(a.output,o);print('FROZEN',o['receipt_sha256'],o['completeness']['campaign_completeness']);return 0
   fr=rr(a.freeze,FRZ)
