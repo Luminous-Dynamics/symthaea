@@ -270,9 +270,18 @@ mod tests {
     fn additive_energy_and_unique_basis_are_complete() {
         let report = project_process_utilities(&process(baseline())).unwrap();
         assert_eq!(report.electrical_status, UtilityProjectionStatus::Complete);
-        assert_eq!(report.electrical_energy_j, Some(EnergyRangeJ::new(50.0, 70.0).unwrap()));
-        assert_eq!(report.peak_electrical_power_w, Some(PowerRangeW::new(15.0, 20.0).unwrap()));
-        assert_eq!(report.process_time_s, Some(DurationRangeS::new(5.0, 10.0).unwrap()));
+        assert_eq!(
+            report.electrical_energy_j,
+            Some(EnergyRangeJ::new(50.0, 70.0).unwrap())
+        );
+        assert_eq!(
+            report.peak_electrical_power_w,
+            Some(PowerRangeW::new(15.0, 20.0).unwrap())
+        );
+        assert_eq!(
+            report.process_time_s,
+            Some(DurationRangeS::new(5.0, 10.0).unwrap())
+        );
         assert!(report.unresolved.is_empty());
     }
 
@@ -281,43 +290,82 @@ mod tests {
         let mut utilities = baseline();
         utilities.pop();
         let report = project_process_utilities(&process(utilities)).unwrap();
-        assert_eq!(report.electrical_status, UtilityProjectionStatus::Incomplete);
+        assert_eq!(
+            report.electrical_status,
+            UtilityProjectionStatus::Incomplete
+        );
         assert_eq!(report.process_time_s, None);
-        assert!(report.unresolved.contains(&UtilityProjectionReason::MissingProcessTime));
+        assert!(
+            report
+                .unresolved
+                .contains(&UtilityProjectionReason::MissingProcessTime)
+        );
     }
 
     #[test]
     fn duplicate_peak_power_is_ambiguous_not_summed_or_maxed() {
         let mut utilities = baseline();
-        utilities.push(UtilityDemand::PeakElectricalPower(PowerRangeW::new(1.0, 1.0).unwrap()));
+        utilities.push(UtilityDemand::PeakElectricalPower(
+            PowerRangeW::new(1.0, 1.0).unwrap(),
+        ));
         let report = project_process_utilities(&process(utilities)).unwrap();
         assert_eq!(report.electrical_status, UtilityProjectionStatus::Ambiguous);
         assert_eq!(report.peak_electrical_power_w, None);
-        assert!(report.unresolved.contains(&UtilityProjectionReason::MultiplePeakPower));
+        assert!(
+            report
+                .unresolved
+                .contains(&UtilityProjectionReason::MultiplePeakPower)
+        );
     }
 
     #[test]
     fn duplicate_process_time_is_ambiguous_not_combined() {
         let mut utilities = baseline();
-        utilities.push(UtilityDemand::ProcessTime(DurationRangeS::new(1.0, 1.0).unwrap()));
+        utilities.push(UtilityDemand::ProcessTime(
+            DurationRangeS::new(1.0, 1.0).unwrap(),
+        ));
         let report = project_process_utilities(&process(utilities)).unwrap();
         assert_eq!(report.electrical_status, UtilityProjectionStatus::Ambiguous);
         assert_eq!(report.process_time_s, None);
-        assert!(report.unresolved.contains(&UtilityProjectionReason::MultipleProcessTime));
+        assert!(
+            report
+                .unresolved
+                .contains(&UtilityProjectionReason::MultipleProcessTime)
+        );
     }
 
     #[test]
     fn thermal_and_cooling_quantities_remain_visible_but_unresolved() {
         let mut utilities = baseline();
-        utilities.push(UtilityDemand::ThermalEnergy(EnergyRangeJ::new(20.0, 25.0).unwrap()));
-        utilities.push(UtilityDemand::ThermalEnergy(EnergyRangeJ::new(5.0, 5.0).unwrap()));
-        utilities.push(UtilityDemand::CoolingEnergy(EnergyRangeJ::new(5.0, 8.0).unwrap()));
+        utilities.push(UtilityDemand::ThermalEnergy(
+            EnergyRangeJ::new(20.0, 25.0).unwrap(),
+        ));
+        utilities.push(UtilityDemand::ThermalEnergy(
+            EnergyRangeJ::new(5.0, 5.0).unwrap(),
+        ));
+        utilities.push(UtilityDemand::CoolingEnergy(
+            EnergyRangeJ::new(5.0, 8.0).unwrap(),
+        ));
         let report = project_process_utilities(&process(utilities)).unwrap();
         assert_eq!(report.electrical_status, UtilityProjectionStatus::Complete);
-        assert_eq!(report.thermal_energy_j, Some(EnergyRangeJ::new(25.0, 30.0).unwrap()));
-        assert_eq!(report.cooling_energy_j, Some(EnergyRangeJ::new(5.0, 8.0).unwrap()));
-        assert!(report.unresolved.contains(&UtilityProjectionReason::ThermalTemperatureUnbound));
-        assert!(report.unresolved.contains(&UtilityProjectionReason::CoolingRejectionUnbound));
+        assert_eq!(
+            report.thermal_energy_j,
+            Some(EnergyRangeJ::new(25.0, 30.0).unwrap())
+        );
+        assert_eq!(
+            report.cooling_energy_j,
+            Some(EnergyRangeJ::new(5.0, 8.0).unwrap())
+        );
+        assert!(
+            report
+                .unresolved
+                .contains(&UtilityProjectionReason::ThermalTemperatureUnbound)
+        );
+        assert!(
+            report
+                .unresolved
+                .contains(&UtilityProjectionReason::CoolingRejectionUnbound)
+        );
     }
 
     #[test]
@@ -327,9 +375,16 @@ mod tests {
             UtilityDemand::ProcessTime(DurationRangeS::new(5.0, 5.0).unwrap()),
         ]))
         .unwrap();
-        assert_eq!(report.electrical_status, UtilityProjectionStatus::Incomplete);
+        assert_eq!(
+            report.electrical_status,
+            UtilityProjectionStatus::Incomplete
+        );
         assert_eq!(report.electrical_energy_j, None);
-        assert!(report.unresolved.contains(&UtilityProjectionReason::MissingElectricalEnergy));
+        assert!(
+            report
+                .unresolved
+                .contains(&UtilityProjectionReason::MissingElectricalEnergy)
+        );
     }
 
     #[test]
@@ -339,8 +394,15 @@ mod tests {
             UtilityDemand::ProcessTime(DurationRangeS::new(5.0, 5.0).unwrap()),
         ]))
         .unwrap();
-        assert_eq!(report.electrical_status, UtilityProjectionStatus::Incomplete);
-        assert!(report.unresolved.contains(&UtilityProjectionReason::MissingPeakPower));
+        assert_eq!(
+            report.electrical_status,
+            UtilityProjectionStatus::Incomplete
+        );
+        assert!(
+            report
+                .unresolved
+                .contains(&UtilityProjectionReason::MissingPeakPower)
+        );
     }
 
     #[test]
