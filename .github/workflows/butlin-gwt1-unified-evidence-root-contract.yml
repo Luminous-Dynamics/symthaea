@@ -59,9 +59,10 @@ jobs:
           }
           direct = Path(".github/workflows/butlin-gwt1-trusted-builder.yml").read_text()
           causal = Path(".github/workflows/butlin-gwt1-causal-trusted-builder.yml").read_text()
+          workflow_sha_token = "$" + "{{ job.workflow_sha }}"
 
           for name, text in (("direct", direct), ("causal", causal)):
-              assert "${{ job.workflow_sha }}" in text, name
+              assert workflow_sha_token in text, name
               assert "git merge-base --is-ancestor" in text, name
               assert "git diff --name-only --diff-filter=ACDMRTUXB" in text, name
               assert "runs-on: ubuntu-24.04" in text, name
@@ -76,9 +77,6 @@ jobs:
           body = adapter.split("fn changed_specialists(", 1)[1].split("\nfn derive_receipt(", 1)[0]
           assert body.count(".get(**id)") == 2, body
           assert ".get(*id)" not in body, body
-
-          # When both workflows and the evidence subject are exact R, each
-          # builder's ancestor test is reflexive and its permitted-drift set is empty.
           PY
           test -z "$(git diff --name-only HEAD HEAD)"
 
