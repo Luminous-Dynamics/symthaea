@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-research-split"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Content-addressed research split contracts for spatial, grouped, and forward-time evaluation integrity."
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
