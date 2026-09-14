@@ -42,6 +42,7 @@ pub struct FabricationContainmentState {
 pub enum ContainmentStateError {
     UnsupportedSchema,
     GenerationZero,
+    GenerationOverflow,
     InvalidGenesis,
     EmptyResilienceDigest,
     GenerationNotSuccessor { previous: u64, proposed: u64 },
@@ -122,9 +123,13 @@ impl FabricationContainmentState {
         {
             return Err(ContainmentStateError::ResilienceSameGenerationSubstitution);
         }
+        let next_generation = self
+            .generation
+            .checked_add(1)
+            .ok_or(ContainmentStateError::GenerationOverflow)?;
         Ok(Self {
             schema_version: CONTAINMENT_STATE_SCHEMA.into(),
-            generation: self.generation.saturating_add(1),
+            generation: next_generation,
             previous_state_digest: Some(digest_containment_state(self)?),
             release_resilience_generation,
             release_resilience_state_digest,
@@ -158,7 +163,11 @@ pub fn verify_containment_state_successor(
 ) -> Result<(), ContainmentStateError> {
     previous.validate()?;
     proposed.validate()?;
-    if proposed.generation != previous.generation.saturating_add(1) {
+    let expected_generation = previous
+        .generation
+        .checked_add(1)
+        .ok_or(ContainmentStateError::GenerationOverflow)?;
+    if proposed.generation != expected_generation {
         return Err(ContainmentStateError::GenerationNotSuccessor {
             previous: previous.generation,
             proposed: proposed.generation,
@@ -225,5 +234,21 @@ mod tests {
         let genesis = FabricationContainmentState::genesis(1, Sha256Digest([1; 32])).unwrap();
         let next = genesis.successor(2, Sha256Digest([2; 32])).unwrap();
         assert_eq!(verify_containment_state_successor(&genesis, &next), Ok(()));
+    }
+
+    #[test]
+    fn generation_overflow_fails_closed() {
+        let mut terminal =
+            FabricationContainmentState::genesis(1, Sha256Digest([1; 32])).unwrap();
+        terminal.generation = u64::MAX;
+        terminal.previous_state_digest = Some(Sha256Digest([7; 32]));
+        assert_eq!(
+            terminal.successor(1, Sha256Digest([1; 32])),
+            Err(ContainmentStateError::GenerationOverflow)
+        );
+        assert_eq!(
+            verify_containment_state_successor(&terminal, &terminal),
+            Err(ContainmentStateError::GenerationOverflow)
+        );
     }
 }
