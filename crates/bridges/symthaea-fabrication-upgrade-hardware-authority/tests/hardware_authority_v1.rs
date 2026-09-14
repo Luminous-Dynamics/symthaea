@@ -36,11 +36,23 @@ fn source_ratchets_exclude_legacy_scalar_live_authority() {
 }
 
 #[test]
-fn statement_timing_is_interval_safe_and_post_probation() {
+fn statement_timing_and_trust_chronology_are_fail_closed() {
     let source = include_str!("../src/lib.rs");
     assert!(source.contains("issued_ms < clearance_clock.upper_unix_ms()"));
     assert!(source.contains("issued_ms > current_clock.lower_unix_ms()"));
     assert!(source.contains("expires_ms <= current_clock.upper_unix_ms()"));
-    assert!(source.contains("current_clock\n        .upper_unix_ms()"));
+    assert!(source.contains("maximum_statement_age_s"));
+    assert!(source.contains("StatementTooOld"));
     assert!(source.contains("StatementOutlivesHandoff"));
+    assert!(source.contains("TrustSnapshotPostdatesStatement"));
+    assert!(source.contains(
+        "trust_snapshot.issued_at_unix_s > signed.statement.issued_at_unix_s"
+    ));
+}
+
+#[test]
+fn clock_hop_count_is_explicit_not_boolean_cast() {
+    let source = include_str!("../src/lib.rs");
+    assert!(source.contains("let clock_hop_count = if current_basis.id() == clearance_basis.id()"));
+    assert!(!source.contains("usize::from(current_basis.id() != clearance_basis.id())"));
 }
