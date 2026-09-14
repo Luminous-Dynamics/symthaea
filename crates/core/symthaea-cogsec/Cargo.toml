@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-cogsec"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Deterministic cognitive-security reference-monitor primitives for Symthaea: mutation taxonomy, security labels, policy decisions, permits, and receipts."
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+serde_json = { workspace = true }
