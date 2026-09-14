@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-assurance-tpm2-measured-boot-replay"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "TPM2 measured-boot event-log replay assurance for Symthaea"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "measured-boot", "attestation", "assurance"]
+categories = ["development-tools", "authentication"]
+
+[dependencies]
+symthaea-assurance-tpm2-attestation-possession = { path = "../symthaea-assurance-tpm2-attestation-possession" }
+serde = { workspace = true }
+blake3 = { workspace = true }

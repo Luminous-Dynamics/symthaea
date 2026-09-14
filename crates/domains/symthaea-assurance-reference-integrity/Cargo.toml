@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-assurance-reference-integrity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Reference-integrity evaluation for measured-boot assurance evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "measured-boot", "rim", "assurance"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-assurance-tpm2-measured-boot-replay = { path = "../symthaea-assurance-tpm2-measured-boot-replay" }
+serde = { workspace = true }
+blake3 = { workspace = true }

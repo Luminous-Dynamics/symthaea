@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-assurance-tpm2-attestation-possession"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Fresh TPM2 quote possession assurance for Symthaea trust-root evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "attestation", "assurance", "security"]
+categories = ["development-tools", "authentication"]
+
+[dependencies]
+symthaea-assurance-tpm2-platform-qualification = { path = "../symthaea-assurance-tpm2-platform-qualification" }
+serde = { workspace = true }
+blake3 = { workspace = true }
