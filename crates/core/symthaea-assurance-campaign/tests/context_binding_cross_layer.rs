@@ -161,7 +161,7 @@ fn assure000_and_assure002_agree_on_exact_evidence_context() {
             &exact_claim,
             &core_subject,
             &core_plan,
-            &[valid.clone()],
+            std::slice::from_ref(&valid),
             QualificationOutcome::Negative(NegativeFinding::NotDemonstrated),
             ReproductionStatus::NotClaimed,
         )
@@ -182,7 +182,7 @@ fn assure000_and_assure002_agree_on_exact_evidence_context() {
             &exact_claim,
             &core_subject,
             &core_plan,
-            &[wrong_subject.clone()],
+            std::slice::from_ref(&wrong_subject),
             QualificationOutcome::Negative(NegativeFinding::NotDemonstrated),
             ReproductionStatus::NotClaimed,
         )
@@ -212,7 +212,7 @@ fn assure000_and_assure002_agree_on_exact_evidence_context() {
             &exact_claim,
             &core_subject,
             &core_plan,
-            &[wrong_claim.clone()],
+            std::slice::from_ref(&wrong_claim),
             QualificationOutcome::Negative(NegativeFinding::NotDemonstrated),
             ReproductionStatus::NotClaimed,
         )
