@@ -11,9 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use symthaea_fabrication_governance_bridge::{
-    ClockGovernedPolicyMigrationIdV1, ClockGovernedPolicyMigrationV1,
-};
+use symthaea_fabrication_governance_bridge::ClockGovernedPolicyMigrationV1;
 use symthaea_fabrication_kernel::attestation::SignatureAlgorithm;
 use symthaea_fabrication_kernel::containment_state::{
     FabricationContainmentState, digest_containment_state,
@@ -28,25 +26,14 @@ use symthaea_fabrication_kernel::trust::{KeyUsage, TrustSnapshot, digest_trust_s
 use symthaea_fabrication_kernel::upgrade_handoff::{
     MAX_UPGRADE_MIGRATIONS, MAX_UPGRADE_REASON_BYTES, UpgradeEndpoint, UpgradeHandoffPolicy,
 };
-use symthaea_fabrication_policy_exact_evidence::{
-    ExactEvidenceBoundPolicyHeadIdV1, ExactEvidenceBoundPolicyHeadV1,
-};
-use symthaea_fabrication_policy_head_observation::{
-    QuorumObservedPolicyHeadIdV1, QuorumObservedPolicyHeadV1,
-};
-use symthaea_fabrication_policy_lineage::{
-    ClockGovernedPolicyLineageIdV1, ClockGovernedPolicyLineageV1,
-};
-use symthaea_fabrication_policy_temporal_validity::{
-    ClockGovernedPolicyTemporalValidityPermitIdV1,
-    ClockGovernedPolicyTemporalValidityPermitV1,
-};
+use symthaea_fabrication_policy_exact_evidence::ExactEvidenceBoundPolicyHeadV1;
+use symthaea_fabrication_policy_head_observation::QuorumObservedPolicyHeadV1;
+use symthaea_fabrication_policy_lineage::ClockGovernedPolicyLineageV1;
+use symthaea_fabrication_policy_temporal_validity::ClockGovernedPolicyTemporalValidityPermitV1;
 use symthaea_fabrication_trust_bridge::{
     ClockGovernedThresholdCeremonyIdV1, ClockGovernedThresholdCeremonyV1,
 };
-use symthaea_fabrication_witness_authority::{
-    RegistryBoundPolicyHeadIdV1, RegistryBoundPolicyHeadV1,
-};
+use symthaea_fabrication_witness_authority::RegistryBoundPolicyHeadV1;
 use symthaea_trust_kernel::{
     ClockGovernanceEvaluationEnvelopeIdV1, ClockGovernanceTimeError, OperationalClockBasisIdV1,
     OperationalClockBasisV1, derive_clock_governance_evaluation_envelope_v1,
@@ -661,6 +648,8 @@ fn derive_policy_requirements(
             || authority.observed.lineage_id() != authority.lineage.id()
             || authority.observed.lineage_sequence() != authority.lineage.sequence()
             || authority.observed.temporal_validity_permit_id() != authority.temporal.id()
+            || authority.observed.clock_envelope_id()
+                != authority.temporal.current_clock_envelope_id()
             || authority.registry_bound.observed_head_id() != authority.observed.id()
             || authority.exact_evidence.observed_head_id() != authority.observed.id()
             || authority.exact_evidence.registry_bound_head_id() != authority.registry_bound.id()
