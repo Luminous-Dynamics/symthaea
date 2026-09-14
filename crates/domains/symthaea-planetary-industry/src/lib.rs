@@ -15,12 +15,14 @@
 mod graph;
 mod mass_balance;
 mod process;
+mod thermal_approach;
 mod types;
 mod utility_accounting;
 
 pub use graph::*;
 pub use mass_balance::*;
 pub use process::*;
+pub use thermal_approach::*;
 pub use types::*;
 pub use utility_accounting::*;
 
