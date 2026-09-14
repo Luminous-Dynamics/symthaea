@@ -237,12 +237,28 @@ impl V2QualificationReceipt {
         &self.subject_head
     }
 
+    pub(super) fn subject_tree(&self) -> &str {
+        &self.subject_tree
+    }
+
+    pub(super) fn cargo_lock_sha256(&self) -> &str {
+        &self.cargo_lock_sha256
+    }
+
     pub(super) fn workflow_sha256(&self) -> &str {
         &self.workflow_sha256
     }
 
     pub(super) fn command_contract_sha256(&self) -> &str {
         &self.command_contract_sha256
+    }
+
+    pub(super) fn rustc_version(&self) -> &str {
+        &self.rustc_version
+    }
+
+    pub(super) fn cargo_version(&self) -> &str {
+        &self.cargo_version
     }
 }
 
@@ -402,8 +418,12 @@ qualification_result=PASS\n"
         assert_eq!(parsed.github_run_id(), 34_829_175_771);
         assert_eq!(parsed.github_run_attempt(), 1);
         assert_eq!(parsed.subject_head(), "1".repeat(40));
+        assert_eq!(parsed.subject_tree(), "2".repeat(40));
+        assert_eq!(parsed.cargo_lock_sha256(), "a".repeat(64));
         assert_eq!(parsed.workflow_sha256(), "b".repeat(64));
         assert_eq!(parsed.command_contract_sha256(), "c".repeat(64));
+        assert_eq!(parsed.rustc_version(), "rustc 1.96.0 (fixture)");
+        assert_eq!(parsed.cargo_version(), "cargo 1.96.0 (fixture)");
     }
 
     #[test]
