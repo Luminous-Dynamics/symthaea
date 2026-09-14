@@ -1,0 +1,62 @@
+name: WCARE-48V Receipt Run Identity
+
+on:
+  push:
+    branches:
+      - wcare-48v-final-child-verifier
+    paths:
+      - .github/workflows/wcare48v-exact-run-binding.yml
+      - scripts/wcare48v_verify_bound_final.py
+      - scripts/wcare48v_verify_final.py
+      - docs/release/evidence/WCARE48V_EXACT_GENERATION_RUN_BINDING_V1.md
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact verifier subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify sibling lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "wcare-48v-final-child-verifier"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = "0321a22986e5c6bf1a6b099d30dc75ccc33d9deb"
+          test "$(git merge-base HEAD 52d1d9fb741250ab8bcab205113689a8cc9431bb)" = "0321a22986e5c6bf1a6b099d30dc75ccc33d9deb"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Compile receipt-run verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            scripts/wcare48v_verify_final.py \
+            scripts/wcare48v_verify_bound_final.py
+
+      - name: Prove current PREPARED subject has no FINAL child
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          OUTPUT="$(python3 scripts/wcare48v_verify_bound_final.py 52d1d9fb741250ab8bcab205113689a8cc9431bb 2>&1)"
+          STATUS=$?
+          set -e
+          test "$STATUS" -eq 3
+          grep -Fq '"classification":"TARGET_MISSING"' <<<"$OUTPUT"
+          grep -Fq '"receipt_run_identity_bound":false' <<<"$OUTPUT"
+          grep -Fq '"github_host_run_attested":false' <<<"$OUTPUT"
+          grep -Fq '"lock_admitted":false' <<<"$OUTPUT"
+          grep -Fq '"runtime_authority_granted":false' <<<"$OUTPUT"
+          printf '%s\n' "$OUTPUT"
+          printf '%s\n' 'PASS_WCARE48V_RECEIPT_RUN_PREREGISTRATION'
