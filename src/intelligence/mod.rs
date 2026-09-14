@@ -57,6 +57,8 @@ pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
 pub mod reasoning_shadow_meta;
 pub mod reasoning_transition_history;
+#[cfg(test)]
+mod reasoning_transition_history_negative_controls;
 
 pub use causal_consciousness::{
     CausalAnalysisResult, CausalAttention, CausalConsciousness, CausalLTCBridge, GridSearchResult,
@@ -183,6 +185,6 @@ pub use reasoning_transition_history::{
     inspect_active_primitive_transition_history, inspect_verified_transition_history,
     ActiveTransitionHistoryProfile, ActiveTransitionHistoryReport, TransitionMeanEnvelope,
     VerifiedChainAdmission, VerifiedTransitionHistory, VerifiedTransitionHistoryError,
-    VerifiedTransitionHistoryKey, VerifiedTransitionSummary,
-    LOCAL_TRANSITION_CONTRIBUTION_SCALE, VERIFIED_TRANSITION_HISTORY_VERSION,
+    VerifiedTransitionHistoryKey, VerifiedTransitionSummary, LOCAL_TRANSITION_CONTRIBUTION_SCALE,
+    VERIFIED_TRANSITION_HISTORY_VERSION,
 };
