@@ -5,10 +5,13 @@ on:
     branches:
       - main
       - psych-bench/live-execution-contract
+      - psych-bench/enforce-learning-freeze
     paths:
       - '.github/workflows/psych-bench-live-execution-contract.yml'
       - 'scripts/ci/strict_clippy_paths.py'
       - 'crates/domains/symthaea-psych-bench/src/harness/live_execution_contract.rs'
+      - 'crates/domains/symthaea-psych-bench/src/harness/live_runner_contract.rs'
+      - 'crates/domains/symthaea-psych-bench/tests/live_execution_contract_backend.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
       - 'Cargo.lock'
@@ -21,7 +24,7 @@ jobs:
   live-execution-contract:
     name: Exact-subject live execution contract
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout exact PR subject
@@ -51,13 +54,22 @@ jobs:
           rustc --version --verbose
           cargo --version
 
+      - name: Install backend system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libasound2-dev libdbus-1-dev
+
       - name: Contract format diagnostic
         continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           rustfmt --edition 2024 --check \
-            crates/domains/symthaea-psych-bench/src/harness/live_execution_contract.rs
+            crates/domains/symthaea-psych-bench/src/harness/live_execution_contract.rs \
+            crates/domains/symthaea-psych-bench/src/harness/live_runner_contract.rs \
+            crates/domains/symthaea-psych-bench/tests/live_execution_contract_backend.rs
 
       - name: Compile psych-bench library
         shell: bash
@@ -71,20 +83,60 @@ jobs:
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib live_execution_contract::tests -- --nocapture
 
+      - name: Execute legacy-runner adapter regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib live_runner_contract::tests -- --nocapture
+
+      - name: Compile backend-gated contract adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --lib --features symthaea-backend
+          cargo test --locked -p symthaea-psych-bench --features symthaea-backend \
+            --test live_execution_contract_backend -- --nocapture
+
       - name: Strict focused Clippy
         shell: bash
         run: |
           set -euo pipefail
-          report="$RUNNER_TEMP/live-execution-clippy.jsonl"
+
+          default_report="$RUNNER_TEMP/live-contract-default-clippy.jsonl"
           set +e
           cargo clippy --locked -p symthaea-psych-bench --lib --no-deps \
-            --message-format=json > "$report"
-          cargo_status=$?
+            --message-format=json > "$default_report"
+          default_status=$?
           set -e
           python3 scripts/ci/strict_clippy_paths.py \
-            "$report" \
-            crates/domains/symthaea-psych-bench/src/harness/live_execution_contract.rs
-          test "$cargo_status" -eq 0
+            "$default_report" \
+            crates/domains/symthaea-psych-bench/src/harness/live_execution_contract.rs \
+            crates/domains/symthaea-psych-bench/src/harness/live_runner_contract.rs
+          test "$default_status" -eq 0
+
+          backend_report="$RUNNER_TEMP/live-contract-backend-clippy.jsonl"
+          set +e
+          cargo clippy --locked -p symthaea-psych-bench --lib --features symthaea-backend --no-deps \
+            --message-format=json > "$backend_report"
+          backend_status=$?
+          set -e
+          python3 scripts/ci/strict_clippy_paths.py \
+            "$backend_report" \
+            crates/domains/symthaea-psych-bench/src/harness/live_execution_contract.rs \
+            crates/domains/symthaea-psych-bench/src/harness/live_runner_contract.rs
+          test "$backend_status" -eq 0
+
+          test_report="$RUNNER_TEMP/live-contract-test-clippy.jsonl"
+          set +e
+          cargo clippy --locked -p symthaea-psych-bench \
+            --test live_execution_contract_backend --features symthaea-backend --no-deps \
+            --message-format=json > "$test_report"
+          test_status=$?
+          set -e
+          python3 scripts/ci/strict_clippy_paths.py \
+            "$test_report" \
+            crates/domains/symthaea-psych-bench/tests/live_execution_contract_backend.rs
+          test "$test_status" -eq 0
 
       - name: Postflight exact-subject immutability
         shell: bash
