@@ -1,0 +1,41 @@
+name: Butlin GWT-1 Consumer Provenance V2 Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-gwt1-trusted-final-consumer.yml"
+      - ".github/workflows/butlin-gwt1-consumer-provenance-v2-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Freeze trusted consumer provenance v2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Audit provenance schema and execution identity source
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/butlin-gwt1-trusted-final-consumer.yml").read_text()
+          assert "butlin-gwt1-trusted-final-consumer-provenance-v2" in workflow
+          assert "butlin-gwt1-trusted-final-consumer-provenance-v1" not in workflow
+          assert '[[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]' in workflow
+          assert '[[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]' in workflow
+          assert '--arg consumer_run_id "$GITHUB_RUN_ID"' in workflow
+          assert '--arg consumer_run_attempt "$GITHUB_RUN_ATTEMPT"' in workflow
+          assert 'consumer_run_id:$consumer_run_id' in workflow
+          assert 'consumer_run_attempt:$consumer_run_attempt' in workflow
+          assert "inputs.consumer_run" not in workflow
+          PY

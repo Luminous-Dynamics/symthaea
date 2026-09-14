@@ -27,11 +27,11 @@
     {"path":"gwt1-verified-report/authority/fresh_final_archive_verification.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":16777216},
     {"path":"gwt1-verified-report/authority/fresh_final_archive_admission.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
     {"path":"gwt1-verified-report/authority/fresh_nested_direct_archive_admission.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
-    {"path":"gwt1-verified-report/authority/fresh_direct_archive_verification.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":16777216},
-    {"path":"gwt1-verified-report/authority/fresh_direct_profile_verification.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":16777216},
 
     {"path":"gwt1-verified-report/source/gwt1-final-resolution.tar.gz","kind":"file","mode":420,"allow_empty":false,"max_bytes":268435456},
     {"path":"gwt1-verified-report/source/gwt1-final-resolution.tar.gz.sha256","kind":"file","mode":420,"allow_empty":false,"max_bytes":4096},
+    {"path":"gwt1-verified-report/source/resolution_provenance.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+    {"path":"gwt1-verified-report/source/final_verifier_profile.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
 
     {"path":"gwt1-verified-report/environment/runner_environment.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
     {"path":"gwt1-verified-report/environment/python-version.txt","kind":"file","mode":420,"allow_empty":false,"max_bytes":65536},
