@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-fabrication-witness-authority"
+version = "0.1.0"
+edition = "2024"
+description = "Threshold-authorized identity and failure-domain registry for transparency witnesses"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-policy-head-observation = { path = "../symthaea-fabrication-policy-head-observation" }
+symthaea-fabrication-trust-bridge = { path = "../symthaea-fabrication-trust-bridge" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
