@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-structured-inconsistency"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Production-neutral structured inconsistency observatory for Symthaea research"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[lints]
+workspace = true
