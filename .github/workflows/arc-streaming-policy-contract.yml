@@ -1,0 +1,40 @@
+name: ARC Streaming Policy Contract
+
+on:
+  pull_request:
+    paths:
+      - 'src/bin/arc_streaming_policy.rs'
+      - '.github/workflows/arc-streaming-policy-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arc-streaming-policy-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  streaming-contract:
+    name: Budget-stable streaming contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact proposed subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Qualify streaming baseline source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check src/bin/arc_streaming_policy.rs
+          cargo check --locked --bin arc_streaming_policy
+          cargo test --locked --bin arc_streaming_policy
+          cargo clippy --locked --bin arc_streaming_policy -- -D warnings
