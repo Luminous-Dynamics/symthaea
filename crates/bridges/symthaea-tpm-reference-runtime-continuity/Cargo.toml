@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-tpm-reference-runtime-continuity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "TPM/reference binding for runtime-backed current verifier independence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "tpm", "attestation"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-domain-awareness-evidence = { path = "../symthaea-domain-awareness-evidence" }
+symthaea-tpm-reference-evidence = { path = "../symthaea-tpm-reference-evidence" }
+symthaea-tpm-reference-current-independence = { path = "../symthaea-tpm-reference-current-independence" }
+symthaea-evidence-verifier-runtime-continuity = { path = "../../domains/symthaea-evidence-verifier-runtime-continuity" }
+symthaea-formal-safety = { path = "../../domains/symthaea-formal-safety" }
