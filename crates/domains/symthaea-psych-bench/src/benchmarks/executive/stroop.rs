@@ -23,7 +23,7 @@
 //! - neutral_accuracy: 0.95
 
 use crate::harness::config::BenchmarkConfig;
-use crate::harness::difficulty::difficulty_model_for;
+use crate::harness::difficulty::{DifficultyModel, difficulty_model_for};
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
@@ -33,6 +33,17 @@ use symthaea_core::hdc::ContinuousHV;
 /// Stroop Color-Word Interference benchmark.
 pub struct StroopBenchmark;
 
+/// Effective calibration-relevant values actually consumed by Stroop scoring.
+///
+/// This is crate-visible so the calibration evidence layer can observe the same
+/// computed values used by execution. It is not an authority-bearing manifest.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct StroopEffectiveCalibrationValues {
+    pub(crate) reading_automaticity: f32,
+    pub(crate) temperature: f64,
+    pub(crate) encoding_noise: f32,
+}
+
 #[derive(Clone, Copy)]
 enum Condition {
     Congruent,
@@ -41,17 +52,46 @@ enum Condition {
 }
 
 impl StroopBenchmark {
+    /// Single calculation authority for the calibration-relevant effective
+    /// values migrated in #3053 tranche 1.
+    pub(crate) fn effective_calibration_values(
+        config: &BenchmarkConfig,
+        diff_model: &DifficultyModel,
+    ) -> StroopEffectiveCalibrationValues {
+        // Reading automaticity: how strongly the word activates its color.
+        // Difficulty amplifies interference (reading automaticity).
+        // 0.35 calibrated to produce ~10% Stroop effect (MacLeod, 1991).
+        // Higher values (0.45) produced superhuman interference resistance.
+        let base_automaticity: f32 = 0.35;
+        let reading_automaticity = (base_automaticity
+            * diff_model.interference_multiplier(config.difficulty) as f32)
+            .min(0.95);
+
+        // Decision temperature: controls stochasticity of response selection.
+        // Difficulty increases temperature (more stochastic responses).
+        let base_temperature: f64 = 0.25 + config.time_pressure * 0.15;
+        let temperature =
+            base_temperature * diff_model.temperature_multiplier(config.difficulty);
+
+        StroopEffectiveCalibrationValues {
+            reading_automaticity,
+            temperature,
+            encoding_noise: config.effective_noise() as f32,
+        }
+    }
+
     fn run_trial_with_difficulty(
         &self,
         config: &BenchmarkConfig,
         trial_idx: usize,
-        diff_model: &crate::harness::difficulty::DifficultyModel,
+        diff_model: &DifficultyModel,
         trace: &mut Vec<TrialOutcome>,
         global_trial_idx: &mut usize,
     ) -> TrialResult {
         let dim = config.dimension;
         let seed = config.trial_seed("executive", "stroop", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
+        let calibration = Self::effective_calibration_values(config, diff_model);
 
         let xor_shift = |s: &mut u64| {
             *s ^= *s << 13;
@@ -64,20 +104,8 @@ impl StroopBenchmark {
             .map(|i| ContinuousHV::random(dim, seed.wrapping_add(100 + i)))
             .collect();
 
-        // Reading automaticity: how strongly the word activates its color.
-        // Difficulty amplifies interference (reading automaticity).
-        // 0.35 calibrated to produce ~10% Stroop effect (MacLeod, 1991).
-        // Higher values (0.45) produced superhuman interference resistance.
-        let base_automaticity: f32 = 0.35;
-        let reading_automaticity: f32 = (base_automaticity
-            * diff_model.interference_multiplier(config.difficulty) as f32)
-            .min(0.95);
-
-        // Decision temperature: controls stochasticity of response selection.
-        // Difficulty increases temperature (more stochastic responses).
-        let base_temperature: f64 = 0.25 + config.time_pressure * 0.15;
-        let temperature: f64 =
-            base_temperature * diff_model.temperature_multiplier(config.difficulty);
+        let reading_automaticity = calibration.reading_automaticity;
+        let temperature = calibration.temperature;
 
         let trials_per_condition = 40;
         let mut congruent_correct = 0u32;
@@ -123,7 +151,7 @@ impl StroopBenchmark {
             // Compute similarity to each color candidate
             // Encoding noise adds per-comparison noise (individual differences in
             // perceptual discrimination; Lu & Dosher, 1998 noise exclusion model).
-            let enc_noise = config.effective_noise() as f32;
+            let enc_noise = calibration.encoding_noise;
             let sims: Vec<f64> = color_hvs
                 .iter()
                 .enumerate()
@@ -354,6 +382,16 @@ mod tests {
         for (key, val) in &result.metrics {
             assert!(val.mean.is_finite(), "metric {} is not finite", key);
         }
+    }
+
+    #[test]
+    fn effective_calibration_values_match_default_scoring_inputs() {
+        let config = BenchmarkConfig::default();
+        let diff_model = difficulty_model_for("Executive::Stroop");
+        let values = StroopBenchmark::effective_calibration_values(&config, &diff_model);
+        assert_eq!(values.reading_automaticity, 0.35);
+        assert_eq!(values.temperature, 0.25);
+        assert_eq!(values.encoding_noise, 0.0);
     }
 
     #[test]

@@ -56,6 +56,7 @@ pub mod benchmarks;
 pub mod calibration_binding;
 pub mod calibration_contract;
 pub mod calibration_inventory;
+pub mod calibration_runtime;
 pub mod harness;
 pub mod substrate_transfer;
 pub mod wm;

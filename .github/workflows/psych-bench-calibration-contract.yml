@@ -7,12 +7,14 @@ on:
       - psych-bench/calibration-manifest-contract
       - psych-bench/calibration-frozen-receipt
       - psych-bench/calibration-target-provenance
+      - psych-bench/calibration-source-inventory
     paths:
       - '.github/workflows/psych-bench-calibration-contract.yml'
       - 'scripts/ci/strict_clippy_paths.py'
       - 'crates/domains/symthaea-psych-bench/src/calibration_contract.rs'
       - 'crates/domains/symthaea-psych-bench/src/calibration_binding.rs'
       - 'crates/domains/symthaea-psych-bench/src/calibration_inventory.rs'
+      - 'crates/domains/symthaea-psych-bench/src/calibration_runtime.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/worm/nback.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/reasoning/arc_fluid.rs'
@@ -66,7 +68,9 @@ jobs:
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-psych-bench/src/calibration_contract.rs \
             crates/domains/symthaea-psych-bench/src/calibration_binding.rs \
-            crates/domains/symthaea-psych-bench/src/calibration_inventory.rs
+            crates/domains/symthaea-psych-bench/src/calibration_inventory.rs \
+            crates/domains/symthaea-psych-bench/src/calibration_runtime.rs \
+            crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs
 
       - name: Compile psych-bench library
         shell: bash
@@ -92,8 +96,15 @@ jobs:
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib calibration_inventory::tests -- --nocapture
 
+      - name: Execute runtime-calibration regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib calibration_runtime::tests -- --nocapture
+          cargo test --locked -p symthaea-psych-bench --lib benchmarks::executive::stroop::tests::effective_calibration_values_match_default_scoring_inputs -- --nocapture
+
       # Keep dependency compilation authoritative, but make lint authority match
-      # the calibration evidence surface this focused job claims to qualify.
+      # the calibration evidence/scoring surface this focused job qualifies.
       - name: Strict focused Clippy
         shell: bash
         run: |
@@ -108,7 +119,9 @@ jobs:
             "$report" \
             crates/domains/symthaea-psych-bench/src/calibration_contract.rs \
             crates/domains/symthaea-psych-bench/src/calibration_binding.rs \
-            crates/domains/symthaea-psych-bench/src/calibration_inventory.rs
+            crates/domains/symthaea-psych-bench/src/calibration_inventory.rs \
+            crates/domains/symthaea-psych-bench/src/calibration_runtime.rs \
+            crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs
           test "$cargo_status" -eq 0
 
       - name: Postflight exact-subject immutability
