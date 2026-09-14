@@ -27,15 +27,15 @@ use super::gwt1_causal_promotion_capsule::{
 pub const GWT1_CAUSAL_PROMOTION_WORKFLOW_V1: &str =
     ".github/workflows/butlin-gwt1-causal-trusted-promotion.yml";
 
-/// Bootstrap candidate only. Before activation this must be updated to the
-/// reviewed/landed #2510 promotion-workflow revision.
+/// Activation candidate only. Authoritative execution requires this exact
+/// promotion root to be independently reviewed and landed first.
 pub const GWT1_CAUSAL_APPROVED_PROMOTION_WORKFLOW_SHA_V1: &str =
-    "8e8100bee2c1f850d7abc2ffee1d903600e2a0ab";
+    "16c85d54a65f284b18202ee5b510a41500466b6c";
 
-/// Bootstrap candidate only. Before activation this must be updated to the
-/// reviewed/landed #2507 causal-builder revision.
+/// Activation candidate only. Authoritative execution requires this exact
+/// unified causal-builder root to be independently reviewed and landed first.
 pub const GWT1_CAUSAL_APPROVED_BUILDER_SHA_V1: &str =
-    "afabae61fa9b93d033410fb58af56f41ec47f60f";
+    "726d2be515e52eeff6c3f32a137e42a2648e35c7";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Gwt1CausalPromotionVerificationErrorV1 {
