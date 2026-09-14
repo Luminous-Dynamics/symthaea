@@ -1,0 +1,269 @@
+name: CORE-ID-001 Production Exact Qualification
+
+on:
+  push:
+    branches:
+      - qualify/core-id-001-production-31d6fe9c
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify CORE-ID-001 production identity primitive
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SUBJECT_SHA: 31d6fe9c03147ef8fed7fccf826d6a9a9a548e4e
+      PARENT_SHA: 4bad8af72ff775e7c869b6df83faba718a339a36
+      SUBJECT_TREE: ac9afa1b7c3fa472aab0f34c7df0bed407b3bcdb
+      PACKAGE: symthaea-identity
+      MANIFEST: crates/core/symthaea-identity/Cargo.toml
+      SOURCE: crates/core/symthaea-identity/src/lib.rs
+      ORACLE_SHA: da3b0e04018f57d9edec6898324964839c36ff09
+      ORACLE_VECTOR_PATH: docs/release/evidence/CORE_ID_001_GOLDEN_VECTORS.tsv
+      ORACLE_VECTOR_SHA256: 142f9dfec85cc0e63bb24e609900010db2f3f69a8b73a6a4314b3cb16f72db71
+      ORACLE_RUST_PATH: scripts/core-canonical-identity-oracle.rs
+      ORACLE_RUST_SHA256: 734c3b4860519a9415917ca442688fb68e67341196baed23a4b62208f7ce4940
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+
+    steps:
+      - name: Checkout frozen production subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject, lineage, tree, and file scope
+        id: identity_scope
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SUBJECT_TREE"
+          mapfile -t files < <(git diff --name-only "$PARENT_SHA" "$SUBJECT_SHA" | sort)
+          printf '%s\n' "${files[@]}"
+          test "${#files[@]}" -eq 2
+          test "${files[0]}" = "$MANIFEST"
+          test "${files[1]}" = "$SOURCE"
+
+      - name: Record production file digests
+        id: production_digests
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          sha256sum "$MANIFEST" "$SOURCE" | tee core-id-production-files.sha256
+
+      - name: Bind qualified CORE-ID oracle dependencies
+        id: oracle_binding
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$ORACLE_SHA"
+          git show "$ORACLE_SHA:$ORACLE_VECTOR_PATH" > /tmp/core-id-qualified-vectors.tsv
+          git show "$ORACLE_SHA:$ORACLE_RUST_PATH" > /tmp/core-id-qualified-oracle.rs
+          printf '%s  %s\n' "$ORACLE_VECTOR_SHA256" /tmp/core-id-qualified-vectors.tsv | sha256sum -c -
+          printf '%s  %s\n' "$ORACLE_RUST_SHA256" /tmp/core-id-qualified-oracle.rs | sha256sum -c -
+
+      - name: Enforce production source boundary
+        id: source_boundary
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          source = Path("crates/core/symthaea-identity/src/lib.rs").read_text()
+          manifest = Path("crates/core/symthaea-identity/Cargo.toml").read_text()
+          executable = "\n".join(
+              line for line in source.splitlines()
+              if not re.match(r"^\s*//", line)
+          )
+
+          required = [
+              'pub const CANONICAL_LEXICAL_ID_V1_PROFILE: &str = "symthaea.core.canonical-lexical-id.v1";',
+              'pub struct CanonicalIdentifier<const MAX_UTF8_BYTES: usize>',
+              'value: String',
+              'Self::new(value).map_err(de::Error::custom)',
+              'String::from_utf8(bytes).map_err(|_| CanonicalIdentifierError::InvalidUtf8)?',
+              '0x0009..=0x000D',
+              '0x2000..=0x200A',
+              '0x202F',
+              '0x205F',
+              '0x3000',
+          ]
+          for needle in required:
+              if needle not in executable:
+                  raise SystemExit(f"missing CORE-ID production authority: {needle}")
+
+          forbidden = [
+              r"\.trim(?:_matches)?\s*\(",
+              r"\.is_whitespace\s*\(",
+              r"\.to_lowercase\s*\(",
+              r"\.to_uppercase\s*\(",
+              r"\bpub\s+value\s*:",
+              r"pub\s+fn\s+(?:unchecked|new_unchecked|from_unchecked)\b",
+          ]
+          for pattern in forbidden:
+              if re.search(pattern, executable):
+                  raise SystemExit(f"forbidden CORE-ID production authority: {pattern}")
+
+          # Runtime dependency surface is deliberately tiny.
+          deps = manifest.split("[dependencies]", 1)[1].split("[dev-dependencies]", 1)[0]
+          dep_lines = [
+              line.strip() for line in deps.splitlines()
+              if line.strip() and not line.lstrip().startswith("#")
+          ]
+          if dep_lines != ["serde = { workspace = true }"]:
+              raise SystemExit(f"unexpected runtime dependencies: {dep_lines}")
+          PY
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Record toolchain
+        run: |
+          rustc --version --verbose
+          cargo --version
+          cargo fmt --version
+          cargo clippy --version
+
+      - name: Package rustfmt
+        id: fmt
+        continue-on-error: true
+        run: cargo fmt -p "$PACKAGE" -- --check
+
+      - name: Package check
+        id: check
+        continue-on-error: true
+        run: cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Package tests
+        id: test
+        continue-on-error: true
+        run: cargo test -p "$PACKAGE" --all-targets --locked --no-fail-fast
+
+      - name: Generate external conformance test from qualified vectors
+        id: generate_vectors
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p crates/core/symthaea-identity/tests
+          python3 - <<'PY'
+          from pathlib import Path
+
+          vectors = Path('/tmp/core-id-qualified-vectors.tsv')
+          out = Path('crates/core/symthaea-identity/tests/core_id_qualified_vectors.rs')
+          lines = [
+              '// Generated only for exact qualification from qualified CORE-ID-001 vectors.',
+              'use symthaea_identity::CanonicalIdentifier;',
+              '',
+              '#[test]',
+              'fn qualified_core_id_vectors_match_production() {',
+          ]
+          count = 0
+          for raw in vectors.read_text().splitlines():
+              if not raw or raw.startswith('#'):
+                  continue
+              name, max_bytes, hex_utf8, expected = raw.split('\t')
+              data = bytes.fromhex(hex_utf8)
+              byte_list = ', '.join(f'0x{byte:02X}' for byte in data)
+              want = 'true' if expected == 'accept' else 'false'
+              lines.append(
+                  f'    assert_eq!(CanonicalIdentifier::<{int(max_bytes)}>::from_utf8_bytes(vec![{byte_list}]).is_ok(), {want}, {name!r});'
+              )
+              count += 1
+          if count != 71:
+              raise SystemExit(f'expected 71 qualified vectors, got {count}')
+          lines.append('}')
+          out.write_text('\n'.join(lines) + '\n')
+          PY
+
+      - name: Run qualified oracle vectors against production crate
+        id: vector_conformance
+        continue-on-error: true
+        run: cargo test -p "$PACKAGE" --test core_id_qualified_vectors --locked
+
+      - name: Remove generated conformance test
+        if: always()
+        run: |
+          rm -f crates/core/symthaea-identity/tests/core_id_qualified_vectors.rs
+          rmdir crates/core/symthaea-identity/tests 2>/dev/null || true
+
+      - name: Package clippy
+        id: clippy
+        continue-on-error: true
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Diff and checkout hygiene
+        id: diff
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          git diff --check "$PARENT_SHA" "$SUBJECT_SHA"
+          test -z "$(git status --porcelain)"
+
+      - name: Emit machine-readable qualification receipt
+        if: always()
+        run: |
+          cat > core-id-production-qualification.json <<EOF
+          {
+            "schema": "symthaea.core.exact-subject-qualification.v1",
+            "program": "CORE-ID-001-PRODUCTION",
+            "profile": "symthaea.core.canonical-lexical-id.v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$PARENT_SHA",
+            "tree_sha": "$SUBJECT_TREE",
+            "qualified_oracle_sha": "$ORACLE_SHA",
+            "qualified_vector_sha256": "$ORACLE_VECTOR_SHA256",
+            "qualified_oracle_rust_sha256": "$ORACLE_RUST_SHA256",
+            "package": "$PACKAGE",
+            "rust_toolchain": "1.96.0",
+            "gates": {
+              "identity_scope": "${{ steps.identity_scope.outcome }}",
+              "production_digests": "${{ steps.production_digests.outcome }}",
+              "qualified_oracle_binding": "${{ steps.oracle_binding.outcome }}",
+              "production_source_boundary": "${{ steps.source_boundary.outcome }}",
+              "rustfmt": "${{ steps.fmt.outcome }}",
+              "check_all_targets_locked": "${{ steps.check.outcome }}",
+              "test_all_targets_locked": "${{ steps.test.outcome }}",
+              "qualified_vector_test_generation": "${{ steps.generate_vectors.outcome }}",
+              "qualified_71_vector_conformance": "${{ steps.vector_conformance.outcome }}",
+              "clippy_all_targets_deny_warnings_locked": "${{ steps.clippy.outcome }}",
+              "diff_and_checkout_hygiene": "${{ steps.diff.outcome }}"
+            },
+            "scope": "Production Rust mirror of qualified CORE-ID-001 lexical admission with private validated state and validation-preserving deserialization; no normalization/case folding, namespace uniqueness, spoof defense, provenance/authenticity, currentness, applicability, or authority."
+          }
+          EOF
+          cat core-id-production-qualification.json
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-id-001-production-exact-subject-qualification
+          path: |
+            core-id-production-qualification.json
+            core-id-production-files.sha256
+          if-no-files-found: error
+
+      - name: Enforce all qualification gates
+        if: always()
+        run: |
+          test "${{ steps.identity_scope.outcome }}" = success
+          test "${{ steps.production_digests.outcome }}" = success
+          test "${{ steps.oracle_binding.outcome }}" = success
+          test "${{ steps.source_boundary.outcome }}" = success
+          test "${{ steps.fmt.outcome }}" = success
+          test "${{ steps.check.outcome }}" = success
+          test "${{ steps.test.outcome }}" = success
+          test "${{ steps.generate_vectors.outcome }}" = success
+          test "${{ steps.vector_conformance.outcome }}" = success
+          test "${{ steps.clippy.outcome }}" = success
+          test "${{ steps.diff.outcome }}" = success
