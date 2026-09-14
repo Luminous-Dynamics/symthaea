@@ -122,7 +122,8 @@ pub enum ClockGovernedKeyContinuityError {
     InvalidPolicy,
     PreviousSnapshotInvalid(String),
     SuccessorSnapshotInvalid(String),
-    SequenceNotAdvanced,
+    SequenceOverflow,
+    SequenceNotAdjacent { expected: u64, actual: u64 },
     Clock(ClockGovernanceTimeError),
     TimeScaleOverflow,
     PreviousSnapshotNotAvailableAcrossTransition,
@@ -189,8 +190,13 @@ pub fn derive_clock_governed_key_continuity_v1(
             "{error:?}"
         )));
     }
-    if successor.sequence <= previous.sequence {
-        violations.push(ClockGovernedKeyContinuityError::SequenceNotAdvanced);
+    match previous.sequence.checked_add(1) {
+        Some(expected) if successor.sequence == expected => {}
+        Some(expected) => violations.push(ClockGovernedKeyContinuityError::SequenceNotAdjacent {
+            expected,
+            actual: successor.sequence,
+        }),
+        None => violations.push(ClockGovernedKeyContinuityError::SequenceOverflow),
     }
     if let Err(error) = containment_state.validate() {
         violations.push(ClockGovernedKeyContinuityError::ContainmentStateInvalid(format!(
