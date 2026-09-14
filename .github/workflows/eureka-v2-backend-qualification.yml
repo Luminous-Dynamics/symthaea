@@ -5,6 +5,10 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "flake.nix"
+      - "flake.lock"
+      - "nix/eureka-v2-qualifier-shell.nix"
       - "src/**"
       - "crates/**"
       - ".github/eureka/**"
@@ -26,6 +30,8 @@ env:
   EUREKA_V2_QUALIFICATION_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION.v2"
   EUREKA_V2_RECEIPT_SCHEMA_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION_RECEIPT.v2"
   EUREKA_V2_COMMAND_CONTRACT_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION_COMMANDS.v2"
+  EUREKA_V2_ENVIRONMENT_CANDIDATE_REVISION: "EUREKA.002.V2.QUALIFIER_ENVIRONMENT_CANDIDATE.v1"
+  EUREKA_QUALIFIER_SHELL: "nix/eureka-v2-qualifier-shell.nix"
   EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
   EUREKA_GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
 
@@ -42,30 +48,13 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # pinned master commit
+      - name: Install pinned Nix bootstrap
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1, Nix 2.35.2
         with:
-          toolchain: 1.96.0
-          components: clippy
+          enable_kvm: false
+          set_as_trusted_user: false
 
-      - name: Cache cargo registry and target
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-eureka-v2-backend-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-eureka-v2-backend-
-
-      - name: Install system dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake libasound2-dev
-
-      - name: Capture exact qualification subject and contract
+      - name: Capture exact subject, workflow, contract, and candidate environment
         shell: bash
         run: |
           set -euo pipefail
@@ -93,16 +82,17 @@ jobs:
             git fetch --no-tags --depth=1 origin "$EUREKA_GITHUB_WORKFLOW_SHA"
           fi
 
-          subject_tree="$(git rev-parse 'HEAD^{tree}')"
-          cargo_lock_sha256="$(sha256sum Cargo.lock | awk '{print $1}')"
           workflow_path=".github/workflows/eureka-v2-backend-qualification.yml"
           contract_path=".github/eureka/eureka-v2-backend-qualification-contract.sh"
+          receipt="${RUNNER_TEMP}/eureka-v2-backend-qualification.env"
+          environment_receipt="${RUNNER_TEMP}/eureka-v2-qualifier-environment-candidate.env"
+          closure_manifest="${RUNNER_TEMP}/eureka-v2-qualifier-closure.txt"
+
+          subject_tree="$(git rev-parse 'HEAD^{tree}')"
+          cargo_lock_sha256="$(sha256sum Cargo.lock | awk '{print $1}')"
           workflow_sha256="$(sha256sum "$workflow_path" | awk '{print $1}')"
           interpreted_workflow_sha256="$(git show "${EUREKA_GITHUB_WORKFLOW_SHA}:${workflow_path}" | sha256sum | awk '{print $1}')"
           command_contract_sha256="$(sha256sum "$contract_path" | awk '{print $1}')"
-          receipt="${RUNNER_TEMP}/eureka-v2-backend-qualification.env"
-          rustc_version="$(rustc --version)"
-          cargo_version="$(cargo --version)"
 
           if [[ "$workflow_sha256" != "$interpreted_workflow_sha256" ]]; then
             echo "Checked-out qualifier workflow bytes differ from the workflow GitHub interpreted" >&2
@@ -112,6 +102,25 @@ jobs:
             exit 1
           fi
 
+          nix_version="$(nix --version)"
+          if [[ "$nix_version" != "nix (Nix) 2.35.2" ]]; then
+            echo "Unexpected Nix bootstrap version: $nix_version" >&2
+            exit 1
+          fi
+
+          flake_nix_sha256="$(sha256sum flake.nix | awk '{print $1}')"
+          flake_lock_sha256="$(sha256sum flake.lock | awk '{print $1}')"
+          rust_toolchain_sha256="$(sha256sum rust-toolchain.toml | awk '{print $1}')"
+          qualifier_shell_sha256="$(sha256sum "$EUREKA_QUALIFIER_SHELL" | awk '{print $1}')"
+
+          qualifier_drv="$(nix-instantiate "$EUREKA_QUALIFIER_SHELL" | tail -n 1)"
+          qualifier_out="$(nix-store --realise "$qualifier_drv" | tail -n 1)"
+          nix-store -qR "$qualifier_out" | LC_ALL=C sort -u > "$closure_manifest"
+          qualifier_closure_sha256="$(sha256sum "$closure_manifest" | awk '{print $1}')"
+
+          rustc_version="$(nix-shell "$EUREKA_QUALIFIER_SHELL" --pure --run 'rustc --version')"
+          cargo_version="$(nix-shell "$EUREKA_QUALIFIER_SHELL" --pure --run 'cargo --version')"
+
           echo "EUREKA_SUBJECT_HEAD=$subject_head" >> "$GITHUB_ENV"
           echo "EUREKA_SUBJECT_TREE=$subject_tree" >> "$GITHUB_ENV"
           echo "EUREKA_CARGO_LOCK_SHA256=$cargo_lock_sha256" >> "$GITHUB_ENV"
@@ -119,6 +128,16 @@ jobs:
           echo "EUREKA_COMMAND_CONTRACT_SHA256=$command_contract_sha256" >> "$GITHUB_ENV"
           echo "EUREKA_QUALIFICATION_RECEIPT=$receipt" >> "$GITHUB_ENV"
           echo "EUREKA_QUALIFICATION_CONTRACT=$contract_path" >> "$GITHUB_ENV"
+          echo "EUREKA_ENVIRONMENT_CANDIDATE_RECEIPT=$environment_receipt" >> "$GITHUB_ENV"
+          echo "EUREKA_ENVIRONMENT_CLOSURE_MANIFEST=$closure_manifest" >> "$GITHUB_ENV"
+          echo "EUREKA_NIX_VERSION=$nix_version" >> "$GITHUB_ENV"
+          echo "EUREKA_FLAKE_NIX_SHA256=$flake_nix_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_FLAKE_LOCK_SHA256=$flake_lock_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_RUST_TOOLCHAIN_SHA256=$rust_toolchain_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_QUALIFIER_SHELL_SHA256=$qualifier_shell_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_QUALIFIER_DRV=$qualifier_drv" >> "$GITHUB_ENV"
+          echo "EUREKA_QUALIFIER_OUT=$qualifier_out" >> "$GITHUB_ENV"
+          echo "EUREKA_QUALIFIER_CLOSURE_SHA256=$qualifier_closure_sha256" >> "$GITHUB_ENV"
 
           {
             printf 'receipt_schema_revision=%s\n' "$EUREKA_V2_RECEIPT_SCHEMA_REVISION"
@@ -145,22 +164,43 @@ jobs:
             printf 'confirmatory_evidence_minted=false\n'
           } > "$receipt"
 
+          {
+            printf 'candidate_environment_schema_revision=%s\n' "$EUREKA_V2_ENVIRONMENT_CANDIDATE_REVISION"
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'github_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'github_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'subject_head=%s\n' "$subject_head"
+            printf 'subject_tree=%s\n' "$subject_tree"
+            printf 'workflow_sha256=%s\n' "$workflow_sha256"
+            printf 'command_contract_sha256=%s\n' "$command_contract_sha256"
+            printf 'nix_version=%s\n' "$nix_version"
+            printf 'flake_nix_sha256=%s\n' "$flake_nix_sha256"
+            printf 'flake_lock_sha256=%s\n' "$flake_lock_sha256"
+            printf 'rust_toolchain_toml_sha256=%s\n' "$rust_toolchain_sha256"
+            printf 'qualifier_shell_sha256=%s\n' "$qualifier_shell_sha256"
+            printf 'qualifier_drv_path=%s\n' "$qualifier_drv"
+            printf 'qualifier_output_path=%s\n' "$qualifier_out"
+            printf 'qualifier_closure_sha256=%s\n' "$qualifier_closure_sha256"
+            printf 'qualification_authority_bound=false\n'
+            printf 'execution_authority_granted=false\n'
+          } > "$environment_receipt"
+
       - name: Check backend-feature compilation
         run: |
           set -euo pipefail
-          bash "$EUREKA_QUALIFICATION_CONTRACT" check
+          nix-shell "$EUREKA_QUALIFIER_SHELL" --pure --run "bash '$EUREKA_QUALIFICATION_CONTRACT' check"
 
       - name: Run EUREKA backend unit tests
         run: |
           set -euo pipefail
-          bash "$EUREKA_QUALIFICATION_CONTRACT" test
+          nix-shell "$EUREKA_QUALIFIER_SHELL" --pure --run "bash '$EUREKA_QUALIFICATION_CONTRACT' test"
 
       - name: Strict Clippy for backend test surface
         run: |
           set -euo pipefail
-          bash "$EUREKA_QUALIFICATION_CONTRACT" clippy
+          nix-shell "$EUREKA_QUALIFIER_SHELL" --pure --run "bash '$EUREKA_QUALIFICATION_CONTRACT' clippy"
 
-      - name: Verify exact-subject postflight and seal PASS receipt
+      - name: Verify exact-subject and candidate-environment postflight and seal PASS
         shell: bash
         run: |
           set -euo pipefail
@@ -173,34 +213,34 @@ jobs:
           current_interpreted_workflow="$(git show "${EUREKA_GITHUB_WORKFLOW_SHA}:${workflow_path}" | sha256sum | awk '{print $1}')"
           current_contract="$(sha256sum "$EUREKA_QUALIFICATION_CONTRACT" | awk '{print $1}')"
 
-          [[ "$current_head" == "$EXPECTED_SUBJECT_SHA" ]] || {
-            echo "HEAD no longer equals intended qualification subject" >&2
-            exit 1
-          }
-          [[ "$current_head" == "$EUREKA_SUBJECT_HEAD" ]] || {
-            echo "HEAD changed during qualification" >&2
-            exit 1
-          }
-          [[ "$current_tree" == "$EUREKA_SUBJECT_TREE" ]] || {
-            echo "Git tree changed during qualification" >&2
-            exit 1
-          }
-          [[ "$current_lock" == "$EUREKA_CARGO_LOCK_SHA256" ]] || {
-            echo "Cargo.lock changed during qualification" >&2
-            exit 1
-          }
-          [[ "$current_workflow" == "$EUREKA_WORKFLOW_SHA256" ]] || {
-            echo "Qualifier workflow changed during qualification" >&2
-            exit 1
-          }
-          [[ "$current_interpreted_workflow" == "$EUREKA_WORKFLOW_SHA256" ]] || {
-            echo "GitHub-interpreted qualifier workflow no longer matches the trusted subject workflow bytes" >&2
-            exit 1
-          }
-          [[ "$current_contract" == "$EUREKA_COMMAND_CONTRACT_SHA256" ]] || {
-            echo "Qualification command contract changed during qualification" >&2
-            exit 1
-          }
+          [[ "$current_head" == "$EXPECTED_SUBJECT_SHA" ]] || { echo "HEAD no longer equals intended qualification subject" >&2; exit 1; }
+          [[ "$current_head" == "$EUREKA_SUBJECT_HEAD" ]] || { echo "HEAD changed during qualification" >&2; exit 1; }
+          [[ "$current_tree" == "$EUREKA_SUBJECT_TREE" ]] || { echo "Git tree changed during qualification" >&2; exit 1; }
+          [[ "$current_lock" == "$EUREKA_CARGO_LOCK_SHA256" ]] || { echo "Cargo.lock changed during qualification" >&2; exit 1; }
+          [[ "$current_workflow" == "$EUREKA_WORKFLOW_SHA256" ]] || { echo "Qualifier workflow changed during qualification" >&2; exit 1; }
+          [[ "$current_interpreted_workflow" == "$EUREKA_WORKFLOW_SHA256" ]] || { echo "GitHub-interpreted qualifier workflow no longer matches subject workflow bytes" >&2; exit 1; }
+          [[ "$current_contract" == "$EUREKA_COMMAND_CONTRACT_SHA256" ]] || { echo "Qualification command contract changed during qualification" >&2; exit 1; }
+
+          current_nix_version="$(nix --version)"
+          current_flake_nix="$(sha256sum flake.nix | awk '{print $1}')"
+          current_flake_lock="$(sha256sum flake.lock | awk '{print $1}')"
+          current_rust_toolchain="$(sha256sum rust-toolchain.toml | awk '{print $1}')"
+          current_shell="$(sha256sum "$EUREKA_QUALIFIER_SHELL" | awk '{print $1}')"
+          current_drv="$(nix-instantiate "$EUREKA_QUALIFIER_SHELL" | tail -n 1)"
+          current_out="$(nix-store --realise "$current_drv" | tail -n 1)"
+          current_closure="${RUNNER_TEMP}/eureka-v2-qualifier-closure-postflight.txt"
+          nix-store -qR "$current_out" | LC_ALL=C sort -u > "$current_closure"
+          current_closure_sha256="$(sha256sum "$current_closure" | awk '{print $1}')"
+
+          [[ "$current_nix_version" == "$EUREKA_NIX_VERSION" ]] || { echo "Nix version changed during qualification" >&2; exit 1; }
+          [[ "$current_flake_nix" == "$EUREKA_FLAKE_NIX_SHA256" ]] || { echo "flake.nix changed during qualification" >&2; exit 1; }
+          [[ "$current_flake_lock" == "$EUREKA_FLAKE_LOCK_SHA256" ]] || { echo "flake.lock changed during qualification" >&2; exit 1; }
+          [[ "$current_rust_toolchain" == "$EUREKA_RUST_TOOLCHAIN_SHA256" ]] || { echo "rust-toolchain.toml changed during qualification" >&2; exit 1; }
+          [[ "$current_shell" == "$EUREKA_QUALIFIER_SHELL_SHA256" ]] || { echo "Qualifier shell changed during qualification" >&2; exit 1; }
+          [[ "$current_drv" == "$EUREKA_QUALIFIER_DRV" ]] || { echo "Qualifier derivation identity changed during qualification" >&2; exit 1; }
+          [[ "$current_out" == "$EUREKA_QUALIFIER_OUT" ]] || { echo "Qualifier output identity changed during qualification" >&2; exit 1; }
+          [[ "$current_closure_sha256" == "$EUREKA_QUALIFIER_CLOSURE_SHA256" ]] || { echo "Qualifier closure identity changed during qualification" >&2; exit 1; }
+          cmp -s "$EUREKA_ENVIRONMENT_CLOSURE_MANIFEST" "$current_closure" || { echo "Qualifier closure manifest changed during qualification" >&2; exit 1; }
 
           dirty="$(git status --porcelain=v1 --untracked-files=all)"
           if [[ -n "$dirty" ]]; then
@@ -218,35 +258,25 @@ jobs:
             printf 'checkout_clean_after=true\n'
           } >> "$EUREKA_QUALIFICATION_RECEIPT"
 
+          {
+            printf 'postflight_nix_version=%s\n' "$current_nix_version"
+            printf 'postflight_flake_nix_sha256=%s\n' "$current_flake_nix"
+            printf 'postflight_flake_lock_sha256=%s\n' "$current_flake_lock"
+            printf 'postflight_rust_toolchain_toml_sha256=%s\n' "$current_rust_toolchain"
+            printf 'postflight_qualifier_shell_sha256=%s\n' "$current_shell"
+            printf 'postflight_qualifier_drv_path=%s\n' "$current_drv"
+            printf 'postflight_qualifier_output_path=%s\n' "$current_out"
+            printf 'postflight_qualifier_closure_sha256=%s\n' "$current_closure_sha256"
+            printf 'candidate_environment_result=PASS\n'
+          } >> "$EUREKA_ENVIRONMENT_CANDIDATE_RECEIPT"
+
           required_keys=(
-            receipt_schema_revision
-            qualification_revision
-            command_contract_revision
-            repository
-            event
-            github_run_id
-            github_run_attempt
-            github_workflow_ref
-            expected_subject_head
-            subject_head
-            subject_tree
-            cargo_lock_sha256
-            workflow_sha256
-            command_contract_sha256
-            rustc_version
-            cargo_version
-            checkout_clean_before
-            claim_scope
-            execution_authority_granted
-            real_canary_executed
-            heldout_executed
-            confirmatory_evidence_minted
-            postflight_head
-            postflight_tree
-            postflight_cargo_lock_sha256
-            postflight_workflow_sha256
-            postflight_command_contract_sha256
-            checkout_clean_after
+            receipt_schema_revision qualification_revision command_contract_revision repository event
+            github_run_id github_run_attempt github_workflow_ref expected_subject_head subject_head
+            subject_tree cargo_lock_sha256 workflow_sha256 command_contract_sha256 rustc_version cargo_version
+            checkout_clean_before claim_scope execution_authority_granted real_canary_executed heldout_executed
+            confirmatory_evidence_minted postflight_head postflight_tree postflight_cargo_lock_sha256
+            postflight_workflow_sha256 postflight_command_contract_sha256 checkout_clean_after
           )
           for key in "${required_keys[@]}"; do
             count="$(grep -c "^${key}=" "$EUREKA_QUALIFICATION_RECEIPT" || true)"
@@ -263,13 +293,16 @@ jobs:
 
           printf 'qualification_result=PASS\n' >> "$EUREKA_QUALIFICATION_RECEIPT"
 
-      - name: Upload exact qualification receipt and contract
+      - name: Upload qualification and candidate-environment evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: eureka-v2-backend-qualification-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/eureka-v2-backend-qualification.env
+            ${{ runner.temp }}/eureka-v2-qualifier-environment-candidate.env
+            ${{ runner.temp }}/eureka-v2-qualifier-closure.txt
             .github/eureka/eureka-v2-backend-qualification-contract.sh
+            nix/eureka-v2-qualifier-shell.nix
           if-no-files-found: error
           retention-days: 90
